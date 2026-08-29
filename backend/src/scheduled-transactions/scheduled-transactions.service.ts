@@ -3073,16 +3073,16 @@ export class ScheduledTransactionsService {
           !preparedTransfer &&
           !fx &&
           !hasInlineAmount &&
-          (storedOverride?.amount === null ||
-            storedOverride?.amount === undefined) &&
-          Array.isArray(transactionPayload.splits) &&
-          transactionPayload.splits.length > 0
+          storedOverride?.amount == null
         ) {
+          // The boundary is the date this occurrence's money actually moves --
+          // `postDate`, which an override can move off the recurrence slot --
+          // because that is the date the interest accrues to.
           const loanAllocation =
             await this.loanService.resolvePostingAllocation(
               current,
               currentSplits,
-              nextDueDateStr,
+              postDate,
             );
           if (loanAllocation) {
             // The payload rows were mapped 1:1 (in order) from the pre-lock
@@ -3102,6 +3102,74 @@ export class ScheduledTransactionsService {
             );
             // A re-resolved child moves the parent with it, or the split
             // validator's exact-4dp equality refuses the whole post.
+            transactionPayload.amount = sumMoney(
+              transactionPayload.splits.map((s: any) => Number(s.amount)),
+            );
+          }
+        }
+      }
+
+      // The same re-resolution for the manual Post dialog, which is the path
+      // users actually take and which does NOT reach the block above: the
+      // dialog echoes the stored template back as INLINE splits, so
+      // `usesScheduledSplits` is false and the occurrence would post the stale
+      // allocation the auto-post path just learned to avoid -- the same
+      // occurrence posting two different amounts depending on which button was
+      // pressed.
+      //
+      // An echo is not an instruction. Each inline line names its source split
+      // (`sourceSplitId`), so an UNCHANGED echo re-resolves while a figure the
+      // user actually typed is honoured -- the distinction the FX path above
+      // already draws for a rate the dialog round-trips (issue #1167 F5-1).
+      if (
+        useSplits &&
+        hasInlineSplits &&
+        !current.isInvestment &&
+        !preparedTransfer &&
+        !fx &&
+        !hasInlineAmount
+      ) {
+        const lockedSplits = await m
+          .getRepository(ScheduledTransactionSplit)
+          .find({ where: { scheduledTransactionId: id } });
+        const storedById = new Map(
+          lockedSplits.map((split) => [
+            split.id,
+            roundMoney(Number(split.amount)),
+          ]),
+        );
+        const rows = transactionPayload.splits as any[];
+        // Every line must echo a stored line at its stored amount; one typed
+        // figure (or one line that names no source) makes the whole set the
+        // user's own statement, which posts as given.
+        const isUnchangedEcho =
+          Array.isArray(rows) &&
+          rows.length === lockedSplits.length &&
+          rows.every((row, index) => {
+            const sourceId = postDto?.splits?.[index]?.sourceSplitId;
+            return (
+              !!sourceId &&
+              storedById.has(sourceId) &&
+              storedById.get(sourceId) === roundMoney(Number(row.amount))
+            );
+          });
+        if (isUnchangedEcho) {
+          const loanAllocation =
+            await this.loanService.resolvePostingAllocation(
+              current,
+              lockedSplits,
+              postDate,
+            );
+          if (loanAllocation) {
+            transactionPayload.splits = rows.map((row, index) => {
+              const sourceId = postDto?.splits?.[index]?.sourceSplitId;
+              const resolved = sourceId
+                ? loanAllocation.amountsBySplitId.get(sourceId)
+                : undefined;
+              return resolved !== undefined
+                ? { ...row, amount: resolved }
+                : row;
+            });
             transactionPayload.amount = sumMoney(
               transactionPayload.splits.map((s: any) => Number(s.amount)),
             );

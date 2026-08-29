@@ -38,7 +38,8 @@
     "ambiguousBrokerage": "「{{ query }}」は複数の証券口座に一致します: {{ list }}。正確な口座名を使用してください。",
     "unknownInvestmentAccount": "不明な口座: {{ name }}。ユーザーの口座リストから正確な名前を使用してください。",
     "notACreditCard": "請求サイクルはクレジットカードの勘定科目でのみ利用できます",
-    "noStatementSettlementDay": "このクレジットカードには請求締め日が設定されていません"
+    "noStatementSettlementDay": "このクレジットカードには請求締め日が設定されていません",
+    "loanLedgerUnreadable": "このローンの残高を読み取れませんでした。もう一度お試しください。"
   },
   "actionHistory": {
     "nothingToUndo": "元に戻すものがありません",
@@ -386,7 +387,8 @@
     "splitOverrideRequiresAmount": "分割上書きを作成するには金額が必要です",
     "overrideNotFound": "ID {{ overrideId }} の上書きが見つかりません",
     "updateSplitOverrideRequiresAmount": "分割上書きには金額が必要です",
-    "dateMustBeYMD": "date は YYYY-MM-DD 形式でなければなりません"
+    "dateMustBeYMD": "date は YYYY-MM-DD 形式でなければなりません",
+    "loanLedgerUnreadable": "元帳の残高を読み取れなかったため、このローン支払いを計算できませんでした。もう一度お試しください。"
   },
   "securities": {
     "exchangeRateUnavailable": "取引日における {{ from }} -> {{ to }} の為替レートを特定できませんでした。現金口座への計上が正しくなるよう、明示的な exchangeRate を指定してください。",

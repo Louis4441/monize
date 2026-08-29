@@ -1552,6 +1552,49 @@ describe("ScheduledTransactionLoanService", () => {
       expect(result).toBeNull();
     });
 
+    it("re-divides the bill it was shown and never resizes it", async () => {
+      // The account's configured payment (2,000) is larger than the template
+      // parent (1,500) the bills page and the Post dialog displayed. The
+      // recalculation may grow the parent back toward the configured figure
+      // (review #1131), but a POSTING may not: doing so moves 500 more than
+      // any surface showed, which is a preview/commit divergence.
+      accountsRepository.findOne.mockResolvedValue(
+        makeLoanAccount({
+          currentBalance: -200000,
+          interestRate: 6,
+          paymentFrequency: "MONTHLY",
+          paymentAmount: 2000,
+        }),
+      );
+
+      const result = await service.resolvePostingAllocation(
+        makeScheduledTransaction({ amount: -1500 }),
+        templateSplits(),
+        "2026-06-01",
+      );
+
+      expect(result!.parentAmount).toBe(-1500);
+      expect(result!.amountsBySplitId.get("split-interest")).toBe(-1000);
+      expect(result!.amountsBySplitId.get("split-principal")).toBe(-500);
+    });
+
+    it("refuses rather than posting a stale split when the ledger cannot be read", async () => {
+      // A failed read is not "this is not a loan template". Returning null
+      // there would post the stored split -- the exact stale-template posting
+      // this method exists to prevent -- so the occurrence refuses and the
+      // posting transaction rolls back.
+      accountsRepository.findOne.mockResolvedValue(makeLoanAccount());
+      manager.query.mockResolvedValue([]);
+
+      await expect(
+        service.resolvePostingAllocation(
+          makeScheduledTransaction(),
+          templateSplits(),
+          "2026-06-01",
+        ),
+      ).rejects.toThrow(/could not be read/i);
+    });
+
     it("returns null when the debt through the boundary is already retired", async () => {
       accountsRepository.findOne.mockResolvedValue(makeLoanAccount());
       manager.query.mockResolvedValue([{ balance: "0" }]);
@@ -1645,6 +1688,71 @@ describe("ScheduledTransactionLoanService", () => {
         expect.stringContaining("t.transaction_date <= $3"),
         [loanAccountId, userId, "2026-08-01"],
       );
+    });
+
+    it("anchors on the schedule the account names, not the soonest transfer into it", async () => {
+      // A standalone extra-principal transfer due sooner than the P/I bill is
+      // an ordinary configuration. Anchoring on it would date the report's
+      // first row to an installment no bill will ever post.
+      accountsRepository.findOne.mockResolvedValue(
+        makeLoanAccount({ scheduledTransactionId: "st-bill" } as never),
+      );
+      manager.query.mockImplementation(
+        async (sql: unknown, params?: unknown[]) => {
+          const text = String(sql);
+          if (text.includes("scheduled_transactions")) {
+            // The account's own pointer is the third parameter, and the query
+            // must select on it rather than on any transfer into the loan.
+            expect((params as unknown[])[2]).toBe("st-bill");
+            return [{ next_due_date: "2026-09-01" }];
+          }
+          return [{ balance: "-198500" }];
+        },
+      );
+
+      const result = await service.getLoanProjectionAnchor(
+        userId,
+        loanAccountId,
+      );
+
+      expect(result.nextDueDate).toBe("2026-09-01");
+    });
+
+    it("falls back to either spelling of the transfer linkage when the account names no schedule", async () => {
+      // A loan set up before the pointer existed: a schedule naming the loan
+      // by its top-level transfer column OR by a split still anchors it.
+      accountsRepository.findOne.mockResolvedValue(makeLoanAccount());
+      let sql = "";
+      manager.query.mockImplementation(async (statement: unknown) => {
+        const text = String(statement);
+        if (text.includes("scheduled_transactions")) {
+          sql = text;
+          return [{ next_due_date: "2026-09-01" }];
+        }
+        return [{ balance: "-198500" }];
+      });
+
+      await service.getLoanProjectionAnchor(userId, loanAccountId);
+
+      expect(sql).toContain("st.transfer_account_id");
+      expect(sql).toContain("scheduled_transaction_splits");
+    });
+
+    it("refuses rather than reporting no schedule when the ledger cannot be read", async () => {
+      // {null, null} is defined to mean "no scheduled payment", which the
+      // report reads as licence to project from today's balance -- the drift
+      // this endpoint closes. A failed read must not wear that answer.
+      accountsRepository.findOne.mockResolvedValue(makeLoanAccount());
+      manager.query.mockImplementation(async (sql: unknown) => {
+        if (String(sql).includes("scheduled_transactions")) {
+          return [{ next_due_date: "2026-09-01" }];
+        }
+        return [];
+      });
+
+      await expect(
+        service.getLoanProjectionAnchor(userId, loanAccountId),
+      ).rejects.toThrow(/could not be read/i);
     });
 
     it("returns nulls when the loan has no active scheduled payment", async () => {

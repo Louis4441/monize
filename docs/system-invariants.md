@@ -102,7 +102,7 @@ implied.
 | INV-LOAN-003 | One named compounding convention, from preview to projection to displayed EAR | enforced |
 | INV-LOAN-004 | The final payment is the residual payoff, not another installment | enforced |
 | INV-LOAN-005 | The first payment date is payment number 1 | enforced |
-| INV-LOAN-006 | A scheduled loan installment prices the ledger debt through its own due date | enforced |
+| INV-LOAN-006 | A scheduled loan installment prices the ledger debt through its own due date | partial |
 | INV-LOAN-HISTORY-001 | Historical loan interest counted as paid is ledger-backed | partial |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
@@ -995,7 +995,19 @@ Required tests      Present: scheduled-transaction-loan.service.spec.ts (prior
                     frontend loan-history.test.ts and
                     LoanAmortizationReport.test.tsx (anchored first projected
                     row equals the bill's interest; anchorless fallback).
-Status              enforced
+Known gaps          Two, both honest about what is NOT closed:
+                    (1) The BALANCE boundary is shared; the RATE source is not.
+                    This service prices at accounts.interest_rate while the
+                    report prices at the loan_rate_changes timeline, which
+                    recording a rate change deliberately does not write back --
+                    so a loan with recorded rate changes can still show a first
+                    projected row differing from its bill. Closing it means
+                    resolving the bill's rate through the same timeline.
+                    (2) The frontend leg is held by component tests, not by a
+                    source scan enumerating buildLoanProjectionInput call
+                    sites, so a fifth consumer promising bill parity can omit
+                    the anchor and compile -- how #1247 recurred.
+Status              partial
 ```
 ### INV-LOAN-HISTORY-001 -- historical loan interest counted as paid is ledger-backed
 

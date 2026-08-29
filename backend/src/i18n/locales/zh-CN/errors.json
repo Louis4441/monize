@@ -38,7 +38,8 @@
     "ambiguousBrokerage": "\"{{ query }}\" 匹配多个经纪账户：{{ list }}。请使用准确的账户名称。",
     "unknownInvestmentAccount": "未知账户：{{ name }}。请使用用户账户列表中的准确名称。",
     "notACreditCard": "账单周期仅适用于信用卡账户",
-    "noStatementSettlementDay": "此信用卡未配置账单结算日"
+    "noStatementSettlementDay": "此信用卡未配置账单结算日",
+    "loanLedgerUnreadable": "无法读取此贷款的余额。请重试。"
   },
   "actionHistory": {
     "nothingToUndo": "没有可撤销的操作",
@@ -386,7 +387,8 @@
     "splitOverrideRequiresAmount": "创建拆分覆盖时需要金额",
     "overrideNotFound": "未找到 ID 为 {{ overrideId }} 的覆盖",
     "updateSplitOverrideRequiresAmount": "拆分覆盖需要金额",
-    "dateMustBeYMD": "date 必须为 YYYY-MM-DD 格式"
+    "dateMustBeYMD": "date 必须为 YYYY-MM-DD 格式",
+    "loanLedgerUnreadable": "无法计算此贷款还款，因为无法读取其账簿余额。请重试。"
   },
   "securities": {
     "exchangeRateUnavailable": "无法确定交易日 {{ from }} -> {{ to }} 的汇率。请提供明确的 exchangeRate，以便现金账户的记账正确。",

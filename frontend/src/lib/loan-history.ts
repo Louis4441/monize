@@ -1,6 +1,7 @@
 import { Account } from '@/types/account';
 import { Transaction, TransactionSplit } from '@/types/transaction';
 import { LoanProjectionAnchor } from '@/types/scheduled-transaction';
+import { parseLocalDate } from '@/lib/utils';
 import { transactionsApi } from '@/lib/transactions';
 import {
   LoanScheduleInput,
@@ -364,7 +365,12 @@ export function resolveCurrentLoanTerms(
   rateChanges: RateTimelineRow[] = [],
   anchor?: LoanProjectionAnchor | null,
 ): CurrentLoanTerms {
-  const seed = resolveSeedPayment(account, history, rateChanges, anchor);
+  const seed = resolveSeedPayment(
+    account,
+    history,
+    rateChanges,
+    usableProjectionAnchor(anchor),
+  );
   return {
     annualRate: seed.annualRate,
     payment: seed.payment != null && seed.payment > 0 ? seed.payment : null,
@@ -377,9 +383,11 @@ export function resolveCurrentLoanTerms(
  * `{null, null}` from the API, and the projection then keeps its today-anchored
  * fallback -- there is no bill for it to be in parity with.
  */
+type UsableProjectionAnchor = { nextDueDate: string; debt: number };
+
 function usableProjectionAnchor(
   anchor: LoanProjectionAnchor | null | undefined,
-): { nextDueDate: string; debt: number } | null {
+): UsableProjectionAnchor | null {
   if (!anchor || anchor.nextDueDate == null || anchor.debt == null) return null;
   return { nextDueDate: anchor.nextDueDate, debt: anchor.debt };
 }
@@ -446,9 +454,12 @@ function resolveSeedPayment(
   account: Account,
   history: LoanHistoryResult,
   rateChanges: RateTimelineRow[],
-  anchor?: LoanProjectionAnchor | null,
+  // Already normalized by the caller: "which balance does the projection
+  // price" is one decision, and spelling it here as well as in
+  // buildLoanProjectionInput is how the seed and the figure on screen drift
+  // apart (issue #1255's shape).
+  usableAnchor: UsableProjectionAnchor | null,
 ): SeedPayment {
-  const usableAnchor = usableProjectionAnchor(anchor);
   const frequency = (account.paymentFrequency as ScheduleFrequency) || 'MONTHLY';
   const isCanadian = account.isCanadianMortgage || false;
   const isVariableRate = account.isVariableRate || false;
@@ -483,17 +494,18 @@ function resolveSeedPayment(
   // own recalculation uses, so the report's first row and the bill cannot
   // disagree (issue #1253). Without one (no active scheduled payment), the
   // projection keeps its today-anchored fallback.
+  // One spelling of row 1's date. `parseLocalDate` is the module family's
+  // helper for a YYYY-MM-DD (a bare `new Date(ymd)` reads as UTC and shifts
+  // the day west of it), and the YMD is derived once so the rate lookup and
+  // the Date cannot disagree.
   const firstPaymentDate = usableAnchor
-    ? new Date(`${usableAnchor.nextDueDate}T00:00:00`)
+    ? parseLocalDate(usableAnchor.nextDueDate)
     : advanceDate(new Date(), frequency);
+  const firstRowYMD =
+    usableAnchor?.nextDueDate ?? firstPaymentDate.toISOString().slice(0, 10);
   const firstRowAnnualRate =
-    resolveEffectiveLoanTerms(
-      rateChanges,
-      usableAnchor
-        ? usableAnchor.nextDueDate
-        : firstPaymentDate.toISOString().slice(0, 10),
-      effective.annualRate,
-    ).annualRate ?? 0;
+    resolveEffectiveLoanTerms(rateChanges, firstRowYMD, effective.annualRate)
+      .annualRate ?? 0;
 
   const observed = observedInstallment(history);
   const contractual = account.paymentAmount ?? 0;
@@ -598,7 +610,12 @@ export function buildLoanProjectionInput(
   const startingDebt = usableAnchor ? usableAnchor.debt : history.currentBalance;
   if (startingDebt <= 0.01 || !account.paymentFrequency) return null;
 
-  const seed = resolveSeedPayment(account, history, rateChanges, anchor);
+  const seed = resolveSeedPayment(
+    account,
+    history,
+    rateChanges,
+    usableAnchor,
+  );
   if (seed.payment == null || seed.payment <= 0 || seed.annualRate == null) {
     return null;
   }

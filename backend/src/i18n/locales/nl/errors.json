@@ -38,7 +38,8 @@
     "ambiguousBrokerage": "\"{{ query }}\" komt overeen met meerdere effectenrekeningen: {{ list }}. Gebruik de exacte rekeningnaam.",
     "unknownInvestmentAccount": "Onbekende rekening: {{ name }}. Gebruik een exacte naam uit de rekeninglijst van de gebruiker.",
     "notACreditCard": "Afschriftperiodes zijn alleen beschikbaar voor creditcardrekeningen",
-    "noStatementSettlementDay": "Voor deze creditcard is geen afsluitdag van het afschrift ingesteld"
+    "noStatementSettlementDay": "Voor deze creditcard is geen afsluitdag van het afschrift ingesteld",
+    "loanLedgerUnreadable": "Het saldo van deze lening kon niet worden gelezen. Probeer het opnieuw."
   },
   "actionHistory": {
     "nothingToUndo": "Niets om ongedaan te maken",
@@ -386,7 +387,8 @@
     "splitOverrideRequiresAmount": "Bedrag is vereist bij het aanmaken van een splitsingsoverschrijving",
     "overrideNotFound": "Overschrijving met ID {{ overrideId }} niet gevonden",
     "updateSplitOverrideRequiresAmount": "Bedrag is vereist voor splitsingsoverschrijving",
-    "dateMustBeYMD": "datum moet in JJJJ-MM-DD-formaat zijn"
+    "dateMustBeYMD": "datum moet in JJJJ-MM-DD-formaat zijn",
+    "loanLedgerUnreadable": "Deze leningbetaling kon niet worden berekend omdat het grootboeksaldo niet kon worden gelezen. Probeer het opnieuw."
   },
   "securities": {
     "exchangeRateUnavailable": "Kon geen wisselkoers bepalen voor {{ from }} -> {{ to }} op de transactiedatum. Geef een expliciete exchangeRate op zodat de boeking op de geldrekening correct is.",

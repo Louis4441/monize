@@ -38,7 +38,8 @@
     "ambiguousBrokerage": "\"{{ query }}\" entspricht mehreren Brokerage-Konten: {{ list }}. Verwenden Sie den genauen Kontonamen.",
     "unknownInvestmentAccount": "Unbekanntes Konto: {{ name }}. Verwenden Sie einen genauen Namen aus der Kontoliste des Benutzers.",
     "notACreditCard": "Abrechnungszeiträume sind nur für Kreditkartenkonten verfügbar",
-    "noStatementSettlementDay": "Für diese Kreditkarte ist kein Abrechnungstag konfiguriert"
+    "noStatementSettlementDay": "Für diese Kreditkarte ist kein Abrechnungstag konfiguriert",
+    "loanLedgerUnreadable": "Der Saldo dieses Kredits konnte nicht gelesen werden. Bitte erneut versuchen."
   },
   "actionHistory": {
     "nothingToUndo": "Nichts rückgängig zu machen",
@@ -386,7 +387,8 @@
     "splitOverrideRequiresAmount": "Betrag ist beim Erstellen einer Buchungsteil-Überschreibung erforderlich",
     "overrideNotFound": "Überschreibung mit ID {{ overrideId }} nicht gefunden",
     "updateSplitOverrideRequiresAmount": "Betrag ist für Buchungsteil-Überschreibung erforderlich",
-    "dateMustBeYMD": "Datum muss im Format YYYY-MM-DD sein"
+    "dateMustBeYMD": "Datum muss im Format YYYY-MM-DD sein",
+    "loanLedgerUnreadable": "Diese Kreditrate konnte nicht berechnet werden, da ihr Kontosaldo nicht gelesen werden konnte. Bitte erneut versuchen."
   },
   "securities": {
     "exchangeRateUnavailable": "Wechselkurs für {{ from }} -> {{ to }} zum Transaktionsdatum konnte nicht ermittelt werden. Geben Sie einen expliziten exchangeRate an, damit die Buchung auf dem Geldkonto korrekt ist.",

@@ -1,4 +1,8 @@
-import { Injectable, Logger } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import { DataSource, EntityManager } from "typeorm";
 import { ScheduledTransaction } from "./entities/scheduled-transaction.entity";
 import { ScheduledTransactionSplit } from "./entities/scheduled-transaction-split.entity";
@@ -12,6 +16,8 @@ import {
 } from "../accounts/loan-payment-waterfall.util";
 import { withScopedDb } from "../common/db/scoped-db";
 import { ensureYMD } from "../common/recurrence";
+import { tr } from "../i18n/translate";
+import { ACCOUNT_BALANCE_AS_OF_SQL } from "../common/ledger-balance.sql";
 import {
   DEFAULT_PERIODS_PER_YEAR,
   periodsPerYearForStoredFrequency,
@@ -37,19 +43,32 @@ interface LoanTemplateSplits {
   extraPrincipalSplit?: ScheduledTransactionSplit;
 }
 
+/**
+ * Whether the installment is being priced to advance the stored TEMPLATE or to
+ * post an OCCURRENCE. The difference is one rule and it is load-bearing.
+ *
+ * The template may grow back toward the account's configured payment: a clamp
+ * written for one installment must not become the standing instruction (review
+ * #1131). An occurrence may NOT: the parent it posts is the bill the user was
+ * shown on the bills page and in the Post dialog, so re-pricing may re-divide
+ * that total between interest and principal and never resize it. Letting the
+ * posting take `max(template, account.payment_amount)` would move more money
+ * than any surface displayed, the preview/commit divergence the FX rules call
+ * out ("a preview computes what the commit will do, through the same code").
+ */
+type InstallmentPurpose = "template" | "posting";
+
 /** One resolved installment: what the next posting of this template should move. */
 type ResolvedInstallment =
   | { kind: "declined"; reason: string }
+  /** The ledger could not be read -- not a zero balance, and not "not a loan". */
+  | { kind: "unreadable"; reason: string }
   | { kind: "paid-off"; debt: number }
   | {
       kind: "ok";
       allocation: LoanPaymentAllocation;
       template: LoanTemplateSplits;
       debt: number;
-      /** Configured installment total, extra principal included. */
-      paymentAmount: number;
-      basePaymentAmount: number;
-      extraPrincipalAmount: number;
       templateAmount: number;
       templateExtraAmount: number;
     };
@@ -108,7 +127,20 @@ export class ScheduledTransactionLoanService {
         splits,
         loanAccount,
         ensureYMD(scheduledTransaction.nextDueDate),
+        "template",
       );
+
+      // A failed ledger read is not a template this method cannot account for,
+      // and the remedy below ("set the interest category") would send the
+      // reader nowhere. Two causes, two messages.
+      if (installment.kind === "unreadable") {
+        this.logger.warn(
+          `Skipping loan recalculation for scheduled transaction ${scheduledTransactionId}: ` +
+            `${installment.reason}. The stored principal/interest split stays at last period's ` +
+            `figures until a later recalculation reads the ledger successfully.`,
+        );
+        return;
+      }
 
       if (installment.kind === "paid-off") {
         await m
@@ -131,9 +163,6 @@ export class ScheduledTransactionLoanService {
         allocation,
         template,
         debt,
-        paymentAmount,
-        basePaymentAmount,
-        extraPrincipalAmount,
         templateAmount,
         templateExtraAmount,
       } = installment;
@@ -146,8 +175,8 @@ export class ScheduledTransactionLoanService {
 
       this.logger.log(
         `Recalculate loan splits: balance=${debt}, rate=${Number(loanAccount.interestRate) || 0}%, ` +
-          `freq=${loanAccount.paymentFrequency || scheduledTransaction.frequency}, basePayment=${basePaymentAmount}, ` +
-          `extra=${extraPrincipalAmount} (final ${finalExtraPrincipal}), ` +
+          `freq=${loanAccount.paymentFrequency || scheduledTransaction.frequency}, ` +
+          `extra final ${finalExtraPrincipal}, ` +
           `newPrincipal=${newPrincipal}, newInterest=${newInterest}, ` +
           `isMortgage=${loanAccount.accountType === "MORTGAGE"}, ` +
           `isCanadian=${loanAccount.isCanadianMortgage}`,
@@ -194,7 +223,7 @@ export class ScheduledTransactionLoanService {
           .getRepository(ScheduledTransaction)
           .update(scheduledTransactionId, { amount: -requiredParentAmount });
         this.logger.log(
-          `Loan payment recalculated: scheduled amount changed from ${templateAmount} to ${requiredParentAmount} (configured payment ${paymentAmount}, outstanding balance ${debt})`,
+          `Loan payment recalculated: scheduled amount changed from ${templateAmount} to ${requiredParentAmount} (outstanding balance ${debt})`,
         );
       }
     });
@@ -212,10 +241,23 @@ export class ScheduledTransactionLoanService {
    * lock -- and posts these amounts instead of the persisted ones. When nothing
    * moved in between, this resolves to exactly what the template already holds.
    *
+   * `asOfDate` is the date this occurrence's money actually moves -- the
+   * posting date, which an override can move off the recurrence slot -- because
+   * that is the date the interest accrues to.
+   *
+   * The total is the bill the user was shown: this re-divides it between
+   * interest and principal and never resizes it (see `InstallmentPurpose`).
+   *
    * Returns null when the split set is not a managed loan template, when the
    * template shape is one the recalculation would also decline, or when the
    * debt through `asOfDate` is already retired -- in each case the posting
    * proceeds on the persisted amounts, which is today's behavior.
+   *
+   * **Throws when the ledger cannot be read.** That is not "this is not a loan
+   * template": silently returning null there would post the stale stored split,
+   * which is the exact defect this method exists to prevent, so the occurrence
+   * refuses and the whole posting transaction rolls back rather than committing
+   * a figure nothing verified.
    */
   async resolvePostingAllocation(
     scheduledTransaction: ScheduledTransaction,
@@ -234,7 +276,16 @@ export class ScheduledTransactionLoanService {
         splits,
         loanAccount,
         asOfDate,
+        "posting",
       );
+      if (installment.kind === "unreadable") {
+        throw new ServiceUnavailableException(
+          tr(
+            "errors.scheduled.loanLedgerUnreadable",
+            "This loan payment could not be priced because its ledger balance could not be read. Try again.",
+          ),
+        );
+      }
       if (installment.kind !== "ok") {
         return null;
       }
@@ -261,8 +312,16 @@ export class ScheduledTransactionLoanService {
    * The authoritative anchor for projecting this loan's amortization forward:
    * the next scheduled installment's due date, and the debt measured from the
    * ledger through that date -- the same boundary the scheduled bill's own
-   * interest is calculated from, so the first projected row and the next bill
-   * cannot disagree about which balance they price (issue #1253).
+   * interest is calculated from, so the two price the same BALANCE (issue
+   * #1253).
+   *
+   * The balance is what this closes, and it is the whole claim: the two still
+   * read the RATE from different places -- this service prices at
+   * `accounts.interest_rate` while the report prices at the rate timeline,
+   * which a rate change recorded through the rate-history UI deliberately
+   * does not write back. For a loan with recorded rate changes the two figures
+   * can therefore still differ; that gap is recorded against INV-LOAN-006 and
+   * is not fixed here.
    *
    * `nextDueDate`/`debt` are null when the loan has no active scheduled payment
    * transferring to it; a projection then has no bill to be in parity with and
@@ -283,21 +342,39 @@ export class ScheduledTransactionLoanService {
         return { nextDueDate: null, debt: null };
       }
 
-      // The loan's scheduled payment is the active schedule holding a split
-      // transferring to it -- the same linkage recalculation resolves in the
-      // other direction. Two schedules against one loan is not a supported
-      // shape; the earliest due one is the next bill.
+      // WHICH schedule is the loan's payment is the account's own statement:
+      // `accounts.scheduled_transaction_id` is written by the two paths that
+      // set a loan payment up, and INV-LOAN-005's migration relies on the same
+      // pointer. Reaching instead for "any active schedule with a transfer
+      // split into this loan" answers a different question -- a standalone
+      // extra-principal transfer is an ordinary configuration and, due sooner,
+      // would win the ORDER BY and anchor the report on an installment no bill
+      // will ever post.
+      //
+      // The fallback covers a loan whose pointer was never written (an older
+      // setup, an imported account): a schedule naming the loan as a transfer
+      // target, by its top-level column OR by a split -- both spellings,
+      // because a plain scheduled transfer into the loan carries no split and
+      // the balance forecast already counts it.
       const scheduleRows: Array<{ next_due_date: string }> = await m.query(
         `SELECT TO_CHAR(st.next_due_date, 'YYYY-MM-DD') AS next_due_date
            FROM scheduled_transactions st
-           JOIN scheduled_transaction_splits sts
-             ON sts.scheduled_transaction_id = st.id
           WHERE st.user_id = $1
             AND st.is_active = true
-            AND sts.transfer_account_id = $2
+            AND (
+              st.id = $3::uuid
+              OR ($3::uuid IS NULL AND (
+                st.transfer_account_id = $2
+                OR EXISTS (
+                  SELECT 1 FROM scheduled_transaction_splits sts
+                   WHERE sts.scheduled_transaction_id = st.id
+                     AND sts.transfer_account_id = $2
+                )
+              ))
+            )
           ORDER BY st.next_due_date ASC
           LIMIT 1`,
-        [userId, loanAccountId],
+        [userId, loanAccountId, loanAccount.scheduledTransactionId ?? null],
       );
       const nextDueDate = scheduleRows[0]?.next_due_date ?? null;
       if (!nextDueDate) {
@@ -306,7 +383,15 @@ export class ScheduledTransactionLoanService {
 
       const debt = await this.datedLoanDebt(m, loanAccount, nextDueDate);
       if (debt === null) {
-        return { nextDueDate: null, debt: null };
+        // "The ledger could not be read" is not "this loan has no scheduled
+        // payment" -- the caller reads the second as licence to project from
+        // today's balance, which is the drift this endpoint exists to close.
+        throw new ServiceUnavailableException(
+          tr(
+            "errors.accounts.loanLedgerUnreadable",
+            "This loan's balance could not be read. Try again.",
+          ),
+        );
       }
       return { nextDueDate, debt };
     });
@@ -351,14 +436,7 @@ export class ScheduledTransactionLoanService {
     asOfDate: string,
   ): Promise<number | null> {
     const rows: Array<{ balance: string }> = await m.query(
-      `SELECT COALESCE(a.opening_balance, 0) + COALESCE(SUM(t.amount), 0) AS balance
-         FROM accounts a
-         LEFT JOIN transactions t ON t.account_id = a.id
-          AND (t.status IS NULL OR t.status != 'VOID')
-          AND t.parent_transaction_id IS NULL
-          AND t.transaction_date <= $3
-        WHERE a.id = $1 AND a.user_id = $2
-        GROUP BY a.id, a.opening_balance`,
+      ACCOUNT_BALANCE_AS_OF_SQL,
       [loanAccount.id, loanAccount.userId, asOfDate],
     );
     if (rows.length === 0 || rows[0].balance == null) {
@@ -416,13 +494,14 @@ export class ScheduledTransactionLoanService {
     splits: ScheduledTransactionSplit[],
     loanAccount: Account,
     asOfDate: string,
+    purpose: InstallmentPurpose,
   ): Promise<ResolvedInstallment> {
     const loanAccountId = loanAccount.id;
 
     const debt = await this.datedLoanDebt(m, loanAccount, asOfDate);
     if (debt === null) {
       return {
-        kind: "declined",
+        kind: "unreadable",
         reason: `the ledger balance for loan account ${loanAccountId} could not be read`,
       };
     }
@@ -509,18 +588,22 @@ export class ScheduledTransactionLoanService {
     const templateExtraAmount = extraPrincipalSplit
       ? Math.abs(Number(extraPrincipalSplit.amount))
       : 0;
-    const paymentAmount = Math.max(
-      templateAmount,
-      Number(loanAccount.paymentAmount) || 0,
-    );
+    // Only a template advancement may grow back toward the configured payment;
+    // a posting re-divides the bill it was shown (see `InstallmentPurpose`).
+    const paymentAmount =
+      purpose === "posting"
+        ? templateAmount
+        : Math.max(templateAmount, Number(loanAccount.paymentAmount) || 0);
     // The extra can only ride in an existing split row -- this recalculation
     // never creates one -- so without the row the configured extra is 0.
-    const extraPrincipalAmount = extraPrincipalSplit
-      ? Math.max(
-          templateExtraAmount,
-          Number(loanAccount.extraPaymentAmount) || 0,
-        )
-      : 0;
+    const extraPrincipalAmount = !extraPrincipalSplit
+      ? 0
+      : purpose === "posting"
+        ? templateExtraAmount
+        : Math.max(
+            templateExtraAmount,
+            Number(loanAccount.extraPaymentAmount) || 0,
+          );
     const basePaymentAmount = paymentAmount - extraPrincipalAmount;
 
     const periodicRate = this.periodicRateFor(
@@ -530,8 +613,7 @@ export class ScheduledTransactionLoanService {
     );
 
     const newInterest = roundMoney(debt * periodicRate);
-    let newPrincipal = roundMoney(basePaymentAmount - newInterest);
-    if (newPrincipal < 0) newPrincipal = 0;
+    const newPrincipal = roundMoney(basePaymentAmount - newInterest);
 
     // The clamp sequence -- interest-first across the whole installment
     // (recheck RR2-006, DR3-01), principal bounded by the debt with the
@@ -552,9 +634,6 @@ export class ScheduledTransactionLoanService {
       allocation,
       template: { principalSplit, interestSplit, extraPrincipalSplit },
       debt,
-      paymentAmount,
-      basePaymentAmount,
-      extraPrincipalAmount,
       templateAmount,
       templateExtraAmount,
     };

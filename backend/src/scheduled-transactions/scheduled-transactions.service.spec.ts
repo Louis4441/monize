@@ -5455,6 +5455,124 @@ describe("ScheduledTransactionsService", () => {
       expect(payload.amount).toBe(-1500);
     });
 
+    it("re-resolves for the manual Post dialog, which echoes the template as inline splits", async () => {
+      // The dialog always sends `isSplit` + `splits`, so this occurrence does
+      // NOT take the base-split path. Without its own re-resolution the same
+      // occurrence posted 992.50 from the list's quick-post button and a stale
+      // 1,000.00 from the dialog -- the path users actually take.
+      const scheduled = makeScheduled({
+        amount: -1500,
+        isSplit: true,
+        splits: loanTemplateSplits(),
+        frequency: "ONCE",
+      });
+      arrangeLoanPost(scheduled);
+      mockDataSource.query.mockImplementation(async (sql: string) => {
+        const text = String(sql);
+        if (text.includes("scheduled_transaction_postings")) {
+          return [[{ id: "posting-1" }], 1];
+        }
+        if (text.includes("opening_balance")) return [{ balance: "-198500" }];
+        return [
+          { user_id: "11111111-1111-1111-1111-111111111111", timezone: "UTC" },
+        ];
+      });
+
+      await service.post(userId, stId, {
+        isSplit: true,
+        splits: [
+          {
+            sourceSplitId: "ss-principal",
+            transferAccountId: "loan-1",
+            amount: -500,
+          },
+          {
+            sourceSplitId: "ss-interest",
+            categoryId: "cat-interest",
+            amount: -1000,
+          },
+        ],
+      } as any);
+
+      const payload = transactionsService.create.mock.calls[0][1];
+      const interest = payload.splits.find(
+        (sp: any) => sp.categoryId === "cat-interest",
+      );
+      expect(interest.amount).toBe(-992.5);
+      expect(payload.amount).toBe(-1500);
+    });
+
+    it("honours a split amount the user actually typed in the dialog", async () => {
+      // An echo is not an instruction, but a figure the user changed is: it
+      // differs from its source split, so it posts as given.
+      const scheduled = makeScheduled({
+        amount: -1500,
+        isSplit: true,
+        splits: loanTemplateSplits(),
+        frequency: "ONCE",
+      });
+      arrangeLoanPost(scheduled);
+
+      await service.post(userId, stId, {
+        isSplit: true,
+        splits: [
+          {
+            sourceSplitId: "ss-principal",
+            transferAccountId: "loan-1",
+            amount: -400,
+          },
+          {
+            sourceSplitId: "ss-interest",
+            categoryId: "cat-interest",
+            amount: -1100,
+          },
+        ],
+      } as any);
+
+      const payload = transactionsService.create.mock.calls[0][1];
+      const interest = payload.splits.find(
+        (sp: any) => sp.categoryId === "cat-interest",
+      );
+      expect(interest.amount).toBe(-1100);
+    });
+
+    it("prices the occurrence at the date its money moves, not the abandoned slot", async () => {
+      // An override moved this occurrence off its recurrence slot. Interest
+      // accrues to the date the payment is actually made, so the boundary is
+      // the posting date.
+      const scheduled = makeScheduled({
+        amount: -1500,
+        isSplit: true,
+        splits: loanTemplateSplits(),
+        nextDueDate: "2025-02-15",
+        frequency: "ONCE",
+      });
+      arrangeLoanPost(scheduled);
+      const movedOverride = {
+        overrideDate: "2025-03-05",
+        amount: null,
+        categoryId: null,
+        description: null,
+        isSplit: null,
+        splits: null,
+        updatedAt: new Date(0),
+      };
+      overridesRepo.createQueryBuilder = jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(movedOverride),
+      });
+      overridesRepo.findOne.mockResolvedValue(movedOverride);
+      mockQueryRunner.manager.remove = jest.fn().mockResolvedValue(undefined);
+
+      await service.post(userId, stId);
+
+      expect(mockDataSource.query).toHaveBeenCalledWith(
+        expect.stringContaining("t.transaction_date <= $3"),
+        ["loan-1", userId, "2025-03-05"],
+      );
+    });
+
     it("honours an override amount instead of re-resolving", async () => {
       // A stored per-occurrence amount is the user's explicit statement for
       // that occurrence; re-pricing the splits against it would make parent

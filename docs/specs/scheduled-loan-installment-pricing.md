@@ -55,6 +55,20 @@ differently is a reported drift:
 | `resolvePostingAllocation` | the occurrence's own due date | inside the posting transaction, under the parent lock, immediately before the financial write |
 | `getLoanProjectionAnchor` | the schedule's `next_due_date` | on demand, for the amortization report's projection (`buildLoanProjectionInput`'s `anchor`) |
 
+Which schedule is "the loan's payment" is the account's own statement --
+`accounts.scheduled_transaction_id`, written by the two paths that set a loan
+payment up. Reaching instead for "any active schedule with a transfer split
+into this loan" answers a different question: a standalone extra-principal
+transfer is an ordinary configuration and, due sooner, would anchor the report
+on an installment no bill will post. The fallback for a loan whose pointer was
+never written accepts both spellings of the linkage (the top-level
+`transfer_account_id` column and a split), because a plain scheduled transfer
+into a loan carries no split.
+
+The posting boundary is the date the occurrence's money actually moves --
+`postDate`, which an override can move off the recurrence slot -- because that
+is the date interest accrues to.
+
 The posting-boundary resolution is what makes the stored split safely a
 **template**: a principal-only payment, void, delete or import committed
 between occurrences changes what the next posting writes without any of those
@@ -65,13 +79,31 @@ same waterfall), so the common case is byte-identical.
 ## 3. What does not re-resolve
 
 - **An inline amount or a stored override amount** is the user's explicit
-  statement for that one occurrence and is posted as given.
+  statement for that one occurrence and is posted as given. So is a split
+  figure the user typed in the Post dialog: that dialog echoes the stored
+  template back as *inline* splits, so an unchanged echo re-resolves (each line
+  names its `sourceSplitId`) while an edited figure posts as given. Without
+  that distinction the dialog -- the path users actually take -- would post the
+  stale allocation the auto-post path avoids, the same occurrence posting two
+  different amounts depending on which button was pressed.
+
+- **The total is never resized by a posting.** The parent an occurrence posts
+  is the bill the user was shown; re-pricing re-divides it between interest and
+  principal. Only a template advancement may grow the parent back toward the
+  account's configured payment (review #1131) -- doing that at posting time
+  would move more money than any surface displayed.
 - **A template shape the resolver cannot account for** (an escrow line, no
   identifiable interest line) declines -- the posting proceeds on the
   persisted amounts and the recalculation writes nothing, exactly as the
   recalculation has always declined, because repricing only the managed lines
   leaves the parent unequal to the sum of its children and the split
   validator then refuses every occurrence.
+- **A ledger that cannot be read refuses.** It is not "this is not a loan
+  template": returning null there would post the stale stored split, the exact
+  defect this exists to prevent, so the posting rolls back and the anchor
+  endpoint answers an error rather than the `{null, null}` the report reads as
+  "no scheduled payment, project from today".
+
 - **A debt already retired through the boundary** resolves nothing: the
   recalculation deactivates the schedule; the posting proceeds unchanged and
   the following recalculation deactivates.
@@ -81,12 +113,21 @@ same waterfall), so the common case is byte-identical.
 ## 4. Report parity
 
 `GET /scheduled-transactions/loan-anchor/:accountId` answers
-`{ nextDueDate, debt }` -- the due date of the earliest active schedule with a
-transfer split into the loan, and `debt(nextDueDate)`. The Loan Amortization
+`{ nextDueDate, debt }` -- the due date of the schedule the loan account names
+as its payment (section 2), and `debt(nextDueDate)`. The Loan Amortization
 Report fetches it inside the same request key as the loan's history (a failed
 fetch reaches the report's error state; "no anchor" is not a fallback for an
 outage) and hands it to `buildLoanProjectionInput`, so the first projected
-row is the next bill: same date, same balance, same interest.
+row and the next bill are measured at the same date against the same balance.
+
+**The rate is a known remaining gap.** This service prices the bill at
+`accounts.interest_rate`; the report prices its rows at the rate timeline
+(`loan_rate_changes`), which recording a rate change deliberately does not
+write back to that column. For a loan whose rate was changed through the
+rate-history UI the two can still disagree -- the balance boundary is closed,
+the rate source is not. That is why INV-LOAN-006 is recorded as `partial`
+rather than `enforced`, and it is the next thing to fix here: the bill should
+resolve its rate through the same timeline the projection uses.
 
 Both fields null means the loan has no active scheduled payment; there is no
 bill to be in parity with, and the projection keeps its today-anchored
