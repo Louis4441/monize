@@ -5483,7 +5483,12 @@ describe("ScheduledTransactionsService", () => {
         ];
       });
 
+      // Exactly what PostTransactionDialog sends: the echoed parent amount
+      // alongside the echoed lines. A fixture omitting `amount` is a payload
+      // no client produces -- and gating on its absence made this whole path
+      // unreachable in production while the test passed.
       await service.post(userId, stId, {
+        amount: -1500,
         isSplit: true,
         splits: [
           {
@@ -5519,6 +5524,7 @@ describe("ScheduledTransactionsService", () => {
       arrangeLoanPost(scheduled);
 
       await service.post(userId, stId, {
+        amount: -1500,
         isSplit: true,
         splits: [
           {
@@ -5576,6 +5582,89 @@ describe("ScheduledTransactionsService", () => {
         expect.stringContaining("t.transaction_date <= $3"),
         ["loan-1", userId, "2025-03-05"],
       );
+    });
+
+    it("honours a parent amount the user retyped in the dialog", async () => {
+      // The amount is an echo only while it still matches the template. A
+      // figure the user changed is their statement for this occurrence, so it
+      // posts as sent rather than being re-divided against a total they did
+      // not ask for.
+      const scheduled = makeScheduled({
+        amount: -1500,
+        isSplit: true,
+        splits: loanTemplateSplits(),
+        frequency: "ONCE",
+      });
+      arrangeLoanPost(scheduled);
+      mockDataSource.query.mockImplementation(async (sql: string) => {
+        const text = String(sql);
+        if (text.includes("scheduled_transaction_postings")) {
+          return [[{ id: "posting-1" }], 1];
+        }
+        if (text.includes("opening_balance")) return [{ balance: "-198500" }];
+        return [
+          { user_id: "11111111-1111-1111-1111-111111111111", timezone: "UTC" },
+        ];
+      });
+
+      await service.post(userId, stId, {
+        amount: -1600,
+        isSplit: true,
+        splits: [
+          {
+            sourceSplitId: "ss-principal",
+            transferAccountId: "loan-1",
+            amount: -600,
+          },
+          {
+            sourceSplitId: "ss-interest",
+            categoryId: "cat-interest",
+            amount: -1000,
+          },
+        ],
+      } as any);
+
+      const payload = transactionsService.create.mock.calls[0][1];
+      const interest = payload.splits.find(
+        (sp: any) => sp.categoryId === "cat-interest",
+      );
+      expect(interest.amount).toBe(-1000);
+      expect(payload.amount).toBe(-1600);
+    });
+
+    it("shrinks the installment to the debt that is actually left", async () => {
+      // The other direction of "re-divides, never resizes upward": a payment
+      // made since the template was written can leave less owing than the bill
+      // charges, and the waterfall clamps principal to the remaining debt. The
+      // occurrence must retire the debt rather than overpay it into credit.
+      const scheduled = makeScheduled({
+        amount: -1500,
+        isSplit: true,
+        splits: loanTemplateSplits(),
+        frequency: "ONCE",
+      });
+      arrangeLoanPost(scheduled);
+      mockDataSource.query.mockImplementation(async (sql: string) => {
+        const text = String(sql);
+        if (text.includes("scheduled_transaction_postings")) {
+          return [[{ id: "posting-1" }], 1];
+        }
+        // Only 200 of debt is left through this occurrence's date.
+        if (text.includes("opening_balance")) return [{ balance: "-200" }];
+        return [
+          { user_id: "11111111-1111-1111-1111-111111111111", timezone: "UTC" },
+        ];
+      });
+
+      await service.post(userId, stId);
+
+      const payload = transactionsService.create.mock.calls[0][1];
+      const principal = payload.splits.find(
+        (sp: any) => sp.transferAccountId === "loan-1",
+      );
+      // 200 x 0.005 = 1.00 of interest, and principal cannot exceed the debt.
+      expect(principal.amount).toBe(-200);
+      expect(payload.amount).toBe(-201);
     });
 
     it("honours an override amount instead of re-resolving", async () => {

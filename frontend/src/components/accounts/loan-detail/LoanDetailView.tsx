@@ -44,6 +44,7 @@ import {
 } from '@/lib/loan-schedule';
 import { scenarioToPlan } from '@/lib/loan-scenarios';
 import type { Account } from '@/types/account';
+import type { LoanProjectionAnchor } from '@/types/scheduled-transaction';
 import type { Transaction } from '@/types/transaction';
 import type { LoanScenario } from '@/types/loan-scenario';
 import type { LoanRateChange } from '@/types/loan-rate-change';
@@ -53,6 +54,14 @@ interface LoanDetailViewProps {
   transactions: Transaction[];
   scenarios: LoanScenario[];
   rateChanges: LoanRateChange[];
+  /**
+   * The next scheduled installment's boundary (date + ledger debt through it),
+   * from the server. This page's schedule table prints per-installment
+   * interest, so it prices the same installment the amortization report does
+   * and anchors on the same boundary -- INV-LOAN-006. Null when the loan has
+   * no active scheduled payment, which keeps the today-anchored projection.
+   */
+  projectionAnchor?: LoanProjectionAnchor | null;
   /** Separate interest expenses (see fetchLoanInterestTransactions), for exact
    *  per-row interest including overpayments. */
   interestTransactions?: Transaction[];
@@ -80,6 +89,7 @@ export function LoanDetailView({
   transactions,
   scenarios,
   rateChanges,
+  projectionAnchor = null,
   interestTransactions = [],
   onScenariosChanged,
   onRateChangesChanged,
@@ -120,14 +130,14 @@ export function LoanDetailView({
   // and the same resolution the projection is seeded with, so the card and the
   // payoff beside it cannot describe two different installments.
   const currentTerms = useMemo(
-    () => resolveCurrentLoanTerms(account, history, rateChanges),
-    [account, history, rateChanges],
+    () => resolveCurrentLoanTerms(account, history, rateChanges, projectionAnchor),
+    [account, history, rateChanges, projectionAnchor],
   );
   const currentInstallment = currentTerms.payment;
 
   const projectionInput = useMemo(
-    () => buildLoanProjectionInput(account, history, rateChanges),
-    [account, history, rateChanges],
+    () => buildLoanProjectionInput(account, history, rateChanges, projectionAnchor),
+    [account, history, rateChanges, projectionAnchor],
   );
 
   const baseline = useMemo(

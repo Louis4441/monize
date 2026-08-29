@@ -239,6 +239,27 @@ describe("Scheduled loan dated ledger balance (integration)", () => {
     expect(anchor).toEqual({ nextDueDate: "2026-08-01", debt: 198000 });
   });
 
+  it("anchors on the date an override moved the occurrence to", async () => {
+    // The posting prices at the date the money actually moves, which an
+    // override can shift off the recurrence slot; an anchor left on the
+    // abandoned slot puts the report back into disagreement with the bill.
+    // Only a real database can prove which date the statement selects.
+    await dataSource.query(
+      `INSERT INTO scheduled_transaction_overrides
+         (scheduled_transaction_id, original_date, override_date)
+       VALUES ($1, $2, $3)`,
+      [scheduledId, "2026-08-01", "2026-08-20"],
+    );
+
+    const anchor = await withUserContext(userId, () =>
+      service.getLoanProjectionAnchor(userId, loanId),
+    );
+
+    // 2026-08-15 is dated between the slot and the moved date, so it counts
+    // only once the boundary follows the occurrence: 198,000 - 1,500.
+    expect(anchor).toEqual({ nextDueDate: "2026-08-20", debt: 196500 });
+  });
+
   it("answers nulls for a loan with no active scheduled payment", async () => {
     await dataSource.manager.update(ScheduledTransaction, scheduledId, {
       isActive: false,

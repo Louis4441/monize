@@ -892,6 +892,44 @@ describe("ScheduledTransactionLoanService", () => {
       );
     });
 
+    it("leaves a revolving line of credit active when it owes nothing", async () => {
+      // A LOC at a zero (or credit) balance is not a finished loan -- the user
+      // can draw on it again tomorrow, and deactivating its schedule is not
+      // recoverable from the UI. This matters since the debt became
+      // `max(0, -balance)`: an overpaid account in credit now reads as owing
+      // nothing, where the old `Math.abs` read a credit balance as fresh debt.
+      accountsRepository.findOne.mockResolvedValue(
+        makeLoanAccount({
+          accountType: AccountType.LINE_OF_CREDIT,
+          currentBalance: 200,
+        }),
+      );
+      scheduledTransactionsRepository.findOne.mockResolvedValue(
+        makeScheduledTransaction(),
+      );
+
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
+
+      expect(scheduledTransactionsRepository.update).not.toHaveBeenCalled();
+      expect(splitsRepository.save).not.toHaveBeenCalled();
+    });
+
+    it("still deactivates an amortizing loan that is paid off", async () => {
+      accountsRepository.findOne.mockResolvedValue(
+        makeLoanAccount({ accountType: AccountType.LOAN, currentBalance: 0 }),
+      );
+      scheduledTransactionsRepository.findOne.mockResolvedValue(
+        makeScheduledTransaction(),
+      );
+
+      await service.recalculateLoanPaymentSplits(scheduledTransactionId);
+
+      expect(scheduledTransactionsRepository.update).toHaveBeenCalledWith(
+        scheduledTransactionId,
+        { isActive: false },
+      );
+    });
+
     it("should deactivate scheduled transaction when balance is exactly zero", async () => {
       const loanAccount = makeLoanAccount({ currentBalance: 0 });
       accountsRepository.findOne.mockResolvedValue(loanAccount);
@@ -1816,6 +1854,39 @@ describe("ScheduledTransactionLoanService", () => {
       await expect(
         service.getLoanProjectionAnchor(userId, loanAccountId),
       ).rejects.toThrow(/could not be read/i);
+    });
+
+    it("asks the override table for the date the occurrence moved to", async () => {
+      // Shape only: a mocked `query` returns whatever this spec hands it, so
+      // it cannot prove WHICH date the statement selects -- that property
+      // belongs to PostgreSQL and is asserted in
+      // test/integration/scheduled-loan-dated-balance.integration.spec.ts
+      // ("anchors on the date an override moved the occurrence to").
+      // What this pins is that the lookup joins the override at all.
+      accountsRepository.findOne.mockResolvedValue(makeLoanAccount());
+      let sql = "";
+      manager.query.mockImplementation(async (statement: unknown) => {
+        const text = String(statement);
+        if (text.includes("scheduled_transactions")) {
+          sql = text;
+          return [{ next_due_date: "2026-08-25" }];
+        }
+        return [{ balance: "-195500" }];
+      });
+
+      const result = await service.getLoanProjectionAnchor(
+        userId,
+        loanAccountId,
+      );
+
+      expect(sql).toContain("scheduled_transaction_overrides");
+      expect(sql).toContain("ovr.original_date = st.next_due_date");
+      expect(result.nextDueDate).toBe("2026-08-25");
+      // ...and the debt is measured through the date it actually falls on.
+      expect(manager.query).toHaveBeenCalledWith(
+        expect.stringContaining("t.transaction_date <= $3"),
+        [loanAccountId, userId, "2026-08-25"],
+      );
     });
 
     it("returns nulls when the loan has no active scheduled payment", async () => {

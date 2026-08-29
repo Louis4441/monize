@@ -124,6 +124,8 @@ vi.mock('@/lib/loan-scenarios', async (importOriginal) => {
 });
 
 const mockGetAllRateChanges = vi.fn();
+const mockGetLoanProjectionAnchor = vi.fn();
+
 vi.mock('@/lib/loan-rate-changes', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/loan-rate-changes')>()),
   loanRateChangesApi: {
@@ -158,6 +160,12 @@ vi.mock('@/components/ui/LoadingSpinner', () => ({
 vi.mock('@/lib/scheduled-transactions', () => ({
   scheduledTransactionsApi: {
     getAll: () => Promise.resolve([]),
+    // The loan detail view prints per-installment interest, so the page
+    // anchors its projection on the next scheduled installment's boundary
+    // (INV-LOAN-006). These fixtures have no scheduled payment, which is what
+    // {null, null} says -- the projection then stays today-anchored.
+    getLoanProjectionAnchor: (...args: unknown[]) =>
+      mockGetLoanProjectionAnchor(...args),
   },
 }));
 
@@ -193,6 +201,10 @@ beforeEach(() => {
   mockGetDailyBalances.mockResolvedValue([]);
   mockGetAllScenarios.mockResolvedValue([]);
   mockGetAllRateChanges.mockResolvedValue([]);
+  mockGetLoanProjectionAnchor.mockResolvedValue({
+    nextDueDate: null,
+    debt: null,
+  });
   mockGetAllTransactions.mockResolvedValue({
     data: [
       {
@@ -313,6 +325,10 @@ describe('AccountDetailPage', () => {
     // "Retryable" has to mean there is a retry: the only control used to be
     // Back to Accounts, which is leaving the page, not trying again.
     mockGetAllRateChanges.mockResolvedValue([]);
+  mockGetLoanProjectionAnchor.mockResolvedValue({
+    nextDueDate: null,
+    debt: null,
+  });
     await act(async () => {
       fireEvent.click(screen.getByText('Try again'));
     });
@@ -326,6 +342,39 @@ describe('AccountDetailPage', () => {
 
     expect(screen.getByText('Projected Future Payments')).toBeInTheDocument();
     expect(screen.getByText('Est. Payoff')).toBeInTheDocument();
+  });
+
+  it('anchors the loan projection on the next scheduled installment (issue #1253)', async () => {
+    // This page's schedule table prints per-installment interest, so it prices
+    // the same installment the amortization report does. Left today-anchored it
+    // showed one figure while the report showed another for one payment.
+    mockGetById.mockResolvedValue(makeAccount());
+    mockGetLoanProjectionAnchor.mockResolvedValue({
+      // Consistent with the fixture (an 8,000 loan at 6% paying 500): a debt
+      // the installment can actually amortize, or the projection refuses for
+      // a reason unrelated to anchoring.
+      nextDueDate: '2026-08-01',
+      debt: 7500,
+    });
+
+    await renderPage();
+
+    expect(mockGetLoanProjectionAnchor).toHaveBeenCalledWith('loan-1');
+    expect(screen.getByText('Projected Future Payments')).toBeInTheDocument();
+  });
+
+  it('fails the page when the projection anchor cannot be read', async () => {
+    // Like the rate history beside it: a failed lookup is not "no scheduled
+    // payment", and quietly projecting from today is the drift this anchor
+    // exists to remove.
+    mockGetById.mockResolvedValue(makeAccount());
+    mockGetLoanProjectionAnchor.mockRejectedValue(new Error('boom'));
+
+    await renderPage();
+
+    expect(
+      screen.queryByText('Projected Future Payments'),
+    ).not.toBeInTheDocument();
   });
 
   it('redirects account types without a registered detail view to their register', async () => {

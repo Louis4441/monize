@@ -91,19 +91,25 @@ same waterfall), so the common case is byte-identical.
 ## 3. What does not re-resolve
 
 - **An inline amount or a stored override amount** is the user's explicit
-  statement for that one occurrence and is posted as given. So is a split
-  figure the user typed in the Post dialog: that dialog echoes the stored
-  template back as *inline* splits, so an unchanged echo re-resolves (each line
-  names its `sourceSplitId`) while an edited figure posts as given. Without
-  that distinction the dialog -- the path users actually take -- would post the
-  stale allocation the auto-post path avoids, the same occurrence posting two
-  different amounts depending on which button was pressed.
+  statement for that one occurrence and is posted as given. So is a figure the
+  user typed in the Post dialog -- but "typed" has to be decided, not assumed:
+  that dialog echoes the stored template back as *inline* splits AND sends the
+  parent `amount` on every non-foreign post, so treating the presence of an
+  amount as a user instruction made this whole path unreachable from the only
+  surface that produces inline splits. An echo is recognised by value (each
+  line against its `sourceSplitId`, the parent against the template's own
+  amount); anything that differs is the user's statement. Without that, the
+  dialog -- the path users actually take -- posts the stale allocation the
+  auto-post path avoids, the same occurrence posting two different amounts
+  depending on which button was pressed.
 
-- **The total is never resized by a posting.** The parent an occurrence posts
-  is the bill the user was shown; re-pricing re-divides it between interest and
+- **A posting never grows the total.** The parent an occurrence posts is the
+  bill the user was shown; re-pricing re-divides it between interest and
   principal. Only a template advancement may grow the parent back toward the
   account's configured payment (review #1131) -- doing that at posting time
-  would move more money than any surface displayed.
+  would move more money than any surface displayed. It may still *shrink*: the
+  waterfall clamps principal to the debt that is actually left, so an
+  occurrence retires the loan rather than overpaying it into credit.
 - **A template shape the resolver cannot account for** (an escrow line, no
   identifiable interest line) declines -- the posting proceeds on the
   persisted amounts and the recalculation writes nothing, exactly as the
@@ -117,8 +123,13 @@ same waterfall), so the common case is byte-identical.
   "no scheduled payment, project from today".
 
 - **A debt already retired through the boundary** resolves nothing: the
-  recalculation deactivates the schedule; the posting proceeds unchanged and
-  the following recalculation deactivates.
+  posting proceeds unchanged, and the recalculation deactivates the
+  schedule -- except for a LINE OF CREDIT, which is revolving. A facility at a
+  zero or credit balance is not a finished loan; the user can draw on it again
+  tomorrow, and deactivating its schedule is not recoverable from the UI. This
+  matters since the debt became `max(0, -balance)`: an overpaid account in
+  credit now reads as owing nothing, where the old `Math.abs` read a credit
+  balance as fresh debt and kept amortizing it.
 - **FX schedules, transfers and investments** do not carry the loan template
   shape and never reach the resolver.
 

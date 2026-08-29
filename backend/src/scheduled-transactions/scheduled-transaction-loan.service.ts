@@ -73,6 +73,11 @@ type ResolvedInstallment =
       debt: number;
       /** The rate actually priced at -- the timeline's, not the scalar. */
       annualRate: number;
+      /** Configured installment total, extra included -- what drove the parent. */
+      paymentAmount: number;
+      basePaymentAmount: number;
+      /** The configured extra, before the waterfall clamped it. */
+      extraPrincipalAmount: number;
       templateAmount: number;
       templateExtraAmount: number;
     };
@@ -147,6 +152,26 @@ export class ScheduledTransactionLoanService {
       }
 
       if (installment.kind === "paid-off") {
+        // A LINE OF CREDIT owing nothing is not a finished loan -- it is a
+        // revolving facility at a zero (or credit) balance, and the user can
+        // draw on it again tomorrow. Deactivating its schedule is not
+        // recoverable from the UI, so it keeps billing whatever the template
+        // holds and simply writes no new split this period.
+        //
+        // This matters more since the debt became `max(0, -balance)`: an
+        // overpaid account in credit now reads as owing nothing, where the
+        // old `Math.abs` read a credit balance as fresh debt and kept
+        // amortizing it. That change is right (it matches `debtMagnitude` on
+        // the client) but it must not take a revolving account's schedule
+        // down with it.
+        if (loanAccount.accountType === AccountType.LINE_OF_CREDIT) {
+          this.logger.log(
+            `Loan recalculation: line of credit ${loanAccount.id} owes nothing through ` +
+              `${ensureYMD(scheduledTransaction.nextDueDate)}; leaving the schedule active ` +
+              `(a revolving facility can be drawn on again).`,
+          );
+          return;
+        }
         await m
           .getRepository(ScheduledTransaction)
           .update(scheduledTransactionId, { isActive: false });
@@ -167,6 +192,9 @@ export class ScheduledTransactionLoanService {
         allocation,
         template,
         debt,
+        paymentAmount,
+        basePaymentAmount,
+        extraPrincipalAmount,
         templateAmount,
         templateExtraAmount,
       } = installment;
@@ -180,7 +208,8 @@ export class ScheduledTransactionLoanService {
       this.logger.log(
         `Recalculate loan splits: balance=${debt}, rate=${installment.annualRate}%, ` +
           `freq=${loanAccount.paymentFrequency || scheduledTransaction.frequency}, ` +
-          `extra final ${finalExtraPrincipal}, ` +
+          `basePayment=${basePaymentAmount}, ` +
+          `extra=${extraPrincipalAmount} (final ${finalExtraPrincipal}), ` +
           `newPrincipal=${newPrincipal}, newInterest=${newInterest}, ` +
           `isMortgage=${loanAccount.accountType === "MORTGAGE"}, ` +
           `isCanadian=${loanAccount.isCanadianMortgage}`,
@@ -227,7 +256,7 @@ export class ScheduledTransactionLoanService {
           .getRepository(ScheduledTransaction)
           .update(scheduledTransactionId, { amount: -requiredParentAmount });
         this.logger.log(
-          `Loan payment recalculated: scheduled amount changed from ${templateAmount} to ${requiredParentAmount} (outstanding balance ${debt})`,
+          `Loan payment recalculated: scheduled amount changed from ${templateAmount} to ${requiredParentAmount} (configured payment ${paymentAmount}, outstanding balance ${debt})`,
         );
       }
     });
@@ -360,9 +389,21 @@ export class ScheduledTransactionLoanService {
       // target, by its top-level column OR by a split -- both spellings,
       // because a plain scheduled transfer into the loan carries no split and
       // the balance forecast already counts it.
+      //
+      // The date is the one the occurrence FALLS ON, so an override that moved
+      // it off its recurrence slot moves the anchor with it -- the posting
+      // prices at `postDate` for exactly that reason, and an anchor left on the
+      // abandoned slot would put the report back into disagreement with the
+      // bill it is supposed to match. The ordering stays on the slot, which is
+      // what makes "the next one" well defined.
       const scheduleRows: Array<{ next_due_date: string }> = await m.query(
-        `SELECT TO_CHAR(st.next_due_date, 'YYYY-MM-DD') AS next_due_date
+        `SELECT TO_CHAR(
+                  COALESCE(ovr.override_date, st.next_due_date), 'YYYY-MM-DD'
+                ) AS next_due_date
            FROM scheduled_transactions st
+           LEFT JOIN scheduled_transaction_overrides ovr
+             ON ovr.scheduled_transaction_id = st.id
+            AND ovr.original_date = st.next_due_date
           WHERE st.user_id = $1
             AND st.is_active = true
             AND (
@@ -664,6 +705,9 @@ export class ScheduledTransactionLoanService {
       template: { principalSplit, interestSplit, extraPrincipalSplit },
       debt,
       annualRate: interestRate,
+      paymentAmount,
+      basePaymentAmount,
+      extraPrincipalAmount,
       templateAmount,
       templateExtraAmount,
     };

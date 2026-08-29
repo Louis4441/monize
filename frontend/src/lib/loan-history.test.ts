@@ -777,8 +777,13 @@ describe('buildLoanProjectionInput scheduled-installment anchor (issue #1253)', 
     const unanchored = buildLoanProjectionInput(acct, history(acct));
     expect(anchored).not.toBeNull();
     expect(anchored!.startingBalance).toBe(unanchored!.startingBalance);
-    expect(anchored!.firstPaymentDate.getTime()).toBe(
-      unanchored!.firstPaymentDate.getTime(),
+    // Compare the DAY, not the timestamp: both calls read the wall clock
+    // independently, so exact times differ whenever the two land in different
+    // milliseconds -- a test that fails a few runs in a hundred and looks like
+    // a regression in the code it is checking.
+    const ymd = (date: Date) => date.toISOString().slice(0, 10);
+    expect(ymd(anchored!.firstPaymentDate)).toBe(
+      ymd(unanchored!.firstPaymentDate),
     );
   });
 

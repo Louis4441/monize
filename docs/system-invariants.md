@@ -1014,6 +1014,9 @@ Required tests      Present: scheduled-transaction-loan.service.spec.ts (prior
                     frontend loan-history.test.ts and
                     LoanAmortizationReport.test.tsx (anchored first projected
                     row equals the bill's interest; anchorless fallback).
+                    A LINE OF CREDIT is exempt from the paid-off deactivation:
+                    it is revolving, so owing nothing this period does not
+                    finish it.
 Known gaps          The PAYMENT is not part of this invariant: a rate change
                     reaches the schedule's payment through
                     LoanRateChangesService.syncScheduledTransaction, which the

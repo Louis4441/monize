@@ -608,7 +608,20 @@ export function buildLoanProjectionInput(
   // N/A". That is the disagreement this work exists to remove, with the halves
   // swapped.
   const startingDebt = usableAnchor ? usableAnchor.debt : history.currentBalance;
-  if (startingDebt <= 0.01 || !account.paymentFrequency) return null;
+  // BOTH must show debt. The anchor is measured through the schedule's next
+  // due date, and nothing floors that date at today -- an overdue schedule
+  // (auto-post off, never posted) anchors on a past date, so a loan the user
+  // has since cleared with a lump sum would project a full amortization from
+  // the pre-payoff balance and print an Est. Payoff years away. Today's
+  // balance is what says the loan is finished, and it kept saying so before
+  // the anchor existed.
+  if (
+    startingDebt <= 0.01 ||
+    history.currentBalance <= 0.01 ||
+    !account.paymentFrequency
+  ) {
+    return null;
+  }
 
   const seed = resolveSeedPayment(
     account,

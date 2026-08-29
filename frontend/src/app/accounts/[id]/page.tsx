@@ -10,6 +10,8 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { AccountDetailShell } from '@/components/accounts/shared/AccountDetailShell';
 import { LoanDetailView } from '@/components/accounts/loan-detail/LoanDetailView';
+import { scheduledTransactionsApi } from '@/lib/scheduled-transactions';
+import type { LoanProjectionAnchor } from '@/types/scheduled-transaction';
 import { LineOfCreditView } from '@/components/accounts/loan-detail/LineOfCreditView';
 import { CreditCardDetailView } from '@/components/accounts/credit-card-detail/CreditCardDetailView';
 import { BankingDetailView } from '@/components/accounts/banking-detail/BankingDetailView';
@@ -81,6 +83,8 @@ function AccountDetailContent() {
   const [interestTransactions, setInterestTransactions] = useState<Transaction[]>([]);
   const [scenarios, setScenarios] = useState<LoanScenario[]>([]);
   const [rateChanges, setRateChanges] = useState<LoanRateChange[]>([]);
+  const [projectionAnchor, setProjectionAnchor] =
+    useState<LoanProjectionAnchor | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Only for the caret beside the name; a failure costs the switcher, not the page.
@@ -137,21 +141,34 @@ function AccountDetailContent() {
       // short of the interest looks comfortably amortizing. So it fails with the
       // page, where the error is retryable, rather than answering with a number
       // nobody can tell is wrong.
-      const [transactionsData, interestData, scenariosData, rateChangesData] =
-        await Promise.all([
-          fetchAllAccountTransactions(accountId),
-          fetchLoanInterestTransactions(accountData),
-          loanScenariosApi.getAll(accountId).catch(() => {
-            toast.error(t('loanDetail.scenarios.loadFailed'));
-            return [] as LoanScenario[];
-          }),
-          loanRateChangesApi.getAll(accountId),
-        ]);
+      const [
+        transactionsData,
+        interestData,
+        scenariosData,
+        rateChangesData,
+        anchorData,
+      ] = await Promise.all([
+        fetchAllAccountTransactions(accountId),
+        fetchLoanInterestTransactions(accountData),
+        loanScenariosApi.getAll(accountId).catch(() => {
+          toast.error(t('loanDetail.scenarios.loadFailed'));
+          return [] as LoanScenario[];
+        }),
+        loanRateChangesApi.getAll(accountId),
+        // This page prints per-installment interest in its schedule table, so
+        // it prices the same installment the amortization report does and must
+        // anchor on the same boundary -- otherwise the two screens show
+        // different interest for one payment (INV-LOAN-006). Like the rate
+        // history above, a failed fetch fails the page rather than quietly
+        // projecting from today.
+        scheduledTransactionsApi.getLoanProjectionAnchor(accountId),
+      ]);
       setAccount(accountData);
       setTransactions(transactionsData);
       setInterestTransactions(interestData);
       setScenarios(scenariosData);
       setRateChanges(rateChangesData);
+      setProjectionAnchor(anchorData);
     } catch (err) {
       const message = getErrorMessage(err, t('loanDetail.loadFailed'));
       setError(message);
@@ -202,12 +219,17 @@ function AccountDetailContent() {
   // see buildLoanProjectionInput.)
   const reloadRateChanges = useCallback(async () => {
     try {
-      const [accountData, rateChangesData] = await Promise.all([
+      const [accountData, rateChangesData, anchorData] = await Promise.all([
         accountsApi.getById(accountId),
         loanRateChangesApi.getAll(accountId),
+        // A recorded rate change can resync the scheduled payment, which moves
+        // the installment this page prices; re-reading it here keeps the
+        // schedule table from describing the terms the user just replaced.
+        scheduledTransactionsApi.getLoanProjectionAnchor(accountId),
       ]);
       setAccount(accountData);
       setRateChanges(rateChangesData);
+      setProjectionAnchor(anchorData);
     } catch (err) {
       // Keeping the old timeline here would be worse than it looks. The
       // mutation SUCCEEDED, so the rows on screen are known-stale -- and since
@@ -331,6 +353,7 @@ function AccountDetailContent() {
                 interestTransactions={interestTransactions}
                 scenarios={scenarios}
                 rateChanges={rateChanges}
+                projectionAnchor={projectionAnchor}
                 onScenariosChanged={reloadScenarios}
                 onRateChangesChanged={reloadRateChanges}
                 exportPdfRef={loanExportRef}

@@ -3126,8 +3126,7 @@ export class ScheduledTransactionsService {
         hasInlineSplits &&
         !current.isInvestment &&
         !preparedTransfer &&
-        !fx &&
-        !hasInlineAmount
+        !fx
       ) {
         const lockedSplits = await m
           .getRepository(ScheduledTransactionSplit)
@@ -3139,10 +3138,21 @@ export class ScheduledTransactionsService {
           ]),
         );
         const rows = transactionPayload.splits as any[];
+        // The dialog sends the parent `amount` on EVERY non-foreign post -- it
+        // is the same echo the lines are, not a typed instruction -- so gating
+        // this on `!hasInlineAmount` made the whole block unreachable from the
+        // only surface that produces inline splits. The amount is an echo when
+        // it still equals what the locked template holds; a figure the user
+        // actually changed is their statement and posts as given.
+        const amountIsEcho =
+          !hasInlineAmount ||
+          roundMoney(Number(postDto?.amount)) ===
+            roundMoney(Number(current.amount));
         // Every line must echo a stored line at its stored amount; one typed
         // figure (or one line that names no source) makes the whole set the
         // user's own statement, which posts as given.
         const isUnchangedEcho =
+          amountIsEcho &&
           Array.isArray(rows) &&
           rows.length === lockedSplits.length &&
           rows.every((row, index) => {
