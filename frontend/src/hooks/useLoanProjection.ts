@@ -15,6 +15,7 @@ import {
 import { generateLoanSchedule } from '@/lib/loan-schedule';
 import { deriveLoanFigures, type LoanFigures } from '@/lib/loan-figures';
 import { createLogger } from '@/lib/logger';
+import { useFinancialToday } from '@/hooks/useFinancialToday';
 import type { Account } from '@/types/account';
 import type { Transaction } from '@/types/transaction';
 import type { LoanRateChange } from '@/types/loan-rate-change';
@@ -134,6 +135,12 @@ export function useLoanProjection(account: Account, refreshKey = 0): LoanProject
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId, isAmortizingDebt, refreshKey]);
 
+  // Today-anchored (see `loan-projection-anchor.guard.test.ts`) still has to
+  // say WHICH today: the rate in effect and the date row 1 falls on are both
+  // calendar-day answers, and this hook's payoff date is quoted beside the
+  // amortization report's schedule.
+  const todayYmd = useFinancialToday();
+
   return useMemo<LoanProjectionResult>(() => {
     const unknown: LoanFigures = {
       isSettled: false,
@@ -165,8 +172,20 @@ export function useLoanProjection(account: Account, refreshKey = 0): LoanProject
       data.rateChanges,
       data.interestTransactions,
     );
-    const currentTerms = resolveCurrentLoanTerms(account, history, data.rateChanges);
-    const projectionInput = buildLoanProjectionInput(account, history, data.rateChanges);
+    const currentTerms = resolveCurrentLoanTerms(
+      account,
+      history,
+      data.rateChanges,
+      null,
+      todayYmd,
+    );
+    const projectionInput = buildLoanProjectionInput(
+      account,
+      history,
+      data.rateChanges,
+      null,
+      todayYmd,
+    );
     const baseline = projectionInput ? generateLoanSchedule(projectionInput) : null;
 
     return {
@@ -178,5 +197,5 @@ export function useLoanProjection(account: Account, refreshKey = 0): LoanProject
         baseline,
       }),
     };
-  }, [account, accountId, data, failedAccountId, isAmortizingDebt]);
+  }, [account, accountId, data, failedAccountId, isAmortizingDebt, todayYmd]);
 }

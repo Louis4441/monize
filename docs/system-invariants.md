@@ -1079,6 +1079,24 @@ Enforcement         ScheduledTransactionLoanService.resolveInstallment is the
                     passes the anchor or is listed as deliberately
                     today-anchored -- an omitted optional argument is otherwise
                     indistinguishable from a decision.
+                    An OVERDUE anchor is refused (its debt predates ledger
+                    activity already on screen), and "overdue" is a question
+                    about the USER's calendar day: the projection is passed
+                    todayYmd from financialTodayYmd
+                    (frontend/src/lib/financial-today.ts, reached through the
+                    useFinancialToday hook), which resolves the stored timezone
+                    preference and falls back to the browser zone -- term for
+                    term the order RequestContextInterceptor uses to answer
+                    todayYMD() for the request that priced the bill. A UTC
+                    instant sliced into a day is a third calendar agreeing with
+                    neither layer, and inside its window (two hours after local
+                    midnight at UTC+2, fourteen at UTC+14, the mirror before
+                    midnight west of Greenwich) the report accepted a stale
+                    anchor or refused a live one.
+                    frontend/src/lib/loan-projection-today.guard.test.ts fails a
+                    projection call that does not state its day, one that
+                    derives it other than from the user's timezone, and any
+                    toISOString() day-slice in the module or its call sites.
                     The rate rule is one truth table
                     (backend/src/accounts/loan-rate-timeline-cases.json)
                     asserted by BOTH layers, since they cannot import each
@@ -1102,7 +1120,12 @@ Required tests      Present: scheduled-transaction-loan.service.spec.ts (prior
                     ledger-derived allocation, honours an override amount);
                     frontend loan-history.test.ts and
                     LoanAmortizationReport.test.tsx (anchored first projected
-                    row equals the bill's interest; anchorless fallback).
+                    row equals the bill's interest; anchorless fallback; an
+                    anchor overdue in the user's zone refused while UTC still
+                    reads yesterday, and one due today kept while UTC already
+                    reads tomorrow) and financial-today.test.ts (the day at
+                    pinned instants in named zones, so a boundary case does not
+                    depend on the runner's TZ).
                     A LINE OF CREDIT is exempt from the paid-off deactivation:
                     it is revolving, so owing nothing this period does not
                     finish it.

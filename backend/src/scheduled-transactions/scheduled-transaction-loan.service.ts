@@ -312,13 +312,20 @@ export class ScheduledTransactionLoanService {
    * The total is the bill the user was shown: this re-divides it between
    * interest and principal and never resizes it (see `InstallmentPurpose`).
    *
-   * Returns null when the split set is not a managed loan template, when the
-   * template shape is one the recalculation would also decline, or when the
-   * debt through `asOfDate` is already retired -- in each case the posting
-   * proceeds on the persisted amounts, which is today's behavior.
+   * The decision distinguishes three outcomes, because two of them used to
+   * share `null` and a retired loan therefore went on charging its whole stale
+   * installment:
+   *
+   *  - `not-applicable` -- the split set is not a managed loan template, or its
+   *    shape is one the recalculation would also decline. The posting proceeds
+   *    on the persisted amounts, which is today's behavior.
+   *  - `retired` -- it IS a managed template and the debt through `asOfDate` is
+   *    already settled, so the correct price is zero: the occurrence is claimed
+   *    and the schedule advances, and no financial transaction is written.
+   *  - `allocation` -- the interest/principal split to post.
    *
    * **Throws when the ledger cannot be read.** That is not "this is not a loan
-   * template": silently returning null there would post the stale stored split,
+   * template": silently declining there would post the stale stored split,
    * which is the exact defect this method exists to prevent, so the occurrence
    * refuses and the whole posting transaction rolls back rather than committing
    * a figure nothing verified.

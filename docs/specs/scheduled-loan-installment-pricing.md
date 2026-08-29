@@ -188,7 +188,22 @@ Both fields null means the loan has no active scheduled payment; there is no
 bill to be in parity with, and the projection keeps its today-anchored
 fallback (`advanceDate(today)` against `history.currentBalance`).
 
-**An OVERDUE anchor is refused, and falls back the same way.** The anchor's
+**An OVERDUE anchor is refused, and falls back the same way.** "Behind us" is
+a question about the **user's** calendar day, and the projection is passed one:
+`todayYmd`, from `financialTodayYmd` (`frontend/src/lib/financial-today.ts`,
+reached through the `useFinancialToday` hook), which prefers the stored
+timezone preference and falls back to the browser zone -- term for term the
+order `RequestContextInterceptor` uses to answer `todayYMD()` for the request
+that priced the bill. `new Date().toISOString().slice(0, 10)` is a third
+calendar belonging to neither layer: east of Greenwich it still reads yesterday
+for the first hours after local midnight (fourteen at UTC+14) and west of it it
+already reads tomorrow through the evening, so inside that window the report
+accepted an anchor the bill had already marked overdue -- or refused one due
+today. `frontend/src/lib/loan-projection-today.guard.test.ts` fails a projection
+call that does not state its day, one that derives it any other way, and any
+`toISOString()` day-slice in the module or its call sites.
+
+The anchor's
 debt is measured through the installment's own date, which is right while that
 date is ahead and wrong the moment it is behind: everything the ledger did
 after it -- a repayment, a draw, a rate change -- is real, is already on screen
@@ -232,8 +247,10 @@ The recurrence gives `100.01 - 399.99 * 0.005 = 98.0101`; the invariant gives
 - Unit (`scheduled-transaction-loan.service.spec.ts`): prior rounded splits
   deliberately inconsistent with the balance; the dated query bounded by
   `next_due_date` with its parameters asserted; posting-boundary resolution
-  (stale template repriced, idempotence, decline on unmanaged shape, null on
-  retired debt, extra-principal line); Canadian and non-Canadian mortgage
+  (stale template repriced, idempotence, decline on unmanaged shape, a
+  `retired` decision on retired debt -- `LoanPostingDecision` keeps it apart
+  from `not-applicable`, which posts the persisted amounts, so the two are
+  asserted separately -- extra-principal line); Canadian and non-Canadian mortgage
   rates unchanged; LINE_OF_CREDIT still supported; final-payment and
   extra-principal clamps unchanged; anchor endpoint shapes.
 - Unit (`scheduled-transactions.service.spec.ts`): `post()` writes the
@@ -248,4 +265,10 @@ The recurrence gives `100.01 - 399.99 * 0.005 = 98.0101`; the invariant gives
   anchored projection starts at the anchor's debt on the anchor's date and
   its first row's interest equals the bill's; `{null, null}` keeps the
   fallback; a retired anchored debt refuses the projection; the report calls
-  the anchor endpoint inside the history request key.
+  the anchor endpoint inside the history request key; an anchor overdue in the
+  user's zone is refused while UTC still reads yesterday, and one due today is
+  kept while UTC already reads tomorrow.
+- Frontend (`financial-today.test.ts`): the calendar day at pinned instants in
+  named zones -- positive offset, negative offset, both extremes, and the
+  browser fallback -- so a boundary case discriminates on any runner rather
+  than only on one whose `TZ` happens to sit on the wrong side of it.
