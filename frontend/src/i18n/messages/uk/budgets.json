@@ -9,6 +9,18 @@
     "buttonTitle": "Сповіщення",
     "buttonAriaLabel": "Сповіщення",
     "dismissAriaLabel": "Відхилити сповіщення",
+    "closeAriaLabel": "Закрити сповіщення",
+    "emptyFiltered": "Немає сповіщень, що відповідають поточному фільтру",
+    "deleteAll": "Видалити всі",
+    "deleteAllConfirmTitle": "Видалити сповіщення",
+    "deleteAllConfirmMessageAll": "Видалити всі сповіщення? Цю дію не можна скасувати.",
+    "deleteAllConfirmMessageFiltered": "Видалити всі сповіщення, що відповідають поточному фільтру, включно з не показаними? Цю дію не можна скасувати.",
+    "deleted": "{count, plural, one {Видалено # сповіщення} few {Видалено # сповіщення} other {Видалено # сповіщень}}",
+    "deleteFailed": "Не вдалося видалити сповіщення",
+    "filter": {
+      "financial": "Фінансові",
+      "system": "Системні"
+    },
     "severity": {
       "critical": "Критичне",
       "warning": "Попередження",

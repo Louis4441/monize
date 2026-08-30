@@ -1,5 +1,7 @@
 import apiClient from './api';
 import {
+  AlertCategory,
+  AlertSeverity,
   Budget,
   BudgetCategory,
   BudgetAlert,
@@ -191,6 +193,25 @@ export const budgetsApi = {
 
   deleteAlert: async (alertId: string): Promise<void> => {
     await apiClient.delete(`/budgets/alerts/${alertId}`);
+  },
+
+  // Dismisses every live alert matching the filter, server-side -- including
+  // alerts beyond the list endpoint's 50-row window. The active filter
+  // travels explicitly on the command, never as a list of on-screen ids.
+  dismissAlerts: async (filters: {
+    severity?: AlertSeverity;
+    category?: AlertCategory;
+  }): Promise<{ dismissed: number }> => {
+    const response = await apiClient.delete<{ dismissed: number }>(
+      '/budgets/alerts',
+      {
+        params: {
+          ...(filters.severity ? { severity: filters.severity } : {}),
+          ...(filters.category ? { category: filters.category } : {}),
+        },
+      },
+    );
+    return response.data;
   },
 
   // Reports

@@ -9,6 +9,18 @@
     "buttonTitle": "Waarschuwingen",
     "buttonAriaLabel": "Waarschuwingen",
     "dismissAriaLabel": "Waarschuwing sluiten",
+    "closeAriaLabel": "Waarschuwingen sluiten",
+    "emptyFiltered": "Geen waarschuwingen komen overeen met het huidige filter",
+    "deleteAll": "Alles verwijderen",
+    "deleteAllConfirmTitle": "Waarschuwingen verwijderen",
+    "deleteAllConfirmMessageAll": "Alle waarschuwingen verwijderen? Dit kan niet ongedaan worden gemaakt.",
+    "deleteAllConfirmMessageFiltered": "Alle waarschuwingen verwijderen die overeenkomen met het huidige filter, ook de niet-getoonde? Dit kan niet ongedaan worden gemaakt.",
+    "deleted": "{count, plural, one {# waarschuwing verwijderd} other {# waarschuwingen verwijderd}}",
+    "deleteFailed": "De waarschuwingen konden niet worden verwijderd",
+    "filter": {
+      "financial": "Financieel",
+      "system": "Systeem"
+    },
     "severity": {
       "critical": "Kritiek",
       "warning": "Waarschuwing",

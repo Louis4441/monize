@@ -9,6 +9,18 @@
     "buttonTitle": "Alertes",
     "buttonAriaLabel": "Alertes",
     "dismissAriaLabel": "Ignorer l'alerte",
+    "closeAriaLabel": "Fermer les alertes",
+    "emptyFiltered": "Aucune alerte ne correspond au filtre actuel",
+    "deleteAll": "Tout supprimer",
+    "deleteAllConfirmTitle": "Supprimer les alertes",
+    "deleteAllConfirmMessageAll": "Supprimer toutes les alertes ? Cette action est irréversible.",
+    "deleteAllConfirmMessageFiltered": "Supprimer toutes les alertes correspondant au filtre actuel, y compris celles qui ne sont pas affichées ? Cette action est irréversible.",
+    "deleted": "{count, plural, one {# alerte supprimée} other {# alertes supprimées}}",
+    "deleteFailed": "Les alertes n'ont pas pu être supprimées",
+    "filter": {
+      "financial": "Financières",
+      "system": "Système"
+    },
     "severity": {
       "critical": "Critique",
       "warning": "Avertissement",

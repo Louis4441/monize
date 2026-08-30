@@ -4,6 +4,7 @@ import { BudgetsService } from "./budgets.service";
 import { BudgetPeriodService } from "./budget-period.service";
 import { BudgetGeneratorService } from "./budget-generator.service";
 import { BudgetReportsService } from "./budget-reports.service";
+import { AlertSeverity } from "./entities/budget-alert.entity";
 
 describe("BudgetsController", () => {
   let controller: BudgetsController;
@@ -38,6 +39,7 @@ describe("BudgetsController", () => {
       getDashboardSummary: jest.fn(),
       getCategoryBudgetStatus: jest.fn(),
       deleteAlert: jest.fn(),
+      dismissAlerts: jest.fn(),
     };
 
     mockBudgetPeriodService = {
@@ -522,6 +524,35 @@ describe("BudgetsController", () => {
       expect(mockBudgetsService.deleteAlert).toHaveBeenCalledWith(
         "user-1",
         "alert-1",
+      );
+    });
+  });
+
+  describe("dismissAlerts()", () => {
+    it("delegates to budgetsService.dismissAlerts with the query filter", () => {
+      mockBudgetsService.dismissAlerts!.mockReturnValue("dismissed");
+
+      const result = controller.dismissAlerts(mockReq, {
+        severity: AlertSeverity.CRITICAL,
+        category: "system",
+      });
+
+      expect(result).toBe("dismissed");
+      expect(mockBudgetsService.dismissAlerts).toHaveBeenCalledWith("user-1", {
+        severity: AlertSeverity.CRITICAL,
+        category: "system",
+      });
+    });
+
+    it("passes an empty filter through unchanged", () => {
+      mockBudgetsService.dismissAlerts!.mockReturnValue("dismissed-all");
+
+      const result = controller.dismissAlerts(mockReq, {});
+
+      expect(result).toBe("dismissed-all");
+      expect(mockBudgetsService.dismissAlerts).toHaveBeenCalledWith(
+        "user-1",
+        {},
       );
     });
   });

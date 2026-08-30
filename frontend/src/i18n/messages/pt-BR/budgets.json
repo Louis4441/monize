@@ -9,6 +9,18 @@
     "buttonTitle": "Alertas",
     "buttonAriaLabel": "Alertas",
     "dismissAriaLabel": "Dispensar alerta",
+    "closeAriaLabel": "Fechar alertas",
+    "emptyFiltered": "Nenhum alerta corresponde ao filtro atual",
+    "deleteAll": "Excluir todos",
+    "deleteAllConfirmTitle": "Excluir alertas",
+    "deleteAllConfirmMessageAll": "Excluir todos os alertas? Esta ação não pode ser desfeita.",
+    "deleteAllConfirmMessageFiltered": "Excluir todos os alertas que correspondem ao filtro atual, incluindo os não exibidos? Esta ação não pode ser desfeita.",
+    "deleted": "{count, plural, one {# alerta excluído} other {# alertas excluídos}}",
+    "deleteFailed": "Não foi possível excluir os alertas",
+    "filter": {
+      "financial": "Financeiros",
+      "system": "Sistema"
+    },
     "severity": {
       "critical": "Crítico",
       "warning": "Aviso",

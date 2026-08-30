@@ -9,6 +9,18 @@
     "buttonTitle": "アラート",
     "buttonAriaLabel": "アラート",
     "dismissAriaLabel": "アラートを閉じる",
+    "closeAriaLabel": "アラート一覧を閉じる",
+    "emptyFiltered": "現在のフィルターに一致するアラートはありません",
+    "deleteAll": "すべて削除",
+    "deleteAllConfirmTitle": "アラートを削除",
+    "deleteAllConfirmMessageAll": "すべてのアラートを削除しますか？この操作は元に戻せません。",
+    "deleteAllConfirmMessageFiltered": "現在のフィルターに一致するすべてのアラート（表示されていないものを含む）を削除しますか？この操作は元に戻せません。",
+    "deleted": "{count}件のアラートを削除しました",
+    "deleteFailed": "アラートを削除できませんでした",
+    "filter": {
+      "financial": "財務",
+      "system": "システム"
+    },
     "severity": {
       "critical": "緊急",
       "warning": "警告",

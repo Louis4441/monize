@@ -2,8 +2,16 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
+import toast from 'react-hot-toast';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import { budgetsApi } from '@/lib/budgets';
+import {
+  AlertFilters,
+  NO_ALERT_FILTERS,
+  hasActiveAlertFilters,
+  matchesAlertFilters,
+} from '@/lib/alert-filters';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import type { BudgetAlert } from '@/types/budget';
 import { BudgetAlertList } from './BudgetAlertList';
 
@@ -14,10 +22,14 @@ export function BudgetAlertBadge() {
   const [isLoading, setIsLoading] = useState(false);
   const [dismissingIds, setDismissingIds] = useState<Set<string>>(new Set());
   const [collapsingIds, setCollapsingIds] = useState<Set<string>>(new Set());
+  const [filters, setFilters] = useState<AlertFilters>(NO_ALERT_FILTERS);
+  const [confirmingDeleteAll, setConfirmingDeleteAll] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const undoTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
+  // The bell's count is about every alert, not the filtered view.
   const unreadCount = alerts.filter((a) => !a.isRead && !dismissingIds.has(a.id)).length;
+  const visibleAlerts = alerts.filter((a) => matchesAlertFilters(a, filters));
 
   const fetchAlerts = useCallback(async () => {
     try {
@@ -35,7 +47,11 @@ export function BudgetAlertBadge() {
     fetchAlerts();
   }, [fetchAlerts]);
 
-  useClickOutside(dropdownRef, () => setIsOpen(false));
+  // The confirm dialog portals to document.body, so its clicks land outside
+  // the dropdown ref; without the gate, confirming would first close the panel.
+  useClickOutside(dropdownRef, () => setIsOpen(false), {
+    enabled: !confirmingDeleteAll,
+  });
 
   const handleMarkRead = async (alertId: string) => {
     try {
@@ -107,6 +123,37 @@ export function BudgetAlertBadge() {
     });
   };
 
+  /**
+   * Dismiss everything matching the active filter, server-side. The filter
+   * itself travels on the command, so it also reaches matching alerts beyond
+   * the fetched window -- the toast reports the server's count, which can be
+   * more than the rows that were on screen.
+   */
+  const handleConfirmDeleteAll = async () => {
+    setConfirmingDeleteAll(false);
+    try {
+      const { dismissed } = await budgetsApi.dismissAlerts({
+        severity: filters.severity ?? undefined,
+        category: filters.category ?? undefined,
+      });
+      const removed = alerts.filter((a) => matchesAlertFilters(a, filters));
+      for (const alert of removed) {
+        const timer = undoTimers.current.get(alert.id);
+        if (timer) {
+          clearTimeout(timer);
+          undoTimers.current.delete(alert.id);
+        }
+      }
+      const removedIds = new Set(removed.map((a) => a.id));
+      setDismissingIds((prev) => new Set([...prev].filter((id) => !removedIds.has(id))));
+      setCollapsingIds((prev) => new Set([...prev].filter((id) => !removedIds.has(id))));
+      setAlerts((prev) => prev.filter((a) => !matchesAlertFilters(a, filters)));
+      toast.success(t('alerts.deleted', { count: dismissed }));
+    } catch {
+      toast.error(t('alerts.deleteFailed'));
+    }
+  };
+
   return (
     <div className="relative" ref={dropdownRef}>
       <button
@@ -142,7 +189,7 @@ export function BudgetAlertBadge() {
 
       {isOpen && (
         <BudgetAlertList
-          alerts={alerts}
+          alerts={visibleAlerts}
           isLoading={isLoading}
           onMarkRead={handleMarkRead}
           onMarkAllRead={handleMarkAllRead}
@@ -151,8 +198,24 @@ export function BudgetAlertBadge() {
           dismissingIds={dismissingIds}
           collapsingIds={collapsingIds}
           onClose={() => setIsOpen(false)}
+          filters={filters}
+          onFiltersChange={setFilters}
+          onDeleteAll={() => setConfirmingDeleteAll(true)}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={confirmingDeleteAll}
+        title={t('alerts.deleteAllConfirmTitle')}
+        message={
+          hasActiveAlertFilters(filters)
+            ? t('alerts.deleteAllConfirmMessageFiltered')
+            : t('alerts.deleteAllConfirmMessageAll')
+        }
+        variant="danger"
+        onConfirm={handleConfirmDeleteAll}
+        onCancel={() => setConfirmingDeleteAll(false)}
+      />
     </div>
   );
 }

@@ -9,6 +9,18 @@
     "buttonTitle": "Alerty",
     "buttonAriaLabel": "Alerty",
     "dismissAriaLabel": "Odrzuć alert",
+    "closeAriaLabel": "Zamknij alerty",
+    "emptyFiltered": "Żaden alert nie pasuje do bieżącego filtra",
+    "deleteAll": "Usuń wszystkie",
+    "deleteAllConfirmTitle": "Usuń alerty",
+    "deleteAllConfirmMessageAll": "Usunąć wszystkie alerty? Tej operacji nie można cofnąć.",
+    "deleteAllConfirmMessageFiltered": "Usunąć wszystkie alerty pasujące do bieżącego filtra, w tym niewyświetlone? Tej operacji nie można cofnąć.",
+    "deleted": "{count, plural, one {Usunięto # alert} few {Usunięto # alerty} other {Usunięto # alertów}}",
+    "deleteFailed": "Nie udało się usunąć alertów",
+    "filter": {
+      "financial": "Finansowe",
+      "system": "Systemowe"
+    },
     "severity": {
       "critical": "Krytyczny",
       "warning": "Ostrzeżenie",

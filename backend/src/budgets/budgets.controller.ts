@@ -35,6 +35,7 @@ import { GenerateBudgetDto } from "./dto/generate-budget.dto";
 import { ApplyGeneratedBudgetDto } from "./dto/apply-generated-budget.dto";
 import { BudgetReportQueryDto } from "./dto/budget-report-query.dto";
 import { CategoryBudgetStatusDto } from "./dto/category-budget-status.dto";
+import { DismissAlertsQueryDto } from "./dto/dismiss-alerts-query.dto";
 import {
   AllowDelegate,
   DelegateRequiresSection,
@@ -183,6 +184,28 @@ export class BudgetsController {
   @ApiResponse({ status: 404, description: "Alert not found" })
   deleteAlert(@Request() req, @Param("id", ParseUUIDPipe) id: string) {
     return this.budgetsService.deleteAlert(req.user.id, id);
+  }
+
+  @Delete("alerts")
+  @ApiOperation({
+    summary: "Dismiss all alerts matching the given filter",
+  })
+  @ApiQuery({
+    name: "severity",
+    required: false,
+    enum: ["info", "warning", "critical", "success"],
+    description: "Only dismiss alerts of this severity",
+  })
+  @ApiQuery({
+    name: "category",
+    required: false,
+    enum: ["system", "financial"],
+    description: "Only dismiss system or financial alerts",
+  })
+  @ApiResponse({ status: 200, description: "Matching alerts dismissed" })
+  @ApiResponse({ status: 401, description: "Unauthorized" })
+  dismissAlerts(@Request() req, @Query() query: DismissAlertsQueryDto) {
+    return this.budgetsService.dismissAlerts(req.user.id, query);
   }
 
   @Get(":id")

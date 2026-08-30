@@ -3,7 +3,11 @@
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
-import type { BudgetAlert, AlertSeverity } from '@/types/budget';
+import type { AlertFilters } from '@/lib/alert-filters';
+import { hasActiveAlertFilters } from '@/lib/alert-filters';
+import { Badge } from '@/components/ui/Badge';
+import { EmptyState } from '@/components/ui/EmptyState';
+import type { AlertCategory, BudgetAlert, AlertSeverity } from '@/types/budget';
 
 /**
  * The structured payload a `BILL_DUE` alert carries, so the reader sees it in
@@ -83,6 +87,7 @@ function systemAlertData(alert: BudgetAlert): SystemAlertData | null {
 }
 
 interface BudgetAlertListProps {
+  /** The alerts matching the active filter -- the owner filters, this renders. */
   alerts: BudgetAlert[];
   isLoading: boolean;
   onMarkRead: (alertId: string) => void;
@@ -92,7 +97,26 @@ interface BudgetAlertListProps {
   dismissingIds: Set<string>;
   collapsingIds: Set<string>;
   onClose: () => void;
+  filters: AlertFilters;
+  onFiltersChange: (filters: AlertFilters) => void;
+  /** Asks the owner to confirm and dismiss everything matching `filters`. */
+  onDeleteAll: () => void;
 }
+
+const SEVERITY_FILTER_OPTIONS: readonly AlertSeverity[] = [
+  'critical',
+  'warning',
+  'info',
+  'success',
+];
+
+const CATEGORY_FILTER_OPTIONS: readonly AlertCategory[] = [
+  'financial',
+  'system',
+];
+
+const FILTER_CHIP_CLASS =
+  'flex-shrink-0 transition-colors motion-reduce:transition-none';
 
 function severityStyles(severity: AlertSeverity): {
   bg: string;
@@ -203,6 +227,9 @@ export function BudgetAlertList({
   dismissingIds,
   collapsingIds,
   onClose,
+  filters,
+  onFiltersChange,
+  onDeleteAll,
 }: BudgetAlertListProps) {
   const t = useTranslations('budgets');
   const router = useRouter();
@@ -358,13 +385,38 @@ export function BudgetAlertList({
     }
   };
 
+  const filtered = hasActiveAlertFilters(filters);
+
+  const toggleSeverity = (severity: AlertSeverity) => {
+    onFiltersChange({
+      ...filters,
+      severity: filters.severity === severity ? null : severity,
+    });
+  };
+
+  const toggleCategory = (category: AlertCategory) => {
+    onFiltersChange({
+      ...filters,
+      category: filters.category === category ? null : category,
+    });
+  };
+
   return (
+    // Full-screen below `sm` (the phone treatment); the desktop dropdown keeps
+    // its card shape via the sm:-scoped rounding, border and height cap.
+    //
+    // The height is `h-dvh`, never `bottom-0`/`inset-0`: the sliding AppHeader
+    // this mounts inside always carries a `transform`, which makes the header
+    // -- not the viewport -- the containing block for `position: fixed`, so a
+    // bottom anchor caps the panel at the header's own ~56px box (it only
+    // *looked* full when alert rows overflowed it). An explicit viewport
+    // height grows past the containing block instead.
     <div
-      className="fixed left-3 right-3 top-14 sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-1 sm:w-96 bg-white dark:bg-gray-800 rounded-lg shadow-lg dark:shadow-gray-700/50 border border-gray-200 dark:border-gray-700 z-50 max-h-[28rem] flex flex-col"
+      className="fixed inset-x-0 top-0 h-dvh sm:absolute sm:inset-auto sm:right-0 sm:mt-1 sm:h-auto sm:w-[30rem] bg-white dark:bg-gray-800 sm:rounded-lg shadow-lg dark:shadow-gray-700/50 sm:border border-gray-200 dark:border-gray-700 z-50 sm:max-h-[28rem] flex flex-col"
       data-testid="alert-list"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
           {t('alerts.title')}
           {unreadCount > 0 && (
@@ -373,29 +425,123 @@ export function BudgetAlertList({
             </span>
           )}
         </h3>
-        {unreadCount > 0 && (
+        <div className="flex items-center gap-3">
+          {unreadCount > 0 && (
+            <button
+              onClick={onMarkAllRead}
+              className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+              data-testid="mark-all-read"
+            >
+              {t('alerts.markAllRead')}
+            </button>
+          )}
+          {alerts.length > 0 && (
+            <button
+              onClick={onDeleteAll}
+              className="text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+              data-testid="delete-all-alerts"
+            >
+              {t('alerts.deleteAll')}
+            </button>
+          )}
+          {/* On mobile the panel covers the screen, so clicking outside is
+              impossible -- this is the only way out (ActionHistoryPanel's
+              pattern). */}
           <button
-            onClick={onMarkAllRead}
-            className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-            data-testid="mark-all-read"
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 sm:hidden"
+            aria-label={t('alerts.closeAriaLabel')}
+            data-testid="close-alerts"
           >
-            {t('alerts.markAllRead')}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="w-5 h-5"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18 18 6M6 6l12 12"
+              />
+            </svg>
           </button>
-        )}
+        </div>
       </div>
 
-      {/* Alert list */}
-      <div className="overflow-y-auto flex-1">
+      {/* Filters */}
+      <div
+        className="flex flex-col gap-1.5 px-4 py-2 border-b border-gray-200 dark:border-gray-700"
+        data-testid="alert-filters"
+      >
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
+          {SEVERITY_FILTER_OPTIONS.map((severity) => (
+            <Badge
+              key={severity}
+              as="button"
+              variant={filters.severity === severity ? 'blue' : 'gray'}
+              onClick={() => toggleSeverity(severity)}
+              aria-pressed={filters.severity === severity}
+              className={FILTER_CHIP_CLASS}
+              data-testid={`alert-filter-severity-${severity}`}
+            >
+              {severityLabel(severity, t)}
+            </Badge>
+          ))}
+        </div>
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
+          {CATEGORY_FILTER_OPTIONS.map((category) => (
+            <Badge
+              key={category}
+              as="button"
+              variant={filters.category === category ? 'blue' : 'gray'}
+              onClick={() => toggleCategory(category)}
+              aria-pressed={filters.category === category}
+              className={FILTER_CHIP_CLASS}
+              data-testid={`alert-filter-category-${category}`}
+            >
+              {category === 'financial'
+                ? t('alerts.filter.financial')
+                : t('alerts.filter.system')}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      {/* Alert list. The body is a flex column so the loading and empty
+          states can center themselves in the leftover height -- on the
+          full-screen mobile panel that is most of the screen, while the
+          desktop dropdown is content-sized and unaffected. */}
+      <div className="overflow-y-auto overscroll-contain flex-1 flex flex-col">
         {isLoading && alerts.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+          <div className="flex-1 flex flex-col justify-center px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
             {t('alerts.loading')}
           </div>
         ) : alerts.length === 0 ? (
           <div
-            className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
+            className="flex-1 flex flex-col justify-center px-4"
             data-testid="no-alerts"
           >
-            {t('alerts.empty')}
+            <EmptyState
+              icon={
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"
+                  />
+                </svg>
+              }
+              title={filtered ? t('alerts.emptyFiltered') : t('alerts.empty')}
+            />
           </div>
         ) : (
           <div>
