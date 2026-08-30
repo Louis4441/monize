@@ -507,13 +507,21 @@ describe('TransactionRow', () => {
     expect(screen.getAllByText('-').length).toBeGreaterThan(0);
   });
 
-  it('renders account name in row', () => {
-    renderRow();
+  it('renders account name in a multi-account view', () => {
+    renderRow({ isSingleAccountView: false });
     expect(screen.getByText('Checking')).toBeInTheDocument();
   });
 
+  it('omits the Account cell entirely in a single-account view', () => {
+    // Structural, not responsive: on a single account's page every row would
+    // repeat the page's own title, so the cell must not exist at any width
+    // (register-columns.ts). The default renderRow props are single-account.
+    renderRow();
+    expect(screen.queryByText('Checking')).not.toBeInTheDocument();
+  });
+
   it('shows dash when account is null', () => {
-    renderRow({}, { account: null as any });
+    renderRow({ isSingleAccountView: false }, { account: null as any });
     expect(screen.getAllByText('-').length).toBeGreaterThan(0);
   });
 
@@ -1074,11 +1082,11 @@ describe('TransactionRow payee brand icon', () => {
   });
 });
 
-describe('TransactionRow compact mobile dates', () => {
-  // The regression this pins: on a phone the register shows only Date, Payee
-  // and Amount, the full date takes all the width it asks for, and the payee
-  // is capped at 100px and truncates. The compact option drops the year below
-  // `sm` and hands the payee the freed width.
+describe('TransactionRow compact dates (the day/month view)', () => {
+  // Born as a phone-only trade -- the payee is what runs out of room there,
+  // and the year is the part a register row can spare -- and now the user's
+  // date view at every width, so the cell renders ONE format rather than a
+  // phone/desktop CSS split.
   const formatCompactDate = (d: string) => d.slice(5);
 
   it('renders the full date alone when the option is off', () => {
@@ -1088,17 +1096,16 @@ describe('TransactionRow compact mobile dates', () => {
     expect(dateCell.querySelector('.sm\\:hidden')).toBeNull();
   });
 
-  it('renders the year-less date for phones and the full one for wider screens', () => {
+  it('renders the year-less date at every width when the option is on', () => {
     const { container } = renderRow({ compactDates: true, formatCompactDate });
     const dateCell = container.querySelector('td')!;
 
     // The day survives -- it is the year that goes, so a register row still
-    // says which day it happened on.
-    const compact = dateCell.querySelector('span.sm\\:hidden')!;
-    expect(compact.textContent).toBe('06-15');
-
-    const full = dateCell.querySelector('span.hidden.sm\\:inline')!;
-    expect(full.textContent).toBe('2025-06-15');
+    // says which day it happened on. One rendering, no breakpoint split: the
+    // chosen view holds on desktop as well as on phones.
+    expect(dateCell.textContent).toBe('06-15');
+    expect(dateCell.querySelector('.sm\\:hidden')).toBeNull();
+    expect(dateCell.querySelector('.sm\\:inline')).toBeNull();
   });
 
   it('widens the phone-width payee cap when compact dates are on', () => {

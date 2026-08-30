@@ -2,14 +2,19 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
 /**
- * Whether the transaction register drops the year from its Date column on
- * phone widths, freeing that width for the payee.
+ * Whether register surfaces drop the year from their Date columns -- the
+ * day/month view, born on phone widths to free width for the payee and now a
+ * view the user can choose at any width.
  *
- * One global flag rather than a per-view bucket: whether a full date fits
- * beside a payee is a property of the phone in the user's hand, the same for
- * every register surface, so the toggle on one register applies to all of
- * them. Desktop widths always show the full date -- the flag only changes
- * what renders below the `sm` breakpoint.
+ * One global flag rather than a per-view bucket: which date view the user
+ * prefers is the same question on every register surface, so the toggle on
+ * one register applies to all of them. Where it applies is the surface's
+ * decision: the transaction register honours it at every width, while the
+ * reconcile table only shortens below `sm`, where its columns crowd.
+ *
+ * The field keeps its historical `compactMobileDates` name because it is the
+ * persisted shape -- renaming it would silently drop every user's saved
+ * choice.
  *
  * Browser-local rather than a row in `user_preferences` for the same reason
  * row density is (see densityStore.ts): what fits on the screen in front of
