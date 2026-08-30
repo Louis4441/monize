@@ -6,6 +6,7 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import type { AlertFilters } from '@/lib/alert-filters';
 import { hasActiveAlertFilters } from '@/lib/alert-filters';
 import { Badge } from '@/components/ui/Badge';
+import { EmptyState } from '@/components/ui/EmptyState';
 import type { AlertCategory, BudgetAlert, AlertSeverity } from '@/types/budget';
 
 /**
@@ -403,8 +404,15 @@ export function BudgetAlertList({
   return (
     // Full-screen below `sm` (the phone treatment); the desktop dropdown keeps
     // its card shape via the sm:-scoped rounding, border and height cap.
+    //
+    // The height is `h-dvh`, never `bottom-0`/`inset-0`: the sliding AppHeader
+    // this mounts inside always carries a `transform`, which makes the header
+    // -- not the viewport -- the containing block for `position: fixed`, so a
+    // bottom anchor caps the panel at the header's own ~56px box (it only
+    // *looked* full when alert rows overflowed it). An explicit viewport
+    // height grows past the containing block instead.
     <div
-      className="fixed inset-0 sm:absolute sm:inset-auto sm:right-0 sm:mt-1 sm:w-[30rem] bg-white dark:bg-gray-800 sm:rounded-lg shadow-lg dark:shadow-gray-700/50 sm:border border-gray-200 dark:border-gray-700 z-50 sm:max-h-[28rem] flex flex-col"
+      className="fixed inset-x-0 top-0 h-dvh sm:absolute sm:inset-auto sm:right-0 sm:mt-1 sm:h-auto sm:w-[30rem] bg-white dark:bg-gray-800 sm:rounded-lg shadow-lg dark:shadow-gray-700/50 sm:border border-gray-200 dark:border-gray-700 z-50 sm:max-h-[28rem] flex flex-col"
       data-testid="alert-list"
     >
       {/* Header */}
@@ -502,18 +510,38 @@ export function BudgetAlertList({
         </div>
       </div>
 
-      {/* Alert list */}
-      <div className="overflow-y-auto flex-1">
+      {/* Alert list. The body is a flex column so the loading and empty
+          states can center themselves in the leftover height -- on the
+          full-screen mobile panel that is most of the screen, while the
+          desktop dropdown is content-sized and unaffected. */}
+      <div className="overflow-y-auto overscroll-contain flex-1 flex flex-col">
         {isLoading && alerts.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+          <div className="flex-1 flex flex-col justify-center px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
             {t('alerts.loading')}
           </div>
         ) : alerts.length === 0 ? (
           <div
-            className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
+            className="flex-1 flex flex-col justify-center px-4"
             data-testid="no-alerts"
           >
-            {filtered ? t('alerts.emptyFiltered') : t('alerts.empty')}
+            <EmptyState
+              icon={
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"
+                  />
+                </svg>
+              }
+              title={filtered ? t('alerts.emptyFiltered') : t('alerts.empty')}
+            />
           </div>
         ) : (
           <div>

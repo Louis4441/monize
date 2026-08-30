@@ -882,14 +882,37 @@ describe('BudgetAlertList', () => {
       render(<BudgetAlertList {...defaultProps} />);
 
       const container = screen.getByTestId('alert-list');
-      // fixed inset-0 is the full-screen mobile treatment; the sm:-scoped
-      // classes restore the desktop dropdown card.
-      expect(container.className).toContain('fixed inset-0');
+      // Full width plus an explicit viewport height is the full-screen mobile
+      // treatment; the sm:-scoped classes restore the desktop dropdown card.
+      expect(container.className).toContain('fixed inset-x-0 top-0');
+      expect(container.className).toContain('h-dvh');
+      expect(container.className).toContain('sm:h-auto');
       expect(container.className).toContain('sm:absolute');
       expect(container.className).toContain('sm:inset-auto');
       expect(container.className).toContain('sm:max-h-[28rem]');
       expect(container.className).toContain('sm:rounded-lg');
       expect(container.className).toContain('sm:w-[30rem]');
+      // Never anchor this panel's height with bottom-0/inset-0: it mounts
+      // inside the sliding AppHeader, whose ever-present transform makes the
+      // header the containing block for position:fixed -- a bottom anchor
+      // caps the panel at the header's own ~56px box, so it collapsed
+      // whenever there were no alert rows overflowing it.
+      expect(container.className).not.toMatch(/(?:^|\s)inset-0(?:\s|$)/);
+      expect(container.className).not.toMatch(/(?:^|\s)bottom-0(?:\s|$)/);
+    });
+
+    it('centers the empty state in the leftover height instead of pinning it to the top', () => {
+      render(<BudgetAlertList {...defaultProps} />);
+
+      // The full-screen mobile panel leaves most of the screen below the
+      // header; the empty state claims that space and centers in it. The
+      // desktop dropdown is content-sized, so the same classes are a no-op.
+      const empty = screen.getByTestId('no-alerts');
+      expect(empty.className).toContain('flex-1');
+      expect(empty.className).toContain('justify-center');
+      const body = empty.parentElement as HTMLElement;
+      expect(body.className).toContain('flex-1');
+      expect(body.className).toContain('flex-col');
     });
 
     it('renders a mobile-only close button that closes the panel', () => {
