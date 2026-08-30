@@ -16,7 +16,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ListTopToolbar } from '@/components/ui/ListTopToolbar';
 import { TransactionRow } from './TransactionRow';
 import { registerDateColumnPadding } from './register-date-columns';
-import { registerColumnClass } from './register-columns';
+import { registerColumnClass, REGISTER_TABLE_CONTAINER } from './register-columns';
 import { TransactionActionSheet } from './TransactionActionSheet';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -514,7 +514,10 @@ export function TransactionList({
           }
         />
       )}
-      <div className="overflow-x-auto">
+      {/* The container the column tiers measure: a column appears when the
+          REGISTER itself is wide enough, not when the viewport is -- the
+          viewport overstates this width by the page padding around it. */}
+      <div className={`overflow-x-auto ${REGISTER_TABLE_CONTAINER}`}>
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead className="bg-gray-50 dark:bg-gray-800">
             <tr>

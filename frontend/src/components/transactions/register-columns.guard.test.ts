@@ -3,6 +3,8 @@ import {
   REGISTER_COLUMN_ORDER,
   REGISTER_COLUMN_PRIORITY,
   PRIORITY_MIN_WIDTH_PX,
+  REGISTER_TABLE_CONTAINER,
+  REGISTER_DESCRIPTION_CELL_FLEX,
   registerColumnClass,
   type RegisterColumnId,
 } from './register-columns';
@@ -39,8 +41,15 @@ function withoutComments(source: string): string {
     .replace(/\/\/[^\n]*/g, (line) => ' '.repeat(line.length));
 }
 
-/** A hand-written responsive column-visibility class. */
-const HAND_WRITTEN_VISIBILITY = /hidden\s+(?:sm|md|lg|xl|2xl|min-\[\d+px\]):table-cell/;
+/**
+ * A hand-written responsive column-visibility class -- viewport variants and
+ * container-query variants alike. The viewport forms are doubly banned: they
+ * bypass the module AND they measure the wrong thing (the register sits
+ * inside page padding, so viewport-keyed columns appeared before the table
+ * could hold them and scrolled Status out from behind the sticky Actions).
+ */
+const HAND_WRITTEN_VISIBILITY =
+  /hidden\s+@?(?:sm|md|lg|xl|2xl|min-\[\d+px\]):table-cell/;
 
 describe('the register column contract', () => {
   it('resolves both register sources (an empty match set proves nothing)', () => {
@@ -125,21 +134,21 @@ describe('the register column contract', () => {
     } satisfies Record<RegisterColumnId, string>);
   });
 
-  it('reveals the tiers in rank order as the window widens', () => {
+  it('reveals the tiers in rank order as the register widens', () => {
     // "High before medium before low" is the whole point of the tiers; a
     // class-string edit that inverted two breakpoints would otherwise pass.
     expect(PRIORITY_MIN_WIDTH_PX.always).toBe(0);
     expect(PRIORITY_MIN_WIDTH_PX.high).toBeLessThan(PRIORITY_MIN_WIDTH_PX.medium);
     expect(PRIORITY_MIN_WIDTH_PX.medium).toBeLessThan(PRIORITY_MIN_WIDTH_PX.low);
-    // And the classes agree with the table the assertion above trusted.
+    // And the classes agree with the table the assertion above trusted. They
+    // must be CONTAINER-QUERY variants (`@min-[...]`): a viewport variant
+    // measures the window, which overstates the register's width by the page
+    // padding around it -- the defect that scrolled Status out of view.
     const widthOfClass = (cls: string): number => {
       if (cls === '') return 0;
-      const named: Record<string, number> = {
-        sm: 640, md: 768, lg: 1024, xl: 1280, '2xl': 1536,
-      };
-      const match = cls.match(/^hidden (?:min-\[(\d+)px\]|(sm|md|lg|xl|2xl)):table-cell$/);
-      expect(match, `parseable visibility class: ${cls}`).toBeTruthy();
-      return match![1] ? Number(match![1]) : named[match![2]];
+      const match = cls.match(/^hidden @min-\[(\d+)px\]:table-cell$/);
+      expect(match, `container-query visibility class: ${cls}`).toBeTruthy();
+      return Number(match![1]);
     };
     for (const id of REGISTER_COLUMN_ORDER) {
       expect(widthOfClass(registerColumnClass(id)), id).toBe(
@@ -160,6 +169,43 @@ describe('the register column contract', () => {
         );
       }
     }
+  });
+
+  it('gives the tier classes a container to measure', () => {
+    // Every `@min-[...]` variant matches against the nearest @container
+    // ancestor; without one on the scroll wrapper the hideable columns
+    // silently never appear at any width.
+    expect(REGISTER_TABLE_CONTAINER).toBe('@container');
+    const list = withoutComments(
+      REGISTER_SOURCES['/src/components/transactions/TransactionList.tsx'],
+    );
+    expect(
+      /overflow-x-auto \$\{REGISTER_TABLE_CONTAINER\}/.test(list),
+      'TransactionList marks the overflow-x-auto wrapper as the register container',
+    ).toBe(true);
+  });
+
+  it('makes Description the column that yields', () => {
+    // `w-full` hands Description the width the content-sized columns leave;
+    // `max-w-0` lets it shrink below its own content so the inner truncate
+    // ellipsizes. Together they are what keeps a low-tier column's arrival
+    // from overflowing the table and scrolling Status out from behind the
+    // sticky Actions column -- the register squeezes Description instead.
+    expect(REGISTER_DESCRIPTION_CELL_FLEX.split(' ').sort()).toEqual([
+      'max-w-0',
+      'w-full',
+    ]);
+    const row = withoutComments(
+      REGISTER_SOURCES['/src/components/transactions/TransactionRow.tsx'],
+    );
+    const descriptionCellLine = row
+      .split('\n')
+      .find((line) => line.includes("registerColumnClass('description')"));
+    expect(descriptionCellLine, 'the description cell exists').toBeTruthy();
+    expect(
+      descriptionCellLine!.includes('REGISTER_DESCRIPTION_CELL_FLEX'),
+      'the description cell carries the yield classes',
+    ).toBe(true);
   });
 
   it('gates the Account column structurally, not with CSS', () => {

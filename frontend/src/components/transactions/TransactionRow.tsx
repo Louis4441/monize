@@ -10,7 +10,7 @@ import { CategoryPill } from '@/components/transactions/CategoryPill';
 import { registerDateColumnPadding } from '@/components/transactions/register-date-columns';
 import {
   registerColumnClass,
-  REGISTER_DESCRIPTION_MAX_WIDTH,
+  REGISTER_DESCRIPTION_CELL_FLEX,
 } from '@/components/transactions/register-columns';
 import { PayeeLogo } from '@/components/payees/PayeeLogo';
 import { Transaction, TransactionSplit, TransactionStatus } from '@/types/transaction';
@@ -527,11 +527,12 @@ export const TransactionRow = memo(function TransactionRow({
           <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
         )}
       </td>
-      <td className={`${cellPadding} text-sm text-gray-500 dark:text-gray-400 ${registerColumnClass('description')}`}>
-        {/* The one column asked to grow with the page: a viewport-relative
-            cap, so a wider window shows more of the description. */}
+      {/* The column that yields: it takes whatever width the content-sized
+          columns leave and shrinks first when there is none, so its arrival
+          can never push Status off the visible edge of the register. */}
+      <td className={`${cellPadding} text-sm text-gray-500 dark:text-gray-400 ${registerColumnClass('description')} ${REGISTER_DESCRIPTION_CELL_FLEX}`}>
         <div
-          className={`truncate ${REGISTER_DESCRIPTION_MAX_WIDTH} ${isVoid ? 'line-through' : ''}`}
+          className={`truncate ${isVoid ? 'line-through' : ''}`}
           title={transaction.description || undefined}
         >
           {transaction.description || '-'}

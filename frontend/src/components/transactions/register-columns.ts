@@ -11,8 +11,18 @@
  * guard test beside this file fails any visibility class that does not come
  * from here.
  *
- * Two rules the tiers do not express, stated here because they are part of
- * the same contract:
+ * The tiers are **container queries, not viewport breakpoints**. The register
+ * sits inside page padding (and, on some surfaces, a card), so the viewport
+ * overstates the width the table actually has -- keyed off the viewport, the
+ * low-tier columns appeared before the register could hold them, the table
+ * overflowed its `overflow-x-auto` wrapper, and with Actions pinned sticky
+ * right it was exactly the columns at the table's right end -- Status, ranked
+ * high -- that scrolled out of sight while Description, ranked low, stayed on
+ * screen. The wrapper carries `REGISTER_TABLE_CONTAINER` and every tier
+ * measures that container, so "appears at 1536px" means 1536px of register.
+ *
+ * Rules the tiers do not express, stated here because they are part of the
+ * same contract:
  *
  * - **Density never changes which columns exist.** Normal/Compact/Dense move
  *   padding and secondary content (`useTableDensity`), not columns -- a column
@@ -22,6 +32,13 @@
  *   the list spans more than one account (`!isSingleAccountView`); on a single
  *   account's page it is omitted from the DOM entirely, at every width. When
  *   it does render, it takes its tier below like any other column.
+ * - **Description is the column that yields.** Its cells carry
+ *   `REGISTER_DESCRIPTION_CELL_FLEX`, so it absorbs whatever width the other
+ *   columns leave and shrinks -- down to nothing -- before the table can
+ *   outgrow its container. A lower-ranked column appearing must squeeze
+ *   itself, never scroll a higher-ranked one out of view; and once even a
+ *   squeezed Description is not worth having, the low tier removes it and
+ *   Ref # together.
  */
 export const REGISTER_COLUMN_ORDER = [
   'date',
@@ -83,33 +100,35 @@ export const REGISTER_COLUMN_PRIORITY: Record<
 };
 
 /**
- * One breakpoint per tier. A tier maps to a class, never a column to a class,
- * so two columns of the same rank cannot appear at different widths.
+ * One breakpoint per tier -- a `@min-[...]` container-query variant measured
+ * against `REGISTER_TABLE_CONTAINER`, never a viewport breakpoint (the
+ * viewport lies about the register's width by however much page padding
+ * surrounds it). A tier maps to a class, never a column to a class, so two
+ * columns of the same rank cannot appear at different widths.
  *
- * The `min-[480px]` on Actions predates the tiers (it is where the action
- * sheet stops being the only way to act on a row) and 900px is where the
- * category pills genuinely have room; both are deliberate off-scale values,
- * which is why they are spelled as arbitrary variants rather than the nearest
- * named breakpoint.
+ * The 480px on Actions predates the tiers (it is where the action sheet
+ * stops being the only way to act on a row); 900px is where the category
+ * pills genuinely have room; 1280/1536 keep the old `xl`/`2xl` figures, now
+ * honestly measured.
  */
 const PRIORITY_VISIBILITY: Record<RegisterColumnPriority, string> = {
   always: '',
-  high: 'hidden min-[900px]:table-cell',
-  medium: 'hidden xl:table-cell',
-  low: 'hidden 2xl:table-cell',
-  exceptPhones: 'hidden min-[480px]:table-cell',
+  high: 'hidden @min-[900px]:table-cell',
+  medium: 'hidden @min-[1280px]:table-cell',
+  low: 'hidden @min-[1536px]:table-cell',
+  exceptPhones: 'hidden @min-[480px]:table-cell',
 };
 
 /**
- * The minimum viewport width, in px, at which each tier's columns render.
+ * The minimum *register* width, in px, at which each tier's columns render.
  * Exported for the guard test, which asserts the tiers appear in rank order
  * (high before medium before low) rather than trusting the class strings.
  */
 export const PRIORITY_MIN_WIDTH_PX: Record<RegisterColumnPriority, number> = {
   always: 0,
   high: 900,
-  medium: 1280, // Tailwind `xl`
-  low: 1536, // Tailwind `2xl`
+  medium: 1280,
+  low: 1536,
   exceptPhones: 480,
 };
 
@@ -123,9 +142,20 @@ export function registerColumnClass(id: RegisterColumnId): string {
 }
 
 /**
- * The Description column's truncation cap. Viewport-relative on purpose: the
- * column only exists at `low`-tier widths and is the one column asked to grow
- * with the page, so a wider window shows more of the description instead of
- * more empty space.
+ * The class the register's scroll wrapper must carry so the tier classes have
+ * a container to measure. Without it every `@min-[...]` variant silently
+ * never matches and the hideable columns never appear -- which is why the
+ * guard test asserts the wrapper references this constant.
  */
-export const REGISTER_DESCRIPTION_MAX_WIDTH = 'max-w-[18vw]';
+export const REGISTER_TABLE_CONTAINER = '@container';
+
+/**
+ * The classes that make Description the column that yields. In an auto-layout
+ * table, `w-full` hands the column every pixel the content-sized columns do
+ * not claim and `max-w-0` lets it shrink below its own content (the cell's
+ * inner `truncate` div then ellipsizes) -- so Description grows with the page
+ * when there is room and gives its width back, down to nothing, when there is
+ * not, instead of the table overflowing and scrolling Status out from behind
+ * the sticky Actions column.
+ */
+export const REGISTER_DESCRIPTION_CELL_FLEX = 'w-full max-w-0';
