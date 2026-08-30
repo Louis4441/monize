@@ -1859,11 +1859,15 @@ describe("AutoBackupService", () => {
     });
 
     it("raises a BACKUP_PARTIAL admin alert naming the attachments reason and the counts", async () => {
-      mockSettingsRepo.findOne.mockResolvedValue(
-        createSettings({ enabled: true, folderPath: root }),
-      );
+      mockSettingsRepo.find.mockResolvedValue([
+        createSettings({
+          enabled: true,
+          folderPath: root,
+          nextBackupAt: new Date(Date.now() - 3600000),
+        }),
+      ]);
 
-      await service.runManualBackup(userId);
+      await service.handleAutoBackupCron();
 
       expect(mockSystemAlerts.raiseAdminAlert).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1883,6 +1887,23 @@ describe("AutoBackupService", () => {
           }),
         }),
       );
+    });
+
+    it("raises nothing for a manual Back up now -- the caller is reading the result", async () => {
+      // The manual path shares applyBackupOutcome, so before the origin
+      // argument a "Back up now" filed an admin alert titled "Automatic
+      // backup incomplete", took that day's dedupe key (silencing the real
+      // automatic failure behind it), and made the HTTP request wait on a
+      // per-administrator SMTP fan-out after the backup had succeeded.
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true, folderPath: root }),
+      );
+
+      const result = await service.runManualBackup(userId);
+
+      expect(mockSystemAlerts.raiseAdminAlert).not.toHaveBeenCalled();
+      // The caller is still told, in the response they are waiting on.
+      expect(result.message).toMatch(/attachment/i);
     });
 
     it("does not run retention, so complete copies past the window survive", async () => {
@@ -2020,6 +2041,13 @@ describe("AutoBackupService", () => {
       mockSettingsRepo.findOne.mockResolvedValue(
         createSettings({ enabled: true, folderPath: root }),
       );
+      mockSettingsRepo.find.mockResolvedValue([
+        createSettings({
+          enabled: true,
+          folderPath: root,
+          nextBackupAt: new Date(Date.now() - 3600000),
+        }),
+      ]);
     });
 
     it("a failed weekly/monthly copy raises reason 'promotion' while the status stays success", async () => {
@@ -2032,7 +2060,7 @@ describe("AutoBackupService", () => {
         )
         .mockResolvedValue("weekly: EACCES: permission denied");
 
-      await service.runManualBackup(userId);
+      await service.handleAutoBackupCron();
 
       expect(mockSystemAlerts.raiseAdminAlert).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -2043,7 +2071,7 @@ describe("AutoBackupService", () => {
           data: expect.objectContaining({ reason: "promotion" }),
         }),
       );
-      expect(mockSettingsRepo.save).toHaveBeenCalledWith(
+      expect(updateBuilder.set).toHaveBeenCalledWith(
         expect.objectContaining({ lastBackupStatus: "success" }),
       );
     });
@@ -2058,7 +2086,7 @@ describe("AutoBackupService", () => {
           "monize-backup-daily-2026-04-01.json.gz: EACCES: permission denied",
         ]);
 
-      await service.runManualBackup(userId);
+      await service.handleAutoBackupCron();
 
       expect(mockSystemAlerts.raiseAdminAlert).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -2074,13 +2102,13 @@ describe("AutoBackupService", () => {
           }),
         }),
       );
-      expect(mockSettingsRepo.save).toHaveBeenCalledWith(
+      expect(updateBuilder.set).toHaveBeenCalledWith(
         expect.objectContaining({ lastBackupStatus: "success" }),
       );
     });
 
     it("a clean complete run raises nothing", async () => {
-      await service.runManualBackup(userId);
+      await service.handleAutoBackupCron();
       expect(mockSystemAlerts.raiseAdminAlert).not.toHaveBeenCalled();
     });
   });

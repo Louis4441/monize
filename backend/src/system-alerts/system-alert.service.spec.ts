@@ -51,6 +51,7 @@ describe("SystemAlertService", () => {
   let manager: ManagerMock;
   let dataSource: DataSourceMock;
   let emailService: { getStatus: jest.Mock; sendMail: jest.Mock };
+  let jobClaims: { claimOnce: jest.Mock };
   let service: SystemAlertService;
 
   /**
@@ -108,6 +109,7 @@ describe("SystemAlertService", () => {
       getStatus: jest.fn().mockReturnValue({ configured: true }),
       sendMail: jest.fn().mockResolvedValue(undefined),
     };
+    jobClaims = { claimOnce: jest.fn().mockResolvedValue(true) };
     service = new SystemAlertService(
       dataSource as never,
       emailService as never,
@@ -115,6 +117,7 @@ describe("SystemAlertService", () => {
         translate: (_key: string, options?: { defaultValue?: string }) =>
           options?.defaultValue ?? _key,
       } as never,
+      jobClaims as never,
     );
   });
 
@@ -327,6 +330,28 @@ describe("SystemAlertService", () => {
       }
     });
 
+    it("truncates a title the VARCHAR(255) column would reject", async () => {
+      // Producers interpolate names they do not control. PostgreSQL raises
+      // 22001 on an over-long title, the never-throws catch swallows it, and
+      // the alert silently never exists -- for SCHEDULED_POST_FAILED that
+      // means the user is never told their money did not move.
+      route({});
+      const long = `${"N".repeat(400)} could not be posted`;
+      await service.raiseAdminAlert(input({ title: long }));
+
+      const [, params] = insertStatements()[0];
+      expect(params[3]).toHaveLength(255);
+      expect(String(params[3]).endsWith("\u2026")).toBe(true);
+    });
+
+    it("leaves a title within the column alone", async () => {
+      route({});
+      await service.raiseAdminAlert(
+        input({ title: "Automatic backup failed" }),
+      );
+      expect(insertStatements()[0][1][3]).toBe("Automatic backup failed");
+    });
+
     it("truncates an oversized dedupe key deterministically rather than throwing", async () => {
       route({});
       const error = jest
@@ -341,6 +366,74 @@ describe("SystemAlertService", () => {
       }
       const [, params] = insertStatements()[0];
       expect(params[7]).toHaveLength(DEDUPE_KEY_MAX_LENGTH);
+    });
+  });
+
+  describe("emailDedupeKey (several same-cause alerts, one message)", () => {
+    it("emails only the claim winner, while every row is still written", async () => {
+      // One broken volume raises one BACKUP_FAILED per affected user. The
+      // rows must stay granular -- an administrator has to know WHICH users
+      // lost a backup -- but a sixty-user install must not send sixty
+      // identical emails.
+      route({});
+      jobClaims.claimOnce
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(false);
+
+      for (const user of ["u-1", "u-2", "u-3"]) {
+        await service.raiseAdminAlert(
+          input({
+            dedupeKey: `BACKUP_FAILED:${user}:2026-08-30`,
+            emailDedupeKey: "BACKUP_FAILED:2026-08-30",
+          }),
+        );
+      }
+
+      expect(insertStatements()).toHaveLength(3);
+      expect(emailService.sendMail).toHaveBeenCalledTimes(1);
+      expect(jobClaims.claimOnce).toHaveBeenCalledWith(
+        "system_alert_email",
+        "admin-1",
+        "BACKUP_FAILED:2026-08-30",
+      );
+    });
+
+    it("claims per administrator, so each one is told once", async () => {
+      route({
+        admins: [adminRow(), adminRow({ id: "admin-2", email: "b@e.f" })],
+      });
+      await service.raiseAdminAlert(
+        input({ emailDedupeKey: "BACKUP_FAILED:2026-08-30" }),
+      );
+      expect(jobClaims.claimOnce.mock.calls.map((call) => call[1])).toEqual([
+        "admin-1",
+        "admin-2",
+      ]);
+      expect(emailService.sendMail).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not claim at all when the caller asked for no email collapsing", async () => {
+      route({});
+      await service.raiseAdminAlert(input());
+      expect(jobClaims.claimOnce).not.toHaveBeenCalled();
+      expect(emailService.sendMail).toHaveBeenCalledTimes(1);
+    });
+
+    it("sends rather than loses the alert when the claim itself fails", async () => {
+      route({});
+      jobClaims.claimOnce.mockRejectedValue(new Error("connection terminated"));
+      const error = jest
+        .spyOn(Logger.prototype, "error")
+        .mockImplementation(() => undefined);
+      try {
+        await service.raiseAdminAlert(
+          input({ emailDedupeKey: "BACKUP_FAILED:2026-08-30" }),
+        );
+      } finally {
+        error.mockRestore();
+      }
+      expect(emailService.sendMail).toHaveBeenCalledTimes(1);
     });
   });
 });

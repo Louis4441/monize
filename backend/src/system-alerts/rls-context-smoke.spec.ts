@@ -67,6 +67,8 @@ describe("System alerts RLS identity smoke (real withScopedDb)", () => {
       // skipping it keeps this file about the two statements that write.
       { getStatus: jest.fn().mockReturnValue({ configured: false }) } as never,
       { translate: jest.fn() } as never,
+      // No emailDedupeKey is passed below, so the claim is never consulted.
+      { claimOnce: jest.fn().mockResolvedValue(true) } as never,
     );
   });
 

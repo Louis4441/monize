@@ -30,9 +30,9 @@
       },
       "backupPartial": {
         "title": "Otomatik yedekleme eksik",
-        "messageAttachments": "{user} için yedek yazıldı, ancak {missing} ek dahil edilemedi. Tam yedekler korundu.",
-        "messagePromotion": "{user} için günlük yedekleme başarılı oldu, ancak haftalık veya aylık kopyası yazılamadı.",
-        "messageRetention": "{user} için yedekleme başarılı oldu, ancak eski yedek dosyaları temizlenemedi."
+        "messageAttachments": "{user} için yedek yazıldı, ancak {expected} ekten {missing} tanesi dahil edilemedi ve {inconsistent} tanesi meta verileriyle eşleşmedi. Tam yedekler korundu.",
+        "messagePromotion": "{user} için günlük yedekleme başarılı oldu, ancak haftalık veya aylık kopyası yazılamadı: {error}",
+        "messageRetention": "{user} için yedekleme başarılı oldu, ancak eski yedek dosyaları temizlenemedi: {error}"
       },
       "encryptionKeyMissing": {
         "title": "Şifreleme anahtarı yapılandırılmamış",

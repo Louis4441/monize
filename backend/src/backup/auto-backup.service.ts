@@ -113,6 +113,20 @@ const PARTIAL_FILE_PATTERN =
 const PARTIAL_TIER_NAME = "partial";
 
 /**
+ * Which path produced a backup run, because the admin alerts belong to only
+ * one of them.
+ *
+ * An automatic run has nobody watching: its failure is the whole reason the
+ * alerts exist. A **manual** run is somebody pressing "Back up now" and
+ * reading the result in the response -- alerting on it filed an admin notice
+ * titled "Automatic backup incomplete" about a backup that was not automatic,
+ * let a manual partial run take that day's dedupe key and silence the real
+ * automatic failure behind it, and made the HTTP request wait on a per-
+ * administrator SMTP fan-out after the backup had already succeeded.
+ */
+type BackupRunOrigin = "automatic" | "manual";
+
+/**
  * Days of the month on which a daily artifact is also promoted to weekly, and
  * the one on which it is promoted to monthly.
  *
@@ -654,6 +668,7 @@ export class AutoBackupService {
       filename,
       report,
       timezone,
+      "manual",
     );
 
     settings.lastBackupAt = new Date();
@@ -695,6 +710,7 @@ export class AutoBackupService {
     filename: string,
     report: BackupCompletenessReport,
     timezone: string,
+    origin: BackupRunOrigin,
   ): Promise<void> {
     if (report.complete) {
       const weeklyError = await this.copyToWeeklyIfNeeded(
@@ -719,11 +735,16 @@ export class AutoBackupService {
       // rightly stays "success", and the alert row is the only durable state
       // these paths have. The daily backup exists; what the admin is told is
       // that the weekly/monthly copy or the cleanup did not happen.
-      await this.raiseBackupSideEffectAlerts(settings.userId, filename, {
-        weeklyError,
-        monthlyError,
-        retentionErrors,
-      });
+      await this.raiseBackupSideEffectAlerts(
+        settings.userId,
+        filename,
+        origin,
+        {
+          weeklyError,
+          monthlyError,
+          retentionErrors,
+        },
+      );
       return;
     }
     const retentionErrors = this.enforceRetention(
@@ -742,14 +763,14 @@ export class AutoBackupService {
     this.logger.warn(
       `Auto-backup for user ${settings.userId} is partial: ${settings.lastBackupError}`,
     );
-    await this.raiseBackupPartialAlert(settings.userId, "attachments", {
+    await this.raiseBackupPartialAlert(settings.userId, "attachments", origin, {
       message: `The backup was written, but ${settings.lastBackupError}`,
       missingAttachments: report.missingAttachments,
       inconsistentAttachments: report.inconsistentAttachments,
       expectedAttachments: report.expectedAttachments,
       filename,
     });
-    await this.raiseBackupSideEffectAlerts(settings.userId, filename, {
+    await this.raiseBackupSideEffectAlerts(settings.userId, filename, origin, {
       weeklyError: null,
       monthlyError: null,
       retentionErrors,
@@ -765,6 +786,7 @@ export class AutoBackupService {
   private async raiseBackupSideEffectAlerts(
     userId: string,
     filename: string,
+    origin: BackupRunOrigin,
     outcome: {
       weeklyError: string | null;
       monthlyError: string | null;
@@ -775,7 +797,7 @@ export class AutoBackupService {
       (e): e is string => e !== null,
     );
     if (promotionErrors.length > 0) {
-      await this.raiseBackupPartialAlert(userId, "promotion", {
+      await this.raiseBackupPartialAlert(userId, "promotion", origin, {
         message:
           `The daily backup ${filename} succeeded, but its weekly/monthly ` +
           `copy could not be written: ${promotionErrors.join("; ")}`,
@@ -784,7 +806,7 @@ export class AutoBackupService {
       });
     }
     if (outcome.retentionErrors.length > 0) {
-      await this.raiseBackupPartialAlert(userId, "retention", {
+      await this.raiseBackupPartialAlert(userId, "retention", origin, {
         message:
           `The backup succeeded, but ${outcome.retentionErrors.length} old ` +
           `backup file(s) could not be cleaned up: ` +
@@ -803,8 +825,10 @@ export class AutoBackupService {
   private async raiseBackupPartialAlert(
     userId: string,
     reason: "attachments" | "promotion" | "retention",
+    origin: BackupRunOrigin,
     detail: { message: string } & Record<string, unknown>,
   ): Promise<void> {
+    if (origin !== "automatic") return;
     const { message, ...data } = detail;
     const email = await this.userEmailQuietly(userId);
     await this.systemAlerts.raiseAdminAlert({
@@ -820,6 +844,11 @@ export class AutoBackupService {
         ...data,
       },
       dedupeKey: `BACKUP_PARTIAL:${userId}:${reason}:${utcDateString()}`,
+      // One row per affected user (an administrator has to know WHICH users
+      // lost a backup), but one email per reason per day: the usual cause is
+      // one broken volume, and a sixty-user install would otherwise send an
+      // administrator sixty identical messages about it.
+      emailDedupeKey: `BACKUP_PARTIAL:${reason}:${utcDateString()}`,
     });
   }
 
@@ -847,6 +876,8 @@ export class AutoBackupService {
         date: utcDateString(at),
       },
       dedupeKey: `BACKUP_FAILED:${userId}:${utcDateString(at)}`,
+      // As above: the rows stay per user, the mail is said once a day.
+      emailDedupeKey: `BACKUP_FAILED:${utcDateString(at)}`,
     });
   }
 
@@ -1065,6 +1096,7 @@ export class AutoBackupService {
       filename,
       report,
       timezone,
+      "automatic",
     );
 
     // applyBackupOutcome set lastBackupStatus/Error to reflect a complete

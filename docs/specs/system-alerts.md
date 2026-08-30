@@ -20,8 +20,8 @@ System-level issues are raised as rows in the existing alerts interface --
 the `budget_alerts` table behind the bell dropdown -- by
 `backend/src/system-alerts/system-alert.service.ts`, and the admin-facing
 ones also email the administrators. `SystemAlertMonitorService` beside it
-owns the two conditions nothing else watches (the encryption key at
-bootstrap, SMTP health on a 15-minute sweep).
+owns the two conditions nothing else watches -- the encryption key and SMTP
+health -- on one 15-minute sweep.
 
 ### Audience
 
@@ -42,9 +42,9 @@ transaction failing to post -- goes to that user, in-app only.
 
 | Type | Severity | Audience | Raised from | Dedupe key | Email |
 |---|---|---|---|---|---|
-| `BACKUP_FAILED` | critical | admins | auto-backup cron catch | `BACKUP_FAILED:<userId>:<utc-date>` | yes |
-| `BACKUP_PARTIAL` | warning | admins | partial artifact; promotion-copy failure; retention-delete failure (`data.reason` names which) | `BACKUP_PARTIAL:<userId>:<reason>:<utc-date>` | yes |
-| `ENCRYPTION_KEY_MISSING` | warning | admins | bootstrap check | `ENCRYPTION_KEY_MISSING:<iso-week>` | yes |
+| `BACKUP_FAILED` | critical | admins | auto-backup cron catch (**automatic runs only**) | `BACKUP_FAILED:<userId>:<utc-date>` | yes, once per day |
+| `BACKUP_PARTIAL` | warning | admins | partial artifact; promotion-copy failure; retention-delete failure (`data.reason` names which), **automatic runs only** | `BACKUP_PARTIAL:<userId>:<reason>:<utc-date>` | yes, once per reason per day |
+| `ENCRYPTION_KEY_MISSING` | warning | admins | the 15-minute sweep | `ENCRYPTION_KEY_MISSING:<iso-week>` | yes |
 | `PROVIDER_OUTAGE` | warning | admins | outage claim win | `PROVIDER_OUTAGE:<provider>:<outage start ISO>` | no (bespoke email exists) |
 | `PROVIDER_RECOVERED` | success | admins | recovery claim win | `PROVIDER_RECOVERED:<provider>:<outage start ISO>` | no |
 | `SMTP_FAILURE` | warning | admins | 15-minute sweep over `EmailService.getFailureSnapshot()` | `SMTP_FAILURE:<utc-date>` | **never** |
@@ -52,7 +52,25 @@ transaction failing to post -- goes to that user, in-app only.
 
 `SMTP_FAILURE` never emails whatever the caller passes -- the channel cannot
 report its own failure -- and the refusal is enforced inside
-`SystemAlertService.shouldEmail`, not left to call sites.
+`SystemAlertService.shouldEmail`, not left to call sites. It is also raised
+only for a **transport** failure: a `550` for one full mailbox means the relay
+answered and refused that address, so `EmailService` counts it as a
+`recipientRejection` and the sweep never sees it (the same "an answer, however
+bad, proves the host answered" rule the provider breaker uses).
+
+**A manual "Back up now" raises nothing.** `applyBackupOutcome` is shared with
+the cron, so it takes a `BackupRunOrigin`: an automatic run has nobody
+watching, while a manual one returns its outcome to the person who pressed the
+button. Alerting on both filed an admin notice titled "Automatic backup
+incomplete" about a backup that was not automatic, let a manual partial take
+that day's dedupe key and silence the real automatic failure behind it, and
+made the HTTP request wait on a per-administrator SMTP fan-out.
+
+**A title is bounded at the door.** Producers interpolate names they do not
+control, and `title` is `VARCHAR(255)`: an over-long one makes PostgreSQL raise
+22001, which the never-throws contract swallows, so the alert silently never
+exists. `SystemAlertService` truncates once, centrally, rather than trusting
+each producer.
 
 ### The two claims and their mechanisms
 
@@ -72,6 +90,15 @@ Every replica runs every cron, so both effects need a cross-replica arbiter
   committing and SMTP accepting loses that email; the in-app row survives,
   and a duplicated admin alert is the failure mode being designed against.
 
+**A per-user fact does not mean a per-user email.** One broken volume raises
+one `BACKUP_FAILED` row per affected user -- an administrator has to know
+*which* users lost a backup -- but sixty rows must not send sixty identical
+messages. `SystemAlertInput.emailDedupeKey` collapses the mail: the row is
+claimed by the unique index as above, and the email additionally requires
+winning `JobClaimService.claimOnce(SystemAlertEmail, adminId, key)`. A claim
+that itself fails falls through to sending, because a duplicate email is the
+lesser outcome once the row exists.
+
 The provider pair additionally sits behind `provider_health`'s existing
 conditional-UPDATE claim: the in-app rows are created only after that claim
 is won, so the episode semantics (15-minute minimum, 6-hour floor) carry
@@ -90,7 +117,12 @@ English title/message (`systemAlertTemplate`).
 ### Lifecycle and re-alerting
 
 System alert rows live the ordinary alert lifecycle: unread, read, soft
-dismiss, and the 30-day purge in `BudgetAlertService.purgeOldAlerts`. The
+dismiss, and the 30-day purge in `BudgetAlertService.purgeOldAlerts`. They are
+**not** budget news, so the weekly budget digest filters them out
+(`dedupe_key IS NULL`): a system alert raised on the first of a month carries
+that day as its `period_start`, which is also the month's budget period start,
+and without the filter it was rendered inside the digest for the rest of the
+month. The
 purge deletes the row **and with it the dedupe key**, so a persistent
 condition (a key still missing, SMTP still broken) is re-raised on its next
 bucket after the old row ages out. That is intended -- a standing problem

@@ -30,9 +30,9 @@
       },
       "backupPartial": {
         "title": "自動バックアップが不完全です",
-        "messageAttachments": "{user} のバックアップは書き込まれましたが、{missing} 件の添付ファイルを含められませんでした。完全なバックアップは保持されています。",
-        "messagePromotion": "{user} の日次バックアップは成功しましたが、週次または月次のコピーを書き込めませんでした。",
-        "messageRetention": "{user} のバックアップは成功しましたが、古いバックアップファイルを削除できませんでした。"
+        "messageAttachments": "{user} のバックアップは書き込まれましたが、{expected} 件中 {missing} 件の添付ファイルを含められず、{inconsistent} 件はメタデータと一致しませんでした。完全なバックアップは保持されています。",
+        "messagePromotion": "{user} の日次バックアップは成功しましたが、週次または月次のコピーを書き込めませんでした: {error}",
+        "messageRetention": "{user} のバックアップは成功しましたが、古いバックアップファイルを削除できませんでした: {error}"
       },
       "encryptionKeyMissing": {
         "title": "暗号化キーが設定されていません",

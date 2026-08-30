@@ -596,16 +596,30 @@ describe('BudgetAlertList', () => {
       ).toBeInTheDocument();
     });
 
-    it('switches the partial-backup message on its reason', () => {
+    it('switches the partial-backup message on its reason, carrying its cause', () => {
       const base = {
         system: true,
         affectedUserId: 'u-1',
         affectedUserEmail: 'ken@example.com',
       };
-      for (const [reason, fragment] of [
-        ['attachments', /2 attachments could not be included/],
-        ['promotion', /weekly or monthly copy could not be written/],
-        ['retention', /old backup files could not be cleaned up/],
+      for (const [data, fragment] of [
+        [
+          {
+            reason: 'attachments',
+            missingAttachments: 2,
+            inconsistentAttachments: 0,
+            expectedAttachments: 7,
+          },
+          /2 of 7 attachments could not be included and 0 did not match/,
+        ],
+        [
+          { reason: 'promotion', error: 'weekly: EACCES: permission denied' },
+          /weekly or monthly copy could not be written: weekly: EACCES/,
+        ],
+        [
+          { reason: 'retention', error: 'daily-2026-04-01: EACCES' },
+          /old backup files could not be cleaned up: daily-2026-04-01/,
+        ],
       ] as const) {
         const { unmount } = render(
           <BudgetAlertList
@@ -613,7 +627,7 @@ describe('BudgetAlertList', () => {
             alerts={[
               systemAlert({
                 alertType: 'BACKUP_PARTIAL',
-                data: { ...base, reason, missingAttachments: 2 },
+                data: { ...base, ...data },
               }),
             ]}
           />,
@@ -621,6 +635,53 @@ describe('BudgetAlertList', () => {
         expect(screen.getByText(fragment)).toBeInTheDocument();
         unmount();
       }
+    });
+
+    it('states an inconsistency-only partial truthfully, not as "0 attachments"', () => {
+      // Reading only `missingAttachments` said "0 attachments could not be
+      // included" for a run whose attachments were all present and did not
+      // match their metadata -- a stored English message that was correct,
+      // replaced by a localized one that was not.
+      render(
+        <BudgetAlertList
+          {...defaultProps}
+          alerts={[
+            systemAlert({
+              alertType: 'BACKUP_PARTIAL',
+              data: {
+                system: true,
+                affectedUserEmail: 'ken@example.com',
+                reason: 'attachments',
+                missingAttachments: 0,
+                inconsistentAttachments: 3,
+                expectedAttachments: 7,
+              },
+            }),
+          ]}
+        />,
+      );
+      expect(
+        screen.getByText(/0 of 7 attachments could not be included and 3 did not match/),
+      ).toBeInTheDocument();
+    });
+
+    it('falls back to the stored English when a partial payload lacks its counts', () => {
+      render(
+        <BudgetAlertList
+          {...defaultProps}
+          alerts={[
+            systemAlert({
+              alertType: 'BACKUP_PARTIAL',
+              data: {
+                system: true,
+                affectedUserEmail: 'ken@example.com',
+                reason: 'promotion',
+              },
+            }),
+          ]}
+        />,
+      );
+      expect(screen.getByText('STORED ENGLISH MESSAGE')).toBeInTheDocument();
     });
 
     it('composes the provider pair from the stored label', () => {

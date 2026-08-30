@@ -1,10 +1,4 @@
-import {
-  forwardRef,
-  Inject,
-  Injectable,
-  Logger,
-  OnApplicationBootstrap,
-} from "@nestjs/common";
+import { forwardRef, Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Cron } from "@nestjs/schedule";
 import {
@@ -29,12 +23,20 @@ export const SMTP_FAILURE_LOOKBACK_MS = 24 * 60 * 60_000;
  * Watches for deployment states nobody currently reports and raises them as
  * admin system alerts:
  *
- * - **Missing encryption key** (issue #1269's silent state): checked once per
- *   boot. The startup log warning in `main.ts` stays; this is the in-app copy
- *   an operator who never reads container logs actually sees. Re-raised once
- *   per ISO week while unset -- every replica boots and every boot checks, so
- *   the week-bucketed dedupe key plus the unique index keep it to one row per
- *   admin per week.
+ * - **Missing encryption key** (issue #1269's silent state), re-raised once
+ *   per ISO week while it stays unset. The startup log warning in `main.ts`
+ *   stays; this is the in-app copy an operator who never reads container logs
+ *   actually sees.
+ *
+ *   Deliberately on the sweep rather than on `onApplicationBootstrap`, for
+ *   three reasons that all bit the boot-time version: a fresh install has no
+ *   administrator yet when it boots, so the fan-out stood down and the alert
+ *   was never raised until somebody restarted the server; a deployment that
+ *   simply keeps running never re-raised it, contradicting the weekly bucket
+ *   it is keyed on; and Nest awaits bootstrap hooks inside `app.listen()`, so
+ *   an unreachable relay delayed the port opening by one SMTP timeout per
+ *   administrator and could hold a readiness probe into a restart loop. A
+ *   condition that has been true since installation can wait fifteen minutes.
  * - **SMTP delivery failing**: a 15-minute sweep over this replica's own
  *   `EmailService` failure snapshot. In-app only by definition -- the email
  *   channel cannot report itself. Skipped entirely when SMTP is not
@@ -45,7 +47,7 @@ export const SMTP_FAILURE_LOOKBACK_MS = 24 * 60 * 60_000;
  * context -- so this file does not need the with-context lint allowlist.
  */
 @Injectable()
-export class SystemAlertMonitorService implements OnApplicationBootstrap {
+export class SystemAlertMonitorService {
   private readonly logger = new Logger(SystemAlertMonitorService.name);
 
   constructor(
@@ -55,11 +57,18 @@ export class SystemAlertMonitorService implements OnApplicationBootstrap {
     private readonly emailService: EmailService,
   ) {}
 
-  async onApplicationBootstrap(): Promise<void> {
-    await this.checkEncryptionKey();
+  /**
+   * Both checks, on one schedule. Each is independent: the encryption key is
+   * a fact about configuration, SMTP health a fact about the last sends, and
+   * neither may stop the other from being reported.
+   */
+  @Cron("*/15 * * * *")
+  async sweepSystemHealth(now: Date = new Date()): Promise<void> {
+    await this.checkEncryptionKey(now);
+    await this.sweepEmailHealth(now);
   }
 
-  /** Exposed for the spec; `raiseAdminAlert` never throws, so nor does this. */
+  /** `raiseAdminAlert` never throws, so nor does this. */
   async checkEncryptionKey(now: Date = new Date()): Promise<void> {
     const resolved = resolveEncryptionKey((name) =>
       this.configService.get<string>(name),
@@ -79,7 +88,6 @@ export class SystemAlertMonitorService implements OnApplicationBootstrap {
     });
   }
 
-  @Cron("*/15 * * * *")
   async sweepEmailHealth(now: Date = new Date()): Promise<void> {
     if (!this.emailService.getStatus().configured) return;
     const snapshot = this.emailService.getFailureSnapshot();

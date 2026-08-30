@@ -3,6 +3,7 @@ import * as path from "path";
 import { DataSource } from "typeorm";
 
 import { SystemAlertService } from "@/system-alerts/system-alert.service";
+import { JobClaimService } from "@/common/jobs/job-claim.service";
 import {
   AlertSeverity,
   AlertType,
@@ -60,6 +61,10 @@ describe("system alert dedupe against a real database", () => {
         translate: (_key: string, options?: { defaultValue?: string }) =>
           options?.defaultValue ?? _key,
       } as never,
+      // The real claim service: `emailDedupeKey` is arbitrated by a second
+      // real table, and a mock that always wins would make the collapse
+      // assertion below vacuous.
+      new JobClaimService(dataSource),
     );
 
   const input = (dedupeKey: string) => ({
@@ -101,7 +106,7 @@ describe("system alert dedupe against a real database", () => {
 
   beforeEach(async () => {
     emailsSent.length = 0;
-    await cleanTables(dataSource, ["budget_alerts", "users"]);
+    await cleanTables(dataSource, ["budget_alerts", "job_claims", "users"]);
   });
 
   it("concurrent same-key raises land one row per admin, and each admin is emailed once", async () => {
@@ -192,5 +197,24 @@ describe("system alert dedupe against a real database", () => {
 
     expect(await alertRows()).toHaveLength(2);
     expect(emailsSent).toEqual([]);
+  });
+
+  it("collapses the email of several same-cause alerts while writing every row", async () => {
+    await createTestUserDirect(dataSource, {
+      email: "ops@example.com",
+      role: "admin",
+    });
+
+    // One broken volume, three affected users: three rows naming who lost a
+    // backup, one message to the administrator.
+    for (const user of ["u-1", "u-2", "u-3"]) {
+      await alertService().raiseAdminAlert({
+        ...input(`BACKUP_FAILED:${user}:2026-08-30`),
+        emailDedupeKey: "BACKUP_FAILED:2026-08-30",
+      });
+    }
+
+    expect(await alertRows()).toHaveLength(3);
+    expect(emailsSent).toHaveLength(1);
   });
 });

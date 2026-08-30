@@ -718,6 +718,14 @@ export class BudgetAlertService {
         where: {
           userId,
           periodStart,
+          // System alerts share this table but are not budget news, and
+          // `dedupe_key` is exactly what tells the two apart (only a system
+          // alert carries one). Without this an alert raised on the FIRST of
+          // a month -- whose `period_start` is stamped with that day, which is
+          // also the month's budget period start -- was rendered inside the
+          // budget digest for the rest of the month, and could produce a
+          // digest for a user who had no budget news at all.
+          dedupeKey: IsNull(),
         },
         order: { createdAt: "DESC" },
         take: 20,

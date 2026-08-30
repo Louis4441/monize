@@ -30,9 +30,9 @@
       },
       "backupPartial": {
         "title": "[XX-Automatic backup incomplete-XX]",
-        "messageAttachments": "[XX-The backup for {user} was written, but {missing, plural, one {# attachment} other {# attachments}} could not be included. Complete backups were preserved.-XX]",
-        "messagePromotion": "[XX-The daily backup for {user} succeeded, but its weekly or monthly copy could not be written.-XX]",
-        "messageRetention": "[XX-The backup for {user} succeeded, but old backup files could not be cleaned up.-XX]"
+        "messageAttachments": "[XX-The backup for {user} was written, but {missing} of {expected} attachments could not be included and {inconsistent} did not match their metadata. Complete backups were preserved.-XX]",
+        "messagePromotion": "[XX-The daily backup for {user} succeeded, but its weekly or monthly copy could not be written: {error}-XX]",
+        "messageRetention": "[XX-The backup for {user} succeeded, but old backup files could not be cleaned up: {error}-XX]"
       },
       "encryptionKeyMissing": {
         "title": "[XX-Encryption key not configured-XX]",

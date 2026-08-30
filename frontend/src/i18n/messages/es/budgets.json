@@ -30,9 +30,9 @@
       },
       "backupPartial": {
         "title": "Copia de seguridad automática incompleta",
-        "messageAttachments": "La copia de seguridad de {user} se escribió, pero {missing, plural, one {no se pudo incluir # archivo adjunto} other {no se pudieron incluir # archivos adjuntos}}. Las copias completas se conservaron.",
-        "messagePromotion": "La copia diaria de {user} se completó, pero su copia semanal o mensual no se pudo escribir.",
-        "messageRetention": "La copia de seguridad de {user} se completó, pero los archivos de copias antiguas no se pudieron eliminar."
+        "messageAttachments": "La copia de seguridad de {user} se escribió, pero no se pudieron incluir {missing} de {expected} archivos adjuntos y {inconsistent} no coincidían con sus metadatos. Las copias completas se conservaron.",
+        "messagePromotion": "La copia diaria de {user} se completó, pero su copia semanal o mensual no se pudo escribir: {error}",
+        "messageRetention": "La copia de seguridad de {user} se completó, pero los archivos de copias antiguas no se pudieron eliminar: {error}"
       },
       "encryptionKeyMissing": {
         "title": "Clave de cifrado sin configurar",

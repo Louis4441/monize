@@ -30,9 +30,9 @@
       },
       "backupPartial": {
         "title": "자동 백업 불완전",
-        "messageAttachments": "{user}의 백업이 기록되었지만 첨부 파일 {missing}개를 포함하지 못했습니다. 완전한 백업은 보존되었습니다.",
-        "messagePromotion": "{user}의 일일 백업은 성공했지만 주간 또는 월간 사본을 기록하지 못했습니다.",
-        "messageRetention": "{user}의 백업은 성공했지만 오래된 백업 파일을 정리하지 못했습니다."
+        "messageAttachments": "{user}의 백업이 기록되었지만 첨부 파일 {expected}개 중 {missing}개를 포함하지 못했고 {inconsistent}개는 메타데이터와 일치하지 않았습니다. 완전한 백업은 보존되었습니다.",
+        "messagePromotion": "{user}의 일일 백업은 성공했지만 주간 또는 월간 사본을 기록하지 못했습니다: {error}",
+        "messageRetention": "{user}의 백업은 성공했지만 오래된 백업 파일을 정리하지 못했습니다: {error}"
       },
       "encryptionKeyMissing": {
         "title": "암호화 키가 설정되지 않음",

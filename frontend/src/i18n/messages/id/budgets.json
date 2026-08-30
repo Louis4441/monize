@@ -30,9 +30,9 @@
       },
       "backupPartial": {
         "title": "Pencadangan otomatis tidak lengkap",
-        "messageAttachments": "Cadangan untuk {user} berhasil ditulis, tetapi {missing} lampiran tidak dapat disertakan. Cadangan lengkap tetap dipertahankan.",
-        "messagePromotion": "Cadangan harian untuk {user} berhasil, tetapi salinan mingguan atau bulanannya tidak dapat ditulis.",
-        "messageRetention": "Cadangan untuk {user} berhasil, tetapi berkas cadangan lama tidak dapat dibersihkan."
+        "messageAttachments": "Cadangan untuk {user} berhasil ditulis, tetapi {missing} dari {expected} lampiran tidak dapat disertakan dan {inconsistent} tidak cocok dengan metadatanya. Cadangan lengkap tetap dipertahankan.",
+        "messagePromotion": "Cadangan harian untuk {user} berhasil, tetapi salinan mingguan atau bulanannya tidak dapat ditulis: {error}",
+        "messageRetention": "Cadangan untuk {user} berhasil, tetapi berkas cadangan lama tidak dapat dibersihkan: {error}"
       },
       "encryptionKeyMissing": {
         "title": "Kunci enkripsi belum dikonfigurasi",

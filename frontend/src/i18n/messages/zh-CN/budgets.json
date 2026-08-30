@@ -30,9 +30,9 @@
       },
       "backupPartial": {
         "title": "自动备份不完整",
-        "messageAttachments": "{user} 的备份已写入，但有 {missing} 个附件无法包含。完整备份已保留。",
-        "messagePromotion": "{user} 的每日备份成功，但其每周或每月副本无法写入。",
-        "messageRetention": "{user} 的备份成功，但旧的备份文件无法清理。"
+        "messageAttachments": "{user} 的备份已写入，但 {expected} 个附件中有 {missing} 个无法包含，另有 {inconsistent} 个与其元数据不匹配。完整备份已保留。",
+        "messagePromotion": "{user} 的每日备份成功，但其每周或每月副本无法写入：{error}",
+        "messageRetention": "{user} 的备份成功，但旧的备份文件无法清理：{error}"
       },
       "encryptionKeyMissing": {
         "title": "未配置加密密钥",

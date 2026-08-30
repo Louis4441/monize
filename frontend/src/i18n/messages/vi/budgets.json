@@ -30,9 +30,9 @@
       },
       "backupPartial": {
         "title": "Sao lưu tự động chưa hoàn chỉnh",
-        "messageAttachments": "Bản sao lưu cho {user} đã được ghi, nhưng không thể đưa vào {missing} tệp đính kèm. Các bản sao lưu đầy đủ đã được giữ nguyên.",
-        "messagePromotion": "Bản sao lưu hằng ngày cho {user} đã thành công, nhưng không thể ghi bản sao hằng tuần hoặc hằng tháng.",
-        "messageRetention": "Bản sao lưu cho {user} đã thành công, nhưng không thể dọn dẹp các tệp sao lưu cũ."
+        "messageAttachments": "Bản sao lưu cho {user} đã được ghi, nhưng không thể đưa vào {missing} trong số {expected} tệp đính kèm và {inconsistent} tệp không khớp với siêu dữ liệu của chúng. Các bản sao lưu đầy đủ đã được giữ nguyên.",
+        "messagePromotion": "Bản sao lưu hằng ngày cho {user} đã thành công, nhưng không thể ghi bản sao hằng tuần hoặc hằng tháng: {error}",
+        "messageRetention": "Bản sao lưu cho {user} đã thành công, nhưng không thể dọn dẹp các tệp sao lưu cũ: {error}"
       },
       "encryptionKeyMissing": {
         "title": "Chưa cấu hình khóa mã hóa",

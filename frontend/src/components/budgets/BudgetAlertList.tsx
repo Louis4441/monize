@@ -36,6 +36,8 @@ interface SystemAlertData {
   affectedUserEmail?: string | null;
   reason?: string;
   missingAttachments?: number;
+  inconsistentAttachments?: number;
+  expectedAttachments?: number;
   providerLabel?: string;
   since?: string;
   lastError?: string | null;
@@ -246,7 +248,6 @@ export function BudgetAlertList({
   const systemAlertTitle = (alert: BudgetAlert): string | null => {
     const data = systemAlertData(alert);
     if (!data) return null;
-    const user = data.affectedUserEmail ?? data.affectedUserId ?? '';
     switch (alert.alertType) {
       case 'BACKUP_FAILED':
         return t('alerts.system.backupFailed.title');
@@ -286,16 +287,37 @@ export function BudgetAlertList({
       case 'BACKUP_PARTIAL': {
         if (!user) return null;
         if (data.reason === 'attachments') {
+          // Both counts, because a run can be partial for either reason
+          // alone: rendering only `missing` told the reader "0 attachments
+          // could not be included" for a run whose attachments were all
+          // present and inconsistent with their metadata.
+          if (
+            data.missingAttachments === undefined ||
+            data.inconsistentAttachments === undefined ||
+            data.expectedAttachments === undefined
+          ) {
+            return null;
+          }
           return t('alerts.system.backupPartial.messageAttachments', {
             user,
-            missing: data.missingAttachments ?? 0,
+            missing: data.missingAttachments,
+            inconsistent: data.inconsistentAttachments,
+            expected: data.expectedAttachments,
           });
         }
-        if (data.reason === 'promotion') {
-          return t('alerts.system.backupPartial.messagePromotion', { user });
+        // The cause is the actionable half of these two (a permission, a full
+        // volume), so it travels into the copy rather than being dropped.
+        if (data.reason === 'promotion' && data.error !== undefined) {
+          return t('alerts.system.backupPartial.messagePromotion', {
+            user,
+            error: data.error,
+          });
         }
-        if (data.reason === 'retention') {
-          return t('alerts.system.backupPartial.messageRetention', { user });
+        if (data.reason === 'retention' && data.error !== undefined) {
+          return t('alerts.system.backupPartial.messageRetention', {
+            user,
+            error: data.error,
+          });
         }
         return null;
       }

@@ -26,6 +26,7 @@ describe("SystemAlertMonitorService", () => {
       lastFailureMessage: null,
       lastSuccessAt: null,
       failuresSinceSuccess: 0,
+      recipientRejections: 0,
       ...overrides,
     };
   }
@@ -77,16 +78,51 @@ describe("SystemAlertMonitorService", () => {
       expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledTimes(1);
     });
 
-    it("runs on application bootstrap", async () => {
-      await service.onApplicationBootstrap();
+    it("runs on the sweep, not on bootstrap", async () => {
+      // Boot-only never fired on a fresh install (no administrator exists yet
+      // when the server first starts, so the fan-out stood down), never
+      // re-raised on the weekly bucket it is keyed on, and made Nest await a
+      // per-administrator SMTP fan-out inside `app.listen()`.
+      expect(
+        (service as unknown as Record<string, unknown>).onApplicationBootstrap,
+      ).toBeUndefined();
+
+      await service.sweepSystemHealth(new Date("2026-08-30T12:00:00Z"));
       expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledWith(
         expect.objectContaining({ type: AlertType.ENCRYPTION_KEY_MISSING }),
       );
+    });
+
+    it("keeps re-raising on later sweeps, so a fresh install is told once an admin exists", async () => {
+      // The weekly dedupe key -- not the number of sweeps -- is what bounds
+      // the noise, and a raise that found no administrator has written
+      // nothing to dedupe against.
+      systemAlerts.raiseAdminAlert.mockResolvedValue({
+        created: 0,
+        emailed: 0,
+      });
+      await service.sweepSystemHealth(new Date("2026-08-30T12:00:00Z"));
+      await service.sweepSystemHealth(new Date("2026-08-30T12:15:00Z"));
+      expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledTimes(2);
     });
   });
 
   describe("SMTP health sweep", () => {
     const now = new Date("2026-08-30T12:00:00Z");
+
+    it("is not stopped by the encryption-key check beside it", async () => {
+      // One handler, two independent facts: a configured key must not mean
+      // the SMTP check is skipped, and vice versa.
+      env.ENCRYPTION_KEY = "k".repeat(32);
+      emailService.getFailureSnapshot.mockReturnValue(
+        snapshot({ lastFailureAt: new Date("2026-08-30T11:50:00Z") }),
+      );
+      await service.sweepSystemHealth(now);
+      expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledTimes(1);
+      expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ type: AlertType.SMTP_FAILURE }),
+      );
+    });
 
     it("raises a daily-bucketed, never-emailed alert when the last send failed", async () => {
       emailService.getFailureSnapshot.mockReturnValue(

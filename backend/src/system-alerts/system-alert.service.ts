@@ -17,9 +17,16 @@ import {
   AdminRecipient,
   queryAdminRecipients,
 } from "../users/admin-recipients.util";
+import {
+  JobClaimService,
+  JobClaimType,
+} from "../common/jobs/job-claim.service";
 
 /** Matches budget_alerts.dedupe_key VARCHAR(120). */
 export const DEDUPE_KEY_MAX_LENGTH = 120;
+
+/** Matches budget_alerts.title VARCHAR(255). */
+export const TITLE_MAX_LENGTH = 255;
 
 export interface SystemAlertInput {
   type: AlertType;
@@ -43,6 +50,17 @@ export interface SystemAlertInput {
    * says: the email channel cannot report its own failure.
    */
   email?: boolean;
+  /**
+   * Collapses the EMAIL (never the rows) of several alerts that share one
+   * cause onto a single message per administrator, claimed through
+   * `job_claims`. Without it every raise that wins its row also emails, which
+   * is right for a deployment-wide fact raised once -- and wrong for a
+   * per-user one: a full disk on a sixty-user install raises sixty
+   * BACKUP_FAILED rows, each correctly naming its user, and would otherwise
+   * send sixty emails per administrator about one broken volume. The rows
+   * stay granular; the mail says it once.
+   */
+  emailDedupeKey?: string;
 }
 
 /**
@@ -90,6 +108,7 @@ export class SystemAlertService {
     @Inject(forwardRef(() => EmailService))
     private readonly emailService: EmailService,
     private readonly i18n: I18nService,
+    private readonly jobClaims: JobClaimService,
   ) {}
 
   /**
@@ -156,7 +175,12 @@ export class SystemAlertService {
         if (rowId === null) continue;
         created += 1;
         const email = admin.email;
-        if (shouldEmail && admin.emailEnabled && email !== null) {
+        if (
+          shouldEmail &&
+          admin.emailEnabled &&
+          email !== null &&
+          (await this.claimEmail(admin.userId, input))
+        ) {
           const sent = await this.emailAdmin({ ...admin, email }, input);
           if (sent) {
             emailed += 1;
@@ -195,7 +219,7 @@ export class SystemAlertService {
             userId,
             input.type,
             input.severity,
-            input.title,
+            boundedTitle(input.title),
             input.message,
             JSON.stringify(input.data ?? {}),
             todayIsoDate(),
@@ -262,6 +286,37 @@ export class SystemAlertService {
   }
 
   /**
+   * Whether this administrator is owed the email, when the caller asked for
+   * several same-cause alerts to share one.
+   *
+   * `claimOnce` is the same cross-replica arbiter the reminders use: the one
+   * caller whose INSERT lands gets `true`, every later raise in the bucket
+   * (and every other replica) gets `false`. A claim failure must not cost the
+   * alert its mail, so an error here falls through to sending -- a duplicate
+   * email is the lesser of the two outcomes once the row already exists.
+   */
+  private async claimEmail(
+    adminUserId: string,
+    input: SystemAlertInput,
+  ): Promise<boolean> {
+    if (input.emailDedupeKey === undefined) return true;
+    try {
+      return await this.jobClaims.claimOnce(
+        JobClaimType.SystemAlertEmail,
+        adminUserId,
+        input.emailDedupeKey.slice(0, DEDUPE_KEY_MAX_LENGTH),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Could not claim the ${input.type} email for admin ${adminUserId}; ` +
+          `sending it rather than losing it: ` +
+          `${error instanceof Error ? error.message : String(error)}`,
+      );
+      return true;
+    }
+  }
+
+  /**
    * Whether this alert's insert winners email. `SMTP_FAILURE` never does,
    * whatever the caller says: the report that email is broken cannot travel
    * by email, and an attempt would land in the failure snapshot it was
@@ -300,6 +355,21 @@ export class SystemAlertService {
         "was told. It is raised again once an administrator exists.",
     );
   }
+}
+
+/**
+ * A title the `title VARCHAR(255)` column will accept.
+ *
+ * Producers interpolate names they do not control -- a scheduled
+ * transaction's, an account's -- and an over-long one makes PostgreSQL raise
+ * 22001, which the never-throws contract then swallows: the alert silently
+ * never exists, and for SCHEDULED_POST_FAILED that means the user is never
+ * told their money did not move. Truncating is the honest failure here, and
+ * it happens once, at the door, rather than at each producer.
+ */
+function boundedTitle(title: string): string {
+  if (title.length <= TITLE_MAX_LENGTH) return title;
+  return `${title.slice(0, TITLE_MAX_LENGTH - 1)}\u2026`;
 }
 
 /** Today as the DATE the NOT NULL period_start column requires. */

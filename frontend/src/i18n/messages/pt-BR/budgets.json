@@ -30,9 +30,9 @@
       },
       "backupPartial": {
         "title": "Backup automático incompleto",
-        "messageAttachments": "O backup de {user} foi gravado, mas {missing, plural, one {não foi possível incluir # anexo} other {não foi possível incluir # anexos}}. Os backups completos foram preservados.",
-        "messagePromotion": "O backup diário de {user} foi concluído, mas sua cópia semanal ou mensal não pôde ser gravada.",
-        "messageRetention": "O backup de {user} foi concluído, mas os arquivos de backups antigos não puderam ser removidos."
+        "messageAttachments": "O backup de {user} foi gravado, mas não foi possível incluir {missing} de {expected} anexos e {inconsistent} não correspondiam aos seus metadados. Os backups completos foram preservados.",
+        "messagePromotion": "O backup diário de {user} foi concluído, mas sua cópia semanal ou mensal não pôde ser gravada: {error}",
+        "messageRetention": "O backup de {user} foi concluído, mas os arquivos de backups antigos não puderam ser removidos: {error}"
       },
       "encryptionKeyMissing": {
         "title": "Chave de criptografia não configurada",

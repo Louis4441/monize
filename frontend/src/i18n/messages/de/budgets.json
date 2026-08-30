@@ -30,9 +30,9 @@
       },
       "backupPartial": {
         "title": "Automatisches Backup unvollständig",
-        "messageAttachments": "Das Backup für {user} wurde geschrieben, aber {missing, plural, one {# Anhang konnte} other {# Anhänge konnten}} nicht aufgenommen werden. Vollständige Backups wurden bewahrt.",
-        "messagePromotion": "Das tägliche Backup für {user} war erfolgreich, aber die wöchentliche oder monatliche Kopie konnte nicht geschrieben werden.",
-        "messageRetention": "Das Backup für {user} war erfolgreich, aber alte Backup-Dateien konnten nicht aufgeräumt werden."
+        "messageAttachments": "Das Backup für {user} wurde geschrieben, aber {missing} von {expected} Anhängen konnten nicht aufgenommen werden und {inconsistent} stimmten nicht mit ihren Metadaten überein. Vollständige Backups wurden bewahrt.",
+        "messagePromotion": "Das tägliche Backup für {user} war erfolgreich, aber die wöchentliche oder monatliche Kopie konnte nicht geschrieben werden: {error}",
+        "messageRetention": "Das Backup für {user} war erfolgreich, aber alte Backup-Dateien konnten nicht aufgeräumt werden: {error}"
       },
       "encryptionKeyMissing": {
         "title": "Verschlüsselungsschlüssel nicht konfiguriert",

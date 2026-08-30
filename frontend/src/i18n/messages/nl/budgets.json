@@ -30,9 +30,9 @@
       },
       "backupPartial": {
         "title": "Automatische back-up onvolledig",
-        "messageAttachments": "De back-up voor {user} is weggeschreven, maar {missing, plural, one {# bijlage kon} other {# bijlagen konden}} niet worden opgenomen. Volledige back-ups zijn bewaard.",
-        "messagePromotion": "De dagelijkse back-up voor {user} is gelukt, maar de wekelijkse of maandelijkse kopie kon niet worden weggeschreven.",
-        "messageRetention": "De back-up voor {user} is gelukt, maar oude back-upbestanden konden niet worden opgeruimd."
+        "messageAttachments": "De back-up voor {user} is weggeschreven, maar {missing} van {expected} bijlagen konden niet worden opgenomen en {inconsistent} kwamen niet overeen met hun metagegevens. Volledige back-ups zijn bewaard.",
+        "messagePromotion": "De dagelijkse back-up voor {user} is gelukt, maar de wekelijkse of maandelijkse kopie kon niet worden weggeschreven: {error}",
+        "messageRetention": "De back-up voor {user} is gelukt, maar oude back-upbestanden konden niet worden opgeruimd: {error}"
       },
       "encryptionKeyMissing": {
         "title": "Encryptiesleutel niet geconfigureerd",
