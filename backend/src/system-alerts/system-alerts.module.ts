@@ -1,0 +1,21 @@
+import { Module, forwardRef } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
+import { SystemAlertService } from "./system-alert.service";
+import { SystemAlertMonitorService } from "./system-alert-monitor.service";
+import { NotificationsModule } from "../notifications/notifications.module";
+
+/**
+ * System-level issues raised through the existing alerts interface (the
+ * `budget_alerts` bell), fanned out to administrators -- see
+ * `docs/specs/system-alerts.md`.
+ *
+ * `forwardRef` because NotificationsModule imports this module back
+ * (ProviderOutageAlertService raises the in-app companion rows), so the edge
+ * sits on a require cycle -- `src/module-graph.spec.ts` proves it.
+ */
+@Module({
+  imports: [ConfigModule, forwardRef(() => NotificationsModule)],
+  providers: [SystemAlertService, SystemAlertMonitorService],
+  exports: [SystemAlertService],
+})
+export class SystemAlertsModule {}

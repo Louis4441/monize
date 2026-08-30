@@ -22,6 +22,38 @@
       "titleInDays": "{payee} 將在 {days} 天後到期",
       "amountDue": "{date} 應付 {amount}",
       "amountUnavailable": "金額無法取得（無目前匯率），到期日 {date}"
+    },
+    "system": {
+      "backupFailed": {
+        "title": "自動備份失敗",
+        "message": "{user} 的自動備份失敗：{error}"
+      },
+      "backupPartial": {
+        "title": "自動備份不完整",
+        "messageAttachments": "{user} 的備份已寫入，但 {expected} 個附件中有 {missing} 個無法納入，另有 {inconsistent} 個與其中繼資料不符。完整備份已保留。",
+        "messagePromotion": "{user} 的每日備份成功，但其每週或每月副本無法寫入：{error}",
+        "messageRetention": "{user} 的備份成功，但舊的備份檔案無法清理：{error}"
+      },
+      "encryptionKeyMissing": {
+        "title": "尚未設定加密金鑰",
+        "message": "未設定 ENCRYPTION_KEY，備份將以未加密方式寫入，且無法儲存機密資訊。未來版本將在缺少該金鑰時拒絕啟動。"
+      },
+      "smtpFailure": {
+        "title": "郵件傳送失敗",
+        "message": "Monize 無法傳送郵件：{error}。通知與提醒未能送達。"
+      },
+      "providerOutage": {
+        "title": "{provider} 沒有回應",
+        "message": "無法取得 {provider} 的市場資料。在其恢復回應之前，價格與指數資料可能已過時。"
+      },
+      "providerRecovered": {
+        "title": "{provider} 已恢復回應",
+        "message": "故障已結束，{provider} 的市場資料正在重新更新。"
+      },
+      "scheduledPostFailed": {
+        "title": "無法登錄 {name}",
+        "message": "您到期日為 {date} 的定期交易未能自動登錄：{error}。您可以在「帳單與存款」中手動登錄。"
+      }
     }
   },
   "summary503020": {

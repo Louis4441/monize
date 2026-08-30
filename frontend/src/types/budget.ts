@@ -12,7 +12,17 @@ export type AlertType =
   | 'PROJECTED_OVERSPEND'
   | 'INCOME_SHORTFALL'
   | 'POSITIVE_MILESTONE'
-  | 'BILL_DUE';
+  | 'BILL_DUE'
+  // System-level alerts (budgetId null). Admin-facing except
+  // SCHEDULED_POST_FAILED, which goes to the affected user. Kept in sync with
+  // the backend AlertType enum by hand.
+  | 'BACKUP_FAILED'
+  | 'BACKUP_PARTIAL'
+  | 'ENCRYPTION_KEY_MISSING'
+  | 'PROVIDER_OUTAGE'
+  | 'PROVIDER_RECOVERED'
+  | 'SMTP_FAILURE'
+  | 'SCHEDULED_POST_FAILED';
 export type AlertSeverity = 'info' | 'warning' | 'critical' | 'success';
 export type PeriodStatus = 'OPEN' | 'CLOSED' | 'PROJECTED';
 export type BudgetProfile = 'COMFORTABLE' | 'ON_TRACK' | 'AGGRESSIVE';
@@ -83,7 +93,8 @@ export interface BudgetCategory {
 export interface BudgetAlert {
   id: string;
   userId: string;
-  budgetId: string;
+  // Null for bill reminders and every system alert.
+  budgetId: string | null;
   budgetCategoryId: string | null;
   alertType: AlertType;
   severity: AlertSeverity;
@@ -94,6 +105,8 @@ export interface BudgetAlert {
   isEmailSent: boolean;
   periodStart: string;
   createdAt: string;
+  // Cross-replica fingerprint on system alerts; null on budget alerts.
+  dedupeKey?: string | null;
 }
 
 export interface BudgetPeriod {

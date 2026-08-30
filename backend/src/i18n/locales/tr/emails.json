@@ -186,5 +186,12 @@
     "greeting": "Merhaba {{ name }},",
     "intro": "<strong>{{ provider }}</strong> {{ restoredAt }} itibarıyla yeniden yanıt verdi. Kesinti {{ duration }} sürdü.",
     "backfill": "Kesinti sırasında alınamayan fiyatlar ve endeks geçmişi, bir sonraki planlı yenilemede tamamlanır; yapmanız gereken bir şey yok."
+  },
+  "systemAlert": {
+    "subject": "Monize: {{ title }}",
+    "heading": "Sistem uyarısı",
+    "greeting": "Merhaba {{ name }},",
+    "intro": "Monize kurulumunuzdaki bir sorun bir yöneticinin ilgisini gerektiriyor.",
+    "footer": "Bu uyarı uygulamanın bildirim zilinde de gösterilir. Kaç sunucu kopyası fark etmiş olursa olsun, her olay için en fazla bir kez oluşturulur."
   }
 }

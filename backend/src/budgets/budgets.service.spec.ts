@@ -130,6 +130,7 @@ describe("BudgetsService", () => {
     periodStart: "2026-02-01",
     createdAt: new Date("2026-02-15"),
     dismissedAt: null,
+    dedupeKey: null,
   };
 
   const createMockQueryBuilder = (

@@ -20,7 +20,8 @@ One row per `@Cron` handler. The Cron column is the decorator's expression verba
 | `net-worth.service` | `0 */30 * * * *` | Every 30 minutes | Recompute current-month net-worth snapshots for accounts whose balance moved since the snapshot was taken (owner-scoped, idempotent across replicas) |
 | `mortgage-reminder.service` | `0 08 * * *` | Daily 8 AM | Mortgage payment reminders |
 | `bill-reminder.service` | `0 08 * * *` | Daily 8 AM | Bill payment reminders |
-| `provider-outage-alert.service` | `*/10 * * * *` | Every 10 minutes | Email the administrators when a market-data provider has been unreachable for 15 minutes, and once more when it recovers; claimed per episode with a 6-hour floor between alerts |
+| `provider-outage-alert.service` | `*/10 * * * *` | Every 10 minutes | Alert the administrators when a market-data provider has been unreachable for 15 minutes, and once more when it recovers -- an in-app alert row per admin plus an email where SMTP is configured; claimed per episode with a 6-hour floor between alerts |
+| `system-alert-monitor.service` | `*/15 * * * *` | Every 15 minutes | Raise admin alerts for two deployment states nobody else reports: no `ENCRYPTION_KEY` (weekly bucket) and failing SMTP delivery (daily bucket, in-app only -- the email channel cannot report itself, and a per-recipient rejection is not counted). Deliberately not a bootstrap hook: a fresh install has no administrator yet when it boots, and Nest awaits bootstrap hooks inside `app.listen()`. The `idx_budget_alerts_dedupe` unique index makes each row at most once per bucket across replicas |
 | `budget-period-cron.service` | `0 0 1 * *` | 1st of month, midnight | Create new budget periods |
 | `budget-alert.service` | `0 7 * * *` | Daily 7 AM | Budget threshold alerts |
 | `budget-alert.service` | `0 7 * * 1` | Mondays 7 AM | Weekly budget digest |

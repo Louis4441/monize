@@ -22,6 +22,38 @@
       "titleInDays": "{payee} vence en {days} días",
       "amountDue": "{amount} a pagar el {date}",
       "amountUnavailable": "Importe no disponible (no hay tipo de cambio actual), vence el {date}"
+    },
+    "system": {
+      "backupFailed": {
+        "title": "Error en la copia de seguridad automática",
+        "message": "La copia de seguridad automática de {user} falló: {error}"
+      },
+      "backupPartial": {
+        "title": "Copia de seguridad automática incompleta",
+        "messageAttachments": "La copia de seguridad de {user} se escribió, pero no se pudieron incluir {missing} de {expected} archivos adjuntos y {inconsistent} no coincidían con sus metadatos. Las copias completas se conservaron.",
+        "messagePromotion": "La copia diaria de {user} se completó, pero su copia semanal o mensual no se pudo escribir: {error}",
+        "messageRetention": "La copia de seguridad de {user} se completó, pero los archivos de copias antiguas no se pudieron eliminar: {error}"
+      },
+      "encryptionKeyMissing": {
+        "title": "Clave de cifrado sin configurar",
+        "message": "ENCRYPTION_KEY no está definida, por lo que las copias de seguridad se escriben sin cifrar y no se pueden guardar secretos. Una versión futura no arrancará sin ella."
+      },
+      "smtpFailure": {
+        "title": "El envío de correo está fallando",
+        "message": "Monize no pudo enviar correo: {error}. Las notificaciones y los recordatorios no se están entregando."
+      },
+      "providerOutage": {
+        "title": "{provider} no responde",
+        "message": "Los datos de mercado de {provider} no están disponibles. Los precios y los datos de índices pueden estar desactualizados hasta que vuelva a responder."
+      },
+      "providerRecovered": {
+        "title": "{provider} responde de nuevo",
+        "message": "La interrupción terminó y los datos de mercado de {provider} se están actualizando de nuevo."
+      },
+      "scheduledPostFailed": {
+        "title": "{name} no se pudo registrar",
+        "message": "Su transacción programada con vencimiento el {date} no se registró automáticamente: {error}. Puede registrarla manualmente desde Facturas y depósitos."
+      }
     }
   },
   "summary503020": {

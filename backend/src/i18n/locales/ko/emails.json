@@ -186,5 +186,12 @@
     "greeting": "안녕하세요 {{ name }}님,",
     "intro": "<strong>{{ provider }}</strong>이(가) {{ restoredAt }}에 다시 응답했습니다. 장애는 {{ duration }} 동안 이어졌습니다.",
     "backfill": "장애 동안 누락된 가격과 지수 이력은 다음 예정된 새로 고침에서 채워집니다. 별도의 조치는 필요하지 않습니다."
+  },
+  "systemAlert": {
+    "subject": "Monize: {{ title }}",
+    "heading": "시스템 알림",
+    "greeting": "안녕하세요 {{ name }}님,",
+    "intro": "Monize 설치 환경에 관리자의 확인이 필요한 문제가 있습니다.",
+    "footer": "이 알림은 앱의 알림 종에도 표시됩니다. 서버 복제본 수와 관계없이 발생 건당 최대 한 번만 생성됩니다."
   }
 }

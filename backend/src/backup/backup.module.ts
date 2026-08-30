@@ -13,9 +13,17 @@ import { SupportBackupService } from "./support-backup/support-backup.service";
 import { AuthModule } from "../auth/auth.module";
 import { EncryptionModule } from "../common/encryption/encryption.module";
 import { AttachmentsModule } from "../attachments/attachments.module";
+import { SystemAlertsModule } from "../system-alerts/system-alerts.module";
 
 @Module({
-  imports: [AuthModule, EncryptionModule, ConfigModule, AttachmentsModule],
+  imports: [
+    AuthModule,
+    EncryptionModule,
+    ConfigModule,
+    AttachmentsModule,
+    // AutoBackupService raises BACKUP_FAILED / BACKUP_PARTIAL admin alerts.
+    SystemAlertsModule,
+  ],
   controllers: [BackupController, AutoBackupController],
   providers: [
     // The four components issue #1092 split BackupService into; BackupService

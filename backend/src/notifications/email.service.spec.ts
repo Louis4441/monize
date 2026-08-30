@@ -77,6 +77,113 @@ describe("EmailService", () => {
       expect(result).toBe(true);
     });
 
+    describe("failure snapshot (read by the SMTP-health sweep)", () => {
+      it("starts empty", () => {
+        expect(service.getFailureSnapshot()).toEqual({
+          lastFailureAt: null,
+          lastFailureMessage: null,
+          lastSuccessAt: null,
+          failuresSinceSuccess: 0,
+          recipientRejections: 0,
+        });
+      });
+
+      it("records a transport failure, bounded, and rethrows unchanged", async () => {
+        const transporter = (nodemailer.createTransport as jest.Mock).mock
+          .results[0].value;
+        const cause = new Error("ECONNREFUSED " + "x".repeat(400));
+        transporter.sendMail.mockRejectedValueOnce(cause);
+
+        await expect(service.sendMail("to@example.com", "S", "B")).rejects.toBe(
+          cause,
+        );
+
+        const snapshot = service.getFailureSnapshot();
+        expect(snapshot.lastFailureAt).toBeInstanceOf(Date);
+        expect(snapshot.lastFailureMessage).toHaveLength(300);
+        expect(snapshot.failuresSinceSuccess).toBe(1);
+        expect(snapshot.lastSuccessAt).toBeNull();
+      });
+
+      it("counts consecutive failures and resets on success", async () => {
+        const transporter = (nodemailer.createTransport as jest.Mock).mock
+          .results[0].value;
+        transporter.sendMail
+          .mockRejectedValueOnce(new Error("greylisted"))
+          .mockRejectedValueOnce(new Error("greylisted"));
+
+        await expect(service.sendMail("a@e.f", "S", "B")).rejects.toThrow();
+        await expect(service.sendMail("a@e.f", "S", "B")).rejects.toThrow();
+        expect(service.getFailureSnapshot().failuresSinceSuccess).toBe(2);
+
+        await service.sendMail("a@e.f", "S", "B");
+        const snapshot = service.getFailureSnapshot();
+        expect(snapshot.failuresSinceSuccess).toBe(0);
+        expect(snapshot.lastSuccessAt).toBeInstanceOf(Date);
+        // The failure history stays readable: the sweep compares the two
+        // timestamps rather than needing the failure erased.
+        expect(snapshot.lastFailureAt).toBeInstanceOf(Date);
+      });
+
+      it("does not count a per-recipient rejection as a transport failure", async () => {
+        // A `550 mailbox full` means the relay ANSWERED and refused this
+        // address. Counted as an outage it told every administrator that
+        // "email delivery is failing" every fifteen minutes for a day, on an
+        // outbox that was working for everybody else.
+        const transporter = (nodemailer.createTransport as jest.Mock).mock
+          .results[0].value;
+        transporter.sendMail.mockRejectedValueOnce(
+          Object.assign(new Error("550 5.2.2 Mailbox full"), {
+            responseCode: 550,
+            code: "EENVELOPE",
+          }),
+        );
+
+        await expect(service.sendMail("full@e.f", "S", "B")).rejects.toThrow();
+
+        const snapshot = service.getFailureSnapshot();
+        expect(snapshot.recipientRejections).toBe(1);
+        expect(snapshot.lastFailureAt).toBeNull();
+        expect(snapshot.failuresSinceSuccess).toBe(0);
+      });
+
+      it("counts an authentication failure as transport -- nothing will ever be delivered", async () => {
+        const transporter = (nodemailer.createTransport as jest.Mock).mock
+          .results[0].value;
+        transporter.sendMail.mockRejectedValueOnce(
+          Object.assign(new Error("Invalid login"), {
+            code: "EAUTH",
+            responseCode: 535,
+          }),
+        );
+        await expect(service.sendMail("a@e.f", "S", "B")).rejects.toThrow();
+        expect(service.getFailureSnapshot().failuresSinceSuccess).toBe(1);
+      });
+
+      it("counts an error carrying no SMTP response as transport", async () => {
+        const transporter = (nodemailer.createTransport as jest.Mock).mock
+          .results[0].value;
+        transporter.sendMail.mockRejectedValueOnce(
+          Object.assign(new Error("connect ECONNREFUSED"), {
+            code: "ECONNECTION",
+          }),
+        );
+        await expect(service.sendMail("a@e.f", "S", "B")).rejects.toThrow();
+        expect(service.getFailureSnapshot().failuresSinceSuccess).toBe(1);
+      });
+
+      it("does not count the unconfigured throw -- that is a setup state, not a transport failure", async () => {
+        const unconfigured = new EmailService({
+          get: jest.fn().mockReturnValue(undefined),
+        } as never);
+        unconfigured.onModuleInit();
+        await expect(
+          unconfigured.sendMail("to@example.com", "S", "B"),
+        ).rejects.toThrow("SMTP is not configured");
+        expect(unconfigured.getFailureSnapshot().failuresSinceSuccess).toBe(0);
+      });
+    });
+
     it("returns false when verify throws", async () => {
       const transporter = (nodemailer.createTransport as jest.Mock).mock
         .results[0].value;

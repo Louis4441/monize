@@ -186,5 +186,12 @@
     "greeting": "{{ name }} 様、",
     "intro": "<strong>{{ provider }}</strong> は {{ restoredAt }} に再び応答しました。障害は {{ duration }} 続きました。",
     "backfill": "障害中に取得できなかった価格と指数の履歴は、次回の定期更新で補完されます。対応は不要です。"
+  },
+  "systemAlert": {
+    "subject": "Monize: {{ title }}",
+    "heading": "システムアラート",
+    "greeting": "{{ name }} 様、",
+    "intro": "Monize の環境で管理者の対応が必要な問題が発生しています。",
+    "footer": "このアラートはアプリの通知ベルにも表示されます。サーバーのレプリカ数にかかわらず、1 件の事象につき最大 1 回だけ発生します。"
   }
 }

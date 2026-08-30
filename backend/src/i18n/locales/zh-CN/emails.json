@@ -186,5 +186,12 @@
     "greeting": "您好，{{ name }}，",
     "intro": "<strong>{{ provider }}</strong> 已于 {{ restoredAt }} 恢复响应，本次故障持续了 {{ duration }}。",
     "backfill": "故障期间缺失的价格和指数历史会在下一次计划刷新时补齐，无需任何操作。"
+  },
+  "systemAlert": {
+    "subject": "Monize: {{ title }}",
+    "heading": "系统警报",
+    "greeting": "您好，{{ name }}，",
+    "intro": "您的 Monize 部署出现了需要管理员关注的问题。",
+    "footer": "此警报也会显示在应用的通知铃铛中。无论有多少个服务器副本发现该问题，每次事件最多只会生成一条警报。"
   }
 }

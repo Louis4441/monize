@@ -59,6 +59,11 @@ import {
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { getUsersByEffectiveTimezone } from "../common/users-by-timezone.util";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
+import { SystemAlertService } from "../system-alerts/system-alert.service";
+import {
+  AlertSeverity,
+  AlertType,
+} from "../budgets/entities/budget-alert.entity";
 import { lockAccountsForBalanceWrite } from "../common/db/locks";
 import { withScopedDb } from "../common/db/scoped-db";
 import { affectedRowCount } from "../common/db/query-result";
@@ -436,6 +441,10 @@ export class ScheduledTransactionsService {
     private actionHistoryService: ActionHistoryService,
     @Inject(forwardRef(() => ExchangeRateService))
     private exchangeRateService: ExchangeRateService,
+    // forwardRef: SystemAlertsModule reaches NotificationsModule, which
+    // imports this module back -- the edge sits on a require cycle.
+    @Inject(forwardRef(() => SystemAlertService))
+    private systemAlerts: SystemAlertService,
   ) {}
 
   @Cron("5 * * * *")
@@ -549,6 +558,31 @@ export class ScheduledTransactionsService {
               `Failed to auto-post "${scheduled.name}" (ID: ${scheduled.id}): ${error.message}`,
               error.stack,
             );
+            // Tell the affected user in-app -- this is their money not moving,
+            // actionable by them (post it manually from Bills), so it is a
+            // per-user alert and not an admin one. `raiseUserAlert` never
+            // throws and seeds its own user context, so the loop's isolation
+            // holds.
+            await this.systemAlerts.raiseUserAlert(scheduled.userId, {
+              type: AlertType.SCHEDULED_POST_FAILED,
+              severity: AlertSeverity.WARNING,
+              title: `${scheduled.name} could not be posted`,
+              message:
+                `Your scheduled transaction "${scheduled.name}" due ` +
+                `${scheduled.nextDueDate} failed to post automatically: ` +
+                `${String(error.message).slice(0, 300)}. You can post it ` +
+                "manually from Bills.",
+              data: {
+                system: true,
+                scheduledId: scheduled.id,
+                scheduledName: scheduled.name,
+                dueDate: scheduled.nextDueDate,
+                error: String(error.message).slice(0, 300),
+              },
+              dedupeKey:
+                `SCHEDULED_POST_FAILED:${scheduled.id}:` +
+                new Date().toISOString().slice(0, 10),
+            });
           }
         }
       }

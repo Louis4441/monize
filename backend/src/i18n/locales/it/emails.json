@@ -186,5 +186,12 @@
     "greeting": "Ciao {{ name }},",
     "intro": "<strong>{{ provider }}</strong> ha risposto di nuovo alle {{ restoredAt }}. L'interruzione è durata {{ duration }}.",
     "backfill": "Prezzi e storico degli indici mancanti durante l'interruzione vengono recuperati al prossimo aggiornamento pianificato; non è necessario alcun intervento."
+  },
+  "systemAlert": {
+    "subject": "Monize: {{ title }}",
+    "heading": "Avviso di sistema",
+    "greeting": "Ciao {{ name }},",
+    "intro": "Un problema nella tua installazione di Monize richiede l'attenzione di un amministratore.",
+    "footer": "Questo avviso è mostrato anche nella campanella delle notifiche dell'app. Viene generato al massimo una volta per evento, indipendentemente da quante repliche del server lo abbiano rilevato."
   }
 }

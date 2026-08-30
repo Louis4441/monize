@@ -1639,7 +1639,8 @@ CREATE TABLE budget_alerts (
     is_email_sent BOOLEAN DEFAULT false,
     period_start DATE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    dismissed_at TIMESTAMP
+    dismissed_at TIMESTAMP,
+    dedupe_key VARCHAR(120)
 );
 
 CREATE INDEX idx_budget_alerts_user ON budget_alerts(user_id);
@@ -1663,6 +1664,17 @@ CREATE UNIQUE INDEX idx_budget_alerts_fingerprint
         COALESCE(budget_category_id, '00000000-0000-0000-0000-000000000000'::uuid),
         severity
     );
+
+-- System-level alerts (BACKUP_FAILED, PROVIDER_OUTAGE, SMTP_FAILURE, ...) have
+-- budget_id NULL, which the fingerprint index above cannot arbitrate: budget_id
+-- is not COALESCE'd there and NULL never equals NULL in a unique index. They
+-- carry an explicit dedupe_key instead (migration 170); the partial unique
+-- index makes INSERT ... ON CONFLICT DO NOTHING RETURNING id the cross-replica
+-- arbiter for both the row and its admin email (only the insert winner sends).
+-- Budget-generated alerts keep dedupe_key NULL.
+CREATE UNIQUE INDEX idx_budget_alerts_dedupe
+    ON budget_alerts(user_id, dedupe_key)
+    WHERE dedupe_key IS NOT NULL;
 
 -- Triggers for budget tables updated_at
 CREATE TRIGGER update_budgets_updated_at BEFORE UPDATE ON budgets FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

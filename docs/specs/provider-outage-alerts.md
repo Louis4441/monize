@@ -78,9 +78,16 @@ marker. Nothing has to remember to enqueue anything, which is the property that
 makes it hold across restarts (the shape `docs/external-side-effects.md` praises
 in the emergency-access grant path).
 
-Recipients are the administrators (`role = 'admin'`, active, not delegate-only,
-`notification_email` not disabled), each in their own locale. A deployment with
-no SMTP does nothing at all.
+Recipients are the administrators, resolved through the shared
+`queryAdminRecipients` (`backend/src/users/admin-recipients.util.ts`):
+`role = 'admin'`, active, not delegate-only. Winning either claim now also
+raises the in-app companion rows (`PROVIDER_OUTAGE` / `PROVIDER_RECOVERED`
+via `SystemAlertService`, one per admin -- see `docs/specs/system-alerts.md`),
+so the sweep no longer stands down when SMTP is unconfigured: the claim is
+consumed, the rows are the delivery, and the email leg -- which additionally
+requires an address with `notification_email` not disabled, each recipient in
+their own locale -- skips inside `deliver`. Only a deployment with no active
+administrator at all does nothing.
 
 ## Deliberate trades
 

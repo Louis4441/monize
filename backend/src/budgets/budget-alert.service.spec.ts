@@ -1,4 +1,4 @@
-import { DataSource } from "typeorm";
+import { DataSource, IsNull } from "typeorm";
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
@@ -96,6 +96,7 @@ function makeAlert(overrides: Partial<BudgetAlert> = {}): BudgetAlert {
     periodStart: "2026-02-01",
     createdAt: new Date(),
     dismissedAt: null,
+    dedupeKey: null,
     ...overrides,
   };
 }
@@ -1335,6 +1336,38 @@ describe("BudgetAlertService", () => {
         "Monize: Your weekly budget summary",
         expect.any(String),
       );
+    });
+
+    it("asks the database only for budget alerts, never for system alerts", async () => {
+      // Both live in `budget_alerts`, and a system alert raised on the FIRST
+      // of a month carries that day as its `period_start` -- which is also the
+      // month's budget period start. Without the `dedupe_key IS NULL` filter
+      // it matched this query and was rendered inside the budget digest for
+      // the rest of the month, and could produce a digest for a user with no
+      // budget news at all.
+      budgetsRepository.find.mockResolvedValue([makeBudget()]);
+      alertsRepository.find.mockResolvedValue([
+        makeAlert({ alertType: AlertType.THRESHOLD_WARNING }),
+      ]);
+
+      await service.sendWeeklyDigest();
+
+      const digestQuery = alertsRepository.find.mock.calls
+        .map(([options]) => options)
+        .find((options) => options?.where?.periodStart !== undefined);
+      expect(digestQuery.where).toEqual(
+        expect.objectContaining({ dedupeKey: IsNull() }),
+      );
+    });
+
+    it("sends no digest when the period's only alerts are system alerts", async () => {
+      budgetsRepository.find.mockResolvedValue([makeBudget()]);
+      // The filtered query is what the repository answers: no budget alerts.
+      alertsRepository.find.mockResolvedValue([]);
+
+      await service.sendWeeklyDigest();
+
+      expect(emailService.sendMail).not.toHaveBeenCalled();
     });
 
     /**

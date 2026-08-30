@@ -22,6 +22,7 @@ import { BackupEncryptionService } from "./backup-encryption.service";
 import { AutoBackupSettings } from "./entities/auto-backup-settings.entity";
 import { User } from "../users/entities/user.entity";
 import { DemoModeService } from "../common/demo-mode.service";
+import { SystemAlertService } from "../system-alerts/system-alert.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import {
   createUserMaintenanceMock,
@@ -82,6 +83,10 @@ describe("AutoBackupService", () => {
   let updateBuilder: Record<string, jest.Mock>;
   let scoped: ReturnType<typeof createScopedDbMocks>;
   let maintenance: UserMaintenanceMock;
+  let mockSystemAlerts: {
+    raiseAdminAlert: jest.Mock;
+    raiseUserAlert: jest.Mock;
+  };
 
   /** A real directory, standing in for the operator's mounted backup volume. */
   let root: string;
@@ -190,6 +195,10 @@ describe("AutoBackupService", () => {
           },
         },
         {
+          provide: SystemAlertService,
+          useValue: mockSystemAlerts,
+        },
+        {
           provide: ConfigService,
           useValue: {
             get: jest.fn((key: string) =>
@@ -282,6 +291,12 @@ describe("AutoBackupService", () => {
     mockBackupEncryption = {
       // Nothing stored by default: an ordinary unencrypted backup.
       resolveBackupPassword: jest.fn().mockResolvedValue({ status: "none" }),
+    };
+
+    mockSystemAlerts = {
+      // The real service never throws; the double keeps that contract.
+      raiseAdminAlert: jest.fn().mockResolvedValue({ created: 1, emailed: 0 }),
+      raiseUserAlert: jest.fn().mockResolvedValue({ created: true }),
     };
 
     service = await createService();
@@ -1492,6 +1507,57 @@ describe("AutoBackupService", () => {
       );
     });
 
+    it("raises a BACKUP_FAILED admin alert beside the failure row -- the row alone notified nobody", async () => {
+      mockSettingsRepo.find.mockResolvedValue([
+        createSettings({
+          enabled: true,
+          folderPath: join(root, "gone"),
+          nextBackupAt: new Date(Date.now() - 3600000),
+        }),
+      ]);
+
+      await service.handleAutoBackupCron();
+
+      expect(mockSystemAlerts.raiseAdminAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "BACKUP_FAILED",
+          severity: "critical",
+          dedupeKey: expect.stringMatching(
+            new RegExp(`^BACKUP_FAILED:${userId}:\\d{4}-\\d{2}-\\d{2}$`),
+          ),
+          data: expect.objectContaining({
+            system: true,
+            affectedUserId: userId,
+            error: expect.any(String),
+          }),
+        }),
+      );
+    });
+
+    it("keeps sweeping the remaining users after raising one user's failure alert", async () => {
+      // Two due users; the first one's folder cannot exist. The alert raise is
+      // inside the per-user try, and the (never-throwing) alert service must
+      // not stop user two's backup either way.
+      mockSettingsRepo.find.mockResolvedValue([
+        createSettings({
+          enabled: true,
+          folderPath: join(root, "gone"),
+          nextBackupAt: new Date(Date.now() - 3600000),
+        }),
+        createSettings({
+          userId: otherUserId,
+          enabled: true,
+          folderPath: "",
+          nextBackupAt: new Date(Date.now() - 3600000),
+        }),
+      ]);
+
+      await service.handleAutoBackupCron();
+
+      expect(await listBackups(folderFor(otherUserId))).toHaveLength(1);
+      expect(mockSystemAlerts.raiseAdminAlert).toHaveBeenCalledTimes(1);
+    });
+
     describe("multi-replica coordination", () => {
       function dueSettings() {
         return createSettings({
@@ -1792,6 +1858,54 @@ describe("AutoBackupService", () => {
       ).toBe("gzipped-export");
     });
 
+    it("raises a BACKUP_PARTIAL admin alert naming the attachments reason and the counts", async () => {
+      mockSettingsRepo.find.mockResolvedValue([
+        createSettings({
+          enabled: true,
+          folderPath: root,
+          nextBackupAt: new Date(Date.now() - 3600000),
+        }),
+      ]);
+
+      await service.handleAutoBackupCron();
+
+      expect(mockSystemAlerts.raiseAdminAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "BACKUP_PARTIAL",
+          severity: "warning",
+          dedupeKey: expect.stringMatching(
+            new RegExp(
+              `^BACKUP_PARTIAL:${userId}:attachments:\\d{4}-\\d{2}-\\d{2}$`,
+            ),
+          ),
+          data: expect.objectContaining({
+            system: true,
+            affectedUserId: userId,
+            reason: "attachments",
+            missingAttachments: 1,
+            expectedAttachments: 3,
+          }),
+        }),
+      );
+    });
+
+    it("raises nothing for a manual Back up now -- the caller is reading the result", async () => {
+      // The manual path shares applyBackupOutcome, so before the origin
+      // argument a "Back up now" filed an admin alert titled "Automatic
+      // backup incomplete", took that day's dedupe key (silencing the real
+      // automatic failure behind it), and made the HTTP request wait on a
+      // per-administrator SMTP fan-out after the backup had succeeded.
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true, folderPath: root }),
+      );
+
+      const result = await service.runManualBackup(userId);
+
+      expect(mockSystemAlerts.raiseAdminAlert).not.toHaveBeenCalled();
+      // The caller is still told, in the response they are waiting on.
+      expect(result.message).toMatch(/attachment/i);
+    });
+
     it("does not run retention, so complete copies past the window survive", async () => {
       mockSettingsRepo.findOne.mockResolvedValue(
         createSettings({
@@ -1914,6 +2028,91 @@ describe("AutoBackupService", () => {
    * is what the previous design got wrong, so a suite that reads names to decide
    * which artifact survived would be asking the defect to grade itself.
    */
+  describe("promotion and retention failures become admin alerts", () => {
+    // These paths have no durable state of their own: the daily artifact is
+    // complete, `lastBackupStatus` rightly stays "success", and before the
+    // alert a failed weekly copy or a stuck delete was one `logger.warn`
+    // nobody saw. The helpers report their failure as a return value, and
+    // `applyBackupOutcome` turns it into a BACKUP_PARTIAL alert with the
+    // reason -- spied here because a real copy/unlink failure needs
+    // filesystem permissions the suite cannot portably arrange.
+
+    beforeEach(() => {
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true, folderPath: root }),
+      );
+      mockSettingsRepo.find.mockResolvedValue([
+        createSettings({
+          enabled: true,
+          folderPath: root,
+          nextBackupAt: new Date(Date.now() - 3600000),
+        }),
+      ]);
+    });
+
+    it("a failed weekly/monthly copy raises reason 'promotion' while the status stays success", async () => {
+      jest
+        .spyOn(
+          service as unknown as {
+            copyToWeeklyIfNeeded: () => Promise<string | null>;
+          },
+          "copyToWeeklyIfNeeded",
+        )
+        .mockResolvedValue("weekly: EACCES: permission denied");
+
+      await service.handleAutoBackupCron();
+
+      expect(mockSystemAlerts.raiseAdminAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "BACKUP_PARTIAL",
+          dedupeKey: expect.stringContaining(
+            `BACKUP_PARTIAL:${userId}:promotion:`,
+          ),
+          data: expect.objectContaining({ reason: "promotion" }),
+        }),
+      );
+      expect(updateBuilder.set).toHaveBeenCalledWith(
+        expect.objectContaining({ lastBackupStatus: "success" }),
+      );
+    });
+
+    it("a failed retention delete raises reason 'retention' naming the stuck file", async () => {
+      jest
+        .spyOn(
+          service as unknown as { enforceRetention: () => string[] },
+          "enforceRetention",
+        )
+        .mockReturnValue([
+          "monize-backup-daily-2026-04-01.json.gz: EACCES: permission denied",
+        ]);
+
+      await service.handleAutoBackupCron();
+
+      expect(mockSystemAlerts.raiseAdminAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "BACKUP_PARTIAL",
+          dedupeKey: expect.stringContaining(
+            `BACKUP_PARTIAL:${userId}:retention:`,
+          ),
+          data: expect.objectContaining({
+            reason: "retention",
+            error: expect.stringContaining(
+              "monize-backup-daily-2026-04-01.json.gz",
+            ),
+          }),
+        }),
+      );
+      expect(updateBuilder.set).toHaveBeenCalledWith(
+        expect.objectContaining({ lastBackupStatus: "success" }),
+      );
+    });
+
+    it("a clean complete run raises nothing", async () => {
+      await service.handleAutoBackupCron();
+      expect(mockSystemAlerts.raiseAdminAlert).not.toHaveBeenCalled();
+    });
+  });
+
   describe("a partial artifact never displaces or ages out a complete one", () => {
     const COMPLETE = {
       complete: true,

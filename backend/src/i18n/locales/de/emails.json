@@ -186,5 +186,12 @@
     "greeting": "Hallo {{ name }},",
     "intro": "<strong>{{ provider }}</strong> hat um {{ restoredAt }} wieder geantwortet. Die Störung dauerte {{ duration }}.",
     "backfill": "Kurse und Indexverläufe, die während der Störung fehlten, werden bei der nächsten geplanten Aktualisierung nachgeholt; es ist nichts zu tun."
+  },
+  "systemAlert": {
+    "subject": "Monize: {{ title }}",
+    "heading": "Systemwarnung",
+    "greeting": "Hallo {{ name }},",
+    "intro": "Ein Problem in Ihrer Monize-Installation erfordert die Aufmerksamkeit eines Administrators.",
+    "footer": "Diese Warnung wird auch in der Benachrichtigungsglocke der App angezeigt. Sie wird höchstens einmal pro Vorfall ausgelöst, unabhängig von der Anzahl der Server-Replikate."
   }
 }

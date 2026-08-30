@@ -27,6 +27,7 @@ import { ScheduledTransactionOverrideService } from "./scheduled-transaction-ove
 import { ScheduledTransactionLoanService } from "./scheduled-transaction-loan.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
+import { SystemAlertService } from "../system-alerts/system-alert.service";
 import { getRequestContext } from "../common/request-context";
 import {
   createScopedDbMocks,
@@ -61,6 +62,7 @@ describe("ScheduledTransactionsService", () => {
   let mockDataSource: DataSourceMock;
   let mockActionHistoryService: Record<string, jest.Mock>;
   let mockExchangeRateService: Record<string, jest.Mock>;
+  let mockSystemAlerts: Record<string, jest.Mock>;
 
   const userId = "11111111-1111-1111-1111-111111111111";
   const stId = "st-1";
@@ -209,6 +211,12 @@ describe("ScheduledTransactionsService", () => {
       getRateForDate: jest.fn().mockResolvedValue(null),
     };
 
+    mockSystemAlerts = {
+      // The real service never throws; the double keeps that contract.
+      raiseUserAlert: jest.fn().mockResolvedValue({ created: true }),
+      raiseAdminAlert: jest.fn().mockResolvedValue({ created: 1, emailed: 0 }),
+    };
+
     // The reader's reporting currency, which the AI/MCP rollups convert into.
     // USD by default so the fixtures' own USD schedules need no rate at all;
     // a cross-currency test overrides the row or the rate deliberately.
@@ -315,6 +323,10 @@ describe("ScheduledTransactionsService", () => {
         {
           provide: ExchangeRateService,
           useValue: mockExchangeRateService,
+        },
+        {
+          provide: SystemAlertService,
+          useValue: mockSystemAlerts,
         },
       ],
     }).compile();
@@ -5019,6 +5031,54 @@ describe("ScheduledTransactionsService", () => {
 
       // Should not throw
       await service.processAutoPostTransactions();
+    });
+
+    it("raises a SCHEDULED_POST_FAILED alert for the affected user when a post genuinely fails", async () => {
+      const st1 = makeScheduled({ id: "st-fail", autoPost: true });
+      scheduledRepo.find.mockResolvedValue([st1]);
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      const postSpy = jest
+        .spyOn(service, "post")
+        .mockRejectedValue(new Error("account is closed"));
+
+      await service.processAutoPostTransactions();
+
+      expect(mockSystemAlerts.raiseUserAlert).toHaveBeenCalledWith(
+        st1.userId,
+        expect.objectContaining({
+          type: "SCHEDULED_POST_FAILED",
+          severity: "warning",
+          dedupeKey: expect.stringMatching(
+            /^SCHEDULED_POST_FAILED:st-fail:\d{4}-\d{2}-\d{2}$/,
+          ),
+          data: expect.objectContaining({
+            system: true,
+            scheduledId: "st-fail",
+            scheduledName: st1.name,
+            dueDate: st1.nextDueDate,
+            error: "account is closed",
+          }),
+        }),
+      );
+      postSpy.mockRestore();
+    });
+
+    it("raises nothing for a ConflictException -- losing the claim means the winner posted it", async () => {
+      const st1 = makeScheduled({ id: "st-claimed", autoPost: true });
+      scheduledRepo.find.mockResolvedValue([st1]);
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      const postSpy = jest
+        .spyOn(service, "post")
+        .mockRejectedValue(new ConflictException("already posted"));
+
+      await service.processAutoPostTransactions();
+
+      expect(mockSystemAlerts.raiseUserAlert).not.toHaveBeenCalled();
+      postSpy.mockRestore();
     });
 
     it("should auto-post transfer transactions using prepareTransfer", async () => {

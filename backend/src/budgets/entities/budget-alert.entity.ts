@@ -21,6 +21,18 @@ export enum AlertType {
   INCOME_SHORTFALL = "INCOME_SHORTFALL",
   POSITIVE_MILESTONE = "POSITIVE_MILESTONE",
   BILL_DUE = "BILL_DUE",
+  // System-level alerts (budget_id NULL, carrying a dedupe_key). Admin-facing
+  // types are fanned out one row per administrator by SystemAlertService;
+  // SCHEDULED_POST_FAILED goes to the affected user. Values must fit the
+  // alert_type VARCHAR(30) column -- a guard test in
+  // system-alerts/system-alert.service.spec.ts holds the bound.
+  BACKUP_FAILED = "BACKUP_FAILED",
+  BACKUP_PARTIAL = "BACKUP_PARTIAL",
+  ENCRYPTION_KEY_MISSING = "ENCRYPTION_KEY_MISSING",
+  PROVIDER_OUTAGE = "PROVIDER_OUTAGE",
+  PROVIDER_RECOVERED = "PROVIDER_RECOVERED",
+  SMTP_FAILURE = "SMTP_FAILURE",
+  SCHEDULED_POST_FAILED = "SCHEDULED_POST_FAILED",
 }
 
 export enum AlertSeverity {
@@ -101,4 +113,11 @@ export class BudgetAlert {
 
   @Column({ type: "timestamp", name: "dismissed_at", nullable: true })
   dismissedAt: Date | null;
+
+  // Explicit fingerprint for system alerts (budget_id NULL), where the
+  // fingerprint unique index cannot arbitrate (NULL never equals NULL).
+  // Unique per (user_id, dedupe_key) via the partial index
+  // idx_budget_alerts_dedupe; budget-generated alerts leave it NULL.
+  @Column({ type: "varchar", length: 120, name: "dedupe_key", nullable: true })
+  dedupeKey: string | null;
 }

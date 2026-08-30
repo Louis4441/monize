@@ -22,6 +22,38 @@
       "titleInDays": "{payee} {days} gün içinde ödenecek",
       "amountDue": "{date} tarihinde {amount} ödenecek",
       "amountUnavailable": "Tutar kullanılamıyor (güncel döviz kuru yok), {date} tarihinde ödenecek"
+    },
+    "system": {
+      "backupFailed": {
+        "title": "Otomatik yedekleme başarısız oldu",
+        "message": "{user} için otomatik yedekleme başarısız oldu: {error}"
+      },
+      "backupPartial": {
+        "title": "Otomatik yedekleme eksik",
+        "messageAttachments": "{user} için yedek yazıldı, ancak {expected} ekten {missing} tanesi dahil edilemedi ve {inconsistent} tanesi meta verileriyle eşleşmedi. Tam yedekler korundu.",
+        "messagePromotion": "{user} için günlük yedekleme başarılı oldu, ancak haftalık veya aylık kopyası yazılamadı: {error}",
+        "messageRetention": "{user} için yedekleme başarılı oldu, ancak eski yedek dosyaları temizlenemedi: {error}"
+      },
+      "encryptionKeyMissing": {
+        "title": "Şifreleme anahtarı yapılandırılmamış",
+        "message": "ENCRYPTION_KEY ayarlanmadığından yedekler şifrelenmeden yazılıyor ve gizli bilgiler saklanamıyor. Gelecek bir sürüm bu anahtar olmadan başlamayacak."
+      },
+      "smtpFailure": {
+        "title": "E-posta gönderimi başarısız oluyor",
+        "message": "Monize e-posta gönderemedi: {error}. Bildirimler ve hatırlatıcılar iletilemiyor."
+      },
+      "providerOutage": {
+        "title": "{provider} yanıt vermiyor",
+        "message": "{provider} kaynaklı piyasa verilerine ulaşılamıyor. Sağlayıcı yeniden yanıt verene kadar fiyatlar ve endeks verileri güncel olmayabilir."
+      },
+      "providerRecovered": {
+        "title": "{provider} yeniden yanıt veriyor",
+        "message": "Kesinti sona erdi ve {provider} kaynaklı piyasa verileri yeniden güncelleniyor."
+      },
+      "scheduledPostFailed": {
+        "title": "{name} kaydedilemedi",
+        "message": "Vadesi {date} olan planlı işleminiz otomatik olarak kaydedilmedi: {error}. Faturalar ve Mevduatlar bölümünden elle kaydedebilirsiniz."
+      }
     }
   },
   "summary503020": {

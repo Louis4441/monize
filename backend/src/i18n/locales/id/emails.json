@@ -186,5 +186,12 @@
     "greeting": "Hai {{ name }},",
     "intro": "<strong>{{ provider }}</strong> merespons kembali pada {{ restoredAt }}. Gangguan berlangsung {{ duration }}.",
     "backfill": "Harga dan riwayat indeks yang terlewat selama gangguan akan diambil pada penyegaran terjadwal berikutnya; tidak ada tindakan yang diperlukan."
+  },
+  "systemAlert": {
+    "subject": "Monize: {{ title }}",
+    "heading": "Peringatan sistem",
+    "greeting": "Hai {{ name }},",
+    "intro": "Sebuah masalah pada instalasi Monize Anda memerlukan perhatian administrator.",
+    "footer": "Peringatan ini juga ditampilkan pada lonceng notifikasi aplikasi. Peringatan hanya dibuat paling banyak satu kali per kejadian, berapa pun jumlah replika server yang mendeteksinya."
   }
 }

@@ -12,6 +12,7 @@ import { ScheduledTransactionOverrideService } from "./scheduled-transaction-ove
 import { ScheduledTransactionLoanService } from "./scheduled-transaction-loan.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
+import { SystemAlertService } from "../system-alerts/system-alert.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
 /**
@@ -73,6 +74,18 @@ describe("scheduled-transactions module RLS context smoke (real withScopedDb)", 
         },
         { provide: ActionHistoryService, useValue: { record: jest.fn() } },
         { provide: ExchangeRateService, useValue: exchangeRateService },
+        {
+          provide: SystemAlertService,
+          // The real service never throws and seeds its own context; the
+          // double keeps that contract. Its own identity smoke lives in
+          // src/system-alerts/rls-context-smoke.spec.ts.
+          useValue: {
+            raiseUserAlert: jest.fn().mockResolvedValue({ created: true }),
+            raiseAdminAlert: jest
+              .fn()
+              .mockResolvedValue({ created: 0, emailed: 0 }),
+          },
+        },
       ],
     }).compile();
 

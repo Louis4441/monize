@@ -5,6 +5,7 @@ import { ProviderOutageAlertService } from "./provider-outage-alert.service";
 import { NotificationsController } from "./notifications.controller";
 import { UsersModule } from "../users/users.module";
 import { ScheduledTransactionsModule } from "../scheduled-transactions/scheduled-transactions.module";
+import { SystemAlertsModule } from "../system-alerts/system-alerts.module";
 
 @Module({
   imports: [
@@ -14,6 +15,10 @@ import { ScheduledTransactionsModule } from "../scheduled-transactions/scheduled
     // because that module reaches AccountsModule and DelegationModule, both of
     // which import this one -- see `src/module-graph.spec.ts`.
     forwardRef(() => ScheduledTransactionsModule),
+    // For SystemAlertService: ProviderOutageAlertService raises the in-app
+    // companion rows beside its emails. `forwardRef` because SystemAlertsModule
+    // imports this module back for EmailService.
+    forwardRef(() => SystemAlertsModule),
   ],
   providers: [EmailService, BillReminderService, ProviderOutageAlertService],
   controllers: [NotificationsController],
