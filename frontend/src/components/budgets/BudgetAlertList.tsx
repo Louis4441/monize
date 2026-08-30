@@ -404,7 +404,7 @@ export function BudgetAlertList({
     // Full-screen below `sm` (the phone treatment); the desktop dropdown keeps
     // its card shape via the sm:-scoped rounding, border and height cap.
     <div
-      className="fixed inset-0 sm:absolute sm:inset-auto sm:right-0 sm:mt-1 sm:w-96 bg-white dark:bg-gray-800 sm:rounded-lg shadow-lg dark:shadow-gray-700/50 sm:border border-gray-200 dark:border-gray-700 z-50 sm:max-h-[28rem] flex flex-col"
+      className="fixed inset-0 sm:absolute sm:inset-auto sm:right-0 sm:mt-1 sm:w-[30rem] bg-white dark:bg-gray-800 sm:rounded-lg shadow-lg dark:shadow-gray-700/50 sm:border border-gray-200 dark:border-gray-700 z-50 sm:max-h-[28rem] flex flex-col"
       data-testid="alert-list"
     >
       {/* Header */}
@@ -465,38 +465,41 @@ export function BudgetAlertList({
 
       {/* Filters */}
       <div
-        className="flex items-center gap-1.5 px-4 py-2 border-b border-gray-200 dark:border-gray-700 overflow-x-auto scrollbar-hide"
+        className="flex flex-col gap-1.5 px-4 py-2 border-b border-gray-200 dark:border-gray-700"
         data-testid="alert-filters"
       >
-        {SEVERITY_FILTER_OPTIONS.map((severity) => (
-          <Badge
-            key={severity}
-            as="button"
-            variant={filters.severity === severity ? 'blue' : 'gray'}
-            onClick={() => toggleSeverity(severity)}
-            aria-pressed={filters.severity === severity}
-            className={FILTER_CHIP_CLASS}
-            data-testid={`alert-filter-severity-${severity}`}
-          >
-            {severityLabel(severity, t)}
-          </Badge>
-        ))}
-        <div className="h-4 w-px bg-gray-200 dark:bg-gray-600 flex-shrink-0" />
-        {CATEGORY_FILTER_OPTIONS.map((category) => (
-          <Badge
-            key={category}
-            as="button"
-            variant={filters.category === category ? 'blue' : 'gray'}
-            onClick={() => toggleCategory(category)}
-            aria-pressed={filters.category === category}
-            className={FILTER_CHIP_CLASS}
-            data-testid={`alert-filter-category-${category}`}
-          >
-            {category === 'financial'
-              ? t('alerts.filter.financial')
-              : t('alerts.filter.system')}
-          </Badge>
-        ))}
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
+          {SEVERITY_FILTER_OPTIONS.map((severity) => (
+            <Badge
+              key={severity}
+              as="button"
+              variant={filters.severity === severity ? 'blue' : 'gray'}
+              onClick={() => toggleSeverity(severity)}
+              aria-pressed={filters.severity === severity}
+              className={FILTER_CHIP_CLASS}
+              data-testid={`alert-filter-severity-${severity}`}
+            >
+              {severityLabel(severity, t)}
+            </Badge>
+          ))}
+        </div>
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
+          {CATEGORY_FILTER_OPTIONS.map((category) => (
+            <Badge
+              key={category}
+              as="button"
+              variant={filters.category === category ? 'blue' : 'gray'}
+              onClick={() => toggleCategory(category)}
+              aria-pressed={filters.category === category}
+              className={FILTER_CHIP_CLASS}
+              data-testid={`alert-filter-category-${category}`}
+            >
+              {category === 'financial'
+                ? t('alerts.filter.financial')
+                : t('alerts.filter.system')}
+            </Badge>
+          ))}
+        </div>
       </div>
 
       {/* Alert list */}

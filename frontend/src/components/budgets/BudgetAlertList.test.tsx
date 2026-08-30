@@ -769,6 +769,19 @@ describe('BudgetAlertList', () => {
       }
     });
 
+    it('renders the category chips on their own row below the severity chips', () => {
+      render(<BudgetAlertList {...defaultProps} />);
+
+      const severityRow = screen.getByTestId('alert-filter-severity-critical')
+        .parentElement as HTMLElement;
+      const categoryRow = screen.getByTestId('alert-filter-category-system')
+        .parentElement as HTMLElement;
+      expect(severityRow).not.toBe(categoryRow);
+      // Same stacked container, severity row first.
+      expect(categoryRow.parentElement).toBe(severityRow.parentElement);
+      expect(severityRow.nextElementSibling).toBe(categoryRow);
+    });
+
     it('activates a severity filter on click', () => {
       render(<BudgetAlertList {...defaultProps} />);
 
@@ -876,6 +889,7 @@ describe('BudgetAlertList', () => {
       expect(container.className).toContain('sm:inset-auto');
       expect(container.className).toContain('sm:max-h-[28rem]');
       expect(container.className).toContain('sm:rounded-lg');
+      expect(container.className).toContain('sm:w-[30rem]');
     });
 
     it('renders a mobile-only close button that closes the panel', () => {
