@@ -39,6 +39,12 @@
  *   itself, never scroll a higher-ranked one out of view; and once even a
  *   squeezed Description is not worth having, the low tier removes it and
  *   Ref # together.
+ * - **Payee outranks Description for width.** Whenever Description is on
+ *   screen the payee name is uncapped (`REGISTER_PAYEE_NAME_CAP`): the
+ *   longest payee renders in full and Description gives the width back.
+ *   The cap survives only below the low tier, where there is no Description
+ *   to yield and an uncapped payee would push Amount and Balance into the
+ *   horizontal scroll instead.
  */
 export const REGISTER_COLUMN_ORDER = [
   'date',
@@ -159,3 +165,18 @@ export const REGISTER_TABLE_CONTAINER = '@container';
  * the sticky Actions column.
  */
 export const REGISTER_DESCRIPTION_CELL_FLEX = 'w-full max-w-0';
+
+/**
+ * The width classes on the payee NAME (the button or div inside the payee
+ * cell). Payee outranks Description: while Description is rendered -- the low
+ * tier, whose 1536px this string must repeat because Tailwind's scanner only
+ * sees complete literal class names (the guard test holds the two figures
+ * equal) -- the name is uncapped, so the longest payee renders in full and
+ * the yielding Description hands the width back. Below the low tier there is
+ * no Description to yield, so the cap is what keeps a runaway payee from
+ * pushing Amount and Balance into the horizontal scroll -- the same defect
+ * that once hid Status. Below `sm` the phone caps on the payee *cell* apply
+ * instead (see the cell in TransactionRow).
+ */
+export const REGISTER_PAYEE_NAME_CAP =
+  'sm:max-w-[280px] @min-[1536px]:max-w-none';

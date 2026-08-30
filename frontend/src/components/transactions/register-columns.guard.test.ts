@@ -5,6 +5,7 @@ import {
   PRIORITY_MIN_WIDTH_PX,
   REGISTER_TABLE_CONTAINER,
   REGISTER_DESCRIPTION_CELL_FLEX,
+  REGISTER_PAYEE_NAME_CAP,
   registerColumnClass,
   type RegisterColumnId,
 } from './register-columns';
@@ -206,6 +207,47 @@ describe('the register column contract', () => {
       descriptionCellLine!.includes('REGISTER_DESCRIPTION_CELL_FLEX'),
       'the description cell carries the yield classes',
     ).toBe(true);
+  });
+
+  it('lets the payee outrank Description for width', () => {
+    // Whenever Description is rendered it is the column that yields, so the
+    // payee name is uncapped -- the longest payee renders in full. The cap
+    // survives only below the low tier, where there is no Description to
+    // yield and a runaway payee would push Amount and Balance into the
+    // horizontal scroll instead. The uncap threshold must repeat the low
+    // tier's figure as a literal (Tailwind's scanner only sees complete
+    // class names), so this holds the two copies equal.
+    const uncap = REGISTER_PAYEE_NAME_CAP.match(/@min-\[(\d+)px\]:max-w-none/);
+    expect(uncap, 'the payee name uncaps at a container width').toBeTruthy();
+    expect(Number(uncap![1])).toBe(PRIORITY_MIN_WIDTH_PX.low);
+    expect(
+      /(?:^|\s)sm:max-w-\[\d+px\](?:\s|$)/.test(REGISTER_PAYEE_NAME_CAP),
+      'below the low tier the cap still protects Amount and Balance',
+    ).toBe(true);
+
+    const row = withoutComments(
+      REGISTER_SOURCES['/src/components/transactions/TransactionRow.tsx'],
+    );
+    // Both payee renderings (the filter button and the plain name) wear the
+    // shared classes -- the cap drifting on one of the two is how the last
+    // hand-written pair got out of sync with the contract.
+    const uses = row.match(/REGISTER_PAYEE_NAME_CAP/g) ?? [];
+    expect(uses.length, 'both payee name renderings use the shared cap').toBeGreaterThanOrEqual(3); // import + 2 uses
+
+    // And no register file reintroduces a hand-written payee-style cap.
+    const offenders = Object.entries(REGISTER_SOURCES).flatMap(([path, content]) =>
+      withoutComments(content)
+        .split('\n')
+        .map((line, index) => ({ line, number: index + 1 }))
+        .filter(({ line }) => /sm:max-w-\[/.test(line))
+        .map(({ line, number }) => `${path}:${number}: ${line.trim()}`),
+    );
+    expect(
+      offenders,
+      'A width cap on the payee name comes from REGISTER_PAYEE_NAME_CAP, ' +
+        'never a hand-written sm:max-w-[...] -- a fixed cap is what kept the ' +
+        'longest payee from rendering while Description held the slack.',
+    ).toEqual([]);
   });
 
   it('gates the Account column structurally, not with CSS', () => {

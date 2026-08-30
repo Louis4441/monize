@@ -11,6 +11,7 @@ import { registerDateColumnPadding } from '@/components/transactions/register-da
 import {
   registerColumnClass,
   REGISTER_DESCRIPTION_CELL_FLEX,
+  REGISTER_PAYEE_NAME_CAP,
 } from '@/components/transactions/register-columns';
 import { PayeeLogo } from '@/components/payees/PayeeLogo';
 import { Transaction, TransactionSplit, TransactionStatus } from '@/types/transaction';
@@ -364,14 +365,14 @@ export const TransactionRow = memo(function TransactionRow({
           {transaction.payeeId && onPayeeClick ? (
             <button
               onClick={(e) => { e.stopPropagation(); onPayeeClick(transaction.payeeId!); }}
-              className={`text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline block truncate sm:max-w-[280px] text-left ${isVoid ? 'line-through' : ''}`}
+              className={`text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline block truncate ${REGISTER_PAYEE_NAME_CAP} text-left ${isVoid ? 'line-through' : ''}`}
               title={t('list.row.viewPayeeTitle', { name: payeeLabel ?? '' })}
             >
               {payeeLabel || '-'}
             </button>
           ) : (
             <div
-              className={`text-sm font-medium text-gray-900 dark:text-gray-100 truncate sm:max-w-[280px] ${isVoid ? 'line-through' : ''}`}
+              className={`text-sm font-medium text-gray-900 dark:text-gray-100 truncate ${REGISTER_PAYEE_NAME_CAP} ${isVoid ? 'line-through' : ''}`}
               title={payeeLabel || undefined}
             >
               {payeeLabel || '-'}
