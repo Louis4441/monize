@@ -9,6 +9,18 @@
     "buttonTitle": "[XX-Alerts-XX]",
     "buttonAriaLabel": "[XX-Alerts-XX]",
     "dismissAriaLabel": "[XX-Dismiss alert-XX]",
+    "closeAriaLabel": "[XX-Close alerts-XX]",
+    "emptyFiltered": "[XX-No alerts match the current filter-XX]",
+    "deleteAll": "[XX-Delete all-XX]",
+    "deleteAllConfirmTitle": "[XX-Delete alerts-XX]",
+    "deleteAllConfirmMessageAll": "[XX-Delete all alerts? This cannot be undone.-XX]",
+    "deleteAllConfirmMessageFiltered": "[XX-Delete every alert matching the current filter, including any not shown? This cannot be undone.-XX]",
+    "deleted": "[XX-{count, plural, one {# alert deleted} other {# alerts deleted}}-XX]",
+    "deleteFailed": "[XX-The alerts could not be deleted-XX]",
+    "filter": {
+      "financial": "[XX-Financial-XX]",
+      "system": "[XX-System-XX]"
+    },
     "severity": {
       "critical": "[XX-Critical-XX]",
       "warning": "[XX-Warning-XX]",

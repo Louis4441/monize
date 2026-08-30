@@ -9,6 +9,18 @@
     "buttonTitle": "Peringatan",
     "buttonAriaLabel": "Peringatan",
     "dismissAriaLabel": "Tutup peringatan",
+    "closeAriaLabel": "Tutup daftar peringatan",
+    "emptyFiltered": "Tidak ada peringatan yang cocok dengan filter saat ini",
+    "deleteAll": "Hapus semua",
+    "deleteAllConfirmTitle": "Hapus peringatan",
+    "deleteAllConfirmMessageAll": "Hapus semua peringatan? Tindakan ini tidak dapat dibatalkan.",
+    "deleteAllConfirmMessageFiltered": "Hapus semua peringatan yang cocok dengan filter saat ini, termasuk yang tidak ditampilkan? Tindakan ini tidak dapat dibatalkan.",
+    "deleted": "{count} peringatan dihapus",
+    "deleteFailed": "Peringatan tidak dapat dihapus",
+    "filter": {
+      "financial": "Keuangan",
+      "system": "Sistem"
+    },
     "severity": {
       "critical": "Kritis",
       "warning": "Peringatan",

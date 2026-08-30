@@ -9,6 +9,18 @@
     "buttonTitle": "Уведомления",
     "buttonAriaLabel": "Уведомления",
     "dismissAriaLabel": "Закрыть уведомление",
+    "closeAriaLabel": "Закрыть уведомления",
+    "emptyFiltered": "Нет уведомлений, соответствующих текущему фильтру",
+    "deleteAll": "Удалить все",
+    "deleteAllConfirmTitle": "Удалить уведомления",
+    "deleteAllConfirmMessageAll": "Удалить все уведомления? Это действие нельзя отменить.",
+    "deleteAllConfirmMessageFiltered": "Удалить все уведомления, соответствующие текущему фильтру, включая не показанные? Это действие нельзя отменить.",
+    "deleted": "{count, plural, one {Удалено # уведомление} few {Удалено # уведомления} other {Удалено # уведомлений}}",
+    "deleteFailed": "Не удалось удалить уведомления",
+    "filter": {
+      "financial": "Финансовые",
+      "system": "Системные"
+    },
     "severity": {
       "critical": "Критическое",
       "warning": "Предупреждение",

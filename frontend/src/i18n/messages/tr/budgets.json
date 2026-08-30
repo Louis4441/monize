@@ -9,6 +9,18 @@
     "buttonTitle": "Uyarılar",
     "buttonAriaLabel": "Uyarılar",
     "dismissAriaLabel": "Uyarıyı kapat",
+    "closeAriaLabel": "Uyarıları kapat",
+    "emptyFiltered": "Geçerli filtreyle eşleşen uyarı yok",
+    "deleteAll": "Tümünü sil",
+    "deleteAllConfirmTitle": "Uyarıları sil",
+    "deleteAllConfirmMessageAll": "Tüm uyarılar silinsin mi? Bu işlem geri alınamaz.",
+    "deleteAllConfirmMessageFiltered": "Geçerli filtreyle eşleşen tüm uyarılar, gösterilmeyenler dahil, silinsin mi? Bu işlem geri alınamaz.",
+    "deleted": "{count} uyarı silindi",
+    "deleteFailed": "Uyarılar silinemedi",
+    "filter": {
+      "financial": "Finansal",
+      "system": "Sistem"
+    },
     "severity": {
       "critical": "Kritik",
       "warning": "Uyarı",

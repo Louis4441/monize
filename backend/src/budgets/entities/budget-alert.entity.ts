@@ -35,6 +35,22 @@ export enum AlertType {
   SCHEDULED_POST_FAILED = "SCHEDULED_POST_FAILED",
 }
 
+/**
+ * The system half of the AlertType partition above, written once so every
+ * consumer of "system vs financial" (the dismiss-matching filter, the
+ * frontend's mirrored copy in `frontend/src/types/budget.ts`) derives from
+ * one set. Financial is NOT IN this set -- never a second list.
+ */
+export const SYSTEM_ALERT_TYPES: readonly AlertType[] = [
+  AlertType.BACKUP_FAILED,
+  AlertType.BACKUP_PARTIAL,
+  AlertType.ENCRYPTION_KEY_MISSING,
+  AlertType.PROVIDER_OUTAGE,
+  AlertType.PROVIDER_RECOVERED,
+  AlertType.SMTP_FAILURE,
+  AlertType.SCHEDULED_POST_FAILED,
+];
+
 export enum AlertSeverity {
   INFO = "info",
   WARNING = "warning",

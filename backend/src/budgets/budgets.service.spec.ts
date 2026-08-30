@@ -1,6 +1,6 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
-import { DataSource } from "typeorm";
+import { DataSource, In, IsNull, Not } from "typeorm";
 import { NotFoundException, BadRequestException } from "@nestjs/common";
 import { BudgetsService } from "./budgets.service";
 import { ScheduledEffectiveAmountService } from "../scheduled-transactions/scheduled-effective-amount.service";
@@ -19,6 +19,7 @@ import {
   BudgetAlert,
   AlertType,
   AlertSeverity,
+  SYSTEM_ALERT_TYPES,
 } from "./entities/budget-alert.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
@@ -1698,6 +1699,112 @@ describe("BudgetsService", () => {
       const result = await service.markAllAlertsRead("user-1");
 
       expect(result.updated).toBe(0);
+    });
+  });
+
+  describe("dismissAlerts", () => {
+    it("dismisses every live alert when no filter is given", async () => {
+      budgetAlertsRepository.update.mockResolvedValue({ affected: 7 });
+
+      const result = await service.dismissAlerts("user-1");
+
+      expect(result).toEqual({ dismissed: 7 });
+      expect(budgetAlertsRepository.update).toHaveBeenCalledWith(
+        { userId: "user-1", dismissedAt: IsNull() },
+        { dismissedAt: expect.any(Date) },
+      );
+    });
+
+    it("restricts the write to the requested severity", async () => {
+      budgetAlertsRepository.update.mockResolvedValue({ affected: 2 });
+
+      await service.dismissAlerts("user-1", {
+        severity: AlertSeverity.CRITICAL,
+      });
+
+      expect(budgetAlertsRepository.update).toHaveBeenCalledWith(
+        {
+          userId: "user-1",
+          dismissedAt: IsNull(),
+          severity: AlertSeverity.CRITICAL,
+        },
+        { dismissedAt: expect.any(Date) },
+      );
+    });
+
+    it("restricts category=system to the system alert types", async () => {
+      budgetAlertsRepository.update.mockResolvedValue({ affected: 1 });
+
+      await service.dismissAlerts("user-1", { category: "system" });
+
+      expect(budgetAlertsRepository.update).toHaveBeenCalledWith(
+        {
+          userId: "user-1",
+          dismissedAt: IsNull(),
+          alertType: In([...SYSTEM_ALERT_TYPES]),
+        },
+        { dismissedAt: expect.any(Date) },
+      );
+    });
+
+    it("restricts category=financial to everything outside the system set", async () => {
+      budgetAlertsRepository.update.mockResolvedValue({ affected: 3 });
+
+      await service.dismissAlerts("user-1", { category: "financial" });
+
+      expect(budgetAlertsRepository.update).toHaveBeenCalledWith(
+        {
+          userId: "user-1",
+          dismissedAt: IsNull(),
+          alertType: Not(In([...SYSTEM_ALERT_TYPES])),
+        },
+        { dismissedAt: expect.any(Date) },
+      );
+    });
+
+    it("applies severity and category together", async () => {
+      budgetAlertsRepository.update.mockResolvedValue({ affected: 0 });
+
+      const result = await service.dismissAlerts("user-1", {
+        severity: AlertSeverity.WARNING,
+        category: "financial",
+      });
+
+      expect(result).toEqual({ dismissed: 0 });
+      expect(budgetAlertsRepository.update).toHaveBeenCalledWith(
+        {
+          userId: "user-1",
+          dismissedAt: IsNull(),
+          severity: AlertSeverity.WARNING,
+          alertType: Not(In([...SYSTEM_ALERT_TYPES])),
+        },
+        { dismissedAt: expect.any(Date) },
+      );
+    });
+  });
+
+  describe("SYSTEM_ALERT_TYPES partition", () => {
+    it("holds exactly the system half of AlertType, so category filters cannot drift", () => {
+      // Financial is defined as NOT IN this set (never a second list), so
+      // membership here is the whole classification. A new AlertType lands as
+      // financial unless deliberately added; the frontend mirror is checked
+      // against this file by its own contract test.
+      expect([...SYSTEM_ALERT_TYPES].sort()).toEqual(
+        [
+          AlertType.BACKUP_FAILED,
+          AlertType.BACKUP_PARTIAL,
+          AlertType.ENCRYPTION_KEY_MISSING,
+          AlertType.PROVIDER_OUTAGE,
+          AlertType.PROVIDER_RECOVERED,
+          AlertType.SMTP_FAILURE,
+          AlertType.SCHEDULED_POST_FAILED,
+        ].sort(),
+      );
+      const allTypes = Object.values(AlertType);
+      for (const type of SYSTEM_ALERT_TYPES) {
+        expect(allTypes).toContain(type);
+      }
+      expect(SYSTEM_ALERT_TYPES).not.toContain(AlertType.BILL_DUE);
     });
   });
 

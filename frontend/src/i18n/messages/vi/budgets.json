@@ -9,6 +9,18 @@
     "buttonTitle": "Cảnh báo",
     "buttonAriaLabel": "Cảnh báo",
     "dismissAriaLabel": "Bỏ qua cảnh báo",
+    "closeAriaLabel": "Đóng danh sách cảnh báo",
+    "emptyFiltered": "Không có cảnh báo nào khớp với bộ lọc hiện tại",
+    "deleteAll": "Xóa tất cả",
+    "deleteAllConfirmTitle": "Xóa cảnh báo",
+    "deleteAllConfirmMessageAll": "Xóa tất cả cảnh báo? Hành động này không thể hoàn tác.",
+    "deleteAllConfirmMessageFiltered": "Xóa tất cả cảnh báo khớp với bộ lọc hiện tại, kể cả những cảnh báo không hiển thị? Hành động này không thể hoàn tác.",
+    "deleted": "Đã xóa {count} cảnh báo",
+    "deleteFailed": "Không thể xóa cảnh báo",
+    "filter": {
+      "financial": "Tài chính",
+      "system": "Hệ thống"
+    },
     "severity": {
       "critical": "Nghiêm trọng",
       "warning": "Cảnh báo",

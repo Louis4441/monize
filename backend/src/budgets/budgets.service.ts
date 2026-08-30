@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { tr } from "../i18n/translate";
-import { DataSource, In, IsNull } from "typeorm";
+import { DataSource, In, IsNull, Not } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { Budget } from "./entities/budget.entity";
 import { BudgetCategory } from "./entities/budget-category.entity";
@@ -12,12 +12,14 @@ import {
   BudgetAlert,
   AlertType,
   AlertSeverity,
+  SYSTEM_ALERT_TYPES,
 } from "./entities/budget-alert.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
 import { Category } from "../categories/entities/category.entity";
 import { ScheduledOccurrenceService } from "../scheduled-transactions/scheduled-occurrence.service";
 import { CreateBudgetDto } from "./dto/create-budget.dto";
+import { DismissAlertsQueryDto } from "./dto/dismiss-alerts-query.dto";
 import { UpdateBudgetDto } from "./dto/update-budget.dto";
 import { CreateBudgetCategoryDto } from "./dto/create-budget-category.dto";
 import { UpdateBudgetCategoryDto } from "./dto/update-budget-category.dto";
@@ -850,6 +852,35 @@ export class BudgetsService {
     );
 
     return { updated: result.affected || 0 };
+  }
+
+  /**
+   * Soft-dismiss every live alert matching the caller's filter, in one
+   * UPDATE. The filter arrives explicitly on the command (severity and/or
+   * system-vs-financial category) rather than as a list of on-screen ids, so
+   * it also reaches alerts beyond the list endpoint's `take: 50` window.
+   * Financial is defined as NOT IN `SYSTEM_ALERT_TYPES` -- the one place the
+   * partition is written.
+   */
+  async dismissAlerts(
+    userId: string,
+    filters: DismissAlertsQueryDto = {},
+  ): Promise<{ dismissed: number }> {
+    const where: Record<string, unknown> = { userId, dismissedAt: IsNull() };
+    if (filters.severity) {
+      where.severity = filters.severity;
+    }
+    if (filters.category === "system") {
+      where.alertType = In([...SYSTEM_ALERT_TYPES]);
+    } else if (filters.category === "financial") {
+      where.alertType = Not(In([...SYSTEM_ALERT_TYPES]));
+    }
+
+    const result = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(BudgetAlert).update(where, { dismissedAt: new Date() }),
+    );
+
+    return { dismissed: result.affected || 0 };
   }
 
   async getDashboardSummary(userId: string): Promise<{

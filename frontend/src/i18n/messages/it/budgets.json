@@ -9,6 +9,18 @@
     "buttonTitle": "Avvisi",
     "buttonAriaLabel": "Avvisi",
     "dismissAriaLabel": "Ignora avviso",
+    "closeAriaLabel": "Chiudi avvisi",
+    "emptyFiltered": "Nessun avviso corrisponde al filtro attuale",
+    "deleteAll": "Elimina tutti",
+    "deleteAllConfirmTitle": "Elimina avvisi",
+    "deleteAllConfirmMessageAll": "Eliminare tutti gli avvisi? Questa operazione non può essere annullata.",
+    "deleteAllConfirmMessageFiltered": "Eliminare tutti gli avvisi corrispondenti al filtro attuale, inclusi quelli non visualizzati? Questa operazione non può essere annullata.",
+    "deleted": "{count, plural, one {# avviso eliminato} other {# avvisi eliminati}}",
+    "deleteFailed": "Impossibile eliminare gli avvisi",
+    "filter": {
+      "financial": "Finanziari",
+      "system": "Sistema"
+    },
     "severity": {
       "critical": "Critico",
       "warning": "Attenzione",

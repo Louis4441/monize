@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@/test/render';
 import { BudgetAlertList } from './BudgetAlertList';
+import { NO_ALERT_FILTERS } from '@/lib/alert-filters';
 import type { BudgetAlert } from '@/types/budget';
 
 const mockPush = vi.fn();
@@ -62,6 +63,9 @@ describe('BudgetAlertList', () => {
     dismissingIds: new Set<string>(),
     collapsingIds: new Set<string>(),
     onClose: vi.fn(),
+    filters: NO_ALERT_FILTERS,
+    onFiltersChange: vi.fn(),
+    onDeleteAll: vi.fn(),
   };
 
   beforeEach(() => {
@@ -746,6 +750,142 @@ describe('BudgetAlertList', () => {
       );
       expect(screen.getByText('STORED ENGLISH TITLE')).toBeInTheDocument();
       expect(screen.getByText('STORED ENGLISH MESSAGE')).toBeInTheDocument();
+    });
+  });
+
+  describe('filters', () => {
+    it('renders one chip per severity and per category', () => {
+      render(<BudgetAlertList {...defaultProps} />);
+
+      for (const severity of ['critical', 'warning', 'info', 'success']) {
+        expect(
+          screen.getByTestId(`alert-filter-severity-${severity}`),
+        ).toHaveAttribute('aria-pressed', 'false');
+      }
+      for (const category of ['financial', 'system']) {
+        expect(
+          screen.getByTestId(`alert-filter-category-${category}`),
+        ).toHaveAttribute('aria-pressed', 'false');
+      }
+    });
+
+    it('activates a severity filter on click', () => {
+      render(<BudgetAlertList {...defaultProps} />);
+
+      fireEvent.click(screen.getByTestId('alert-filter-severity-critical'));
+
+      expect(defaultProps.onFiltersChange).toHaveBeenCalledWith({
+        severity: 'critical',
+        category: null,
+      });
+    });
+
+    it('clears an active severity filter on a second click', () => {
+      render(
+        <BudgetAlertList
+          {...defaultProps}
+          filters={{ severity: 'critical', category: null }}
+        />,
+      );
+
+      const chip = screen.getByTestId('alert-filter-severity-critical');
+      expect(chip).toHaveAttribute('aria-pressed', 'true');
+      fireEvent.click(chip);
+
+      expect(defaultProps.onFiltersChange).toHaveBeenCalledWith({
+        severity: null,
+        category: null,
+      });
+    });
+
+    it('activates a category filter without touching the severity filter', () => {
+      render(
+        <BudgetAlertList
+          {...defaultProps}
+          filters={{ severity: 'warning', category: null }}
+        />,
+      );
+
+      fireEvent.click(screen.getByTestId('alert-filter-category-system'));
+
+      expect(defaultProps.onFiltersChange).toHaveBeenCalledWith({
+        severity: 'warning',
+        category: 'system',
+      });
+    });
+
+    it('clears an active category filter on a second click', () => {
+      render(
+        <BudgetAlertList
+          {...defaultProps}
+          filters={{ severity: null, category: 'financial' }}
+        />,
+      );
+
+      fireEvent.click(screen.getByTestId('alert-filter-category-financial'));
+
+      expect(defaultProps.onFiltersChange).toHaveBeenCalledWith({
+        severity: null,
+        category: null,
+      });
+    });
+
+    it('tells an empty filtered view apart from having no alerts at all', () => {
+      render(
+        <BudgetAlertList
+          {...defaultProps}
+          filters={{ severity: 'critical', category: null }}
+        />,
+      );
+
+      expect(screen.getByTestId('no-alerts')).toHaveTextContent(
+        'No alerts match the current filter',
+      );
+    });
+  });
+
+  describe('delete all', () => {
+    it('offers delete-all only when alerts are shown', () => {
+      const { rerender } = render(<BudgetAlertList {...defaultProps} />);
+      expect(screen.queryByTestId('delete-all-alerts')).not.toBeInTheDocument();
+
+      rerender(
+        <BudgetAlertList {...defaultProps} alerts={[makeAlert()]} />,
+      );
+      expect(screen.getByTestId('delete-all-alerts')).toBeInTheDocument();
+    });
+
+    it('asks the owner to delete on click', () => {
+      render(<BudgetAlertList {...defaultProps} alerts={[makeAlert()]} />);
+
+      fireEvent.click(screen.getByTestId('delete-all-alerts'));
+
+      expect(defaultProps.onDeleteAll).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('mobile layout', () => {
+    it('covers the whole screen below the sm breakpoint and stays a dropdown above it', () => {
+      render(<BudgetAlertList {...defaultProps} />);
+
+      const container = screen.getByTestId('alert-list');
+      // fixed inset-0 is the full-screen mobile treatment; the sm:-scoped
+      // classes restore the desktop dropdown card.
+      expect(container.className).toContain('fixed inset-0');
+      expect(container.className).toContain('sm:absolute');
+      expect(container.className).toContain('sm:inset-auto');
+      expect(container.className).toContain('sm:max-h-[28rem]');
+      expect(container.className).toContain('sm:rounded-lg');
+    });
+
+    it('renders a mobile-only close button that closes the panel', () => {
+      render(<BudgetAlertList {...defaultProps} />);
+
+      const close = screen.getByTestId('close-alerts');
+      expect(close.className).toContain('sm:hidden');
+      fireEvent.click(close);
+
+      expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
     });
   });
 });

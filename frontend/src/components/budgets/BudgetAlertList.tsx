@@ -3,7 +3,10 @@
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
-import type { BudgetAlert, AlertSeverity } from '@/types/budget';
+import type { AlertFilters } from '@/lib/alert-filters';
+import { hasActiveAlertFilters } from '@/lib/alert-filters';
+import { Badge } from '@/components/ui/Badge';
+import type { AlertCategory, BudgetAlert, AlertSeverity } from '@/types/budget';
 
 /**
  * The structured payload a `BILL_DUE` alert carries, so the reader sees it in
@@ -83,6 +86,7 @@ function systemAlertData(alert: BudgetAlert): SystemAlertData | null {
 }
 
 interface BudgetAlertListProps {
+  /** The alerts matching the active filter -- the owner filters, this renders. */
   alerts: BudgetAlert[];
   isLoading: boolean;
   onMarkRead: (alertId: string) => void;
@@ -92,7 +96,26 @@ interface BudgetAlertListProps {
   dismissingIds: Set<string>;
   collapsingIds: Set<string>;
   onClose: () => void;
+  filters: AlertFilters;
+  onFiltersChange: (filters: AlertFilters) => void;
+  /** Asks the owner to confirm and dismiss everything matching `filters`. */
+  onDeleteAll: () => void;
 }
+
+const SEVERITY_FILTER_OPTIONS: readonly AlertSeverity[] = [
+  'critical',
+  'warning',
+  'info',
+  'success',
+];
+
+const CATEGORY_FILTER_OPTIONS: readonly AlertCategory[] = [
+  'financial',
+  'system',
+];
+
+const FILTER_CHIP_CLASS =
+  'flex-shrink-0 transition-colors motion-reduce:transition-none';
 
 function severityStyles(severity: AlertSeverity): {
   bg: string;
@@ -203,6 +226,9 @@ export function BudgetAlertList({
   dismissingIds,
   collapsingIds,
   onClose,
+  filters,
+  onFiltersChange,
+  onDeleteAll,
 }: BudgetAlertListProps) {
   const t = useTranslations('budgets');
   const router = useRouter();
@@ -358,13 +384,31 @@ export function BudgetAlertList({
     }
   };
 
+  const filtered = hasActiveAlertFilters(filters);
+
+  const toggleSeverity = (severity: AlertSeverity) => {
+    onFiltersChange({
+      ...filters,
+      severity: filters.severity === severity ? null : severity,
+    });
+  };
+
+  const toggleCategory = (category: AlertCategory) => {
+    onFiltersChange({
+      ...filters,
+      category: filters.category === category ? null : category,
+    });
+  };
+
   return (
+    // Full-screen below `sm` (the phone treatment); the desktop dropdown keeps
+    // its card shape via the sm:-scoped rounding, border and height cap.
     <div
-      className="fixed left-3 right-3 top-14 sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-1 sm:w-96 bg-white dark:bg-gray-800 rounded-lg shadow-lg dark:shadow-gray-700/50 border border-gray-200 dark:border-gray-700 z-50 max-h-[28rem] flex flex-col"
+      className="fixed inset-0 sm:absolute sm:inset-auto sm:right-0 sm:mt-1 sm:w-96 bg-white dark:bg-gray-800 sm:rounded-lg shadow-lg dark:shadow-gray-700/50 sm:border border-gray-200 dark:border-gray-700 z-50 sm:max-h-[28rem] flex flex-col"
       data-testid="alert-list"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
           {t('alerts.title')}
           {unreadCount > 0 && (
@@ -373,15 +417,86 @@ export function BudgetAlertList({
             </span>
           )}
         </h3>
-        {unreadCount > 0 && (
+        <div className="flex items-center gap-3">
+          {unreadCount > 0 && (
+            <button
+              onClick={onMarkAllRead}
+              className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+              data-testid="mark-all-read"
+            >
+              {t('alerts.markAllRead')}
+            </button>
+          )}
+          {alerts.length > 0 && (
+            <button
+              onClick={onDeleteAll}
+              className="text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+              data-testid="delete-all-alerts"
+            >
+              {t('alerts.deleteAll')}
+            </button>
+          )}
+          {/* On mobile the panel covers the screen, so clicking outside is
+              impossible -- this is the only way out (ActionHistoryPanel's
+              pattern). */}
           <button
-            onClick={onMarkAllRead}
-            className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-            data-testid="mark-all-read"
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 sm:hidden"
+            aria-label={t('alerts.closeAriaLabel')}
+            data-testid="close-alerts"
           >
-            {t('alerts.markAllRead')}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="w-5 h-5"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18 18 6M6 6l12 12"
+              />
+            </svg>
           </button>
-        )}
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div
+        className="flex items-center gap-1.5 px-4 py-2 border-b border-gray-200 dark:border-gray-700 overflow-x-auto scrollbar-hide"
+        data-testid="alert-filters"
+      >
+        {SEVERITY_FILTER_OPTIONS.map((severity) => (
+          <Badge
+            key={severity}
+            as="button"
+            variant={filters.severity === severity ? 'blue' : 'gray'}
+            onClick={() => toggleSeverity(severity)}
+            aria-pressed={filters.severity === severity}
+            className={FILTER_CHIP_CLASS}
+            data-testid={`alert-filter-severity-${severity}`}
+          >
+            {severityLabel(severity, t)}
+          </Badge>
+        ))}
+        <div className="h-4 w-px bg-gray-200 dark:bg-gray-600 flex-shrink-0" />
+        {CATEGORY_FILTER_OPTIONS.map((category) => (
+          <Badge
+            key={category}
+            as="button"
+            variant={filters.category === category ? 'blue' : 'gray'}
+            onClick={() => toggleCategory(category)}
+            aria-pressed={filters.category === category}
+            className={FILTER_CHIP_CLASS}
+            data-testid={`alert-filter-category-${category}`}
+          >
+            {category === 'financial'
+              ? t('alerts.filter.financial')
+              : t('alerts.filter.system')}
+          </Badge>
+        ))}
       </div>
 
       {/* Alert list */}
@@ -395,7 +510,7 @@ export function BudgetAlertList({
             className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
             data-testid="no-alerts"
           >
-            {t('alerts.empty')}
+            {filtered ? t('alerts.emptyFiltered') : t('alerts.empty')}
           </div>
         ) : (
           <div>
