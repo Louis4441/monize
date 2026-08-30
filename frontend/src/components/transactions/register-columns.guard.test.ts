@@ -210,20 +210,30 @@ describe('the register column contract', () => {
   });
 
   it('lets the payee outrank Description for width', () => {
-    // Whenever Description is rendered it is the column that yields, so the
-    // payee name is uncapped -- the longest payee renders in full. The cap
-    // survives only below the low tier, where there is no Description to
-    // yield and a runaway payee would push Amount and Balance into the
-    // horizontal scroll instead. The uncap threshold must repeat the low
-    // tier's figure as a literal (Tailwind's scanner only sees complete
-    // class names), so this holds the two copies equal.
-    const uncap = REGISTER_PAYEE_NAME_CAP.match(/@min-\[(\d+)px\]:max-w-none/);
-    expect(uncap, 'the payee name uncaps at a container width').toBeTruthy();
-    expect(Number(uncap![1])).toBe(PRIORITY_MIN_WIDTH_PX.low);
-    expect(
-      /(?:^|\s)sm:max-w-\[\d+px\](?:\s|$)/.test(REGISTER_PAYEE_NAME_CAP),
-      'below the low tier the cap still protects Amount and Balance',
-    ).toBe(true);
+    // The payee cap is never a fixed pixel figure -- fixed is what kept the
+    // longest payees truncated at 280px however wide the register grew. Both
+    // halves scale with the register in cqw: a conservative share with a px
+    // floor while nothing can yield, and a wider share once Description is on
+    // screen to yield -- still a bound, because a 255-char payee under
+    // max-w-none would overflow the table and scroll Status out from behind
+    // the sticky Actions. The tier threshold must repeat the low tier's
+    // figure as a literal (Tailwind's scanner only sees complete class
+    // names), so this holds the two copies equal.
+    const shape = REGISTER_PAYEE_NAME_CAP.match(
+      /^sm:max-w-\[max\((\d+)px,(\d+)cqw\)\] @min-\[(\d+)px\]:max-w-\[(\d+)cqw\]$/,
+    );
+    expect(shape, 'a scaling cap with a px floor, widened at a container width').toBeTruthy();
+    const [, floorPx, baseShare, thresholdPx, wideShare] = shape!.map(Number);
+    expect(thresholdPx, 'the cap widens exactly where Description appears').toBe(
+      PRIORITY_MIN_WIDTH_PX.low,
+    );
+    expect(floorPx, 'no register width renders less payee than the old fixed cap did')
+      .toBeGreaterThanOrEqual(280);
+    expect(wideShare, 'with Description there to yield, the payee gets more').toBeGreaterThan(
+      baseShare,
+    );
+    expect(wideShare, 'and still a bound, so a pathological payee cannot hide Status')
+      .toBeLessThan(100);
 
     const row = withoutComments(
       REGISTER_SOURCES['/src/components/transactions/TransactionRow.tsx'],

@@ -168,15 +168,24 @@ export const REGISTER_DESCRIPTION_CELL_FLEX = 'w-full max-w-0';
 
 /**
  * The width classes on the payee NAME (the button or div inside the payee
- * cell). Payee outranks Description: while Description is rendered -- the low
- * tier, whose 1536px this string must repeat because Tailwind's scanner only
- * sees complete literal class names (the guard test holds the two figures
- * equal) -- the name is uncapped, so the longest payee renders in full and
- * the yielding Description hands the width back. Below the low tier there is
- * no Description to yield, so the cap is what keeps a runaway payee from
- * pushing Amount and Balance into the horizontal scroll -- the same defect
- * that once hid Status. Below `sm` the phone caps on the payee *cell* apply
- * instead (see the cell in TransactionRow).
+ * cell). The cap is never a fixed pixel figure -- a fixed cap is what kept
+ * the longest payees truncated at 280px however wide the register grew. It
+ * scales with the register in `cqw` (1cqw = 1% of the @container's width):
+ *
+ * - Below the low tier nothing can yield, so the cap is conservative --
+ *   `max(280px, 35cqw)`: never narrower than the old fixed cap, and growing
+ *   with the register so a wider window always shows more of the payee.
+ * - From the low tier -- whose 1536px this string must repeat because
+ *   Tailwind's scanner only sees complete literal class names (the guard
+ *   test holds the two figures equal) -- Description is on screen and yields,
+ *   so the cap opens to `60cqw`: any realistic longest payee renders in full
+ *   and Description hands the width back. It stays a bound rather than
+ *   `max-w-none` because a payee at the column's 255-char maximum would
+ *   otherwise overflow the table and scroll Status out from behind the
+ *   sticky Actions -- the defect this whole contract exists to prevent.
+ *
+ * Below `sm` the phone caps on the payee *cell* apply instead (see the cell
+ * in TransactionRow).
  */
 export const REGISTER_PAYEE_NAME_CAP =
-  'sm:max-w-[280px] @min-[1536px]:max-w-none';
+  'sm:max-w-[max(280px,35cqw)] @min-[1536px]:max-w-[60cqw]';
