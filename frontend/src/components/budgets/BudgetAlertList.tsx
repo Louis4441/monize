@@ -23,6 +23,63 @@ interface BillDueAlertData {
   currencyCode?: string;
 }
 
+/**
+ * The structured payload a system alert carries (`data.system === true`),
+ * following the same rule as `BillDueAlertData`: the row stores English
+ * fallbacks, the UI composes localized copy from these facts. Fields are
+ * per-type; every one is optional so an older or foreign row falls back to
+ * its stored text rather than rendering a hole.
+ */
+interface SystemAlertData {
+  system?: boolean;
+  affectedUserId?: string;
+  affectedUserEmail?: string | null;
+  reason?: string;
+  missingAttachments?: number;
+  providerLabel?: string;
+  since?: string;
+  lastError?: string | null;
+  scheduledName?: string;
+  dueDate?: string;
+  error?: string;
+}
+
+/**
+ * Where clicking an alert takes the reader, per type. `null` means the click
+ * marks it read and closes the dropdown, nothing more -- there is no page
+ * that says more than the alert itself (the provider pair), or no page to
+ * point at (a budget alert whose budgetId is null, which used to push the
+ * broken route /budgets/null).
+ */
+function alertRoute(alert: BudgetAlert): string | null {
+  switch (alert.alertType) {
+    case 'BILL_DUE':
+    case 'SCHEDULED_POST_FAILED':
+      return '/bills';
+    case 'BACKUP_FAILED':
+    case 'BACKUP_PARTIAL':
+    case 'ENCRYPTION_KEY_MISSING':
+    case 'SMTP_FAILURE':
+      return '/settings';
+    case 'PROVIDER_OUTAGE':
+    case 'PROVIDER_RECOVERED':
+      return null;
+    default:
+      return alert.budgetId ? `/budgets/${alert.budgetId}` : null;
+  }
+}
+
+/**
+ * The structured payload of a system alert, or null for anything else --
+ * including a row written before the payload existed, which falls back to
+ * its stored English.
+ */
+function systemAlertData(alert: BudgetAlert): SystemAlertData | null {
+  const data = alert.data as SystemAlertData | undefined;
+  if (!data || data.system !== true) return null;
+  return data;
+}
+
 interface BudgetAlertListProps {
   alerts: BudgetAlert[];
   isLoading: boolean;
@@ -182,6 +239,90 @@ export function BudgetAlertList({
     });
   };
 
+  /**
+   * A system alert's headline in the reader's language, or null for other
+   * types and for rows without the structured payload (stored English wins).
+   */
+  const systemAlertTitle = (alert: BudgetAlert): string | null => {
+    const data = systemAlertData(alert);
+    if (!data) return null;
+    const user = data.affectedUserEmail ?? data.affectedUserId ?? '';
+    switch (alert.alertType) {
+      case 'BACKUP_FAILED':
+        return t('alerts.system.backupFailed.title');
+      case 'BACKUP_PARTIAL':
+        return t('alerts.system.backupPartial.title');
+      case 'ENCRYPTION_KEY_MISSING':
+        return t('alerts.system.encryptionKeyMissing.title');
+      case 'SMTP_FAILURE':
+        return t('alerts.system.smtpFailure.title');
+      case 'PROVIDER_OUTAGE':
+        return data.providerLabel
+          ? t('alerts.system.providerOutage.title', { provider: data.providerLabel })
+          : null;
+      case 'PROVIDER_RECOVERED':
+        return data.providerLabel
+          ? t('alerts.system.providerRecovered.title', { provider: data.providerLabel })
+          : null;
+      case 'SCHEDULED_POST_FAILED':
+        return data.scheduledName
+          ? t('alerts.system.scheduledPostFailed.title', { name: data.scheduledName })
+          : null;
+      default:
+        return null;
+    }
+  };
+
+  /** The system alert's body, same contract as `systemAlertTitle`. */
+  const systemAlertMessage = (alert: BudgetAlert): string | null => {
+    const data = systemAlertData(alert);
+    if (!data) return null;
+    const user = data.affectedUserEmail ?? data.affectedUserId ?? '';
+    switch (alert.alertType) {
+      case 'BACKUP_FAILED':
+        return user
+          ? t('alerts.system.backupFailed.message', { user, error: data.error ?? '' })
+          : null;
+      case 'BACKUP_PARTIAL': {
+        if (!user) return null;
+        if (data.reason === 'attachments') {
+          return t('alerts.system.backupPartial.messageAttachments', {
+            user,
+            missing: data.missingAttachments ?? 0,
+          });
+        }
+        if (data.reason === 'promotion') {
+          return t('alerts.system.backupPartial.messagePromotion', { user });
+        }
+        if (data.reason === 'retention') {
+          return t('alerts.system.backupPartial.messageRetention', { user });
+        }
+        return null;
+      }
+      case 'ENCRYPTION_KEY_MISSING':
+        return t('alerts.system.encryptionKeyMissing.message');
+      case 'SMTP_FAILURE':
+        return t('alerts.system.smtpFailure.message', { error: data.lastError ?? '' });
+      case 'PROVIDER_OUTAGE':
+        return data.providerLabel
+          ? t('alerts.system.providerOutage.message', { provider: data.providerLabel })
+          : null;
+      case 'PROVIDER_RECOVERED':
+        return data.providerLabel
+          ? t('alerts.system.providerRecovered.message', { provider: data.providerLabel })
+          : null;
+      case 'SCHEDULED_POST_FAILED':
+        return data.dueDate
+          ? t('alerts.system.scheduledPostFailed.message', {
+              date: data.dueDate,
+              error: data.error ?? '',
+            })
+          : null;
+      default:
+        return null;
+    }
+  };
+
   const unreadCount = alerts.filter((a) => !a.isRead && !dismissingIds.has(a.id)).length;
 
   const handleAlertClick = (alert: BudgetAlert) => {
@@ -189,10 +330,9 @@ export function BudgetAlertList({
       onMarkRead(alert.id);
     }
     onClose();
-    if (alert.alertType === 'BILL_DUE') {
-      router.push('/bills');
-    } else {
-      router.push(`/budgets/${alert.budgetId}`);
+    const route = alertRoute(alert);
+    if (route) {
+      router.push(route);
     }
   };
 
@@ -298,10 +438,10 @@ export function BudgetAlertList({
                               </span>
                             </div>
                             <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                              {billDueTitle(alert) ?? alert.title}
+                              {billDueTitle(alert) ?? systemAlertTitle(alert) ?? alert.title}
                             </p>
                             <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mt-0.5">
-                              {billDueMessage(alert) ?? alert.message}
+                              {billDueMessage(alert) ?? systemAlertMessage(alert) ?? alert.message}
                             </p>
                           </div>
                         </div>

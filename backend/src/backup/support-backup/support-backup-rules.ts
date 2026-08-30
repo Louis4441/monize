@@ -526,6 +526,9 @@ export const RULES: Record<string, TableRules> = {
     period_start: keep,
     created_at: keep,
     dismissed_at: keep,
+    // Machine fingerprint (alert type + affected user id + date bucket);
+    // the user id in it is the same identifier user_id already keeps.
+    dedupe_key: keep,
   },
   custom_reports: {
     id: keep,

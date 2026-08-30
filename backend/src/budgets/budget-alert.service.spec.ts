@@ -96,6 +96,7 @@ function makeAlert(overrides: Partial<BudgetAlert> = {}): BudgetAlert {
     periodStart: "2026-02-01",
     createdAt: new Date(),
     dismissedAt: null,
+    dedupeKey: null,
     ...overrides,
   };
 }

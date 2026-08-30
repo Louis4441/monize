@@ -751,3 +751,46 @@ export function providerRecoveryTemplate(
     </div>
   `;
 }
+
+export interface SystemAlertEmailData {
+  severity: string;
+  /** The alert row's stored English title. */
+  title: string;
+  /** The alert row's stored English message -- may contain error strings. */
+  message: string;
+}
+
+/**
+ * The generic admin email behind `SystemAlertService`: one severity badge, the
+ * alert's stored title and message, and localized framing around them. The
+ * title/message travel as the row stores them (English, composed by the
+ * producer), because a cron has no request locale and the facts inside them --
+ * error strings, addresses -- are not translatable anyway; the greeting,
+ * intro and footer render in the recipient's own language.
+ */
+export function systemAlertTemplate(
+  firstName: string,
+  data: SystemAlertEmailData,
+  t: EmailT = englishEmailT,
+): string {
+  const safeName = escapeHtml(firstName || "there");
+  const title = escapeHtml(data.title);
+  const message = escapeHtml(data.message);
+  const badge = escapeHtml(severityLabel(data.severity, t));
+  return `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <h2 style="color: #1f2937;">${t("emails.systemAlert.heading", "System alert")}</h2>
+      <p style="color: #374151;">${t("emails.systemAlert.greeting", `Hi ${safeName},`, { name: safeName })}</p>
+      <p style="color: #374151;">${t("emails.systemAlert.intro", "An issue on your Monize deployment needs an administrator's attention.")}</p>
+      <div style="margin: 16px 0; padding: 14px 16px; border: 1px solid #e5e7eb; border-radius: 8px;">
+        <p style="margin: 0 0 8px 0;">
+          <span style="display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; color: white; background: ${severityColor(data.severity)};">${badge}</span>
+        </p>
+        <p style="margin: 0 0 6px 0; font-weight: 600; color: #1f2937;">${title}</p>
+        <p style="margin: 0; color: #374151;">${message}</p>
+      </div>
+      <p style="color: #6b7280; font-size: 14px;">${t("emails.systemAlert.footer", "This alert is also shown in the app's notification bell. It is raised at most once per occurrence, however many server replicas noticed it.")}</p>
+      <p style="color: #6b7280; font-size: 14px; margin-top: 24px;">-- Monize</p>
+    </div>
+  `;
+}

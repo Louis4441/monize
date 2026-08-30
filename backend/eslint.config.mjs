@@ -106,6 +106,11 @@ const WITH_CONTEXT_ALLOWLIST = [
   "src/securities/market-index.service.ts",
   "src/securities/securities.controller.ts",
   "src/securities/security-price.service.ts",
+  // System alerts: every caller is a cron catch, a post-claim hook or a
+  // bootstrap hook with no request behind it, so the service seeds its own
+  // context -- system for the admin fan-out, user for a per-user alert
+  // (docs/specs/system-alerts.md).
+  "src/system-alerts/system-alert.service.ts",
   "src/transactions/transaction-transfer.service.ts",
 ];
 

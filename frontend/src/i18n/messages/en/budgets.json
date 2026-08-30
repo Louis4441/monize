@@ -22,6 +22,38 @@
       "titleInDays": "{payee} due in {days} days",
       "amountDue": "{amount} due on {date}",
       "amountUnavailable": "Amount unavailable (no current exchange rate), due on {date}"
+    },
+    "system": {
+      "backupFailed": {
+        "title": "Automatic backup failed",
+        "message": "The automatic backup for {user} failed: {error}"
+      },
+      "backupPartial": {
+        "title": "Automatic backup incomplete",
+        "messageAttachments": "The backup for {user} was written, but {missing, plural, one {# attachment} other {# attachments}} could not be included. Complete backups were preserved.",
+        "messagePromotion": "The daily backup for {user} succeeded, but its weekly or monthly copy could not be written.",
+        "messageRetention": "The backup for {user} succeeded, but old backup files could not be cleaned up."
+      },
+      "encryptionKeyMissing": {
+        "title": "Encryption key not configured",
+        "message": "ENCRYPTION_KEY is not set, so backups are written unencrypted and secrets cannot be stored. A future release will refuse to start without it."
+      },
+      "smtpFailure": {
+        "title": "Email delivery is failing",
+        "message": "Monize could not send email: {error}. Notifications and reminders are not being delivered."
+      },
+      "providerOutage": {
+        "title": "{provider} is not responding",
+        "message": "Market data from {provider} is unavailable. Prices and index data may be out of date until it answers again."
+      },
+      "providerRecovered": {
+        "title": "{provider} is answering again",
+        "message": "The outage is over and market data from {provider} is updating again."
+      },
+      "scheduledPostFailed": {
+        "title": "{name} could not be posted",
+        "message": "Your scheduled transaction due {date} did not post automatically: {error}. You can post it manually from Bills."
+      }
     }
   },
   "summary503020": {

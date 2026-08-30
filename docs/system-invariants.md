@@ -121,6 +121,7 @@ implied.
 | INV-BACKUP-001 | A backup file is complete, verified and owner-namespaced | enforced |
 | INV-CRON-001 | One logical cron effect per schedule tick, across replicas | partial |
 | INV-PROVIDER-001 | An unreachable provider stops being called, and produces at most one alert pair per outage | enforced |
+| INV-ALERT-001 | A system alert row lands at most once per (recipient, dedupe key), and only the insert winner emails | enforced |
 | INV-RLS-001 | Enforced mode refuses to run on a role that can bypass RLS | enforced |
 | INV-CACHE-001 | A money-moving write invalidates every derived cache | enforced |
 | INV-RELEASE-001 | The tested, imaged and tagged revisions are one revision | partial |
@@ -2049,6 +2050,53 @@ Required tests      Present: provider-circuit.spec.ts, provider-health.service
                     Owed: nothing exercises two *processes*, so the exclusion is
                     proven across concurrent transactions rather than across
                     replicas.
+Status              enforced
+```
+
+### INV-ALERT-001 -- a system alert is raised once, and only the insert winner emails
+
+```text
+Statement           A system-level alert (BACKUP_FAILED, ENCRYPTION_KEY_MISSING,
+                    PROVIDER_OUTAGE, SMTP_FAILURE, SCHEDULED_POST_FAILED, ...)
+                    is materialized at most once per (recipient, dedupe key)
+                    however many replicas raise it, and its admin email is sent
+                    only by whichever replica's INSERT actually created the row.
+                    SMTP_FAILURE never emails at all.
+Source of truth     budget_alerts.dedupe_key under the partial unique index
+                    idx_budget_alerts_dedupe (user_id, dedupe_key) WHERE
+                    dedupe_key IS NOT NULL (migration 170). The fingerprint
+                    index from migration 140 cannot arbitrate these rows: it
+                    keys on budget_id, NULL for every system alert, and NULL
+                    never equals NULL in a unique index.
+Enforcement         SystemAlertService.insertAlert writes INSERT ... ON CONFLICT
+                    (user_id, dedupe_key) WHERE dedupe_key IS NOT NULL DO
+                    NOTHING RETURNING id; the email leg runs only for rows the
+                    INSERT returned (the insert-winner shape BudgetAlertService
+                    uses). shouldEmail refuses SMTP_FAILURE unconditionally.
+                    The provider pair additionally sits behind provider_health's
+                    conditional-UPDATE claim, so its episode semantics are
+                    unchanged.
+Concurrency scope   (user_id, dedupe_key)
+Retry semantics     Raising the same alert again inside its dedupe bucket is an
+                    idempotent no-op; the next bucket (day, week, or episode)
+                    raises it afresh while the condition persists. The 30-day
+                    purge frees the key, so a standing condition re-alerts --
+                    intended, see docs/specs/system-alerts.md.
+Crash semantics     The email is at most once: a process killed between the
+                    insert committing and SMTP accepting loses that email; the
+                    in-app row survives as the durable notice. Same trade as
+                    INV-PROVIDER-001, same reason.
+Failure response    raiseAdminAlert/raiseUserAlert never throw -- an alert is a
+                    side reporting channel, and its failure is logged and
+                    swallowed so it cannot end the sweep that noticed the
+                    original problem.
+Required tests      system-alerts/system-alert.service.spec.ts (fan-out,
+                    insert-loser sends no email, SMTP_FAILURE never emails,
+                    never throws); test/integration/system-alert-dedupe
+                    .integration.spec.ts against a real PostgreSQL (concurrent
+                    same-key raises produce one row per admin; the partial-index
+                    ON CONFLICT target is accepted by the real planner, which a
+                    mocked query cannot prove).
 Status              enforced
 ```
 

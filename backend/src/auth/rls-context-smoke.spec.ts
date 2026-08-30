@@ -61,6 +61,11 @@ describe("R7 modules RLS context smoke (real withScopedDb)", () => {
       {} as never,
       { isDemo: false } as never,
       { isUnderMaintenance: jest.fn().mockResolvedValue(false) } as never,
+      {
+        raiseAdminAlert: jest
+          .fn()
+          .mockResolvedValue({ created: 0, emailed: 0 }),
+      } as never,
       { get: jest.fn() } as never,
     );
 

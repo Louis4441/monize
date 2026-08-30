@@ -186,5 +186,12 @@
     "greeting": "[XX-Hi {{ name }},-XX]",
     "intro": "[XX-<strong>{{ provider }}</strong> answered again at {{ restoredAt }}. The outage lasted {{ duration }}.-XX]",
     "backfill": "[XX-Prices and index history missed during the outage are picked up by the next scheduled refresh; no action is needed.-XX]"
+  },
+  "systemAlert": {
+    "subject": "[XX-Monize: {{ title }}-XX]",
+    "heading": "[XX-System alert-XX]",
+    "greeting": "[XX-Hi {{ name }},-XX]",
+    "intro": "[XX-An issue on your Monize deployment needs an administrator's attention.-XX]",
+    "footer": "[XX-This alert is also shown in the app's notification bell. It is raised at most once per occurrence, however many server replicas noticed it.-XX]"
   }
 }

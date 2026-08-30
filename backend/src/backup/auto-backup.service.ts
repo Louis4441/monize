@@ -40,6 +40,11 @@ import { DemoModeService } from "../common/demo-mode.service";
 import { isShardableId, shardedSegments } from "../common/shard-path.util";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
 import { UserMaintenanceService } from "../common/jobs/user-maintenance.service";
+import { SystemAlertService } from "../system-alerts/system-alert.service";
+import {
+  AlertSeverity,
+  AlertType,
+} from "../budgets/entities/budget-alert.entity";
 import {
   UpdateAutoBackupSettingsDto,
   AutoBackupFrequency,
@@ -201,6 +206,7 @@ export class AutoBackupService {
     private readonly backupEncryption: BackupEncryptionService,
     private readonly demoMode: DemoModeService,
     private readonly maintenance: UserMaintenanceService,
+    private readonly systemAlerts: SystemAlertService,
     config: ConfigService,
   ) {
     this.defaultFolderPath = this.resolveConfiguredFolderPath(
@@ -691,16 +697,41 @@ export class AutoBackupService {
     timezone: string,
   ): Promise<void> {
     if (report.complete) {
-      await this.copyToWeeklyIfNeeded(folder, filename, timezone);
-      await this.copyToMonthlyIfNeeded(folder, filename, timezone);
-      this.enforceRetention(folder, settings.folderPath, settings);
+      const weeklyError = await this.copyToWeeklyIfNeeded(
+        folder,
+        filename,
+        timezone,
+      );
+      const monthlyError = await this.copyToMonthlyIfNeeded(
+        folder,
+        filename,
+        timezone,
+      );
+      const retentionErrors = this.enforceRetention(
+        folder,
+        settings.folderPath,
+        settings,
+      );
       settings.lastBackupStatus = "success";
       settings.lastBackupError = null;
+      // Promotion and retention failures used to be a `logger.warn` and
+      // nothing else -- the artifact is complete, so the status column
+      // rightly stays "success", and the alert row is the only durable state
+      // these paths have. The daily backup exists; what the admin is told is
+      // that the weekly/monthly copy or the cleanup did not happen.
+      await this.raiseBackupSideEffectAlerts(settings.userId, filename, {
+        weeklyError,
+        monthlyError,
+        retentionErrors,
+      });
       return;
     }
-    this.enforceRetention(folder, settings.folderPath, settings, [
-      PARTIAL_TIER_NAME,
-    ]);
+    const retentionErrors = this.enforceRetention(
+      folder,
+      settings.folderPath,
+      settings,
+      [PARTIAL_TIER_NAME],
+    );
     settings.lastBackupStatus = "partial";
     settings.lastBackupError =
       `${report.missingAttachments} attachment(s) could not be included and ` +
@@ -711,6 +742,131 @@ export class AutoBackupService {
     this.logger.warn(
       `Auto-backup for user ${settings.userId} is partial: ${settings.lastBackupError}`,
     );
+    await this.raiseBackupPartialAlert(settings.userId, "attachments", {
+      message: `The backup was written, but ${settings.lastBackupError}`,
+      missingAttachments: report.missingAttachments,
+      inconsistentAttachments: report.inconsistentAttachments,
+      expectedAttachments: report.expectedAttachments,
+      filename,
+    });
+    await this.raiseBackupSideEffectAlerts(settings.userId, filename, {
+      weeklyError: null,
+      monthlyError: null,
+      retentionErrors,
+    });
+  }
+
+  /**
+   * Raise BACKUP_PARTIAL admin alerts for a run whose artifact is fine but
+   * whose promotion copies or retention cleanup failed -- the two paths that
+   * otherwise leave no durable state at all (`lastBackupStatus` stays
+   * "success", correctly: the daily artifact is complete).
+   */
+  private async raiseBackupSideEffectAlerts(
+    userId: string,
+    filename: string,
+    outcome: {
+      weeklyError: string | null;
+      monthlyError: string | null;
+      retentionErrors: string[];
+    },
+  ): Promise<void> {
+    const promotionErrors = [outcome.weeklyError, outcome.monthlyError].filter(
+      (e): e is string => e !== null,
+    );
+    if (promotionErrors.length > 0) {
+      await this.raiseBackupPartialAlert(userId, "promotion", {
+        message:
+          `The daily backup ${filename} succeeded, but its weekly/monthly ` +
+          `copy could not be written: ${promotionErrors.join("; ")}`,
+        error: promotionErrors.join("; "),
+        filename,
+      });
+    }
+    if (outcome.retentionErrors.length > 0) {
+      await this.raiseBackupPartialAlert(userId, "retention", {
+        message:
+          `The backup succeeded, but ${outcome.retentionErrors.length} old ` +
+          `backup file(s) could not be cleaned up: ` +
+          outcome.retentionErrors.join("; "),
+        error: outcome.retentionErrors.join("; "),
+        filename,
+      });
+    }
+  }
+
+  /**
+   * One BACKUP_PARTIAL alert to the administrators, deduped per affected
+   * user, reason and day. `data` carries the facts for client-side
+   * localization; the stored message is the English fallback.
+   */
+  private async raiseBackupPartialAlert(
+    userId: string,
+    reason: "attachments" | "promotion" | "retention",
+    detail: { message: string } & Record<string, unknown>,
+  ): Promise<void> {
+    const { message, ...data } = detail;
+    const email = await this.userEmailQuietly(userId);
+    await this.systemAlerts.raiseAdminAlert({
+      type: AlertType.BACKUP_PARTIAL,
+      severity: AlertSeverity.WARNING,
+      title: "Automatic backup incomplete",
+      message: `Automatic backup for ${email ?? `user ${userId}`}: ${message}`,
+      data: {
+        system: true,
+        affectedUserId: userId,
+        affectedUserEmail: email,
+        reason,
+        ...data,
+      },
+      dedupeKey: `BACKUP_PARTIAL:${userId}:${reason}:${utcDateString()}`,
+    });
+  }
+
+  /** One BACKUP_FAILED alert to the administrators, deduped per user and day. */
+  private async raiseBackupFailedAlert(
+    userId: string,
+    cause: unknown,
+    at: Date,
+  ): Promise<void> {
+    const error = String((cause as Error)?.message ?? cause).slice(0, 300);
+    const email = await this.userEmailQuietly(userId);
+    await this.systemAlerts.raiseAdminAlert({
+      type: AlertType.BACKUP_FAILED,
+      severity: AlertSeverity.CRITICAL,
+      title: "Automatic backup failed",
+      message:
+        `The automatic backup for ${email ?? `user ${userId}`} failed: ` +
+        `${error}. No new backup was written this window; the next attempt ` +
+        "is the next scheduled one.",
+      data: {
+        system: true,
+        affectedUserId: userId,
+        affectedUserEmail: email,
+        error,
+        date: utcDateString(at),
+      },
+      dedupeKey: `BACKUP_FAILED:${userId}:${utcDateString(at)}`,
+    });
+  }
+
+  /**
+   * The affected user's email, for the admin alert's copy -- an address means
+   * more to an operator than a UUID. Best-effort: the alert goes out either
+   * way, and this lookup runs from failure paths where the database may be
+   * the problem.
+   */
+  private async userEmailQuietly(userId: string): Promise<string | null> {
+    try {
+      const user = await withSystemContext(() =>
+        this.scoped(User, (repo) =>
+          repo.findOne({ where: { id: userId }, select: ["id", "email"] }),
+        ),
+      );
+      return user?.email && user.email !== "" ? user.email : null;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -825,6 +981,12 @@ export class AutoBackupService {
           `Auto-backup failed for user ${settings.userId}: ${error.message}`,
         );
         await this.recordFailureQuietly(settings.userId, now, error);
+        // The alert is the notification the failure row never was (the status
+        // sat on auto_backup_settings and nobody looked). Backups are an
+        // operator setting, so the audience is the administrators.
+        // `raiseAdminAlert` never throws -- one user's alert failing must not
+        // end the sweep any more than the backup failing may.
+        await this.raiseBackupFailedAlert(settings.userId, error, now);
       }
     }
   }
@@ -1145,13 +1307,14 @@ export class AutoBackupService {
     return { filename, report };
   }
 
+  /** Returns the copy error's message when the promotion failed, else null. */
   private async copyToWeeklyIfNeeded(
     folderPath: string,
     dailyFilename: string,
     timezone: string,
-  ): Promise<void> {
+  ): Promise<string | null> {
     const dayOfMonth = this.getLocalDayOfMonth(new Date(), timezone);
-    if (!WEEKLY_DAYS.includes(dayOfMonth)) return;
+    if (!WEEKLY_DAYS.includes(dayOfMonth)) return null;
 
     const ext = dailyFilename.endsWith(".mzbe") ? "mzbe" : "json.gz";
     const dateStr = this.getLocalDateString(new Date(), timezone);
@@ -1168,16 +1331,19 @@ export class AutoBackupService {
       this.logger.log(`Copied daily backup to weekly: ${weeklyFilename}`);
     } catch (err) {
       this.logger.warn(`Failed to copy daily to weekly: ${err.message}`);
+      return `weekly: ${err.message}`;
     }
+    return null;
   }
 
+  /** Returns the copy error's message when the promotion failed, else null. */
   private async copyToMonthlyIfNeeded(
     folderPath: string,
     dailyFilename: string,
     timezone: string,
-  ): Promise<void> {
+  ): Promise<string | null> {
     const dayOfMonth = this.getLocalDayOfMonth(new Date(), timezone);
-    if (dayOfMonth !== MONTHLY_DAY) return;
+    if (dayOfMonth !== MONTHLY_DAY) return null;
 
     const now = new Date();
     const formatter = new Intl.DateTimeFormat("en-US", {
@@ -1199,7 +1365,9 @@ export class AutoBackupService {
       this.logger.log(`Copied daily backup to monthly: ${monthlyFilename}`);
     } catch (err) {
       this.logger.warn(`Failed to copy daily to monthly: ${err.message}`);
+      return `monthly: ${err.message}`;
     }
+    return null;
   }
 
   /** Backup files found directly in `dir`, tagged with where they came from. */
@@ -1275,11 +1443,14 @@ export class AutoBackupService {
     basePath: string,
     settings: AutoBackupSettings,
     tiers: readonly BackupTier[] = ["daily", "weekly", "monthly", "partial"],
-  ): void {
+  ): string[] {
     const files = [
       ...this.collectBackupFiles(userFolder, false),
       ...this.collectBackupFiles(basePath, true),
     ];
+    // Returned to the caller so a delete failure can become an admin alert --
+    // it has no durable state of its own and the run's status stays "success".
+    const failures: string[] = [];
 
     // Sort each tier newest first and delete beyond retention limit
     const deleteExcess = (tier: BackupTier, limit: number) => {
@@ -1299,6 +1470,7 @@ export class AutoBackupService {
           this.logger.warn(
             `Retention: failed to delete ${sorted[i].name}: ${err.message}`,
           );
+          failures.push(`${sorted[i].name}: ${err.message}`);
         }
       }
     };
@@ -1314,6 +1486,7 @@ export class AutoBackupService {
     // *independent* -- a partial can neither take a complete artifact's slot nor
     // accumulate without bound while storage is broken.
     deleteExcess(PARTIAL_TIER_NAME, settings.retentionDaily);
+    return failures;
   }
 
   private getLocalDateString(date: Date, timezone: string): string {
@@ -1618,4 +1791,14 @@ export class AutoBackupService {
       );
     }
   }
+}
+
+/**
+ * The UTC calendar day, as the daily bucket in a system-alert dedupe key. UTC
+ * rather than the user's backup timezone on purpose: the key only has to be
+ * the same on every replica, and replicas share a clock, not a user timezone
+ * lookup.
+ */
+function utcDateString(at: Date = new Date()): string {
+  return at.toISOString().slice(0, 10);
 }

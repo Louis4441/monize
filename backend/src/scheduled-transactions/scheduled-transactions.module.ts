@@ -17,6 +17,7 @@ import { SecuritiesModule } from "../securities/securities.module";
 import { CurrenciesModule } from "../currencies/currencies.module";
 import { ActionHistoryModule } from "../action-history/action-history.module";
 import { DelegationModule } from "../delegation/delegation.module";
+import { SystemAlertsModule } from "../system-alerts/system-alerts.module";
 
 @Module({
   imports: [
@@ -35,6 +36,9 @@ import { DelegationModule } from "../delegation/delegation.module";
     forwardRef(() => CurrenciesModule),
     ActionHistoryModule,
     forwardRef(() => DelegationModule),
+    // SCHEDULED_POST_FAILED user alerts. forwardRef: SystemAlertsModule
+    // reaches NotificationsModule, which imports this module back.
+    forwardRef(() => SystemAlertsModule),
   ],
   providers: [
     ScheduledTransactionsService,

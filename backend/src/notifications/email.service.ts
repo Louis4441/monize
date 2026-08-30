@@ -3,11 +3,32 @@ import { ConfigService } from "@nestjs/config";
 import * as nodemailer from "nodemailer";
 import { Transporter } from "nodemailer";
 
+/**
+ * What this replica's own SMTP sends have done lately. Purely in-process --
+ * the `SMTP_FAILURE` system alert that reads it dedupes across replicas at the
+ * database, so per-replica memory is enough -- and only about *configured*
+ * transport failures: an unconfigured deployment throws before the snapshot
+ * and is a setup state, not a failure.
+ */
+export interface EmailFailureSnapshot {
+  lastFailureAt: Date | null;
+  /** Bounded copy of the last transport error's message. */
+  lastFailureMessage: string | null;
+  lastSuccessAt: Date | null;
+  failuresSinceSuccess: number;
+}
+
+const FAILURE_MESSAGE_MAX_LENGTH = 300;
+
 @Injectable()
 export class EmailService implements OnModuleInit {
   private readonly logger = new Logger(EmailService.name);
   private transporter: Transporter | null = null;
   private configured = false;
+  private lastFailureAt: Date | null = null;
+  private lastFailureMessage: string | null = null;
+  private lastSuccessAt: Date | null = null;
+  private failuresSinceSuccess = 0;
 
   constructor(private configService: ConfigService) {}
 
@@ -47,6 +68,16 @@ export class EmailService implements OnModuleInit {
     return { configured: this.configured };
   }
 
+  /** Read by SystemAlertMonitorService's SMTP-health sweep. */
+  getFailureSnapshot(): EmailFailureSnapshot {
+    return {
+      lastFailureAt: this.lastFailureAt,
+      lastFailureMessage: this.lastFailureMessage,
+      lastSuccessAt: this.lastSuccessAt,
+      failuresSinceSuccess: this.failuresSinceSuccess,
+    };
+  }
+
   async sendMail(to: string, subject: string, html: string): Promise<void> {
     if (!this.transporter || !this.configured) {
       throw new Error("SMTP is not configured");
@@ -56,7 +87,20 @@ export class EmailService implements OnModuleInit {
       "EMAIL_FROM",
       "noreply@monize.app",
     );
-    await this.transporter.sendMail({ from, to, subject, html });
+    try {
+      await this.transporter.sendMail({ from, to, subject, html });
+    } catch (error) {
+      // Record for the SMTP-health sweep, then rethrow unchanged -- callers
+      // already own their per-recipient isolation and their own logging.
+      this.lastFailureAt = new Date();
+      this.lastFailureMessage = (
+        error instanceof Error ? error.message : String(error)
+      ).slice(0, FAILURE_MESSAGE_MAX_LENGTH);
+      this.failuresSinceSuccess += 1;
+      throw error;
+    }
+    this.lastSuccessAt = new Date();
+    this.failuresSinceSuccess = 0;
     this.logger.log(`Email sent to ${to}: ${subject}`);
   }
 

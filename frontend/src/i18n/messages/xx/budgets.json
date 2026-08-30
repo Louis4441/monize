@@ -22,6 +22,38 @@
       "titleInDays": "[XX-{payee} due in {days} days-XX]",
       "amountDue": "[XX-{amount} due on {date}-XX]",
       "amountUnavailable": "[XX-Amount unavailable (no current exchange rate), due on {date}-XX]"
+    },
+    "system": {
+      "backupFailed": {
+        "title": "[XX-Automatic backup failed-XX]",
+        "message": "[XX-The automatic backup for {user} failed: {error}-XX]"
+      },
+      "backupPartial": {
+        "title": "[XX-Automatic backup incomplete-XX]",
+        "messageAttachments": "[XX-The backup for {user} was written, but {missing, plural, one {# attachment} other {# attachments}} could not be included. Complete backups were preserved.-XX]",
+        "messagePromotion": "[XX-The daily backup for {user} succeeded, but its weekly or monthly copy could not be written.-XX]",
+        "messageRetention": "[XX-The backup for {user} succeeded, but old backup files could not be cleaned up.-XX]"
+      },
+      "encryptionKeyMissing": {
+        "title": "[XX-Encryption key not configured-XX]",
+        "message": "[XX-ENCRYPTION_KEY is not set, so backups are written unencrypted and secrets cannot be stored. A future release will refuse to start without it.-XX]"
+      },
+      "smtpFailure": {
+        "title": "[XX-Email delivery is failing-XX]",
+        "message": "[XX-Monize could not send email: {error}. Notifications and reminders are not being delivered.-XX]"
+      },
+      "providerOutage": {
+        "title": "[XX-{provider} is not responding-XX]",
+        "message": "[XX-Market data from {provider} is unavailable. Prices and index data may be out of date until it answers again.-XX]"
+      },
+      "providerRecovered": {
+        "title": "[XX-{provider} is answering again-XX]",
+        "message": "[XX-The outage is over and market data from {provider} is updating again.-XX]"
+      },
+      "scheduledPostFailed": {
+        "title": "[XX-{name} could not be posted-XX]",
+        "message": "[XX-Your scheduled transaction due {date} did not post automatically: {error}. You can post it manually from Bills.-XX]"
+      }
     }
   },
   "summary503020": {

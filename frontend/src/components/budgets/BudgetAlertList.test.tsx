@@ -464,4 +464,227 @@ describe('BudgetAlertList', () => {
 
     expect(screen.getByText('1 unread')).toBeInTheDocument();
   });
+
+  // ---- System alerts (data.system === true) ----
+  //
+  // Same contract as BILL_DUE: the row stores English fallbacks written by a
+  // cron with no request locale; the UI composes localized copy from `data`.
+
+  const systemAlert = (overrides: Partial<BudgetAlert>): BudgetAlert =>
+    makeAlert({
+      id: 'alert-sys',
+      budgetId: null,
+      budgetCategoryId: null,
+      severity: 'warning',
+      title: 'STORED ENGLISH TITLE',
+      message: 'STORED ENGLISH MESSAGE',
+      ...overrides,
+    });
+
+  describe('system alerts', () => {
+    it('routes backup and mail issues to settings', () => {
+      for (const alertType of [
+        'BACKUP_FAILED',
+        'BACKUP_PARTIAL',
+        'ENCRYPTION_KEY_MISSING',
+        'SMTP_FAILURE',
+      ] as const) {
+        mockPush.mockClear();
+        const { unmount } = render(
+          <BudgetAlertList
+            {...defaultProps}
+            alerts={[systemAlert({ id: 'sys-1', alertType, data: {} })]}
+          />,
+        );
+        fireEvent.click(screen.getByTestId('alert-item-sys-1'));
+        expect(mockPush).toHaveBeenCalledWith('/settings');
+        unmount();
+      }
+    });
+
+    it('routes a scheduled-post failure to bills', () => {
+      render(
+        <BudgetAlertList
+          {...defaultProps}
+          alerts={[
+            systemAlert({ id: 'sys-1', alertType: 'SCHEDULED_POST_FAILED', data: {} }),
+          ]}
+        />,
+      );
+      fireEvent.click(screen.getByTestId('alert-item-sys-1'));
+      expect(mockPush).toHaveBeenCalledWith('/bills');
+    });
+
+    it('marks a provider alert read and closes without navigating -- no page says more than the alert', () => {
+      const onMarkRead = vi.fn();
+      const onClose = vi.fn();
+      render(
+        <BudgetAlertList
+          {...defaultProps}
+          alerts={[
+            systemAlert({ id: 'sys-1', alertType: 'PROVIDER_OUTAGE', data: {} }),
+          ]}
+          onMarkRead={onMarkRead}
+          onClose={onClose}
+        />,
+      );
+      fireEvent.click(screen.getByTestId('alert-item-sys-1'));
+      expect(onMarkRead).toHaveBeenCalledWith('sys-1');
+      expect(onClose).toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('never pushes /budgets/null for a budget-typed alert whose budgetId is null', () => {
+      render(
+        <BudgetAlertList
+          {...defaultProps}
+          alerts={[
+            systemAlert({ id: 'sys-1', alertType: 'THRESHOLD_WARNING', data: {} }),
+          ]}
+        />,
+      );
+      fireEvent.click(screen.getByTestId('alert-item-sys-1'));
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('composes a backup failure from its data, naming the affected user and the error', () => {
+      render(
+        <BudgetAlertList
+          {...defaultProps}
+          alerts={[
+            systemAlert({
+              alertType: 'BACKUP_FAILED',
+              severity: 'critical',
+              data: {
+                system: true,
+                affectedUserId: 'u-1',
+                affectedUserEmail: 'ken@example.com',
+                error: 'ENOSPC: no space left on device',
+              },
+            }),
+          ]}
+        />,
+      );
+      expect(screen.getByText('Automatic backup failed')).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'The automatic backup for ken@example.com failed: ENOSPC: no space left on device',
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText('STORED ENGLISH TITLE')).not.toBeInTheDocument();
+    });
+
+    it('falls back to the user id when the email lookup failed', () => {
+      render(
+        <BudgetAlertList
+          {...defaultProps}
+          alerts={[
+            systemAlert({
+              alertType: 'BACKUP_FAILED',
+              data: {
+                system: true,
+                affectedUserId: 'u-1',
+                affectedUserEmail: null,
+                error: 'boom',
+              },
+            }),
+          ]}
+        />,
+      );
+      expect(
+        screen.getByText('The automatic backup for u-1 failed: boom'),
+      ).toBeInTheDocument();
+    });
+
+    it('switches the partial-backup message on its reason', () => {
+      const base = {
+        system: true,
+        affectedUserId: 'u-1',
+        affectedUserEmail: 'ken@example.com',
+      };
+      for (const [reason, fragment] of [
+        ['attachments', /2 attachments could not be included/],
+        ['promotion', /weekly or monthly copy could not be written/],
+        ['retention', /old backup files could not be cleaned up/],
+      ] as const) {
+        const { unmount } = render(
+          <BudgetAlertList
+            {...defaultProps}
+            alerts={[
+              systemAlert({
+                alertType: 'BACKUP_PARTIAL',
+                data: { ...base, reason, missingAttachments: 2 },
+              }),
+            ]}
+          />,
+        );
+        expect(screen.getByText(fragment)).toBeInTheDocument();
+        unmount();
+      }
+    });
+
+    it('composes the provider pair from the stored label', () => {
+      render(
+        <BudgetAlertList
+          {...defaultProps}
+          alerts={[
+            systemAlert({
+              id: 'sys-out',
+              alertType: 'PROVIDER_OUTAGE',
+              data: { system: true, providerLabel: 'Yahoo Finance' },
+            }),
+            systemAlert({
+              id: 'sys-rec',
+              alertType: 'PROVIDER_RECOVERED',
+              severity: 'success',
+              data: { system: true, providerLabel: 'Yahoo Finance' },
+            }),
+          ]}
+        />,
+      );
+      expect(
+        screen.getByText('Yahoo Finance is not responding'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('Yahoo Finance is answering again'),
+      ).toBeInTheDocument();
+    });
+
+    it('composes a scheduled-post failure with the schedule name, date and error', () => {
+      render(
+        <BudgetAlertList
+          {...defaultProps}
+          alerts={[
+            systemAlert({
+              alertType: 'SCHEDULED_POST_FAILED',
+              data: {
+                system: true,
+                scheduledId: 'st-1',
+                scheduledName: 'Rent',
+                dueDate: '2026-09-01',
+                error: 'account is closed',
+              },
+            }),
+          ]}
+        />,
+      );
+      expect(screen.getByText('Rent could not be posted')).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Your scheduled transaction due 2026-09-01 did not post automatically: account is closed. You can post it manually from Bills.',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('falls back to the stored English for a row without the structured payload', () => {
+      render(
+        <BudgetAlertList
+          {...defaultProps}
+          alerts={[systemAlert({ alertType: 'BACKUP_FAILED', data: {} })]}
+        />,
+      );
+      expect(screen.getByText('STORED ENGLISH TITLE')).toBeInTheDocument();
+      expect(screen.getByText('STORED ENGLISH MESSAGE')).toBeInTheDocument();
+    });
+  });
 });
