@@ -186,5 +186,12 @@
     "greeting": "Bonjour {{ name }},",
     "intro": "<strong>{{ provider }}</strong> a répondu à nouveau à {{ restoredAt }}. La panne a duré {{ duration }}.",
     "backfill": "Les cours et l'historique d'indices manquants pendant la panne sont récupérés lors de la prochaine actualisation planifiée ; aucune action n'est nécessaire."
+  },
+  "systemAlert": {
+    "subject": "Monize: {{ title }}",
+    "heading": "Alerte système",
+    "greeting": "Bonjour {{ name }},",
+    "intro": "Un problème sur votre installation Monize requiert l'attention d'un administrateur.",
+    "footer": "Cette alerte apparaît aussi dans la cloche de notifications de l'application. Elle est émise au plus une fois par incident, quel que soit le nombre de réplicas du serveur qui l'ont détecté."
   }
 }

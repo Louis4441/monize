@@ -22,6 +22,38 @@
       "titleInDays": "{payee} {days}일 후 결제 예정",
       "amountDue": "{date}에 {amount} 결제",
       "amountUnavailable": "금액을 확인할 수 없습니다 (현재 환율 없음). 결제일 {date}"
+    },
+    "system": {
+      "backupFailed": {
+        "title": "자동 백업 실패",
+        "message": "{user}의 자동 백업이 실패했습니다: {error}"
+      },
+      "backupPartial": {
+        "title": "자동 백업 불완전",
+        "messageAttachments": "{user}의 백업이 기록되었지만 첨부 파일 {missing}개를 포함하지 못했습니다. 완전한 백업은 보존되었습니다.",
+        "messagePromotion": "{user}의 일일 백업은 성공했지만 주간 또는 월간 사본을 기록하지 못했습니다.",
+        "messageRetention": "{user}의 백업은 성공했지만 오래된 백업 파일을 정리하지 못했습니다."
+      },
+      "encryptionKeyMissing": {
+        "title": "암호화 키가 설정되지 않음",
+        "message": "ENCRYPTION_KEY가 설정되어 있지 않아 백업이 암호화되지 않은 채 기록되고 비밀 정보를 저장할 수 없습니다. 향후 릴리스에서는 이 키 없이 시작되지 않습니다."
+      },
+      "smtpFailure": {
+        "title": "이메일 발송이 실패하고 있음",
+        "message": "Monize가 이메일을 보내지 못했습니다: {error}. 알림과 미리 알림이 전달되지 않고 있습니다."
+      },
+      "providerOutage": {
+        "title": "{provider}가 응답하지 않음",
+        "message": "{provider}의 시장 데이터를 사용할 수 없습니다. 다시 응답할 때까지 가격과 지수 데이터가 오래된 상태일 수 있습니다."
+      },
+      "providerRecovered": {
+        "title": "{provider}가 다시 응답함",
+        "message": "장애가 해소되어 {provider}의 시장 데이터가 다시 갱신되고 있습니다."
+      },
+      "scheduledPostFailed": {
+        "title": "{name}을(를) 기록하지 못했습니다",
+        "message": "{date}이 만기인 예약 거래가 자동으로 기록되지 않았습니다: {error}. 청구서 및 입금 화면에서 수동으로 기록할 수 있습니다."
+      }
     }
   },
   "summary503020": {

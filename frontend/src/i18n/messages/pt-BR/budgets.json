@@ -22,6 +22,38 @@
       "titleInDays": "{payee} vence em {days} dias",
       "amountDue": "{amount} a pagar em {date}",
       "amountUnavailable": "Valor indisponível (sem taxa de câmbio atual), vence em {date}"
+    },
+    "system": {
+      "backupFailed": {
+        "title": "Falha no backup automático",
+        "message": "O backup automático de {user} falhou: {error}"
+      },
+      "backupPartial": {
+        "title": "Backup automático incompleto",
+        "messageAttachments": "O backup de {user} foi gravado, mas {missing, plural, one {não foi possível incluir # anexo} other {não foi possível incluir # anexos}}. Os backups completos foram preservados.",
+        "messagePromotion": "O backup diário de {user} foi concluído, mas sua cópia semanal ou mensal não pôde ser gravada.",
+        "messageRetention": "O backup de {user} foi concluído, mas os arquivos de backups antigos não puderam ser removidos."
+      },
+      "encryptionKeyMissing": {
+        "title": "Chave de criptografia não configurada",
+        "message": "A ENCRYPTION_KEY não está definida, então os backups são gravados sem criptografia e segredos não podem ser armazenados. Uma versão futura não iniciará sem ela."
+      },
+      "smtpFailure": {
+        "title": "O envio de email está falhando",
+        "message": "O Monize não conseguiu enviar email: {error}. Notificações e lembretes não estão sendo entregues."
+      },
+      "providerOutage": {
+        "title": "{provider} não está respondendo",
+        "message": "Os dados de mercado de {provider} estão indisponíveis. Preços e dados de índices podem ficar desatualizados até que ele volte a responder."
+      },
+      "providerRecovered": {
+        "title": "{provider} está respondendo novamente",
+        "message": "A interrupção terminou e os dados de mercado de {provider} estão sendo atualizados novamente."
+      },
+      "scheduledPostFailed": {
+        "title": "Não foi possível lançar {name}",
+        "message": "Sua transação agendada com vencimento em {date} não foi lançada automaticamente: {error}. Você pode lançá-la manualmente em Faturas e depósitos."
+      }
     }
   },
   "summary503020": {

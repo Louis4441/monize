@@ -22,6 +22,38 @@
       "titleInDays": "{payee} vence em {days} dias",
       "amountDue": "{amount} a pagar em {date}",
       "amountUnavailable": "Valor indisponível (sem taxa de câmbio atual), vence em {date}"
+    },
+    "system": {
+      "backupFailed": {
+        "title": "Falha na cópia de segurança automática",
+        "message": "A cópia de segurança automática de {user} falhou: {error}"
+      },
+      "backupPartial": {
+        "title": "Cópia de segurança automática incompleta",
+        "messageAttachments": "A cópia de segurança de {user} foi escrita, mas {missing, plural, one {não foi possível incluir # anexo} other {não foi possível incluir # anexos}}. As cópias completas foram preservadas.",
+        "messagePromotion": "A cópia diária de {user} foi concluída, mas a sua cópia semanal ou mensal não pôde ser escrita.",
+        "messageRetention": "A cópia de segurança de {user} foi concluída, mas os ficheiros de cópias antigas não puderam ser eliminados."
+      },
+      "encryptionKeyMissing": {
+        "title": "Chave de encriptação não configurada",
+        "message": "A ENCRYPTION_KEY não está definida, pelo que as cópias de segurança são escritas sem encriptação e não é possível guardar segredos. Uma versão futura não arrancará sem ela."
+      },
+      "smtpFailure": {
+        "title": "O envio de email está a falhar",
+        "message": "O Monize não conseguiu enviar email: {error}. As notificações e os lembretes não estão a ser entregues."
+      },
+      "providerOutage": {
+        "title": "{provider} não responde",
+        "message": "Os dados de mercado de {provider} estão indisponíveis. Os preços e os dados de índices podem estar desatualizados até que volte a responder."
+      },
+      "providerRecovered": {
+        "title": "{provider} está a responder novamente",
+        "message": "A interrupção terminou e os dados de mercado de {provider} estão novamente a ser atualizados."
+      },
+      "scheduledPostFailed": {
+        "title": "Não foi possível registar {name}",
+        "message": "A sua transação agendada com vencimento em {date} não foi registada automaticamente: {error}. Pode registá-la manualmente em Faturas e depósitos."
+      }
     }
   },
   "summary503020": {

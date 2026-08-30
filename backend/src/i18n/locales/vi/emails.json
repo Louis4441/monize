@@ -186,5 +186,12 @@
     "greeting": "Xin chào {{ name }},",
     "intro": "<strong>{{ provider }}</strong> đã phản hồi lại vào {{ restoredAt }}. Sự cố kéo dài {{ duration }}.",
     "backfill": "Giá và lịch sử chỉ số bị thiếu trong thời gian sự cố sẽ được lấy ở lần làm mới định kỳ tiếp theo; bạn không cần làm gì."
+  },
+  "systemAlert": {
+    "subject": "Monize: {{ title }}",
+    "heading": "Cảnh báo hệ thống",
+    "greeting": "Xin chào {{ name }},",
+    "intro": "Một sự cố trong bản cài đặt Monize của bạn cần quản trị viên xử lý.",
+    "footer": "Cảnh báo này cũng hiển thị ở chuông thông báo của ứng dụng. Nó chỉ được tạo tối đa một lần cho mỗi sự cố, bất kể bao nhiêu bản sao máy chủ phát hiện ra."
   }
 }

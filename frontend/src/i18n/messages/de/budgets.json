@@ -22,6 +22,38 @@
       "titleInDays": "{payee} fällig in {days} Tagen",
       "amountDue": "{amount} fällig am {date}",
       "amountUnavailable": "Betrag nicht verfügbar (kein aktueller Wechselkurs), fällig am {date}"
+    },
+    "system": {
+      "backupFailed": {
+        "title": "Automatisches Backup fehlgeschlagen",
+        "message": "Das automatische Backup für {user} ist fehlgeschlagen: {error}"
+      },
+      "backupPartial": {
+        "title": "Automatisches Backup unvollständig",
+        "messageAttachments": "Das Backup für {user} wurde geschrieben, aber {missing, plural, one {# Anhang konnte} other {# Anhänge konnten}} nicht aufgenommen werden. Vollständige Backups wurden bewahrt.",
+        "messagePromotion": "Das tägliche Backup für {user} war erfolgreich, aber die wöchentliche oder monatliche Kopie konnte nicht geschrieben werden.",
+        "messageRetention": "Das Backup für {user} war erfolgreich, aber alte Backup-Dateien konnten nicht aufgeräumt werden."
+      },
+      "encryptionKeyMissing": {
+        "title": "Verschlüsselungsschlüssel nicht konfiguriert",
+        "message": "ENCRYPTION_KEY ist nicht gesetzt, daher werden Backups unverschlüsselt geschrieben und Geheimnisse können nicht gespeichert werden. Eine zukünftige Version wird ohne den Schlüssel nicht mehr starten."
+      },
+      "smtpFailure": {
+        "title": "E-Mail-Zustellung schlägt fehl",
+        "message": "Monize konnte keine E-Mail senden: {error}. Benachrichtigungen und Erinnerungen werden nicht zugestellt."
+      },
+      "providerOutage": {
+        "title": "{provider} antwortet nicht",
+        "message": "Marktdaten von {provider} sind nicht verfügbar. Kurse und Indexdaten sind möglicherweise veraltet, bis der Anbieter wieder antwortet."
+      },
+      "providerRecovered": {
+        "title": "{provider} antwortet wieder",
+        "message": "Der Ausfall ist vorbei und Marktdaten von {provider} werden wieder aktualisiert."
+      },
+      "scheduledPostFailed": {
+        "title": "{name} konnte nicht gebucht werden",
+        "message": "Ihre geplante Transaktion, fällig am {date}, wurde nicht automatisch gebucht: {error}. Sie können sie unter Rechnungen & Einzahlungen manuell buchen."
+      }
     }
   },
   "summary503020": {

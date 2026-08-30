@@ -186,5 +186,12 @@
     "greeting": "Olá {{ name }},",
     "intro": "<strong>{{ provider }}</strong> voltou a responder às {{ restoredAt }}. A interrupção durou {{ duration }}.",
     "backfill": "Cotações e histórico de índices perdidos durante a interrupção são recuperados na próxima atualização agendada; nenhuma ação é necessária."
+  },
+  "systemAlert": {
+    "subject": "Monize: {{ title }}",
+    "heading": "Alerta de sistema",
+    "greeting": "Olá {{ name }},",
+    "intro": "Um problema na sua instalação do Monize requer a atenção de um administrador.",
+    "footer": "Este alerta também é exibido no sino de notificações do aplicativo. Ele é gerado no máximo uma vez por ocorrência, independentemente de quantas réplicas do servidor a detectaram."
   }
 }

@@ -22,6 +22,38 @@
       "titleInDays": "{payee} 将在 {days} 天后到期",
       "amountDue": "{date} 应付 {amount}",
       "amountUnavailable": "金额不可用（无当前汇率），到期日 {date}"
+    },
+    "system": {
+      "backupFailed": {
+        "title": "自动备份失败",
+        "message": "{user} 的自动备份失败：{error}"
+      },
+      "backupPartial": {
+        "title": "自动备份不完整",
+        "messageAttachments": "{user} 的备份已写入，但有 {missing} 个附件无法包含。完整备份已保留。",
+        "messagePromotion": "{user} 的每日备份成功，但其每周或每月副本无法写入。",
+        "messageRetention": "{user} 的备份成功，但旧的备份文件无法清理。"
+      },
+      "encryptionKeyMissing": {
+        "title": "未配置加密密钥",
+        "message": "未设置 ENCRYPTION_KEY，备份将以未加密方式写入，且无法保存机密信息。未来版本将在缺少该密钥时拒绝启动。"
+      },
+      "smtpFailure": {
+        "title": "邮件发送失败",
+        "message": "Monize 无法发送邮件：{error}。通知和提醒未能送达。"
+      },
+      "providerOutage": {
+        "title": "{provider} 无响应",
+        "message": "无法获取 {provider} 的市场数据。在其恢复响应之前，价格和指数数据可能已过时。"
+      },
+      "providerRecovered": {
+        "title": "{provider} 已恢复响应",
+        "message": "故障已结束，{provider} 的市场数据正在重新更新。"
+      },
+      "scheduledPostFailed": {
+        "title": "无法登记 {name}",
+        "message": "您到期日为 {date} 的定期交易未能自动登记：{error}。您可以在“账单与存款”中手动登记。"
+      }
     }
   },
   "summary503020": {

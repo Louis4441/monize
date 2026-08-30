@@ -186,5 +186,12 @@
     "greeting": "Cześć {{ name }},",
     "intro": "<strong>{{ provider }}</strong> odpowiedział ponownie o {{ restoredAt }}. Awaria trwała {{ duration }}.",
     "backfill": "Ceny i historia indeksów pominięte w czasie awarii zostaną uzupełnione przy najbliższym zaplanowanym odświeżeniu; nie musisz nic robić."
+  },
+  "systemAlert": {
+    "subject": "Monize: {{ title }}",
+    "heading": "Alert systemowy",
+    "greeting": "Cześć {{ name }},",
+    "intro": "Problem w Twojej instalacji Monize wymaga uwagi administratora.",
+    "footer": "Ten alert jest też widoczny w dzwonku powiadomień aplikacji. Jest tworzony najwyżej raz na zdarzenie, niezależnie od liczby replik serwera, które je zauważyły."
   }
 }

@@ -22,6 +22,38 @@
       "titleInDays": "{payee} over {days} dagen verschuldigd",
       "amountDue": "{amount} te betalen op {date}",
       "amountUnavailable": "Bedrag niet beschikbaar (geen actuele wisselkoers), te betalen op {date}"
+    },
+    "system": {
+      "backupFailed": {
+        "title": "Automatische back-up mislukt",
+        "message": "De automatische back-up voor {user} is mislukt: {error}"
+      },
+      "backupPartial": {
+        "title": "Automatische back-up onvolledig",
+        "messageAttachments": "De back-up voor {user} is weggeschreven, maar {missing, plural, one {# bijlage kon} other {# bijlagen konden}} niet worden opgenomen. Volledige back-ups zijn bewaard.",
+        "messagePromotion": "De dagelijkse back-up voor {user} is gelukt, maar de wekelijkse of maandelijkse kopie kon niet worden weggeschreven.",
+        "messageRetention": "De back-up voor {user} is gelukt, maar oude back-upbestanden konden niet worden opgeruimd."
+      },
+      "encryptionKeyMissing": {
+        "title": "Encryptiesleutel niet geconfigureerd",
+        "message": "ENCRYPTION_KEY is niet ingesteld, dus back-ups worden onversleuteld weggeschreven en geheimen kunnen niet worden opgeslagen. Een toekomstige versie start niet meer zonder deze sleutel."
+      },
+      "smtpFailure": {
+        "title": "E-mailbezorging mislukt",
+        "message": "Monize kon geen e-mail verzenden: {error}. Meldingen en herinneringen worden niet bezorgd."
+      },
+      "providerOutage": {
+        "title": "{provider} reageert niet",
+        "message": "Marktgegevens van {provider} zijn niet beschikbaar. Koersen en indexgegevens kunnen verouderd zijn totdat de provider weer reageert."
+      },
+      "providerRecovered": {
+        "title": "{provider} reageert weer",
+        "message": "De storing is voorbij en marktgegevens van {provider} worden weer bijgewerkt."
+      },
+      "scheduledPostFailed": {
+        "title": "{name} kon niet worden geboekt",
+        "message": "Je geplande transactie met vervaldatum {date} is niet automatisch geboekt: {error}. Je kunt deze handmatig boeken via Facturen & stortingen."
+      }
     }
   },
   "summary503020": {

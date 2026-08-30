@@ -186,5 +186,12 @@
     "greeting": "Hoi {{ name }},",
     "intro": "<strong>{{ provider }}</strong> reageerde weer om {{ restoredAt }}. De storing duurde {{ duration }}.",
     "backfill": "Koersen en indexhistorie die tijdens de storing zijn gemist, worden bij de volgende geplande verversing opgehaald; je hoeft niets te doen."
+  },
+  "systemAlert": {
+    "subject": "Monize: {{ title }}",
+    "heading": "Systeemwaarschuwing",
+    "greeting": "Hoi {{ name }},",
+    "intro": "Een probleem in je Monize-installatie vraagt om de aandacht van een beheerder.",
+    "footer": "Deze waarschuwing wordt ook getoond in de notificatiebel van de app. Ze wordt hoogstens één keer per voorval aangemaakt, ongeacht het aantal serverreplica's dat het opmerkte."
   }
 }
