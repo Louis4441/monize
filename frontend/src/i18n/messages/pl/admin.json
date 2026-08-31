@@ -127,7 +127,8 @@
         "name": "Push w przeglądarce",
         "description": "Powiadomienia docierające na telefon lub komputer nawet przy zamkniętym Monize. Nie wymaga Firebase ani konta Google Play czy Apple Developer.",
         "toggleLabel": "Włącz push w przeglądarce dla tej instancji",
-        "missingKeys": "Ta instancja nie ma pary kluczy push. Ustaw ENCRYPTION_KEY i uruchom ponownie: przy następnym starcie Monize sam wygeneruje parę."
+        "missingKeys": "Ta instancja nie ma pary kluczy push. Ustaw ENCRYPTION_KEY i uruchom ponownie: przy następnym starcie Monize sam wygeneruje parę.",
+        "keyUnreadable": "Ta instancja nie potrafi odszyfrować zapisanej pary kluczy push, więc nic nie jest dostarczane. Wymień parę kluczy poniżej, aby odzyskać kanał."
       },
       "email": {
         "name": "E-mail",
@@ -149,7 +150,8 @@
       "rotateDescription": "Wymiana zastępuje parę kluczy tej instancji. Każde zarejestrowane urządzenie przestaje być osiągalne i musi ponownie włączyć push, więc wymieniaj klucze tylko wtedy, gdy klucz mógł zostać ujawniony.",
       "rotateButton": "Wymień parę kluczy",
       "rotatingButton": "Wymiana...",
-      "missingEncryptionKey": "Ta instancja nie ma pary kluczy push, ponieważ nie ustawiono ENCRYPTION_KEY, a klucz prywatny musiałby zostać zapisany bez szyfrowania. Ustaw ją i uruchom ponownie: Monize sam wygeneruje parę."
+      "missingEncryptionKey": "Ta instancja nie ma pary kluczy push, ponieważ nie ustawiono ENCRYPTION_KEY, a klucz prywatny musiałby zostać zapisany bez szyfrowania. Ustaw ją i uruchom ponownie: Monize sam wygeneruje parę.",
+      "keyUnreadable": "Ta instancja ma parę kluczy push, której nie potrafi już odszyfrować, więc nic nie jest dostarczane. Dzieje się tak, gdy ENCRYPTION_KEY zmieni się przy działającej bazie albo gdy kopia zapasowa zostanie przywrócona na inną instancję. Wymień parę kluczy, aby odzyskać kanał; każde urządzenie zarejestruje się ponownie."
     },
     "dialogs": {
       "rotateTitle": "Wymienić parę kluczy push?",

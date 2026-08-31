@@ -26,7 +26,12 @@ export enum PushDisabledReason {
  * one browser receive the same endpoint and the same encryption keys. Per-user
  * uniqueness would leave both rows alive and let a notification addressed to
  * the first account be decrypted and displayed on the device the second account
- * is now using. One row per endpoint makes the second subscribe a takeover.
+ * is now using.
+ *
+ * One row per endpoint, and the second subscriber is refused rather than
+ * allowed to take the row over -- see `PushSubscriptionService.subscribe` for
+ * why an endpoint buys no right to another account's row, and what the client
+ * does about the refusal.
  */
 @Entity("push_subscriptions")
 export class PushSubscription {

@@ -164,6 +164,12 @@ export function VapidIdentityPanel({
         </div>
       </dl>
 
+      {config.keyUnreadable && (
+        <p className="mt-4 text-sm text-amber-700 dark:text-amber-400">
+          {t('identity.keyUnreadable')}
+        </p>
+      )}
+
       <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
         {t('identity.rotateDescription')}
       </p>

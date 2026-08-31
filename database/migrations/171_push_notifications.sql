@@ -68,8 +68,14 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 -- Monize session: two people sharing one browser get the same endpoint and the
 -- same encryption keys from pushManager.subscribe(). Scoped per user, both rows
 -- would survive and a notification addressed to the first account would be
--- decrypted and displayed on the device the second account is now using. One
--- row per endpoint makes the second subscribe a takeover instead.
+-- decrypted and displayed on the device the second account is now using.
+--
+-- One row per endpoint, and the second subscriber is REFUSED rather than
+-- allowed to take the row over: an endpoint is a string the caller supplied,
+-- and no ownership check covers it, so a takeover would be a cross-tenant
+-- delete on an unverified identifier -- and a silent one. The client answers
+-- the refusal by unsubscribing and subscribing again, which mints a fresh
+-- endpoint nobody holds, and logging out releases the endpoint the same way.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_push_subscriptions_endpoint
     ON push_subscriptions(endpoint_hash);
 

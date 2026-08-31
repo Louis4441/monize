@@ -345,7 +345,8 @@
     "channelUnavailable": "Las notificaciones push no están disponibles en esta instancia de Monize.",
     "endpointClaimed": "Este navegador ya está registrado en otra cuenta de Monize. Cierra la sesión de esa cuenta en este navegador e inténtalo de nuevo.",
     "deviceNotFound": "Dispositivo push no encontrado.",
-    "noDevices": "No hay dispositivos push registrados en esta cuenta. Activa primero las notificaciones push en este navegador."
+    "noDevices": "No hay dispositivos push registrados en esta cuenta. Activa primero las notificaciones push en este navegador.",
+    "rotationUnavailable": "ENCRYPTION_KEY no está definida, así que la nueva clave privada no se pudo guardar cifrada. Defínela y reinicia antes de rotar."
   },
   "institutions": {
     "nameConflict": "Ya existe una institución con el nombre \"{{ name }}\"",

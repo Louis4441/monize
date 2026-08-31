@@ -2244,8 +2244,14 @@ CREATE TABLE push_subscriptions (
 -- Monize session: two people sharing one browser get the same endpoint and the
 -- same encryption keys from pushManager.subscribe(). Scoped per user, both rows
 -- would survive and a notification addressed to the first account would be
--- decrypted and displayed on the device the second account is now using. One
--- row per endpoint makes the second subscribe a takeover instead.
+-- decrypted and displayed on the device the second account is now using.
+--
+-- One row per endpoint, and the second subscriber is REFUSED rather than
+-- allowed to take the row over: an endpoint is a string the caller supplied,
+-- and no ownership check covers it, so a takeover would be a cross-tenant
+-- delete on an unverified identifier -- and a silent one. The client answers
+-- the refusal by unsubscribing and subscribing again, which mints a fresh
+-- endpoint nobody holds, and logging out releases the endpoint the same way.
 CREATE UNIQUE INDEX idx_push_subscriptions_endpoint ON push_subscriptions(endpoint_hash);
 
 -- Every send starts with "which of this user's devices are still live".
@@ -2860,13 +2866,13 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- Verification helper (run manually; not part of the migration's effect):
 --   SELECT tablename, policyname FROM pg_policies
 --    WHERE schemaname = 'public' ORDER BY tablename;
--- Expected: 59 policies -- 27 direct + 4 real-user-keyed (112),
+-- Expected: 59 policies -- 26 direct + 4 real-user-keyed (112),
 --           15 indirect (113), 5 special (114),
 --           2 direct for the .mny import's staging + job tables (117),
 --           1 direct for security_documents (118),
 --           4 direct for the GEM strategy tables (124, 125),
 --           2 direct for job_claims and attachment_blob_tombstones,
---           1 indirect for scheduled_transaction_postings (133), and
+--           1 indirect for scheduled_transaction_postings (133),
 --           1 direct for the OIDC step-up claim ledger (155), and
 --           1 direct for push_subscriptions (171).
 

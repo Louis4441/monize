@@ -127,7 +127,8 @@
         "name": "Push do navegador",
         "description": "Notificações entregues no celular ou no computador mesmo com o Monize fechado. Não exige Firebase nem conta do Google Play ou Apple Developer.",
         "toggleLabel": "Ativar o push do navegador nesta instância",
-        "missingKeys": "Esta instância não tem par de chaves push. Defina ENCRYPTION_KEY e reinicie: o Monize gera o par na próxima inicialização."
+        "missingKeys": "Esta instância não tem par de chaves push. Defina ENCRYPTION_KEY e reinicie: o Monize gera o par na próxima inicialização.",
+        "keyUnreadable": "Esta instância não consegue descriptografar o par de chaves push armazenado, então nada é entregue. Gire o par de chaves abaixo para recuperar."
       },
       "email": {
         "name": "E-mail",
@@ -149,7 +150,8 @@
       "rotateDescription": "A rotação substitui o par de chaves desta instância. Todos os dispositivos registrados deixam de ser alcançáveis e precisarão ativar o push de novo, então gire apenas se a chave puder ter sido exposta.",
       "rotateButton": "Girar par de chaves",
       "rotatingButton": "Girando...",
-      "missingEncryptionKey": "Esta instância não tem par de chaves push porque ENCRYPTION_KEY não está definida e a chave privada teria de ser armazenada sem criptografia. Defina-a e reinicie: o Monize gera o par sozinho."
+      "missingEncryptionKey": "Esta instância não tem par de chaves push porque ENCRYPTION_KEY não está definida e a chave privada teria de ser armazenada sem criptografia. Defina-a e reinicie: o Monize gera o par sozinho.",
+      "keyUnreadable": "Esta instância tem um par de chaves push que não consegue mais descriptografar, então nada é entregue. Acontece quando ENCRYPTION_KEY muda com o banco de dados em funcionamento, ou quando um backup é restaurado em outra instância. Gire o par de chaves para recuperar; todos os dispositivos se registrarão novamente."
     },
     "dialogs": {
       "rotateTitle": "Girar o par de chaves push?",

@@ -5,6 +5,7 @@ import {
   PushPermissionError,
   currentDeviceFingerprint,
   disablePushOnThisDevice,
+  releaseLocalPushSubscription,
   enablePushOnThisDevice,
   fingerprintEndpoint,
   getPushSupport,
@@ -118,29 +119,45 @@ describe('toSubscriptionPayload', () => {
 });
 
 describe('getPushSupport', () => {
+  interface SupportFixture {
+    serviceWorker?: boolean;
+    pushManager?: boolean;
+    notification?: NotificationPermission | null;
+    userAgent?: string;
+    platform?: string;
+    maxTouchPoints?: number;
+    /** iOS Safari's own installed-app flag; absent on every other browser. */
+    standalone?: boolean;
+    displayModeStandalone?: boolean;
+  }
+
+  // Built as loose records rather than partial Window/Navigator: both declare
+  // the properties under test as readonly, so a typed partial cannot express
+  // "this browser does not have a PushManager at all", which is the whole
+  // subject here.
   function build({
     serviceWorker = true,
     pushManager = true,
-    notification = 'default' as NotificationPermission | null,
+    notification = 'default',
     userAgent = 'Mozilla/5.0 (X11; Linux x86_64) Chrome/120',
     platform = 'Linux x86_64',
     maxTouchPoints = 0,
     standalone,
     displayModeStandalone = false,
-  } = {}) {
-    const win = {
+  }: SupportFixture = {}) {
+    const win: Record<string, unknown> = {
       matchMedia: () => ({ matches: displayModeStandalone }),
       navigator: { standalone },
-    } as unknown as Window & Record<string, unknown>;
+    };
     if (pushManager) win.PushManager = class {};
     if (notification !== null) win.Notification = { permission: notification };
-    const nav = {
+    const nav: Record<string, unknown> = {
       userAgent,
       platform,
       maxTouchPoints,
-    } as unknown as Navigator & Record<string, unknown>;
+    };
     if (serviceWorker) nav.serviceWorker = {};
-    return { win: win as Window, nav: nav as Navigator };
+    return { win: win as unknown as Window, nav: nav as unknown as Navigator };
   }
 
   it('reports support on a capable browser that has not been asked yet', () => {
@@ -382,6 +399,81 @@ describe('enabling and disabling push on this device', () => {
     await expect(currentDeviceFingerprint()).resolves.toBe(
       await fingerprintEndpoint(ENDPOINT),
     );
+  });
+
+  // The server refuses to take an endpoint over from another account -- an
+  // endpoint is a string the client supplied, not proof of ownership -- so the
+  // repair belongs here: drop the stale subscription and mint a fresh endpoint
+  // nobody holds.
+  it('recovers from a claimed endpoint by subscribing again', async () => {
+    const claimed = Object.assign(new Error('conflict'), {
+      response: { status: 409 },
+    });
+    vi.mocked(apiClient.post)
+      .mockRejectedValueOnce(claimed)
+      .mockResolvedValueOnce({ data: { id: 'd-2' } });
+    getSubscription.mockResolvedValue(
+      browserSubscription(urlBase64ToUint8Array(PUBLIC_KEY).buffer),
+    );
+
+    const device = await enablePushOnThisDevice(PUBLIC_KEY);
+
+    // One unsubscribe and one subscribe, both caused by the 409 rather than by
+    // a key mismatch: the browser held a subscription minted under this very
+    // key, so nothing before the POST had any reason to replace it.
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    expect(subscribe).toHaveBeenCalledTimes(1);
+    expect(apiClient.post).toHaveBeenCalledTimes(2);
+    expect(device.id).toBe('d-2');
+  });
+
+  // A second 409 on a brand-new endpoint means something other than a stale
+  // claim, so it surfaces instead of looping.
+  it('retries a claimed endpoint exactly once', async () => {
+    const claimed = Object.assign(new Error('conflict'), {
+      response: { status: 409 },
+    });
+    vi.mocked(apiClient.post).mockRejectedValue(claimed);
+    getSubscription.mockResolvedValue(
+      browserSubscription(urlBase64ToUint8Array(PUBLIC_KEY).buffer),
+    );
+
+    await expect(enablePushOnThisDevice(PUBLIC_KEY)).rejects.toBe(claimed);
+    expect(apiClient.post).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([400, 403, 500])(
+    'does not re-subscribe on a %s that is not a claimed endpoint',
+    async (status) => {
+      vi.mocked(apiClient.post).mockRejectedValue(
+        Object.assign(new Error('nope'), { response: { status } }),
+      );
+      getSubscription.mockResolvedValue(
+        browserSubscription(urlBase64ToUint8Array(PUBLIC_KEY).buffer),
+      );
+
+      await expect(enablePushOnThisDevice(PUBLIC_KEY)).rejects.toThrow('nope');
+      expect(unsubscribe).not.toHaveBeenCalled();
+      expect(apiClient.post).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  // Logout's half: the subscription is scoped to the origin, not the session,
+  // so leaving it registered keeps delivering the departing account's
+  // notifications onto a browser the next person is using.
+  it('releases the local subscription without deleting any server row', async () => {
+    getSubscription.mockResolvedValue(browserSubscription());
+
+    await releaseLocalPushSubscription();
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    expect(apiClient.delete).not.toHaveBeenCalled();
+  });
+
+  it('never throws while releasing, so a logout cannot fail on the push channel', async () => {
+    getSubscription.mockRejectedValue(new Error('service worker gone'));
+
+    await expect(releaseLocalPushSubscription()).resolves.toBeUndefined();
   });
 
   it('exposes the permission refusal as a named error class', () => {

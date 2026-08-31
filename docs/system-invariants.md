@@ -119,8 +119,9 @@ implied.
 | INV-CURRENCY-001 | A shared currency is deleted only by its creator, on a global count | enforced |
 | INV-ATTACHMENT-001 | Available metadata resolves to committed bytes | enforced |
 | INV-BACKUP-001 | A backup file is complete, verified and owner-namespaced | enforced |
-| INV-PUSH-001 | A push subscription belongs to the authenticated caller, and one browser endpoint has one owner | enforced |
+| INV-PUSH-001 | A push subscription belongs to the authenticated caller, and no request touches another account's device | enforced |
 | INV-PUSH-002 | The VAPID private key never leaves the server, and is never stored unencrypted | enforced |
+| INV-PUSH-006 | A push channel is offered only while its key pair can actually be used | enforced |
 | INV-PUSH-003 | A key rotation retires every subscription minted under the superseded pair | enforced |
 | INV-PUSH-004 | A push failure never rolls back what produced it, and a dead subscription stops being attempted | enforced |
 | INV-PUSH-005 | A push subscription is instance-bound state, never portable backup data | enforced |
@@ -2112,12 +2113,12 @@ two replicas from producing the same effect.
 ### INV-PUSH-001 -- a subscription belongs to its caller, and an endpoint to one account
 
 ```text
-Statement           A push subscription is owned by the authenticated caller, and
-                    a browser endpoint has exactly one owner at a time.
+Statement           A push subscription is owned by the authenticated caller; a
+                    browser endpoint has exactly one owner; and no request
+                    writes to, or deletes, a row belonging to another account.
 Source of truth     push_subscriptions.user_id, arbitrated by
                     idx_push_subscriptions_endpoint
-Enforcement         Two mechanisms, because there are two ways to get this wrong.
-                    Ownership: CreatePushSubscriptionDto has no userId field at
+Enforcement         Ownership: CreatePushSubscriptionDto has no userId field at
                     all and forbidNonWhitelisted rejects one, so the tenant can
                     only be req.user.id; every list, delete and outcome write
                     carries user_id in its own WHERE. Endpoint exclusivity: the
@@ -2127,28 +2128,36 @@ Enforcement         Two mechanisms, because there are two ways to get this wrong
                     one browser receive the same endpoint AND the same encryption
                     keys, and a per-user index would leave both rows live and let
                     the first account's notification be decrypted and displayed on
-                    the device the second is now using. subscribe() therefore
-                    deletes any other user's claim (system context -- the row is
-                    another tenant's and no user transaction can see it) before
-                    upserting its own with
-                    ON CONFLICT (endpoint_hash) DO UPDATE ... WHERE user_id =
-                    EXCLUDED.user_id.
+                    the device the second is now using.
+                    The second subscriber is REFUSED, not allowed to take the row
+                    over: ON CONFLICT (endpoint_hash) DO UPDATE ... WHERE
+                    user_id = EXCLUDED.user_id returns no row when the conflict
+                    belongs to somebody else, and that is a 409. The takeover this
+                    replaced deleted another tenant's row on the strength of a
+                    client-supplied string -- an unauthorized cross-tenant write,
+                    and a silent one: the first account lost push with no notice.
+                    An endpoint is not proof of ownership, so it buys no right.
 Concurrency scope   per endpoint, globally
 Retry semantics     Safe: a repeat subscribe from the same browser refreshes the
                     one row rather than adding a device.
-Failure response    Losing the takeover race is a 409 having written nothing --
-                    never a second row for one endpoint.
-Required tests      push-subscription.service.spec.ts (the takeover runs before
-                    the insert; the conflict arm is scoped to the caller; a 409
-                    on the lost race). The database half needs no new spec: the
-                    catalog-driven rls-enforcement.integration.spec.ts enumerates
-                    the live schema, so push_subscriptions is bucketed as direct
-                    by its user_id column and its policy, its ENABLE and its
-                    cross-user INSERT rejection are all asserted automatically --
-                    and the harness picks up migration 171 by content marker
-                    (it references app_current_user_id). A two-connection race on
-                    the endpoint takeover is the gold-standard proof still owed;
-                    losing that race is a 409, not a shared device.
+Failure response    409, having written nothing. Not a dead end: the client
+                    unsubscribes and subscribes again for a fresh endpoint
+                    (enablePushOnThisDevice, exactly one retry), and logout
+                    releases the endpoint the same way
+                    (releaseLocalPushSubscription), so the ordinary
+                    shared-browser case never reaches the refusal.
+Required tests      push-subscription.service.spec.ts asserts no statement on
+                    this path names another user (no DELETE, no `user_id <>`,
+                    every statement bound to the caller) and that a foreign
+                    conflict is a 409. push.test.ts covers the client's single
+                    retry and the logout release. The database half needs no new
+                    spec: the catalog-driven
+                    rls-enforcement.integration.spec.ts enumerates the live
+                    schema, so push_subscriptions is bucketed as direct by its
+                    user_id column and its policy, its ENABLE and its cross-user
+                    INSERT rejection are all asserted automatically -- and the
+                    harness picks up migration 171 by content marker (it
+                    references app_current_user_id).
 Status              enforced
 ```
 
@@ -2174,6 +2183,41 @@ Crash semantics     A pair this instance cannot decrypt (ENCRYPTION_KEY changed
                     under a live database) yields a null identity and a named log
                     line, not an AES-GCM failure behind a generic 500.
 Required tests      push-config.service.spec.ts, push-secret.guard.spec.ts.
+Status              enforced
+```
+
+### INV-PUSH-006 -- a channel is offered only while its key can be used
+
+```text
+Statement           Push reports itself available only while this server can
+                    actually sign with the stored key pair.
+Source of truth     EncryptionService.canDecrypt(push_instance_config
+                    .vapid_private_key_enc)
+Enforcement         PushConfigService.canUseKeyPair gates `enabled` on both the
+                    public and the admin shape, and getVapidIdentity refuses the
+                    same way, so the three answers cannot disagree. The failure
+                    is otherwise entirely silent: ENCRYPTION_KEY changes under a
+                    live database (or a backup lands on another instance), the
+                    column stays populated, every "is push configured?" check
+                    says yes, and only the send fails -- the same shape
+                    AiService names for a stored API key it cannot decrypt.
+                    `keyUnreadable` is its own field rather than folded into
+                    `configured` because the repairs differ: no key pair is
+                    fixed by setting ENCRYPTION_KEY and restarting, an unreadable
+                    one by rotating. Two causes, two repairs, one message each.
+                    Rotation itself refuses with a 400 when there is nowhere safe
+                    to store the new private half, rather than returning the
+                    unchanged config -- which reported a refusal as a success,
+                    indistinguishable from a genuine no-op rotation.
+Concurrency scope   per instance
+Failure response    The channel reads as unavailable everywhere, the admin page
+                    names the cause and keeps rotation offered, and the account
+                    surface stops offering an enable button that would produce a
+                    subscription nothing is ever delivered to.
+Required tests      push-config.service.spec.ts (both surfaces report the
+                    unreadable pair, it stays distinct from having none, and the
+                    rotation refusal throws); the admin page spec asserts the
+                    two messages do not collapse into one.
 Status              enforced
 ```
 

@@ -3,7 +3,6 @@ import { render, screen, waitFor, fireEvent } from '@/test/render';
 import AdminNotificationsPage from './page';
 
 vi.mock('next/image', () => ({
-   
   default: ({ priority, fill, ...props }: any) => <img alt="" {...props} />,
 }));
 
@@ -32,7 +31,6 @@ vi.mock('next/navigation', () => ({
 let currentRole = 'admin';
 vi.mock('@/store/authStore', () => ({
   useAuthStore: Object.assign(
-     
     (selector?: any) => {
       const state = {
         user: { id: 'admin-id', email: 'a@example.com', role: currentRole },
@@ -55,7 +53,6 @@ vi.mock('@/store/authStore', () => ({
 }));
 
 vi.mock('@/store/preferencesStore', () => ({
-   
   usePreferencesStore: (selector?: any) => {
     const state = {
       preferences: { theme: 'system' },
@@ -80,7 +77,6 @@ vi.mock('@/lib/auth', () => ({
 }));
 
 vi.mock('@/lib/errors', () => ({
-   
   getErrorMessage: (_error: any, fallback: string) => fallback,
 }));
 
@@ -89,11 +85,10 @@ const mockSetWebPushEnabled = vi.fn();
 const mockRotate = vi.fn();
 vi.mock('@/lib/admin-notifications', () => ({
   adminNotificationsApi: {
-     
     getChannels: (...args: any[]) => mockGetChannels(...args),
-     
+
     setWebPushEnabled: (...args: any[]) => mockSetWebPushEnabled(...args),
-     
+
     rotateVapidKeys: (...args: any[]) => mockRotate(...args),
   },
 }));
@@ -101,7 +96,6 @@ vi.mock('@/lib/admin-notifications', () => ({
 const mockGetSmtpStatus = vi.fn();
 vi.mock('@/lib/user-settings', () => ({
   userSettingsApi: {
-     
     getSmtpStatus: (...args: any[]) => mockGetSmtpStatus(...args),
   },
 }));
@@ -110,6 +104,7 @@ const CONFIGURED = {
   enabled: true,
   publicKey: 'PUB',
   configured: true,
+  keyUnreadable: false,
   publicKeyFingerprint: 'abc123def4567890',
   generatedAt: '2026-08-01T10:00:00.000Z',
   liveSubscriptionCount: 3,
@@ -184,6 +179,37 @@ describe('AdminNotificationsPage', () => {
     expect(
       await screen.findByText(/ENCRYPTION_KEY is not set/i),
     ).toBeInTheDocument();
+  });
+
+  // Three states, three repairs. A key pair this server cannot decrypt reports
+  // itself as a healthy channel unless it is its own state: the column is
+  // populated, every "is push configured?" check says yes, and only the send
+  // fails -- so an administrator has no reason to rotate, which is the one fix.
+  it('names an unreadable key pair as its own problem, not as push being off', async () => {
+    mockGetChannels.mockResolvedValue({
+      ...CONFIGURED,
+      enabled: false,
+      configured: true,
+      keyUnreadable: true,
+    });
+
+    render(<AdminNotificationsPage />);
+
+    expect(
+      await screen.findByText(/cannot decrypt its stored push key pair/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/ENCRYPTION_KEY is not set/i),
+    ).not.toBeInTheDocument();
+    // Rotation is the repair, so it stays offered; the kill-switch is not.
+    expect(
+      screen.getByRole('button', { name: /rotate key pair/i }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole('switch', {
+        name: /enable browser push for this instance/i,
+      }),
+    ).toBeDisabled();
   });
 
   it('switches the instance channel off through the toggle', async () => {

@@ -345,7 +345,8 @@
     "channelUnavailable": "Push-Benachrichtigungen sind auf dieser Monize-Instanz nicht verfügbar.",
     "endpointClaimed": "Dieser Browser ist bereits bei einem anderen Monize-Konto registriert. Melden Sie sich in diesem Browser von jenem Konto ab und versuchen Sie es erneut.",
     "deviceNotFound": "Push-Gerät nicht gefunden.",
-    "noDevices": "Für dieses Konto ist kein Push-Gerät registriert. Aktivieren Sie Push-Benachrichtigungen zuerst in diesem Browser."
+    "noDevices": "Für dieses Konto ist kein Push-Gerät registriert. Aktivieren Sie Push-Benachrichtigungen zuerst in diesem Browser.",
+    "rotationUnavailable": "ENCRYPTION_KEY ist nicht gesetzt, daher konnte kein neuer privater Schlüssel verschlüsselt gespeichert werden. Setzen Sie die Variable und starten Sie neu, bevor Sie erneuern."
   },
   "institutions": {
     "nameConflict": "Institut mit dem Namen \"{{ name }}\" existiert bereits",

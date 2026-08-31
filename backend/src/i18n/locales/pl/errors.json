@@ -345,7 +345,8 @@
     "channelUnavailable": "Powiadomienia push nie są dostępne w tej instancji Monize.",
     "endpointClaimed": "Ta przeglądarka jest już zarejestrowana na innym koncie Monize. Wyloguj się z tamtego konta w tej przeglądarce i spróbuj ponownie.",
     "deviceNotFound": "Nie znaleziono urządzenia push.",
-    "noDevices": "Do tego konta nie przypisano żadnego urządzenia push. Najpierw włącz powiadomienia push w tej przeglądarce."
+    "noDevices": "Do tego konta nie przypisano żadnego urządzenia push. Najpierw włącz powiadomienia push w tej przeglądarce.",
+    "rotationUnavailable": "Nie ustawiono ENCRYPTION_KEY, więc nowego klucza prywatnego nie dało się zapisać zaszyfrowanego. Ustaw ją i uruchom ponownie przed wymianą."
   },
   "institutions": {
     "nameConflict": "Instytucja o nazwie \"{{ name }}\" już istnieje",

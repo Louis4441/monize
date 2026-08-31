@@ -127,7 +127,8 @@
         "name": "Browser push",
         "description": "Notifications delivered to a phone or desktop even when Monize is closed. Needs no Firebase, Google Play or Apple Developer account.",
         "toggleLabel": "Enable browser push for this instance",
-        "missingKeys": "This instance has no push key pair. Set ENCRYPTION_KEY and restart: Monize generates the pair itself on the next start."
+        "missingKeys": "This instance has no push key pair. Set ENCRYPTION_KEY and restart: Monize generates the pair itself on the next start.",
+        "keyUnreadable": "This instance cannot decrypt its stored push key pair, so nothing can be delivered. Rotate the key pair below to recover."
       },
       "email": {
         "name": "Email",
@@ -149,7 +150,8 @@
       "rotateDescription": "Rotating replaces this instance’s key pair. Every registered device stops being reachable and has to turn push on again, so rotate only if the key may have been exposed.",
       "rotateButton": "Rotate key pair",
       "rotatingButton": "Rotating...",
-      "missingEncryptionKey": "This instance has no push key pair, because ENCRYPTION_KEY is not set and the private key would have to be stored unencrypted. Set it and restart: Monize generates the pair itself."
+      "missingEncryptionKey": "This instance has no push key pair, because ENCRYPTION_KEY is not set and the private key would have to be stored unencrypted. Set it and restart: Monize generates the pair itself.",
+      "keyUnreadable": "This instance holds a push key pair it can no longer decrypt, so nothing can be delivered. It happens when ENCRYPTION_KEY changes under a live database, or when a backup is restored onto a different instance. Rotate the key pair to recover; every device will register again."
     },
     "dialogs": {
       "rotateTitle": "Rotate the push key pair?",

@@ -345,7 +345,8 @@
     "channelUnavailable": "Le notifiche push non sono disponibili su questa istanza di Monize.",
     "endpointClaimed": "Questo browser è già registrato su un altro account Monize. Esci da quell'account in questo browser e riprova.",
     "deviceNotFound": "Dispositivo push non trovato.",
-    "noDevices": "Nessun dispositivo push è registrato per questo account. Attiva prima le notifiche push in questo browser."
+    "noDevices": "Nessun dispositivo push è registrato per questo account. Attiva prima le notifiche push in questo browser.",
+    "rotationUnavailable": "ENCRYPTION_KEY non è impostata, quindi la nuova chiave privata non può essere memorizzata cifrata. Impostala e riavvia prima di ruotare."
   },
   "institutions": {
     "nameConflict": "Esiste già un istituto con il nome \"{{ name }}\"",

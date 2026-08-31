@@ -108,6 +108,7 @@ INV-LOAN-002's entry names the missing source scan while its row said `--`.
 | INV-BACKUP-001 backup complete | supporting | -- | required | -- | optional | **required** | **required** | required |
 | INV-PUSH-001 subscription ownership | required | -- | **required** | required (not yet met) | -- | -- | -- | optional |
 | INV-PUSH-002 private key stays server-side | supporting | **required** | -- | -- | -- | -- | -- | -- |
+| INV-PUSH-006 channel offered only while usable | **required** | -- | optional | -- | -- | -- | -- | -- |
 | INV-PUSH-003 rotation retires subscriptions | **required** | -- | required | -- | -- | -- | -- | -- |
 | INV-PUSH-004 push failure is reported | **required** | -- | optional | -- | -- | required | required | -- |
 | INV-PUSH-005 subscription not portable | supporting | -- | **required** | -- | -- | -- | -- | -- |

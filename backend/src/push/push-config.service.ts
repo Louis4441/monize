@@ -1,8 +1,14 @@
-import { Injectable, Logger, OnApplicationBootstrap } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnApplicationBootstrap,
+} from "@nestjs/common";
 import { DataSource, EntityManager, IsNull, Not } from "typeorm";
 import * as crypto from "crypto";
 import * as webpush from "web-push";
 import { withScopedDb } from "../common/db/scoped-db";
+import { tr } from "../i18n/translate";
 import { withSystemContext } from "../common/db/with-context";
 import { EncryptionService } from "../common/encryption/encryption.service";
 import { ENCRYPTION_KEY_ENV } from "../common/encryption/encryption-key";
@@ -24,11 +30,16 @@ export const VAPID_SUBJECT = "https://github.com/kenlasko/monize";
 
 /** What the browser is told, and the only shape `/push/config` ever returns. */
 export interface PublicPushConfig {
-  /** Both halves true: the instance holds a key pair AND the channel is on. */
+  /**
+   * All three true: the instance holds a key pair, that key pair can actually
+   * be used, and an administrator has left the channel on. A key pair this
+   * server cannot decrypt is not a channel -- offering the enable button over
+   * one produces a subscription nothing will ever be delivered to.
+   */
   enabled: boolean;
   /** Handed to `pushManager.subscribe()`. Public by construction. */
   publicKey: string | null;
-  /** False when `ENCRYPTION_KEY` is absent, so the UI can say which it is. */
+  /** False when the instance holds no key pair at all, so the UI can say which. */
   configured: boolean;
 }
 
@@ -36,6 +47,14 @@ export interface PublicPushConfig {
 export interface AdminPushConfig extends PublicPushConfig {
   publicKeyFingerprint: string | null;
   generatedAt: string | null;
+  /**
+   * A stored key pair this instance cannot decrypt -- ENCRYPTION_KEY changed
+   * under a live database, or a restore landed on a different instance. Its own
+   * state, not folded into `configured`: "no key pair" is repaired by setting
+   * ENCRYPTION_KEY and restarting, and this one by rotating. Two causes, two
+   * repairs, so one message each.
+   */
+  keyUnreadable: boolean;
   /** Live devices across the whole deployment -- a count, never a device list. */
   liveSubscriptionCount: number;
   disabledSubscriptionCount: number;
@@ -140,28 +159,48 @@ export class PushConfigService implements OnApplicationBootstrap {
     );
   }
 
-  /** The row as stored, or `null` when this instance has no push identity yet. */
+  /**
+   * The row as stored, or `null` when this instance has no push identity yet.
+   *
+   * Runs under whatever identity the caller already has: `push_instance_config`
+   * is RLS-exempt, so a tenant transaction reads it exactly as a system one
+   * would, and seeding a bypass here would widen the fence on a request path
+   * for nothing (`backend/CLAUDE.md`, "a read about somebody else"). The two
+   * callers that genuinely have no ambient identity -- the bootstrap hook, and
+   * the deployment-wide device counts -- seed their own.
+   */
   async readConfig(): Promise<PushInstanceConfig | null> {
-    return withSystemContext(() =>
-      withScopedDb(this.dataSource, (manager) =>
-        manager
-          .getRepository(PushInstanceConfig)
-          .findOne({ where: { id: true } }),
-      ),
+    return withScopedDb(this.dataSource, (manager) =>
+      manager
+        .getRepository(PushInstanceConfig)
+        .findOne({ where: { id: true } }),
     );
   }
 
   async getPublicConfig(): Promise<PublicPushConfig> {
     const config = await this.readConfig();
     return {
-      enabled: !!config && config.webPushEnabled,
+      enabled: !!config && config.webPushEnabled && this.canUseKeyPair(config),
       publicKey: config?.vapidPublicKey ?? null,
       configured: !!config,
     };
   }
 
+  /**
+   * Whether the stored private half can still be opened by this server.
+   *
+   * The failure it separates out is silent otherwise: the column is populated,
+   * every "is push configured?" check says yes, and only the send fails --
+   * exactly the shape `AiService` names for a stored API key it cannot decrypt.
+   */
+  private canUseKeyPair(config: PushInstanceConfig): boolean {
+    return this.encryption.canDecrypt(config.vapidPrivateKeyEnc);
+  }
+
   async getAdminConfig(): Promise<AdminPushConfig> {
     const config = await this.readConfig();
+    // System context for the counts alone: "how many devices does this
+    // deployment have" is a cross-user question, and it is the only one here.
     const counts = await withSystemContext(() =>
       withScopedDb(this.dataSource, async (manager) => {
         const repo = manager.getRepository(PushSubscription);
@@ -173,10 +212,12 @@ export class PushConfigService implements OnApplicationBootstrap {
       }),
     );
 
+    const keyUnreadable = !!config && !this.canUseKeyPair(config);
     return {
-      enabled: !!config && config.webPushEnabled,
+      enabled: !!config && config.webPushEnabled && !keyUnreadable,
       publicKey: config?.vapidPublicKey ?? null,
       configured: !!config,
+      keyUnreadable,
       publicKeyFingerprint: config
         ? fingerprintPublicKey(config.vapidPublicKey)
         : null,
@@ -195,7 +236,7 @@ export class PushConfigService implements OnApplicationBootstrap {
   async getVapidIdentity(): Promise<VapidIdentity | null> {
     const config = await this.readConfig();
     if (!config || !config.webPushEnabled) return null;
-    if (!this.encryption.canDecrypt(config.vapidPrivateKeyEnc)) {
+    if (!this.canUseKeyPair(config)) {
       // A stored pair this instance cannot open is its own diagnosis: it
       // happens when ENCRYPTION_KEY changes under a live database. Saying so
       // beats an AES-GCM authentication failure surfacing as a generic 500.
@@ -238,7 +279,15 @@ export class PushConfigService implements OnApplicationBootstrap {
     disabled: number;
   }> {
     if (!this.encryption.isConfigured()) {
-      return { config: await this.getAdminConfig(), disabled: 0 };
+      // Returning the unchanged config here reported a refusal as a success:
+      // the caller got 200 and "0 devices must register again", which is also
+      // what a genuine no-op rotation looks like.
+      throw new BadRequestException(
+        tr(
+          "errors.push.rotationUnavailable",
+          `${ENCRYPTION_KEY_ENV} is not set, so a new private key could not be stored encrypted. Set it and restart before rotating.`,
+        ),
+      );
     }
     const generated = webpush.generateVAPIDKeys();
     const disabled = await withSystemContext(() =>

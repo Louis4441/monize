@@ -10,6 +10,12 @@ import type { PushConfig } from './push';
  * ever appears.
  */
 export interface AdminPushConfig extends PushConfig {
+  /**
+   * A stored key pair this server cannot decrypt. Its own state rather than
+   * part of `configured`: "no key pair" is repaired by setting ENCRYPTION_KEY
+   * and restarting, this one by rotating, so they cannot share a message.
+   */
+  keyUnreadable: boolean;
   publicKeyFingerprint: string | null;
   generatedAt: string | null;
   liveSubscriptionCount: number;

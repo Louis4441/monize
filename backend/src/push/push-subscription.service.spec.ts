@@ -96,7 +96,6 @@ describe("PushSubscriptionService", () => {
       sender as unknown as WebPushSender,
       { translate: jest.fn((key: string) => key) } as unknown as I18nService,
     );
-    jest.spyOn(service["logger"], "log").mockImplementation(() => undefined);
   });
 
   describe("subscribe", () => {
@@ -112,36 +111,27 @@ describe("PushSubscriptionService", () => {
       expect(Object.keys(DTO)).not.toContain("userId");
     });
 
-    // The security half of subscribing. pushManager.subscribe() is scoped to a
-    // browser profile and an origin, not to a Monize session, so two accounts in
-    // one browser are handed the same endpoint AND the same encryption keys.
-    // Leaving the first account's row alive would have its notifications
-    // decrypted and displayed on the device the second account is now using.
-    it("releases another account's claim on the endpoint before writing its own", async () => {
+    // The rule this pins, and the reason the previous shape was wrong: an
+    // endpoint is a string the caller supplied, and it proves nothing about
+    // what they own. Deleting another account's row on the strength of it was a
+    // cross-tenant destructive write -- and a silent one, so the first account
+    // lost push with no notice. One row per endpoint, and the second subscriber
+    // is refused.
+    it("touches no row belonging to another account", async () => {
       await service.subscribe(USER, DTO, null);
 
       const sqls = manager.query.mock.calls.map(([sql]) => String(sql));
-      const deleteIndex = sqls.findIndex((sql) =>
-        sql.includes("DELETE FROM push_subscriptions"),
-      );
-      const insertIndex = sqls.findIndex((sql) =>
-        sql.includes("INSERT INTO push_subscriptions"),
-      );
-      expect(deleteIndex).toBeGreaterThanOrEqual(0);
-      expect(insertIndex).toBeGreaterThan(deleteIndex);
-      expect(sqls[deleteIndex]).toContain("user_id <> $2");
-      expect(manager.query.mock.calls[deleteIndex][1]).toEqual([
-        hashEndpoint(ENDPOINT),
-        USER,
-      ]);
+      expect(sqls.some((sql) => sql.includes("DELETE"))).toBe(false);
+      for (const [sql, params] of manager.query.mock.calls) {
+        // Every statement this path issues is scoped to the caller, either by
+        // an explicit predicate or by the value it inserts.
+        expect(String(sql)).not.toContain("user_id <>");
+        expect(params).toContain(USER);
+      }
     });
 
-    it("refuses rather than sharing a device when the takeover lost its race", async () => {
-      manager.query.mockImplementation((sql: string) =>
-        String(sql).includes("INSERT INTO push_subscriptions")
-          ? Promise.resolve([[], 0])
-          : Promise.resolve([[], 0]),
-      );
+    it("refuses when the endpoint is registered to another account", async () => {
+      manager.query.mockResolvedValue([[], 0]);
 
       await expect(service.subscribe(USER, DTO, null)).rejects.toThrow(
         ConflictException,
@@ -329,7 +319,6 @@ describe("PushSubscriptionService", () => {
         sender as unknown as WebPushSender,
         { translate } as unknown as I18nService,
       );
-      jest.spyOn(service["logger"], "log").mockImplementation(() => undefined);
 
       await service.sendTest(USER);
 

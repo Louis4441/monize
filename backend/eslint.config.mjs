@@ -103,17 +103,12 @@ const WITH_CONTEXT_ALLOWLIST = [
   // transaction on purpose, because an outage is not part of whatever request
   // discovered it.
   "src/provider-health/provider-health.service.ts",
-  // The deployment's Web Push identity is one VAPID key pair for every account,
-  // so reading it, generating it on the bootstrap hook (no request behind it),
-  // rotating it and counting the devices it serves are all cross-user work by
-  // construction. No user context could see the whole of any of them.
+  // Two genuinely cross-user pieces of work, and only those: generating the
+  // deployment's one VAPID key pair on the bootstrap hook (no request behind
+  // it), and counting the devices that key pair serves across every account.
+  // Reading the row itself runs under the caller's own identity -- the table is
+  // RLS-exempt, so a bypass there would widen the fence for nothing.
   "src/push/push-config.service.ts",
-  // One cross-user statement, and it is the security half of subscribing: a
-  // push endpoint belongs to a browser profile, not to a Monize session, so a
-  // second account subscribing in the same browser must first drop the row the
-  // first account holds for that endpoint -- a row its own tenant transaction
-  // cannot see. The user's own write stays in user context.
-  "src/push/push-subscription.service.ts",
   "src/scheduled-transactions/scheduled-transactions.service.ts",
   "src/securities/holdings.service.ts",
   // The market-index refresh is a deployment-wide cron with no request behind

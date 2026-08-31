@@ -345,7 +345,8 @@
     "channelUnavailable": "Notifikasi push tidak tersedia di instans Monize ini.",
     "endpointClaimed": "Peramban ini sudah terdaftar pada akun Monize lain. Keluar dari akun tersebut di peramban ini lalu coba lagi.",
     "deviceNotFound": "Perangkat push tidak ditemukan.",
-    "noDevices": "Belum ada perangkat push terdaftar untuk akun ini. Aktifkan notifikasi push di peramban ini terlebih dahulu."
+    "noDevices": "Belum ada perangkat push terdaftar untuk akun ini. Aktifkan notifikasi push di peramban ini terlebih dahulu.",
+    "rotationUnavailable": "ENCRYPTION_KEY belum disetel, sehingga kunci privat baru tidak dapat disimpan terenkripsi. Setel dan mulai ulang sebelum merotasi."
   },
   "institutions": {
     "nameConflict": "Institusi bernama \"{{ name }}\" sudah ada",

@@ -1,3 +1,4 @@
+import { BadRequestException } from "@nestjs/common";
 import * as webpush from "web-push";
 import { PushConfigService, fingerprintPublicKey } from "./push-config.service";
 import { EncryptionService } from "../common/encryption/encryption.service";
@@ -205,12 +206,48 @@ describe("PushConfigService", () => {
         enabled: true,
         publicKey: "PUB-STORED",
         configured: true,
+        keyUnreadable: false,
         publicKeyFingerprint: fingerprintPublicKey("PUB-STORED"),
         generatedAt: "2026-01-02T03:04:05.000Z",
         liveSubscriptionCount: 3,
         disabledSubscriptionCount: 1,
       });
       expect(JSON.stringify(config)).not.toContain("enc(");
+    });
+  });
+
+  describe("an unreadable stored key pair", () => {
+    // The failure this separates out is silent otherwise: the column is
+    // populated, every "is push configured?" check says yes, and only the send
+    // fails. An administrator looking at a green channel has no reason to
+    // rotate, which is the one repair.
+    beforeEach(() => {
+      configRepo.findOne.mockResolvedValue(storedConfig());
+      encryption.canDecrypt.mockReturnValue(false);
+    });
+
+    it("is not an enabled channel, on either surface", async () => {
+      await expect(service.getPublicConfig()).resolves.toMatchObject({
+        enabled: false,
+        configured: true,
+      });
+      await expect(service.getAdminConfig()).resolves.toMatchObject({
+        enabled: false,
+        configured: true,
+        keyUnreadable: true,
+      });
+    });
+
+    // Two causes, two repairs: "no key pair" is fixed by setting ENCRYPTION_KEY
+    // and restarting, this one by rotating. Folding them into one flag sends an
+    // operator to the wrong one.
+    it("stays distinct from having no key pair at all", async () => {
+      configRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.getAdminConfig()).resolves.toMatchObject({
+        configured: false,
+        keyUnreadable: false,
+      });
     });
   });
 
@@ -272,13 +309,16 @@ describe("PushConfigService", () => {
       expect(new Set(queryTransactionIds).size).toBe(1);
     });
 
-    it("refuses to rotate when there is nowhere safe to put the new private key", async () => {
+    // Returning the unchanged config here reported a refusal as a success: the
+    // caller got 200 and "0 devices must register again", which is also exactly
+    // what a genuine no-op rotation looks like.
+    it("refuses, rather than reporting success, when there is nowhere safe to put the new private key", async () => {
       encryption.isConfigured.mockReturnValue(false);
       configRepo.findOne.mockResolvedValue(null);
 
-      const result = await service.rotateKeyPair();
-
-      expect(result.disabled).toBe(0);
+      await expect(service.rotateKeyPair()).rejects.toThrow(
+        BadRequestException,
+      );
       expect(generateVAPIDKeys).not.toHaveBeenCalled();
       expect(manager.query).not.toHaveBeenCalled();
     });

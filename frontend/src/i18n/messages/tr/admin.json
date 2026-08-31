@@ -127,7 +127,8 @@
         "name": "Tarayıcı anlık bildirimi",
         "description": "Monize kapalıyken bile telefona veya masaüstüne ulaşan bildirimler. Firebase, Google Play veya Apple Developer hesabı gerekmez.",
         "toggleLabel": "Bu örnek için tarayıcı anlık bildirimini etkinleştir",
-        "missingKeys": "Bu örneğin anlık bildirim anahtar çifti yok. ENCRYPTION_KEY değerini ayarlayıp yeniden başlatın: Monize bir sonraki açılışta çifti kendisi üretir."
+        "missingKeys": "Bu örneğin anlık bildirim anahtar çifti yok. ENCRYPTION_KEY değerini ayarlayıp yeniden başlatın: Monize bir sonraki açılışta çifti kendisi üretir.",
+        "keyUnreadable": "Bu örnek, kayıtlı anlık bildirim anahtar çiftini çözemiyor; bu yüzden hiçbir şey teslim edilmiyor. Kurtarmak için aşağıdan anahtar çiftini değiştirin."
       },
       "email": {
         "name": "E-posta",
@@ -149,7 +150,8 @@
       "rotateDescription": "Değiştirme bu örneğin anahtar çiftini yeniler. Kayıtlı her cihaz erişilemez hale gelir ve anlık bildirimleri yeniden açması gerekir; bu nedenle yalnızca anahtar ifşa olmuş olabilecekse değiştirin.",
       "rotateButton": "Anahtar çiftini değiştir",
       "rotatingButton": "Değiştiriliyor...",
-      "missingEncryptionKey": "ENCRYPTION_KEY ayarlanmadığı ve özel anahtarın şifrelenmeden saklanması gerekeceği için bu örneğin anlık bildirim anahtar çifti yok. Değişkeni ayarlayıp yeniden başlatın: Monize çifti kendisi üretir."
+      "missingEncryptionKey": "ENCRYPTION_KEY ayarlanmadığı ve özel anahtarın şifrelenmeden saklanması gerekeceği için bu örneğin anlık bildirim anahtar çifti yok. Değişkeni ayarlayıp yeniden başlatın: Monize çifti kendisi üretir.",
+      "keyUnreadable": "Bu örnek, artık çözemediği bir anlık bildirim anahtar çifti tutuyor; bu yüzden hiçbir şey teslim edilmiyor. Çalışan bir veritabanında ENCRYPTION_KEY değiştiğinde ya da bir yedek başka bir örneğe geri yüklendiğinde olur. Kurtarmak için anahtar çiftini değiştirin; her cihaz yeniden kaydolacaktır."
     },
     "dialogs": {
       "rotateTitle": "Anlık bildirim anahtar çifti değiştirilsin mi?",

@@ -354,7 +354,8 @@
     "channelUnavailable": "Push notifications are not available on this Monize instance.",
     "endpointClaimed": "This browser is already registered to a different Monize account. Sign out of that account in this browser and try again.",
     "deviceNotFound": "Push device not found.",
-    "noDevices": "No push devices are registered for this account. Enable push notifications in this browser first."
+    "noDevices": "No push devices are registered for this account. Enable push notifications in this browser first.",
+    "rotationUnavailable": "ENCRYPTION_KEY is not set, so a new private key could not be stored encrypted. Set it and restart before rotating."
   },
   "institutions": {
     "nameConflict": "Institution with name \"{{ name }}\" already exists",

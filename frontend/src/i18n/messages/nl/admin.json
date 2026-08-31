@@ -127,7 +127,8 @@
         "name": "Browserpush",
         "description": "Meldingen op telefoon of desktop, ook als Monize gesloten is. Vereist geen Firebase, Google Play- of Apple Developer-account.",
         "toggleLabel": "Browserpush inschakelen voor deze instantie",
-        "missingKeys": "Deze instantie heeft geen pushsleutelpaar. Stel ENCRYPTION_KEY in en start opnieuw: Monize genereert het paar bij de volgende start zelf."
+        "missingKeys": "Deze instantie heeft geen pushsleutelpaar. Stel ENCRYPTION_KEY in en start opnieuw: Monize genereert het paar bij de volgende start zelf.",
+        "keyUnreadable": "Deze instantie kan haar opgeslagen pushsleutelpaar niet ontsleutelen, dus er wordt niets bezorgd. Vervang het sleutelpaar hieronder om te herstellen."
       },
       "email": {
         "name": "E-mail",
@@ -149,7 +150,8 @@
       "rotateDescription": "Vervangen wisselt het sleutelpaar van deze instantie. Elk geregistreerd apparaat is daarna onbereikbaar en moet push opnieuw inschakelen; vervang dus alleen als de sleutel mogelijk is gelekt.",
       "rotateButton": "Sleutelpaar vervangen",
       "rotatingButton": "Vervangen...",
-      "missingEncryptionKey": "Deze instantie heeft geen pushsleutelpaar, omdat ENCRYPTION_KEY niet is ingesteld en de privésleutel onversleuteld opgeslagen zou moeten worden. Stel de variabele in en start opnieuw: Monize genereert het paar zelf."
+      "missingEncryptionKey": "Deze instantie heeft geen pushsleutelpaar, omdat ENCRYPTION_KEY niet is ingesteld en de privésleutel onversleuteld opgeslagen zou moeten worden. Stel de variabele in en start opnieuw: Monize genereert het paar zelf.",
+      "keyUnreadable": "Deze instantie heeft een pushsleutelpaar dat ze niet meer kan ontsleutelen, dus er wordt niets bezorgd. Dat gebeurt als ENCRYPTION_KEY verandert bij een draaiende database, of als een back-up op een andere instantie wordt teruggezet. Vervang het sleutelpaar om te herstellen; elk apparaat registreert zich opnieuw."
     },
     "dialogs": {
       "rotateTitle": "Pushsleutelpaar vervangen?",

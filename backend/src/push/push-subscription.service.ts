@@ -2,14 +2,12 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
-  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { DataSource, IsNull } from "typeorm";
 import * as crypto from "crypto";
 import { I18nService } from "nestjs-i18n";
 import { withScopedDb } from "../common/db/scoped-db";
-import { withSystemContext } from "../common/db/with-context";
 import { affectedRowCount, returnedRows } from "../common/db/query-result";
 import { tr } from "../i18n/translate";
 import { emailTranslator } from "../i18n/email-translator";
@@ -83,8 +81,6 @@ export const MAX_USER_AGENT_LENGTH = 255;
  */
 @Injectable()
 export class PushSubscriptionService {
-  private readonly logger = new Logger(PushSubscriptionService.name);
-
   constructor(
     private readonly dataSource: DataSource,
     private readonly pushConfig: PushConfigService,
@@ -95,19 +91,20 @@ export class PushSubscriptionService {
   /**
    * Register (or refresh) the calling user's device.
    *
-   * Two transactions, deliberately, and the first one is the security half.
-   * `pushManager.subscribe()` is scoped to a browser profile and an origin, so
-   * two accounts used in one browser are handed the *same* endpoint and the
-   * same encryption keys. The endpoint is therefore globally unique and a
-   * second account's subscribe is a takeover: any row another user holds for
-   * this endpoint is removed first, under system context, because "who else
-   * claims this device" is a cross-user question no tenant transaction can see.
-   * Without it, a notification addressed to the first account would be
-   * decrypted and displayed on the device the second account is now using.
+   * `pushManager.subscribe()` is scoped to a browser profile and an origin, not
+   * to a Monize session, so two accounts used in one browser can be handed the
+   * *same* endpoint and the same encryption keys. One row per endpoint is what
+   * stops both rows living at once; the question is what happens to the second
+   * subscriber, and the answer is that it is **refused**, never a takeover.
    *
-   * The two statements are not atomic with each other, and the failure mode of
-   * losing that race is the *safe* one: whoever commits second gets a unique
-   * violation surfaced as a 409, never a second row for one endpoint.
+   * A takeover would delete another tenant's row on the strength of a string
+   * the caller supplied, which no ownership check covers -- and it would do so
+   * silently, so the first account loses push with no notice. The 409 is the
+   * honest answer, and it is not a dead end: the client answers it by
+   * unsubscribing in the browser and subscribing again, which mints a *fresh*
+   * endpoint nobody holds (`enablePushOnThisDevice` in
+   * `frontend/src/lib/push.ts`). Logging out releases the endpoint the same
+   * way, so the ordinary shared-browser case never reaches this refusal.
    */
   async subscribe(
     userId: string,
@@ -125,7 +122,6 @@ export class PushSubscriptionService {
     }
 
     const endpointHash = hashEndpoint(dto.endpoint);
-    await this.releaseEndpointFromOtherUsers(endpointHash, userId);
 
     const row = await withScopedDb(this.dataSource, async (manager) => {
       const inserted = await manager.query(
@@ -159,9 +155,9 @@ export class PushSubscriptionService {
 
       const ids = returnedRows<{ id: string }>(inserted);
       if (ids.length === 0) {
-        // The conflicting row belongs to somebody else: the takeover above lost
-        // its race. Refusing is the only honest answer -- writing anyway would
-        // put two accounts on one device.
+        // The conflicting row belongs to somebody else. Refusing is the whole
+        // rule: this endpoint is not proof of anything the caller owns, so it
+        // buys no right to touch another account's device.
         throw new ConflictException(
           tr(
             "errors.push.endpointClaimed",
@@ -188,35 +184,6 @@ export class PushSubscriptionService {
     });
 
     return toDeviceDto(row);
-  }
-
-  /**
-   * Drop any *other* user's claim on this endpoint.
-   *
-   * System context because the rows being removed belong to a different tenant
-   * by definition -- a user transaction cannot see them, and under RLS
-   * enforcement the conflicting row would be invisible to the upsert's DO UPDATE
-   * arm and surface as an unresolvable unique violation instead.
-   */
-  private async releaseEndpointFromOtherUsers(
-    endpointHash: string,
-    userId: string,
-  ): Promise<void> {
-    const removed = await withSystemContext(() =>
-      withScopedDb(this.dataSource, async (manager) => {
-        const result = await manager.query(
-          `DELETE FROM push_subscriptions
-            WHERE endpoint_hash = $1 AND user_id <> $2`,
-          [endpointHash, userId],
-        );
-        return affectedRowCount(result);
-      }),
-    );
-    if (removed > 0) {
-      this.logger.log(
-        `Re-assigned ${removed} push subscription(s) for a shared browser endpoint to the account that just subscribed`,
-      );
-    }
   }
 
   async listForUser(userId: string): Promise<PushDeviceDto[]> {

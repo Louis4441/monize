@@ -345,7 +345,8 @@
     "channelUnavailable": "Pushmeldingen zijn niet beschikbaar op deze Monize-instantie.",
     "endpointClaimed": "Deze browser is al geregistreerd bij een ander Monize-account. Meld je in deze browser af bij dat account en probeer het opnieuw.",
     "deviceNotFound": "Pushapparaat niet gevonden.",
-    "noDevices": "Er is geen pushapparaat geregistreerd voor dit account. Schakel pushmeldingen eerst in deze browser in."
+    "noDevices": "Er is geen pushapparaat geregistreerd voor dit account. Schakel pushmeldingen eerst in deze browser in.",
+    "rotationUnavailable": "ENCRYPTION_KEY is niet ingesteld, dus de nieuwe privésleutel kon niet versleuteld worden opgeslagen. Stel de variabele in en start opnieuw voordat je vervangt."
   },
   "institutions": {
     "nameConflict": "Er bestaat al een instelling met de naam \"{{ name }}\"",

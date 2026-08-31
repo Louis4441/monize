@@ -146,19 +146,27 @@ function AdminNotificationsContent() {
           id: 'web-push',
           name: t('channels.webPush.name'),
           description: t('channels.webPush.description'),
-          state: config.configured
-            ? config.enabled
-              ? 'on'
-              : 'off'
-            : 'unconfigured',
-          unavailableNote: config.configured
-            ? undefined
-            : t('channels.webPush.missingKeys'),
+          state:
+            config.configured && !config.keyUnreadable
+              ? config.enabled
+                ? 'on'
+                : 'off'
+              : 'unconfigured',
+          // Three states, three repairs: no key pair at all, a key pair this
+          // server cannot decrypt, and a channel an administrator turned off.
+          // Folding the middle one into either of the others sends an operator
+          // to fix something that is not broken.
+          unavailableNote: !config.configured
+            ? t('channels.webPush.missingKeys')
+            : config.keyUnreadable
+              ? t('channels.webPush.keyUnreadable')
+              : undefined,
           toggle: {
             label: t('channels.webPush.toggleLabel'),
             checked: config.enabled,
             onChange: handleTogglePush,
-            disabled: isTogglingPush || !config.configured,
+            disabled:
+              isTogglingPush || !config.configured || config.keyUnreadable,
           },
         },
         {

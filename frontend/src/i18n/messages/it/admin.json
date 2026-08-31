@@ -127,7 +127,8 @@
         "name": "Push del browser",
         "description": "Notifiche consegnate a telefono o desktop anche con Monize chiuso. Non richiede Firebase né un account Google Play o Apple Developer.",
         "toggleLabel": "Attiva il push del browser per questa istanza",
-        "missingKeys": "Questa istanza non ha una coppia di chiavi push. Imposta ENCRYPTION_KEY e riavvia: Monize genera la coppia da sé al prossimo avvio."
+        "missingKeys": "Questa istanza non ha una coppia di chiavi push. Imposta ENCRYPTION_KEY e riavvia: Monize genera la coppia da sé al prossimo avvio.",
+        "keyUnreadable": "Questa istanza non riesce a decifrare la coppia di chiavi push memorizzata, quindi non viene consegnato nulla. Ruota la coppia di chiavi qui sotto per recuperare."
       },
       "email": {
         "name": "Email",
@@ -149,7 +150,8 @@
       "rotateDescription": "La rotazione sostituisce la coppia di chiavi di questa istanza. Ogni dispositivo registrato diventa irraggiungibile e dovrà riattivare il push: ruota solo se la chiave potrebbe essere stata esposta.",
       "rotateButton": "Ruota coppia di chiavi",
       "rotatingButton": "Rotazione...",
-      "missingEncryptionKey": "Questa istanza non ha una coppia di chiavi push perché ENCRYPTION_KEY non è impostata e la chiave privata dovrebbe essere memorizzata in chiaro. Impostala e riavvia: Monize genera la coppia da sé."
+      "missingEncryptionKey": "Questa istanza non ha una coppia di chiavi push perché ENCRYPTION_KEY non è impostata e la chiave privata dovrebbe essere memorizzata in chiaro. Impostala e riavvia: Monize genera la coppia da sé.",
+      "keyUnreadable": "Questa istanza possiede una coppia di chiavi push che non riesce più a decifrare, quindi non viene consegnato nulla. Succede quando ENCRYPTION_KEY cambia con il database in funzione, o quando un backup viene ripristinato su un'altra istanza. Ruota la coppia di chiavi per recuperare; ogni dispositivo si registrerà di nuovo."
     },
     "dialogs": {
       "rotateTitle": "Ruotare la coppia di chiavi push?",

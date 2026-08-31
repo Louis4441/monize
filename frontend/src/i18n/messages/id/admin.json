@@ -127,7 +127,8 @@
         "name": "Push peramban",
         "description": "Notifikasi terkirim ke ponsel atau desktop bahkan saat Monize tertutup. Tidak memerlukan Firebase, Google Play, atau akun Apple Developer.",
         "toggleLabel": "Aktifkan push peramban untuk instans ini",
-        "missingKeys": "Instans ini tidak memiliki pasangan kunci push. Setel ENCRYPTION_KEY dan mulai ulang: Monize akan membuat pasangannya sendiri saat start berikutnya."
+        "missingKeys": "Instans ini tidak memiliki pasangan kunci push. Setel ENCRYPTION_KEY dan mulai ulang: Monize akan membuat pasangannya sendiri saat start berikutnya.",
+        "keyUnreadable": "Instans ini tidak dapat mendekripsi pasangan kunci push yang tersimpan, sehingga tidak ada yang terkirim. Rotasi pasangan kunci di bawah untuk memulihkan."
       },
       "email": {
         "name": "Email",
@@ -149,7 +150,8 @@
       "rotateDescription": "Rotasi mengganti pasangan kunci instans ini. Semua perangkat terdaftar tidak lagi dapat dijangkau dan harus mengaktifkan push kembali, jadi lakukan rotasi hanya jika kunci mungkin bocor.",
       "rotateButton": "Rotasi pasangan kunci",
       "rotatingButton": "Merotasi...",
-      "missingEncryptionKey": "Instans ini tidak memiliki pasangan kunci push karena ENCRYPTION_KEY belum disetel dan kunci privat harus disimpan tanpa enkripsi. Setel dan mulai ulang: Monize akan membuat pasangannya sendiri."
+      "missingEncryptionKey": "Instans ini tidak memiliki pasangan kunci push karena ENCRYPTION_KEY belum disetel dan kunci privat harus disimpan tanpa enkripsi. Setel dan mulai ulang: Monize akan membuat pasangannya sendiri.",
+      "keyUnreadable": "Instans ini memiliki pasangan kunci push yang tidak lagi dapat didekripsi, sehingga tidak ada yang terkirim. Ini terjadi saat ENCRYPTION_KEY berubah pada basis data yang sedang berjalan, atau saat cadangan dipulihkan ke instans lain. Rotasi pasangan kunci untuk memulihkan; setiap perangkat akan mendaftar ulang."
     },
     "dialogs": {
       "rotateTitle": "Rotasi pasangan kunci push?",

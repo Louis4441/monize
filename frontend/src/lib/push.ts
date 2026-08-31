@@ -193,6 +193,13 @@ export class PushPermissionError extends Error {
  * Re-uses an existing browser subscription when there is one, and replaces it
  * when it was minted under a different key -- after an instance rotates its key
  * pair the old subscription still exists in the browser and is undeliverable.
+ *
+ * A 409 means the endpoint this browser holds is registered to a different
+ * account (someone whose session ended without a logout). The server refuses to
+ * take it over -- an endpoint is not proof of ownership -- so the repair is
+ * here: unsubscribe and subscribe again, which mints a fresh endpoint nobody
+ * holds. Exactly one retry, because a second 409 on a brand-new endpoint would
+ * mean something other than a stale claim.
  */
 export async function enablePushOnThisDevice(
   publicKey: string,
@@ -226,11 +233,38 @@ export async function enablePushOnThisDevice(
     });
   }
 
+  try {
+    return await postSubscription(subscription, deviceName);
+  } catch (error) {
+    if (!isEndpointClaimed(error)) throw error;
+    await subscription.unsubscribe();
+    const replacement = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey,
+    });
+    return postSubscription(replacement, deviceName);
+  }
+}
+
+function postSubscription(
+  subscription: PushSubscription,
+  deviceName?: string,
+): Promise<PushDevice> {
   const payload = toSubscriptionPayload(subscription.toJSON());
   if (!payload) {
     throw new Error('The browser returned an incomplete push subscription.');
   }
   return pushApi.subscribe({ ...payload, deviceName });
+}
+
+/** A 409 from `POST /push/subscriptions`: this endpoint belongs to someone else. */
+function isEndpointClaimed(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    (error as { response?: { status?: number } }).response?.status === 409
+  );
 }
 
 function keyMatches(
@@ -254,10 +288,33 @@ export async function disablePushOnThisDevice(
   deviceId?: string,
 ): Promise<void> {
   if (deviceId) await pushApi.removeDevice(deviceId);
-  if (!('serviceWorker' in navigator)) return;
-  const registration = await navigator.serviceWorker.ready;
-  const subscription = await registration.pushManager.getSubscription();
-  if (subscription) await subscription.unsubscribe();
+  await releaseLocalPushSubscription();
+}
+
+/**
+ * Drop this browser's push subscription without touching any server row.
+ *
+ * What logout needs: the subscription is scoped to the origin rather than to
+ * the session, so leaving it registered keeps delivering the departing
+ * account's notifications onto a browser the next person is using, and holds
+ * the endpoint against their own subscribe. The server row is deliberately left
+ * alone -- it belongs to the account that is leaving, and its next delivery
+ * answers 410 and retires it.
+ *
+ * Never throws: a logout that fails on the push channel is worse than a
+ * subscription that outlives it.
+ */
+export async function releaseLocalPushSubscription(): Promise<void> {
+  try {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+      return;
+    }
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    if (subscription) await subscription.unsubscribe();
+  } catch {
+    // Best effort.
+  }
 }
 
 /**

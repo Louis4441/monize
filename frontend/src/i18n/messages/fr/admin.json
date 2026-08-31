@@ -127,7 +127,8 @@
         "name": "Push du navigateur",
         "description": "Notifications distribuées sur téléphone ou ordinateur même lorsque Monize est fermé. Ne nécessite ni Firebase, ni compte Google Play ou Apple Developer.",
         "toggleLabel": "Activer le push du navigateur pour cette instance",
-        "missingKeys": "Cette instance n'a pas de paire de clés push. Définissez ENCRYPTION_KEY et redémarrez : Monize génère la paire au démarrage suivant."
+        "missingKeys": "Cette instance n'a pas de paire de clés push. Définissez ENCRYPTION_KEY et redémarrez : Monize génère la paire au démarrage suivant.",
+        "keyUnreadable": "Cette instance ne peut pas déchiffrer sa paire de clés push : rien n'est distribué. Effectuez la rotation ci-dessous pour rétablir le service."
       },
       "email": {
         "name": "E-mail",
@@ -149,7 +150,8 @@
       "rotateDescription": "La rotation remplace la paire de clés de cette instance. Tous les appareils enregistrés deviennent injoignables et devront réactiver le push : ne faites une rotation que si la clé a pu être exposée.",
       "rotateButton": "Effectuer la rotation",
       "rotatingButton": "Rotation...",
-      "missingEncryptionKey": "Cette instance n'a pas de paire de clés push, car ENCRYPTION_KEY n'est pas définie et la clé privée devrait être stockée en clair. Définissez-la et redémarrez : Monize génère la paire lui-même."
+      "missingEncryptionKey": "Cette instance n'a pas de paire de clés push, car ENCRYPTION_KEY n'est pas définie et la clé privée devrait être stockée en clair. Définissez-la et redémarrez : Monize génère la paire lui-même.",
+      "keyUnreadable": "Cette instance détient une paire de clés push qu'elle ne peut plus déchiffrer : rien n'est distribué. Cela arrive quand ENCRYPTION_KEY change sur une base en service, ou après la restauration d'une sauvegarde sur une autre instance. Effectuez une rotation pour rétablir le service ; chaque appareil se réenregistrera."
     },
     "dialogs": {
       "rotateTitle": "Effectuer la rotation de la paire de clés push ?",

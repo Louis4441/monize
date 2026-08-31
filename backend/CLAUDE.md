@@ -286,9 +286,13 @@ Two consequences that are easy to get backwards. **A push endpoint is a URL the
 server will make an outbound request to**, so it is validated with
 `IsPushEndpoint`, which reuses the AI provider's `validateUrlIsSafe` and adds an
 https floor -- never a bare `@IsUrl()`. And **a subscription belongs to a browser
-profile, not to a session**: the unique index is on `endpoint_hash` alone, so a
-second account subscribing in the same browser takes the endpoint over instead of
-sharing it.
+profile, not to a session**: the unique index is on `endpoint_hash` alone, so
+one endpoint has one owner -- and the second account subscribing in the same
+browser is *refused*, never allowed to take the row over. An endpoint is a
+string the caller supplied; deleting somebody else's row on the strength of it
+is a cross-tenant write no ownership check covers. The client answers the 409 by
+unsubscribing and subscribing again for a fresh endpoint, and logout releases
+the endpoint the same way (`releaseLocalPushSubscription`).
 
 ## Copy composed outside a request is rendered in the recipient's locale
 
