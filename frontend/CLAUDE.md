@@ -730,7 +730,21 @@ Never use synchronous `act(() => {...})` for calls that trigger async side-effec
 
 ## Testing Conventions
 
-**Custom render** (`test/render.tsx`): Wraps components with `ThemeProvider`. Import `render` from `@/test/render` instead of `@testing-library/react`.
+**Custom render** (`test/render.tsx`): Wraps components with `ThemeProvider` and a `NextIntlClientProvider` carrying every English namespace. Import `render` **and `renderHook`** from `@/test/render`, never from `@testing-library/react`.
+
+### A missing message is a failure, and the harness is what supplies them
+
+`useTranslations` does not throw on a missing message -- it reports the error and returns the KEY, so a toast renders `common.importComplete` instead of "Import complete" while the test passes. Vitest's default reporter buffers that stderr line away for passing tests, so it is visible only in a CI log.
+
+The harness looked correct throughout: `render.tsx` has always loaded every English namespace from an `import.meta.glob`. But it wrapped only `render`, and its `export * from '@testing-library/react'` re-exported `renderHook` **untouched** -- so a hook test had no way to get a provider except to build one, and fourteen files did, each with a hand-picked namespace list, every one of them partial. `useImportWizard` reads `import` and `common`; its test supplied `import` alone. A hand-picked list is a snapshot of what its subject used the day it was written, and nothing fails when it rots.
+
+So: **`renderHook` is exported from `@/test/render` too**, wrapped in the same providers, and both compose a caller's own `wrapper` *inside* them rather than replacing them (a test needing StrictMode no longer has to give up intl to get it). A nested provider is worse than it looks -- it SHADOWS the full message set for everything below it, so adding one narrows the catalogue rather than widening it.
+
+`src/test/intl-guard.ts` turns any `MISSING_MESSAGE` / `INVALID_MESSAGE` / `INVALID_KEY` / `INSUFFICIENT_PATH` / `FORMATTING_ERROR` into a test failure, wired both as the shared provider's `onError` and as a `console.error` filter in `setup.ts` -- two doors, so a tree rendered outside the harness is still caught. `ENVIRONMENT_FALLBACK` is deliberately excluded: it is a property of the harness, fires identically for every test, and names nothing an author can act on (the same reasoning as the act guard's second React message).
+
+`intl-harness.guard.test.ts` scans for the two ways round it: `render`/`renderHook` imported from `@testing-library/react`, and a `NextIntlClientProvider` built in a test. Its `ALLOWED_*` sets are deliberate exceptions -- tests that genuinely vary the locale, and the boot-path components defined by having no providers -- while `RTL_IMPORT_BASELINE` is shrink-only: 45 older tests that work today only because their subjects happen not to translate anything. Converting one means deleting its line.
+
+Fix the lookup, never the symptom. Adding a code to the ignore list only restores the silence the guard exists to remove.
 
 **Global mocks** (`test/setup.ts`): `next/navigation` (useRouter, usePathname, useSearchParams), `react-hot-toast`, `localStorage`, `window.scrollTo`, `window.matchMedia`.
 

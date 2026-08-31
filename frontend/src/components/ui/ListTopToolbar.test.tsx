@@ -1,16 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@/test/render';
-import { NextIntlClientProvider } from 'next-intl';
 import { ListTopToolbar } from './ListTopToolbar';
 import { useDensityStore } from '@/store/densityStore';
-import commonNs from '@/i18n/messages/en/common.json';
 
 function renderToolbar(ui: React.ReactElement) {
-  return render(
-    <NextIntlClientProvider locale="en" messages={{ common: commonNs }}>
-      {ui}
-    </NextIntlClientProvider>,
-  );
+  return render(ui);
 }
 
 const PAGING = {

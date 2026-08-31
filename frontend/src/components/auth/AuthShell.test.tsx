@@ -1,15 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { NextIntlClientProvider } from 'next-intl';
 import { render } from '@/test/render';
 import { AuthShell } from './AuthShell';
 import { CARD_CLASS } from '@/components/ui/Card';
 
 function renderShell(ui: React.ReactElement) {
-  return render(
-    <NextIntlClientProvider locale="en" messages={{}}>
-      {ui}
-    </NextIntlClientProvider>,
-  );
+  return render(ui);
 }
 
 describe('AuthShell', () => {
@@ -59,11 +54,9 @@ describe('AuthShell', () => {
     expect(document.querySelector('.max-w-lg')).toBeTruthy();
     expect(document.querySelector('.max-w-md')).toBeFalsy();
     rerender(
-      <NextIntlClientProvider locale="en" messages={{}}>
-        <AuthShell>
-          <div>x</div>
-        </AuthShell>
-      </NextIntlClientProvider>,
+      <AuthShell>
+        <div>x</div>
+      </AuthShell>,
     );
     expect(getByText('x')).toBeInTheDocument();
     expect(document.querySelector('.max-w-md')).toBeTruthy();
