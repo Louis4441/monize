@@ -131,12 +131,20 @@ describe("RLS lint bans are documented where contributors read", () => {
     // `@InjectRepository`/`createQueryRunner` sites and failing on any increase.
     // The script is gone -- the ratchet reached zero and became an outright ban
     // -- so a reader was being pointed at a gate that could not fail.
+    // Walk recursively and keep FILES. `readdirSync` lists directories too, so
+    // reading every entry threw EISDIR the first time a script directory grew a
+    // subdirectory (`scripts/lib/`) -- a spec unrelated to that change failing
+    // on it. Recursing is also the honest reading of the question: a ratchet
+    // script nested one level down would have been invisible to a flat scan.
     const scripts = [
       path.join(REPO_ROOT, "scripts"),
       path.join(REPO_ROOT, "backend/scripts"),
     ].flatMap((dir) =>
       fs.existsSync(dir)
-        ? fs.readdirSync(dir).map((name) => path.join(dir, name))
+        ? fs
+            .readdirSync(dir, { withFileTypes: true, recursive: true })
+            .filter((entry) => entry.isFile())
+            .map((entry) => path.join(entry.parentPath, entry.name))
         : [],
     );
     const ratchetExists = scripts.some((file) =>
