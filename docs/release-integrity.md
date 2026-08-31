@@ -209,6 +209,7 @@ does not.
 | Workflows themselves are scanned | `zizmor-scan`, SARIF uploaded | Workflow security is machine-checked rather than reviewed by eye |
 | Schema drift is a required gate | `schema-drift` running `scripts/verify-schema.sh` | Gates both the release and preview publish paths, and reproduces locally with only Docker |
 | Bearer scan exceptions expire | `bearer-exceptions-review.yml` | A suppression with a `review-by` date that lapses opens an issue, so exceptions cannot become permanent silently |
+| Published images refresh their base OS packages | `apk upgrade` in each Dockerfile's `production` stage, scanned by `frontend/src/test/dockerfile-os-upgrade.test.ts` | `node:24-alpine` is rebuilt on Node's cadence, not Alpine's, so a base tag lags every OpenSSL advisory until upstream rebuilds. Upgrading at build time clears the class rather than the CVEs open on any one day |
 
 The last two are the model this whole document is arguing for: a rule with an
 expiry date and a job that enforces it, rather than a paragraph asking people to
