@@ -76,9 +76,15 @@ export function PushDevicesPanel() {
     };
   }, [refreshDevices]);
 
+  // A retired row is not a registration: after a key rotation the device is
+  // listed with the copy telling the user to enable push again, and hiding the
+  // button on the strength of that row left them with the instruction and no
+  // way to follow it.
   const registeredHere = devices.find(
     (device) =>
-      thisDevice !== null && device.endpointFingerprint === thisDevice,
+      thisDevice !== null &&
+      device.endpointFingerprint === thisDevice &&
+      !device.disabledAt,
   );
   const liveDevices = devices.filter((device) => !device.disabledAt);
 
@@ -161,11 +167,17 @@ export function PushDevicesPanel() {
   }
 
   if (!config?.enabled) {
+    // Three reasons, three messages. A key pair the server cannot read is not
+    // an administrator's decision, and saying it is sends the reader to ask
+    // somebody who has nothing to change.
+    const reason = !config?.configured
+      ? 'notConfigured'
+      : config.keyUnreadable
+        ? 'keyUnreadable'
+        : 'disabledByAdmin';
     return (
       <PushBlock heading={t('heading')}>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          {config?.configured ? t('disabledByAdmin') : t('notConfigured')}
-        </p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">{t(reason)}</p>
       </PushBlock>
     );
   }

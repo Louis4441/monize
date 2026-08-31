@@ -21,11 +21,21 @@ export interface PushDevice {
 }
 
 export interface PushConfig {
-  /** The instance holds a key pair AND an administrator has left push on. */
+  /**
+   * All three: the instance holds a key pair, that key pair can still be used,
+   * and an administrator has left the channel on.
+   */
   enabled: boolean;
   publicKey: string | null;
   /** False when the server has no key pair at all, so the UI can say which. */
   configured: boolean;
+  /**
+   * A stored key pair the server can no longer decrypt. Its own state, because
+   * the repair differs from every other reason push is unavailable -- and
+   * without it this surface told users an administrator had switched push off,
+   * which is false and sends them to the wrong person.
+   */
+  keyUnreadable: boolean;
 }
 
 export type PushTestStatus = 'sent' | 'unconfigured' | 'expired' | 'transient';
@@ -287,8 +297,15 @@ function keyMatches(
 export async function disablePushOnThisDevice(
   deviceId?: string,
 ): Promise<void> {
-  if (deviceId) await pushApi.removeDevice(deviceId);
-  await releaseLocalPushSubscription();
+  try {
+    if (deviceId) await pushApi.removeDevice(deviceId);
+  } finally {
+    // "Both halves, always" has to survive the first half failing. A browser
+    // subscription with no server row is a permission the app holds and no
+    // longer uses, and the user has no way to see it; the reverse self-heals on
+    // the next delivery's 410.
+    await releaseLocalPushSubscription();
+  }
 }
 
 /**

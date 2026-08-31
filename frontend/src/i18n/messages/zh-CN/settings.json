@@ -249,6 +249,7 @@
       "noLiveDevices": "尚未注册任何设备。请在此设备上启用推送后再发送测试。",
       "notConfigured": "此 Monize 实例不提供浏览器推送。管理员可以在 Admin 区域启用。",
       "disabledByAdmin": "管理员已为此 Monize 实例关闭浏览器推送。",
+      "keyUnreadable": "Monize 无法读取此实例的推送密钥对，因此无法投递任何通知。管理员可在 Admin 区域轮换密钥对以恢复。",
       "statusUnavailable": "Monize 无法确认浏览器推送是否可用。请重新加载页面后重试。",
       "unsupported": {
         "unsupported": "此浏览器无法接收推送通知。",

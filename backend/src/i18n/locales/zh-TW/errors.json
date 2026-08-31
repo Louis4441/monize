@@ -346,7 +346,8 @@
     "endpointClaimed": "這個瀏覽器已註冊至另一個 Monize 帳戶。請在此瀏覽器登出該帳戶後再試一次。",
     "deviceNotFound": "找不到推播裝置。",
     "noDevices": "此帳戶尚未註冊推播裝置。請先在此瀏覽器啟用推播通知。",
-    "rotationUnavailable": "未設定 ENCRYPTION_KEY，因此無法加密儲存新的私密金鑰。請先設定並重新啟動，然後再輪替。"
+    "rotationUnavailable": "未設定 ENCRYPTION_KEY，因此無法加密儲存新的私密金鑰。請先設定並重新啟動，然後再輪替。",
+    "channelNotConfigured": "此執行個體尚無推播金鑰組，因此無法開啟或關閉瀏覽器推播管道。"
   },
   "institutions": {
     "nameConflict": "已有名為「{{ name }}」的機構",

@@ -171,6 +171,7 @@ describe("PushConfigService", () => {
         enabled: true,
         publicKey: "PUB-STORED",
         configured: true,
+        keyUnreadable: false,
       });
       expect(Object.keys(config)).not.toContain("privateKey");
       expect(JSON.stringify(config)).not.toContain("PRIV");
@@ -182,6 +183,7 @@ describe("PushConfigService", () => {
         enabled: false,
         publicKey: null,
         configured: false,
+        keyUnreadable: false,
       });
 
       configRepo.findOne.mockResolvedValue(
@@ -191,6 +193,18 @@ describe("PushConfigService", () => {
         enabled: false,
         publicKey: "PUB-STORED",
         configured: true,
+        keyUnreadable: false,
+      });
+
+      // ...and from a key pair this server cannot open, which the account
+      // surface would otherwise render as "an administrator switched it off".
+      configRepo.findOne.mockResolvedValue(storedConfig());
+      encryption.canDecrypt.mockReturnValue(false);
+      await expect(service.getPublicConfig()).resolves.toEqual({
+        enabled: false,
+        publicKey: "PUB-STORED",
+        configured: true,
+        keyUnreadable: true,
       });
     });
   });
@@ -278,6 +292,31 @@ describe("PushConfigService", () => {
 
       await expect(service.getVapidIdentity()).resolves.toBeNull();
       expect(encryption.decrypt).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("setWebPushEnabled", () => {
+    it("switches the stored flag and reports the new state", async () => {
+      configRepo.findOne.mockResolvedValue(
+        storedConfig({ webPushEnabled: false }),
+      );
+      manager.query.mockResolvedValue([[], 1]);
+
+      const config = await service.setWebPushEnabled(false);
+
+      expect(manager.query.mock.calls[0][1]).toEqual([false]);
+      expect(config.enabled).toBe(false);
+    });
+
+    // The same shape the rotation had: an UPDATE that matched nothing changed
+    // nothing, and answering 200 leaves the toggle springing back in silence.
+    it("refuses when there is no configuration row to switch", async () => {
+      configRepo.findOne.mockResolvedValue(null);
+      manager.query.mockResolvedValue([[], 0]);
+
+      await expect(service.setWebPushEnabled(true)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 

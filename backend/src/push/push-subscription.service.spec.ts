@@ -139,6 +139,46 @@ describe("PushSubscriptionService", () => {
       expect(subscriptionRepo.findOne).not.toHaveBeenCalled();
     });
 
+    // Under enforced RLS the conflicting row is invisible to this transaction,
+    // so PostgreSQL never reaches the `WHERE user_id = EXCLUDED.user_id` guard:
+    // it raises instead. Letting that surface would turn the documented 409
+    // into a 500 and silence the client's single retry -- which is the whole
+    // recovery path for a stale claim.
+    it.each([
+      ["a unique violation", "23505"],
+      ["a policy violation", "42501"],
+    ])("answers %s with the same refusal", async (_name, code) => {
+      manager.query.mockRejectedValue(
+        Object.assign(new Error("nope"), { code }),
+      );
+
+      await expect(service.subscribe(USER, DTO, null)).rejects.toThrow(
+        ConflictException,
+      );
+    });
+
+    it("reads the code through TypeORM's driverError wrapper too", async () => {
+      manager.query.mockRejectedValue(
+        Object.assign(new Error("nope"), { driverError: { code: "23505" } }),
+      );
+
+      await expect(service.subscribe(USER, DTO, null)).rejects.toThrow(
+        ConflictException,
+      );
+    });
+
+    // Anything that is not this statement's documented outcome propagates: a
+    // 409 over a broken connection would send the client into a pointless
+    // re-subscribe and hide the real failure.
+    it("does not disguise an unrelated database failure as a refusal", async () => {
+      const failure = Object.assign(new Error("connection terminated"), {
+        code: "57P01",
+      });
+      manager.query.mockRejectedValue(failure);
+
+      await expect(service.subscribe(USER, DTO, null)).rejects.toBe(failure);
+    });
+
     it("only writes its own row on the conflict arm", async () => {
       await service.subscribe(USER, DTO, null);
 

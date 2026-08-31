@@ -28,7 +28,12 @@ describe('pushApi', () => {
 
   it('reads the instance configuration', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({
-      data: { enabled: true, publicKey: PUBLIC_KEY, configured: true },
+      data: {
+        enabled: true,
+        publicKey: PUBLIC_KEY,
+        configured: true,
+        keyUnreadable: false,
+      },
     });
 
     const config = await pushApi.getConfig();
@@ -377,6 +382,18 @@ describe('enabling and disabling push on this device', () => {
     await disablePushOnThisDevice('d-1');
 
     expect(apiClient.delete).toHaveBeenCalledWith('/push/subscriptions/d-1');
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases the browser subscription even when the server delete fails', async () => {
+    getSubscription.mockResolvedValue(browserSubscription());
+    vi.mocked(apiClient.delete).mockRejectedValue(new Error('server down'));
+
+    await expect(disablePushOnThisDevice('d-1')).rejects.toThrow('server down');
+
+    // The failure propagates -- the row may well still be there -- but the
+    // local half runs regardless, because a browser subscription with no server
+    // row is a permission the app holds and the user cannot see.
     expect(unsubscribe).toHaveBeenCalledTimes(1);
   });
 

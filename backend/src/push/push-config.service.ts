@@ -8,6 +8,7 @@ import { DataSource, EntityManager, IsNull, Not } from "typeorm";
 import * as crypto from "crypto";
 import * as webpush from "web-push";
 import { withScopedDb } from "../common/db/scoped-db";
+import { affectedRowCount } from "../common/db/query-result";
 import { tr } from "../i18n/translate";
 import { withSystemContext } from "../common/db/with-context";
 import { EncryptionService } from "../common/encryption/encryption.service";
@@ -41,20 +42,23 @@ export interface PublicPushConfig {
   publicKey: string | null;
   /** False when the instance holds no key pair at all, so the UI can say which. */
   configured: boolean;
+  /**
+   * A stored key pair this instance cannot decrypt -- ENCRYPTION_KEY changed
+   * under a live database, or a restore landed on a different instance.
+   *
+   * Its own state, not folded into `configured`: "no key pair" is repaired by
+   * setting ENCRYPTION_KEY and restarting, and this one by rotating. Two causes,
+   * two repairs, so one message each -- and it is on the *public* shape too,
+   * because without it the account surface reported this as "an administrator
+   * switched push off", which is false and sends the reader to the wrong person.
+   */
+  keyUnreadable: boolean;
 }
 
 /** The administrator's view. Adds provenance, never the private key. */
 export interface AdminPushConfig extends PublicPushConfig {
   publicKeyFingerprint: string | null;
   generatedAt: string | null;
-  /**
-   * A stored key pair this instance cannot decrypt -- ENCRYPTION_KEY changed
-   * under a live database, or a restore landed on a different instance. Its own
-   * state, not folded into `configured`: "no key pair" is repaired by setting
-   * ENCRYPTION_KEY and restarting, and this one by rotating. Two causes, two
-   * repairs, so one message each.
-   */
-  keyUnreadable: boolean;
   /** Live devices across the whole deployment -- a count, never a device list. */
   liveSubscriptionCount: number;
   disabledSubscriptionCount: number;
@@ -118,8 +122,20 @@ export class PushConfigService implements OnApplicationBootstrap {
    * already told about the missing key by the weekly `ENCRYPTION_KEY_MISSING`
    * alert (`SystemAlertMonitorService`) -- raising a second alert for one cause
    * would send them to fix two things.
+   *
+   * The WHOLE method runs under system context, the initial read included:
+   * `onApplicationBootstrap` has no request to inherit an identity from, so a
+   * bare `withScopedDb` there throws before it reads anything -- and the throw
+   * is swallowed by the hook, which leaves the deployment permanently without a
+   * key pair and the admin page blaming a missing ENCRYPTION_KEY. Seeding the
+   * context at the entry point rather than around the write is what makes the
+   * whole path work with no request behind it.
    */
   async ensureKeyPair(): Promise<PushInstanceConfig | null> {
+    return withSystemContext(() => this.ensureKeyPairInContext());
+  }
+
+  private async ensureKeyPairInContext(): Promise<PushInstanceConfig | null> {
     const existing = await this.readConfig();
     if (existing) return existing;
 
@@ -133,30 +149,28 @@ export class PushConfigService implements OnApplicationBootstrap {
     }
 
     const generated = webpush.generateVAPIDKeys();
-    return withSystemContext(() =>
-      withScopedDb(this.dataSource, async (manager) => {
-        // Every replica runs this hook, so the insert is the arbiter rather
-        // than a read-then-write. A conflict means another replica won, and the
-        // authoritative row is then re-read inside this same transaction --
-        // never assembled from the values we tried to insert.
-        await manager.query(
-          `INSERT INTO push_instance_config
+    return withScopedDb(this.dataSource, async (manager) => {
+      // Every replica runs this hook, so the insert is the arbiter rather
+      // than a read-then-write. A conflict means another replica won, and the
+      // authoritative row is then re-read inside this same transaction --
+      // never assembled from the values we tried to insert.
+      await manager.query(
+        `INSERT INTO push_instance_config
              (id, vapid_public_key, vapid_private_key_enc, vapid_generated_at)
            VALUES (TRUE, $1, $2, CURRENT_TIMESTAMP)
            ON CONFLICT (id) DO NOTHING`,
-          [generated.publicKey, this.encryption.encrypt(generated.privateKey)],
+        [generated.publicKey, this.encryption.encrypt(generated.privateKey)],
+      );
+      const row = await manager
+        .getRepository(PushInstanceConfig)
+        .findOne({ where: { id: true } });
+      if (row && row.vapidPublicKey === generated.publicKey) {
+        this.logger.log(
+          `Generated this instance's Web Push key pair (fingerprint ${fingerprintPublicKey(row.vapidPublicKey)})`,
         );
-        const row = await manager
-          .getRepository(PushInstanceConfig)
-          .findOne({ where: { id: true } });
-        if (row && row.vapidPublicKey === generated.publicKey) {
-          this.logger.log(
-            `Generated this instance's Web Push key pair (fingerprint ${fingerprintPublicKey(row.vapidPublicKey)})`,
-          );
-        }
-        return row;
-      }),
-    );
+      }
+      return row;
+    });
   }
 
   /**
@@ -179,10 +193,12 @@ export class PushConfigService implements OnApplicationBootstrap {
 
   async getPublicConfig(): Promise<PublicPushConfig> {
     const config = await this.readConfig();
+    const keyUnreadable = !!config && !this.canUseKeyPair(config);
     return {
-      enabled: !!config && config.webPushEnabled && this.canUseKeyPair(config),
+      enabled: !!config && config.webPushEnabled && !keyUnreadable,
       publicKey: config?.vapidPublicKey ?? null,
       configured: !!config,
+      keyUnreadable,
     };
   }
 
@@ -252,16 +268,29 @@ export class PushConfigService implements OnApplicationBootstrap {
   }
 
   async setWebPushEnabled(enabled: boolean): Promise<AdminPushConfig> {
-    await withSystemContext(() =>
-      withScopedDb(this.dataSource, (manager) =>
-        manager.query(
-          `UPDATE push_instance_config
-              SET web_push_enabled = $1, updated_at = CURRENT_TIMESTAMP
-            WHERE id = TRUE`,
-          [enabled],
+    const updated = await withSystemContext(() =>
+      withScopedDb(this.dataSource, async (manager) =>
+        affectedRowCount(
+          await manager.query(
+            `UPDATE push_instance_config
+                SET web_push_enabled = $1, updated_at = CURRENT_TIMESTAMP
+              WHERE id = TRUE`,
+            [enabled],
+          ),
         ),
       ),
     );
+    if (updated === 0) {
+      // No row to switch, so nothing was switched: the same "refusal reported
+      // as success" shape the rotation had. Answering 200 would leave the
+      // toggle springing back with no explanation.
+      throw new BadRequestException(
+        tr(
+          "errors.push.channelNotConfigured",
+          "This instance has no push key pair yet, so the browser push channel cannot be switched on or off.",
+        ),
+      );
+    }
     return this.getAdminConfig();
   }
 

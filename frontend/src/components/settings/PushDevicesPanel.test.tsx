@@ -13,7 +13,6 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 vi.mock('@/lib/errors', () => ({
-   
   getErrorMessage: (_error: any, fallback: string) => fallback,
 }));
 
@@ -30,13 +29,13 @@ vi.mock('@/lib/push', () => ({
   pushApi: {
     getConfig: () => mockGetConfig(),
     listDevices: () => mockListDevices(),
-     
+
     removeDevice: (...args: any[]) => mockRemoveDevice(...args),
     sendTest: () => mockSendTest(),
   },
-   
+
   enablePushOnThisDevice: (...args: any[]) => mockEnable(...args),
-   
+
   disablePushOnThisDevice: (...args: any[]) => mockDisable(...args),
   currentDeviceFingerprint: () => mockCurrentFingerprint(),
   getPushSupport: () => mockGetPushSupport(),
@@ -76,6 +75,7 @@ describe('PushDevicesPanel', () => {
       enabled: true,
       publicKey: 'PUB',
       configured: true,
+      keyUnreadable: false,
     });
     mockListDevices.mockResolvedValue([]);
     mockCurrentFingerprint.mockResolvedValue(null);
@@ -125,6 +125,27 @@ describe('PushDevicesPanel', () => {
     expect(screen.getAllByText('This device')).toHaveLength(1);
   });
 
+  // The regression: a retired row is not a registration. After a rotation the
+  // device is listed with the copy telling the user to enable push again, and
+  // hiding the button on the strength of that row left them with the
+  // instruction and no way to follow it.
+  it('offers the enable button again once this browser is retired', async () => {
+    mockListDevices.mockResolvedValue([
+      device({
+        disabledAt: '2026-08-03T10:00:00.000Z',
+        disabledReason: 'KEY_ROTATED',
+      }),
+    ]);
+    mockCurrentFingerprint.mockResolvedValue(THIS_DEVICE);
+
+    render(<PushDevicesPanel />);
+
+    await screen.findByText(/rotated its push key pair/i);
+    expect(
+      screen.getByRole('button', { name: /enable on this device/i }),
+    ).toBeInTheDocument();
+  });
+
   it('hides the enable button once this browser is registered', async () => {
     mockListDevices.mockResolvedValue([device()]);
     mockCurrentFingerprint.mockResolvedValue(THIS_DEVICE);
@@ -159,27 +180,47 @@ describe('PushDevicesPanel', () => {
     },
   );
 
-  it('separates an administrator switching push off from an unconfigured instance', async () => {
-    mockGetConfig.mockResolvedValue({
-      enabled: false,
-      publicKey: 'PUB',
-      configured: true,
-    });
-    const { unmount } = render(<PushDevicesPanel />);
-    expect(
-      await screen.findByText(/administrator has switched browser push off/i),
-    ).toBeInTheDocument();
-    unmount();
+  // Three reasons push can be unavailable, three repairs, three messages. The
+  // one that matters most is the middle: a key pair the server cannot read is
+  // not an administrator's decision, and saying it is sends the reader to ask
+  // somebody who has nothing to change.
+  it.each([
+    [
+      'an administrator switched it off',
+      {
+        enabled: false,
+        publicKey: 'PUB',
+        configured: true,
+        keyUnreadable: false,
+      },
+      /administrator has switched browser push off/i,
+    ],
+    [
+      'the instance has no key pair',
+      {
+        enabled: false,
+        publicKey: null,
+        configured: false,
+        keyUnreadable: false,
+      },
+      /not available on this Monize instance/i,
+    ],
+    [
+      'the key pair cannot be read',
+      {
+        enabled: false,
+        publicKey: 'PUB',
+        configured: true,
+        keyUnreadable: true,
+      },
+      /cannot read this instance's push key pair/i,
+    ],
+  ])('says so in its own words when %s', async (_name, config, copy) => {
+    mockGetConfig.mockResolvedValue(config);
 
-    mockGetConfig.mockResolvedValue({
-      enabled: false,
-      publicKey: null,
-      configured: false,
-    });
     render(<PushDevicesPanel />);
-    expect(
-      await screen.findByText(/not available on this Monize instance/i),
-    ).toBeInTheDocument();
+
+    expect(await screen.findByText(copy)).toBeInTheDocument();
   });
 
   // A failed read is not "push is off here": that message sends the user to ask
@@ -252,6 +293,23 @@ describe('PushDevicesPanel', () => {
 
   // Removing this browser's own device has to unsubscribe locally too, or the
   // browser keeps a permission the app no longer uses.
+  // "Both halves, always" has to survive the first half failing: a browser
+  // subscription with no server row is a permission the app holds, no longer
+  // uses, and the user cannot see.
+  it('still releases the browser subscription when the server delete fails', async () => {
+    mockListDevices.mockResolvedValue([device()]);
+    mockCurrentFingerprint.mockResolvedValue(THIS_DEVICE);
+    mockDisable.mockRejectedValue(new Error('server down'));
+
+    render(<PushDevicesPanel />);
+    await screen.findByText('Chrome on Linux');
+    fireEvent.click(screen.getByRole('button', { name: /remove/i }));
+
+    await waitFor(() => expect(mockDisable).toHaveBeenCalledWith('d-1'));
+    // The panel reports the failure rather than pretending the device is gone.
+    expect(await screen.findByText('Chrome on Linux')).toBeInTheDocument();
+  });
+
   it('unsubscribes locally when removing this browser, not when removing another', async () => {
     mockListDevices.mockResolvedValue([
       device(),

@@ -346,7 +346,8 @@
     "endpointClaimed": "Bu tarayıcı zaten başka bir Monize hesabına kayıtlı. Bu tarayıcıda o hesaptan çıkış yapıp yeniden deneyin.",
     "deviceNotFound": "Anlık bildirim cihazı bulunamadı.",
     "noDevices": "Bu hesap için kayıtlı anlık bildirim cihazı yok. Önce bu tarayıcıda anlık bildirimleri açın.",
-    "rotationUnavailable": "ENCRYPTION_KEY ayarlanmadığı için yeni özel anahtar şifrelenmiş olarak saklanamadı. Değiştirmeden önce ayarlayıp yeniden başlatın."
+    "rotationUnavailable": "ENCRYPTION_KEY ayarlanmadığı için yeni özel anahtar şifrelenmiş olarak saklanamadı. Değiştirmeden önce ayarlayıp yeniden başlatın.",
+    "channelNotConfigured": "Bu örneğin henüz anlık bildirim anahtar çifti yok; bu yüzden tarayıcı anlık bildirim kanalı açılıp kapatılamaz."
   },
   "institutions": {
     "nameConflict": "\"{{ name }}\" adlı kurum zaten mevcut",

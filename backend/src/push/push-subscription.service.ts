@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { DataSource, IsNull } from "typeorm";
+import { DataSource, EntityManager, IsNull } from "typeorm";
 import * as crypto from "crypto";
 import { I18nService } from "nestjs-i18n";
 import { withScopedDb } from "../common/db/scoped-db";
@@ -122,8 +122,56 @@ export class PushSubscriptionService {
     }
 
     const endpointHash = hashEndpoint(dto.endpoint);
+    // Hoisted so the narrowing above survives into the closure.
+    const vapidPublicKey = config.publicKey;
 
     const row = await withScopedDb(this.dataSource, async (manager) => {
+      const ids = await this.claimEndpointForCaller(manager, {
+        userId,
+        dto,
+        endpointHash,
+        userAgent,
+        vapidPublicKey,
+      });
+      if (ids.length === 0) throw endpointClaimed();
+
+      // The response is read back from the committed row rather than assembled
+      // from the values we sent: on the DO UPDATE arm the stored device name may
+      // be the one already there (COALESCE below), which the request never saw.
+      const saved = await manager
+        .getRepository(PushSubscription)
+        .findOne({ where: { id: ids[0].id } });
+      if (!saved) throw endpointClaimed();
+      return saved;
+    });
+
+    return toDeviceDto(row);
+  }
+
+  /**
+   * Insert the caller's row, or refresh the one they already hold for this
+   * endpoint. Returns no id when the endpoint belongs to somebody else.
+   *
+   * The refusal arrives two ways and both have to become the same 409. At
+   * `RLS_MODE=off` the `WHERE user_id = EXCLUDED.user_id` guard simply matches
+   * nothing and the statement returns zero rows. Under enforcement the
+   * conflicting row is invisible to this transaction, so PostgreSQL never gets
+   * as far as that guard: it raises instead -- a unique violation, or a
+   * policy violation on the update arm. Letting that surface would turn the
+   * documented 409 into a 500 and silence the client's one retry, which is the
+   * whole recovery path for a stale claim.
+   */
+  private async claimEndpointForCaller(
+    manager: EntityManager,
+    input: {
+      userId: string;
+      dto: CreatePushSubscriptionDto;
+      endpointHash: string;
+      userAgent: string | null;
+      vapidPublicKey: string;
+    },
+  ): Promise<Array<{ id: string }>> {
+    try {
       const inserted = await manager.query(
         `INSERT INTO push_subscriptions
            (user_id, endpoint, endpoint_hash, p256dh, auth, device_name,
@@ -142,48 +190,23 @@ export class PushSubscriptionService {
           WHERE push_subscriptions.user_id = EXCLUDED.user_id
        RETURNING id`,
         [
-          userId,
-          dto.endpoint,
-          endpointHash,
-          dto.p256dh,
-          dto.auth,
-          dto.deviceName ?? null,
-          userAgent ? userAgent.slice(0, MAX_USER_AGENT_LENGTH) : null,
-          config.publicKey,
+          input.userId,
+          input.dto.endpoint,
+          input.endpointHash,
+          input.dto.p256dh,
+          input.dto.auth,
+          input.dto.deviceName ?? null,
+          input.userAgent
+            ? input.userAgent.slice(0, MAX_USER_AGENT_LENGTH)
+            : null,
+          input.vapidPublicKey,
         ],
       );
-
-      const ids = returnedRows<{ id: string }>(inserted);
-      if (ids.length === 0) {
-        // The conflicting row belongs to somebody else. Refusing is the whole
-        // rule: this endpoint is not proof of anything the caller owns, so it
-        // buys no right to touch another account's device.
-        throw new ConflictException(
-          tr(
-            "errors.push.endpointClaimed",
-            "This browser is already registered to a different Monize account. Sign out of that account in this browser and try again.",
-          ),
-        );
-      }
-
-      // The response is read back from the committed row rather than assembled
-      // from the values we sent: on the DO UPDATE arm the stored device name may
-      // be the one already there (COALESCE above), which the request never saw.
-      const saved = await manager
-        .getRepository(PushSubscription)
-        .findOne({ where: { id: ids[0].id } });
-      if (!saved) {
-        throw new ConflictException(
-          tr(
-            "errors.push.endpointClaimed",
-            "This browser is already registered to a different Monize account. Sign out of that account in this browser and try again.",
-          ),
-        );
-      }
-      return saved;
-    });
-
-    return toDeviceDto(row);
+      return returnedRows<{ id: string }>(inserted);
+    } catch (error) {
+      if (isForeignEndpointConflict(error)) return [];
+      throw error;
+    }
   }
 
   async listForUser(userId: string): Promise<PushDeviceDto[]> {
@@ -360,6 +383,38 @@ export class PushSubscriptionService {
     });
     return retired ? PushDisabledReason.FAILING : undefined;
   }
+}
+
+/** The one refusal this path can give, so its two arms cannot drift apart. */
+function endpointClaimed(): ConflictException {
+  return new ConflictException(
+    tr(
+      "errors.push.endpointClaimed",
+      "This browser is already registered to a different Monize account. Sign out of that account in this browser and try again.",
+    ),
+  );
+}
+
+/**
+ * PostgreSQL's two ways of saying "that endpoint is somebody else's".
+ *
+ * 23505 is the unique violation raised when the conflicting row is invisible to
+ * this transaction, so `ON CONFLICT` cannot resolve against it; 42501 is the
+ * policy violation on the update arm. Both are the *documented* outcome of this
+ * statement, not an unexpected database failure, so both become the 409 the
+ * client knows how to recover from. Anything else propagates.
+ */
+function isForeignEndpointConflict(error: unknown): boolean {
+  const code = (error as { code?: unknown; driverError?: { code?: unknown } })
+    ?.code;
+  const driverCode = (error as { driverError?: { code?: unknown } })
+    ?.driverError?.code;
+  return (
+    code === "23505" ||
+    code === "42501" ||
+    driverCode === "23505" ||
+    driverCode === "42501"
+  );
 }
 
 function toDeviceDto(row: PushSubscription): PushDeviceDto {

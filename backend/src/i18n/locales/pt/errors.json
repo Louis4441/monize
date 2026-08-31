@@ -346,7 +346,8 @@
     "endpointClaimed": "Este navegador já está registado noutra conta Monize. Termine a sessão dessa conta neste navegador e tente novamente.",
     "deviceNotFound": "Dispositivo push não encontrado.",
     "noDevices": "Não há dispositivos push registados nesta conta. Ative primeiro as notificações push neste navegador.",
-    "rotationUnavailable": "ENCRYPTION_KEY não está definida, por isso a nova chave privada não pôde ser guardada cifrada. Defina-a e reinicie antes de rodar."
+    "rotationUnavailable": "ENCRYPTION_KEY não está definida, por isso a nova chave privada não pôde ser guardada cifrada. Defina-a e reinicie antes de rodar.",
+    "channelNotConfigured": "Esta instância ainda não tem par de chaves push, por isso o canal de push do navegador não pode ser ligado nem desligado."
   },
   "institutions": {
     "nameConflict": "Já existe uma instituição com o nome \"{{ name }}\"",
