@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@/test/render';
 import { UpcomingBills } from './UpcomingBills';
+import dashboardMessages from '@/i18n/messages/en/dashboard.json';
 
 const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({
@@ -32,6 +33,14 @@ function todayStr(): string {
 }
 
 const defaultMaxItems = 20;
+
+/**
+ * The warning's tooltip, read from the catalog the widget renders from rather
+ * than retyped here: the assertion this replaced queried a title string that no
+ * locale contains, so it could never have found the warning it claimed to rule
+ * out.
+ */
+const BELOW_ZERO_TITLE = dashboardMessages.upcomingBills.negativeBalanceWarning;
 
 describe('UpcomingBills', () => {
   beforeEach(() => {
@@ -555,9 +564,257 @@ describe('UpcomingBills', () => {
 
     // With the unknown item skipped and the projection stopped, no row claims a
     // measured overdraft.
-    expect(
-      screen.queryByTitle('This payment may overdraw the account'),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTitle(BELOW_ZERO_TITLE)).not.toBeInTheDocument();
+  });
+
+  // ---- The below-zero warning ----
+
+  it('warns on the item that takes an account below zero', () => {
+    // The positive case the rest of this block is measured against: without it,
+    // every "no warning" assertion below passes on a widget that never warns.
+    const transactions = [
+      {
+        id: 'bill-1',
+        name: 'Rent',
+        accountId: 'acc-cash',
+        amount: -1200,
+        currencyCode: 'CAD',
+        effectiveAmount: -1200,
+        effectiveAmountComplete: true,
+        effectiveCurrencyCode: 'CAD',
+        settlementAccountId: 'acc-cash',
+        nextDueDate: futureDateStr(1),
+        isActive: true,
+        autoPost: true,
+      },
+    ] as any[];
+    const accounts = [
+      {
+        id: 'acc-cash',
+        accountType: 'CHECKING',
+        currencyCode: 'CAD',
+        currentBalance: 1000,
+        futureTransactionsSum: 0,
+      },
+    ] as any[];
+
+    render(<UpcomingBills accounts={accounts} scheduledTransactions={transactions} isLoading={false} maxItems={defaultMaxItems} />);
+
+    expect(screen.getByTitle(BELOW_ZERO_TITLE)).toBeInTheDocument();
+  });
+
+  it('charges a scheduled investment to its settlement account, not the brokerage', () => {
+    // The purchase spends the linked cash account to exactly zero. Projected
+    // onto the brokerage -- whose own balance is not the cash the trade spends
+    // -- the same occurrence reads as a 5,000 overdraft, which is the warning
+    // this test exists to keep off the widget (issue #1247).
+    const transactions = [
+      {
+        id: 'buy-1',
+        name: 'Monthly ETF buy',
+        accountId: 'acc-brokerage',
+        amount: -5000,
+        currencyCode: 'CAD',
+        isInvestment: true,
+        effectiveAmount: -5000,
+        effectiveAmountComplete: true,
+        effectiveCurrencyCode: 'CAD',
+        settlementAccountId: 'acc-cash',
+        nextDueDate: futureDateStr(1),
+        isActive: true,
+        autoPost: true,
+      },
+    ] as any[];
+    const accounts = [
+      {
+        id: 'acc-brokerage',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_BROKERAGE',
+        currencyCode: 'CAD',
+        linkedAccountId: 'acc-cash',
+        currentBalance: 0,
+        futureTransactionsSum: 0,
+      },
+      {
+        id: 'acc-cash',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_CASH',
+        currencyCode: 'CAD',
+        currentBalance: 5000,
+        futureTransactionsSum: 0,
+      },
+    ] as any[];
+
+    render(<UpcomingBills accounts={accounts} scheduledTransactions={transactions} isLoading={false} maxItems={defaultMaxItems} />);
+
+    expect(screen.queryByTitle(BELOW_ZERO_TITLE)).not.toBeInTheDocument();
+  });
+
+  it('still warns when the settlement account cannot cover the purchase', () => {
+    // The other side of the same fix: charging the right account is not the
+    // same as never warning.
+    const transactions = [
+      {
+        id: 'buy-1',
+        name: 'Monthly ETF buy',
+        accountId: 'acc-brokerage',
+        amount: -5000,
+        currencyCode: 'CAD',
+        isInvestment: true,
+        effectiveAmount: -5000,
+        effectiveAmountComplete: true,
+        effectiveCurrencyCode: 'CAD',
+        settlementAccountId: 'acc-cash',
+        nextDueDate: futureDateStr(1),
+        isActive: true,
+        autoPost: true,
+      },
+    ] as any[];
+    const accounts = [
+      {
+        id: 'acc-brokerage',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_BROKERAGE',
+        currencyCode: 'CAD',
+        linkedAccountId: 'acc-cash',
+        currentBalance: 0,
+        futureTransactionsSum: 0,
+      },
+      {
+        id: 'acc-cash',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_CASH',
+        currencyCode: 'CAD',
+        currentBalance: 4999.99,
+        futureTransactionsSum: 0,
+      },
+    ] as any[];
+
+    render(<UpcomingBills accounts={accounts} scheduledTransactions={transactions} isLoading={false} maxItems={defaultMaxItems} />);
+
+    expect(screen.getByTitle(BELOW_ZERO_TITLE)).toBeInTheDocument();
+  });
+
+  it('derives the settlement account from the linked cash account on an older backend', () => {
+    // No `settlementAccountId` on the payload (a rolling deploy). The brokerage's
+    // linked cash account is the answer, exactly as the cash-flow forecast has
+    // always derived it -- absent is never a licence to charge `accountId`.
+    const transactions = [
+      {
+        id: 'buy-1',
+        name: 'Monthly ETF buy',
+        accountId: 'acc-brokerage',
+        amount: -5000,
+        currencyCode: 'CAD',
+        isInvestment: true,
+        effectiveAmount: -5000,
+        effectiveAmountComplete: true,
+        effectiveCurrencyCode: 'CAD',
+        nextDueDate: futureDateStr(1),
+        isActive: true,
+        autoPost: true,
+      },
+    ] as any[];
+    const accounts = [
+      {
+        id: 'acc-brokerage',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_BROKERAGE',
+        currencyCode: 'CAD',
+        linkedAccountId: 'acc-cash',
+        currentBalance: 0,
+        futureTransactionsSum: 0,
+      },
+      {
+        id: 'acc-cash',
+        accountType: 'INVESTMENT',
+        accountSubType: 'INVESTMENT_CASH',
+        currencyCode: 'CAD',
+        currentBalance: 5000,
+        futureTransactionsSum: 0,
+      },
+    ] as any[];
+
+    render(<UpcomingBills accounts={accounts} scheduledTransactions={transactions} isLoading={false} maxItems={defaultMaxItems} />);
+
+    expect(screen.queryByTitle(BELOW_ZERO_TITLE)).not.toBeInTheDocument();
+  });
+
+  it('does not warn on an account a run of bills lands on exactly zero', () => {
+    // Every figure here is a decimal(20,4), and the balance ends at exactly
+    // 0.0000 -- but the doubles behind them do not sum to a clean zero, so an
+    // unrounded running balance finishes a fraction below it and warns.
+    const transactions = [
+      {
+        id: 'bill-1',
+        name: 'Hydro',
+        accountId: 'acc-cash',
+        amount: -949.37,
+        currencyCode: 'CAD',
+        effectiveAmount: -949.37,
+        effectiveAmountComplete: true,
+        effectiveCurrencyCode: 'CAD',
+        settlementAccountId: 'acc-cash',
+        nextDueDate: futureDateStr(1),
+        isActive: true,
+        autoPost: true,
+      },
+    ] as any[];
+    const accounts = [
+      {
+        id: 'acc-cash',
+        accountType: 'CHECKING',
+        currencyCode: 'CAD',
+        currentBalance: 647.67,
+        futureTransactionsSum: 301.7,
+      },
+    ] as any[];
+
+    // The unrounded arithmetic this guards against: 647.67 + 301.70 - 949.37 is
+    // exactly zero in decimal(20,4) and a shade below zero in binary floating
+    // point, which is all `newBalance < 0` needs to raise the warning.
+    expect(647.67 + 301.7 - 949.37).toBeLessThan(0);
+
+    render(<UpcomingBills accounts={accounts} scheduledTransactions={transactions} isLoading={false} maxItems={defaultMaxItems} />);
+
+    expect(screen.queryByTitle(BELOW_ZERO_TITLE)).not.toBeInTheDocument();
+  });
+
+  it('withholds the warning when the occurrence is priced in another currency', () => {
+    // An amount and its currency are one value. A payload claiming 1,100 USD
+    // settles in a CAD account contradicts itself -- a live backend derives both
+    // fields from that one account -- and this widget holds no rate table to
+    // resolve it, so the projection is unknown. Compared as bare numbers,
+    // 1,000 - 1,100 warns about an overdraft in units the account does not hold.
+    const transactions = [
+      {
+        id: 'bill-1',
+        name: 'US subscription',
+        accountId: 'acc-cash',
+        amount: -1100,
+        currencyCode: 'USD',
+        effectiveAmount: -1100,
+        effectiveAmountComplete: true,
+        effectiveCurrencyCode: 'USD',
+        settlementAccountId: 'acc-cash',
+        nextDueDate: futureDateStr(1),
+        isActive: true,
+        autoPost: true,
+      },
+    ] as any[];
+    const accounts = [
+      {
+        id: 'acc-cash',
+        accountType: 'CHECKING',
+        currencyCode: 'CAD',
+        currentBalance: 1000,
+        futureTransactionsSum: 0,
+      },
+    ] as any[];
+
+    render(<UpcomingBills accounts={accounts} scheduledTransactions={transactions} isLoading={false} maxItems={defaultMaxItems} />);
+
+    expect(screen.queryByTitle(BELOW_ZERO_TITLE)).not.toBeInTheDocument();
   });
 
   it('prioritizes manual items over auto-post items on the same day', () => {

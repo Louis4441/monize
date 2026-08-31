@@ -1130,6 +1130,13 @@ describe("ScheduledTransactionsService", () => {
       expect(result[0].effectiveAmountComplete).toBe(true);
       // The settlement currency, not the brokerage account's.
       expect(result[0].effectiveCurrencyCode).toBe("CAD");
+      // And the account that amount belongs to: the funding account, not the
+      // brokerage the schedule is filed under. A client projecting a running
+      // balance from `accountId` charges an account the trade never moves, which
+      // is how a purchase its funding account covers exactly came to be reported
+      // as an overdraft.
+      expect(result[0].settlementAccountId).toBe("cash-1");
+      expect(result[0].settlementAccountId).not.toBe(st.accountId);
     });
 
     it("reports the effective amount as unknown when the current rate is unavailable", async () => {
@@ -1197,6 +1204,8 @@ describe("ScheduledTransactionsService", () => {
       expect(result[0].effectiveAmount).toBe(-1200);
       expect(result[0].effectiveAmountComplete).toBe(true);
       expect(result[0].effectiveCurrencyCode).toBe("USD");
+      // A schedule that moves no securities settles in its own account.
+      expect(result[0].settlementAccountId).toBe("acc-1");
     });
   });
 

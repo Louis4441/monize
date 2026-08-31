@@ -149,6 +149,15 @@ export interface ScheduledTransaction {
   // older backend, which is no information -- `occurrenceKind` then falls back as
   // it always did.
   effectiveDirectionAmount?: number | null;
+  // Read-only, server-resolved: the account whose balance `effectiveAmount`
+  // actually moves. For an investment schedule that is the SETTLEMENT account
+  // (the named funding account, or the brokerage's linked cash account), not
+  // `accountId`, which is the brokerage. Absent means an older backend, and the
+  // client derives the same answer from the funding/linked account it already
+  // holds (`occurrenceSettlementAccountId`); it is never a licence to project
+  // onto `accountId`, which charged the brokerage for cash it never moved
+  // (issue #1247).
+  settlementAccountId?: string;
   tagIds?: string[];
   splits?: ScheduledTransactionSplit[];
   overrideCount?: number;

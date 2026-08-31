@@ -2,6 +2,7 @@ import { ScheduledTransaction } from '@/types/scheduled-transaction';
 import { Account } from '@/types/account';
 import { parseLocalDate } from '@/lib/utils';
 import { advanceByFrequency } from '@/lib/frequency';
+import { occurrenceSettlementAccountId } from '@/lib/scheduled-effective-amount';
 
 export interface FutureTransaction {
   id: string;
@@ -414,13 +415,10 @@ function normalizeInvestmentForForecast(
     }
     return transaction;
   }
-  let cashAccountId = transaction.investmentFundingAccountId;
-  if (!cashAccountId) {
-    const brokerage = accountsById.get(transaction.accountId);
-    if (brokerage?.linkedAccountId) {
-      cashAccountId = brokerage.linkedAccountId;
-    }
-  }
+  // Which account settles is one decision, made by the server for the posting
+  // and read here through the shared helper -- the projection and the dashboard
+  // widget cannot charge different accounts for the same occurrence (#1247).
+  const cashAccountId = occurrenceSettlementAccountId(transaction, accountsById);
   if (!cashAccountId) {
     return transaction;
   }

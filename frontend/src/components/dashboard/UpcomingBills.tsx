@@ -18,7 +18,9 @@ import { UnknownAmount } from '@/components/ui/UnknownAmount';
 import {
   nextOccurrenceDueDate,
   nextOccurrenceEffectiveAmount,
+  occurrenceSettlementAccountId,
 } from '@/lib/scheduled-effective-amount';
+import { roundMoney } from '@/lib/investmentFold';
 import { WidgetHeading } from './widget-meta';
 import { CARD_CLASS } from '@/components/ui/Card';
 
@@ -71,22 +73,31 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
   // Uses running balances per account, processing items in date order (which they already are).
   const negativeBalanceItems = useMemo(() => {
     const result = new Set<string>();
-    // Running balance per account: start with currentBalance + futureTransactionsSum
+    // Running balance per settlement account: currentBalance + futureTransactionsSum
     const runningBalances = new Map<string, number>();
     /** Accounts whose projection hit an unknown amount and cannot continue. */
     const unknown = new Set<string>();
 
     for (const item of upcomingItems) {
-      const account = accountMap.get(item.accountId);
+      // The account the cash actually moves through, which for an investment
+      // schedule is the settlement account and not `accountId` (the brokerage).
+      // Charging the brokerage warned that a purchase would overdraw it while
+      // the funding account covering the trade to the cent went unprojected
+      // (issue #1247).
+      const settlementAccountId = occurrenceSettlementAccountId(item, accountMap);
+      if (!settlementAccountId) continue;
+      const account = accountMap.get(settlementAccountId);
       if (!account) continue;
 
       // Skip liability accounts - they normally carry negative balances
       if (LIABILITY_TYPES.has(account.accountType)) continue;
 
-      if (!runningBalances.has(item.accountId)) {
+      if (!runningBalances.has(settlementAccountId)) {
         runningBalances.set(
-          item.accountId,
-          (Number(account.currentBalance) || 0) + (Number(account.futureTransactionsSum) || 0),
+          settlementAccountId,
+          roundMoney(
+            (Number(account.currentBalance) || 0) + (Number(account.futureTransactionsSum) || 0),
+          ),
         );
       }
 
@@ -94,14 +105,25 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
       // balance, it is an unknown one -- so the projection stops for that
       // account rather than carrying on as if the item cost nothing and
       // flagging (or clearing) the rows after it (issue #1247).
-      const { amount: effectiveAmount } = nextOccurrenceEffectiveAmount(item);
+      const { amount: effectiveAmount, currencyCode } = nextOccurrenceEffectiveAmount(item);
       if (effectiveAmount === null) {
-        unknown.add(item.accountId);
+        unknown.add(settlementAccountId);
         continue;
       }
-      if (unknown.has(item.accountId)) continue;
-      const newBalance = runningBalances.get(item.accountId)! + effectiveAmount;
-      runningBalances.set(item.accountId, newBalance);
+      // An amount and its currency are one value. Converting here would invent a
+      // rate this widget holds no table for, and adding the bare number would
+      // compare foreign units against this balance, so a mismatch is unknown.
+      if (currencyCode !== account.currencyCode) {
+        unknown.add(settlementAccountId);
+        continue;
+      }
+      if (unknown.has(settlementAccountId)) continue;
+      // Money precision, not float precision: a balance and the amount that
+      // empties it are both decimal(20,4), and only the rounded difference is
+      // one. An unrounded sum lands a fraction of a ten-thousandth below zero
+      // and warns about an account that ends at exactly zero.
+      const newBalance = roundMoney(runningBalances.get(settlementAccountId)! + effectiveAmount);
+      runningBalances.set(settlementAccountId, newBalance);
 
       if (newBalance < 0) {
         result.add(item.id);

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   nextOccurrenceEffectiveAmount,
+  occurrenceSettlementAccountId,
   overrideEffectiveAmount,
   scheduleEffectiveAmount,
   sumEffectiveOccurrences,
@@ -292,5 +293,81 @@ describe('scheduled effective amounts', () => {
 
       expect(result.value).toBe(0.3);
     });
+  });
+});
+
+describe('occurrenceSettlementAccountId', () => {
+  const accounts = new Map([
+    ['acc-brokerage', { linkedAccountId: 'acc-cash' }],
+    ['acc-lonely-brokerage', { linkedAccountId: null }],
+    ['acc-cash', { linkedAccountId: null }],
+    ['acc-chequing', { linkedAccountId: null }],
+  ]);
+
+  const schedule = (overrides: Partial<ScheduledTransaction>) =>
+    ({
+      id: 'st-1',
+      amount: -5000,
+      currencyCode: 'CAD',
+      accountId: 'acc-brokerage',
+      isInvestment: true,
+      ...overrides,
+    }) as unknown as ScheduledTransaction;
+
+  it('takes the server answer, which is the decision the posting makes', () => {
+    expect(
+      occurrenceSettlementAccountId(
+        schedule({
+          settlementAccountId: 'acc-chequing',
+          investmentFundingAccountId: 'acc-cash',
+        }),
+        accounts,
+      ),
+    ).toBe('acc-chequing');
+  });
+
+  it('never charges the brokerage a trade only files against it', () => {
+    // The defect in one line: `accountId` is where the schedule LIVES, not where
+    // its cash comes from.
+    const st = schedule({ settlementAccountId: 'acc-cash' });
+
+    expect(occurrenceSettlementAccountId(st, accounts)).not.toBe(st.accountId);
+    expect(occurrenceSettlementAccountId(st, accounts)).toBe('acc-cash');
+  });
+
+  it('falls back to the named funding account when the server did not say', () => {
+    expect(
+      occurrenceSettlementAccountId(
+        schedule({ investmentFundingAccountId: 'acc-chequing' }),
+        accounts,
+      ),
+    ).toBe('acc-chequing');
+  });
+
+  it("falls back to the brokerage's linked cash account after that", () => {
+    expect(occurrenceSettlementAccountId(schedule({}), accounts)).toBe(
+      'acc-cash',
+    );
+  });
+
+  it('answers undefined rather than naming the brokerage it cannot resolve', () => {
+    // Undefined means "not identifiable from what the client holds", and a
+    // caller projects nothing. Returning `accountId` here would be the defect
+    // wearing the helper's name.
+    expect(
+      occurrenceSettlementAccountId(
+        schedule({ accountId: 'acc-lonely-brokerage' }),
+        accounts,
+      ),
+    ).toBeUndefined();
+  });
+
+  it('leaves a non-investment schedule on its own account', () => {
+    expect(
+      occurrenceSettlementAccountId(
+        schedule({ accountId: 'acc-chequing', isInvestment: false }),
+        accounts,
+      ),
+    ).toBe('acc-chequing');
   });
 });
