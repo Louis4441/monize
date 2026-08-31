@@ -16,6 +16,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ListTopToolbar } from '@/components/ui/ListTopToolbar';
 import { TransactionRow } from './TransactionRow';
 import { registerDateColumnPadding } from './register-date-columns';
+import { registerColumnClass, REGISTER_TABLE_CONTAINER } from './register-columns';
 import { TransactionActionSheet } from './TransactionActionSheet';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -513,7 +514,10 @@ export function TransactionList({
           }
         />
       )}
-      <div className="overflow-x-auto">
+      {/* The container the column tiers measure: a column appears when the
+          REGISTER itself is wide enough, not when the viewport is -- the
+          viewport overstates this width by the page padding around it. */}
+      <div className={`overflow-x-auto ${REGISTER_TABLE_CONTAINER}`}>
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead className="bg-gray-50 dark:bg-gray-800">
             <tr>
@@ -530,17 +534,17 @@ export function TransactionList({
               <th className={`${headerPadding} ${compactPadding.date} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>
                 <span className="inline-flex items-center gap-1">
                   {t('list.header.date')}
-                  {/* Phones show only Date, Payee and Amount, and the payee is
-                      what runs out of room -- this drops the year so the payee
-                      gets that width back. Above `sm` the full date always
-                      fits, so the control would be a no-op there and is not
-                      drawn. */}
+                  {/* Drops the year from the Date column. Born on phones --
+                      where the payee is what runs out of room and the year is
+                      the part a register row can spare -- and now offered at
+                      every width, so the day/month view is a choice rather
+                      than something only phones get. */}
                   <button
                     onClick={toggleCompactMobileDates}
                     aria-pressed={compactMobileDates}
                     aria-label={t('list.dateDisplay.toggleLabel')}
                     title={t('list.dateDisplay.toggleTitle')}
-                    className={`sm:hidden rounded p-0.5 focus-visible:outline-2 focus-visible:outline-blue-500 ${
+                    className={`rounded p-0.5 focus-visible:outline-2 focus-visible:outline-blue-500 ${
                       compactMobileDates
                         ? 'text-blue-600 dark:text-blue-400'
                         : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
@@ -552,14 +556,19 @@ export function TransactionList({
                   </button>
                 </span>
               </th>
-              <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell`}>{t('list.header.account')}</th>
+              {/* Structural, not responsive: on a single account's page every
+                  row would repeat the page's own title, so the column is
+                  omitted from the DOM entirely (see register-columns.ts). */}
+              {!isSingleAccountView && (
+                <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('account')}`}>{t('list.header.account')}</th>
+              )}
               <th className={`${headerPadding} ${compactPadding.payee} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>{t('list.header.payee')}</th>
-              <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden min-[900px]:table-cell`}>{t('list.header.category')}</th>
-              <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden 2xl:table-cell`}>{t('list.header.description')}</th>
-              <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden 2xl:table-cell`}>{t('list.header.refNumber')}</th>
-              <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden xl:table-cell`}>{t('list.header.tags')}</th>
+              <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('category')}`}>{t('list.header.category')}</th>
+              <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('description')}`}>{t('list.header.description')}</th>
+              <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('refNumber')}`}>{t('list.header.refNumber')}</th>
+              <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('tags')}`}>{t('list.header.tags')}</th>
               <th
-                className={`${headerPadding} text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden min-[900px]:table-cell`}
+                className={`${headerPadding} text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('attachments')}`}
                 title={t('list.header.attachments')}
                 aria-label={t('list.header.attachments')}
               >
@@ -578,14 +587,18 @@ export function TransactionList({
               {showRunningBalance && (
                 <th className={`${headerPadding} text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>{t('list.header.balance')}</th>
               )}
-              <th className={`${headerPadding} text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden min-[1400px]:table-cell`}>{t('list.header.status')}</th>
-              <th className={`${headerPadding} text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden min-[480px]:table-cell sticky right-0 bg-gray-50 dark:bg-gray-800`}>{t('list.header.actions')}</th>
+              <th className={`${headerPadding} text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('status')}`}>{t('list.header.status')}</th>
+              <th className={`${headerPadding} text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('actions')} sticky right-0 bg-gray-50 dark:bg-gray-800`}>{t('list.header.actions')}</th>
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
             {transactions.map((transaction, index) => {
               const isFuture = index < futureBoundaryIndex;
-              const colCount = 11
+              // Ten unconditional columns (register-columns.ts order, minus
+              // Account/FX/Balance, which are conditional) plus the ones this
+              // render actually drew.
+              const colCount = 10
+                + (isSingleAccountView ? 0 : 1)
                 + (selectionMode ? 1 : 0)
                 + (showRunningBalance ? 1 : 0)
                 + (showFxColumns ? 3 : 0);

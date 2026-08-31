@@ -8,6 +8,11 @@ import { getIconComponent } from '@/components/ui/IconPicker';
 import { HOVER_ROW_ON_PAGE } from '@/components/ui/Card';
 import { CategoryPill } from '@/components/transactions/CategoryPill';
 import { registerDateColumnPadding } from '@/components/transactions/register-date-columns';
+import {
+  registerColumnClass,
+  REGISTER_DESCRIPTION_CELL_FLEX,
+  REGISTER_PAYEE_NAME_CAP,
+} from '@/components/transactions/register-columns';
 import { PayeeLogo } from '@/components/payees/PayeeLogo';
 import { Transaction, TransactionSplit, TransactionStatus } from '@/types/transaction';
 import { StatusCellButton } from '@/components/transactions/StatusCellButton';
@@ -154,10 +159,10 @@ export interface TransactionRowProps {
   isDeleting: boolean;
   formatDate: (date: string) => string;
   /**
-   * Drop the year from the date below the `sm` breakpoint, handing the freed
-   * width to the payee. Both formats are rendered and CSS picks one, so wider
-   * screens keep the full date whatever the flag says. The long-press action
-   * sheet still shows the full date, so the year stays reachable.
+   * Drop the year from the Date column, at every width. On phones this hands
+   * the freed width to the payee; on wider screens it is simply the user's
+   * chosen date view. The long-press action sheet still shows the full date,
+   * so the year stays reachable.
    */
   compactDates?: boolean;
   /** Day and month in the user's own ordering (useDateFormat's formatDateWithoutYear). */
@@ -307,10 +312,11 @@ export const TransactionRow = memo(function TransactionRow({
       <td className={`${cellPadding} ${compactPadding.date} whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 ${isVoid ? 'line-through' : ''}`}>
         <span className={`flex items-center gap-1.5 ${isVoid ? 'line-through' : ''}`}>
           {compactDates && formatCompactDate ? (
-            <>
-              <span className="sm:hidden">{formatCompactDate(transaction.transactionDate)}</span>
-              <span className="hidden sm:inline">{formatDate(transaction.transactionDate)}</span>
-            </>
+            // The full date stays reachable without leaving the row: on
+            // hover here, and in the long-press action sheet.
+            <span title={formatDate(transaction.transactionDate)}>
+              {formatCompactDate(transaction.transactionDate)}
+            </span>
           ) : (
             formatDate(transaction.transactionDate)
           )}
@@ -330,9 +336,13 @@ export const TransactionRow = memo(function TransactionRow({
           )}
         </span>
       </td>
-      <td className={`${cellPadding} whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 ${isVoid ? 'line-through' : ''} hidden lg:table-cell`}>
-        {transaction.account?.name || '-'}
-      </td>
+      {/* Structural, not responsive: a single-account page omits the Account
+          column entirely (see register-columns.ts). */}
+      {!isSingleAccountView && (
+        <td className={`${cellPadding} whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 ${isVoid ? 'line-through' : ''} ${registerColumnClass('account')}`}>
+          {transaction.account?.name || '-'}
+        </td>
+      )}
       {/* Two things give the payee room when the year is hidden: this
           phone-width cap widens, and the inset between this column and the
           date closes (registerDateColumnPadding). It stays a cap, with
@@ -355,14 +365,14 @@ export const TransactionRow = memo(function TransactionRow({
           {transaction.payeeId && onPayeeClick ? (
             <button
               onClick={(e) => { e.stopPropagation(); onPayeeClick(transaction.payeeId!); }}
-              className={`text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline block truncate sm:max-w-[280px] text-left ${isVoid ? 'line-through' : ''}`}
+              className={`text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline block truncate ${REGISTER_PAYEE_NAME_CAP} text-left ${isVoid ? 'line-through' : ''}`}
               title={t('list.row.viewPayeeTitle', { name: payeeLabel ?? '' })}
             >
               {payeeLabel || '-'}
             </button>
           ) : (
             <div
-              className={`text-sm font-medium text-gray-900 dark:text-gray-100 truncate sm:max-w-[280px] ${isVoid ? 'line-through' : ''}`}
+              className={`text-sm font-medium text-gray-900 dark:text-gray-100 truncate ${REGISTER_PAYEE_NAME_CAP} ${isVoid ? 'line-through' : ''}`}
               title={payeeLabel || undefined}
             >
               {payeeLabel || '-'}
@@ -375,7 +385,7 @@ export const TransactionRow = memo(function TransactionRow({
           </div>
         )}
       </td>
-      <td className={`${cellPadding} ${density !== 'normal' ? 'whitespace-nowrap' : ''} hidden min-[900px]:table-cell`}>
+      <td className={`${cellPadding} ${density !== 'normal' ? 'whitespace-nowrap' : ''} ${registerColumnClass('category')}`}>
         {transaction.linkedInvestmentTransactionId ? (
           <span
             className={`inline-flex text-xs leading-5 font-semibold rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 ${density === 'dense' ? 'px-1.5 py-0.5' : 'px-2 py-1'}`}
@@ -518,15 +528,18 @@ export const TransactionRow = memo(function TransactionRow({
           <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
         )}
       </td>
-      <td className={`${cellPadding} text-sm text-gray-500 dark:text-gray-400 hidden 2xl:table-cell`}>
+      {/* The column that yields: it takes whatever width the content-sized
+          columns leave and shrinks first when there is none, so its arrival
+          can never push Status off the visible edge of the register. */}
+      <td className={`${cellPadding} text-sm text-gray-500 dark:text-gray-400 ${registerColumnClass('description')} ${REGISTER_DESCRIPTION_CELL_FLEX}`}>
         <div
-          className={`truncate max-w-[320px] ${isVoid ? 'line-through' : ''}`}
+          className={`truncate ${isVoid ? 'line-through' : ''}`}
           title={transaction.description || undefined}
         >
           {transaction.description || '-'}
         </div>
       </td>
-      <td className={`${cellPadding} text-sm text-gray-500 dark:text-gray-400 hidden 2xl:table-cell`}>
+      <td className={`${cellPadding} text-sm text-gray-500 dark:text-gray-400 ${registerColumnClass('refNumber')}`}>
         <div
           className={`truncate max-w-[160px] ${isVoid ? 'line-through' : ''}`}
           title={transaction.referenceNumber || undefined}
@@ -534,7 +547,7 @@ export const TransactionRow = memo(function TransactionRow({
           {transaction.referenceNumber || '-'}
         </div>
       </td>
-      <td className={`${cellPadding} text-sm hidden xl:table-cell`}>
+      <td className={`${cellPadding} text-sm ${registerColumnClass('tags')}`}>
         {transaction.tags && transaction.tags.length > 0 ? (
           <div className="flex flex-wrap gap-1">
             {transaction.tags.map((tag) => onTagClick ? (
@@ -578,7 +591,7 @@ export const TransactionRow = memo(function TransactionRow({
           <span className="text-gray-400 dark:text-gray-500">-</span>
         )}
       </td>
-      <td className={`${cellPadding} whitespace-nowrap text-center text-sm hidden min-[900px]:table-cell`}>
+      <td className={`${cellPadding} whitespace-nowrap text-center text-sm ${registerColumnClass('attachments')}`}>
         {transaction.attachmentCount && transaction.attachmentCount > 0 ? (
           <span className="inline-flex items-center gap-1 text-gray-600 dark:text-gray-300" title={t('list.attachmentsCount', { count: transaction.attachmentCount })}>
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -645,14 +658,14 @@ export const TransactionRow = memo(function TransactionRow({
             : '-'}
         </td>
       )}
-      <td className={`${cellPadding} whitespace-nowrap text-center hidden min-[1400px]:table-cell`}>
+      <td className={`${cellPadding} whitespace-nowrap text-center ${registerColumnClass('status')}`}>
         <StatusCellButton
           status={transaction.status}
           dense={density === 'dense'}
           onCycle={() => onCycleStatus(transaction)}
         />
       </td>
-      <td className={`${cellPadding} whitespace-nowrap text-right text-sm font-medium space-x-2 hidden min-[480px]:table-cell sticky right-0 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : density !== 'normal' && index % 2 === 1 ? 'bg-gray-50 dark:bg-table-stripe-dark' : 'bg-white dark:bg-gray-900'} group-hover:bg-gray-100 dark:group-hover:bg-gray-800 ${isHighlighted ? HIGHLIGHT_FLASH_CELL : ''}`}>
+      <td className={`${cellPadding} whitespace-nowrap text-right text-sm font-medium space-x-2 ${registerColumnClass('actions')} sticky right-0 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : density !== 'normal' && index % 2 === 1 ? 'bg-gray-50 dark:bg-table-stripe-dark' : 'bg-white dark:bg-gray-900'} group-hover:bg-gray-100 dark:group-hover:bg-gray-800 ${isHighlighted ? HIGHLIGHT_FLASH_CELL : ''}`}>
         {onEdit && (
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(transaction); }}

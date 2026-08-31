@@ -918,6 +918,42 @@ describe('TransactionList', () => {
       });
     });
 
+    it('omits the Account column entirely in a single-account view', async () => {
+      // Structural, not responsive: on a single account's page every row
+      // would repeat the page's own title, so neither the header nor the
+      // cells exist at any width (register-columns.ts).
+      render(
+        <TransactionList
+          transactions={[createTransaction()]}
+          onEdit={mockOnEdit}
+          onRefresh={mockOnRefresh}
+          isSingleAccountView={true}
+          startingBalance={1000}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Grocery Store')).toBeInTheDocument();
+      });
+      expect(screen.queryByText('Account')).not.toBeInTheDocument();
+      expect(screen.queryByText('Chequing')).not.toBeInTheDocument();
+    });
+
+    it('renders the Account column for a multi-account view', async () => {
+      render(
+        <TransactionList
+          transactions={[createTransaction()]}
+          onEdit={mockOnEdit}
+          onRefresh={mockOnRefresh}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Account')).toBeInTheDocument();
+        expect(screen.getByText('Chequing')).toBeInTheDocument();
+      });
+    });
+
     it('renders Balance column header when isSingleAccountView is true', async () => {
       render(
         <TransactionList
@@ -3230,24 +3266,24 @@ describe('TransactionList compact mobile dates', () => {
     expect(screen.queryByText('01-15')).not.toBeInTheDocument();
   });
 
-  it('drops the year for phones and keeps the full date for wider screens', async () => {
+  it('drops the year at every width once the option is on', async () => {
     render(<TransactionList transactions={[createTransaction()]} />);
 
     const toggle = screen.getByRole('button', { name: 'Hide the year' });
+    // The toggle is offered at every width -- the day/month view began as a
+    // phone-only trade and is now a date view the user can pick anywhere.
+    expect(toggle.className).not.toContain('sm:hidden');
     fireEvent.click(toggle);
 
     await waitFor(() => {
       expect(toggle).toHaveAttribute('aria-pressed', 'true');
     });
 
-    // The day is kept -- the year is the part a register row can spare.
-    const compact = screen.getByText('01-15');
-    expect(compact.className).toContain('sm:hidden');
-
-    // The full date is still rendered, gated to sm and up.
-    const full = screen.getByText('2024-01-15');
-    expect(full.className).toContain('hidden');
-    expect(full.className).toContain('sm:inline');
+    // The day is kept -- the year is the part a register row can spare -- and
+    // there is one rendering, no phone/desktop CSS split: the chosen view is
+    // what every width shows.
+    expect(screen.getByText('01-15')).toBeInTheDocument();
+    expect(screen.queryByText('2024-01-15')).not.toBeInTheDocument();
   });
 
   it('closes the gap between the Date and Payee columns, header and cells alike', async () => {
