@@ -105,6 +105,18 @@ export const INTENTIONALLY_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
   // backup is restored onto, and a future sweeper reading a restored row could
   // delete a live object whose key happens to collide.
   "attachment_blob_tombstones",
+  // Push transport state for *this* instance, and the one table pair where
+  // exporting it would be actively dangerous. A subscription names a browser on
+  // one machine talking to one origin, encrypted under this deployment's VAPID
+  // key pair -- restored elsewhere it either cannot be delivered to at all or,
+  // worse, can: a production backup restored into a test instance would hand
+  // that instance the right to push to real phones. Devices re-subscribe, which
+  // costs one click and is the only way the new instance gets a key the push
+  // service will accept.
+  "push_subscriptions",
+  // The key pair itself: an installation secret, not user content. It shares
+  // the backup/restore lifecycle of ENCRYPTION_KEY rather than of a ledger.
+  "push_instance_config",
 ]);
 
 export function buildExportTableQueries(

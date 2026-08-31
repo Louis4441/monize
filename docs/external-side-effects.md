@@ -185,6 +185,46 @@ most of what the rule asks for -- durable state written before the effect -- and
 still fails, because the state is not *claimed* atomically. Durable-before-effect
 and atomically-claimed are two requirements, not one.
 
+## 4a. Web Push
+
+`WebPushSender` is the only file in `src/` that imports `web-push`, and the one
+place a payload crosses an external push service. It is an external effect in
+the narrowest sense: once Mozilla, Google or Apple has accepted a message, no
+transaction can recall it.
+
+Three rules follow, and all three are the ordering rule rather than new
+mechanism:
+
+1. **The send happens after the commit, and never inside a transaction.**
+   `PushSubscriptionService.sendTest` loads its targets in one short
+   transaction, sends outside any, then records each outcome in its own short
+   transaction. A notification is about something that already happened; it must
+   not be able to roll that thing back.
+2. **The sender never throws.** Every failure is returned as an outcome
+   (`sent` / `unconfigured` / `expired` / `transient`), because the caller of a
+   future producer is a budget recalculation or a backup sweep, and a delivery
+   failure is not that operation's failure. This is the same trade as
+   `SystemAlertService`: the durable notice is the in-app row, and the push is
+   the best-effort copy.
+3. **A dead subscription stops being attempted.** 404 and 410 are the push
+   service saying the subscription is gone, and retire the device immediately
+   (`disabled_reason = GONE`). Everything else -- 401 and 403 included -- is
+   transient, deliberately: an authorization failure usually means this
+   instance's key or clock is wrong rather than that the device went away, and
+   retiring on it would empty every device list in the deployment over one bad
+   configuration. `MAX_CONSECUTIVE_FAILURES` bounds the retry either way
+   (`disabled_reason = FAILING`), so nothing is attempted forever.
+
+There is no outbox and no delivery ledger, which is the same gap email has: a
+crash between the send and the outcome write loses the bookkeeping for that one
+attempt, not the notification. `notification_deliveries` from discussion #1291
+is where that would be closed, and the open question recorded there is whether
+`job_claims` already does the job -- a third idempotency mechanism beside the
+two the codebase has would be a regression, not a feature.
+
+The subscription itself is instance-bound state, not portable user data: see
+`INTENTIONALLY_EXCLUDED_TABLES` and INV-PUSH-005.
+
 ## 5. Emergency access
 
 The grant path is the only place in the codebase that gets the external-effect

@@ -42,6 +42,7 @@ import { BuiltInReportsModule } from "./built-in-reports/built-in-reports.module
 import { NotificationsModule } from "./notifications/notifications.module";
 import { SystemAlertsModule } from "./system-alerts/system-alerts.module";
 import { ProviderHealthModule } from "./provider-health/provider-health.module";
+import { PushModule } from "./push/push.module";
 import { HealthModule } from "./health/health.module";
 import { AdminModule } from "./admin/admin.module";
 import { AiModule } from "./ai/ai.module";
@@ -152,6 +153,7 @@ import { I18nModule } from "./i18n/i18n.module";
     NotificationsModule,
     SystemAlertsModule,
     ProviderHealthModule,
+    PushModule,
     AdminModule,
     AiModule,
     AiRelayModule,

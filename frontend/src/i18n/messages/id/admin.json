@@ -104,5 +104,65 @@
       "tempPasswordDescCreated": "Kata sandi sementara dibuat untuk {name}. Bagikan kepada mereka untuk masuk.",
       "tempPasswordDescUpgraded": "Pengguna bersama yang sudah ada telah ditingkatkan ke akun penuh. Bagikan kata sandi sementara ini kepada {name}."
     }
+  },
+  "notificationsPage": {
+    "title": "Notifikasi",
+    "subtitle": "Kanal pengiriman yang disediakan instans Monize ini, beserta identitas push di baliknya.",
+    "loading": "Memuat pengaturan notifikasi...",
+    "loadUnavailable": "Monize tidak dapat membaca pengaturan notifikasi dari server. Muat ulang halaman untuk mencoba lagi.",
+    "channelsHeading": "Kanal pengiriman",
+    "identityHeading": "Identitas Web Push",
+    "perAccountNote": "Perangkat, notifikasi uji coba, dan preferensi notifikasi adalah milik masing-masing akun dan dikelola di Pengaturan. Administrator mengonfigurasi instans dan tidak pernah mengirim ke, atau melihat, notifikasi orang lain.",
+    "channelState": {
+      "on": "Aktif",
+      "off": "Nonaktif",
+      "unconfigured": "Tidak tersedia"
+    },
+    "channels": {
+      "inApp": {
+        "name": "Notifikasi dalam aplikasi",
+        "description": "Lonceng di bagian atas. Selalu tersedia dan tidak dapat dimatikan: di sinilah notifikasi tetap ada meski kanal lain gagal."
+      },
+      "webPush": {
+        "name": "Push peramban",
+        "description": "Notifikasi terkirim ke ponsel atau desktop bahkan saat Monize tertutup. Tidak memerlukan Firebase, Google Play, atau akun Apple Developer.",
+        "toggleLabel": "Aktifkan push peramban untuk instans ini",
+        "missingKeys": "Instans ini tidak memiliki pasangan kunci push. Setel ENCRYPTION_KEY dan mulai ulang: Monize akan membuat pasangannya sendiri saat start berikutnya."
+      },
+      "email": {
+        "name": "Email",
+        "description": "Pengingat tagihan, ringkasan anggaran, dan peringatan sistem dikirim ke alamat email tiap akun.",
+        "missingSmtp": "Belum ada server email yang dikonfigurasi. Setel variabel lingkungan SMTP untuk mengaktifkan email.",
+        "statusUnavailable": "Monize tidak dapat membaca status server email."
+      },
+      "ntfy": {
+        "name": "ntfy dan UnifiedPush",
+        "description": "Pengiriman swakelola bagi yang lebih suka tidak bergantung pada infrastruktur Google atau Apple.",
+        "notYetAvailable": "Belum tersedia. Direncanakan setelah push peramban mapan."
+      }
+    },
+    "identity": {
+      "fingerprintLabel": "Sidik kunci",
+      "generatedLabel": "Dibuat",
+      "devicesLabel": "Perangkat terdaftar",
+      "deviceCounts": "{live} aktif, {disabled} dinonaktifkan",
+      "rotateDescription": "Rotasi mengganti pasangan kunci instans ini. Semua perangkat terdaftar tidak lagi dapat dijangkau dan harus mengaktifkan push kembali, jadi lakukan rotasi hanya jika kunci mungkin bocor.",
+      "rotateButton": "Rotasi pasangan kunci",
+      "rotatingButton": "Merotasi...",
+      "missingEncryptionKey": "Instans ini tidak memiliki pasangan kunci push karena ENCRYPTION_KEY belum disetel dan kunci privat harus disimpan tanpa enkripsi. Setel dan mulai ulang: Monize akan membuat pasangannya sendiri."
+    },
+    "dialogs": {
+      "rotateTitle": "Rotasi pasangan kunci push?",
+      "rotateMessage": "{count, plural, =0 {Belum ada perangkat terdaftar, jadi tidak ada yang hilang.} other {# perangkat terdaftar akan berhenti menerima notifikasi sampai push diaktifkan kembali di tiap peramban.}}",
+      "rotateConfirm": "Rotasi"
+    },
+    "toasts": {
+      "loadFailed": "Tidak dapat memuat pengaturan notifikasi",
+      "pushEnabled": "Push peramban diaktifkan untuk instans ini",
+      "pushDisabled": "Push peramban dinonaktifkan untuk instans ini",
+      "pushToggleFailed": "Tidak dapat mengubah pengaturan push peramban",
+      "rotated": "{count, plural, =0 {Pasangan kunci dirotasi} other {Pasangan kunci dirotasi; # perangkat harus mendaftar ulang}}",
+      "rotateFailed": "Tidak dapat merotasi pasangan kunci"
+    }
   }
 }

@@ -341,6 +341,12 @@
     "smtpNotConfigured": "SMTP is niet geconfigureerd. Stel SMTP-omgevingsvariabelen in.",
     "noEmailOnFile": "Geen e-mailadres bekend voor deze gebruiker."
   },
+  "push": {
+    "channelUnavailable": "Pushmeldingen zijn niet beschikbaar op deze Monize-instantie.",
+    "endpointClaimed": "Deze browser is al geregistreerd bij een ander Monize-account. Meld je in deze browser af bij dat account en probeer het opnieuw.",
+    "deviceNotFound": "Pushapparaat niet gevonden.",
+    "noDevices": "Er is geen pushapparaat geregistreerd voor dit account. Schakel pushmeldingen eerst in deze browser in."
+  },
   "institutions": {
     "nameConflict": "Er bestaat al een instelling met de naam \"{{ name }}\"",
     "notFound": "Instelling met ID {{ id }} niet gevonden",

@@ -104,5 +104,65 @@
       "tempPasswordDescCreated": "[XX-A temporary password was generated for {name}. Share it with them to sign in.-XX]",
       "tempPasswordDescUpgraded": "[XX-An existing shared user was upgraded to a full account. Share this temporary password with {name}.-XX]"
     }
+  },
+  "notificationsPage": {
+    "title": "[XX-Notifications-XX]",
+    "subtitle": "[XX-Delivery channels this Monize instance offers, and the push identity behind them.-XX]",
+    "loading": "[XX-Loading notification settings...-XX]",
+    "loadUnavailable": "[XX-Monize could not read the notification settings from the server. Reload the page to try again.-XX]",
+    "channelsHeading": "[XX-Delivery channels-XX]",
+    "identityHeading": "[XX-Web Push identity-XX]",
+    "perAccountNote": "[XX-Devices, test notifications and per-notification preferences belong to each account and are managed in Settings. An administrator configures the instance and never sends to, or sees, another person’s notifications.-XX]",
+    "channelState": {
+      "on": "[XX-On-XX]",
+      "off": "[XX-Off-XX]",
+      "unconfigured": "[XX-Unavailable-XX]"
+    },
+    "channels": {
+      "inApp": {
+        "name": "[XX-In-app notifications-XX]",
+        "description": "[XX-The bell in the header. Always available and cannot be switched off: it is where a notification lives even when every other channel fails.-XX]"
+      },
+      "webPush": {
+        "name": "[XX-Browser push-XX]",
+        "description": "[XX-Notifications delivered to a phone or desktop even when Monize is closed. Needs no Firebase, Google Play or Apple Developer account.-XX]",
+        "toggleLabel": "[XX-Enable browser push for this instance-XX]",
+        "missingKeys": "[XX-This instance has no push key pair. Set ENCRYPTION_KEY and restart: Monize generates the pair itself on the next start.-XX]"
+      },
+      "email": {
+        "name": "[XX-Email-XX]",
+        "description": "[XX-Bill reminders, budget digests and system alerts sent to each account’s email address.-XX]",
+        "missingSmtp": "[XX-No mail server is configured. Set the SMTP environment variables to enable email.-XX]",
+        "statusUnavailable": "[XX-Monize could not read the mail server status.-XX]"
+      },
+      "ntfy": {
+        "name": "[XX-ntfy and UnifiedPush-XX]",
+        "description": "[XX-Self-hosted delivery for people who would rather not depend on Google or Apple infrastructure.-XX]",
+        "notYetAvailable": "[XX-Not available yet. Planned once browser push is established.-XX]"
+      }
+    },
+    "identity": {
+      "fingerprintLabel": "[XX-Key fingerprint-XX]",
+      "generatedLabel": "[XX-Generated-XX]",
+      "devicesLabel": "[XX-Registered devices-XX]",
+      "deviceCounts": "[XX-{live} active, {disabled} retired-XX]",
+      "rotateDescription": "[XX-Rotating replaces this instance’s key pair. Every registered device stops being reachable and has to turn push on again, so rotate only if the key may have been exposed.-XX]",
+      "rotateButton": "[XX-Rotate key pair-XX]",
+      "rotatingButton": "[XX-Rotating...-XX]",
+      "missingEncryptionKey": "[XX-This instance has no push key pair, because ENCRYPTION_KEY is not set and the private key would have to be stored unencrypted. Set it and restart: Monize generates the pair itself.-XX]"
+    },
+    "dialogs": {
+      "rotateTitle": "[XX-Rotate the push key pair?-XX]",
+      "rotateMessage": "[XX-{count, plural, =0 {No device is registered yet, so nothing is lost.} one {One registered device will stop receiving notifications until someone turns push back on in that browser.} other {# registered devices will stop receiving notifications until someone turns push back on in each browser.}}-XX]",
+      "rotateConfirm": "[XX-Rotate-XX]"
+    },
+    "toasts": {
+      "loadFailed": "[XX-Could not load notification settings-XX]",
+      "pushEnabled": "[XX-Browser push enabled for this instance-XX]",
+      "pushDisabled": "[XX-Browser push disabled for this instance-XX]",
+      "pushToggleFailed": "[XX-Could not change the browser push setting-XX]",
+      "rotated": "[XX-{count, plural, =0 {Key pair rotated} one {Key pair rotated; 1 device must register again} other {Key pair rotated; # devices must register again}}-XX]",
+      "rotateFailed": "[XX-Could not rotate the key pair-XX]"
+    }
   }
 }

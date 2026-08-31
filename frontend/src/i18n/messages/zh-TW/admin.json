@@ -104,5 +104,65 @@
       "tempPasswordDescCreated": "已為 {name} 產生臨時密碼。請將其分享給對方以供登入。",
       "tempPasswordDescUpgraded": "現有的共用使用者已升級為完整帳號。請將此臨時密碼分享給 {name}。"
     }
+  },
+  "notificationsPage": {
+    "title": "通知",
+    "subtitle": "此 Monize 執行個體提供的傳送管道，以及其背後的推播身分。",
+    "loading": "正在載入通知設定...",
+    "loadUnavailable": "Monize 無法從伺服器讀取通知設定。請重新載入頁面後再試。",
+    "channelsHeading": "傳送管道",
+    "identityHeading": "Web Push 身分",
+    "perAccountNote": "裝置、測試通知與通知偏好屬於各個帳戶，於「設定」中管理。管理員只負責設定執行個體，絕不會傳送或檢視他人的通知。",
+    "channelState": {
+      "on": "已開啟",
+      "off": "已關閉",
+      "unconfigured": "無法使用"
+    },
+    "channels": {
+      "inApp": {
+        "name": "應用程式內通知",
+        "description": "標題列的鈴鐺。永遠可用且無法關閉：即使其他所有管道失效，通知仍留在這裡。"
+      },
+      "webPush": {
+        "name": "瀏覽器推播",
+        "description": "即使 Monize 已關閉，也能把通知送到手機或桌面。不需要 Firebase、Google Play 或 Apple Developer 帳戶。",
+        "toggleLabel": "為此執行個體啟用瀏覽器推播",
+        "missingKeys": "此執行個體沒有推播金鑰組。請設定 ENCRYPTION_KEY 並重新啟動：Monize 會在下次啟動時自行產生金鑰組。"
+      },
+      "email": {
+        "name": "電子郵件",
+        "description": "帳單提醒、預算摘要與系統警示會寄送到每個帳戶的電子郵件地址。",
+        "missingSmtp": "尚未設定郵件伺服器。請設定 SMTP 環境變數以啟用電子郵件。",
+        "statusUnavailable": "Monize 無法讀取郵件伺服器狀態。"
+      },
+      "ntfy": {
+        "name": "ntfy 與 UnifiedPush",
+        "description": "為不願依賴 Google 或 Apple 基礎設施的使用者提供的自架傳送方式。",
+        "notYetAvailable": "尚未提供。預計在瀏覽器推播穩定之後推出。"
+      }
+    },
+    "identity": {
+      "fingerprintLabel": "金鑰指紋",
+      "generatedLabel": "產生時間",
+      "devicesLabel": "已註冊裝置",
+      "deviceCounts": "{live} 台使用中，{disabled} 台已停用",
+      "rotateDescription": "輪替會更換此執行個體的金鑰組。所有已註冊裝置將無法送達，必須重新啟用推播，因此僅在金鑰可能外洩時才輪替。",
+      "rotateButton": "輪替金鑰組",
+      "rotatingButton": "輪替中...",
+      "missingEncryptionKey": "由於未設定 ENCRYPTION_KEY，私密金鑰將必須以明文儲存，因此此執行個體沒有推播金鑰組。設定後重新啟動，Monize 會自行產生金鑰組。"
+    },
+    "dialogs": {
+      "rotateTitle": "要輪替推播金鑰組嗎？",
+      "rotateMessage": "{count, plural, =0 {尚未註冊任何裝置，不會有任何損失。} other {# 台已註冊裝置將停止接收通知，直到在各自的瀏覽器中重新啟用推播。}}",
+      "rotateConfirm": "輪替"
+    },
+    "toasts": {
+      "loadFailed": "無法載入通知設定",
+      "pushEnabled": "已為此執行個體啟用瀏覽器推播",
+      "pushDisabled": "已為此執行個體關閉瀏覽器推播",
+      "pushToggleFailed": "無法變更瀏覽器推播設定",
+      "rotated": "{count, plural, =0 {已輪替金鑰組} other {已輪替金鑰組；# 台裝置必須重新註冊}}",
+      "rotateFailed": "無法輪替金鑰組"
+    }
   }
 }

@@ -179,6 +179,41 @@ describe("IsSafeUrl validator", () => {
     });
   });
 
+  // `URL.hostname` keeps the brackets on an IPv6 literal, and every check in the
+  // validator compares against unbracketed forms: net.isIP("[::1]") is 0,
+  // normalizeIp returns null, and /^::1$/ does not match. So every case below
+  // passed the strict check until `unbracketHost` was added -- an SSRF bypass on
+  // any client-supplied URL, reachable through one bracket pair.
+  describe("IPv6 literals (bracketed-host bypass prevention)", () => {
+    it("rejects [::1] (loopback)", async () => {
+      await expectInvalid("https://[::1]/api");
+    });
+
+    it("rejects [::1] on an explicit port", async () => {
+      await expectInvalid("https://[::1]:8080/api");
+    });
+
+    it("rejects [::] (unspecified)", async () => {
+      await expectInvalid("https://[::]/api");
+    });
+
+    it("rejects a unique-local address", async () => {
+      await expectInvalid("https://[fd00::1]/api");
+    });
+
+    it("rejects a link-local address", async () => {
+      await expectInvalid("https://[fe80::1]/api");
+    });
+
+    it("rejects an IPv4-mapped loopback", async () => {
+      await expectInvalid("https://[::ffff:127.0.0.1]/api");
+    });
+
+    it("allows a public IPv6 address", async () => {
+      await expectValid("https://[2606:4700:4700::1111]/api");
+    });
+  });
+
   describe("alternative IP encodings (SSRF bypass prevention)", () => {
     it("rejects decimal IP for 127.0.0.1 (2130706433)", async () => {
       await expectInvalid("https://2130706433/api");

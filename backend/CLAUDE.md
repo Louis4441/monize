@@ -270,6 +270,34 @@ Seven rules, each with a test in `payee-contact-enrichment.service.spec.ts`, `co
 - **A lookup never fails a create, and it runs after the commit.** `PayeesService.create` dispatches the background enrichment only when the row carries no contact detail, the preview did not already look up, and `getActiveScopedManager()` is undefined -- "the callback resolved" only means "committed" when nobody upstream opened a transaction we joined, and a dispatch inside one would look for a row nobody else can see. The dispatch runs under `withUserContext` on the request's tail and logs its failure.
 - **The preview looks up so the card and the commit agree.** A single AI/MCP `create_payee` preview with no contact details runs the lookup (`previewCreate(..., { lookupContact: true })`) and hands its stamp down the descriptor to `create(..., { contactLookup })`, which stores that provenance instead of looking up again. Batch rows are enriched after they commit instead -- 25 model calls inside one chat turn is the wrong latency budget -- and both tool descriptions say so.
 
+## A business feature asks for a notification; it never imports a transport
+
+`WebPushSender` (`src/push/web-push-sender.service.ts`) is the only file in
+`src/` that imports `web-push` or calls `sendNotification`, and
+`push-secret.guard.spec.ts` fails on a second one. Budgets, bills, backups and
+imports call the notification layer and let it decide the wire -- that is what
+will let ntfy or UnifiedPush arrive later without any of them changing
+(discussion #1291, "delivery isolation"). The VAPID private key follows from the
+same boundary: it is read only by `PushConfigService`, handed only to the sender,
+and no response shape in `src/push/` declares a private field. See INV-PUSH-001
+through INV-PUSH-005.
+
+Two consequences that are easy to get backwards. **A push endpoint is a URL the
+server will make an outbound request to**, so it is validated with
+`IsPushEndpoint`, which reuses the AI provider's `validateUrlIsSafe` and adds an
+https floor -- never a bare `@IsUrl()`. And **a subscription belongs to a browser
+profile, not to a session**: the unique index is on `endpoint_hash` alone, so a
+second account subscribing in the same browser takes the endpoint over instead of
+sharing it.
+
+## Copy composed outside a request is rendered in the recipient's locale
+
+`emailTranslator(i18n, lang)` with `resolveUserEmailLocale` is not email-only
+despite the names: a Web Push body is composed on the server, in a cron or a
+background write with no request locale to inherit, so it resolves the
+recipient's stored `user_preferences.language` exactly as an email does. Reuse
+those two; a second locale resolver is how the answers drift.
+
 ## Rejection happens before the write
 
 A check capable of refusing a command belongs inside the transaction that performs it, and under the same lock where concurrency is in play. A service that mutates, commits, and returns a success-shaped value for a caller to reject afterwards has already done the thing the `409` says it did not do.
@@ -392,7 +420,7 @@ Changing what a service computes and seeing every test pass means the change is 
 
 ## Internationalization (i18n)
 
-Server-rendered strings (exception messages, email copy) are localized via `nestjs-i18n`. Wrap exception messages in `tr(key, fallback, args)` (`src/i18n/translate.ts`), which resolves against the request locale and returns the English `fallback` outside an HTTP context. Render emails with `emailTranslator(i18n, recipientLang)` (`src/i18n/email-translator.ts`) so copy matches the recipient's stored locale. Catalogs live in `src/i18n/locales/{locale}/*.json`; the authoritative locale list is `SUPPORTED_LOCALE_CODES` in `src/i18n/config.ts` (root `CLAUDE.md` enumerates them) -- keep in sync with the frontend's. The `en-*` entries are lean regional variants (`LOCALE_BASES`), falling back to `en` per key. Adding or changing a string means updating every locale (`src/i18n/locales.parity.spec.ts` fails otherwise), then `npm run i18n:pseudo`. Full flow: `src/i18n/README.md`.
+Server-rendered strings (exception messages, email copy) are localized via `nestjs-i18n`. Wrap exception messages in `tr(key, fallback, args)` (`src/i18n/translate.ts`), which resolves against the request locale and returns the English `fallback` outside an HTTP context. Render anything addressed to a person and composed outside a request -- emails, and a Web Push body -- with `emailTranslator(i18n, recipientLang)` (`src/i18n/email-translator.ts`) so copy matches the recipient's stored locale. Catalogs live in `src/i18n/locales/{locale}/*.json`; the authoritative locale list is `SUPPORTED_LOCALE_CODES` in `src/i18n/config.ts` (root `CLAUDE.md` enumerates them) -- keep in sync with the frontend's. The `en-*` entries are lean regional variants (`LOCALE_BASES`), falling back to `en` per key. Adding or changing a string means updating every locale (`src/i18n/locales.parity.spec.ts` fails otherwise), then `npm run i18n:pseudo`. Full flow: `src/i18n/README.md`.
 
 ## Every line in the log has the same shape
 

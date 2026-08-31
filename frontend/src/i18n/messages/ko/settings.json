@@ -234,6 +234,43 @@
       "digestUpdateFailed": "예산 요약 설정 업데이트에 실패했습니다",
       "digestDayFailed": "요약 발송일 업데이트에 실패했습니다",
       "testEmailFailed": "테스트 이메일 전송에 실패했습니다"
+    },
+    "push": {
+      "heading": "브라우저 푸시",
+      "description": "Monize를 닫아 두어도 이 기기에서 알림을 받습니다.",
+      "enableButton": "이 기기에서 사용",
+      "enablingButton": "사용 설정 중...",
+      "sendTestButton": "테스트 알림 보내기",
+      "sendingTestButton": "보내는 중...",
+      "removeButton": "삭제",
+      "thisDevice": "이 기기",
+      "unnamedDevice": "이름 없는 기기",
+      "lastSeen": "마지막 활동 {when}",
+      "noLiveDevices": "아직 등록된 기기가 없습니다. 테스트를 보내려면 이 기기에서 푸시를 켜세요.",
+      "notConfigured": "이 Monize 인스턴스에서는 브라우저 푸시를 사용할 수 없습니다. 관리자가 Admin 영역에서 켤 수 있습니다.",
+      "disabledByAdmin": "관리자가 이 Monize 인스턴스의 브라우저 푸시를 껐습니다.",
+      "statusUnavailable": "브라우저 푸시를 사용할 수 있는지 확인하지 못했습니다. 페이지를 새로고침해 다시 시도하세요.",
+      "unsupported": {
+        "unsupported": "이 브라우저는 푸시 알림을 받을 수 없습니다.",
+        "denied": "이 브라우저에서 Monize 알림이 차단되어 있습니다. 브라우저의 사이트 설정에서 허용한 뒤 이 페이지를 새로고침하세요.",
+        "ios-browser": "iPhone과 iPad에서는 Monize를 홈 화면에 설치해야 푸시 알림이 작동합니다. 공유 메뉴에서 홈 화면에 추가를 선택한 뒤 거기서 Monize를 여세요."
+      },
+      "disabledReason": {
+        "GONE": "더 이상 연결할 수 없습니다. 해당 브라우저에서 푸시를 다시 켜세요.",
+        "KEY_ROTATED": "이 인스턴스가 푸시 키 쌍을 교체할 때 해제되었습니다. 해당 브라우저에서 푸시를 다시 켜세요.",
+        "FAILING": "전송 실패가 반복되어 해제되었습니다. 해당 브라우저에서 푸시를 다시 켜세요."
+      },
+      "toasts": {
+        "enabled": "이 기기에서 푸시 알림을 켰습니다",
+        "enableFailed": "푸시 알림을 켤 수 없습니다",
+        "permissionDenied": "이 브라우저가 Monize 알림을 차단하고 있습니다. 사이트 설정에서 허용한 뒤 다시 시도하세요.",
+        "permissionDismissed": "알림이 켜지지 않았습니다. 브라우저가 물으면 허용을 선택하세요.",
+        "removed": "기기를 삭제했습니다",
+        "removeFailed": "기기를 삭제할 수 없습니다",
+        "testSent": "{count, plural, other {기기 #대에 테스트 알림을 보냈습니다}}",
+        "testPartial": "테스트 알림이 기기 {attempted}대 중 {delivered}대에 도착했습니다",
+        "testFailed": "테스트 알림을 전달하지 못했습니다"
+      }
     }
   },
   "help": {

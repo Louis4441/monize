@@ -104,5 +104,65 @@
       "tempPasswordDescCreated": "Er is een tijdelijk wachtwoord gegenereerd voor {name}. Deel dit met hen om in te loggen.",
       "tempPasswordDescUpgraded": "Een bestaande gedeelde gebruiker is omgezet naar een volledig account. Deel dit tijdelijke wachtwoord met {name}."
     }
+  },
+  "notificationsPage": {
+    "title": "Meldingen",
+    "subtitle": "Bezorgkanalen die deze Monize-instantie biedt, en de push-identiteit erachter.",
+    "loading": "Meldingsinstellingen laden...",
+    "loadUnavailable": "Monize kon de meldingsinstellingen niet van de server lezen. Herlaad de pagina om het opnieuw te proberen.",
+    "channelsHeading": "Bezorgkanalen",
+    "identityHeading": "Web Push-identiteit",
+    "perAccountNote": "Apparaten, testmeldingen en meldingsvoorkeuren horen bij elk account en worden beheerd in Instellingen. Een beheerder configureert de instantie en verstuurt of ziet nooit de meldingen van iemand anders.",
+    "channelState": {
+      "on": "Aan",
+      "off": "Uit",
+      "unconfigured": "Niet beschikbaar"
+    },
+    "channels": {
+      "inApp": {
+        "name": "Meldingen in de app",
+        "description": "De bel in de kopregel. Altijd beschikbaar en niet uit te schakelen: hier blijft een melding staan, ook als elk ander kanaal faalt."
+      },
+      "webPush": {
+        "name": "Browserpush",
+        "description": "Meldingen op telefoon of desktop, ook als Monize gesloten is. Vereist geen Firebase, Google Play- of Apple Developer-account.",
+        "toggleLabel": "Browserpush inschakelen voor deze instantie",
+        "missingKeys": "Deze instantie heeft geen pushsleutelpaar. Stel ENCRYPTION_KEY in en start opnieuw: Monize genereert het paar bij de volgende start zelf."
+      },
+      "email": {
+        "name": "E-mail",
+        "description": "Factuurherinneringen, budgetsamenvattingen en systeemwaarschuwingen naar het e-mailadres van elk account.",
+        "missingSmtp": "Er is geen mailserver geconfigureerd. Stel de SMTP-omgevingsvariabelen in om e-mail in te schakelen.",
+        "statusUnavailable": "Monize kon de status van de mailserver niet lezen."
+      },
+      "ntfy": {
+        "name": "ntfy en UnifiedPush",
+        "description": "Zelfgehoste bezorging voor wie liever niet afhankelijk is van de infrastructuur van Google of Apple.",
+        "notYetAvailable": "Nog niet beschikbaar. Gepland zodra browserpush is ingeburgerd."
+      }
+    },
+    "identity": {
+      "fingerprintLabel": "Sleutelvingerafdruk",
+      "generatedLabel": "Gegenereerd",
+      "devicesLabel": "Geregistreerde apparaten",
+      "deviceCounts": "{live} actief, {disabled} stopgezet",
+      "rotateDescription": "Vervangen wisselt het sleutelpaar van deze instantie. Elk geregistreerd apparaat is daarna onbereikbaar en moet push opnieuw inschakelen; vervang dus alleen als de sleutel mogelijk is gelekt.",
+      "rotateButton": "Sleutelpaar vervangen",
+      "rotatingButton": "Vervangen...",
+      "missingEncryptionKey": "Deze instantie heeft geen pushsleutelpaar, omdat ENCRYPTION_KEY niet is ingesteld en de privésleutel onversleuteld opgeslagen zou moeten worden. Stel de variabele in en start opnieuw: Monize genereert het paar zelf."
+    },
+    "dialogs": {
+      "rotateTitle": "Pushsleutelpaar vervangen?",
+      "rotateMessage": "{count, plural, =0 {Er is nog geen apparaat geregistreerd, dus er gaat niets verloren.} one {Eén geregistreerd apparaat ontvangt geen meldingen meer totdat push in die browser opnieuw wordt ingeschakeld.} other {# geregistreerde apparaten ontvangen geen meldingen meer totdat push in elke browser opnieuw wordt ingeschakeld.}}",
+      "rotateConfirm": "Vervangen"
+    },
+    "toasts": {
+      "loadFailed": "Kon de meldingsinstellingen niet laden",
+      "pushEnabled": "Browserpush ingeschakeld voor deze instantie",
+      "pushDisabled": "Browserpush uitgeschakeld voor deze instantie",
+      "pushToggleFailed": "Kon de browserpush-instelling niet wijzigen",
+      "rotated": "{count, plural, =0 {Sleutelpaar vervangen} one {Sleutelpaar vervangen; 1 apparaat moet zich opnieuw registreren} other {Sleutelpaar vervangen; # apparaten moeten zich opnieuw registreren}}",
+      "rotateFailed": "Kon het sleutelpaar niet vervangen"
+    }
   }
 }

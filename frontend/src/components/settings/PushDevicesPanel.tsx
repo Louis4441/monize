@@ -1,0 +1,306 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
+import toast from 'react-hot-toast';
+import { Button } from '@/components/ui/Button';
+import { TABLE_BODY_CLASS } from '@/components/ui/Table';
+import {
+  currentDeviceFingerprint,
+  disablePushOnThisDevice,
+  enablePushOnThisDevice,
+  getPushSupport,
+  pushApi,
+  PushPermissionError,
+  type PushConfig,
+  type PushDevice,
+  type PushSupport,
+} from '@/lib/push';
+import { createLogger } from '@/lib/logger';
+import { getErrorMessage } from '@/lib/errors';
+
+const logger = createLogger('PushDevices');
+
+/**
+ * Browser push, from the account's own side: turn it on for this device, see
+ * the devices this account has registered, send a test notification.
+ *
+ * The instance-level half -- whether this deployment offers push at all, and
+ * the key pair behind it -- is an administrator's page. Nothing here reaches
+ * another account's devices, and there is no route that could.
+ */
+export function PushDevicesPanel() {
+  const t = useTranslations('settings.notifications.push');
+
+  const [config, setConfig] = useState<PushConfig | null>(null);
+  const [configFailed, setConfigFailed] = useState(false);
+  const [devices, setDevices] = useState<PushDevice[]>([]);
+  const [thisDevice, setThisDevice] = useState<string | null>(null);
+  const [support, setSupport] = useState<PushSupport | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isEnabling, setIsEnabling] = useState(false);
+  const [isSendingTest, setIsSendingTest] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  const refreshDevices = useCallback(async () => {
+    const [rows, fingerprint] = await Promise.all([
+      pushApi.listDevices(),
+      currentDeviceFingerprint().catch(() => null),
+    ]);
+    setDevices(rows);
+    setThisDevice(fingerprint);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const pushConfig = await pushApi.getConfig();
+        if (cancelled) return;
+        setConfig(pushConfig);
+        setSupport(getPushSupport());
+        if (pushConfig.enabled) await refreshDevices();
+      } catch (error) {
+        if (cancelled) return;
+        // A failed read is not "push is off here". Rendering the panel as
+        // disabled would tell the user to ask an administrator about a switch
+        // that may be on.
+        logger.error('Failed to load push configuration:', error);
+        setConfigFailed(true);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshDevices]);
+
+  const registeredHere = devices.find(
+    (device) =>
+      thisDevice !== null && device.endpointFingerprint === thisDevice,
+  );
+  const liveDevices = devices.filter((device) => !device.disabledAt);
+
+  const handleEnable = async () => {
+    if (!config?.publicKey) return;
+    setIsEnabling(true);
+    try {
+      await enablePushOnThisDevice(config.publicKey, defaultDeviceName());
+      await refreshDevices();
+      toast.success(t('toasts.enabled'));
+    } catch (error) {
+      if (error instanceof PushPermissionError) {
+        toast.error(
+          error.reason === 'denied'
+            ? t('toasts.permissionDenied')
+            : t('toasts.permissionDismissed'),
+        );
+      } else {
+        toast.error(getErrorMessage(error, t('toasts.enableFailed')));
+      }
+    } finally {
+      setIsEnabling(false);
+    }
+  };
+
+  const handleRemove = async (device: PushDevice) => {
+    setRemovingId(device.id);
+    try {
+      const isThisBrowser = device.endpointFingerprint === thisDevice;
+      if (isThisBrowser) {
+        // Both halves: the server row AND the browser subscription. Leaving
+        // either behind is a device the user can neither receive on nor see.
+        await disablePushOnThisDevice(device.id);
+      } else {
+        await pushApi.removeDevice(device.id);
+      }
+      await refreshDevices();
+      toast.success(t('toasts.removed'));
+    } catch (error) {
+      toast.error(getErrorMessage(error, t('toasts.removeFailed')));
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
+  const handleSendTest = async () => {
+    setIsSendingTest(true);
+    try {
+      const result = await pushApi.sendTest();
+      await refreshDevices();
+      if (result.delivered === result.attempted) {
+        toast.success(t('toasts.testSent', { count: result.delivered }));
+      } else if (result.delivered > 0) {
+        toast.success(
+          t('toasts.testPartial', {
+            delivered: result.delivered,
+            attempted: result.attempted,
+          }),
+        );
+      } else {
+        toast.error(t('toasts.testFailed'));
+      }
+    } catch (error) {
+      toast.error(getErrorMessage(error, t('toasts.testFailed')));
+    } finally {
+      setIsSendingTest(false);
+    }
+  };
+
+  if (isLoading) return null;
+
+  if (configFailed) {
+    return (
+      <PushBlock heading={t('heading')}>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          {t('statusUnavailable')}
+        </p>
+      </PushBlock>
+    );
+  }
+
+  if (!config?.enabled) {
+    return (
+      <PushBlock heading={t('heading')}>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          {config?.configured ? t('disabledByAdmin') : t('notConfigured')}
+        </p>
+      </PushBlock>
+    );
+  }
+
+  if (support && !support.supported) {
+    return (
+      <PushBlock heading={t('heading')}>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          {t(`unsupported.${support.reason ?? 'unsupported'}`)}
+        </p>
+      </PushBlock>
+    );
+  }
+
+  return (
+    <PushBlock heading={t('heading')}>
+      <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
+        {t('description')}
+      </p>
+
+      {devices.length > 0 && (
+        <ul className={`mb-4 ${TABLE_BODY_CLASS}`}>
+          {devices.map((device) => (
+            <li
+              key={device.id}
+              className="flex flex-wrap items-center justify-between gap-2 py-2"
+            >
+              <div className="min-w-0">
+                <p className="text-sm text-gray-900 dark:text-gray-100">
+                  {device.deviceName || t('unnamedDevice')}
+                  {device.endpointFingerprint === thisDevice && (
+                    <span className="ml-2 rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
+                      {t('thisDevice')}
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {device.disabledAt
+                    ? t(`disabledReason.${device.disabledReason ?? 'GONE'}`)
+                    : t('lastSeen', {
+                        when: new Date(device.lastSeenAt).toLocaleString(),
+                      })}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={removingId === device.id}
+                onClick={() => handleRemove(device)}
+              >
+                {t('removeButton')}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        {!registeredHere && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isEnabling}
+            onClick={handleEnable}
+          >
+            {isEnabling ? t('enablingButton') : t('enableButton')}
+          </Button>
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={isSendingTest || liveDevices.length === 0}
+          onClick={handleSendTest}
+        >
+          {isSendingTest ? t('sendingTestButton') : t('sendTestButton')}
+        </Button>
+      </div>
+
+      {liveDevices.length === 0 && (
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          {t('noLiveDevices')}
+        </p>
+      )}
+    </PushBlock>
+  );
+}
+
+function PushBlock({
+  heading,
+  children,
+}: {
+  heading: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border-t border-gray-200 pt-4 dark:border-gray-700">
+      <h3 className="mb-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+        {heading}
+      </h3>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * A name the user will recognise in their own device list, from the platform the
+ * browser reports. Only ever a default -- the field is theirs to change later.
+ */
+export function defaultDeviceName(
+  nav: Navigator = navigator,
+): string | undefined {
+  const ua = nav.userAgent;
+  if (!ua) return undefined;
+  const platform = /iPhone|iPad|iPod/.test(ua)
+    ? 'iOS'
+    : /Android/.test(ua)
+      ? 'Android'
+      : /Macintosh/.test(ua)
+        ? 'Mac'
+        : /Windows/.test(ua)
+          ? 'Windows'
+          : /Linux/.test(ua)
+            ? 'Linux'
+            : null;
+  const browser = /Edg\//.test(ua)
+    ? 'Edge'
+    : /OPR\//.test(ua)
+      ? 'Opera'
+      : /Chrome\//.test(ua)
+        ? 'Chrome'
+        : /Firefox\//.test(ua)
+          ? 'Firefox'
+          : /Safari\//.test(ua)
+            ? 'Safari'
+            : null;
+  if (!platform && !browser) return undefined;
+  return [browser, platform].filter(Boolean).join(' on ');
+}

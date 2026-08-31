@@ -104,5 +104,65 @@
       "tempPasswordDescCreated": "Un mot de passe temporaire a été généré pour {name}. Communiquez-le lui pour se connecter.",
       "tempPasswordDescUpgraded": "Un utilisateur partagé existant a été promu en compte complet. Communiquez ce mot de passe temporaire à {name}."
     }
+  },
+  "notificationsPage": {
+    "title": "Notifications",
+    "subtitle": "Canaux de distribution offerts par cette instance Monize, et l'identité push qui les sous-tend.",
+    "loading": "Chargement des paramètres de notification...",
+    "loadUnavailable": "Monize n'a pas pu lire les paramètres de notification depuis le serveur. Rechargez la page pour réessayer.",
+    "channelsHeading": "Canaux de distribution",
+    "identityHeading": "Identité Web Push",
+    "perAccountNote": "Les appareils, les notifications de test et les préférences appartiennent à chaque compte et se gèrent dans les Paramètres. Un administrateur configure l'instance et n'envoie jamais de notification à autrui, ni ne les voit.",
+    "channelState": {
+      "on": "Activé",
+      "off": "Désactivé",
+      "unconfigured": "Indisponible"
+    },
+    "channels": {
+      "inApp": {
+        "name": "Notifications dans l'application",
+        "description": "La cloche dans l'en-tête. Toujours disponible et non désactivable : c'est là qu'une notification subsiste même si tous les autres canaux échouent."
+      },
+      "webPush": {
+        "name": "Push du navigateur",
+        "description": "Notifications distribuées sur téléphone ou ordinateur même lorsque Monize est fermé. Ne nécessite ni Firebase, ni compte Google Play ou Apple Developer.",
+        "toggleLabel": "Activer le push du navigateur pour cette instance",
+        "missingKeys": "Cette instance n'a pas de paire de clés push. Définissez ENCRYPTION_KEY et redémarrez : Monize génère la paire au démarrage suivant."
+      },
+      "email": {
+        "name": "E-mail",
+        "description": "Rappels de factures, synthèses de budget et alertes système envoyés à l'adresse de chaque compte.",
+        "missingSmtp": "Aucun serveur de messagerie n'est configuré. Définissez les variables d'environnement SMTP pour activer l'e-mail.",
+        "statusUnavailable": "Monize n'a pas pu lire l'état du serveur de messagerie."
+      },
+      "ntfy": {
+        "name": "ntfy et UnifiedPush",
+        "description": "Distribution auto-hébergée pour qui préfère ne pas dépendre de l'infrastructure Google ou Apple.",
+        "notYetAvailable": "Pas encore disponible. Prévu une fois le push du navigateur établi."
+      }
+    },
+    "identity": {
+      "fingerprintLabel": "Empreinte de la clé",
+      "generatedLabel": "Générée",
+      "devicesLabel": "Appareils enregistrés",
+      "deviceCounts": "{live} actifs, {disabled} retirés",
+      "rotateDescription": "La rotation remplace la paire de clés de cette instance. Tous les appareils enregistrés deviennent injoignables et devront réactiver le push : ne faites une rotation que si la clé a pu être exposée.",
+      "rotateButton": "Effectuer la rotation",
+      "rotatingButton": "Rotation...",
+      "missingEncryptionKey": "Cette instance n'a pas de paire de clés push, car ENCRYPTION_KEY n'est pas définie et la clé privée devrait être stockée en clair. Définissez-la et redémarrez : Monize génère la paire lui-même."
+    },
+    "dialogs": {
+      "rotateTitle": "Effectuer la rotation de la paire de clés push ?",
+      "rotateMessage": "{count, plural, =0 {Aucun appareil n'est encore enregistré, rien n'est perdu.} one {Un appareil enregistré cessera de recevoir des notifications tant que le push ne sera pas réactivé dans ce navigateur.} other {# appareils enregistrés cesseront de recevoir des notifications tant que le push ne sera pas réactivé dans chaque navigateur.}}",
+      "rotateConfirm": "Effectuer la rotation"
+    },
+    "toasts": {
+      "loadFailed": "Impossible de charger les paramètres de notification",
+      "pushEnabled": "Push du navigateur activé pour cette instance",
+      "pushDisabled": "Push du navigateur désactivé pour cette instance",
+      "pushToggleFailed": "Impossible de modifier le paramètre de push du navigateur",
+      "rotated": "{count, plural, =0 {Paire de clés renouvelée} one {Paire de clés renouvelée ; 1 appareil doit se réenregistrer} other {Paire de clés renouvelée ; # appareils doivent se réenregistrer}}",
+      "rotateFailed": "Impossible de renouveler la paire de clés"
+    }
   }
 }

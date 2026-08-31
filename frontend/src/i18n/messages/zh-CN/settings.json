@@ -234,6 +234,43 @@
       "digestUpdateFailed": "更新预算摘要偏好失败",
       "digestDayFailed": "更新摘要日期失败",
       "testEmailFailed": "发送测试邮件失败"
+    },
+    "push": {
+      "heading": "浏览器推送",
+      "description": "即使 Monize 已关闭，也能在此设备上接收通知。",
+      "enableButton": "在此设备上启用",
+      "enablingButton": "正在启用...",
+      "sendTestButton": "发送测试通知",
+      "sendingTestButton": "正在发送...",
+      "removeButton": "移除",
+      "thisDevice": "此设备",
+      "unnamedDevice": "未命名设备",
+      "lastSeen": "最后活动 {when}",
+      "noLiveDevices": "尚未注册任何设备。请在此设备上启用推送后再发送测试。",
+      "notConfigured": "此 Monize 实例不提供浏览器推送。管理员可以在 Admin 区域启用。",
+      "disabledByAdmin": "管理员已为此 Monize 实例关闭浏览器推送。",
+      "statusUnavailable": "Monize 无法确认浏览器推送是否可用。请重新加载页面后重试。",
+      "unsupported": {
+        "unsupported": "此浏览器无法接收推送通知。",
+        "denied": "此浏览器已阻止 Monize 的通知。请在浏览器的网站设置中允许通知，然后重新加载本页。",
+        "ios-browser": "在 iPhone 和 iPad 上，只有将 Monize 添加到主屏幕后推送通知才会生效。请使用“分享”，然后选择“添加到主屏幕”，并从那里打开 Monize。"
+      },
+      "disabledReason": {
+        "GONE": "已无法送达。请在该浏览器中重新启用推送。",
+        "KEY_ROTATED": "此实例轮换推送密钥对时已停用。请在该浏览器中重新启用推送。",
+        "FAILING": "多次投递失败后已停用。请在该浏览器中重新启用推送。"
+      },
+      "toasts": {
+        "enabled": "已在此设备上启用推送通知",
+        "enableFailed": "无法启用推送通知",
+        "permissionDenied": "此浏览器正在阻止 Monize 的通知。请在网站设置中允许后重试。",
+        "permissionDismissed": "未启用通知。浏览器询问时请选择“允许”。",
+        "removed": "已移除设备",
+        "removeFailed": "无法移除设备",
+        "testSent": "{count, plural, other {测试通知已发送至 # 台设备}}",
+        "testPartial": "测试通知送达 {attempted} 台设备中的 {delivered} 台",
+        "testFailed": "无法投递测试通知"
+      }
     }
   },
   "help": {

@@ -2181,6 +2181,76 @@ CREATE TABLE gem_strategy_signals (
 CREATE UNIQUE INDEX idx_gem_strategy_signals_period ON gem_strategy_signals(strategy_id, evaluated_on, algorithm_version);
 CREATE INDEX idx_gem_strategy_signals_user ON gem_strategy_signals(user_id);
 
+-- ---------------------------------------------------------------------------
+-- Web Push transport (migration 171).
+--
+-- push_instance_config is the deployment's push identity: one VAPID key pair
+-- per Monize instance, generated on first start so a self-hosted administrator
+-- registers nothing with Google, Apple or Firebase. The private half is
+-- AES-256-GCM ciphertext under ENCRYPTION_KEY; an instance without that
+-- variable stores no key at all rather than a plaintext secret. Deployment-wide
+-- state with no owner column, so the table is RLS-exempt for the same reason
+-- provider_health is -- see the marker block at the foot of the RLS section.
+--
+-- Neither table is exported by a backup (INTENTIONALLY_EXCLUDED_TABLES in
+-- backend/src/backup/export-table-queries.ts): a subscription names a browser
+-- on one machine talking to one origin under one VAPID key, and restoring a
+-- production backup onto a test instance must not hand that instance the right
+-- to push to real phones.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE push_instance_config (
+    -- Singleton. The key admits exactly one value, so a second insert is a
+    -- conflict rather than a second push identity for one deployment.
+    id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
+    vapid_public_key VARCHAR(200) NOT NULL,
+    vapid_private_key_enc TEXT NOT NULL,
+    vapid_generated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- Instance kill-switch. Off hides the whole push surface from every
+    -- account's settings and makes the sender a no-op; it does not delete
+    -- subscriptions, so turning it back on restores the devices as they were.
+    web_push_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE push_subscriptions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    endpoint TEXT NOT NULL,
+    -- SHA-256 hex of the endpoint. The endpoint itself is unbounded text and a
+    -- btree index has a row-size limit, so the hash is what gets indexed.
+    endpoint_hash VARCHAR(64) NOT NULL,
+    p256dh VARCHAR(255) NOT NULL,
+    auth VARCHAR(255) NOT NULL,
+    device_name VARCHAR(100),
+    user_agent VARCHAR(255),
+    -- The instance identity this subscription was minted under. A rotation
+    -- makes every older subscription undeliverable -- the push service checks
+    -- the VAPID signature against the key the subscription was created with --
+    -- so the column is what lets the sender skip a stale row even if the
+    -- rotation that should have disabled it was interrupted.
+    vapid_public_key VARCHAR(200) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_success_at TIMESTAMP,
+    failure_count INTEGER NOT NULL DEFAULT 0,
+    disabled_at TIMESTAMP,
+    disabled_reason VARCHAR(40)
+);
+
+-- Globally unique, not unique per user, and that is the security property.
+--
+-- A push subscription belongs to a browser profile and an origin, NOT to a
+-- Monize session: two people sharing one browser get the same endpoint and the
+-- same encryption keys from pushManager.subscribe(). Scoped per user, both rows
+-- would survive and a notification addressed to the first account would be
+-- decrypted and displayed on the device the second account is now using. One
+-- row per endpoint makes the second subscribe a takeover instead.
+CREATE UNIQUE INDEX idx_push_subscriptions_endpoint ON push_subscriptions(endpoint_hash);
+
+-- Every send starts with "which of this user's devices are still live".
+CREATE INDEX idx_push_subscriptions_user_live ON push_subscriptions(user_id) WHERE disabled_at IS NULL;
+
 -- ===========================================================================
 -- Row-Level Security policies
 --
@@ -2230,6 +2300,7 @@ DECLARE
         'loan_scenarios',
         'monte_carlo_scenarios',
         'payee_aliases',
+        'push_subscriptions',
         'scheduled_transactions',
         'securities',
         'transaction_attachments',
@@ -2782,20 +2853,22 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- rls-exempt: market_index_sync
 -- rls-exempt: oauth_payloads
 -- rls-exempt: provider_health
+-- rls-exempt: push_instance_config
 -- rls-exempt: schema_migrations
 -- ---------------------------------------------------------------------------
 
 -- Verification helper (run manually; not part of the migration's effect):
 --   SELECT tablename, policyname FROM pg_policies
 --    WHERE schemaname = 'public' ORDER BY tablename;
--- Expected: 58 policies -- 26 direct + 4 real-user-keyed (112),
+-- Expected: 59 policies -- 27 direct + 4 real-user-keyed (112),
 --           15 indirect (113), 5 special (114),
 --           2 direct for the .mny import's staging + job tables (117),
 --           1 direct for security_documents (118),
 --           4 direct for the GEM strategy tables (124, 125),
 --           2 direct for job_claims and attachment_blob_tombstones,
 --           1 indirect for scheduled_transaction_postings (133), and
---           1 direct for the OIDC step-up claim ledger (155).
+--           1 direct for the OIDC step-up claim ledger (155), and
+--           1 direct for push_subscriptions (171).
 
 -- ---------------------------------------------------------------------------
 -- Enable row-level security (migration 123).

@@ -104,5 +104,65 @@
       "tempPasswordDescCreated": "Für {name} wurde ein temporäres Passwort generiert. Teilen Sie es der Person mit, damit sie sich anmelden kann.",
       "tempPasswordDescUpgraded": "Ein bestehender geteilter Benutzer wurde auf ein vollständiges Konto hochgestuft. Teilen Sie {name} dieses temporäre Passwort mit."
     }
+  },
+  "notificationsPage": {
+    "title": "Benachrichtigungen",
+    "subtitle": "Zustellkanäle dieser Monize-Instanz und die Push-Identität dahinter.",
+    "loading": "Benachrichtigungseinstellungen werden geladen ...",
+    "loadUnavailable": "Monize konnte die Benachrichtigungseinstellungen nicht vom Server lesen. Laden Sie die Seite neu, um es erneut zu versuchen.",
+    "channelsHeading": "Zustellkanäle",
+    "identityHeading": "Web-Push-Identität",
+    "perAccountNote": "Geräte, Testbenachrichtigungen und Benachrichtigungseinstellungen gehören zu jedem Konto und werden in den Einstellungen verwaltet. Die Administration konfiguriert die Instanz und sendet nie an fremde Benachrichtigungen – und sieht sie auch nicht.",
+    "channelState": {
+      "on": "Ein",
+      "off": "Aus",
+      "unconfigured": "Nicht verfügbar"
+    },
+    "channels": {
+      "inApp": {
+        "name": "In-App-Benachrichtigungen",
+        "description": "Die Glocke in der Kopfzeile. Immer verfügbar und nicht abschaltbar: Hier lebt eine Benachrichtigung, auch wenn jeder andere Kanal ausfällt."
+      },
+      "webPush": {
+        "name": "Browser-Push",
+        "description": "Benachrichtigungen auf Telefon oder Desktop, auch wenn Monize geschlossen ist. Benötigt weder Firebase noch ein Google-Play- oder Apple-Developer-Konto.",
+        "toggleLabel": "Browser-Push für diese Instanz aktivieren",
+        "missingKeys": "Diese Instanz hat kein Push-Schlüsselpaar. Setzen Sie ENCRYPTION_KEY und starten Sie neu: Monize erzeugt das Paar beim nächsten Start selbst."
+      },
+      "email": {
+        "name": "E-Mail",
+        "description": "Rechnungserinnerungen, Budget-Zusammenfassungen und Systemwarnungen an die E-Mail-Adresse des jeweiligen Kontos.",
+        "missingSmtp": "Es ist kein Mailserver konfiguriert. Setzen Sie die SMTP-Umgebungsvariablen, um E-Mail zu aktivieren.",
+        "statusUnavailable": "Monize konnte den Status des Mailservers nicht lesen."
+      },
+      "ntfy": {
+        "name": "ntfy und UnifiedPush",
+        "description": "Selbst gehostete Zustellung für alle, die nicht von Google- oder Apple-Infrastruktur abhängen möchten.",
+        "notYetAvailable": "Noch nicht verfügbar. Geplant, sobald Browser-Push etabliert ist."
+      }
+    },
+    "identity": {
+      "fingerprintLabel": "Schlüssel-Fingerabdruck",
+      "generatedLabel": "Erzeugt",
+      "devicesLabel": "Registrierte Geräte",
+      "deviceCounts": "{live} aktiv, {disabled} stillgelegt",
+      "rotateDescription": "Beim Erneuern wird das Schlüsselpaar dieser Instanz ersetzt. Jedes registrierte Gerät ist danach nicht mehr erreichbar und muss Push erneut aktivieren – erneuern Sie also nur, wenn der Schlüssel offengelegt sein könnte.",
+      "rotateButton": "Schlüsselpaar erneuern",
+      "rotatingButton": "Wird erneuert ...",
+      "missingEncryptionKey": "Diese Instanz hat kein Push-Schlüsselpaar, weil ENCRYPTION_KEY nicht gesetzt ist und der private Schlüssel unverschlüsselt gespeichert werden müsste. Setzen Sie die Variable und starten Sie neu: Monize erzeugt das Paar selbst."
+    },
+    "dialogs": {
+      "rotateTitle": "Push-Schlüsselpaar erneuern?",
+      "rotateMessage": "{count, plural, =0 {Es ist noch kein Gerät registriert, es geht also nichts verloren.} one {Ein registriertes Gerät erhält keine Benachrichtigungen mehr, bis Push in diesem Browser wieder aktiviert wird.} other {# registrierte Geräte erhalten keine Benachrichtigungen mehr, bis Push in jedem dieser Browser wieder aktiviert wird.}}",
+      "rotateConfirm": "Erneuern"
+    },
+    "toasts": {
+      "loadFailed": "Benachrichtigungseinstellungen konnten nicht geladen werden",
+      "pushEnabled": "Browser-Push für diese Instanz aktiviert",
+      "pushDisabled": "Browser-Push für diese Instanz deaktiviert",
+      "pushToggleFailed": "Die Browser-Push-Einstellung konnte nicht geändert werden",
+      "rotated": "{count, plural, =0 {Schlüsselpaar erneuert} one {Schlüsselpaar erneuert; 1 Gerät muss sich erneut registrieren} other {Schlüsselpaar erneuert; # Geräte müssen sich erneut registrieren}}",
+      "rotateFailed": "Das Schlüsselpaar konnte nicht erneuert werden"
+    }
   }
 }

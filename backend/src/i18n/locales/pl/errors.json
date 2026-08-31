@@ -341,6 +341,12 @@
     "smtpNotConfigured": "SMTP nie jest skonfigurowany. Ustaw zmienne środowiskowe SMTP.",
     "noEmailOnFile": "Brak zapisanego adresu e-mail dla tego użytkownika."
   },
+  "push": {
+    "channelUnavailable": "Powiadomienia push nie są dostępne w tej instancji Monize.",
+    "endpointClaimed": "Ta przeglądarka jest już zarejestrowana na innym koncie Monize. Wyloguj się z tamtego konta w tej przeglądarce i spróbuj ponownie.",
+    "deviceNotFound": "Nie znaleziono urządzenia push.",
+    "noDevices": "Do tego konta nie przypisano żadnego urządzenia push. Najpierw włącz powiadomienia push w tej przeglądarce."
+  },
   "institutions": {
     "nameConflict": "Instytucja o nazwie \"{{ name }}\" już istnieje",
     "notFound": "Nie znaleziono instytucji o ID {{ id }}",

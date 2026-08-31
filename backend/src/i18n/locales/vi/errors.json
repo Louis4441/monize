@@ -341,6 +341,12 @@
     "smtpNotConfigured": "SMTP chưa được cấu hình. Hãy thiết lập các biến môi trường SMTP.",
     "noEmailOnFile": "Không có địa chỉ email nào được lưu cho người dùng này."
   },
+  "push": {
+    "channelUnavailable": "Thông báo đẩy không khả dụng trên phiên bản Monize này.",
+    "endpointClaimed": "Trình duyệt này đã được đăng ký cho một tài khoản Monize khác. Hãy đăng xuất khỏi tài khoản đó trong trình duyệt này rồi thử lại.",
+    "deviceNotFound": "Không tìm thấy thiết bị nhận thông báo đẩy.",
+    "noDevices": "Chưa có thiết bị nhận thông báo đẩy nào cho tài khoản này. Hãy bật thông báo đẩy trong trình duyệt này trước."
+  },
   "institutions": {
     "nameConflict": "Tổ chức với tên \"{{ name }}\" đã tồn tại",
     "notFound": "Không tìm thấy tổ chức với ID {{ id }}",

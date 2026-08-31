@@ -341,6 +341,12 @@
     "smtpNotConfigured": "SMTPが設定されていません。SMTP環境変数を設定してください。",
     "noEmailOnFile": "このユーザーにはメールアドレスが登録されていません。"
   },
+  "push": {
+    "channelUnavailable": "この Monize インスタンスではプッシュ通知を利用できません。",
+    "endpointClaimed": "このブラウザーはすでに別の Monize アカウントに登録されています。このブラウザーでそのアカウントからサインアウトしてから、もう一度お試しください。",
+    "deviceNotFound": "プッシュデバイスが見つかりません。",
+    "noDevices": "このアカウントにはプッシュデバイスが登録されていません。まずこのブラウザーでプッシュ通知を有効にしてください。"
+  },
   "institutions": {
     "nameConflict": "「{{ name }}」という名前の金融機関はすでに存在します",
     "notFound": "ID {{ id }} の金融機関が見つかりません",

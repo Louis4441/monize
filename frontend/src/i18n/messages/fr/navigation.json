@@ -19,6 +19,7 @@
   "tools": "Outils",
   "admin": "Administration",
   "userManagement": "Gestion des utilisateurs",
+  "notificationSettings": "Paramètres de notification",
   "settings": "Paramètres",
   "logout": "Déconnexion",
   "toggleMenu": "Afficher/masquer le menu",

@@ -341,6 +341,12 @@
     "smtpNotConfigured": "SMTP yapılandırılmamış. SMTP ortam değişkenlerini ayarlayın.",
     "noEmailOnFile": "Bu kullanıcı için kayıtlı e-posta adresi yok."
   },
+  "push": {
+    "channelUnavailable": "Bu Monize örneğinde anlık bildirimler kullanılamıyor.",
+    "endpointClaimed": "Bu tarayıcı zaten başka bir Monize hesabına kayıtlı. Bu tarayıcıda o hesaptan çıkış yapıp yeniden deneyin.",
+    "deviceNotFound": "Anlık bildirim cihazı bulunamadı.",
+    "noDevices": "Bu hesap için kayıtlı anlık bildirim cihazı yok. Önce bu tarayıcıda anlık bildirimleri açın."
+  },
   "institutions": {
     "nameConflict": "\"{{ name }}\" adlı kurum zaten mevcut",
     "notFound": "{{ id }} kimliğine sahip kurum bulunamadı",

@@ -1,0 +1,62 @@
+import { Body, Controller, Get, Patch, Post, UseGuards } from "@nestjs/common";
+import { AuthGuard } from "@nestjs/passport";
+import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { DemoRestricted } from "../common/decorators/demo-restricted.decorator";
+import { AdminPushConfig, PushConfigService } from "./push-config.service";
+import { UpdatePushChannelsDto } from "./dto/update-push-channels.dto";
+
+/** The rotation's report: the new identity, and how many devices it retired. */
+export interface RotateVapidResult {
+  config: AdminPushConfig;
+  disabledSubscriptions: number;
+}
+
+/**
+ * Instance-level notification settings: which delivery channels this Monize
+ * deployment offers, and the Web Push identity behind one of them.
+ *
+ * Deliberately nothing per user. An administrator decides whether the
+ * deployment can push at all; every account decides its own devices and
+ * preferences in its own settings, and no route here reads or sends another
+ * user's notifications.
+ */
+@ApiTags("Admin")
+@Controller("admin/notifications")
+@UseGuards(AuthGuard("jwt"), RolesGuard)
+@Roles("admin")
+@ApiBearerAuth()
+@DemoRestricted()
+export class AdminNotificationsController {
+  constructor(private readonly pushConfig: PushConfigService) {}
+
+  @Get("channels")
+  @ApiOperation({ summary: "Instance push identity and channel availability" })
+  getChannels(): Promise<AdminPushConfig> {
+    return this.pushConfig.getAdminConfig();
+  }
+
+  @Patch("channels")
+  @ApiOperation({
+    summary: "Turn the Web Push channel on or off instance-wide",
+  })
+  updateChannels(@Body() dto: UpdatePushChannelsDto): Promise<AdminPushConfig> {
+    return this.pushConfig.setWebPushEnabled(dto.webPushEnabled);
+  }
+
+  /**
+   * Mint a new VAPID key pair.
+   *
+   * Every registered device stops being reachable and has to subscribe again --
+   * the push service validates the signature against the key the subscription
+   * was minted with -- so the count of retired devices is part of the answer,
+   * not a log line.
+   */
+  @Post("vapid/rotate")
+  @ApiOperation({ summary: "Rotate this instance's Web Push key pair" })
+  async rotate(): Promise<RotateVapidResult> {
+    const { config, disabled } = await this.pushConfig.rotateKeyPair();
+    return { config, disabledSubscriptions: disabled };
+  }
+}

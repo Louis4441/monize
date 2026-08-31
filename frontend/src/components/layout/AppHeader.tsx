@@ -21,7 +21,7 @@ import {
   clearTransactionFilterStorage,
   type HeaderSearchEventDetail,
 } from '@/hooks/useTransactionFilters';
-import { NAV_LINKS, TOOLS_LINKS, AI_LINKS, NAV_ICONS } from '@/lib/nav-links';
+import { NAV_LINKS, TOOLS_LINKS, AI_LINKS, ADMIN_LINKS, NAV_ICONS } from '@/lib/nav-links';
 import toast from 'react-hot-toast';
 
 // Labels are translation keys in the `navigation` namespace, resolved at
@@ -30,6 +30,7 @@ import toast from 'react-hot-toast';
 const navLinks = NAV_LINKS;
 const toolsLinks = TOOLS_LINKS;
 const aiLinks = AI_LINKS;
+const adminLinks = ADMIN_LINKS;
 
 /** Leading icon on a dropdown/menu row; the top-bar pills stay text-only. */
 function NavItemIcon({ href, active }: { href: string; active: boolean }) {
@@ -114,10 +115,12 @@ export function AppHeader() {
   const tourOpensTools = useTourOpensToolsMenu();
   const toolsExpanded = toolsOpen || tourOpensTools;
   const [aiOpen, setAiOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const toolsRef = useRef<HTMLDivElement>(null);
+  const adminRef = useRef<HTMLDivElement>(null);
   const aiRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -125,6 +128,7 @@ export function AppHeader() {
   // Close dropdowns when clicking outside
   useClickOutside(toolsRef, () => setToolsOpen(false));
   useClickOutside(aiRef, () => setAiOpen(false));
+  useClickOutside(adminRef, () => setAdminOpen(false));
   useClickOutside(searchRef, () => setSearchOpen(false));
 
   // Focus the search input as it slides open.
@@ -173,7 +177,8 @@ export function AppHeader() {
   // moving it in lockstep with the scroll position. Keep it pinned while any
   // menu or the search field is open so the open surface never scrolls away.
   const { ref: headerRef, offset: scrollOffset } = useHideOnScroll<HTMLElement>();
-  const anyMenuOpen = mobileMenuOpen || searchOpen || toolsExpanded || aiOpen;
+  const anyMenuOpen =
+    mobileMenuOpen || searchOpen || toolsExpanded || aiOpen || adminOpen;
   const headerOffset = anyMenuOpen ? 0 : scrollOffset;
 
   // Publish how far the header is currently slid up so sticky sub-navigation
@@ -414,18 +419,55 @@ export function AppHeader() {
               </>
               )}
 
-              {/* Admin link - only visible to admins */}
+              {/* Admin menu - only visible to admins */}
               {!isDelegateView && user?.role === 'admin' && (
-                <button
-                  onClick={() => router.push('/admin/users')}
-                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    pathname.startsWith('/admin')
-                      ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200'
-                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  {t('admin')}
-                </button>
+                <div className="relative" ref={adminRef}>
+                  <button
+                    onClick={() => setAdminOpen(!adminOpen)}
+                    className={`px-3 py-2 text-sm font-medium rounded-md transition-colors inline-flex items-center gap-1 ${
+                      pathname.startsWith('/admin')
+                        ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {t('admin')}
+                    <svg
+                      className={`w-4 h-4 transition-transform ${adminOpen ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {adminOpen && (
+                    <div className="absolute left-0 mt-1 w-56 bg-white dark:bg-gray-800 rounded-md shadow-lg dark:shadow-gray-700/50 border border-gray-200 dark:border-gray-700 z-50">
+                      <div className="py-1">
+                        {adminLinks.map((link) => {
+                          const active = isNavSectionActive(pathname, link.href);
+                          return (
+                            <button
+                              key={link.href}
+                              onClick={() => {
+                                router.push(link.href);
+                                setAdminOpen(false);
+                              }}
+                              className={`flex w-full items-center gap-2.5 text-left px-4 py-2 text-sm transition-colors ${
+                                active
+                                  ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-200'
+                                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                              }`}
+                            >
+                              <NavItemIcon href={link.href} active={active} />
+                              {t(link.labelKey)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </nav>
             )}

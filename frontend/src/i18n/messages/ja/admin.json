@@ -104,5 +104,65 @@
       "tempPasswordDescCreated": "{name} の一時パスワードが生成されました。サインインするために共有してください。",
       "tempPasswordDescUpgraded": "既存の共有ユーザーが正式アカウントにアップグレードされました。{name} にこの一時パスワードを共有してください。"
     }
+  },
+  "notificationsPage": {
+    "title": "通知",
+    "subtitle": "この Monize インスタンスが提供する配信チャネルと、その背後にあるプッシュ ID。",
+    "loading": "通知設定を読み込んでいます...",
+    "loadUnavailable": "Monize はサーバーから通知設定を読み取れませんでした。ページを再読み込みしてやり直してください。",
+    "channelsHeading": "配信チャネル",
+    "identityHeading": "Web Push ID",
+    "perAccountNote": "端末、テスト通知、通知の設定は各アカウントのものであり、設定画面で管理します。管理者はインスタンスを構成するだけで、他の人の通知を送ることも見ることもありません。",
+    "channelState": {
+      "on": "オン",
+      "off": "オフ",
+      "unconfigured": "利用不可"
+    },
+    "channels": {
+      "inApp": {
+        "name": "アプリ内通知",
+        "description": "ヘッダーのベル。常に利用でき、無効にできません。他のすべてのチャネルが失敗しても、通知はここに残ります。"
+      },
+      "webPush": {
+        "name": "ブラウザープッシュ",
+        "description": "Monize を閉じていても、スマートフォンやデスクトップに届く通知。Firebase も Google Play や Apple Developer のアカウントも不要です。",
+        "toggleLabel": "このインスタンスでブラウザープッシュを有効にする",
+        "missingKeys": "このインスタンスにはプッシュ鍵ペアがありません。ENCRYPTION_KEY を設定して再起動してください。次回起動時に Monize が鍵ペアを自動生成します。"
+      },
+      "email": {
+        "name": "メール",
+        "description": "請求リマインダー、予算ダイジェスト、システム警告を各アカウントのメールアドレスへ送信します。",
+        "missingSmtp": "メールサーバーが設定されていません。メールを有効にするには SMTP の環境変数を設定してください。",
+        "statusUnavailable": "Monize はメールサーバーの状態を読み取れませんでした。"
+      },
+      "ntfy": {
+        "name": "ntfy と UnifiedPush",
+        "description": "Google や Apple のインフラに依存したくない方のためのセルフホスト配信。",
+        "notYetAvailable": "まだ利用できません。ブラウザープッシュが定着した後に予定しています。"
+      }
+    },
+    "identity": {
+      "fingerprintLabel": "鍵のフィンガープリント",
+      "generatedLabel": "生成日時",
+      "devicesLabel": "登録済み端末",
+      "deviceCounts": "有効 {live} 台、停止 {disabled} 台",
+      "rotateDescription": "更新するとこのインスタンスの鍵ペアが置き換わります。登録済みの端末はすべて到達できなくなり、再度プッシュを有効にする必要があるため、鍵が漏えいした可能性がある場合にのみ更新してください。",
+      "rotateButton": "鍵ペアを更新",
+      "rotatingButton": "更新中...",
+      "missingEncryptionKey": "ENCRYPTION_KEY が設定されておらず、秘密鍵を暗号化せずに保存することになるため、このインスタンスにはプッシュ鍵ペアがありません。設定して再起動すれば、Monize が鍵ペアを自動生成します。"
+    },
+    "dialogs": {
+      "rotateTitle": "プッシュ鍵ペアを更新しますか？",
+      "rotateMessage": "{count, plural, =0 {まだ端末が登録されていないため、失われるものはありません。} other {登録済みの # 台の端末は、それぞれのブラウザーでプッシュを再度有効にするまで通知を受け取れなくなります。}}",
+      "rotateConfirm": "更新"
+    },
+    "toasts": {
+      "loadFailed": "通知設定を読み込めませんでした",
+      "pushEnabled": "このインスタンスでブラウザープッシュを有効にしました",
+      "pushDisabled": "このインスタンスでブラウザープッシュを無効にしました",
+      "pushToggleFailed": "ブラウザープッシュの設定を変更できませんでした",
+      "rotated": "{count, plural, =0 {鍵ペアを更新しました} other {鍵ペアを更新しました。# 台の端末は再登録が必要です}}",
+      "rotateFailed": "鍵ペアを更新できませんでした"
+    }
   }
 }

@@ -37,10 +37,52 @@ const PRIVATE_IP_RANGES = [
 ];
 
 /**
+ * The host as an address-comparable string.
+ *
+ * `URL.hostname` keeps the brackets on an IPv6 literal (`https://[::1]/` yields
+ * `"[::1]"`), and every check below compares against unbracketed forms:
+ * `net.isIP("[::1]")` is 0, `normalizeIp` returns null, and `/^::1$/` does not
+ * match. So a bracketed loopback or link-local address passed the whole strict
+ * check -- an SSRF bypass on any client-supplied URL, found by the push
+ * endpoint's own validator spec. Stripping the brackets once, where the hostname
+ * is derived, is what makes the existing rules apply to IPv6 at all.
+ */
+function unbracketHost(hostname: string): string {
+  return hostname.startsWith("[") && hostname.endsWith("]")
+    ? hostname.slice(1, -1)
+    : hostname;
+}
+
+/**
  * Normalize an IP address string to dotted-decimal (IPv4),
  * catching hex/octal/decimal encoded IPs that bypass regex-based checks.
  */
 function normalizeIp(hostname: string): string | null {
+  // IPv4-mapped IPv6 first, because such an address IS a valid IPv6 literal and
+  // would otherwise be returned unchanged for the IPv6 patterns to test -- and
+  // those only spell the dotted form (`::ffff:127.0.0.1`), while Node's URL
+  // parser normalizes it to hex (`::ffff:7f00:1`). Mapping it back to dotted
+  // decimal is what puts it in front of the IPv4 rules that already cover it.
+  const mapped = /^::ffff:(.+)$/i.exec(hostname);
+  if (mapped) {
+    const tail = mapped[1];
+    if (net.isIPv4(tail)) return tail;
+    const groups = tail.split(":");
+    if (
+      groups.length === 2 &&
+      groups.every((g) => /^[0-9a-f]{1,4}$/i.test(g))
+    ) {
+      const high = parseInt(groups[0], 16);
+      const low = parseInt(groups[1], 16);
+      return [
+        (high >>> 8) & 0xff,
+        high & 0xff,
+        (low >>> 8) & 0xff,
+        low & 0xff,
+      ].join(".");
+    }
+  }
+
   if (net.isIP(hostname)) return hostname;
 
   try {
@@ -127,7 +169,7 @@ export class IsSafeUrlConstraint implements ValidatorConstraintInterface {
       return false;
     }
 
-    const hostname = parsed.hostname.toLowerCase();
+    const hostname = unbracketHost(parsed.hostname.toLowerCase());
 
     if (BLOCKED_HOSTNAMES.has(hostname)) {
       return false;

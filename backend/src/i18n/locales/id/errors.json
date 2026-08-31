@@ -341,6 +341,12 @@
     "smtpNotConfigured": "SMTP belum dikonfigurasi. Atur variabel lingkungan SMTP.",
     "noEmailOnFile": "Tidak ada alamat email yang tercatat untuk pengguna ini."
   },
+  "push": {
+    "channelUnavailable": "Notifikasi push tidak tersedia di instans Monize ini.",
+    "endpointClaimed": "Peramban ini sudah terdaftar pada akun Monize lain. Keluar dari akun tersebut di peramban ini lalu coba lagi.",
+    "deviceNotFound": "Perangkat push tidak ditemukan.",
+    "noDevices": "Belum ada perangkat push terdaftar untuk akun ini. Aktifkan notifikasi push di peramban ini terlebih dahulu."
+  },
   "institutions": {
     "nameConflict": "Institusi bernama \"{{ name }}\" sudah ada",
     "notFound": "Institusi dengan ID {{ id }} tidak ditemukan",

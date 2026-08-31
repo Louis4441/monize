@@ -100,6 +100,101 @@ self.addEventListener('message', function (event) {
   if (event.waitUntil) event.waitUntil(write);
 });
 
+// ---------------------------------------------------------------------------
+// Web Push
+//
+// The payload is composed by the server and travels through Mozilla's, Google's
+// or Apple's infrastructure, so it deliberately carries no amount, account or
+// payee -- the detail loads once the app is open. What arrives here is
+// { type, title, body, target } and nothing about it is trusted: a worker is the
+// last place a forged value can be caught before it becomes a navigation.
+// ---------------------------------------------------------------------------
+
+var PUSH_ICON = '/icons/icon-192x192.png';
+var PUSH_BADGE = '/icons/icon-maskable-192x192.png';
+var PUSH_FALLBACK_TITLE = 'Monize';
+var PUSH_FALLBACK_BODY = 'You have a new notification in Monize.';
+
+// A push target is a path inside this app, never a URL. Anything else -- an
+// absolute URL, a protocol-relative '//host', a backslash Chrome normalises to
+// a slash, a 'javascript:' string -- is discarded rather than repaired, because
+// a repaired hostile value is still a value somebody chose.
+function safeNotificationPath(value) {
+  if (typeof value !== 'string') return '/';
+  if (value.length === 0 || value.length > 512) return '/';
+  if (value.charAt(0) !== '/') return '/';
+  if (value.charAt(1) === '/' || value.charAt(1) === '\\') return '/';
+  if (value.indexOf('\\') !== -1) return '/';
+  return value;
+}
+
+function readPushPayload(event) {
+  if (!event.data) return {};
+  try {
+    var parsed = event.data.json();
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (_error) {
+    return {};
+  }
+}
+
+function pushText(value, fallback) {
+  return typeof value === 'string' && value.length > 0 && value.length <= 300
+    ? value
+    : fallback;
+}
+
+self.addEventListener('push', function (event) {
+  var payload = readPushPayload(event);
+  var target = safeNotificationPath(payload.target);
+
+  event.waitUntil(
+    self.registration.showNotification(
+      pushText(payload.title, PUSH_FALLBACK_TITLE),
+      {
+        body: pushText(payload.body, PUSH_FALLBACK_BODY),
+        icon: PUSH_ICON,
+        badge: PUSH_BADGE,
+        // Collapse repeats of one subject onto one notification rather than
+        // stacking four of them; the type is what the server groups by.
+        tag: pushText(payload.type, 'monize'),
+        data: { target: target },
+      }
+    )
+  );
+});
+
+self.addEventListener('notificationclick', function (event) {
+  event.notification.close();
+
+  var data = event.notification.data || {};
+  var target = safeNotificationPath(data.target);
+  var url = new URL(target, self.location.origin).href;
+
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then(function (clientList) {
+        // Focus an open window rather than opening a second one, and navigate it
+        // where the app can. A client that cannot navigate is still better
+        // focused than ignored.
+        for (var i = 0; i < clientList.length; i++) {
+          var client = clientList[i];
+          if (new URL(client.url).origin !== self.location.origin) continue;
+          if (typeof client.navigate === 'function') {
+            return client.navigate(url).then(function (navigated) {
+              return (navigated || client).focus();
+            }).catch(function () {
+              return client.focus();
+            });
+          }
+          return client.focus();
+        }
+        return self.clients.openWindow(url);
+      })
+  );
+});
+
 function escapeHtml(value) {
   return String(value)
     .replace(/&/g, '&amp;')

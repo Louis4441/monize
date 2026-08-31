@@ -104,5 +104,65 @@
       "tempPasswordDescCreated": "Wygenerowano hasło tymczasowe dla użytkownika {name}. Przekaż mu je, aby mógł się zalogować.",
       "tempPasswordDescUpgraded": "Istniejący użytkownik współdzielony został przekształcony w pełne konto. Przekaż użytkownikowi {name} to hasło tymczasowe."
     }
+  },
+  "notificationsPage": {
+    "title": "Powiadomienia",
+    "subtitle": "Kanały dostarczania dostępne w tej instancji Monize i tożsamość push, która za nimi stoi.",
+    "loading": "Wczytywanie ustawień powiadomień...",
+    "loadUnavailable": "Monize nie odczytał ustawień powiadomień z serwera. Odśwież stronę, aby spróbować ponownie.",
+    "channelsHeading": "Kanały dostarczania",
+    "identityHeading": "Tożsamość Web Push",
+    "perAccountNote": "Urządzenia, powiadomienia testowe i preferencje należą do każdego konta i są zarządzane w Ustawieniach. Administrator konfiguruje instancję i nigdy nie wysyła ani nie widzi cudzych powiadomień.",
+    "channelState": {
+      "on": "Włączony",
+      "off": "Wyłączony",
+      "unconfigured": "Niedostępny"
+    },
+    "channels": {
+      "inApp": {
+        "name": "Powiadomienia w aplikacji",
+        "description": "Dzwonek w nagłówku. Zawsze dostępny i nie można go wyłączyć: to tutaj powiadomienie pozostaje nawet wtedy, gdy każdy inny kanał zawiedzie."
+      },
+      "webPush": {
+        "name": "Push w przeglądarce",
+        "description": "Powiadomienia docierające na telefon lub komputer nawet przy zamkniętym Monize. Nie wymaga Firebase ani konta Google Play czy Apple Developer.",
+        "toggleLabel": "Włącz push w przeglądarce dla tej instancji",
+        "missingKeys": "Ta instancja nie ma pary kluczy push. Ustaw ENCRYPTION_KEY i uruchom ponownie: przy następnym starcie Monize sam wygeneruje parę."
+      },
+      "email": {
+        "name": "E-mail",
+        "description": "Przypomnienia o rachunkach, podsumowania budżetu i alerty systemowe wysyłane na adres e-mail każdego konta.",
+        "missingSmtp": "Nie skonfigurowano serwera poczty. Ustaw zmienne środowiskowe SMTP, aby włączyć e-mail.",
+        "statusUnavailable": "Monize nie odczytał stanu serwera poczty."
+      },
+      "ntfy": {
+        "name": "ntfy i UnifiedPush",
+        "description": "Dostarczanie we własnej infrastrukturze dla osób, które wolą nie zależeć od Google ani Apple.",
+        "notYetAvailable": "Jeszcze niedostępne. Planowane, gdy push w przeglądarce się ustabilizuje."
+      }
+    },
+    "identity": {
+      "fingerprintLabel": "Odcisk klucza",
+      "generatedLabel": "Wygenerowano",
+      "devicesLabel": "Zarejestrowane urządzenia",
+      "deviceCounts": "aktywne: {live}, wyłączone: {disabled}",
+      "rotateDescription": "Wymiana zastępuje parę kluczy tej instancji. Każde zarejestrowane urządzenie przestaje być osiągalne i musi ponownie włączyć push, więc wymieniaj klucze tylko wtedy, gdy klucz mógł zostać ujawniony.",
+      "rotateButton": "Wymień parę kluczy",
+      "rotatingButton": "Wymiana...",
+      "missingEncryptionKey": "Ta instancja nie ma pary kluczy push, ponieważ nie ustawiono ENCRYPTION_KEY, a klucz prywatny musiałby zostać zapisany bez szyfrowania. Ustaw ją i uruchom ponownie: Monize sam wygeneruje parę."
+    },
+    "dialogs": {
+      "rotateTitle": "Wymienić parę kluczy push?",
+      "rotateMessage": "{count, plural, =0 {Nie zarejestrowano jeszcze żadnego urządzenia, więc nic nie zostanie utracone.} one {Jedno zarejestrowane urządzenie przestanie otrzymywać powiadomienia, dopóki ktoś ponownie nie włączy push w tamtej przeglądarce.} few {# zarejestrowane urządzenia przestaną otrzymywać powiadomienia, dopóki push nie zostanie ponownie włączony w każdej z tych przeglądarek.} many {# zarejestrowanych urządzeń przestanie otrzymywać powiadomienia, dopóki push nie zostanie ponownie włączony w każdej z tych przeglądarek.} other {# zarejestrowanego urządzenia przestanie otrzymywać powiadomienia, dopóki push nie zostanie ponownie włączony w każdej z tych przeglądarek.}}",
+      "rotateConfirm": "Wymień"
+    },
+    "toasts": {
+      "loadFailed": "Nie udało się wczytać ustawień powiadomień",
+      "pushEnabled": "Włączono push w przeglądarce dla tej instancji",
+      "pushDisabled": "Wyłączono push w przeglądarce dla tej instancji",
+      "pushToggleFailed": "Nie udało się zmienić ustawienia push w przeglądarce",
+      "rotated": "{count, plural, =0 {Wymieniono parę kluczy} one {Wymieniono parę kluczy; 1 urządzenie musi zarejestrować się ponownie} few {Wymieniono parę kluczy; # urządzenia muszą zarejestrować się ponownie} many {Wymieniono parę kluczy; # urządzeń musi zarejestrować się ponownie} other {Wymieniono parę kluczy; # urządzenia musi zarejestrować się ponownie}}",
+      "rotateFailed": "Nie udało się wymienić pary kluczy"
+    }
   }
 }

@@ -106,6 +106,11 @@ INV-LOAN-002's entry names the missing source scan while its row said `--`.
 | INV-CURRENCY-001 currency delete | supporting | **required** | required | required | -- | -- | -- | optional |
 | INV-ATTACHMENT-001 bytes present | supporting | -- | required | optional | -- | **required** | **required** | required |
 | INV-BACKUP-001 backup complete | supporting | -- | required | -- | optional | **required** | **required** | required |
+| INV-PUSH-001 subscription ownership | required | -- | **required** | required (not yet met) | -- | -- | -- | optional |
+| INV-PUSH-002 private key stays server-side | supporting | **required** | -- | -- | -- | -- | -- | -- |
+| INV-PUSH-003 rotation retires subscriptions | **required** | -- | required | -- | -- | -- | -- | -- |
+| INV-PUSH-004 push failure is reported | **required** | -- | optional | -- | -- | required | required | -- |
+| INV-PUSH-005 subscription not portable | supporting | -- | **required** | -- | -- | -- | -- | -- |
 | INV-CRON-001 one effect per tick | supporting | -- | required | required | **required** | optional | -- | -- |
 | INV-PROVIDER-001 outage reported once | required | **required** | required | optional | required | -- | required | -- |
 | INV-ALERT-001 system alert raised once | required | -- | **required** | optional | required | -- | -- | -- |

@@ -341,6 +341,12 @@
     "smtpNotConfigured": "SMTP ist nicht konfiguriert. Setzen Sie SMTP-Umgebungsvariablen.",
     "noEmailOnFile": "Keine E-Mail-Adresse für diesen Benutzer hinterlegt."
   },
+  "push": {
+    "channelUnavailable": "Push-Benachrichtigungen sind auf dieser Monize-Instanz nicht verfügbar.",
+    "endpointClaimed": "Dieser Browser ist bereits bei einem anderen Monize-Konto registriert. Melden Sie sich in diesem Browser von jenem Konto ab und versuchen Sie es erneut.",
+    "deviceNotFound": "Push-Gerät nicht gefunden.",
+    "noDevices": "Für dieses Konto ist kein Push-Gerät registriert. Aktivieren Sie Push-Benachrichtigungen zuerst in diesem Browser."
+  },
   "institutions": {
     "nameConflict": "Institut mit dem Namen \"{{ name }}\" existiert bereits",
     "notFound": "Institut mit ID {{ id }} nicht gefunden",

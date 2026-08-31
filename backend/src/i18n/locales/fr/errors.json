@@ -341,6 +341,12 @@
     "smtpNotConfigured": "SMTP n'est pas configuré. Définissez les variables d'environnement SMTP.",
     "noEmailOnFile": "Aucune adresse e-mail enregistrée pour cet utilisateur."
   },
+  "push": {
+    "channelUnavailable": "Les notifications push ne sont pas disponibles sur cette instance Monize.",
+    "endpointClaimed": "Ce navigateur est déjà associé à un autre compte Monize. Déconnectez-vous de ce compte dans ce navigateur puis réessayez.",
+    "deviceNotFound": "Appareil push introuvable.",
+    "noDevices": "Aucun appareil push n'est enregistré pour ce compte. Activez d'abord les notifications push dans ce navigateur."
+  },
   "institutions": {
     "nameConflict": "Un établissement avec le nom « {{ name }} » existe déjà",
     "notFound": "Établissement avec l'ID {{ id }} introuvable",

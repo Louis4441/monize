@@ -341,6 +341,12 @@
     "smtpNotConfigured": "SMTP 未配置。请设置 SMTP 环境变量。",
     "noEmailOnFile": "此用户没有邮箱地址记录。"
   },
+  "push": {
+    "channelUnavailable": "此 Monize 实例不提供推送通知。",
+    "endpointClaimed": "此浏览器已注册到另一个 Monize 账户。请在此浏览器中退出该账户后重试。",
+    "deviceNotFound": "未找到推送设备。",
+    "noDevices": "此账户尚未注册推送设备。请先在此浏览器中启用推送通知。"
+  },
   "institutions": {
     "nameConflict": "名为\"{{ name }}\"的机构已存在",
     "notFound": "未找到 ID 为 {{ id }} 的机构",

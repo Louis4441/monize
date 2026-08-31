@@ -234,6 +234,43 @@
       "digestUpdateFailed": "Impossibile aggiornare la preferenza del riepilogo budget",
       "digestDayFailed": "Impossibile aggiornare il giorno del riepilogo",
       "testEmailFailed": "Invio dell'email di prova non riuscito"
+    },
+    "push": {
+      "heading": "Push del browser",
+      "description": "Ricevi notifiche su questo dispositivo anche quando Monize è chiuso.",
+      "enableButton": "Attiva su questo dispositivo",
+      "enablingButton": "Attivazione...",
+      "sendTestButton": "Invia notifica di prova",
+      "sendingTestButton": "Invio...",
+      "removeButton": "Rimuovi",
+      "thisDevice": "Questo dispositivo",
+      "unnamedDevice": "Dispositivo senza nome",
+      "lastSeen": "Ultima attività {when}",
+      "noLiveDevices": "Nessun dispositivo registrato. Attiva il push su questo dispositivo per inviare una prova.",
+      "notConfigured": "Il push del browser non è disponibile su questa istanza di Monize. Un amministratore può attivarlo nell'area Admin.",
+      "disabledByAdmin": "Un amministratore ha disattivato il push del browser per questa istanza di Monize.",
+      "statusUnavailable": "Monize non è riuscito a verificare se il push del browser è disponibile. Ricarica la pagina per riprovare.",
+      "unsupported": {
+        "unsupported": "Questo browser non può ricevere notifiche push.",
+        "denied": "Le notifiche sono bloccate per Monize in questo browser. Consentile nelle impostazioni del sito, poi ricarica questa pagina.",
+        "ios-browser": "Su iPhone e iPad le notifiche push funzionano solo dopo aver installato Monize nella schermata Home. Usa Condividi, poi Aggiungi a Home, e apri Monize da lì."
+      },
+      "disabledReason": {
+        "GONE": "Non più raggiungibile. Riattiva il push in quel browser.",
+        "KEY_ROTATED": "Ritirato quando questa istanza ha ruotato la coppia di chiavi push. Riattiva il push in quel browser.",
+        "FAILING": "Ritirato dopo ripetuti errori di consegna. Riattiva il push in quel browser."
+      },
+      "toasts": {
+        "enabled": "Notifiche push attivate su questo dispositivo",
+        "enableFailed": "Impossibile attivare le notifiche push",
+        "permissionDenied": "Questo browser sta bloccando le notifiche di Monize. Consentile nelle impostazioni del sito e riprova.",
+        "permissionDismissed": "Le notifiche non sono state attivate. Scegli Consenti quando il browser lo chiede.",
+        "removed": "Dispositivo rimosso",
+        "removeFailed": "Impossibile rimuovere il dispositivo",
+        "testSent": "{count, plural, one {Notifica di prova inviata a 1 dispositivo} other {Notifica di prova inviata a # dispositivi}}",
+        "testPartial": "La notifica di prova ha raggiunto {delivered} dispositivi su {attempted}",
+        "testFailed": "Impossibile consegnare la notifica di prova"
+      }
     }
   },
   "help": {

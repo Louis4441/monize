@@ -1,0 +1,6 @@
+{
+  "test": {
+    "title": "Monize test notification",
+    "body": "Push notifications are working on this device."
+  }
+}

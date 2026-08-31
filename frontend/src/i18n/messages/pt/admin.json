@@ -104,5 +104,65 @@
       "tempPasswordDescCreated": "Foi gerada uma palavra-passe temporária para {name}. Partilhe-a para que possa iniciar sessão.",
       "tempPasswordDescUpgraded": "Um utilizador partilhado existente foi promovido a conta completa. Partilhe esta palavra-passe temporária com {name}."
     }
+  },
+  "notificationsPage": {
+    "title": "Notificações",
+    "subtitle": "Canais de entrega oferecidos por esta instância do Monize e a identidade push que os suporta.",
+    "loading": "A carregar as definições de notificações...",
+    "loadUnavailable": "O Monize não conseguiu ler as definições de notificações do servidor. Recarregue a página para tentar novamente.",
+    "channelsHeading": "Canais de entrega",
+    "identityHeading": "Identidade Web Push",
+    "perAccountNote": "Dispositivos, notificações de teste e preferências pertencem a cada conta e são geridos nas Definições. Um administrador configura a instância e nunca envia nem vê as notificações de outra pessoa.",
+    "channelState": {
+      "on": "Ligado",
+      "off": "Desligado",
+      "unconfigured": "Indisponível"
+    },
+    "channels": {
+      "inApp": {
+        "name": "Notificações na aplicação",
+        "description": "O sino no cabeçalho. Sempre disponível e impossível de desligar: é onde uma notificação permanece mesmo que todos os outros canais falhem."
+      },
+      "webPush": {
+        "name": "Push do navegador",
+        "description": "Notificações entregues no telemóvel ou no computador mesmo com o Monize fechado. Não requer Firebase nem conta Google Play ou Apple Developer.",
+        "toggleLabel": "Ativar o push do navegador nesta instância",
+        "missingKeys": "Esta instância não tem par de chaves push. Defina ENCRYPTION_KEY e reinicie: o Monize gera o par no arranque seguinte."
+      },
+      "email": {
+        "name": "E-mail",
+        "description": "Lembretes de contas, resumos de orçamento e alertas do sistema enviados para o endereço de cada conta.",
+        "missingSmtp": "Não há servidor de e-mail configurado. Defina as variáveis de ambiente SMTP para ativar o e-mail.",
+        "statusUnavailable": "O Monize não conseguiu ler o estado do servidor de e-mail."
+      },
+      "ntfy": {
+        "name": "ntfy e UnifiedPush",
+        "description": "Entrega auto-alojada para quem prefere não depender da infraestrutura da Google ou da Apple.",
+        "notYetAvailable": "Ainda não disponível. Planeado assim que o push do navegador estiver consolidado."
+      }
+    },
+    "identity": {
+      "fingerprintLabel": "Impressão digital da chave",
+      "generatedLabel": "Gerada",
+      "devicesLabel": "Dispositivos registados",
+      "deviceCounts": "{live} ativos, {disabled} desativados",
+      "rotateDescription": "A rotação substitui o par de chaves desta instância. Todos os dispositivos registados deixam de ser alcançáveis e terão de ativar o push novamente, por isso rode apenas se a chave puder ter sido exposta.",
+      "rotateButton": "Rodar par de chaves",
+      "rotatingButton": "A rodar...",
+      "missingEncryptionKey": "Esta instância não tem par de chaves push porque ENCRYPTION_KEY não está definida e a chave privada teria de ser guardada sem cifra. Defina-a e reinicie: o Monize gera o par sozinho."
+    },
+    "dialogs": {
+      "rotateTitle": "Rodar o par de chaves push?",
+      "rotateMessage": "{count, plural, =0 {Ainda não há dispositivos registados, por isso nada se perde.} one {Um dispositivo registado deixará de receber notificações até alguém voltar a ativar o push nesse navegador.} other {# dispositivos registados deixarão de receber notificações até o push ser ativado novamente em cada navegador.}}",
+      "rotateConfirm": "Rodar"
+    },
+    "toasts": {
+      "loadFailed": "Não foi possível carregar as definições de notificações",
+      "pushEnabled": "Push do navegador ativado nesta instância",
+      "pushDisabled": "Push do navegador desativado nesta instância",
+      "pushToggleFailed": "Não foi possível alterar a definição de push do navegador",
+      "rotated": "{count, plural, =0 {Par de chaves rodado} one {Par de chaves rodado; 1 dispositivo tem de se registar novamente} other {Par de chaves rodado; # dispositivos têm de se registar novamente}}",
+      "rotateFailed": "Não foi possível rodar o par de chaves"
+    }
   }
 }

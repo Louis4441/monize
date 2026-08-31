@@ -119,6 +119,11 @@ implied.
 | INV-CURRENCY-001 | A shared currency is deleted only by its creator, on a global count | enforced |
 | INV-ATTACHMENT-001 | Available metadata resolves to committed bytes | enforced |
 | INV-BACKUP-001 | A backup file is complete, verified and owner-namespaced | enforced |
+| INV-PUSH-001 | A push subscription belongs to the authenticated caller, and one browser endpoint has one owner | enforced |
+| INV-PUSH-002 | The VAPID private key never leaves the server, and is never stored unencrypted | enforced |
+| INV-PUSH-003 | A key rotation retires every subscription minted under the superseded pair | enforced |
+| INV-PUSH-004 | A push failure never rolls back what produced it, and a dead subscription stops being attempted | enforced |
+| INV-PUSH-005 | A push subscription is instance-bound state, never portable backup data | enforced |
 | INV-CRON-001 | One logical cron effect per schedule tick, across replicas | partial |
 | INV-PROVIDER-001 | An unreachable provider stops being called, and produces at most one alert pair per outage | enforced |
 | INV-ALERT-001 | A system alert row lands at most once per (recipient, dedupe key), and only the insert winner emails | enforced |
@@ -2103,6 +2108,157 @@ Status              partial
 `docs/cron-jobs.md` lists schedules; per section 7 of
 `docs/concurrency-and-idempotency.md` it must also record, per job, what prevents
 two replicas from producing the same effect.
+
+### INV-PUSH-001 -- a subscription belongs to its caller, and an endpoint to one account
+
+```text
+Statement           A push subscription is owned by the authenticated caller, and
+                    a browser endpoint has exactly one owner at a time.
+Source of truth     push_subscriptions.user_id, arbitrated by
+                    idx_push_subscriptions_endpoint
+Enforcement         Two mechanisms, because there are two ways to get this wrong.
+                    Ownership: CreatePushSubscriptionDto has no userId field at
+                    all and forbidNonWhitelisted rejects one, so the tenant can
+                    only be req.user.id; every list, delete and outcome write
+                    carries user_id in its own WHERE. Endpoint exclusivity: the
+                    unique index is on endpoint_hash ALONE, not
+                    (user_id, endpoint_hash) -- pushManager.subscribe() is scoped
+                    to a browser profile and an origin, so two accounts used in
+                    one browser receive the same endpoint AND the same encryption
+                    keys, and a per-user index would leave both rows live and let
+                    the first account's notification be decrypted and displayed on
+                    the device the second is now using. subscribe() therefore
+                    deletes any other user's claim (system context -- the row is
+                    another tenant's and no user transaction can see it) before
+                    upserting its own with
+                    ON CONFLICT (endpoint_hash) DO UPDATE ... WHERE user_id =
+                    EXCLUDED.user_id.
+Concurrency scope   per endpoint, globally
+Retry semantics     Safe: a repeat subscribe from the same browser refreshes the
+                    one row rather than adding a device.
+Failure response    Losing the takeover race is a 409 having written nothing --
+                    never a second row for one endpoint.
+Required tests      push-subscription.service.spec.ts (the takeover runs before
+                    the insert; the conflict arm is scoped to the caller; a 409
+                    on the lost race). The database half needs no new spec: the
+                    catalog-driven rls-enforcement.integration.spec.ts enumerates
+                    the live schema, so push_subscriptions is bucketed as direct
+                    by its user_id column and its policy, its ENABLE and its
+                    cross-user INSERT rejection are all asserted automatically --
+                    and the harness picks up migration 171 by content marker
+                    (it references app_current_user_id). A two-connection race on
+                    the endpoint takeover is the gold-standard proof still owed;
+                    losing that race is a 409, not a shared device.
+Status              enforced
+```
+
+### INV-PUSH-002 -- the private key stays on the server
+
+```text
+Statement           The instance's VAPID private key is never returned by an API
+                    and never stored in plaintext.
+Source of truth     push_instance_config.vapid_private_key_enc
+Enforcement         Storage: PushConfigService.ensureKeyPair refuses to generate a
+                    pair at all when EncryptionService is unconfigured, so an
+                    instance without ENCRYPTION_KEY has no push rather than a
+                    plaintext secret; the operator already learns about the
+                    missing key from the weekly ENCRYPTION_KEY_MISSING alert.
+                    Exposure: no response shape in src/push/ declares a private
+                    field, and push-secret.guard.spec.ts scans the whole of src/
+                    for a second reader of the column, a second caller of
+                    getVapidIdentity, a second importer of web-push and a second
+                    caller of sendNotification. The public half is public by
+                    construction -- every subscribing browser is handed it.
+Concurrency scope   per instance
+Crash semantics     A pair this instance cannot decrypt (ENCRYPTION_KEY changed
+                    under a live database) yields a null identity and a named log
+                    line, not an AES-GCM failure behind a generic 500.
+Required tests      push-config.service.spec.ts, push-secret.guard.spec.ts.
+Status              enforced
+```
+
+### INV-PUSH-003 -- a rotation retires what it supersedes
+
+```text
+Statement           After a key rotation, no subscription minted under the
+                    superseded pair is listed as reachable.
+Source of truth     push_subscriptions.vapid_public_key vs
+                    push_instance_config.vapid_public_key
+Enforcement         PushConfigService.rotateKeyPair writes the new pair and sets
+                    disabled_at/disabled_reason = KEY_ROTATED on every live
+                    subscription carrying a different key in ONE withScopedDb
+                    transaction: the push service validates the signature against
+                    the key the subscription was created with, so a new pair with
+                    live old subscriptions is an interface listing devices it
+                    cannot reach. WebPushSender re-checks the stored key before
+                    every send, so an interrupted rotation cannot produce an
+                    endless stream of 403s either.
+Concurrency scope   per instance
+Retry semantics     Re-running a rotation mints another pair and retires again;
+                    idempotent in effect, not in identity.
+Failure response    The count of retired devices is part of the response and of
+                    the confirmation dialog, not a log line.
+Required tests      push-config.service.spec.ts asserts both writes share one
+                    transaction (by transaction identity, not call count);
+                    web-push-sender.service.spec.ts asserts the pre-send check.
+Status              enforced
+```
+
+### INV-PUSH-004 -- a push failure is reported, never raised
+
+```text
+Statement           A delivery failure does not roll back the operation that
+                    produced the notification, and a subscription that cannot be
+                    delivered to stops being attempted.
+Source of truth     the PushSendOutcome returned by WebPushSender;
+                    push_subscriptions.failure_count / disabled_at
+Enforcement         WebPushSender never throws: every transport error is
+                    classified and returned. Sends happen outside any
+                    transaction, after the reads that selected the targets, and
+                    each outcome is written in its own short transaction --
+                    the ordering rule of docs/external-side-effects.md section
+                    4a. 404 and 410 retire the device immediately (GONE);
+                    everything else is transient and bounded by
+                    MAX_CONSECUTIVE_FAILURES (FAILING), because retiring on 401
+                    or 403 would empty every device list in the deployment over
+                    one bad key or clock.
+Concurrency scope   per subscription
+Retry semantics     A success resets failure_count; the bound is on consecutive
+                    failures, not on lifetime attempts.
+Crash semantics     A crash between the send and the outcome write loses that
+                    attempt's bookkeeping, not the notification. There is no
+                    delivery ledger yet -- see docs/external-side-effects.md.
+Required tests      web-push-sender.service.spec.ts (the full status table, and
+                    that a bare non-Error rejection still resolves);
+                    push-subscription.service.spec.ts (per-device outcomes are
+                    reported rather than thrown).
+Status              enforced
+```
+
+### INV-PUSH-005 -- a subscription is instance-bound, not portable
+
+```text
+Statement           A backup neither exports nor restores push subscriptions or
+                    the instance key pair.
+Source of truth     INTENTIONALLY_EXCLUDED_TABLES in
+                    backend/src/backup/export-table-queries.ts
+Enforcement         Both push tables are listed there, and neither appears in
+                    RESTORE_PLAN. The failure being designed against is concrete:
+                    a production backup restored into a test instance would hand
+                    that instance the endpoints and keys needed to push to real
+                    phones. Devices re-subscribe, which costs one click and is
+                    the only way the new instance obtains a subscription the push
+                    service will accept under its own VAPID key.
+                    push_subscriptions.vapid_public_key is the second line of
+                    defence: a row that did arrive by some other route carries a
+                    key this instance does not hold and is skipped by the sender.
+Concurrency scope   per instance
+Required tests      The backup integration spec's coverage check fails on a
+                    schema table that is in neither the export queries nor the
+                    exclusion set, so a future migration cannot quietly start
+                    exporting these.
+Status              enforced
+```
 
 ## Platform
 
