@@ -73,7 +73,10 @@ function loadServiceWorker(clients: WindowClientStub[] = []) {
   });
   vm.runInContext(swSource, context);
 
-  const dispatchPush = async (payload: unknown, options: { malformed?: boolean } = {}) => {
+  const dispatchPush = async (
+    payload: unknown,
+    options: { malformed?: boolean } = {},
+  ) => {
     let pending: Promise<unknown> = Promise.resolve();
     const event = {
       data:
@@ -139,7 +142,11 @@ describe('service worker push handling', () => {
   it('groups repeats of one subject onto a single notification', async () => {
     const sw = loadServiceWorker();
 
-    await sw.dispatchPush({ type: 'PRICE_REFRESH_FAILED', title: 'a', body: 'b' });
+    await sw.dispatchPush({
+      type: 'PRICE_REFRESH_FAILED',
+      title: 'a',
+      body: 'b',
+    });
 
     expect(sw.shown[0].options.tag).toBe('PRICE_REFRESH_FAILED');
   });
@@ -150,15 +157,18 @@ describe('service worker push handling', () => {
   it.each([
     ['no data at all', undefined, false],
     ['a payload that is not JSON', undefined, true],
-  ])('falls back to generic copy given %s', async (_name, payload, malformed) => {
-    const sw = loadServiceWorker();
+  ])(
+    'falls back to generic copy given %s',
+    async (_name, payload, malformed) => {
+      const sw = loadServiceWorker();
 
-    await sw.dispatchPush(payload, { malformed });
+      await sw.dispatchPush(payload, { malformed });
 
-    expect(sw.shown).toHaveLength(1);
-    expect(sw.shown[0].title).toBe('Monize');
-    expect(sw.shown[0].options.data.target).toBe('/');
-  });
+      expect(sw.shown).toHaveLength(1);
+      expect(sw.shown[0].title).toBe('Monize');
+      expect(sw.shown[0].options.data.target).toBe('/');
+    },
+  );
 
   it('ignores a title or body that is not a usable string', async () => {
     const sw = loadServiceWorker();
@@ -181,12 +191,30 @@ describe('service worker push handling', () => {
     ['a relative path', 'settings'],
     ['a number', 7],
     ['null', null],
+    // WHATWG URL strips ASCII tab, CR and LF before parsing, so each of these
+    // reads as a protocol-relative host while looking like an ordinary path to
+    // any guard written against the characters. This is why the check resolves
+    // the value instead of inspecting it.
+    ['a tab hiding a protocol-relative host', '/\t/evil.test/steal'],
+    ['a newline hiding one', '/\n//evil.test'],
+    ['a carriage return hiding one', '/\r\t/evil.test'],
   ])('discards %s as a navigation target', async (_name, target) => {
     const sw = loadServiceWorker();
 
     await sw.dispatchPush({ title: 't', body: 'b', target });
 
     expect(sw.shown[0].options.data.target).toBe('/');
+  });
+
+  // Not every stripped-whitespace value is hostile: this one still resolves to
+  // this origin, so it is kept -- as the parser's own normalised path, which is
+  // what the click will actually navigate to.
+  it('normalises a same-origin target rather than discarding it', async () => {
+    const sw = loadServiceWorker();
+
+    await sw.dispatchPush({ title: 't', body: 'b', target: '/\thttps://x' });
+
+    expect(sw.shown[0].options.data.target).toBe('/https://x');
   });
 
   it('keeps a same-origin path, query and fragment', async () => {
@@ -206,7 +234,11 @@ describe('service worker push handling', () => {
   it('discards an absurdly long target rather than navigating to it', async () => {
     const sw = loadServiceWorker();
 
-    await sw.dispatchPush({ title: 't', body: 'b', target: `/${'a'.repeat(600)}` });
+    await sw.dispatchPush({
+      title: 't',
+      body: 'b',
+      target: `/${'a'.repeat(600)}`,
+    });
 
     expect(sw.shown[0].options.data.target).toBe('/');
   });
@@ -252,7 +284,11 @@ describe('service worker notification clicks', () => {
   });
 
   it('ignores a window on another origin', async () => {
-    const foreign = { url: 'https://evil.test/', focus: vi.fn(), navigate: vi.fn() };
+    const foreign = {
+      url: 'https://evil.test/',
+      focus: vi.fn(),
+      navigate: vi.fn(),
+    };
     const sw = loadServiceWorker([foreign]);
 
     await sw.dispatchClick({ target: '/settings' });
@@ -277,6 +313,7 @@ describe('service worker notification clicks', () => {
     'https://evil.test/steal',
     '//evil.test/steal',
     'javascript:alert(1)',
+    '/\t/evil.test/steal',
   ])('never navigates to %s from stored notification data', async (target) => {
     const sw = loadServiceWorker([]);
 

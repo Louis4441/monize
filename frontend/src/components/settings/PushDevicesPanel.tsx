@@ -34,6 +34,7 @@ export function PushDevicesPanel() {
 
   const [config, setConfig] = useState<PushConfig | null>(null);
   const [configFailed, setConfigFailed] = useState(false);
+  const [devicesFailed, setDevicesFailed] = useState(false);
   const [devices, setDevices] = useState<PushDevice[]>([]);
   const [thisDevice, setThisDevice] = useState<string | null>(null);
   const [support, setSupport] = useState<PushSupport | null>(null);
@@ -49,6 +50,7 @@ export function PushDevicesPanel() {
     ]);
     setDevices(rows);
     setThisDevice(fingerprint);
+    setDevicesFailed(false);
   }, []);
 
   useEffect(() => {
@@ -59,7 +61,6 @@ export function PushDevicesPanel() {
         if (cancelled) return;
         setConfig(pushConfig);
         setSupport(getPushSupport());
-        if (pushConfig.enabled) await refreshDevices();
       } catch (error) {
         if (cancelled) return;
         // A failed read is not "push is off here". Rendering the panel as
@@ -67,8 +68,20 @@ export function PushDevicesPanel() {
         // that may be on.
         logger.error('Failed to load push configuration:', error);
         setConfigFailed(true);
+        return;
       } finally {
         if (!cancelled) setIsLoading(false);
+      }
+
+      // Its own try, and its own failure: a device list that will not load says
+      // nothing about whether push is available here, and folding the two
+      // together hid a working Enable button behind "we could not check".
+      try {
+        await refreshDevices();
+      } catch (error) {
+        if (cancelled) return;
+        logger.error('Failed to load push devices:', error);
+        setDevicesFailed(true);
       }
     })();
     return () => {
@@ -197,6 +210,12 @@ export function PushDevicesPanel() {
       <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
         {t('description')}
       </p>
+
+      {devicesFailed && (
+        <p className="mb-3 text-sm text-amber-700 dark:text-amber-400">
+          {t('devicesUnavailable')}
+        </p>
+      )}
 
       {devices.length > 0 && (
         <ul className={`mb-4 ${TABLE_BODY_CLASS}`}>

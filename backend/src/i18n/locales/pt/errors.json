@@ -347,7 +347,8 @@
     "deviceNotFound": "Dispositivo push não encontrado.",
     "noDevices": "Não há dispositivos push registados nesta conta. Ative primeiro as notificações push neste navegador.",
     "rotationUnavailable": "ENCRYPTION_KEY não está definida, por isso a nova chave privada não pôde ser guardada cifrada. Defina-a e reinicie antes de rodar.",
-    "channelNotConfigured": "Esta instância ainda não tem par de chaves push, por isso o canal de push do navegador não pode ser ligado nem desligado."
+    "channelNotConfigured": "Esta instância ainda não tem par de chaves push, por isso o canal de push do navegador não pode ser ligado nem desligado.",
+    "keyRotated": "Esta instância mudou a sua chave push enquanto estava nesta página. Recarregue e ative o push novamente."
   },
   "institutions": {
     "nameConflict": "Já existe uma instituição com o nome \"{{ name }}\"",

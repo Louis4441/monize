@@ -347,7 +347,8 @@
     "deviceNotFound": "Appareil push introuvable.",
     "noDevices": "Aucun appareil push n'est enregistré pour ce compte. Activez d'abord les notifications push dans ce navigateur.",
     "rotationUnavailable": "ENCRYPTION_KEY n'est pas définie : la nouvelle clé privée n'a pas pu être stockée chiffrée. Définissez-la et redémarrez avant d'effectuer une rotation.",
-    "channelNotConfigured": "Cette instance n'a pas encore de paire de clés push : le canal de push du navigateur ne peut être ni activé ni désactivé."
+    "channelNotConfigured": "Cette instance n'a pas encore de paire de clés push : le canal de push du navigateur ne peut être ni activé ni désactivé.",
+    "keyRotated": "Cette instance a changé sa clé push pendant que vous étiez sur cette page. Rechargez puis réactivez le push."
   },
   "institutions": {
     "nameConflict": "Un établissement avec le nom « {{ name }} » existe déjà",

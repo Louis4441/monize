@@ -121,6 +121,19 @@ export class PushSubscriptionService {
       );
     }
 
+    if (dto.applicationServerKey !== config.publicKey) {
+      // The browser subscribed under a key this instance no longer uses -- a
+      // rotation between the page load and the click. Storing the row anyway
+      // would record a subscription nothing can ever be delivered to, so it is
+      // refused and the client is told to try again with the current key.
+      throw new ConflictException(
+        tr(
+          "errors.push.keyRotated",
+          "This instance changed its push key while you were on this page. Reload and enable push again.",
+        ),
+      );
+    }
+
     const endpointHash = hashEndpoint(dto.endpoint);
     // Hoisted so the narrowing above survives into the closure.
     const vapidPublicKey = config.publicKey;
@@ -385,6 +398,9 @@ export class PushSubscriptionService {
   }
 }
 
+/** The table the classifier below looks for in a policy-violation message. */
+const PUSH_SUBSCRIPTIONS_TABLE = "push_subscriptions";
+
 /** The one refusal this path can give, so its two arms cannot drift apart. */
 function endpointClaimed(): ConflictException {
   return new ConflictException(
@@ -395,26 +411,51 @@ function endpointClaimed(): ConflictException {
   );
 }
 
+/** The arbiter index; named so the classifier below cannot answer for another. */
+export const ENDPOINT_UNIQUE_INDEX = "idx_push_subscriptions_endpoint";
+
 /**
- * PostgreSQL's two ways of saying "that endpoint is somebody else's".
+ * PostgreSQL's two ways of saying "that endpoint is somebody else's", and only
+ * those.
  *
  * 23505 is the unique violation raised when the conflicting row is invisible to
  * this transaction, so `ON CONFLICT` cannot resolve against it; 42501 is the
  * policy violation on the update arm. Both are the *documented* outcome of this
- * statement, not an unexpected database failure, so both become the 409 the
- * client knows how to recover from. Anything else propagates.
+ * statement, so both become the 409 the client knows how to recover from.
+ *
+ * Both are also **scoped**, and that matters more than it looks: a bare code
+ * match turns a missing INSERT grant -- an ordinary 42501, and a deployment
+ * fault -- into "already registered to a different Monize account", and the
+ * client's automatic recovery then unsubscribes and destroys a working browser
+ * registration before failing again. A conflict is a conflict only when the
+ * database names this endpoint index or this table.
  */
 function isForeignEndpointConflict(error: unknown): boolean {
-  const code = (error as { code?: unknown; driverError?: { code?: unknown } })
-    ?.code;
-  const driverCode = (error as { driverError?: { code?: unknown } })
-    ?.driverError?.code;
-  return (
-    code === "23505" ||
-    code === "42501" ||
-    driverCode === "23505" ||
-    driverCode === "42501"
-  );
+  const wrapped = error as {
+    code?: unknown;
+    constraint?: unknown;
+    message?: unknown;
+    driverError?: { code?: unknown; constraint?: unknown; message?: unknown };
+  };
+  const code = wrapped?.code ?? wrapped?.driverError?.code;
+  const constraint = wrapped?.constraint ?? wrapped?.driverError?.constraint;
+  const message = `${wrapped?.message ?? ""} ${wrapped?.driverError?.message ?? ""}`;
+
+  if (code === "23505") {
+    return (
+      constraint === ENDPOINT_UNIQUE_INDEX ||
+      message.includes(ENDPOINT_UNIQUE_INDEX)
+    );
+  }
+  if (code === "42501") {
+    // The RLS message names the table; a grant failure on some other object
+    // does not, and must not be dressed up as a conflict.
+    return (
+      message.includes("row-level security") &&
+      message.includes(PUSH_SUBSCRIPTIONS_TABLE)
+    );
+  }
+  return false;
 }
 
 function toDeviceDto(row: PushSubscription): PushDeviceDto {

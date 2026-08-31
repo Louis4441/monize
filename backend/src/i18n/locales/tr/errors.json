@@ -347,7 +347,8 @@
     "deviceNotFound": "Anlık bildirim cihazı bulunamadı.",
     "noDevices": "Bu hesap için kayıtlı anlık bildirim cihazı yok. Önce bu tarayıcıda anlık bildirimleri açın.",
     "rotationUnavailable": "ENCRYPTION_KEY ayarlanmadığı için yeni özel anahtar şifrelenmiş olarak saklanamadı. Değiştirmeden önce ayarlayıp yeniden başlatın.",
-    "channelNotConfigured": "Bu örneğin henüz anlık bildirim anahtar çifti yok; bu yüzden tarayıcı anlık bildirim kanalı açılıp kapatılamaz."
+    "channelNotConfigured": "Bu örneğin henüz anlık bildirim anahtar çifti yok; bu yüzden tarayıcı anlık bildirim kanalı açılıp kapatılamaz.",
+    "keyRotated": "Bu sayfadayken örnek anlık bildirim anahtarını değiştirdi. Sayfayı yenileyip anlık bildirimleri yeniden açın."
   },
   "institutions": {
     "nameConflict": "\"{{ name }}\" adlı kurum zaten mevcut",

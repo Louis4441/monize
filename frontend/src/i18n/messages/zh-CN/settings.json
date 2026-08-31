@@ -251,6 +251,7 @@
       "disabledByAdmin": "管理员已为此 Monize 实例关闭浏览器推送。",
       "keyUnreadable": "Monize 无法读取此实例的推送密钥对，因此无法投递任何通知。管理员可在 Admin 区域轮换密钥对以恢复。",
       "statusUnavailable": "Monize 无法确认浏览器推送是否可用。请重新加载页面后重试。",
+      "devicesUnavailable": "Monize 无法加载你已注册的设备。本页其他功能仍可使用；请重新加载后重试。",
       "unsupported": {
         "unsupported": "此浏览器无法接收推送通知。",
         "denied": "此浏览器已阻止 Monize 的通知。请在浏览器的网站设置中允许通知，然后重新加载本页。",

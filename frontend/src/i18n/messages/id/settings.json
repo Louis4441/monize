@@ -251,6 +251,7 @@
       "disabledByAdmin": "Administrator telah mematikan push peramban untuk instans Monize ini.",
       "keyUnreadable": "Monize tidak dapat membaca pasangan kunci push instans ini, sehingga tidak ada yang terkirim. Administrator dapat memulihkannya dengan merotasi pasangan kunci di area Admin.",
       "statusUnavailable": "Monize tidak dapat memeriksa apakah push peramban tersedia. Muat ulang halaman untuk mencoba lagi.",
+      "devicesUnavailable": "Monize tidak dapat memuat perangkat terdaftar Anda. Semua hal lain di halaman ini tetap berfungsi; muat ulang untuk mencoba lagi.",
       "unsupported": {
         "unsupported": "Peramban ini tidak dapat menerima notifikasi push.",
         "denied": "Notifikasi diblokir untuk Monize di peramban ini. Izinkan di pengaturan situs peramban, lalu muat ulang halaman ini.",

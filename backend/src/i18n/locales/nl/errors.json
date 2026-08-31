@@ -347,7 +347,8 @@
     "deviceNotFound": "Pushapparaat niet gevonden.",
     "noDevices": "Er is geen pushapparaat geregistreerd voor dit account. Schakel pushmeldingen eerst in deze browser in.",
     "rotationUnavailable": "ENCRYPTION_KEY is niet ingesteld, dus de nieuwe privésleutel kon niet versleuteld worden opgeslagen. Stel de variabele in en start opnieuw voordat je vervangt.",
-    "channelNotConfigured": "Deze instantie heeft nog geen pushsleutelpaar, dus het browserpush-kanaal kan niet worden in- of uitgeschakeld."
+    "channelNotConfigured": "Deze instantie heeft nog geen pushsleutelpaar, dus het browserpush-kanaal kan niet worden in- of uitgeschakeld.",
+    "keyRotated": "Deze instantie heeft haar pushsleutel gewijzigd terwijl je op deze pagina was. Herlaad en schakel push opnieuw in."
   },
   "institutions": {
     "nameConflict": "Er bestaat al een instelling met de naam \"{{ name }}\"",

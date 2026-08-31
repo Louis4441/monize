@@ -6,9 +6,13 @@ import { useClickOutside } from '@/hooks/useClickOutside';
 import { useHideOnScroll } from '@/hooks/useHideOnScroll';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
+import { releaseLocalPushSubscription } from '@/lib/push';
 import { authApi } from '@/lib/auth';
 import { isNavSectionActive } from '@/lib/nav-section';
-import { markLogoutIncomplete, clearLogoutIncomplete } from '@/lib/logout-state';
+import {
+  markLogoutIncomplete,
+  clearLogoutIncomplete,
+} from '@/lib/logout-state';
 import Image from 'next/image';
 import { Button } from '@/components/ui/Button';
 import { BudgetAlertBadge } from '@/components/budgets/BudgetAlertBadge';
@@ -21,7 +25,13 @@ import {
   clearTransactionFilterStorage,
   type HeaderSearchEventDetail,
 } from '@/hooks/useTransactionFilters';
-import { NAV_LINKS, TOOLS_LINKS, AI_LINKS, ADMIN_LINKS, NAV_ICONS } from '@/lib/nav-links';
+import {
+  NAV_LINKS,
+  TOOLS_LINKS,
+  AI_LINKS,
+  ADMIN_LINKS,
+  NAV_ICONS,
+} from '@/lib/nav-links';
 import toast from 'react-hot-toast';
 
 // Labels are translation keys in the `navigation` namespace, resolved at
@@ -75,7 +85,12 @@ export function AppHeader() {
   // the section nav; the dashboard remains the delegate's landing page.
   const navSectionByHref: Record<
     string,
-    'bills' | 'investments' | 'budgets' | 'reports' | 'transactions' | 'accounts'
+    | 'bills'
+    | 'investments'
+    | 'budgets'
+    | 'reports'
+    | 'transactions'
+    | 'accounts'
   > = {
     '/accounts': 'accounts',
     '/transactions': 'transactions',
@@ -152,7 +167,9 @@ export function AppHeader() {
     setSearchTerm('');
   };
 
-  const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleSearchKeyDown = (
+    event: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
     if (event.key === 'Enter') {
       event.preventDefault();
       submitSearch();
@@ -170,13 +187,18 @@ export function AppHeader() {
     setMobileMenuOpen(false);
   }
 
-  const isToolsActive = toolsLinks.some((link) => isNavSectionActive(pathname, link.href));
-  const isAiActive = aiLinks.some((link) => isNavSectionActive(pathname, link.href));
+  const isToolsActive = toolsLinks.some((link) =>
+    isNavSectionActive(pathname, link.href),
+  );
+  const isAiActive = aiLinks.some((link) =>
+    isNavSectionActive(pathname, link.href),
+  );
 
   // Slide the header out of view when scrolling down, back in when scrolling up,
   // moving it in lockstep with the scroll position. Keep it pinned while any
   // menu or the search field is open so the open surface never scrolls away.
-  const { ref: headerRef, offset: scrollOffset } = useHideOnScroll<HTMLElement>();
+  const { ref: headerRef, offset: scrollOffset } =
+    useHideOnScroll<HTMLElement>();
   const anyMenuOpen =
     mobileMenuOpen || searchOpen || toolsExpanded || aiOpen || adminOpen;
   const headerOffset = anyMenuOpen ? 0 : scrollOffset;
@@ -193,6 +215,16 @@ export function AppHeader() {
   }, [headerOffset]);
 
   const handleLogout = async () => {
+    // Deliberately here rather than in the store's `logout()`, which the 401
+    // interceptor and the rehydrate error path also call: a session that merely
+    // expired is not somebody handing the browser over, and deregistering push
+    // on it would make every timeout cost the user their notifications. This is
+    // the one place someone chose to leave. The push subscription is scoped to
+    // the origin, not the session, so without releasing it the departing
+    // account's notifications keep arriving on a browser the next person is
+    // using -- and hold the endpoint against their own subscribe. The server row
+    // survives and is retired by its next 410.
+    await releaseLocalPushSubscription();
     try {
       await authApi.logout();
       clearLogoutIncomplete();
@@ -207,7 +239,10 @@ export function AppHeader() {
       // Record it, warn, and let the login screen offer the retry.
       markLogoutIncomplete();
       logout();
-      toast.error(t('logoutNotConfirmed'), { duration: 12_000, id: 'logout-failed' });
+      toast.error(t('logoutNotConfirmed'), {
+        duration: 12_000,
+        id: 'logout-failed',
+      });
       router.push('/login');
     }
   };
@@ -233,12 +268,32 @@ export function AppHeader() {
                 aria-label={t('toggleMenu')}
               >
                 {mobileMenuOpen ? (
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 ) : (
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 6h16M4 12h16M4 18h16"
+                    />
                   </svg>
                 )}
               </button>
@@ -279,197 +334,232 @@ export function AppHeader() {
               onClick={() => router.push('/dashboard')}
               className="hidden xl:flex items-center gap-2 text-2xl font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
             >
-              <Image src="/icons/monize-logo-transparent.svg" alt="Monize" width={32} height={32} className="rounded" priority />
+              <Image
+                src="/icons/monize-logo-transparent.svg"
+                alt="Monize"
+                width={32}
+                height={32}
+                className="rounded"
+                priority
+              />
               <span className="hidden xl:inline">Monize</span>
             </button>
             {(!isDelegateView ||
               visibleNavLinks.length > 0 ||
               visibleToolsLinks.length > 0 ||
               showAiMenu) && (
-            <nav className="hidden xl:ml-8 xl:flex xl:items-center xl:space-x-4">
-              {visibleNavLinks.map((link) => (
-                <button
-                  key={link.href}
-                  {...NAV_TOUR_ANCHORS[link.href]}
-                  onClick={() => router.push(link.href)}
-                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    isNavSectionActive(pathname, link.href)
-                      ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200'
-                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  {t(link.labelKey)}
-                </button>
-              ))}
-
-              {showAiMenu && (
-              <>
-              {/* AI Dropdown */}
-              <div className="relative" ref={aiRef}>
-                <button
-                  onClick={() => setAiOpen(!aiOpen)}
-                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors inline-flex items-center gap-1 ${
-                    isAiActive
-                      ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200'
-                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  {t('ai')}
-                  <svg
-                    className={`w-4 h-4 transition-transform ${aiOpen ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-
-                {aiOpen && (
-                  <div className="absolute left-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg dark:shadow-gray-700/50 border border-gray-200 dark:border-gray-700 z-50">
-                    <div className="py-1">
-                      {aiLinks.map((link) => {
-                        const active = isNavSectionActive(pathname, link.href);
-                        return (
-                          <button
-                            key={link.href}
-                            onClick={() => {
-                              router.push(link.href);
-                              setAiOpen(false);
-                            }}
-                            className={`flex w-full items-center gap-2.5 text-left px-4 py-2 text-sm transition-colors ${
-                              active
-                                ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-200'
-                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                            }`}
-                          >
-                            <NavItemIcon href={link.href} active={active} />
-                            {t(link.labelKey)}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              </>
-              )}
-
-              {visibleToolsLinks.length > 0 && (
-              <>
-              {/* Tools Dropdown */}
-              <div className="relative" ref={toolsRef}>
-                <button
-                  {...tourAnchor(TOUR_ANCHORS.navTools)}
-                  onClick={() => setToolsOpen(!toolsOpen)}
-                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors inline-flex items-center gap-1 ${
-                    isToolsActive
-                      ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200'
-                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  {t('tools')}
-                  <svg
-                    className={`w-4 h-4 transition-transform ${toolsExpanded ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-
-                {toolsExpanded && (
-                  <div
-                    {...tourAnchor(TOUR_ANCHORS.navToolsMenu)}
-                    className="absolute left-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg dark:shadow-gray-700/50 border border-gray-200 dark:border-gray-700 z-50"
-                  >
-                    <div className="py-1">
-                      {visibleToolsLinks.map((link) => {
-                        const active = isNavSectionActive(pathname, link.href);
-                        return (
-                          <button
-                            key={link.href}
-                            onClick={() => {
-                              router.push(link.href);
-                              setToolsOpen(false);
-                            }}
-                            className={`flex w-full items-center gap-2.5 text-left px-4 py-2 text-sm transition-colors ${
-                              active
-                                ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-200'
-                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                            }`}
-                          >
-                            <NavItemIcon href={link.href} active={active} />
-                            {t(link.labelKey)}
-                            {link.badge && (
-                              <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-                                {link.badge}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              </>
-              )}
-
-              {/* Admin menu - only visible to admins */}
-              {!isDelegateView && user?.role === 'admin' && (
-                <div className="relative" ref={adminRef}>
+              <nav className="hidden xl:ml-8 xl:flex xl:items-center xl:space-x-4">
+                {visibleNavLinks.map((link) => (
                   <button
-                    onClick={() => setAdminOpen(!adminOpen)}
-                    className={`px-3 py-2 text-sm font-medium rounded-md transition-colors inline-flex items-center gap-1 ${
-                      pathname.startsWith('/admin')
+                    key={link.href}
+                    {...NAV_TOUR_ANCHORS[link.href]}
+                    onClick={() => router.push(link.href)}
+                    className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      isNavSectionActive(pathname, link.href)
                         ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200'
                         : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
                   >
-                    {t('admin')}
-                    <svg
-                      className={`w-4 h-4 transition-transform ${adminOpen ? 'rotate-180' : ''}`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
+                    {t(link.labelKey)}
                   </button>
+                ))}
 
-                  {adminOpen && (
-                    <div className="absolute left-0 mt-1 w-56 bg-white dark:bg-gray-800 rounded-md shadow-lg dark:shadow-gray-700/50 border border-gray-200 dark:border-gray-700 z-50">
-                      <div className="py-1">
-                        {adminLinks.map((link) => {
-                          const active = isNavSectionActive(pathname, link.href);
-                          return (
-                            <button
-                              key={link.href}
-                              onClick={() => {
-                                router.push(link.href);
-                                setAdminOpen(false);
-                              }}
-                              className={`flex w-full items-center gap-2.5 text-left px-4 py-2 text-sm transition-colors ${
-                                active
-                                  ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-200'
-                                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                              }`}
-                            >
-                              <NavItemIcon href={link.href} active={active} />
-                              {t(link.labelKey)}
-                            </button>
-                          );
-                        })}
-                      </div>
+                {showAiMenu && (
+                  <>
+                    {/* AI Dropdown */}
+                    <div className="relative" ref={aiRef}>
+                      <button
+                        onClick={() => setAiOpen(!aiOpen)}
+                        className={`px-3 py-2 text-sm font-medium rounded-md transition-colors inline-flex items-center gap-1 ${
+                          isAiActive
+                            ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200'
+                            : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        {t('ai')}
+                        <svg
+                          className={`w-4 h-4 transition-transform ${aiOpen ? 'rotate-180' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </button>
+
+                      {aiOpen && (
+                        <div className="absolute left-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg dark:shadow-gray-700/50 border border-gray-200 dark:border-gray-700 z-50">
+                          <div className="py-1">
+                            {aiLinks.map((link) => {
+                              const active = isNavSectionActive(
+                                pathname,
+                                link.href,
+                              );
+                              return (
+                                <button
+                                  key={link.href}
+                                  onClick={() => {
+                                    router.push(link.href);
+                                    setAiOpen(false);
+                                  }}
+                                  className={`flex w-full items-center gap-2.5 text-left px-4 py-2 text-sm transition-colors ${
+                                    active
+                                      ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-200'
+                                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                  }`}
+                                >
+                                  <NavItemIcon
+                                    href={link.href}
+                                    active={active}
+                                  />
+                                  {t(link.labelKey)}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              )}
-            </nav>
+                  </>
+                )}
+
+                {visibleToolsLinks.length > 0 && (
+                  <>
+                    {/* Tools Dropdown */}
+                    <div className="relative" ref={toolsRef}>
+                      <button
+                        {...tourAnchor(TOUR_ANCHORS.navTools)}
+                        onClick={() => setToolsOpen(!toolsOpen)}
+                        className={`px-3 py-2 text-sm font-medium rounded-md transition-colors inline-flex items-center gap-1 ${
+                          isToolsActive
+                            ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200'
+                            : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        {t('tools')}
+                        <svg
+                          className={`w-4 h-4 transition-transform ${toolsExpanded ? 'rotate-180' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </button>
+
+                      {toolsExpanded && (
+                        <div
+                          {...tourAnchor(TOUR_ANCHORS.navToolsMenu)}
+                          className="absolute left-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg dark:shadow-gray-700/50 border border-gray-200 dark:border-gray-700 z-50"
+                        >
+                          <div className="py-1">
+                            {visibleToolsLinks.map((link) => {
+                              const active = isNavSectionActive(
+                                pathname,
+                                link.href,
+                              );
+                              return (
+                                <button
+                                  key={link.href}
+                                  onClick={() => {
+                                    router.push(link.href);
+                                    setToolsOpen(false);
+                                  }}
+                                  className={`flex w-full items-center gap-2.5 text-left px-4 py-2 text-sm transition-colors ${
+                                    active
+                                      ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-200'
+                                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                  }`}
+                                >
+                                  <NavItemIcon
+                                    href={link.href}
+                                    active={active}
+                                  />
+                                  {t(link.labelKey)}
+                                  {link.badge && (
+                                    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                                      {link.badge}
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* Admin menu - only visible to admins */}
+                {!isDelegateView && user?.role === 'admin' && (
+                  <div className="relative" ref={adminRef}>
+                    <button
+                      onClick={() => setAdminOpen(!adminOpen)}
+                      className={`px-3 py-2 text-sm font-medium rounded-md transition-colors inline-flex items-center gap-1 ${
+                        pathname.startsWith('/admin')
+                          ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200'
+                          : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      {t('admin')}
+                      <svg
+                        className={`w-4 h-4 transition-transform ${adminOpen ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </button>
+
+                    {adminOpen && (
+                      <div className="absolute left-0 mt-1 w-56 bg-white dark:bg-gray-800 rounded-md shadow-lg dark:shadow-gray-700/50 border border-gray-200 dark:border-gray-700 z-50">
+                        <div className="py-1">
+                          {adminLinks.map((link) => {
+                            const active = isNavSectionActive(
+                              pathname,
+                              link.href,
+                            );
+                            return (
+                              <button
+                                key={link.href}
+                                onClick={() => {
+                                  router.push(link.href);
+                                  setAdminOpen(false);
+                                }}
+                                className={`flex w-full items-center gap-2.5 text-left px-4 py-2 text-sm transition-colors ${
+                                  active
+                                    ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-200'
+                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                }`}
+                              >
+                                <NavItemIcon href={link.href} active={active} />
+                                {t(link.labelKey)}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </nav>
             )}
           </div>
           <div className="flex items-center space-x-1 sm:space-x-4">
@@ -500,7 +590,9 @@ export function AppHeader() {
                       setSearchOpen(true);
                     }
                   }}
-                  aria-label={searchOpen ? t('search.submit') : t('search.open')}
+                  aria-label={
+                    searchOpen ? t('search.submit') : t('search.open')
+                  }
                   title={t('search.label')}
                   className="p-2 rounded-md text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
@@ -556,7 +648,9 @@ export function AppHeader() {
                   d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
                 />
               </svg>
-              <span className="hidden sm:inline">{user?.firstName || user?.email}</span>
+              <span className="hidden sm:inline">
+                {user?.firstName || user?.email}
+              </span>
             </button>
             <Button
               variant="outline"

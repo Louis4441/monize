@@ -119,13 +119,28 @@ var PUSH_FALLBACK_BODY = 'You have a new notification in Monize.';
 // absolute URL, a protocol-relative '//host', a backslash Chrome normalises to
 // a slash, a 'javascript:' string -- is discarded rather than repaired, because
 // a repaired hostile value is still a value somebody chose.
+//
+// The parser is the authority here, not the shape of the raw string. WHATWG URL
+// strips ASCII tab, CR and LF *before* parsing, so '/\t/evil.test/steal' begins
+// with a slash, has no second slash, contains no backslash -- and resolves to
+// https://evil.test/steal. Any guard written against the characters alone loses
+// to that, so the check is: resolve it, then require the result to be this
+// origin, and hand back the parser's own normalised path.
 function safeNotificationPath(value) {
   if (typeof value !== 'string') return '/';
   if (value.length === 0 || value.length > 512) return '/';
+  // Still required, so a target is an absolute path rather than something whose
+  // meaning depends on what it is resolved against.
   if (value.charAt(0) !== '/') return '/';
-  if (value.charAt(1) === '/' || value.charAt(1) === '\\') return '/';
-  if (value.indexOf('\\') !== -1) return '/';
-  return value;
+
+  var resolved;
+  try {
+    resolved = new URL(value, self.location.origin);
+  } catch (_error) {
+    return '/';
+  }
+  if (resolved.origin !== self.location.origin) return '/';
+  return resolved.pathname + resolved.search + resolved.hash;
 }
 
 function readPushPayload(event) {
@@ -168,8 +183,12 @@ self.addEventListener('notificationclick', function (event) {
   event.notification.close();
 
   var data = event.notification.data || {};
-  var target = safeNotificationPath(data.target);
-  var url = new URL(target, self.location.origin).href;
+  // Re-validated rather than trusted: the stored data IS the payload, so it is
+  // no more trustworthy here than it was on arrival.
+  var url = new URL(
+    safeNotificationPath(data.target),
+    self.location.origin
+  ).href;
 
   event.waitUntil(
     self.clients

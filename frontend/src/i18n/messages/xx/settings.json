@@ -251,6 +251,7 @@
       "disabledByAdmin": "[XX-An administrator has switched browser push off for this Monize instance.-XX]",
       "keyUnreadable": "[XX-Monize cannot read this instance's push key pair, so nothing can be delivered. An administrator can recover it by rotating the key pair in the Admin area.-XX]",
       "statusUnavailable": "[XX-Monize could not check whether browser push is available. Reload the page to try again.-XX]",
+      "devicesUnavailable": "[XX-Monize could not load your registered devices. Everything else on this page still works; reload to try again.-XX]",
       "unsupported": {
         "unsupported": "[XX-This browser cannot receive push notifications.-XX]",
         "denied": "[XX-Notifications are blocked for Monize in this browser. Allow them in the browser’s site settings, then reload this page.-XX]",

@@ -251,6 +251,7 @@
       "disabledByAdmin": "Die Administration hat Browser-Push für diese Monize-Instanz deaktiviert.",
       "keyUnreadable": "Monize kann das Push-Schlüsselpaar dieser Instanz nicht lesen, daher wird nichts zugestellt. Die Administration kann es im Admin-Bereich durch Erneuern des Schlüsselpaars wiederherstellen.",
       "statusUnavailable": "Monize konnte nicht prüfen, ob Browser-Push verfügbar ist. Laden Sie die Seite neu, um es erneut zu versuchen.",
+      "devicesUnavailable": "Monize konnte Ihre registrierten Geräte nicht laden. Alles andere auf dieser Seite funktioniert weiterhin; laden Sie neu, um es erneut zu versuchen.",
       "unsupported": {
         "unsupported": "Dieser Browser kann keine Push-Benachrichtigungen empfangen.",
         "denied": "Benachrichtigungen sind für Monize in diesem Browser blockiert. Erlauben Sie sie in den Website-Einstellungen des Browsers und laden Sie diese Seite neu.",

@@ -251,6 +251,7 @@
       "disabledByAdmin": "Un administrateur a désactivé le push du navigateur pour cette instance Monize.",
       "keyUnreadable": "Monize ne peut pas lire la paire de clés push de cette instance : rien n'est distribué. Un administrateur peut rétablir le service en effectuant une rotation dans l'espace d'administration.",
       "statusUnavailable": "Monize n'a pas pu vérifier si le push du navigateur est disponible. Rechargez la page pour réessayer.",
+      "devicesUnavailable": "Monize n'a pas pu charger vos appareils enregistrés. Le reste de cette page fonctionne toujours ; rechargez pour réessayer.",
       "unsupported": {
         "unsupported": "Ce navigateur ne peut pas recevoir de notifications push.",
         "denied": "Les notifications sont bloquées pour Monize dans ce navigateur. Autorisez-les dans les paramètres du site, puis rechargez cette page.",

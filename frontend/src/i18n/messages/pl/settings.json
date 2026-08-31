@@ -251,6 +251,7 @@
       "disabledByAdmin": "Administrator wyłączył push w przeglądarce dla tej instancji Monize.",
       "keyUnreadable": "Monize nie potrafi odczytać pary kluczy push tej instancji, więc nic nie jest dostarczane. Administrator może to naprawić, wymieniając parę kluczy w sekcji Admin.",
       "statusUnavailable": "Monize nie mógł sprawdzić, czy push w przeglądarce jest dostępny. Odśwież stronę, aby spróbować ponownie.",
+      "devicesUnavailable": "Monize nie wczytał Twoich zarejestrowanych urządzeń. Reszta tej strony działa normalnie; odśwież, aby spróbować ponownie.",
       "unsupported": {
         "unsupported": "Ta przeglądarka nie może odbierać powiadomień push.",
         "denied": "Powiadomienia dla Monize są zablokowane w tej przeglądarce. Zezwól na nie w ustawieniach witryny, a następnie odśwież tę stronę.",

@@ -7,6 +7,7 @@ import { I18nService } from "nestjs-i18n";
 import {
   PushSubscriptionService,
   ENDPOINT_FINGERPRINT_LENGTH,
+  ENDPOINT_UNIQUE_INDEX,
   MAX_USER_AGENT_LENGTH,
   hashEndpoint,
 } from "./push-subscription.service";
@@ -35,6 +36,7 @@ const DTO = {
   endpoint: ENDPOINT,
   p256dh: "p256dh-value",
   auth: "auth-value",
+  applicationServerKey: "PUB",
   deviceName: "Pixel 9",
 };
 
@@ -145,35 +147,69 @@ describe("PushSubscriptionService", () => {
     // into a 500 and silence the client's single retry -- which is the whole
     // recovery path for a stale claim.
     it.each([
-      ["a unique violation", "23505"],
-      ["a policy violation", "42501"],
-    ])("answers %s with the same refusal", async (_name, code) => {
-      manager.query.mockRejectedValue(
-        Object.assign(new Error("nope"), { code }),
-      );
+      [
+        "a unique violation naming the endpoint index",
+        Object.assign(new Error("duplicate key"), {
+          code: "23505",
+          constraint: ENDPOINT_UNIQUE_INDEX,
+        }),
+      ],
+      [
+        "the same violation reported only in the message",
+        Object.assign(
+          new Error(
+            `duplicate key value violates unique constraint "${ENDPOINT_UNIQUE_INDEX}"`,
+          ),
+          { code: "23505" },
+        ),
+      ],
+      [
+        "a policy violation on this table",
+        Object.assign(
+          new Error(
+            'new row violates row-level security policy for table "push_subscriptions"',
+          ),
+          { code: "42501" },
+        ),
+      ],
+      [
+        "either of them behind TypeORM's driverError wrapper",
+        Object.assign(new Error("wrapped"), {
+          driverError: { code: "23505", constraint: ENDPOINT_UNIQUE_INDEX },
+        }),
+      ],
+    ])("answers %s with the same refusal", async (_name, failure) => {
+      manager.query.mockRejectedValue(failure);
 
       await expect(service.subscribe(USER, DTO, null)).rejects.toThrow(
         ConflictException,
       );
     });
 
-    it("reads the code through TypeORM's driverError wrapper too", async () => {
-      manager.query.mockRejectedValue(
-        Object.assign(new Error("nope"), { driverError: { code: "23505" } }),
-      );
-
-      await expect(service.subscribe(USER, DTO, null)).rejects.toThrow(
-        ConflictException,
-      );
-    });
-
-    // Anything that is not this statement's documented outcome propagates: a
-    // 409 over a broken connection would send the client into a pointless
-    // re-subscribe and hide the real failure.
-    it("does not disguise an unrelated database failure as a refusal", async () => {
-      const failure = Object.assign(new Error("connection terminated"), {
-        code: "57P01",
-      });
+    // Anything that is not this statement's documented outcome propagates. The
+    // grant case is the one that matters: dressed up as a 409 it would send the
+    // client into its automatic recovery, which unsubscribes and destroys a
+    // working browser registration before failing again.
+    it.each([
+      [
+        "a missing INSERT grant",
+        Object.assign(
+          new Error("permission denied for table push_subscriptions"),
+          { code: "42501" },
+        ),
+      ],
+      [
+        "a unique violation on some other constraint",
+        Object.assign(new Error("duplicate key"), {
+          code: "23505",
+          constraint: "some_other_index",
+        }),
+      ],
+      [
+        "a dropped connection",
+        Object.assign(new Error("connection terminated"), { code: "57P01" }),
+      ],
+    ])("does not disguise %s as a refusal", async (_name, failure) => {
       manager.query.mockRejectedValue(failure);
 
       await expect(service.subscribe(USER, DTO, null)).rejects.toBe(failure);
@@ -242,6 +278,22 @@ describe("PushSubscriptionService", () => {
         String(sql).includes("INSERT INTO push_subscriptions"),
       )!;
       expect(insert[1][6]).toHaveLength(MAX_USER_AGENT_LENGTH);
+    });
+
+    // The row records the key the BROWSER used, not the server's current value.
+    // A rotation between the page load and the click would otherwise stamp a
+    // key the subscription does not have, so the sender's KEY_ROTATED guard
+    // could never fire and the device would silently 403 until the retry bound
+    // retired it with the wrong reason.
+    it("refuses a subscription minted under a superseded key", async () => {
+      await expect(
+        service.subscribe(
+          USER,
+          { ...DTO, applicationServerKey: "PUB-OLD" },
+          null,
+        ),
+      ).rejects.toThrow(ConflictException);
+      expect(manager.query).not.toHaveBeenCalled();
     });
 
     it("stamps the subscription with the key pair it was minted under", async () => {

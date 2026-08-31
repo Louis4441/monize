@@ -251,6 +251,7 @@
       "disabledByAdmin": "Een beheerder heeft browserpush uitgeschakeld voor deze Monize-instantie.",
       "keyUnreadable": "Monize kan het pushsleutelpaar van deze instantie niet lezen, dus er wordt niets bezorgd. Een beheerder kan dit herstellen door het sleutelpaar in het Admin-gedeelte te vervangen.",
       "statusUnavailable": "Monize kon niet controleren of browserpush beschikbaar is. Herlaad de pagina om het opnieuw te proberen.",
+      "devicesUnavailable": "Monize kon je geregistreerde apparaten niet laden. De rest van deze pagina werkt gewoon; herlaad om het opnieuw te proberen.",
       "unsupported": {
         "unsupported": "Deze browser kan geen pushmeldingen ontvangen.",
         "denied": "Meldingen zijn geblokkeerd voor Monize in deze browser. Sta ze toe in de site-instellingen en herlaad deze pagina.",

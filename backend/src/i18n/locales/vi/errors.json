@@ -347,7 +347,8 @@
     "deviceNotFound": "Không tìm thấy thiết bị nhận thông báo đẩy.",
     "noDevices": "Chưa có thiết bị nhận thông báo đẩy nào cho tài khoản này. Hãy bật thông báo đẩy trong trình duyệt này trước.",
     "rotationUnavailable": "Chưa đặt ENCRYPTION_KEY nên không thể lưu khóa riêng mới ở dạng mã hóa. Hãy đặt biến này và khởi động lại trước khi xoay khóa.",
-    "channelNotConfigured": "Phiên bản này chưa có cặp khóa đẩy nên không thể bật hoặc tắt kênh đẩy từ trình duyệt."
+    "channelNotConfigured": "Phiên bản này chưa có cặp khóa đẩy nên không thể bật hoặc tắt kênh đẩy từ trình duyệt.",
+    "keyRotated": "Phiên bản này đã đổi khóa đẩy trong lúc bạn ở trang này. Hãy tải lại trang và bật đẩy lần nữa."
   },
   "institutions": {
     "nameConflict": "Tổ chức với tên \"{{ name }}\" đã tồn tại",

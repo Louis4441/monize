@@ -225,6 +225,25 @@ describe('PushDevicesPanel', () => {
 
   // A failed read is not "push is off here": that message sends the user to ask
   // an administrator about a switch that may well be on.
+  // Two failures, two questions. A device list that will not load says nothing
+  // about whether push is available here, and folding them together hid a
+  // working Enable button behind "we could not check".
+  it('keeps the enable button when only the device list fails', async () => {
+    mockListDevices.mockRejectedValue(new Error('boom'));
+
+    render(<PushDevicesPanel />);
+
+    expect(
+      await screen.findByText(/could not load your registered devices/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /enable on this device/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/could not check whether browser push is available/i),
+    ).not.toBeInTheDocument();
+  });
+
   it('says the status could not be read when the request fails', async () => {
     mockGetConfig.mockRejectedValue(new Error('boom'));
 

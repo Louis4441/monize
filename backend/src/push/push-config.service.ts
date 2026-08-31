@@ -351,14 +351,14 @@ export class PushConfigService implements OnApplicationBootstrap {
     manager: EntityManager,
     currentPublicKey: string,
   ): Promise<number> {
-    const result = await manager.query(
-      `UPDATE push_subscriptions
-          SET disabled_at = CURRENT_TIMESTAMP, disabled_reason = $1
-        WHERE disabled_at IS NULL
-          AND vapid_public_key <> $2`,
-      [PushDisabledReason.KEY_ROTATED, currentPublicKey],
+    return affectedRowCount(
+      await manager.query(
+        `UPDATE push_subscriptions
+            SET disabled_at = CURRENT_TIMESTAMP, disabled_reason = $1
+          WHERE disabled_at IS NULL
+            AND vapid_public_key <> $2`,
+        [PushDisabledReason.KEY_ROTATED, currentPublicKey],
+      ),
     );
-    // UPDATE returns the [rows, rowCount] tuple; see common/db/query-result.ts.
-    return Array.isArray(result) ? Number(result[1] ?? 0) : 0;
   }
 }

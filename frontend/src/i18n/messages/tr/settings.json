@@ -251,6 +251,7 @@
       "disabledByAdmin": "Bir yönetici bu Monize örneği için tarayıcı anlık bildirimini kapattı.",
       "keyUnreadable": "Monize bu örneğin anlık bildirim anahtar çiftini okuyamıyor; bu yüzden hiçbir şey teslim edilmiyor. Bir yönetici Admin bölümünde anahtar çiftini değiştirerek kurtarabilir.",
       "statusUnavailable": "Monize, tarayıcı anlık bildiriminin kullanılabilir olup olmadığını kontrol edemedi. Yeniden denemek için sayfayı yenileyin.",
+      "devicesUnavailable": "Monize kayıtlı cihazlarınızı yükleyemedi. Bu sayfadaki diğer her şey çalışıyor; yeniden denemek için sayfayı yenileyin.",
       "unsupported": {
         "unsupported": "Bu tarayıcı anlık bildirim alamaz.",
         "denied": "Bu tarayıcıda Monize bildirimleri engellenmiş. Tarayıcının site ayarlarından izin verin ve bu sayfayı yenileyin.",

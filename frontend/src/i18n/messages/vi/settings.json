@@ -251,6 +251,7 @@
       "disabledByAdmin": "Quản trị viên đã tắt đẩy từ trình duyệt cho phiên bản Monize này.",
       "keyUnreadable": "Monize không đọc được cặp khóa đẩy của phiên bản này nên không có gì được gửi đi. Quản trị viên có thể khôi phục bằng cách xoay cặp khóa trong khu vực Admin.",
       "statusUnavailable": "Monize không kiểm tra được đẩy từ trình duyệt có khả dụng hay không. Hãy tải lại trang để thử lại.",
+      "devicesUnavailable": "Monize không tải được các thiết bị đã đăng ký của bạn. Mọi thứ khác trên trang này vẫn hoạt động; hãy tải lại để thử lại.",
       "unsupported": {
         "unsupported": "Trình duyệt này không thể nhận thông báo đẩy.",
         "denied": "Thông báo cho Monize đang bị chặn trong trình duyệt này. Hãy cho phép trong cài đặt trang web rồi tải lại trang.",

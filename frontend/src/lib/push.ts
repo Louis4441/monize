@@ -68,6 +68,8 @@ export const pushApi = {
     endpoint: string;
     p256dh: string;
     auth: string;
+    /** The key the browser subscribed with, which the server checks is current. */
+    applicationServerKey: string;
     deviceName?: string;
   }): Promise<PushDevice> => {
     const response = await apiClient.post<PushDevice>(
@@ -185,6 +187,45 @@ export function toSubscriptionPayload(
   return { endpoint, p256dh: keys.p256dh, auth: keys.auth };
 }
 
+/**
+ * How long to wait for the service worker before giving up on it.
+ *
+ * `navigator.serviceWorker.ready` never rejects: a worker that fails to install
+ * -- `/sw.js` misserved behind a proxy, say -- leaves the promise pending for
+ * the life of the page. Awaited unbounded it takes the whole push block down
+ * with it: the settings panel never leaves its loading state and simply
+ * vanishes, and Enable and Remove hang with no error.
+ */
+export const SERVICE_WORKER_READY_TIMEOUT_MS = 5000;
+
+/** Thrown when the service worker never became ready, so callers can say so. */
+export class ServiceWorkerUnavailableError extends Error {
+  constructor() {
+    super('The Monize service worker is not available in this browser.');
+    this.name = 'ServiceWorkerUnavailableError';
+  }
+}
+
+/** `navigator.serviceWorker.ready` with a bound, because it has none of its own. */
+export async function serviceWorkerReady(
+  timeoutMs = SERVICE_WORKER_READY_TIMEOUT_MS,
+): Promise<ServiceWorkerRegistration> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(
+          () => reject(new ServiceWorkerUnavailableError()),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
 /** Thrown when the browser refuses, so the caller can tell the user which refusal. */
 export class PushPermissionError extends Error {
   constructor(readonly reason: 'denied' | 'dismissed') {
@@ -219,7 +260,7 @@ export async function enablePushOnThisDevice(
   if (permission === 'denied') throw new PushPermissionError('denied');
   if (permission !== 'granted') throw new PushPermissionError('dismissed');
 
-  const registration = await navigator.serviceWorker.ready;
+  const registration = await serviceWorkerReady();
   const applicationServerKey = urlBase64ToUint8Array(publicKey);
 
   let subscription = await registration.pushManager.getSubscription();
@@ -244,7 +285,7 @@ export async function enablePushOnThisDevice(
   }
 
   try {
-    return await postSubscription(subscription, deviceName);
+    return await postSubscription(subscription, publicKey, deviceName);
   } catch (error) {
     if (!isEndpointClaimed(error)) throw error;
     await subscription.unsubscribe();
@@ -252,19 +293,20 @@ export async function enablePushOnThisDevice(
       userVisibleOnly: true,
       applicationServerKey,
     });
-    return postSubscription(replacement, deviceName);
+    return postSubscription(replacement, publicKey, deviceName);
   }
 }
 
 function postSubscription(
   subscription: PushSubscription,
+  applicationServerKey: string,
   deviceName?: string,
 ): Promise<PushDevice> {
   const payload = toSubscriptionPayload(subscription.toJSON());
   if (!payload) {
     throw new Error('The browser returned an incomplete push subscription.');
   }
-  return pushApi.subscribe({ ...payload, deviceName });
+  return pushApi.subscribe({ ...payload, applicationServerKey, deviceName });
 }
 
 /** A 409 from `POST /push/subscriptions`: this endpoint belongs to someone else. */
@@ -326,7 +368,7 @@ export async function releaseLocalPushSubscription(): Promise<void> {
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
       return;
     }
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await serviceWorkerReady();
     const subscription = await registration.pushManager.getSubscription();
     if (subscription) await subscription.unsubscribe();
   } catch {
@@ -365,7 +407,7 @@ export async function currentDeviceFingerprint(): Promise<string | null> {
 /** The endpoint this browser currently holds, or null. */
 export async function currentEndpoint(): Promise<string | null> {
   if (!('serviceWorker' in navigator)) return null;
-  const registration = await navigator.serviceWorker.ready;
+  const registration = await serviceWorkerReady();
   const subscription = await registration.pushManager.getSubscription();
   return subscription?.endpoint ?? null;
 }

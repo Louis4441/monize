@@ -97,19 +97,6 @@ export const useAuthStore = create<AuthState>()(
         import('@/store/preferencesStore').then(({ usePreferencesStore }) => {
           usePreferencesStore.getState().clearPreferences();
         });
-        // SECURITY: Release this browser's push subscription. It is scoped to the
-        // origin, not to the session, so leaving it registered keeps delivering
-        // the departing account's notifications onto a browser the next person
-        // is using -- and holds the endpoint against their own subscribe. The
-        // server row survives and is retired by its next 410; unsubscribing
-        // locally is the half that stops the notifications appearing.
-        import('@/lib/push')
-          .then(({ releaseLocalPushSubscription }) =>
-            releaseLocalPushSubscription(),
-          )
-          .catch(() => {
-            // Best effort: a logout must never fail on the push channel.
-          });
         // SECURITY: Clear AI chat history so conversations don't leak across accounts
         try {
           if (typeof window !== 'undefined') {

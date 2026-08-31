@@ -34,6 +34,22 @@ export class CreatePushSubscriptionDto {
   @MaxLength(255)
   auth: string;
 
+  /**
+   * The VAPID public key the browser actually subscribed with.
+   *
+   * Not decoration, and not the same thing as the server's current key: a
+   * client holds the key it read when the page loaded, so a rotation in between
+   * produces a subscription minted under the old pair. Stamping the row with
+   * the server's own value would then record a key the subscription does not
+   * have, `WebPushSender`'s KEY_ROTATED guard could never fire, and the device
+   * would silently 403 until the retry bound retired it with the wrong reason.
+   */
+  @ApiProperty({ maxLength: 200 })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  applicationServerKey: string;
+
   /** What the user calls this device. Rendered in their own device list. */
   @ApiPropertyOptional({ maxLength: 100 })
   @IsOptional()

@@ -6,6 +6,8 @@ import {
   currentDeviceFingerprint,
   disablePushOnThisDevice,
   releaseLocalPushSubscription,
+  ServiceWorkerUnavailableError,
+  SERVICE_WORKER_READY_TIMEOUT_MS,
   enablePushOnThisDevice,
   fingerprintEndpoint,
   getPushSupport,
@@ -51,6 +53,7 @@ describe('pushApi', () => {
       endpoint: ENDPOINT,
       p256dh: 'p',
       auth: 'a',
+      applicationServerKey: PUBLIC_KEY,
       deviceName: 'Pixel',
     });
 
@@ -58,6 +61,7 @@ describe('pushApi', () => {
     const [, payload] = vi.mocked(apiClient.post).mock.calls[0];
     // The owner is the JWT's, and there is no field here that could say otherwise.
     expect(Object.keys(payload as object).sort()).toEqual([
+      'applicationServerKey',
       'auth',
       'deviceName',
       'endpoint',
@@ -300,6 +304,12 @@ describe('enabling and disabling push on this device', () => {
   it('asks for permission, then registers, and reports the stored device', async () => {
     const device = await enablePushOnThisDevice(PUBLIC_KEY, 'Pixel 9');
 
+    // The key the browser actually used travels with the registration: the
+    // server checks it is still current rather than stamping its own value over
+    // a subscription minted under a superseded pair.
+    expect(vi.mocked(apiClient.post).mock.calls[0][1]).toMatchObject({
+      applicationServerKey: PUBLIC_KEY,
+    });
     expect(requestPermission).toHaveBeenCalledTimes(1);
     expect(subscribe).toHaveBeenCalledWith({
       userVisibleOnly: true,
@@ -491,6 +501,26 @@ describe('enabling and disabling push on this device', () => {
     getSubscription.mockRejectedValue(new Error('service worker gone'));
 
     await expect(releaseLocalPushSubscription()).resolves.toBeUndefined();
+  });
+
+  // `navigator.serviceWorker.ready` never rejects, so an unbounded await on a
+  // worker that never installs leaves the whole push block stuck in its loading
+  // state -- it simply disappears from Settings, with no error anywhere.
+  it('gives up on a service worker that never becomes ready', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('navigator', {
+      serviceWorker: { ready: new Promise<never>(() => {}) },
+    });
+    try {
+      const pending = enablePushOnThisDevice(PUBLIC_KEY);
+      const assertion = expect(pending).rejects.toThrow(
+        ServiceWorkerUnavailableError,
+      );
+      await vi.advanceTimersByTimeAsync(SERVICE_WORKER_READY_TIMEOUT_MS + 1);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('exposes the permission refusal as a named error class', () => {
