@@ -13,8 +13,13 @@ interface UnknownAmountProps {
    * component's own amount is known, in a currency with no rate into the one this
    * figure is reported in. Telling the reader to check the security's currency
    * when what is missing is a display rate sends them to the wrong screen.
+   *
+   * `noPrice` is a third cause with a third fix and no exchange rate in it at
+   * all: the quantity is known, and the security has no quoted price to value it
+   * at. Naming a currency pair here would send the reader to the Currencies page
+   * over a rate that is already there.
    */
-  reason?: 'scheduledFx' | 'displayFx';
+  reason?: 'scheduledFx' | 'displayFx' | 'noPrice';
   /** Extra classes for the wrapper, so a table cell can keep its alignment. */
   className?: string;
 }

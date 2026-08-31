@@ -49,6 +49,7 @@
       "name": "이름",
       "type": "유형",
       "shares": "주식수",
+      "value": "평가액",
       "exchange": "거래소",
       "currency": "통화",
       "provider": "제공자",
@@ -69,6 +70,7 @@
     },
     "columnTitles": {
       "shares": "모든 계정에 걸쳐 현재 보유 중인 주식수",
+      "value": "모든 계좌에서 보유한 주식 수에 최근 가격을 곱한 금액(증권 자체 통화 기준)",
       "source": "가장 최근 가격의 출처"
     },
     "actions": {

@@ -241,7 +241,8 @@
     "marker": "—",
     "srLabel": "Montant non disponible",
     "scheduledFx": "Le montant actuel ne peut pas être déterminé : aucun taux de change n'est disponible pour la paire de devises de règlement de cet élément planifié. Le montant enregistré a été calculé à un taux antérieur, il n'est donc pas affiché.",
-    "displayFx": "Ce montant ne peut pas être affiché ici : la valeur est connue, mais aucun taux de change n'est disponible pour la convertir dans la devise de ce total. Actualisez les taux sur la page Devises."
+    "displayFx": "Ce montant ne peut pas être affiché ici : la valeur est connue, mais aucun taux de change n'est disponible pour la convertir dans la devise de ce total. Actualisez les taux sur la page Devises.",
+    "noPrice": "Cette valeur ne peut pas être calculée : le nombre d'actions détenues est connu, mais le titre n'a aucun cours permettant de les valoriser. Actualisez les cours ou saisissez-en un à la main dans l'historique des cours du titre."
   },
   "density": {
     "title": "Changer la densité des lignes",

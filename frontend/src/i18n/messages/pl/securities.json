@@ -49,6 +49,7 @@
       "name": "Nazwa",
       "type": "Typ",
       "shares": "Udziały",
+      "value": "Wartość",
       "exchange": "Giełda",
       "currency": "Waluta",
       "provider": "Dostawca",
@@ -69,6 +70,7 @@
     },
     "columnTitles": {
       "shares": "Aktualnie posiadane udziały na wszystkich kontach",
+      "value": "Udziały na wszystkich kontach według najnowszej ceny, w walucie samego papieru wartościowego",
       "source": "Źródło ostatniej ceny"
     },
     "actions": {

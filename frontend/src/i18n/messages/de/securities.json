@@ -49,6 +49,7 @@
       "name": "Name",
       "type": "Typ",
       "shares": "Anteile",
+      "value": "Wert",
       "exchange": "Börse",
       "currency": "Währung",
       "provider": "Anbieter",
@@ -69,6 +70,7 @@
     },
     "columnTitles": {
       "shares": "Aktuell gehaltene Anteile über alle Konten",
+      "value": "Über alle Konten gehaltene Anteile zum zuletzt abgerufenen Kurs, in der Währung des Wertpapiers",
       "source": "Quelle des zuletzt abgerufenen Kurses"
     },
     "actions": {

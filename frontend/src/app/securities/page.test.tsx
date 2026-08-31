@@ -119,6 +119,13 @@ const mockUpdateSecurity = vi.fn();
 const mockDeactivateSecurity = vi.fn();
 const mockActivateSecurity = vi.fn();
 const mockSetSecurityFavourite = vi.fn().mockResolvedValue(undefined);
+const mockRefreshSelectedPrices = vi.fn().mockResolvedValue({
+  updated: 2,
+  failed: 0,
+  results: [],
+  lastUpdated: '2026-08-31T12:00:00.000Z',
+});
+const mockGetPriceStatus = vi.fn().mockResolvedValue({ lastUpdated: '2026-08-30T12:00:00.000Z' });
 
 vi.mock('@/lib/investments', () => ({
   investmentsApi: {
@@ -131,6 +138,8 @@ vi.mock('@/lib/investments', () => ({
     deactivateSecurity: (...args: any[]) => mockDeactivateSecurity(...args),
     activateSecurity: (...args: any[]) => mockActivateSecurity(...args),
     setSecurityFavourite: (...args: any[]) => mockSetSecurityFavourite(...args),
+    refreshSelectedPrices: (...args: any[]) => mockRefreshSelectedPrices(...args),
+    getPriceStatus: (...args: any[]) => mockGetPriceStatus(...args),
   },
 }));
 
@@ -147,6 +156,7 @@ vi.mock('@/components/securities/SecurityList', () => ({
       {onSort && <button data-testid="sort-currency" onClick={() => onSort('currency')}>SortCurrency</button>}
       {onSort && <button data-testid="sort-provider" onClick={() => onSort('provider')}>SortProvider</button>}
       {onSort && <button data-testid="sort-source" onClick={() => onSort('source')}>SortSource</button>}
+      {onSort && <button data-testid="sort-value" onClick={() => onSort('value')}>SortValue</button>}
       {securities.map((s: any) => (
         <div key={s.id} data-testid={`security-row-${s.symbol}`}>
           {s.name}
@@ -769,6 +779,76 @@ describe('SecuritiesPage', () => {
     await act(async () => { fireEvent.click(screen.getByTestId('sort-source')); });
     await waitFor(() => {
       expect(screen.getByTestId('sort-field')).toHaveTextContent('source');
+    });
+  });
+
+  it('sorts by value, keeping a security with no price last in both directions', async () => {
+    // Two priced securities plus one held position the server could not price.
+    // Its value is unknown, so it belongs at neither end of an ascending sort.
+    mockGetSecurities.mockResolvedValueOnce([
+      { id: 's1', symbol: 'AAPL', name: 'Apple Inc.', securityType: 'STOCK', exchange: 'NASDAQ', currencyCode: 'USD', isActive: true, isFavourite: false, skipPriceUpdates: false, lastPrice: 10, createdAt: '2026-01-01', updatedAt: '2026-01-01' },
+      { id: 's2', symbol: 'XEQT', name: 'iShares Core Equity', securityType: 'ETF', exchange: 'TSX', currencyCode: 'CAD', isActive: true, isFavourite: false, skipPriceUpdates: false, lastPrice: 100, createdAt: '2026-01-01', updatedAt: '2026-01-01' },
+      { id: 's4', symbol: 'ZZZ', name: 'Unpriced Co', securityType: 'STOCK', exchange: 'NYSE', currencyCode: 'USD', isActive: true, isFavourite: false, skipPriceUpdates: false, lastPrice: null, createdAt: '2026-01-01', updatedAt: '2026-01-01' },
+    ]);
+    mockGetHoldings.mockResolvedValueOnce([
+      { id: 'h1', accountId: 'a1', securityId: 's1', quantity: 10, averageCost: 5, security: {}, createdAt: '2026-01-01', updatedAt: '2026-01-01' },
+      { id: 'h2', accountId: 'a1', securityId: 's2', quantity: 3, averageCost: 90, security: {}, createdAt: '2026-01-01', updatedAt: '2026-01-01' },
+      { id: 'h3', accountId: 'a1', securityId: 's4', quantity: 4, averageCost: 1, security: {}, createdAt: '2026-01-01', updatedAt: '2026-01-01' },
+    ]);
+    render(<SecuritiesPage />);
+    await waitFor(() => expect(screen.getByTestId('security-list')).toBeInTheDocument());
+
+    const rendered = () =>
+      screen
+        .getAllByTestId(/^security-row-/)
+        .map((row) => row.getAttribute('data-testid')!.replace('security-row-', ''));
+
+    await act(async () => { fireEvent.click(screen.getByTestId('sort-value')); });
+    await waitFor(() => expect(screen.getByTestId('sort-field')).toHaveTextContent('value'));
+    // AAPL is 10 x 10 = 100, XEQT is 3 x 100 = 300, ZZZ has no price at all.
+    expect(rendered()).toEqual(['AAPL', 'XEQT', 'ZZZ']);
+
+    await act(async () => { fireEvent.click(screen.getByTestId('sort-value')); });
+    await waitFor(() => expect(screen.getByTestId('sort-direction')).toHaveTextContent('desc'));
+    expect(rendered()).toEqual(['XEQT', 'AAPL', 'ZZZ']);
+  });
+
+  describe('refresh prices', () => {
+    it('sits right-justified on the search and filter line', async () => {
+      render(<SecuritiesPage />);
+      await waitFor(() => expect(screen.getByTestId('security-list')).toBeInTheDocument());
+
+      const button = screen.getByRole('button', { name: 'Refresh' });
+      const filterRow = screen.getByPlaceholderText('Search by symbol or name...').parentElement!;
+      expect(filterRow).toContainElement(button);
+      expect(button.closest('div')).toHaveClass('sm:ml-auto');
+    });
+
+    it('refreshes every eligible security and re-reads the list', async () => {
+      render(<SecuritiesPage />);
+      await waitFor(() => expect(screen.getByTestId('security-list')).toBeInTheDocument());
+      mockGetHoldings.mockClear();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+      });
+
+      // The inactive security is not eligible; the two active ones are.
+      await waitFor(() =>
+        expect(mockRefreshSelectedPrices).toHaveBeenCalledWith(['s1', 's2']),
+      );
+      // The Value column is `shares x lastPrice`, so prices written by the
+      // refresh only reach the screen if the list is read again.
+      await waitFor(() => expect(mockGetHoldings).toHaveBeenCalled());
+      expect(toast.success).toHaveBeenCalledWith('2 security prices updated');
+    });
+
+    it('reads the last refresh time on load, for the button to report', async () => {
+      render(<SecuritiesPage />);
+      await waitFor(() => expect(mockGetPriceStatus).toHaveBeenCalled());
+      expect(
+        screen.getByRole('button', { name: 'Refresh' }).getAttribute('title'),
+      ).toMatch(/^Last updated:/);
     });
   });
 

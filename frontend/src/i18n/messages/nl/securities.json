@@ -49,6 +49,7 @@
       "name": "Naam",
       "type": "Type",
       "shares": "Aandelen",
+      "value": "Waarde",
       "exchange": "Beurs",
       "currency": "Valuta",
       "provider": "Provider",
@@ -69,6 +70,7 @@
     },
     "columnTitles": {
       "shares": "Huidig aandelenbestand over alle rekeningen",
+      "value": "Aandelen over alle rekeningen tegen de meest recente koers, in de valuta van het effect zelf",
       "source": "Bron van de meest recente koers"
     },
     "actions": {

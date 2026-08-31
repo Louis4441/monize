@@ -49,6 +49,7 @@
       "name": "Nome",
       "type": "Tipo",
       "shares": "Azioni",
+      "value": "Valore",
       "exchange": "Borsa",
       "currency": "Valuta",
       "provider": "Fornitore",
@@ -69,6 +70,7 @@
     },
     "columnTitles": {
       "shares": "Azioni correnti detenute in tutti i conti",
+      "value": "Quote detenute su tutti i conti al prezzo più recente, nella valuta del titolo",
       "source": "Fonte del prezzo più recente"
     },
     "actions": {

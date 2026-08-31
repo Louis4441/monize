@@ -49,6 +49,7 @@
       "name": "Ad",
       "type": "Tür",
       "shares": "Hisse",
+      "value": "Değer",
       "exchange": "Borsa",
       "currency": "Para Birimi",
       "provider": "Sağlayıcı",
@@ -69,6 +70,7 @@
     },
     "columnTitles": {
       "shares": "Tüm hesaplarda tutulan güncel hisse sayısı",
+      "value": "Tüm hesaplardaki paylar, en güncel fiyatla ve menkul kıymetin kendi para biriminde",
       "source": "En güncel fiyatın kaynağı"
     },
     "actions": {
