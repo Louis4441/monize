@@ -1,17 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
-import { type ReactNode } from 'react';
-import { NextIntlClientProvider } from 'next-intl';
-import investmentsEn from '@/i18n/messages/en/investments.json';
+import { renderHook, act } from '@/test/render';
 import { useInvestmentData } from './useInvestmentData';
-
-// useInvestmentData emits its delete-failure toast through next-intl; resolve
-// it against the real English catalog so assertions on visible text stay accurate.
-const wrapper = ({ children }: { children: ReactNode }) => (
-  <NextIntlClientProvider locale="en" messages={{ investments: investmentsEn }}>
-    {children}
-  </NextIntlClientProvider>
-);
 
 // --- API mocks ---
 const mockDeleteTransaction = vi.fn();
@@ -143,7 +132,7 @@ describe('useInvestmentData – handleDeleteTransaction', () => {
     let resolveDelete!: () => void;
     mockDeleteTransaction.mockReturnValue(new Promise<void>(res => { resolveDelete = res; }));
 
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
 
     // Seed state with two transactions
     await act(async () => {
@@ -178,7 +167,7 @@ describe('useInvestmentData – handleDeleteTransaction', () => {
       pagination: { page: 1, limit: 25, total: 2, totalPages: 1, hasMore: false },
     });
 
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
 
     holdReloadOpen();
@@ -199,7 +188,7 @@ describe('useInvestmentData – handleDeleteTransaction', () => {
       pagination: { page: 1, limit: 25, total: 10, totalPages: 1, hasMore: false },
     });
 
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
 
     holdReloadOpen();
@@ -222,7 +211,7 @@ describe('useInvestmentData – handleDeleteTransaction', () => {
       pagination: { page: 1, limit: 25, total: 10, totalPages: 1, hasMore: false },
     });
 
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
 
     // Filter to a single account.
@@ -243,7 +232,7 @@ describe('useInvestmentData – handleDeleteTransaction', () => {
   it('calls deleteTransaction API with the correct id', async () => {
     mockDeleteTransaction.mockResolvedValue(undefined);
 
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
 
     await act(async () => {
@@ -258,7 +247,7 @@ describe('useInvestmentData – handleDeleteTransaction', () => {
     const freshSummary = { totalValue: 4000, totalCost: 3500, totalGain: 500 };
     mockGetPortfolioSummary.mockResolvedValue(freshSummary);
 
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
 
     await act(async () => {
@@ -280,7 +269,7 @@ describe('useInvestmentData – handleDeleteTransaction', () => {
     mockGetPortfolioSummary.mockResolvedValue(mockSummary);
     mockGetTransactions.mockResolvedValue({ data: [], pagination: null });
 
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
 
     expect(result.current.isLoading).toBe(false);
@@ -298,7 +287,7 @@ describe('useInvestmentData – handleDeleteTransaction', () => {
   it('does not call setIsLoading on successful delete (no full reload)', async () => {
     mockDeleteTransaction.mockResolvedValue(undefined);
 
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
 
     // isLoading should be false after initial load
@@ -318,7 +307,7 @@ describe('useInvestmentData – handleDeleteTransaction', () => {
     mockGetPortfolioSummary.mockResolvedValue(mockSummary);
     mockGetTransactions.mockResolvedValue({ data: [makeTx('t1'), makeTx('t2')], pagination: null });
 
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
 
     await act(async () => {
@@ -335,7 +324,7 @@ describe('useInvestmentData – handleDeleteTransaction', () => {
     mockGetPortfolioSummary.mockResolvedValue(mockSummary);
     mockGetTransactions.mockResolvedValue({ data: [], pagination: null });
 
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
 
     const summaryCallsBefore = mockGetPortfolioSummary.mock.calls.length;
@@ -383,7 +372,7 @@ describe('useInvestmentData – accountId URL filter', () => {
     mockSearchParamsGet = (key: string) => key === 'accountId' ? 'broker-1' : null;
     mockGetInvestmentAccounts.mockResolvedValue([brokerageAccount, cashAccount]);
 
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
 
     expect(result.current.selectedAccountIds).toEqual(['broker-1']);
@@ -393,7 +382,7 @@ describe('useInvestmentData – accountId URL filter', () => {
     mockSearchParamsGet = (key: string) => key === 'accountId' ? 'broker-1' : null;
     mockGetInvestmentAccounts.mockResolvedValue([brokerageAccount, cashAccount]);
 
-    renderHook(() => useInvestmentData(), { wrapper });
+    renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
 
     expect(mockRouterReplace).toHaveBeenCalledWith('/investments', { scroll: false });
@@ -403,7 +392,7 @@ describe('useInvestmentData – accountId URL filter', () => {
     mockSearchParamsGet = (key: string) => key === 'accountId' ? 'nonexistent-id' : null;
     mockGetInvestmentAccounts.mockResolvedValue([brokerageAccount, cashAccount]);
 
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
 
     // Should remain empty (default) since the account was not found
@@ -416,7 +405,7 @@ describe('useInvestmentData – accountId URL filter', () => {
     mockSearchParamsGet = (key: string) => key === 'accountId' ? 'cash-1' : null;
     mockGetInvestmentAccounts.mockResolvedValue([brokerageAccount, cashAccount]);
 
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
 
     expect(result.current.selectedAccountIds).toEqual([]);
@@ -426,7 +415,7 @@ describe('useInvestmentData – accountId URL filter', () => {
     mockSearchParamsGet = () => null;
     mockGetInvestmentAccounts.mockResolvedValue([brokerageAccount, cashAccount]);
 
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
 
     expect(result.current.selectedAccountIds).toEqual([]);
@@ -454,7 +443,7 @@ describe('useInvestmentData – pagination, filters, handlers', () => {
   });
 
   it('handleAccountChange updates selection and resets pages', async () => {
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     await act(async () => {
       result.current.handleAccountChange(['b1']);
@@ -464,7 +453,7 @@ describe('useInvestmentData – pagination, filters, handlers', () => {
   });
 
   it('handleSecurityClick opens the security detail page', async () => {
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     await act(async () => {
       result.current.handleSecurityClick('sec-1');
@@ -475,7 +464,7 @@ describe('useInvestmentData – pagination, filters, handlers', () => {
   });
 
   it('handleFiltersChange updates filter and resets page', async () => {
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     await act(async () => {
       result.current.handleFiltersChange({ action: 'BUY' });
@@ -485,7 +474,7 @@ describe('useInvestmentData – pagination, filters, handlers', () => {
 
   it('goToPage updates page when within bounds', async () => {
     mockGetTransactions.mockResolvedValue({ data: [], pagination: { page: 1, limit: 25, total: 50, totalPages: 2, hasMore: false } });
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     await act(async () => { result.current.goToPage(2); });
     expect(result.current.currentPage).toBe(2);
@@ -493,7 +482,7 @@ describe('useInvestmentData – pagination, filters, handlers', () => {
 
   it('goToPage rejects out-of-bounds pages', async () => {
     mockGetTransactions.mockResolvedValue({ data: [], pagination: { page: 1, limit: 25, total: 1, totalPages: 1, hasMore: false } });
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     await act(async () => { result.current.goToPage(99); });
     expect(result.current.currentPage).toBe(1);
@@ -502,7 +491,7 @@ describe('useInvestmentData – pagination, filters, handlers', () => {
   });
 
   it('clearCashFilters resets all cash filter state', async () => {
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     await act(async () => {
       result.current.setCashFilters({
@@ -520,21 +509,21 @@ describe('useInvestmentData – pagination, filters, handlers', () => {
   });
 
   it('handleCashClick navigates to transactions page', async () => {
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     await act(async () => { result.current.handleCashClick('cash-x'); });
     expect(mockRouterPush).toHaveBeenCalledWith('/transactions?accountId=cash-x');
   });
 
   it('goToCashPage updates page when within bounds', async () => {
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     await act(async () => { result.current.goToCashPage(2); });
     expect(result.current.cashCurrentPage).toBe(2);
   });
 
   it('handleCashTransactionUpdate replaces matching transaction', async () => {
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     await act(async () => {
       result.current.handleCashTransactionUpdate({ id: 'x', amount: 5 } as any);
@@ -542,20 +531,20 @@ describe('useInvestmentData – pagination, filters, handlers', () => {
   });
 
   it('getSelectedBrokerageAccountId returns first selected', async () => {
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     await act(async () => { result.current.handleAccountChange(['b1']); });
     expect(result.current.getSelectedBrokerageAccountId()).toBe('b1');
   });
 
   it('getSelectedBrokerageAccountId returns undefined when none selected', async () => {
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     expect(result.current.getSelectedBrokerageAccountId()).toBeUndefined();
   });
 
   it('cashAccountIds derives from selected brokerages with linkedAccountId', async () => {
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     expect(result.current.cashAccountIds).toEqual(['c1']);
 
@@ -564,7 +553,7 @@ describe('useInvestmentData – pagination, filters, handlers', () => {
   });
 
   it('hasActiveCashFilters returns false when none set', async () => {
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     expect(result.current.hasActiveCashFilters).toBe(false);
     expect(result.current.activeCashFilterCount).toBe(0);
@@ -591,7 +580,7 @@ describe('useInvestmentData – cash transaction loading', () => {
   });
 
   it('loadCashTransactionsIfNeeded loads when view is "cash"', async () => {
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     await act(async () => {
       result.current.loadCashTransactionsIfNeeded('cash');
@@ -600,7 +589,7 @@ describe('useInvestmentData – cash transaction loading', () => {
   });
 
   it('loadCashTransactionsIfNeeded skips when view is not "cash"', async () => {
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     act(() => {
       result.current.loadCashTransactionsIfNeeded('brokerage');
@@ -608,7 +597,7 @@ describe('useInvestmentData – cash transaction loading', () => {
   });
 
   it('refreshAfterWrite reloads both registers and bumps the chart key', async () => {
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
 
     const summaryCallsBefore = mockGetPortfolioSummary.mock.calls.length;
@@ -625,7 +614,7 @@ describe('useInvestmentData – cash transaction loading', () => {
   });
 
   it('loadCashFilterData loads categories and payees', async () => {
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     await act(async () => {
       await result.current.loadCashFilterData();
@@ -633,7 +622,7 @@ describe('useInvestmentData – cash transaction loading', () => {
   });
 
   it('handleCashFormSuccess closes form and reloads data', async () => {
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     // openCashCreate then handleCashFormSuccess
     act(() => result.current.openCashCreate());
@@ -641,19 +630,19 @@ describe('useInvestmentData – cash transaction loading', () => {
   });
 
   it('handleNewTransaction opens create modal', async () => {
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     act(() => result.current.handleNewTransaction());
   });
 
   it('handleEditTransaction opens edit modal', async () => {
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     act(() => result.current.handleEditTransaction(makeTx('t1') as any));
   });
 
   it('handleFormSuccess reloads portfolio data', async () => {
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     await act(async () => result.current.handleFormSuccess());
   });
@@ -686,7 +675,7 @@ describe('useInvestmentData – selectableAccounts ordering', () => {
       makeAccount('2', 'Mango Brokerage'),
     ]);
 
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
 
     expect(result.current.selectableAccounts.map(a => a.name)).toEqual([
@@ -703,7 +692,7 @@ describe('useInvestmentData – selectableAccounts ordering', () => {
       makeAccount('s1', 'Standalone Fund', undefined as unknown as string),
     ]);
 
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
 
     // Cash sub-accounts are filtered out; the remaining two stay alphabetical.
@@ -729,7 +718,7 @@ describe('useInvestmentData – pruning stale account IDs', () => {
     mockGetInvestmentAccounts.mockResolvedValue([
       { id: 'broker-1', name: 'B', accountType: 'INVESTMENT', accountSubType: 'INVESTMENT_BROKERAGE', linkedAccountId: null, currencyCode: 'USD', currentBalance: 0 },
     ]);
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     expect(result.current.selectedAccountIds).toEqual([]);
   });
@@ -757,7 +746,7 @@ describe('useInvestmentData – edit URL parameter flow', () => {
     const originalGetTx = (investmentsApiMod.investmentsApi as any).getTransaction;
     (investmentsApiMod.investmentsApi as any).getTransaction = mockGetTx;
     try {
-      renderHook(() => useInvestmentData(), { wrapper });
+      renderHook(() => useInvestmentData());
       await act(async () => { await new Promise(res => setTimeout(res, 0)); });
       expect(mockGetTx).toHaveBeenCalledWith('tx-edit-1');
     } finally {
@@ -771,7 +760,7 @@ describe('useInvestmentData – edit URL parameter flow', () => {
     const originalGetTx = (investmentsApiMod.investmentsApi as any).getTransaction;
     (investmentsApiMod.investmentsApi as any).getTransaction = vi.fn().mockRejectedValue(new Error('boom'));
     try {
-      renderHook(() => useInvestmentData(), { wrapper });
+      renderHook(() => useInvestmentData());
       await act(async () => { await new Promise(res => setTimeout(res, 0)); });
       expect(mockRouterReplace).toHaveBeenCalled();
     } finally {
@@ -792,7 +781,7 @@ describe('useInvestmentData – delete error toast', () => {
 
   it('updates pagination optimistically when transaction is deleted', async () => {
     mockDeleteTransaction.mockResolvedValue(undefined);
-    const { result } = renderHook(() => useInvestmentData(), { wrapper });
+    const { result } = renderHook(() => useInvestmentData());
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     expect(result.current.pagination?.total).toBe(1);
     holdReloadOpen();

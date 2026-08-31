@@ -1,21 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
-import { ReactNode } from 'react';
-import { NextIntlClientProvider } from 'next-intl';
-import commonEn from '@/i18n/messages/en/common.json';
-import layoutEn from '@/i18n/messages/en/layout.json';
+import { renderHook, act } from '@/test/render';
 
-// Hook emits toasts via next-intl; resolve them against the real English
-// catalogs so renderHook has an intl context. `layout` carries the action
-// descriptions and undo/redo prefixes; `common` carries the error messages.
-const wrapper = ({ children }: { children: ReactNode }) => (
-  <NextIntlClientProvider
-    locale="en"
-    messages={{ common: commonEn, layout: layoutEn }}
-  >
-    {children}
-  </NextIntlClientProvider>
-);
 import toast from 'react-hot-toast';
 import { useUndoRedo } from './useUndoRedo';
 
@@ -50,7 +35,7 @@ describe('useUndoRedo', () => {
   });
 
   it('should return handleUndo and handleRedo functions', () => {
-    const { result } = renderHook(() => useUndoRedo(), { wrapper });
+    const { result } = renderHook(() => useUndoRedo());
     expect(result.current.handleUndo).toBeInstanceOf(Function);
     expect(result.current.handleRedo).toBeInstanceOf(Function);
   });
@@ -65,7 +50,7 @@ describe('useUndoRedo', () => {
       description: 'ignored backend string',
     });
 
-    const { result } = renderHook(() => useUndoRedo(), { wrapper });
+    const { result } = renderHook(() => useUndoRedo());
 
     await act(async () => {
       await result.current.handleUndo();
@@ -85,7 +70,7 @@ describe('useUndoRedo', () => {
       description: 'ignored backend string',
     });
 
-    const { result } = renderHook(() => useUndoRedo(), { wrapper });
+    const { result } = renderHook(() => useUndoRedo());
 
     await act(async () => {
       await result.current.handleRedo();
@@ -100,7 +85,7 @@ describe('useUndoRedo', () => {
       response: { status: 404, data: { message: 'Nothing to undo' } },
     });
 
-    const { result } = renderHook(() => useUndoRedo(), { wrapper });
+    const { result } = renderHook(() => useUndoRedo());
 
     await act(async () => {
       await result.current.handleUndo();
@@ -118,7 +103,7 @@ describe('useUndoRedo', () => {
       },
     });
 
-    const { result } = renderHook(() => useUndoRedo(), { wrapper });
+    const { result } = renderHook(() => useUndoRedo());
 
     await act(async () => {
       await result.current.handleUndo();
@@ -139,7 +124,7 @@ describe('useUndoRedo', () => {
     const signalHandler = vi.fn();
     const unsubscribe = subscribeUndoRedo(signalHandler);
 
-    const { result } = renderHook(() => useUndoRedo(), { wrapper });
+    const { result } = renderHook(() => useUndoRedo());
 
     await act(async () => {
       await result.current.handleUndo();
@@ -155,7 +140,7 @@ describe('useUndoRedo', () => {
       description: 'Undone: test',
     });
 
-    renderHook(() => useUndoRedo(), { wrapper });
+    renderHook(() => useUndoRedo());
 
     await act(async () => {
       document.dispatchEvent(
@@ -178,7 +163,7 @@ describe('useUndoRedo', () => {
       description: 'Redone: test',
     });
 
-    renderHook(() => useUndoRedo(), { wrapper });
+    renderHook(() => useUndoRedo());
 
     await act(async () => {
       document.dispatchEvent(
@@ -196,7 +181,7 @@ describe('useUndoRedo', () => {
   });
 
   it('should not trigger when focus is in an input', async () => {
-    renderHook(() => useUndoRedo(), { wrapper });
+    renderHook(() => useUndoRedo());
 
     const input = document.createElement('input');
     document.body.appendChild(input);
@@ -218,7 +203,7 @@ describe('useUndoRedo', () => {
   });
 
   it('should not trigger from textarea', async () => {
-    renderHook(() => useUndoRedo(), { wrapper });
+    renderHook(() => useUndoRedo());
     const ta = document.createElement('textarea');
     document.body.appendChild(ta);
     ta.focus();
@@ -231,7 +216,7 @@ describe('useUndoRedo', () => {
   });
 
   it('should not trigger when no modifier key', async () => {
-    renderHook(() => useUndoRedo(), { wrapper });
+    renderHook(() => useUndoRedo());
     await act(async () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', bubbles: true }));
       await new Promise((r) => setTimeout(r, 10));
@@ -241,7 +226,7 @@ describe('useUndoRedo', () => {
 
   it('should respond to Ctrl+Y for redo', async () => {
     actionHistoryApi.redo.mockResolvedValue({ action: { id: 'a' }, description: 'Redo' });
-    renderHook(() => useUndoRedo(), { wrapper });
+    renderHook(() => useUndoRedo());
     await act(async () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'y', ctrlKey: true, bubbles: true }));
       await new Promise((r) => setTimeout(r, 10));
@@ -251,7 +236,7 @@ describe('useUndoRedo', () => {
 
   it('should show success toast (not error) when nothing to redo', async () => {
     actionHistoryApi.redo.mockRejectedValue({ response: { status: 404, data: { message: 'Nothing to redo' } } });
-    const { result } = renderHook(() => useUndoRedo(), { wrapper });
+    const { result } = renderHook(() => useUndoRedo());
     await act(async () => {
       await result.current.handleRedo();
     });
@@ -260,7 +245,7 @@ describe('useUndoRedo', () => {
 
   it('should show error toast on redo conflict', async () => {
     actionHistoryApi.redo.mockRejectedValue({ response: { status: 409, data: { message: 'Conflict' } } });
-    const { result } = renderHook(() => useUndoRedo(), { wrapper });
+    const { result } = renderHook(() => useUndoRedo());
     await act(async () => {
       await result.current.handleRedo();
     });
@@ -269,7 +254,7 @@ describe('useUndoRedo', () => {
 
   it('should show generic error toast when undo fails unexpectedly', async () => {
     actionHistoryApi.undo.mockRejectedValue({ response: { status: 500 } });
-    const { result } = renderHook(() => useUndoRedo(), { wrapper });
+    const { result } = renderHook(() => useUndoRedo());
     await act(async () => {
       await result.current.handleUndo();
     });
@@ -278,7 +263,7 @@ describe('useUndoRedo', () => {
 
   it('should show generic error toast when redo fails unexpectedly', async () => {
     actionHistoryApi.redo.mockRejectedValue(new Error('boom'));
-    const { result } = renderHook(() => useUndoRedo(), { wrapper });
+    const { result } = renderHook(() => useUndoRedo());
     await act(async () => {
       await result.current.handleRedo();
     });
@@ -287,7 +272,7 @@ describe('useUndoRedo', () => {
 
   it('uses default messages when 409 has no message', async () => {
     actionHistoryApi.undo.mockRejectedValue({ response: { status: 409, data: {} } });
-    const { result } = renderHook(() => useUndoRedo(), { wrapper });
+    const { result } = renderHook(() => useUndoRedo());
     await act(async () => {
       await result.current.handleUndo();
     });
@@ -299,7 +284,7 @@ describe('useUndoRedo', () => {
     actionHistoryApi.undo.mockImplementation(
       () => new Promise((res) => { resolve = res; }),
     );
-    const { result } = renderHook(() => useUndoRedo(), { wrapper });
+    const { result } = renderHook(() => useUndoRedo());
 
     // Start first undo without awaiting so the second call races with it
     const firstPromise = result.current.handleUndo();
