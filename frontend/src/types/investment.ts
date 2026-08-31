@@ -62,6 +62,20 @@ export interface Security {
   marketCloseTime?: string | null;
   /** Source of the most recent price row for this security (e.g. "yahoo_finance", "msn_finance", "manual"), or null if no prices exist. */
   lastPriceSource?: string | null;
+  /**
+   * The close on that same most recent price row, in this security's own
+   * `currencyCode` -- so a position's worth is `quantity * lastPrice` with no
+   * exchange rate involved, and none that can be missing.
+   *
+   * `null` when the security has no prices at all, which is a gap and not a
+   * price of zero: `securityPositionValue` (`@/lib/security-value`) is the one
+   * place that turns the pair into a figure, and it returns `null` rather than
+   * report a held position as worthless.
+   *
+   * Optional for the rolling-deploy reason the portfolio flags are: a backend
+   * that predates the field sends nothing, and absent means "no information".
+   */
+  lastPrice?: number | null;
   createdAt: string;
   updatedAt: string;
 }

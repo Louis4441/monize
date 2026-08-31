@@ -49,6 +49,7 @@
       "name": "名称",
       "type": "类型",
       "shares": "股数",
+      "value": "市值",
       "exchange": "交易所",
       "currency": "货币",
       "provider": "提供商",
@@ -69,6 +70,7 @@
     },
     "columnTitles": {
       "shares": "所有账户中当前持有的股数",
+      "value": "所有账户中持有的股数按最新价格计算，以证券自身的货币计价",
       "source": "最新价格的来源"
     },
     "actions": {

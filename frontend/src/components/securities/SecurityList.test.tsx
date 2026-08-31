@@ -2,6 +2,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@/test/render';
 import { SecurityList } from './SecurityList';
 import { useDensityStore } from '@/store/densityStore';
+import { FALLBACK_DEFAULT_CURRENCY } from '@/lib/default-currency';
+import { formatCurrency } from '@/lib/format';
+
+// The reader states no preference in these tests, so their own currency is the
+// fallback -- derived, never spelled, so the cases keep meaning what their names
+// say if that constant moves. A foreign currency has to be a code the fallback
+// can never be.
+const READER_CURRENCY = FALLBACK_DEFAULT_CURRENCY;
+const FOREIGN_CURRENCY = 'JPY';
 
 describe('SecurityList', () => {
   const onEdit = vi.fn();
@@ -175,6 +184,72 @@ describe('SecurityList', () => {
 
     render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
     expect(screen.getByText('0')).toBeInTheDocument();
+  });
+
+  describe('value column', () => {
+    it('shows shares times the latest price, in the security\'s own currency', () => {
+      const securities = [makeSecurity({ currencyCode: READER_CURRENCY, lastPrice: 150.25 })];
+
+      render(<SecurityList securities={securities} holdings={{ s1: 10 }} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
+      expect(screen.getByText('Value')).toBeInTheDocument();
+      // Quoted in the reader's own currency, so the code is not repeated after
+      // it -- an exact text match would fail if it were.
+      expect(screen.getByText(formatCurrency(1502.5, READER_CURRENCY))).toBeInTheDocument();
+    });
+
+    it('names the currency when the security is not quoted in the reader\'s own', () => {
+      const securities = [makeSecurity({ currencyCode: FOREIGN_CURRENCY, lastPrice: 150 })];
+
+      render(<SecurityList securities={securities} holdings={{ s1: 10 }} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
+      expect(
+        screen.getByText(`${formatCurrency(1500, FOREIGN_CURRENCY)} ${FOREIGN_CURRENCY}`),
+      ).toBeInTheDocument();
+    });
+
+    it('renders a held position with no price as unknown, never as zero', () => {
+      const securities = [makeSecurity({ currencyCode: READER_CURRENCY, lastPrice: null })];
+
+      render(<SecurityList securities={securities} holdings={{ s1: 10 }} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
+      expect(screen.getByTestId('unknown-amount')).toBeInTheDocument();
+      expect(screen.queryByText(formatCurrency(0, READER_CURRENCY))).not.toBeInTheDocument();
+    });
+
+    it('treats an absent price field (an older backend) as unknown too', () => {
+      const securities = [makeSecurity({ currencyCode: READER_CURRENCY })];
+
+      render(<SecurityList securities={securities} holdings={{ s1: 10 }} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
+      expect(screen.getByTestId('unknown-amount')).toBeInTheDocument();
+    });
+
+    it('shows a measured zero for a security nobody holds, price or no price', () => {
+      const securities = [makeSecurity({ currencyCode: READER_CURRENCY, lastPrice: null })];
+
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
+      expect(screen.getByText(formatCurrency(0, READER_CURRENCY))).toBeInTheDocument();
+      expect(screen.queryByTestId('unknown-amount')).not.toBeInTheDocument();
+    });
+
+    it('leaves the row alone when the unknown-value help icon is clicked', () => {
+      // `InfoTooltip` acts on itself, so explaining the gap must not navigate
+      // away from the row being explained.
+      const securities = [makeSecurity({ currencyCode: READER_CURRENCY, lastPrice: null })];
+
+      render(<SecurityList securities={securities} holdings={{ s1: 10 }} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
+      fireEvent.click(screen.getByTestId('unknown-amount').querySelector('button')!);
+      expect(onOpen).not.toHaveBeenCalled();
+    });
+
+    it('keeps the value column at every density, beside Shares', () => {
+      const securities = [makeSecurity({ currencyCode: READER_CURRENCY, lastPrice: 2 })];
+
+      useDensityStore.setState({ densities: { securities: 'dense' } });
+      render(<SecurityList securities={securities} holdings={{ s1: 3 }} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
+      const headers = screen.getAllByRole('columnheader').map((th) => th.textContent);
+      expect(headers.findIndex((h) => h?.startsWith('Value'))).toBe(
+        headers.findIndex((h) => h?.startsWith('Shares')) + 1,
+      );
+      expect(screen.getByText(formatCurrency(6, READER_CURRENCY))).toBeInTheDocument();
+    });
   });
 
   it('opens the detail page from a click anywhere on the row', () => {
@@ -617,6 +692,15 @@ describe('SecurityList', () => {
       render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} onSort={onSort} sortField="symbol" sortDirection="asc" />);
       fireEvent.click(screen.getByText('Shares'));
       expect(onSort).toHaveBeenCalledWith('shares');
+    });
+
+    it('calls onSort with "value" when the Value header is clicked', () => {
+      const onSort = vi.fn();
+      const securities = [makeSecurity()];
+
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} onSort={onSort} sortField="symbol" sortDirection="asc" />);
+      fireEvent.click(screen.getByText('Value'));
+      expect(onSort).toHaveBeenCalledWith('value');
     });
   });
 

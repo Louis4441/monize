@@ -49,6 +49,7 @@
       "name": "Name",
       "type": "Type",
       "shares": "Shares",
+      "value": "Value",
       "exchange": "Exchange",
       "currency": "Currency",
       "provider": "Provider",
@@ -69,6 +70,7 @@
     },
     "columnTitles": {
       "shares": "Current shares held across all accounts",
+      "value": "Shares held across all accounts at the most recent price, in the security's own currency",
       "source": "Source of the most recent price"
     },
     "actions": {

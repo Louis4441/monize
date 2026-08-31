@@ -241,7 +241,8 @@
     "marker": "—",
     "srLabel": "Bedrag niet beschikbaar",
     "scheduledFx": "Het huidige bedrag kan niet worden bepaald: er is geen wisselkoers beschikbaar voor het afwikkelingsvalutapaar van dit geplande item. Het opgeslagen bedrag is met een oudere koers berekend en wordt daarom niet weergegeven.",
-    "displayFx": "Dit bedrag kan hier niet worden weergegeven: het bedrag is bekend, maar er is geen wisselkoers beschikbaar om het om te rekenen naar de valuta van dit totaal. Vernieuw de koersen op de pagina Valuta's."
+    "displayFx": "Dit bedrag kan hier niet worden weergegeven: het bedrag is bekend, maar er is geen wisselkoers beschikbaar om het om te rekenen naar de valuta van dit totaal. Vernieuw de koersen op de pagina Valuta's.",
+    "noPrice": "Deze waarde kan niet worden berekend: het aantal aandelen is bekend, maar het effect heeft geen koers om ze mee te waarderen. Vernieuw de koersen of voeg er handmatig een toe in de koershistorie van het effect."
   },
   "density": {
     "title": "Rijdichtheid wisselen",

@@ -241,7 +241,8 @@
     "marker": "—",
     "srLabel": "Kwota niedostępna",
     "scheduledFx": "Nie można ustalić aktualnej kwoty: brak kursu wymiany dla pary walutowej rozliczenia tej zaplanowanej pozycji. Zapisana kwota została obliczona po starszym kursie, więc nie jest wyświetlana.",
-    "displayFx": "Tej kwoty nie można tu pokazać: sama kwota jest znana, ale brakuje kursu wymiany, aby przeliczyć ją na walutę tej sumy. Odśwież kursy na stronie Waluty."
+    "displayFx": "Tej kwoty nie można tu pokazać: sama kwota jest znana, ale brakuje kursu wymiany, aby przeliczyć ją na walutę tej sumy. Odśwież kursy na stronie Waluty.",
+    "noPrice": "Nie można obliczyć tej wartości: liczba posiadanych udziałów jest znana, ale papier wartościowy nie ma ceny, według której można je wycenić. Odśwież ceny lub dodaj cenę ręcznie w historii cen papieru wartościowego."
   },
   "density": {
     "title": "Przełącz gęstość wierszy",

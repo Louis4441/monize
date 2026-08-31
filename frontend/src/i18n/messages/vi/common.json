@@ -241,7 +241,8 @@
     "marker": "—",
     "srLabel": "Không có số tiền",
     "scheduledFx": "Không thể xác định số tiền hiện tại: không có tỷ giá cho cặp tiền tệ thanh toán của mục đã lên lịch này. Số tiền đã lưu được tính theo tỷ giá cũ nên không được hiển thị.",
-    "displayFx": "Không thể hiển thị số tiền này ở đây: giá trị đã biết, nhưng không có tỷ giá để chuyển đổi sang đơn vị tiền tệ của tổng này. Hãy làm mới tỷ giá trên trang Tiền tệ."
+    "displayFx": "Không thể hiển thị số tiền này ở đây: giá trị đã biết, nhưng không có tỷ giá để chuyển đổi sang đơn vị tiền tệ của tổng này. Hãy làm mới tỷ giá trên trang Tiền tệ.",
+    "noPrice": "Không thể tính giá trị này: số cổ phần nắm giữ đã biết, nhưng chứng khoán không có giá để định giá. Hãy làm mới giá, hoặc tự thêm một giá trong lịch sử giá của chứng khoán."
   },
   "density": {
     "title": "Chuyển đổi mật độ hàng",

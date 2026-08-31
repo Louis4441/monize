@@ -241,7 +241,8 @@
     "marker": "—",
     "srLabel": "Importo non disponibile",
     "scheduledFx": "Non è possibile determinare l'importo attuale: non è disponibile alcun tasso di cambio per la coppia di valute di regolamento di questa voce pianificata. L'importo salvato è stato calcolato con un tasso precedente, quindi non viene mostrato.",
-    "displayFx": "Questo importo non può essere mostrato qui: il valore è noto, ma non è disponibile alcun tasso di cambio per convertirlo nella valuta di questo totale. Aggiorna i tassi nella pagina Valute."
+    "displayFx": "Questo importo non può essere mostrato qui: il valore è noto, ma non è disponibile alcun tasso di cambio per convertirlo nella valuta di questo totale. Aggiorna i tassi nella pagina Valute.",
+    "noPrice": "Questo valore non può essere calcolato: le quote detenute sono note, ma il titolo non ha alcun prezzo con cui valorizzarle. Aggiorna i prezzi o inseriscine uno a mano nello storico prezzi del titolo."
   },
   "density": {
     "title": "Cambia densità righe",

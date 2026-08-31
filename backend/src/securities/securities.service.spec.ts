@@ -553,6 +553,50 @@ describe("SecuritiesService", () => {
         order: { symbol: "ASC" },
       });
     });
+
+    it("decorates each security with the close from its latest price row", async () => {
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      // `pg` hands NUMERIC back as a string; the securities list multiplies this
+      // by a share count, so it has to arrive as a number.
+      scopedManager.query.mockResolvedValueOnce([
+        {
+          security_id: "sec-1",
+          source: "yahoo_finance",
+          close_price: "123.4500000000",
+        },
+      ]);
+
+      const result = await service.findAll("user-1");
+
+      expect(result[0].lastPrice).toBe(123.45);
+      expect(result[0].lastPriceSource).toBe("yahoo_finance");
+      expect(scopedManager.query.mock.calls[0][0]).toContain("close_price");
+    });
+
+    it("reports no price rather than a zero for a security with none", async () => {
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      scopedManager.query.mockResolvedValueOnce([]);
+
+      const result = await service.findAll("user-1");
+
+      // A zero here would render as a position worth nothing, which is a
+      // measurement nobody made.
+      expect(result[0].lastPrice).toBeNull();
+      expect(result[0].lastPriceSource).toBeNull();
+    });
+
+    it("reports no price when the stored close cannot be read as a number", async () => {
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      scopedManager.query.mockResolvedValueOnce([
+        { security_id: "sec-1", source: "manual", close_price: null },
+      ]);
+
+      const result = await service.findAll("user-1");
+
+      expect(result[0].lastPrice).toBeNull();
+      // The row exists, so its source is still known.
+      expect(result[0].lastPriceSource).toBe("manual");
+    });
   });
 
   describe("findOne", () => {

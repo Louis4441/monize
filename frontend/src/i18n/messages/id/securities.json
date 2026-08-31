@@ -49,6 +49,7 @@
       "name": "Nama",
       "type": "Jenis",
       "shares": "Lembar",
+      "value": "Nilai",
       "exchange": "Bursa",
       "currency": "Mata Uang",
       "provider": "Penyedia",
@@ -69,6 +70,7 @@
     },
     "columnTitles": {
       "shares": "Lembar saham saat ini yang dimiliki di semua akun",
+      "value": "Saham yang dimiliki di semua akun pada harga terbaru, dalam mata uang efek itu sendiri",
       "source": "Sumber harga terbaru"
     },
     "actions": {

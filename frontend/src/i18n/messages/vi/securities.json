@@ -49,6 +49,7 @@
       "name": "Tên",
       "type": "Loại",
       "shares": "Cổ phiếu",
+      "value": "Giá trị",
       "exchange": "Sàn giao dịch",
       "currency": "Tiền tệ",
       "provider": "Nhà cung cấp",
@@ -69,6 +70,7 @@
     },
     "columnTitles": {
       "shares": "Cổ phiếu hiện đang nắm giữ trên tất cả tài khoản",
+      "value": "Số cổ phần nắm giữ trên tất cả tài khoản theo giá gần nhất, tính bằng đồng tiền của chính chứng khoán",
       "source": "Nguồn của giá gần nhất"
     },
     "actions": {

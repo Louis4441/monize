@@ -8,7 +8,11 @@ import { useDensityPreference } from '@/store/densityStore';
 import { HIGHLIGHT_FLASH, HIGHLIGHT_FLASH_CELL, useScrollIntoViewWhen } from '@/hooks/useHighlightTarget';
 import { SortIcon } from '@/components/ui/SortIcon';
 import { usePreferencesStore } from '@/store/preferencesStore';
-import { formatShareQuantity } from '@/lib/format';
+import { preferredCurrency } from '@/lib/default-currency';
+import { formatCurrency, formatShareQuantity } from '@/lib/format';
+import { withCurrencyCode } from '@/lib/security-detail';
+import { securityPositionValue } from '@/lib/security-value';
+import { UnknownAmount } from '@/components/ui/UnknownAmount';
 import { useLongPress, type LongPressRowHandlers } from '@/hooks/useLongPress';
 import { RowActions } from '@/components/ui/row-actions/RowActions';
 import { RowActionSheet } from '@/components/ui/row-actions/RowActionSheet';
@@ -77,7 +81,7 @@ function buildSecurityActions(
   ];
 }
 
-export type SecuritySortField = 'symbol' | 'name' | 'type' | 'shares' | 'exchange' | 'currency' | 'provider' | 'source';
+export type SecuritySortField = 'symbol' | 'name' | 'type' | 'shares' | 'value' | 'exchange' | 'currency' | 'provider' | 'source';
 
 /** Format a security_prices.source value into a short human label. */
 function formatPriceSource(source: string | null | undefined): string {
@@ -152,6 +156,8 @@ interface SecurityRowProps {
   getRowHandlers: (security: Security) => LongPressRowHandlers;
   index: number;
   defaultQuoteProvider: 'yahoo' | 'msn';
+  /** The reader's own currency, so a value quoted in another one says which. */
+  defaultCurrency: string;
   isHighlighted?: boolean;
 }
 
@@ -169,6 +175,7 @@ const SecurityRow = memo(function SecurityRow({
   getRowHandlers,
   index,
   defaultQuoteProvider,
+  defaultCurrency,
   isHighlighted,
 }: SecurityRowProps) {
   const rowRef = useScrollIntoViewWhen<HTMLTableRowElement>(!!isHighlighted);
@@ -188,6 +195,8 @@ const SecurityRow = memo(function SecurityRow({
     },
     [onToggleFavourite, security],
   );
+
+  const value = securityPositionValue(shares, security.lastPrice);
 
   const actions = buildSecurityActions(
     security,
@@ -278,6 +287,26 @@ const SecurityRow = memo(function SecurityRow({
         >
           {formatShareQuantity(shares)}
         </span>
+      </td>
+      {/* What the position is worth: shares times the latest close, in the
+          security's own currency (never converted, so the code is appended
+          whenever that is not the reader's). A held position with no price is
+          unknown rather than zero -- see `securityPositionValue`. */}
+      <td className={`${cellPadding} whitespace-nowrap text-right`}>
+        {value === null ? (
+          <UnknownAmount reason="noPrice" className="justify-end" />
+        ) : (
+          <span
+            className="text-sm text-gray-900 dark:text-gray-100"
+            title={t('list.columnTitles.value')}
+          >
+            {withCurrencyCode(
+              formatCurrency(value, security.currencyCode),
+              security.currencyCode,
+              defaultCurrency,
+            )}
+          </span>
+        )}
       </td>
       {density === 'normal' && (
         <>
@@ -370,6 +399,11 @@ export function SecurityList({
 
   const defaultQuoteProvider =
     usePreferencesStore((s) => s.preferences?.defaultQuoteProvider) ?? 'yahoo';
+  // Read once here rather than per row: the value column is native-currency, so
+  // every row needs to know whether its code differs from the reader's.
+  const defaultCurrency = preferredCurrency(
+    usePreferencesStore((s) => s.preferences?.defaultCurrency),
+  );
 
   // Use prop sort state if provided (controlled), otherwise use local state
   const sortField = propSortField ?? localSortField;
@@ -464,6 +498,13 @@ export function SecurityList({
               >
                 {t('list.columns.shares')}<SortIcon field="shares" sortField={sortField} sortDirection={sortDirection} />
               </th>
+              <th
+                className={`${headerPadding} text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-700 dark:hover:text-gray-200`}
+                onClick={() => handleSort('value')}
+                title={t('list.columnTitles.value')}
+              >
+                {t('list.columns.value')}<SortIcon field="value" sortField={sortField} sortDirection={sortDirection} />
+              </th>
               {density === 'normal' && (
                 <>
                   <th
@@ -519,6 +560,7 @@ export function SecurityList({
                 getRowHandlers={getRowHandlers}
                 index={index}
                 defaultQuoteProvider={defaultQuoteProvider}
+                defaultCurrency={defaultCurrency}
                 isHighlighted={!!highlightId && security.id === highlightId}
               />
             ))}

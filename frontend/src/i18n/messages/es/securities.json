@@ -49,6 +49,7 @@
       "name": "Nombre",
       "type": "Tipo",
       "shares": "Acciones",
+      "value": "Valor",
       "exchange": "Bolsa",
       "currency": "Divisa",
       "provider": "Proveedor",
@@ -69,6 +70,7 @@
     },
     "columnTitles": {
       "shares": "Acciones actuales en todas las cuentas",
+      "value": "Acciones en todas las cuentas al precio más reciente, en la divisa del propio valor",
       "source": "Fuente del precio más reciente"
     },
     "actions": {

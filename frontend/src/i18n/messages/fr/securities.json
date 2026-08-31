@@ -49,6 +49,7 @@
       "name": "Nom",
       "type": "Type",
       "shares": "Actions",
+      "value": "Valeur",
       "exchange": "Marché",
       "currency": "Devise",
       "provider": "Fournisseur",
@@ -69,6 +70,7 @@
     },
     "columnTitles": {
       "shares": "Actions détenues au total sur tous les comptes",
+      "value": "Actions détenues sur tous les comptes au cours le plus récent, dans la devise du titre",
       "source": "Source du cours le plus récent"
     },
     "actions": {

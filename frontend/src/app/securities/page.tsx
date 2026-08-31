@@ -21,6 +21,9 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { CARD_CLASS } from '@/components/ui/Card';
 import { SecurityList, type SecurityHoldings, type SecurityTransactions, type SecuritySortField, type SortDirection } from '@/components/securities/SecurityList';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { usePriceRefresh } from '@/hooks/usePriceRefresh';
+import { RefreshPricesButton } from '@/components/investments/RefreshPricesButton';
+import { securityPositionValue, compareSecurityValues } from '@/lib/security-value';
 import { createLogger } from '@/lib/logger';
 import { getErrorMessage } from '@/lib/errors';
 import { useFormModal } from '@/hooks/useFormModal';
@@ -62,6 +65,7 @@ function SecuritiesContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useLocalStorage<SecuritySortField>('monize-securities-sort-field', 'symbol');
   const [sortDirection, setSortDirection] = useLocalStorage<SortDirection>('monize-securities-sort-dir', 'asc');
+  const [lastPriceUpdate, setLastPriceUpdate] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -99,6 +103,39 @@ function SecuritiesContent() {
     }
   }, [t]);
 
+  const loadPriceStatus = useCallback(async () => {
+    try {
+      const status = await investmentsApi.getPriceStatus();
+      setLastPriceUpdate(status.lastUpdated);
+    } catch (error) {
+      // The age of the last refresh is decoration beside the list; failing to
+      // read it must not take the page's own error handling with it.
+      logger.error(error);
+    }
+  }, []);
+
+  // The same control the Investments page carries, doing the same work through
+  // the same hook: refresh every eligible security's quote, then reload. The
+  // Value column beside each row is `shares * lastPrice`, so a refresh that did
+  // not re-read the securities would leave the new prices off the screen that
+  // asked for them.
+  const { isRefreshing: isRefreshingPrices, triggerManualRefresh } = usePriceRefresh({
+    onRefreshComplete: (lastUpdated) => {
+      loadData();
+      // Prefer the refresh result's own timestamp: a same-day refresh UPDATEs
+      // the price row in place, so the DB-backed `createdAt` would not advance.
+      if (lastUpdated) {
+        setLastPriceUpdate(lastUpdated);
+      } else {
+        loadPriceStatus();
+      }
+    },
+  });
+
+  const handleRefreshPrices = useCallback(() => {
+    void triggerManualRefresh();
+  }, [triggerManualRefresh]);
+
   // Legacy `?price=<id>` links land on the detail page's Price history tab.
   useEffect(() => {
     if (priceParamId) router.replace(`/securities/${priceParamId}?tab=prices`);
@@ -117,6 +154,10 @@ function SecuritiesContent() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    loadPriceStatus();
+  }, [loadPriceStatus]);
 
   const handleCreateNew = () => {
     openCreate();
@@ -219,6 +260,15 @@ function SecuritiesContent() {
   // Sort
   const sortedSecurities = useMemo(() => {
     return [...filteredSecurities].sort((a, b) => {
+      // Value is the one field whose unknowns must not sort as small numbers,
+      // so it answers before the direction is applied rather than after.
+      if (sortField === 'value') {
+        return compareSecurityValues(
+          securityPositionValue(holdings[a.id] || 0, a.lastPrice),
+          securityPositionValue(holdings[b.id] || 0, b.lastPrice),
+          sortDirection,
+        );
+      }
       let comparison = 0;
       if (sortField === 'symbol') {
         comparison = a.symbol.localeCompare(b.symbol, undefined, { sensitivity: 'base' });
@@ -340,6 +390,16 @@ function SecuritiesContent() {
                  t('page.statusAll', { count: allSecurities.length })}
               </button>
             ))}
+          </div>
+          {/* Right-justified on the filter line: the prices it fetches are what
+              the Value column is computed from, so the control sits with the
+              other things that change what the table shows. */}
+          <div className="flex sm:ml-auto">
+            <RefreshPricesButton
+              onClick={handleRefreshPrices}
+              isRefreshing={isRefreshingPrices}
+              lastPriceUpdate={lastPriceUpdate}
+            />
           </div>
         </div>
 

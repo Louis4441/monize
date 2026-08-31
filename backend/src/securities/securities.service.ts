@@ -30,6 +30,19 @@ import {
   COUNTRY_OPTIONS,
 } from "./security-enums";
 
+/**
+ * A security decorated with what its most recent price row says.
+ *
+ * Both fields are null when the security has no prices at all. `lastPrice` is
+ * the quoted close in the security's **own** currency -- nothing here converts,
+ * so the securities list can multiply it by the shares held without a rate, and
+ * a null is "no price", never a zero to multiply through.
+ */
+export type SecurityWithLatestPrice = Security & {
+  lastPriceSource: string | null;
+  lastPrice: number | null;
+};
+
 /** A single {name, weight} allocation slice; weight is a decimal 0-1. */
 export interface AllocationWeight {
   name: string;
@@ -462,7 +475,7 @@ export class SecuritiesService {
   async findAll(
     userId: string,
     includeInactive: boolean = false,
-  ): Promise<Array<Security & { lastPriceSource: string | null }>> {
+  ): Promise<SecurityWithLatestPrice[]> {
     const where: Record<string, unknown> = { userId };
     if (!includeInactive) {
       where.isActive = true;
@@ -474,34 +487,53 @@ export class SecuritiesService {
         order: { symbol: "ASC" },
       }),
     );
-    return this.attachLastPriceSource(securities);
+    return this.attachLatestPrice(securities);
   }
 
   /**
-   * Decorate each security with the `source` from its most recent price row
-   * (via a single grouped query for efficiency). Returns null when the
-   * security has no prices yet.
+   * Decorate each security with its most recent price row -- the `source` that
+   * wrote it and the close itself (via a single grouped query for efficiency).
+   * Both are null when the security has no prices yet, which is what lets the
+   * list say "no price" rather than show a value nobody measured.
    */
-  private async attachLastPriceSource(
+  private async attachLatestPrice(
     securities: Security[],
-  ): Promise<Array<Security & { lastPriceSource: string | null }>> {
+  ): Promise<SecurityWithLatestPrice[]> {
     if (securities.length === 0) return [];
     const ids = securities.map((s) => s.id);
-    const rows: Array<{ security_id: string; source: string | null }> =
-      await withScopedDb(this.dataSource, (m) =>
-        m.query(
-          `SELECT DISTINCT ON (security_id) security_id, source
+    const rows: Array<{
+      security_id: string;
+      source: string | null;
+      close_price: string | number | null;
+    }> = await withScopedDb(this.dataSource, (m) =>
+      m.query(
+        `SELECT DISTINCT ON (security_id) security_id, source, close_price
          FROM security_prices
          WHERE security_id = ANY($1::uuid[])
          ORDER BY security_id, price_date DESC, created_at DESC`,
-          [ids],
-        ),
-      );
-    const sourceById = new Map(rows.map((r) => [r.security_id, r.source]));
-    return securities.map((s) => ({
-      ...s,
-      lastPriceSource: sourceById.get(s.id) ?? null,
-    }));
+        [ids],
+      ),
+    );
+    const latestById = new Map(rows.map((r) => [r.security_id, r]));
+    return securities.map((s) => {
+      const latest = latestById.get(s.id);
+      // `pg` hands a NUMERIC back as a string, so the close is parsed here
+      // rather than shipped as one and coerced by every reader. A row that
+      // cannot be read as a finite number is no price at all -- null, never 0,
+      // which a client would render as a security worth nothing. The empty and
+      // null cases are tested before `Number`, not after: `Number(null)` and
+      // `Number("")` are both a perfectly finite 0.
+      const raw = latest?.close_price;
+      const close =
+        raw === null || raw === undefined || raw === ""
+          ? Number.NaN
+          : Number(raw);
+      return {
+        ...s,
+        lastPriceSource: latest?.source ?? null,
+        lastPrice: Number.isFinite(close) ? close : null,
+      };
+    });
   }
 
   async findOne(userId: string, id: string): Promise<Security> {

@@ -241,7 +241,8 @@
     "marker": "[XX-—-XX]",
     "srLabel": "[XX-Amount not available-XX]",
     "scheduledFx": "[XX-The current amount cannot be worked out: no exchange rate is available for this scheduled item's settlement currency pair. The stored amount was calculated at an older rate, so it is not shown.-XX]",
-    "displayFx": "[XX-This figure cannot be shown here: the amount is known, but no exchange rate is available to convert it into the currency this total is reported in. Refresh your rates on the Currencies page.-XX]"
+    "displayFx": "[XX-This figure cannot be shown here: the amount is known, but no exchange rate is available to convert it into the currency this total is reported in. Refresh your rates on the Currencies page.-XX]",
+    "noPrice": "[XX-This value cannot be worked out: the shares held are known, but the security has no price to value them at. Refresh prices, or add one by hand on the security's Price history.-XX]"
   },
   "density": {
     "title": "[XX-Toggle row density-XX]",
