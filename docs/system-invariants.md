@@ -1472,9 +1472,16 @@ Enforcement         Server: every occurrence-aware surface consumes the occurren
                     ForecastAggregatorService, BalanceForecastService, and
                     GET /scheduled-transactions/occurrences for clients. findAll
                     still emits effectiveAmount / effectiveAmountComplete /
-                    effectiveCurrencyCode per schedule and per override, which is
-                    a SCHEDULE-level read model: it says what the base occurrence
-                    costs and carries the overrides beside it.
+                    effectiveCurrencyCode / settlementAccountId per schedule (and
+                    the amount fields per override), which is a SCHEDULE-level
+                    read model: it says what the base occurrence costs, WHOSE
+                    balance that costs, and carries the overrides beside it. The
+                    account travels with the amount because it is the other half
+                    of the answer -- an investment schedule's accountId is the
+                    brokerage, so the dashboard's below-zero projection, keyed on
+                    that column, warned that a purchase would overdraw an account
+                    the trade never moves while the funding account covering it
+                    exactly went unprojected.
                     occurrence-selection.guard.spec.ts is the scan, over the files
                     that import the resolver or the occurrence service: a second
                     recurrence loop, a second overrideEffectiveKey lookup, a read
@@ -1502,7 +1509,14 @@ Enforcement         Server: every occurrence-aware surface consumes the occurren
                     and for the Upcoming Bills report actually calling
                     getOccurrences (import presence is not proof: the report
                     imported the helper throughout the period it was applying one
-                    amount to every occurrence).
+                    amount to every occurrence). The same scan fails a
+                    `<map>.get(<x>.accountId)` in any file that resolves an
+                    occurrence's amount: which account settles is
+                    occurrenceSettlementAccountId's answer (the server's
+                    settlementAccountId, else the funding or linked cash account),
+                    and the two exemptions -- the helper itself and lib/forecast.ts
+                    reading the brokerage's own currency -- each record why they
+                    address the brokerage on purpose.
 Aggregation rule    A total is null when any component is unknown; the partial sum
                     travels in a separately named field (knownUpcoming*Subtotal,
                     knownSubtotal) and never under the total's caption.

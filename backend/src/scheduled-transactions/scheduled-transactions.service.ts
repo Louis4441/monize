@@ -207,6 +207,19 @@ export type ScheduledTransactionReadModel = ScheduledTransaction & {
   effectiveAmount: number | null;
   effectiveAmountComplete: boolean;
   effectiveCurrencyCode: string;
+  /**
+   * The account whose balance `effectiveAmount` moves -- the settlement account
+   * for an investment schedule (its named funding account, or the brokerage's
+   * linked cash account), `accountId` for everything else.
+   *
+   * The amount is half the answer and the account is the other half: a client
+   * projecting a running balance from `accountId` charges the brokerage for cash
+   * it never moves, which is how the dashboard's below-zero warning fired on a
+   * purchase the funding account covers exactly (issue #1247, INV-OCCURRENCE-003).
+   * `effectiveCurrencyCode` is this account's currency by construction, which is
+   * what makes the addition sound.
+   */
+  settlementAccountId: string;
 };
 
 /**
@@ -1555,6 +1568,9 @@ export class ScheduledTransactionsService {
         effectiveAmount: resolved.base.amount,
         effectiveAmountComplete: resolved.base.complete,
         effectiveCurrencyCode: resolved.base.currencyCode,
+        // The account that effective amount belongs to, so no client has to
+        // re-derive "which account settles this" (issue #1247).
+        settlementAccountId: resolved.settlementAccountId,
         // Whether the direction is derivable at all, so a client never has to
         // reach for the snapshot's sign (issue #1247 re-audit).
         effectiveDirectionAmount: resolved.base.directionAmount,

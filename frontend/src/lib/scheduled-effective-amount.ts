@@ -124,6 +124,40 @@ export function nextOccurrenceEffectiveAmount(
 }
 
 /**
+ * The account whose balance one occurrence of `st` actually moves.
+ *
+ * The amount is half the answer; the account is the other half. A scheduled
+ * investment's `accountId` is the BROKERAGE, but its cash settles in the named
+ * funding account or the brokerage's linked cash account -- so a running balance
+ * keyed on `accountId` charges the brokerage for cash it never moves, and the
+ * account that pays is left projecting an outflow it never sees. That is how the
+ * dashboard's below-zero warning fired on a purchase whose funding account covers
+ * it to the cent: the brokerage's own balance is not the cash the trade spends
+ * (issue #1247, INV-OCCURRENCE-003).
+ *
+ * The server's `settlementAccountId` is authoritative -- it is the same decision
+ * `resolveSettlementAccountId` makes for the posting, so a projection cannot
+ * charge a different account than the posting will. When the field is absent (an
+ * older backend mid rolling deploy) the answer is derived from the funding and
+ * linked accounts the client already holds, exactly as the cash-flow forecast has
+ * always derived it.
+ *
+ * `undefined` means "this investment schedule's settlement account cannot be
+ * identified from what the client holds" -- a caller projects nothing rather than
+ * falling back to `accountId`, which is the defect above. A non-investment
+ * schedule always settles in its own account.
+ */
+export function occurrenceSettlementAccountId(
+  st: ScheduledTransaction,
+  accountsById: ReadonlyMap<string, { linkedAccountId?: string | null }>,
+): string | undefined {
+  if (st.settlementAccountId) return st.settlementAccountId;
+  if (!st.isInvestment) return st.accountId;
+  if (st.investmentFundingAccountId) return st.investmentFundingAccountId;
+  return accountsById.get(st.accountId)?.linkedAccountId ?? undefined;
+}
+
+/**
  * The date the schedule's *next* occurrence actually falls on.
  *
  * `nextDueDate` is the recurrence slot; an override addressed to that slot can
