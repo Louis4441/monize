@@ -74,6 +74,24 @@ describe("notification type partition", () => {
     expect(unknown).toEqual([]);
   });
 
+  /**
+   * Two classifications of one type now travel to the client: the fine
+   * `category` a per-category preference will key on, and the coarse
+   * system-vs-financial split the list's filter and the dismiss-all command
+   * already use. Both derive from `SYSTEM_NOTIFICATION_TYPES`, so they cannot
+   * drift by accident -- but `notificationCategoryOf` checks BILL_DUE FIRST, so
+   * a type added to the system set that the function special-cases earlier would
+   * be SYSTEM to one reader and financial to the other, and a filtered
+   * delete-all would remove rows the filter never showed.
+   */
+  it("agrees with the coarse split the filters use", () => {
+    for (const type of ALL_TYPES) {
+      const fine = notificationCategoryOf(type) === NotificationCategory.SYSTEM;
+      const coarse = SYSTEM_NOTIFICATION_TYPES.includes(type);
+      expect({ type, fine }).toEqual({ type, fine: coarse });
+    }
+  });
+
   it("categorizes every type, and only into declared categories", () => {
     const categories = Object.values(NotificationCategory);
     const uncategorized = ALL_TYPES.filter(

@@ -42,23 +42,77 @@ function backendFiles(dir: string): string[] {
 }
 
 /**
- * The literal `target:` values the backend assigns, as route patterns with each
- * `${...}` interpolation collapsed to a single dynamic segment.
+ * The object literal enclosing `index`, found by walking out to the nearest
+ * unmatched `{` and back in to its `}`.
+ *
+ * Scanning for `target:` alone is not an option: `target` is an ordinary word in
+ * this codebase (class-validator's `target: object.constructor`, the GEM
+ * strategy's composition target), so the anchor has to be the thing that makes a
+ * literal a notification -- its `type: NotificationType.X`.
  */
-function producedTargets(): { file: string; target: string }[] {
-  const found: { file: string; target: string }[] = [];
+function enclosingObject(source: string, index: number): string {
+  let depth = 0;
+  let start = index;
+  while (start > 0) {
+    const char = source[start];
+    if (char === '}') depth += 1;
+    else if (char === '{') {
+      if (depth === 0) break;
+      depth -= 1;
+    }
+    start -= 1;
+  }
+  depth = 0;
+  let end = start;
+  while (end < source.length) {
+    const char = source[end];
+    if (char === '{') depth += 1;
+    else if (char === '}') {
+      depth -= 1;
+      if (depth === 0) break;
+    }
+    end += 1;
+  }
+  return source.slice(start, end + 1);
+}
+
+interface ProducedTarget {
+  file: string;
+  /** The route pattern, with each `${...}` collapsed to one dynamic segment. */
+  target: string | null;
+  /** The raw text when it is not a string literal, so the report can name it. */
+  unverifiable?: string;
+}
+
+/**
+ * Every notification a backend producer builds, with the target it asks for.
+ *
+ * A target that is not a string literal is reported rather than skipped: the
+ * route claim is then unverifiable from here, and silently passing it would let
+ * the next invented route through the way the first one got through.
+ */
+function producedTargets(): ProducedTarget[] {
+  const found: ProducedTarget[] = [];
   for (const file of backendFiles(BACKEND_SRC)) {
     const source = stripComments(readFileSync(file, 'utf8'));
-    for (const match of source.matchAll(
-      /\btarget:\s*(?:`([^`]*)`|"([^"]*)"|'([^']*)')/g,
-    )) {
-      const literal = match[1] ?? match[2] ?? match[3];
-      // Only a path is a route claim. Anything else here is another `target`
-      // (a Money field, a budget target amount) and is not this test's subject.
-      if (!literal.startsWith('/')) continue;
+    for (const marker of source.matchAll(/type:\s*NotificationType\.[A-Z_]+/g)) {
+      const literal = enclosingObject(source, marker.index ?? 0);
+      const target = /(?:^|[\s,{])target:\s*([^\n]*)/.exec(literal);
+      if (!target) continue;
+      const value = target[1].trim().replace(/,$/, '');
+      const quoted = /^(?:`([^`]*)`|"([^"]*)"|'([^']*)')$/.exec(value);
+      if (!quoted) {
+        found.push({
+          file: file.slice(BACKEND_SRC.length + 1),
+          target: null,
+          unverifiable: value.slice(0, 80),
+        });
+        continue;
+      }
+      const path = quoted[1] ?? quoted[2] ?? quoted[3];
       found.push({
         file: file.slice(BACKEND_SRC.length + 1),
-        target: literal.replace(/\$\{[^}]*\}/g, ':param'),
+        target: path.replace(/\$\{[^}]*\}/g, ':param'),
       });
     }
   }
@@ -104,9 +158,19 @@ describe('every notification target resolves to a route', () => {
 
   it('resolves every produced target', () => {
     const broken = targets
-      .filter(({ target }) => !routeExists(target))
+      .filter(({ target }) => target !== null && !routeExists(target))
       .map(({ file, target }) => `${file}: ${target}`);
     expect(broken).toEqual([]);
+  });
+
+  it('leaves no target it cannot check', () => {
+    // A target built from a variable is a route claim this test cannot read, and
+    // skipping it quietly is how the first invented route reached production.
+    // Inline it, or state the reason here.
+    const unverifiable = targets
+      .filter((entry) => entry.unverifiable !== undefined)
+      .map(({ file, unverifiable }) => `${file}: ${unverifiable}`);
+    expect(unverifiable).toEqual([]);
   });
 });
 

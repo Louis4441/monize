@@ -115,7 +115,7 @@ INV-LOAN-002's entry names the missing source scan while its row said `--`.
 | INV-CRON-001 one effect per tick | supporting | -- | required | required | **required** | optional | -- | -- |
 | INV-PROVIDER-001 outage reported once | required | **required** | required | optional | required | -- | required | -- |
 | INV-ALERT-001 system alert raised once | required | -- | **required** | optional | required | -- | -- | -- |
-| INV-NOTIFY-001 one notification writer | -- | **required** | -- | -- | -- | -- | -- | -- |
+| INV-NOTIFY-001 one notification writer | supporting | **required** | -- | -- | -- | -- | -- | -- |
 | INV-RLS-001 role privilege | supporting | -- | **required** | -- | required | -- | -- | -- |
 | INV-CACHE-001 cache invalidation | required | **required** | -- | -- | -- | -- | -- | required |
 | INV-PAYEE-001 lookup never overwrites | **required** | supporting | optional | optional | -- | -- | -- | -- |
