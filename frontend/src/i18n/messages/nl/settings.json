@@ -237,6 +237,19 @@
     },
     "push": {
       "heading": "Browserpush",
+      "diagnostics": {
+        "summary": "Meldingsdiagnose",
+        "intro": "Wat deze browser en dit apparaat aan Monize melden over meldingen. Gebruik de testknop om te controleren of het systeem daadwerkelijk een melding toont, en daarna Kopiëren om het volledige rapport te sturen.",
+        "refresh": "Vernieuwen",
+        "copy": "Rapport kopiëren",
+        "copied": "Diagnose naar klembord gekopieerd",
+        "localTest": "Testmelding tonen",
+        "localTestRunning": "Controleren…",
+        "localTestBody": "Als je dit ziet, werken meldingen op dit apparaat.",
+        "localTestShown": "Weergegeven. Meldingen werken op dit apparaat.",
+        "localTestBlocked": "De melding is aangemaakt, maar het systeem heeft deze niet getoond. Open op Android Instellingen, dan Apps, dan Monize (of Chrome) en schakel Meldingen in.",
+        "localTestError": "Kan de test niet uitvoeren op dit apparaat ({detail})."
+      },
       "description": "Registreer dit apparaat zodat Monize het ook kan bereiken als de app gesloten is. Voorlopig wordt alleen de testmelding zo bezorgd; al het andere komt nog steeds in de bel.",
       "permissionHint": "Als je dit aanzet, vraagt je browser toestemming om meldingen te tonen. Er wordt niets verzonden voordat je die geeft.",
       "enableButton": "Inschakelen op dit apparaat",

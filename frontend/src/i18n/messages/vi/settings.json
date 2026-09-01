@@ -237,6 +237,19 @@
     },
     "push": {
       "heading": "Đẩy từ trình duyệt",
+      "diagnostics": {
+        "summary": "Chẩn đoán thông báo",
+        "intro": "Những gì trình duyệt và thiết bị này báo cáo cho Monize về thông báo. Dùng nút kiểm tra để xem hệ thống có thực sự hiển thị thông báo hay không, rồi Sao chép để gửi báo cáo đầy đủ.",
+        "refresh": "Làm mới",
+        "copy": "Sao chép báo cáo",
+        "copied": "Đã sao chép chẩn đoán vào bảng nhớ tạm",
+        "localTest": "Hiển thị thông báo thử",
+        "localTestRunning": "Đang kiểm tra…",
+        "localTestBody": "Nếu bạn thấy điều này, thông báo đang hoạt động trên thiết bị này.",
+        "localTestShown": "Đã hiển thị. Thông báo hoạt động trên thiết bị này.",
+        "localTestBlocked": "Thông báo đã được tạo, nhưng hệ thống không hiển thị. Trên Android, mở Cài đặt, rồi Ứng dụng, rồi Monize (hoặc Chrome) và bật Thông báo.",
+        "localTestError": "Không thể chạy kiểm tra trên thiết bị này ({detail})."
+      },
       "description": "Đăng ký thiết bị này để Monize có thể gửi tới nó ngay cả khi ứng dụng đã đóng. Hiện chỉ có thông báo thử nghiệm được gửi theo đường này; mọi thứ khác vẫn đến ở chuông.",
       "permissionHint": "Khi bạn bật, trình duyệt sẽ xin quyền hiển thị thông báo. Không có gì được gửi trước khi bạn cho phép.",
       "enableButton": "Bật trên thiết bị này",

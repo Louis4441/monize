@@ -237,6 +237,19 @@
     },
     "push": {
       "heading": "Push du navigateur",
+      "diagnostics": {
+        "summary": "Diagnostic des notifications",
+        "intro": "Ce que ce navigateur et cet appareil signalent à Monize au sujet des notifications. Utilisez le bouton de test pour vérifier si le système affiche réellement une notification, puis Copier pour envoyer le rapport complet.",
+        "refresh": "Actualiser",
+        "copy": "Copier le rapport",
+        "copied": "Diagnostic copié dans le presse-papiers",
+        "localTest": "Afficher une notification de test",
+        "localTestRunning": "Vérification…",
+        "localTestBody": "Si vous voyez ceci, les notifications fonctionnent sur cet appareil.",
+        "localTestShown": "Affichée. Les notifications fonctionnent sur cet appareil.",
+        "localTestBlocked": "La notification a été créée, mais le système ne l'a pas affichée. Sur Android, ouvrez Paramètres, puis Applications, puis Monize (ou Chrome), et activez les notifications.",
+        "localTestError": "Impossible d'exécuter le test sur cet appareil ({detail})."
+      },
       "description": "Enregistrez cet appareil pour que Monize puisse l'atteindre même quand l'application est fermée. Pour l'instant, seule la notification de test passe par ce canal ; tout le reste arrive toujours dans la cloche.",
       "permissionHint": "Quand vous l'activez, votre navigateur demande l'autorisation d'afficher des notifications. Rien n'est envoyé avant votre accord.",
       "enableButton": "Activer sur cet appareil",

@@ -237,6 +237,19 @@
     },
     "push": {
       "heading": "浏览器推送",
+      "diagnostics": {
+        "summary": "通知诊断",
+        "intro": "此浏览器和设备向 Monize 报告的关于通知的信息。使用测试按钮检查系统是否真正显示通知，然后点击复制以发送完整报告。",
+        "refresh": "刷新",
+        "copy": "复制报告",
+        "copied": "已将诊断复制到剪贴板",
+        "localTest": "显示测试通知",
+        "localTestRunning": "检查中…",
+        "localTestBody": "如果你能看到这条消息，说明此设备上的通知正常工作。",
+        "localTestShown": "已显示。此设备上的通知正常工作。",
+        "localTestBlocked": "通知已创建，但系统未显示。在 Android 上依次打开“设置”、“应用”、Monize（或 Chrome），然后开启通知。",
+        "localTestError": "无法在此设备上运行测试（{detail}）。"
+      },
       "description": "注册此设备，Monize 即可在应用关闭时也送达通知。目前通过这条通道送达的只有测试通知，其余仍然出现在铃铛里。",
       "permissionHint": "开启后，浏览器会请求显示通知的权限。在你允许之前不会发送任何内容。",
       "enableButton": "在此设备上启用",

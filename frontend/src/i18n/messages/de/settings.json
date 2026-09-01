@@ -237,6 +237,19 @@
     },
     "push": {
       "heading": "Browser-Push",
+      "diagnostics": {
+        "summary": "Benachrichtigungsdiagnose",
+        "intro": "Was dieser Browser und dieses Gerät Monize über Benachrichtigungen melden. Nutze die Testschaltfläche, um zu prüfen, ob das System eine Benachrichtigung tatsächlich anzeigt, und dann Kopieren, um den vollständigen Bericht zu senden.",
+        "refresh": "Aktualisieren",
+        "copy": "Bericht kopieren",
+        "copied": "Diagnose in die Zwischenablage kopiert",
+        "localTest": "Testbenachrichtigung anzeigen",
+        "localTestRunning": "Wird geprüft…",
+        "localTestBody": "Wenn du das siehst, funktionieren Benachrichtigungen auf diesem Gerät.",
+        "localTestShown": "Angezeigt. Benachrichtigungen funktionieren auf diesem Gerät.",
+        "localTestBlocked": "Die Benachrichtigung wurde erstellt, aber vom System nicht angezeigt. Öffne unter Android die Einstellungen, dann Apps, dann Monize (oder Chrome), und aktiviere Benachrichtigungen.",
+        "localTestError": "Der Test konnte auf diesem Gerät nicht ausgeführt werden ({detail})."
+      },
       "description": "Dieses Gerät registrieren, damit Monize es auch bei geschlossener App erreichen kann. Bisher wird auf diesem Weg nur die Testbenachrichtigung zugestellt; alles andere landet weiterhin in der Glocke.",
       "permissionHint": "Wenn Sie dies aktivieren, fragt Ihr Browser um Erlaubnis, Benachrichtigungen anzuzeigen. Vorher wird nichts gesendet.",
       "enableButton": "Auf diesem Gerät aktivieren",

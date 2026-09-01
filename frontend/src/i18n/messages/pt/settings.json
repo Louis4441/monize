@@ -237,6 +237,19 @@
     },
     "push": {
       "heading": "Push do navegador",
+      "diagnostics": {
+        "summary": "Diagnóstico de notificações",
+        "intro": "O que este navegador e dispositivo comunicam ao Monize sobre notificações. Use o botão de teste para verificar se o sistema mostra realmente uma notificação e depois Copiar para enviar o relatório completo.",
+        "refresh": "Atualizar",
+        "copy": "Copiar relatório",
+        "copied": "Diagnóstico copiado para a área de transferência",
+        "localTest": "Mostrar uma notificação de teste",
+        "localTestRunning": "A verificar…",
+        "localTestBody": "Se consegue ver isto, as notificações funcionam neste dispositivo.",
+        "localTestShown": "Mostrada. As notificações funcionam neste dispositivo.",
+        "localTestBlocked": "A notificação foi criada, mas o sistema não a mostrou. No Android abra Definições, depois Aplicações, depois Monize (ou Chrome) e ative as notificações.",
+        "localTestError": "Não foi possível executar o teste neste dispositivo ({detail})."
+      },
       "description": "Registe este dispositivo para que o Monize o possa alcançar mesmo com a aplicação fechada. Por agora só a notificação de teste é entregue por esta via; tudo o resto continua a chegar à campainha.",
       "permissionHint": "Quando ativar isto, o seu navegador pede permissão para mostrar notificações. Nada é enviado antes de permitir.",
       "enableButton": "Ativar neste dispositivo",
