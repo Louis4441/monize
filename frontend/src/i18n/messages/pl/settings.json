@@ -237,6 +237,19 @@
     },
     "push": {
       "heading": "Push w przeglądarce",
+      "diagnostics": {
+        "summary": "Diagnostyka powiadomień",
+        "intro": "Co ta przeglądarka i urządzenie zgłaszają Monize w sprawie powiadomień. Użyj przycisku testu, aby sprawdzić, czy system faktycznie wyświetla powiadomienie, a następnie Kopiuj, aby przesłać pełny raport.",
+        "refresh": "Odśwież",
+        "copy": "Kopiuj raport",
+        "copied": "Skopiowano diagnostykę do schowka",
+        "localTest": "Pokaż testowe powiadomienie",
+        "localTestRunning": "Sprawdzanie…",
+        "localTestBody": "Jeśli to widzisz, powiadomienia działają na tym urządzeniu.",
+        "localTestShown": "Wyświetlono. Powiadomienia działają na tym urządzeniu.",
+        "localTestBlocked": "Powiadomienie zostało utworzone, ale system go nie wyświetlił. Na Androidzie otwórz Ustawienia, potem Aplikacje, potem Monize (lub Chrome) i włącz Powiadomienia.",
+        "localTestError": "Nie udało się uruchomić testu na tym urządzeniu ({detail})."
+      },
       "description": "Zarejestruj to urządzenie, aby Monize mogło je powiadomić nawet przy zamkniętej aplikacji. Na razie tą drogą dostarczane jest tylko powiadomienie testowe; wszystko inne nadal trafia do dzwonka.",
       "permissionHint": "Po włączeniu przeglądarka poprosi o zgodę na wyświetlanie powiadomień. Nic nie zostanie wysłane, dopóki jej nie udzielisz.",
       "enableButton": "Włącz na tym urządzeniu",

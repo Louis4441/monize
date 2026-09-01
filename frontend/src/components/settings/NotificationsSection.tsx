@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
 import { PushDevicesPanel } from './PushDevicesPanel';
+import { PushDiagnostics } from './PushDiagnostics';
 import { userSettingsApi } from '@/lib/user-settings';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { UserPreferences } from '@/types/auth';
@@ -197,6 +198,7 @@ export function NotificationsSection({
       )}
 
       <PushDevicesPanel />
+      <PushDiagnostics />
     </div>
   );
 }

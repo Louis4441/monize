@@ -237,6 +237,19 @@
     },
     "push": {
       "heading": "Browser push",
+      "diagnostics": {
+        "summary": "Notification diagnostics",
+        "intro": "What this browser and device report to Monize about notifications. Use the test button to check whether the system actually displays a notification, then Copy to send the full report.",
+        "refresh": "Refresh",
+        "copy": "Copy report",
+        "copied": "Diagnostics copied to clipboard",
+        "localTest": "Show a test notification",
+        "localTestRunning": "Checking…",
+        "localTestBody": "If you can see this, notifications are working on this device.",
+        "localTestShown": "Displayed. Notifications work on this device.",
+        "localTestBlocked": "The notification was created, but the system did not display it. On Android open Settings, then Apps, then Monize (or Chrome), and turn Notifications on.",
+        "localTestError": "Could not run the test on this device ({detail})."
+      },
       "description": "Register this device so Monize can reach it even when the app is closed. Only the test notification is delivered this way so far; everything else still arrives in the bell.",
       "permissionHint": "When you turn this on, your browser asks for permission to show notifications. Nothing is sent until you allow it.",
       "enableButton": "Enable on this device",
