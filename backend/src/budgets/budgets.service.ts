@@ -774,8 +774,14 @@ export class BudgetsService {
           originalDate: occurrence.originalDate,
           currencyCode: occurrence.currencyCode,
         },
-        // Where the bell sends the reader: the bill itself, not the list.
-        target: `/scheduled-transactions/${bill.id}`,
+        // Where the bell sends the reader. `/bills` and not
+        // `/scheduled-transactions/<id>`, which is not a route: the app router
+        // has no such segment, and because a stored target WINS over the
+        // client's type table, inventing one replaced a working destination
+        // with the not-found page. There is no per-bill route to deep-link to;
+        // `notification-target.contract.test.ts` checks every target a producer
+        // writes against the router tree.
+        target: "/bills",
         periodStart: dueDate,
       });
     }

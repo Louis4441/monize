@@ -71,8 +71,11 @@ export class NotificationController {
     @Query("unreadOnly", new ParseBoolPipe({ optional: true }))
     unreadOnly?: boolean,
   ) {
-    // Only the full list materializes pending bill reminders: the unread count
-    // the bell polls must not write on every poll.
+    // Only the full list materializes pending bill reminders. `unreadOnly` has
+    // no client today -- the bell reads the full list once and counts unread
+    // rows itself -- so this branch exists for a caller that wants the count
+    // without a write, and is kept honest by the controller spec rather than by
+    // a comment claiming a caller it does not have.
     if (!unreadOnly) {
       await this.budgets.ensureBillDueNotifications(req.user.id);
     }

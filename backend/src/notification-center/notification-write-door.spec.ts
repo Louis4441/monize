@@ -48,13 +48,38 @@ function stripComments(source: string): string {
     .replace(/\/\/[^\n]*/g, "");
 }
 
-/** Every write shape, as `label -> pattern`. */
+/** The repository methods that write. */
+const WRITE_METHODS =
+  "save|insert|update|delete|remove|upsert|softDelete|restore";
+
+/**
+ * Every write shape, as `label -> pattern`.
+ *
+ * The chained form and the two-statement form are separate patterns because one
+ * regex cannot span an arbitrary number of statements. The second one exists
+ * because the first was the whole scan for one commit and missed the idiom this
+ * very file's subject uses -- `notification.service.ts`'s own `markRead` binds
+ * the repository to a local and writes through it, so the guard was blind to the
+ * most natural spelling of the thing it bans. A real second writer added to
+ * `budgets.service.ts` in that shape left the scan green.
+ */
 const WRITE_PATTERNS: Readonly<Record<string, RegExp>> = {
   "raw INSERT": /INSERT\s+INTO\s+notifications\b/gi,
   "raw UPDATE": /UPDATE\s+notifications\b/gi,
   "raw DELETE": /DELETE\s+FROM\s+notifications\b/gi,
-  "repository write":
-    /getRepository\(\s*Notification\s*\)\s*(?:\r?\n\s*)?\.\s*(save|insert|update|delete|remove|upsert)\b/g,
+  "repository write": new RegExp(
+    `getRepository\\(\\s*Notification\\s*\\)\\s*(?:\\r?\\n\\s*)?\\.\\s*(?:${WRITE_METHODS})\\b`,
+    "g",
+  ),
+  // `const repo = m.getRepository(Notification); ... repo.save(...)`. The
+  // binding is found first, then any write through that name anywhere later in
+  // the file -- deliberately not scoped to the enclosing block, because a scan
+  // that tries to track scope is a parser, and the cost of over-reporting here
+  // is one allowlist line with a reason.
+  "bound repository write": new RegExp(
+    `(?:const|let|var)\\s+(\\w+)\\s*=\\s*[^;\\n]*getRepository\\(\\s*Notification\\s*\\)[\\s\\S]*?\\b\\1\\s*\\.\\s*(?:${WRITE_METHODS})\\b`,
+    "g",
+  ),
 };
 
 /**
@@ -109,6 +134,41 @@ describe("the notifications table has one writer", () => {
       );
       expect(writes).toBe(true);
     }
+  });
+
+  it("catches a write through a bound repository, not only a chained one", () => {
+    // The shape that got through: a real notification write in a
+    // non-allowlisted file left the scan green for one commit.
+    const bound = [
+      "async function probe(m: EntityManager) {",
+      "  const repo = m.getRepository(Notification);",
+      '  await repo.save({ id: "x" } as never);',
+      "}",
+    ].join("\n");
+    const chained = "await m.getRepository(Notification).save(row);";
+
+    for (const source of [bound, chained]) {
+      const hit = Object.values(WRITE_PATTERNS).some((pattern) =>
+        new RegExp(pattern.source, pattern.flags).test(source),
+      );
+      expect(hit).toBe(true);
+    }
+  });
+
+  it("does not read a bound repository's READS as writes", () => {
+    // A producer's own de-duplication query is not a write, and reporting it
+    // would push budget logic into this module -- see the file header.
+    const reads = [
+      "const repo = m.getRepository(Notification);",
+      "const rows = await repo.find({ where: { userId } });",
+      "const one = await repo.findOne({ where: { id } });",
+      "const qb = repo.createQueryBuilder('n').getMany();",
+    ].join("\n");
+
+    const hits = Object.entries(WRITE_PATTERNS).filter(([, pattern]) =>
+      new RegExp(pattern.source, pattern.flags).test(reads),
+    );
+    expect(hits.map(([label]) => label)).toEqual([]);
   });
 
   it("blanks comments in both directions", () => {

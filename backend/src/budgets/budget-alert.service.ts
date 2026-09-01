@@ -376,7 +376,9 @@ export class BudgetAlertService {
       if (sent) {
         emailsSent = 1;
         for (const alert of criticalAlerts) {
-          alert.isEmailSent = true;
+          // The flag is set through the door, on that row alone. Mutating the
+          // loaded entity as well would read as if the local copy mattered --
+          // it is never saved, and a full-row save is what this replaced.
           await this.notifications.markEmailSent(alert.id);
         }
       }

@@ -20,6 +20,11 @@ import {
   SYSTEM_NOTIFICATION_TYPES,
   notificationCategoryOf,
 } from "./entities/notification.entity";
+import {
+  DEDUPE_KEY_MAX_LENGTH,
+  TARGET_MAX_LENGTH,
+  TITLE_MAX_LENGTH,
+} from "./notification.service";
 
 const SCHEMA_SQL = path.join(__dirname, "../../../database/schema.sql");
 
@@ -102,6 +107,23 @@ describe("notification type partition", () => {
           !SYSTEM_NOTIFICATION_TYPES.includes(t),
       ).sort(),
     );
+  });
+
+  /**
+   * The write door truncates on these three numbers, and truncating at the wrong
+   * width is not a smaller version of the same behaviour: too low silently
+   * shortens copy the column would have accepted, and too high hands PostgreSQL
+   * a value it refuses with 22001 -- inside a producer's never-throws catch, so
+   * the notification silently never exists. That is the exact failure the
+   * truncation was written to prevent, which makes an unchecked constant the one
+   * way to reintroduce it.
+   */
+  it.each([
+    ["title", () => TITLE_MAX_LENGTH],
+    ["dedupe_key", () => DEDUPE_KEY_MAX_LENGTH],
+    ["target", () => TARGET_MAX_LENGTH],
+  ])("the door's bound for %s is the column's own width", (column, bound) => {
+    expect(bound()).toBe(varcharLength(column));
   });
 
   it("has no stored category column to disagree with the derivation", () => {

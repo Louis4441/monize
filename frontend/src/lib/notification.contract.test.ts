@@ -93,11 +93,26 @@ function parseBackendColumns(): string[] {
       'the Notification entity class was not found -- this guard has lost its subject',
     );
   }
-  return [
+  const decorator =
+    /@(?:Column|PrimaryGeneratedColumn|CreateDateColumn|UpdateDateColumn)\(/g;
+  const declared = [...classBody[1].matchAll(decorator)].length;
+  const parsed = [
     ...classBody[1].matchAll(
       /@(?:Column|PrimaryGeneratedColumn|CreateDateColumn|UpdateDateColumn)\([\s\S]*?\)\s*(\w+)[?!]?\s*:/g,
     ),
   ].map((m) => m[1]);
+  // The lazy `)` stops at the decorator's own closing paren, which holds only
+  // while no decorator argument contains one. `@Column({ transformer: f() })`
+  // would silently drop that property from the list and quietly narrow every
+  // comparison below, so the count is checked rather than trusted.
+  if (parsed.length !== declared) {
+    throw new Error(
+      `parsed ${parsed.length} of ${declared} column decorators -- a decorator ` +
+        'argument now contains a parenthesis and the parser needs widening, ' +
+        'not a smaller expectation',
+    );
+  }
+  return parsed;
 }
 
 /** The field names the frontend read model declares. */

@@ -240,6 +240,11 @@ export function renameLegacyTableKeys(data: BackupData): string[] {
       const rows = tables[legacy];
       if (rows === undefined) continue;
       delete tables[legacy];
+      // Only a row array is moved. A malformed artifact carrying a scalar or an
+      // object under the legacy key would otherwise arrive under the current
+      // one, turning an absent table (which every later phase handles) into a
+      // present malformed one.
+      if (!Array.isArray(rows)) continue;
       if (tables[current] !== undefined) continue;
       tables[current] = rows;
       moved.push(`${legacy} -> ${current}`);

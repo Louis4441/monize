@@ -16,13 +16,19 @@ import {
 } from "./entities/notification.entity";
 import { DismissNotificationsQueryDto } from "./dto/dismiss-notifications-query.dto";
 
-/** Matches notifications.title VARCHAR(255). */
+// The three column widths the door truncates on. Each is checked against
+// `database/schema.sql` by `notification-category.spec.ts`: a bound that is too
+// low silently shortens copy the column would have taken, and one that is too
+// high hands PostgreSQL a value it refuses with 22001 -- inside a producer's
+// never-throws catch, which is the failure the truncation exists to prevent.
+
+/** Matches notifications.title. */
 export const TITLE_MAX_LENGTH = 255;
 
-/** Matches notifications.dedupe_key VARCHAR(120). */
+/** Matches notifications.dedupe_key. */
 export const DEDUPE_KEY_MAX_LENGTH = 120;
 
-/** Matches notifications.target VARCHAR(255). */
+/** Matches notifications.target. */
 export const TARGET_MAX_LENGTH = 255;
 
 /** How long a dismissed or read notification is kept before the purge. */
