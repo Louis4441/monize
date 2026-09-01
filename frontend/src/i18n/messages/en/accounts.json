@@ -485,6 +485,11 @@
       "memoPlaceholder": "e.g. Extra principal",
       "memoHelp": "Payments whose memo contains this text count as overpayments (case-insensitive)."
     },
+    "notAmortizing": {
+      "title": "This loan does not pay off, so the estimated payoff and remaining interest are unknown.",
+      "paymentBelowInterest": "The installment ({payment}) is below the monthly interest (about {interest}) at {rate}%, so the balance never falls. Record the real installment (the interest rate history entry, or the account's payment amount) so it covers the interest.",
+      "beyondHorizon": "The installment covers the interest, but the term runs past the projection horizon, so the payoff date and remaining interest are not shown."
+    },
     "simulator": {
       "title": "Overpayment Simulator",
       "unavailable": {

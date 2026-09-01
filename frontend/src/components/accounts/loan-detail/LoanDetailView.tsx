@@ -37,6 +37,8 @@ import {
   resolveCurrentLoanTerms,
 } from '@/lib/loan-history';
 import { SimulatorUnavailableNotice } from '@/components/accounts/loan-detail/SimulatorUnavailableNotice';
+import { LoanNotAmortizingNotice } from '@/components/accounts/loan-detail/LoanNotAmortizingNotice';
+import { loanNotAmortizingReason } from '@/lib/loan-figures';
 import { computePastImpact } from '@/lib/loan-past-impact';
 import {
   OverpaymentPlan,
@@ -184,6 +186,15 @@ export function LoanDetailView({
   const baseline = useMemo(
     () => (projectionInput ? generateLoanSchedule(projectionInput) : null),
     [projectionInput],
+  );
+
+  // The projection built but does not reach payoff (so the payoff date and
+  // remaining interest are unknown). Why -- so the "unknown" on the cards is
+  // explained rather than left as a dead end. Reads the same baseline the cards
+  // do, so it never claims a reason the figures do not have.
+  const notAmortizing = useMemo(
+    () => loanNotAmortizingReason(projectionInput, baseline),
+    [projectionInput, baseline],
   );
 
   const scenario = useMemo(
@@ -348,6 +359,13 @@ export function LoanDetailView({
         currentAnnualRate={currentTerms.annualRate}
         baseline={baseline}
       />
+
+      {notAmortizing && (
+        <LoanNotAmortizingNotice
+          reason={notAmortizing}
+          currencyCode={account.currencyCode}
+        />
+      )}
 
       <PastImpactSection account={account} impact={impact} />
 

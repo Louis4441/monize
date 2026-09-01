@@ -415,6 +415,11 @@
       "overpaymentBadge": "Nadpłata",
       "editRateLabel": "Edytuj oprocentowanie dla {date}"
     },
+    "notAmortizing": {
+      "title": "Ten kredyt się nie spłaca, więc szacowana data spłaty i pozostałe odsetki są nieznane.",
+      "paymentBelowInterest": "Rata ({payment}) jest niższa niż miesięczne odsetki (około {interest}) przy {rate}%, więc saldo nie maleje. Wpisz rzeczywistą ratę (wpis w historii oprocentowania albo kwotę płatności konta), tak aby pokrywała odsetki.",
+      "beyondHorizon": "Rata pokrywa odsetki, ale okres kredytowania wykracza poza horyzont prognozy, więc data spłaty i pozostałe odsetki nie są pokazane."
+    },
     "simulator": {
       "title": "Symulator nadpłat",
       "unavailable": {
