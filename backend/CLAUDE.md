@@ -286,9 +286,9 @@ Two consequences that are easy to get backwards. **A push endpoint is a URL the
 server will make an outbound request to**, so it is validated with
 `IsPushEndpoint`, which reuses the AI provider's safety check and adds an https
 floor -- never a bare `@IsUrl()`. That check resolves the host, and
-`dns.resolve4`/`resolve6` carry no timeout of their own, so it is always reached
-bounded INSIDE the check itself (`resolveBothFamilies` in
-`src/ai/validators/safe-url.validator.ts`), so every caller is covered without
+`dns.resolve4`/`resolve6` carry no timeout of their own, so the lookup is bounded
+INSIDE the check itself (`resolveBothFamilies` in
+`src/ai/validators/safe-url.validator.ts`) and every caller is covered without
 asking: the AI provider `baseUrl` validators and the startup check reach it
 through plain `validateUrlIsSafe`, and a resolver that never answers would hold
 whichever request asked -- a save, or a subscribe an authenticated caller may
