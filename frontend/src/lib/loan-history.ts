@@ -314,6 +314,8 @@ function debtMagnitude(signedBalance: number): number {
 /** The last regular installment actually observed, and whether it is complete. */
 export interface ObservedInstallment {
   amount: number;
+  /** The date (YYYY-MM-DD) of the regular installment this figure comes from. */
+  date: string;
   /**
    * True when the row's interest is KNOWN -- either recorded (a split, or a
    * paired separate expense) or known to be zero because the rate in effect on
@@ -356,6 +358,7 @@ export function observedInstallment(
   // exactly -- "`null` is not the safe answer either", from the other side.
   return {
     amount,
+    date: lastRegular.date.split('T')[0],
     complete: lastRegular.interest > 0 || lastRegular.annualRate === 0,
   };
 }
@@ -475,11 +478,13 @@ interface SeedPayment {
  * The payment comes from the most authoritative source that states one, and only
  * the unranked candidates are tested against the first period's interest:
  *
- *   1. a payment stated by an applicable `manual` or `inferred` rate-change row,
- *      used unconditionally -- it is the recorded answer to "what is being paid
- *      now", so one that no longer covers the interest is a fact about the loan
- *      (a rate rise the installment has not caught up with) and the schedule
- *      must be allowed to refuse rather than be handed a different number;
+ *   1. a payment stated by an applicable `manual` or `inferred` rate-change row
+ *      -- the recorded answer to "what is being paid now", so one that no longer
+ *      covers the interest is a fact about the loan (a rate rise the installment
+ *      has not caught up with) and the schedule must be allowed to refuse rather
+ *      than be handed a different number. It yields to rank 2 only when a
+ *      complete installment was actually paid AFTER the row stating it: that
+ *      later payment is the newer statement (see `observedIsNewer` below);
  *   2. otherwise a COMPLETE observed installment -- `principal + interest` of the
  *      last regular payment, where that interest is known -- also unconditionally,
  *      for the same reason: it is a complete statement of what is being paid;
@@ -602,8 +607,24 @@ function resolveSeedPayment(
   // not a lower payment, it is an incomplete one, and the contractual figure is
   // the only complete payment fact such a loan has. This is the only case the
   // fallback is for.
+  // A payment stated in a rate-change row is authoritative -- UNLESS a complete
+  // installment was actually paid AFTER the row that stated it. A stated payment
+  // is a snapshot of the contractual installment on that day; a real payment
+  // made later is a newer statement of what is owed. This matters most for a
+  // loan whose lender re-amortizes after each overpayment (a lower installment):
+  // one stated 1,200.99 in 2022 kept reading as "the installment" on every
+  // surface while the bank had long since dropped it to ~860 -- and the projection,
+  // seeded from the stale figure, described payments nobody was making. The
+  // reverse ordering is still protected: a row recorded AFTER the last payment
+  // (a rate rise with a new contractual installment not yet paid) keeps
+  // precedence over the older observation. Strict `>` -- on a tie the recorded
+  // statement wins.
+  const observedIsNewer =
+    observed?.complete === true &&
+    effective.paymentEffectiveDate != null &&
+    observed.date > effective.paymentEffectiveDate;
   let payment: number | null;
-  if (effective.paymentAmount != null) {
+  if (effective.paymentAmount != null && !observedIsNewer) {
     payment = effective.paymentAmount;
   } else if (observed?.complete) {
     payment = observed.amount;

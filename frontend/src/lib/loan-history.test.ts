@@ -502,7 +502,7 @@ describe('observedInstallment', () => {
         { principal: 765, interest: 153, type: 'REGULAR' },
       ]),
     );
-    expect(result).toEqual({ amount: 918, complete: true });
+    expect(result).toMatchObject({ amount: 918, complete: true });
   });
 
   it('reports what was observed, whatever the stored payment says', () => {
@@ -511,7 +511,7 @@ describe('observedInstallment', () => {
     const result = observedInstallment(
       history([{ principal: 765, interest: 700, type: 'REGULAR' }]),
     );
-    expect(result).toEqual({ amount: 1465, complete: true });
+    expect(result).toMatchObject({ amount: 1465, complete: true });
   });
 
   it('skips overpayment rows when finding the last regular installment', () => {
@@ -521,7 +521,7 @@ describe('observedInstallment', () => {
         { principal: 5000, interest: 0, type: 'OVERPAYMENT' },
       ]),
     );
-    expect(result).toEqual({ amount: 918, complete: true });
+    expect(result).toMatchObject({ amount: 918, complete: true });
   });
 
   it('reports nothing observed with no regular history', () => {
@@ -529,12 +529,35 @@ describe('observedInstallment', () => {
     expect(observedInstallment(history([]))).toBeNull();
   });
 
+  it('dates the figure at the last REGULAR row, not the last row', () => {
+    // The date is what resolveSeedPayment compares against a stated payment's
+    // row to decide which statement is newer, so it has to belong to the
+    // installment the amount came from -- a trailing overpayment must not move
+    // it forward.
+    expect(
+      observedInstallment(
+        history([
+          { principal: 765, interest: 153, type: 'REGULAR' },
+          { principal: 5000, interest: 0, type: 'OVERPAYMENT' },
+        ]),
+      ),
+    ).toMatchObject({ amount: 918, date: '2026-01-15' });
+    expect(
+      observedInstallment(
+        history([
+          { principal: 800, interest: 200, type: 'REGULAR' },
+          { principal: 765, interest: 153, type: 'REGULAR' },
+        ]),
+      ),
+    ).toMatchObject({ date: '2026-02-15' });
+  });
+
   it('marks a principal-only row incomplete rather than smaller', () => {
     // The distinction the contractual fallback keys off: principal + 0 is a
     // partial installment, not a lower one.
     expect(
       observedInstallment(history([{ principal: 450, interest: 0, type: 'REGULAR' }])),
-    ).toEqual({ amount: 450, complete: false });
+    ).toMatchObject({ amount: 450, complete: false });
   });
 
   it('marks a principal-only row COMPLETE at a known 0% rate', () => {
@@ -547,7 +570,7 @@ describe('observedInstallment', () => {
       observedInstallment(
         history([{ principal: 450, interest: 0, type: 'REGULAR', annualRate: 0 }]),
       ),
-    ).toEqual({ amount: 450, complete: true });
+    ).toMatchObject({ amount: 450, complete: true });
   });
 
   it('keeps a principal-only row incomplete at a known NON-zero rate', () => {
@@ -555,7 +578,7 @@ describe('observedInstallment', () => {
       observedInstallment(
         history([{ principal: 450, interest: 0, type: 'REGULAR', annualRate: 5 }]),
       ),
-    ).toEqual({ amount: 450, complete: false });
+    ).toMatchObject({ amount: 450, complete: false });
   });
 
   it('keeps a principal-only row incomplete when the rate is unknown', () => {
@@ -565,7 +588,7 @@ describe('observedInstallment', () => {
       observedInstallment(
         history([{ principal: 450, interest: 0, type: 'REGULAR', annualRate: null }]),
       ),
-    ).toEqual({ amount: 450, complete: false });
+    ).toMatchObject({ amount: 450, complete: false });
   });
 
   it('uses principal + interest for separately-booked interest', () => {
@@ -582,7 +605,7 @@ describe('observedInstallment', () => {
         { principal: 300, interest: 300, type: 'REGULAR' },
       ]),
     );
-    expect(result).toEqual({ amount: 600, complete: true });
+    expect(result).toMatchObject({ amount: 600, complete: true });
   });
 });
 
@@ -2310,5 +2333,45 @@ describe('diagnoseLoanProjection', () => {
     );
     expect(reason).toBe('no-payment');
     expect(input).toBeNull();
+  });
+});
+
+describe('resolveSeedPayment recency: a later real payment supersedes a stated one', () => {
+  const TODAY = '2026-09-01';
+  // A regular installment actually paid on 2026-08-05:
+  // 104.74 principal + 775.07 interest = 879.81, interest recorded (complete).
+  const paid = withInterestSplit(
+    makeTransaction({ id: 'reg', transactionDate: '2026-08-05', amount: 104.74 }),
+    'parent-reg',
+    775.07,
+  );
+  const account = makeAccount({
+    accountType: 'MORTGAGE',
+    currentBalance: -135662.61,
+    interestRate: 5.5,
+  });
+
+  it('uses the observed installment when it is dated after the stated payment row', () => {
+    // The user's case: 1,200.99 stated in a 2022 rate-change row, while the
+    // lender re-amortized after each overpayment and the 2026 payment is 879.81.
+    // The stated figure showed as "the installment" on every surface and seeded
+    // a projection of payments nobody was making.
+    const rows = [
+      { effectiveDate: '2022-04-05', annualRate: 5.5, newPaymentAmount: 1200.99, source: 'manual' as const },
+    ];
+    const history = deriveLoanPaymentHistory(account, [paid], rows);
+    const terms = resolveCurrentLoanTerms(account, history, rows, null, TODAY);
+    expect(terms.payment).toBeCloseTo(879.81, 2);
+  });
+
+  it('keeps the stated payment when its row is dated after the last real payment', () => {
+    // A rate rise recorded with a new contractual installment that has not been
+    // paid yet must not be overridden by the older observation.
+    const rows = [
+      { effectiveDate: '2026-08-20', annualRate: 5.5, newPaymentAmount: 1300, source: 'manual' as const },
+    ];
+    const history = deriveLoanPaymentHistory(account, [paid], rows);
+    const terms = resolveCurrentLoanTerms(account, history, rows, null, TODAY);
+    expect(terms.payment).toBe(1300);
   });
 });

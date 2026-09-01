@@ -110,6 +110,15 @@ export interface EffectiveLoanTerms {
   /** Stated by an applicable `manual` or `inferred` row; authoritative. */
   paymentAmount: number | null;
   /**
+   * The effective date of the row that stated `paymentAmount`, so a caller can
+   * tell whether an actual installment observed AFTER it has superseded the
+   * statement. Null whenever `paymentAmount` is null. A payment stated in a
+   * rate-change row is a snapshot of the contractual installment on that day;
+   * for a loan whose lender re-amortizes after each overpayment (a lower
+   * installment), every later payment is a newer statement of what is owed.
+   */
+  paymentEffectiveDate: string | null;
+  /**
    * From an applicable `initial` row. Either a real observed installment or a
    * stale copy of `account.paymentAmount` -- see `RateTimelineRow.source` -- so a
    * caller ranks it with the account's own scalar rather than above it.
@@ -138,6 +147,7 @@ export function resolveEffectiveLoanTerms(
     // to the caller as null rather than becoming a measured zero.
     annualRate: latest?.annualRate ?? fallbackAnnualRate ?? null,
     paymentAmount: statedPayment?.newPaymentAmount ?? null,
+    paymentEffectiveDate: statedPayment?.effectiveDate ?? null,
     snapshotPaymentAmount: snapshotPayment?.newPaymentAmount ?? null,
   };
 }
