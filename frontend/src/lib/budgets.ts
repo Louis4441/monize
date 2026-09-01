@@ -169,9 +169,11 @@ export const budgetsApi = {
     return response.data;
   },
 
-  // Alerts
+  // Notifications. They stopped being budget alerts when the first
+  // BACKUP_FAILED row landed in the table, so the endpoints moved off
+  // /budgets/alerts; these wrappers keep their names until the component rename.
   getAlerts: async (unreadOnly = false): Promise<BudgetAlert[]> => {
-    const response = await apiClient.get<BudgetAlert[]>('/budgets/alerts', {
+    const response = await apiClient.get<BudgetAlert[]>('/notifications', {
       params: { unreadOnly },
     });
     return response.data;
@@ -179,31 +181,31 @@ export const budgetsApi = {
 
   markAlertRead: async (alertId: string): Promise<BudgetAlert> => {
     const response = await apiClient.patch<BudgetAlert>(
-      `/budgets/alerts/${alertId}/read`,
+      `/notifications/${alertId}/read`,
     );
     return response.data;
   },
 
   markAllAlertsRead: async (): Promise<{ updated: number }> => {
     const response = await apiClient.patch<{ updated: number }>(
-      '/budgets/alerts/read-all',
+      '/notifications/read-all',
     );
     return response.data;
   },
 
   deleteAlert: async (alertId: string): Promise<void> => {
-    await apiClient.delete(`/budgets/alerts/${alertId}`);
+    await apiClient.delete(`/notifications/${alertId}`);
   },
 
-  // Dismisses every live alert matching the filter, server-side -- including
-  // alerts beyond the list endpoint's 50-row window. The active filter
+  // Dismisses every live notification matching the filter, server-side --
+  // including rows beyond the list endpoint's 50-row window. The active filter
   // travels explicitly on the command, never as a list of on-screen ids.
   dismissAlerts: async (filters: {
     severity?: AlertSeverity;
     category?: AlertCategory;
   }): Promise<{ dismissed: number }> => {
     const response = await apiClient.delete<{ dismissed: number }>(
-      '/budgets/alerts',
+      '/notifications',
       {
         params: {
           ...(filters.severity ? { severity: filters.severity } : {}),

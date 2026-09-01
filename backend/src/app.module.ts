@@ -40,6 +40,7 @@ import { ImportModule } from "./import/import.module";
 import { NetWorthModule } from "./net-worth/net-worth.module";
 import { BuiltInReportsModule } from "./built-in-reports/built-in-reports.module";
 import { NotificationsModule } from "./notifications/notifications.module";
+import { NotificationCenterModule } from "./notification-center/notification-center.module";
 import { SystemAlertsModule } from "./system-alerts/system-alerts.module";
 import { ProviderHealthModule } from "./provider-health/provider-health.module";
 import { PushModule } from "./push/push.module";
@@ -151,6 +152,7 @@ import { I18nModule } from "./i18n/i18n.module";
     NetWorthModule,
     BuiltInReportsModule,
     NotificationsModule,
+    NotificationCenterModule,
     SystemAlertsModule,
     ProviderHealthModule,
     PushModule,

@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
-import { DataSource, In, IsNull, LessThan, Not } from "typeorm";
+import { DataSource, EntityManager, In, IsNull, LessThan, Not } from "typeorm";
 
 import { withScopedDb } from "../common/db/scoped-db";
 import { withSystemContext } from "../common/db/with-context";
@@ -305,7 +305,7 @@ export class NotificationService {
    * an id exists.
    */
   private async requireLive(
-    manager: { getRepository: typeof Notification extends never ? never : any },
+    manager: EntityManager,
     userId: string,
     notificationId: string,
   ): Promise<Notification> {

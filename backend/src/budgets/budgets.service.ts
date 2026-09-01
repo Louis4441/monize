@@ -1,7 +1,9 @@
 import {
+  Inject,
   Injectable,
   NotFoundException,
   BadRequestException,
+  forwardRef,
 } from "@nestjs/common";
 import { tr } from "../i18n/translate";
 import { DataSource, In, IsNull, Not } from "typeorm";
@@ -12,14 +14,13 @@ import {
   Notification,
   NotificationType,
   NotificationSeverity,
-  SYSTEM_NOTIFICATION_TYPES,
 } from "../notification-center/entities/notification.entity";
+import { NotificationService } from "../notification-center/notification.service";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
 import { Category } from "../categories/entities/category.entity";
 import { ScheduledOccurrenceService } from "../scheduled-transactions/scheduled-occurrence.service";
 import { CreateBudgetDto } from "./dto/create-budget.dto";
-import { DismissAlertsQueryDto } from "./dto/dismiss-alerts-query.dto";
 import { UpdateBudgetDto } from "./dto/update-budget.dto";
 import { CreateBudgetCategoryDto } from "./dto/create-budget-category.dto";
 import { UpdateBudgetCategoryDto } from "./dto/update-budget-category.dto";
@@ -107,6 +108,12 @@ export class BudgetsService {
     // budget's figures are in the budget's: the two are reconciled here rather
     // than by dropping the currency and hoping they match (issue #1247).
     private exchangeRates: ExchangeRateService,
+    // Every notification this service produces goes through the one door, so
+    // the column bounds, the conflict handling and the period default are not
+    // re-decided here. The edge is deferred because the notification centre's
+    // list endpoint calls back into this service to materialize bill reminders.
+    @Inject(forwardRef(() => NotificationService))
+    private notifications: NotificationService,
   ) {}
 
   async create(
@@ -628,29 +635,17 @@ export class BudgetsService {
     };
   }
 
-  async getAlerts(userId: string, unreadOnly = false): Promise<Notification[]> {
-    // Ensure upcoming bill alerts are persisted before querying
-    if (!unreadOnly) {
-      await this.ensureBillAlerts(userId);
-    }
-
-    const where: Record<string, unknown> = { userId, dismissedAt: IsNull() };
-    if (unreadOnly) {
-      where.isRead = false;
-    }
-
-    const alerts = await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(Notification).find({
-        where,
-        order: { createdAt: "DESC" },
-        take: 50,
-      }),
-    );
-
-    return alerts;
-  }
-
-  private async ensureBillAlerts(userId: string): Promise<void> {
+  /**
+   * Materialize a BILL_DUE notification for every upcoming bill that does not
+   * have one yet.
+   *
+   * Called from the notification list endpoint rather than a cron, which is how
+   * it has always worked: a reminder that appears the moment the user looks is
+   * better than one that waits for 07:00, and the dedup below makes the read
+   * idempotent. Public because the notification centre owns the endpoint and
+   * budgets owns the producer.
+   */
+  async ensureBillDueNotifications(userId: string): Promise<void> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayStr = todayYMD();
@@ -756,133 +751,38 @@ export class BudgetsService {
           ? NotificationSeverity.WARNING
           : NotificationSeverity.INFO;
 
-      const alert = new Notification();
-      alert.userId = userId;
-      alert.budgetId = null;
-      alert.budgetCategoryId = null;
-      alert.type = NotificationType.BILL_DUE;
-      alert.severity = severity;
-      // `title`/`message` are the English fallbacks for a reader with no client
-      // to render them (the email digest, an API consumer). The UI composes both
-      // from `type` and `data` in the reader's own language -- a stored
-      // sentence cannot be translated after the fact, and the missing-rate case
-      // is exactly the one a non-English reader hits.
-      alert.title = `${payeeName} due${daysUntilDue === 0 ? " today" : daysUntilDue === 1 ? " tomorrow" : ` in ${daysUntilDue} days`}`;
-      alert.message =
-        amount === null
-          ? `Amount unavailable (no current exchange rate), due on ${dueDate}`
-          : `${formatCurrency(amount, occurrence.currencyCode)} due on ${dueDate}`;
-      // Structured, so the UI can compose the copy in the reader's language --
-      // and deliberately without `daysUntilDue`: "due in 3 days" was true when
-      // this row was written and stops being true the next morning, while the
-      // row lives until it is dismissed. The client counts from `dueDate`
-      // against its own clock.
-      alert.data = {
-        billId: bill.id,
-        payeeName,
-        amount,
-        amountComplete: amount !== null,
-        dueDate,
-        originalDate: occurrence.originalDate,
-        currencyCode: occurrence.currencyCode,
-      };
-      alert.isRead = false;
-      alert.isEmailSent = false;
-      alert.periodStart = dueDate;
-      alert.dismissedAt = null;
-
-      await withScopedDb(this.dataSource, (m) =>
-        m.getRepository(Notification).save(alert),
-      );
+      await this.notifications.create(userId, {
+        type: NotificationType.BILL_DUE,
+        severity,
+        // `title`/`message` are the English fallbacks for a reader with no
+        // client to render them (the email digest, an API consumer). The UI
+        // composes both from `type` and `data` in the reader's own language --
+        // a stored sentence cannot be translated after the fact, and the
+        // missing-rate case is exactly the one a non-English reader hits.
+        title: `${payeeName} due${daysUntilDue === 0 ? " today" : daysUntilDue === 1 ? " tomorrow" : ` in ${daysUntilDue} days`}`,
+        message:
+          amount === null
+            ? `Amount unavailable (no current exchange rate), due on ${dueDate}`
+            : `${formatCurrency(amount, occurrence.currencyCode)} due on ${dueDate}`,
+        // Structured, so the UI can compose the copy in the reader's language
+        // -- and deliberately without `daysUntilDue`: "due in 3 days" was true
+        // when this row was written and stops being true the next morning,
+        // while the row lives until it is dismissed. The client counts from
+        // `dueDate` against its own clock.
+        data: {
+          billId: bill.id,
+          payeeName,
+          amount,
+          amountComplete: amount !== null,
+          dueDate,
+          originalDate: occurrence.originalDate,
+          currencyCode: occurrence.currencyCode,
+        },
+        // Where the bell sends the reader: the bill itself, not the list.
+        target: `/scheduled-transactions/${bill.id}`,
+        periodStart: dueDate,
+      });
     }
-  }
-
-  async markAlertRead(userId: string, alertId: string): Promise<Notification> {
-    const alert = await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(Notification).findOne({
-        where: { id: alertId, userId, dismissedAt: IsNull() },
-      }),
-    );
-
-    if (!alert) {
-      throw new NotFoundException(
-        tr(
-          "errors.budgets.alertNotFound",
-          `Alert with ID ${alertId} not found`,
-          { id: alertId },
-        ),
-      );
-    }
-
-    alert.isRead = true;
-    return withScopedDb(this.dataSource, (m) =>
-      m.getRepository(Notification).save(alert),
-    );
-  }
-
-  async deleteAlert(userId: string, alertId: string): Promise<void> {
-    const alert = await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(Notification).findOne({
-        where: { id: alertId, userId, dismissedAt: IsNull() },
-      }),
-    );
-
-    if (!alert) {
-      throw new NotFoundException(
-        tr(
-          "errors.budgets.alertNotFound",
-          `Alert with ID ${alertId} not found`,
-          { id: alertId },
-        ),
-      );
-    }
-
-    alert.dismissedAt = new Date();
-    await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(Notification).save(alert),
-    );
-  }
-
-  async markAllAlertsRead(userId: string): Promise<{ updated: number }> {
-    const result = await withScopedDb(this.dataSource, (m) =>
-      m
-        .getRepository(Notification)
-        .update(
-          { userId, isRead: false, dismissedAt: IsNull() },
-          { isRead: true },
-        ),
-    );
-
-    return { updated: result.affected || 0 };
-  }
-
-  /**
-   * Soft-dismiss every live alert matching the caller's filter, in one
-   * UPDATE. The filter arrives explicitly on the command (severity and/or
-   * system-vs-financial category) rather than as a list of on-screen ids, so
-   * it also reaches alerts beyond the list endpoint's `take: 50` window.
-   * Financial is defined as NOT IN `SYSTEM_NOTIFICATION_TYPES` -- the one place the
-   * partition is written.
-   */
-  async dismissAlerts(
-    userId: string,
-    filters: DismissAlertsQueryDto = {},
-  ): Promise<{ dismissed: number }> {
-    const where: Record<string, unknown> = { userId, dismissedAt: IsNull() };
-    if (filters.severity) {
-      where.severity = filters.severity;
-    }
-    if (filters.category === "system") {
-      where.type = In([...SYSTEM_NOTIFICATION_TYPES]);
-    } else if (filters.category === "financial") {
-      where.type = Not(In([...SYSTEM_NOTIFICATION_TYPES]));
-    }
-
-    const result = await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(Notification).update(where, { dismissedAt: new Date() }),
-    );
-
-    return { dismissed: result.affected || 0 };
   }
 
   async getDashboardSummary(userId: string): Promise<{

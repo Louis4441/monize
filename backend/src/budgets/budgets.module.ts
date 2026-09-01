@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { Budget } from "./entities/budget.entity";
 import { BudgetCategory } from "./entities/budget-category.entity";
@@ -27,6 +27,7 @@ import { NotificationsModule } from "../notifications/notifications.module";
 import { ActionHistoryModule } from "../action-history/action-history.module";
 import { ScheduledTransactionsModule } from "../scheduled-transactions/scheduled-transactions.module";
 import { CurrenciesModule } from "../currencies/currencies.module";
+import { NotificationCenterModule } from "../notification-center/notification-center.module";
 
 @Module({
   imports: [
@@ -53,6 +54,10 @@ import { CurrenciesModule } from "../currencies/currencies.module";
     // For ExchangeRateService: an occurrence's amount is in the occurrence's own
     // currency, which the budget converts into its own before totalling.
     CurrenciesModule,
+    // For NotificationService: every notification a budget produces goes
+    // through the one write door. Deferred because the notification centre's
+    // list endpoint calls back here to materialize bill reminders.
+    forwardRef(() => NotificationCenterModule),
   ],
   providers: [
     BudgetsService,

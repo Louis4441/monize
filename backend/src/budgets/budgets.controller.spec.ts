@@ -33,14 +33,9 @@ describe("BudgetsController", () => {
       bulkUpdateCategories: jest.fn(),
       getSummary: jest.fn(),
       getVelocity: jest.fn(),
-      getAlerts: jest.fn(),
-      markAlertRead: jest.fn(),
-      markAllAlertsRead: jest.fn(),
-      getDashboardSummary: jest.fn(),
+            getDashboardSummary: jest.fn(),
       getCategoryBudgetStatus: jest.fn(),
-      deleteAlert: jest.fn(),
-      dismissAlerts: jest.fn(),
-    };
+        };
 
     mockBudgetPeriodService = {
       findAll: jest.fn(),
@@ -256,55 +251,6 @@ describe("BudgetsController", () => {
     });
   });
 
-  describe("getAlerts()", () => {
-    it("delegates to budgetsService.getAlerts with unreadOnly", () => {
-      mockBudgetsService.getAlerts!.mockReturnValue("alerts");
-
-      const result = controller.getAlerts(mockReq, true);
-
-      expect(result).toBe("alerts");
-      expect(mockBudgetsService.getAlerts).toHaveBeenCalledWith("user-1", true);
-    });
-
-    it("defaults unreadOnly to false when undefined", () => {
-      mockBudgetsService.getAlerts!.mockReturnValue("alerts");
-
-      controller.getAlerts(mockReq, undefined);
-
-      expect(mockBudgetsService.getAlerts).toHaveBeenCalledWith(
-        "user-1",
-        false,
-      );
-    });
-  });
-
-  describe("markAlertRead()", () => {
-    it("delegates to budgetsService.markAlertRead", () => {
-      mockBudgetsService.markAlertRead!.mockReturnValue("read");
-
-      const result = controller.markAlertRead(mockReq, "alert-1");
-
-      expect(result).toBe("read");
-      expect(mockBudgetsService.markAlertRead).toHaveBeenCalledWith(
-        "user-1",
-        "alert-1",
-      );
-    });
-  });
-
-  describe("markAllAlertsRead()", () => {
-    it("delegates to budgetsService.markAllAlertsRead", () => {
-      mockBudgetsService.markAllAlertsRead!.mockReturnValue("all-read");
-
-      const result = controller.markAllAlertsRead(mockReq);
-
-      expect(result).toBe("all-read");
-      expect(mockBudgetsService.markAllAlertsRead).toHaveBeenCalledWith(
-        "user-1",
-      );
-    });
-  });
-
   describe("getPeriods()", () => {
     it("delegates to budgetPeriodService.findAll", () => {
       mockBudgetPeriodService.findAll!.mockReturnValue("periods");
@@ -511,49 +457,6 @@ describe("BudgetsController", () => {
         "cat-1": { spent: 100 },
         "cat-2": { spent: 200 },
       });
-    });
-  });
-
-  describe("deleteAlert()", () => {
-    it("delegates to budgetsService.deleteAlert", () => {
-      mockBudgetsService.deleteAlert!.mockReturnValue("deleted");
-
-      const result = controller.deleteAlert(mockReq, "alert-1");
-
-      expect(result).toBe("deleted");
-      expect(mockBudgetsService.deleteAlert).toHaveBeenCalledWith(
-        "user-1",
-        "alert-1",
-      );
-    });
-  });
-
-  describe("dismissAlerts()", () => {
-    it("delegates to budgetsService.dismissAlerts with the query filter", () => {
-      mockBudgetsService.dismissAlerts!.mockReturnValue("dismissed");
-
-      const result = controller.dismissAlerts(mockReq, {
-        severity: NotificationSeverity.CRITICAL,
-        category: "system",
-      });
-
-      expect(result).toBe("dismissed");
-      expect(mockBudgetsService.dismissAlerts).toHaveBeenCalledWith("user-1", {
-        severity: NotificationSeverity.CRITICAL,
-        category: "system",
-      });
-    });
-
-    it("passes an empty filter through unchanged", () => {
-      mockBudgetsService.dismissAlerts!.mockReturnValue("dismissed-all");
-
-      const result = controller.dismissAlerts(mockReq, {});
-
-      expect(result).toBe("dismissed-all");
-      expect(mockBudgetsService.dismissAlerts).toHaveBeenCalledWith(
-        "user-1",
-        {},
-      );
     });
   });
 

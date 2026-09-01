@@ -130,7 +130,7 @@ describe('budgetsApi', () => {
   it('getAlerts fetches alerts with default unreadOnly=false', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
     await budgetsApi.getAlerts();
-    expect(apiClient.get).toHaveBeenCalledWith('/budgets/alerts', {
+    expect(apiClient.get).toHaveBeenCalledWith('/notifications', {
       params: { unreadOnly: false },
     });
   });
@@ -138,7 +138,7 @@ describe('budgetsApi', () => {
   it('getAlerts fetches alerts with unreadOnly=true', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
     await budgetsApi.getAlerts(true);
-    expect(apiClient.get).toHaveBeenCalledWith('/budgets/alerts', {
+    expect(apiClient.get).toHaveBeenCalledWith('/notifications', {
       params: { unreadOnly: true },
     });
   });
@@ -146,20 +146,20 @@ describe('budgetsApi', () => {
   it('markAlertRead patches alert', async () => {
     vi.mocked(apiClient.patch).mockResolvedValue({ data: { id: 'a-1' } });
     await budgetsApi.markAlertRead('a-1');
-    expect(apiClient.patch).toHaveBeenCalledWith('/budgets/alerts/a-1/read');
+    expect(apiClient.patch).toHaveBeenCalledWith('/notifications/a-1/read');
   });
 
   it('markAllAlertsRead patches all alerts', async () => {
     vi.mocked(apiClient.patch).mockResolvedValue({ data: { updated: 3 } });
     const result = await budgetsApi.markAllAlertsRead();
-    expect(apiClient.patch).toHaveBeenCalledWith('/budgets/alerts/read-all');
+    expect(apiClient.patch).toHaveBeenCalledWith('/notifications/read-all');
     expect(result.updated).toBe(3);
   });
 
   it('deleteAlert removes alert', async () => {
     vi.mocked(apiClient.delete).mockResolvedValue({});
     await budgetsApi.deleteAlert('a-1');
-    expect(apiClient.delete).toHaveBeenCalledWith('/budgets/alerts/a-1');
+    expect(apiClient.delete).toHaveBeenCalledWith('/notifications/a-1');
   });
 
   it('getTrend fetches trend with default 6 months', async () => {
