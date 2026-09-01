@@ -146,15 +146,26 @@ function safeNotificationPath(value) {
 /**
  * The key two notifications must share to replace each other.
  *
- * `safeNotificationPath` answers `/` both for a payload with no target and for
- * one whose target was refused, and both belong in the same bucket: neither
- * names a subject, so grouping those by type is what is wanted -- and it also
- * means a hostile target cannot mint a fresh bucket per push.
+ * The browser replaces a shown notification whose `tag` matches, so the tag is
+ * a claim about what the notification is ABOUT. Two bills due on the same day
+ * are both `BILL_DUE`, so grouping by type alone showed the reader one of them
+ * and threw the other away.
+ *
+ * The subject comes from the payload's own `collapseKey`, not from `target`: a
+ * route is not a subject, and the bill producer proves it -- every reminder
+ * points at `/bills`, because no per-bill page exists, so a tag built from the
+ * target collapsed exactly the case it was meant to separate.
+ *
+ * A payload with no usable key groups by type, which is right where the type
+ * really does describe one subject: one "email delivery is failing", not four.
+ * The key is bounded and read as text like every other field here, so a hostile
+ * payload can neither mint unbounded buckets nor put anything but a short string
+ * in the tag.
  */
 function collapseTag(payload) {
   var type = pushText(payload.type, 'monize');
-  var target = safeNotificationPath(payload.target);
-  return target === '/' ? type : type + '|' + target;
+  var key = pushText(payload.collapseKey, '');
+  return key === '' ? type : type + '|' + key;
 }
 
 function readPushPayload(event) {
@@ -185,12 +196,9 @@ self.addEventListener('push', function (event) {
         icon: PUSH_ICON,
         badge: PUSH_BADGE,
         // Collapse repeats of ONE subject onto one notification rather than
-        // stacking four of them -- and let two different subjects stack, which
-        // the type alone could not do: two bills due on the same day are both
-        // BILL_DUE, so grouping by type would have shown the reader one of them
-        // and silently replaced the other. The target is what names the subject,
-        // and a notice with nowhere to go (a system alert) collapses by type,
-        // which is right: one "email is failing", not four.
+        // stacking four of them, and let two different subjects stack. See
+        // `collapseTag`: the subject is the payload's `collapseKey`, and a
+        // payload without one is saying its type IS the subject.
         tag: collapseTag(payload),
         data: { target: target },
       }

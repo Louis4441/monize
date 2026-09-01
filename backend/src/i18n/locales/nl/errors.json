@@ -214,7 +214,6 @@
     "categoryNotFound": "Categorie met ID {{ id }} niet gevonden",
     "categoryAlreadyInBudget": "Deze categorie staat al in het budget",
     "budgetCategoryNotFound": "Budgetcategorie met ID {{ id }} niet gevonden",
-    "alertNotFound": "Melding met ID {{ id }} niet gevonden",
     "periodNotFound": "Budgetperiode met ID {{ id }} niet gevonden",
     "noOpenPeriod": "Geen open periode om te sluiten",
     "categoryIdsNotOwned": "Categorie-ID's niet gevonden of niet eigendom van gebruiker: {{ ids }}"
@@ -338,6 +337,7 @@
     "invalidGranularity": "granularity moet 'daily' of 'monthly' zijn"
   },
   "notifications": {
+    "notFound": "Notificatie met ID {{ id }} niet gevonden",
     "smtpNotConfigured": "SMTP is niet geconfigureerd. Stel SMTP-omgevingsvariabelen in.",
     "noEmailOnFile": "Geen e-mailadres bekend voor deze gebruiker."
   },

@@ -231,10 +231,24 @@ export const LEGACY_TABLE_KEYS: Readonly<Record<string, readonly string[]>> = {
  * walk the document by table name, and a rule applied at only one of them is a
  * rule that holds for one of them. An artifact carrying both names keeps the
  * current one: it was written by an instance that already knew the new name.
+ *
+ * That decision DISCARDS the legacy rows, so it is reported rather than made
+ * silently -- an artifact holding 40 `budget_alerts` beside an empty
+ * `notifications` restored as a success with nothing said about the 40. A count
+ * of rows that did not come back never belongs only in a comment; the caller
+ * logs it, for the same reason `skippedAttachments` is its own field.
  */
-export function renameLegacyTableKeys(data: BackupData): string[] {
+export interface LegacyTableRename {
+  /** `legacy -> current`, for the log line. */
+  readonly renamed: string[];
+  /** Legacy tables whose rows were dropped because the current name won. */
+  readonly discarded: { table: string; supersededBy: string; rows: number }[];
+}
+
+export function renameLegacyTableKeys(data: BackupData): LegacyTableRename {
   const tables = backupTables(data);
-  const moved: string[] = [];
+  const renamed: string[] = [];
+  const discarded: LegacyTableRename["discarded"] = [];
   for (const [current, legacyNames] of Object.entries(LEGACY_TABLE_KEYS)) {
     for (const legacy of legacyNames) {
       const rows = tables[legacy];
@@ -245,10 +259,19 @@ export function renameLegacyTableKeys(data: BackupData): string[] {
       // one, turning an absent table (which every later phase handles) into a
       // present malformed one.
       if (!Array.isArray(rows)) continue;
-      if (tables[current] !== undefined) continue;
+      if (tables[current] !== undefined) {
+        if (rows.length > 0) {
+          discarded.push({
+            table: legacy,
+            supersededBy: current,
+            rows: rows.length,
+          });
+        }
+        continue;
+      }
       tables[current] = rows;
-      moved.push(`${legacy} -> ${current}`);
+      renamed.push(`${legacy} -> ${current}`);
     }
   }
-  return moved;
+  return { renamed, discarded };
 }

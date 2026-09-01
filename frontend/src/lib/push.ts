@@ -1,6 +1,7 @@
 import type { AxiosRequestConfig } from 'axios';
 import apiClient from './api';
 import { getErrorCode } from './errors';
+import { useAuthStore } from '@/store/authStore';
 
 /** Why a device stopped being reachable. Mirrors the backend enum. */
 export type PushDisabledReason = 'GONE' | 'KEY_ROTATED' | 'FAILING';
@@ -415,7 +416,15 @@ async function postSubscription(
   // computed here, so "the endpoint I registered" and "the endpoint the row
   // names" are the same value by construction. Only on success: a refused
   // registration has nothing to remember.
-  rememberRegisteredEndpoint(device.endpointFingerprint);
+  //
+  // The owner is recorded with it: the row belongs to whoever this request was
+  // authenticated as, and a browser profile outlives a session. With no id
+  // available nothing is written, because a marker with an unknown owner is
+  // read as somebody else's and would be worse than none.
+  const ownerId = useAuthStore.getState().user?.id ?? null;
+  if (ownerId !== null) {
+    rememberRegisteredEndpoint(ownerId, device.endpointFingerprint);
+  }
   return device;
 }
 
@@ -481,10 +490,36 @@ export async function disablePushOnThisDevice(
  */
 const REGISTERED_ENDPOINT_KEY = 'monize.push.registeredEndpoint';
 
+/**
+ * The endpoint this browser registered, and WHOSE registration it was.
+ *
+ * `localStorage` is per origin, but a push subscription's owner is an account:
+ * two people share one browser profile, and one of them signing in must not be
+ * able to reason about the other's registration. Without the owner recorded, the
+ * second account's Settings page saw a subscription it had no row for, read it
+ * as "revoked" and unsubscribed the browser -- silently taking push away from
+ * the first account, whose device list still showed the row as active.
+ *
+ * So the marker states both, and a marker written by somebody else is not
+ * evidence about the reader. Stored as JSON; a value from the previous
+ * single-string format reads as an unknown owner, which is the same answer as
+ * "not mine" and errs toward doing nothing.
+ */
+interface RegisteredEndpointMarker {
+  userId: string;
+  fingerprint: string;
+}
+
 /** Every accessor is guarded: some browsers throw on `localStorage` outright. */
-export function rememberRegisteredEndpoint(fingerprint: string): void {
+export function rememberRegisteredEndpoint(
+  userId: string,
+  fingerprint: string,
+): void {
   try {
-    window.localStorage.setItem(REGISTERED_ENDPOINT_KEY, fingerprint);
+    window.localStorage.setItem(
+      REGISTERED_ENDPOINT_KEY,
+      JSON.stringify({ userId, fingerprint } satisfies RegisteredEndpointMarker),
+    );
   } catch {
     // Storage blocked. The reconciliation degrades to doing nothing, which is
     // the behaviour before it existed.
@@ -499,10 +534,25 @@ export function forgetRegisteredEndpoint(): void {
   }
 }
 
-export function readRegisteredEndpoint(): string | null {
+export function readRegisteredEndpoint(): RegisteredEndpointMarker | null {
   try {
-    return window.localStorage.getItem(REGISTERED_ENDPOINT_KEY);
+    const raw = window.localStorage.getItem(REGISTERED_ENDPOINT_KEY);
+    if (raw === null) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed === null || typeof parsed !== 'object') return null;
+    const marker = parsed as Partial<RegisteredEndpointMarker>;
+    if (
+      typeof marker.userId !== 'string' ||
+      typeof marker.fingerprint !== 'string' ||
+      marker.userId.length === 0 ||
+      marker.fingerprint.length === 0
+    ) {
+      return null;
+    }
+    return { userId: marker.userId, fingerprint: marker.fingerprint };
   } catch {
+    // Blocked storage, or a value from the pre-owner format (a bare
+    // fingerprint, which is not JSON). Both are "no information".
     return null;
   }
 }
@@ -520,7 +570,9 @@ export type PushRegistrationState =
   | { kind: 'in-sync' }
   | { kind: 'no-subscription' }
   | { kind: 'rotated'; fingerprint: string }
-  | { kind: 'revoked'; fingerprint: string };
+  | { kind: 'revoked'; fingerprint: string }
+  /** The subscription this browser holds belongs to a different account. */
+  | { kind: 'foreign'; fingerprint: string };
 
 export function classifyPushRegistration(input: {
   /** The fingerprint of the subscription this browser holds, or null. */
@@ -528,15 +580,29 @@ export function classifyPushRegistration(input: {
   /** The fingerprints of the account's LIVE server rows. */
   liveFingerprints: readonly string[];
   /** What this browser last registered, from `readRegisteredEndpoint`. */
-  registeredFingerprint: string | null;
+  marker: { userId: string; fingerprint: string } | null;
+  /** Who is reading. A marker naming anyone else says nothing about them. */
+  readerUserId: string | null;
 }): PushRegistrationState {
-  const { currentFingerprint, liveFingerprints, registeredFingerprint } = input;
+  const { currentFingerprint, liveFingerprints, marker, readerUserId } = input;
   if (currentFingerprint === null) return { kind: 'no-subscription' };
   if (liveFingerprints.includes(currentFingerprint)) return { kind: 'in-sync' };
+
+  // A subscription this browser holds, that the reader has no row for, and that
+  // another account registered: theirs. Releasing it would revoke their push
+  // from a device they still hold, and re-registering it would move their
+  // endpoint onto this account -- which the server refuses anyway. Neither
+  // repair is the reader's to make, so this state does nothing.
   if (
-    registeredFingerprint !== null &&
-    registeredFingerprint !== currentFingerprint
+    marker !== null &&
+    marker.fingerprint === currentFingerprint &&
+    (readerUserId === null || marker.userId !== readerUserId)
   ) {
+    return { kind: 'foreign', fingerprint: currentFingerprint };
+  }
+
+  if (marker !== null && marker.fingerprint !== currentFingerprint) {
+    // The browser replaced the endpoint this account registered. Rotation.
     return { kind: 'rotated', fingerprint: currentFingerprint };
   }
   return { kind: 'revoked', fingerprint: currentFingerprint };

@@ -214,7 +214,6 @@
     "categoryNotFound": "Categoría con ID {{ id }} no encontrada",
     "categoryAlreadyInBudget": "Esta categoría ya está en el presupuesto",
     "budgetCategoryNotFound": "Categoría de presupuesto con ID {{ id }} no encontrada",
-    "alertNotFound": "Alerta con ID {{ id }} no encontrada",
     "periodNotFound": "Período de presupuesto con ID {{ id }} no encontrado",
     "noOpenPeriod": "No hay ningún período abierto para cerrar",
     "categoryIdsNotOwned": "IDs de categoría no encontrados o no pertenecen al usuario: {{ ids }}"
@@ -338,6 +337,7 @@
     "invalidGranularity": "granularity debe ser 'daily' o 'monthly'"
   },
   "notifications": {
+    "notFound": "Notificación con ID {{ id }} no encontrada",
     "smtpNotConfigured": "SMTP no está configurado. Establece las variables de entorno SMTP.",
     "noEmailOnFile": "No hay dirección de correo electrónico registrada para este usuario."
   },

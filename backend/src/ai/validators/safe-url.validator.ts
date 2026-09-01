@@ -54,34 +54,118 @@ function unbracketHost(hostname: string): string {
 }
 
 /**
+ * The IPv4 address an IPv6 literal carries, or null.
+ *
+ * An IPv6 address can embed an IPv4 one, and the private-address rules are
+ * written in dotted decimal -- so an embedded form has to be mapped back before
+ * it is tested, or it is compared against patterns that cannot match it. There
+ * are more spellings than the obvious one, and the URL parser rewrites all of
+ * them to hex: `https://[::ffff:127.0.0.1]/` arrives as `::ffff:7f00:1`,
+ * `https://[::127.0.0.1]/` as `::7f00:1`, and `https://[::ffff:0:127.0.0.1]/`
+ * as `::ffff:0:7f00:1`. A rule spelled per-spelling covers whichever ones its
+ * author thought of: the first pass here handled `::ffff:` with a two-group
+ * tail and left IPv4-compatible and IPv4-translated loopback ACCEPTED.
+ *
+ * So the address is expanded to its eight groups and the known embedding
+ * prefixes are matched on the groups, not on the text:
+ *
+ * - the zero-prefixed forms: IPv4-compatible (`::a.b.c.d`), IPv4-mapped
+ *   (`::ffff:a.b.c.d`) and the deprecated IPv4-translated `::ffff:0:a.b.c.d`,
+ *   which differ only in where the `ffff` sits.
+ * - `64:ff9b::/96` and `64:ff9b:1::/48` -- the NAT64 prefixes, whose whole
+ *   purpose is that a gateway forwards them to the embedded IPv4 address.
+ *
+ * Deliberately not covered: 6to4 (`2002::/16`) and Teredo (`2001::/32`), which
+ * also embed an IPv4 address but reach it only through a relay this server
+ * would have to be configured to use. They are named here so the omission is a
+ * decision rather than an oversight.
+ */
+function embeddedIpv4(hostname: string): string | null {
+  if (!net.isIPv6(hostname)) return null;
+
+  const groups = expandIpv6(hostname);
+  if (!groups) return null;
+
+  // The three zero-prefixed embeddings, written as what distinguishes them:
+  // groups 0-3 are zero in all of them, and the pair (4, 5) is (0, 0) for
+  // IPv4-compatible, (0, ffff) for IPv4-mapped and (ffff, 0) for the
+  // IPv4-translated form. Anything else in that pair is an ordinary IPv6
+  // address whose last 32 bits mean nothing in particular.
+  const zeroPrefix =
+    groups.slice(0, 4).every((g) => g === 0) &&
+    ((groups[4] === 0 && (groups[5] === 0 || groups[5] === 0xffff)) ||
+      (groups[4] === 0xffff && groups[5] === 0));
+  const nat64 =
+    groups[0] === 0x64 &&
+    groups[1] === 0xff9b &&
+    // 64:ff9b::/96 has zeros through group 5; 64:ff9b:1::/48 sets group 2 to 1.
+    (groups[2] === 0 || groups[2] === 1) &&
+    groups.slice(3, 6).every((g) => g === 0);
+  if (!zeroPrefix && !nat64) return null;
+
+  const high = groups[6];
+  const low = groups[7];
+  return [
+    (high >>> 8) & 0xff,
+    high & 0xff,
+    (low >>> 8) & 0xff,
+    low & 0xff,
+  ].join(".");
+}
+
+/**
+ * An IPv6 literal as eight numeric groups, `::` expanded and a dotted IPv4 tail
+ * folded into the last two. Returns null for anything it cannot read, so a
+ * caller never sees a partially parsed address.
+ */
+function expandIpv6(hostname: string): number[] | null {
+  let text = hostname;
+
+  // A dotted tail (`::ffff:127.0.0.1`) is two groups. Node's parser normally
+  // rewrites it, but this function is also handed addresses from DNS answers.
+  const dotted = /:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(text);
+  if (dotted) {
+    if (!net.isIPv4(dotted[1])) return null;
+    const octets = dotted[1].split(".").map((o) => parseInt(o, 10));
+    const high = ((octets[0] << 8) | octets[1]).toString(16);
+    const low = ((octets[2] << 8) | octets[3]).toString(16);
+    text = `${text.slice(0, dotted.index)}:${high}:${low}`;
+  }
+
+  const halves = text.split("::");
+  if (halves.length > 2) return null;
+
+  const parse = (part: string): number[] | null => {
+    if (part === "") return [];
+    const out: number[] = [];
+    for (const group of part.split(":")) {
+      if (!/^[0-9a-f]{1,4}$/i.test(group)) return null;
+      out.push(parseInt(group, 16));
+    }
+    return out;
+  };
+
+  const left = parse(halves[0]);
+  const right = halves.length === 2 ? parse(halves[1]) : [];
+  if (left === null || right === null) return null;
+
+  if (halves.length === 1) return left.length === 8 ? left : null;
+  const fill = 8 - left.length - right.length;
+  if (fill < 1) return null;
+  return [...left, ...new Array<number>(fill).fill(0), ...right];
+}
+
+/**
  * Normalize an IP address string to dotted-decimal (IPv4),
  * catching hex/octal/decimal encoded IPs that bypass regex-based checks.
  */
 function normalizeIp(hostname: string): string | null {
-  // IPv4-mapped IPv6 first, because such an address IS a valid IPv6 literal and
-  // would otherwise be returned unchanged for the IPv6 patterns to test -- and
-  // those only spell the dotted form (`::ffff:127.0.0.1`), while Node's URL
-  // parser normalizes it to hex (`::ffff:7f00:1`). Mapping it back to dotted
-  // decimal is what puts it in front of the IPv4 rules that already cover it.
-  const mapped = /^::ffff:(.+)$/i.exec(hostname);
-  if (mapped) {
-    const tail = mapped[1];
-    if (net.isIPv4(tail)) return tail;
-    const groups = tail.split(":");
-    if (
-      groups.length === 2 &&
-      groups.every((g) => /^[0-9a-f]{1,4}$/i.test(g))
-    ) {
-      const high = parseInt(groups[0], 16);
-      const low = parseInt(groups[1], 16);
-      return [
-        (high >>> 8) & 0xff,
-        high & 0xff,
-        (low >>> 8) & 0xff,
-        low & 0xff,
-      ].join(".");
-    }
-  }
+  // An embedded IPv4 first, because such an address IS a valid IPv6 literal and
+  // `net.isIP` below would return it unchanged for the IPv6 patterns to test --
+  // which spell loopback and private space in dotted decimal. Mapping it back
+  // is what puts it in front of the IPv4 rules that already cover it.
+  const embedded = embeddedIpv4(hostname);
+  if (embedded) return embedded;
 
   if (net.isIP(hostname)) return hostname;
 
@@ -128,9 +212,21 @@ function normalizeIp(hostname: string): string | null {
   return null;
 }
 
+/**
+ * Whether an address is one this server must not be sent to.
+ *
+ * The embedded-IPv4 mapping happens HERE rather than only at the hostname,
+ * because this function is also handed the answers to a DNS lookup: a name with
+ * an AAAA record of `::7f00:1` is the rebinding half of the same bypass, and it
+ * never passes through `normalizeIp`.
+ */
 function isPrivateIp(ip: string): boolean {
-  for (const pattern of PRIVATE_IP_RANGES) {
-    if (pattern.test(ip)) return true;
+  const embedded = embeddedIpv4(ip);
+  const candidates = embedded ? [ip, embedded] : [ip];
+  for (const candidate of candidates) {
+    for (const pattern of PRIVATE_IP_RANGES) {
+      if (pattern.test(candidate)) return true;
+    }
   }
   return false;
 }
@@ -229,6 +325,49 @@ export class IsSafeUrlConstraint implements ValidatorConstraintInterface {
 export async function validateUrlIsSafe(url: string): Promise<boolean> {
   const validator = new IsSafeUrlConstraint();
   return validator.validate(url);
+}
+
+/**
+ * How long a safety check may take before the answer is "not established".
+ *
+ * The check resolves the host, and `dns.resolve4`/`resolve6` carry no timeout of
+ * their own -- so a name whose authoritative nameserver never answers holds the
+ * caller for c-ares' whole retry budget, tens of seconds. That is a value
+ * somebody else chooses, on a request path: `IsPushEndpoint` runs this check on
+ * `POST /push/subscriptions` before any row exists, and the AI provider's
+ * `baseUrl` field runs it on a save.
+ *
+ * A check that has not answered in this long has not established the host is
+ * safe, and an unestablished host is not sent to -- so the timeout answers
+ * `false`, never "probably fine". Two seconds is far past a working resolver
+ * and far short of a lever.
+ */
+export const URL_SAFETY_CHECK_TIMEOUT_MS = 2_000;
+
+/**
+ * `validateUrlIsSafe` under a deadline.
+ *
+ * The bound is here, beside the check it bounds, rather than at each caller: the
+ * push sender had its own 2-second race and the validator on the same path had
+ * none, which is exactly the shape of a rule written twice.
+ */
+export async function validateUrlIsSafeWithin(
+  url: string,
+  timeoutMs: number = URL_SAFETY_CHECK_TIMEOUT_MS,
+): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      validateUrlIsSafe(url),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(false), timeoutMs);
+      }),
+    ]);
+  } catch {
+    return false;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
 }
 
 /**

@@ -284,13 +284,21 @@ through INV-PUSH-005.
 
 Two consequences that are easy to get backwards. **A push endpoint is a URL the
 server will make an outbound request to**, so it is validated with
-`IsPushEndpoint`, which reuses the AI provider's `validateUrlIsSafe` and adds an
-https floor -- never a bare `@IsUrl()`. And **a subscription belongs to a browser
-profile, not to a session**: the unique index is on `endpoint_hash` alone, so
-one endpoint has one owner -- and the second account subscribing in the same
-browser is *refused*, never allowed to take the row over. An endpoint is a
-string the caller supplied; deleting somebody else's row on the strength of it
-is a cross-tenant write no ownership check covers. The client answers the 409 by
+`IsPushEndpoint`, which reuses the AI provider's safety check and adds an https
+floor -- never a bare `@IsUrl()`. That check resolves the host, and
+`dns.resolve4`/`resolve6` carry no timeout of their own, so it is always reached
+through `validateUrlIsSafeWithin` (`src/ai/validators/safe-url.validator.ts`):
+the bound lives with the check rather than at each caller, because a resolver
+that never answers holds whichever request asked -- a save, or a subscribe an
+authenticated caller may issue twenty times a minute. A timeout answers
+**false**: not knowing whether a host is public is not knowing it is.
+
+And **a subscription belongs to a browser profile, not to a session**: the
+unique index is on `endpoint_hash` alone, so one endpoint has one owner -- and
+the second account subscribing in the same browser is *refused*, never allowed
+to take the row over. An endpoint is a string the caller supplied; deleting
+somebody else's row on the strength of it is a cross-tenant write no ownership
+check covers. The client answers the 409 by
 unsubscribing and subscribing again for a fresh endpoint, and logout releases
 the endpoint the same way (`releaseLocalPushSubscription`).
 
@@ -318,6 +326,17 @@ about its candidates, not about the reader's list.
 `category` is derived (`notificationCategoryOf`), never stored -- see migration
 172's header for why, and `notification-category.spec.ts` asserts the column's
 absence against `schema.sql`.
+
+**What a push notification COLLAPSES onto is the producer's decision, and the
+type is not the subject.** The browser replaces a shown notification whose `tag`
+matches, so `PushPayload.collapseKey` is a required field: `null` means "this
+type is one subject" (a test send, "email delivery is failing"), and a value
+names the subject. Deliberately not derived from `target` -- the bill producer
+sends every reminder to `/bills`, because there is no per-bill page, so a tag
+built from the route collapsed exactly the case it had to separate: two bills due
+on the same day, one of them shown and the other silently replaced. It carries an
+id, never a name or an amount: the payload is encrypted to the device, but a
+collapse key is metadata.
 
 The HTTP surface lives in its own module (`notification-api.module.ts`) because
 it is the one part that needs a producer: bill reminders are materialized when

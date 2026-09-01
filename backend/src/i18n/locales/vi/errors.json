@@ -214,7 +214,6 @@
     "categoryNotFound": "Không tìm thấy danh mục với ID {{ id }}",
     "categoryAlreadyInBudget": "Danh mục này đã có trong ngân sách",
     "budgetCategoryNotFound": "Không tìm thấy danh mục ngân sách với ID {{ id }}",
-    "alertNotFound": "Không tìm thấy cảnh báo với ID {{ id }}",
     "periodNotFound": "Không tìm thấy kỳ ngân sách với ID {{ id }}",
     "noOpenPeriod": "Không có kỳ mở để đóng",
     "categoryIdsNotOwned": "Không tìm thấy ID danh mục hoặc không thuộc sở hữu của người dùng: {{ ids }}"
@@ -338,6 +337,7 @@
     "invalidGranularity": "granularity phải là 'daily' hoặc 'monthly'"
   },
   "notifications": {
+    "notFound": "Không tìm thấy thông báo với ID {{ id }}",
     "smtpNotConfigured": "SMTP chưa được cấu hình. Hãy thiết lập các biến môi trường SMTP.",
     "noEmailOnFile": "Không có địa chỉ email nào được lưu cho người dùng này."
   },

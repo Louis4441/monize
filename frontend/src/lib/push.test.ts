@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import apiClient from './api';
+import { useAuthStore } from '@/store/authStore';
 import {
   ENDPOINT_FINGERPRINT_LENGTH,
   PushPermissionError,
@@ -265,68 +266,155 @@ describe('getPushSupport', () => {
 describe('classifyPushRegistration', () => {
   const MINE = 'aaaabbbbccccdddd';
   const OTHER = '1111222233334444';
+  const READER = 'user-1';
+  const SOMEBODY_ELSE = 'user-2';
+  const mine = (fingerprint: string) => ({
+    userId: READER,
+    fingerprint,
+  });
 
   /**
-   * The whole truth table, because the two interesting rows are the two ways
-   * "the server has no live row for the endpoint I hold" happens -- and reading
-   * them as one state is a defect either way round. Re-register on a revocation
-   * and the user's removal is undone the next time that device opens the app; do
-   * nothing on a rotation and delivery is dead while the device list still shows
-   * the old row as active.
+   * The whole truth table, because the interesting rows are the ways "the server
+   * has no live row for the endpoint I hold" happens -- and reading any two of
+   * them as one state is a defect. Re-register on a revocation and the user's
+   * removal is undone the next time that device opens the app; do nothing on a
+   * rotation and delivery is dead while the device list still shows the old row
+   * as active; act on ANOTHER account's subscription in a shared browser and you
+   * revoke push for somebody who is not even signed in.
    */
   it.each([
-    // current, live rows, remembered, expected
-    ['no subscription at all', null, [], null, 'no-subscription'],
-    ['no subscription, but a stale marker', null, [], OTHER, 'no-subscription'],
-    ['registered and live', MINE, [MINE], MINE, 'in-sync'],
-    ['live alongside another device', MINE, [OTHER, MINE], MINE, 'in-sync'],
-    ['endpoint changed under us', MINE, [], OTHER, 'rotated'],
-    ['endpoint changed, other rows live', MINE, [OTHER], OTHER, 'rotated'],
-    ['our row removed elsewhere', MINE, [], MINE, 'revoked'],
-    ['our row removed, others remain', MINE, [OTHER], MINE, 'revoked'],
+    // current, live rows, marker, reader, expected
+    ['no subscription at all', null, [], null, READER, 'no-subscription'],
+    [
+      'no subscription, but a stale marker',
+      null,
+      [],
+      mine(OTHER),
+      READER,
+      'no-subscription',
+    ],
+    ['registered and live', MINE, [MINE], mine(MINE), READER, 'in-sync'],
+    [
+      'live alongside another device',
+      MINE,
+      [OTHER, MINE],
+      mine(MINE),
+      READER,
+      'in-sync',
+    ],
+    ['endpoint changed under us', MINE, [], mine(OTHER), READER, 'rotated'],
+    [
+      'endpoint changed, other rows live',
+      MINE,
+      [OTHER],
+      mine(OTHER),
+      READER,
+      'rotated',
+    ],
+    ['our row removed elsewhere', MINE, [], mine(MINE), READER, 'revoked'],
+    [
+      'our row removed, others remain',
+      MINE,
+      [OTHER],
+      mine(MINE),
+      READER,
+      'revoked',
+    ],
     // A cleared store cannot prove a rotation, so it takes the conservative
     // half: nothing is re-registered behind the user's back.
-    ['no marker at all', MINE, [], null, 'revoked'],
+    ['no marker at all', MINE, [], null, READER, 'revoked'],
+    // The shared-browser rows. `localStorage` is per origin and a subscription's
+    // owner is an account, so a marker naming somebody else is not evidence
+    // about the reader -- and both repairs would be aimed at that other
+    // account's device.
+    [
+      "another account's subscription, still held by the browser",
+      MINE,
+      [],
+      { userId: SOMEBODY_ELSE, fingerprint: MINE },
+      READER,
+      'foreign',
+    ],
+    [
+      "another account's, while the reader also has rows",
+      MINE,
+      [OTHER],
+      { userId: SOMEBODY_ELSE, fingerprint: MINE },
+      READER,
+      'foreign',
+    ],
+    // An unknown reader cannot claim a marked subscription either: it is one of
+    // the two, and only one of them is safe to assume.
+    [
+      'a marked subscription with no reader identity',
+      MINE,
+      [],
+      { userId: SOMEBODY_ELSE, fingerprint: MINE },
+      null,
+      'foreign',
+    ],
+    // ...but a marker naming somebody else and an endpoint we do not hold is a
+    // rotation of OUR endpoint, not their subscription.
+    [
+      "another account's marker, different endpoint",
+      MINE,
+      [],
+      { userId: SOMEBODY_ELSE, fingerprint: OTHER },
+      READER,
+      'rotated',
+    ],
   ])(
     '%s',
-    (_case, currentFingerprint, liveFingerprints, registeredFingerprint, kind) => {
+    (_case, currentFingerprint, liveFingerprints, marker, reader, kind) => {
       expect(
         classifyPushRegistration({
           currentFingerprint: currentFingerprint as string | null,
           liveFingerprints: liveFingerprints as string[],
-          registeredFingerprint: registeredFingerprint as string | null,
+          marker: marker as { userId: string; fingerprint: string } | null,
+          readerUserId: reader as string | null,
         }).kind,
       ).toBe(kind);
     },
   );
 
-  it('names the endpoint on the two states that act on one', () => {
+  it('names the endpoint on every state that acts on one', () => {
     // The caller registers or releases a specific subscription, so the state
     // carries which -- not merely that something is out of step.
     expect(
       classifyPushRegistration({
         currentFingerprint: MINE,
         liveFingerprints: [],
-        registeredFingerprint: OTHER,
+        marker: mine(OTHER),
+        readerUserId: READER,
       }),
     ).toEqual({ kind: 'rotated', fingerprint: MINE });
     expect(
       classifyPushRegistration({
         currentFingerprint: MINE,
         liveFingerprints: [],
-        registeredFingerprint: MINE,
+        marker: mine(MINE),
+        readerUserId: READER,
       }),
     ).toEqual({ kind: 'revoked', fingerprint: MINE });
-  });
-
-  // A disabled row is not a registration: the panel filters those out before
-  // asking, and this is the assertion that says so.
-  it('treats only live rows as registrations, which is the caller\'s job', () => {
     expect(
       classifyPushRegistration({
         currentFingerprint: MINE,
         liveFingerprints: [],
-        registeredFingerprint: MINE,
+        marker: { userId: SOMEBODY_ELSE, fingerprint: MINE },
+        readerUserId: READER,
+      }),
+    ).toEqual({ kind: 'foreign', fingerprint: MINE });
+  });
+
+  // A disabled row is not a registration: the panel filters those out before
+  // asking, and this is the assertion that says so.
+  it("treats only live rows as registrations, which is the caller's job", () => {
+    expect(
+      classifyPushRegistration({
+        currentFingerprint: MINE,
+        liveFingerprints: [],
+        marker: mine(MINE),
+        readerUserId: READER,
       }).kind,
     ).toBe('revoked');
   });
@@ -335,8 +423,11 @@ describe('classifyPushRegistration', () => {
 describe('the registered-endpoint marker', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('remembers, reads back and forgets', () => {
+  const withStore = (initial?: string) => {
     const store = new Map<string, string>();
+    if (initial !== undefined) {
+      store.set('monize.push.registeredEndpoint', initial);
+    }
     vi.stubGlobal('window', {
       localStorage: {
         setItem: (k: string, v: string) => store.set(k, v),
@@ -344,10 +435,40 @@ describe('the registered-endpoint marker', () => {
         removeItem: (k: string) => store.delete(k),
       },
     });
+    return store;
+  };
 
-    rememberRegisteredEndpoint('abc123');
-    expect(readRegisteredEndpoint()).toBe('abc123');
+  it('remembers its owner alongside the endpoint, reads back and forgets', () => {
+    withStore();
+
+    rememberRegisteredEndpoint('user-1', 'abc123');
+    expect(readRegisteredEndpoint()).toEqual({
+      userId: 'user-1',
+      fingerprint: 'abc123',
+    });
     forgetRegisteredEndpoint();
+    expect(readRegisteredEndpoint()).toBeNull();
+  });
+
+  // The pre-owner format was a bare fingerprint. Read as an owner-less marker it
+  // would be treated as the reader's own, which is the state this format exists
+  // to stop assuming -- so it reads as no information.
+  it('reads a value from the previous format as no information', () => {
+    withStore('abc123');
+
+    expect(readRegisteredEndpoint()).toBeNull();
+  });
+
+  it.each([
+    ['a JSON scalar', '"abc123"'],
+    ['an object missing the owner', '{"fingerprint":"abc123"}'],
+    ['an object missing the endpoint', '{"userId":"user-1"}'],
+    ['an empty owner', '{"userId":"","fingerprint":"abc123"}'],
+    ['a non-string owner', '{"userId":7,"fingerprint":"abc123"}'],
+    ['null', 'null'],
+  ])('reads %s as no information', (_name, raw) => {
+    withStore(raw);
+
     expect(readRegisteredEndpoint()).toBeNull();
   });
 
@@ -361,7 +482,7 @@ describe('the registered-endpoint marker', () => {
       },
     });
 
-    expect(() => rememberRegisteredEndpoint('abc123')).not.toThrow();
+    expect(() => rememberRegisteredEndpoint('user-1', 'abc123')).not.toThrow();
     expect(() => forgetRegisteredEndpoint()).not.toThrow();
     expect(readRegisteredEndpoint()).toBeNull();
   });
@@ -581,6 +702,46 @@ describe('enabling and disabling push on this device', () => {
       expect(apiClient.post).not.toHaveBeenCalled();
     },
   );
+
+  // The marker is what tells a later page load whether the endpoint this browser
+  // holds is this account's -- so it is written on a successful registration,
+  // with the owner, and the fingerprint is the SERVER's digest rather than a
+  // second one computed here.
+  it("records the registration against the account that made it", async () => {
+    useAuthStore.setState({ user: { id: 'user-1' } as never });
+    getSubscription.mockResolvedValue(
+      browserSubscription(urlBase64ToUint8Array(PUBLIC_KEY).buffer),
+    );
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: { id: 'd-1', endpointFingerprint: 'server-digest' },
+    });
+
+    await enablePushOnThisDevice(PUBLIC_KEY);
+
+    expect(readRegisteredEndpoint()).toEqual({
+      userId: 'user-1',
+      fingerprint: 'server-digest',
+    });
+  });
+
+  // No identity, no marker: one that names an unknown owner is read as somebody
+  // else's, and would classify this browser's own subscription as foreign.
+  it('writes no marker when no account is signed in', async () => {
+    useAuthStore.setState({ user: null });
+    getSubscription.mockResolvedValue(
+      browserSubscription(urlBase64ToUint8Array(PUBLIC_KEY).buffer),
+    );
+    // A complete response on purpose: the only reason nothing may be written
+    // here is the missing identity, so the fingerprint must not be what makes
+    // the assertion pass.
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: { id: 'd-1', endpointFingerprint: 'server-digest' },
+    });
+
+    await enablePushOnThisDevice(PUBLIC_KEY);
+
+    expect(readRegisteredEndpoint()).toBeNull();
+  });
 
   it('reuses a subscription already minted under the current key', async () => {
     const current = urlBase64ToUint8Array(PUBLIC_KEY);

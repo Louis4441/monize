@@ -185,12 +185,19 @@ export class NotificationService {
    * that loaded the row and saved it back would be a second place deciding what
    * a notification row looks like, and the guard scan could no longer tell a
    * flag update from a create.
+   *
+   * The owner is a parameter and is in the `WHERE`, like every other write on
+   * this service. At `RLS_MODE=off` -- the documented default -- `withScopedDb`
+   * emits no identity GUCs, so an id-only `UPDATE` is scoped by nothing but the
+   * caller happening to pass an id it created; that is an invariant living in
+   * the call sites rather than in the statement.
    */
-  async markEmailSent(notificationId: string): Promise<void> {
+  async markEmailSent(userId: string, notificationId: string): Promise<void> {
     await withScopedDb(this.dataSource, (manager) =>
       manager.query(
-        `UPDATE notifications SET is_email_sent = true WHERE id = $1`,
-        [notificationId],
+        `UPDATE notifications SET is_email_sent = true
+           WHERE id = $1 AND user_id = $2`,
+        [notificationId, userId],
       ),
     );
   }
@@ -340,8 +347,8 @@ export class NotificationService {
     if (!row) {
       throw new NotFoundException(
         tr(
-          "errors.budgets.alertNotFound",
-          `Alert with ID ${notificationId} not found`,
+          "errors.notifications.notFound",
+          `Notification with ID ${notificationId} not found`,
           { id: notificationId },
         ),
       );

@@ -176,9 +176,6 @@ function AdminNotificationsContent() {
           // Three states, not two. `null` is "we could not read the status",
           // and drawing it as "Unavailable" contradicted the note beside it and
           // sent an operator to configure SMTP that may already be configured.
-          // Three states, not two. `null` is "we could not read the status",
-          // and drawing it as "Unavailable" contradicted the note beside it and
-          // sent an operator to configure SMTP that may already be configured.
           state:
             smtpConfigured === null
               ? 'unknown'

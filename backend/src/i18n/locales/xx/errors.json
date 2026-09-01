@@ -223,7 +223,6 @@
     "categoryNotFound": "[XX-Category with ID {{ id }} not found-XX]",
     "categoryAlreadyInBudget": "[XX-This category is already in the budget-XX]",
     "budgetCategoryNotFound": "[XX-Budget category with ID {{ id }} not found-XX]",
-    "alertNotFound": "[XX-Alert with ID {{ id }} not found-XX]",
     "periodNotFound": "[XX-Budget period with ID {{ id }} not found-XX]",
     "noOpenPeriod": "[XX-No open period to close-XX]",
     "categoryIdsNotOwned": "[XX-Category IDs not found or not owned by user: {{ ids }}-XX]"
@@ -347,6 +346,7 @@
     "invalidGranularity": "[XX-granularity must be 'daily' or 'monthly'-XX]"
   },
   "notifications": {
+    "notFound": "[XX-Notification with ID {{ id }} not found-XX]",
     "smtpNotConfigured": "[XX-SMTP is not configured. Set SMTP environment variables.-XX]",
     "noEmailOnFile": "[XX-No email address on file for this user.-XX]"
   },

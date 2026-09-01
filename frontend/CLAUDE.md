@@ -347,6 +347,26 @@ A provider is the prerequisite for the payee contact lookup and the assistant al
 
 The hook answers `configured: false` until the status settles **and** for a status read that failed -- deliberately, because "we could not ask" is not "there is a provider", and it is also what keeps a control from flashing in and vanishing. Read the cached `aiApi.getStatus` through the hook rather than fetching status again: one request serves every mounted surface, and a provider added or removed in Settings drops that cache.
 
+### A push subscription belongs to an account; `localStorage` belongs to an origin
+
+`monize.push.registeredEndpoint` records the endpoint this browser registered
+**and whose registration it was** (`rememberRegisteredEndpoint(userId,
+fingerprint)`), because two people share one browser profile: with the owner
+missing, the second account signing in saw a subscription it had no server row
+for, read it as a revocation and unsubscribed the browser -- taking push away
+from the first account, whose device list still showed the row as active.
+`classifyPushRegistration` therefore takes the marker *and* the reader's id, and
+answers `foreign` for a subscription somebody else registered; the panel acts on
+nothing there, because neither repair (release, or re-register) is the reader's to
+make. A value in the pre-owner format, or one with no reader identity, reads as
+"no information" -- which errs toward doing nothing.
+
+Whatever `getPushSupport` reads is the same shape of problem in time rather than
+identity: `Notification.permission` and "is this the installed iOS app" are
+states the user changes *elsewhere* and then comes back, so the panel re-reads
+them when the page becomes visible. Read once on mount, it kept telling the user
+the browser had refused after they had allowed it, with the Enable button hidden.
+
 ### A password field declares what may be autofilled into it
 
 Every `<Input type="password">` carries an `autoComplete`: `current-password` when it really is this account's password, `new-password` when one is being set here, `off` when it is not a credential of this site at all. Omitting it is not neutral -- a password manager fills a bare box with the saved credential, and the form submits it as typed: the AI provider's API key field silently replaced the stored key ("Saved" on screen, provider dead, row shows `****` either way), and the backup export password is the same shape and worse. `ui-conventions.test.ts` fails on a password input with no `autoComplete`, and on a value outside those three.

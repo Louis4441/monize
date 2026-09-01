@@ -180,6 +180,12 @@ export class PushConfigService implements OnApplicationBootstrap {
           `Generated this instance's Web Push key pair (fingerprint ${fingerprintPublicKey(row.vapidPublicKey)})`,
         );
       }
+      // Warmed on this branch as well as the early return above. A first-ever
+      // start reaches only this one, so warming only the other left the very
+      // deployment that has never decrypted the key paying the `scryptSync` on
+      // its first request -- the branch the memo exists for, missed because the
+      // fix was written from the restart case.
+      if (row) this.canUseKeyPair(row);
       return row;
     });
   }

@@ -214,7 +214,6 @@
     "categoryNotFound": "ID {{ id }} のカテゴリが見つかりません",
     "categoryAlreadyInBudget": "このカテゴリはすでに予算に含まれています",
     "budgetCategoryNotFound": "ID {{ id }} の予算カテゴリが見つかりません",
-    "alertNotFound": "ID {{ id }} のアラートが見つかりません",
     "periodNotFound": "ID {{ id }} の予算期間が見つかりません",
     "noOpenPeriod": "閉鎖するオープン期間がありません",
     "categoryIdsNotOwned": "カテゴリIDが見つからないか、ユーザーが所有していません：{{ ids }}"
@@ -338,6 +337,7 @@
     "invalidGranularity": "granularity は 'daily' または 'monthly' である必要があります"
   },
   "notifications": {
+    "notFound": "ID {{ id }} の通知が見つかりません",
     "smtpNotConfigured": "SMTPが設定されていません。SMTP環境変数を設定してください。",
     "noEmailOnFile": "このユーザーにはメールアドレスが登録されていません。"
   },

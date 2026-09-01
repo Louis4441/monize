@@ -130,4 +130,37 @@ describe("PushConfigService bootstrap (real withScopedDb)", () => {
     await withSystemContext(() => service.getPublicConfig());
     expect(decrypt).toHaveBeenCalledTimes(1);
   });
+
+  /**
+   * And on the branch a first-ever start actually takes. Warming only the reuse
+   * branch was a fix written from the restart case: the deployment that has
+   * never decrypted this key -- the one with no memo at all -- still paid the
+   * `scryptSync` on its first request.
+   */
+  it("warms the memo on the branch that generates the key pair", async () => {
+    const decrypt = jest.fn((cipher: string) => cipher);
+    service = new PushConfigService(
+      dataSource as never,
+      {
+        isConfigured: () => true,
+        encrypt: (plain: string) => `enc(${plain})`,
+        decrypt,
+        canDecrypt: () => true,
+      } as unknown as EncryptionService,
+    );
+    jest.spyOn(service["logger"], "log").mockImplementation(() => undefined);
+    // Nothing stored, then the row as the insert leaves it.
+    configRepo.findOne.mockResolvedValueOnce(null).mockResolvedValue({
+      id: true,
+      vapidPublicKey: "PUB-NEW",
+      vapidPrivateKeyEnc: "enc(PRIV-NEW)",
+    } as PushInstanceConfig);
+
+    await service.ensureKeyPair();
+    expect(generateVAPIDKeys).toHaveBeenCalled();
+    expect(decrypt).toHaveBeenCalledTimes(1);
+
+    await withSystemContext(() => service.getPublicConfig());
+    expect(decrypt).toHaveBeenCalledTimes(1);
+  });
 });

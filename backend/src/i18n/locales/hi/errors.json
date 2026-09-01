@@ -214,7 +214,6 @@
     "categoryNotFound": "ID {{ id }} वाली श्रेणी नहीं मिली",
     "categoryAlreadyInBudget": "यह श्रेणी पहले से बजट में है",
     "budgetCategoryNotFound": "ID {{ id }} वाली बजट श्रेणी नहीं मिली",
-    "alertNotFound": "ID {{ id }} वाला अलर्ट नहीं मिला",
     "periodNotFound": "ID {{ id }} वाली बजट अवधि नहीं मिली",
     "noOpenPeriod": "बंद करने के लिए कोई खुली अवधि नहीं है",
     "categoryIdsNotOwned": "श्रेणी ID नहीं मिली या उपयोगकर्ता की नहीं हैं: {{ ids }}"
@@ -338,6 +337,7 @@
     "invalidGranularity": "granularity 'daily' या 'monthly' होना चाहिए"
   },
   "notifications": {
+    "notFound": "ID {{ id }} वाली अधिसूचना नहीं मिली",
     "smtpNotConfigured": "SMTP कॉन्फ़िगर नहीं है। SMTP पर्यावरण चर सेट करें।",
     "noEmailOnFile": "इस उपयोगकर्ता के लिए कोई ईमेल पता दर्ज नहीं है।"
   },

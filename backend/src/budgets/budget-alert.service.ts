@@ -379,7 +379,7 @@ export class BudgetAlertService {
           // The flag is set through the door, on that row alone. Mutating the
           // loaded entity as well would read as if the local copy mattered --
           // it is never saved, and a full-row save is what this replaced.
-          await this.notifications.markEmailSent(alert.id);
+          await this.notifications.markEmailSent(alert.userId, alert.id);
         }
       }
     }

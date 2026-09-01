@@ -200,7 +200,9 @@ describe("SystemAlertService", () => {
         expect.any(String),
       );
       expect(emailSentUpdates()).toHaveLength(1);
-      expect(emailSentUpdates()[0][1]).toEqual(["row-1"]);
+      // The row AND its owner: the flag update carries a tenant predicate, so
+      // an id from one admin's fan-out cannot reach another's row.
+      expect(emailSentUpdates()[0][1]).toEqual(["row-1", "admin-1"]);
     });
 
     it("gives an admin with email disabled the row but no mail", async () => {

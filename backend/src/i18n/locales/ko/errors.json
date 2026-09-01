@@ -214,7 +214,6 @@
     "categoryNotFound": "ID가 {{ id }}인 카테고리를 찾을 수 없습니다",
     "categoryAlreadyInBudget": "이 카테고리는 이미 예산에 포함되어 있습니다",
     "budgetCategoryNotFound": "ID가 {{ id }}인 예산 카테고리를 찾을 수 없습니다",
-    "alertNotFound": "ID가 {{ id }}인 알림을 찾을 수 없습니다",
     "periodNotFound": "ID가 {{ id }}인 예산 기간을 찾을 수 없습니다",
     "noOpenPeriod": "마감할 열린 기간이 없습니다",
     "categoryIdsNotOwned": "사용자가 찾을 수 없거나 소유하지 않은 카테고리 ID입니다: {{ ids }}"
@@ -338,6 +337,7 @@
     "invalidGranularity": "granularity는 'daily' 또는 'monthly'여야 합니다"
   },
   "notifications": {
+    "notFound": "ID가 {{ id }}인 알림을 찾을 수 없습니다",
     "smtpNotConfigured": "SMTP가 구성되지 않았습니다. SMTP 환경 변수를 설정하세요.",
     "noEmailOnFile": "이 사용자에 대해 등록된 이메일 주소가 없습니다."
   },

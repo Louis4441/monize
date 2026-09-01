@@ -214,7 +214,6 @@
     "categoryNotFound": "Категорію з ідентифікатором {{ id }} не знайдено",
     "categoryAlreadyInBudget": "Ця категорія вже є в бюджеті",
     "budgetCategoryNotFound": "Категорію бюджету з ідентифікатором {{ id }} не знайдено",
-    "alertNotFound": "Сповіщення з ідентифікатором {{ id }} не знайдено",
     "periodNotFound": "Період бюджету з ідентифікатором {{ id }} не знайдено",
     "noOpenPeriod": "Немає відкритого періоду для закриття",
     "categoryIdsNotOwned": "Ідентифікатори категорій не знайдено або вони не належать користувачу: {{ ids }}"
@@ -338,6 +337,7 @@
     "invalidGranularity": "granularity має бути 'daily' або 'monthly'"
   },
   "notifications": {
+    "notFound": "Сповіщення з ідентифікатором {{ id }} не знайдено",
     "smtpNotConfigured": "SMTP не налаштовано. Встановіть змінні середовища SMTP.",
     "noEmailOnFile": "Для цього користувача не зазначено електронну адресу."
   },

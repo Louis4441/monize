@@ -4,7 +4,10 @@ import * as https from "node:https";
 import type { Socket } from "node:net";
 import { PushConfigService, VAPID_SUBJECT } from "./push-config.service";
 import { PushDisabledReason } from "./entities/push-subscription.entity";
-import { validateUrlIsSafe } from "../ai/validators/safe-url.validator";
+import {
+  URL_SAFETY_CHECK_TIMEOUT_MS,
+  validateUrlIsSafeWithin,
+} from "../ai/validators/safe-url.validator";
 
 /**
  * How long the push service should hold a message for a device that is offline.
@@ -57,13 +60,12 @@ export const PUSH_DEADLINE_MESSAGE = "push delivery deadline exceeded";
 /**
  * How long the per-send endpoint re-check may take.
  *
- * `validateUrlIsSafe` resolves the host, and `dns.resolve4`/`resolve6` carry no
- * timeout of their own: a stalled nameserver would sit in front of the HTTP
- * send, so `PUSH_REQUEST_TIMEOUT_MS` would bound only the half that had already
- * got past it. A check that has not answered in this long has not established
- * the endpoint is safe, and an unestablished endpoint is not sent to.
+ * The bound itself belongs to the check (`URL_SAFETY_CHECK_TIMEOUT_MS`): an
+ * unbounded DNS lookup is a hazard wherever that check runs, and it ran
+ * unbounded in `IsPushEndpoint` while this file raced it. Re-exported under the
+ * push name because `sendTest`'s documented worst case is composed from it.
  */
-export const PUSH_ENDPOINT_RECHECK_TIMEOUT_MS = 2_000;
+export const PUSH_ENDPOINT_RECHECK_TIMEOUT_MS = URL_SAFETY_CHECK_TIMEOUT_MS;
 
 /**
  * Make an agent's connections observable, so a deadline can close them.
@@ -111,6 +113,27 @@ export interface PushPayload {
   body: string;
   /** Same-origin path the click should open. Validated again in the worker. */
   target?: string;
+  /**
+   * What this notification is ABOUT, for the worker's collapse decision -- or
+   * `null` to mean "collapse every notification of this type onto one".
+   *
+   * Required rather than optional, so a producer states which it means. The
+   * browser replaces a shown notification whose `tag` matches, so the tag is a
+   * subject identity: two bills due on the same day are both `BILL_DUE`, and
+   * grouping by type alone showed the reader one of them and dropped the other.
+   * A ROUTE is not a subject either -- the bill producer sends every reminder to
+   * `/bills`, because no per-bill page exists -- which is why this is its own
+   * field and not derived from `target`.
+   *
+   * `null` is the right answer where the type really does describe one subject:
+   * a test send, or "email delivery is failing", where four stacked copies are
+   * worse than one.
+   *
+   * Never a value the user would mind seeing: the payload is end-to-end
+   * encrypted to the device, but a collapse key is metadata, so it carries an
+   * id, not a name or an amount.
+   */
+  collapseKey: string | null;
 }
 
 export type PushSendOutcome =
@@ -254,21 +277,18 @@ export class WebPushSender {
    * two is a reason to POST to it.
    */
   private async endpointStillSafe(endpoint: string): Promise<boolean> {
-    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      return await Promise.race([
-        validateUrlIsSafe(endpoint),
-        new Promise<boolean>((resolve) => {
-          timer = setTimeout(
-            () => resolve(false),
-            PUSH_ENDPOINT_RECHECK_TIMEOUT_MS,
-          );
-        }),
-      ]);
+      return await validateUrlIsSafeWithin(
+        endpoint,
+        PUSH_ENDPOINT_RECHECK_TIMEOUT_MS,
+      );
     } catch {
+      // `validateUrlIsSafeWithin` catches its own, so this is not a second
+      // guess at the same failure: this class promises never to throw, and that
+      // promise cannot rest on a collaborator's internals. It is also the one
+      // call outside `send`'s own try, which is deliberate -- a refused
+      // endpoint is not a failed delivery.
       return false;
-    } finally {
-      if (timer !== undefined) clearTimeout(timer);
     }
   }
 

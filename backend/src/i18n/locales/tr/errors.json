@@ -214,7 +214,6 @@
     "categoryNotFound": "{{ id }} kimliğine sahip kategori bulunamadı",
     "categoryAlreadyInBudget": "Bu kategori zaten bütçede mevcut",
     "budgetCategoryNotFound": "{{ id }} kimliğine sahip bütçe kategorisi bulunamadı",
-    "alertNotFound": "{{ id }} kimliğine sahip uyarı bulunamadı",
     "periodNotFound": "{{ id }} kimliğine sahip bütçe dönemi bulunamadı",
     "noOpenPeriod": "Kapatılacak açık dönem yok",
     "categoryIdsNotOwned": "Kategori kimlikleri bulunamadı veya kullanıcıya ait değil: {{ ids }}"
@@ -338,6 +337,7 @@
     "invalidGranularity": "granularity 'daily' veya 'monthly' olmalıdır"
   },
   "notifications": {
+    "notFound": "{{ id }} kimliğine sahip bildirim bulunamadı",
     "smtpNotConfigured": "SMTP yapılandırılmamış. SMTP ortam değişkenlerini ayarlayın.",
     "noEmailOnFile": "Bu kullanıcı için kayıtlı e-posta adresi yok."
   },

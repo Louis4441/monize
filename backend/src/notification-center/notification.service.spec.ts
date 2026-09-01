@@ -281,11 +281,21 @@ describe("NotificationService", () => {
 
   describe("markEmailSent", () => {
     it("sets the flag on that row alone", async () => {
-      await service.markEmailSent("n-1");
+      await service.markEmailSent("user-1", "n-1");
 
       const [sql, params] = manager.query.mock.calls[0];
       expect(String(sql)).toContain("SET is_email_sent = true");
-      expect(params).toEqual(["n-1"]);
+      expect(params).toEqual(["n-1", "user-1"]);
+    });
+
+    // At RLS_MODE=off nothing outside this statement scopes it, so the owner has
+    // to be IN it: an id-only UPDATE would flip whichever account's row carries
+    // that id.
+    it("restricts the update to the owner as well as the id", async () => {
+      await service.markEmailSent("user-1", "n-1");
+
+      const [sql] = manager.query.mock.calls[0];
+      expect(String(sql)).toMatch(/WHERE\s+id = \$1\s+AND\s+user_id = \$2/);
     });
   });
 

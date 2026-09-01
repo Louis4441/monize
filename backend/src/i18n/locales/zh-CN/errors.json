@@ -214,7 +214,6 @@
     "categoryNotFound": "未找到 ID 为 {{ id }} 的分类",
     "categoryAlreadyInBudget": "此分类已在预算中",
     "budgetCategoryNotFound": "未找到 ID 为 {{ id }} 的预算分类",
-    "alertNotFound": "未找到 ID 为 {{ id }} 的提醒",
     "periodNotFound": "未找到 ID 为 {{ id }} 的预算周期",
     "noOpenPeriod": "没有可关闭的开放周期",
     "categoryIdsNotOwned": "未找到分类 ID 或不属于该用户：{{ ids }}"
@@ -338,6 +337,7 @@
     "invalidGranularity": "granularity 必须为 'daily' 或 'monthly'"
   },
   "notifications": {
+    "notFound": "未找到 ID 为 {{ id }} 的通知",
     "smtpNotConfigured": "SMTP 未配置。请设置 SMTP 环境变量。",
     "noEmailOnFile": "此用户没有邮箱地址记录。"
   },

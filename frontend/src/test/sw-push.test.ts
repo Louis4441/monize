@@ -183,10 +183,11 @@ describe('service worker push handling', () => {
     expect(sw.shown[0].options.tag).toBe('PRICE_REFRESH_FAILED');
   });
 
-  // The tag is what decides whether a second notification REPLACES the first,
-  // and the type alone is not the subject: two bills due on the same day are
-  // both BILL_DUE, so grouping by type would have shown the reader one of them
-  // and thrown the other away silently.
+  // The tag decides whether a second notification REPLACES the first, and the
+  // type is not the subject: two bills due on the same day are both BILL_DUE.
+  // The subject is the payload's own `collapseKey` -- deliberately not its
+  // target, because the bill producer sends every reminder to `/bills`, so a tag
+  // built from the route would collapse exactly the case it must separate.
   it('lets two subjects of one type stack instead of replacing each other', async () => {
     const sw = loadServiceWorker();
 
@@ -194,13 +195,15 @@ describe('service worker push handling', () => {
       type: 'BILL_DUE',
       title: 'Hydro is due',
       body: 'b',
-      target: '/scheduled-transactions/1',
+      target: '/bills',
+      collapseKey: 'st-1',
     });
     await sw.dispatchPush({
       type: 'BILL_DUE',
       title: 'Rent is due',
       body: 'b',
-      target: '/scheduled-transactions/2',
+      target: '/bills',
+      collapseKey: 'st-2',
     });
 
     expect(sw.shown).toHaveLength(2);
@@ -214,34 +217,59 @@ describe('service worker push handling', () => {
       type: 'BILL_DUE',
       title: 'Hydro is due',
       body: 'b',
-      target: '/scheduled-transactions/1',
+      target: '/bills',
+      collapseKey: 'st-1',
     });
     await sw.dispatchPush({
       type: 'BILL_DUE',
       title: 'Hydro is due tomorrow',
       body: 'b',
-      target: '/scheduled-transactions/1',
+      target: '/bills',
+      collapseKey: 'st-1',
     });
 
     expect(sw.shown[0].options.tag).toBe(sw.shown[1].options.tag);
   });
 
-  // A refused target is not a subject, so it must not become one: otherwise a
-  // push service could mint a fresh bucket per message and stack notifications
-  // without limit, which is the behaviour the tag exists to bound.
-  it('groups a refused target with the type rather than giving it a bucket', async () => {
+  // A payload with no key is saying its type IS the subject, which is what a
+  // system alert or a test send means.
+  it.each([
+    ['no key at all', undefined],
+    ['an empty key', ''],
+    ['a key that is not a string', 42],
+  ])('groups by type given %s', async (_name, collapseKey) => {
+    const sw = loadServiceWorker();
+
+    await sw.dispatchPush({
+      type: 'PRICE_REFRESH_FAILED',
+      title: 'a',
+      body: 'b',
+      collapseKey,
+    });
+
+    expect(sw.shown[0].options.tag).toBe('PRICE_REFRESH_FAILED');
+  });
+
+  // The route never enters the tag. Same subject, two paths: still one bucket.
+  it('ignores the target when deciding what collapses', async () => {
     const sw = loadServiceWorker();
 
     await sw.dispatchPush({
       type: 'BILL_DUE',
       title: 'a',
       body: 'b',
-      target: 'https://evil.test/steal',
+      target: '/bills',
+      collapseKey: 'st-1',
     });
-    await sw.dispatchPush({ type: 'BILL_DUE', title: 'a', body: 'b' });
+    await sw.dispatchPush({
+      type: 'BILL_DUE',
+      title: 'a',
+      body: 'b',
+      target: '/budgets',
+      collapseKey: 'st-1',
+    });
 
-    expect(sw.shown[0].options.tag).toBe('BILL_DUE');
-    expect(sw.shown[1].options.tag).toBe('BILL_DUE');
+    expect(sw.shown[0].options.tag).toBe(sw.shown[1].options.tag);
   });
 
   it('falls back to one bucket when the payload names no type', async () => {

@@ -27,9 +27,10 @@ describe("renameLegacyTableKeys", () => {
   it("moves a legacy key onto the name the restore uses", () => {
     const data = artifact({ budget_alerts: [{ id: "n-1" }] });
 
-    expect(renameLegacyTableKeys(data)).toEqual([
-      "budget_alerts -> notifications",
-    ]);
+    expect(renameLegacyTableKeys(data)).toEqual({
+      renamed: ["budget_alerts -> notifications"],
+      discarded: [],
+    });
     const tables = backupTables(data);
     expect(tables.notifications).toEqual([{ id: "n-1" }]);
     // The old key is gone rather than left beside the new one: the insert path
@@ -44,16 +45,20 @@ describe("renameLegacyTableKeys", () => {
     // case may not be harmless.
     const data = artifact({ budget_alerts: [] });
 
-    expect(renameLegacyTableKeys(data)).toEqual([
-      "budget_alerts -> notifications",
-    ]);
+    expect(renameLegacyTableKeys(data)).toEqual({
+      renamed: ["budget_alerts -> notifications"],
+      discarded: [],
+    });
     expect(backupTables(data).notifications).toEqual([]);
   });
 
   it("leaves a current artifact untouched and reports nothing moved", () => {
     const data = artifact({ notifications: [{ id: "n-1" }] });
 
-    expect(renameLegacyTableKeys(data)).toEqual([]);
+    expect(renameLegacyTableKeys(data)).toEqual({
+      renamed: [],
+      discarded: [],
+    });
     expect(backupTables(data).notifications).toEqual([{ id: "n-1" }]);
   });
 
@@ -72,13 +77,47 @@ describe("renameLegacyTableKeys", () => {
     expect("budget_alerts" in tables).toBe(false);
   });
 
+  // Keeping the current key is the decision; being quiet about it is not part
+  // of it. These rows are in the artifact and are not restored, and a restore
+  // that says nothing about them reports a success it did not have.
+  it("reports the rows it discarded when both keys carry data", () => {
+    const data = artifact({
+      budget_alerts: [{ id: "a" }, { id: "b" }],
+      notifications: [{ id: "n-1" }],
+    });
+
+    expect(renameLegacyTableKeys(data)).toEqual({
+      renamed: [],
+      discarded: [
+        { table: "budget_alerts", supersededBy: "notifications", rows: 2 },
+      ],
+    });
+  });
+
+  it("reports nothing when the discarded legacy table is empty", () => {
+    // Nothing was lost, so there is nothing to warn about -- a warning per
+    // restore of a perfectly ordinary artifact is how a real one gets ignored.
+    const data = artifact({
+      budget_alerts: [],
+      notifications: [{ id: "n-1" }],
+    });
+
+    expect(renameLegacyTableKeys(data)).toEqual({
+      renamed: [],
+      discarded: [],
+    });
+  });
+
   it("does not invent a key for a table the artifact does not carry", () => {
     // A partial artifact (a support backup section, an older export) omits
     // tables entirely, and an empty array is a different claim from a missing
     // key: `insertRows` skips the second and truncates on the first.
     const data = artifact({ transactions: [] });
 
-    expect(renameLegacyTableKeys(data)).toEqual([]);
+    expect(renameLegacyTableKeys(data)).toEqual({
+      renamed: [],
+      discarded: [],
+    });
     expect("notifications" in backupTables(data)).toBe(false);
   });
 

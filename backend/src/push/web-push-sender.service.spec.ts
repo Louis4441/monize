@@ -8,6 +8,7 @@ import {
   PUSH_ENDPOINT_RECHECK_TIMEOUT_MS,
   PUSH_REQUEST_DEADLINE_MS,
   PUSH_REQUEST_TIMEOUT_MS,
+  PushPayload,
 } from "./web-push-sender.service";
 import { PushConfigService, VAPID_SUBJECT } from "./push-config.service";
 import { PushDisabledReason } from "./entities/push-subscription.entity";
@@ -19,14 +20,20 @@ jest.mock("web-push", () => ({
 
 // The sender re-checks the endpoint before every send; this double keeps the
 // suite off real DNS and lets one test drive the refusal.
+//
+// The real module is spread rather than replaced. A bare factory blanks every
+// other export -- and the sender reads `URL_SAFETY_CHECK_TIMEOUT_MS` from here,
+// so a replaced module made the recheck bound `undefined` and every test in this
+// file failed somewhere else entirely.
 jest.mock("../ai/validators/safe-url.validator", () => ({
-  validateUrlIsSafe: jest.fn().mockResolvedValue(true),
+  ...jest.requireActual("../ai/validators/safe-url.validator"),
+  validateUrlIsSafeWithin: jest.fn().mockResolvedValue(true),
 }));
 
 const sendNotification = webpush.sendNotification as jest.Mock;
-const validateUrlIsSafe = jest.requireMock(
+const validateUrlIsSafeWithin = jest.requireMock(
   "../ai/validators/safe-url.validator",
-).validateUrlIsSafe as jest.Mock;
+).validateUrlIsSafeWithin as jest.Mock;
 
 const IDENTITY = { publicKey: "PUB-CURRENT", privateKey: "PRIV" };
 
@@ -40,7 +47,13 @@ function target(overrides: Partial<Parameters<WebPushSender["send"]>[0]> = {}) {
   };
 }
 
-const PAYLOAD = { type: "TEST", title: "t", body: "b", target: "/settings" };
+const PAYLOAD: PushPayload = {
+  type: "TEST",
+  title: "t",
+  body: "b",
+  target: "/settings",
+  collapseKey: null,
+};
 
 describe("collectAgentSockets", () => {
   /**
@@ -92,7 +105,7 @@ describe("WebPushSender", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    validateUrlIsSafe.mockResolvedValue(true);
+    validateUrlIsSafeWithin.mockResolvedValue(true);
     pushConfig = { getVapidIdentity: jest.fn().mockResolvedValue(IDENTITY) };
     sender = new WebPushSender(pushConfig as unknown as PushConfigService);
     jest.spyOn(sender["logger"], "warn").mockImplementation(() => undefined);
@@ -189,7 +202,7 @@ describe("WebPushSender", () => {
   // publicly then and resolves to a private address now must not become an
   // internal request.
   it("refuses to send to an endpoint that no longer resolves publicly", async () => {
-    validateUrlIsSafe.mockResolvedValue(false);
+    validateUrlIsSafeWithin.mockResolvedValue(false);
 
     await expect(sender.send(target(), PAYLOAD)).resolves.toMatchObject({
       status: "transient",
@@ -199,25 +212,32 @@ describe("WebPushSender", () => {
 
   // The check resolves DNS, and dns.resolve4/6 carry no timeout of their own, so
   // a stalled nameserver would sit in front of the HTTP send and the request
-  // timeout would bound only the half that had already got past it.
-  it("gives up on a check that stalls, and does not send", async () => {
-    jest.useFakeTimers();
-    try {
-      validateUrlIsSafe.mockReturnValue(new Promise(() => {}));
+  // timeout would bound only the half that had already got past it. The bound
+  // itself lives with the check (`safe-url-dns.spec.ts` drives a resolver that
+  // never answers); what this file owns is that the sender asks for it.
+  it("asks for the check under the recheck bound", async () => {
+    await sender.send(target(), PAYLOAD);
 
-      const pending = sender.send(target(), PAYLOAD);
-      await jest.advanceTimersByTimeAsync(PUSH_ENDPOINT_RECHECK_TIMEOUT_MS + 1);
+    expect(validateUrlIsSafeWithin).toHaveBeenCalledWith(
+      target().endpoint,
+      PUSH_ENDPOINT_RECHECK_TIMEOUT_MS,
+    );
+  });
 
-      await expect(pending).resolves.toMatchObject({ status: "transient" });
-      expect(sendNotification).not.toHaveBeenCalled();
-    } finally {
-      jest.useRealTimers();
-    }
+  // A check that timed out answers false, and false is a refusal rather than a
+  // send: not knowing whether a host is public is not the same as knowing it is.
+  it("does not send when the check gave up", async () => {
+    validateUrlIsSafeWithin.mockResolvedValue(false);
+
+    await expect(sender.send(target(), PAYLOAD)).resolves.toMatchObject({
+      status: "transient",
+    });
+    expect(sendNotification).not.toHaveBeenCalled();
   });
 
   // Not knowing whether a host is public is not the same as knowing it is.
   it("does not send when the check itself fails", async () => {
-    validateUrlIsSafe.mockRejectedValue(new Error("resolver exploded"));
+    validateUrlIsSafeWithin.mockRejectedValue(new Error("resolver exploded"));
 
     await expect(sender.send(target(), PAYLOAD)).resolves.toMatchObject({
       status: "transient",

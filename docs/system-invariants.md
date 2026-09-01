@@ -2147,11 +2147,33 @@ Failure response    409, having written nothing. Not a dead end: the client
                     releases the endpoint the same way
                     (releaseLocalPushSubscription), so the ordinary
                     shared-browser case never reaches the refusal.
+                    Both refusals on the subscribe path -- the channel being off,
+                    and a superseded applicationServerKey -- are decided from a
+                    read taken INSIDE the transaction that writes. Read outside
+                    it, an administrator's rotation committing in the window
+                    left a committed row whose 409 said nothing was written:
+                    disableStaleSubscriptions cannot retire a row that does not
+                    exist yet, so the device was listed live under a key nothing
+                    can be delivered under.
+                    The CLIENT's half of shared-browser safety is the registered-
+                    endpoint marker, which records the OWNER beside the endpoint:
+                    localStorage is per origin while a subscription's owner is an
+                    account, so an owner-less marker let the second account read
+                    the first's subscription as "revoked" and unsubscribe the
+                    browser -- revoking push for somebody not even signed in.
+                    classifyPushRegistration answers `foreign` there and acts on
+                    nothing.
 Required tests      push-subscription.service.spec.ts asserts no statement on
                     this path names another user (no DELETE, no `user_id <>`,
-                    every statement bound to the caller) and that a foreign
-                    conflict is a 409. push.test.ts covers the client's single
-                    retry and the logout release. The database half needs no new
+                    every statement bound to the caller), that a foreign conflict
+                    is a 409, and that both preconditions are read with a
+                    transaction already open (recorded, not asserted inside the
+                    mock: an expect that throws there arrives as the rejection
+                    the test was expecting). push.test.ts covers the client's
+                    single retry, the logout release, the marker's owner and the
+                    twelve-row classifier truth table including the foreign
+                    rows; PushDevicesPanel.test.tsx covers the panel acting on
+                    none of them. The database half needs no new
                     spec: the catalog-driven
                     rls-enforcement.integration.spec.ts enumerates the live
                     schema, so push_subscriptions is bucketed as direct by its

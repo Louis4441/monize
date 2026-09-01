@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@/test/render';
+import { render, screen, waitFor, fireEvent, act } from '@/test/render';
 import { PushDevicesPanel, defaultDeviceName } from './PushDevicesPanel';
 import toast from 'react-hot-toast';
 import { PushPermissionError, type PushDevice } from '@/lib/push';
+import { useAuthStore } from '@/store/authStore';
 
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({
@@ -94,6 +95,8 @@ describe('PushDevicesPanel', () => {
     mockClassify.mockReturnValue({ kind: 'in-sync' });
     mockRelease.mockResolvedValue(undefined);
     mockReadRegistered.mockReturnValue(null);
+    // Signed out by default, so a test that needs an identity states it.
+    useAuthStore.setState({ user: null });
     mockEnable.mockResolvedValue(device());
     mockSendTest.mockResolvedValue({ attempted: 1, delivered: 1, devices: [] });
   });
@@ -282,6 +285,47 @@ describe('PushDevicesPanel', () => {
     expect(await screen.findByText(/Add to Home Screen/i)).toBeInTheDocument();
   });
 
+  // The refusal the user reads here is a state they change SOMEWHERE ELSE and
+  // then come back: site settings, or "Add to Home Screen". Read once on mount,
+  // the panel kept the refusal and the hidden Enable button after the refusal
+  // was lifted, and nothing on screen said a reload was needed.
+  it('re-reads what the browser allows when the user returns to the page', async () => {
+    mockGetPushSupport.mockReturnValue({ supported: false, reason: 'denied' });
+
+    render(<PushDevicesPanel />);
+
+    expect(
+      await screen.findByText(/Notifications are blocked for Monize/i),
+    ).toBeInTheDocument();
+
+    mockGetPushSupport.mockReturnValue({ supported: true });
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    expect(
+      await screen.findByRole('button', { name: /enable on this device/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('ignores a visibility change that leaves the page hidden', async () => {
+    mockGetPushSupport.mockReturnValue({ supported: false, reason: 'denied' });
+
+    render(<PushDevicesPanel />);
+    await screen.findByText(/Notifications are blocked for Monize/i);
+
+    const readsWhileVisible = mockGetPushSupport.mock.calls.length;
+    const visibility = vi
+      .spyOn(document, 'visibilityState', 'get')
+      .mockReturnValue('hidden');
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    visibility.mockRestore();
+
+    expect(mockGetPushSupport.mock.calls.length).toBe(readsWhileVisible);
+  });
+
   // A browser that cannot receive push is still the browser somebody is sitting
   // at when they want to revoke a device registered on another machine.
   it('still lists and can remove devices on a browser that cannot receive push', async () => {
@@ -397,7 +441,35 @@ describe('PushDevicesPanel', () => {
       expect(mockEnable).not.toHaveBeenCalled();
     });
 
-    it.each([['in-sync'], ['no-subscription']])(
+    // The classifier cannot tell a foreign subscription from a revoked one
+    // without both halves, so the panel has to hand it both: the marker with
+    // its owner, and who is reading.
+    it('asks with the marker and the reader identity', async () => {
+      withPermission('granted');
+      // Written before the render, so no act() wrapper is needed -- and the real
+      // store rather than a mock, because a zero-argument mock of a selector
+      // store returns the whole state for every selector.
+      useAuthStore.setState({ user: { id: 'user-1' } as never });
+      mockReadRegistered.mockReturnValue({
+        userId: 'user-1',
+        fingerprint: THIS_DEVICE,
+      });
+      mockListDevices.mockResolvedValue([]);
+      mockCurrentFingerprint.mockResolvedValue(THIS_DEVICE);
+
+      render(<PushDevicesPanel />);
+
+      await waitFor(() => expect(mockClassify).toHaveBeenCalled());
+      expect(mockClassify.mock.calls[0][0]).toMatchObject({
+        marker: { userId: 'user-1', fingerprint: THIS_DEVICE },
+        readerUserId: 'user-1',
+      });
+    });
+
+    // A shared browser profile: the endpoint belongs to an account that is not
+    // the one reading. Releasing it revokes THEIR push on a device they still
+    // hold, and they find out when a notification does not arrive.
+    it.each([['in-sync'], ['no-subscription'], ['foreign']])(
       'does nothing when the state is %s',
       async (kind) => {
         withPermission('granted');

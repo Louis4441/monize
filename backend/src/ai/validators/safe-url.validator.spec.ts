@@ -212,6 +212,49 @@ describe("IsSafeUrl validator", () => {
     it("allows a public IPv6 address", async () => {
       await expectValid("https://[2606:4700:4700::1111]/api");
     });
+
+    // An IPv6 address can embed an IPv4 one in more than one spelling, and the
+    // URL parser rewrites all of them to hex -- so a rule written per-spelling
+    // covers whichever ones its author thought of. The first pass here handled
+    // `::ffff:` with a two-group tail, which left IPv4-compatible and
+    // IPv4-translated LOOPBACK accepted: `https://[::127.0.0.1]/` arrives as
+    // `::7f00:1` and matched no pattern at all.
+    it.each([
+      // IPv4-compatible, the deprecated `::a.b.c.d` form.
+      ["loopback, IPv4-compatible", "https://[::127.0.0.1]/api"],
+      ["private, IPv4-compatible", "https://[::10.0.0.1]/api"],
+      ["metadata, IPv4-compatible", "https://[::169.254.169.254]/api"],
+      // IPv4-translated, `::ffff:0:a.b.c.d`.
+      ["loopback, IPv4-translated", "https://[::ffff:0:127.0.0.1]/api"],
+      ["private, IPv4-translated", "https://[::ffff:0:192.168.1.1]/api"],
+      // Already-hex spellings, which is what the parser hands the validator.
+      ["loopback, written in hex", "https://[::7f00:1]/api"],
+      ["mapped loopback in hex", "https://[::ffff:7f00:1]/api"],
+      // NAT64: the prefix exists so a gateway forwards it to the embedded
+      // address, which is the whole hazard.
+      ["private behind the NAT64 prefix", "https://[64:ff9b::10.0.0.1]/api"],
+      [
+        "loopback behind the local-use NAT64 prefix",
+        "https://[64:ff9b:1::127.0.0.1]/api",
+      ],
+    ])("rejects %s", async (_name, url) => {
+      await expectInvalid(url);
+    });
+
+    // The other direction, because a check that rejects everything is not a
+    // check: an embedded PUBLIC address stays reachable.
+    it.each([
+      ["a mapped public address", "https://[::ffff:8.8.8.8]/api"],
+      ["a public address behind NAT64", "https://[64:ff9b::8.8.8.8]/api"],
+      // Not an embedding at all -- an ordinary address whose last 32 bits
+      // happen to spell one.
+      [
+        "an ordinary address with a low-bit tail",
+        "https://[2001:db8::7f00:1]/api",
+      ],
+    ])("allows %s", async (_name, url) => {
+      await expectValid(url);
+    });
   });
 
   describe("alternative IP encodings (SSRF bypass prevention)", () => {

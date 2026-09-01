@@ -2,12 +2,15 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { DataSource, EntityManager, IsNull } from "typeorm";
 import * as crypto from "crypto";
 import { I18nService } from "nestjs-i18n";
+import { Cron } from "@nestjs/schedule";
 import { withScopedDb } from "../common/db/scoped-db";
+import { withSystemContext } from "../common/db/with-context";
 import { affectedRowCount, returnedRows } from "../common/db/query-result";
 import { tr } from "../i18n/translate";
 import { emailTranslator } from "../i18n/email-translator";
@@ -20,6 +23,9 @@ import {
 } from "./entities/push-subscription.entity";
 import {
   MAX_CONSECUTIVE_FAILURES,
+  PUSH_ENDPOINT_RECHECK_TIMEOUT_MS,
+  PUSH_REQUEST_DEADLINE_MS,
+  PushPayload,
   PushSendOutcome,
   WebPushSender,
 } from "./web-push-sender.service";
@@ -88,12 +94,36 @@ export const MAX_LIVE_DEVICES_PER_USER = 20;
  * The per-send bound covers ONE delivery; this bounds the request. Sending to
  * the cap serially would hold a request for the product of the two, over hosts
  * the account chose. Four at a time makes the worst case ceil(20/4) = 5 rounds,
- * and a round is bounded by `PUSH_ENDPOINT_RECHECK_TIMEOUT_MS +
- * PUSH_REQUEST_TIMEOUT_MS` -- about 35 seconds in total today. A realistic one
- * or two devices is still a single round. Size a gateway timeout against the
- * 35, not against the 5-second per-send figure.
+ * and a realistic one or two devices is still a single round.
  */
 export const PUSH_TEST_CONCURRENCY = 4;
+
+/**
+ * How long a retired device stays in the user's list before it is forgotten.
+ *
+ * The same window the notification centre keeps a read notification for: the
+ * row exists so the user can see that a device needs re-enabling, and once that
+ * has had a month to be noticed it is debris.
+ */
+export const RETIRED_DEVICE_RETENTION_DAYS = 30;
+
+/**
+ * The longest `POST /push/test` can take, derived rather than restated.
+ *
+ * A round is bounded by the endpoint re-check plus the whole-delivery deadline,
+ * and it is the DEADLINE that bounds a delivery: `PUSH_REQUEST_TIMEOUT_MS`
+ * becomes Node's socket timeout, an inactivity timer a host can reset forever
+ * by trickling a byte. Composing the figure from the 5-second inactivity value
+ * gave "about 35 seconds" and understated the real bound by a factor of nearly
+ * three -- and this number is what an operator sizes a gateway timeout against,
+ * so a wrong one buys a 504 over a request that was still running correctly.
+ *
+ * Written as the arithmetic so it cannot go stale when a part moves;
+ * `push-subscription.service.spec.ts` pins the composition.
+ */
+export const PUSH_TEST_WORST_CASE_MS =
+  Math.ceil(MAX_LIVE_DEVICES_PER_USER / PUSH_TEST_CONCURRENCY) *
+  (PUSH_ENDPOINT_RECHECK_TIMEOUT_MS + PUSH_REQUEST_DEADLINE_MS);
 
 /**
  * A user's own push devices: registering one, listing them, removing one, and
@@ -105,6 +135,8 @@ export const PUSH_TEST_CONCURRENCY = 4;
  */
 @Injectable()
 export class PushSubscriptionService {
+  private readonly logger = new Logger(PushSubscriptionService.name);
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly pushConfig: PushConfigService,
@@ -135,34 +167,42 @@ export class PushSubscriptionService {
     dto: CreatePushSubscriptionDto,
     userAgent: string | null,
   ): Promise<PushDeviceDto> {
-    const config = await this.pushConfig.getPublicConfig();
-    if (!config.enabled || !config.publicKey) {
-      throw new BadRequestException(
-        tr(
-          "errors.push.channelUnavailable",
-          "Push notifications are not available on this Monize instance.",
-        ),
-      );
-    }
-
-    if (dto.applicationServerKey !== config.publicKey) {
-      // The browser subscribed under a key this instance no longer uses -- a
-      // rotation between the page load and the click. Storing the row anyway
-      // would record a subscription nothing can ever be delivered to, so it is
-      // refused and the client is told to try again with the current key.
-      throw new ConflictException(
-        tr(
-          "errors.push.keyRotated",
-          "This instance changed its push key while you were on this page. Reload and enable push again.",
-        ),
-      );
-    }
-
     const endpointHash = hashEndpoint(dto.endpoint);
-    // Hoisted so the narrowing above survives into the closure.
-    const vapidPublicKey = config.publicKey;
 
     const row = await withScopedDb(this.dataSource, async (manager) => {
+      // Both refusals are decided INSIDE the transaction that writes, from a
+      // read taken in it. Read outside, an administrator's rotation (or a
+      // channel switched off) committing in the window between the two left a
+      // row whose 409 says it was never written: `disableStaleSubscriptions`
+      // cannot see a row that does not exist yet, so the device was listed as
+      // live under a superseded key and only its first delivery retired it.
+      // `backend/CLAUDE.md`, "Rejection happens before the write". It reads
+      // through its own `withScopedDb`, which JOINS this one -- same
+      // connection, same atomicity -- rather than opening a second transaction.
+      const config = await this.pushConfig.getPublicConfig();
+      const publicKey = config.publicKey;
+      if (!config.enabled || !publicKey) {
+        throw new BadRequestException(
+          tr(
+            "errors.push.channelUnavailable",
+            "Push notifications are not available on this Monize instance.",
+          ),
+        );
+      }
+
+      if (dto.applicationServerKey !== publicKey) {
+        // The browser subscribed under a key this instance no longer uses -- a
+        // rotation between the page load and the click. Storing the row anyway
+        // would record a subscription nothing can ever be delivered to, so it
+        // is refused and the client is told to try again with the current key.
+        throw new ConflictException(
+          tr(
+            "errors.push.keyRotated",
+            "This instance changed its push key while you were on this page. Reload and enable push again.",
+          ),
+        );
+      }
+      const vapidPublicKey = publicKey;
       // Counted inside the transaction that writes, which is where it belongs,
       // though READ COMMITTED and no lock means two simultaneous subscribes at
       // 19 devices can both pass and land on 21. That is the deliberate trade:
@@ -275,6 +315,53 @@ export class PushSubscriptionService {
     }
   }
 
+  /**
+   * Forget devices that have been retired long enough to have been noticed.
+   *
+   * A retired row is not debris on the day it is retired -- it is how the user
+   * learns their phone stopped receiving push and needs enabling again, which is
+   * why `listForUser` returns it. But nothing ever removed one: an
+   * administrator's key rotation retires EVERY subscription in the deployment,
+   * so after three rotations a user who re-enabled each time was looking at
+   * three dead rows plus a live one, each needing its own Remove click, forever.
+   *
+   * The same thirty days the notification centre keeps a read notification for,
+   * and for the same reason: long enough to be acted on, short enough not to
+   * accumulate. Re-enabling a device clears `disabled_at`, so nothing live is
+   * ever in range.
+   */
+  @Cron("30 3 * * *")
+  async purgeRetiredDevices(): Promise<void> {
+    try {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - RETIRED_DEVICE_RETENTION_DAYS);
+
+      // A cross-user sweep with no request behind it, so it seeds its own
+      // system context (task C2). Every row it can reach is one whose owner
+      // stopped being able to receive on it.
+      const removed = await withSystemContext(async () =>
+        withScopedDb(this.dataSource, async (manager) => {
+          const result = await manager.query(
+            `DELETE FROM push_subscriptions
+               WHERE disabled_at IS NOT NULL AND disabled_at < $1`,
+            [cutoff],
+          );
+          return affectedRowCount(result);
+        }),
+      );
+
+      if (removed > 0) {
+        this.logger.log(`Removed ${removed} long-retired push device(s)`);
+      }
+    } catch (error) {
+      // A cron that throws takes the scheduler's next run with it on some
+      // versions, and this one is housekeeping: it is not worth a restart.
+      this.logger.error(
+        `Could not purge retired push devices: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   async listForUser(userId: string): Promise<PushDeviceDto[]> {
     const rows = await withScopedDb(this.dataSource, (manager) =>
       manager.getRepository(PushSubscription).find({
@@ -340,7 +427,7 @@ export class PushSubscriptionService {
       resolveUserEmailLocale(manager.getRepository(UserPreference), userId),
     );
     const t = emailTranslator(this.i18n, lang);
-    const payload = {
+    const payload: PushPayload = {
       type: "TEST",
       title: t("push.test.title", "Monize test notification"),
       body: t(
@@ -348,6 +435,9 @@ export class PushSubscriptionService {
         "Push notifications are working on this device.",
       ),
       target: "/settings",
+      // One subject: "push works here". Two taps of the button should leave one
+      // notification, not two.
+      collapseKey: null,
     };
 
     const devices: PushTestDeviceResult[] = [];

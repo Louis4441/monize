@@ -113,6 +113,10 @@ const WITH_CONTEXT_ALLOWLIST = [
   // Reading the row itself runs under the caller's own identity -- the table is
   // RLS-exempt, so a bypass there would widen the fence for nothing.
   "src/push/push-config.service.ts",
+  // Daily sweep of long-retired push devices: a cross-user cron with no request
+  // behind it, and every row it can reach belongs to somebody who can no longer
+  // receive on it.
+  "src/push/push-subscription.service.ts",
   "src/scheduled-transactions/scheduled-transactions.service.ts",
   "src/securities/holdings.service.ts",
   // The market-index refresh is a deployment-wide cron with no request behind

@@ -214,7 +214,6 @@
     "categoryNotFound": "Kategori dengan ID {{ id }} tidak ditemukan",
     "categoryAlreadyInBudget": "Kategori ini sudah ada dalam anggaran",
     "budgetCategoryNotFound": "Kategori anggaran dengan ID {{ id }} tidak ditemukan",
-    "alertNotFound": "Peringatan dengan ID {{ id }} tidak ditemukan",
     "periodNotFound": "Periode anggaran dengan ID {{ id }} tidak ditemukan",
     "noOpenPeriod": "Tidak ada periode yang terbuka untuk ditutup",
     "categoryIdsNotOwned": "ID kategori tidak ditemukan atau bukan milik pengguna: {{ ids }}"
@@ -338,6 +337,7 @@
     "invalidGranularity": "granularity harus 'daily' atau 'monthly'"
   },
   "notifications": {
+    "notFound": "Notifikasi dengan ID {{ id }} tidak ditemukan",
     "smtpNotConfigured": "SMTP belum dikonfigurasi. Atur variabel lingkungan SMTP.",
     "noEmailOnFile": "Tidak ada alamat email yang tercatat untuk pengguna ini."
   },

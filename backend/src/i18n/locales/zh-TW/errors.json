@@ -214,7 +214,6 @@
     "categoryNotFound": "找不到 ID 為 {{ id }} 的類別",
     "categoryAlreadyInBudget": "此類別已在預算中",
     "budgetCategoryNotFound": "找不到 ID 為 {{ id }} 的預算類別",
-    "alertNotFound": "找不到 ID 為 {{ id }} 的警示",
     "periodNotFound": "找不到 ID 為 {{ id }} 的預算期間",
     "noOpenPeriod": "沒有可關閉的開放期間",
     "categoryIdsNotOwned": "找不到類別 ID 或類別不屬於使用者：{{ ids }}"
@@ -338,6 +337,7 @@
     "invalidGranularity": "granularity 必須為 'daily' 或 'monthly'"
   },
   "notifications": {
+    "notFound": "找不到 ID 為 {{ id }} 的通知",
     "smtpNotConfigured": "未設定 SMTP。請設定 SMTP 環境變數。",
     "noEmailOnFile": "此使用者沒有電子郵件地址記錄。"
   },

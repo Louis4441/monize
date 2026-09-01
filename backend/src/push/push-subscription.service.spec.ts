@@ -11,11 +11,16 @@ import {
   MAX_LIVE_DEVICES_PER_USER,
   MAX_USER_AGENT_LENGTH,
   PUSH_TEST_CONCURRENCY,
+  PUSH_TEST_WORST_CASE_MS,
+  RETIRED_DEVICE_RETENTION_DAYS,
   hashEndpoint,
 } from "./push-subscription.service";
 import { PushConfigService } from "./push-config.service";
 import {
   MAX_CONSECUTIVE_FAILURES,
+  PUSH_ENDPOINT_RECHECK_TIMEOUT_MS,
+  PUSH_REQUEST_DEADLINE_MS,
+  PUSH_REQUEST_TIMEOUT_MS,
   WebPushSender,
 } from "./web-push-sender.service";
 import {
@@ -24,10 +29,15 @@ import {
 } from "./entities/push-subscription.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+import { withSystemContext } from "../common/db/with-context";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
+
+jest.mock("../common/db/with-context", () => ({
+  withSystemContext: jest.fn((fn: () => unknown) => fn()),
+}));
 
 const USER = "11111111-1111-4111-8111-111111111111";
 const OTHER_USER = "22222222-2222-4222-8222-222222222222";
@@ -338,6 +348,38 @@ describe("PushSubscriptionService", () => {
       expect(manager.query).not.toHaveBeenCalled();
     });
 
+    // Read outside the write's transaction, an administrator's rotation
+    // committing in the window between the two left a row whose 409 says it was
+    // never written: `disableStaleSubscriptions` cannot retire a row that does
+    // not exist yet, so the device was listed as live under a key nothing can be
+    // delivered under. `backend/CLAUDE.md`, "Rejection happens before the write".
+    it.each([
+      [
+        "the channel state",
+        { enabled: false, publicKey: "PUB", configured: true },
+      ],
+      [
+        "the current key",
+        { enabled: true, publicKey: "PUB-NEW", configured: true },
+      ],
+    ])("reads %s inside the transaction that writes", async (_name, config) => {
+      // Recorded rather than asserted inside the mock: an `expect` that throws
+      // there arrives as a rejected `subscribe`, which `rejects.toThrow()` then
+      // accepts -- so the test would pass for the pre-fix shape it exists to
+      // fail.
+      const transactionOpenAtRead: boolean[] = [];
+      pushConfig.getPublicConfig.mockImplementation(async () => {
+        transactionOpenAtRead.push(
+          dataSource.transaction.mock.calls.length > 0,
+        );
+        return config;
+      });
+
+      await expect(service.subscribe(USER, DTO, null)).rejects.toThrow();
+      expect(transactionOpenAtRead).toEqual([true]);
+      expect(manager.query).not.toHaveBeenCalled();
+    });
+
     it("stamps the subscription with the key pair it was minted under", async () => {
       await service.subscribe(USER, DTO, null);
 
@@ -431,14 +473,20 @@ describe("PushSubscriptionService", () => {
       await service.sendTest(USER);
 
       const [, payload] = sender.send.mock.calls[0];
+      // Pinned so a new field on the payload is a decision: everything here
+      // crosses the push service and can reach a lock screen.
       expect(Object.keys(payload).sort()).toEqual([
         "body",
+        "collapseKey",
         "target",
         "title",
         "type",
       ]);
       expect(payload.type).toBe("TEST");
       expect(payload.target.startsWith("/")).toBe(true);
+      // "Push works here" is one subject, so two taps leave one notification
+      // rather than two -- and there is no id to carry for it.
+      expect(payload.collapseKey).toBeNull();
     });
 
     it("renders the body in the recipient's stored language", async () => {
@@ -638,6 +686,64 @@ describe("PushSubscriptionService", () => {
         "d-4",
         "d-5",
       ]);
+    });
+  });
+
+  describe("the documented worst case for one test send", () => {
+    // This number is what an operator sizes a gateway timeout against, so it is
+    // composed from the parts rather than written down: it was derived from the
+    // SOCKET timeout, which is an inactivity timer a host can reset forever, and
+    // understated the real bound by a factor of nearly three.
+    it("is composed from the re-check and the delivery deadline", () => {
+      expect(PUSH_TEST_WORST_CASE_MS).toBe(
+        Math.ceil(MAX_LIVE_DEVICES_PER_USER / PUSH_TEST_CONCURRENCY) *
+          (PUSH_ENDPOINT_RECHECK_TIMEOUT_MS + PUSH_REQUEST_DEADLINE_MS),
+      );
+    });
+
+    it("is bounded by the deadline, not by the inactivity timeout", () => {
+      const fromInactivity =
+        Math.ceil(MAX_LIVE_DEVICES_PER_USER / PUSH_TEST_CONCURRENCY) *
+        (PUSH_ENDPOINT_RECHECK_TIMEOUT_MS + PUSH_REQUEST_TIMEOUT_MS);
+      expect(PUSH_TEST_WORST_CASE_MS).toBeGreaterThan(fromInactivity);
+    });
+  });
+
+  describe("purgeRetiredDevices", () => {
+    it("deletes only rows retired past the retention window", async () => {
+      manager.query.mockResolvedValue([[], 3]);
+
+      await service.purgeRetiredDevices();
+
+      const [sql, params] = manager.query.mock.calls[0];
+      expect(String(sql)).toContain("DELETE FROM push_subscriptions");
+      // Both halves matter: without the NOT NULL a live device is deleted, and
+      // without the cutoff a device retired an hour ago vanishes before its
+      // owner has seen why their phone went quiet.
+      expect(String(sql)).toContain("disabled_at IS NOT NULL");
+      expect(String(sql)).toContain("disabled_at < $1");
+      const cutoff = (params as [Date])[0];
+      const days = Math.round(
+        (Date.now() - cutoff.getTime()) / (24 * 60 * 60 * 1000),
+      );
+      expect(days).toBe(RETIRED_DEVICE_RETENTION_DAYS);
+    });
+
+    // A cron has no request to inherit an identity from, so the real
+    // `withScopedDb` throws unless the handler seeds one -- in every RLS_MODE,
+    // including off.
+    it("runs as a cross-user sweep under a system context", async () => {
+      await service.purgeRetiredDevices();
+
+      expect(withSystemContext).toHaveBeenCalledTimes(1);
+    });
+
+    // Housekeeping: a throw here is not worth taking the scheduler down for, and
+    // the next run repeats the same idempotent DELETE.
+    it("swallows a failure rather than escaping the cron", async () => {
+      manager.query.mockRejectedValue(new Error("connection terminated"));
+
+      await expect(service.purgeRetiredDevices()).resolves.toBeUndefined();
     });
   });
 

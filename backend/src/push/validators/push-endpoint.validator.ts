@@ -4,7 +4,7 @@ import {
   ValidatorConstraint,
   ValidatorConstraintInterface,
 } from "class-validator";
-import { validateUrlIsSafe } from "../../ai/validators/safe-url.validator";
+import { validateUrlIsSafeWithin } from "../../ai/validators/safe-url.validator";
 
 /** Longest endpoint accepted. Real ones sit well under 500 characters. */
 export const MAX_PUSH_ENDPOINT_LENGTH = 1024;
@@ -21,6 +21,11 @@ export const MAX_PUSH_ENDPOINT_LENGTH = 1024;
  * `http:` because a self-hosted model server may be plain HTTP on a LAN; a push
  * endpoint is issued by Mozilla, Google or Apple and is always `https:`, so
  * anything else is a forged value rather than a permissive deployment.
+ *
+ * The check runs under `validateUrlIsSafeWithin`'s deadline rather than
+ * unbounded. It resolves the host, and a resolver that never answers would hold
+ * this request -- one an authenticated caller may make twenty times a minute --
+ * for the DNS retry budget, before validation has even returned its 400.
  */
 @ValidatorConstraint({ async: true })
 export class IsPushEndpointConstraint implements ValidatorConstraintInterface {
@@ -36,7 +41,7 @@ export class IsPushEndpointConstraint implements ValidatorConstraintInterface {
     }
     if (parsed.protocol !== "https:") return false;
 
-    return validateUrlIsSafe(value);
+    return validateUrlIsSafeWithin(value);
   }
 
   defaultMessage(): string {

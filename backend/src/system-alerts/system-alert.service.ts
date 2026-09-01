@@ -199,7 +199,7 @@ export class SystemAlertService {
           const sent = await this.emailAdmin({ ...admin, email }, input);
           if (sent) {
             emailed += 1;
-            await this.notifications.markEmailSent(rowId);
+            await this.notifications.markEmailSent(admin.userId, rowId);
           }
         }
       } catch (error) {

@@ -148,10 +148,18 @@ export class BackupRestoreService {
         // An artifact older than a table rename addresses that table by its old
         // name. Move it onto the current one here, before anything walks the
         // document, so every later phase sees one shape.
-        const movedTables = renameLegacyTableKeys(rawData);
-        if (movedTables.length > 0) {
+        const legacyNames = renameLegacyTableKeys(rawData);
+        if (legacyNames.renamed.length > 0) {
           this.logger.log(
-            `Backup for user ${userId} uses legacy table names: ${movedTables.join(", ")}`,
+            `Backup for user ${userId} uses legacy table names: ${legacyNames.renamed.join(", ")}`,
+          );
+        }
+        for (const dropped of legacyNames.discarded) {
+          // Warned, not logged: rows in the artifact are not being restored.
+          this.logger.warn(
+            `Backup for user ${userId} carries both ${dropped.table} and ` +
+              `${dropped.supersededBy}; keeping ${dropped.supersededBy} and ` +
+              `discarding ${dropped.rows} row(s) under the legacy name.`,
           );
         }
 

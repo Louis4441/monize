@@ -214,7 +214,6 @@
     "categoryNotFound": "Категория с ID {{ id }} не найдена",
     "categoryAlreadyInBudget": "Эта категория уже включена в бюджет",
     "budgetCategoryNotFound": "Категория бюджета с ID {{ id }} не найдена",
-    "alertNotFound": "Уведомление с ID {{ id }} не найдено",
     "periodNotFound": "Период бюджета с ID {{ id }} не найден",
     "noOpenPeriod": "Нет открытого периода для закрытия",
     "categoryIdsNotOwned": "Идентификаторы категорий не найдены или не принадлежат пользователю: {{ ids }}"
@@ -338,6 +337,7 @@
     "invalidGranularity": "granularity должно быть 'daily' или 'monthly'"
   },
   "notifications": {
+    "notFound": "Уведомление с ID {{ id }} не найдено",
     "smtpNotConfigured": "SMTP не настроен. Задайте переменные окружения SMTP.",
     "noEmailOnFile": "Для этого пользователя нет адреса электронной почты."
   },

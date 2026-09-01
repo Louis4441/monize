@@ -85,6 +85,23 @@ describe("IsPushEndpoint", () => {
     ).resolves.toBe(false);
   });
 
+  // The endpoint is a host the CALLER names, and the safety check resolves it.
+  // `dns.resolve4`/`resolve6` carry no timeout, so an unbounded check would hold
+  // this request for the resolver's whole retry budget -- before returning the
+  // 400 it was always going to return -- twenty times a minute per account.
+  it("gives up on a resolver that never answers rather than holding the request", async () => {
+    const dns = jest.requireMock("dns");
+    dns.resolve4.mockImplementationOnce(() => undefined);
+    dns.resolve6.mockImplementationOnce(() => undefined);
+
+    const started = Date.now();
+    await expect(
+      constraint.validate("https://blackhole.attacker.example/wpush"),
+    ).resolves.toBe(false);
+    // Bounded, and generously asserted: the point is that it settles at all.
+    expect(Date.now() - started).toBeLessThan(10_000);
+  });
+
   it("rejects an endpoint longer than the column can hold", async () => {
     const tooLong = `https://fcm.googleapis.com/fcm/send/${"a".repeat(MAX_PUSH_ENDPOINT_LENGTH)}`;
 

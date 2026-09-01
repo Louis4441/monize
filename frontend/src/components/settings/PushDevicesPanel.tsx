@@ -20,6 +20,7 @@ import {
   type PushDevice,
   type PushSupport,
 } from '@/lib/push';
+import { useAuthStore } from '@/store/authStore';
 import { createLogger } from '@/lib/logger';
 import { getErrorMessage } from '@/lib/errors';
 
@@ -35,6 +36,10 @@ const logger = createLogger('PushDevices');
  */
 export function PushDevicesPanel() {
   const t = useTranslations('settings.notifications.push');
+  // Who is reading. A push subscription belongs to an account, but the browser
+  // holds it per origin, so the reconciliation below has to know whether the
+  // subscription it can see is this account's at all.
+  const userId = useAuthStore((state) => state.user?.id ?? null);
 
   const [config, setConfig] = useState<PushConfig | null>(null);
   const [configFailed, setConfigFailed] = useState(false);
@@ -55,6 +60,39 @@ export function PushDevicesPanel() {
     setDevices(rows);
     setThisDevice(fingerprint);
     setDevicesFailed(false);
+  }, []);
+
+  /**
+   * Re-read what this browser supports whenever the user comes back to the page.
+   *
+   * `getPushSupport` reads `Notification.permission` and, on iOS, whether this
+   * window is the installed app -- both of which the user changes ELSEWHERE and
+   * then returns: site settings, or "Add to Home Screen". Read once on mount,
+   * the panel went on saying the browser had refused after the refusal was
+   * lifted, with the Enable button still hidden and no way to get it back short
+   * of a reload nobody was told to do.
+   *
+   * Only on becoming visible, and only when the answer actually differs, so a
+   * tab switch is not a re-render.
+   */
+  useEffect(() => {
+    const reread = () => {
+      if (document.visibilityState !== 'visible') return;
+      const next = getPushSupport();
+      setSupport((previous) =>
+        previous !== null &&
+        previous.supported === next.supported &&
+        previous.reason === next.reason
+          ? previous
+          : next,
+      );
+    };
+    document.addEventListener('visibilitychange', reread);
+    window.addEventListener('focus', reread);
+    return () => {
+      document.removeEventListener('visibilitychange', reread);
+      window.removeEventListener('focus', reread);
+    };
   }, []);
 
   // A browser can rotate its subscription on its own; the worker resubscribes
@@ -157,9 +195,17 @@ export function PushDevicesPanel() {
       liveFingerprints: devices
         .filter((device) => !device.disabledAt)
         .map((device) => device.endpointFingerprint),
-      registeredFingerprint: readRegisteredEndpoint(),
+      marker: readRegisteredEndpoint(),
+      readerUserId: userId,
     });
-    if (state.kind === 'in-sync' || state.kind === 'no-subscription') return;
+    if (
+      state.kind === 'in-sync' ||
+      state.kind === 'no-subscription' ||
+      // Somebody else's subscription in a shared browser. Not ours to repair.
+      state.kind === 'foreign'
+    ) {
+      return;
+    }
     reconciled.current = true;
     const publicKey = config.publicKey;
     (async () => {
@@ -177,7 +223,7 @@ export function PushDevicesPanel() {
         logger.error('Failed to reconcile this push subscription:', error);
       }
     })();
-  }, [config, thisDevice, devices, refreshDevices]);
+  }, [config, thisDevice, devices, refreshDevices, userId]);
 
   // A retired row is not a registration: after a key rotation the device is
   // listed with the copy telling the user to enable push again, and hiding the
