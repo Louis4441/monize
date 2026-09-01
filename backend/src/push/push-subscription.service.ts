@@ -72,6 +72,17 @@ export function hashEndpoint(endpoint: string): string {
 export const MAX_USER_AGENT_LENGTH = 255;
 
 /**
+ * Live devices one account may hold.
+ *
+ * `sendTest` fans out over every live row, so without a bound one account's
+ * request costs whatever that account chose to make it cost -- the same reason
+ * every request-supplied array in this codebase declares an upper size
+ * (`backend/CLAUDE.md`). Twenty is far past a person's real device count and
+ * far short of a useful lever.
+ */
+export const MAX_LIVE_DEVICES_PER_USER = 20;
+
+/**
  * A user's own push devices: registering one, listing them, removing one, and
  * sending that user a test notification.
  *
@@ -139,6 +150,27 @@ export class PushSubscriptionService {
     const vapidPublicKey = config.publicKey;
 
     const row = await withScopedDb(this.dataSource, async (manager) => {
+      // Counted inside the transaction that writes, so the check cannot be
+      // outrun by a concurrent subscribe. Refreshing a device the caller
+      // already holds is never blocked by the cap -- only a new row is.
+      const repo = manager.getRepository(PushSubscription);
+      const alreadyHeld = await repo.findOne({
+        where: { userId, endpointHash },
+      });
+      if (!alreadyHeld) {
+        const live = await repo.count({
+          where: { userId, disabledAt: IsNull() },
+        });
+        if (live >= MAX_LIVE_DEVICES_PER_USER) {
+          throw new BadRequestException(
+            tr(
+              "errors.push.tooManyDevices",
+              "This account already has the maximum number of push devices. Remove one before adding another.",
+            ),
+          );
+        }
+      }
+
       const ids = await this.claimEndpointForCaller(manager, {
         userId,
         dto,
@@ -373,6 +405,10 @@ export class PushSubscriptionService {
     // Transient: count it, and retire the device once the bound is reached so a
     // dead endpoint is not attempted forever.
     const retired = await withScopedDb(this.dataSource, async (manager) => {
+      // `disabled_at IS NULL` for the same reason the expired arm has it: two
+      // concurrent test sends can both hold this row, and a device already
+      // retired as GONE must not be relabelled FAILING -- the two ask the user
+      // for different repairs.
       const result = await manager.query(
         `UPDATE push_subscriptions
             SET failure_count = failure_count + 1,
@@ -382,8 +418,8 @@ export class PushSubscriptionService {
                 disabled_reason = CASE
                   WHEN failure_count + 1 >= $3 THEN $4
                   ELSE disabled_reason END
-          WHERE id = $1 AND user_id = $2
-      RETURNING disabled_reason`,
+          WHERE id = $1 AND user_id = $2 AND disabled_at IS NULL
+      RETURNING disabled_at, disabled_reason`,
         [
           subscriptionId,
           userId,
@@ -391,8 +427,18 @@ export class PushSubscriptionService {
           PushDisabledReason.FAILING,
         ],
       );
-      const rows = returnedRows<{ disabled_reason: string | null }>(result);
-      return rows[0]?.disabled_reason === PushDisabledReason.FAILING;
+      // The transition, not the resulting value: this attempt retired the
+      // device only if the row it just wrote is the one that went from live to
+      // disabled, which the guarded WHERE is what makes true.
+      const rows = returnedRows<{
+        disabled_at: Date | string | null;
+        disabled_reason: string | null;
+      }>(result);
+      return (
+        rows.length > 0 &&
+        rows[0].disabled_at !== null &&
+        rows[0].disabled_reason === PushDisabledReason.FAILING
+      );
     });
     return retired ? PushDisabledReason.FAILING : undefined;
   }
@@ -401,14 +447,26 @@ export class PushSubscriptionService {
 /** The table the classifier below looks for in a policy-violation message. */
 const PUSH_SUBSCRIPTIONS_TABLE = "push_subscriptions";
 
+/**
+ * The machine-readable half of the endpoint refusal.
+ *
+ * The client answers this one by unsubscribing and subscribing again for a
+ * fresh endpoint, and it must not answer any *other* 409 that way -- the key
+ * rotation refusal is also a 409, and recovering from it by unsubscribing
+ * destroys a working registration and then retries with the same stale key.
+ * Branching on the status alone is exactly that bug, so the code travels.
+ */
+export const ENDPOINT_CLAIMED_CODE = "pushEndpointClaimed";
+
 /** The one refusal this path can give, so its two arms cannot drift apart. */
 function endpointClaimed(): ConflictException {
-  return new ConflictException(
-    tr(
+  return new ConflictException({
+    message: tr(
       "errors.push.endpointClaimed",
       "This browser is already registered to a different Monize account. Sign out of that account in this browser and try again.",
     ),
-  );
+    errorCode: ENDPOINT_CLAIMED_CODE,
+  });
 }
 
 /** The arbiter index; named so the classifier below cannot answer for another. */

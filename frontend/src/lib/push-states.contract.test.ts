@@ -59,6 +59,24 @@ describe('push device states are one list, checked where it can be checked', () 
     ).toEqual(disabledReasons);
   });
 
+  // The client answers this one code by unsubscribing and re-subscribing, and
+  // must not answer any other 409 that way. A drifted literal would silently
+  // turn the recovery off (or, worse, on for the wrong refusal).
+  it('agrees with the server on the claimed-endpoint code', () => {
+    const backend = /ENDPOINT_CLAIMED_CODE = "([^"]+)"/.exec(
+      readFileSync(
+        resolve(repoRoot, 'backend/src/push/push-subscription.service.ts'),
+        'utf8',
+      ),
+    )?.[1];
+    const frontend = /ENDPOINT_CLAIMED_CODE = '([^']+)'/.exec(
+      readFileSync(resolve(repoRoot, 'frontend/src/lib/push.ts'), 'utf8'),
+    )?.[1];
+
+    expect(backend).toBeTruthy();
+    expect(frontend).toBe(backend);
+  });
+
   it('declares the same send outcomes on both sides of the API', () => {
     const backend = [
       ...readFileSync(

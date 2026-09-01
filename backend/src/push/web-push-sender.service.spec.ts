@@ -2,6 +2,7 @@ import * as webpush from "web-push";
 import {
   WebPushSender,
   MAX_CONSECUTIVE_FAILURES,
+  PUSH_REQUEST_TIMEOUT_MS,
 } from "./web-push-sender.service";
 import { PushConfigService, VAPID_SUBJECT } from "./push-config.service";
 import { PushDisabledReason } from "./entities/push-subscription.entity";
@@ -11,7 +12,16 @@ jest.mock("web-push", () => ({
   generateVAPIDKeys: jest.fn(),
 }));
 
+// The sender re-checks the endpoint before every send; this double keeps the
+// suite off real DNS and lets one test drive the refusal.
+jest.mock("../ai/validators/safe-url.validator", () => ({
+  validateUrlIsSafe: jest.fn().mockResolvedValue(true),
+}));
+
 const sendNotification = webpush.sendNotification as jest.Mock;
+const validateUrlIsSafe = jest.requireMock(
+  "../ai/validators/safe-url.validator",
+).validateUrlIsSafe as jest.Mock;
 
 const IDENTITY = { publicKey: "PUB-CURRENT", privateKey: "PRIV" };
 
@@ -33,6 +43,7 @@ describe("WebPushSender", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    validateUrlIsSafe.mockResolvedValue(true);
     pushConfig = { getVapidIdentity: jest.fn().mockResolvedValue(IDENTITY) };
     sender = new WebPushSender(pushConfig as unknown as PushConfigService);
     jest.spyOn(sender["logger"], "warn").mockImplementation(() => undefined);
@@ -56,6 +67,23 @@ describe("WebPushSender", () => {
       publicKey: "PUB-CURRENT",
       privateKey: "PRIV",
     });
+    // Node's https client has no default timeout and web-push adds none, so a
+    // user-supplied endpoint host that stalls would hold the socket -- and the
+    // request that triggered the send -- for as long as it liked.
+    expect(options.timeout).toBe(PUSH_REQUEST_TIMEOUT_MS);
+  });
+
+  // The endpoint is SSRF-checked when the row is written, and the row then names
+  // a host this server POSTs to for as long as it lives. A name that resolved
+  // publicly then and resolves to a private address now must not become an
+  // internal request.
+  it("refuses to send to an endpoint that no longer resolves publicly", async () => {
+    validateUrlIsSafe.mockResolvedValue(false);
+
+    await expect(sender.send(target(), PAYLOAD)).resolves.toMatchObject({
+      status: "transient",
+    });
+    expect(sendNotification).not.toHaveBeenCalled();
   });
 
   it("reports unconfigured, and sends nothing, when the instance has no usable identity", async () => {

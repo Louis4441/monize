@@ -268,6 +268,30 @@ describe('PushDevicesPanel', () => {
     expect(await screen.findByText(/Add to Home Screen/i)).toBeInTheDocument();
   });
 
+  // A browser that cannot receive push is still the browser somebody is sitting
+  // at when they want to revoke a device registered on another machine.
+  it('still lists and can remove devices on a browser that cannot receive push', async () => {
+    mockGetPushSupport.mockReturnValue({ supported: false, reason: 'denied' });
+    mockListDevices.mockResolvedValue([
+      device({
+        id: 'd-2',
+        endpointFingerprint: OTHER_DEVICE,
+        deviceName: 'Safari on iOS',
+      }),
+    ]);
+    mockRemoveDevice.mockResolvedValue(undefined);
+
+    render(<PushDevicesPanel />);
+
+    expect(await screen.findByText('Safari on iOS')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /enable on this device/i }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /remove/i }));
+    await waitFor(() => expect(mockRemoveDevice).toHaveBeenCalledWith('d-2'));
+  });
+
   it('explains a blocked permission as a browser setting to change', async () => {
     mockGetPushSupport.mockReturnValue({ supported: false, reason: 'denied' });
 

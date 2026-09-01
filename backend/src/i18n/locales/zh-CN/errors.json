@@ -348,7 +348,8 @@
     "noDevices": "此账户尚未注册推送设备。请先在此浏览器中启用推送通知。",
     "rotationUnavailable": "未设置 ENCRYPTION_KEY，因此无法加密存储新的私钥。请先设置并重启，然后再轮换。",
     "channelNotConfigured": "此实例尚无推送密钥对，因此无法开启或关闭浏览器推送渠道。",
-    "keyRotated": "在你停留在本页期间，此实例更换了推送密钥。请重新加载页面并再次启用推送。"
+    "keyRotated": "在你停留在本页期间，此实例更换了推送密钥。请重新加载页面并再次启用推送。",
+    "tooManyDevices": "此账户的推送设备数量已达上限。请先移除一台再添加。"
   },
   "institutions": {
     "nameConflict": "名为\"{{ name }}\"的机构已存在",

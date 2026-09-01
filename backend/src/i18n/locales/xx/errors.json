@@ -357,7 +357,8 @@
     "noDevices": "[XX-No push devices are registered for this account. Enable push notifications in this browser first.-XX]",
     "rotationUnavailable": "[XX-ENCRYPTION_KEY is not set, so a new private key could not be stored encrypted. Set it and restart before rotating.-XX]",
     "channelNotConfigured": "[XX-This instance has no push key pair yet, so the browser push channel cannot be switched on or off.-XX]",
-    "keyRotated": "[XX-This instance changed its push key while you were on this page. Reload and enable push again.-XX]"
+    "keyRotated": "[XX-This instance changed its push key while you were on this page. Reload and enable push again.-XX]",
+    "tooManyDevices": "[XX-This account already has the maximum number of push devices. Remove one before adding another.-XX]"
   },
   "institutions": {
     "nameConflict": "[XX-Institution with name \"{{ name }}\" already exists-XX]",

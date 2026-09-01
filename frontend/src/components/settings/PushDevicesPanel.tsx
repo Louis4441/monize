@@ -195,20 +195,20 @@ export function PushDevicesPanel() {
     );
   }
 
-  if (support && !support.supported) {
-    return (
-      <PushBlock heading={t('heading')}>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          {t(`unsupported.${support.reason ?? 'unsupported'}`)}
-        </p>
-      </PushBlock>
-    );
-  }
+  // A browser that cannot receive push still has to be able to SEE and REMOVE
+  // the devices this account registered elsewhere -- suppressing the list left a
+  // user with no way to revoke a device from the machine they were sitting at.
+  const unsupportedReason =
+    support && !support.supported
+      ? (support.reason ?? 'unsupported')
+      : undefined;
 
   return (
     <PushBlock heading={t('heading')}>
       <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
-        {t('description')}
+        {unsupportedReason
+          ? t(`unsupported.${unsupportedReason}`)
+          : t('description')}
       </p>
 
       {devicesFailed && (
@@ -255,7 +255,7 @@ export function PushDevicesPanel() {
       )}
 
       <div className="flex flex-wrap gap-2">
-        {!registeredHere && (
+        {!registeredHere && !unsupportedReason && (
           <Button
             variant="outline"
             size="sm"
@@ -275,7 +275,7 @@ export function PushDevicesPanel() {
         </Button>
       </div>
 
-      {liveDevices.length === 0 && (
+      {liveDevices.length === 0 && !unsupportedReason && (
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
           {t('noLiveDevices')}
         </p>

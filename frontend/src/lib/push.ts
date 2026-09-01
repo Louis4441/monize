@@ -1,4 +1,5 @@
 import apiClient from './api';
+import { getErrorCode } from './errors';
 
 /** Why a device stopped being reachable. Mirrors the backend enum. */
 export type PushDisabledReason = 'GONE' | 'KEY_ROTATED' | 'FAILING';
@@ -309,14 +310,19 @@ function postSubscription(
   return pushApi.subscribe({ ...payload, applicationServerKey, deviceName });
 }
 
-/** A 409 from `POST /push/subscriptions`: this endpoint belongs to someone else. */
+/** Matches `ENDPOINT_CLAIMED_CODE` in the backend's push subscription service. */
+export const ENDPOINT_CLAIMED_CODE = 'pushEndpointClaimed';
+
+/**
+ * This endpoint belongs to someone else -- and only that.
+ *
+ * Deliberately not "any 409": a key rotation between page load and click is
+ * also a 409, and answering it by unsubscribing would destroy a working
+ * registration and then retry with the same stale key, guaranteed to fail. The
+ * server ships a machine-readable code for exactly this branch.
+ */
 function isEndpointClaimed(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'response' in error &&
-    (error as { response?: { status?: number } }).response?.status === 409
-  );
+  return getErrorCode(error) === ENDPOINT_CLAIMED_CODE;
 }
 
 function keyMatches(

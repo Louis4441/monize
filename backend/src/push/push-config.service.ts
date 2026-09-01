@@ -203,14 +203,57 @@ export class PushConfigService implements OnApplicationBootstrap {
   }
 
   /**
-   * Whether the stored private half can still be opened by this server.
+   * The identity a stored ciphertext opens, decrypted at most once per key pair.
    *
-   * The failure it separates out is silent otherwise: the column is populated,
-   * every "is push configured?" check says yes, and only the send fails --
-   * exactly the shape `AiService` names for a stored API key it cannot decrypt.
+   * The memo is not an optimization detail, it is the difference between a
+   * usable endpoint and a blocked event loop: `EncryptionService.canDecrypt`
+   * derives its key with `scryptSync` -- tens of milliseconds, by design -- and
+   * its own doc comment says not to put it on a list path. This answer is
+   * needed on every `GET /push/config`, every subscribe and every send, so a
+   * ten-device test would otherwise have spent about a second of CPU deriving
+   * the same key twenty times.
+   *
+   * Keyed on the ciphertext, so a rotation invalidates it by construction and
+   * there is nothing to remember to clear. It holds the decrypted private key
+   * in process memory, which is a real trade and a small one: `ENCRYPTION_KEY`
+   * itself is already there, so anything that can read this could derive it
+   * anyway, and every send needs the plaintext regardless.
    */
+  private identityCache: {
+    ciphertext: string;
+    identity: VapidIdentity | null;
+  } | null = null;
+
+  /**
+   * The usable identity for a stored config, or `null` when this server cannot
+   * open it -- ENCRYPTION_KEY changed under a live database, or a backup landed
+   * on a different instance. The failure is silent otherwise: the column is
+   * populated, every "is push configured?" check says yes, and only the send
+   * finds out -- exactly the shape `AiService` names for a stored API key it
+   * cannot decrypt.
+   */
+  private resolveIdentity(config: PushInstanceConfig): VapidIdentity | null {
+    const ciphertext = config.vapidPrivateKeyEnc;
+    if (this.identityCache?.ciphertext === ciphertext) {
+      return this.identityCache.identity;
+    }
+    let identity: VapidIdentity | null = null;
+    try {
+      identity = this.encryption.isConfigured()
+        ? {
+            publicKey: config.vapidPublicKey,
+            privateKey: this.encryption.decrypt(ciphertext),
+          }
+        : null;
+    } catch {
+      identity = null;
+    }
+    this.identityCache = { ciphertext, identity };
+    return identity;
+  }
+
   private canUseKeyPair(config: PushInstanceConfig): boolean {
-    return this.encryption.canDecrypt(config.vapidPrivateKeyEnc);
+    return this.resolveIdentity(config) !== null;
   }
 
   async getAdminConfig(): Promise<AdminPushConfig> {
@@ -252,7 +295,8 @@ export class PushConfigService implements OnApplicationBootstrap {
   async getVapidIdentity(): Promise<VapidIdentity | null> {
     const config = await this.readConfig();
     if (!config || !config.webPushEnabled) return null;
-    if (!this.canUseKeyPair(config)) {
+    const identity = this.resolveIdentity(config);
+    if (!identity) {
       // A stored pair this instance cannot open is its own diagnosis: it
       // happens when ENCRYPTION_KEY changes under a live database. Saying so
       // beats an AES-GCM authentication failure surfacing as a generic 500.
@@ -261,10 +305,7 @@ export class PushConfigService implements OnApplicationBootstrap {
       );
       return null;
     }
-    return {
-      publicKey: config.vapidPublicKey,
-      privateKey: this.encryption.decrypt(config.vapidPrivateKeyEnc),
-    };
+    return identity;
   }
 
   async setWebPushEnabled(enabled: boolean): Promise<AdminPushConfig> {

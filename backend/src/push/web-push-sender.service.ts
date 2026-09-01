@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import * as webpush from "web-push";
 import { PushConfigService, VAPID_SUBJECT } from "./push-config.service";
 import { PushDisabledReason } from "./entities/push-subscription.entity";
+import { validateUrlIsSafe } from "../ai/validators/safe-url.validator";
 
 /**
  * How long the push service should hold a message for a device that is offline.
@@ -19,6 +20,17 @@ export const PUSH_TTL_SECONDS = 4 * 60 * 60;
  * forever.
  */
 export const MAX_CONSECUTIVE_FAILURES = 10;
+
+/**
+ * How long one delivery may take before it is abandoned.
+ *
+ * Node's https client has no default timeout and `web-push` adds none, so an
+ * endpoint host that accepts the connection and then stalls holds the socket --
+ * and the request that triggered the send -- for as long as it likes. The
+ * endpoint is a user-supplied host, which makes "as long as it likes" a choice
+ * somebody else gets to make.
+ */
+export const PUSH_REQUEST_TIMEOUT_MS = 10_000;
 
 /**
  * The minimal shape a delivery needs. Deliberately not the entity: the sender
@@ -94,6 +106,22 @@ export class WebPushSender {
       };
     }
 
+    // Re-checked on every send, not only at registration. `IsPushEndpoint` runs
+    // once, when the row is written, and the row then names a host this server
+    // POSTs to for as long as it lives -- so a name that resolved publicly then
+    // and resolves to a private address now would turn each send into an
+    // internal request. Reported as transient rather than as a distinct state:
+    // the bounded retry retires it as FAILING, which is what actually happened.
+    if (!(await validateUrlIsSafe(target.endpoint))) {
+      this.logger.warn(
+        "Refusing a push to an endpoint that no longer resolves to a public host",
+      );
+      return {
+        status: "transient",
+        message: "endpoint no longer resolves to a public host",
+      };
+    }
+
     try {
       await webpush.sendNotification(
         {
@@ -108,6 +136,7 @@ export class WebPushSender {
             privateKey: identity.privateKey,
           },
           TTL: PUSH_TTL_SECONDS,
+          timeout: PUSH_REQUEST_TIMEOUT_MS,
         },
       );
       return { status: "sent" };

@@ -6,6 +6,7 @@ import {
   currentDeviceFingerprint,
   disablePushOnThisDevice,
   releaseLocalPushSubscription,
+  ENDPOINT_CLAIMED_CODE,
   ServiceWorkerUnavailableError,
   SERVICE_WORKER_READY_TIMEOUT_MS,
   enablePushOnThisDevice,
@@ -434,7 +435,7 @@ describe('enabling and disabling push on this device', () => {
   // nobody holds.
   it('recovers from a claimed endpoint by subscribing again', async () => {
     const claimed = Object.assign(new Error('conflict'), {
-      response: { status: 409 },
+      response: { status: 409, data: { errorCode: ENDPOINT_CLAIMED_CODE } },
     });
     vi.mocked(apiClient.post)
       .mockRejectedValueOnce(claimed)
@@ -458,7 +459,7 @@ describe('enabling and disabling push on this device', () => {
   // claim, so it surfaces instead of looping.
   it('retries a claimed endpoint exactly once', async () => {
     const claimed = Object.assign(new Error('conflict'), {
-      response: { status: 409 },
+      response: { status: 409, data: { errorCode: ENDPOINT_CLAIMED_CODE } },
     });
     vi.mocked(apiClient.post).mockRejectedValue(claimed);
     getSubscription.mockResolvedValue(
@@ -469,21 +470,30 @@ describe('enabling and disabling push on this device', () => {
     expect(apiClient.post).toHaveBeenCalledTimes(2);
   });
 
-  it.each([400, 403, 500])(
-    'does not re-subscribe on a %s that is not a claimed endpoint',
-    async (status) => {
-      vi.mocked(apiClient.post).mockRejectedValue(
-        Object.assign(new Error('nope'), { response: { status } }),
-      );
-      getSubscription.mockResolvedValue(
-        browserSubscription(urlBase64ToUint8Array(PUBLIC_KEY).buffer),
-      );
+  // The key-rotation refusal is also a 409, and recovering from it by
+  // unsubscribing would destroy a working registration and retry with the same
+  // stale key. Branching on the status alone was exactly that bug.
+  it.each([
+    ['a plain 400', { status: 400 }],
+    ['a plain 403', { status: 403 }],
+    ['a 500', { status: 500 }],
+    ['a 409 that is not a claimed endpoint', { status: 409 }],
+    [
+      'a 409 carrying some other code',
+      { status: 409, data: { errorCode: 'somethingElse' } },
+    ],
+  ])('does not re-subscribe on %s', async (_name, response) => {
+    vi.mocked(apiClient.post).mockRejectedValue(
+      Object.assign(new Error('nope'), { response }),
+    );
+    getSubscription.mockResolvedValue(
+      browserSubscription(urlBase64ToUint8Array(PUBLIC_KEY).buffer),
+    );
 
-      await expect(enablePushOnThisDevice(PUBLIC_KEY)).rejects.toThrow('nope');
-      expect(unsubscribe).not.toHaveBeenCalled();
-      expect(apiClient.post).toHaveBeenCalledTimes(1);
-    },
-  );
+    await expect(enablePushOnThisDevice(PUBLIC_KEY)).rejects.toThrow('nope');
+    expect(unsubscribe).not.toHaveBeenCalled();
+    expect(apiClient.post).toHaveBeenCalledTimes(1);
+  });
 
   // Logout's half: the subscription is scoped to the origin, not the session,
   // so leaving it registered keeps delivering the departing account's

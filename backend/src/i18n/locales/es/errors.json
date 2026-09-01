@@ -348,7 +348,8 @@
     "noDevices": "No hay dispositivos push registrados en esta cuenta. Activa primero las notificaciones push en este navegador.",
     "rotationUnavailable": "ENCRYPTION_KEY no está definida, así que la nueva clave privada no se pudo guardar cifrada. Defínela y reinicia antes de rotar.",
     "channelNotConfigured": "Esta instancia todavía no tiene par de claves push, así que el canal de push del navegador no se puede activar ni desactivar.",
-    "keyRotated": "Esta instancia cambió su clave push mientras estabas en esta página. Recarga y activa el push de nuevo."
+    "keyRotated": "Esta instancia cambió su clave push mientras estabas en esta página. Recarga y activa el push de nuevo.",
+    "tooManyDevices": "Esta cuenta ya tiene el número máximo de dispositivos push. Elimina uno antes de añadir otro."
   },
   "institutions": {
     "nameConflict": "Ya existe una institución con el nombre \"{{ name }}\"",

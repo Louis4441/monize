@@ -8,6 +8,7 @@ import {
   PushSubscriptionService,
   ENDPOINT_FINGERPRINT_LENGTH,
   ENDPOINT_UNIQUE_INDEX,
+  MAX_LIVE_DEVICES_PER_USER,
   MAX_USER_AGENT_LENGTH,
   hashEndpoint,
 } from "./push-subscription.service";
@@ -75,6 +76,7 @@ describe("PushSubscriptionService", () => {
     subscriptionRepo = {
       find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn().mockResolvedValue(storedDevice()),
+      count: jest.fn().mockResolvedValue(0),
     };
     preferenceRepo = {
       findOne: jest.fn().mockResolvedValue({ language: "en" }),
@@ -134,11 +136,36 @@ describe("PushSubscriptionService", () => {
 
     it("refuses when the endpoint is registered to another account", async () => {
       manager.query.mockResolvedValue([[], 0]);
+      // The cap check reads first; the read-back after the insert is the one
+      // that must not happen once the write was refused.
+      subscriptionRepo.findOne.mockResolvedValue(null);
 
       await expect(service.subscribe(USER, DTO, null)).rejects.toThrow(
         ConflictException,
       );
-      expect(subscriptionRepo.findOne).not.toHaveBeenCalled();
+      expect(manager.query).toHaveBeenCalledTimes(1);
+    });
+
+    // `sendTest` fans out over every live row, so one account's request would
+    // otherwise cost whatever that account chose to make it cost.
+    it("refuses a new device past the per-account cap", async () => {
+      subscriptionRepo.findOne.mockResolvedValue(null);
+      subscriptionRepo.count.mockResolvedValue(MAX_LIVE_DEVICES_PER_USER);
+
+      await expect(service.subscribe(USER, DTO, null)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(manager.query).not.toHaveBeenCalled();
+    });
+
+    // Refreshing a device the caller already holds adds nothing, so the cap
+    // must not lock them out of the browser they are sitting at.
+    it("still refreshes a device the caller already holds at the cap", async () => {
+      subscriptionRepo.count.mockResolvedValue(MAX_LIVE_DEVICES_PER_USER);
+
+      await expect(service.subscribe(USER, DTO, null)).resolves.toMatchObject({
+        id: DEVICE_ID,
+      });
     });
 
     // Under enforced RLS the conflicting row is invisible to this transaction,
@@ -465,7 +492,10 @@ describe("PushSubscriptionService", () => {
     it("counts a transient failure without retiring the device", async () => {
       subscriptionRepo.find.mockResolvedValue([storedDevice()]);
       sender.send.mockResolvedValue({ status: "transient", message: "503" });
-      manager.query.mockResolvedValue([[{ disabled_reason: null }], 1]);
+      manager.query.mockResolvedValue([
+        [{ disabled_at: null, disabled_reason: null }],
+        1,
+      ]);
 
       const result = await service.sendTest(USER);
 
@@ -482,11 +512,33 @@ describe("PushSubscriptionService", () => {
       ]);
     });
 
+    // Two concurrent test sends can both hold one row. The device that has
+    // already been retired as GONE must keep that reason: GONE and FAILING ask
+    // the user for different repairs.
+    it("does not relabel a device another send already retired", async () => {
+      subscriptionRepo.find.mockResolvedValue([storedDevice()]);
+      sender.send.mockResolvedValue({ status: "transient", message: "503" });
+      manager.query.mockResolvedValue([[], 0]);
+
+      const result = await service.sendTest(USER);
+
+      expect(result.devices[0].disabledReason).toBeUndefined();
+      const [sql] = manager.query.mock.calls.find(([s]) =>
+        String(s).includes("failure_count = failure_count + 1"),
+      )!;
+      expect(sql).toContain("disabled_at IS NULL");
+    });
+
     it("retires a device once the retry bound is reached", async () => {
       subscriptionRepo.find.mockResolvedValue([storedDevice()]);
       sender.send.mockResolvedValue({ status: "transient", message: "503" });
       manager.query.mockResolvedValue([
-        [{ disabled_reason: PushDisabledReason.FAILING }],
+        [
+          {
+            disabled_at: new Date("2026-08-03T10:00:00Z"),
+            disabled_reason: PushDisabledReason.FAILING,
+          },
+        ],
         1,
       ]);
 
@@ -515,7 +567,10 @@ describe("PushSubscriptionService", () => {
       sender.send
         .mockResolvedValueOnce({ status: "transient", message: "503" })
         .mockResolvedValueOnce({ status: "sent" });
-      manager.query.mockResolvedValue([[{ disabled_reason: null }], 1]);
+      manager.query.mockResolvedValue([
+        [{ disabled_at: null, disabled_reason: null }],
+        1,
+      ]);
 
       const result = await service.sendTest(USER);
 

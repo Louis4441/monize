@@ -348,7 +348,8 @@
     "noDevices": "Belum ada perangkat push terdaftar untuk akun ini. Aktifkan notifikasi push di peramban ini terlebih dahulu.",
     "rotationUnavailable": "ENCRYPTION_KEY belum disetel, sehingga kunci privat baru tidak dapat disimpan terenkripsi. Setel dan mulai ulang sebelum merotasi.",
     "channelNotConfigured": "Instans ini belum memiliki pasangan kunci push, sehingga kanal push peramban tidak dapat dinyalakan atau dimatikan.",
-    "keyRotated": "Instans ini mengganti kunci push saat Anda berada di halaman ini. Muat ulang lalu aktifkan push lagi."
+    "keyRotated": "Instans ini mengganti kunci push saat Anda berada di halaman ini. Muat ulang lalu aktifkan push lagi.",
+    "tooManyDevices": "Akun ini sudah mencapai jumlah maksimum perangkat push. Hapus satu sebelum menambah yang lain."
   },
   "institutions": {
     "nameConflict": "Institusi bernama \"{{ name }}\" sudah ada",

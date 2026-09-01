@@ -348,7 +348,8 @@
     "noDevices": "Do tego konta nie przypisano żadnego urządzenia push. Najpierw włącz powiadomienia push w tej przeglądarce.",
     "rotationUnavailable": "Nie ustawiono ENCRYPTION_KEY, więc nowego klucza prywatnego nie dało się zapisać zaszyfrowanego. Ustaw ją i uruchom ponownie przed wymianą.",
     "channelNotConfigured": "Ta instancja nie ma jeszcze pary kluczy push, więc kanału push w przeglądarce nie da się włączyć ani wyłączyć.",
-    "keyRotated": "Ta instancja zmieniła klucz push, gdy ta strona była otwarta. Odśwież stronę i włącz push ponownie."
+    "keyRotated": "Ta instancja zmieniła klucz push, gdy ta strona była otwarta. Odśwież stronę i włącz push ponownie.",
+    "tooManyDevices": "To konto ma już maksymalną liczbę urządzeń push. Usuń jedno, zanim dodasz kolejne."
   },
   "institutions": {
     "nameConflict": "Instytucja o nazwie \"{{ name }}\" już istnieje",

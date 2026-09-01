@@ -79,13 +79,21 @@ describe("PushConfigService", () => {
       return fn(txManager);
     });
     manager.query.mockResolvedValue([[], 0]);
+    // One coherent double: `decrypt` throwing IS what "cannot be read" means, so
+    // a spec cannot set up a state the real service could not produce. A
+    // ciphertext this double refuses is spelled `unreadable(...)`.
     encryption = {
       isConfigured: jest.fn().mockReturnValue(true),
       encrypt: jest.fn((plain: string) => `enc(${plain})`),
-      decrypt: jest.fn((cipher: string) =>
-        cipher.replace(/^enc\((.*)\)$/, "$1"),
+      decrypt: jest.fn((cipher: string) => {
+        if (cipher.startsWith("unreadable(")) {
+          throw new Error("Unsupported state or unable to authenticate data");
+        }
+        return cipher.replace(/^enc\((.*)\)$/, "$1");
+      }),
+      canDecrypt: jest.fn(
+        (cipher: string) => !cipher.startsWith("unreadable("),
       ),
-      canDecrypt: jest.fn().mockReturnValue(true),
     };
     generateVAPIDKeys.mockReturnValue({
       publicKey: "PUB-NEW",
@@ -198,8 +206,9 @@ describe("PushConfigService", () => {
 
       // ...and from a key pair this server cannot open, which the account
       // surface would otherwise render as "an administrator switched it off".
-      configRepo.findOne.mockResolvedValue(storedConfig());
-      encryption.canDecrypt.mockReturnValue(false);
+      configRepo.findOne.mockResolvedValue(
+        storedConfig({ vapidPrivateKeyEnc: "unreadable(PRIV-STORED)" }),
+      );
       await expect(service.getPublicConfig()).resolves.toEqual({
         enabled: false,
         publicKey: "PUB-STORED",
@@ -236,8 +245,9 @@ describe("PushConfigService", () => {
     // fails. An administrator looking at a green channel has no reason to
     // rotate, which is the one repair.
     beforeEach(() => {
-      configRepo.findOne.mockResolvedValue(storedConfig());
-      encryption.canDecrypt.mockReturnValue(false);
+      configRepo.findOne.mockResolvedValue(
+        storedConfig({ vapidPrivateKeyEnc: "unreadable(PRIV-STORED)" }),
+      );
     });
 
     it("is not an enabled channel, on either surface", async () => {
@@ -287,11 +297,40 @@ describe("PushConfigService", () => {
     // A pair this instance cannot open happens when ENCRYPTION_KEY changes under
     // a live database. Returning null names it; letting AES-GCM throw does not.
     it("withholds the identity, and does not throw, when the stored pair cannot be decrypted", async () => {
-      configRepo.findOne.mockResolvedValue(storedConfig());
-      encryption.canDecrypt.mockReturnValue(false);
+      configRepo.findOne.mockResolvedValue(
+        storedConfig({ vapidPrivateKeyEnc: "unreadable(PRIV-STORED)" }),
+      );
 
       await expect(service.getVapidIdentity()).resolves.toBeNull();
-      expect(encryption.decrypt).not.toHaveBeenCalled();
+    });
+
+    // `canDecrypt` derives its key with scryptSync -- tens of milliseconds by
+    // design, and its own doc comment says not to put it on a list path. This
+    // answer is needed on every config read, subscribe and send, so the derived
+    // identity is memoised per key pair rather than per call.
+    it("derives the key once per key pair, not once per caller", async () => {
+      configRepo.findOne.mockResolvedValue(storedConfig());
+
+      await service.getVapidIdentity();
+      await service.getVapidIdentity();
+      await service.getPublicConfig();
+      await service.getPublicConfig();
+
+      expect(encryption.decrypt).toHaveBeenCalledTimes(1);
+    });
+
+    it("re-derives once the stored pair changes", async () => {
+      configRepo.findOne.mockResolvedValue(storedConfig());
+      await service.getVapidIdentity();
+
+      configRepo.findOne.mockResolvedValue(
+        storedConfig({ vapidPrivateKeyEnc: "enc(PRIV-ROTATED)" }),
+      );
+      await expect(service.getVapidIdentity()).resolves.toEqual({
+        publicKey: "PUB-STORED",
+        privateKey: "PRIV-ROTATED",
+      });
+      expect(encryption.decrypt).toHaveBeenCalledTimes(2);
     });
   });
 
