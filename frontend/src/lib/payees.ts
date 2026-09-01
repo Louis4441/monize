@@ -32,36 +32,10 @@ export function payeeLogoUrl(id: string): string {
   return `/api/v1/payees/${id}/logo`;
 }
 
-/**
- * A map raster tile, served from our own backend rather than a tile provider.
- *
- * Same rule as the payee logo above: the bytes come from this origin, so the
- * browser never contacts a third party -- which the nonce-based CSP would block
- * anyway. The backend caches each tile, so repeat views cost no upstream
- * request.
- */
-export function mapTileUrl(z: number, x: number, y: number): string {
-  return `/api/v1/map-tiles/${z}/${x}/${y}`;
-}
-
 export const payeesApi = {
   // Re-fetch the payee's brand favicon from its current website
   refreshLogo: async (id: string): Promise<Payee> => {
     const response = await apiClient.post<Payee>(`/payees/${id}/refresh-logo`);
-    invalidateCache('payees:');
-    return response.data;
-  },
-
-  /**
-   * Re-run the location lookup for the payee's stored address. The escape
-   * hatch for the backend's value-difference guard: because an unchanged
-   * address is never re-geocoded, a payee whose lookup failed can only be
-   * retried explicitly.
-   */
-  refreshGeocode: async (id: string): Promise<Payee> => {
-    const response = await apiClient.post<Payee>(
-      `/payees/${id}/refresh-geocode`,
-    );
     invalidateCache('payees:');
     return response.data;
   },

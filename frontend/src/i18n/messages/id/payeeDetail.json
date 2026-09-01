@@ -99,15 +99,6 @@
     "email": "Email",
     "notes": "Catatan"
   },
-  "map": {
-    "title": "Lokasi",
-    "attribution": "(c) Kontributor OpenStreetMap",
-    "openInMaps": "Buka alamat ini di aplikasi peta Anda",
-    "notLocated": "Alamat ini tidak dapat ditemukan di peta.",
-    "retryLookup": "Coba lagi pencarian lokasi",
-    "retrying": "Mencari...",
-    "retryFailed": "Tidak dapat mencari alamat ini. Silakan coba lagi nanti."
-  },
   "tabs": {
     "ariaLabel": "Bagian penerima",
     "overview": "Ringkasan",

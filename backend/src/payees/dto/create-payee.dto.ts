@@ -67,7 +67,7 @@ export class CreatePayeeDto {
     example: "1912 Pike Pl, Seattle, WA 98101",
     required: false,
     description:
-      "Free-text postal address. Geocoded server-side to place the payee on a map.",
+      "Free-text postal address, rendered as a link that opens the reader's maps app.",
   })
   @IsOptional()
   // Same "" -> clear contract as `website` above: the form sends an empty

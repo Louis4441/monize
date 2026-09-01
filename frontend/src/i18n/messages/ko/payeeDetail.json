@@ -99,15 +99,6 @@
     "email": "이메일",
     "notes": "메모"
   },
-  "map": {
-    "title": "위치",
-    "attribution": "(c) OpenStreetMap 기여자",
-    "openInMaps": "이 주소를 기본 지도 앱에서 열기",
-    "notLocated": "지도에서 이 주소를 찾을 수 없습니다.",
-    "retryLookup": "위치 조회 다시 시도",
-    "retrying": "조회 중...",
-    "retryFailed": "이 주소를 조회할 수 없습니다. 나중에 다시 시도하세요."
-  },
   "tabs": {
     "ariaLabel": "수취인 섹션",
     "overview": "개요",

@@ -99,15 +99,6 @@
     "email": "E-mail",
     "notes": "Note"
   },
-  "map": {
-    "title": "Posizione",
-    "attribution": "(c) Contributori di OpenStreetMap",
-    "openInMaps": "Apri questo indirizzo nella tua app di mappe",
-    "notLocated": "Non è stato possibile trovare questo indirizzo sulla mappa.",
-    "retryLookup": "Riprova la ricerca della posizione",
-    "retrying": "Ricerca in corso...",
-    "retryFailed": "Non è stato possibile cercare questo indirizzo. Riprova più tardi."
-  },
   "tabs": {
     "ariaLabel": "Sezioni del beneficiario",
     "overview": "Panoramica",

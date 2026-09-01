@@ -99,15 +99,6 @@
     "email": "[XX-Email-XX]",
     "notes": "[XX-Notes-XX]"
   },
-  "map": {
-    "title": "[XX-Location-XX]",
-    "attribution": "[XX-(c) OpenStreetMap contributors-XX]",
-    "openInMaps": "[XX-Open this address in your maps app-XX]",
-    "notLocated": "[XX-This address could not be found on the map.-XX]",
-    "retryLookup": "[XX-Retry location lookup-XX]",
-    "retrying": "[XX-Looking up...-XX]",
-    "retryFailed": "[XX-Could not look up this address. Please try again later.-XX]"
-  },
   "tabs": {
     "ariaLabel": "[XX-Payee detail sections-XX]",
     "overview": "[XX-Overview-XX]",

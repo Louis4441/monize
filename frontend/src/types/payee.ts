@@ -24,19 +24,6 @@ export interface Payee {
   address: string | null;
   email: string | null;
   phone: string | null;
-  /**
-   * Where `address` resolved to, looked up server-side. Null when the address
-   * has not been located -- which `geocodedAt` disambiguates.
-   */
-  latitude: number | null;
-  longitude: number | null;
-  /**
-   * Last time the address was looked up, successfully or not. Null means never
-   * looked up (no address, or it was cleared); set with a null `latitude`
-   * means the lookup ran and found nothing, which is the only case where
-   * offering a retry would do anything.
-   */
-  geocodedAt: string | null;
   isActive: boolean;
   createdAt: string;
   transactionCount?: number;

@@ -99,15 +99,6 @@
     "email": "E-mail",
     "notes": "Notes"
   },
-  "map": {
-    "title": "Emplacement",
-    "attribution": "(c) Les contributeurs OpenStreetMap",
-    "openInMaps": "Ouvrir cette adresse dans votre application de cartes",
-    "notLocated": "Cette adresse est introuvable sur la carte.",
-    "retryLookup": "Relancer la recherche de l'emplacement",
-    "retrying": "Recherche...",
-    "retryFailed": "Impossible de localiser cette adresse. Veuillez réessayer plus tard."
-  },
   "tabs": {
     "ariaLabel": "Sections du bénéficiaire",
     "overview": "Aperçu",

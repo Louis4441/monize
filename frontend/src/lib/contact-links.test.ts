@@ -45,69 +45,43 @@ describe('addressQuery', () => {
 });
 
 describe('mapsUrl', () => {
-  const point = { latitude: 47.609722, longitude: -122.342201 };
   const address = '1912 Pike Pl, Seattle';
 
-  it('opens Apple Maps at the coordinates on iOS', () => {
-    const url = mapsUrl({ ...point, address, platform: 'ios' });
-
-    expect(url).toContain('https://maps.apple.com/?ll=47.609722,-122.342201');
-    expect(url).toContain(`q=${encodeURIComponent(address)}`);
+  it('opens Apple Maps with the address on iOS', () => {
+    expect(mapsUrl({ address, platform: 'ios' })).toBe(
+      `https://maps.apple.com/?q=${encodeURIComponent(address)}`,
+    );
   });
 
-  it('drops a geo: pin at the coordinates on Android', () => {
-    const url = mapsUrl({ ...point, address, platform: 'android' });
-
-    // The q=lat,lng(Label) form pins the exact point; a bare q= would search
-    // near it and can land on a different building.
-    expect(url).toBe(
-      `geo:47.609722,-122.342201?q=47.609722,-122.342201(${encodeURIComponent(address)})`,
+  it('hands the address to the default app via geo: on Android', () => {
+    // geo:0,0?q=<text> searches; a bare geo:0,0 would drop a pin in the
+    // Atlantic.
+    expect(mapsUrl({ address, platform: 'android' })).toBe(
+      `geo:0,0?q=${encodeURIComponent(address)}`,
     );
   });
 
   it('links a web map elsewhere', () => {
-    const url = mapsUrl({ ...point, address, platform: 'other' });
-
-    expect(url).toContain('openstreetmap.org');
-    expect(url).toContain('mlat=47.609722');
-    expect(url).toContain('mlon=-122.342201');
+    expect(mapsUrl({ address, platform: 'other' })).toBe(
+      `https://www.openstreetmap.org/search?query=${encodeURIComponent(address)}`,
+    );
   });
 
-  describe('when the address was never located', () => {
-    const unlocated = { latitude: null, longitude: null, address };
-
-    it('still hands the address over as a search on iOS', () => {
-      expect(mapsUrl({ ...unlocated, platform: 'ios' })).toBe(
-        `https://maps.apple.com/?q=${encodeURIComponent(address)}`,
-      );
+  it('collapses a multi-line address into the query', () => {
+    const url = mapsUrl({
+      address: '1912 Pike Pl\nSeattle, WA',
+      platform: 'other',
     });
 
-    it('still hands the address over as a search on Android', () => {
-      expect(mapsUrl({ ...unlocated, platform: 'android' })).toBe(
-        `geo:0,0?q=${encodeURIComponent(address)}`,
-      );
-    });
-
-    it('still hands the address over as a search on the web', () => {
-      expect(mapsUrl({ ...unlocated, platform: 'other' })).toContain(
-        `search?query=${encodeURIComponent(address)}`,
-      );
-    });
+    expect(url).toContain(encodeURIComponent('1912 Pike Pl, Seattle, WA'));
   });
 
-  it('returns null when there is neither a point nor an address', () => {
-    expect(
-      mapsUrl({ latitude: null, longitude: null, address: '  ', platform: 'ios' }),
-    ).toBeNull();
+  it('returns null when there is no address to search for', () => {
+    expect(mapsUrl({ address: '  ', platform: 'ios' })).toBeNull();
   });
 
   it('encodes an address that would otherwise break out of the query', () => {
-    const url = mapsUrl({
-      latitude: null,
-      longitude: null,
-      address: 'A & B St #3?x=1',
-      platform: 'other',
-    });
+    const url = mapsUrl({ address: 'A & B St #3?x=1', platform: 'other' });
 
     expect(url).not.toContain('&x=1');
     expect(url).toContain(encodeURIComponent('A & B St #3?x=1'));

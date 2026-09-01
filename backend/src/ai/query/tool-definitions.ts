@@ -634,7 +634,7 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
               address: {
                 type: "string",
                 description:
-                  "create/update: the payee's postal address as free text. Setting one also resolves its map location. update: empty string clears it.",
+                  "create/update: the payee's postal address as free text. update: empty string clears it.",
               },
               email: {
                 type: "string",

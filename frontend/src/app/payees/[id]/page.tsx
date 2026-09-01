@@ -16,7 +16,6 @@ import { Tabs, TabPanel } from '@/components/ui/Tabs';
 import { PayeeDetailHeader } from '@/components/payees/detail/PayeeDetailHeader';
 import { PayeeSummaryCards } from '@/components/payees/detail/PayeeSummaryCards';
 import { PayeeKeyInfoCard } from '@/components/payees/detail/PayeeKeyInfoCard';
-import { PayeeLocationMap } from '@/components/payees/detail/PayeeLocationMap';
 import { PayeeRecurringPanel } from '@/components/payees/detail/PayeeRecurringPanel';
 import { PayeeSeasonalityPanel } from '@/components/payees/detail/PayeeSeasonalityPanel';
 import { TopGroupsPanel } from '@/components/accounts/shared/TopGroupsPanel';
@@ -634,22 +633,18 @@ function PayeeDetailContent() {
                       filterLabel={payee.name}
                     />
                   </div>
-                  <div className="space-y-6">
-                    <PayeeKeyInfoCard
-                      detail={detail}
-                      categoryLabelMap={categoryLabelMap}
-                      // The largest transaction narrows the register to its own
-                      // day, so the row it names is the one on screen.
-                      onSelectDate={(date) =>
-                        goToRegister({ startDate: date, endDate: date })
-                      }
-                      onSelectAccount={(accountId) =>
-                        router.push(`/accounts/${accountId}`)
-                      }
-                    />
-                    {/* Renders nothing when the payee has no address. */}
-                    <PayeeLocationMap payee={payee} onRefreshed={loadData} />
-                  </div>
+                  <PayeeKeyInfoCard
+                    detail={detail}
+                    categoryLabelMap={categoryLabelMap}
+                    // The largest transaction narrows the register to its own
+                    // day, so the row it names is the one on screen.
+                    onSelectDate={(date) =>
+                      goToRegister({ startDate: date, endDate: date })
+                    }
+                    onSelectAccount={(accountId) =>
+                      router.push(`/accounts/${accountId}`)
+                    }
+                  />
                 </div>
 
                 <div className="grid gap-6 lg:grid-cols-2">

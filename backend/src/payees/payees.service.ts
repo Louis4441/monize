@@ -36,11 +36,6 @@ import { withScopedDb } from "../common/db/scoped-db";
 import { normalizeWebsite } from "../common/normalize-website";
 import { FaviconService, FetchedLogo } from "../common/favicon/favicon.service";
 import { brandLogoColumns } from "../common/favicon/brand-logo.columns";
-import { GeocodingService } from "../common/geocoding/geocoding.service";
-import {
-  CLEARED_GEOCODE_COLUMNS,
-  geocodeColumns,
-} from "../common/geocoding/geocode.columns";
 
 /**
  * Resolved, sanitized preview of a proposed new payee. Shared by the AI
@@ -169,7 +164,6 @@ export class PayeesService {
     private dataSource: DataSource,
     private actionHistoryService: ActionHistoryService,
     private faviconService: FaviconService,
-    private geocodingService: GeocodingService,
   ) {}
 
   async create(userId: string, createPayeeDto: CreatePayeeDto): Promise<Payee> {
@@ -189,13 +183,6 @@ export class PayeesService {
     const address = normalizeContactField(createPayeeDto.address) ?? null;
     const email = normalizeContactField(createPayeeDto.email) ?? null;
     const phone = normalizeContactField(createPayeeDto.phone) ?? null;
-    // Same best-effort contract as the favicon above, and outside any
-    // transaction for the same reason: a slow geocoder must not hold a
-    // connection, and a failed lookup must not fail the create.
-    const geocode = address
-      ? await this.geocodingService.geocode(address)
-      : null;
-
     const saved = await withScopedDb(this.dataSource, async (m) => {
       const repo = m.getRepository(Payee);
       // Check if payee with same name already exists for this user
@@ -226,9 +213,6 @@ export class PayeesService {
         address,
         email,
         phone,
-        // Same rule for the address: with none, geocoded_at stays null so the
-        // UI knows no lookup has been attempted rather than that one failed.
-        ...(address ? geocodeColumns(geocode) : CLEARED_GEOCODE_COLUMNS),
         userId,
       });
 
@@ -247,12 +231,6 @@ export class PayeesService {
         address: saved.address,
         email: saved.email,
         phone: saved.phone,
-        // The point travels with the address it was resolved from -- restoring
-        // one without the other leaves the map pointing somewhere the payee is
-        // not.
-        latitude: saved.latitude,
-        longitude: saved.longitude,
-        geocodedAt: saved.geocodedAt,
         defaultCategoryId: saved.defaultCategoryId,
         isActive: saved.isActive,
       },
@@ -665,34 +643,6 @@ export class PayeesService {
     return this.findOne(userId, id);
   }
 
-  /**
-   * Re-run the location lookup for a payee's stored address.
-   *
-   * The escape hatch for the value-difference guard in `update`: because an
-   * unchanged address is deliberately never re-geocoded, a payee whose lookup
-   * failed while the geocoder was down would otherwise stay maplessly stuck
-   * forever -- re-saving the same address does nothing by design. This is what
-   * the "retry location lookup" affordance on the payee page calls.
-   */
-  async refreshGeocode(userId: string, id: string): Promise<Payee> {
-    const payee = await this.findOne(userId, id);
-    const geocode = payee.address
-      ? await this.geocodingService.geocode(payee.address)
-      : null;
-
-    await withScopedDb(this.dataSource, (m) =>
-      m.update(
-        Payee,
-        { id, userId },
-        // No address means nothing was attempted, so the stamp clears too --
-        // exactly as it does when an address is removed through `update`.
-        payee.address ? geocodeColumns(geocode) : CLEARED_GEOCODE_COLUMNS,
-      ),
-    );
-
-    return this.findOne(userId, id);
-  }
-
   async search(
     userId: string,
     query: string,
@@ -860,10 +810,6 @@ export class PayeesService {
       address: payee.address,
       email: payee.email,
       phone: payee.phone,
-      // See create(): the point is part of the address, not a separate fact.
-      latitude: payee.latitude,
-      longitude: payee.longitude,
-      geocodedAt: payee.geocodedAt,
       defaultCategoryId: payee.defaultCategoryId,
       isActive: payee.isActive,
     };
@@ -926,26 +872,9 @@ export class PayeesService {
       updateFields.email = normalizeContactField(updatePayeeDto.email) ?? null;
     if (updatePayeeDto.phone !== undefined)
       updateFields.phone = normalizeContactField(updatePayeeDto.phone) ?? null;
-    if (updatePayeeDto.address !== undefined) {
-      const address = normalizeContactField(updatePayeeDto.address) ?? null;
-      updateFields.address = address;
-      // Re-resolve the location only when the address actually changed. The
-      // form resends the current address on every save, so keying this off the
-      // field being *present* would geocode on a rename -- spending a request
-      // against a rate-limited service, and replacing good coordinates with
-      // whatever a failed lookup returns. Clearing the address clears the
-      // point, and clears the attempt stamp with it: nothing was tried, so the
-      // UI must not offer to retry.
-      if (address !== payee.address) {
-        const geocode = address
-          ? await this.geocodingService.geocode(address)
-          : null;
-        Object.assign(
-          updateFields,
-          address ? geocodeColumns(geocode) : CLEARED_GEOCODE_COLUMNS,
-        );
-      }
-    }
+    if (updatePayeeDto.address !== undefined)
+      updateFields.address =
+        normalizeContactField(updatePayeeDto.address) ?? null;
     if (updatePayeeDto.isActive !== undefined)
       updateFields.isActive = updatePayeeDto.isActive;
 
@@ -1020,9 +949,6 @@ export class PayeesService {
         address: refreshed.address,
         email: refreshed.email,
         phone: refreshed.phone,
-        latitude: refreshed.latitude,
-        longitude: refreshed.longitude,
-        geocodedAt: refreshed.geocodedAt,
         defaultCategoryId: refreshed.defaultCategoryId,
         isActive: refreshed.isActive,
       },

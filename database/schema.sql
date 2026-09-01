@@ -219,17 +219,12 @@ CREATE TABLE payees (
     has_logo BOOLEAN NOT NULL DEFAULT false,
     logo_fetched_at TIMESTAMP,
     -- Contact information. address is free text (one field, not structured
-    -- parts) because formats are locale-specific and the geocoder takes a
-    -- single query string. latitude/longitude are resolved server-side so the
-    -- browser never contacts a third party; geocoded_at stamps the ATTEMPT,
-    -- successful or not, the way logo_fetched_at does -- so NULL means "never
-    -- looked up", and set-with-NULL-latitude means "looked up, nothing found".
+    -- parts) because formats are locale-specific and its only consumer is a
+    -- maps link that takes a single query string. phone is stored as written --
+    -- country codes, spaces, brackets and extensions all survive.
     address TEXT,
     email VARCHAR(255),
     phone VARCHAR(50),
-    latitude NUMERIC(9,6),
-    longitude NUMERIC(9,6),
-    geocoded_at TIMESTAMP,
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, name)

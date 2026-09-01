@@ -99,15 +99,6 @@
     "email": "電子郵件",
     "notes": "備註"
   },
-  "map": {
-    "title": "位置",
-    "attribution": "(c) OpenStreetMap 貢獻者",
-    "openInMaps": "在您的地圖應用程式中開啟此地址",
-    "notLocated": "在地圖上找不到此地址。",
-    "retryLookup": "重試位置查詢",
-    "retrying": "正在查詢...",
-    "retryFailed": "無法查詢此地址。請稍後再試。"
-  },
   "tabs": {
     "ariaLabel": "收款人各區塊",
     "overview": "總覽",

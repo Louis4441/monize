@@ -18,9 +18,6 @@ function payee(id: string, name: string): Payee {
     address: null,
     email: null,
     phone: null,
-    latitude: null,
-    longitude: null,
-    geocodedAt: null,
     isActive: true,
     createdAt: '2024-01-01T00:00:00.000Z',
   };

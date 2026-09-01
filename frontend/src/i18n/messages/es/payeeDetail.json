@@ -99,15 +99,6 @@
     "email": "Correo electrónico",
     "notes": "Notas"
   },
-  "map": {
-    "title": "Ubicación",
-    "attribution": "(c) Colaboradores de OpenStreetMap",
-    "openInMaps": "Abrir esta dirección en su aplicación de mapas",
-    "notLocated": "No se ha podido encontrar esta dirección en el mapa.",
-    "retryLookup": "Reintentar la búsqueda de ubicación",
-    "retrying": "Buscando...",
-    "retryFailed": "No se ha podido buscar esta dirección. Inténtelo de nuevo más tarde."
-  },
   "tabs": {
     "ariaLabel": "Secciones del beneficiario",
     "overview": "Resumen",

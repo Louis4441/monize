@@ -42,13 +42,7 @@ export function PayeeKeyInfoCard({
   // Each contact value is turned into a link by its own guard, and a value the
   // guard rejects still renders as text rather than disappearing -- a stored
   // "call the shop" is worth showing even though it cannot be dialled.
-  const addressLink = payee.address
-    ? mapsUrl({
-        latitude: payee.latitude,
-        longitude: payee.longitude,
-        address: payee.address,
-      })
-    : null;
+  const addressLink = payee.address ? mapsUrl({ address: payee.address }) : null;
   const phoneLink = telHref(payee.phone);
   const emailLink = mailtoHref(payee.email);
 

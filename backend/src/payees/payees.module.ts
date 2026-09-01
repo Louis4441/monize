@@ -12,7 +12,6 @@ import { PayeeAutoMergeService } from "./payee-auto-merge.service";
 import { PayeesController } from "./payees.controller";
 import { ActionHistoryModule } from "../action-history/action-history.module";
 import { FaviconModule } from "../common/favicon/favicon.module";
-import { GeocodingModule } from "../common/geocoding/geocoding.module";
 
 @Module({
   imports: [
@@ -25,7 +24,6 @@ import { GeocodingModule } from "../common/geocoding/geocoding.module";
     ]),
     ActionHistoryModule,
     FaviconModule,
-    GeocodingModule,
   ],
   providers: [
     PayeesService,

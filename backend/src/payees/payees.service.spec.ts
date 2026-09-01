@@ -17,7 +17,6 @@ import {
   DataSourceMock,
 } from "../test-helpers/scoped-db-testing";
 import { FaviconService } from "../common/favicon/favicon.service";
-import { GeocodingService } from "../common/geocoding/geocoding.service";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -50,9 +49,6 @@ describe("PayeesService", () => {
     address: null,
     email: null,
     phone: null,
-    latitude: null,
-    longitude: null,
-    geocodedAt: null,
     defaultCategory: { id: "cat-1", name: "Food & Drink" } as any,
     isActive: true,
     createdAt: new Date("2025-01-01"),
@@ -72,9 +68,6 @@ describe("PayeesService", () => {
     address: null,
     email: null,
     phone: null,
-    latitude: null,
-    longitude: null,
-    geocodedAt: null,
     defaultCategory: null as any,
     isActive: true,
     createdAt: new Date("2025-01-02"),
@@ -85,11 +78,9 @@ describe("PayeesService", () => {
   // Typed against the real service so a signature change breaks the double
   // rather than leaving it describing a contract nothing has any more.
   let faviconService: jest.Mocked<Pick<FaviconService, "fetchFavicon">>;
-  let geocodingService: jest.Mocked<Pick<GeocodingService, "geocode">>;
 
   beforeEach(async () => {
     faviconService = { fetchFavicon: jest.fn().mockResolvedValue(null) };
-    geocodingService = { geocode: jest.fn().mockResolvedValue(null) };
     queryBuilderMock = {
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
@@ -207,7 +198,6 @@ describe("PayeesService", () => {
           useValue: { record: jest.fn().mockResolvedValue(null) },
         },
         { provide: FaviconService, useValue: faviconService },
-        { provide: GeocodingService, useValue: geocodingService },
       ],
     }).compile();
 
@@ -235,9 +225,6 @@ describe("PayeesService", () => {
         address: null,
         email: null,
         phone: null,
-        latitude: null,
-        longitude: null,
-        geocodedAt: null,
         userId,
       });
       expect(payeesRepository.save).toHaveBeenCalled();
@@ -289,9 +276,6 @@ describe("PayeesService", () => {
         address: null,
         email: null,
         phone: null,
-        latitude: null,
-        longitude: null,
-        geocodedAt: null,
         userId,
       });
     });
@@ -502,9 +486,6 @@ describe("PayeesService", () => {
         address: null,
         email: null,
         phone: null,
-        latitude: null,
-        longitude: null,
-        geocodedAt: null,
         userId,
       });
       expect(payeesRepository.save).toHaveBeenCalled();
@@ -522,9 +503,6 @@ describe("PayeesService", () => {
         address: null,
         email: null,
         phone: null,
-        latitude: null,
-        longitude: null,
-        geocodedAt: null,
         userId,
       });
     });
@@ -2483,15 +2461,12 @@ describe("PayeesService", () => {
       });
     });
   });
-  // ─── contact information and geocoding ───────────────────────────────
+  // ─── contact information ─────────────────────────────────────────────
 
   describe("contact information", () => {
-    const point = { latitude: 47.609722, longitude: -122.342201 };
-
     describe("create", () => {
-      it("stores the contact fields and the resolved point", async () => {
+      it("stores the contact fields", async () => {
         payeesRepository.findOne.mockResolvedValue(null);
-        geocodingService.geocode.mockResolvedValue(point);
 
         await service.create(userId, {
           name: "Starbucks",
@@ -2500,54 +2475,18 @@ describe("PayeesService", () => {
           phone: "+1 206-448-8762",
         } as any);
 
-        expect(geocodingService.geocode).toHaveBeenCalledWith(
-          "1912 Pike Pl, Seattle",
-        );
         expect(payeesRepository.create).toHaveBeenCalledWith(
           expect.objectContaining({
             address: "1912 Pike Pl, Seattle",
             email: "hello@starbucks.com",
             phone: "+1 206-448-8762",
-            latitude: point.latitude,
-            longitude: point.longitude,
-            geocodedAt: expect.any(Date),
           }),
-        );
-      });
-
-      it("creates the payee anyway when the lookup finds nothing", async () => {
-        payeesRepository.findOne.mockResolvedValue(null);
-        geocodingService.geocode.mockResolvedValue(null);
-
-        const result = await service.create(userId, {
-          name: "Starbucks",
-          address: "nowhere at all",
-        } as any);
-
-        expect(result).toBeDefined();
-        // Attempted and failed: the stamp is what lets the page offer a retry.
-        expect(payeesRepository.create).toHaveBeenCalledWith(
-          expect.objectContaining({
-            latitude: null,
-            longitude: null,
-            geocodedAt: expect.any(Date),
-          }),
-        );
-      });
-
-      it("never looks up a payee with no address", async () => {
-        payeesRepository.findOne.mockResolvedValue(null);
-
-        await service.create(userId, { name: "Cash" } as any);
-
-        expect(geocodingService.geocode).not.toHaveBeenCalled();
-        // Never attempted, so no stamp -- distinct from attempted-and-failed.
-        expect(payeesRepository.create).toHaveBeenCalledWith(
-          expect.objectContaining({ geocodedAt: null }),
         );
       });
 
       it("stores a blank contact field as null rather than an empty string", async () => {
+        // "has an address" must not read true for a payee with none, or the
+        // detail page renders an empty row and a link to nowhere.
         payeesRepository.findOne.mockResolvedValue(null);
 
         await service.create(userId, {
@@ -2560,109 +2499,43 @@ describe("PayeesService", () => {
         expect(payeesRepository.create).toHaveBeenCalledWith(
           expect.objectContaining({ address: null, email: null, phone: null }),
         );
-        expect(geocodingService.geocode).not.toHaveBeenCalled();
       });
     });
 
     describe("update", () => {
-      it("re-resolves the point when the address changes", async () => {
+      it("stores a changed address", async () => {
         payeesRepository.findOne.mockResolvedValue({
           ...mockPayee,
           address: "1 Old Street",
         });
-        geocodingService.geocode.mockResolvedValue(point);
 
         await service.update(userId, "payee-1", { address: "2 New Street" });
 
-        expect(geocodingService.geocode).toHaveBeenCalledWith("2 New Street");
         expect(txManager.update).toHaveBeenCalledWith(
           Payee,
           { id: "payee-1", userId },
-          expect.objectContaining({
-            address: "2 New Street",
-            latitude: point.latitude,
-            longitude: point.longitude,
-          }),
+          expect.objectContaining({ address: "2 New Street" }),
         );
       });
 
-      it("does not re-resolve when the form resends the same address", async () => {
-        payeesRepository.findOne.mockResolvedValue({
-          ...mockPayee,
-          address: "1912 Pike Pl, Seattle",
-          latitude: point.latitude,
-          longitude: point.longitude,
-        });
-
-        await service.update(userId, "payee-1", {
-          address: "1912 Pike Pl, Seattle",
-          notes: "Corner of Pike and 1st",
-        });
-
-        // The form resends every field on each save, so keying the lookup off
-        // the field being present would spend a rate-limited request on a
-        // rename -- and a failed one would replace good coordinates.
-        expect(geocodingService.geocode).not.toHaveBeenCalled();
-        expect(txManager.update).toHaveBeenCalledWith(
-          Payee,
-          { id: "payee-1", userId },
-          expect.not.objectContaining({ latitude: expect.anything() }),
-        );
-      });
-
-      it("treats a whitespace-only resend of a blank address as unchanged", async () => {
-        payeesRepository.findOne.mockResolvedValue({
-          ...mockPayee,
-          address: null,
-        });
-
-        await service.update(userId, "payee-1", { address: "  " });
-
-        expect(geocodingService.geocode).not.toHaveBeenCalled();
-      });
-
-      it("clears the point and the stamp when the address is emptied", async () => {
+      it("clears an emptied address, email and phone", async () => {
         payeesRepository.findOne.mockResolvedValue({
           ...mockPayee,
           address: "1912 Pike Pl",
-          latitude: point.latitude,
-          longitude: point.longitude,
-          geocodedAt: new Date(),
+          email: "hello@example.com",
+          phone: "555",
         });
 
-        await service.update(userId, "payee-1", { address: "" });
-
-        expect(geocodingService.geocode).not.toHaveBeenCalled();
-        expect(txManager.update).toHaveBeenCalledWith(
-          Payee,
-          { id: "payee-1", userId },
-          expect.objectContaining({
-            address: null,
-            latitude: null,
-            longitude: null,
-            // Nothing was attempted, so the page must not offer a retry.
-            geocodedAt: null,
-          }),
-        );
-      });
-
-      it("saves the payee even when the lookup fails", async () => {
-        payeesRepository.findOne.mockResolvedValue({
-          ...mockPayee,
-          address: null,
+        await service.update(userId, "payee-1", {
+          address: "",
+          email: "",
+          phone: "",
         });
-        geocodingService.geocode.mockResolvedValue(null);
-
-        await service.update(userId, "payee-1", { address: "somewhere new" });
 
         expect(txManager.update).toHaveBeenCalledWith(
           Payee,
           { id: "payee-1", userId },
-          expect.objectContaining({
-            address: "somewhere new",
-            latitude: null,
-            geocodedAt: expect.any(Date),
-          }),
+          expect.objectContaining({ address: null, email: null, phone: null }),
         );
       });
 
@@ -2681,38 +2554,18 @@ describe("PayeesService", () => {
           expect.not.objectContaining({ address: expect.anything() }),
         );
       });
-
-      it("clears an emptied email and phone", async () => {
-        payeesRepository.findOne.mockResolvedValue({
-          ...mockPayee,
-          email: "hello@example.com",
-          phone: "555",
-        });
-
-        await service.update(userId, "payee-1", { email: "", phone: "" });
-
-        expect(txManager.update).toHaveBeenCalledWith(
-          Payee,
-          { id: "payee-1", userId },
-          expect.objectContaining({ email: null, phone: null }),
-        );
-      });
     });
 
     describe("action history", () => {
-      it("snapshots the contact fields and the point on both sides of an update", async () => {
+      it("snapshots the contact fields on both sides of an update", async () => {
         // Undo restores beforeData, so a field missing from it silently
-        // survives the undo -- and the point has to travel with the address it
-        // was resolved from or the restored payee maps to the wrong place.
+        // survives the undo.
         payeesRepository.findOne.mockResolvedValue({
           ...mockPayee,
           address: "1 Old Street",
           email: "old@example.com",
           phone: "111",
-          latitude: 1.5,
-          longitude: 2.5,
         });
-        geocodingService.geocode.mockResolvedValue(point);
 
         await service.update(userId, "payee-1", { address: "2 New Street" });
 
@@ -2724,8 +2577,6 @@ describe("PayeesService", () => {
             address: "1 Old Street",
             email: "old@example.com",
             phone: "111",
-            latitude: 1.5,
-            longitude: 2.5,
           }),
         );
         expect(params.afterData).toEqual(
@@ -2733,8 +2584,6 @@ describe("PayeesService", () => {
             address: expect.anything(),
             email: expect.anything(),
             phone: expect.anything(),
-            latitude: expect.anything(),
-            longitude: expect.anything(),
           }),
         );
       });
@@ -2787,63 +2636,6 @@ describe("PayeesService", () => {
         // A field nobody mentioned stays undefined so the card can tell the
         // two apart.
         expect(preview.phone).toBeUndefined();
-      });
-    });
-
-    describe("refreshGeocode", () => {
-      it("re-runs the lookup for the stored address", async () => {
-        payeesRepository.findOne.mockResolvedValue({
-          ...mockPayee,
-          address: "1912 Pike Pl",
-        });
-        geocodingService.geocode.mockResolvedValue(point);
-
-        await service.refreshGeocode(userId, "payee-1");
-
-        expect(geocodingService.geocode).toHaveBeenCalledWith("1912 Pike Pl");
-        expect(txManager.update).toHaveBeenCalledWith(
-          Payee,
-          { id: "payee-1", userId },
-          expect.objectContaining({
-            latitude: point.latitude,
-            longitude: point.longitude,
-          }),
-        );
-      });
-
-      it("stamps the attempt when the retry also finds nothing", async () => {
-        payeesRepository.findOne.mockResolvedValue({
-          ...mockPayee,
-          address: "still nowhere",
-        });
-        geocodingService.geocode.mockResolvedValue(null);
-
-        await service.refreshGeocode(userId, "payee-1");
-
-        expect(txManager.update).toHaveBeenCalledWith(
-          Payee,
-          { id: "payee-1", userId },
-          expect.objectContaining({
-            latitude: null,
-            geocodedAt: expect.any(Date),
-          }),
-        );
-      });
-
-      it("clears everything when the payee has no address to look up", async () => {
-        payeesRepository.findOne.mockResolvedValue({
-          ...mockPayee,
-          address: null,
-        });
-
-        await service.refreshGeocode(userId, "payee-1");
-
-        expect(geocodingService.geocode).not.toHaveBeenCalled();
-        expect(txManager.update).toHaveBeenCalledWith(
-          Payee,
-          { id: "payee-1", userId },
-          { latitude: null, longitude: null, geocodedAt: null },
-        );
       });
     });
   });

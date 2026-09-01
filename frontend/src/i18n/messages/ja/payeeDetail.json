@@ -99,15 +99,6 @@
     "email": "メールアドレス",
     "notes": "メモ"
   },
-  "map": {
-    "title": "場所",
-    "attribution": "(c) OpenStreetMap 貢献者",
-    "openInMaps": "この住所を地図アプリで開く",
-    "notLocated": "この住所は地図上で見つかりませんでした。",
-    "retryLookup": "位置の検索を再試行",
-    "retrying": "検索中...",
-    "retryFailed": "この住所を検索できませんでした。しばらくしてからもう一度お試しください。"
-  },
   "tabs": {
     "ariaLabel": "支払先のセクション",
     "overview": "概要",

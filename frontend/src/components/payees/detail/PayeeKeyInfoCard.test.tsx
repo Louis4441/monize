@@ -22,9 +22,6 @@ function detailFixture(overrides: Partial<PayeeDetail> = {}): PayeeDetail {
       address: null,
       email: null,
       phone: null,
-      latitude: null,
-      longitude: null,
-      geocodedAt: null,
       isActive: true,
       createdAt: '2024-01-15T00:00:00.000Z',
     },
@@ -115,9 +112,6 @@ describe('PayeeKeyInfoCard', () => {
           address: null,
           email: null,
           phone: null,
-          latitude: null,
-          longitude: null,
-          geocodedAt: null,
           isActive: true,
           createdAt: '2024-01-15T00:00:00.000Z',
         },
@@ -194,27 +188,7 @@ describe('PayeeKeyInfoCard contact details', () => {
     ).toHaveAttribute('href', 'mailto:hello%40example.com');
   });
 
-  it('links a located address to a maps application', () => {
-    render(
-      <PayeeKeyInfoCard
-        detail={withContact({
-          address: '1912 Pike Pl, Seattle',
-          latitude: 47.609722,
-          longitude: -122.342201,
-        })}
-        categoryLabelMap={new Map()}
-        onSelectDate={vi.fn()}
-        onSelectAccount={vi.fn()}
-      />,
-    );
-
-    const link = screen.getByRole('link', { name: /1912 Pike Pl/ });
-    expect(link.getAttribute('href')).toContain('47.609722');
-  });
-
-  it('still links an address the lookup could not locate', () => {
-    // The coordinates are what the map needs; directions only need the text,
-    // so a failed lookup must not turn the address into dead text.
+  it('links an address to a maps application', () => {
     render(
       <PayeeKeyInfoCard
         detail={withContact({ address: '1912 Pike Pl, Seattle' })}

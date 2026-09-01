@@ -99,15 +99,6 @@
     "email": "E-mail",
     "notes": "Notities"
   },
-  "map": {
-    "title": "Locatie",
-    "attribution": "(c) OpenStreetMap-bijdragers",
-    "openInMaps": "Dit adres openen in uw kaarten-app",
-    "notLocated": "Dit adres kon niet op de kaart worden gevonden.",
-    "retryLookup": "Locatie opnieuw opzoeken",
-    "retrying": "Bezig met opzoeken...",
-    "retryFailed": "Dit adres kon niet worden opgezocht. Probeer het later opnieuw."
-  },
   "tabs": {
     "ariaLabel": "Onderdelen van de begunstigde",
     "overview": "Overzicht",

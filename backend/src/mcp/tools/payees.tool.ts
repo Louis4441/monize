@@ -124,7 +124,7 @@ export class McpPayeesTools {
         description:
           "Create, edit, or delete the user's payees. Accepts NAMES -- the payee and its default category are resolved internally, so you do NOT need to call list_payees/list_categories first. operation = 'create' | 'update' | 'delete' with an items array (1-25 rows). " +
           "create: { name, categoryName?, website?, address?, email?, phone? } -- categoryName optionally sets the payee's default category ('Parent: Child' for a subcategory); website accepts a bare domain ('acme.com') and is stored as an absolute https URL; address, email and phone are the payee's contact details. " +
-          "update: { name, newName?, categoryName?, website?, address?, email?, phone? } -- name identifies the existing payee; provide newName to rename, categoryName to set the default category, website to set the web address, and/or address, email and phone for its contact details (pass an empty string to clear any of them). At least one change is required. Setting a website also resolves that site's icon for the payee, and setting an address resolves its map location; to find payees missing one, call list_payees and look for a null or missing field. " +
+          "update: { name, newName?, categoryName?, website?, address?, email?, phone? } -- name identifies the existing payee; provide newName to rename, categoryName to set the default category, website to set the web address, and/or address, email and phone for its contact details (pass an empty string to clear any of them). At least one change is required. Setting a website also resolves that site's icon for the payee; to find payees missing a field, call list_payees and look for a null or missing one. " +
           "delete: { name } -- removes the payee (its transactions keep their stored payee name). " +
           "approvalMode = 'bulk' (default; one confirmation for the whole batch) or 'individual' (one confirmation per item); ignored for a single item. Set dryRun=true to preview every item without saving. The user is asked to confirm before anything is saved (web chat card via relay, or an MCP confirmation dialog).",
         inputSchema: {
@@ -164,7 +164,7 @@ export class McpPayeesTools {
                   .max(500)
                   .optional()
                   .describe(
-                    "create/update: the payee's postal address as free text. Setting one also resolves its map location. update: empty string clears it.",
+                    "create/update: the payee's postal address as free text. update: empty string clears it.",
                   ),
                 email: z
                   .string()

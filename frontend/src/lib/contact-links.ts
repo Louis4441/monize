@@ -53,8 +53,6 @@ export function addressQuery(address: string): string {
 }
 
 export interface MapsUrlInput {
-  latitude: number | null;
-  longitude: number | null;
   address: string;
   /** Injectable for tests; defaults to the current device. */
   platform?: MapPlatform;
@@ -63,44 +61,23 @@ export interface MapsUrlInput {
 /**
  * A URL that opens the viewer's default maps application at the payee.
  *
- * Coordinates are preferred where they exist because they are unambiguous --
- * the geocoder already decided which "1 Main Street" this is -- with the
- * address carried alongside as the pin's label. Where the lookup found nothing,
- * the address is still handed over as a search, so a payee with an
- * un-geocodable address remains one tap from directions rather than dead text.
+ * The address is handed over as a search rather than a resolved point: nothing
+ * here geocodes, so the maps application does that itself, which is what it is
+ * good at. Returns null when there is no address to search for, so a caller
+ * renders text rather than a link to nowhere.
  */
-export function mapsUrl({
-  latitude,
-  longitude,
-  address,
-  platform,
-}: MapsUrlInput): string | null {
+export function mapsUrl({ address, platform }: MapsUrlInput): string | null {
   const query = addressQuery(address);
-  const hasPoint =
-    typeof latitude === 'number' &&
-    typeof longitude === 'number' &&
-    Number.isFinite(latitude) &&
-    Number.isFinite(longitude);
-  if (!query && !hasPoint) return null;
+  if (!query) return null;
 
   const target = platform ?? detectMapPlatform();
   const label = encodeURIComponent(query);
 
-  if (target === 'ios') {
-    return hasPoint
-      ? `https://maps.apple.com/?ll=${latitude},${longitude}${query ? `&q=${label}` : ''}`
-      : `https://maps.apple.com/?q=${label}`;
-  }
-  if (target === 'android') {
-    // geo:lat,lng?q=lat,lng(Label) is the documented form that drops a pin at
-    // the coordinates rather than searching near them.
-    return hasPoint
-      ? `geo:${latitude},${longitude}?q=${latitude},${longitude}${query ? `(${label})` : ''}`
-      : `geo:0,0?q=${label}`;
-  }
-  return hasPoint
-    ? `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=16/${latitude}/${longitude}`
-    : `https://www.openstreetmap.org/search?query=${label}`;
+  if (target === 'ios') return `https://maps.apple.com/?q=${label}`;
+  // geo:0,0?q=<query> is the documented form for searching by text rather than
+  // dropping a pin at literal 0,0.
+  if (target === 'android') return `geo:0,0?q=${label}`;
+  return `https://www.openstreetmap.org/search?query=${label}`;
 }
 
 /**

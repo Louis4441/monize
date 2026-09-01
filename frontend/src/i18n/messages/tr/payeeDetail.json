@@ -99,15 +99,6 @@
     "email": "E-posta",
     "notes": "Notlar"
   },
-  "map": {
-    "title": "Konum",
-    "attribution": "(c) OpenStreetMap katkıda bulunanlar",
-    "openInMaps": "Bu adresi harita uygulamanızda açın",
-    "notLocated": "Bu adres haritada bulunamadı.",
-    "retryLookup": "Konum aramasını yeniden dene",
-    "retrying": "Aranıyor...",
-    "retryFailed": "Bu adres aranamadı. Lütfen daha sonra tekrar deneyin."
-  },
   "tabs": {
     "ariaLabel": "Alacaklı bölümleri",
     "overview": "Genel bakış",
