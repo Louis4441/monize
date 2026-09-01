@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   buildLoanProjectionInput,
   deriveLoanPaymentHistory,
+  diagnoseLoanProjection,
   observedInstallment,
   resolveCurrentLoanTerms,
   fetchAllAccountTransactions,
@@ -2223,5 +2224,59 @@ describe('deriveLoanPaymentHistory with paired separate interest expenses', () =
     expect(sameDayRegular?.annualRate).not.toBeNull();
     expect(sameDayRegular!.annualRate!).toBeGreaterThan(3);
     expect(sameDayRegular!.annualRate!).toBeLessThan(8);
+  });
+});
+
+describe('diagnoseLoanProjection', () => {
+  const TODAY = '2026-06-01';
+
+  // The reason and buildLoanProjectionInput share one evaluation, so a reason
+  // of null must mean the input builds, and any reason must mean it does not.
+  function reasonAndInputAgree(account: Account, rateChanges = []) {
+    const history = deriveLoanPaymentHistory(account, []);
+    const reason = diagnoseLoanProjection(account, history, rateChanges, null, TODAY);
+    const input = buildLoanProjectionInput(account, history, rateChanges, null, TODAY);
+    return { reason, input };
+  }
+
+  it('is null and the input builds for a rate + payment + frequency loan', () => {
+    const { reason, input } = reasonAndInputAgree(makeAccount());
+    expect(reason).toBeNull();
+    expect(input).not.toBeNull();
+  });
+
+  it("reports 'paid-off' when nothing is outstanding", () => {
+    const { reason, input } = reasonAndInputAgree(
+      makeAccount({ currentBalance: 0 }),
+    );
+    expect(reason).toBe('paid-off');
+    expect(input).toBeNull();
+  });
+
+  it("reports 'no-frequency' when the payment frequency is unset", () => {
+    const { reason, input } = reasonAndInputAgree(
+      makeAccount({ paymentFrequency: null as unknown as Account['paymentFrequency'] }),
+    );
+    expect(reason).toBe('no-frequency');
+    expect(input).toBeNull();
+  });
+
+  it("reports 'no-rate' when no rate is recorded anywhere", () => {
+    const { reason, input } = reasonAndInputAgree(
+      makeAccount({ interestRate: null as unknown as number }),
+    );
+    expect(reason).toBe('no-rate');
+    expect(input).toBeNull();
+  });
+
+  it("reports 'no-payment' when the installment cannot be resolved", () => {
+    // Rate is set, but there is no observed regular installment (no rows on the
+    // loan account) and no stored contractual payment -- the shape of a loan
+    // whose installments were booked as expenses on the source account.
+    const { reason, input } = reasonAndInputAgree(
+      makeAccount({ paymentAmount: undefined as unknown as number }),
+    );
+    expect(reason).toBe('no-payment');
+    expect(input).toBeNull();
   });
 });

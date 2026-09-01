@@ -678,6 +678,68 @@ export function buildLoanProjectionInput(
   // that does not.
   todayYmd: string = financialTodayYmd(undefined),
 ): LoanScheduleInput | null {
+  return evaluateLoanProjection(account, history, rateChanges, anchor, todayYmd)
+    .input;
+}
+
+/**
+ * Why the forward projection cannot be built, or `null` when it can. Each value
+ * is a SEPARATE, separately-fixable cause, so the surface can tell the user
+ * which one applies instead of hiding the panel with no explanation:
+ *
+ * - `paid-off` -- nothing outstanding to amortize (balance <= 0.01).
+ * - `no-frequency` -- the account has no payment frequency set.
+ * - `no-rate` -- no rate recorded anywhere (neither `account.interestRate` nor
+ *   an applicable rate-change row). A per-row rate reconstructed from the
+ *   interest charged still shows in the schedule table, so the table can carry
+ *   a rate while the projection cannot -- see `assignObservedRates`.
+ * - `no-payment` -- no complete installment resolves: there is no complete
+ *   observed regular payment (a loan whose regular installments are booked as
+ *   categorized expenses on the source account, never as transfers to the loan
+ *   account, has no regular row here at all) AND no stored contractual payment.
+ */
+export type LoanProjectionUnavailableReason =
+  | 'paid-off'
+  | 'no-frequency'
+  | 'no-rate'
+  | 'no-payment';
+
+/**
+ * The reason `buildLoanProjectionInput` cannot produce a schedule, or `null`
+ * when it can. Shares ONE evaluation with `buildLoanProjectionInput`
+ * (`evaluateLoanProjection`), so the two can never disagree about whether a
+ * projection exists -- a surface renders the simulator when this is `null` and
+ * this explanation when it is not, rather than silently drawing nothing.
+ */
+export function diagnoseLoanProjection(
+  account: Account,
+  history: LoanHistoryResult,
+  rateChanges: RateTimelineRow[] = [],
+  anchor?: LoanProjectionAnchor | null,
+  todayYmd: string = financialTodayYmd(undefined),
+): LoanProjectionUnavailableReason | null {
+  return evaluateLoanProjection(account, history, rateChanges, anchor, todayYmd)
+    .reason;
+}
+
+interface LoanProjectionEvaluation {
+  input: LoanScheduleInput | null;
+  reason: LoanProjectionUnavailableReason | null;
+}
+
+/**
+ * The projection gate, evaluated once: either the schedule input, or the reason
+ * it cannot be built. `input` and `reason` are mutually exclusive -- exactly one
+ * is non-null -- so the "can we project" decision lives in a single place and
+ * `buildLoanProjectionInput` / `diagnoseLoanProjection` cannot drift apart.
+ */
+function evaluateLoanProjection(
+  account: Account,
+  history: LoanHistoryResult,
+  rateChanges: RateTimelineRow[],
+  anchor: LoanProjectionAnchor | null | undefined,
+  todayYmd: string,
+): LoanProjectionEvaluation {
   const usableAnchor = usableProjectionAnchor(anchor, todayYmd);
   // Gated on the RESOLVED terms, not on the account's scalars. Gating on the
   // scalars asked the wrong question: this function goes on to resolve both the
@@ -696,12 +758,11 @@ export function buildLoanProjectionInput(
   // the pre-payoff balance and print an Est. Payoff years away. Today's
   // balance is what says the loan is finished, and it kept saying so before
   // the anchor existed.
-  if (
-    startingDebt <= 0.01 ||
-    history.currentBalance <= 0.01 ||
-    !account.paymentFrequency
-  ) {
-    return null;
+  if (startingDebt <= 0.01 || history.currentBalance <= 0.01) {
+    return { input: null, reason: 'paid-off' };
+  }
+  if (!account.paymentFrequency) {
+    return { input: null, reason: 'no-frequency' };
   }
 
   const seed = resolveSeedPayment(
@@ -711,8 +772,14 @@ export function buildLoanProjectionInput(
     usableAnchor,
     todayYmd,
   );
-  if (seed.payment == null || seed.payment <= 0 || seed.annualRate == null) {
-    return null;
+  // A missing rate and a missing payment are different causes with different
+  // fixes, so they are reported apart rather than folded into one `null`. The
+  // combined null condition is unchanged from the single guard this replaced.
+  if (seed.annualRate == null) {
+    return { input: null, reason: 'no-rate' };
+  }
+  if (seed.payment == null || seed.payment <= 0) {
+    return { input: null, reason: 'no-payment' };
   }
 
   // Only the future-dated steps are taken from here; the current terms are the
@@ -721,14 +788,17 @@ export function buildLoanProjectionInput(
   const futureTimeline = buildRateTimeline(rateChanges, todayYmd, seed.annualRate);
 
   return {
-    startingBalance: startingDebt,
-    annualRate: seed.annualRate,
-    paymentAmount: seed.payment,
-    frequency: account.paymentFrequency as ScheduleFrequency,
-    isCanadian: account.isCanadianMortgage || false,
-    isVariableRate: account.isVariableRate || false,
-    firstPaymentDate: seed.firstPaymentDate,
-    rateChanges: futureTimeline.rateChanges,
+    input: {
+      startingBalance: startingDebt,
+      annualRate: seed.annualRate,
+      paymentAmount: seed.payment,
+      frequency: account.paymentFrequency as ScheduleFrequency,
+      isCanadian: account.isCanadianMortgage || false,
+      isVariableRate: account.isVariableRate || false,
+      firstPaymentDate: seed.firstPaymentDate,
+      rateChanges: futureTimeline.rateChanges,
+    },
+    reason: null,
   };
 }
 

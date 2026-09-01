@@ -487,6 +487,13 @@
     },
     "simulator": {
       "title": "[XX-Overpayment Simulator-XX]",
+      "unavailable": {
+        "title": "[XX-The overpayment simulation cannot be calculated for this loan yet.-XX]",
+        "reasonPaidOff": "[XX-This loan has no outstanding balance, so there is nothing left to amortize.-XX]",
+        "reasonNoFrequency": "[XX-This loan has no payment frequency set. Add it in the account settings.-XX]",
+        "reasonNoRate": "[XX-This loan has no saved interest rate. Set the interest rate in the account settings, or record a rate change dated today or earlier. A rate shown per row in the schedule below is reconstructed from the interest charged and is not a saved rate.-XX]",
+        "reasonNoPayment": "[XX-The installment amount cannot be determined. Record the regular installments as transfers to the loan account (principal, with interest as a split line or a separate categorized expense), or set the payment amount in the account settings. Payments booked as ordinary expenses on the source account never reach the loan account, so the schedule cannot see them.-XX]"
+      },
       "description": "[XX-Model extra payments to see how much sooner the loan could be paid off and how much interest you would save. Simulations do not change your real payments.-XX]",
       "reset": "[XX-Reset-XX]",
       "modeLabel": "[XX-After an overpayment-XX]",

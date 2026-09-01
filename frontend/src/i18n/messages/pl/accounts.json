@@ -417,6 +417,13 @@
     },
     "simulator": {
       "title": "Symulator nadpłat",
+      "unavailable": {
+        "title": "Nie można jeszcze wyliczyć symulacji nadpłaty dla tego kredytu.",
+        "reasonPaidOff": "Ten kredyt nie ma zadłużenia do spłaty, więc nie ma czego amortyzować.",
+        "reasonNoFrequency": "Ten kredyt nie ma ustawionej częstotliwości płatności. Ustaw ją w edycji konta.",
+        "reasonNoRate": "Ten kredyt nie ma zapisanej stopy procentowej. Ustaw oprocentowanie w edycji konta lub dodaj zmianę oprocentowania z datą dzisiejszą albo wcześniejszą. Stopa pokazana w wierszach harmonogramu poniżej jest odtworzona z naliczonych odsetek i nie jest stopą zapisaną.",
+        "reasonNoPayment": "Nie można ustalić kwoty raty. Zaksięguj raty regularne jako transfery na konto kredytu (kapitał, a odsetki jako linia podziału lub osobny wydatek z kategorią), albo ustaw kwotę płatności w edycji konta. Raty zaksięgowane jako zwykłe wydatki na koncie źródłowym nie trafiają na konto kredytu, więc harmonogram ich nie widzi."
+      },
       "description": "Zasymuluj dodatkowe wpłaty, aby zobaczyć, o ile wcześniej kredyt mógłby zostać spłacony i ile odsetek byś zaoszczędził. Symulacje nie zmieniają Twoich rzeczywistych płatności.",
       "reset": "Resetuj",
       "detectedExtraHint": "Twoja historia płatności pokazuje średnio {amount} dodatkowego kapitału na ratę.",
