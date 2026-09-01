@@ -1898,6 +1898,38 @@ describe('deriveLoanPaymentHistory with paired separate interest expenses', () =
     expect(cumulativeInterest).toBeCloseTo(388.14 + 286.49 + 335.92, 2);
   });
 
+  it('keeps a zero-amount interest row (a payment holiday), like a -0.01 one', () => {
+    // A suspended installment ("wakacje kredytowe") posts a 0 against the
+    // interest category. It is a real recorded event, so it must show in the
+    // schedule -- dropping exactly 0 while keeping a -0.01 rounding of the same
+    // row is the bug this asserts against (an interest expense far from any
+    // payment becomes its own interest-only row).
+    const account = makeAccount({
+      accountType: 'MORTGAGE',
+      openingBalance: -200000,
+      currentBalance: -199000,
+      interestRate: 5.5,
+    });
+    const transactions = [
+      makeTransaction({ transactionDate: '2022-01-05', amount: 500 }),
+    ];
+
+    const withZero = deriveLoanPaymentHistory(account, transactions, [], [
+      { transactionDate: '2020-01-05', amount: 0, isTransfer: false } as Transaction,
+    ]);
+    const withTinyNegative = deriveLoanPaymentHistory(account, transactions, [], [
+      { transactionDate: '2020-01-05', amount: -0.01, isTransfer: false } as Transaction,
+    ]);
+
+    // The zero row is kept (an interest-only row), so the schedule has the same
+    // number of rows either way.
+    expect(withZero.events).toHaveLength(withTinyNegative.events.length);
+    const zeroRow = withZero.events.find((e) => e.date.includes('2020-01'));
+    expect(zeroRow).toBeDefined();
+    expect(zeroRow!.principal).toBe(0);
+    expect(zeroRow!.interest).toBe(0);
+  });
+
   it('consumes a date\'s booked interest once across two payments sharing it', () => {
     // Real case (2023-09-05): two principal payments land on the same day -- an
     // overpayment (973.11, whose interest is booked separately) and the regular

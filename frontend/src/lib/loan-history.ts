@@ -1138,7 +1138,16 @@ function pairSeparateInterestByDate(
   for (const tx of interestTransactions) {
     if (tx.isTransfer) continue; // interest is never a transfer to the loan
     const amount = Math.abs(Number(tx.amount));
-    if (!(amount > 0)) continue;
+    // Skip only a non-numeric amount, never an exact zero. A zero-value row is
+    // a REAL recorded event -- a payment holiday ("rata zawieszona") posts a
+    // 0 against the interest category -- and a measured zero is not absence
+    // (the same rule this module holds for interest and rates). Dropping
+    // exactly 0 while keeping -0.01 made a suspended installment vanish from
+    // the schedule while a one-groszy rounding of the very same row appeared.
+    // A zero pairs into a date's interest as 0 (no effect) and, when it pairs
+    // to no payment, becomes its own interest-only row -- which is what shows
+    // the holiday.
+    if (!Number.isFinite(amount)) continue;
     const nearest =
       sortedDates.length > 0
         ? nearestDateKey(tx.transactionDate.split('T')[0], sortedDates, tolerance)
