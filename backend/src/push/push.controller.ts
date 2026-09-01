@@ -13,6 +13,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
+import { Throttle } from "@nestjs/throttler";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { DemoRestricted } from "../common/decorators/demo-restricted.decorator";
 import { PushConfigService, PublicPushConfig } from "./push-config.service";
@@ -60,6 +61,10 @@ export class PushController {
    * subscription registered by one visitor would receive the test notification
    * another visitor triggered.
    */
+  // Registering a device writes a row and reads it back; the tighter bound
+  // exists because the endpoint is reachable before any device exists, so the
+  // per-account device cap does not bound how often it can be called.
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
   @Post("subscriptions")
   @HttpCode(HttpStatus.CREATED)
   @DemoRestricted()
@@ -72,6 +77,7 @@ export class PushController {
     return this.subscriptions.subscribe(req.user.id, dto, userAgent ?? null);
   }
 
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
   @Delete("subscriptions/:id")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Remove one of the current user's push devices" })
@@ -83,6 +89,15 @@ export class PushController {
   }
 
   /** Demo-restricted for the shared-account reason given on `subscribe`. */
+  // The one endpoint here that reaches an outbound provider, and it fans out:
+  // up to MAX_LIVE_DEVICES_PER_USER endpoints per call. Under the global
+  // 100/minute alone one account could drive 2,000 signed push requests a
+  // minute out of this instance -- and the VAPID key pair is one per
+  // DEPLOYMENT, so a push service that throttles or penalises the origin
+  // degrades push for every user, not for the account that did it. Five a
+  // minute is the same bound the other expensive outbound operations here
+  // carry.
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Post("test")
   @DemoRestricted()
   @ApiOperation({

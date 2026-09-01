@@ -345,6 +345,72 @@ describe('PushDevicesPanel', () => {
     );
   });
 
+  describe('a subscription the server has never seen', () => {
+    // The push service rotated it while the app was closed, so the worker's
+    // message reached no window: the browser holds an endpoint the server has
+    // never seen, and the list showed the dead row as active.
+    it('re-registers it without asking, because consent already exists', async () => {
+      vi.stubGlobal('Notification', { permission: 'granted' });
+      mockListDevices.mockResolvedValue([
+        device({ id: 'stale', endpointFingerprint: OTHER_DEVICE }),
+      ]);
+      mockCurrentFingerprint.mockResolvedValue(THIS_DEVICE);
+
+      render(<PushDevicesPanel />);
+
+      // The instance key, and whatever name this agent yields -- which is
+      // `undefined` for an agent `defaultDeviceName` does not recognise, so the
+      // argument is read rather than matched with `expect.anything()`.
+      await waitFor(() => expect(mockEnable).toHaveBeenCalled());
+      expect(mockEnable.mock.calls[0][0]).toBe('PUB');
+      // And the list is re-read, so the row the user sees is the new one.
+      await waitFor(() => expect(mockListDevices).toHaveBeenCalledTimes(2));
+      vi.unstubAllGlobals();
+    });
+
+    it('leaves a browser whose subscription is already registered alone', async () => {
+      vi.stubGlobal('Notification', { permission: 'granted' });
+      mockListDevices.mockResolvedValue([device()]);
+      mockCurrentFingerprint.mockResolvedValue(THIS_DEVICE);
+
+      render(<PushDevicesPanel />);
+
+      await waitFor(() => expect(mockListDevices).toHaveBeenCalled());
+      expect(mockEnable).not.toHaveBeenCalled();
+      vi.unstubAllGlobals();
+    });
+
+    // Re-registering is a re-registration of something consented to. Without a
+    // grant it would be a permission request with no user gesture behind it,
+    // which iOS answers `default` with no prompt shown -- and the user would be
+    // told their permission was refused for something they never asked for.
+    it('does not touch a browser that has not granted permission', async () => {
+      vi.stubGlobal('Notification', { permission: 'default' });
+      mockListDevices.mockResolvedValue([
+        device({ id: 'stale', endpointFingerprint: OTHER_DEVICE }),
+      ]);
+      mockCurrentFingerprint.mockResolvedValue(THIS_DEVICE);
+
+      render(<PushDevicesPanel />);
+
+      await waitFor(() => expect(mockListDevices).toHaveBeenCalled());
+      expect(mockEnable).not.toHaveBeenCalled();
+      vi.unstubAllGlobals();
+    });
+
+    it('does not touch a browser holding no subscription at all', async () => {
+      vi.stubGlobal('Notification', { permission: 'granted' });
+      mockListDevices.mockResolvedValue([]);
+      mockCurrentFingerprint.mockResolvedValue(null);
+
+      render(<PushDevicesPanel />);
+
+      await waitFor(() => expect(mockListDevices).toHaveBeenCalled());
+      expect(mockEnable).not.toHaveBeenCalled();
+      vi.unstubAllGlobals();
+    });
+  });
+
   // A prompt that never appears is what an installed iOS web app does when the
   // click's user activation has been spent -- and it reaches the app as the
   // same 'dismissed' the user gets for closing a dialogue. Telling that user to

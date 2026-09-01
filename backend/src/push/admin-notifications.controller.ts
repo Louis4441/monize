@@ -3,6 +3,7 @@ import { AuthGuard } from "@nestjs/passport";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
+import { Throttle } from "@nestjs/throttler";
 import { DemoRestricted } from "../common/decorators/demo-restricted.decorator";
 import { AdminPushConfig, PushConfigService } from "./push-config.service";
 import { UpdatePushChannelsDto } from "./dto/update-push-channels.dto";
@@ -37,6 +38,7 @@ export class AdminNotificationsController {
     return this.pushConfig.getAdminConfig();
   }
 
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
   @Patch("channels")
   @ApiOperation({
     summary: "Turn the Web Push channel on or off instance-wide",
@@ -53,6 +55,11 @@ export class AdminNotificationsController {
    * was minted with -- so the count of retired devices is part of the answer,
    * not a log line.
    */
+  // Destructive and instance-wide: a rotation retires every registered device
+  // on the deployment, and it derives a new key pair through scrypt. Confirmed
+  // in the UI with the live device count, and bounded here as well, because a
+  // confirmation dialogue is not a rate limit.
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Post("vapid/rotate")
   @ApiOperation({ summary: "Rotate this instance's Web Push key pair" })
   async rotate(): Promise<RotateVapidResult> {

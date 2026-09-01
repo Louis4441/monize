@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
@@ -58,6 +58,11 @@ export function PushDevicesPanel() {
   // and says so, and this is the surface that holds the session and the CSRF
   // token needed to register the replacement. Without it the row keeps naming a
   // dead endpoint and delivery stops with nothing to show for it.
+  //
+  // The message only reaches a page that is OPEN when the rotation happens,
+  // which is the less likely case -- a rotation while the app is closed posts to
+  // `clients.matchAll()` and finds nobody, so the reconciliation below is the
+  // durable half. See `reconcileThisDevice`.
   useEffect(() => {
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
       return;
@@ -108,6 +113,48 @@ export function PushDevicesPanel() {
       cancelled = true;
     };
   }, [refreshDevices]);
+
+  /**
+   * Register the subscription this browser holds when the server has no live row
+   * for it.
+   *
+   * The case this exists for: the push service rotated the subscription while
+   * the app was closed. The worker resubscribed and posted a message to every
+   * open window -- there were none -- so the browser now holds an endpoint the
+   * server has never seen, and the server holds a row naming a dead one. The
+   * device list showed that row as active, so the interface asserted delivery
+   * was working while nothing could be delivered, and the only recovery was a
+   * button the user had no reason to press.
+   *
+   * Only ever with permission already `granted`: that is what makes this a
+   * re-registration of something the user consented to rather than a permission
+   * request without a gesture, which iOS would answer `default` with no prompt
+   * shown. Once per mount, so a server that keeps refusing cannot become a loop.
+   */
+  const reconciled = useRef(false);
+  useEffect(() => {
+    if (reconciled.current) return;
+    if (!config?.enabled || !config.publicKey) return;
+    if (thisDevice === null) return;
+    if (typeof Notification === 'undefined') return;
+    if (Notification.permission !== 'granted') return;
+    const known = devices.some(
+      (device) =>
+        device.endpointFingerprint === thisDevice && !device.disabledAt,
+    );
+    if (known) return;
+    reconciled.current = true;
+    (async () => {
+      try {
+        await enablePushOnThisDevice(config.publicKey!, defaultDeviceName());
+        await refreshDevices();
+      } catch (error) {
+        // Best effort and silent: the user did not ask for this, and the Enable
+        // button is still there for them if it fails.
+        logger.error('Failed to re-register a rotated push subscription:', error);
+      }
+    })();
+  }, [config, thisDevice, devices, refreshDevices]);
 
   // A retired row is not a registration: after a key rotation the device is
   // listed with the copy telling the user to enable push again, and hiding the
