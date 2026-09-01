@@ -2,6 +2,8 @@
 
 import { useState, useEffect, forwardRef, InputHTMLAttributes, FocusEvent } from 'react';
 import { cn, inputBaseClasses, inputErrorClasses } from '@/lib/utils';
+import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { filterNumberTyping, formatNumberForEdit, parseLocaleNumber } from '@/lib/number-parse';
 
 interface NumericInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value' | 'type'> {
   label?: string;
@@ -55,12 +57,14 @@ export const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
     },
     ref
   ) => {
-    // Format value to specified decimal places
+    // Defensive default: a partial mock (or an older build mid rolling deploy)
+    // may not carry the separators; en-US keeps the previous behaviour.
+    const numberSeparators = useNumberFormat().numberSeparators ?? { decimal: '.', group: ',' };
+
+    // Format value to specified decimal places, in the user's decimal separator
+    // (no grouping) so the field round-trips a value they can read.
     function formatValue(val: number | undefined | null, decimals: number): string {
-      if (val === undefined || val === null || isNaN(val)) {
-        return '';
-      }
-      return val.toFixed(decimals);
+      return formatNumberForEdit(val, decimals, numberSeparators);
     }
 
     // Local display state - allows free typing
@@ -73,14 +77,10 @@ export const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
       return Math.round(val * multiplier) / multiplier;
     }
 
-    // Parse input string to number
+    // Parse input string to number, in the user's number convention.
     function parseValue(input: string): number | undefined {
-      const filtered = input.replace(/[^0-9.-]/g, '');
-      if (filtered === '' || filtered === '-' || filtered === '.') {
-        return undefined;
-      }
-      const parsed = parseFloat(filtered);
-      if (isNaN(parsed)) {
+      const parsed = parseLocaleNumber(input, numberSeparators);
+      if (parsed === undefined) {
         return undefined;
       }
       return roundToDecimals(parsed, decimalPlaces);
@@ -104,18 +104,20 @@ export const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
     }
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      // Filter to only valid characters
-      let filtered = e.target.value.replace(/[^0-9.-]/g, '');
+      // Filter to valid characters, keeping the user's decimal separator and
+      // dropping their grouping separator.
+      let filtered = filterNumberTyping(e.target.value, {
+        allowNegative,
+        groupSeparator: numberSeparators.group,
+      });
 
-      // Remove minus sign if negative not allowed
-      if (!allowNegative) {
-        filtered = filtered.replace(/-/g, '');
-      }
-
-      // Limit decimal places while typing
-      const parts = filtered.split('.');
-      if (parts.length > 1 && parts[1].length > decimalPlaces) {
-        filtered = parts[0] + '.' + parts[1].slice(0, decimalPlaces);
+      // Limit decimal places while typing, measured from the locale decimal
+      // separator (the only decimal that can be present after filtering out the
+      // grouping separator).
+      const dec = numberSeparators.decimal;
+      const idx = filtered.indexOf(dec);
+      if (idx !== -1 && filtered.length - idx - dec.length > decimalPlaces) {
+        filtered = filtered.slice(0, idx + dec.length + decimalPlaces);
       }
 
       setDisplayValue(filtered);

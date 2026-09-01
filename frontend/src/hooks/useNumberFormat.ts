@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { roundToDecimals, adaptiveFractionDigits } from '@/lib/format';
 import { preferredCurrency } from '@/lib/default-currency';
+import { getNumberSeparators } from '@/lib/number-parse';
 
 /**
  * Get the effective locale for number formatting.
@@ -61,6 +62,12 @@ export function useNumberFormat() {
     usePreferencesStore((state) => state.preferences?.defaultCurrency),
   );
   const language = usePreferencesStore((state) => state.preferences?.language);
+
+  // The user's effective number locale and its separators, so number INPUT
+  // fields can parse and format in the same convention numbers are displayed
+  // in (a Polish user types and pastes "1200,99", not "1200.99").
+  const numberLocale = getEffectiveLocale(numberFormat, language);
+  const numberSeparators = getNumberSeparators(numberLocale);
 
   const formatCurrency = useCallback(
     (amount: number, currencyCode?: string, fractionDigits?: number): string => {
@@ -279,5 +286,5 @@ export function useNumberFormat() {
     [numberFormat, defaultCurrency, language]
   );
 
-  return { formatCurrency, formatCurrencyPrecise, formatCurrencyCompact, formatCurrencyAxis, formatCurrencyFlag, formatCurrencyLabel, formatNumber, formatPercent, formatSignedPercent, formatQuantity, formatPrice, defaultCurrency, numberFormat };
+  return { formatCurrency, formatCurrencyPrecise, formatCurrencyCompact, formatCurrencyAxis, formatCurrencyFlag, formatCurrencyLabel, formatNumber, formatPercent, formatSignedPercent, formatQuantity, formatPrice, defaultCurrency, numberFormat, numberLocale, numberSeparators };
 }

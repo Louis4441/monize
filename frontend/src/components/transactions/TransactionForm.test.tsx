@@ -271,6 +271,8 @@ vi.mock('@/hooks/useNumberFormat', () => ({
     formatCurrency: (amount: number, currency: string) =>
       `${currency} ${(Math.round(amount * 100) / 100).toFixed(2)}`,
     formatNumber: (value: number, decimals: number = 2) => value.toFixed(decimals),
+    numberLocale: 'en-US',
+    numberSeparators: { decimal: '.', group: ',' },
   }),
 }));
 
