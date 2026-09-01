@@ -31,11 +31,16 @@ const logger = createLogger('PushDiagnostics');
  * No web API reads that OS toggle directly, so the panel and the "test sent"
  * status both look healthy while nothing arrives.
  *
- * The one thing that DOES surface it is `showNotification` followed by
- * `getNotifications()`: if the notification was created but is not actually
- * present, the system suppressed it. `runLocalTest` does exactly that, entirely
- * client-side -- no server, no subscription -- so it isolates "web granted but
- * OS blocked" from every server-side reason a delivery might not arrive.
+ * There is NO reliable web signal for this, and it was proven on a real device
+ * (Android 10): all three permission APIs (`Notification.permission`,
+ * `permissions.query`, `pushManager.permissionState`) read `granted`, and
+ * `getNotifications()` returns the notification even while the OS suppresses its
+ * display. So the panel dumps every signal for a human to read, and its
+ * client-only self-test (`showNotification`, no server, no subscription) reports
+ * only that the browser CREATED a notification without error -- never that the
+ * system showed it, because nothing here can know that. The honest instruction
+ * is to look for it and, if it is absent, enable notifications in the OS
+ * settings.
  *
  * Field labels are the API identifiers being inspected, kept verbatim: this is a
  * diagnostic readout of names like `Notification.permission`, not prose to
@@ -50,8 +55,7 @@ interface DiagnosticRow {
 type LocalTest =
   | { kind: 'idle' }
   | { kind: 'running' }
-  | { kind: 'shown' }
-  | { kind: 'blocked' }
+  | { kind: 'created' }
   | { kind: 'error'; detail: string };
 
 const TEST_DISPLAY_GRACE_MS = 400;
@@ -308,9 +312,15 @@ export function PushDiagnostics() {
       await new Promise((resolve) =>
         setTimeout(resolve, TEST_DISPLAY_GRACE_MS),
       );
-      const shown = await registration.getNotifications({ tag });
-      shown.forEach((notification) => notification.close());
-      setLocalTest({ kind: shown.length > 0 ? 'shown' : 'blocked' });
+      // Close it again so the probe leaves nothing behind. Deliberately NOT a
+      // verdict: the OS suppresses the display while getNotifications still
+      // lists the notification (proven on Android 10), so a non-empty result
+      // cannot mean "the user saw it" -- and an empty one is not reliable the
+      // other way either. No web API reveals the OS notification toggle, so the
+      // honest report is "created, verify it visually", never "it works".
+      const created = await registration.getNotifications({ tag });
+      created.forEach((notification) => notification.close());
+      setLocalTest({ kind: 'created' });
     } catch (error) {
       logger.error('Local notification test failed', error);
       setLocalTest({ kind: 'error', detail: getErrorMessage(error, 'failed') });
@@ -359,14 +369,9 @@ export function PushDiagnostics() {
         </Button>
       </div>
 
-      {localTest.kind === 'shown' && (
-        <p className="mb-3 text-sm text-green-700 dark:text-green-400">
-          {t('localTestShown')}
-        </p>
-      )}
-      {localTest.kind === 'blocked' && (
+      {localTest.kind === 'created' && (
         <p className="mb-3 text-sm text-amber-700 dark:text-amber-400">
-          {t('localTestBlocked')}
+          {t('localTestCreated')}
         </p>
       )}
       {localTest.kind === 'error' && (

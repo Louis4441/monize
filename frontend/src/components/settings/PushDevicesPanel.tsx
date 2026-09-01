@@ -48,6 +48,12 @@ export function PushDevicesPanel() {
   const [devices, setDevices] = useState<PushDevice[]>([]);
   const [thisDevice, setThisDevice] = useState<string | null>(null);
   const [support, setSupport] = useState<PushSupport | null>(null);
+  // Android hides notifications behind an OS toggle that no web API reveals
+  // (Notification.permission, permissions.query and pushManager.permissionState
+  // all read "granted" while the system drops the display), so the panel cannot
+  // detect the block -- it can only tell the reader where to look. Gated on
+  // Android so iOS and desktop are not told to open a menu they do not have.
+  const [isAndroid, setIsAndroid] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isEnabling, setIsEnabling] = useState(false);
   const [isSendingTest, setIsSendingTest] = useState(false);
@@ -131,6 +137,10 @@ export function PushDevicesPanel() {
         if (cancelled) return;
         setConfig(pushConfig);
         setSupport(getPushSupport());
+        setIsAndroid(
+          typeof navigator !== 'undefined' &&
+            /Android/i.test(navigator.userAgent),
+        );
       } catch (error) {
         if (cancelled) return;
         // A failed read is not "push is off here". Rendering the panel as
@@ -391,6 +401,12 @@ export function PushDevicesPanel() {
           ? t(`unsupported.${unsupportedReason}`)
           : t('description')}
       </p>
+
+      {isAndroid && (
+        <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+          {t('androidNotify')}
+        </p>
+      )}
 
       {devicesFailed && (
         <p className="mb-3 text-sm text-amber-700 dark:text-amber-400">
