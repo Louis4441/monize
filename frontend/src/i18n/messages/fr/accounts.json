@@ -455,7 +455,14 @@
       "budgetLabel": "Paiement mensuel total",
       "budgetHint": "Consacrez chaque mois un total fixe au prêt ; le remboursement anticipé est ce qui reste après la mensualité. Quand la mensualité baisse, le remboursement augmente pour garder le même total.",
       "budgetBelowInstallment": "C'est inférieur à la mensualité actuelle ({amount}) ; augmentez-le pour rembourser par anticipation.",
-      "windowInverted": "La date de début est postérieure à la date de fin, ce plan ne s'applique donc jamais."
+      "windowInverted": "La date de début est postérieure à la date de fin, ce plan ne s'applique donc jamais.",
+      "unavailable": {
+        "title": "La simulation de remboursement anticipé ne peut pas encore être calculée pour ce prêt.",
+        "reasonPaidOff": "Ce prêt n'a aucun solde restant dû, il n'y a donc plus rien à amortir.",
+        "reasonNoFrequency": "Aucune périodicité de paiement n'est définie pour ce prêt. Ajoutez-la dans les paramètres du compte.",
+        "reasonNoRate": "Aucun taux d'intérêt n'est enregistré pour ce prêt. Définissez le taux dans les paramètres du compte, ou enregistrez un changement de taux daté d'aujourd'hui ou avant. Un taux affiché par ligne dans l'échéancier ci-dessous est reconstruit à partir des intérêts facturés et n'est pas un taux enregistré.",
+        "reasonNoPayment": "Le montant de l'échéance ne peut pas être déterminé. Enregistrez les échéances régulières comme des virements vers le compte du prêt (capital, avec les intérêts en ligne de ventilation ou en dépense catégorisée distincte), ou définissez le montant du paiement dans les paramètres du compte. Les paiements enregistrés comme des dépenses ordinaires sur le compte source n'atteignent jamais le compte du prêt, donc l'échéancier ne peut pas les voir."
+      }
     },
     "comparison": {
       "newPayoff": "Nouvelle date de remboursement",
@@ -616,6 +623,11 @@
       "memoLabel": "Note de remboursement anticipé",
       "memoPlaceholder": "ex. Capital supplémentaire",
       "memoHelp": "Les paiements dont la note contient ce texte sont comptés comme des remboursements anticipés (insensible à la casse)."
+    },
+    "notAmortizing": {
+      "title": "Ce prêt ne se rembourse pas, la date de remboursement estimée et les intérêts restants sont donc inconnus.",
+      "paymentBelowInterest": "L'échéance ({payment}) est inférieure aux intérêts mensuels (environ {interest}) à {rate}%, donc le solde ne baisse jamais. Enregistrez l'échéance réelle (l'entrée de l'historique des taux ou le montant de paiement du compte) pour qu'elle couvre les intérêts.",
+      "beyondHorizon": "L'échéance couvre les intérêts, mais la durée dépasse l'horizon de projection, donc la date de remboursement et les intérêts restants ne sont pas affichés."
     }
   }
 }

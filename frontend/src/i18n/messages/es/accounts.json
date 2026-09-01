@@ -455,7 +455,14 @@
       "budgetLabel": "Pago mensual total",
       "budgetHint": "Destina cada mes un total fijo al préstamo; la amortización es lo que queda tras la cuota. Al bajar la cuota, la amortización crece para mantener el total.",
       "budgetBelowInstallment": "Es inferior a la cuota actual ({amount}); auméntalo para amortizar de más.",
-      "windowInverted": "La fecha de inicio es posterior a la fecha final, por lo que este plan nunca se aplica."
+      "windowInverted": "La fecha de inicio es posterior a la fecha final, por lo que este plan nunca se aplica.",
+      "unavailable": {
+        "title": "La simulación de amortización anticipada aún no se puede calcular para este préstamo.",
+        "reasonPaidOff": "Este préstamo no tiene saldo pendiente, así que no queda nada por amortizar.",
+        "reasonNoFrequency": "Este préstamo no tiene una frecuencia de pago configurada. Añádela en la configuración de la cuenta.",
+        "reasonNoRate": "Este préstamo no tiene un tipo de interés guardado. Establece el tipo de interés en la configuración de la cuenta o registra un cambio de tipo con fecha de hoy o anterior. Un tipo mostrado por fila en el calendario de abajo se reconstruye a partir del interés cobrado y no es un tipo guardado.",
+        "reasonNoPayment": "No se puede determinar el importe de la cuota. Registra las cuotas regulares como transferencias a la cuenta del préstamo (capital, con el interés como línea de desglose o como un gasto categorizado aparte), o establece el importe del pago en la configuración de la cuenta. Los pagos registrados como gastos normales en la cuenta de origen nunca llegan a la cuenta del préstamo, por lo que el calendario no puede verlos."
+      }
     },
     "comparison": {
       "newPayoff": "Nueva fecha de liquidación",
@@ -616,6 +623,11 @@
       "memoLabel": "Nota de pago anticipado",
       "memoPlaceholder": "p. ej. Capital adicional",
       "memoHelp": "Los pagos cuya nota contenga este texto se cuentan como pagos anticipados (no distingue mayúsculas de minúsculas)."
+    },
+    "notAmortizing": {
+      "title": "Este préstamo no se amortiza, por lo que la fecha estimada de liquidación y el interés restante son desconocidos.",
+      "paymentBelowInterest": "La cuota ({payment}) es inferior al interés mensual (unos {interest}) al {rate}%, por lo que el saldo nunca baja. Registra la cuota real (la entrada del historial de tipos de interés o el importe de pago de la cuenta) para que cubra el interés.",
+      "beyondHorizon": "La cuota cubre el interés, pero el plazo se extiende más allá del horizonte de proyección, por lo que no se muestran la fecha de liquidación ni el interés restante."
     }
   }
 }

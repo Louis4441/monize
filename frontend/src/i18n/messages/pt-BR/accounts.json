@@ -455,7 +455,14 @@
       "budgetLabel": "Pagamento mensal total",
       "budgetHint": "Gaste um total fixo no empréstimo todo mês; a amortização é o que sobra depois da parcela. Quando a parcela cai, a amortização cresce para manter o total.",
       "budgetBelowInstallment": "É inferior à parcela atual ({amount}); aumente para amortizar.",
-      "windowInverted": "A data de início é posterior à data final, então este plano nunca se aplica."
+      "windowInverted": "A data de início é posterior à data final, então este plano nunca se aplica.",
+      "unavailable": {
+        "title": "A simulação de amortização antecipada ainda não pode ser calculada para este empréstimo.",
+        "reasonPaidOff": "Este empréstimo não tem saldo devedor, então não há nada para amortizar.",
+        "reasonNoFrequency": "Este empréstimo não tem uma frequência de pagamento definida. Adicione-a nas configurações da conta.",
+        "reasonNoRate": "Este empréstimo não tem uma taxa de juros salva. Defina a taxa nas configurações da conta ou registre uma alteração de taxa com data de hoje ou anterior. Uma taxa mostrada por linha no cronograma abaixo é reconstruída a partir dos juros cobrados e não é uma taxa salva.",
+        "reasonNoPayment": "O valor da parcela não pode ser determinado. Registre as parcelas regulares como transferências para a conta do empréstimo (principal, com os juros como linha de divisão ou como uma despesa categorizada separada), ou defina o valor do pagamento nas configurações da conta. Pagamentos registrados como despesas comuns na conta de origem nunca chegam à conta do empréstimo, então o cronograma não consegue vê-los."
+      }
     },
     "comparison": {
       "newPayoff": "Nova data de quitação",
@@ -616,6 +623,11 @@
       "memoLabel": "Nota de amortização extra",
       "memoPlaceholder": "ex. Principal adicional",
       "memoHelp": "Os pagamentos cuja nota contém este texto são contabilizados como amortizações extras (não diferencia maiúsculas de minúsculas)."
+    },
+    "notAmortizing": {
+      "title": "Este empréstimo não é quitado, então a data estimada de quitação e os juros restantes são desconhecidos.",
+      "paymentBelowInterest": "A parcela ({payment}) é menor que os juros mensais (cerca de {interest}) a {rate}%, então o saldo nunca cai. Registre a parcela real (a entrada no histórico de taxas ou o valor de pagamento da conta) para que ela cubra os juros.",
+      "beyondHorizon": "A parcela cobre os juros, mas o prazo vai além do horizonte de projeção, então a data de quitação e os juros restantes não são mostrados."
     }
   }
 }

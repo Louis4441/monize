@@ -455,7 +455,14 @@
       "budgetLabel": "Toplam aylık ödeme",
       "budgetHint": "Her ay krediye sabit bir toplam ayırın; fazladan ödeme, taksitten sonra kalan tutardır. Taksit düştükçe toplam aynı kalsın diye fazladan ödeme artar.",
       "budgetBelowInstallment": "Bu, mevcut taksitin ({amount}) altında; fazladan ödeme için artırın.",
-      "windowInverted": "Başlangıç tarihi bitiş tarihinden sonra olduğundan bu plan hiçbir zaman uygulanmaz."
+      "windowInverted": "Başlangıç tarihi bitiş tarihinden sonra olduğundan bu plan hiçbir zaman uygulanmaz.",
+      "unavailable": {
+        "title": "Bu kredi için erken ödeme simülasyonu henüz hesaplanamıyor.",
+        "reasonPaidOff": "Bu kredinin ödenmemiş bakiyesi yok, bu yüzden amorti edilecek bir şey kalmadı.",
+        "reasonNoFrequency": "Bu kredi için ödeme sıklığı ayarlanmamış. Hesap ayarlarından ekleyin.",
+        "reasonNoRate": "Bu kredi için kayıtlı bir faiz oranı yok. Faiz oranını hesap ayarlarından belirleyin veya bugün ya da daha önceki tarihli bir oran değişikliği kaydedin. Aşağıdaki planda satır başına gösterilen oran, tahsil edilen faizden yeniden oluşturulur ve kayıtlı bir oran değildir.",
+        "reasonNoPayment": "Taksit tutarı belirlenemiyor. Düzenli taksitleri kredi hesabına transfer olarak kaydedin (anapara, faiz ise bölünmüş satır veya ayrı kategorili bir gider olarak) ya da ödeme tutarını hesap ayarlarından belirleyin. Kaynak hesapta sıradan gider olarak kaydedilen ödemeler kredi hesabına asla ulaşmaz, bu yüzden plan onları göremez."
+      }
     },
     "comparison": {
       "newPayoff": "Yeni Kapanış Tarihi",
@@ -616,6 +623,11 @@
       "memoLabel": "Ek ödeme notu",
       "memoPlaceholder": "örn. Ek anapara",
       "memoHelp": "Notu bu metni içeren ödemeler ek ödeme olarak sayılır (büyük/küçük harfe duyarlı değildir)."
+    },
+    "notAmortizing": {
+      "title": "Bu kredi kapanmıyor, bu yüzden tahmini kapanış tarihi ve kalan faiz bilinmiyor.",
+      "paymentBelowInterest": "Taksit ({payment}), {rate}% oranında aylık faizin (yaklaşık {interest}) altında, bu yüzden bakiye hiç düşmüyor. Faizi karşılaması için gerçek taksiti kaydedin (faiz geçmişi kaydı veya hesabın ödeme tutarı).",
+      "beyondHorizon": "Taksit faizi karşılıyor ancak vade projeksiyon ufkunu aşıyor, bu yüzden kapanış tarihi ve kalan faiz gösterilmiyor."
     }
   }
 }

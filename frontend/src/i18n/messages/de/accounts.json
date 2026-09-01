@@ -455,7 +455,14 @@
       "budgetLabel": "Monatliche Gesamtzahlung",
       "budgetHint": "Gib jeden Monat einen festen Gesamtbetrag für den Kredit aus; die Sondertilgung ist der Rest nach der Rate. Sinkt die Rate, wächst die Sondertilgung, damit der Gesamtbetrag gleich bleibt.",
       "budgetBelowInstallment": "Das liegt unter der aktuellen Rate ({amount}); erhöhe den Betrag, um zusätzlich zu tilgen.",
-      "windowInverted": "Das Startdatum liegt nach dem Enddatum, daher wird dieser Plan nie angewendet."
+      "windowInverted": "Das Startdatum liegt nach dem Enddatum, daher wird dieser Plan nie angewendet.",
+      "unavailable": {
+        "title": "Die Sondertilgungs-Simulation kann für diesen Kredit noch nicht berechnet werden.",
+        "reasonPaidOff": "Dieser Kredit hat keinen offenen Saldo, es bleibt also nichts zu tilgen.",
+        "reasonNoFrequency": "Für diesen Kredit ist keine Zahlungshäufigkeit festgelegt. Legen Sie sie in den Kontoeinstellungen fest.",
+        "reasonNoRate": "Für diesen Kredit ist kein Zinssatz gespeichert. Legen Sie den Zinssatz in den Kontoeinstellungen fest oder erfassen Sie eine Zinsänderung mit heutigem oder früherem Datum. Ein je Zeile im Tilgungsplan angezeigter Zinssatz wird aus den berechneten Zinsen rekonstruiert und ist kein gespeicherter Zinssatz.",
+        "reasonNoPayment": "Die Ratenhöhe kann nicht ermittelt werden. Erfassen Sie die regelmäßigen Raten als Überweisungen auf das Kreditkonto (Tilgung, mit Zinsen als Splitzeile oder als separate kategorisierte Ausgabe) oder legen Sie den Zahlungsbetrag in den Kontoeinstellungen fest. Als gewöhnliche Ausgaben auf dem Quellkonto gebuchte Zahlungen erreichen das Kreditkonto nie, daher kann der Tilgungsplan sie nicht sehen."
+      }
     },
     "comparison": {
       "newPayoff": "Neues Tilgungsdatum",
@@ -616,6 +623,11 @@
       "memoLabel": "Sondertilgungs-Memo",
       "memoPlaceholder": "z. B. Zusätzliche Tilgung",
       "memoHelp": "Zahlungen, deren Memo diesen Text enthält, zählen als Sondertilgungen (Groß-/Kleinschreibung wird ignoriert)."
+    },
+    "notAmortizing": {
+      "title": "Dieser Kredit wird nicht getilgt, daher sind das voraussichtliche Tilgungsdatum und die restlichen Zinsen unbekannt.",
+      "paymentBelowInterest": "Die Rate ({payment}) liegt unter den monatlichen Zinsen (etwa {interest}) bei {rate}%, sodass der Saldo nie sinkt. Erfassen Sie die tatsächliche Rate (den Eintrag in der Zinsverlauf-Historie oder den Zahlungsbetrag des Kontos), damit sie die Zinsen deckt.",
+      "beyondHorizon": "Die Rate deckt die Zinsen, aber die Laufzeit reicht über den Prognosehorizont hinaus, daher werden Tilgungsdatum und restliche Zinsen nicht angezeigt."
     }
   }
 }

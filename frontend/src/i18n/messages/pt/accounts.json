@@ -455,7 +455,14 @@
       "budgetLabel": "Pagamento mensal total",
       "budgetHint": "Gaste um total fixo no empréstimo todos os meses; a amortização é o que sobra depois da prestação. Quando a prestação desce, a amortização cresce para manter o total.",
       "budgetBelowInstallment": "É inferior à prestação atual ({amount}); aumente para amortizar.",
-      "windowInverted": "A data de início é posterior à data final, pelo que este plano nunca se aplica."
+      "windowInverted": "A data de início é posterior à data final, pelo que este plano nunca se aplica.",
+      "unavailable": {
+        "title": "A simulação de amortização antecipada ainda não pode ser calculada para este empréstimo.",
+        "reasonPaidOff": "Este empréstimo não tem saldo em dívida, por isso não há nada para amortizar.",
+        "reasonNoFrequency": "Este empréstimo não tem uma periodicidade de pagamento definida. Adicione-a nas definições da conta.",
+        "reasonNoRate": "Este empréstimo não tem uma taxa de juro guardada. Defina a taxa nas definições da conta ou registe uma alteração de taxa com data de hoje ou anterior. Uma taxa mostrada por linha no plano abaixo é reconstruída a partir dos juros cobrados e não é uma taxa guardada.",
+        "reasonNoPayment": "O valor da prestação não pode ser determinado. Registe as prestações regulares como transferências para a conta do empréstimo (capital, com os juros como linha de divisão ou como despesa categorizada separada), ou defina o valor do pagamento nas definições da conta. Pagamentos registados como despesas normais na conta de origem nunca chegam à conta do empréstimo, por isso o plano não os consegue ver."
+      }
     },
     "comparison": {
       "newPayoff": "Nova data de liquidação",
@@ -616,6 +623,11 @@
       "memoLabel": "Nota de amortização antecipada",
       "memoPlaceholder": "ex. Capital adicional",
       "memoHelp": "Os pagamentos cuja nota contém este texto são contabilizados como amortizações antecipadas (não distingue maiúsculas de minúsculas)."
+    },
+    "notAmortizing": {
+      "title": "Este empréstimo não é amortizado, por isso a data estimada de liquidação e os juros restantes são desconhecidos.",
+      "paymentBelowInterest": "A prestação ({payment}) é inferior aos juros mensais (cerca de {interest}) a {rate}%, por isso o saldo nunca diminui. Registe a prestação real (a entrada no histórico de taxas ou o valor de pagamento da conta) para que cubra os juros.",
+      "beyondHorizon": "A prestação cobre os juros, mas o prazo ultrapassa o horizonte da projeção, por isso a data de liquidação e os juros restantes não são mostrados."
     }
   }
 }

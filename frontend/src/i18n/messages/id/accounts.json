@@ -455,7 +455,14 @@
       "budgetLabel": "Total pembayaran bulanan",
       "budgetHint": "Keluarkan total tetap untuk pinjaman tiap bulan; pembayaran ekstra adalah sisa setelah angsuran. Saat angsuran turun, pembayaran ekstra naik agar totalnya tetap.",
       "budgetBelowInstallment": "Ini di bawah angsuran saat ini ({amount}); naikkan agar bisa membayar lebih.",
-      "windowInverted": "Tanggal mulai berada setelah tanggal akhir, sehingga rencana ini tidak akan pernah berlaku."
+      "windowInverted": "Tanggal mulai berada setelah tanggal akhir, sehingga rencana ini tidak akan pernah berlaku.",
+      "unavailable": {
+        "title": "Simulasi pelunasan dipercepat belum dapat dihitung untuk pinjaman ini.",
+        "reasonPaidOff": "Pinjaman ini tidak memiliki saldo terutang, jadi tidak ada yang perlu diamortisasi.",
+        "reasonNoFrequency": "Pinjaman ini belum memiliki frekuensi pembayaran. Tambahkan di pengaturan akun.",
+        "reasonNoRate": "Pinjaman ini belum memiliki suku bunga tersimpan. Setel suku bunga di pengaturan akun, atau catat perubahan suku bunga bertanggal hari ini atau lebih awal. Suku bunga yang ditampilkan per baris pada jadwal di bawah direkonstruksi dari bunga yang ditagihkan dan bukan suku bunga tersimpan.",
+        "reasonNoPayment": "Jumlah angsuran tidak dapat ditentukan. Catat angsuran reguler sebagai transfer ke akun pinjaman (pokok, dengan bunga sebagai baris pembagian atau sebagai pengeluaran berkategori terpisah), atau setel jumlah pembayaran di pengaturan akun. Pembayaran yang dicatat sebagai pengeluaran biasa di akun sumber tidak pernah sampai ke akun pinjaman, sehingga jadwal tidak dapat melihatnya."
+      }
     },
     "comparison": {
       "newPayoff": "Tanggal Lunas Baru",
@@ -616,6 +623,11 @@
       "memoLabel": "Memo pembayaran ekstra",
       "memoPlaceholder": "mis. Pokok tambahan",
       "memoHelp": "Pembayaran yang memonya berisi teks ini dihitung sebagai pembayaran ekstra (tidak membedakan huruf besar/kecil)."
+    },
+    "notAmortizing": {
+      "title": "Pinjaman ini tidak lunas, sehingga perkiraan tanggal pelunasan dan sisa bunga tidak diketahui.",
+      "paymentBelowInterest": "Angsuran ({payment}) lebih kecil dari bunga bulanan (sekitar {interest}) pada {rate}%, sehingga saldo tidak pernah turun. Catat angsuran yang sebenarnya (entri riwayat suku bunga atau jumlah pembayaran akun) agar menutupi bunga.",
+      "beyondHorizon": "Angsuran menutupi bunga, tetapi jangka waktunya melampaui horizon proyeksi, sehingga tanggal pelunasan dan sisa bunga tidak ditampilkan."
     }
   }
 }
