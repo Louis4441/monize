@@ -2,7 +2,10 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 
 import { Notification } from "./entities/notification.entity";
+import { NotificationPreference } from "./entities/notification-preference.entity";
+import { UserPreference } from "../users/entities/user-preference.entity";
 import { NotificationService } from "./notification.service";
+import { NotificationPreferenceService } from "./notification-preference.service";
 
 /**
  * The durable `notifications` table and the one service that reads and writes
@@ -21,8 +24,14 @@ import { NotificationService } from "./notification.service";
  * transport; see `backend/CLAUDE.md`.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Notification])],
-  providers: [NotificationService],
-  exports: [NotificationService],
+  imports: [
+    TypeOrmModule.forFeature([
+      Notification,
+      NotificationPreference,
+      UserPreference,
+    ]),
+  ],
+  providers: [NotificationService, NotificationPreferenceService],
+  exports: [NotificationService, NotificationPreferenceService],
 })
 export class NotificationCenterModule {}

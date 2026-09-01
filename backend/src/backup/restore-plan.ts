@@ -148,6 +148,11 @@ export const RESTORE_PLAN: ReadonlyArray<RestoreStep> = [
     scopeToUser: false,
   },
   { table: "notifications", countKey: "notifications", scopeToUser: true },
+  {
+    table: "notification_preferences",
+    countKey: "notificationPreferences",
+    scopeToUser: true,
+  },
   { table: "custom_reports", countKey: "customReports", scopeToUser: true },
   {
     table: "investment_reports",

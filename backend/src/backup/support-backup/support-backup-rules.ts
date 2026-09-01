@@ -543,6 +543,13 @@ export const RULES: Record<string, TableRules> = {
     // the user id in it is the same identifier user_id already keeps.
     dedupe_key: keep,
   },
+  notification_preferences: {
+    user_id: keep,
+    category: keep, // a derived NotificationCategory value, not free text
+    email: keep,
+    created_at: keep,
+    updated_at: keep,
+  },
   custom_reports: {
     id: keep,
     user_id: keep,
@@ -749,6 +756,7 @@ export const SECTION_TABLES: Record<SupportBackupSection, string[]> = {
     "budget_periods",
     "budget_period_categories",
     "notifications",
+    "notification_preferences",
   ],
   reports: [
     "custom_reports",

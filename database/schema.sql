@@ -1716,6 +1716,21 @@ CREATE UNIQUE INDEX idx_notifications_dedupe
     ON notifications(user_id, dedupe_key)
     WHERE dedupe_key IS NOT NULL;
 
+-- Per-category notification channel preferences (migration 173,
+-- docs/specs/notification-preferences.md). One row per (user, category); an
+-- absent row means the default matrix. Phase 1 carries only the live channel,
+-- email; push, unifiedpush and the throttle window land with the dispatch that
+-- reads them. `category` is a derived NotificationCategory value (PAYMENTS,
+-- BUDGETS, SYSTEM today), never a raw alert_type.
+CREATE TABLE notification_preferences (
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    category VARCHAR(20) NOT NULL,
+    email BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, category)
+);
+
 -- Triggers for budget tables updated_at
 CREATE TRIGGER update_budgets_updated_at BEFORE UPDATE ON budgets FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_budget_categories_updated_at BEFORE UPDATE ON budget_categories FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -2322,6 +2337,7 @@ DECLARE
         'loan_rate_changes',
         'loan_scenarios',
         'monte_carlo_scenarios',
+        'notification_preferences',
         'notifications',
         'payee_aliases',
         'push_subscriptions',
@@ -2884,7 +2900,7 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- Verification helper (run manually; not part of the migration's effect):
 --   SELECT tablename, policyname FROM pg_policies
 --    WHERE schemaname = 'public' ORDER BY tablename;
--- Expected: 59 policies -- 26 direct + 4 real-user-keyed (112),
+-- Expected: 60 policies -- 26 direct + 4 real-user-keyed (112),
 --           15 indirect (113), 5 special (114),
 --           2 direct for the .mny import's staging + job tables (117),
 --           1 direct for security_documents (118),
@@ -2892,7 +2908,8 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 --           2 direct for job_claims and attachment_blob_tombstones,
 --           1 indirect for scheduled_transaction_postings (133),
 --           1 direct for the OIDC step-up claim ledger (155), and
---           1 direct for push_subscriptions (171).
+--           1 direct for push_subscriptions (171), and
+--           1 direct for notification_preferences (173).
 
 -- ---------------------------------------------------------------------------
 -- Enable row-level security (migration 123).
