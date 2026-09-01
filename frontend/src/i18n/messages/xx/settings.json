@@ -290,6 +290,22 @@
         "testPartial": "[XX-Test notification reached {delivered} of {attempted} devices-XX]",
         "testFailed": "[XX-Could not deliver the test notification-XX]"
       }
+    },
+    "preferences": {
+      "heading": "[XX-Also notify me by email-XX]",
+      "description": "[XX-The bell always shows every notification. Choose which kinds Monize also sends to your email.-XX]",
+      "categoryHeader": "[XX-Notification-XX]",
+      "channels": {
+        "inApp": "[XX-In-app-XX]",
+        "email": "[XX-Email-XX]"
+      },
+      "categories": {
+        "PAYMENTS": "[XX-Bills and scheduled-XX]",
+        "BUDGETS": "[XX-Budgets-XX]"
+      },
+      "inAppAlways": "[XX-Always shown in the bell-XX]",
+      "emailToggleLabel": "[XX-Email for {category}-XX]",
+      "saveFailed": "[XX-Could not save that setting-XX]"
     }
   },
   "help": {

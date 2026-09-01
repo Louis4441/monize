@@ -290,6 +290,22 @@
         "testPartial": "Powiadomienie testowe dotarło do {delivered} z {attempted} urządzeń",
         "testFailed": "Nie udało się dostarczyć powiadomienia testowego"
       }
+    },
+    "preferences": {
+      "heading": "Powiadamiaj mnie też e-mailem",
+      "description": "Dzwonek zawsze pokazuje wszystkie powiadomienia. Wybierz, które rodzaje Monize wyśle również na e-mail.",
+      "categoryHeader": "Powiadomienie",
+      "channels": {
+        "inApp": "W aplikacji",
+        "email": "E-mail"
+      },
+      "categories": {
+        "PAYMENTS": "Rachunki i zaplanowane",
+        "BUDGETS": "Budżety"
+      },
+      "inAppAlways": "Zawsze widoczne w dzwonku",
+      "emailToggleLabel": "E-mail dla: {category}",
+      "saveFailed": "Nie udało się zapisać tego ustawienia"
     }
   },
   "help": {

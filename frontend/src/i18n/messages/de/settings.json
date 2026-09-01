@@ -290,6 +290,22 @@
         "testPartial": "Testbenachrichtigung erreichte {delivered} von {attempted} Geräten",
         "testFailed": "Testbenachrichtigung konnte nicht zugestellt werden"
       }
+    },
+    "preferences": {
+      "heading": "Auch per E-Mail benachrichtigen",
+      "description": "Die Glocke zeigt immer alle Benachrichtigungen. Wähle, welche Arten Monize zusätzlich per E-Mail sendet.",
+      "categoryHeader": "Benachrichtigung",
+      "channels": {
+        "inApp": "In der App",
+        "email": "E-Mail"
+      },
+      "categories": {
+        "PAYMENTS": "Rechnungen und Geplantes",
+        "BUDGETS": "Budgets"
+      },
+      "inAppAlways": "Immer in der Glocke sichtbar",
+      "emailToggleLabel": "E-Mail für {category}",
+      "saveFailed": "Diese Einstellung konnte nicht gespeichert werden"
     }
   },
   "help": {

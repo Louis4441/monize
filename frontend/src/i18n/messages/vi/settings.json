@@ -290,6 +290,22 @@
         "testPartial": "Thông báo thử nghiệm đã tới {delivered} trên {attempted} thiết bị",
         "testFailed": "Không thể gửi thông báo thử nghiệm"
       }
+    },
+    "preferences": {
+      "heading": "Cũng thông báo cho tôi qua email",
+      "description": "Chuông luôn hiển thị mọi thông báo. Chọn loại nào Monize cũng gửi tới email của bạn.",
+      "categoryHeader": "Thông báo",
+      "channels": {
+        "inApp": "Trong ứng dụng",
+        "email": "Email"
+      },
+      "categories": {
+        "PAYMENTS": "Hóa đơn và đã lên lịch",
+        "BUDGETS": "Ngân sách"
+      },
+      "inAppAlways": "Luôn hiển thị trong chuông",
+      "emailToggleLabel": "Email cho {category}",
+      "saveFailed": "Không thể lưu cài đặt đó"
     }
   },
   "help": {

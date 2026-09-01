@@ -290,6 +290,22 @@
         "testPartial": "テスト通知は {attempted} 台中 {delivered} 台に届きました",
         "testFailed": "テスト通知を配信できませんでした"
       }
+    },
+    "preferences": {
+      "heading": "メールでも通知する",
+      "description": "ベルには常にすべての通知が表示されます。どの種類を Monize がメールでも送るか選んでください。",
+      "categoryHeader": "通知",
+      "channels": {
+        "inApp": "アプリ内",
+        "email": "メール"
+      },
+      "categories": {
+        "PAYMENTS": "請求と予定",
+        "BUDGETS": "予算"
+      },
+      "inAppAlways": "ベルには常に表示されます",
+      "emailToggleLabel": "{category} のメール",
+      "saveFailed": "設定を保存できませんでした"
     }
   },
   "help": {

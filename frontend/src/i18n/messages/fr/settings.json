@@ -290,6 +290,22 @@
         "testPartial": "La notification de test a atteint {delivered} appareils sur {attempted}",
         "testFailed": "Impossible de distribuer la notification de test"
       }
+    },
+    "preferences": {
+      "heading": "M'avertir aussi par e-mail",
+      "description": "La cloche affiche toujours toutes les notifications. Choisissez lesquelles Monize envoie aussi par e-mail.",
+      "categoryHeader": "Notification",
+      "channels": {
+        "inApp": "Dans l'appli",
+        "email": "E-mail"
+      },
+      "categories": {
+        "PAYMENTS": "Factures et planifiés",
+        "BUDGETS": "Budgets"
+      },
+      "inAppAlways": "Toujours visible dans la cloche",
+      "emailToggleLabel": "E-mail pour {category}",
+      "saveFailed": "Impossible d'enregistrer ce réglage"
     }
   },
   "help": {

@@ -290,6 +290,22 @@
         "testPartial": "परीक्षण सूचना {attempted} में से {delivered} डिवाइस तक पहुंची",
         "testFailed": "परीक्षण सूचना नहीं भेजी जा सकी"
       }
+    },
+    "preferences": {
+      "heading": "मुझे ईमेल से भी सूचित करें",
+      "description": "घंटी हमेशा सभी सूचनाएँ दिखाती है। चुनें कि Monize किन प्रकारों को ईमेल पर भी भेजे।",
+      "categoryHeader": "सूचना",
+      "channels": {
+        "inApp": "ऐप में",
+        "email": "ईमेल"
+      },
+      "categories": {
+        "PAYMENTS": "बिल और शेड्यूल",
+        "BUDGETS": "बजट"
+      },
+      "inAppAlways": "घंटी में हमेशा दिखती है",
+      "emailToggleLabel": "{category} के लिए ईमेल",
+      "saveFailed": "यह सेटिंग सहेजी नहीं जा सकी"
     }
   },
   "help": {

@@ -290,6 +290,22 @@
         "testPartial": "Notifikasi uji coba menjangkau {delivered} dari {attempted} perangkat",
         "testFailed": "Tidak dapat mengirim notifikasi uji coba"
       }
+    },
+    "preferences": {
+      "heading": "Beri tahu saya lewat email juga",
+      "description": "Lonceng selalu menampilkan semua notifikasi. Pilih jenis mana yang juga dikirim Monize ke email Anda.",
+      "categoryHeader": "Notifikasi",
+      "channels": {
+        "inApp": "Dalam aplikasi",
+        "email": "Email"
+      },
+      "categories": {
+        "PAYMENTS": "Tagihan dan terjadwal",
+        "BUDGETS": "Anggaran"
+      },
+      "inAppAlways": "Selalu tampil di lonceng",
+      "emailToggleLabel": "Email untuk {category}",
+      "saveFailed": "Tidak dapat menyimpan setelan itu"
     }
   },
   "help": {

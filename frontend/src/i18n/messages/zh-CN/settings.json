@@ -290,6 +290,22 @@
         "testPartial": "测试通知送达 {attempted} 台设备中的 {delivered} 台",
         "testFailed": "无法投递测试通知"
       }
+    },
+    "preferences": {
+      "heading": "同时通过邮件通知我",
+      "description": "铃铛始终显示所有通知。选择 Monize 还会通过邮件发送哪些类型。",
+      "categoryHeader": "通知",
+      "channels": {
+        "inApp": "应用内",
+        "email": "邮件"
+      },
+      "categories": {
+        "PAYMENTS": "账单与计划",
+        "BUDGETS": "预算"
+      },
+      "inAppAlways": "始终显示在铃铛中",
+      "emailToggleLabel": "{category} 的邮件",
+      "saveFailed": "无法保存该设置"
     }
   },
   "help": {

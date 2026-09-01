@@ -290,6 +290,22 @@
         "testPartial": "La notificación de prueba llegó a {delivered} de {attempted} dispositivos",
         "testFailed": "No se pudo entregar la notificación de prueba"
       }
+    },
+    "preferences": {
+      "heading": "Avisarme también por correo",
+      "description": "La campana siempre muestra todas las notificaciones. Elige qué tipos envía Monize también por correo.",
+      "categoryHeader": "Notificación",
+      "channels": {
+        "inApp": "En la app",
+        "email": "Correo"
+      },
+      "categories": {
+        "PAYMENTS": "Facturas y programados",
+        "BUDGETS": "Presupuestos"
+      },
+      "inAppAlways": "Siempre visible en la campana",
+      "emailToggleLabel": "Correo para {category}",
+      "saveFailed": "No se pudo guardar ese ajuste"
     }
   },
   "help": {

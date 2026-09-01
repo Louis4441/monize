@@ -290,6 +290,22 @@
         "testPartial": "測試通知送達 {attempted} 台裝置中的 {delivered} 台",
         "testFailed": "無法傳送測試通知"
       }
+    },
+    "preferences": {
+      "heading": "同時以電子郵件通知我",
+      "description": "鈴鐺始終顯示所有通知。選擇 Monize 還會以電子郵件寄送哪些類型。",
+      "categoryHeader": "通知",
+      "channels": {
+        "inApp": "應用程式內",
+        "email": "電子郵件"
+      },
+      "categories": {
+        "PAYMENTS": "帳單與排程",
+        "BUDGETS": "預算"
+      },
+      "inAppAlways": "始終顯示在鈴鐺中",
+      "emailToggleLabel": "{category} 的電子郵件",
+      "saveFailed": "無法儲存該設定"
     }
   },
   "help": {

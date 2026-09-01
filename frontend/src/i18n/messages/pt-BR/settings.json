@@ -290,6 +290,22 @@
         "testPartial": "A notificação de teste chegou a {delivered} de {attempted} dispositivos",
         "testFailed": "Não foi possível entregar a notificação de teste"
       }
+    },
+    "preferences": {
+      "heading": "Avisar também por email",
+      "description": "O sino sempre mostra todas as notificações. Escolha quais tipos o Monize também envia para o seu email.",
+      "categoryHeader": "Notificação",
+      "channels": {
+        "inApp": "No app",
+        "email": "Email"
+      },
+      "categories": {
+        "PAYMENTS": "Contas e agendados",
+        "BUDGETS": "Orçamentos"
+      },
+      "inAppAlways": "Sempre visível no sino",
+      "emailToggleLabel": "Email para {category}",
+      "saveFailed": "Não foi possível salvar essa configuração"
     }
   },
   "help": {

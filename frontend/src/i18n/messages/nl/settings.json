@@ -290,6 +290,22 @@
         "testPartial": "De testmelding bereikte {delivered} van {attempted} apparaten",
         "testFailed": "De testmelding kon niet worden afgeleverd"
       }
+    },
+    "preferences": {
+      "heading": "Ook per e-mail melden",
+      "description": "De bel toont altijd alle meldingen. Kies welke soorten Monize ook naar je e-mail stuurt.",
+      "categoryHeader": "Melding",
+      "channels": {
+        "inApp": "In de app",
+        "email": "E-mail"
+      },
+      "categories": {
+        "PAYMENTS": "Rekeningen en gepland",
+        "BUDGETS": "Budgetten"
+      },
+      "inAppAlways": "Altijd zichtbaar in de bel",
+      "emailToggleLabel": "E-mail voor {category}",
+      "saveFailed": "Kon die instelling niet opslaan"
     }
   },
   "help": {

@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
 import { PushDevicesPanel } from './PushDevicesPanel';
 import { PushDiagnostics } from './PushDiagnostics';
+import { NotificationPreferencesMatrix } from './NotificationPreferencesMatrix';
 import { userSettingsApi } from '@/lib/user-settings';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { UserPreferences } from '@/types/auth';
@@ -128,6 +129,7 @@ export function NotificationsSection({
 
           {notificationEmail && (
             <>
+              <NotificationPreferencesMatrix />
               <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                 <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
                   {t('budgetNotificationsHeading')}

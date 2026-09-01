@@ -290,6 +290,22 @@
         "testPartial": "Test bildirimi {attempted} cihazın {delivered} tanesine ulaştı",
         "testFailed": "Test bildirimi teslim edilemedi"
       }
+    },
+    "preferences": {
+      "heading": "Beni e-postayla da bilgilendir",
+      "description": "Zil her zaman tüm bildirimleri gösterir. Monize'ın hangi türleri e-postayla da göndereceğini seçin.",
+      "categoryHeader": "Bildirim",
+      "channels": {
+        "inApp": "Uygulamada",
+        "email": "E-posta"
+      },
+      "categories": {
+        "PAYMENTS": "Faturalar ve planlananlar",
+        "BUDGETS": "Bütçeler"
+      },
+      "inAppAlways": "Zilde her zaman görünür",
+      "emailToggleLabel": "{category} için e-posta",
+      "saveFailed": "Bu ayar kaydedilemedi"
     }
   },
   "help": {

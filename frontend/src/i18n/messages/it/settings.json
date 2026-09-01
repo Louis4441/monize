@@ -290,6 +290,22 @@
         "testPartial": "La notifica di prova ha raggiunto {delivered} dispositivi su {attempted}",
         "testFailed": "Impossibile consegnare la notifica di prova"
       }
+    },
+    "preferences": {
+      "heading": "Avvisami anche via email",
+      "description": "La campanella mostra sempre tutte le notifiche. Scegli quali tipi Monize invia anche via email.",
+      "categoryHeader": "Notifica",
+      "channels": {
+        "inApp": "Nell'app",
+        "email": "Email"
+      },
+      "categories": {
+        "PAYMENTS": "Bollette e programmati",
+        "BUDGETS": "Budget"
+      },
+      "inAppAlways": "Sempre visibile nella campanella",
+      "emailToggleLabel": "Email per {category}",
+      "saveFailed": "Impossibile salvare questa impostazione"
     }
   },
   "help": {
