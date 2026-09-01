@@ -69,8 +69,9 @@ export type PushSendOutcome =
   | { status: "transient"; message: string; statusCode?: number };
 
 /**
- * The only file in `src/` that imports `web-push`, enforced by
- * `push-secret.guard.spec.ts`.
+ * The only file in `src/` that *sends*, enforced by `push-secret.guard.spec.ts`.
+ * (`PushConfigService` also imports `web-push`, for key generation and nothing
+ * else; the guard's allowlist names both files and their reasons.)
  *
  * Business features never reach a transport. They ask the notification layer to
  * deliver something and this class decides what the wire looks like -- which is

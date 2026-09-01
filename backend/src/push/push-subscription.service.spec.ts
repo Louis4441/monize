@@ -10,6 +10,7 @@ import {
   ENDPOINT_UNIQUE_INDEX,
   MAX_LIVE_DEVICES_PER_USER,
   MAX_USER_AGENT_LENGTH,
+  PUSH_TEST_CONCURRENCY,
   hashEndpoint,
 } from "./push-subscription.service";
 import { PushConfigService } from "./push-config.service";
@@ -578,6 +579,50 @@ describe("PushSubscriptionService", () => {
       expect(result.devices.map((d) => d.status)).toEqual([
         "transient",
         "sent",
+      ]);
+    });
+  });
+
+  describe("bounding one test send", () => {
+    function devices(count: number) {
+      return Array.from({ length: count }, (_, i) =>
+        storedDevice({ id: `d-${i}`, deviceName: `Device ${i}` }),
+      );
+    }
+
+    // The per-send timeout bounds one delivery; this bounds the request. Sending
+    // to the cap serially at that timeout would hold a request for the product
+    // of the two, over hosts the account chose.
+    it("talks to at most PUSH_TEST_CONCURRENCY devices at once", async () => {
+      subscriptionRepo.find.mockResolvedValue(devices(10));
+      let inFlight = 0;
+      let peak = 0;
+      sender.send.mockImplementation(async () => {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await Promise.resolve();
+        inFlight -= 1;
+        return { status: "sent" };
+      });
+
+      const result = await service.sendTest(USER);
+
+      expect(peak).toBeLessThanOrEqual(PUSH_TEST_CONCURRENCY);
+      expect(result).toMatchObject({ attempted: 10, delivered: 10 });
+    });
+
+    it("reports every device exactly once, in order", async () => {
+      subscriptionRepo.find.mockResolvedValue(devices(6));
+
+      const result = await service.sendTest(USER);
+
+      expect(result.devices.map((d) => d.id)).toEqual([
+        "d-0",
+        "d-1",
+        "d-2",
+        "d-3",
+        "d-4",
+        "d-5",
       ]);
     });
   });

@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryGeneratedColumn } from "typeorm";
+import { Entity, Column, Index, PrimaryGeneratedColumn } from "typeorm";
 
 /**
  * Why a subscription stops being usable. Stored so the device list can say
@@ -34,6 +34,14 @@ export enum PushDisabledReason {
  * does about the refusal.
  */
 @Entity("push_subscriptions")
+// Declared here as well as in migration 171, because the integration suites
+// build their schema from the entities: without it `ON CONFLICT (endpoint_hash)`
+// has no arbiter to name and `subscribe` fails outright there, while two
+// accounts could hold one endpoint -- the exact thing INV-PUSH-001 rests on.
+@Index("idx_push_subscriptions_endpoint", ["endpointHash"], { unique: true })
+@Index("idx_push_subscriptions_user_live", ["userId"], {
+  where: "disabled_at IS NULL",
+})
 export class PushSubscription {
   @PrimaryGeneratedColumn("uuid")
   id: string;

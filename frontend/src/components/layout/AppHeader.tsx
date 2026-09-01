@@ -6,7 +6,7 @@ import { useClickOutside } from '@/hooks/useClickOutside';
 import { useHideOnScroll } from '@/hooks/useHideOnScroll';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
-import { releaseLocalPushSubscription } from '@/lib/push';
+import { releasePushForSignOut } from '@/lib/push';
 import { authApi } from '@/lib/auth';
 import { isNavSectionActive } from '@/lib/nav-section';
 import {
@@ -222,9 +222,12 @@ export function AppHeader() {
     // the one place someone chose to leave. The push subscription is scoped to
     // the origin, not the session, so without releasing it the departing
     // account's notifications keep arriving on a browser the next person is
-    // using -- and hold the endpoint against their own subscribe. The server row
-    // survives and is retired by its next 410.
-    await releaseLocalPushSubscription();
+    // using -- and hold the endpoint against their own subscribe.
+    //
+    // Before `authApi.logout()`, because deleting the server row needs the
+    // session that is ending -- and under its own short bound, because the
+    // cleanup is best effort and revoking the session is not.
+    await releasePushForSignOut();
     try {
       await authApi.logout();
       clearLogoutIncomplete();

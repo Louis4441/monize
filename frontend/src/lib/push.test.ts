@@ -6,6 +6,8 @@ import {
   currentDeviceFingerprint,
   disablePushOnThisDevice,
   releaseLocalPushSubscription,
+  releasePushForSignOut,
+  SIGN_OUT_PUSH_RELEASE_TIMEOUT_MS,
   ENDPOINT_CLAIMED_CODE,
   ServiceWorkerUnavailableError,
   SERVICE_WORKER_READY_TIMEOUT_MS,
@@ -394,6 +396,99 @@ describe('enabling and disabling push on this device', () => {
 
     expect(apiClient.delete).toHaveBeenCalledWith('/push/subscriptions/d-1');
     expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  // A refusal that is not a stale claim -- the per-account cap, a rotated key, a
+  // 500 -- must not leave a browser subscription with no server row behind it:
+  // a permission this app holds, no longer uses, and the user cannot see.
+  it('takes back a subscription it minted when the registration is refused', async () => {
+    vi.mocked(apiClient.post).mockRejectedValue(
+      Object.assign(new Error('too many devices'), {
+        response: { status: 400 },
+      }),
+    );
+
+    await expect(enablePushOnThisDevice(PUBLIC_KEY)).rejects.toThrow(
+      'too many devices',
+    );
+
+    expect(subscribe).toHaveBeenCalledTimes(1);
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  // ...but one the browser already had may back a perfectly good row, so a
+  // failure here is not licence to drop it.
+  it('leaves a pre-existing subscription alone when the registration is refused', async () => {
+    getSubscription.mockResolvedValue(
+      browserSubscription(urlBase64ToUint8Array(PUBLIC_KEY).buffer),
+    );
+    vi.mocked(apiClient.post).mockRejectedValue(
+      Object.assign(new Error('boom'), { response: { status: 500 } }),
+    );
+
+    await expect(enablePushOnThisDevice(PUBLIC_KEY)).rejects.toThrow('boom');
+
+    expect(unsubscribe).not.toHaveBeenCalled();
+  });
+
+  it('takes back the replacement too when the retry is refused', async () => {
+    getSubscription.mockResolvedValue(
+      browserSubscription(urlBase64ToUint8Array(PUBLIC_KEY).buffer),
+    );
+    vi.mocked(apiClient.post).mockRejectedValue(
+      Object.assign(new Error('conflict'), {
+        response: { status: 409, data: { errorCode: ENDPOINT_CLAIMED_CODE } },
+      }),
+    );
+
+    await expect(enablePushOnThisDevice(PUBLIC_KEY)).rejects.toThrow(
+      'conflict',
+    );
+
+    // One for the stale claim, one taking the replacement back.
+    expect(unsubscribe).toHaveBeenCalledTimes(2);
+  });
+
+  // Deleting the server row needs the session that is ending, so this runs
+  // before the cookies are cleared -- and under its own short bound, because
+  // the cleanup is best effort and revoking the session is not.
+  it("removes this browser's server row and subscription on sign-out", async () => {
+    getSubscription.mockResolvedValue(browserSubscription());
+    const fingerprint = await fingerprintEndpoint(ENDPOINT);
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: [
+        { id: 'd-other', endpointFingerprint: '0000000000000000' },
+        { id: 'd-1', endpointFingerprint: fingerprint },
+      ],
+    });
+
+    await releasePushForSignOut();
+
+    expect(apiClient.delete).toHaveBeenCalledWith('/push/subscriptions/d-1');
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it('still unsubscribes locally when the row cannot be removed', async () => {
+    getSubscription.mockResolvedValue(browserSubscription());
+    vi.mocked(apiClient.get).mockRejectedValue(new Error('401'));
+
+    await expect(releasePushForSignOut()).resolves.toBeUndefined();
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives up rather than holding a sign-out open', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('navigator', {
+      serviceWorker: { ready: new Promise<never>(() => {}) },
+    });
+    try {
+      const pending = releasePushForSignOut();
+      await vi.advanceTimersByTimeAsync(SIGN_OUT_PUSH_RELEASE_TIMEOUT_MS + 1);
+      await expect(pending).resolves.toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('releases the browser subscription even when the server delete fails', async () => {

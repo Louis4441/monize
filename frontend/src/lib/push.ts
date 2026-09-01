@@ -278,23 +278,49 @@ export async function enablePushOnThisDevice(
     await subscription.unsubscribe();
     subscription = null;
   }
+  // Whether THIS call minted the subscription: only then is dropping it on a
+  // failure the right cleanup. A subscription the browser already had may well
+  // belong to a row that is perfectly fine.
+  let minted = false;
   if (!subscription) {
     subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey,
     });
+    minted = true;
   }
 
   try {
     return await postSubscription(subscription, publicKey, deviceName);
   } catch (error) {
-    if (!isEndpointClaimed(error)) throw error;
+    if (!isEndpointClaimed(error)) {
+      // Any other refusal -- the per-account device cap, a rotated key, a 500 --
+      // leaves a browser subscription with no server row behind it: a
+      // permission this app holds, no longer uses, and the user cannot see. If
+      // this call is what minted it, this call takes it back.
+      if (minted) await safeUnsubscribe(subscription);
+      throw error;
+    }
     await subscription.unsubscribe();
     const replacement = await registration.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey,
     });
-    return postSubscription(replacement, publicKey, deviceName);
+    try {
+      return await postSubscription(replacement, publicKey, deviceName);
+    } catch (retryError) {
+      await safeUnsubscribe(replacement);
+      throw retryError;
+    }
+  }
+}
+
+/** Unsubscribing is cleanup, so its own failure must not replace the real one. */
+async function safeUnsubscribe(subscription: PushSubscription): Promise<void> {
+  try {
+    await subscription.unsubscribe();
+  } catch {
+    // Best effort.
   }
 }
 
@@ -408,6 +434,63 @@ export const ENDPOINT_FINGERPRINT_LENGTH = 16;
 export async function currentDeviceFingerprint(): Promise<string | null> {
   const endpoint = await currentEndpoint();
   return endpoint ? fingerprintEndpoint(endpoint) : null;
+}
+
+/**
+ * How long a sign-out will wait for the push cleanup before moving on.
+ *
+ * The cleanup is best effort and the session revocation is not, so the two must
+ * not share a deadline: awaiting the service worker's own 5-second bound here
+ * would stall the sign-out that long, and a tab closed in that window would
+ * never revoke its session at all.
+ */
+export const SIGN_OUT_PUSH_RELEASE_TIMEOUT_MS = 1500;
+
+/**
+ * Release this browser's push registration on the way out of a session: the
+ * server row AND the browser subscription.
+ *
+ * Both halves, and the server half is why this cannot wait until after the
+ * cookies are cleared -- deleting the row needs the session that is ending.
+ * Without it the row stays live, looks healthy in the device list, and counts
+ * against the per-account cap while nothing will ever be delivered to it: the
+ * 410 that would retire it only arrives when something tries to send.
+ *
+ * Never throws, and never waits long: whatever has not finished when the bound
+ * elapses is abandoned rather than allowed to hold up the sign-out.
+ */
+export async function releasePushForSignOut(
+  timeoutMs = SIGN_OUT_PUSH_RELEASE_TIMEOUT_MS,
+): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      removeThisBrowsersRegistration(),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, timeoutMs);
+      }),
+    ]);
+  } catch {
+    // Best effort.
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+async function removeThisBrowsersRegistration(): Promise<void> {
+  try {
+    const fingerprint = await currentDeviceFingerprint();
+    if (fingerprint) {
+      const mine = (await pushApi.listDevices()).find(
+        (device) => device.endpointFingerprint === fingerprint,
+      );
+      if (mine) await pushApi.removeDevice(mine.id);
+    }
+  } catch {
+    // The row may outlive the browser subscription; the local half below is
+    // what actually stops notifications appearing, so it runs either way.
+  }
+  await releaseLocalPushSubscription();
 }
 
 /** The endpoint this browser currently holds, or null. */

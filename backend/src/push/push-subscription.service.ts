@@ -83,6 +83,17 @@ export const MAX_USER_AGENT_LENGTH = 255;
 export const MAX_LIVE_DEVICES_PER_USER = 20;
 
 /**
+ * How many devices one test send talks to at a time.
+ *
+ * The per-send timeout bounds ONE delivery; this bounds the request. Sending to
+ * the cap serially at the timeout would hold a request for the product of the
+ * two, and the endpoints are hosts the account chose. Four at a time turns the
+ * worst case into ceil(20/4) rounds -- about 25 seconds -- while a realistic
+ * one or two devices is still a single round.
+ */
+export const PUSH_TEST_CONCURRENCY = 4;
+
+/**
  * A user's own push devices: registering one, listing them, removing one, and
  * sending that user a test notification.
  *
@@ -150,9 +161,13 @@ export class PushSubscriptionService {
     const vapidPublicKey = config.publicKey;
 
     const row = await withScopedDb(this.dataSource, async (manager) => {
-      // Counted inside the transaction that writes, so the check cannot be
-      // outrun by a concurrent subscribe. Refreshing a device the caller
-      // already holds is never blocked by the cap -- only a new row is.
+      // Counted inside the transaction that writes, which is where it belongs,
+      // though READ COMMITTED and no lock means two simultaneous subscribes at
+      // 19 devices can both pass and land on 21. That is the deliberate trade:
+      // the cap exists to bound a fan-out, not to be an exact quota, and a lock
+      // over every subscribe would cost more than the overshoot. Refreshing a
+      // device the caller already holds is never blocked by it -- only a new
+      // row is.
       const repo = manager.getRepository(PushSubscription);
       const alreadyHeld = await repo.findOne({
         where: { userId, endpointHash },
@@ -330,31 +345,36 @@ export class PushSubscriptionService {
     };
 
     const devices: PushTestDeviceResult[] = [];
-    let delivered = 0;
-    for (const target of targets) {
-      const outcome = await this.sender.send(
-        {
-          endpoint: target.endpoint,
-          p256dh: target.p256dh,
-          auth: target.auth,
-          vapidPublicKey: target.vapidPublicKey,
-        },
-        payload,
+    for (let i = 0; i < targets.length; i += PUSH_TEST_CONCURRENCY) {
+      const batch = targets.slice(i, i + PUSH_TEST_CONCURRENCY);
+      const results = await Promise.all(
+        batch.map(async (target) => {
+          const outcome = await this.sender.send(
+            {
+              endpoint: target.endpoint,
+              p256dh: target.p256dh,
+              auth: target.auth,
+              vapidPublicKey: target.vapidPublicKey,
+            },
+            payload,
+          );
+          const disabledReason = await this.recordOutcome(
+            userId,
+            target.id,
+            outcome,
+          );
+          return {
+            id: target.id,
+            deviceName: target.deviceName,
+            status: outcome.status,
+            ...(disabledReason ? { disabledReason } : {}),
+          };
+        }),
       );
-      const disabledReason = await this.recordOutcome(
-        userId,
-        target.id,
-        outcome,
-      );
-      if (outcome.status === "sent") delivered += 1;
-      devices.push({
-        id: target.id,
-        deviceName: target.deviceName,
-        status: outcome.status,
-        ...(disabledReason ? { disabledReason } : {}),
-      });
+      devices.push(...results);
     }
 
+    const delivered = devices.filter((d) => d.status === "sent").length;
     return { attempted: targets.length, delivered, devices };
   }
 

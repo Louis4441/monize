@@ -2191,11 +2191,16 @@ Status              enforced
 ```text
 Statement           Push reports itself available only while this server can
                     actually sign with the stored key pair.
-Source of truth     EncryptionService.canDecrypt(push_instance_config
-                    .vapid_private_key_enc)
-Enforcement         PushConfigService.canUseKeyPair gates `enabled` on both the
-                    public and the admin shape, and getVapidIdentity refuses the
-                    same way, so the three answers cannot disagree. The failure
+Source of truth     Whether EncryptionService can decrypt
+                    push_instance_config.vapid_private_key_enc, resolved once
+                    per key pair by PushConfigService.resolveIdentity.
+Enforcement         resolveIdentity is the single answer: canUseKeyPair gates
+                    `enabled` on both the public and the admin shape, and
+                    getVapidIdentity returns what it resolved, so the three
+                    cannot disagree. It is memoised on the ciphertext -- key
+                    derivation is scryptSync, tens of milliseconds, and this
+                    answer is wanted on every config read, subscribe and send --
+                    which a rotation invalidates by construction. The failure
                     is otherwise entirely silent: ENCRYPTION_KEY changes under a
                     live database (or a backup lands on another instance), the
                     column stays populated, every "is push configured?" check
