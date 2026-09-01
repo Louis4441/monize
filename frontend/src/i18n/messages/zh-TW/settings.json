@@ -237,7 +237,7 @@
     },
     "push": {
       "heading": "瀏覽器推播",
-      "description": "即使 Monize 已關閉，也能在此裝置接收通知。",
+      "description": "註冊此裝置，Monize 就能在應用程式關閉時也送達通知。目前透過這條通道送達的只有測試通知，其餘仍會出現在鈴鐺裡。",
       "enableButton": "在此裝置啟用",
       "enablingButton": "啟用中...",
       "sendTestButton": "傳送測試通知",

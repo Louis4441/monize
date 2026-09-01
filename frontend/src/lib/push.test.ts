@@ -13,8 +13,12 @@ import {
   SERVICE_WORKER_READY_TIMEOUT_MS,
   enablePushOnThisDevice,
   fingerprintEndpoint,
+  classifyPushRegistration,
+  forgetRegisteredEndpoint,
   getPushSupport,
   isInstalledIosWebApp,
+  readRegisteredEndpoint,
+  rememberRegisteredEndpoint,
   requestNotificationPermission,
   pushApi,
   toSubscriptionPayload,
@@ -255,6 +259,111 @@ describe('getPushSupport', () => {
     });
 
     expect(getPushSupport(win, nav).reason).toBe('unsupported');
+  });
+});
+
+describe('classifyPushRegistration', () => {
+  const MINE = 'aaaabbbbccccdddd';
+  const OTHER = '1111222233334444';
+
+  /**
+   * The whole truth table, because the two interesting rows are the two ways
+   * "the server has no live row for the endpoint I hold" happens -- and reading
+   * them as one state is a defect either way round. Re-register on a revocation
+   * and the user's removal is undone the next time that device opens the app; do
+   * nothing on a rotation and delivery is dead while the device list still shows
+   * the old row as active.
+   */
+  it.each([
+    // current, live rows, remembered, expected
+    ['no subscription at all', null, [], null, 'no-subscription'],
+    ['no subscription, but a stale marker', null, [], OTHER, 'no-subscription'],
+    ['registered and live', MINE, [MINE], MINE, 'in-sync'],
+    ['live alongside another device', MINE, [OTHER, MINE], MINE, 'in-sync'],
+    ['endpoint changed under us', MINE, [], OTHER, 'rotated'],
+    ['endpoint changed, other rows live', MINE, [OTHER], OTHER, 'rotated'],
+    ['our row removed elsewhere', MINE, [], MINE, 'revoked'],
+    ['our row removed, others remain', MINE, [OTHER], MINE, 'revoked'],
+    // A cleared store cannot prove a rotation, so it takes the conservative
+    // half: nothing is re-registered behind the user's back.
+    ['no marker at all', MINE, [], null, 'revoked'],
+  ])(
+    '%s',
+    (_case, currentFingerprint, liveFingerprints, registeredFingerprint, kind) => {
+      expect(
+        classifyPushRegistration({
+          currentFingerprint: currentFingerprint as string | null,
+          liveFingerprints: liveFingerprints as string[],
+          registeredFingerprint: registeredFingerprint as string | null,
+        }).kind,
+      ).toBe(kind);
+    },
+  );
+
+  it('names the endpoint on the two states that act on one', () => {
+    // The caller registers or releases a specific subscription, so the state
+    // carries which -- not merely that something is out of step.
+    expect(
+      classifyPushRegistration({
+        currentFingerprint: MINE,
+        liveFingerprints: [],
+        registeredFingerprint: OTHER,
+      }),
+    ).toEqual({ kind: 'rotated', fingerprint: MINE });
+    expect(
+      classifyPushRegistration({
+        currentFingerprint: MINE,
+        liveFingerprints: [],
+        registeredFingerprint: MINE,
+      }),
+    ).toEqual({ kind: 'revoked', fingerprint: MINE });
+  });
+
+  // A disabled row is not a registration: the panel filters those out before
+  // asking, and this is the assertion that says so.
+  it('treats only live rows as registrations, which is the caller\'s job', () => {
+    expect(
+      classifyPushRegistration({
+        currentFingerprint: MINE,
+        liveFingerprints: [],
+        registeredFingerprint: MINE,
+      }).kind,
+    ).toBe('revoked');
+  });
+});
+
+describe('the registered-endpoint marker', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('remembers, reads back and forgets', () => {
+    const store = new Map<string, string>();
+    vi.stubGlobal('window', {
+      localStorage: {
+        setItem: (k: string, v: string) => store.set(k, v),
+        getItem: (k: string) => store.get(k) ?? null,
+        removeItem: (k: string) => store.delete(k),
+      },
+    });
+
+    rememberRegisteredEndpoint('abc123');
+    expect(readRegisteredEndpoint()).toBe('abc123');
+    forgetRegisteredEndpoint();
+    expect(readRegisteredEndpoint()).toBeNull();
+  });
+
+  // Some browsers throw on `localStorage` outright (a private window, blocked
+  // site data). The reconciliation then degrades to doing nothing, which is the
+  // behaviour before the marker existed -- it must not take the page down.
+  it('survives a store that throws', () => {
+    vi.stubGlobal('window', {
+      get localStorage(): never {
+        throw new Error('blocked');
+      },
+    });
+
+    expect(() => rememberRegisteredEndpoint('abc123')).not.toThrow();
+    expect(() => forgetRegisteredEndpoint()).not.toThrow();
+    expect(readRegisteredEndpoint()).toBeNull();
   });
 });
 

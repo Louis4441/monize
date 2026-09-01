@@ -169,6 +169,45 @@ describe("PushConfigService", () => {
     });
   });
 
+  /**
+   * A stored row with a public key and no private half. It reached
+   * `resolveIdentity` as a cache HIT on an EMPTY cache -- the optional chain
+   * answered `undefined`, the row's absent ciphertext was `undefined` too, and
+   * the next line dereferenced null -- so `GET /push/config` answered 500
+   * instead of reporting that the key cannot be used.
+   */
+  // Both spellings of "no stored private half", because only ONE of them
+  // triggered the crash and the other looks identical in a fixture: an ABSENT
+  // field is `undefined`, which the old optional chain compared equal to the
+  // empty cache's `undefined`; an explicit `null` compared false and was fine.
+  // null, undefined and absent are three states and the bug lived in exactly
+  // one of them.
+  it.each([
+    ["an absent private key", {}],
+    ["an explicitly null private key", { vapidPrivateKeyEnc: null }],
+  ])(
+    "reports %s as unreadable rather than crashing on it",
+    async (_case, privateHalf) => {
+      configRepo.findOne.mockResolvedValue({
+        id: true,
+        vapidPublicKey: "PUB-STORED",
+        webPushEnabled: true,
+        ...privateHalf,
+      });
+
+      const config = await service.getPublicConfig();
+
+      expect(config.configured).toBe(true);
+      expect(config.keyUnreadable).toBe(true);
+      // `enabled` false is the gate the client reads; the stored public key still
+      // travels, which is deliberate -- the panel needs to distinguish "no key
+      // pair at all" from "one this server cannot open", and the Enable button is
+      // rendered on `enabled`, not on the key's presence.
+      expect(config.enabled).toBe(false);
+      expect(config.publicKey).toBe("PUB-STORED");
+    },
+  );
+
   describe("getPublicConfig", () => {
     it("hands the browser the public key and nothing else", async () => {
       configRepo.findOne.mockResolvedValue(storedConfig());

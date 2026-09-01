@@ -237,7 +237,7 @@
     },
     "push": {
       "heading": "Push w przeglądarce",
-      "description": "Otrzymuj powiadomienia na tym urządzeniu, nawet gdy Monize jest zamknięty.",
+      "description": "Zarejestruj to urządzenie, aby Monize mogło je powiadomić nawet przy zamkniętej aplikacji. Na razie tą drogą dostarczane jest tylko powiadomienie testowe; wszystko inne nadal trafia do dzwonka.",
       "enableButton": "Włącz na tym urządzeniu",
       "enablingButton": "Włączanie...",
       "sendTestButton": "Wyślij powiadomienie testowe",

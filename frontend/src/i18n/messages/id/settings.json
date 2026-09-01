@@ -237,7 +237,7 @@
     },
     "push": {
       "heading": "Push peramban",
-      "description": "Terima notifikasi di perangkat ini bahkan saat Monize tertutup.",
+      "description": "Daftarkan perangkat ini agar Monize dapat menghubunginya bahkan saat aplikasi ditutup. Untuk saat ini hanya notifikasi uji yang dikirim lewat jalur ini; sisanya tetap masuk ke bel.",
       "enableButton": "Aktifkan di perangkat ini",
       "enablingButton": "Mengaktifkan...",
       "sendTestButton": "Kirim notifikasi uji coba",

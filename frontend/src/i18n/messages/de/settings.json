@@ -237,7 +237,7 @@
     },
     "push": {
       "heading": "Browser-Push",
-      "description": "Erhalten Sie Benachrichtigungen auf diesem Gerät, auch wenn Monize geschlossen ist.",
+      "description": "Dieses Gerät registrieren, damit Monize es auch bei geschlossener App erreichen kann. Bisher wird auf diesem Weg nur die Testbenachrichtigung zugestellt; alles andere landet weiterhin in der Glocke.",
       "enableButton": "Auf diesem Gerät aktivieren",
       "enablingButton": "Wird aktiviert ...",
       "sendTestButton": "Testbenachrichtigung senden",

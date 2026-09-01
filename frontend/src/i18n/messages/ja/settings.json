@@ -237,7 +237,7 @@
     },
     "push": {
       "heading": "ブラウザープッシュ",
-      "description": "Monize を閉じていても、この端末で通知を受け取れます。",
+      "description": "この端末を登録すると、アプリを閉じていても Monize から通知を届けられます。今のところこの経路で届くのはテスト通知だけで、それ以外はこれまでどおりベルに届きます。",
       "enableButton": "この端末で有効にする",
       "enablingButton": "有効化中...",
       "sendTestButton": "テスト通知を送信",

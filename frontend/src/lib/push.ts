@@ -397,7 +397,7 @@ async function safeUnsubscribe(subscription: PushSubscription): Promise<void> {
   }
 }
 
-function postSubscription(
+async function postSubscription(
   subscription: PushSubscription,
   applicationServerKey: string,
   deviceName?: string,
@@ -406,7 +406,17 @@ function postSubscription(
   if (!payload) {
     throw new Error('The browser returned an incomplete push subscription.');
   }
-  return pushApi.subscribe({ ...payload, applicationServerKey, deviceName });
+  const device = await pushApi.subscribe({
+    ...payload,
+    applicationServerKey,
+    deviceName,
+  });
+  // Recorded from the SERVER's digest of the endpoint rather than a second one
+  // computed here, so "the endpoint I registered" and "the endpoint the row
+  // names" are the same value by construction. Only on success: a refused
+  // registration has nothing to remember.
+  rememberRegisteredEndpoint(device.endpointFingerprint);
+  return device;
 }
 
 /** Matches `ENDPOINT_CLAIMED_CODE` in the backend's push subscription service. */
@@ -456,6 +466,83 @@ export async function disablePushOnThisDevice(
 }
 
 /**
+ * Where this browser records the endpoint fingerprint it last registered.
+ *
+ * Per-browser, per-origin, and never read by the server -- what it exists for is
+ * a question no server row can answer: when the server has no live row for the
+ * endpoint this browser holds, WHY not. Two causes with opposite repairs. The
+ * push service rotated the subscription under us, in which case the right move is
+ * to register the new endpoint; or another device revoked this one, in which case
+ * registering it again would undo the user's revocation.
+ *
+ * A cleared store (a private window, blocked site data) reads as `null`, which
+ * classifies as a revocation -- the conservative half: nothing is re-registered
+ * behind the user's back, and the Enable button is still there.
+ */
+const REGISTERED_ENDPOINT_KEY = 'monize.push.registeredEndpoint';
+
+/** Every accessor is guarded: some browsers throw on `localStorage` outright. */
+export function rememberRegisteredEndpoint(fingerprint: string): void {
+  try {
+    window.localStorage.setItem(REGISTERED_ENDPOINT_KEY, fingerprint);
+  } catch {
+    // Storage blocked. The reconciliation degrades to doing nothing, which is
+    // the behaviour before it existed.
+  }
+}
+
+export function forgetRegisteredEndpoint(): void {
+  try {
+    window.localStorage.removeItem(REGISTERED_ENDPOINT_KEY);
+  } catch {
+    // As above.
+  }
+}
+
+export function readRegisteredEndpoint(): string | null {
+  try {
+    return window.localStorage.getItem(REGISTERED_ENDPOINT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * What this browser's push registration is, relative to the server's rows.
+ *
+ * `rotated` and `revoked` are the two ways "the server has no live row for the
+ * endpoint I hold" happens, and reading them as one state is a defect either
+ * way round: re-register on a revocation and the user's removal is undone the
+ * next time the revoked device opens the app; do nothing on a rotation and
+ * delivery is dead while the device list still shows the old row as active.
+ */
+export type PushRegistrationState =
+  | { kind: 'in-sync' }
+  | { kind: 'no-subscription' }
+  | { kind: 'rotated'; fingerprint: string }
+  | { kind: 'revoked'; fingerprint: string };
+
+export function classifyPushRegistration(input: {
+  /** The fingerprint of the subscription this browser holds, or null. */
+  currentFingerprint: string | null;
+  /** The fingerprints of the account's LIVE server rows. */
+  liveFingerprints: readonly string[];
+  /** What this browser last registered, from `readRegisteredEndpoint`. */
+  registeredFingerprint: string | null;
+}): PushRegistrationState {
+  const { currentFingerprint, liveFingerprints, registeredFingerprint } = input;
+  if (currentFingerprint === null) return { kind: 'no-subscription' };
+  if (liveFingerprints.includes(currentFingerprint)) return { kind: 'in-sync' };
+  if (
+    registeredFingerprint !== null &&
+    registeredFingerprint !== currentFingerprint
+  ) {
+    return { kind: 'rotated', fingerprint: currentFingerprint };
+  }
+  return { kind: 'revoked', fingerprint: currentFingerprint };
+}
+
+/**
  * Drop this browser's push subscription without touching any server row.
  *
  * What logout needs: the subscription is scoped to the origin rather than to
@@ -478,6 +565,10 @@ export async function releaseLocalPushSubscription(): Promise<void> {
     if (subscription) await subscription.unsubscribe();
   } catch {
     // Best effort.
+  } finally {
+    // The endpoint this browser registered is gone either way, and a stale
+    // marker would classify the next subscription as a rotation.
+    forgetRegisteredEndpoint();
   }
 }
 

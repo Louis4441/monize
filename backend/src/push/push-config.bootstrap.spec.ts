@@ -1,5 +1,6 @@
 import * as webpush from "web-push";
 import { EntityManager } from "typeorm";
+import { withSystemContext } from "../common/db/with-context";
 import { PushConfigService } from "./push-config.service";
 import { EncryptionService } from "../common/encryption/encryption.service";
 import { PushInstanceConfig } from "./entities/push-instance-config.entity";
@@ -93,5 +94,40 @@ describe("PushConfigService bootstrap (real withScopedDb)", () => {
     expect(result?.vapidPublicKey).toBe("PUB-STORED");
     expect(generateVAPIDKeys).not.toHaveBeenCalled();
     expect(manager.query).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The reuse branch is the NORMAL one -- every restart after the first -- and it
+   * used to return the row without touching the identity, leaving the memo cold.
+   * The first `GET /push/config` then paid the decryption, whose derivation is
+   * `scryptSync`: tens of milliseconds of blocked event loop, for every
+   * concurrent request, on whichever request happened to arrive first. Warming
+   * it here is what the hook is for.
+   */
+  it("warms the identity memo on the reuse branch, so no request pays for it", async () => {
+    const decrypt = jest.fn((cipher: string) => cipher);
+    service = new PushConfigService(
+      dataSource as never,
+      {
+        isConfigured: () => true,
+        encrypt: (plain: string) => `enc(${plain})`,
+        decrypt,
+        canDecrypt: () => true,
+      } as unknown as EncryptionService,
+    );
+    configRepo.findOne.mockResolvedValue({
+      id: true,
+      vapidPublicKey: "PUB-STORED",
+      vapidPrivateKeyEnc: "enc(PRIV-STORED)",
+    } as PushInstanceConfig);
+
+    await service.ensureKeyPair();
+    expect(decrypt).toHaveBeenCalledTimes(1);
+
+    // And the memo is what answers afterwards: a second read decrypts nothing.
+    // Through a context of its own, because this file runs the REAL
+    // withScopedDb and a public read has no hook seeding one for it.
+    await withSystemContext(() => service.getPublicConfig());
+    expect(decrypt).toHaveBeenCalledTimes(1);
   });
 });

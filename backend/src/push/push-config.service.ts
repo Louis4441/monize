@@ -137,7 +137,18 @@ export class PushConfigService implements OnApplicationBootstrap {
 
   private async ensureKeyPairInContext(): Promise<PushInstanceConfig | null> {
     const existing = await this.readConfig();
-    if (existing) return existing;
+    if (existing) {
+      // Warm the identity memo here, in the bootstrap hook, rather than leaving
+      // the first request to pay for it. `resolveIdentity` decrypts through
+      // `EncryptionService`, whose derivation is `scryptSync` -- tens of
+      // milliseconds of BLOCKED event loop, for every concurrent request, on
+      // whichever `GET /push/config` happened to arrive first after a restart.
+      // The normal case is exactly this branch: the row already exists, so
+      // returning it early meant the memo was cold after every restart, which is
+      // the opposite of what it is for.
+      this.canUseKeyPair(existing);
+      return existing;
+    }
 
     if (!this.encryption.isConfigured()) {
       this.logger.warn(
@@ -234,17 +245,29 @@ export class PushConfigService implements OnApplicationBootstrap {
    */
   private resolveIdentity(config: PushInstanceConfig): VapidIdentity | null {
     const ciphertext = config.vapidPrivateKeyEnc;
-    if (this.identityCache?.ciphertext === ciphertext) {
-      return this.identityCache.identity;
+    // `this.identityCache?.ciphertext === ciphertext` was a cache HIT for a row
+    // whose ciphertext is absent: the optional chain answers `undefined`, which
+    // equals the `undefined` on the right, and the next line then dereferenced a
+    // null cache. An empty cache and an unreadable row are two different facts
+    // and this is the line that used to treat them as one, so the guard is on
+    // the cache's existence and nothing else.
+    const cached = this.identityCache;
+    if (cached !== null && cached.ciphertext === ciphertext) {
+      return cached.identity;
     }
     let identity: VapidIdentity | null = null;
     try {
-      identity = this.encryption.isConfigured()
-        ? {
-            publicKey: config.vapidPublicKey,
-            privateKey: this.encryption.decrypt(ciphertext),
-          }
-        : null;
+      // A row with a public key and no stored private half is unreadable, not a
+      // crash: `getPublicConfig` reports `keyUnreadable` and the operator is
+      // told to rotate, which is the same answer as a key this server cannot
+      // decrypt.
+      identity =
+        this.encryption.isConfigured() && ciphertext
+          ? {
+              publicKey: config.vapidPublicKey,
+              privateKey: this.encryption.decrypt(ciphertext),
+            }
+          : null;
     } catch {
       identity = null;
     }

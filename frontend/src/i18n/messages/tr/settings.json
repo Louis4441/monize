@@ -237,7 +237,7 @@
     },
     "push": {
       "heading": "Tarayıcı anlık bildirimi",
-      "description": "Monize kapalıyken bile bu cihazda bildirim alın.",
+      "description": "Bu cihazı kaydedin, böylece uygulama kapalıyken de Monize ona ulaşabilir. Şimdilik bu yolla yalnızca test bildirimi teslim ediliyor; diğer her şey yine zil simgesine geliyor.",
       "enableButton": "Bu cihazda etkinleştir",
       "enablingButton": "Etkinleştiriliyor...",
       "sendTestButton": "Test bildirimi gönder",

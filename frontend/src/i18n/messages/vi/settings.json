@@ -237,7 +237,7 @@
     },
     "push": {
       "heading": "Đẩy từ trình duyệt",
-      "description": "Nhận thông báo trên thiết bị này ngay cả khi Monize đã đóng.",
+      "description": "Đăng ký thiết bị này để Monize có thể gửi tới nó ngay cả khi ứng dụng đã đóng. Hiện chỉ có thông báo thử nghiệm được gửi theo đường này; mọi thứ khác vẫn đến ở chuông.",
       "enableButton": "Bật trên thiết bị này",
       "enablingButton": "Đang bật...",
       "sendTestButton": "Gửi thông báo thử nghiệm",

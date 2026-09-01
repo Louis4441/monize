@@ -237,7 +237,7 @@
     },
     "push": {
       "heading": "[XX-Browser push-XX]",
-      "description": "[XX-Get notifications on this device even when Monize is closed.-XX]",
+      "description": "[XX-Register this device so Monize can reach it even when the app is closed. Only the test notification is delivered this way so far; everything else still arrives in the bell.-XX]",
       "enableButton": "[XX-Enable on this device-XX]",
       "enablingButton": "[XX-Enabling...-XX]",
       "sendTestButton": "[XX-Send test notification-XX]",

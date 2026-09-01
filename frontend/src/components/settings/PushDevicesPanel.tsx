@@ -9,9 +9,12 @@ import {
   currentDeviceFingerprint,
   disablePushOnThisDevice,
   enablePushOnThisDevice,
+  classifyPushRegistration,
   getPushSupport,
   isInstalledIosWebApp,
   pushApi,
+  readRegisteredEndpoint,
+  releaseLocalPushSubscription,
   PushPermissionError,
   type PushConfig,
   type PushDevice,
@@ -59,10 +62,13 @@ export function PushDevicesPanel() {
   // token needed to register the replacement. Without it the row keeps naming a
   // dead endpoint and delivery stops with nothing to show for it.
   //
-  // The message only reaches a page that is OPEN when the rotation happens,
-  // which is the less likely case -- a rotation while the app is closed posts to
-  // `clients.matchAll()` and finds nobody, so the reconciliation below is the
-  // durable half. See `reconcileThisDevice`.
+  // This only covers a rotation that happens while this page is open, which is
+  // the less likely case: a rotation while the app is closed posts to
+  // `clients.matchAll()` and finds nobody. The durable half is the
+  // reconciliation below, which reads the browser's own record rather than a
+  // message that may never have been delivered. It is still Settings-gated --
+  // app-wide recovery is named in the notification-permission work, not
+  // pretended here.
   useEffect(() => {
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
       return;
@@ -115,43 +121,60 @@ export function PushDevicesPanel() {
   }, [refreshDevices]);
 
   /**
-   * Register the subscription this browser holds when the server has no live row
-   * for it.
+   * Reconcile the subscription this browser holds with the server's rows.
    *
-   * The case this exists for: the push service rotated the subscription while
-   * the app was closed. The worker resubscribed and posted a message to every
-   * open window -- there were none -- so the browser now holds an endpoint the
-   * server has never seen, and the server holds a row naming a dead one. The
-   * device list showed that row as active, so the interface asserted delivery
-   * was working while nothing could be delivered, and the only recovery was a
-   * button the user had no reason to press.
+   * Two states need acting on, and they are the two ways "the server has no live
+   * row for the endpoint I hold" happens (`classifyPushRegistration`):
    *
-   * Only ever with permission already `granted`: that is what makes this a
-   * re-registration of something the user consented to rather than a permission
-   * request without a gesture, which iOS would answer `default` with no prompt
-   * shown. Once per mount, so a server that keeps refusing cannot become a loop.
+   *   * `rotated` -- the push service replaced the subscription while the app was
+   *     closed, so the worker's `pushsubscriptionchange` message reached no
+   *     window. The browser holds an endpoint the server has never seen and the
+   *     server holds a row naming a dead one, which the device list showed as
+   *     ACTIVE: the interface asserted delivery was working while nothing could
+   *     be delivered. Register the new endpoint.
+   *   * `revoked` -- another device removed this one. Removing a row cannot
+   *     unsubscribe a browser it is not running in, so this browser still holds
+   *     the subscription; registering it again would UNDO the revocation the
+   *     next time this device opened Settings. Release it locally instead, which
+   *     is what the codebase already says about a subscription with no row: a
+   *     permission the app holds, no longer uses, and the user cannot see.
+   *
+   * Only ever with permission already `granted`. Without a grant this would be a
+   * permission request with no user gesture behind it, which iOS answers
+   * `default` with no prompt shown -- and the user would be told their
+   * permission was refused for something they never asked for.
+   *
+   * Once per mount, so a server that keeps refusing cannot become a loop.
    */
   const reconciled = useRef(false);
   useEffect(() => {
     if (reconciled.current) return;
     if (!config?.enabled || !config.publicKey) return;
-    if (thisDevice === null) return;
     if (typeof Notification === 'undefined') return;
     if (Notification.permission !== 'granted') return;
-    const known = devices.some(
-      (device) =>
-        device.endpointFingerprint === thisDevice && !device.disabledAt,
-    );
-    if (known) return;
+    const state = classifyPushRegistration({
+      currentFingerprint: thisDevice,
+      liveFingerprints: devices
+        .filter((device) => !device.disabledAt)
+        .map((device) => device.endpointFingerprint),
+      registeredFingerprint: readRegisteredEndpoint(),
+    });
+    if (state.kind === 'in-sync' || state.kind === 'no-subscription') return;
     reconciled.current = true;
+    const publicKey = config.publicKey;
     (async () => {
       try {
-        await enablePushOnThisDevice(config.publicKey!, defaultDeviceName());
-        await refreshDevices();
+        if (state.kind === 'rotated') {
+          await enablePushOnThisDevice(publicKey, defaultDeviceName());
+          await refreshDevices();
+          return;
+        }
+        await releaseLocalPushSubscription();
+        setThisDevice(null);
       } catch (error) {
         // Best effort and silent: the user did not ask for this, and the Enable
         // button is still there for them if it fails.
-        logger.error('Failed to re-register a rotated push subscription:', error);
+        logger.error('Failed to reconcile this push subscription:', error);
       }
     })();
   }, [config, thisDevice, devices, refreshDevices]);

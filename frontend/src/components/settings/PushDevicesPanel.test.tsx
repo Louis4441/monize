@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@/test/render';
 import { PushDevicesPanel, defaultDeviceName } from './PushDevicesPanel';
 import toast from 'react-hot-toast';
@@ -26,6 +26,9 @@ const mockDisable = vi.fn();
 const mockCurrentFingerprint = vi.fn();
 const mockGetPushSupport = vi.fn();
 const mockIsInstalledIosWebApp = vi.fn();
+const mockClassify = vi.fn();
+const mockRelease = vi.fn();
+const mockReadRegistered = vi.fn();
 
 vi.mock('@/lib/push', () => ({
   pushApi: {
@@ -42,6 +45,9 @@ vi.mock('@/lib/push', () => ({
   currentDeviceFingerprint: () => mockCurrentFingerprint(),
   getPushSupport: () => mockGetPushSupport(),
   isInstalledIosWebApp: () => mockIsInstalledIosWebApp(),
+  classifyPushRegistration: (...args: any[]) => mockClassify(...args),
+  releaseLocalPushSubscription: () => mockRelease(),
+  readRegisteredEndpoint: () => mockReadRegistered(),
   // Declared inside the factory: `vi.mock` is hoisted above every top-level
   // binding in this file, so a class defined outside it is not yet initialised
   // when the factory runs.
@@ -84,6 +90,10 @@ describe('PushDevicesPanel', () => {
     mockCurrentFingerprint.mockResolvedValue(null);
     mockGetPushSupport.mockReturnValue({ supported: true });
     mockIsInstalledIosWebApp.mockReturnValue(false);
+    // The default for every test that is not about reconciliation.
+    mockClassify.mockReturnValue({ kind: 'in-sync' });
+    mockRelease.mockResolvedValue(undefined);
+    mockReadRegistered.mockReturnValue(null);
     mockEnable.mockResolvedValue(device());
     mockSendTest.mockResolvedValue({ attempted: 1, delivered: 1, devices: [] });
   });
@@ -345,12 +355,18 @@ describe('PushDevicesPanel', () => {
     );
   });
 
-  describe('a subscription the server has never seen', () => {
+  describe('a subscription the server has no live row for', () => {
+    const withPermission = (permission: string) =>
+      vi.stubGlobal('Notification', { permission });
+
+    afterEach(() => vi.unstubAllGlobals());
+
     // The push service rotated it while the app was closed, so the worker's
     // message reached no window: the browser holds an endpoint the server has
     // never seen, and the list showed the dead row as active.
-    it('re-registers it without asking, because consent already exists', async () => {
-      vi.stubGlobal('Notification', { permission: 'granted' });
+    it('registers a rotated subscription without asking', async () => {
+      withPermission('granted');
+      mockClassify.mockReturnValue({ kind: 'rotated', fingerprint: THIS_DEVICE });
       mockListDevices.mockResolvedValue([
         device({ id: 'stale', endpointFingerprint: OTHER_DEVICE }),
       ]);
@@ -363,29 +379,47 @@ describe('PushDevicesPanel', () => {
       // argument is read rather than matched with `expect.anything()`.
       await waitFor(() => expect(mockEnable).toHaveBeenCalled());
       expect(mockEnable.mock.calls[0][0]).toBe('PUB');
-      // And the list is re-read, so the row the user sees is the new one.
       await waitFor(() => expect(mockListDevices).toHaveBeenCalledTimes(2));
-      vi.unstubAllGlobals();
     });
 
-    it('leaves a browser whose subscription is already registered alone', async () => {
-      vi.stubGlobal('Notification', { permission: 'granted' });
-      mockListDevices.mockResolvedValue([device()]);
+    // Another device removed this one. Removing a row cannot unsubscribe a
+    // browser it is not running in, so re-registering here would undo the
+    // user's revocation the next time this device opened Settings.
+    it('releases a revoked subscription instead of re-registering it', async () => {
+      withPermission('granted');
+      mockClassify.mockReturnValue({ kind: 'revoked', fingerprint: THIS_DEVICE });
+      mockListDevices.mockResolvedValue([]);
       mockCurrentFingerprint.mockResolvedValue(THIS_DEVICE);
 
       render(<PushDevicesPanel />);
 
-      await waitFor(() => expect(mockListDevices).toHaveBeenCalled());
+      await waitFor(() => expect(mockRelease).toHaveBeenCalled());
       expect(mockEnable).not.toHaveBeenCalled();
-      vi.unstubAllGlobals();
     });
+
+    it.each([['in-sync'], ['no-subscription']])(
+      'does nothing when the state is %s',
+      async (kind) => {
+        withPermission('granted');
+        mockClassify.mockReturnValue({ kind });
+        mockListDevices.mockResolvedValue([device()]);
+        mockCurrentFingerprint.mockResolvedValue(THIS_DEVICE);
+
+        render(<PushDevicesPanel />);
+
+        await waitFor(() => expect(mockListDevices).toHaveBeenCalled());
+        expect(mockEnable).not.toHaveBeenCalled();
+        expect(mockRelease).not.toHaveBeenCalled();
+      },
+    );
 
     // Re-registering is a re-registration of something consented to. Without a
     // grant it would be a permission request with no user gesture behind it,
     // which iOS answers `default` with no prompt shown -- and the user would be
     // told their permission was refused for something they never asked for.
     it('does not touch a browser that has not granted permission', async () => {
-      vi.stubGlobal('Notification', { permission: 'default' });
+      withPermission('default');
+      mockClassify.mockReturnValue({ kind: 'rotated', fingerprint: THIS_DEVICE });
       mockListDevices.mockResolvedValue([
         device({ id: 'stale', endpointFingerprint: OTHER_DEVICE }),
       ]);
@@ -395,19 +429,9 @@ describe('PushDevicesPanel', () => {
 
       await waitFor(() => expect(mockListDevices).toHaveBeenCalled());
       expect(mockEnable).not.toHaveBeenCalled();
-      vi.unstubAllGlobals();
-    });
-
-    it('does not touch a browser holding no subscription at all', async () => {
-      vi.stubGlobal('Notification', { permission: 'granted' });
-      mockListDevices.mockResolvedValue([]);
-      mockCurrentFingerprint.mockResolvedValue(null);
-
-      render(<PushDevicesPanel />);
-
-      await waitFor(() => expect(mockListDevices).toHaveBeenCalled());
-      expect(mockEnable).not.toHaveBeenCalled();
-      vi.unstubAllGlobals();
+      expect(mockRelease).not.toHaveBeenCalled();
+      // And the classifier is not even consulted: no grant, nothing to reconcile.
+      expect(mockClassify).not.toHaveBeenCalled();
     });
   });
 

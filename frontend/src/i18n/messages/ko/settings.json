@@ -237,7 +237,7 @@
     },
     "push": {
       "heading": "브라우저 푸시",
-      "description": "Monize를 닫아 두어도 이 기기에서 알림을 받습니다.",
+      "description": "이 기기를 등록하면 앱이 닫혀 있어도 Monize가 알릴 수 있습니다. 현재 이 경로로 전달되는 것은 테스트 알림뿐이며, 나머지는 여전히 종 아이콘에 도착합니다.",
       "enableButton": "이 기기에서 사용",
       "enablingButton": "사용 설정 중...",
       "sendTestButton": "테스트 알림 보내기",

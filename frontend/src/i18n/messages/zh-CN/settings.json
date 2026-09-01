@@ -237,7 +237,7 @@
     },
     "push": {
       "heading": "浏览器推送",
-      "description": "即使 Monize 已关闭，也能在此设备上接收通知。",
+      "description": "注册此设备，Monize 即可在应用关闭时也送达通知。目前通过这条通道送达的只有测试通知，其余仍然出现在铃铛里。",
       "enableButton": "在此设备上启用",
       "enablingButton": "正在启用...",
       "sendTestButton": "发送测试通知",

@@ -66,7 +66,6 @@ export interface PushPayload {
   body: string;
   /** Same-origin path the click should open. Validated again in the worker. */
   target?: string;
-  notificationId?: string;
 }
 
 export type PushSendOutcome =

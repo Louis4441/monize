@@ -237,7 +237,7 @@
     },
     "push": {
       "heading": "Browserpush",
-      "description": "Ontvang meldingen op dit apparaat, ook als Monize gesloten is.",
+      "description": "Registreer dit apparaat zodat Monize het ook kan bereiken als de app gesloten is. Voorlopig wordt alleen de testmelding zo bezorgd; al het andere komt nog steeds in de bel.",
       "enableButton": "Inschakelen op dit apparaat",
       "enablingButton": "Inschakelen...",
       "sendTestButton": "Testmelding versturen",

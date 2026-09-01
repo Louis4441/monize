@@ -237,7 +237,7 @@
     },
     "push": {
       "heading": "Push do navegador",
-      "description": "Receba notificações neste dispositivo mesmo com o Monize fechado.",
+      "description": "Registre este dispositivo para que o Monize possa alcançá-lo mesmo com o app fechado. Por enquanto só a notificação de teste é entregue por esse caminho; todo o resto continua chegando no sininho.",
       "enableButton": "Ativar neste dispositivo",
       "enablingButton": "Ativando...",
       "sendTestButton": "Enviar notificação de teste",

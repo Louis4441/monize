@@ -19,6 +19,9 @@ import { safeNotificationTarget } from './notification-target';
  */
 
 const APP_DIR = resolve(__dirname, '../app');
+
+/** The origin the worker sandbox runs on, so both rules resolve against one. */
+const WORKER_ORIGIN = 'https://monize.test';
 const BACKEND_SRC = resolve(__dirname, '../../../backend/src');
 
 // ---------------------------------------------------------------------------
@@ -189,7 +192,7 @@ function loadWorkerRule(): (value: unknown) => string {
     self: {
       addEventListener: () => {},
       skipWaiting: () => {},
-      location: { origin: 'https://monize.test' },
+      location: { origin: WORKER_ORIGIN },
       registration: { showNotification: async () => {}, pushManager: {} },
       clients: { claim: () => {}, matchAll: async () => [], openWindow: async () => {} },
     },
@@ -226,6 +229,13 @@ const SHARED_CASES: readonly { name: string; value: string; follow: boolean }[] 
   { name: 'the root', value: '/', follow: true },
   { name: 'protocol-relative', value: '//evil.example/steal', follow: false },
   { name: 'backslash protocol-relative', value: '/\\evil.example/steal', follow: false },
+  // The four the app got wrong while the worker got them right: one slash, no
+  // backslash, and the URL parser strips the whitespace and reads
+  // `//evil.example`. A prefix test cannot see that.
+  { name: 'tab then protocol-relative', value: '/\t/evil.example/steal', follow: false },
+  { name: 'newline then protocol-relative', value: '/\n/evil.example/steal', follow: false },
+  { name: 'return then protocol-relative', value: '/\r/evil.example/steal', follow: false },
+  { name: 'tab then backslash', value: '/\t\\evil.example/steal', follow: false },
   { name: 'an absolute https URL', value: 'https://evil.example/steal', follow: false },
   { name: 'a scheme', value: 'javascript:alert(1)', follow: false },
   { name: 'a relative path', value: 'budgets/b-1', follow: false },
@@ -244,26 +254,37 @@ describe('the worker and the app agree on what may be followed', () => {
   });
 
   it.each(SHARED_CASES)('$name', ({ value, follow }) => {
-    expect(safeNotificationTarget(value) !== null).toBe(follow);
+    expect(safeNotificationTarget(value, WORKER_ORIGIN) !== null).toBe(follow);
     expect(workerRule(value) !== '/' || value === '/').toBe(follow);
   });
 
   /**
-   * The two places they deliberately differ, pinned so a change to either side
-   * has to come here and say so.
+   * The one place they still differ, pinned so a change to either side has to
+   * come here and say so.
    *
-   * Neither is reachable for a STORED target: the write door caps `target` at
-   * the column's 255 characters and every producer writes a leading slash. They
-   * are reachable for a PUSH PAYLOAD, which is why the worker is the stricter of
-   * the two -- it is the surface an external push service can influence.
+   * The worker refuses a target over 512 characters; the app has no cap. That is
+   * unreachable for a STORED target -- the write door caps the column at 255 --
+   * and reachable for a PUSH PAYLOAD, which the worker receives from an external
+   * service and the app never sees. The stricter side is the exposed one.
+   *
+   * There used to be a second difference, and it was not a difference of
+   * strictness: the app pattern-matched the prefix and the worker resolved, so
+   * `/<tab>/evil.example` was refused by the worker and FOLLOWED by the app. The
+   * shared table above is where that now lives.
    */
-  it('differs only on the payload-only cases, and in the safe direction', () => {
+  it('differs only on the payload-only length cap', () => {
     const tooLong = `/${'a'.repeat(600)}`;
     expect(workerRule(tooLong)).toBe('/');
-    expect(safeNotificationTarget(tooLong)).toBe(tooLong);
+    expect(safeNotificationTarget(tooLong, WORKER_ORIGIN)).toBe(tooLong);
+  });
 
-    const withTab = '/\thttps://x';
-    expect(workerRule(withTab)).toBe('/https://x');
-    expect(safeNotificationTarget(withTab)).toBe(withTab);
+  it('normalises an accepted target to the same path on both sides', () => {
+    // One notification is reachable through both surfaces, so agreeing on
+    // "followable" is not enough -- they have to land on the same page.
+    for (const value of ['/budgets/b-1', '/bills?due=today#top', '/']) {
+      expect(safeNotificationTarget(value, WORKER_ORIGIN)).toBe(
+        workerRule(value),
+      );
+    }
   });
 });
