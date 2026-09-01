@@ -303,6 +303,26 @@ export function TransactionConfirmationCard({
         value: preview.website || none,
       });
     }
+    // Same rule for each contact field: shown only when the action sets it, so
+    // a card never implies a change the commit is not making.
+    if (preview.address !== undefined) {
+      rows.push({
+        label: t('confirmAction.address'),
+        value: preview.address || none,
+      });
+    }
+    if (preview.email !== undefined) {
+      rows.push({
+        label: t('confirmAction.email'),
+        value: preview.email || none,
+      });
+    }
+    if (preview.phone !== undefined) {
+      rows.push({
+        label: t('confirmAction.phone'),
+        value: preview.phone || none,
+      });
+    }
   }
 
   const isSecurityResult =

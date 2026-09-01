@@ -121,6 +121,16 @@ export const RULES: Record<string, TableRules> = {
     logo_content_type: drop,
     has_logo: konst(false),
     logo_fetched_at: drop,
+    // Contact details are direct personal data and name the payee outright,
+    // which is the whole point of masking the name. Coordinates are no weaker:
+    // a point on a map re-identifies a business as surely as its address does,
+    // and for an individual payee it is a home.
+    address: drop,
+    email: drop,
+    phone: drop,
+    latitude: drop,
+    longitude: drop,
+    geocoded_at: drop,
     is_active: keep,
     created_at: keep,
   },

@@ -101,6 +101,9 @@ export function payeePreviewRow(
     name: preview.name,
     categoryName: preview.defaultCategoryName,
     website: preview.website,
+    address: preview.address,
+    email: preview.email,
+    phone: preview.phone,
   };
 }
 
@@ -279,6 +282,9 @@ export class AiActionBuilderService {
       name: preview.name,
       defaultCategoryId: preview.defaultCategoryId,
       website: preview.website,
+      address: preview.address,
+      email: preview.email,
+      phone: preview.phone,
     };
     return {
       actionId,
@@ -290,6 +296,9 @@ export class AiActionBuilderService {
         name: preview.name,
         categoryName: preview.defaultCategoryName,
         website: preview.website,
+        address: preview.address,
+        email: preview.email,
+        phone: preview.phone,
       },
     };
   }
@@ -308,6 +317,9 @@ export class AiActionBuilderService {
       name: preview.name,
       defaultCategoryId: preview.defaultCategoryId,
       website: preview.website,
+      address: preview.address,
+      email: preview.email,
+      phone: preview.phone,
     };
     return {
       actionId,
@@ -319,6 +331,9 @@ export class AiActionBuilderService {
         name: preview.name,
         categoryName: preview.defaultCategoryName,
         website: preview.website,
+        address: preview.address,
+        email: preview.email,
+        phone: preview.phone,
       },
     };
   }

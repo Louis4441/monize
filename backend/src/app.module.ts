@@ -31,6 +31,7 @@ import { CategoriesModule } from "./categories/categories.module";
 import { CurrenciesModule } from "./currencies/currencies.module";
 import { SecuritiesModule } from "./securities/securities.module";
 import { PayeesModule } from "./payees/payees.module";
+import { MapTilesModule } from "./map-tiles/map-tiles.module";
 import { InstitutionsModule } from "./institutions/institutions.module";
 import { ScheduledTransactionsModule } from "./scheduled-transactions/scheduled-transactions.module";
 import { ReportsModule } from "./reports/reports.module";
@@ -139,6 +140,7 @@ import { I18nModule } from "./i18n/i18n.module";
     AttachmentsModule,
     CategoriesModule,
     PayeesModule,
+    MapTilesModule,
     InstitutionsModule,
     CurrenciesModule,
     SecuritiesModule,

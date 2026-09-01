@@ -94,7 +94,19 @@
     "largestValue": "{date} 的 {amount}",
     "overpaymentFor": "作为以下账户的额外还款收款人",
     "website": "网站",
+    "address": "地址",
+    "phone": "电话",
+    "email": "电子邮件",
     "notes": "备注"
+  },
+  "map": {
+    "title": "位置",
+    "attribution": "(c) OpenStreetMap 贡献者",
+    "openInMaps": "在您的地图应用中打开此地址",
+    "notLocated": "在地图上找不到此地址。",
+    "retryLookup": "重试位置查找",
+    "retrying": "正在查找...",
+    "retryFailed": "无法查找此地址。请稍后重试。"
   },
   "tabs": {
     "ariaLabel": "收款人各部分",

@@ -94,7 +94,19 @@
     "largestValue": "{amount} dnia {date}",
     "overpaymentFor": "Odbiorca nadpłat dla",
     "website": "Strona internetowa",
+    "address": "Adres",
+    "phone": "Telefon",
+    "email": "E-mail",
     "notes": "Notatki"
+  },
+  "map": {
+    "title": "Lokalizacja",
+    "attribution": "(c) Współtwórcy OpenStreetMap",
+    "openInMaps": "Otwórz ten adres w aplikacji map",
+    "notLocated": "Nie znaleziono tego adresu na mapie.",
+    "retryLookup": "Ponów wyszukiwanie lokalizacji",
+    "retrying": "Wyszukiwanie...",
+    "retryFailed": "Nie udało się wyszukać tego adresu. Spróbuj ponownie później."
   },
   "tabs": {
     "ariaLabel": "Sekcje odbiorcy",

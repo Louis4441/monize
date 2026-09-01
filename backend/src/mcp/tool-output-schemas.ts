@@ -237,6 +237,11 @@ export const getPayeesOutput = {
       // the schema rather than guessing that the field exists. Nullable, like
       // notes -- a payee without one serializes as null.
       website: strNull.optional(),
+      // Contact details, same nullable contract as website above: absent from
+      // the payee means null, not a missing key.
+      address: strNull.optional(),
+      email: strNull.optional(),
+      phone: strNull.optional(),
       /** Whether a brand icon has been resolved from that website. */
       hasLogo: bool.optional(),
       isActive: bool.optional(),

@@ -197,7 +197,7 @@ transactionDate: string;
 
 ### An optional field with a format validator needs `@ValidateIf`, not just `@IsOptional`
 
-`@IsOptional()` waives validation for `undefined` and `null` only. A text input the user left alone arrives as `""` (react-hook-form sends it), so an `@IsUrl` / `@IsEmail` beside `@IsOptional()` still rejects it -- and because validation fails per *request*, one blank optional field breaks every save from that form. Add `@ValidateIf((_o, value) => value !== null && value !== "")` for a nullable column so a blank clears it. `src/common/optional-url-dto.spec.ts` sweeps every URL-validated DTO property; a NOT NULL field belongs on its exemption list with a reason. This class of bug is invisible to unit tests (hand-built payloads); it surfaces in E2E or production.
+`@IsOptional()` waives validation for `undefined` and `null` only. A text input the user left alone arrives as `""` (react-hook-form sends it), so an `@IsUrl` / `@IsEmail` beside `@IsOptional()` still rejects it -- and because validation fails per *request*, one blank optional field breaks every save from that form. Add `@ValidateIf((_o, value) => value !== null && value !== "")` for a nullable column so a blank clears it. `src/common/optional-format-dto.spec.ts` sweeps every URL- and email-validated DTO property; a NOT NULL field belongs on its exemption list with a reason. This class of bug is invisible to unit tests (hand-built payloads); it surfaces in E2E or production.
 
 ### A request-supplied array declares an upper bound
 

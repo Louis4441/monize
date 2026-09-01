@@ -191,11 +191,15 @@ export function BulkConfirmationCard({
       return { primary, secondary: parts.join(' · ') };
     }
     if (isPayee) {
-      // The row has two slots, so the category and the website share the
-      // second one rather than the website going unshown.
+      // The row has two slots, so the category, website and contact details
+      // share the second one rather than any of them going unshown. The
+      // address is deliberately left out: it is long enough to push the rest
+      // out of the slot, and the individual card carries it.
       return {
         primary: row.name || '',
-        secondary: [row.categoryName, row.website].filter(Boolean).join(' · '),
+        secondary: [row.categoryName, row.website, row.email, row.phone]
+          .filter(Boolean)
+          .join(' · '),
       };
     }
     if (isSecurity) {

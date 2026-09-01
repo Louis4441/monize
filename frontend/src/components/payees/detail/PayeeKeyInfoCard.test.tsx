@@ -19,6 +19,12 @@ function detailFixture(overrides: Partial<PayeeDetail> = {}): PayeeDetail {
       website: null,
       hasLogo: false,
       logoFetchedAt: null,
+      address: null,
+      email: null,
+      phone: null,
+      latitude: null,
+      longitude: null,
+      geocodedAt: null,
       isActive: true,
       createdAt: '2024-01-15T00:00:00.000Z',
     },
@@ -106,6 +112,12 @@ describe('PayeeKeyInfoCard', () => {
           website: null,
           hasLogo: false,
           logoFetchedAt: null,
+          address: null,
+          email: null,
+          phone: null,
+          latitude: null,
+          longitude: null,
+          geocodedAt: null,
           isActive: true,
           createdAt: '2024-01-15T00:00:00.000Z',
         },
@@ -125,5 +137,112 @@ describe('PayeeKeyInfoCard', () => {
     expect(screen.queryByText('Largest Transaction')).toBeNull();
     expect(screen.queryByText('Overpayment Payee For')).toBeNull();
     expect(screen.queryByText('Notes')).toBeNull();
+  });
+});
+
+describe('PayeeKeyInfoCard contact details', () => {
+  const withContact = (overrides: Partial<PayeeDetail['payee']>) =>
+    detailFixture({
+      payee: { ...detailFixture().payee, ...overrides },
+    });
+
+  it('shows nothing for a payee with no contact details', () => {
+    // KeyValueList drops empty rows, which is what makes "only if populated"
+    // free -- assert it rather than assuming it.
+    render(
+      <PayeeKeyInfoCard
+        detail={detailFixture()}
+        categoryLabelMap={new Map()}
+        onSelectDate={vi.fn()}
+        onSelectAccount={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText('Address')).not.toBeInTheDocument();
+    expect(screen.queryByText('Phone')).not.toBeInTheDocument();
+    expect(screen.queryByText('Email')).not.toBeInTheDocument();
+  });
+
+  it('links a phone number to the dialer', () => {
+    render(
+      <PayeeKeyInfoCard
+        detail={withContact({ phone: '+1 (555) 010-1234' })}
+        categoryLabelMap={new Map()}
+        onSelectDate={vi.fn()}
+        onSelectAccount={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('link', { name: '+1 (555) 010-1234' })).toHaveAttribute(
+      'href',
+      'tel:+15550101234',
+    );
+  });
+
+  it('links an email to the mail composer', () => {
+    render(
+      <PayeeKeyInfoCard
+        detail={withContact({ email: 'hello@example.com' })}
+        categoryLabelMap={new Map()}
+        onSelectDate={vi.fn()}
+        onSelectAccount={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole('link', { name: 'hello@example.com' }),
+    ).toHaveAttribute('href', 'mailto:hello%40example.com');
+  });
+
+  it('links a located address to a maps application', () => {
+    render(
+      <PayeeKeyInfoCard
+        detail={withContact({
+          address: '1912 Pike Pl, Seattle',
+          latitude: 47.609722,
+          longitude: -122.342201,
+        })}
+        categoryLabelMap={new Map()}
+        onSelectDate={vi.fn()}
+        onSelectAccount={vi.fn()}
+      />,
+    );
+
+    const link = screen.getByRole('link', { name: /1912 Pike Pl/ });
+    expect(link.getAttribute('href')).toContain('47.609722');
+  });
+
+  it('still links an address the lookup could not locate', () => {
+    // The coordinates are what the map needs; directions only need the text,
+    // so a failed lookup must not turn the address into dead text.
+    render(
+      <PayeeKeyInfoCard
+        detail={withContact({ address: '1912 Pike Pl, Seattle' })}
+        categoryLabelMap={new Map()}
+        onSelectDate={vi.fn()}
+        onSelectAccount={vi.fn()}
+      />,
+    );
+
+    const link = screen.getByRole('link', { name: /1912 Pike Pl/ });
+    expect(link.getAttribute('href')).toContain(
+      encodeURIComponent('1912 Pike Pl, Seattle'),
+    );
+  });
+
+  it('renders an undialable phone number as plain text rather than a link', () => {
+    render(
+      <PayeeKeyInfoCard
+        detail={withContact({ phone: 'call the shop' })}
+        categoryLabelMap={new Map()}
+        onSelectDate={vi.fn()}
+        onSelectAccount={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('call the shop')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'call the shop' }),
+    ).not.toBeInTheDocument();
   });
 });

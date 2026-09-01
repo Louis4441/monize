@@ -82,6 +82,9 @@
     "categoryLabel": "預設類別",
     "notesLabel": "備註（選填）",
     "websiteLabel": "網站",
+    "addressLabel": "地址",
+    "emailLabel": "電子郵件",
+    "phoneLabel": "電話",
     "submitCreate": "建立收款人",
     "submitUpdate": "更新收款人",
     "applyCategoryLabel": "將此類別套用至現有交易",
@@ -270,7 +273,8 @@
   },
   "selectCategoryPlaceholder": "選擇類別...",
   "validation": {
-    "nameRequired": "收款人名稱為必填"
+    "nameRequired": "收款人名稱為必填",
+    "emailInvalid": "請輸入有效的電子郵件地址"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "套用預設類別？",

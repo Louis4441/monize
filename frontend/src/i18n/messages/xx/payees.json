@@ -82,6 +82,9 @@
     "categoryLabel": "[XX-Default Category-XX]",
     "notesLabel": "[XX-Notes (optional)-XX]",
     "websiteLabel": "[XX-Website-XX]",
+    "addressLabel": "[XX-Address-XX]",
+    "emailLabel": "[XX-Email-XX]",
+    "phoneLabel": "[XX-Phone-XX]",
     "submitCreate": "[XX-Create Payee-XX]",
     "submitUpdate": "[XX-Update Payee-XX]",
     "applyCategoryLabel": "[XX-Apply this category to existing transactions-XX]",
@@ -270,7 +273,8 @@
   },
   "selectCategoryPlaceholder": "[XX-Select category...-XX]",
   "validation": {
-    "nameRequired": "[XX-Payee name is required-XX]"
+    "nameRequired": "[XX-Payee name is required-XX]",
+    "emailInvalid": "[XX-Enter a valid email address-XX]"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "[XX-Apply default categories?-XX]",

@@ -350,6 +350,7 @@
   "payees": {
     "nameConflict": "Já existe um beneficiário com o nome \"{{ name }}\"",
     "nameRequired": "O nome do beneficiário é obrigatório",
+    "invalidEmail": "\"{{ email }}\" não é um endereço de e-mail válido",
     "notFound": "Beneficiário com ID {{ id }} não encontrado",
     "logoNotFound": "Nenhum logótipo disponível para este beneficiário",
     "categoryIdsNotOwned": "IDs de categoria não encontrados ou não pertencentes ao utilizador: {{ ids }}",

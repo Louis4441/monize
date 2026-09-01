@@ -94,7 +94,19 @@
     "largestValue": "{amount} am {date}",
     "overpaymentFor": "Sondertilgungs-Empfänger für",
     "website": "Website",
+    "address": "Adresse",
+    "phone": "Telefon",
+    "email": "E-Mail",
     "notes": "Notizen"
+  },
+  "map": {
+    "title": "Standort",
+    "attribution": "(c) OpenStreetMap-Mitwirkende",
+    "openInMaps": "Diese Adresse in Ihrer Karten-App öffnen",
+    "notLocated": "Diese Adresse konnte auf der Karte nicht gefunden werden.",
+    "retryLookup": "Standortsuche wiederholen",
+    "retrying": "Wird gesucht...",
+    "retryFailed": "Diese Adresse konnte nicht gefunden werden. Bitte versuchen Sie es später erneut."
   },
   "tabs": {
     "ariaLabel": "Zahlungsempfänger-Abschnitte",

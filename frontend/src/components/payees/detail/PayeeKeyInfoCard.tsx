@@ -5,6 +5,7 @@ import { KeyValueList, type KeyValueRow } from '@/components/ui/KeyValueList';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { externalUrlLabel, toSafeExternalUrl } from '@/lib/external-url';
+import { mailtoHref, mapsUrl, telHref } from '@/lib/contact-links';
 import type { PayeeDetail } from '@/types/payee';
 
 interface PayeeKeyInfoCardProps {
@@ -38,6 +39,18 @@ export function PayeeKeyInfoCard({
 
   const { payee, stats, largestTransaction, overpaymentForAccounts } = detail;
   const websiteUrl = toSafeExternalUrl(payee.website);
+  // Each contact value is turned into a link by its own guard, and a value the
+  // guard rejects still renders as text rather than disappearing -- a stored
+  // "call the shop" is worth showing even though it cannot be dialled.
+  const addressLink = payee.address
+    ? mapsUrl({
+        latitude: payee.latitude,
+        longitude: payee.longitude,
+        address: payee.address,
+      })
+    : null;
+  const phoneLink = telHref(payee.phone);
+  const emailLink = mailtoHref(payee.email);
 
   const rows: KeyValueRow[] = [
     {
@@ -127,6 +140,56 @@ export function PayeeKeyInfoCard({
         >
           {externalUrlLabel(websiteUrl)}
         </a>
+      ) : null,
+    },
+    {
+      key: 'address',
+      label: t('keyInfo.address'),
+      value: payee.address ? (
+        addressLink ? (
+          <a
+            href={addressLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="whitespace-pre-line text-blue-600 hover:underline dark:text-blue-400"
+          >
+            {payee.address}
+          </a>
+        ) : (
+          <span className="whitespace-pre-line">{payee.address}</span>
+        )
+      ) : null,
+    },
+    {
+      key: 'phone',
+      label: t('keyInfo.phone'),
+      value: payee.phone ? (
+        phoneLink ? (
+          <a
+            href={phoneLink}
+            className="text-blue-600 hover:underline dark:text-blue-400"
+          >
+            {payee.phone}
+          </a>
+        ) : (
+          payee.phone
+        )
+      ) : null,
+    },
+    {
+      key: 'email',
+      label: t('keyInfo.email'),
+      value: payee.email ? (
+        emailLink ? (
+          <a
+            href={emailLink}
+            className="break-all text-blue-600 hover:underline dark:text-blue-400"
+          >
+            {payee.email}
+          </a>
+        ) : (
+          payee.email
+        )
       ) : null,
     },
     {

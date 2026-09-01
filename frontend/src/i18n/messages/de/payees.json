@@ -82,6 +82,9 @@
     "categoryLabel": "Standardkategorie",
     "notesLabel": "Notizen (optional)",
     "websiteLabel": "Website",
+    "addressLabel": "Adresse",
+    "emailLabel": "E-Mail",
+    "phoneLabel": "Telefon",
     "submitCreate": "Zahlungsempfänger erstellen",
     "submitUpdate": "Zahlungsempfänger aktualisieren",
     "applyCategoryLabel": "Diese Kategorie auf vorhandene Transaktionen anwenden",
@@ -270,7 +273,8 @@
   },
   "selectCategoryPlaceholder": "Kategorie auswählen...",
   "validation": {
-    "nameRequired": "Name des Zahlungsempfängers ist erforderlich"
+    "nameRequired": "Name des Zahlungsempfängers ist erforderlich",
+    "emailInvalid": "Geben Sie eine gültige E-Mail-Adresse ein"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "Standardkategorien zuweisen?",

@@ -20,6 +20,10 @@ export interface ManageCreatePayeeRow {
   categoryName?: string;
   /** Absent leaves it unset; a bare domain is normalised to https. */
   website?: string;
+  /** Absent leaves it unset; an empty string clears it. */
+  address?: string;
+  email?: string;
+  phone?: string;
 }
 
 /** Update-row input for manage_payees (identified by current name). */
@@ -29,6 +33,10 @@ export interface ManageUpdatePayeeRow {
   categoryName?: string;
   /** Absent leaves the stored address alone; an empty string clears it. */
   website?: string;
+  /** Absent leaves it unset; an empty string clears it. */
+  address?: string;
+  email?: string;
+  phone?: string;
 }
 
 /** Delete-row input for manage_payees (identified by name). */
@@ -78,6 +86,9 @@ export class PayeeToolPrepService {
       name: preview.name,
       defaultCategoryId: preview.defaultCategoryId,
       website: preview.website,
+      address: preview.address,
+      email: preview.email,
+      phone: preview.phone,
     };
   }
 
@@ -87,6 +98,9 @@ export class PayeeToolPrepService {
       name: preview.name,
       defaultCategoryId: preview.defaultCategoryId,
       website: preview.website,
+      address: preview.address,
+      email: preview.email,
+      phone: preview.phone,
     };
   }
 
@@ -98,6 +112,9 @@ export class PayeeToolPrepService {
       name: row.name,
       categoryName: row.categoryName,
       website: row.website,
+      address: row.address,
+      email: row.email,
+      phone: row.phone,
     });
   }
 
@@ -110,6 +127,9 @@ export class PayeeToolPrepService {
       newName: row.newName,
       categoryName: row.categoryName,
       website: row.website,
+      address: row.address,
+      email: row.email,
+      phone: row.phone,
     });
   }
 

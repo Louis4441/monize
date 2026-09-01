@@ -108,6 +108,31 @@ const PENDING_ACTION_TOOL_RESULT = {
     "A confirmation card has been shown to the user. The action has NOT been performed. Do not call this tool again or claim it was done; briefly ask the user to review and approve the card.",
 };
 
+/**
+ * The contact fields a payee preview would write, for the model-facing summary
+ * line beside a confirmation card.
+ *
+ * `undefined` means the request said nothing about the field and is omitted;
+ * `null` means the field is being cleared and says so, because "address"
+ * missing from the sentence and "address being emptied" are different edits and
+ * the model quotes this line back to the user.
+ */
+function contactSummary(preview: {
+  address?: string | null;
+  email?: string | null;
+  phone?: string | null;
+}): string {
+  const parts: string[] = [];
+  for (const [label, value] of [
+    ["address", preview.address],
+    ["email", preview.email],
+    ["phone", preview.phone],
+  ] as const) {
+    if (value !== undefined) parts.push(`${label} ${value ?? "cleared"}`);
+  }
+  return parts.length ? `, ${parts.join(", ")}` : "";
+}
+
 @Injectable()
 export class ToolExecutorService {
   private readonly logger = new Logger(ToolExecutorService.name);
@@ -1052,6 +1077,9 @@ export class ToolExecutorService {
       name: item.name as string,
       categoryName: item.categoryName as string | undefined,
       website: item.website as string | undefined,
+      address: item.address as string | undefined,
+      email: item.email as string | undefined,
+      phone: item.phone as string | undefined,
     };
   }
 
@@ -1063,6 +1091,9 @@ export class ToolExecutorService {
       newName: item.newName as string | undefined,
       categoryName: item.categoryName as string | undefined,
       website: item.website as string | undefined,
+      address: item.address as string | undefined,
+      email: item.email as string | undefined,
+      phone: item.phone as string | undefined,
     };
   }
 
@@ -1086,7 +1117,7 @@ export class ToolExecutorService {
         );
         return {
           data: PENDING_ACTION_TOOL_RESULT,
-          summary: `Prepared to create payee "${preview.name}"${preview.defaultCategoryName ? ` with default category ${preview.defaultCategoryName}` : ""}${preview.website ? ` and website ${preview.website}` : ""}. Awaiting user confirmation.`,
+          summary: `Prepared to create payee "${preview.name}"${preview.defaultCategoryName ? ` with default category ${preview.defaultCategoryName}` : ""}${preview.website ? ` and website ${preview.website}` : ""}${contactSummary(preview)}. Awaiting user confirmation.`,
           sources: [],
           pendingAction: this.actionBuilder.buildCreatePayee(userId, preview),
         };
@@ -1141,7 +1172,7 @@ export class ToolExecutorService {
         );
         return {
           data: PENDING_ACTION_TOOL_RESULT,
-          summary: `Prepared an edit to payee "${preview.name}" (default category ${preview.defaultCategoryName ?? "none"}${preview.website !== undefined ? `, website ${preview.website ?? "cleared"}` : ""}). Awaiting user confirmation.`,
+          summary: `Prepared an edit to payee "${preview.name}" (default category ${preview.defaultCategoryName ?? "none"}${preview.website !== undefined ? `, website ${preview.website ?? "cleared"}` : ""}${contactSummary(preview)}). Awaiting user confirmation.`,
           sources: [],
           pendingAction: this.actionBuilder.buildUpdatePayee(userId, preview),
         };

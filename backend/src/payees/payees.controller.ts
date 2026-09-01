@@ -511,6 +511,19 @@ export class PayeesController {
     return this.payeesService.refreshLogo(req.user.id, id);
   }
 
+  @Post(":id/refresh-geocode")
+  @AllowDelegate()
+  @DelegateRequiresCapability("payees", "edit")
+  @ApiOperation({ summary: "Re-run the location lookup for the payee address" })
+  @ApiResponse({ status: 200, description: "Payee with refreshed coordinates" })
+  @ApiResponse({ status: 404, description: "Payee not found" })
+  refreshGeocode(
+    @Request() req,
+    @Param("id", ParseUUIDPipe) id: string,
+  ): Promise<Payee> {
+    return this.payeesService.refreshGeocode(req.user.id, id);
+  }
+
   @Get("inactive/match")
   @AllowDelegate()
   @ApiOperation({

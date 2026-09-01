@@ -82,6 +82,9 @@
     "categoryLabel": "Catégorie par défaut",
     "notesLabel": "Notes (facultatif)",
     "websiteLabel": "Site web",
+    "addressLabel": "Adresse",
+    "emailLabel": "E-mail",
+    "phoneLabel": "Téléphone",
     "submitCreate": "Créer le bénéficiaire",
     "submitUpdate": "Mettre à jour le bénéficiaire",
     "applyCategoryLabel": "Appliquer cette catégorie aux transactions existantes",
@@ -270,7 +273,8 @@
   },
   "selectCategoryPlaceholder": "Sélectionner une catégorie...",
   "validation": {
-    "nameRequired": "Le nom du bénéficiaire est requis"
+    "nameRequired": "Le nom du bénéficiaire est requis",
+    "emailInvalid": "Saisissez une adresse e-mail valide"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "Appliquer les catégories par défaut ?",

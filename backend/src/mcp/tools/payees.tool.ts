@@ -38,6 +38,32 @@ interface ManagePayeeItem {
   // update (name identifies the payee; the rest are the changes)
   newName?: string;
   website?: string;
+  address?: string;
+  email?: string;
+  phone?: string;
+}
+
+/**
+ * The contact lines on a payee confirmation card.
+ *
+ * A field the request did not mention is omitted; one being cleared says so
+ * explicitly, because a card that silently drops "address" for both cases would
+ * have the user approve an edit whose effect they cannot see.
+ */
+function contactCardLines(preview: {
+  address?: string | null;
+  email?: string | null;
+  phone?: string | null;
+}): string {
+  const rows: string[] = [];
+  for (const [label, value] of [
+    ["Address", preview.address],
+    ["Email", preview.email],
+    ["Phone", preview.phone],
+  ] as const) {
+    if (value !== undefined) rows.push(`\n${label}: ${value ?? "(cleared)"}`);
+  }
+  return rows.join("");
 }
 
 @Injectable()
@@ -57,7 +83,7 @@ export class McpPayeesTools {
         title: "List payees",
         annotations: READ_ONLY,
         description:
-          "List payees, optionally filtered by search query. Each payee carries its default category and its website (null when unset), so this is how to find payees whose website is missing before filling them in with manage_payees.",
+          "List payees, optionally filtered by search query. Each payee carries its default category, website and contact details (address, email, phone; null when unset), so this is how to find payees missing one before filling them in with manage_payees.",
         inputSchema: {
           search: z
             .string()
@@ -97,8 +123,8 @@ export class McpPayeesTools {
         annotations: WRITE,
         description:
           "Create, edit, or delete the user's payees. Accepts NAMES -- the payee and its default category are resolved internally, so you do NOT need to call list_payees/list_categories first. operation = 'create' | 'update' | 'delete' with an items array (1-25 rows). " +
-          "create: { name, categoryName?, website? } -- categoryName optionally sets the payee's default category ('Parent: Child' for a subcategory); website accepts a bare domain ('acme.com') and is stored as an absolute https URL. " +
-          "update: { name, newName?, categoryName?, website? } -- name identifies the existing payee; provide newName to rename, categoryName to set the default category, and/or website to set the web address (pass an empty string to clear either). At least one of newName/categoryName/website is required. Setting a website also resolves that site's icon for the payee; to find payees that need one, call list_payees and look for a null or missing website. " +
+          "create: { name, categoryName?, website?, address?, email?, phone? } -- categoryName optionally sets the payee's default category ('Parent: Child' for a subcategory); website accepts a bare domain ('acme.com') and is stored as an absolute https URL; address, email and phone are the payee's contact details. " +
+          "update: { name, newName?, categoryName?, website?, address?, email?, phone? } -- name identifies the existing payee; provide newName to rename, categoryName to set the default category, website to set the web address, and/or address, email and phone for its contact details (pass an empty string to clear any of them). At least one change is required. Setting a website also resolves that site's icon for the payee, and setting an address resolves its map location; to find payees missing one, call list_payees and look for a null or missing field. " +
           "delete: { name } -- removes the payee (its transactions keep their stored payee name). " +
           "approvalMode = 'bulk' (default; one confirmation for the whole batch) or 'individual' (one confirmation per item); ignored for a single item. Set dryRun=true to preview every item without saving. The user is asked to confirm before anything is saved (web chat card via relay, or an MCP confirmation dialog).",
         inputSchema: {
@@ -132,6 +158,27 @@ export class McpPayeesTools {
                   .optional()
                   .describe(
                     'create/update: the payee\'s web address. A bare domain ("acme.com") is stored as "https://acme.com". update: empty string clears it.',
+                  ),
+                address: z
+                  .string()
+                  .max(500)
+                  .optional()
+                  .describe(
+                    "create/update: the payee's postal address as free text. Setting one also resolves its map location. update: empty string clears it.",
+                  ),
+                email: z
+                  .string()
+                  .max(255)
+                  .optional()
+                  .describe(
+                    "create/update: the payee's contact email address. update: empty string clears it.",
+                  ),
+                phone: z
+                  .string()
+                  .max(50)
+                  .optional()
+                  .describe(
+                    "create/update: the payee's contact phone number, in whatever format the user gives. update: empty string clears it.",
                   ),
               }),
             )
@@ -209,6 +256,9 @@ export class McpPayeesTools {
       name: item.name as string,
       categoryName: item.categoryName,
       website: item.website,
+      address: item.address,
+      email: item.email,
+      phone: item.phone,
     };
   }
 
@@ -218,6 +268,9 @@ export class McpPayeesTools {
       newName: item.newName,
       categoryName: item.categoryName,
       website: item.website,
+      address: item.address,
+      email: item.email,
+      phone: item.phone,
     };
   }
 
@@ -292,7 +345,7 @@ export class McpPayeesTools {
         server,
         userId,
         action,
-        `Create this payee?\nName: ${preview.name}${preview.defaultCategoryName ? `\nDefault category: ${preview.defaultCategoryName}` : ""}${preview.website ? `\nWebsite: ${preview.website}` : ""}`,
+        `Create this payee?\nName: ${preview.name}${preview.defaultCategoryName ? `\nDefault category: ${preview.defaultCategoryName}` : ""}${preview.website ? `\nWebsite: ${preview.website}` : ""}${contactCardLines(preview)}`,
         requestId,
       );
       if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
@@ -304,6 +357,9 @@ export class McpPayeesTools {
         name: preview.name,
         defaultCategoryId: preview.defaultCategoryId ?? undefined,
         website: preview.website,
+        address: preview.address,
+        email: preview.email,
+        phone: preview.phone,
       });
       this.writeLimiter.record(userId, "create_payee");
       return toolResult({ id: payee.id, name: payee.name, count: 1 });
@@ -352,6 +408,9 @@ export class McpPayeesTools {
         name: preview.name,
         defaultCategoryId: preview.defaultCategoryId ?? undefined,
         website: preview.website,
+        address: preview.address,
+        email: preview.email,
+        phone: preview.phone,
       });
       ids.push(payee.id);
       this.writeLimiter.record(userId, "create_payee");
@@ -378,7 +437,7 @@ export class McpPayeesTools {
         server,
         userId,
         action,
-        `Apply this payee edit?\nName: ${preview.name}\nDefault category: ${preview.defaultCategoryName ?? "(none)"}${preview.website !== undefined ? `\nWebsite: ${preview.website ?? "(cleared)"}` : ""}`,
+        `Apply this payee edit?\nName: ${preview.name}\nDefault category: ${preview.defaultCategoryName ?? "(none)"}${preview.website !== undefined ? `\nWebsite: ${preview.website ?? "(cleared)"}` : ""}${contactCardLines(preview)}`,
         requestId,
       );
       if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
@@ -390,6 +449,9 @@ export class McpPayeesTools {
         name: preview.name,
         defaultCategoryId: preview.defaultCategoryId,
         website: preview.website,
+        address: preview.address,
+        email: preview.email,
+        phone: preview.phone,
       });
       this.writeLimiter.record(userId, "update_payee");
       return toolResult({ id: payee.id, name: payee.name, count: 1 });
@@ -438,6 +500,9 @@ export class McpPayeesTools {
         name: preview.name,
         defaultCategoryId: preview.defaultCategoryId,
         website: preview.website,
+        address: preview.address,
+        email: preview.email,
+        phone: preview.phone,
       });
       ids.push(payee.id);
       this.writeLimiter.record(userId, "update_payee");
@@ -560,9 +625,9 @@ export class McpPayeesTools {
       case "delete_payee":
         return `Delete this payee?\nName: ${p.name}`;
       case "update_payee":
-        return `Apply this payee edit?\nName: ${p.name}\nDefault category: ${p.categoryName ?? "(none)"}${p.website !== undefined ? `\nWebsite: ${p.website ?? "(cleared)"}` : ""}`;
+        return `Apply this payee edit?\nName: ${p.name}\nDefault category: ${p.categoryName ?? "(none)"}${p.website !== undefined ? `\nWebsite: ${p.website ?? "(cleared)"}` : ""}${contactCardLines(p)}`;
       default:
-        return `Create this payee?\nName: ${p.name}${p.categoryName ? `\nDefault category: ${p.categoryName}` : ""}${p.website ? `\nWebsite: ${p.website}` : ""}`;
+        return `Create this payee?\nName: ${p.name}${p.categoryName ? `\nDefault category: ${p.categoryName}` : ""}${p.website ? `\nWebsite: ${p.website}` : ""}${contactCardLines(p)}`;
     }
   }
 
@@ -578,6 +643,9 @@ export class McpPayeesTools {
           name: d.name,
           defaultCategoryId: d.defaultCategoryId ?? undefined,
           website: d.website,
+          address: d.address,
+          email: d.email,
+          phone: d.phone,
         });
         this.writeLimiter.record(userId, "create_payee");
         return payee.id;
@@ -587,6 +655,9 @@ export class McpPayeesTools {
           name: d.name,
           defaultCategoryId: d.defaultCategoryId,
           website: d.website,
+          address: d.address,
+          email: d.email,
+          phone: d.phone,
         });
         this.writeLimiter.record(userId, "update_payee");
         return payee.id;

@@ -94,7 +94,19 @@
     "largestValue": "{date} को {amount}",
     "overpaymentFor": "इनके अतिरिक्त भुगतान का भुगतानकर्ता",
     "website": "वेबसाइट",
+    "address": "पता",
+    "phone": "फ़ोन",
+    "email": "ईमेल",
     "notes": "नोट्स"
+  },
+  "map": {
+    "title": "स्थान",
+    "attribution": "(c) OpenStreetMap योगदानकर्ता",
+    "openInMaps": "इस पते को अपने मानचित्र ऐप में खोलें",
+    "notLocated": "यह पता मानचित्र पर नहीं मिल सका।",
+    "retryLookup": "स्थान खोज पुनः प्रयास करें",
+    "retrying": "खोजा जा रहा है...",
+    "retryFailed": "इस पते को खोजा नहीं जा सका। कृपया बाद में पुनः प्रयास करें।"
   },
   "tabs": {
     "ariaLabel": "भुगतानकर्ता के अनुभाग",

@@ -94,7 +94,19 @@
     "largestValue": "{amount} on {date}",
     "overpaymentFor": "Overpayment Payee For",
     "website": "Website",
+    "address": "Address",
+    "phone": "Phone",
+    "email": "Email",
     "notes": "Notes"
+  },
+  "map": {
+    "title": "Location",
+    "attribution": "(c) OpenStreetMap contributors",
+    "openInMaps": "Open this address in your maps app",
+    "notLocated": "This address could not be found on the map.",
+    "retryLookup": "Retry location lookup",
+    "retrying": "Looking up...",
+    "retryFailed": "Could not look up this address. Please try again later."
   },
   "tabs": {
     "ariaLabel": "Payee detail sections",

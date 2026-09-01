@@ -81,6 +81,15 @@ const ALLOWED_COLUMNS: Record<string, Set<string>> = {
     "name",
     "default_category_id",
     "notes",
+    "website",
+    "address",
+    "email",
+    "phone",
+    // The coordinates travel with the address: restoring one without the other
+    // would leave the payee's map pointing at the address it no longer has.
+    "latitude",
+    "longitude",
+    "geocoded_at",
     "is_active",
     "created_at",
   ]),

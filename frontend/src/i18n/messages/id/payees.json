@@ -82,6 +82,9 @@
     "categoryLabel": "Kategori Default",
     "notesLabel": "Catatan (opsional)",
     "websiteLabel": "Situs web",
+    "addressLabel": "Alamat",
+    "emailLabel": "Email",
+    "phoneLabel": "Telepon",
     "submitCreate": "Buat Penerima",
     "submitUpdate": "Perbarui Penerima",
     "applyCategoryLabel": "Terapkan kategori ini ke transaksi yang sudah ada",
@@ -270,7 +273,8 @@
   },
   "selectCategoryPlaceholder": "Pilih kategori...",
   "validation": {
-    "nameRequired": "Nama penerima wajib diisi"
+    "nameRequired": "Nama penerima wajib diisi",
+    "emailInvalid": "Masukkan alamat email yang valid"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "Terapkan kategori default?",

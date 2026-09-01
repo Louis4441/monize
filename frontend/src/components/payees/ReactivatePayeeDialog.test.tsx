@@ -17,6 +17,12 @@ describe('ReactivatePayeeDialog', () => {
     website: null,
     hasLogo: false,
     logoFetchedAt: null,
+    address: null,
+    email: null,
+    phone: null,
+    latitude: null,
+    longitude: null,
+    geocodedAt: null,
     isActive: false,
     createdAt: '2024-01-01',
   };

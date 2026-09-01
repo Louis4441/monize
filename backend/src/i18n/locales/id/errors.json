@@ -350,6 +350,7 @@
   "payees": {
     "nameConflict": "Penerima bernama \"{{ name }}\" sudah ada",
     "nameRequired": "Nama penerima wajib diisi",
+    "invalidEmail": "\"{{ email }}\" bukan alamat email yang valid",
     "notFound": "Penerima dengan ID {{ id }} tidak ditemukan",
     "logoNotFound": "Tidak ada logo yang tersedia untuk penerima pembayaran ini",
     "categoryIdsNotOwned": "ID kategori tidak ditemukan atau bukan milik pengguna: {{ ids }}",

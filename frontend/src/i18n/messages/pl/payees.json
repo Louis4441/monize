@@ -82,6 +82,9 @@
     "categoryLabel": "Domyślna kategoria",
     "notesLabel": "Notatki (opcjonalnie)",
     "websiteLabel": "Strona internetowa",
+    "addressLabel": "Adres",
+    "emailLabel": "E-mail",
+    "phoneLabel": "Telefon",
     "submitCreate": "Utwórz odbiorcę",
     "submitUpdate": "Zapisz odbiorcę",
     "applyCategoryLabel": "Zastosuj tę kategorię do istniejących transakcji",
@@ -270,7 +273,8 @@
   },
   "selectCategoryPlaceholder": "Wybierz kategorię...",
   "validation": {
-    "nameRequired": "Nazwa odbiorcy jest wymagana"
+    "nameRequired": "Nazwa odbiorcy jest wymagana",
+    "emailInvalid": "Wprowadź prawidłowy adres e-mail"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "Przypisać domyślne kategorie?",

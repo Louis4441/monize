@@ -82,6 +82,9 @@
     "categoryLabel": "Default Category",
     "notesLabel": "Notes (optional)",
     "websiteLabel": "Website",
+    "addressLabel": "Address",
+    "emailLabel": "Email",
+    "phoneLabel": "Phone",
     "submitCreate": "Create Payee",
     "submitUpdate": "Update Payee",
     "applyCategoryLabel": "Apply this category to existing transactions",
@@ -270,7 +273,8 @@
   },
   "selectCategoryPlaceholder": "Select category...",
   "validation": {
-    "nameRequired": "Payee name is required"
+    "nameRequired": "Payee name is required",
+    "emailInvalid": "Enter a valid email address"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "Apply default categories?",

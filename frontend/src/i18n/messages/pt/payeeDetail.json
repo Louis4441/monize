@@ -94,7 +94,19 @@
     "largestValue": "{amount} em {date}",
     "overpaymentFor": "Beneficiário de amortização extra de",
     "website": "Site",
+    "address": "Morada",
+    "phone": "Telefone",
+    "email": "E-mail",
     "notes": "Notas"
+  },
+  "map": {
+    "title": "Localização",
+    "attribution": "(c) Contribuidores do OpenStreetMap",
+    "openInMaps": "Abrir esta morada na sua aplicação de mapas",
+    "notLocated": "Não foi possível encontrar esta morada no mapa.",
+    "retryLookup": "Repetir a procura de localização",
+    "retrying": "A procurar...",
+    "retryFailed": "Não foi possível procurar esta morada. Tente novamente mais tarde."
   },
   "tabs": {
     "ariaLabel": "Secções do beneficiário",

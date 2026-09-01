@@ -216,6 +216,10 @@ export interface CreatePayeeDescriptor extends BaseDescriptor {
   defaultCategoryId: string | null;
   /** Normalised at preview time; absent means the request set no address. */
   website?: string | null;
+  /** Contact fields, same contract as {@link website} above. */
+  address?: string | null;
+  email?: string | null;
+  phone?: string | null;
 }
 
 /**
@@ -229,6 +233,10 @@ export interface UpdatePayeeDescriptor extends BaseDescriptor {
   defaultCategoryId: string | null;
   /** Absent leaves the stored address alone; null clears it. */
   website?: string | null;
+  /** Contact fields, same contract as {@link website} above. */
+  address?: string | null;
+  email?: string | null;
+  phone?: string | null;
 }
 
 /** Delete an existing payee (identified only; confirm re-checks ownership). */
@@ -528,6 +536,9 @@ export interface BatchCreatePayeeRow {
   name: string;
   defaultCategoryId: string | null;
   website?: string | null;
+  address?: string | null;
+  email?: string | null;
+  phone?: string | null;
 }
 
 /** One resolved payee edit inside a `batch_actions` envelope (operation `update_payee`). */
@@ -536,6 +547,9 @@ export interface BatchUpdatePayeeRow {
   name: string;
   defaultCategoryId: string | null;
   website?: string | null;
+  address?: string | null;
+  email?: string | null;
+  phone?: string | null;
 }
 
 /** One payee deletion inside a `batch_actions` envelope (operation `delete_payee`). */
@@ -677,6 +691,10 @@ export interface AiActionPreview {
   name?: string | null;
   /** Payee website, as the commit would store it (create_payee/update_payee). */
   website?: string | null;
+  /** Payee contact fields, as the commit would store them. */
+  address?: string | null;
+  email?: string | null;
+  phone?: string | null;
   /**
    * True when an update/delete targets a reconciled transaction. The
    * confirmation card surfaces a warning so the user knows approving will
@@ -739,6 +757,9 @@ export interface AiActionPreviewRow {
   // Payee display fields (batch_actions with a payee operation).
   name?: string | null;
   website?: string | null;
+  address?: string | null;
+  email?: string | null;
+  phone?: string | null;
   // Shared / cash-transaction display fields.
   accountName?: string;
   amount?: number;

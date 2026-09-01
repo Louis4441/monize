@@ -5,6 +5,7 @@ import {
   BadRequestException,
   Logger,
 } from "@nestjs/common";
+import { isEmail } from "class-validator";
 import { tr } from "../i18n/translate";
 import { DataSource, Like, In, Not, IsNull } from "typeorm";
 import { Payee } from "./entities/payee.entity";
@@ -35,6 +36,11 @@ import { withScopedDb } from "../common/db/scoped-db";
 import { normalizeWebsite } from "../common/normalize-website";
 import { FaviconService, FetchedLogo } from "../common/favicon/favicon.service";
 import { brandLogoColumns } from "../common/favicon/brand-logo.columns";
+import { GeocodingService } from "../common/geocoding/geocoding.service";
+import {
+  CLEARED_GEOCODE_COLUMNS,
+  geocodeColumns,
+} from "../common/geocoding/geocode.columns";
 
 /**
  * Resolved, sanitized preview of a proposed new payee. Shared by the AI
@@ -52,6 +58,10 @@ export interface CreatePayeePreview {
    * it; `null` means clear it.
    */
   website?: string | null;
+  /** Contact fields, with the same undefined/null contract as {@link website}. */
+  address?: string | null;
+  email?: string | null;
+  phone?: string | null;
 }
 
 /**
@@ -66,6 +76,13 @@ export interface UpdatePayeePreview {
   defaultCategoryName: string | null;
   /** See {@link CreatePayeePreview.website}. */
   website?: string | null;
+  /**
+   * Contact fields, with the same contract as {@link website}: `undefined`
+   * leaves the stored value alone, `null` clears it.
+   */
+  address?: string | null;
+  email?: string | null;
+  phone?: string | null;
 }
 
 /** Resolved preview of a proposed payee deletion. */
@@ -95,6 +112,55 @@ function normalizePayeeName(value: string): string {
     .trim();
 }
 
+/**
+ * What a contact field the user emptied should be stored as.
+ *
+ * The form resends every field on each save, so a cleared input arrives as "" --
+ * which must become NULL rather than an empty string, or "has an address" reads
+ * true for a payee with none and the map renders an empty query. Undefined is
+ * left alone: it means the caller did not mention the field at all.
+ */
+function normalizeContactField(
+  value: string | null | undefined,
+): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
+/**
+ * The contact fields as a preview would store them, with the email checked.
+ *
+ * The check belongs here because a preview has to compute what the commit will
+ * do: `CreatePayeeDto` rejects a malformed email, so without this the user
+ * would be shown a confirmation card, approve it, and only then get a
+ * validation failure from a request they had already agreed to.
+ */
+function previewContactFields(input: {
+  address?: string | null;
+  email?: string | null;
+  phone?: string | null;
+}): { address?: string | null; email?: string | null; phone?: string | null } {
+  const email = normalizeContactField(input.email);
+  if (email && !isEmail(email)) {
+    throw new BadRequestException(
+      tr(
+        "errors.payees.invalidEmail",
+        `"${email}" is not a valid email address`,
+        {
+          email,
+        },
+      ),
+    );
+  }
+  return {
+    address: normalizeContactField(input.address),
+    email,
+    phone: normalizeContactField(input.phone),
+  };
+}
+
 @Injectable()
 export class PayeesService {
   private readonly logger = new Logger(PayeesService.name);
@@ -103,6 +169,7 @@ export class PayeesService {
     private dataSource: DataSource,
     private actionHistoryService: ActionHistoryService,
     private faviconService: FaviconService,
+    private geocodingService: GeocodingService,
   ) {}
 
   async create(userId: string, createPayeeDto: CreatePayeeDto): Promise<Payee> {
@@ -115,6 +182,18 @@ export class PayeesService {
     // host cannot hold a database connection open.
     const logo = website
       ? await this.faviconService.fetchFavicon(website)
+      : null;
+
+    // The contact fields the form sends as "" mean "empty", not "a blank
+    // string" -- see normalizeContactField.
+    const address = normalizeContactField(createPayeeDto.address) ?? null;
+    const email = normalizeContactField(createPayeeDto.email) ?? null;
+    const phone = normalizeContactField(createPayeeDto.phone) ?? null;
+    // Same best-effort contract as the favicon above, and outside any
+    // transaction for the same reason: a slow geocoder must not hold a
+    // connection, and a failed lookup must not fail the create.
+    const geocode = address
+      ? await this.geocodingService.geocode(address)
       : null;
 
     const saved = await withScopedDb(this.dataSource, async (m) => {
@@ -144,6 +223,12 @@ export class PayeesService {
         // null -- so the columns are only written when there was an address
         // to resolve.
         ...(website ? brandLogoColumns(logo) : {}),
+        address,
+        email,
+        phone,
+        // Same rule for the address: with none, geocoded_at stays null so the
+        // UI knows no lookup has been attempted rather than that one failed.
+        ...(address ? geocodeColumns(geocode) : CLEARED_GEOCODE_COLUMNS),
         userId,
       });
 
@@ -159,6 +244,15 @@ export class PayeesService {
         name: saved.name,
         notes: saved.notes,
         website: saved.website,
+        address: saved.address,
+        email: saved.email,
+        phone: saved.phone,
+        // The point travels with the address it was resolved from -- restoring
+        // one without the other leaves the map pointing somewhere the payee is
+        // not.
+        latitude: saved.latitude,
+        longitude: saved.longitude,
+        geocodedAt: saved.geocodedAt,
         defaultCategoryId: saved.defaultCategoryId,
         isActive: saved.isActive,
       },
@@ -180,9 +274,13 @@ export class PayeesService {
       name: string;
       defaultCategoryId?: string | null;
       website?: string | null;
+      address?: string | null;
+      email?: string | null;
+      phone?: string | null;
     },
   ): Promise<CreatePayeePreview> {
     const name = stripHtml(input.name)?.trim() || "";
+    const contact = previewContactFields(input);
     // Normalise here, not at commit time: a preview has to compute what the
     // commit will do, so the card shows "https://acme.com" for a typed
     // "acme.com" rather than a value the save would then change.
@@ -220,7 +318,13 @@ export class PayeesService {
         defaultCategoryName = names.get(cat.id) ?? cat.name;
       }
 
-      return { name, defaultCategoryId, defaultCategoryName, website };
+      return {
+        name,
+        defaultCategoryId,
+        defaultCategoryName,
+        website,
+        ...contact,
+      };
     });
   }
 
@@ -286,6 +390,9 @@ export class PayeesService {
       name: string;
       categoryName?: string | null;
       website?: string | null;
+      address?: string | null;
+      email?: string | null;
+      phone?: string | null;
     },
   ): Promise<CreatePayeePreview> {
     let defaultCategoryId: string | null = null;
@@ -298,6 +405,9 @@ export class PayeesService {
       name: input.name,
       defaultCategoryId,
       website: input.website,
+      address: input.address,
+      email: input.email,
+      phone: input.phone,
     });
   }
 
@@ -313,6 +423,9 @@ export class PayeesService {
       newName?: string;
       categoryName?: string | null;
       website?: string | null;
+      address?: string | null;
+      email?: string | null;
+      phone?: string | null;
     },
   ): Promise<UpdatePayeePreview> {
     const payee = await this.resolvePayeeForManage(userId, input.name);
@@ -374,6 +487,7 @@ export class PayeesService {
       defaultCategoryId,
       defaultCategoryName,
       website,
+      ...previewContactFields(input),
     };
   }
 
@@ -551,6 +665,34 @@ export class PayeesService {
     return this.findOne(userId, id);
   }
 
+  /**
+   * Re-run the location lookup for a payee's stored address.
+   *
+   * The escape hatch for the value-difference guard in `update`: because an
+   * unchanged address is deliberately never re-geocoded, a payee whose lookup
+   * failed while the geocoder was down would otherwise stay maplessly stuck
+   * forever -- re-saving the same address does nothing by design. This is what
+   * the "retry location lookup" affordance on the payee page calls.
+   */
+  async refreshGeocode(userId: string, id: string): Promise<Payee> {
+    const payee = await this.findOne(userId, id);
+    const geocode = payee.address
+      ? await this.geocodingService.geocode(payee.address)
+      : null;
+
+    await withScopedDb(this.dataSource, (m) =>
+      m.update(
+        Payee,
+        { id, userId },
+        // No address means nothing was attempted, so the stamp clears too --
+        // exactly as it does when an address is removed through `update`.
+        payee.address ? geocodeColumns(geocode) : CLEARED_GEOCODE_COLUMNS,
+      ),
+    );
+
+    return this.findOne(userId, id);
+  }
+
   async search(
     userId: string,
     query: string,
@@ -715,6 +857,13 @@ export class PayeesService {
       name: payee.name,
       notes: payee.notes,
       website: payee.website,
+      address: payee.address,
+      email: payee.email,
+      phone: payee.phone,
+      // See create(): the point is part of the address, not a separate fact.
+      latitude: payee.latitude,
+      longitude: payee.longitude,
+      geocodedAt: payee.geocodedAt,
       defaultCategoryId: payee.defaultCategoryId,
       isActive: payee.isActive,
     };
@@ -771,6 +920,30 @@ export class PayeesService {
           ? await this.faviconService.fetchFavicon(website)
           : null;
         Object.assign(updateFields, brandLogoColumns(logo));
+      }
+    }
+    if (updatePayeeDto.email !== undefined)
+      updateFields.email = normalizeContactField(updatePayeeDto.email) ?? null;
+    if (updatePayeeDto.phone !== undefined)
+      updateFields.phone = normalizeContactField(updatePayeeDto.phone) ?? null;
+    if (updatePayeeDto.address !== undefined) {
+      const address = normalizeContactField(updatePayeeDto.address) ?? null;
+      updateFields.address = address;
+      // Re-resolve the location only when the address actually changed. The
+      // form resends the current address on every save, so keying this off the
+      // field being *present* would geocode on a rename -- spending a request
+      // against a rate-limited service, and replacing good coordinates with
+      // whatever a failed lookup returns. Clearing the address clears the
+      // point, and clears the attempt stamp with it: nothing was tried, so the
+      // UI must not offer to retry.
+      if (address !== payee.address) {
+        const geocode = address
+          ? await this.geocodingService.geocode(address)
+          : null;
+        Object.assign(
+          updateFields,
+          address ? geocodeColumns(geocode) : CLEARED_GEOCODE_COLUMNS,
+        );
       }
     }
     if (updatePayeeDto.isActive !== undefined)
@@ -843,6 +1016,13 @@ export class PayeesService {
       afterData: {
         name: refreshed.name,
         notes: refreshed.notes,
+        website: refreshed.website,
+        address: refreshed.address,
+        email: refreshed.email,
+        phone: refreshed.phone,
+        latitude: refreshed.latitude,
+        longitude: refreshed.longitude,
+        geocodedAt: refreshed.geocodedAt,
         defaultCategoryId: refreshed.defaultCategoryId,
         isActive: refreshed.isActive,
       },

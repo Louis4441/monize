@@ -293,6 +293,10 @@ export interface PendingActionPreview {
   name?: string | null;
   /** Payee website, as the commit would store it. */
   website?: string | null;
+  /** Payee contact details, as the commit would store them. */
+  address?: string | null;
+  email?: string | null;
+  phone?: string | null;
   /**
    * True when an update_transaction / delete_transaction targets a reconciled
    * transaction. The card shows a warning line so the user knows approving will
@@ -342,6 +346,10 @@ export interface PendingActionPreviewRow {
   name?: string | null;
   /** Payee website, as the commit would store it. */
   website?: string | null;
+  /** Payee contact details, as the commit would store them. */
+  address?: string | null;
+  email?: string | null;
+  phone?: string | null;
   accountName?: string;
   amount?: number;
   currencyCode?: string;

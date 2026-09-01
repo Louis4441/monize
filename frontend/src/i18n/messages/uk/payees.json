@@ -82,6 +82,9 @@
     "categoryLabel": "Категорія за замовчуванням",
     "notesLabel": "Примітки (необов'язково)",
     "websiteLabel": "Сайт",
+    "addressLabel": "Адреса",
+    "emailLabel": "Електронна пошта",
+    "phoneLabel": "Телефон",
     "submitCreate": "Створити одержувача",
     "submitUpdate": "Оновити одержувача",
     "applyCategoryLabel": "Застосувати цю категорію до наявних транзакцій",
@@ -270,7 +273,8 @@
   },
   "selectCategoryPlaceholder": "Оберіть категорію...",
   "validation": {
-    "nameRequired": "Назва одержувача обов'язкова"
+    "nameRequired": "Назва одержувача обов'язкова",
+    "emailInvalid": "Введіть дійсну адресу електронної пошти"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "Застосувати категорії за замовчуванням?",

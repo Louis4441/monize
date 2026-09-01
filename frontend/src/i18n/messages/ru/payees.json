@@ -82,6 +82,9 @@
     "categoryLabel": "Категория по умолчанию",
     "notesLabel": "Примечания (необязательно)",
     "websiteLabel": "Сайт",
+    "addressLabel": "Адрес",
+    "emailLabel": "Электронная почта",
+    "phoneLabel": "Телефон",
     "submitCreate": "Создать получателя",
     "submitUpdate": "Обновить получателя",
     "applyCategoryLabel": "Применить эту категорию к существующим проводкам",
@@ -270,7 +273,8 @@
   },
   "selectCategoryPlaceholder": "Выберите категорию...",
   "validation": {
-    "nameRequired": "Имя получателя обязательно"
+    "nameRequired": "Имя получателя обязательно",
+    "emailInvalid": "Введите действительный адрес электронной почты"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "Применить категории по умолчанию?",

@@ -94,7 +94,19 @@
     "largestValue": "{amount} vào {date}",
     "overpaymentFor": "Người nhận khoản trả thêm cho",
     "website": "Trang web",
+    "address": "Địa chỉ",
+    "phone": "Điện thoại",
+    "email": "Email",
     "notes": "Ghi chú"
+  },
+  "map": {
+    "title": "Vị trí",
+    "attribution": "(c) Những người đóng góp OpenStreetMap",
+    "openInMaps": "Mở địa chỉ này trong ứng dụng bản đồ của bạn",
+    "notLocated": "Không tìm thấy địa chỉ này trên bản đồ.",
+    "retryLookup": "Thử tìm lại vị trí",
+    "retrying": "Đang tìm...",
+    "retryFailed": "Không thể tìm địa chỉ này. Vui lòng thử lại sau."
   },
   "tabs": {
     "ariaLabel": "Các phần của người nhận",
