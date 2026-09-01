@@ -31,6 +31,7 @@ interface Route {
   route: string;
   line: number;
   throttleLimit: number | null;
+  demoRestricted: boolean;
 }
 
 /**
@@ -40,6 +41,31 @@ interface Route {
  * Comments are blanked first: this file's own header has to name the decorators
  * it looks for, and the prose in the controllers explains the limits.
  */
+/**
+ * The whole decorator run a route decorator belongs to: the lines above it back
+ * to the previous statement, and the lines below it up to the method signature.
+ */
+function decoratorRunAt(lines: string[], routeIndex: number): string[] {
+  const run: string[] = [lines[routeIndex]];
+  for (let i = routeIndex - 1; i >= 0; i--) {
+    const line = lines[i].trim();
+    if (line === "") continue;
+    if (!line.startsWith("@") && !line.startsWith(")")) break;
+    run.push(line);
+  }
+  for (let i = routeIndex + 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line === "") continue;
+    // A decorator, or a continuation of one -- `@ApiOperation({` spans lines.
+    if (line.startsWith("@") || /^[})\]]/.test(line) || /^[a-z]+:/.test(line)) {
+      run.push(line);
+      continue;
+    }
+    break;
+  }
+  return run;
+}
+
 function routesOf(controller: string): Route[] {
   const raw = fs.readFileSync(path.join(__dirname, controller), "utf8");
   const source = raw
@@ -48,12 +74,18 @@ function routesOf(controller: string): Route[] {
   const lines = source.split("\n");
   const routes: Route[] = [];
   let pendingThrottle: number | null = null;
+  // A class-level `@DemoRestricted()` covers every route in the file. It is
+  // recorded rather than assumed either way: on this controller it used to be at
+  // class level, which 403s the read-only GET as well and left a demo
+  // administrator on a page that could render nothing.
+  const classLevelDemo = /@DemoRestricted\(\)[\s\S]*?export class/.test(source);
   for (const [index, line] of lines.entries()) {
     const throttle = /@Throttle\(\{[^}]*limit:\s*([\d_]+)/.exec(line);
     if (throttle) {
       pendingThrottle = Number(throttle[1].replace(/_/g, ""));
       continue;
     }
+
     const route = /@(Get|Post|Patch|Put|Delete)\(\s*(?:"([^"]*)")?/.exec(line);
     if (route) {
       routes.push({
@@ -62,6 +94,15 @@ function routesOf(controller: string): Route[] {
         route: route[2] ?? "",
         line: index + 1,
         throttleLimit: pendingThrottle,
+        // Decorator ORDER carries no meaning to Nest, so neither may the scan
+        // read one into it: `@DemoRestricted()` sits before the route decorator
+        // on one controller and after it on the other, and a scan that only
+        // looked backwards reported two closed routes as open.
+        demoRestricted:
+          classLevelDemo ||
+          decoratorRunAt(lines, index).some((decorator) =>
+            /@DemoRestricted\(\)/.test(decorator),
+          ),
       });
       pendingThrottle = null;
       continue;
@@ -100,6 +141,26 @@ describe("push routes are rate-limited", () => {
       .filter((r) => (r.throttleLimit as number) > MAX_LIMIT)
       .map((r) => `${r.method} ${r.route}: ${r.throttleLimit}`);
     expect(tooHigh).toEqual([]);
+  });
+
+  // Demo mode is the other half of the same question: which routes may a demo
+  // administrator reach. Every write must be closed, and every read must be
+  // OPEN -- the class-level restriction this replaced 403d the channels GET, and
+  // the nav links to that page unconditionally, so the page rendered nothing but
+  // "we could not check" for a request with no body that returns a fingerprint
+  // and two counts.
+  it("closes every mutating route to demo mode", () => {
+    const open = routes
+      .filter((r) => r.method !== "Get" && !r.demoRestricted)
+      .map((r) => `${r.controller}:${r.line} ${r.method} ${r.route}`);
+    expect(open).toEqual([]);
+  });
+
+  it("leaves the reads reachable in demo mode", () => {
+    const closed = routes
+      .filter((r) => r.method === "Get" && r.demoRestricted)
+      .map((r) => `${r.controller}:${r.line} ${r.method} ${r.route}`);
+    expect(closed).toEqual([]);
   });
 
   it("holds the two expensive routes to the tightest bound", () => {

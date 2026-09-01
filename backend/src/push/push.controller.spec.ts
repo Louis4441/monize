@@ -84,8 +84,12 @@ describe("PushController", () => {
   });
 
   // Every demo visitor shares one account, so a subscription registered by one
-  // visitor would receive the test notification another visitor triggered.
-  it.each(["subscribe", "test"] as const)(
+  // visitor would receive the test notification another visitor triggered -- and
+  // `remove` is on this list because it is a WRITE, not because it is expensive:
+  // it was grouped with the reads and called "read-only", which a DELETE is not.
+  // On one shared account a removal is a stranger deleting the row somebody else
+  // is looking at.
+  it.each(["subscribe", "test", "remove"] as const)(
     "restricts %s in demo mode",
     (method) => {
       expect(
@@ -97,7 +101,7 @@ describe("PushController", () => {
     },
   );
 
-  it.each(["list", "remove", "getConfig"] as const)(
+  it.each(["list", "getConfig"] as const)(
     "leaves the read-only route %s available in demo mode",
     (method) => {
       expect(
@@ -137,10 +141,33 @@ describe("AdminNotificationsController", () => {
     ).toEqual(["admin"]);
   });
 
-  it("is demo-restricted for the whole controller", () => {
+  // Not at class level, which is what it used to be: that 403s the channels GET
+  // as well, and the nav links to that page unconditionally -- so a demo
+  // administrator following it got a page rendering nothing but "we could not
+  // check", for a request with no body that returns a key fingerprint and two
+  // counts. The two writes carry it; the read must not.
+  it.each(["updateChannels", "rotate"] as const)(
+    "restricts %s in demo mode",
+    (method) => {
+      expect(
+        new Reflector().get(
+          DEMO_RESTRICTED_KEY,
+          AdminNotificationsController.prototype[method],
+        ),
+      ).toBe(true);
+    },
+  );
+
+  it("leaves the channel read reachable in demo mode", () => {
     expect(
       new Reflector().get(DEMO_RESTRICTED_KEY, AdminNotificationsController),
-    ).toBe(true);
+    ).toBeUndefined();
+    expect(
+      new Reflector().get(
+        DEMO_RESTRICTED_KEY,
+        AdminNotificationsController.prototype.getChannels,
+      ),
+    ).toBeUndefined();
   });
 
   it("switches the instance channel from the payload", async () => {

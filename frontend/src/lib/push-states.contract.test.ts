@@ -94,3 +94,51 @@ describe('push device states are one list, checked where it can be checked', () 
     );
   });
 });
+
+/**
+ * The fingerprint's width is the third thing both layers must agree on, and it
+ * was mirrored by a comment alone.
+ *
+ * Drift here is silent AND destructive. The server truncates the endpoint digest
+ * to this many characters for the device list; the browser computes its own
+ * digest and truncates it the same way to recognise which row is itself. Shorten
+ * the backend's copy and `liveFingerprints` never contains `currentFingerprint`,
+ * so `classifyPushRegistration` answers `revoked` for a perfectly healthy
+ * registration and the settings panel unsubscribes the browser of every user who
+ * opens the page -- with both suites green, because each asserts against its own
+ * constant.
+ */
+describe('the endpoint fingerprint has one width', () => {
+  function declaredNumber(file: string, name: string): number {
+    const source = readFileSync(resolve(repoRoot, file), 'utf8');
+    const match = new RegExp(
+      `export const ${name}\\s*(?::\\s*number\\s*)?=\\s*([\\d_]+)`,
+    ).exec(source);
+    if (!match) throw new Error(`${name} not found in ${file}`);
+    return Number(match[1].replace(/_/g, ''));
+  }
+
+  it('is the same number on both sides of the wire', () => {
+    const backend = declaredNumber(
+      'backend/src/push/push-subscription.service.ts',
+      'ENDPOINT_FINGERPRINT_LENGTH',
+    );
+    const frontend = declaredNumber(
+      'frontend/src/lib/push.ts',
+      'ENDPOINT_FINGERPRINT_LENGTH',
+    );
+
+    expect(frontend).toBe(backend);
+  });
+
+  it('is wide enough to identify a device and narrower than the digest', () => {
+    const width = declaredNumber(
+      'frontend/src/lib/push.ts',
+      'ENDPOINT_FINGERPRINT_LENGTH',
+    );
+    // A SHA-256 hex digest is 64 characters; a prefix is published so the
+    // endpoint itself -- a delivery credential -- never leaves the server.
+    expect(width).toBeGreaterThanOrEqual(8);
+    expect(width).toBeLessThan(64);
+  });
+});

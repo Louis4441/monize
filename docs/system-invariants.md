@@ -128,7 +128,7 @@ implied.
 | INV-CRON-001 | One logical cron effect per schedule tick, across replicas | partial |
 | INV-PROVIDER-001 | An unreachable provider stops being called, and produces at most one alert pair per outage | enforced |
 | INV-ALERT-001 | A system alert row lands at most once per (recipient, dedupe key), and only the insert winner emails | enforced |
-| INV-NOTIFY-001 | Every notification row is written by NotificationService.create; no producer touches the table | enforced |
+| INV-NOTIFY-001 | Every notification a producer creates is written by NotificationService.create; the restore's dynamic-table insert is outside the scan | partial |
 | INV-RLS-001 | Enforced mode refuses to run on a role that can bypass RLS | enforced |
 | INV-CACHE-001 | A money-moving write invalidates every derived cache | enforced |
 | INV-PAYEE-001 | A contact lookup never overwrites a value the user entered, and the automatic one runs at most once per payee | enforced |
@@ -2448,11 +2448,11 @@ Status              enforced
 ### INV-NOTIFY-001 -- one writer owns the notifications table
 
 ```text
-Statement           Every notification row is written by
-                    NotificationService.create. No producer inserts, updates or
-                    deletes the notifications table itself, so the column
-                    bounds, the conflict handling and the period_start default
-                    are one rule rather than one rule per producer.
+Statement           Every notification a PRODUCER creates is written by
+                    NotificationService.create, so the column bounds, the
+                    conflict handling and the period_start default are one rule
+                    rather than one rule per producer. The backup restore is the
+                    one exception, and it is not covered (see Status).
 Source of truth     src/notification-center/notification.service.ts
 Enforcement         notification-write-door.spec.ts scans every tracked
                     non-spec file under backend/src for a raw INSERT/UPDATE/
@@ -2460,10 +2460,22 @@ Enforcement         notification-write-door.spec.ts scans every tracked
                     Notification entity, with comments blanked so the prose
                     explaining the ban cannot trip it. Three files are
                     allowlisted with reasons -- the door, delete-my-data, and
-                    the restore's table wipe -- none of which produce
-                    notifications; the spec also fails if an allowlisted file
-                    stops writing, because a standing permission nobody uses is
-                    inherited by the next writer in that file.
+                    the restore -- and the spec also fails if an allowlisted
+                    file stops writing, because a standing permission nobody
+                    uses is inherited by the next writer in that file.
+                    What the scan CANNOT see: backup-restore-database.service.ts
+                    inserts through a dynamic table name
+                    (`INSERT INTO "${table}"`, driven by RESTORE_PLAN, whose
+                    notifications entry this branch added), so a restored row
+                    never passes boundedTitle, boundedDedupeKey or
+                    boundedTarget. The one field where that has a consequence a
+                    reader can see is `target`, and it is re-validated at the
+                    consumer instead: safeNotificationTarget resolves it against
+                    this origin before any navigation, on the app side and again
+                    in the service worker. The column widths are the database's
+                    own (a longer value raises 22001 and fails the restore
+                    loudly, which is the honest failure for an artifact that
+                    does not fit).
 Concurrency scope   n/a -- a static property of the source
 Retry semantics     n/a
 Crash semantics     n/a
@@ -2481,7 +2493,14 @@ Why it exists       There were three writers with three opinions: a raw INSERT
                     over-long scheduled-transaction name raised 22001 inside a
                     never-throws catch, and the notification the user needed
                     silently never existed.
-Status              enforced
+Status              partial -- every producer goes through the door and the scan
+                    proves it, but the restore's dynamic-table insert is outside
+                    what a source scan on the table name can reach. Closing it
+                    means the restore calling the door per row (which would
+                    rewrite ids and conflict handling the restore owns) or the
+                    scan understanding RESTORE_PLAN; neither is done, so this
+                    entry says so rather than claiming a coverage it does not
+                    have.
 ```
 
 ### INV-RLS-001 -- enforced mode refuses a privileged role

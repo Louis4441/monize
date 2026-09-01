@@ -241,6 +241,38 @@ describe("IsSafeUrl validator", () => {
       await expectInvalid(url);
     });
 
+    // A CIDR block is a mask over the first 16 bits, and spelling it as a text
+    // prefix covered a fraction of what it claimed: `/^fc00:/` plus `/^fd/` left
+    // `fc01::1` through `fcff::1` -- most of unique-local fc00::/7 -- reading as
+    // public, and `/^fe80:/` left `fe90::` to `febf::` of link-local fe80::/10.
+    // Every one of these was accepted as a push endpoint this server then POSTs
+    // to on a schedule.
+    it.each([
+      ["the bottom of fc00::/7", "https://[fc00::1]/api"],
+      ["the block the prefix rule missed", "https://[fc01::1]/api"],
+      ["the top of the fc half", "https://[fcff:ffff::1]/api"],
+      ["the fd half", "https://[fd00::1]/api"],
+      ["the top of fc00::/7", "https://[fdff:ffff::1]/api"],
+      ["the bottom of fe80::/10", "https://[fe80::1]/api"],
+      ["the middle of fe80::/10", "https://[fe90::1]/api"],
+      ["the top of fe80::/10", "https://[febf:ffff::1]/api"],
+      ["deprecated site-local", "https://[fec0::1]/api"],
+      ["link-local all-nodes multicast", "https://[ff02::1]/api"],
+    ])("rejects %s", async (_name, url) => {
+      await expectInvalid(url);
+    });
+
+    // The boundaries from the outside, which is what makes the masks a range
+    // rather than a wider ban: fb.. is below fc00::/7 and fe00 is below
+    // fe80::/10, and both are ordinary global space.
+    it.each([
+      ["just below fc00::/7", "https://[fbff:ffff::1]/api"],
+      ["just below fe80::/10", "https://[fe00::1]/api"],
+      ["documentation space", "https://[2001:db8::1]/api"],
+    ])("allows %s", async (_name, url) => {
+      await expectValid(url);
+    });
+
     // The other direction, because a check that rejects everything is not a
     // check: an embedded PUBLIC address stays reachable.
     it.each([

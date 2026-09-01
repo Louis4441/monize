@@ -67,13 +67,13 @@ const WITH_CONTEXT_ALLOWLIST = [
   // grantee's session cannot see the owner's users row under enforcement;
   // only the display label leaves the method).
   "src/delegation/joint-accounts.service.ts",
-  // Joint register writes: authorization-decision row load plus the
-  // owner-scoped mutation window, both fully decided by jointAccessFor
-  // before the bypass opens (joint-accounts spec W1).
   // The nightly purge of notifications the reader is done with: a cross-user
   // sweep from a cron entry point, with no request to inherit an identity
   // from. Every other method here runs under the caller's own context.
   "src/notification-center/notification.service.ts",
+  // Joint register writes: authorization-decision row load plus the
+  // owner-scoped mutation window, both fully decided by jointAccessFor
+  // before the bypass opens (joint-accounts spec W1).
   "src/transactions/joint-register.service.ts",
   "src/emergency-access/emergency-access-claim.controller.ts",
   "src/emergency-access/emergency-access-monitor.service.ts",

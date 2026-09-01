@@ -308,7 +308,7 @@ describe("WebPushSender", () => {
 
   // The regression this pins: retiring a device on an authorization failure
   // would empty every device list in the deployment over one bad clock or key.
-  it.each([400, 401, 403, 413, 429, 500, 503])(
+  it.each([400, 401, 403, 413, 500, 503])(
     "treats %s as transient rather than retiring the device",
     async (statusCode) => {
       sendNotification.mockRejectedValue(
@@ -322,6 +322,39 @@ describe("WebPushSender", () => {
         message: "nope",
         statusCode,
       });
+    },
+  );
+
+  // 429 is the push service throttling this INSTANCE -- one deployment holds one
+  // VAPID key pair, so it is per origin and says nothing about the device.
+  // Counted like any other transient failure it would retire every device in the
+  // deployment during one outage.
+  it("marks a throttle as not the device's failure", async () => {
+    sendNotification.mockRejectedValue(
+      Object.assign(new Error("Too Many Requests"), { statusCode: 429 }),
+    );
+
+    await expect(sender.send(target(), PAYLOAD)).resolves.toEqual({
+      status: "transient",
+      message: "Too Many Requests",
+      statusCode: 429,
+      throttled: true,
+    });
+  });
+
+  // ...and nothing else is. A 401 or a 500 may well be about this endpoint, and
+  // the retirement bound is what stops a dead one being attempted forever.
+  it.each([[401], [403], [500], [503]])(
+    "leaves %s counting against the device",
+    async (statusCode) => {
+      sendNotification.mockRejectedValue(
+        Object.assign(new Error("nope"), { statusCode }),
+      );
+
+      const outcome = await sender.send(target(), PAYLOAD);
+
+      expect(outcome).toMatchObject({ status: "transient", statusCode });
+      expect(outcome).not.toHaveProperty("throttled");
     },
   );
 

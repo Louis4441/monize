@@ -686,6 +686,18 @@ export class UsersService {
     );
     deleted.notifications = result[1] ?? 0;
 
+    // The devices this account registered for push. Left behind, "delete my
+    // data" kept the endpoint and both encryption keys for every device, they
+    // went on counting against the per-account device cap, and anything a
+    // producer sent still arrived on the user's phone -- after they had asked
+    // for their data to be gone. The account survives this flow, so nothing
+    // cascades: it has to be deleted here.
+    result = await manager.query(
+      `DELETE FROM push_subscriptions WHERE user_id = $1`,
+      [userId],
+    );
+    deleted.pushDevices = result[1] ?? 0;
+
     result = await manager.query(
       `DELETE FROM budget_period_categories WHERE budget_period_id IN
          (SELECT bp.id FROM budget_periods bp

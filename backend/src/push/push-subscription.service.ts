@@ -523,6 +523,14 @@ export class PushSubscriptionService {
       return retired > 0 ? outcome.reason : undefined;
     }
 
+    // A throttle is not this device's failure. `MAX_CONSECUTIVE_FAILURES` exists
+    // so a dead endpoint stops being attempted; a 429 is the push service
+    // rate-limiting the whole INSTANCE (one deployment, one VAPID key pair), so
+    // counting it would retire every device in the deployment over one outage.
+    // Nothing is written at all: not even `last_seen_at`, which would claim we
+    // heard something about this device.
+    if (outcome.status === "transient" && outcome.throttled) return undefined;
+
     // Transient: count it, and retire the device once the bound is reached so a
     // dead endpoint is not attempted forever.
     const retired = await withScopedDb(this.dataSource, async (manager) => {

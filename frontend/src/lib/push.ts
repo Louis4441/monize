@@ -394,6 +394,14 @@ export async function enablePushOnThisDevice(
       if (minted) await safeUnsubscribe(subscription);
       throw error;
     }
+    // This one DOES unsubscribe whatever the browser holds, including another
+    // account's, and that is the difference from every other path here: it runs
+    // only because the reader clicked Enable. A browser profile holds exactly
+    // one subscription per origin, so there is no version of "B gets push in
+    // this browser" that leaves A's endpoint alive -- the platform decides that,
+    // not this code. What the 409 refuses is the silent half: taking over A's
+    // ROW. A's row stays theirs, is undeliverable from this moment, and retires
+    // itself on its next delivery (410 from the push service -> GONE).
     await safeUnsubscribe(subscription);
     const replacement = await registration.pushManager.subscribe({
       userVisibleOnly: true,

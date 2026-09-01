@@ -1400,6 +1400,15 @@ describe("UsersService", () => {
       expect(
         queries.some((q: string) => q.includes("DELETE FROM notifications")),
       ).toBe(true);
+      // The account survives this flow, so nothing cascades: a device left
+      // behind keeps its endpoint and both encryption keys, and anything a
+      // producer sends still arrives on the phone of somebody who asked for
+      // their data to be gone.
+      expect(
+        queries.some((q: string) =>
+          q.includes("DELETE FROM push_subscriptions"),
+        ),
+      ).toBe(true);
       expect(
         queries.some((q: string) => q.includes("DELETE FROM budgets")),
       ).toBe(true);

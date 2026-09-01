@@ -105,10 +105,12 @@ function loadServiceWorker(clients: WindowClientStub[] = []) {
 
   const dispatchSubscriptionChange = async (
     oldSubscription: unknown,
+    newSubscription?: unknown,
   ): Promise<void> => {
     let pending: Promise<unknown> = Promise.resolve();
     const event = {
       oldSubscription,
+      newSubscription,
       waitUntil: (promise: Promise<unknown>) => {
         pending = promise;
       },
@@ -494,13 +496,53 @@ describe('service worker subscription rotation', () => {
     expect(sw.posted).toEqual([{ type: 'monize-push-subscription-changed' }]);
   });
 
-  it('does nothing when the old subscription names no key', async () => {
+  // Firefox -- where Web Push is most used -- fires this event with no
+  // oldSubscription at all, and so did Chrome before the event's properties
+  // shipped. Reading only the old one meant the browsers that need this handler
+  // most got nothing out of it.
+  it('falls back to the new subscription for the key', async () => {
     const sw = loadServiceWorker([]);
 
-    await sw.dispatchSubscriptionChange({ options: {} });
-    await sw.dispatchSubscriptionChange(undefined);
+    await sw.dispatchSubscriptionChange(undefined, {
+      options: { applicationServerKey: KEY },
+    });
+
+    expect(sw.resubscribe).toHaveBeenCalledWith({
+      userVisibleOnly: true,
+      applicationServerKey: KEY,
+    });
+  });
+
+  // With no key there is nothing to subscribe with -- but the page holds the
+  // session and the CSRF token this worker cannot read, so it can do the whole
+  // thing itself. Staying silent left an open settings panel knowing nothing.
+  it.each([
+    ['neither subscription carries a key', { options: {} }, undefined],
+    ['the event carries no subscriptions at all', undefined, undefined],
+  ])('still tells the page when %s', async (_name, oldSub, newSub) => {
+    const sw = loadServiceWorker([
+      { url: `${ORIGIN}/settings`, focus: vi.fn() },
+    ]);
+
+    await sw.dispatchSubscriptionChange(oldSub, newSub);
 
     expect(sw.resubscribe).not.toHaveBeenCalled();
+    expect(sw.posted).toEqual([{ type: 'monize-push-subscription-changed' }]);
+  });
+
+  // A failed resubscribe is exactly when the page needs to know: the panel is
+  // the durable path, and it can ask the user.
+  it('tells the page even when resubscribing fails', async () => {
+    const sw = loadServiceWorker([
+      { url: `${ORIGIN}/settings`, focus: vi.fn() },
+    ]);
+    sw.resubscribe.mockRejectedValue(new Error('permission revoked'));
+
+    await sw.dispatchSubscriptionChange({
+      options: { applicationServerKey: KEY },
+    });
+
+    expect(sw.posted).toEqual([{ type: 'monize-push-subscription-changed' }]);
   });
 
   it('does not reject when resubscribing fails', async () => {

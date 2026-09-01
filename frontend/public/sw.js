@@ -218,30 +218,50 @@ self.addEventListener('push', function (event) {
 // page, which has the session and the token. With no page open, the settings
 // panel already reads this browser's endpoint on load and offers to enable
 // again -- the message is the fast path, not the only one.
+function applicationServerKeyOf(subscription) {
+  return (
+    subscription && subscription.options && subscription.options.applicationServerKey
+  );
+}
+
+/** Tell every open window, so the settings panel reconciles even if we cannot. */
+function announceSubscriptionChange() {
+  return self.clients
+    .matchAll({ type: 'window', includeUncontrolled: true })
+    .then(function (clientList) {
+      for (var i = 0; i < clientList.length; i++) {
+        clientList[i].postMessage({ type: 'monize-push-subscription-changed' });
+      }
+    });
+}
+
 self.addEventListener('pushsubscriptionchange', function (event) {
-  var oldSubscription = event.oldSubscription;
+  // Firefox -- where Web Push is most used -- fires this with NO oldSubscription,
+  // and so did Chrome before the event's properties shipped. Returning early
+  // there meant the browsers that need this handler most got nothing from it:
+  // no resubscribe, and no message, so even a window with the settings panel
+  // open learned nothing and delivery stayed dead until somebody happened to
+  // open Settings again.
   var key =
-    oldSubscription &&
-    oldSubscription.options &&
-    oldSubscription.options.applicationServerKey;
-  if (!key) return;
+    applicationServerKeyOf(event.oldSubscription) ||
+    applicationServerKeyOf(event.newSubscription);
+
+  // No key to subscribe with is not a reason to stay silent: the page holds the
+  // session and the CSRF token this worker cannot read, so it can do the whole
+  // thing itself. Announcing is the part that must always happen.
+  if (!key) {
+    event.waitUntil(announceSubscriptionChange().catch(function () {}));
+    return;
+  }
 
   event.waitUntil(
     self.registration.pushManager
       .subscribe({ userVisibleOnly: true, applicationServerKey: key })
-      .then(function () {
-        return self.clients.matchAll({
-          type: 'window',
-          includeUncontrolled: true,
-        });
-      })
-      .then(function (clientList) {
-        for (var i = 0; i < clientList.length; i++) {
-          clientList[i].postMessage({ type: 'monize-push-subscription-changed' });
-        }
-      })
+      .then(announceSubscriptionChange)
       .catch(function () {
-        // Best effort: the settings panel is the durable path.
+        // The resubscribe failed -- a rotation, a revoked permission. The panel
+        // is still the durable path, so it is told either way.
+        return announceSubscriptionChange().catch(function () {});
       })
   );
 });

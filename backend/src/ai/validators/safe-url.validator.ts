@@ -30,10 +30,18 @@ const BLOCKED_SUFFIXES = [".internal", ".local", ".localhost"];
  * retry budget -- tens of seconds, on a request path, chosen by whoever supplied
  * the URL. A lookup that has not answered in this long has not established the
  * host is public, and an unestablished host is not one this server connects to,
- * so the timeout answers `false` rather than "probably fine". Two seconds is far
- * past a working resolver and far short of a lever.
+ * so the timeout answers `false` rather than "probably fine".
+ *
+ * Five seconds, not two, and the difference is a decision. Bounding the lookup
+ * turned a slow resolver from "allow, the HTTP request will fail" into a
+ * rejection, for every caller -- including an operator saving a perfectly valid
+ * `api.anthropic.com` behind an intermittent resolver, who would be told their
+ * URL was the problem. A save can wait five seconds; the push sender's per-send
+ * re-check cannot, and it passes its own tighter bound through
+ * `validateUrlIsSafeWithin` because its budget is part of a documented request
+ * worst case.
  */
-export const URL_SAFETY_CHECK_TIMEOUT_MS = 2_000;
+export const URL_SAFETY_CHECK_TIMEOUT_MS = 5_000;
 
 const PRIVATE_IP_RANGES = [
   /^127\./,
@@ -42,13 +50,51 @@ const PRIVATE_IP_RANGES = [
   /^192\.168\./,
   /^0\./,
   /^169\.254\./,
-  /^fc00:/i,
-  /^fd/i,
-  /^fe80:/i,
-  /^::1$/,
-  /^::$/,
-  /^::ffff:(?:127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|0\.|169\.254\.)/i,
 ];
+
+/**
+ * The IPv6 blocks this server must not connect to, as the masks that define
+ * them.
+ *
+ * Spelled as text prefixes, they were wrong for most of the space they claimed:
+ * `/^fc00:/` and `/^fd/` covered `fc00::` and every `fd..`, and left `fc01::1`
+ * through `fcff::1` -- most of unique-local fc00::/7 -- reading as public.
+ * `/^fe80:/` left `fe90::` to `febf::`, most of link-local fe80::/10. Both were
+ * reachable through a client-supplied URL this server then POSTs to.
+ *
+ * A CIDR block is a mask over the first 16 bits, so that is what the check is.
+ * `fec0::/10` is deprecated site-local and blocked for the same reason; `ff00::/8`
+ * is multicast, which is not a host to make an HTTP request to at all.
+ *
+ * Deliberately absent, as elsewhere in this file: 6to4 (`2002::/16`) and Teredo
+ * (`2001::/32`), which embed an IPv4 address but reach it only through a relay
+ * this server would have to be configured to use.
+ */
+const PRIVATE_IPV6_BLOCKS: ReadonlyArray<{
+  mask: number;
+  value: number;
+  block: string;
+}> = [
+  { mask: 0xfe00, value: 0xfc00, block: "fc00::/7 unique-local" },
+  { mask: 0xffc0, value: 0xfe80, block: "fe80::/10 link-local" },
+  { mask: 0xffc0, value: 0xfec0, block: "fec0::/10 site-local (deprecated)" },
+  { mask: 0xff00, value: 0xff00, block: "ff00::/8 multicast" },
+];
+
+/** Loopback, the unspecified address, and the blocks above. */
+function isPrivateIpv6(hostname: string): boolean {
+  const groups = expandIpv6(hostname);
+  if (!groups) return false;
+  // `::` -- unspecified, which a connect() reads as localhost.
+  if (groups.every((group) => group === 0)) return true;
+  // `::1` -- loopback.
+  if (groups.slice(0, 7).every((group) => group === 0) && groups[7] === 1) {
+    return true;
+  }
+  return PRIVATE_IPV6_BLOCKS.some(
+    ({ mask, value }) => (groups[0] & mask) === value,
+  );
+}
 
 /**
  * The host as an address-comparable string.
@@ -242,7 +288,7 @@ function isPrivateIp(ip: string): boolean {
       if (pattern.test(candidate)) return true;
     }
   }
-  return false;
+  return isPrivateIpv6(ip);
 }
 
 function dnsResolve(hostname: string): Promise<string[]> {
@@ -336,10 +382,12 @@ export class IsSafeUrlConstraint implements ValidatorConstraintInterface {
       return false;
     }
 
-    for (const pattern of PRIVATE_IP_RANGES) {
-      if (pattern.test(hostname)) {
-        return false;
-      }
+    // The hostname as written, through the same decision. Two loops over the
+    // same list is how the IPv6 half came to be missing from one of them: the
+    // ranges were text prefixes here and nothing structural anywhere, so
+    // `fc01::1` passed both.
+    if (isPrivateIp(hostname)) {
+      return false;
     }
 
     if (parsed.username || parsed.password) {

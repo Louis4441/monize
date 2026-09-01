@@ -77,6 +77,13 @@ export class PushController {
     return this.subscriptions.subscribe(req.user.id, dto, userAgent ?? null);
   }
 
+  // Restricted for the same shared-account reason as `subscribe`: the demo
+  // account is one account every visitor is signed in to, so a removal here is
+  // a visitor deleting a row somebody else is looking at. Nothing can be
+  // registered in demo mode either, so closing it costs nothing -- and "every
+  // write on this module is closed in demo mode" is a rule with no exception to
+  // remember. `push-route-throttle.spec.ts` scans for it.
+  @DemoRestricted()
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
   @Delete("subscriptions/:id")
   @HttpCode(HttpStatus.NO_CONTENT)

@@ -28,16 +28,25 @@ export interface RotateVapidResult {
 @UseGuards(AuthGuard("jwt"), RolesGuard)
 @Roles("admin")
 @ApiBearerAuth()
-@DemoRestricted()
 export class AdminNotificationsController {
   constructor(private readonly pushConfig: PushConfigService) {}
 
+  /**
+   * Deliberately NOT `@DemoRestricted()`, unlike the two writes below.
+   *
+   * At class level the restriction 403s this read as well, and the nav links to
+   * this page unconditionally: a demo administrator following it got a page that
+   * renders nothing but "we could not check", for a request that has no body,
+   * changes nothing and returns a key fingerprint and two counts. Restricting a
+   * read buys nothing and costs the whole page.
+   */
   @Get("channels")
   @ApiOperation({ summary: "Instance push identity and channel availability" })
   getChannels(): Promise<AdminPushConfig> {
     return this.pushConfig.getAdminConfig();
   }
 
+  @DemoRestricted()
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
   @Patch("channels")
   @ApiOperation({
@@ -59,6 +68,7 @@ export class AdminNotificationsController {
   // on the deployment, and it derives a new key pair through scrypt. Confirmed
   // in the UI with the live device count, and bounded here as well, because a
   // confirmation dialogue is not a rate limit.
+  @DemoRestricted()
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Post("vapid/rotate")
   @ApiOperation({ summary: "Rotate this instance's Web Push key pair" })

@@ -689,6 +689,44 @@ describe("PushSubscriptionService", () => {
     });
   });
 
+  describe("a throttle is not a device's failure", () => {
+    it("writes nothing at all for a throttled attempt", async () => {
+      subscriptionRepo.find.mockResolvedValue([storedDevice()]);
+      sender.send.mockResolvedValue({
+        status: "transient",
+        message: "Too Many Requests",
+        statusCode: 429,
+        throttled: true,
+      });
+
+      const result = await service.sendTest(USER);
+
+      expect(result.devices[0].status).toBe("transient");
+      expect(result.devices[0]).not.toHaveProperty("disabledReason");
+      // Not the failure counter, and not `last_seen_at` either: neither claims
+      // we heard anything about this device.
+      const writes = manager.query.mock.calls.filter(([sql]) =>
+        String(sql).includes("UPDATE push_subscriptions"),
+      );
+      expect(writes).toHaveLength(0);
+    });
+
+    it("still counts an ordinary transient failure", async () => {
+      subscriptionRepo.find.mockResolvedValue([storedDevice()]);
+      sender.send.mockResolvedValue({
+        status: "transient",
+        message: "socket hang up",
+      });
+
+      await service.sendTest(USER);
+
+      const writes = manager.query.mock.calls.filter(([sql]) =>
+        String(sql).includes("failure_count = failure_count + 1"),
+      );
+      expect(writes).toHaveLength(1);
+    });
+  });
+
   describe("the documented worst case for one test send", () => {
     // This number is what an operator sizes a gateway timeout against, so it is
     // composed from the parts rather than written down: it was derived from the

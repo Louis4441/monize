@@ -12,6 +12,7 @@ import {
   IsPushEndpointConstraint,
   MAX_PUSH_ENDPOINT_LENGTH,
 } from "./push-endpoint.validator";
+import { URL_SAFETY_CHECK_TIMEOUT_MS } from "../../ai/validators/safe-url.validator";
 
 class TestDto {
   @IsPushEndpoint()
@@ -94,12 +95,19 @@ describe("IsPushEndpoint", () => {
     dns.resolve4.mockImplementationOnce(() => undefined);
     dns.resolve6.mockImplementationOnce(() => undefined);
 
-    const started = Date.now();
-    await expect(
-      constraint.validate("https://blackhole.attacker.example/wpush"),
-    ).resolves.toBe(false);
-    // Bounded, and generously asserted: the point is that it settles at all.
-    expect(Date.now() - started).toBeLessThan(10_000);
+    jest.useFakeTimers();
+    try {
+      const pending = constraint.validate(
+        "https://blackhole.attacker.example/wpush",
+      );
+      await jest.advanceTimersByTimeAsync(URL_SAFETY_CHECK_TIMEOUT_MS + 1);
+
+      // It settles, and it settles as a refusal: not knowing whether a host is
+      // public is not the same as knowing it is.
+      await expect(pending).resolves.toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("rejects an endpoint longer than the column can hold", async () => {

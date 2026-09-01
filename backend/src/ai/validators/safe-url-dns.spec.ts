@@ -116,9 +116,11 @@ describe("the safety check against a controlled resolver", () => {
     });
 
     it("bounds by default at the documented timeout", () => {
-      // Two seconds: far past a working resolver, far short of a lever. Pinned
-      // because `sendTest`'s documented worst case is composed from it.
-      expect(URL_SAFETY_CHECK_TIMEOUT_MS).toBe(2_000);
+      // Five seconds: a save can wait, and bounding the lookup turned a slow
+      // resolver into a rejection that names the URL rather than the resolver.
+      // The push sender's per-send re-check passes its own tighter bound, since
+      // that one is spent once per device inside a fan-out.
+      expect(URL_SAFETY_CHECK_TIMEOUT_MS).toBe(5_000);
     });
   });
 

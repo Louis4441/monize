@@ -4,10 +4,7 @@ import * as https from "node:https";
 import type { Socket } from "node:net";
 import { PushConfigService, VAPID_SUBJECT } from "./push-config.service";
 import { PushDisabledReason } from "./entities/push-subscription.entity";
-import {
-  URL_SAFETY_CHECK_TIMEOUT_MS,
-  validateUrlIsSafeWithin,
-} from "../ai/validators/safe-url.validator";
+import { validateUrlIsSafeWithin } from "../ai/validators/safe-url.validator";
 
 /**
  * How long the push service should hold a message for a device that is offline.
@@ -60,12 +57,14 @@ export const PUSH_DEADLINE_MESSAGE = "push delivery deadline exceeded";
 /**
  * How long the per-send endpoint re-check may take.
  *
- * The bound itself belongs to the check (`URL_SAFETY_CHECK_TIMEOUT_MS`): an
- * unbounded DNS lookup is a hazard wherever that check runs, and it ran
- * unbounded in `IsPushEndpoint` while this file raced it. Re-exported under the
- * push name because `sendTest`'s documented worst case is composed from it.
+ * Its own number, tighter than the check's own default: this bound is spent
+ * once per device inside a fan-out of up to twenty, so it is part of
+ * `PUSH_TEST_WORST_CASE_MS` -- a figure an operator sizes a gateway timeout
+ * against. The default (`URL_SAFETY_CHECK_TIMEOUT_MS`) is sized for a *save*,
+ * where waiting is cheaper than rejecting a valid host, and inheriting it here
+ * would have grown the request's worst case by half.
  */
-export const PUSH_ENDPOINT_RECHECK_TIMEOUT_MS = URL_SAFETY_CHECK_TIMEOUT_MS;
+export const PUSH_ENDPOINT_RECHECK_TIMEOUT_MS = 2_000;
 
 /**
  * Make an agent's connections observable, so a deadline can close them.
@@ -151,8 +150,16 @@ export type PushSendOutcome =
   | { status: "unconfigured" }
   /** Permanently unusable; `reason` says which repair the user needs. */
   | { status: "expired"; reason: PushDisabledReason; statusCode?: number }
-  /** Might work next time. The caller counts these. */
-  | { status: "transient"; message: string; statusCode?: number };
+  /**
+   * Might work next time. The caller counts these -- unless `throttled`, which
+   * says the failure is about US and not about this device.
+   */
+  | {
+      status: "transient";
+      message: string;
+      statusCode?: number;
+      throttled?: boolean;
+    };
 
 /**
  * The only file in `src/` that *sends*, enforced by `push-secret.guard.spec.ts`.
@@ -337,6 +344,30 @@ export class WebPushSender {
         status: "expired",
         reason: PushDisabledReason.GONE,
         statusCode,
+      };
+    }
+
+    // 429 is the push service throttling this INSTANCE. One deployment holds one
+    // VAPID key pair, so the throttle is per origin and says nothing whatever
+    // about the device -- and counted toward `MAX_CONSECUTIVE_FAILURES` it would
+    // retire every device in the deployment during one outage, telling every
+    // user to enable push again for a fault that was neither theirs nor their
+    // phone's. That is the same "empty every device list over one bad
+    // configuration" the 401/403 reasoning above rejects.
+    //
+    // The cost, stated: a host that answers 429 forever is attempted once per
+    // cycle rather than retired. Bounded by the fan-out cap and the cron
+    // cadence, and a 429 is a claim that a later attempt will be accepted --
+    // which is exactly what a device-specific bound must not be spent on.
+    if (statusCode === 429) {
+      this.logger.warn(
+        "The push service is throttling this instance (429); not counting it against any device",
+      );
+      return {
+        status: "transient",
+        message,
+        statusCode,
+        throttled: true,
       };
     }
 
