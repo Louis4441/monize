@@ -13,8 +13,13 @@ import type { AdminPushConfig } from '@/lib/admin-notifications';
  * be on, off by an administrator's decision, or unavailable because the
  * deployment never configured it. Collapsing the last two into "off" would send
  * an operator to flip a switch that is not the problem.
+ *
+ * `unknown` is that same argument one state further out: while the status has not
+ * arrived -- the first render, or a read that failed -- the answer is not known,
+ * and drawing "Unavailable" there sends an operator to configure something that
+ * may already be configured. The note beside the pill says which read failed.
  */
-export type ChannelState = 'on' | 'off' | 'unconfigured';
+export type ChannelState = 'on' | 'off' | 'unconfigured' | 'unknown';
 
 export interface ChannelRow {
   id: string;
@@ -40,6 +45,9 @@ const STATE_CLASS: Record<ChannelState, string> = {
   off: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
   unconfigured:
     'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  // Neither green nor amber: an unread status is not a verdict either way.
+  unknown:
+    'bg-gray-100 text-gray-500 dark:bg-gray-700/60 dark:text-gray-400',
 };
 
 export function PushChannelsPanel({ channels }: PushChannelsPanelProps) {

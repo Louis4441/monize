@@ -116,7 +116,8 @@
     "channelState": {
       "on": "चालू",
       "off": "बंद",
-      "unconfigured": "अनुपलब्ध"
+      "unconfigured": "अनुपलब्ध",
+      "unknown": "अज्ञात"
     },
     "channels": {
       "inApp": {

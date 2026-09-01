@@ -116,7 +116,8 @@
     "channelState": {
       "on": "Açık",
       "off": "Kapalı",
-      "unconfigured": "Kullanılamıyor"
+      "unconfigured": "Kullanılamıyor",
+      "unknown": "Bilinmiyor"
     },
     "channels": {
       "inApp": {

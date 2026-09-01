@@ -116,7 +116,8 @@
     "channelState": {
       "on": "Увімк.",
       "off": "Вимк.",
-      "unconfigured": "Недоступно"
+      "unconfigured": "Недоступно",
+      "unknown": "Невідомо"
     },
     "channels": {
       "inApp": {

@@ -116,7 +116,8 @@
     "channelState": {
       "on": "Aktif",
       "off": "Nonaktif",
-      "unconfigured": "Tidak tersedia"
+      "unconfigured": "Tidak tersedia",
+      "unknown": "Tidak diketahui"
     },
     "channels": {
       "inApp": {

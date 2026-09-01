@@ -183,6 +183,75 @@ describe('service worker push handling', () => {
     expect(sw.shown[0].options.tag).toBe('PRICE_REFRESH_FAILED');
   });
 
+  // The tag is what decides whether a second notification REPLACES the first,
+  // and the type alone is not the subject: two bills due on the same day are
+  // both BILL_DUE, so grouping by type would have shown the reader one of them
+  // and thrown the other away silently.
+  it('lets two subjects of one type stack instead of replacing each other', async () => {
+    const sw = loadServiceWorker();
+
+    await sw.dispatchPush({
+      type: 'BILL_DUE',
+      title: 'Hydro is due',
+      body: 'b',
+      target: '/scheduled-transactions/1',
+    });
+    await sw.dispatchPush({
+      type: 'BILL_DUE',
+      title: 'Rent is due',
+      body: 'b',
+      target: '/scheduled-transactions/2',
+    });
+
+    expect(sw.shown).toHaveLength(2);
+    expect(sw.shown[0].options.tag).not.toBe(sw.shown[1].options.tag);
+  });
+
+  it('still collapses two pushes about the same subject', async () => {
+    const sw = loadServiceWorker();
+
+    await sw.dispatchPush({
+      type: 'BILL_DUE',
+      title: 'Hydro is due',
+      body: 'b',
+      target: '/scheduled-transactions/1',
+    });
+    await sw.dispatchPush({
+      type: 'BILL_DUE',
+      title: 'Hydro is due tomorrow',
+      body: 'b',
+      target: '/scheduled-transactions/1',
+    });
+
+    expect(sw.shown[0].options.tag).toBe(sw.shown[1].options.tag);
+  });
+
+  // A refused target is not a subject, so it must not become one: otherwise a
+  // push service could mint a fresh bucket per message and stack notifications
+  // without limit, which is the behaviour the tag exists to bound.
+  it('groups a refused target with the type rather than giving it a bucket', async () => {
+    const sw = loadServiceWorker();
+
+    await sw.dispatchPush({
+      type: 'BILL_DUE',
+      title: 'a',
+      body: 'b',
+      target: 'https://evil.test/steal',
+    });
+    await sw.dispatchPush({ type: 'BILL_DUE', title: 'a', body: 'b' });
+
+    expect(sw.shown[0].options.tag).toBe('BILL_DUE');
+    expect(sw.shown[1].options.tag).toBe('BILL_DUE');
+  });
+
+  it('falls back to one bucket when the payload names no type', async () => {
+    const sw = loadServiceWorker();
+
+    await sw.dispatchPush({ title: 'a', body: 'b' });
+
+    expect(sw.shown[0].options.tag).toBe('monize');
+  });
+
   // A push with no readable payload still has to produce a notification: the
   // browser showed the user *something* was delivered, and a silent push is a
   // permission violation in most browsers.

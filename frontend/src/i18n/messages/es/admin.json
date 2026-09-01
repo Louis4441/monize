@@ -116,7 +116,8 @@
     "channelState": {
       "on": "Activo",
       "off": "Inactivo",
-      "unconfigured": "No disponible"
+      "unconfigured": "No disponible",
+      "unknown": "Desconocido"
     },
     "channels": {
       "inApp": {

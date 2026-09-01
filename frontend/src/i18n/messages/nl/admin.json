@@ -116,7 +116,8 @@
     "channelState": {
       "on": "Aan",
       "off": "Uit",
-      "unconfigured": "Niet beschikbaar"
+      "unconfigured": "Niet beschikbaar",
+      "unknown": "Onbekend"
     },
     "channels": {
       "inApp": {

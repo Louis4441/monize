@@ -173,7 +173,18 @@ function AdminNotificationsContent() {
           id: 'email',
           name: t('channels.email.name'),
           description: t('channels.email.description'),
-          state: smtpConfigured ? 'on' : 'unconfigured',
+          // Three states, not two. `null` is "we could not read the status",
+          // and drawing it as "Unavailable" contradicted the note beside it and
+          // sent an operator to configure SMTP that may already be configured.
+          // Three states, not two. `null` is "we could not read the status",
+          // and drawing it as "Unavailable" contradicted the note beside it and
+          // sent an operator to configure SMTP that may already be configured.
+          state:
+            smtpConfigured === null
+              ? 'unknown'
+              : smtpConfigured
+                ? 'on'
+                : 'unconfigured',
           unavailableNote:
             smtpConfigured === null
               ? t('channels.email.statusUnavailable')

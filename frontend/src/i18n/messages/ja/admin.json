@@ -116,7 +116,8 @@
     "channelState": {
       "on": "オン",
       "off": "オフ",
-      "unconfigured": "利用不可"
+      "unconfigured": "利用不可",
+      "unknown": "不明"
     },
     "channels": {
       "inApp": {

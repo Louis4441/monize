@@ -1,5 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import * as webpush from "web-push";
+import * as https from "node:https";
+import type { Socket } from "node:net";
 import { PushConfigService, VAPID_SUBJECT } from "./push-config.service";
 import { PushDisabledReason } from "./entities/push-subscription.entity";
 import { validateUrlIsSafe } from "../ai/validators/safe-url.validator";
@@ -33,6 +35,26 @@ export const MAX_CONSECUTIVE_FAILURES = 10;
 export const PUSH_REQUEST_TIMEOUT_MS = 5_000;
 
 /**
+ * The whole-delivery deadline, which is a different guarantee from the one
+ * above.
+ *
+ * `PUSH_REQUEST_TIMEOUT_MS` becomes Node's socket timeout, and that is an
+ * INACTIVITY timer: a host that sends one byte every four seconds resets it
+ * forever, so it bounds a peer that goes silent and nothing else. This bounds
+ * the delivery itself, and expiring it destroys the socket -- abandoning the
+ * promise alone would leave `web-push` reading into `responseText += chunk`,
+ * which has no cap, from a host the caller chose.
+ *
+ * Generous against the inactivity timeout on purpose: a real push service
+ * answering slowly under load must not be mistaken for a stalling one, and the
+ * cheaper timer already covers silence.
+ */
+export const PUSH_REQUEST_DEADLINE_MS = 15_000;
+
+/** What a delivery that ran out of time reports, so `classify` can see it. */
+export const PUSH_DEADLINE_MESSAGE = "push delivery deadline exceeded";
+
+/**
  * How long the per-send endpoint re-check may take.
  *
  * `validateUrlIsSafe` resolves the host, and `dns.resolve4`/`resolve6` carry no
@@ -42,6 +64,29 @@ export const PUSH_REQUEST_TIMEOUT_MS = 5_000;
  * the endpoint is safe, and an unestablished endpoint is not sent to.
  */
 export const PUSH_ENDPOINT_RECHECK_TIMEOUT_MS = 2_000;
+
+/**
+ * Make an agent's connections observable, so a deadline can close them.
+ *
+ * `createConnection` is the one place a connection becomes visible from outside
+ * the agent, and Node types it as an overload set -- so the wrapper is written
+ * against `unknown[]` and forwards whatever it was given, recording only the
+ * result. Exported because it is the mechanism the deadline depends on, and a
+ * mechanism nothing can test on its own is a mechanism nobody checks.
+ */
+export function collectAgentSockets(agent: https.Agent): Socket[] {
+  const sockets: Socket[] = [];
+  const hooked = agent as unknown as {
+    createConnection: (...args: unknown[]) => Socket;
+  };
+  const connect = hooked.createConnection.bind(agent);
+  hooked.createConnection = (...args: unknown[]): Socket => {
+    const socket = connect(...args);
+    sockets.push(socket);
+    return socket;
+  };
+  return sockets;
+}
 
 /**
  * The minimal shape a delivery needs. Deliberately not the entity: the sender
@@ -134,25 +179,72 @@ export class WebPushSender {
     }
 
     try {
-      await webpush.sendNotification(
-        {
-          endpoint: target.endpoint,
-          keys: { p256dh: target.p256dh, auth: target.auth },
-        },
-        JSON.stringify(payload),
-        {
-          vapidDetails: {
-            subject: VAPID_SUBJECT,
-            publicKey: identity.publicKey,
-            privateKey: identity.privateKey,
-          },
-          TTL: PUSH_TTL_SECONDS,
-          timeout: PUSH_REQUEST_TIMEOUT_MS,
-        },
-      );
+      await this.deliverWithDeadline(target, payload, identity);
       return { status: "sent" };
     } catch (error) {
       return this.classify(error);
+    }
+  }
+
+  /**
+   * One delivery, under a deadline this service owns.
+   *
+   * `web-push`'s `timeout` option becomes Node's socket timeout, which is an
+   * INACTIVITY timer: an endpoint that trickles one byte every four seconds
+   * never trips a five-second one, so the option is not an upper bound on
+   * anything. And the endpoint is a host the CALLER registered -- `IsPushEndpoint`
+   * proves it is https and public, not that it is a push service -- so a slow
+   * peer is reachable on purpose: `POST /push/test` would hold its request open
+   * for as long as that host cared to, while `web-push` grew `responseText +=
+   * chunk` with no cap on it.
+   *
+   * So the deadline is a race, and losing it DESTROYS THE SOCKET rather than
+   * merely abandoning the promise -- an orphaned request keeps reading, which is
+   * the half that costs memory. The socket is reachable because the agent is
+   * ours: `web-push` forwards `options.agent` to `https.request`, and
+   * `createConnection` is where a connection becomes visible.
+   *
+   * The inactivity timeout stays as well. It is the cheaper answer for a host
+   * that stops answering entirely, and it costs nothing to keep.
+   */
+  private async deliverWithDeadline(
+    target: PushTarget,
+    payload: PushPayload,
+    identity: { publicKey: string; privateKey: string },
+  ): Promise<void> {
+    const agent = new https.Agent({ keepAlive: false });
+    const sockets = collectAgentSockets(agent);
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        webpush.sendNotification(
+          {
+            endpoint: target.endpoint,
+            keys: { p256dh: target.p256dh, auth: target.auth },
+          },
+          JSON.stringify(payload),
+          {
+            vapidDetails: {
+              subject: VAPID_SUBJECT,
+              publicKey: identity.publicKey,
+              privateKey: identity.privateKey,
+            },
+            TTL: PUSH_TTL_SECONDS,
+            timeout: PUSH_REQUEST_TIMEOUT_MS,
+            agent,
+          },
+        ),
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => {
+            for (const socket of sockets) socket.destroy();
+            reject(new Error(PUSH_DEADLINE_MESSAGE));
+          }, PUSH_REQUEST_DEADLINE_MS);
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+      agent.destroy();
     }
   }
 

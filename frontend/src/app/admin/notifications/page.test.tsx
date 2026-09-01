@@ -129,6 +129,42 @@ describe('AdminNotificationsPage', () => {
     expect(screen.getByText('ntfy and UnifiedPush')).toBeInTheDocument();
   });
 
+  describe('the email channel state', () => {
+    /**
+     * Three states, and the pill used to draw two. `null` is "the status could
+     * not be read", and rendering it as "Unavailable" contradicted the note
+     * printed right beside it -- so the page asserted SMTP was not configured
+     * while also saying it did not know.
+     */
+    it.each([
+      [{ configured: true }, 'On'],
+      [{ configured: false }, 'Unavailable'],
+    ])('reads %o as %s', async (status, label) => {
+      mockGetSmtpStatus.mockResolvedValue(status);
+
+      render(<AdminNotificationsPage />);
+
+      await waitFor(() => expect(screen.getByText('Email')).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getAllByText(label).length).toBeGreaterThan(0),
+      );
+      expect(screen.queryByText('Unknown')).not.toBeInTheDocument();
+    });
+
+    it('says it does not know when the status cannot be read', async () => {
+      mockGetSmtpStatus.mockRejectedValue(new Error('down'));
+
+      render(<AdminNotificationsPage />);
+
+      await waitFor(() => expect(screen.getByText('Unknown')).toBeInTheDocument());
+      // And not the verdict it does not have: "Unavailable" belongs to a read
+      // that came back saying SMTP is not configured.
+      expect(
+        screen.queryByText('Email is not configured on this deployment.'),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   it('shows the key fingerprint and device counts, never a private key', async () => {
     render(<AdminNotificationsPage />);
 

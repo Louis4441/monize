@@ -116,7 +116,8 @@
     "channelState": {
       "on": "已开启",
       "off": "已关闭",
-      "unconfigured": "不可用"
+      "unconfigured": "不可用",
+      "unknown": "未知"
     },
     "channels": {
       "inApp": {

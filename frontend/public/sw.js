@@ -143,6 +143,20 @@ function safeNotificationPath(value) {
   return resolved.pathname + resolved.search + resolved.hash;
 }
 
+/**
+ * The key two notifications must share to replace each other.
+ *
+ * `safeNotificationPath` answers `/` both for a payload with no target and for
+ * one whose target was refused, and both belong in the same bucket: neither
+ * names a subject, so grouping those by type is what is wanted -- and it also
+ * means a hostile target cannot mint a fresh bucket per push.
+ */
+function collapseTag(payload) {
+  var type = pushText(payload.type, 'monize');
+  var target = safeNotificationPath(payload.target);
+  return target === '/' ? type : type + '|' + target;
+}
+
 function readPushPayload(event) {
   if (!event.data) return {};
   try {
@@ -170,9 +184,14 @@ self.addEventListener('push', function (event) {
         body: pushText(payload.body, PUSH_FALLBACK_BODY),
         icon: PUSH_ICON,
         badge: PUSH_BADGE,
-        // Collapse repeats of one subject onto one notification rather than
-        // stacking four of them; the type is what the server groups by.
-        tag: pushText(payload.type, 'monize'),
+        // Collapse repeats of ONE subject onto one notification rather than
+        // stacking four of them -- and let two different subjects stack, which
+        // the type alone could not do: two bills due on the same day are both
+        // BILL_DUE, so grouping by type would have shown the reader one of them
+        // and silently replaced the other. The target is what names the subject,
+        // and a notice with nowhere to go (a system alert) collapses by type,
+        // which is right: one "email is failing", not four.
+        tag: collapseTag(payload),
         data: { target: target },
       }
     )
