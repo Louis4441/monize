@@ -109,7 +109,7 @@ export class BackupRestoreDatabaseService {
     await manager.query("DELETE FROM securities WHERE user_id = $1", [userId]);
 
     // Budget data
-    await manager.query("DELETE FROM budget_alerts WHERE user_id = $1", [
+    await manager.query("DELETE FROM notifications WHERE user_id = $1", [
       userId,
     ]);
     await manager.query(

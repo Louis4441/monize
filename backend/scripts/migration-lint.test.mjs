@@ -16,6 +16,7 @@ import {
   isBlockGuarded,
   normalizeIdentifier,
   collectPragmas,
+  collectDrops,
   lintSql,
   lintDirectory,
   NON_RERUNNABLE_DATA_MIGRATIONS,
@@ -51,9 +52,38 @@ test("stripComments removes block comments and leaves double dashes inside liter
   assert.ok(literal.includes("-- not a comment"));
 });
 
-test("stripComments leaves dollar-quoted bodies untouched", () => {
+test("stripComments reaches inside a dollar-quoted body", () => {
+  // The body is plpgsql, and splitStatements turns it into statements the rules
+  // read -- so a comment left in it is scanned as code.
   const sql = "DO $$ BEGIN -- inner\n RAISE NOTICE 'x'; END $$;";
-  assert.ok(stripComments(sql).includes("-- inner"));
+  const stripped = stripComments(sql);
+  assert.ok(!stripped.includes("inner"));
+  // Byte offsets survive, so a finding still names the right line.
+  assert.equal(stripped.length, sql.length);
+  assert.equal(stripped.split("\n").length, sql.split("\n").length);
+  // The code around it is untouched.
+  assert.ok(stripped.includes("RAISE NOTICE 'x'"));
+});
+
+test("a comment inside a block cannot open a string or fake a statement", () => {
+  // Both halves of this happened in one comment. An apostrophe in prose opened
+  // a literal that swallowed every statement separator after it, so the DROP
+  // stopped preceding the CREATE it guards; and the words naming the rule were
+  // matched as the statement the rule looks for.
+  const sql = [
+    "DO $$",
+    "BEGIN",
+    "    -- the loop's other failure -- CREATE POLICY validating user_id",
+    "    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', t, t);",
+    "    EXECUTE format('CREATE POLICY %I ON %I USING (true)', t, t);",
+    "END $$;",
+  ].join("\n");
+  const stripped = stripComments(sql);
+  assert.ok(!stripped.includes("validating"));
+  const statements = splitStatements(stripped);
+  const create = statements.findIndex((st) => /CREATE\s+POLICY/i.test(st.text));
+  assert.ok(create > 0);
+  assert.ok(collectDrops(statements, create).has("policy:%i"));
 });
 
 test("splitStatements separates top-level statements and reports offsets", () => {

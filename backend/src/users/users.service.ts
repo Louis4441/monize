@@ -681,10 +681,10 @@ export class UsersService {
 
     // Budget data
     result = await manager.query(
-      `DELETE FROM budget_alerts WHERE user_id = $1`,
+      `DELETE FROM notifications WHERE user_id = $1`,
       [userId],
     );
-    deleted.budgetAlerts = result[1] ?? 0;
+    deleted.notifications = result[1] ?? 0;
 
     result = await manager.query(
       `DELETE FROM budget_period_categories WHERE budget_period_id IN

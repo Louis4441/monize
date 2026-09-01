@@ -1646,8 +1646,22 @@ CREATE TABLE budget_period_categories (
 CREATE INDEX idx_bpc_period ON budget_period_categories(budget_period_id);
 CREATE INDEX idx_bpc_category ON budget_period_categories(category_id);
 
--- Budget Alerts - persistent alert records
-CREATE TABLE budget_alerts (
+-- Every durable notification, whatever produced it (migration 172, renamed from
+-- budget_alerts). The table stopped being about budgets some time ago:
+-- BACKUP_FAILED, SMTP_FAILURE, PROVIDER_OUTAGE and SCHEDULED_POST_FAILED live
+-- here with budget_id NULL, and this is what the bell in the header reads. One
+-- durable row, one read model, one creation door (NotificationService).
+--
+-- `severity` is the priority axis discussion #1291 asked for -- it has carried
+-- that meaning since the first budget alert -- so there is no second column for
+-- it. Localization is the stored English fallback plus the facts in `data`,
+-- rendered in the reader's language by the client (or, for copy composed on the
+-- server, through emailTranslator); there are no message-key columns for a
+-- second mechanism to drift against. There is no `category` column either: what
+-- a notification is *about* is a pure function of alert_type, so it is derived
+-- by `notificationCategoryOf` rather than stored beside the value it is derived
+-- from. Migration 172 has the full reasoning for all four.
+CREATE TABLE notifications (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     budget_id UUID REFERENCES budgets(id) ON DELETE CASCADE,
@@ -1657,6 +1671,10 @@ CREATE TABLE budget_alerts (
     title VARCHAR(255) NOT NULL,
     message TEXT NOT NULL,
     data JSONB DEFAULT '{}',
+    -- The in-app path this points at, e.g. '/budgets/<id>'. Always a same-origin
+    -- path, never a URL: the service worker resolves it against the app's own
+    -- origin and discards anything that leaves it.
+    target VARCHAR(255),
     is_read BOOLEAN DEFAULT false,
     is_email_sent BOOLEAN DEFAULT false,
     period_start DATE NOT NULL,
@@ -1665,9 +1683,9 @@ CREATE TABLE budget_alerts (
     dedupe_key VARCHAR(120)
 );
 
-CREATE INDEX idx_budget_alerts_user ON budget_alerts(user_id);
-CREATE INDEX idx_budget_alerts_user_unread ON budget_alerts(user_id, is_read) WHERE is_read = false;
-CREATE INDEX idx_budget_alerts_budget_period ON budget_alerts(budget_id, period_start);
+CREATE INDEX idx_notifications_user ON notifications(user_id);
+CREATE INDEX idx_notifications_user_unread ON notifications(user_id, is_read) WHERE is_read = false;
+CREATE INDEX idx_notifications_budget_period ON notifications(budget_id, period_start);
 
 -- The app's own de-duplication rule as a database key (migration 140).
 -- deduplicateAlerts() drops a candidate matching an existing (alert_type,
@@ -1678,8 +1696,8 @@ CREATE INDEX idx_budget_alerts_budget_period ON budget_alerts(budget_id, period_
 --
 -- Duplicates predating the key are collapsed by the migration's preflight before
 -- it is created, keeping whichever row the user acted on.
-CREATE UNIQUE INDEX idx_budget_alerts_fingerprint
-    ON budget_alerts(
+CREATE UNIQUE INDEX idx_notifications_fingerprint
+    ON notifications(
         budget_id,
         period_start,
         alert_type,
@@ -1694,8 +1712,8 @@ CREATE UNIQUE INDEX idx_budget_alerts_fingerprint
 -- index makes INSERT ... ON CONFLICT DO NOTHING RETURNING id the cross-replica
 -- arbiter for both the row and its admin email (only the insert winner sends).
 -- Budget-generated alerts keep dedupe_key NULL.
-CREATE UNIQUE INDEX idx_budget_alerts_dedupe
-    ON budget_alerts(user_id, dedupe_key)
+CREATE UNIQUE INDEX idx_notifications_dedupe
+    ON notifications(user_id, dedupe_key)
     WHERE dedupe_key IS NOT NULL;
 
 -- Triggers for budget tables updated_at
@@ -2288,7 +2306,6 @@ DECLARE
         'ai_provider_configs',
         'ai_usage_logs',
         'auto_backup_settings',
-        'budget_alerts',
         'budgets',
         'custom_reports',
         'gem_strategies',
@@ -2305,6 +2322,7 @@ DECLARE
         'loan_rate_changes',
         'loan_scenarios',
         'monte_carlo_scenarios',
+        'notifications',
         'payee_aliases',
         'push_subscriptions',
         'scheduled_transactions',

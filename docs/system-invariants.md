@@ -2383,8 +2383,8 @@ Statement           A system-level alert (BACKUP_FAILED, ENCRYPTION_KEY_MISSING,
                     however many replicas raise it, and its admin email is sent
                     only by whichever replica's INSERT actually created the row.
                     SMTP_FAILURE never emails at all.
-Source of truth     budget_alerts.dedupe_key under the partial unique index
-                    idx_budget_alerts_dedupe (user_id, dedupe_key) WHERE
+Source of truth     notifications.dedupe_key under the partial unique index
+                    idx_notifications_dedupe (user_id, dedupe_key) WHERE
                     dedupe_key IS NOT NULL (migration 170). The fingerprint
                     index from migration 140 cannot arbitrate these rows: it
                     keys on budget_id, NULL for every system alert, and NULL

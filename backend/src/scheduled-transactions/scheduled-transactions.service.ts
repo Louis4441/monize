@@ -61,9 +61,9 @@ import { getUsersByEffectiveTimezone } from "../common/users-by-timezone.util";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
 import { SystemAlertService } from "../system-alerts/system-alert.service";
 import {
-  AlertSeverity,
-  AlertType,
-} from "../budgets/entities/budget-alert.entity";
+  NotificationSeverity,
+  NotificationType,
+} from "../notification-center/entities/notification.entity";
 import { lockAccountsForBalanceWrite } from "../common/db/locks";
 import { withScopedDb } from "../common/db/scoped-db";
 import { affectedRowCount } from "../common/db/query-result";
@@ -577,8 +577,8 @@ export class ScheduledTransactionsService {
             // throws and seeds its own user context, so the loop's isolation
             // holds.
             await this.systemAlerts.raiseUserAlert(scheduled.userId, {
-              type: AlertType.SCHEDULED_POST_FAILED,
-              severity: AlertSeverity.WARNING,
+              type: NotificationType.SCHEDULED_POST_FAILED,
+              severity: NotificationSeverity.WARNING,
               title: `${scheduled.name} could not be posted`,
               message:
                 `Your scheduled transaction "${scheduled.name}" due ` +

@@ -4,7 +4,7 @@ import { Budget } from "./entities/budget.entity";
 import { BudgetCategory } from "./entities/budget-category.entity";
 import { BudgetPeriod } from "./entities/budget-period.entity";
 import { BudgetPeriodCategory } from "./entities/budget-period-category.entity";
-import { BudgetAlert } from "./entities/budget-alert.entity";
+import { Notification } from "../notification-center/entities/notification.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
 import { Category } from "../categories/entities/category.entity";
@@ -35,7 +35,7 @@ import { CurrenciesModule } from "../currencies/currencies.module";
       BudgetCategory,
       BudgetPeriod,
       BudgetPeriodCategory,
-      BudgetAlert,
+      Notification,
       Transaction,
       TransactionSplit,
       Category,

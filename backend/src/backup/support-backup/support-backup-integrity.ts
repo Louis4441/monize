@@ -252,7 +252,7 @@ const REFS: Record<string, RefRule[]> = {
     },
     { column: "category_id", refTable: "categories", onMissing: "null" },
   ],
-  budget_alerts: [
+  notifications: [
     { column: "budget_id", refTable: "budgets", onMissing: "null" },
     {
       column: "budget_category_id",

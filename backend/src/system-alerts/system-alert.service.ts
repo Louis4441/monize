@@ -5,9 +5,9 @@ import { withScopedDb } from "../common/db/scoped-db";
 import { returnedRows } from "../common/db/query-result";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
 import {
-  AlertSeverity,
-  AlertType,
-} from "../budgets/entities/budget-alert.entity";
+  NotificationSeverity,
+  NotificationType,
+} from "../notification-center/entities/notification.entity";
 import { EmailService } from "../notifications/email.service";
 import { systemAlertTemplate } from "../notifications/email-templates";
 import { emailTranslator } from "../i18n/email-translator";
@@ -22,15 +22,15 @@ import {
   JobClaimType,
 } from "../common/jobs/job-claim.service";
 
-/** Matches budget_alerts.dedupe_key VARCHAR(120). */
+/** Matches notifications.dedupe_key VARCHAR(120). */
 export const DEDUPE_KEY_MAX_LENGTH = 120;
 
-/** Matches budget_alerts.title VARCHAR(255). */
+/** Matches notifications.title VARCHAR(255). */
 export const TITLE_MAX_LENGTH = 255;
 
 export interface SystemAlertInput {
-  type: AlertType;
-  severity: AlertSeverity;
+  type: NotificationType;
+  severity: NotificationSeverity;
   /** Stored English fallback; the client composes localized copy from `data`. */
   title: string;
   /** Stored English fallback; the client composes localized copy from `data`. */
@@ -39,7 +39,7 @@ export interface SystemAlertInput {
    *  value that goes stale while the row lives. */
   data: Record<string, unknown>;
   /**
-   * Explicit fingerprint, unique per recipient via `idx_budget_alerts_dedupe`
+   * Explicit fingerprint, unique per recipient via `idx_notifications_dedupe`
    * -- the cross-replica arbiter for both the row and its email. At most
    * `DEDUPE_KEY_MAX_LENGTH` characters.
    */
@@ -66,10 +66,10 @@ export interface SystemAlertInput {
 /**
  * Raises system-level issues (a failed backup, a missing encryption key, a
  * provider outage) as rows in the existing alerts interface -- the
- * `budget_alerts` table behind the bell dropdown -- and, for admin alerts that
+ * `notifications` table behind the bell dropdown -- and, for admin alerts that
  * warrant it, as an email to the administrators.
  *
- * **Fan-out**: `budget_alerts` is RLS-keyed on `user_id`, so a deployment-wide
+ * **Fan-out**: `notifications` is RLS-keyed on `user_id`, so a deployment-wide
  * fact is materialized as one row per administrator, each independently
  * readable and dismissible. The recipient predicate is
  * `queryAdminRecipients` (`users/admin-recipients.util.ts`), shared with
@@ -77,7 +77,7 @@ export interface SystemAlertInput {
  *
  * **At-most-once**: every replica runs every cron, so each insert carries a
  * `dedupe_key` and lands as `INSERT ... ON CONFLICT DO NOTHING RETURNING id`
- * against the partial unique index `idx_budget_alerts_dedupe`
+ * against the partial unique index `idx_notifications_dedupe`
  * (migration 170). Only the insert winner's rows email -- the same trade as
  * `ProviderOutageAlertService`: a process killed between the insert
  * committing and SMTP accepting loses that email, the in-app row survives,
@@ -208,7 +208,7 @@ export class SystemAlertService {
     const rows = returnedRows<{ id: string }>(
       await withScopedDb(this.dataSource, (manager) =>
         manager.query(
-          `INSERT INTO budget_alerts
+          `INSERT INTO notifications
              (user_id, alert_type, severity, title, message, data,
               period_start, dedupe_key)
            VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
@@ -234,7 +234,7 @@ export class SystemAlertService {
   private async markEmailSent(alertId: string): Promise<void> {
     await withScopedDb(this.dataSource, (manager) =>
       manager.query(
-        `UPDATE budget_alerts SET is_email_sent = true WHERE id = $1`,
+        `UPDATE notifications SET is_email_sent = true WHERE id = $1`,
         [alertId],
       ),
     );
@@ -323,11 +323,11 @@ export class SystemAlertService {
    * raised from.
    */
   private shouldEmail(input: SystemAlertInput): boolean {
-    if (input.type === AlertType.SMTP_FAILURE) return false;
+    if (input.type === NotificationType.SMTP_FAILURE) return false;
     if (input.email !== undefined) return input.email;
     return (
-      input.severity === AlertSeverity.CRITICAL ||
-      input.severity === AlertSeverity.WARNING
+      input.severity === NotificationSeverity.CRITICAL ||
+      input.severity === NotificationSeverity.WARNING
     );
   }
 
@@ -347,7 +347,7 @@ export class SystemAlertService {
   }
 
   /** Say once that there is nobody to tell, not once per sweep. */
-  private reportNoAdmins(type: AlertType): void {
+  private reportNoAdmins(type: NotificationType): void {
     if (this.noAdminsReported) return;
     this.noAdminsReported = true;
     this.logger.warn(

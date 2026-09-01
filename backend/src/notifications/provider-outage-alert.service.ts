@@ -12,9 +12,9 @@ import {
 } from "../i18n/email-translator";
 import { SystemAlertService } from "../system-alerts/system-alert.service";
 import {
-  AlertSeverity,
-  AlertType,
-} from "../budgets/entities/budget-alert.entity";
+  NotificationSeverity,
+  NotificationType,
+} from "../notification-center/entities/notification.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import {
   AdminRecipient,
@@ -261,8 +261,8 @@ export class ProviderOutageAlertService {
     // already carries this episode -- and the dedupe key names the episode so
     // a re-notification after the quiet period lands as a fresh row.
     await this.systemAlerts.raiseAdminAlert({
-      type: AlertType.PROVIDER_OUTAGE,
-      severity: AlertSeverity.WARNING,
+      type: NotificationType.PROVIDER_OUTAGE,
+      severity: NotificationSeverity.WARNING,
       title: `${label} is not responding`,
       message:
         `The market data provider ${label} has been unreachable since ` +
@@ -362,8 +362,8 @@ export class ProviderOutageAlertService {
     // episode identity (its start) so the pair shares a suffix; `restoredAt`
     // is the fallback for a row whose start the upsert lost.
     await this.systemAlerts.raiseAdminAlert({
-      type: AlertType.PROVIDER_RECOVERED,
-      severity: AlertSeverity.SUCCESS,
+      type: NotificationType.PROVIDER_RECOVERED,
+      severity: NotificationSeverity.SUCCESS,
       title: `${label} is answering again`,
       message:
         `The market data provider ${label} answered again at ` +

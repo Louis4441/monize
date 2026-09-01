@@ -5,9 +5,9 @@ import {
   SystemAlertInput,
 } from "./system-alert.service";
 import {
-  AlertSeverity,
-  AlertType,
-} from "../budgets/entities/budget-alert.entity";
+  NotificationSeverity,
+  NotificationType,
+} from "../notification-center/entities/notification.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import {
   createScopedDbMocks,
@@ -37,8 +37,8 @@ function adminRow(overrides: Record<string, unknown> = {}) {
 
 function input(overrides: Partial<SystemAlertInput> = {}): SystemAlertInput {
   return {
-    type: AlertType.BACKUP_FAILED,
-    severity: AlertSeverity.CRITICAL,
+    type: NotificationType.BACKUP_FAILED,
+    severity: NotificationSeverity.CRITICAL,
     title: "Automatic backup failed",
     message: "The automatic backup for x failed: boom",
     data: { system: true },
@@ -71,7 +71,7 @@ describe("SystemAlertService", () => {
         if (data.adminQueryError) return Promise.reject(data.adminQueryError);
         return Promise.resolve(data.admins ?? [adminRow()]);
       }
-      if (text.includes("INSERT INTO budget_alerts")) {
+      if (text.includes("INSERT INTO notifications")) {
         // The pg driver returns bare rows for INSERT (never the
         // [rows, rowCount] tuple) -- see common/db/query-result.ts.
         return Promise.resolve(
@@ -90,7 +90,7 @@ describe("SystemAlertService", () => {
 
   const insertStatements = () =>
     manager.query.mock.calls.filter(([sql]) =>
-      String(sql).includes("INSERT INTO budget_alerts"),
+      String(sql).includes("INSERT INTO notifications"),
     );
 
   const emailSentUpdates = () =>
@@ -208,10 +208,10 @@ describe("SystemAlertService", () => {
   describe("email gating", () => {
     it("defaults to email for critical and warning, none for info and success", async () => {
       for (const [severity, expected] of [
-        [AlertSeverity.CRITICAL, 1],
-        [AlertSeverity.WARNING, 1],
-        [AlertSeverity.INFO, 0],
-        [AlertSeverity.SUCCESS, 0],
+        [NotificationSeverity.CRITICAL, 1],
+        [NotificationSeverity.WARNING, 1],
+        [NotificationSeverity.INFO, 0],
+        [NotificationSeverity.SUCCESS, 0],
       ] as const) {
         emailService.sendMail.mockClear();
         route({});
@@ -232,8 +232,8 @@ describe("SystemAlertService", () => {
       route({});
       await service.raiseAdminAlert(
         input({
-          type: AlertType.SMTP_FAILURE,
-          severity: AlertSeverity.CRITICAL,
+          type: NotificationType.SMTP_FAILURE,
+          severity: NotificationSeverity.CRITICAL,
           email: true,
           dedupeKey: "SMTP_FAILURE:2026-08-30",
         }),
@@ -254,8 +254,8 @@ describe("SystemAlertService", () => {
     it("writes one row for the affected user and sends no email", async () => {
       route({});
       const result = await service.raiseUserAlert("user-9", {
-        type: AlertType.SCHEDULED_POST_FAILED,
-        severity: AlertSeverity.WARNING,
+        type: NotificationType.SCHEDULED_POST_FAILED,
+        severity: NotificationSeverity.WARNING,
         title: "Rent could not be posted",
         message: "It failed",
         data: { system: true, scheduledId: "st-1" },
@@ -271,8 +271,8 @@ describe("SystemAlertService", () => {
     it("reports created: false for the dedupe loser", async () => {
       route({ insertResults: [[]] });
       const result = await service.raiseUserAlert("user-9", {
-        type: AlertType.SCHEDULED_POST_FAILED,
-        severity: AlertSeverity.WARNING,
+        type: NotificationType.SCHEDULED_POST_FAILED,
+        severity: NotificationSeverity.WARNING,
         title: "t",
         message: "m",
         data: {},
@@ -306,8 +306,8 @@ describe("SystemAlertService", () => {
       try {
         await expect(
           service.raiseUserAlert("user-9", {
-            type: AlertType.SCHEDULED_POST_FAILED,
-            severity: AlertSeverity.WARNING,
+            type: NotificationType.SCHEDULED_POST_FAILED,
+            severity: NotificationSeverity.WARNING,
             title: "t",
             message: "m",
             data: {},
@@ -321,11 +321,11 @@ describe("SystemAlertService", () => {
   });
 
   describe("bounds", () => {
-    it("every AlertType member fits the alert_type VARCHAR(30) column", () => {
+    it("every NotificationType member fits the alert_type VARCHAR(30) column", () => {
       // A longer member would not fail loudly: PostgreSQL raises 22001 at
       // insert time, which the never-throws contract would swallow, so the
       // alert would silently never exist. Guard the enum instead.
-      for (const member of Object.values(AlertType)) {
+      for (const member of Object.values(NotificationType)) {
         expect(member.length).toBeLessThanOrEqual(30);
       }
     });

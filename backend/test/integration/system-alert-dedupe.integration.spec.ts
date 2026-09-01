@@ -5,9 +5,9 @@ import { DataSource } from "typeorm";
 import { SystemAlertService } from "@/system-alerts/system-alert.service";
 import { JobClaimService } from "@/common/jobs/job-claim.service";
 import {
-  AlertSeverity,
-  AlertType,
-} from "@/budgets/entities/budget-alert.entity";
+  NotificationSeverity,
+  NotificationType,
+} from "@/notification-center/entities/notification.entity";
 
 import {
   INTEGRATION_TYPEORM_OPTIONS,
@@ -68,8 +68,8 @@ describe("system alert dedupe against a real database", () => {
     );
 
   const input = (dedupeKey: string) => ({
-    type: AlertType.BACKUP_FAILED,
-    severity: AlertSeverity.CRITICAL,
+    type: NotificationType.BACKUP_FAILED,
+    severity: NotificationSeverity.CRITICAL,
     title: "Automatic backup failed",
     message: "The automatic backup for u failed: disk full",
     data: { system: true, affectedUserId: "u" },
@@ -81,7 +81,7 @@ describe("system alert dedupe against a real database", () => {
   > =>
     dataSource.query(
       `SELECT user_id, dedupe_key, is_email_sent
-         FROM budget_alerts ORDER BY user_id`,
+         FROM notifications ORDER BY user_id`,
     );
 
   beforeAll(async () => {
@@ -106,7 +106,7 @@ describe("system alert dedupe against a real database", () => {
 
   beforeEach(async () => {
     emailsSent.length = 0;
-    await cleanTables(dataSource, ["budget_alerts", "job_claims", "users"]);
+    await cleanTables(dataSource, ["notifications", "job_claims", "users"]);
   });
 
   it("concurrent same-key raises land one row per admin, and each admin is emailed once", async () => {
@@ -176,8 +176,8 @@ describe("system alert dedupe against a real database", () => {
     });
 
     const perUser = {
-      type: AlertType.SCHEDULED_POST_FAILED,
-      severity: AlertSeverity.WARNING,
+      type: NotificationType.SCHEDULED_POST_FAILED,
+      severity: NotificationSeverity.WARNING,
       title: "Rent could not be posted",
       message: "It failed",
       data: { system: true },

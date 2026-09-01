@@ -17,7 +17,7 @@ by construction, any report that SMTP itself was broken.
 ## What now happens
 
 System-level issues are raised as rows in the existing alerts interface --
-the `budget_alerts` table behind the bell dropdown -- by
+the `notifications` table behind the bell dropdown -- by
 `backend/src/system-alerts/system-alert.service.ts`, and the admin-facing
 ones also email the administrators. `SystemAlertMonitorService` beside it
 owns the two conditions nothing else watches -- the encryption key and SMTP
@@ -26,7 +26,7 @@ health -- on one 15-minute sweep.
 ### Audience
 
 An issue only an administrator can act on goes **only to administrators**:
-one row per active admin (RLS keys `budget_alerts` on `user_id`, so a
+one row per active admin (RLS keys `notifications` on `user_id`, so a
 deployment-wide fact is materialized per recipient, each independently
 readable and dismissible). The recipient predicate is written once, in
 `queryAdminRecipients` (`backend/src/users/admin-recipients.util.ts`):
@@ -78,7 +78,7 @@ Every replica runs every cron, so both effects need a cross-replica arbiter
 (INV-ALERT-001 in `docs/system-invariants.md`):
 
 - **The row** is claimed by the partial unique index
-  `idx_budget_alerts_dedupe` on `(user_id, dedupe_key) WHERE dedupe_key IS
+  `idx_notifications_dedupe` on `(user_id, dedupe_key) WHERE dedupe_key IS
   NOT NULL` (migration 170), written as `INSERT ... ON CONFLICT DO NOTHING
   RETURNING id`. The fingerprint index from migration 140 cannot arbitrate
   these rows: it keys on `budget_id`, which is NULL for every system alert,

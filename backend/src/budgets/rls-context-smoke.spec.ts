@@ -1,7 +1,7 @@
 import { BudgetAlertService } from "./budget-alert.service";
 import { BudgetPeriodCronService } from "./budget-period-cron.service";
 import { Budget } from "./entities/budget.entity";
-import { BudgetAlert } from "./entities/budget-alert.entity";
+import { Notification } from "../notification-center/entities/notification.entity";
 import { BudgetPeriod } from "./entities/budget-period.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
@@ -52,7 +52,7 @@ describe("budgets module RLS context smoke (real withScopedDb)", () => {
     };
     const { dataSource } = createScopedDbMocks([
       [Budget, budgetsRepo],
-      [BudgetAlert, { find: jest.fn().mockResolvedValue([]) }],
+      [Notification, { find: jest.fn().mockResolvedValue([]) }],
       [Transaction, { createQueryBuilder: jest.fn() }],
       [TransactionSplit, { createQueryBuilder: jest.fn() }],
       [ScheduledTransaction, { createQueryBuilder: jest.fn() }],

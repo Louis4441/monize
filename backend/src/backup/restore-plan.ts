@@ -147,7 +147,7 @@ export const RESTORE_PLAN: ReadonlyArray<RestoreStep> = [
     countKey: "budgetPeriodCategories",
     scopeToUser: false,
   },
-  { table: "budget_alerts", countKey: "budgetAlerts", scopeToUser: true },
+  { table: "notifications", countKey: "notifications", scopeToUser: true },
   { table: "custom_reports", countKey: "customReports", scopeToUser: true },
   {
     table: "investment_reports",

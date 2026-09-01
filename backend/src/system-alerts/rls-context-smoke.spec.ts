@@ -1,8 +1,8 @@
 import { SystemAlertService } from "./system-alert.service";
 import {
-  AlertSeverity,
-  AlertType,
-} from "../budgets/entities/budget-alert.entity";
+  NotificationSeverity,
+  NotificationType,
+} from "../notification-center/entities/notification.entity";
 import { getRequestContext, RequestContext } from "../common/request-context";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
@@ -55,7 +55,7 @@ describe("System alerts RLS identity smoke (real withScopedDb)", () => {
           },
         ];
       }
-      if (text.includes("INSERT INTO budget_alerts")) {
+      if (text.includes("INSERT INTO notifications")) {
         seen.push({ op: "insert", ctx: getRequestContext() });
         return [{ id: "row-1" }];
       }
@@ -90,8 +90,8 @@ describe("System alerts RLS identity smoke (real withScopedDb)", () => {
     // Deliberately no ambient context around the call -- the cron catch that
     // raises a backup alert has none, and the service must not depend on one.
     const result = await service.raiseAdminAlert({
-      type: AlertType.BACKUP_FAILED,
-      severity: AlertSeverity.CRITICAL,
+      type: NotificationType.BACKUP_FAILED,
+      severity: NotificationSeverity.CRITICAL,
       title: "t",
       message: "m",
       data: { system: true },
@@ -109,8 +109,8 @@ describe("System alerts RLS identity smoke (real withScopedDb)", () => {
 
   it("raiseUserAlert seeds the affected user's own identity, not a bypass", async () => {
     const result = await service.raiseUserAlert(USER_ID, {
-      type: AlertType.SCHEDULED_POST_FAILED,
-      severity: AlertSeverity.WARNING,
+      type: NotificationType.SCHEDULED_POST_FAILED,
+      severity: NotificationSeverity.WARNING,
       title: "t",
       message: "m",
       data: { system: true },

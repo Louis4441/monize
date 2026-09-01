@@ -6,7 +6,7 @@ import { NotificationsModule } from "../notifications/notifications.module";
 
 /**
  * System-level issues raised through the existing alerts interface (the
- * `budget_alerts` bell), fanned out to administrators -- see
+ * `notifications` bell), fanned out to administrators -- see
  * `docs/specs/system-alerts.md`.
  *
  * `forwardRef` because NotificationsModule imports this module back

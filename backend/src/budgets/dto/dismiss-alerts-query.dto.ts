@@ -1,5 +1,5 @@
 import { IsEnum, IsIn, IsOptional } from "class-validator";
-import { AlertSeverity } from "../entities/budget-alert.entity";
+import { NotificationSeverity } from "../../notification-center/entities/notification.entity";
 
 export const ALERT_CATEGORIES = ["system", "financial"] as const;
 export type AlertCategory = (typeof ALERT_CATEGORIES)[number];
@@ -12,8 +12,8 @@ export type AlertCategory = (typeof ALERT_CATEGORIES)[number];
  */
 export class DismissAlertsQueryDto {
   @IsOptional()
-  @IsEnum(AlertSeverity)
-  severity?: AlertSeverity;
+  @IsEnum(NotificationSeverity)
+  severity?: NotificationSeverity;
 
   @IsOptional()
   @IsIn(ALERT_CATEGORIES)

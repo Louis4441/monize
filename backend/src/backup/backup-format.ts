@@ -177,7 +177,7 @@ export interface BackupData {
   budget_categories: Record<string, unknown>[];
   budget_periods: Record<string, unknown>[];
   budget_period_categories: Record<string, unknown>[];
-  budget_alerts: Record<string, unknown>[];
+  notifications: Record<string, unknown>[];
   custom_reports: Record<string, unknown>[];
   investment_reports: Record<string, unknown>[];
   import_column_mappings: Record<string, unknown>[];
@@ -202,4 +202,48 @@ export type BackupTables = Record<
 /** `data` viewed as plain table -> rows, without an `as unknown as` at each site. */
 export function backupTables(data: BackupData): BackupTables {
   return data as unknown as BackupTables;
+}
+
+/**
+ * Tables that used to be exported under a different name, as
+ * `currentName -> the names older artifacts wrote it under`.
+ *
+ * A backup keys its tables by SQL table name, so renaming a table renames the
+ * key every artifact written before the rename does *not* carry. Nothing about
+ * that is loud: `insertRows` is handed `undefined` for the new key, restores
+ * zero rows, and reports zero -- a silent data loss inside an operation whose
+ * whole promise is that nothing is lost. The version cannot carry the fix
+ * either: `validateBackupFormat` compares it for equality, so bumping it would
+ * reject every existing artifact instead of reading one.
+ *
+ * `budget_alerts` became `notifications` in migration 172.
+ */
+export const LEGACY_TABLE_KEYS: Readonly<Record<string, readonly string[]>> = {
+  notifications: ["budget_alerts"],
+};
+
+/**
+ * Move any legacy table key onto the name the rest of the restore uses, in
+ * place, and report which ones moved.
+ *
+ * Called once, on the parsed artifact, before anything else looks at it -- id
+ * remapping, attachment staging, currency pre-creation and the insert loop all
+ * walk the document by table name, and a rule applied at only one of them is a
+ * rule that holds for one of them. An artifact carrying both names keeps the
+ * current one: it was written by an instance that already knew the new name.
+ */
+export function renameLegacyTableKeys(data: BackupData): string[] {
+  const tables = backupTables(data);
+  const moved: string[] = [];
+  for (const [current, legacyNames] of Object.entries(LEGACY_TABLE_KEYS)) {
+    for (const legacy of legacyNames) {
+      const rows = tables[legacy];
+      if (rows === undefined) continue;
+      delete tables[legacy];
+      if (tables[current] !== undefined) continue;
+      tables[current] = rows;
+      moved.push(`${legacy} -> ${current}`);
+    }
+  }
+  return moved;
 }

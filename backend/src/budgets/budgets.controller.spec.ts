@@ -4,7 +4,7 @@ import { BudgetsService } from "./budgets.service";
 import { BudgetPeriodService } from "./budget-period.service";
 import { BudgetGeneratorService } from "./budget-generator.service";
 import { BudgetReportsService } from "./budget-reports.service";
-import { AlertSeverity } from "./entities/budget-alert.entity";
+import { NotificationSeverity } from "../notification-center/entities/notification.entity";
 
 describe("BudgetsController", () => {
   let controller: BudgetsController;
@@ -533,13 +533,13 @@ describe("BudgetsController", () => {
       mockBudgetsService.dismissAlerts!.mockReturnValue("dismissed");
 
       const result = controller.dismissAlerts(mockReq, {
-        severity: AlertSeverity.CRITICAL,
+        severity: NotificationSeverity.CRITICAL,
         category: "system",
       });
 
       expect(result).toBe("dismissed");
       expect(mockBudgetsService.dismissAlerts).toHaveBeenCalledWith("user-1", {
-        severity: AlertSeverity.CRITICAL,
+        severity: NotificationSeverity.CRITICAL,
         category: "system",
       });
     });

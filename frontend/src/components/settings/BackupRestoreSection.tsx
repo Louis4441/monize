@@ -48,7 +48,7 @@ const RESTORE_LABELS: Record<string, string> = {
   budgetCategories: 'Budget Categories',
   budgetPeriods: 'Budget Periods',
   budgetPeriodCategories: 'Budget Period Categories',
-  budgetAlerts: 'Budget Alerts',
+  notifications: 'Notifications',
   customReports: 'Custom Reports',
   importColumnMappings: 'Import Column Mappings',
   monthlyAccountBalances: 'Monthly Account Balances',

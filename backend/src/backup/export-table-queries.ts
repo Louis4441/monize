@@ -353,8 +353,8 @@ export function buildExportTableQueries(
             WHERE b.user_id = $1`,
     },
     {
-      key: "budget_alerts",
-      sql: "SELECT * FROM budget_alerts WHERE user_id = $1",
+      key: "notifications",
+      sql: "SELECT * FROM notifications WHERE user_id = $1",
     },
     {
       key: "custom_reports",

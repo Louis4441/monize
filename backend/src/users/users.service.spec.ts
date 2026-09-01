@@ -1398,7 +1398,7 @@ describe("UsersService", () => {
         queries.some((q: string) => q.includes("DELETE FROM securities")),
       ).toBe(true);
       expect(
-        queries.some((q: string) => q.includes("DELETE FROM budget_alerts")),
+        queries.some((q: string) => q.includes("DELETE FROM notifications")),
       ).toBe(true);
       expect(
         queries.some((q: string) => q.includes("DELETE FROM budgets")),

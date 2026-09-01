@@ -2,9 +2,9 @@ import { forwardRef, Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Cron } from "@nestjs/schedule";
 import {
-  AlertSeverity,
-  AlertType,
-} from "../budgets/entities/budget-alert.entity";
+  NotificationSeverity,
+  NotificationType,
+} from "../notification-center/entities/notification.entity";
 import {
   ENCRYPTION_KEY_ENV,
   resolveEncryptionKey,
@@ -76,8 +76,8 @@ export class SystemAlertMonitorService {
     if (resolved !== null) return;
 
     await this.systemAlerts.raiseAdminAlert({
-      type: AlertType.ENCRYPTION_KEY_MISSING,
-      severity: AlertSeverity.WARNING,
+      type: NotificationType.ENCRYPTION_KEY_MISSING,
+      severity: NotificationSeverity.WARNING,
       title: "Encryption key not configured",
       message:
         `${ENCRYPTION_KEY_ENV} is not set. Backups are written unencrypted ` +
@@ -107,8 +107,8 @@ export class SystemAlertMonitorService {
     }
 
     await this.systemAlerts.raiseAdminAlert({
-      type: AlertType.SMTP_FAILURE,
-      severity: AlertSeverity.WARNING,
+      type: NotificationType.SMTP_FAILURE,
+      severity: NotificationSeverity.WARNING,
       title: "Email delivery is failing",
       message:
         `Monize could not send email: ${snapshot.lastFailureMessage ?? "unknown error"}. ` +

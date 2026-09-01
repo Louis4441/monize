@@ -11,10 +11,10 @@ import { getMonthEndYMD } from "../common/date-utils";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
 import { Budget } from "./entities/budget.entity";
 import {
-  BudgetAlert,
-  AlertType,
-  AlertSeverity,
-} from "./entities/budget-alert.entity";
+  Notification,
+  NotificationType,
+  NotificationSeverity,
+} from "../notification-center/entities/notification.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
 import { User } from "../users/entities/user.entity";
@@ -63,8 +63,8 @@ interface CategoryActual {
 interface AlertCandidate {
   budgetId: string;
   budgetCategoryId: string | null;
-  alertType: AlertType;
-  severity: AlertSeverity;
+  type: NotificationType;
+  severity: NotificationSeverity;
   title: string;
   message: string;
   data: Record<string, unknown>;
@@ -309,7 +309,7 @@ export class BudgetAlertService {
 
     // De-duplicate against existing alerts for same period
     const existingAlerts = await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(BudgetAlert).find({
+      m.getRepository(Notification).find({
         where: {
           budgetId: budget.id,
           periodStart,
@@ -332,11 +332,11 @@ export class BudgetAlertService {
     // (audit P4-015). The unique fingerprint from migration 140 arbitrates
     // instead, and `ON CONFLICT DO NOTHING RETURNING` reports the outcome
     // honestly: the loser gets no row and therefore sends nothing.
-    const savedAlerts: BudgetAlert[] = [];
+    const savedAlerts: Notification[] = [];
     for (const candidate of newCandidates) {
       const inserted = await withScopedDb(this.dataSource, (m) =>
         m.query(
-          `INSERT INTO budget_alerts
+          `INSERT INTO notifications
              (user_id, budget_id, budget_category_id, alert_type, severity,
               title, message, data, period_start)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
@@ -349,7 +349,7 @@ export class BudgetAlertService {
             budget.userId,
             candidate.budgetId,
             candidate.budgetCategoryId,
-            candidate.alertType,
+            candidate.type,
             candidate.severity,
             candidate.title,
             candidate.message,
@@ -362,7 +362,7 @@ export class BudgetAlertService {
       if (rows.length === 0) continue;
 
       const saved = await withScopedDb(this.dataSource, (m) =>
-        m.getRepository(BudgetAlert).findOne({ where: { id: rows[0].id } }),
+        m.getRepository(Notification).findOne({ where: { id: rows[0].id } }),
       );
       if (saved) savedAlerts.push(saved);
     }
@@ -375,10 +375,10 @@ export class BudgetAlertService {
     let emailsSent = 0;
     const criticalAlerts = savedAlerts.filter(
       (a) =>
-        a.severity === AlertSeverity.CRITICAL &&
-        (a.alertType === AlertType.THRESHOLD_CRITICAL ||
-          a.alertType === AlertType.OVER_BUDGET ||
-          a.alertType === AlertType.INCOME_SHORTFALL),
+        a.severity === NotificationSeverity.CRITICAL &&
+        (a.type === NotificationType.THRESHOLD_CRITICAL ||
+          a.type === NotificationType.OVER_BUDGET ||
+          a.type === NotificationType.INCOME_SHORTFALL),
     );
 
     if (criticalAlerts.length > 0) {
@@ -391,7 +391,7 @@ export class BudgetAlertService {
         for (const alert of criticalAlerts) {
           alert.isEmailSent = true;
           await withScopedDb(this.dataSource, (m) =>
-            m.getRepository(BudgetAlert).save(alert),
+            m.getRepository(Notification).save(alert),
           );
         }
       }
@@ -407,8 +407,8 @@ export class BudgetAlertService {
       alerts.push({
         budgetId: "",
         budgetCategoryId: cat.budgetCategoryId,
-        alertType: AlertType.OVER_BUDGET,
-        severity: AlertSeverity.CRITICAL,
+        type: NotificationType.OVER_BUDGET,
+        severity: NotificationSeverity.CRITICAL,
         title: `${cat.categoryName} is over budget`,
         message: `You have spent ${formatCurrency(cat.spent, cat.currencyCode)} of your ${formatCurrency(cat.budgeted, cat.currencyCode)} budget for ${cat.categoryName} (${cat.percentUsed.toFixed(1)}%).`,
         data: {
@@ -422,8 +422,8 @@ export class BudgetAlertService {
       alerts.push({
         budgetId: "",
         budgetCategoryId: cat.budgetCategoryId,
-        alertType: AlertType.THRESHOLD_CRITICAL,
-        severity: AlertSeverity.WARNING,
+        type: NotificationType.THRESHOLD_CRITICAL,
+        severity: NotificationSeverity.WARNING,
         title: `${cat.categoryName} approaching limit`,
         message: `You have used ${cat.percentUsed.toFixed(1)}% of your ${cat.categoryName} budget (${formatCurrency(cat.spent, cat.currencyCode)} of ${formatCurrency(cat.budgeted, cat.currencyCode)}).`,
         data: {
@@ -438,8 +438,8 @@ export class BudgetAlertService {
       alerts.push({
         budgetId: "",
         budgetCategoryId: cat.budgetCategoryId,
-        alertType: AlertType.THRESHOLD_WARNING,
-        severity: AlertSeverity.WARNING,
+        type: NotificationType.THRESHOLD_WARNING,
+        severity: NotificationSeverity.WARNING,
         title: `${cat.categoryName} reaching budget limit`,
         message: `You have used ${cat.percentUsed.toFixed(1)}% of your ${cat.categoryName} budget (${formatCurrency(cat.spent, cat.currencyCode)} of ${formatCurrency(cat.budgeted, cat.currencyCode)}).`,
         data: {
@@ -468,8 +468,8 @@ export class BudgetAlertService {
       return {
         budgetId: "",
         budgetCategoryId: cat.budgetCategoryId,
-        alertType: AlertType.PROJECTED_OVERSPEND,
-        severity: AlertSeverity.WARNING,
+        type: NotificationType.PROJECTED_OVERSPEND,
+        severity: NotificationSeverity.WARNING,
         title: `${cat.categoryName} projected to overspend`,
         message: `At your current pace, ${cat.categoryName} is projected to reach ${formatCurrency(projectedTotal, cat.currencyCode)} by the end of the period (budget: ${formatCurrency(cat.budgeted, cat.currencyCode)}).`,
         data: {
@@ -513,8 +513,8 @@ export class BudgetAlertService {
         alerts.push({
           budgetId: "",
           budgetCategoryId: null,
-          alertType: AlertType.FLEX_GROUP_WARNING,
-          severity: AlertSeverity.WARNING,
+          type: NotificationType.FLEX_GROUP_WARNING,
+          severity: NotificationSeverity.WARNING,
           title: `Flex group "${groupName}" at ${groupPercent.toFixed(0)}%`,
           message: `The "${groupName}" flex group has used ${formatCurrency(group.totalSpent, group.currencyCode)} of its combined ${formatCurrency(group.totalBudgeted, group.currencyCode)} budget (${groupPercent.toFixed(1)}%).`,
           data: {
@@ -545,8 +545,8 @@ export class BudgetAlertService {
       return {
         budgetId: "",
         budgetCategoryId: null,
-        alertType: AlertType.INCOME_SHORTFALL,
-        severity: AlertSeverity.CRITICAL,
+        type: NotificationType.INCOME_SHORTFALL,
+        severity: NotificationSeverity.CRITICAL,
         title: "Income below expected",
         message: `Your actual income (${formatCurrency(totalActualIncome, incomeActuals[0]?.currencyCode || "USD")}) is below ${Math.round(incomeRatio * 100)}% of expected income (${formatCurrency(expectedSoFar, incomeActuals[0]?.currencyCode || "USD")}) at this point in the period.`,
         data: {
@@ -580,8 +580,8 @@ export class BudgetAlertService {
         {
           budgetId: "",
           budgetCategoryId: null,
-          alertType: AlertType.POSITIVE_MILESTONE,
-          severity: AlertSeverity.SUCCESS,
+          type: NotificationType.POSITIVE_MILESTONE,
+          severity: NotificationSeverity.SUCCESS,
           title: "Budget on track",
           message: `You are ${Math.round(periodProgress * 100)}% through the period and have only used ${overallPercent.toFixed(1)}% of your total budget. Keep it up!`,
           data: {
@@ -600,7 +600,7 @@ export class BudgetAlertService {
 
   deduplicateAlerts(
     candidates: AlertCandidate[],
-    existing: BudgetAlert[],
+    existing: Notification[],
   ): AlertCandidate[] {
     // M25: Allow severity escalation (e.g., WARNING -> CRITICAL)
     const severityRank: Record<string, number> = {
@@ -613,7 +613,7 @@ export class BudgetAlertService {
     return candidates.filter((candidate) => {
       const match = existing.find(
         (e) =>
-          e.alertType === candidate.alertType &&
+          e.type === candidate.type &&
           e.budgetCategoryId === candidate.budgetCategoryId,
       );
       if (!match) return true;
@@ -627,7 +627,7 @@ export class BudgetAlertService {
 
   private async sendImmediateAlertEmail(
     userId: string,
-    alerts: BudgetAlert[],
+    alerts: Notification[],
   ): Promise<boolean> {
     if (!this.emailService.getStatus().configured) return false;
 
@@ -714,7 +714,7 @@ export class BudgetAlertService {
     const { periodStart } = this.getCurrentPeriodDates();
 
     const allRecentAlerts = await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(BudgetAlert).find({
+      m.getRepository(Notification).find({
         where: {
           userId,
           periodStart,
@@ -736,7 +736,7 @@ export class BudgetAlertService {
 
     // Filter out BILL_DUE alerts for bills already paid ahead of time
     const billAlerts = allRecentAlerts.filter(
-      (a) => a.alertType === AlertType.BILL_DUE,
+      (a) => a.type === NotificationType.BILL_DUE,
     );
     const paidBillIds = new Set<string>();
     if (billAlerts.length > 0) {
@@ -779,7 +779,7 @@ export class BudgetAlertService {
     }
 
     const recentAlerts = allRecentAlerts.filter((a) => {
-      if (a.alertType !== AlertType.BILL_DUE) return true;
+      if (a.type !== NotificationType.BILL_DUE) return true;
       const billId = (a.data as Record<string, unknown>)?.billId as string;
       return !paidBillIds.has(billId);
     });
@@ -854,8 +854,8 @@ export class BudgetAlertService {
         alerts.push({
           budgetId: "",
           budgetCategoryId: profile.budgetCategoryId,
-          alertType: AlertType.SEASONAL_SPIKE,
-          severity: AlertSeverity.INFO,
+          type: NotificationType.SEASONAL_SPIKE,
+          severity: NotificationSeverity.INFO,
           title: `Seasonal spike expected for ${profile.categoryName}`,
           message: `Last ${monthName} you spent ${profile.typicalIncrease.toFixed(1)}x your usual on ${profile.categoryName}. Consider adjusting your budget.`,
           data: {
@@ -1090,12 +1090,12 @@ export class BudgetAlertService {
       // RLS (task C2): cross-user bulk purge -- runs under a system context.
       const { dismissed, read } = await withSystemContext(async () => {
         const result = await withScopedDb(this.dataSource, (m) =>
-          m.getRepository(BudgetAlert).delete({
+          m.getRepository(Notification).delete({
             dismissedAt: LessThan(cutoff),
           }),
         );
         const readResult = await withScopedDb(this.dataSource, (m) =>
-          m.getRepository(BudgetAlert).delete({
+          m.getRepository(Notification).delete({
             isRead: true,
             dismissedAt: IsNull(),
             createdAt: LessThan(cutoff),

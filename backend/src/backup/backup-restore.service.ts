@@ -36,6 +36,7 @@ import {
   BackupPasswordRequiredError,
   backupTables,
   parseArtifactCompleteness,
+  renameLegacyTableKeys,
   RestoreBackupInput,
   RestoreResult,
 } from "./backup-format";
@@ -143,6 +144,16 @@ export class BackupRestoreService {
         const gzippedPayload = await this.maybeDecrypt(input, user);
         const rawData = await this.decompressAndParse(gzippedPayload);
         this.validateBackupFormat(rawData);
+
+        // An artifact older than a table rename addresses that table by its old
+        // name. Move it onto the current one here, before anything walks the
+        // document, so every later phase sees one shape.
+        const movedTables = renameLegacyTableKeys(rawData);
+        if (movedTables.length > 0) {
+          this.logger.log(
+            `Backup for user ${userId} uses legacy table names: ${movedTables.join(", ")}`,
+          );
+        }
 
         await this.verifyAuthentication(user, input);
 

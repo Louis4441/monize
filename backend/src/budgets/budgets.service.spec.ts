@@ -16,11 +16,11 @@ import {
   RolloverType,
 } from "./entities/budget-category.entity";
 import {
-  BudgetAlert,
-  AlertType,
-  AlertSeverity,
-  SYSTEM_ALERT_TYPES,
-} from "./entities/budget-alert.entity";
+  Notification,
+  NotificationType,
+  NotificationSeverity,
+  SYSTEM_NOTIFICATION_TYPES,
+} from "../notification-center/entities/notification.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
 import { Category } from "../categories/entities/category.entity";
@@ -114,15 +114,16 @@ describe("BudgetsService", () => {
     updatedAt: new Date("2026-01-01"),
   };
 
-  const mockAlert: BudgetAlert = {
+  const mockAlert: Notification = {
     id: "alert-1",
     userId: "user-1",
     budgetId: "budget-1",
     budget: mockBudget,
     budgetCategoryId: "bc-1",
     budgetCategory: mockBudgetCategory,
-    alertType: AlertType.THRESHOLD_WARNING,
-    severity: AlertSeverity.WARNING,
+    type: NotificationType.THRESHOLD_WARNING,
+    severity: NotificationSeverity.WARNING,
+    target: null,
     title: "Groceries at 80%",
     message: "You have spent 80% of your groceries budget",
     data: {},
@@ -221,7 +222,7 @@ describe("BudgetsService", () => {
       createScopedDbMocks([
         [Budget, budgetsRepository as never],
         [BudgetCategory, budgetCategoriesRepository as never],
-        [BudgetAlert, budgetAlertsRepository as never],
+        [Notification, budgetAlertsRepository as never],
         [Transaction, transactionsRepository as never],
         [TransactionSplit, splitsRepository as never],
         [Category, categoriesRepository as never],
@@ -265,7 +266,7 @@ describe("BudgetsService", () => {
           useValue: budgetCategoriesRepository,
         },
         {
-          provide: getRepositoryToken(BudgetAlert),
+          provide: getRepositoryToken(Notification),
           useValue: budgetAlertsRepository,
         },
         {
@@ -1315,7 +1316,7 @@ describe("BudgetsService", () => {
       });
       budgetAlertsRepository.createQueryBuilder.mockReturnValue(alertQb);
       overridesRepository.find.mockResolvedValue([]);
-      budgetAlertsRepository.save.mockImplementation((data: BudgetAlert) => ({
+      budgetAlertsRepository.save.mockImplementation((data: Notification) => ({
         ...data,
         id: "new-alert-1",
       }));
@@ -1325,7 +1326,7 @@ describe("BudgetsService", () => {
 
       expect(budgetAlertsRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
-          alertType: AlertType.BILL_DUE,
+          type: NotificationType.BILL_DUE,
           title: expect.stringContaining("Netflix Inc"),
           message: expect.stringContaining("15.99"),
           budgetId: null,
@@ -1376,7 +1377,7 @@ describe("BudgetsService", () => {
           amount: -312.65,
         },
       ]);
-      budgetAlertsRepository.save.mockImplementation((data: BudgetAlert) => ({
+      budgetAlertsRepository.save.mockImplementation((data: Notification) => ({
         ...data,
         id: "new-alert-1",
       }));
@@ -1432,7 +1433,7 @@ describe("BudgetsService", () => {
         createMockQueryBuilder({ getMany: jest.fn().mockResolvedValue([]) }),
       );
       overridesRepository.find.mockResolvedValue([]);
-      budgetAlertsRepository.save.mockImplementation((data: BudgetAlert) => ({
+      budgetAlertsRepository.save.mockImplementation((data: Notification) => ({
         ...data,
         id: "new-alert-1",
       }));
@@ -1447,7 +1448,8 @@ describe("BudgetsService", () => {
 
       await service.getAlerts("user-1");
 
-      const saved = budgetAlertsRepository.save.mock.calls[0][0] as BudgetAlert;
+      const saved = budgetAlertsRepository.save.mock
+        .calls[0][0] as Notification;
       expect(saved.message).toContain("Amount unavailable");
       // Not the persisted snapshot, at either rate.
       expect(saved.message).not.toContain("1,500");
@@ -1502,7 +1504,7 @@ describe("BudgetsService", () => {
           amount: -312.65,
         },
       ]);
-      budgetAlertsRepository.save.mockImplementation((data: BudgetAlert) => ({
+      budgetAlertsRepository.save.mockImplementation((data: Notification) => ({
         ...data,
         id: "new-alert-1",
       }));
@@ -1510,7 +1512,8 @@ describe("BudgetsService", () => {
 
       await service.getAlerts("user-1");
 
-      const saved = budgetAlertsRepository.save.mock.calls[0][0] as BudgetAlert;
+      const saved = budgetAlertsRepository.save.mock
+        .calls[0][0] as Notification;
       expect(saved.message).toContain("312.65");
       expect(saved.message).not.toContain("250");
       const data = saved.data as Record<string, unknown>;
@@ -1650,7 +1653,7 @@ describe("BudgetsService", () => {
     it("soft-deletes alert when found and belongs to user", async () => {
       budgetAlertsRepository.findOne.mockResolvedValue({ ...mockAlert });
       budgetAlertsRepository.save.mockImplementation(
-        (data: BudgetAlert) => data,
+        (data: Notification) => data,
       );
 
       await service.deleteAlert("user-1", "alert-1");
@@ -1719,14 +1722,14 @@ describe("BudgetsService", () => {
       budgetAlertsRepository.update.mockResolvedValue({ affected: 2 });
 
       await service.dismissAlerts("user-1", {
-        severity: AlertSeverity.CRITICAL,
+        severity: NotificationSeverity.CRITICAL,
       });
 
       expect(budgetAlertsRepository.update).toHaveBeenCalledWith(
         {
           userId: "user-1",
           dismissedAt: IsNull(),
-          severity: AlertSeverity.CRITICAL,
+          severity: NotificationSeverity.CRITICAL,
         },
         { dismissedAt: expect.any(Date) },
       );
@@ -1741,7 +1744,7 @@ describe("BudgetsService", () => {
         {
           userId: "user-1",
           dismissedAt: IsNull(),
-          alertType: In([...SYSTEM_ALERT_TYPES]),
+          type: In([...SYSTEM_NOTIFICATION_TYPES]),
         },
         { dismissedAt: expect.any(Date) },
       );
@@ -1756,7 +1759,7 @@ describe("BudgetsService", () => {
         {
           userId: "user-1",
           dismissedAt: IsNull(),
-          alertType: Not(In([...SYSTEM_ALERT_TYPES])),
+          type: Not(In([...SYSTEM_NOTIFICATION_TYPES])),
         },
         { dismissedAt: expect.any(Date) },
       );
@@ -1766,7 +1769,7 @@ describe("BudgetsService", () => {
       budgetAlertsRepository.update.mockResolvedValue({ affected: 0 });
 
       const result = await service.dismissAlerts("user-1", {
-        severity: AlertSeverity.WARNING,
+        severity: NotificationSeverity.WARNING,
         category: "financial",
       });
 
@@ -1775,36 +1778,38 @@ describe("BudgetsService", () => {
         {
           userId: "user-1",
           dismissedAt: IsNull(),
-          severity: AlertSeverity.WARNING,
-          alertType: Not(In([...SYSTEM_ALERT_TYPES])),
+          severity: NotificationSeverity.WARNING,
+          type: Not(In([...SYSTEM_NOTIFICATION_TYPES])),
         },
         { dismissedAt: expect.any(Date) },
       );
     });
   });
 
-  describe("SYSTEM_ALERT_TYPES partition", () => {
-    it("holds exactly the system half of AlertType, so category filters cannot drift", () => {
+  describe("SYSTEM_NOTIFICATION_TYPES partition", () => {
+    it("holds exactly the system half of NotificationType, so category filters cannot drift", () => {
       // Financial is defined as NOT IN this set (never a second list), so
-      // membership here is the whole classification. A new AlertType lands as
+      // membership here is the whole classification. A new NotificationType lands as
       // financial unless deliberately added; the frontend mirror is checked
       // against this file by its own contract test.
-      expect([...SYSTEM_ALERT_TYPES].sort()).toEqual(
+      expect([...SYSTEM_NOTIFICATION_TYPES].sort()).toEqual(
         [
-          AlertType.BACKUP_FAILED,
-          AlertType.BACKUP_PARTIAL,
-          AlertType.ENCRYPTION_KEY_MISSING,
-          AlertType.PROVIDER_OUTAGE,
-          AlertType.PROVIDER_RECOVERED,
-          AlertType.SMTP_FAILURE,
-          AlertType.SCHEDULED_POST_FAILED,
+          NotificationType.BACKUP_FAILED,
+          NotificationType.BACKUP_PARTIAL,
+          NotificationType.ENCRYPTION_KEY_MISSING,
+          NotificationType.PROVIDER_OUTAGE,
+          NotificationType.PROVIDER_RECOVERED,
+          NotificationType.SMTP_FAILURE,
+          NotificationType.SCHEDULED_POST_FAILED,
         ].sort(),
       );
-      const allTypes = Object.values(AlertType);
-      for (const type of SYSTEM_ALERT_TYPES) {
+      const allTypes = Object.values(NotificationType);
+      for (const type of SYSTEM_NOTIFICATION_TYPES) {
         expect(allTypes).toContain(type);
       }
-      expect(SYSTEM_ALERT_TYPES).not.toContain(AlertType.BILL_DUE);
+      expect(SYSTEM_NOTIFICATION_TYPES).not.toContain(
+        NotificationType.BILL_DUE,
+      );
     });
   });
 

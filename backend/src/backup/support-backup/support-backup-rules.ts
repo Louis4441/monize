@@ -522,7 +522,7 @@ export const RULES: Record<string, TableRules> = {
     created_at: keep,
     updated_at: keep,
   },
-  budget_alerts: {
+  notifications: {
     id: keep,
     user_id: keep,
     budget_id: keep,
@@ -532,6 +532,8 @@ export const RULES: Record<string, TableRules> = {
     title: konst("***"), // NOT NULL
     message: konst("***"), // NOT NULL
     data: drop, // amounts/names in JSON; alerts regenerate anyway
+    // An in-app path, so at most an id this row already keeps elsewhere.
+    target: keep,
     is_read: keep,
     is_email_sent: keep,
     period_start: keep,
@@ -746,7 +748,7 @@ export const SECTION_TABLES: Record<SupportBackupSection, string[]> = {
     "budget_categories",
     "budget_periods",
     "budget_period_categories",
-    "budget_alerts",
+    "notifications",
   ],
   reports: [
     "custom_reports",

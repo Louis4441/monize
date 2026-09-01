@@ -9,11 +9,11 @@ import { withScopedDb } from "../common/db/scoped-db";
 import { Budget } from "./entities/budget.entity";
 import { BudgetCategory } from "./entities/budget-category.entity";
 import {
-  BudgetAlert,
-  AlertType,
-  AlertSeverity,
-  SYSTEM_ALERT_TYPES,
-} from "./entities/budget-alert.entity";
+  Notification,
+  NotificationType,
+  NotificationSeverity,
+  SYSTEM_NOTIFICATION_TYPES,
+} from "../notification-center/entities/notification.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
 import { Category } from "../categories/entities/category.entity";
@@ -628,7 +628,7 @@ export class BudgetsService {
     };
   }
 
-  async getAlerts(userId: string, unreadOnly = false): Promise<BudgetAlert[]> {
+  async getAlerts(userId: string, unreadOnly = false): Promise<Notification[]> {
     // Ensure upcoming bill alerts are persisted before querying
     if (!unreadOnly) {
       await this.ensureBillAlerts(userId);
@@ -640,7 +640,7 @@ export class BudgetsService {
     }
 
     const alerts = await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(BudgetAlert).find({
+      m.getRepository(Notification).find({
         where,
         order: { createdAt: "DESC" },
         take: 50,
@@ -705,11 +705,11 @@ export class BudgetsService {
     // Fetch ALL existing BILL_DUE alerts (including dismissed) to prevent re-creation
     const existingAlerts = await withScopedDb(this.dataSource, (m) =>
       m
-        .getRepository(BudgetAlert)
+        .getRepository(Notification)
         .createQueryBuilder("ba")
         .where("ba.user_id = :userId", { userId })
-        .andWhere("ba.alert_type = :alertType", {
-          alertType: AlertType.BILL_DUE,
+        .andWhere("ba.alert_type = :type", {
+          type: NotificationType.BILL_DUE,
         })
         .getMany(),
     );
@@ -752,17 +752,19 @@ export class BudgetsService {
         (new Date(dueDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
       );
       const severity =
-        daysUntilDue <= 1 ? AlertSeverity.WARNING : AlertSeverity.INFO;
+        daysUntilDue <= 1
+          ? NotificationSeverity.WARNING
+          : NotificationSeverity.INFO;
 
-      const alert = new BudgetAlert();
+      const alert = new Notification();
       alert.userId = userId;
       alert.budgetId = null;
       alert.budgetCategoryId = null;
-      alert.alertType = AlertType.BILL_DUE;
+      alert.type = NotificationType.BILL_DUE;
       alert.severity = severity;
       // `title`/`message` are the English fallbacks for a reader with no client
       // to render them (the email digest, an API consumer). The UI composes both
-      // from `alertType` and `data` in the reader's own language -- a stored
+      // from `type` and `data` in the reader's own language -- a stored
       // sentence cannot be translated after the fact, and the missing-rate case
       // is exactly the one a non-English reader hits.
       alert.title = `${payeeName} due${daysUntilDue === 0 ? " today" : daysUntilDue === 1 ? " tomorrow" : ` in ${daysUntilDue} days`}`;
@@ -790,14 +792,14 @@ export class BudgetsService {
       alert.dismissedAt = null;
 
       await withScopedDb(this.dataSource, (m) =>
-        m.getRepository(BudgetAlert).save(alert),
+        m.getRepository(Notification).save(alert),
       );
     }
   }
 
-  async markAlertRead(userId: string, alertId: string): Promise<BudgetAlert> {
+  async markAlertRead(userId: string, alertId: string): Promise<Notification> {
     const alert = await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(BudgetAlert).findOne({
+      m.getRepository(Notification).findOne({
         where: { id: alertId, userId, dismissedAt: IsNull() },
       }),
     );
@@ -814,13 +816,13 @@ export class BudgetsService {
 
     alert.isRead = true;
     return withScopedDb(this.dataSource, (m) =>
-      m.getRepository(BudgetAlert).save(alert),
+      m.getRepository(Notification).save(alert),
     );
   }
 
   async deleteAlert(userId: string, alertId: string): Promise<void> {
     const alert = await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(BudgetAlert).findOne({
+      m.getRepository(Notification).findOne({
         where: { id: alertId, userId, dismissedAt: IsNull() },
       }),
     );
@@ -837,14 +839,14 @@ export class BudgetsService {
 
     alert.dismissedAt = new Date();
     await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(BudgetAlert).save(alert),
+      m.getRepository(Notification).save(alert),
     );
   }
 
   async markAllAlertsRead(userId: string): Promise<{ updated: number }> {
     const result = await withScopedDb(this.dataSource, (m) =>
       m
-        .getRepository(BudgetAlert)
+        .getRepository(Notification)
         .update(
           { userId, isRead: false, dismissedAt: IsNull() },
           { isRead: true },
@@ -859,7 +861,7 @@ export class BudgetsService {
    * UPDATE. The filter arrives explicitly on the command (severity and/or
    * system-vs-financial category) rather than as a list of on-screen ids, so
    * it also reaches alerts beyond the list endpoint's `take: 50` window.
-   * Financial is defined as NOT IN `SYSTEM_ALERT_TYPES` -- the one place the
+   * Financial is defined as NOT IN `SYSTEM_NOTIFICATION_TYPES` -- the one place the
    * partition is written.
    */
   async dismissAlerts(
@@ -871,13 +873,13 @@ export class BudgetsService {
       where.severity = filters.severity;
     }
     if (filters.category === "system") {
-      where.alertType = In([...SYSTEM_ALERT_TYPES]);
+      where.type = In([...SYSTEM_NOTIFICATION_TYPES]);
     } else if (filters.category === "financial") {
-      where.alertType = Not(In([...SYSTEM_ALERT_TYPES]));
+      where.type = Not(In([...SYSTEM_NOTIFICATION_TYPES]));
     }
 
     const result = await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(BudgetAlert).update(where, { dismissedAt: new Date() }),
+      m.getRepository(Notification).update(where, { dismissedAt: new Date() }),
     );
 
     return { dismissed: result.affected || 0 };
