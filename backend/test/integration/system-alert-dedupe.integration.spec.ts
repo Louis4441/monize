@@ -4,6 +4,7 @@ import { DataSource } from "typeorm";
 
 import { SystemAlertService } from "@/system-alerts/system-alert.service";
 import { JobClaimService } from "@/common/jobs/job-claim.service";
+import { NotificationService } from "@/notification-center/notification.service";
 import {
   NotificationSeverity,
   NotificationType,
@@ -65,6 +66,10 @@ describe("system alert dedupe against a real database", () => {
       // real table, and a mock that always wins would make the collapse
       // assertion below vacuous.
       new JobClaimService(dataSource),
+      // The real write door on the real connection: what this file proves is
+      // that PostgreSQL's own planner refuses the second insert, which is a
+      // property of the statement the door issues.
+      new NotificationService(dataSource),
     );
 
   const input = (dedupeKey: string) => ({

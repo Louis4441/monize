@@ -1,4 +1,5 @@
 import { SystemAlertService } from "./system-alert.service";
+import { NotificationService } from "../notification-center/notification.service";
 import {
   NotificationSeverity,
   NotificationType,
@@ -41,6 +42,13 @@ describe("System alerts RLS identity smoke (real withScopedDb)", () => {
     seen = [];
     const mocks = createScopedDbMocks();
     manager = mocks.manager;
+    // The door reads back the row it inserted; answer that read so the insert
+    // is reported as a win rather than as somebody else's row.
+    manager.getRepository.mockImplementation(() => ({
+      findOne: jest.fn(({ where }: { where: { id: string } }) =>
+        Promise.resolve({ id: where.id }),
+      ),
+    }));
     manager.query.mockImplementation(async (sql: string) => {
       const text = String(sql);
       if (text.includes("set_config")) return [];
@@ -69,6 +77,10 @@ describe("System alerts RLS identity smoke (real withScopedDb)", () => {
       { translate: jest.fn() } as never,
       // No emailDedupeKey is passed below, so the claim is never consulted.
       { claimOnce: jest.fn().mockResolvedValue(true) } as never,
+      // The real write door, on the same connection: the point of this file is
+      // which identity each statement runs under, and the door is where the
+      // INSERT now lives.
+      new NotificationService(mocks.dataSource as never),
     );
   });
 

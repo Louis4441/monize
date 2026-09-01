@@ -5,9 +5,11 @@ import {
   SystemAlertInput,
 } from "./system-alert.service";
 import {
+  Notification,
   NotificationSeverity,
   NotificationType,
 } from "../notification-center/entities/notification.entity";
+import { NotificationService } from "../notification-center/notification.service";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import {
   createScopedDbMocks,
@@ -83,15 +85,44 @@ describe("SystemAlertService", () => {
       }
       return Promise.resolve([]);
     });
-    manager.getRepository.mockReturnValue({
-      findOne: jest.fn().mockResolvedValue({ language: "en" }),
-    });
+    // Entity-aware because the write door reads the row it just inserted back
+    // as authoritative state: answering every findOne with a user preference
+    // would hand it a row with no id, which it correctly reads as "somebody
+    // else holds this notification".
+    manager.getRepository.mockImplementation((entity: unknown) =>
+      entity === Notification
+        ? {
+            findOne: jest.fn(({ where }: { where: { id: string } }) =>
+              Promise.resolve({ id: where.id }),
+            ),
+          }
+        : { findOne: jest.fn().mockResolvedValue({ language: "en" }) },
+    );
   }
 
   const insertStatements = () =>
     manager.query.mock.calls.filter(([sql]) =>
       String(sql).includes("INSERT INTO notifications"),
     );
+
+  /**
+   * One insert's parameters keyed by the column the statement names, read out of
+   * the statement itself.
+   *
+   * By position these assertions pinned a parameter index, which is a fact about
+   * the writer's column order and not about the row: moving the INSERT behind
+   * one door renumbered every one of them, and an index that still exists points
+   * at the wrong value rather than failing.
+   */
+  const insertedRow = (index = 0): Record<string, unknown> => {
+    const [sql, params] = insertStatements()[index];
+    const columns = /INSERT INTO notifications\s*\(([^)]*)\)/.exec(String(sql));
+    if (!columns) throw new Error(`no column list in: ${String(sql)}`);
+    const names = columns[1].split(",").map((name) => name.trim());
+    return Object.fromEntries(
+      names.map((name, i) => [name, (params as unknown[])[i]]),
+    );
+  };
 
   const emailSentUpdates = () =>
     manager.query.mock.calls.filter(([sql]) =>
@@ -118,6 +149,10 @@ describe("SystemAlertService", () => {
           options?.defaultValue ?? _key,
       } as never,
       jobClaims as never,
+      // The real door, on the same mocked connection: what these tests are
+      // about is the SQL that lands and which recipient emails, and a double
+      // standing in for the writer would assert the call instead of the row.
+      new NotificationService(dataSource as never),
     );
   });
 
@@ -131,14 +166,19 @@ describe("SystemAlertService", () => {
       expect(result.created).toBe(2);
       const inserts = insertStatements();
       expect(inserts).toHaveLength(2);
-      for (const [sql, params] of inserts) {
-        expect(String(sql)).toContain(
-          "ON CONFLICT (user_id, dedupe_key) WHERE dedupe_key IS NOT NULL",
-        );
+      for (const [sql] of inserts) {
+        // One `ON CONFLICT DO NOTHING` covers every unique index on the table,
+        // so it arbitrates the dedupe key without naming it: the loser gets no
+        // row back and therefore sends nothing.
+        expect(String(sql)).toContain("ON CONFLICT DO NOTHING");
         expect(String(sql)).toContain("RETURNING id");
-        expect(params[7]).toBe("BACKUP_FAILED:user-1:2026-08-30");
       }
-      expect(inserts.map(([, params]) => params[0])).toEqual([
+      for (const i of [0, 1]) {
+        expect(insertedRow(i).dedupe_key).toBe(
+          "BACKUP_FAILED:user-1:2026-08-30",
+        );
+      }
+      expect([insertedRow(0).user_id, insertedRow(1).user_id]).toEqual([
         "admin-1",
         "admin-2",
       ]);
@@ -339,9 +379,9 @@ describe("SystemAlertService", () => {
       const long = `${"N".repeat(400)} could not be posted`;
       await service.raiseAdminAlert(input({ title: long }));
 
-      const [, params] = insertStatements()[0];
-      expect(params[3]).toHaveLength(255);
-      expect(String(params[3]).endsWith("\u2026")).toBe(true);
+      const title = insertedRow().title;
+      expect(title).toHaveLength(255);
+      expect(String(title).endsWith("\u2026")).toBe(true);
     });
 
     it("leaves a title within the column alone", async () => {
@@ -349,7 +389,7 @@ describe("SystemAlertService", () => {
       await service.raiseAdminAlert(
         input({ title: "Automatic backup failed" }),
       );
-      expect(insertStatements()[0][1][3]).toBe("Automatic backup failed");
+      expect(insertedRow().title).toBe("Automatic backup failed");
     });
 
     it("truncates an oversized dedupe key deterministically rather than throwing", async () => {
@@ -364,8 +404,7 @@ describe("SystemAlertService", () => {
       } finally {
         error.mockRestore();
       }
-      const [, params] = insertStatements()[0];
-      expect(params[7]).toHaveLength(DEDUPE_KEY_MAX_LENGTH);
+      expect(insertedRow().dedupe_key).toHaveLength(DEDUPE_KEY_MAX_LENGTH);
     });
   });
 

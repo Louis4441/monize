@@ -294,6 +294,36 @@ is a cross-tenant write no ownership check covers. The client answers the 409 by
 unsubscribing and subscribing again for a fresh endpoint, and logout releases
 the endpoint the same way (`releaseLocalPushSubscription`).
 
+## The notifications table has one writer
+
+`NotificationService.create` (`src/notification-center/notification.service.ts`)
+is the only place a notification row is written, and
+`notification-write-door.spec.ts` fails on a second one. A producer decides
+*what* to say; the row's shape is not its decision. There were three writers
+with three opinions -- a raw `INSERT` for budget alerts with its own conflict
+target and no title bound, an entity `save` for bill reminders with no conflict
+handling at all, and a second raw `INSERT` for system alerts with its own
+truncation helpers -- so every rule the row must obey held on one path and not
+the others.
+
+Two consequences worth knowing before you add a producer. The insert is
+`ON CONFLICT DO NOTHING` with **no conflict target**, which covers both unique
+indexes at once (the fingerprint for a budget notification, the dedupe key for a
+system one) -- a producer does not know which applies to it, and does not have
+to; `null` back means somebody else holds this notification, so it is not yours
+to email about, and that is the normal case rather than an error. And **reads
+are deliberately not centralized**: a producer's own de-duplication query is
+about its candidates, not about the reader's list.
+
+`category` is derived (`notificationCategoryOf`), never stored -- see migration
+172's header for why, and `notification-category.spec.ts` asserts the column's
+absence against `schema.sql`.
+
+The HTTP surface lives in its own module (`notification-api.module.ts`) because
+it is the one part that needs a producer: bill reminders are materialized when
+the list is read. Put that edge on `NotificationCenterModule` and every producer
+of a notification lands on a require cycle with budgets.
+
 ## Copy composed outside a request is rendered in the recipient's locale
 
 `emailTranslator(i18n, lang)` with `resolveUserEmailLocale` is not email-only

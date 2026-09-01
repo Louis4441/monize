@@ -4,7 +4,6 @@ import { BudgetsService } from "./budgets.service";
 import { BudgetPeriodService } from "./budget-period.service";
 import { BudgetGeneratorService } from "./budget-generator.service";
 import { BudgetReportsService } from "./budget-reports.service";
-import { NotificationSeverity } from "../notification-center/entities/notification.entity";
 
 describe("BudgetsController", () => {
   let controller: BudgetsController;
@@ -33,9 +32,9 @@ describe("BudgetsController", () => {
       bulkUpdateCategories: jest.fn(),
       getSummary: jest.fn(),
       getVelocity: jest.fn(),
-            getDashboardSummary: jest.fn(),
+      getDashboardSummary: jest.fn(),
       getCategoryBudgetStatus: jest.fn(),
-        };
+    };
 
     mockBudgetPeriodService = {
       findAll: jest.fn(),

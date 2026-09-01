@@ -175,15 +175,17 @@ Every caller is a cron, and each has a different amount of protection:
 | --- | --- |
 | `BillReminderService` | None. It recomputes the window from `nextDueDate`/`reminderDaysBefore` daily; there is no "already reminded for this due date" flag. Sending every day the bill is inside the window is intentional, but a crash-restart or a second replica sends the same reminder twice with nothing able to notice. |
 | `MortgageReminderService` | None -- same shape, no dedup state at all. |
-| `BudgetAlertService` | Partial. It creates the `Notification` row before sending and dedups candidates against existing rows by `(budgetId, type, budgetCategoryId, periodStart)`, so a sequential re-run does not re-notify. But the dedup read and the insert are not one atomic unit and no unique constraint backs them, so two replicas can both pass the check and both insert and send. `isEmailSent` is set after the send, so a crash in between leaves it `false` forever without causing a duplicate. |
+| `BudgetAlertService` | Full, by insert-winner, since migration 140. The in-memory dedup against existing rows by `(budgetId, type, budgetCategoryId, periodStart)` is a check-then-act and never was the arbiter; the unique fingerprint index is, through `NotificationService.create`, which answers `null` for the replica that loses the race so only the winner emails. `isEmailSent` is set after the send, so a crash in between leaves it `false` forever without causing a duplicate. |
 | Emergency-access grant | The one deliberate design. See section 5. |
-| `SystemAlertService` | Full, by insert-winner. Each admin's alert row is written `INSERT ... ON CONFLICT (user_id, dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING RETURNING id` against the partial unique index from migration 170, and the email goes only to rows the INSERT returned -- the shape `BudgetAlertService` is missing, with the same at-most-once trade as `ProviderOutageAlertService`: a crash between the commit and SMTP loses that email, and the in-app row survives as the durable notice (`docs/specs/system-alerts.md`, INV-ALERT-001). |
+| `SystemAlertService` | Full, by insert-winner. Each admin's alert row goes through `NotificationService.create`, whose `INSERT ... ON CONFLICT DO NOTHING RETURNING id` is arbitrated for these rows by the partial unique index from migration 170, and the email goes only to rows the INSERT returned -- with the same at-most-once trade as `ProviderOutageAlertService`: a crash between the commit and SMTP loses that email, and the in-app row survives as the durable notice (`docs/specs/system-alerts.md`, INV-ALERT-001). |
 | `ProviderOutageAlertService` | Full, and the opposite trade from the reminders. The notice is claimed with a single conditional `UPDATE ... WHERE state = 'down' AND outage_notified_at IS NULL AND outage_started_at <= now() - 15min AND (last_notified_at IS NULL OR last_notified_at <= now() - 6h) RETURNING ...`, so one replica sends per episode and a flapping provider cannot mail its way around the floor. The claim is taken *before* the send, which makes it **at most once**: a process killed in between loses that alert. Deliberate -- a duplicated monitoring email is the failure mode being designed against, the outage is still in the log and in `provider_health`, and a provider still down when the 6-hour floor elapses becomes notifiable again. |
 
-`BudgetAlertService` is a useful illustration of EXT-001: it accidentally has
-most of what the rule asks for -- durable state written before the effect -- and
-still fails, because the state is not *claimed* atomically. Durable-before-effect
-and atomically-claimed are two requirements, not one.
+`BudgetAlertService` is a useful illustration of EXT-001 both before and after
+its repair: it always had most of what the rule asks for -- durable state written
+before the effect -- and still sent duplicates, because the state was not
+*claimed* atomically. Durable-before-effect and atomically-claimed are two
+requirements, not one, and the unique index is what turned the first into the
+second.
 
 ## 4a. Web Push
 

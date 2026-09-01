@@ -1,8 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
-import { LessThan, IsNull, DataSource } from "typeorm";
+import { IsNull, DataSource } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
-import { returnedRows } from "../common/db/query-result";
 import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
 import { emailTranslator } from "../i18n/email-translator";
@@ -15,6 +14,7 @@ import {
   NotificationType,
   NotificationSeverity,
 } from "../notification-center/entities/notification.entity";
+import { NotificationService } from "../notification-center/notification.service";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
 import { User } from "../users/entities/user.entity";
@@ -79,6 +79,8 @@ export class BudgetAlertService {
     private emailService: EmailService,
     private configService: ConfigService,
     private readonly i18n: I18nService,
+    // Every notification this service produces goes through the one write door.
+    private notifications: NotificationService,
   ) {}
 
   @Cron("0 7 * * *")
@@ -334,36 +336,21 @@ export class BudgetAlertService {
     // honestly: the loser gets no row and therefore sends nothing.
     const savedAlerts: Notification[] = [];
     for (const candidate of newCandidates) {
-      const inserted = await withScopedDb(this.dataSource, (m) =>
-        m.query(
-          `INSERT INTO notifications
-             (user_id, budget_id, budget_category_id, alert_type, severity,
-              title, message, data, period_start)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
-           ON CONFLICT (budget_id, period_start, alert_type,
-                        COALESCE(budget_category_id, '00000000-0000-0000-0000-000000000000'::uuid),
-                        severity)
-             DO NOTHING
-           RETURNING id`,
-          [
-            budget.userId,
-            candidate.budgetId,
-            candidate.budgetCategoryId,
-            candidate.type,
-            candidate.severity,
-            candidate.title,
-            candidate.message,
-            JSON.stringify(candidate.data ?? {}),
-            periodStart,
-          ],
-        ),
-      );
-      const rows = returnedRows<{ id: string }>(inserted);
-      if (rows.length === 0) continue;
-
-      const saved = await withScopedDb(this.dataSource, (m) =>
-        m.getRepository(Notification).findOne({ where: { id: rows[0].id } }),
-      );
+      // `null` from the door means the fingerprint index refused the row --
+      // another replica holds this alert -- so this processor sends nothing for
+      // it. That is the whole arbitration; there is no second check.
+      const saved = await this.notifications.create(budget.userId, {
+        type: candidate.type,
+        severity: candidate.severity,
+        title: candidate.title,
+        message: candidate.message,
+        data: candidate.data,
+        budgetId: candidate.budgetId,
+        budgetCategoryId: candidate.budgetCategoryId,
+        // Where the bell sends the reader: the budget the alert is about.
+        target: `/budgets/${candidate.budgetId}`,
+        periodStart,
+      });
       if (saved) savedAlerts.push(saved);
     }
 
@@ -390,9 +377,7 @@ export class BudgetAlertService {
         emailsSent = 1;
         for (const alert of criticalAlerts) {
           alert.isEmailSent = true;
-          await withScopedDb(this.dataSource, (m) =>
-            m.getRepository(Notification).save(alert),
-          );
+          await this.notifications.markEmailSent(alert.id);
         }
       }
     }
@@ -1078,45 +1063,5 @@ export class BudgetAlertService {
         flexGroup: bc.flexGroup,
       };
     });
-  }
-
-  @Cron("0 3 * * *")
-  async purgeOldAlerts(): Promise<void> {
-    this.logger.log("Purging old alerts...");
-    try {
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 30);
-
-      // RLS (task C2): cross-user bulk purge -- runs under a system context.
-      const { dismissed, read } = await withSystemContext(async () => {
-        const result = await withScopedDb(this.dataSource, (m) =>
-          m.getRepository(Notification).delete({
-            dismissedAt: LessThan(cutoff),
-          }),
-        );
-        const readResult = await withScopedDb(this.dataSource, (m) =>
-          m.getRepository(Notification).delete({
-            isRead: true,
-            dismissedAt: IsNull(),
-            createdAt: LessThan(cutoff),
-          }),
-        );
-        return {
-          dismissed: result.affected || 0,
-          read: readResult.affected || 0,
-        };
-      });
-
-      if (dismissed + read > 0) {
-        this.logger.log(
-          `Purged ${dismissed} dismissed and ${read} old read alerts`,
-        );
-      }
-    } catch (error) {
-      this.logger.error(
-        "Failed to purge old alerts",
-        error instanceof Error ? error.stack : error,
-      );
-    }
   }
 }

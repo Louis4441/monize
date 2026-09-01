@@ -128,6 +128,7 @@ implied.
 | INV-CRON-001 | One logical cron effect per schedule tick, across replicas | partial |
 | INV-PROVIDER-001 | An unreachable provider stops being called, and produces at most one alert pair per outage | enforced |
 | INV-ALERT-001 | A system alert row lands at most once per (recipient, dedupe key), and only the insert winner emails | enforced |
+| INV-NOTIFY-001 | Every notification row is written by NotificationService.create; no producer touches the table | enforced |
 | INV-RLS-001 | Enforced mode refuses to run on a role that can bypass RLS | enforced |
 | INV-CACHE-001 | A money-moving write invalidates every derived cache | enforced |
 | INV-PAYEE-001 | A contact lookup never overwrites a value the user entered, and the automatic one runs at most once per payee | enforced |
@@ -2389,11 +2390,12 @@ Source of truth     notifications.dedupe_key under the partial unique index
                     index from migration 140 cannot arbitrate these rows: it
                     keys on budget_id, NULL for every system alert, and NULL
                     never equals NULL in a unique index.
-Enforcement         SystemAlertService.insertAlert writes INSERT ... ON CONFLICT
-                    (user_id, dedupe_key) WHERE dedupe_key IS NOT NULL DO
-                    NOTHING RETURNING id; the email leg runs only for rows the
-                    INSERT returned (the insert-winner shape BudgetAlertService
-                    uses). shouldEmail refuses SMTP_FAILURE unconditionally.
+Enforcement         SystemAlertService.insertAlert asks
+                    NotificationService.create, whose INSERT ... ON CONFLICT DO
+                    NOTHING RETURNING id names no conflict target and so is
+                    arbitrated for these rows by the dedupe index; the email leg
+                    runs only where create returned a row. shouldEmail refuses
+                    SMTP_FAILURE unconditionally.
                     The provider pair additionally sits behind provider_health's
                     conditional-UPDATE claim, so its episode semantics are
                     unchanged.
@@ -2418,6 +2420,45 @@ Required tests      system-alerts/system-alert.service.spec.ts (fan-out,
                     same-key raises produce one row per admin; the partial-index
                     ON CONFLICT target is accepted by the real planner, which a
                     mocked query cannot prove).
+Status              enforced
+```
+
+### INV-NOTIFY-001 -- one writer owns the notifications table
+
+```text
+Statement           Every notification row is written by
+                    NotificationService.create. No producer inserts, updates or
+                    deletes the notifications table itself, so the column
+                    bounds, the conflict handling and the period_start default
+                    are one rule rather than one rule per producer.
+Source of truth     src/notification-center/notification.service.ts
+Enforcement         notification-write-door.spec.ts scans every tracked
+                    non-spec file under backend/src for a raw INSERT/UPDATE/
+                    DELETE naming the table and for a repository write on the
+                    Notification entity, with comments blanked so the prose
+                    explaining the ban cannot trip it. Three files are
+                    allowlisted with reasons -- the door, delete-my-data, and
+                    the restore's table wipe -- none of which produce
+                    notifications; the spec also fails if an allowlisted file
+                    stops writing, because a standing permission nobody uses is
+                    inherited by the next writer in that file.
+Concurrency scope   n/a -- a static property of the source
+Retry semantics     n/a
+Crash semantics     n/a
+Failure response    n/a
+Required tests      notification-write-door.spec.ts (the scan, plus a
+                    stripper test in both directions);
+                    notification.service.spec.ts (the bounds and the conflict
+                    answer the door enforces on every producer's behalf).
+Why it exists       There were three writers with three opinions: a raw INSERT
+                    for budget alerts with its own conflict target and no title
+                    bound, an entity save for bill reminders with no conflict
+                    handling at all, and a second raw INSERT for system alerts
+                    with its own truncation helpers. Every rule the row has to
+                    obey therefore held on one path and not the others -- an
+                    over-long scheduled-transaction name raised 22001 inside a
+                    never-throws catch, and the notification the user needed
+                    silently never existed.
 Status              enforced
 ```
 

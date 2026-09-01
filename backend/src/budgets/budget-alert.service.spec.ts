@@ -4,6 +4,7 @@ import { getRepositoryToken } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
 import { BudgetAlertService } from "./budget-alert.service";
+import { NotificationService } from "../notification-center/notification.service";
 import { Budget, BudgetType, BudgetStrategy } from "./entities/budget.entity";
 import {
   BudgetCategory,
@@ -209,21 +210,33 @@ describe("BudgetAlertService", () => {
     // the in-memory comparison (audit P4-015). So the double has to behave like
     // the real insert: record the row, hand back an id, and let the follow-up
     // read find it.
+    //
+    // Parameters are read by the column the statement names rather than by
+    // position: by index this double silently mapped `target` onto `periodStart`
+    // the moment the INSERT moved behind one write door, which is a fact about
+    // that writer's column order and not about the row.
     insertedAlerts = [];
     scopedManager.query.mockImplementation(
       async (sql: string, params: unknown[]) => {
         if (!sql.includes("INSERT INTO notifications")) return [];
+        const columns = /INSERT INTO notifications\s*\(([^)]*)\)/.exec(sql);
+        if (!columns) throw new Error(`no column list in: ${sql}`);
+        const byColumn = Object.fromEntries(
+          columns[1]
+            .split(",")
+            .map((name, i) => [name.trim(), params[i]] as const),
+        );
         const row = {
           id: `alert-${insertedAlerts.length + 1}`,
-          userId: params[0],
-          budgetId: params[1],
-          budgetCategoryId: params[2],
-          type: params[3],
-          severity: params[4],
-          title: params[5],
-          message: params[6],
-          data: JSON.parse(String(params[7])),
-          periodStart: params[8],
+          userId: byColumn.user_id,
+          budgetId: byColumn.budget_id,
+          budgetCategoryId: byColumn.budget_category_id,
+          type: byColumn.alert_type,
+          severity: byColumn.severity,
+          title: byColumn.title,
+          message: byColumn.message,
+          data: JSON.parse(String(byColumn.data)),
+          periodStart: byColumn.period_start,
         };
         insertedAlerts.push(row);
         return [[{ id: row.id }], 1];
@@ -237,6 +250,13 @@ describe("BudgetAlertService", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BudgetAlertService,
+        // The real write door on the same mocked connection: these tests are
+        // about the statement that lands and which alerts email, so a double
+        // standing in for the writer would assert the call instead of the row.
+        {
+          provide: NotificationService,
+          useFactory: () => new NotificationService(scopedDataSource as never),
+        },
         { provide: getRepositoryToken(Budget), useValue: budgetsRepository },
         {
           provide: getRepositoryToken(Notification),
@@ -1727,37 +1747,6 @@ describe("BudgetAlertService", () => {
       expect(periodEnd).toBe(
         `${year}-${month}-${String(lastDay).padStart(2, "0")}`,
       );
-    });
-  });
-
-  describe("purgeOldAlerts", () => {
-    it("deletes dismissed alerts older than 30 days", async () => {
-      alertsRepository.delete.mockResolvedValue({ affected: 5 });
-
-      await service.purgeOldAlerts();
-
-      expect(alertsRepository.delete).toHaveBeenCalledWith(
-        expect.objectContaining({ dismissedAt: expect.anything() }),
-      );
-    });
-
-    it("deletes read alerts older than 30 days", async () => {
-      alertsRepository.delete
-        .mockResolvedValueOnce({ affected: 0 })
-        .mockResolvedValueOnce({ affected: 3 });
-
-      await service.purgeOldAlerts();
-
-      expect(alertsRepository.delete).toHaveBeenCalledTimes(2);
-      expect(alertsRepository.delete).toHaveBeenCalledWith(
-        expect.objectContaining({ isRead: true }),
-      );
-    });
-
-    it("handles errors gracefully", async () => {
-      alertsRepository.delete.mockRejectedValue(new Error("DB error"));
-
-      await expect(service.purgeOldAlerts()).resolves.not.toThrow();
     });
   });
 });

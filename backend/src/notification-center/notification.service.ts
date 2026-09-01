@@ -73,7 +73,9 @@ export interface CreateNotificationInput {
  * A notification as a reader sees it: the row, plus the category derived from
  * its type. There is no `category` column -- see `notificationCategoryOf`.
  */
-export type NotificationView = Notification & { category: NotificationCategory };
+export type NotificationView = Notification & {
+  category: NotificationCategory;
+};
 
 function withCategory(row: Notification): NotificationView {
   return { ...row, category: notificationCategoryOf(row.type) };
@@ -168,6 +170,23 @@ export class NotificationService {
           .findOne({ where: { id } })) ?? null
       );
     });
+  }
+
+  /**
+   * Record that this notification's email went out.
+   *
+   * Here rather than at the producer so the table has one writer: a producer
+   * that loaded the row and saved it back would be a second place deciding what
+   * a notification row looks like, and the guard scan could no longer tell a
+   * flag update from a create.
+   */
+  async markEmailSent(notificationId: string): Promise<void> {
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        `UPDATE notifications SET is_email_sent = true WHERE id = $1`,
+        [notificationId],
+      ),
+    );
   }
 
   /** The reader's live notifications, newest first. */

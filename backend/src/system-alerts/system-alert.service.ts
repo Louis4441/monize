@@ -2,7 +2,6 @@ import { forwardRef, Inject, Injectable, Logger } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { I18nService } from "nestjs-i18n";
 import { withScopedDb } from "../common/db/scoped-db";
-import { returnedRows } from "../common/db/query-result";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
 import {
   NotificationSeverity,
@@ -21,12 +20,18 @@ import {
   JobClaimService,
   JobClaimType,
 } from "../common/jobs/job-claim.service";
+import {
+  DEDUPE_KEY_MAX_LENGTH,
+  NotificationService,
+} from "../notification-center/notification.service";
 
-/** Matches notifications.dedupe_key VARCHAR(120). */
-export const DEDUPE_KEY_MAX_LENGTH = 120;
-
-/** Matches notifications.title VARCHAR(255). */
-export const TITLE_MAX_LENGTH = 255;
+// The column bounds live with the writer that enforces them; re-exported here
+// because the email-dedupe claim key is bounded by the same column width and
+// callers' specs assert against it.
+export {
+  DEDUPE_KEY_MAX_LENGTH,
+  TITLE_MAX_LENGTH,
+} from "../notification-center/notification.service";
 
 export interface SystemAlertInput {
   type: NotificationType;
@@ -38,6 +43,11 @@ export interface SystemAlertInput {
   /** Facts for client-side localization. Include `system: true`; never store a
    *  value that goes stale while the row lives. */
   data: Record<string, unknown>;
+  /**
+   * Where the bell sends the reader, as a same-origin path. Optional: most
+   * system alerts describe a deployment state with no page to open.
+   */
+  target?: string | null;
   /**
    * Explicit fingerprint, unique per recipient via `idx_notifications_dedupe`
    * -- the cross-replica arbiter for both the row and its email. At most
@@ -109,6 +119,11 @@ export class SystemAlertService {
     private readonly emailService: EmailService,
     private readonly i18n: I18nService,
     private readonly jobClaims: JobClaimService,
+    // Every notification this service raises goes through the one write door,
+    // which owns the column bounds, the conflict handling and the period
+    // default -- so a system alert and a budget alert cannot land as differently
+    // shaped rows.
+    private readonly notifications: NotificationService,
   ) {}
 
   /**
@@ -184,7 +199,7 @@ export class SystemAlertService {
           const sent = await this.emailAdmin({ ...admin, email }, input);
           if (sent) {
             emailed += 1;
-            await this.markEmailSent(rowId);
+            await this.notifications.markEmailSent(rowId);
           }
         }
       } catch (error) {
@@ -205,39 +220,16 @@ export class SystemAlertService {
     userId: string,
     input: Omit<SystemAlertInput, "email">,
   ): Promise<string | null> {
-    const rows = returnedRows<{ id: string }>(
-      await withScopedDb(this.dataSource, (manager) =>
-        manager.query(
-          `INSERT INTO notifications
-             (user_id, alert_type, severity, title, message, data,
-              period_start, dedupe_key)
-           VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
-           ON CONFLICT (user_id, dedupe_key) WHERE dedupe_key IS NOT NULL
-             DO NOTHING
-           RETURNING id`,
-          [
-            userId,
-            input.type,
-            input.severity,
-            boundedTitle(input.title),
-            input.message,
-            JSON.stringify(input.data ?? {}),
-            todayIsoDate(),
-            this.boundedDedupeKey(input),
-          ],
-        ),
-      ),
-    );
-    return rows[0]?.id ?? null;
-  }
-
-  private async markEmailSent(alertId: string): Promise<void> {
-    await withScopedDb(this.dataSource, (manager) =>
-      manager.query(
-        `UPDATE notifications SET is_email_sent = true WHERE id = $1`,
-        [alertId],
-      ),
-    );
+    const row = await this.notifications.create(userId, {
+      type: input.type,
+      severity: input.severity,
+      title: input.title,
+      message: input.message,
+      data: input.data,
+      target: input.target,
+      dedupeKey: input.dedupeKey,
+    });
+    return row?.id ?? null;
   }
 
   /**
@@ -331,21 +323,6 @@ export class SystemAlertService {
     );
   }
 
-  /**
-   * Keys are bounded by construction (type + UUID + date is well under the
-   * column); a longer one is a caller bug, reported and truncated
-   * deterministically rather than thrown, because the alert still deduping --
-   * slightly too coarsely -- beats the sweep that raised it dying here.
-   */
-  private boundedDedupeKey(input: Omit<SystemAlertInput, "email">): string {
-    if (input.dedupeKey.length <= DEDUPE_KEY_MAX_LENGTH) return input.dedupeKey;
-    this.logger.error(
-      `Dedupe key for ${input.type} exceeds ${DEDUPE_KEY_MAX_LENGTH} chars ` +
-        `and was truncated: ${input.dedupeKey.slice(0, 60)}...`,
-    );
-    return input.dedupeKey.slice(0, DEDUPE_KEY_MAX_LENGTH);
-  }
-
   /** Say once that there is nobody to tell, not once per sweep. */
   private reportNoAdmins(type: NotificationType): void {
     if (this.noAdminsReported) return;
@@ -355,24 +332,4 @@ export class SystemAlertService {
         "was told. It is raised again once an administrator exists.",
     );
   }
-}
-
-/**
- * A title the `title VARCHAR(255)` column will accept.
- *
- * Producers interpolate names they do not control -- a scheduled
- * transaction's, an account's -- and an over-long one makes PostgreSQL raise
- * 22001, which the never-throws contract then swallows: the alert silently
- * never exists, and for SCHEDULED_POST_FAILED that means the user is never
- * told their money did not move. Truncating is the honest failure here, and
- * it happens once, at the door, rather than at each producer.
- */
-function boundedTitle(title: string): string {
-  if (title.length <= TITLE_MAX_LENGTH) return title;
-  return `${title.slice(0, TITLE_MAX_LENGTH - 1)}\u2026`;
-}
-
-/** Today as the DATE the NOT NULL period_start column requires. */
-function todayIsoDate(): string {
-  return new Date().toISOString().slice(0, 10);
 }

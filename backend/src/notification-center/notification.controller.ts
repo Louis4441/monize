@@ -23,7 +23,6 @@ import { AuthGuard } from "@nestjs/passport";
 import { NotificationService } from "./notification.service";
 import { DismissNotificationsQueryDto } from "./dto/dismiss-notifications-query.dto";
 import { BudgetsService } from "../budgets/budgets.service";
-import { Inject, forwardRef } from "@nestjs/common";
 import {
   AllowDelegate,
   DelegateRequiresSection,
@@ -50,10 +49,9 @@ export class NotificationController {
   constructor(
     private readonly notifications: NotificationService,
     // Bill reminders are materialized on read rather than by a cron, so the
-    // list endpoint asks their producer to catch up first. The edge is deferred
-    // because BudgetsModule needs NotificationService to write through the one
-    // door -- see `src/module-graph.spec.ts`.
-    @Inject(forwardRef(() => BudgetsService))
+    // list endpoint asks their producer to catch up first. This is the only
+    // dependency the notification centre has on a producer, and it is why the
+    // controller lives in its own module -- see `notification-api.module.ts`.
     private readonly budgets: BudgetsService,
   ) {}
 

@@ -70,6 +70,10 @@ const WITH_CONTEXT_ALLOWLIST = [
   // Joint register writes: authorization-decision row load plus the
   // owner-scoped mutation window, both fully decided by jointAccessFor
   // before the bypass opens (joint-accounts spec W1).
+  // The nightly purge of notifications the reader is done with: a cross-user
+  // sweep from a cron entry point, with no request to inherit an identity
+  // from. Every other method here runs under the caller's own context.
+  "src/notification-center/notification.service.ts",
   "src/transactions/joint-register.service.ts",
   "src/emergency-access/emergency-access-claim.controller.ts",
   "src/emergency-access/emergency-access-monitor.service.ts",

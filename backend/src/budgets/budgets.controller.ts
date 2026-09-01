@@ -9,7 +9,6 @@ import {
   UseGuards,
   Request,
   Query,
-  ParseBoolPipe,
   ParseUUIDPipe,
 } from "@nestjs/common";
 import {

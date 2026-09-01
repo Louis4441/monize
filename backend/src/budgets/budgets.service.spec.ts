@@ -1,6 +1,6 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
-import { DataSource, In, IsNull, Not } from "typeorm";
+import { DataSource } from "typeorm";
 import { NotFoundException, BadRequestException } from "@nestjs/common";
 import { BudgetsService } from "./budgets.service";
 import { ScheduledEffectiveAmountService } from "../scheduled-transactions/scheduled-effective-amount.service";
@@ -22,8 +22,6 @@ import {
 import {
   Notification,
   NotificationType,
-  NotificationSeverity,
-  SYSTEM_NOTIFICATION_TYPES,
 } from "../notification-center/entities/notification.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
@@ -117,27 +115,6 @@ describe("BudgetsService", () => {
     sortOrder: 0,
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
-  };
-
-  const mockAlert: Notification = {
-    id: "alert-1",
-    userId: "user-1",
-    budgetId: "budget-1",
-    budget: mockBudget,
-    budgetCategoryId: "bc-1",
-    budgetCategory: mockBudgetCategory,
-    type: NotificationType.THRESHOLD_WARNING,
-    severity: NotificationSeverity.WARNING,
-    target: null,
-    title: "Groceries at 80%",
-    message: "You have spent 80% of your groceries budget",
-    data: {},
-    isRead: false,
-    isEmailSent: false,
-    periodStart: "2026-02-01",
-    createdAt: new Date("2026-02-15"),
-    dismissedAt: null,
-    dedupeKey: null,
   };
 
   const createMockQueryBuilder = (

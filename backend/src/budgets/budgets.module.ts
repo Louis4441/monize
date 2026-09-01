@@ -1,4 +1,4 @@
-import { Module, forwardRef } from "@nestjs/common";
+import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { Budget } from "./entities/budget.entity";
 import { BudgetCategory } from "./entities/budget-category.entity";
@@ -55,9 +55,9 @@ import { NotificationCenterModule } from "../notification-center/notification-ce
     // currency, which the budget converts into its own before totalling.
     CurrenciesModule,
     // For NotificationService: every notification a budget produces goes
-    // through the one write door. Deferred because the notification centre's
-    // list endpoint calls back here to materialize bill reminders.
-    forwardRef(() => NotificationCenterModule),
+    // through the one write door. Bare, not deferred: the notification centre
+    // depends on nothing, so this edge lies on no cycle.
+    NotificationCenterModule,
   ],
   providers: [
     BudgetsService,

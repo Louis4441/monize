@@ -1,12 +1,10 @@
 import {
-  Inject,
   Injectable,
   NotFoundException,
   BadRequestException,
-  forwardRef,
 } from "@nestjs/common";
 import { tr } from "../i18n/translate";
-import { DataSource, In, IsNull, Not } from "typeorm";
+import { DataSource, In } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { Budget } from "./entities/budget.entity";
 import { BudgetCategory } from "./entities/budget-category.entity";
@@ -110,9 +108,7 @@ export class BudgetsService {
     private exchangeRates: ExchangeRateService,
     // Every notification this service produces goes through the one door, so
     // the column bounds, the conflict handling and the period default are not
-    // re-decided here. The edge is deferred because the notification centre's
-    // list endpoint calls back into this service to materialize bill reminders.
-    @Inject(forwardRef(() => NotificationService))
+    // re-decided here.
     private notifications: NotificationService,
   ) {}
 
