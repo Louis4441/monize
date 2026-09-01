@@ -134,9 +134,9 @@
     "recentTransactionsLabel": "Giao tác gần đây trong điền nhanh",
     "recentTransactionsHelp": "Số mục được hiển thị trong cửa sổ bật lên lịch sử bên cạnh trường Người nhận trên biểu mẫu giao tác.",
     "mapProviderLabel": "Nhà cung cấp bản đồ cho địa chỉ",
-    "mapProviderHelp": "Dịch vụ bản đồ nào sẽ mở khi bạn nhấp vào một địa chỉ. Mặc định của thiết bị theo nền tảng của bạn: Apple Maps trên iPhone và iPad, ứng dụng bản đồ mặc định của bạn trên Android, và OpenStreetMap ở những nơi khác.",
+    "mapProviderHelp": "Dịch vụ bản đồ nào sẽ mở khi bạn nhấp vào một địa chỉ trong trình duyệt máy tính. Điện thoại và máy tính bảng luôn mở ứng dụng bản đồ của riêng chúng, bất kể bạn chọn gì ở đây. Tự động sẽ dùng OpenStreetMap trên máy tính.",
     "mapProviderOptions": {
-      "device": "Mặc định của thiết bị",
+      "device": "Tự động",
       "apple": "Apple Maps",
       "bing": "Bing Maps",
       "google": "Google Maps",

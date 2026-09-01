@@ -134,9 +134,9 @@
     "recentTransactionsLabel": "Recente transacties in snel invullen",
     "recentTransactionsHelp": "Aantal vermeldingen dat wordt weergegeven in de popover van de geschiedenis-knop naast het veld Begunstigde op transactieformulieren.",
     "mapProviderLabel": "Kaartaanbieder voor adressen",
-    "mapProviderHelp": "Welke kaartendienst wordt geopend wanneer u op een adres klikt. Standaard van apparaat volgt uw platform: Apple Kaarten op iPhone en iPad, uw standaard kaarten-app op Android en OpenStreetMap elders.",
+    "mapProviderHelp": "Welke kaartendienst wordt geopend wanneer u in een desktopbrowser op een adres klikt. Telefoons en tablets openen altijd hun eigen kaarten-app, wat u hier ook kiest. Automatisch gebruikt OpenStreetMap op de desktop.",
     "mapProviderOptions": {
-      "device": "Standaard van apparaat",
+      "device": "Automatisch",
       "apple": "Apple Maps",
       "bing": "Bing Maps",
       "google": "Google Maps",

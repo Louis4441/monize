@@ -134,9 +134,9 @@
     "recentTransactionsLabel": "Transacciones recientes en completado rápido",
     "recentTransactionsHelp": "Número de entradas mostradas en el historial emergente junto al campo Beneficiario en los formularios de transacciones.",
     "mapProviderLabel": "Proveedor de mapas para direcciones",
-    "mapProviderHelp": "Qué servicio de mapas se abre al hacer clic en una dirección. El predeterminado del dispositivo usa su plataforma: Apple Maps en iPhone y iPad, su aplicación de mapas predeterminada en Android, y OpenStreetMap en el resto.",
+    "mapProviderHelp": "Qué servicio de mapas se abre al hacer clic en una dirección en un navegador de escritorio. Los teléfonos y las tabletas siempre abren su propia aplicación de mapas, sea cual sea su elección aquí. Automático usa OpenStreetMap en el escritorio.",
     "mapProviderOptions": {
-      "device": "Predeterminado del dispositivo",
+      "device": "Automático",
       "apple": "Apple Maps",
       "bing": "Bing Maps",
       "google": "Google Maps",

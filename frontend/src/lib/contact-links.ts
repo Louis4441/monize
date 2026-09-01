@@ -15,10 +15,10 @@
  * Map services an address link can be sent to, as stored in the user's
  * `defaultMapProvider` preference.
  *
- * 'device' is the platform hand-off that predates the setting -- Apple Maps on
- * iOS, a `geo:` URI on Android (which opens whichever map app the phone is set
- * to), OpenStreetMap everywhere else. It is a value rather than an absence so a
- * user can deliberately choose it again after picking something specific.
+ * Every one of these applies on DESKTOP only: iOS and Android always hand off
+ * to the device's own map app (see mapsUrl). 'device' is the unset default and
+ * resolves to OpenStreetMap on a desktop; it is a value rather than an absence
+ * so a user can deliberately choose it again after picking something specific.
  *
  * Mirrors MAP_PROVIDERS in the backend's update-preferences DTO, which is what
  * the API and the database CHECK constraint validate against.
@@ -78,8 +78,9 @@ export function addressQuery(address: string): string {
 export interface MapsUrlInput {
   address: string;
   /**
-   * The user's chosen map service. Absent or 'device' keeps the platform
-   * hand-off, which is what everyone got before the preference existed.
+   * The user's chosen map service, which applies on desktop only -- a device
+   * with its own map app ignores it. Absent or 'device' means OpenStreetMap on
+   * desktop, which is what everyone got before the preference existed.
    */
   provider?: MapProvider;
   /** Injectable for tests; defaults to the current device. */
@@ -103,6 +104,20 @@ export function mapsUrl({
   if (!query) return null;
 
   const label = encodeURIComponent(query);
+  const target = platform ?? detectMapPlatform();
+
+  // A device with its own map app always hands off to it, whatever the
+  // preference says. The setting describes what a DESKTOP browser should do,
+  // where there is no such app -- sending a phone to a web map instead of the
+  // app it has installed is the behaviour the address link exists to avoid.
+  //
+  // The check lives here rather than at the call site because this is the one
+  // place a provider becomes a URL: a second caller that skipped it would be a
+  // rule nobody enforces.
+  if (target === 'ios') return `https://maps.apple.com/?q=${label}`;
+  // geo:0,0?q=<query> is the documented form for searching by text rather than
+  // dropping a pin at literal 0,0.
+  if (target === 'android') return `geo:0,0?q=${label}`;
 
   switch (provider) {
     case 'openstreetmap':
@@ -118,18 +133,9 @@ export function mapsUrl({
     case 'waze':
       return `https://waze.com/ul?q=${label}`;
     default:
-      break;
+      // 'device' on a desktop, and any value a newer build might have stored.
+      return `https://www.openstreetmap.org/search?query=${label}`;
   }
-
-  // 'device' and anything unrecognised (a value stored by a newer build, say)
-  // fall through to the platform hand-off rather than to a hardcoded service:
-  // guessing is what this branch is for, and it is the documented default.
-  const target = platform ?? detectMapPlatform();
-  if (target === 'ios') return `https://maps.apple.com/?q=${label}`;
-  // geo:0,0?q=<query> is the documented form for searching by text rather than
-  // dropping a pin at literal 0,0.
-  if (target === 'android') return `geo:0,0?q=${label}`;
-  return `https://www.openstreetmap.org/search?query=${label}`;
 }
 
 /**

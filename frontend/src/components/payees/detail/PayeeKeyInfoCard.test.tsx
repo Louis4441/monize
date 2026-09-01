@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
 import { render } from '@/test/render';
 import { PayeeKeyInfoCard } from './PayeeKeyInfoCard';
@@ -142,6 +142,12 @@ describe('PayeeKeyInfoCard', () => {
 });
 
 describe('PayeeKeyInfoCard contact details', () => {
+  // The ref is module-level, so without this the tests depend on running in
+  // order and one leaks its provider into the next.
+  beforeEach(() => {
+    mapProvider.current = undefined;
+  });
+
   const withContact = (overrides: Partial<PayeeDetail['payee']>) =>
     detailFixture({
       payee: { ...detailFixture().payee, ...overrides },
@@ -226,6 +232,46 @@ describe('PayeeKeyInfoCard contact details', () => {
     expect(
       screen.getByRole('link', { name: /1912 Pike Pl/ }).getAttribute('href'),
     ).toContain('google.com/maps');
+  });
+
+  it('hands off to the phone map app even when a provider is stored', () => {
+    // The preference applies to desktop only. jsdom reports a desktop UA, so
+    // the platform has to be stubbed to exercise the branch a phone takes.
+    // userAgent lives on Navigator.prototype, so there is no own descriptor to
+    // put back -- defining one shadows the prototype and deleting it is what
+    // undoes that. Restoring an undefined descriptor would leave the stub in
+    // place for every test after this one.
+    const original = Object.getOwnPropertyDescriptor(
+      window.navigator,
+      'userAgent',
+    );
+    Object.defineProperty(window.navigator, 'userAgent', {
+      value:
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
+      configurable: true,
+    });
+    mapProvider.current = 'google';
+
+    try {
+      render(
+        <PayeeKeyInfoCard
+          detail={withContact({ address: '1912 Pike Pl, Seattle' })}
+          categoryLabelMap={new Map()}
+          onSelectDate={vi.fn()}
+          onSelectAccount={vi.fn()}
+        />,
+      );
+
+      expect(
+        screen.getByRole('link', { name: /1912 Pike Pl/ }).getAttribute('href'),
+      ).toContain('maps.apple.com');
+    } finally {
+      if (original) {
+        Object.defineProperty(window.navigator, 'userAgent', original);
+      } else {
+        delete (window.navigator as { userAgent?: unknown }).userAgent;
+      }
+    }
   });
 
   it('falls back to the platform hand-off when no provider is stored', () => {

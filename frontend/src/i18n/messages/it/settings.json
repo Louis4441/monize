@@ -134,9 +134,9 @@
     "recentTransactionsLabel": "Transazioni recenti nel riempimento rapido",
     "recentTransactionsHelp": "Numero di voci mostrate nel popover della cronologia accanto al campo Beneficiario nei moduli transazione.",
     "mapProviderLabel": "Provider di mappe per gli indirizzi",
-    "mapProviderHelp": "Quale servizio di mappe si apre quando fai clic su un indirizzo. L'impostazione predefinita del dispositivo segue la tua piattaforma: Apple Mappe su iPhone e iPad, la tua app di mappe predefinita su Android e OpenStreetMap altrove.",
+    "mapProviderHelp": "Quale servizio di mappe si apre quando fai clic su un indirizzo in un browser desktop. Telefoni e tablet aprono sempre la propria app di mappe, qualunque cosa tu scelga qui. Automatico usa OpenStreetMap su desktop.",
     "mapProviderOptions": {
-      "device": "Predefinito del dispositivo",
+      "device": "Automatico",
       "apple": "Apple Maps",
       "bing": "Bing Maps",
       "google": "Google Maps",

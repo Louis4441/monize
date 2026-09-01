@@ -134,9 +134,9 @@
     "recentTransactionsLabel": "Transaksi terbaru dalam isi-cepat",
     "recentTransactionsHelp": "Jumlah entri yang ditampilkan di popover tombol riwayat di samping kolom Penerima pada formulir transaksi.",
     "mapProviderLabel": "Penyedia peta untuk alamat",
-    "mapProviderHelp": "Layanan peta mana yang terbuka saat Anda mengeklik alamat. Bawaan perangkat mengikuti platform Anda: Apple Maps di iPhone dan iPad, aplikasi peta bawaan Anda di Android, dan OpenStreetMap di tempat lain.",
+    "mapProviderHelp": "Layanan peta mana yang terbuka saat Anda mengeklik alamat di peramban desktop. Ponsel dan tablet selalu membuka aplikasi peta mereka sendiri, apa pun pilihan Anda di sini. Otomatis menggunakan OpenStreetMap di desktop.",
     "mapProviderOptions": {
-      "device": "Bawaan perangkat",
+      "device": "Otomatis",
       "apple": "Apple Maps",
       "bing": "Bing Maps",
       "google": "Google Maps",

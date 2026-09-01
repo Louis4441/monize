@@ -134,9 +134,9 @@
     "recentTransactionsLabel": "Hızlı doldurma için son işlemler",
     "recentTransactionsHelp": "İşlem formlarında Alacaklı alanı yanındaki geçmiş düğmesi açılır penceresinde gösterilen kayıt sayısı.",
     "mapProviderLabel": "Adresler için harita sağlayıcısı",
-    "mapProviderHelp": "Bir adrese tıkladığınızda hangi harita hizmetinin açılacağı. Cihaz varsayılanı platformunuzu izler: iPhone ve iPad’de Apple Haritalar, Android’de varsayılan harita uygulamanız, diğer durumlarda OpenStreetMap.",
+    "mapProviderHelp": "Masaüstü tarayıcıda bir adrese tıkladığınızda hangi harita hizmetinin açılacağı. Telefonlar ve tabletler, burada ne seçerseniz seçin her zaman kendi harita uygulamalarını açar. Otomatik, masaüstünde OpenStreetMap kullanır.",
     "mapProviderOptions": {
-      "device": "Cihaz varsayılanı",
+      "device": "Otomatik",
       "apple": "Apple Maps",
       "bing": "Bing Maps",
       "google": "Google Maps",

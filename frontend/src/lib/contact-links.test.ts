@@ -3,6 +3,7 @@ import {
   addressQuery,
   detectMapPlatform,
   mailtoHref,
+  MAP_PROVIDERS,
   mapsUrl,
   telHref,
 } from './contact-links';
@@ -76,7 +77,7 @@ describe('mapsUrl', () => {
     expect(url).toContain(encodeURIComponent('1912 Pike Pl, Seattle, WA'));
   });
 
-  describe('with an explicit provider', () => {
+  describe('with an explicit provider, on a desktop', () => {
     it.each([
       ['openstreetmap', 'https://www.openstreetmap.org/search?query='],
       ['google', 'https://www.google.com/maps/search/?api=1&query='],
@@ -84,20 +85,36 @@ describe('mapsUrl', () => {
       ['bing', 'https://www.bing.com/maps?where1='],
       ['waze', 'https://waze.com/ul?q='],
     ] as const)('sends %s to its own search URL', (provider, prefix) => {
-      expect(mapsUrl({ address, provider, platform: 'ios' })).toBe(
+      expect(mapsUrl({ address, provider, platform: 'other' })).toBe(
         `${prefix}${encodeURIComponent(address)}`,
       );
     });
+  });
 
-    it('overrides the platform rather than deferring to it', () => {
-      // The whole point of the preference: an iPhone user who picked Google
-      // must not be sent to Apple Maps.
-      expect(mapsUrl({ address, provider: 'google', platform: 'ios' })).toContain(
-        'google.com/maps',
+  describe('on a device with its own map app', () => {
+    // The preference describes what a desktop browser does. A phone or tablet
+    // hands off to the app it has installed, whatever is stored -- sending it
+    // to a web map instead is what the address link exists to avoid.
+    //
+    // Parametrised over every provider rather than a representative one, so a
+    // provider added later cannot quietly escape the rule.
+    const IOS_HANDOFF = `https://maps.apple.com/?q=${encodeURIComponent(address)}`;
+    const ANDROID_HANDOFF = `geo:0,0?q=${encodeURIComponent(address)}`;
+
+    it.each(MAP_PROVIDERS)('ignores %s on iOS', (provider) => {
+      expect(mapsUrl({ address, provider, platform: 'ios' })).toBe(IOS_HANDOFF);
+    });
+
+    it.each(MAP_PROVIDERS)('ignores %s on Android', (provider) => {
+      expect(mapsUrl({ address, provider, platform: 'android' })).toBe(
+        ANDROID_HANDOFF,
       );
+    });
+
+    it('ignores a provider a newer build might have stored', () => {
       expect(
-        mapsUrl({ address, provider: 'apple', platform: 'android' }),
-      ).toContain('maps.apple.com');
+        mapsUrl({ address, provider: 'yandex' as never, platform: 'ios' }),
+      ).toBe(IOS_HANDOFF);
     });
   });
 

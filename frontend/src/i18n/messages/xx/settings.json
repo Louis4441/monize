@@ -134,9 +134,9 @@
     "recentTransactionsLabel": "[XX-Recent transactions in quick-fill-XX]",
     "recentTransactionsHelp": "[XX-Number of entries shown in the history button popover next to the Payee field on transaction forms.-XX]",
     "mapProviderLabel": "[XX-Map provider for addresses-XX]",
-    "mapProviderHelp": "[XX-Which map service opens when you click an address. Device default uses your platform: Apple Maps on iPhone and iPad, your default map app on Android, OpenStreetMap elsewhere.-XX]",
+    "mapProviderHelp": "[XX-Which map service opens when you click an address in a desktop browser. Phones and tablets always open their own map app, whatever you choose here. Automatic uses OpenStreetMap on desktop.-XX]",
     "mapProviderOptions": {
-      "device": "[XX-Device default-XX]",
+      "device": "[XX-Automatic-XX]",
       "apple": "[XX-Apple Maps-XX]",
       "bing": "[XX-Bing Maps-XX]",
       "google": "[XX-Google Maps-XX]",
