@@ -85,11 +85,13 @@ export const MAX_LIVE_DEVICES_PER_USER = 20;
 /**
  * How many devices one test send talks to at a time.
  *
- * The per-send timeout bounds ONE delivery; this bounds the request. Sending to
- * the cap serially at the timeout would hold a request for the product of the
- * two, and the endpoints are hosts the account chose. Four at a time turns the
- * worst case into ceil(20/4) rounds -- about 25 seconds -- while a realistic
- * one or two devices is still a single round.
+ * The per-send bound covers ONE delivery; this bounds the request. Sending to
+ * the cap serially would hold a request for the product of the two, over hosts
+ * the account chose. Four at a time makes the worst case ceil(20/4) = 5 rounds,
+ * and a round is bounded by `PUSH_ENDPOINT_RECHECK_TIMEOUT_MS +
+ * PUSH_REQUEST_TIMEOUT_MS` -- about 35 seconds in total today. A realistic one
+ * or two devices is still a single round. Size a gateway timeout against the
+ * 35, not against the 5-second per-send figure.
  */
 export const PUSH_TEST_CONCURRENCY = 4;
 
@@ -169,10 +171,14 @@ export class PushSubscriptionService {
       // device the caller already holds is never blocked by it -- only a new
       // row is.
       const repo = manager.getRepository(PushSubscription);
-      const alreadyHeld = await repo.findOne({
-        where: { userId, endpointHash },
+      // Scoped to LIVE rows on purpose: the upsert below clears `disabled_at`,
+      // so re-enabling a retired device adds a live one and the cap has to see
+      // it. Matching any row would let an account past the cap deterministically
+      // rather than only through the race described below.
+      const alreadyLive = await repo.findOne({
+        where: { userId, endpointHash, disabledAt: IsNull() },
       });
-      if (!alreadyHeld) {
+      if (!alreadyLive) {
         const live = await repo.count({
           where: { userId, disabledAt: IsNull() },
         });
@@ -409,17 +415,22 @@ export class PushSubscriptionService {
     }
 
     if (outcome.status === "expired") {
-      await withScopedDb(this.dataSource, (manager) =>
-        manager.query(
-          `UPDATE push_subscriptions
-              SET disabled_at = CURRENT_TIMESTAMP,
-                  disabled_reason = $3,
-                  failure_count = failure_count + 1
-            WHERE id = $1 AND user_id = $2 AND disabled_at IS NULL`,
-          [subscriptionId, userId, outcome.reason],
+      // The transition, not the outcome: the guard means a device a concurrent
+      // send already retired keeps ITS reason, and reporting this attempt's
+      // reason anyway would show the user a repair that does not match the row.
+      const retired = await withScopedDb(this.dataSource, async (manager) =>
+        affectedRowCount(
+          await manager.query(
+            `UPDATE push_subscriptions
+                SET disabled_at = CURRENT_TIMESTAMP,
+                    disabled_reason = $3,
+                    failure_count = failure_count + 1
+              WHERE id = $1 AND user_id = $2 AND disabled_at IS NULL`,
+            [subscriptionId, userId, outcome.reason],
+          ),
         ),
       );
-      return outcome.reason;
+      return retired > 0 ? outcome.reason : undefined;
     }
 
     // Transient: count it, and retire the device once the bound is reached so a

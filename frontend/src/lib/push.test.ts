@@ -60,7 +60,10 @@ describe('pushApi', () => {
       deviceName: 'Pixel',
     });
 
-    expect(apiClient.get).toHaveBeenCalledWith('/push/subscriptions');
+    expect(apiClient.get).toHaveBeenCalledWith(
+      '/push/subscriptions',
+      undefined,
+    );
     const [, payload] = vi.mocked(apiClient.post).mock.calls[0];
     // The owner is the JWT's, and there is no field here that could say otherwise.
     expect(Object.keys(payload as object).sort()).toEqual([
@@ -81,7 +84,10 @@ describe('pushApi', () => {
     await pushApi.removeDevice('d-1');
     await pushApi.sendTest();
 
-    expect(apiClient.delete).toHaveBeenCalledWith('/push/subscriptions/d-1');
+    expect(apiClient.delete).toHaveBeenCalledWith(
+      '/push/subscriptions/d-1',
+      undefined,
+    );
     expect(apiClient.post).toHaveBeenCalledWith('/push/test');
   });
 });
@@ -394,7 +400,10 @@ describe('enabling and disabling push on this device', () => {
 
     await disablePushOnThisDevice('d-1');
 
-    expect(apiClient.delete).toHaveBeenCalledWith('/push/subscriptions/d-1');
+    expect(apiClient.delete).toHaveBeenCalledWith(
+      '/push/subscriptions/d-1',
+      undefined,
+    );
     expect(unsubscribe).toHaveBeenCalledTimes(1);
   });
 
@@ -464,7 +473,15 @@ describe('enabling and disabling push on this device', () => {
 
     await releasePushForSignOut();
 
-    expect(apiClient.delete).toHaveBeenCalledWith('/push/subscriptions/d-1');
+    // Flagged so a 401 arriving after the session is gone does not drive the
+    // interceptor's refresh-and-redirect on top of a sign-out already
+    // navigating.
+    expect(apiClient.delete).toHaveBeenCalledWith('/push/subscriptions/d-1', {
+      _skipAuthRedirect: true,
+    });
+    expect(apiClient.get).toHaveBeenCalledWith('/push/subscriptions', {
+      _skipAuthRedirect: true,
+    });
     expect(unsubscribe).toHaveBeenCalledTimes(1);
   });
 

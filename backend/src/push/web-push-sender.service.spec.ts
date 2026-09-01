@@ -2,6 +2,7 @@ import * as webpush from "web-push";
 import {
   WebPushSender,
   MAX_CONSECUTIVE_FAILURES,
+  PUSH_ENDPOINT_RECHECK_TIMEOUT_MS,
   PUSH_REQUEST_TIMEOUT_MS,
 } from "./web-push-sender.service";
 import { PushConfigService, VAPID_SUBJECT } from "./push-config.service";
@@ -79,6 +80,34 @@ describe("WebPushSender", () => {
   // internal request.
   it("refuses to send to an endpoint that no longer resolves publicly", async () => {
     validateUrlIsSafe.mockResolvedValue(false);
+
+    await expect(sender.send(target(), PAYLOAD)).resolves.toMatchObject({
+      status: "transient",
+    });
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
+
+  // The check resolves DNS, and dns.resolve4/6 carry no timeout of their own, so
+  // a stalled nameserver would sit in front of the HTTP send and the request
+  // timeout would bound only the half that had already got past it.
+  it("gives up on a check that stalls, and does not send", async () => {
+    jest.useFakeTimers();
+    try {
+      validateUrlIsSafe.mockReturnValue(new Promise(() => {}));
+
+      const pending = sender.send(target(), PAYLOAD);
+      await jest.advanceTimersByTimeAsync(PUSH_ENDPOINT_RECHECK_TIMEOUT_MS + 1);
+
+      await expect(pending).resolves.toMatchObject({ status: "transient" });
+      expect(sendNotification).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  // Not knowing whether a host is public is not the same as knowing it is.
+  it("does not send when the check itself fails", async () => {
+    validateUrlIsSafe.mockRejectedValue(new Error("resolver exploded"));
 
     await expect(sender.send(target(), PAYLOAD)).resolves.toMatchObject({
       status: "transient",

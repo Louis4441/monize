@@ -53,6 +53,25 @@ export function PushDevicesPanel() {
     setDevicesFailed(false);
   }, []);
 
+  // A browser can rotate its subscription on its own; the worker resubscribes
+  // and says so, and this is the surface that holds the session and the CSRF
+  // token needed to register the replacement. Without it the row keeps naming a
+  // dead endpoint and delivery stops with nothing to show for it.
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+      return;
+    }
+    // The container is captured, not re-read at teardown: an effect's cleanup
+    // must not depend on a global still being what it was when it subscribed.
+    const worker = navigator.serviceWorker;
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type !== 'monize-push-subscription-changed') return;
+      void refreshDevices().catch(() => setDevicesFailed(true));
+    };
+    worker.addEventListener('message', onMessage);
+    return () => worker.removeEventListener('message', onMessage);
+  }, [refreshDevices]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {

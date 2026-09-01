@@ -38,6 +38,8 @@ function loadServiceWorker(clients: WindowClientStub[] = []) {
   const listeners: Record<string, Listener[]> = {};
   const shown: ShownNotification[] = [];
   const openWindow = vi.fn(async (url: string) => ({ url }));
+  const resubscribe = vi.fn(async () => ({ endpoint: 'https://new.example' }));
+  const posted: unknown[] = [];
 
   const context = vm.createContext({
     self: {
@@ -50,10 +52,15 @@ function loadServiceWorker(clients: WindowClientStub[] = []) {
         showNotification: vi.fn(async (title: string, options: never) => {
           shown.push({ title, options });
         }),
+        pushManager: { subscribe: resubscribe },
       },
       clients: {
         claim: vi.fn(),
-        matchAll: async () => clients,
+        matchAll: async () =>
+          clients.map((client) => ({
+            ...client,
+            postMessage: (message: unknown) => posted.push(message),
+          })),
         openWindow,
       },
     },
@@ -96,6 +103,22 @@ function loadServiceWorker(clients: WindowClientStub[] = []) {
     await pending;
   };
 
+  const dispatchSubscriptionChange = async (
+    oldSubscription: unknown,
+  ): Promise<void> => {
+    let pending: Promise<unknown> = Promise.resolve();
+    const event = {
+      oldSubscription,
+      waitUntil: (promise: Promise<unknown>) => {
+        pending = promise;
+      },
+    };
+    for (const listener of listeners.pushsubscriptionchange ?? []) {
+      listener(event);
+    }
+    await pending;
+  };
+
   const dispatchClick = async (data: unknown) => {
     let pending: Promise<unknown> = Promise.resolve();
     const close = vi.fn();
@@ -110,7 +133,16 @@ function loadServiceWorker(clients: WindowClientStub[] = []) {
     return { close };
   };
 
-  return { listeners, shown, openWindow, dispatchPush, dispatchClick };
+  return {
+    listeners,
+    shown,
+    openWindow,
+    dispatchPush,
+    dispatchClick,
+    dispatchSubscriptionChange,
+    resubscribe,
+    posted,
+  };
 }
 
 describe('service worker push handling', () => {
@@ -328,5 +360,58 @@ describe('service worker notification clicks', () => {
     await sw.dispatchClick(undefined);
 
     expect(sw.openWindow).toHaveBeenCalledWith(`${ORIGIN}/`);
+  });
+});
+
+describe('service worker subscription rotation', () => {
+  const KEY = new Uint8Array([1, 2, 3]).buffer;
+
+  // A browser may rotate a subscription on its own. The old endpoint stops
+  // working and the stored row keeps naming it, so delivery just stops -- and
+  // with only a manual test send in the product, nothing retires the row.
+  it('resubscribes with the key the old subscription carried', async () => {
+    const sw = loadServiceWorker([]);
+
+    await sw.dispatchSubscriptionChange({
+      options: { applicationServerKey: KEY },
+    });
+
+    expect(sw.resubscribe).toHaveBeenCalledWith({
+      userVisibleOnly: true,
+      applicationServerKey: KEY,
+    });
+  });
+
+  // The worker cannot register the replacement itself: the API is CSRF-protected
+  // by a double-submit cookie it has no portable way to read. It tells the page,
+  // which has the session and the token.
+  it('tells every open window so the page can register the replacement', async () => {
+    const sw = loadServiceWorker([
+      { url: `${ORIGIN}/settings`, focus: vi.fn() },
+    ]);
+
+    await sw.dispatchSubscriptionChange({
+      options: { applicationServerKey: KEY },
+    });
+
+    expect(sw.posted).toEqual([{ type: 'monize-push-subscription-changed' }]);
+  });
+
+  it('does nothing when the old subscription names no key', async () => {
+    const sw = loadServiceWorker([]);
+
+    await sw.dispatchSubscriptionChange({ options: {} });
+    await sw.dispatchSubscriptionChange(undefined);
+
+    expect(sw.resubscribe).not.toHaveBeenCalled();
+  });
+
+  it('does not reject when resubscribing fails', async () => {
+    const sw = loadServiceWorker([]);
+    sw.resubscribe.mockRejectedValue(new Error('permission revoked'));
+
+    await expect(
+      sw.dispatchSubscriptionChange({ options: { applicationServerKey: KEY } }),
+    ).resolves.toBeUndefined();
   });
 });

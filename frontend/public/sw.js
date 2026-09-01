@@ -179,6 +179,46 @@ self.addEventListener('push', function (event) {
   );
 });
 
+// A browser may rotate a push subscription on its own -- a key refresh, a long
+// idle period, storage pressure. The old endpoint stops working and the stored
+// row keeps naming it: delivery just stops, and nothing retires the row until
+// something tries to send to it.
+//
+// The worker resubscribes with the key the old subscription carried (the server
+// checks it is still current, and refuses if a rotation is what caused this),
+// but it cannot register the result itself: the API is CSRF-protected by a
+// double-submit cookie the worker has no portable way to read. So it tells the
+// page, which has the session and the token. With no page open, the settings
+// panel already reads this browser's endpoint on load and offers to enable
+// again -- the message is the fast path, not the only one.
+self.addEventListener('pushsubscriptionchange', function (event) {
+  var oldSubscription = event.oldSubscription;
+  var key =
+    oldSubscription &&
+    oldSubscription.options &&
+    oldSubscription.options.applicationServerKey;
+  if (!key) return;
+
+  event.waitUntil(
+    self.registration.pushManager
+      .subscribe({ userVisibleOnly: true, applicationServerKey: key })
+      .then(function () {
+        return self.clients.matchAll({
+          type: 'window',
+          includeUncontrolled: true,
+        });
+      })
+      .then(function (clientList) {
+        for (var i = 0; i < clientList.length; i++) {
+          clientList[i].postMessage({ type: 'monize-push-subscription-changed' });
+        }
+      })
+      .catch(function () {
+        // Best effort: the settings panel is the durable path.
+      })
+  );
+});
+
 self.addEventListener('notificationclick', function (event) {
   event.notification.close();
 

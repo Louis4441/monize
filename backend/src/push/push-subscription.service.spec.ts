@@ -167,6 +167,20 @@ describe("PushSubscriptionService", () => {
       await expect(service.subscribe(USER, DTO, null)).resolves.toMatchObject({
         id: DEVICE_ID,
       });
+      const [[lookup]] = subscriptionRepo.findOne.mock.calls;
+      // Scoped to LIVE rows: the upsert clears `disabled_at`, so re-enabling a
+      // retired device adds a live one and the cap has to count it.
+      expect(lookup.where.disabledAt).toBeDefined();
+    });
+
+    it("applies the cap when re-enabling a device that had been retired", async () => {
+      // No LIVE row for this endpoint -- the retired one does not match.
+      subscriptionRepo.findOne.mockResolvedValue(null);
+      subscriptionRepo.count.mockResolvedValue(MAX_LIVE_DEVICES_PER_USER);
+
+      await expect(service.subscribe(USER, DTO, null)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     // Under enforced RLS the conflicting row is invisible to this transaction,

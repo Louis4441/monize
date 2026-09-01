@@ -1,3 +1,4 @@
+import type { AxiosRequestConfig } from 'axios';
 import apiClient from './api';
 import { getErrorCode } from './errors';
 
@@ -54,14 +55,26 @@ export interface PushTestResult {
   devices: PushTestDeviceResult[];
 }
 
+/**
+ * Marks a request the caller has already decided not to wait for, so a 401
+ * arriving after the session it belonged to does not drive the interceptor's
+ * refresh-and-redirect on top of a sign-out that is already navigating.
+ */
+type BestEffort = AxiosRequestConfig & { _skipAuthRedirect: true };
+
+const BEST_EFFORT: BestEffort = { _skipAuthRedirect: true };
+
 export const pushApi = {
   getConfig: async (): Promise<PushConfig> => {
     const response = await apiClient.get<PushConfig>('/push/config');
     return response.data;
   },
 
-  listDevices: async (): Promise<PushDevice[]> => {
-    const response = await apiClient.get<PushDevice[]>('/push/subscriptions');
+  listDevices: async (options?: BestEffort): Promise<PushDevice[]> => {
+    const response = await apiClient.get<PushDevice[]>(
+      '/push/subscriptions',
+      options,
+    );
     return response.data;
   },
 
@@ -80,8 +93,8 @@ export const pushApi = {
     return response.data;
   },
 
-  removeDevice: async (id: string): Promise<void> => {
-    await apiClient.delete(`/push/subscriptions/${id}`);
+  removeDevice: async (id: string, options?: BestEffort): Promise<void> => {
+    await apiClient.delete(`/push/subscriptions/${id}`, options);
   },
 
   sendTest: async (): Promise<PushTestResult> => {
@@ -301,7 +314,7 @@ export async function enablePushOnThisDevice(
       if (minted) await safeUnsubscribe(subscription);
       throw error;
     }
-    await subscription.unsubscribe();
+    await safeUnsubscribe(subscription);
     const replacement = await registration.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey,
@@ -481,10 +494,10 @@ async function removeThisBrowsersRegistration(): Promise<void> {
   try {
     const fingerprint = await currentDeviceFingerprint();
     if (fingerprint) {
-      const mine = (await pushApi.listDevices()).find(
+      const mine = (await pushApi.listDevices(BEST_EFFORT)).find(
         (device) => device.endpointFingerprint === fingerprint,
       );
-      if (mine) await pushApi.removeDevice(mine.id);
+      if (mine) await pushApi.removeDevice(mine.id, BEST_EFFORT);
     }
   } catch {
     // The row may outlive the browser subscription; the local half below is

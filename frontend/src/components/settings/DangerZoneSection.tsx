@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { userSettingsApi, DeleteDataOptions } from '@/lib/user-settings';
 import { useAuthStore } from '@/store/authStore';
 import { getErrorMessage } from '@/lib/errors';
-import { releaseLocalPushSubscription } from '@/lib/push';
+import { releasePushForSignOut } from '@/lib/push';
 import { User } from '@/types/auth';
 import { takeOidcReauthArtifact } from '@/lib/stepUpToken';
 
@@ -94,10 +94,12 @@ export function DangerZoneSection({ user }: DangerZoneSectionProps) {
       } else {
         toast.success(t('deleteAccount.toasts.deleted'));
       }
-      // The account is gone, so its push registrations are too -- but this
-      // browser still holds a live subscription for the origin. Releasing it is
-      // what stops the permission outliving the account that asked for it.
-      await releaseLocalPushSubscription();
+      // Both halves, on both branches. A deleted account takes its rows with
+      // it, but a *downgraded* one does not: that row survives as a permanently
+      // undeliverable device, listed as live and holding a slot under the
+      // per-account cap. And either way this browser still holds a subscription
+      // for the origin, which is the half that stops notifications appearing.
+      await releasePushForSignOut();
       logout();
       router.push('/login');
     } catch (error) {

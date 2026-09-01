@@ -399,6 +399,70 @@ describe('PushDevicesPanel', () => {
   });
 });
 
+describe('PushDevicesPanel and a browser-rotated subscription', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetConfig.mockResolvedValue({
+      enabled: true,
+      publicKey: 'PUB',
+      configured: true,
+      keyUnreadable: false,
+    });
+    mockListDevices.mockResolvedValue([]);
+    mockCurrentFingerprint.mockResolvedValue(null);
+    mockGetPushSupport.mockReturnValue({ supported: true });
+  });
+
+  // The worker resubscribes and says so; this is the surface that holds the
+  // session and the CSRF token, so it is the one that has to notice.
+  it('re-reads the device list when the worker reports a rotation', async () => {
+    const listeners = new Map<string, EventListener>();
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        addEventListener: (type: string, fn: EventListener) =>
+          listeners.set(type, fn),
+        removeEventListener: () => listeners.clear(),
+      },
+    });
+    try {
+      render(<PushDevicesPanel />);
+      await waitFor(() => expect(mockListDevices).toHaveBeenCalledTimes(1));
+
+      listeners.get('message')?.({
+        data: { type: 'monize-push-subscription-changed' },
+      } as unknown as Event);
+
+      await waitFor(() => expect(mockListDevices).toHaveBeenCalledTimes(2));
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('ignores an unrelated worker message', async () => {
+    const listeners = new Map<string, EventListener>();
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        addEventListener: (type: string, fn: EventListener) =>
+          listeners.set(type, fn),
+        removeEventListener: () => listeners.clear(),
+      },
+    });
+    try {
+      render(<PushDevicesPanel />);
+      await waitFor(() => expect(mockListDevices).toHaveBeenCalledTimes(1));
+
+      listeners.get('message')?.({
+        data: { type: 'monize-offline-strings' },
+      } as unknown as Event);
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(mockListDevices).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe('defaultDeviceName', () => {
   it.each([
     [

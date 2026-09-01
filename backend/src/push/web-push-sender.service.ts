@@ -30,7 +30,18 @@ export const MAX_CONSECUTIVE_FAILURES = 10;
  * endpoint is a user-supplied host, which makes "as long as it likes" a choice
  * somebody else gets to make.
  */
-export const PUSH_REQUEST_TIMEOUT_MS = 10_000;
+export const PUSH_REQUEST_TIMEOUT_MS = 5_000;
+
+/**
+ * How long the per-send endpoint re-check may take.
+ *
+ * `validateUrlIsSafe` resolves the host, and `dns.resolve4`/`resolve6` carry no
+ * timeout of their own: a stalled nameserver would sit in front of the HTTP
+ * send, so `PUSH_REQUEST_TIMEOUT_MS` would bound only the half that had already
+ * got past it. A check that has not answered in this long has not established
+ * the endpoint is safe, and an unestablished endpoint is not sent to.
+ */
+export const PUSH_ENDPOINT_RECHECK_TIMEOUT_MS = 2_000;
 
 /**
  * The minimal shape a delivery needs. Deliberately not the entity: the sender
@@ -113,13 +124,13 @@ export class WebPushSender {
     // and resolves to a private address now would turn each send into an
     // internal request. Reported as transient rather than as a distinct state:
     // the bounded retry retires it as FAILING, which is what actually happened.
-    if (!(await validateUrlIsSafe(target.endpoint))) {
+    if (!(await this.endpointStillSafe(target.endpoint))) {
       this.logger.warn(
-        "Refusing a push to an endpoint that no longer resolves to a public host",
+        "Refusing a push to an endpoint that could not be confirmed as a public host",
       );
       return {
         status: "transient",
-        message: "endpoint no longer resolves to a public host",
+        message: "endpoint could not be confirmed as a public host",
       };
     }
 
@@ -143,6 +154,30 @@ export class WebPushSender {
       return { status: "sent" };
     } catch (error) {
       return this.classify(error);
+    }
+  }
+
+  /**
+   * The endpoint check, bounded. A timeout answers `false`: not knowing whether
+   * a host is public is not the same as knowing it is, and only one of those
+   * two is a reason to POST to it.
+   */
+  private async endpointStillSafe(endpoint: string): Promise<boolean> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        validateUrlIsSafe(endpoint),
+        new Promise<boolean>((resolve) => {
+          timer = setTimeout(
+            () => resolve(false),
+            PUSH_ENDPOINT_RECHECK_TIMEOUT_MS,
+          );
+        }),
+      ]);
+    } catch {
+      return false;
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
     }
   }
 
