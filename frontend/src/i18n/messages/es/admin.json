@@ -129,7 +129,8 @@
         "description": "Notificaciones entregadas al teléfono o al escritorio incluso con Monize cerrado. No necesita cuenta de Firebase, Google Play ni Apple Developer.",
         "toggleLabel": "Activar el push del navegador en esta instancia",
         "missingKeys": "Esta instancia no tiene par de claves push. Define ENCRYPTION_KEY y reinicia: Monize generará el par en el siguiente arranque.",
-        "keyUnreadable": "Esta instancia no puede descifrar su par de claves push almacenado, así que no se entrega nada. Rota el par de claves más abajo para recuperarlo."
+        "keyUnreadable": "Esta instancia no puede descifrar su par de claves push almacenado, así que no se entrega nada. Rota el par de claves más abajo para recuperarlo.",
+        "serverKeyMissing": "Esta instancia no tiene ENCRYPTION_KEY, por lo que no puede abrir el par de claves push que guardó. Configure ENCRYPTION_KEY en el despliegue y reinicie: rotar no sirve mientras falte la clave."
       },
       "email": {
         "name": "Correo electrónico",
@@ -152,7 +153,8 @@
       "rotateButton": "Rotar par de claves",
       "rotatingButton": "Rotando...",
       "missingEncryptionKey": "Esta instancia no tiene par de claves push porque ENCRYPTION_KEY no está definida y la clave privada tendría que guardarse sin cifrar. Defínela y reinicia: Monize generará el par por sí mismo.",
-      "keyUnreadable": "Esta instancia tiene un par de claves push que ya no puede descifrar, así que no se entrega nada. Ocurre cuando ENCRYPTION_KEY cambia con la base de datos en marcha, o cuando se restaura una copia en otra instancia. Rota el par de claves para recuperarlo; todos los dispositivos volverán a registrarse."
+      "keyUnreadable": "Esta instancia tiene un par de claves push que ya no puede descifrar, así que no se entrega nada. Ocurre cuando ENCRYPTION_KEY cambia con la base de datos en marcha, o cuando se restaura una copia en otra instancia. Rota el par de claves para recuperarlo; todos los dispositivos volverán a registrarse.",
+      "serverKeyMissing": "Esta instancia no tiene ENCRYPTION_KEY configurada, por lo que no puede abrir el par de claves push que guardó. Rotar no servirá mientras falte la clave: configure ENCRYPTION_KEY en el despliegue y reinicie, y las notificaciones push volverán a funcionar con los dispositivos existentes."
     },
     "dialogs": {
       "rotateTitle": "¿Rotar el par de claves push?",

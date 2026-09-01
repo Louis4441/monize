@@ -250,6 +250,7 @@
       "notConfigured": "Browser-Push ist auf dieser Monize-Instanz nicht verfügbar. Eine Administratorin oder ein Administrator kann es im Admin-Bereich aktivieren.",
       "disabledByAdmin": "Die Administration hat Browser-Push für diese Monize-Instanz deaktiviert.",
       "keyUnreadable": "Monize kann das Push-Schlüsselpaar dieser Instanz nicht lesen, daher wird nichts zugestellt. Die Administration kann es im Admin-Bereich durch Erneuern des Schlüsselpaars wiederherstellen.",
+      "serverKeyMissing": "Dieser Monize-Instanz fehlt der Schlüssel, mit dem sie ihr Push-Schlüsselpaar öffnet, daher kann nichts zugestellt werden. Ein Administrator muss ihn im Deployment setzen und neu starten.",
       "statusUnavailable": "Monize konnte nicht prüfen, ob Browser-Push verfügbar ist. Laden Sie die Seite neu, um es erneut zu versuchen.",
       "devicesUnavailable": "Monize konnte Ihre registrierten Geräte nicht laden. Alles andere auf dieser Seite funktioniert weiterhin; laden Sie neu, um es erneut zu versuchen.",
       "unsupported": {

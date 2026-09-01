@@ -39,6 +39,17 @@ export interface PushConfig {
    * which is false and sends them to the wrong person.
    */
   keyUnreadable: boolean;
+  /**
+   * Whether the SERVER holds an encryption key at all.
+   *
+   * `keyUnreadable` has two causes and their repairs are opposites: a key that
+   * changed under a live database is fixed by rotating the key pair, a missing
+   * `ENCRYPTION_KEY` by setting it and restarting -- and rotation REFUSES in
+   * that state, so telling the reader to rotate was an instruction that could
+   * not work. Absent means "an older backend", which reads as the rotate case,
+   * the message this surface has always shown.
+   */
+  encryptionAvailable?: boolean;
 }
 
 export type PushTestStatus = 'sent' | 'unconfigured' | 'expired' | 'transient';
@@ -349,8 +360,16 @@ export async function enablePushOnThisDevice(
     // Minted under a superseded key pair: the push service would reject every
     // message signed with the current one, so the stale subscription is dropped
     // rather than re-registered.
+    //
+    // The server row for it goes too. Replacing the subscription leaves a row
+    // whose endpoint no longer exists anywhere -- listed as live, undeliverable,
+    // and counting against the per-account device cap, with nothing that would
+    // ever retire it (only a delivery's own 404 does, and nothing delivers to
+    // it). Retiring it is part of replacing it, not a separate tidy-up.
+    const superseded = await fingerprintEndpoint(subscription.endpoint);
     await subscription.unsubscribe();
     subscription = null;
+    await retireServerRowFor(superseded);
   }
   // Whether THIS call minted the subscription: only then is dropping it on a
   // failure the right cleanup. A subscription the browser already had may well
@@ -443,6 +462,35 @@ function isEndpointClaimed(error: unknown): boolean {
   return getErrorCode(error) === ENDPOINT_CLAIMED_CODE;
 }
 
+/**
+ * Delete the server row for an endpoint this browser no longer holds.
+ *
+ * Best effort by construction: it runs beside an operation whose success matters
+ * more (registering the replacement), and a row left behind is untidy rather
+ * than harmful -- it is retired by the retention sweep, or by its first delivery.
+ */
+export async function retireServerRowFor(fingerprint: string): Promise<void> {
+  try {
+    const row = (await pushApi.listDevices()).find(
+      (device) => device.endpointFingerprint === fingerprint,
+    );
+    if (row) await pushApi.removeDevice(row.id);
+  } catch {
+    // As above.
+  }
+}
+
+/**
+ * Whether a subscription was minted under the key we are about to sign with.
+ *
+ * A browser that does not expose `options.applicationServerKey` answers
+ * "unknown", and unknown is treated as a mismatch: a subscription minted under a
+ * superseded key is silently undeliverable, while re-minting one that was
+ * actually current costs a fresh endpoint and a retired row. Only one of those
+ * two failures is visible to the user, so the guess goes the other way -- and
+ * the row for the endpoint we drop is retired either way, which is what made the
+ * conservative choice affordable.
+ */
 function keyMatches(
   stored: ArrayBuffer | null | undefined,
   wanted: Uint8Array,
@@ -569,7 +617,12 @@ export function readRegisteredEndpoint(): RegisteredEndpointMarker | null {
 export type PushRegistrationState =
   | { kind: 'in-sync' }
   | { kind: 'no-subscription' }
-  | { kind: 'rotated'; fingerprint: string }
+  | {
+      kind: 'rotated';
+      fingerprint: string;
+      /** The endpoint the browser replaced, whose server row is now dead. */
+      supersededFingerprint: string;
+    }
   | { kind: 'revoked'; fingerprint: string }
   /** The subscription this browser holds belongs to a different account. */
   | { kind: 'foreign'; fingerprint: string };
@@ -588,22 +641,27 @@ export function classifyPushRegistration(input: {
   if (currentFingerprint === null) return { kind: 'no-subscription' };
   if (liveFingerprints.includes(currentFingerprint)) return { kind: 'in-sync' };
 
-  // A subscription this browser holds, that the reader has no row for, and that
-  // another account registered: theirs. Releasing it would revoke their push
-  // from a device they still hold, and re-registering it would move their
-  // endpoint onto this account -- which the server refuses anyway. Neither
-  // repair is the reader's to make, so this state does nothing.
+  // A marker somebody else wrote is not evidence about the reader -- whichever
+  // endpoint it names. Releasing the subscription would revoke their push from a
+  // device they still hold; registering it would sign the reader up for
+  // notifications they never asked for, passing the permission gate only because
+  // the other account granted it. Neither repair is the reader's to make.
   if (
     marker !== null &&
-    marker.fingerprint === currentFingerprint &&
     (readerUserId === null || marker.userId !== readerUserId)
   ) {
     return { kind: 'foreign', fingerprint: currentFingerprint };
   }
 
   if (marker !== null && marker.fingerprint !== currentFingerprint) {
-    // The browser replaced the endpoint this account registered. Rotation.
-    return { kind: 'rotated', fingerprint: currentFingerprint };
+    // The browser replaced the endpoint this account registered. Rotation --
+    // and the endpoint it replaced is named, because the row for it is still
+    // live on the server and nothing else will ever retire it.
+    return {
+      kind: 'rotated',
+      fingerprint: currentFingerprint,
+      supersededFingerprint: marker.fingerprint,
+    };
   }
   return { kind: 'revoked', fingerprint: currentFingerprint };
 }
@@ -708,6 +766,18 @@ export async function releasePushForSignOut(
 }
 
 async function removeThisBrowsersRegistration(): Promise<void> {
+  // A subscription another account registered in this browser profile is not
+  // this sign-out's to destroy: unsubscribing it revokes THEIR push on a device
+  // they still hold, and they find out when a notification does not arrive. The
+  // marker is what distinguishes the two, so an absent one keeps the old
+  // behaviour -- with no information, the departing account is the likely owner
+  // and a subscription nobody claims must not outlive the session.
+  const marker = readRegisteredEndpoint();
+  const readerId = useAuthStore.getState().user?.id ?? null;
+  if (marker !== null && readerId !== null && marker.userId !== readerId) {
+    return;
+  }
+
   try {
     const fingerprint = await currentDeviceFingerprint();
     if (fingerprint) {

@@ -129,7 +129,8 @@
         "description": "Notifications distribuées sur téléphone ou ordinateur même lorsque Monize est fermé. Ne nécessite ni Firebase, ni compte Google Play ou Apple Developer.",
         "toggleLabel": "Activer le push du navigateur pour cette instance",
         "missingKeys": "Cette instance n'a pas de paire de clés push. Définissez ENCRYPTION_KEY et redémarrez : Monize génère la paire au démarrage suivant.",
-        "keyUnreadable": "Cette instance ne peut pas déchiffrer sa paire de clés push : rien n'est distribué. Effectuez la rotation ci-dessous pour rétablir le service."
+        "keyUnreadable": "Cette instance ne peut pas déchiffrer sa paire de clés push : rien n'est distribué. Effectuez la rotation ci-dessous pour rétablir le service.",
+        "serverKeyMissing": "Cette instance n'a pas d'ENCRYPTION_KEY, elle ne peut donc pas ouvrir la paire de cles push enregistree. Definissez ENCRYPTION_KEY dans le deploiement et redemarrez : la rotation ne peut pas aider tant que la cle manque."
       },
       "email": {
         "name": "E-mail",
@@ -152,7 +153,8 @@
       "rotateButton": "Effectuer la rotation",
       "rotatingButton": "Rotation...",
       "missingEncryptionKey": "Cette instance n'a pas de paire de clés push, car ENCRYPTION_KEY n'est pas définie et la clé privée devrait être stockée en clair. Définissez-la et redémarrez : Monize génère la paire lui-même.",
-      "keyUnreadable": "Cette instance détient une paire de clés push qu'elle ne peut plus déchiffrer : rien n'est distribué. Cela arrive quand ENCRYPTION_KEY change sur une base en service, ou après la restauration d'une sauvegarde sur une autre instance. Effectuez une rotation pour rétablir le service ; chaque appareil se réenregistrera."
+      "keyUnreadable": "Cette instance détient une paire de clés push qu'elle ne peut plus déchiffrer : rien n'est distribué. Cela arrive quand ENCRYPTION_KEY change sur une base en service, ou après la restauration d'une sauvegarde sur une autre instance. Effectuez une rotation pour rétablir le service ; chaque appareil se réenregistrera.",
+      "serverKeyMissing": "Aucune ENCRYPTION_KEY n'est definie pour cette instance, elle ne peut donc pas ouvrir la paire de cles push enregistree. La rotation n'aidera pas tant que la cle manque : definissez ENCRYPTION_KEY dans le deploiement et redemarrez, et les notifications push refonctionneront avec les appareils existants."
     },
     "dialogs": {
       "rotateTitle": "Effectuer la rotation de la paire de clés push ?",

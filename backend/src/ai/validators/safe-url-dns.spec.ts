@@ -80,7 +80,7 @@ describe("the safety check against a controlled resolver", () => {
       resolve6.mockImplementation(() => undefined);
     }
 
-    it("is not established as safe, so the bounded check answers false", async () => {
+    it("is not established as safe, so the check answers false", async () => {
       neverAnswers();
 
       await expect(
@@ -88,17 +88,31 @@ describe("the safety check against a controlled resolver", () => {
       ).resolves.toBe(false);
     });
 
-    // The reason the bound exists rather than being left to each caller: the
-    // unbounded call does not settle at all, and it sat in front of a 400 on a
-    // request an authenticated caller can make twenty times a minute.
-    it("leaves the unbounded check unsettled", async () => {
+    // The bound is inside the check, so a caller that asks for nothing gets it:
+    // the AI provider `baseUrl` validators and the startup check all go through
+    // `validateUrlIsSafe`, and only the push paths ever passed a timeout.
+    it("bounds the plain check too, without the caller asking", async () => {
       neverAnswers();
+      jest.useFakeTimers();
+      try {
+        const pending = validateUrlIsSafe("https://blackhole.test/x");
+        await jest.advanceTimersByTimeAsync(URL_SAFETY_CHECK_TIMEOUT_MS + 1);
 
-      const settled = jest.fn();
-      void validateUrlIsSafe("https://blackhole.test/x").then(settled);
-      await new Promise((resolve) => setImmediate(resolve));
+        await expect(pending).resolves.toBe(false);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
 
-      expect(settled).not.toHaveBeenCalled();
+    // A lookup that did not answer is not a lookup that answered "nothing":
+    // an empty result is allowed (a name that resolves nowhere fails on its own),
+    // so a timeout borrowing that answer would be an open door.
+    it("does not read a timeout as an empty result", async () => {
+      answers([], []);
+
+      await expect(validateUrlIsSafe("https://nowhere.test/x")).resolves.toBe(
+        true,
+      );
     });
 
     it("bounds by default at the documented timeout", () => {

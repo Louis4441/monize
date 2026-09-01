@@ -129,7 +129,8 @@
         "description": "Monize kapalıyken bile telefona veya masaüstüne ulaşan bildirimler. Firebase, Google Play veya Apple Developer hesabı gerekmez.",
         "toggleLabel": "Bu örnek için tarayıcı anlık bildirimini etkinleştir",
         "missingKeys": "Bu örneğin anlık bildirim anahtar çifti yok. ENCRYPTION_KEY değerini ayarlayıp yeniden başlatın: Monize bir sonraki açılışta çifti kendisi üretir.",
-        "keyUnreadable": "Bu örnek, kayıtlı anlık bildirim anahtar çiftini çözemiyor; bu yüzden hiçbir şey teslim edilmiyor. Kurtarmak için aşağıdan anahtar çiftini değiştirin."
+        "keyUnreadable": "Bu örnek, kayıtlı anlık bildirim anahtar çiftini çözemiyor; bu yüzden hiçbir şey teslim edilmiyor. Kurtarmak için aşağıdan anahtar çiftini değiştirin.",
+        "serverKeyMissing": "Bu örnekte ENCRYPTION_KEY yok, bu yüzden kaydettiği push anahtar çiftini açamıyor. Dağıtımda ENCRYPTION_KEY ayarlayın ve yeniden başlatın — anahtar yokken döndürmek yardımcı olamaz."
       },
       "email": {
         "name": "E-posta",
@@ -152,7 +153,8 @@
       "rotateButton": "Anahtar çiftini değiştir",
       "rotatingButton": "Değiştiriliyor...",
       "missingEncryptionKey": "ENCRYPTION_KEY ayarlanmadığı ve özel anahtarın şifrelenmeden saklanması gerekeceği için bu örneğin anlık bildirim anahtar çifti yok. Değişkeni ayarlayıp yeniden başlatın: Monize çifti kendisi üretir.",
-      "keyUnreadable": "Bu örnek, artık çözemediği bir anlık bildirim anahtar çifti tutuyor; bu yüzden hiçbir şey teslim edilmiyor. Çalışan bir veritabanında ENCRYPTION_KEY değiştiğinde ya da bir yedek başka bir örneğe geri yüklendiğinde olur. Kurtarmak için anahtar çiftini değiştirin; her cihaz yeniden kaydolacaktır."
+      "keyUnreadable": "Bu örnek, artık çözemediği bir anlık bildirim anahtar çifti tutuyor; bu yüzden hiçbir şey teslim edilmiyor. Çalışan bir veritabanında ENCRYPTION_KEY değiştiğinde ya da bir yedek başka bir örneğe geri yüklendiğinde olur. Kurtarmak için anahtar çiftini değiştirin; her cihaz yeniden kaydolacaktır.",
+      "serverKeyMissing": "Bu örnekte ENCRYPTION_KEY tanımlı değil, bu yüzden kaydettiği push anahtar çiftini açamıyor. Anahtar yokken döndürmek işe yaramaz: dağıtımda ENCRYPTION_KEY değerini ayarlayın ve yeniden başlatın; push mevcut cihazlarla yeniden çalışır."
     },
     "dialogs": {
       "rotateTitle": "Anlık bildirim anahtar çifti değiştirilsin mi?",

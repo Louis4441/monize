@@ -250,6 +250,7 @@
       "notConfigured": "Bu Monize örneğinde tarayıcı anlık bildirimi kullanılamıyor. Bir yönetici Admin bölümünden etkinleştirebilir.",
       "disabledByAdmin": "Bir yönetici bu Monize örneği için tarayıcı anlık bildirimini kapattı.",
       "keyUnreadable": "Monize bu örneğin anlık bildirim anahtar çiftini okuyamıyor; bu yüzden hiçbir şey teslim edilmiyor. Bir yönetici Admin bölümünde anahtar çiftini değiştirerek kurtarabilir.",
+      "serverKeyMissing": "Bu Monize örneğinde push anahtar çiftini açmak için gereken şifreleme anahtarı yok, bu yüzden hiçbir şey iletilemiyor. Bir yöneticinin bunu dağıtımda ayarlayıp yeniden başlatması gerekiyor.",
       "statusUnavailable": "Monize, tarayıcı anlık bildiriminin kullanılabilir olup olmadığını kontrol edemedi. Yeniden denemek için sayfayı yenileyin.",
       "devicesUnavailable": "Monize kayıtlı cihazlarınızı yükleyemedi. Bu sayfadaki diğer her şey çalışıyor; yeniden denemek için sayfayı yenileyin.",
       "unsupported": {

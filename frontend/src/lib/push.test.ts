@@ -353,15 +353,17 @@ describe('classifyPushRegistration', () => {
       null,
       'foreign',
     ],
-    // ...but a marker naming somebody else and an endpoint we do not hold is a
-    // rotation of OUR endpoint, not their subscription.
+    // A marker somebody else wrote is not evidence about the reader whichever
+    // endpoint it names. Read as a rotation, this registered a device for a
+    // reader who never asked for notifications -- passing the permission gate
+    // only because the other account had granted it.
     [
       "another account's marker, different endpoint",
       MINE,
       [],
       { userId: SOMEBODY_ELSE, fingerprint: OTHER },
       READER,
-      'rotated',
+      'foreign',
     ],
   ])(
     '%s',
@@ -387,7 +389,12 @@ describe('classifyPushRegistration', () => {
         marker: mine(OTHER),
         readerUserId: READER,
       }),
-    ).toEqual({ kind: 'rotated', fingerprint: MINE });
+    ).toEqual({
+      kind: 'rotated',
+      fingerprint: MINE,
+      // The endpoint the browser replaced, so its dead server row can go.
+      supersededFingerprint: OTHER,
+    });
     expect(
       classifyPushRegistration({
         currentFingerprint: MINE,
@@ -743,6 +750,43 @@ describe('enabling and disabling push on this device', () => {
     expect(readRegisteredEndpoint()).toBeNull();
   });
 
+  // Replacing this browser's subscription leaves a server row for an endpoint
+  // that no longer exists anywhere: listed as a live device, undeliverable, and
+  // spending one of the account's slots, with nothing that would ever retire it
+  // (only a delivery's own 404 does, and nothing delivers to it).
+  it("retires the row for the endpoint it replaces", async () => {
+    getSubscription.mockResolvedValue(
+      browserSubscription(new Uint8Array([1, 2, 3]).buffer),
+    );
+    const superseded = await fingerprintEndpoint(ENDPOINT);
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: [
+        { id: 'd-other', endpointFingerprint: '0000000000000000' },
+        { id: 'd-stale', endpointFingerprint: superseded },
+      ],
+    });
+
+    await enablePushOnThisDevice(PUBLIC_KEY);
+
+    expect(apiClient.delete).toHaveBeenCalledWith(
+      '/push/subscriptions/d-stale',
+      undefined,
+    );
+  });
+
+  it('deletes nothing when the replaced endpoint has no row', async () => {
+    getSubscription.mockResolvedValue(
+      browserSubscription(new Uint8Array([1, 2, 3]).buffer),
+    );
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: [{ id: 'd-other', endpointFingerprint: '0000000000000000' }],
+    });
+
+    await enablePushOnThisDevice(PUBLIC_KEY);
+
+    expect(apiClient.delete).not.toHaveBeenCalled();
+  });
+
   it('reuses a subscription already minted under the current key', async () => {
     const current = urlBase64ToUint8Array(PUBLIC_KEY);
     getSubscription.mockResolvedValue(browserSubscription(current.buffer));
@@ -879,6 +923,38 @@ describe('enabling and disabling push on this device', () => {
     expect(apiClient.get).toHaveBeenCalledWith('/push/subscriptions', {
       _skipAuthRedirect: true,
     });
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  // A shared browser profile. The subscription belongs to an account that is not
+  // the one signing out, so destroying it revokes THEIR push on a device they
+  // still hold -- and takes the marker the `foreign` classification depends on
+  // with it, so nothing can ever recognise the state again.
+  it("leaves another account's subscription alone on sign-out", async () => {
+    useAuthStore.setState({ user: { id: 'user-1' } as never });
+    rememberRegisteredEndpoint('user-2', await fingerprintEndpoint(ENDPOINT));
+    getSubscription.mockResolvedValue(browserSubscription());
+
+    await releasePushForSignOut();
+
+    expect(unsubscribe).not.toHaveBeenCalled();
+    expect(apiClient.delete).not.toHaveBeenCalled();
+    expect(readRegisteredEndpoint()).toEqual({
+      userId: 'user-2',
+      fingerprint: await fingerprintEndpoint(ENDPOINT),
+    });
+  });
+
+  // With no marker there is no information, and the departing account is the
+  // likely owner: a subscription nobody claims must not outlive the session.
+  it('still releases when no marker says whose the subscription is', async () => {
+    useAuthStore.setState({ user: { id: 'user-1' } as never });
+    forgetRegisteredEndpoint();
+    getSubscription.mockResolvedValue(browserSubscription());
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+
+    await releasePushForSignOut();
+
     expect(unsubscribe).toHaveBeenCalledTimes(1);
   });
 

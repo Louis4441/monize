@@ -129,7 +129,8 @@
         "description": "[XX-Notifications delivered to a phone or desktop even when Monize is closed. Needs no Firebase, Google Play or Apple Developer account.-XX]",
         "toggleLabel": "[XX-Enable browser push for this instance-XX]",
         "missingKeys": "[XX-This instance has no push key pair. Set ENCRYPTION_KEY and restart: Monize generates the pair itself on the next start.-XX]",
-        "keyUnreadable": "[XX-This instance cannot decrypt its stored push key pair, so nothing can be delivered. Rotate the key pair below to recover.-XX]"
+        "keyUnreadable": "[XX-This instance cannot decrypt its stored push key pair, so nothing can be delivered. Rotate the key pair below to recover.-XX]",
+        "serverKeyMissing": "[XX-This instance has no ENCRYPTION_KEY, so it cannot open the push key pair it stored. Set ENCRYPTION_KEY in the deployment and restart — rotating cannot help while the key is missing.-XX]"
       },
       "email": {
         "name": "[XX-Email-XX]",
@@ -152,7 +153,8 @@
       "rotateButton": "[XX-Rotate key pair-XX]",
       "rotatingButton": "[XX-Rotating...-XX]",
       "missingEncryptionKey": "[XX-This instance has no push key pair, because ENCRYPTION_KEY is not set and the private key would have to be stored unencrypted. Set it and restart: Monize generates the pair itself.-XX]",
-      "keyUnreadable": "[XX-This instance holds a push key pair it can no longer decrypt, so nothing can be delivered. It happens when ENCRYPTION_KEY changes under a live database, or when a backup is restored onto a different instance. Rotate the key pair to recover; every device will register again.-XX]"
+      "keyUnreadable": "[XX-This instance holds a push key pair it can no longer decrypt, so nothing can be delivered. It happens when ENCRYPTION_KEY changes under a live database, or when a backup is restored onto a different instance. Rotate the key pair to recover; every device will register again.-XX]",
+      "serverKeyMissing": "[XX-This instance has no ENCRYPTION_KEY set, so it cannot open the push key pair it stored. Rotating will not help while the key is missing: set ENCRYPTION_KEY in the deployment and restart, and push works again with the existing devices.-XX]"
     },
     "dialogs": {
       "rotateTitle": "[XX-Rotate the push key pair?-XX]",

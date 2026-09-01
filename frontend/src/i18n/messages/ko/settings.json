@@ -250,6 +250,7 @@
       "notConfigured": "이 Monize 인스턴스에서는 브라우저 푸시를 사용할 수 없습니다. 관리자가 Admin 영역에서 켤 수 있습니다.",
       "disabledByAdmin": "관리자가 이 Monize 인스턴스의 브라우저 푸시를 껐습니다.",
       "keyUnreadable": "Monize가 이 인스턴스의 푸시 키 쌍을 읽지 못해 아무것도 전달되지 않습니다. 관리자가 Admin 영역에서 키 쌍을 교체하면 복구됩니다.",
+      "serverKeyMissing": "이 Monize 인스턴스에는 푸시 키 쌍을 열기 위한 암호화 키가 없어 아무것도 전달할 수 없습니다. 관리자가 배포에 설정하고 재시작해야 합니다.",
       "statusUnavailable": "브라우저 푸시를 사용할 수 있는지 확인하지 못했습니다. 페이지를 새로고침해 다시 시도하세요.",
       "devicesUnavailable": "등록된 기기를 불러오지 못했습니다. 이 페이지의 나머지는 정상 작동합니다. 새로고침해 다시 시도하세요.",
       "unsupported": {

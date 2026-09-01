@@ -129,7 +129,8 @@
         "description": "即使 Monize 已关闭，也能把通知送到手机或桌面。无需 Firebase、Google Play 或 Apple Developer 账户。",
         "toggleLabel": "为此实例启用浏览器推送",
         "missingKeys": "此实例没有推送密钥对。请设置 ENCRYPTION_KEY 并重启：Monize 会在下次启动时自行生成密钥对。",
-        "keyUnreadable": "此实例无法解密已存储的推送密钥对，因此无法投递任何通知。请在下方轮换密钥对以恢复。"
+        "keyUnreadable": "此实例无法解密已存储的推送密钥对，因此无法投递任何通知。请在下方轮换密钥对以恢复。",
+        "serverKeyMissing": "此实例没有 ENCRYPTION_KEY，因此无法打开已存储的推送密钥对。请在部署中设置 ENCRYPTION_KEY 并重启 — 缺少密钥时轮换无法解决问题。"
       },
       "email": {
         "name": "电子邮件",
@@ -152,7 +153,8 @@
       "rotateButton": "轮换密钥对",
       "rotatingButton": "正在轮换...",
       "missingEncryptionKey": "由于未设置 ENCRYPTION_KEY，私钥将不得不明文存储，因此此实例没有推送密钥对。设置后重启，Monize 会自行生成密钥对。",
-      "keyUnreadable": "此实例持有一个已无法解密的推送密钥对，因此无法投递任何通知。这通常发生在数据库运行期间更改了 ENCRYPTION_KEY，或将备份还原到了另一个实例。轮换密钥对即可恢复，所有设备将重新注册。"
+      "keyUnreadable": "此实例持有一个已无法解密的推送密钥对，因此无法投递任何通知。这通常发生在数据库运行期间更改了 ENCRYPTION_KEY，或将备份还原到了另一个实例。轮换密钥对即可恢复，所有设备将重新注册。",
+      "serverKeyMissing": "此实例未设置 ENCRYPTION_KEY，因此无法打开已存储的推送密钥对。缺少密钥时轮换无济于事：请在部署中设置 ENCRYPTION_KEY 并重启，推送即可继续使用现有设备。"
     },
     "dialogs": {
       "rotateTitle": "要轮换推送密钥对吗？",

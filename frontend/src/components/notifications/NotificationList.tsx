@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import type { NotificationFilters } from '@/lib/notification-filters';
@@ -203,28 +203,6 @@ function daysUntil(dueDate: string): number {
   return Math.round((due.getTime() - today.getTime()) / 86_400_000);
 }
 
-function timeAgo(dateStr: string): string {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const absDiffMs = Math.abs(diffMs);
-  const absDiffMins = Math.floor(absDiffMs / 60000);
-  const absDiffHours = Math.floor(absDiffMins / 60);
-  const absDiffDays = Math.floor(absDiffHours / 24);
-
-  if (diffMs < 0) {
-    // Future date
-    if (absDiffDays > 0) return `in ${absDiffDays}d`;
-    if (absDiffHours > 0) return `in ${absDiffHours}h`;
-    return 'today';
-  }
-
-  if (absDiffDays > 0) return `${absDiffDays}d ago`;
-  if (absDiffHours > 0) return `${absDiffHours}h ago`;
-  if (absDiffMins > 0) return `${absDiffMins}m ago`;
-  return 'just now';
-}
-
 export function NotificationList({
   notifications,
   isLoading,
@@ -240,6 +218,16 @@ export function NotificationList({
   onDeleteAll,
 }: NotificationListProps) {
   const t = useTranslations('notifications');
+  /**
+   * The row's timestamp, in the reader's language.
+   *
+   * `Intl.RelativeTimeFormat` through next-intl rather than a hand-written
+   * `${n}h ago`: this is the one string on every row, and it was the one string
+   * the rename left in English while the title and body beside it were composed
+   * in the reader's locale. It also gets future dates right in every language
+   * ("in 2 days"), which the hand-written version spelled out per branch.
+   */
+  const format = useFormatter();
   const router = useRouter();
   const { formatCurrency } = useNumberFormat();
 
@@ -610,7 +598,7 @@ export function NotificationList({
                                 {severityLabel(notification.severity, t)}
                               </span>
                               <span className="text-[11px] text-gray-400 dark:text-gray-500">
-                                {timeAgo(notification.createdAt)}
+                                {format.relativeTime(new Date(notification.createdAt))}
                               </span>
                             </div>
                             <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">

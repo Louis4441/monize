@@ -30,6 +30,7 @@ const mockIsInstalledIosWebApp = vi.fn();
 const mockClassify = vi.fn();
 const mockRelease = vi.fn();
 const mockReadRegistered = vi.fn();
+const mockRetireRow = vi.fn();
 
 vi.mock('@/lib/push', () => ({
   pushApi: {
@@ -49,6 +50,7 @@ vi.mock('@/lib/push', () => ({
   classifyPushRegistration: (...args: any[]) => mockClassify(...args),
   releaseLocalPushSubscription: () => mockRelease(),
   readRegisteredEndpoint: () => mockReadRegistered(),
+  retireServerRowFor: (fingerprint: string) => mockRetireRow(fingerprint),
   // Declared inside the factory: `vi.mock` is hoisted above every top-level
   // binding in this file, so a class defined outside it is not yet initialised
   // when the factory runs.
@@ -94,6 +96,7 @@ describe('PushDevicesPanel', () => {
     // The default for every test that is not about reconciliation.
     mockClassify.mockReturnValue({ kind: 'in-sync' });
     mockRelease.mockResolvedValue(undefined);
+    mockRetireRow.mockResolvedValue(undefined);
     mockReadRegistered.mockReturnValue(null);
     // Signed out by default, so a test that needs an identity states it.
     useAuthStore.setState({ user: null });
@@ -197,10 +200,11 @@ describe('PushDevicesPanel', () => {
     },
   );
 
-  // Three reasons push can be unavailable, three repairs, three messages. The
-  // one that matters most is the middle: a key pair the server cannot read is
-  // not an administrator's decision, and saying it is sends the reader to ask
-  // somebody who has nothing to change.
+  // Four reasons push can be unavailable, four repairs, four messages. Two
+  // matter most: a key pair the server cannot read is not an administrator's
+  // decision, and saying it is sends the reader to ask somebody who has nothing
+  // to change; and an unreadable key has two causes whose repairs are opposites,
+  // so one message told the reader to ask for a rotation the server refuses.
   it.each([
     [
       'an administrator switched it off',
@@ -224,6 +228,31 @@ describe('PushDevicesPanel', () => {
     ],
     [
       'the key pair cannot be read',
+      {
+        enabled: false,
+        publicKey: 'PUB',
+        configured: true,
+        keyUnreadable: true,
+        encryptionAvailable: true,
+      },
+      /cannot read this instance's push key pair/i,
+    ],
+    [
+      'the server has no encryption key at all',
+      {
+        enabled: false,
+        publicKey: 'PUB',
+        configured: true,
+        keyUnreadable: true,
+        encryptionAvailable: false,
+      },
+      /missing the encryption key/i,
+    ],
+    // Absent, not false: during a rolling deploy an older backend sends no such
+    // field, and "no information" has to read as the message this surface has
+    // always shown rather than as the new one.
+    [
+      'an older backend does not say which cause it is',
       {
         enabled: false,
         publicKey: 'PUB',
@@ -424,6 +453,32 @@ describe('PushDevicesPanel', () => {
       await waitFor(() => expect(mockEnable).toHaveBeenCalled());
       expect(mockEnable.mock.calls[0][0]).toBe('PUB');
       await waitFor(() => expect(mockListDevices).toHaveBeenCalledTimes(2));
+    });
+
+    // The endpoint the browser replaced still has a live row, and nothing else
+    // retires it: only a delivery's own 404 does, and nothing delivers to an
+    // endpoint that no longer exists. Each rotation otherwise left a permanent
+    // undeliverable device in the list, spending one of the account's slots.
+    it('retires the row for the endpoint the rotation replaced', async () => {
+      withPermission('granted');
+      mockClassify.mockReturnValue({
+        kind: 'rotated',
+        fingerprint: THIS_DEVICE,
+        supersededFingerprint: OTHER_DEVICE,
+      });
+      mockListDevices.mockResolvedValue([
+        device({ id: 'stale', endpointFingerprint: OTHER_DEVICE }),
+      ]);
+      mockCurrentFingerprint.mockResolvedValue(THIS_DEVICE);
+
+      render(<PushDevicesPanel />);
+
+      await waitFor(() => expect(mockRetireRow).toHaveBeenCalledWith(OTHER_DEVICE));
+      // After registering the replacement, never before: a failed registration
+      // must not leave the browser with no reachable device at all.
+      expect(mockEnable.mock.invocationCallOrder[0]).toBeLessThan(
+        mockRetireRow.mock.invocationCallOrder[0],
+      );
     });
 
     // Another device removed this one. Removing a row cannot unsubscribe a

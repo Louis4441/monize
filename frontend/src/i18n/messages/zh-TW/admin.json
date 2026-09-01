@@ -129,7 +129,8 @@
         "description": "即使 Monize 已關閉，也能把通知送到手機或桌面。不需要 Firebase、Google Play 或 Apple Developer 帳戶。",
         "toggleLabel": "為此執行個體啟用瀏覽器推播",
         "missingKeys": "此執行個體沒有推播金鑰組。請設定 ENCRYPTION_KEY 並重新啟動：Monize 會在下次啟動時自行產生金鑰組。",
-        "keyUnreadable": "此執行個體無法解密已儲存的推播金鑰組，因此無法傳送任何通知。請於下方輪替金鑰組以恢復。"
+        "keyUnreadable": "此執行個體無法解密已儲存的推播金鑰組，因此無法傳送任何通知。請於下方輪替金鑰組以恢復。",
+        "serverKeyMissing": "此實例沒有 ENCRYPTION_KEY，因此無法開啟已儲存的推播金鑰組。請在部署中設定 ENCRYPTION_KEY 並重新啟動 — 缺少金鑰時輪換無法解決問題。"
       },
       "email": {
         "name": "電子郵件",
@@ -152,7 +153,8 @@
       "rotateButton": "輪替金鑰組",
       "rotatingButton": "輪替中...",
       "missingEncryptionKey": "由於未設定 ENCRYPTION_KEY，私密金鑰將必須以明文儲存，因此此執行個體沒有推播金鑰組。設定後重新啟動，Monize 會自行產生金鑰組。",
-      "keyUnreadable": "此執行個體持有一組已無法解密的推播金鑰組，因此無法傳送任何通知。這通常發生在資料庫運作期間變更了 ENCRYPTION_KEY，或將備份還原到另一個執行個體。輪替金鑰組即可恢復，所有裝置將重新註冊。"
+      "keyUnreadable": "此執行個體持有一組已無法解密的推播金鑰組，因此無法傳送任何通知。這通常發生在資料庫運作期間變更了 ENCRYPTION_KEY，或將備份還原到另一個執行個體。輪替金鑰組即可恢復，所有裝置將重新註冊。",
+      "serverKeyMissing": "此實例未設定 ENCRYPTION_KEY，因此無法開啟已儲存的推播金鑰組。缺少金鑰時輪換沒有幫助：請在部署中設定 ENCRYPTION_KEY 並重新啟動，推播即可繼續使用現有裝置。"
     },
     "dialogs": {
       "rotateTitle": "要輪替推播金鑰組嗎？",

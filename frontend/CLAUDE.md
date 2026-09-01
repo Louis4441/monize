@@ -356,10 +356,24 @@ missing, the second account signing in saw a subscription it had no server row
 for, read it as a revocation and unsubscribed the browser -- taking push away
 from the first account, whose device list still showed the row as active.
 `classifyPushRegistration` therefore takes the marker *and* the reader's id, and
-answers `foreign` for a subscription somebody else registered; the panel acts on
-nothing there, because neither repair (release, or re-register) is the reader's to
-make. A value in the pre-owner format, or one with no reader identity, reads as
-"no information" -- which errs toward doing nothing.
+answers `foreign` for a marker somebody else wrote -- **whichever endpoint it
+names**: read as a rotation, a foreign marker naming a different endpoint had the
+panel register a device for a reader who never asked for notifications, passing
+the permission gate only because the other account had granted it. The panel acts
+on nothing there, because neither repair (release, or re-register) is the reader's
+to make, and sign-out leaves such a subscription alone for the same reason. A
+value in the pre-owner format, or one with no reader identity, reads as "no
+information" -- which errs toward doing nothing.
+
+**Replacing this browser's endpoint means retiring the row for the one it
+replaced** (`retireServerRowFor`). Nothing else ever would: a row is retired by a
+delivery's own 404, and nothing delivers to an endpoint that no longer exists --
+so each rotation, and each Enable on a browser that does not expose
+`options.applicationServerKey`, left a permanent undeliverable "device" in the
+user's list holding one of their `MAX_LIVE_DEVICES_PER_USER` slots. That cleanup
+is also what makes the conservative reading of an unknown key affordable: an
+unreadable key is treated as a mismatch, because a silently undeliverable
+subscription is worse than a fresh endpoint.
 
 Whatever `getPushSupport` reads is the same shape of problem in time rather than
 identity: `Notification.permission` and "is this the installed iOS app" are

@@ -53,6 +53,21 @@ export interface PublicPushConfig {
    * switched push off", which is false and sends the reader to the wrong person.
    */
   keyUnreadable: boolean;
+  /**
+   * Whether this server holds an `ENCRYPTION_KEY` at all.
+   *
+   * `keyUnreadable` has two causes with OPPOSITE repairs, and folding them cost
+   * the reader the only thing they needed: with no key configured, both surfaces
+   * said "rotate the key pair to recover" and `rotateKeyPair` refuses in exactly
+   * that state, so the documented repair was guaranteed to fail. A key that
+   * changed under a live database is repaired by rotating; a missing one by
+   * setting the variable and restarting, which no button here can do.
+   *
+   * Named as the AI provider surface names the same fact
+   * (`AiConfigResponse.encryptionAvailable`), so a reader who has seen one
+   * recognises the other.
+   */
+  encryptionAvailable: boolean;
 }
 
 /** The administrator's view. Adds provenance, never the private key. */
@@ -216,6 +231,7 @@ export class PushConfigService implements OnApplicationBootstrap {
       publicKey: config?.vapidPublicKey ?? null,
       configured: !!config,
       keyUnreadable,
+      encryptionAvailable: this.encryption.isConfigured(),
     };
   }
 
@@ -306,6 +322,7 @@ export class PushConfigService implements OnApplicationBootstrap {
       publicKey: config?.vapidPublicKey ?? null,
       configured: !!config,
       keyUnreadable,
+      encryptionAvailable: this.encryption.isConfigured(),
       publicKeyFingerprint: config
         ? fingerprintPublicKey(config.vapidPublicKey)
         : null,

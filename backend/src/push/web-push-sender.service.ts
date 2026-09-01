@@ -84,7 +84,15 @@ export function collectAgentSockets(agent: https.Agent): Socket[] {
   const connect = hooked.createConnection.bind(agent);
   hooked.createConnection = (...args: unknown[]): Socket => {
     const socket = connect(...args);
-    sockets.push(socket);
+    // Only something destroyable is recorded. Node's agent contract permits
+    // `createConnection(options, oncreate)` to deliver the socket through its
+    // callback and return undefined -- `_http_agent` does `if (newSocket)
+    // oncreate(...)` for exactly that -- and an `undefined` in this list would
+    // make the deadline's `socket.destroy()` throw inside a setTimeout: an
+    // uncaught exception, and the reject on the next line never runs, so the
+    // delivery never settles either. The mechanism the deadline depends on must
+    // not be the thing that kills the process.
+    if (socket && typeof socket.destroy === "function") sockets.push(socket);
     return socket;
   };
   return sockets;
@@ -260,7 +268,17 @@ export class WebPushSender {
         ),
         new Promise<never>((_resolve, reject) => {
           timer = setTimeout(() => {
-            for (const socket of sockets) socket.destroy();
+            // The destroy is best effort and the rejection is not: a socket that
+            // objects to being destroyed must not swallow the deadline, which is
+            // what actually frees the caller.
+            for (const socket of sockets) {
+              try {
+                socket.destroy();
+              } catch {
+                // Already gone, or a socket that refuses. Either way the
+                // rejection below is the part the caller is waiting for.
+              }
+            }
             reject(new Error(PUSH_DEADLINE_MESSAGE));
           }, PUSH_REQUEST_DEADLINE_MS);
         }),

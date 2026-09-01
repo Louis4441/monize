@@ -15,6 +15,7 @@ import {
   pushApi,
   readRegisteredEndpoint,
   releaseLocalPushSubscription,
+  retireServerRowFor,
   PushPermissionError,
   type PushConfig,
   type PushDevice,
@@ -212,6 +213,12 @@ export function PushDevicesPanel() {
       try {
         if (state.kind === 'rotated') {
           await enablePushOnThisDevice(publicKey, defaultDeviceName());
+          // The endpoint the browser replaced still has a live row, and nothing
+          // else would ever retire it: only a delivery's own 404 does, and
+          // nothing delivers to an endpoint that no longer exists. Left behind,
+          // each rotation added a permanent undeliverable "device" to the user's
+          // list and spent one of their MAX_LIVE_DEVICES_PER_USER slots.
+          await retireServerRowFor(state.supersededFingerprint);
           await refreshDevices();
           return;
         }
@@ -342,10 +349,17 @@ export function PushDevicesPanel() {
     // Three reasons, three messages. A key pair the server cannot read is not
     // an administrator's decision, and saying it is sends the reader to ask
     // somebody who has nothing to change.
+    // Four, once the unreadable key is asked WHY. Rotating repairs a key that
+    // changed under a live database and is refused outright when the server has
+    // no encryption key at all, so one of the two messages named a repair that
+    // could not work. `encryptionAvailable === false` is the deliberate read:
+    // absent means an older backend, which is the rotate case.
     const reason = !config?.configured
       ? 'notConfigured'
       : config.keyUnreadable
-        ? 'keyUnreadable'
+        ? config.encryptionAvailable === false
+          ? 'serverKeyMissing'
+          : 'keyUnreadable'
         : 'disabledByAdmin';
     return (
       <PushBlock heading={t('heading')}>

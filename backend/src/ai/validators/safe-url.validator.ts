@@ -21,6 +21,20 @@ const BLOCKED_HOSTNAMES = new Set([
 
 const BLOCKED_SUFFIXES = [".internal", ".local", ".localhost"];
 
+/**
+ * How long the safety check's DNS lookup may take before the answer is "not
+ * established".
+ *
+ * `dns.resolve4`/`resolve6` carry no timeout of their own, so a name whose
+ * authoritative nameserver never answers holds the caller for c-ares' whole
+ * retry budget -- tens of seconds, on a request path, chosen by whoever supplied
+ * the URL. A lookup that has not answered in this long has not established the
+ * host is public, and an unestablished host is not one this server connects to,
+ * so the timeout answers `false` rather than "probably fine". Two seconds is far
+ * past a working resolver and far short of a lever.
+ */
+export const URL_SAFETY_CHECK_TIMEOUT_MS = 2_000;
+
 const PRIVATE_IP_RANGES = [
   /^127\./,
   /^10\./,
@@ -249,6 +263,45 @@ function dnsResolve6(hostname: string): Promise<string[]> {
   });
 }
 
+/**
+ * Both families, or `null` when the resolver did not answer in time.
+ *
+ * `null` is a third state on purpose: an empty list means "this name resolves to
+ * nothing", which the caller allows, and a stalled resolver must not borrow that
+ * answer. A rejection stays "allow" -- a name that genuinely does not resolve is
+ * a request that will fail on its own -- but a name we simply did not wait long
+ * enough to learn about is not established as safe.
+ */
+async function resolveBothFamilies(
+  hostname: string,
+  timeoutMs: number = URL_SAFETY_CHECK_TIMEOUT_MS,
+): Promise<string[] | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.all([dnsResolve(hostname), dnsResolve6(hostname)]).then(
+        ([ipv4Addrs, ipv6Addrs]) => [...ipv4Addrs, ...ipv6Addrs],
+      ),
+      new Promise<null>((resolve) => {
+        // Unreffed: a caller that bounds the WHOLE check (validateUrlIsSafeWithin)
+        // abandons this race when its own deadline wins, and the abandoned timer
+        // would then keep the event loop -- and a Jest worker -- alive for the
+        // rest of its budget. A timer that exists only to bound a race must not
+        // outlive interest in the answer.
+        timer = setTimeout(() => resolve(null), timeoutMs);
+        timer.unref?.();
+      }),
+    ]);
+  } catch {
+    // Neither lookup rejects (both resolve to [] on error), so this is defensive
+    // only -- and it answers "resolved to nothing", the behaviour a failed
+    // lookup has always had here.
+    return [];
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
 @ValidatorConstraint({ async: true })
 export class IsSafeUrlConstraint implements ValidatorConstraintInterface {
   async validate(value: unknown): Promise<boolean> {
@@ -293,20 +346,20 @@ export class IsSafeUrlConstraint implements ValidatorConstraintInterface {
       return false;
     }
 
-    // DNS resolution check: resolve hostname and verify IPs are not private
+    // DNS resolution check: resolve hostname and verify IPs are not private.
+    //
+    // Bounded HERE, so every caller is bounded -- `dns.resolve4`/`resolve6` carry
+    // no timeout of their own, and a name delegated to a nameserver that never
+    // answers held whichever request asked for the resolver's whole retry budget
+    // (tens of seconds). A lookup that did not answer is NOT "no addresses":
+    // empty means "resolved to nothing", which this code allows, so a timeout
+    // has to reach the verdict as a refusal instead.
     if (!net.isIP(hostname) && !normalizedIp) {
-      try {
-        const [ipv4Addrs, ipv6Addrs] = await Promise.all([
-          dnsResolve(hostname),
-          dnsResolve6(hostname),
-        ]);
-        const allAddrs = [...ipv4Addrs, ...ipv6Addrs];
-        // Reject if ANY resolved address is private (prevents DNS rebinding)
-        if (allAddrs.length > 0 && allAddrs.some((ip) => isPrivateIp(ip))) {
-          return false;
-        }
-      } catch {
-        // DNS resolution failed — allow the URL (the actual HTTP request will fail)
+      const allAddrs = await resolveBothFamilies(hostname);
+      if (allAddrs === null) return false;
+      // Reject if ANY resolved address is private (prevents DNS rebinding)
+      if (allAddrs.length > 0 && allAddrs.some((ip) => isPrivateIp(ip))) {
+        return false;
       }
     }
 
@@ -328,28 +381,15 @@ export async function validateUrlIsSafe(url: string): Promise<boolean> {
 }
 
 /**
- * How long a safety check may take before the answer is "not established".
+ * `validateUrlIsSafe` under a deadline, for a caller that wants the WHOLE check
+ * bounded rather than only its lookup.
  *
- * The check resolves the host, and `dns.resolve4`/`resolve6` carry no timeout of
- * their own -- so a name whose authoritative nameserver never answers holds the
- * caller for c-ares' whole retry budget, tens of seconds. That is a value
- * somebody else chooses, on a request path: `IsPushEndpoint` runs this check on
- * `POST /push/subscriptions` before any row exists, and the AI provider's
- * `baseUrl` field runs it on a save.
- *
- * A check that has not answered in this long has not established the host is
- * safe, and an unestablished host is not sent to -- so the timeout answers
- * `false`, never "probably fine". Two seconds is far past a working resolver
- * and far short of a lever.
- */
-export const URL_SAFETY_CHECK_TIMEOUT_MS = 2_000;
-
-/**
- * `validateUrlIsSafe` under a deadline.
- *
- * The bound is here, beside the check it bounds, rather than at each caller: the
- * push sender had its own 2-second race and the validator on the same path had
- * none, which is exactly the shape of a rule written twice.
+ * The DNS phase is bounded inside the check itself (`resolveBothFamilies`), so
+ * every caller -- the AI provider `baseUrl` validators, the startup check, the
+ * push endpoint -- is covered without asking for it. This wrapper adds nothing
+ * for them; it exists because the push sender bounds a per-send re-check whose
+ * budget is part of a documented request worst case
+ * (`PUSH_TEST_WORST_CASE_MS`), and that figure has to name a bound it owns.
  */
 export async function validateUrlIsSafeWithin(
   url: string,

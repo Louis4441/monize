@@ -250,6 +250,7 @@
       "notConfigured": "此 Monize 实例不提供浏览器推送。管理员可以在 Admin 区域启用。",
       "disabledByAdmin": "管理员已为此 Monize 实例关闭浏览器推送。",
       "keyUnreadable": "Monize 无法读取此实例的推送密钥对，因此无法投递任何通知。管理员可在 Admin 区域轮换密钥对以恢复。",
+      "serverKeyMissing": "此 Monize 实例缺少打开推送密钥对所需的加密密钥，因此无法投递任何内容。需要管理员在部署中设置该密钥并重启。",
       "statusUnavailable": "Monize 无法确认浏览器推送是否可用。请重新加载页面后重试。",
       "devicesUnavailable": "Monize 无法加载你已注册的设备。本页其他功能仍可使用；请重新加载后重试。",
       "unsupported": {

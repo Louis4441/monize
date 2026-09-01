@@ -129,7 +129,8 @@
         "description": "Notifikasi terkirim ke ponsel atau desktop bahkan saat Monize tertutup. Tidak memerlukan Firebase, Google Play, atau akun Apple Developer.",
         "toggleLabel": "Aktifkan push peramban untuk instans ini",
         "missingKeys": "Instans ini tidak memiliki pasangan kunci push. Setel ENCRYPTION_KEY dan mulai ulang: Monize akan membuat pasangannya sendiri saat start berikutnya.",
-        "keyUnreadable": "Instans ini tidak dapat mendekripsi pasangan kunci push yang tersimpan, sehingga tidak ada yang terkirim. Rotasi pasangan kunci di bawah untuk memulihkan."
+        "keyUnreadable": "Instans ini tidak dapat mendekripsi pasangan kunci push yang tersimpan, sehingga tidak ada yang terkirim. Rotasi pasangan kunci di bawah untuk memulihkan.",
+        "serverKeyMissing": "Instance ini tidak memiliki ENCRYPTION_KEY, sehingga tidak dapat membuka pasangan kunci push yang disimpannya. Setel ENCRYPTION_KEY di deployment lalu mulai ulang — merotasi tidak membantu selama kuncinya hilang."
       },
       "email": {
         "name": "Email",
@@ -152,7 +153,8 @@
       "rotateButton": "Rotasi pasangan kunci",
       "rotatingButton": "Merotasi...",
       "missingEncryptionKey": "Instans ini tidak memiliki pasangan kunci push karena ENCRYPTION_KEY belum disetel dan kunci privat harus disimpan tanpa enkripsi. Setel dan mulai ulang: Monize akan membuat pasangannya sendiri.",
-      "keyUnreadable": "Instans ini memiliki pasangan kunci push yang tidak lagi dapat didekripsi, sehingga tidak ada yang terkirim. Ini terjadi saat ENCRYPTION_KEY berubah pada basis data yang sedang berjalan, atau saat cadangan dipulihkan ke instans lain. Rotasi pasangan kunci untuk memulihkan; setiap perangkat akan mendaftar ulang."
+      "keyUnreadable": "Instans ini memiliki pasangan kunci push yang tidak lagi dapat didekripsi, sehingga tidak ada yang terkirim. Ini terjadi saat ENCRYPTION_KEY berubah pada basis data yang sedang berjalan, atau saat cadangan dipulihkan ke instans lain. Rotasi pasangan kunci untuk memulihkan; setiap perangkat akan mendaftar ulang.",
+      "serverKeyMissing": "Instance ini tidak memiliki ENCRYPTION_KEY, sehingga tidak dapat membuka pasangan kunci push yang disimpannya. Merotasi tidak membantu selama kuncinya hilang: setel ENCRYPTION_KEY di deployment dan mulai ulang, lalu push berfungsi lagi dengan perangkat yang ada."
     },
     "dialogs": {
       "rotateTitle": "Rotasi pasangan kunci push?",

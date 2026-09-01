@@ -62,10 +62,10 @@ describe("collectAgentSockets", () => {
    * drives a real connection is a test about the network.
    */
   it("records every connection the agent opens and returns it unchanged", () => {
-    const first = { id: 1 } as unknown as ReturnType<
+    const first = { id: 1, destroy: jest.fn() } as unknown as ReturnType<
       https.Agent["createConnection"]
     >;
-    const second = { id: 2 } as unknown as typeof first;
+    const second = { id: 2, destroy: jest.fn() } as unknown as typeof first;
     const answers = [first, second];
     const agent = {
       createConnection: jest.fn(() => answers.shift()),
@@ -86,8 +86,33 @@ describe("collectAgentSockets", () => {
     expect(returnedSecond).toBe(second);
   });
 
+  // Node's agent contract permits `createConnection(options, oncreate)` to hand
+  // the socket to its callback and return undefined (`_http_agent` does
+  // `if (newSocket) oncreate(...)` for exactly that). Recorded anyway, the
+  // deadline's `socket.destroy()` throws inside a setTimeout -- an uncaught
+  // exception that takes the process with it, and the rejection beside it never
+  // runs, so the delivery never settles either.
+  it.each([
+    ["undefined", undefined],
+    ["null", null],
+    ["something with no destroy", { id: 1 }],
+  ])("records nothing when the agent returns %s", (_name, answer) => {
+    const agent = {
+      createConnection: jest.fn(() => answer as never),
+    } as unknown as https.Agent;
+
+    const sockets = collectAgentSockets(agent);
+    const returned = (
+      agent as unknown as { createConnection: (o: unknown) => unknown }
+    ).createConnection({ host: "a" });
+
+    expect(sockets).toEqual([]);
+    // Still handed back untouched: the wrapper observes, it does not decide.
+    expect(returned).toBe(answer);
+  });
+
   it("forwards the arguments it was given", () => {
-    const createConnection = jest.fn(() => ({}) as never);
+    const createConnection = jest.fn(() => ({ destroy: jest.fn() }) as never);
     const agent = { createConnection } as unknown as https.Agent;
 
     collectAgentSockets(agent);

@@ -287,11 +287,17 @@ server will make an outbound request to**, so it is validated with
 `IsPushEndpoint`, which reuses the AI provider's safety check and adds an https
 floor -- never a bare `@IsUrl()`. That check resolves the host, and
 `dns.resolve4`/`resolve6` carry no timeout of their own, so it is always reached
-through `validateUrlIsSafeWithin` (`src/ai/validators/safe-url.validator.ts`):
-the bound lives with the check rather than at each caller, because a resolver
-that never answers holds whichever request asked -- a save, or a subscribe an
-authenticated caller may issue twenty times a minute. A timeout answers
-**false**: not knowing whether a host is public is not knowing it is.
+bounded INSIDE the check itself (`resolveBothFamilies` in
+`src/ai/validators/safe-url.validator.ts`), so every caller is covered without
+asking: the AI provider `baseUrl` validators and the startup check reach it
+through plain `validateUrlIsSafe`, and a resolver that never answers would hold
+whichever request asked -- a save, or a subscribe an authenticated caller may
+issue twenty times a minute. A timeout answers **false**, and specifically not
+"resolved to nothing": an empty answer is allowed (a name that resolves nowhere
+fails on its own), so a stall borrowing that answer would be an open door.
+`validateUrlIsSafeWithin` bounds the *whole* check and exists for the push
+sender, whose documented request worst case (`PUSH_TEST_WORST_CASE_MS`) has to
+name a budget it owns.
 
 And **a subscription belongs to a browser profile, not to a session**: the
 unique index is on `endpoint_hash` alone, so one endpoint has one owner -- and

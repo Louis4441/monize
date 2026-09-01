@@ -129,7 +129,8 @@
         "description": "Thông báo được gửi tới điện thoại hoặc máy tính ngay cả khi Monize đã đóng. Không cần Firebase, Google Play hay tài khoản Apple Developer.",
         "toggleLabel": "Bật đẩy từ trình duyệt cho phiên bản này",
         "missingKeys": "Phiên bản này chưa có cặp khóa đẩy. Hãy đặt ENCRYPTION_KEY rồi khởi động lại: Monize sẽ tự tạo cặp khóa ở lần khởi động sau.",
-        "keyUnreadable": "Phiên bản này không giải mã được cặp khóa đẩy đã lưu, nên không có gì được gửi đi. Hãy xoay cặp khóa bên dưới để khôi phục."
+        "keyUnreadable": "Phiên bản này không giải mã được cặp khóa đẩy đã lưu, nên không có gì được gửi đi. Hãy xoay cặp khóa bên dưới để khôi phục.",
+        "serverKeyMissing": "Phiên bản này không có ENCRYPTION_KEY nên không thể mở cặp khóa push đã lưu. Hãy đặt ENCRYPTION_KEY trong bản triển khai và khởi động lại — luân chuyển khóa không giúp được khi khóa còn thiếu."
       },
       "email": {
         "name": "Email",
@@ -152,7 +153,8 @@
       "rotateButton": "Xoay cặp khóa",
       "rotatingButton": "Đang xoay...",
       "missingEncryptionKey": "Phiên bản này chưa có cặp khóa đẩy vì ENCRYPTION_KEY chưa được đặt và khóa riêng sẽ phải lưu ở dạng không mã hóa. Hãy đặt biến này rồi khởi động lại: Monize sẽ tự tạo cặp khóa.",
-      "keyUnreadable": "Phiên bản này giữ một cặp khóa đẩy mà nó không còn giải mã được, nên không có gì được gửi đi. Điều này xảy ra khi ENCRYPTION_KEY thay đổi trên cơ sở dữ liệu đang chạy, hoặc khi bản sao lưu được khôi phục sang phiên bản khác. Hãy xoay cặp khóa để khôi phục; mọi thiết bị sẽ đăng ký lại."
+      "keyUnreadable": "Phiên bản này giữ một cặp khóa đẩy mà nó không còn giải mã được, nên không có gì được gửi đi. Điều này xảy ra khi ENCRYPTION_KEY thay đổi trên cơ sở dữ liệu đang chạy, hoặc khi bản sao lưu được khôi phục sang phiên bản khác. Hãy xoay cặp khóa để khôi phục; mọi thiết bị sẽ đăng ký lại.",
+      "serverKeyMissing": "Phiên bản này chưa đặt ENCRYPTION_KEY nên không thể mở cặp khóa push đã lưu. Việc luân chuyển khóa sẽ không giúp gì khi khóa còn thiếu: hãy đặt ENCRYPTION_KEY trong bản triển khai và khởi động lại, push sẽ hoạt động lại với các thiết bị hiện có."
     },
     "dialogs": {
       "rotateTitle": "Xoay cặp khóa đẩy?",

@@ -219,6 +219,7 @@ describe("PushConfigService", () => {
         publicKey: "PUB-STORED",
         configured: true,
         keyUnreadable: false,
+        encryptionAvailable: true,
       });
       expect(Object.keys(config)).not.toContain("privateKey");
       expect(JSON.stringify(config)).not.toContain("PRIV");
@@ -231,6 +232,7 @@ describe("PushConfigService", () => {
         publicKey: null,
         configured: false,
         keyUnreadable: false,
+        encryptionAvailable: true,
       });
 
       configRepo.findOne.mockResolvedValue(
@@ -241,6 +243,7 @@ describe("PushConfigService", () => {
         publicKey: "PUB-STORED",
         configured: true,
         keyUnreadable: false,
+        encryptionAvailable: true,
       });
 
       // ...and from a key pair this server cannot open, which the account
@@ -253,6 +256,29 @@ describe("PushConfigService", () => {
         publicKey: "PUB-STORED",
         configured: true,
         keyUnreadable: true,
+        encryptionAvailable: true,
+      });
+    });
+
+    // The two causes of `keyUnreadable` have OPPOSITE repairs, and both UIs said
+    // "rotate the key pair" -- which `rotateKeyPair` refuses in exactly this
+    // state, so the documented repair could not work. With no key configured the
+    // repair is setting the variable and restarting, which no button can do.
+    it("says whether the server has an encryption key at all", async () => {
+      const service = new PushConfigService(
+        dataSource as never,
+        {
+          isConfigured: () => false,
+          encrypt: (plain: string) => `enc(${plain})`,
+          decrypt: (cipher: string) => cipher,
+          canDecrypt: () => false,
+        } as unknown as EncryptionService,
+      );
+      configRepo.findOne.mockResolvedValue(storedConfig());
+
+      await expect(service.getPublicConfig()).resolves.toMatchObject({
+        keyUnreadable: true,
+        encryptionAvailable: false,
       });
     });
   });
@@ -269,6 +295,7 @@ describe("PushConfigService", () => {
         publicKey: "PUB-STORED",
         configured: true,
         keyUnreadable: false,
+        encryptionAvailable: true,
         publicKeyFingerprint: fingerprintPublicKey("PUB-STORED"),
         generatedAt: "2026-01-02T03:04:05.000Z",
         liveSubscriptionCount: 3,

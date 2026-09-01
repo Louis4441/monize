@@ -152,14 +152,18 @@ function AdminNotificationsContent() {
                 ? 'on'
                 : 'off'
               : 'unconfigured',
-          // Three states, three repairs: no key pair at all, a key pair this
-          // server cannot decrypt, and a channel an administrator turned off.
-          // Folding the middle one into either of the others sends an operator
-          // to fix something that is not broken.
+          // Four states, four repairs: no key pair at all, a key pair this
+          // server cannot decrypt, the same with no ENCRYPTION_KEY to decrypt it
+          // WITH, and a channel an administrator turned off. Folding any of them
+          // into another sends an operator to fix something that is not broken --
+          // and the third folded into the second named a repair (rotate) that
+          // `rotateKeyPair` refuses in exactly that state.
           unavailableNote: !config.configured
             ? t('channels.webPush.missingKeys')
             : config.keyUnreadable
-              ? t('channels.webPush.keyUnreadable')
+              ? config.encryptionAvailable === false
+                ? t('channels.webPush.serverKeyMissing')
+                : t('channels.webPush.keyUnreadable')
               : undefined,
           toggle: {
             label: t('channels.webPush.toggleLabel'),

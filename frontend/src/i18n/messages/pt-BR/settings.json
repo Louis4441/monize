@@ -250,6 +250,7 @@
       "notConfigured": "O push do navegador não está disponível nesta instância do Monize. Um administrador pode ativá-lo na área Admin.",
       "disabledByAdmin": "Um administrador desativou o push do navegador nesta instância do Monize.",
       "keyUnreadable": "O Monize não consegue ler o par de chaves push desta instância, então nada é entregue. Um administrador pode recuperá-lo girando o par de chaves na área Admin.",
+      "serverKeyMissing": "A esta instância do Monize falta a chave de criptografia necessária para abrir seu par de chaves push, por isso nada pode ser entregue. Um administrador precisa defini-la no deployment e reiniciar.",
       "statusUnavailable": "O Monize não conseguiu verificar se o push do navegador está disponível. Recarregue a página para tentar novamente.",
       "devicesUnavailable": "O Monize não conseguiu carregar seus dispositivos registrados. O resto desta página continua funcionando; recarregue para tentar novamente.",
       "unsupported": {

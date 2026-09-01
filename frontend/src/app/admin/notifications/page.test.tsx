@@ -227,6 +227,7 @@ describe('AdminNotificationsPage', () => {
       enabled: false,
       configured: true,
       keyUnreadable: true,
+      encryptionAvailable: true,
     });
 
     render(<AdminNotificationsPage />);
@@ -246,6 +247,36 @@ describe('AdminNotificationsPage', () => {
         name: /enable browser push for this instance/i,
       }),
     ).toBeDisabled();
+  });
+
+  // The same state, the other cause -- and the repairs are opposites. Rotation
+  // needs a key to store the new private half under, so `rotateKeyPair` refuses
+  // outright when ENCRYPTION_KEY is missing: telling this operator to rotate is
+  // an instruction that cannot succeed, and the one that can (set the variable,
+  // restart) is not a button on any page.
+  it('sends the operator to the variable, not to the rotate button, when no key is set', async () => {
+    mockGetChannels.mockResolvedValue({
+      ...CONFIGURED,
+      enabled: false,
+      configured: true,
+      keyUnreadable: true,
+      encryptionAvailable: false,
+    });
+
+    render(<AdminNotificationsPage />);
+
+    // Both surfaces on this page say it: the channel row's note and the identity
+    // panel's. Neither may keep the rotate wording, which is why the second
+    // assertion is the one that matters.
+    expect(
+      (await screen.findAllByText(/ENCRYPTION_KEY/i)).length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(
+      screen.queryByText(/Rotate the key pair below to recover/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/cannot decrypt its stored push key pair/i),
+    ).not.toBeInTheDocument();
   });
 
   it('switches the instance channel off through the toggle', async () => {

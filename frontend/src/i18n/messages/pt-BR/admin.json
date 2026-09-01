@@ -129,7 +129,8 @@
         "description": "Notificações entregues no celular ou no computador mesmo com o Monize fechado. Não exige Firebase nem conta do Google Play ou Apple Developer.",
         "toggleLabel": "Ativar o push do navegador nesta instância",
         "missingKeys": "Esta instância não tem par de chaves push. Defina ENCRYPTION_KEY e reinicie: o Monize gera o par na próxima inicialização.",
-        "keyUnreadable": "Esta instância não consegue descriptografar o par de chaves push armazenado, então nada é entregue. Gire o par de chaves abaixo para recuperar."
+        "keyUnreadable": "Esta instância não consegue descriptografar o par de chaves push armazenado, então nada é entregue. Gire o par de chaves abaixo para recuperar.",
+        "serverKeyMissing": "Esta instância não tem ENCRYPTION_KEY, por isso não consegue abrir o par de chaves push que salvou. Defina ENCRYPTION_KEY no deployment e reinicie — rotacionar não ajuda enquanto a chave estiver ausente."
       },
       "email": {
         "name": "E-mail",
@@ -152,7 +153,8 @@
       "rotateButton": "Girar par de chaves",
       "rotatingButton": "Girando...",
       "missingEncryptionKey": "Esta instância não tem par de chaves push porque ENCRYPTION_KEY não está definida e a chave privada teria de ser armazenada sem criptografia. Defina-a e reinicie: o Monize gera o par sozinho.",
-      "keyUnreadable": "Esta instância tem um par de chaves push que não consegue mais descriptografar, então nada é entregue. Acontece quando ENCRYPTION_KEY muda com o banco de dados em funcionamento, ou quando um backup é restaurado em outra instância. Gire o par de chaves para recuperar; todos os dispositivos se registrarão novamente."
+      "keyUnreadable": "Esta instância tem um par de chaves push que não consegue mais descriptografar, então nada é entregue. Acontece quando ENCRYPTION_KEY muda com o banco de dados em funcionamento, ou quando um backup é restaurado em outra instância. Gire o par de chaves para recuperar; todos os dispositivos se registrarão novamente.",
+      "serverKeyMissing": "Esta instância não tem ENCRYPTION_KEY definida, por isso não consegue abrir o par de chaves push que salvou. Rotacionar não ajuda enquanto a chave estiver ausente: defina ENCRYPTION_KEY no deployment e reinicie, e as notificações push voltam a funcionar com os dispositivos existentes."
     },
     "dialogs": {
       "rotateTitle": "Girar o par de chaves push?",

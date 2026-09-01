@@ -87,7 +87,6 @@ export function NotificationBell() {
 
     // After 5 seconds, start collapse animation then remove
     const timer = setTimeout(() => {
-      undoTimers.current.delete(notificationId);
       setDismissingIds((prev) => {
         const next = new Set(prev);
         next.delete(notificationId);
@@ -95,8 +94,13 @@ export function NotificationBell() {
       });
       setCollapsingIds((prev) => new Set(prev).add(notificationId));
 
-      // After collapse animation completes, remove from array + API call
-      setTimeout(() => {
+      // After collapse animation completes, remove from array + API call.
+      // Tracked under the same key, replacing the outer timer rather than
+      // dropping it: the map is what unmount cleanup and "dismiss all" cancel
+      // through, so an untracked timer ran on a torn-down component and sent a
+      // dismiss for a row the bulk request had already covered.
+      const collapse = setTimeout(() => {
+        undoTimers.current.delete(notificationId);
         setCollapsingIds((prev) => {
           const next = new Set(prev);
           next.delete(notificationId);
@@ -105,6 +109,7 @@ export function NotificationBell() {
         setAlerts((prev) => prev.filter((a) => a.id !== notificationId));
         notificationsApi.dismiss(notificationId).catch(() => {});
       }, 300);
+      undoTimers.current.set(notificationId, collapse);
     }, 5000);
 
     undoTimers.current.set(notificationId, timer);

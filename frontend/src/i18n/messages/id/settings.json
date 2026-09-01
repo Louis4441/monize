@@ -250,6 +250,7 @@
       "notConfigured": "Push peramban tidak tersedia di instans Monize ini. Administrator dapat mengaktifkannya di area Admin.",
       "disabledByAdmin": "Administrator telah mematikan push peramban untuk instans Monize ini.",
       "keyUnreadable": "Monize tidak dapat membaca pasangan kunci push instans ini, sehingga tidak ada yang terkirim. Administrator dapat memulihkannya dengan merotasi pasangan kunci di area Admin.",
+      "serverKeyMissing": "Instance Monize ini tidak memiliki kunci enkripsi yang dibutuhkan untuk membuka pasangan kunci push-nya, sehingga tidak ada yang dapat dikirim. Administrator harus menyetelnya di deployment dan memulai ulang.",
       "statusUnavailable": "Monize tidak dapat memeriksa apakah push peramban tersedia. Muat ulang halaman untuk mencoba lagi.",
       "devicesUnavailable": "Monize tidak dapat memuat perangkat terdaftar Anda. Semua hal lain di halaman ini tetap berfungsi; muat ulang untuk mencoba lagi.",
       "unsupported": {

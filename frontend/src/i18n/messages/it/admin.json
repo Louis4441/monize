@@ -129,7 +129,8 @@
         "description": "Notifiche consegnate a telefono o desktop anche con Monize chiuso. Non richiede Firebase né un account Google Play o Apple Developer.",
         "toggleLabel": "Attiva il push del browser per questa istanza",
         "missingKeys": "Questa istanza non ha una coppia di chiavi push. Imposta ENCRYPTION_KEY e riavvia: Monize genera la coppia da sé al prossimo avvio.",
-        "keyUnreadable": "Questa istanza non riesce a decifrare la coppia di chiavi push memorizzata, quindi non viene consegnato nulla. Ruota la coppia di chiavi qui sotto per recuperare."
+        "keyUnreadable": "Questa istanza non riesce a decifrare la coppia di chiavi push memorizzata, quindi non viene consegnato nulla. Ruota la coppia di chiavi qui sotto per recuperare.",
+        "serverKeyMissing": "Questa istanza non ha ENCRYPTION_KEY, quindi non puo aprire la coppia di chiavi push memorizzata. Imposta ENCRYPTION_KEY nel deployment e riavvia: la rotazione non puo aiutare se la chiave manca."
       },
       "email": {
         "name": "Email",
@@ -152,7 +153,8 @@
       "rotateButton": "Ruota coppia di chiavi",
       "rotatingButton": "Rotazione...",
       "missingEncryptionKey": "Questa istanza non ha una coppia di chiavi push perché ENCRYPTION_KEY non è impostata e la chiave privata dovrebbe essere memorizzata in chiaro. Impostala e riavvia: Monize genera la coppia da sé.",
-      "keyUnreadable": "Questa istanza possiede una coppia di chiavi push che non riesce più a decifrare, quindi non viene consegnato nulla. Succede quando ENCRYPTION_KEY cambia con il database in funzione, o quando un backup viene ripristinato su un'altra istanza. Ruota la coppia di chiavi per recuperare; ogni dispositivo si registrerà di nuovo."
+      "keyUnreadable": "Questa istanza possiede una coppia di chiavi push che non riesce più a decifrare, quindi non viene consegnato nulla. Succede quando ENCRYPTION_KEY cambia con il database in funzione, o quando un backup viene ripristinato su un'altra istanza. Ruota la coppia di chiavi per recuperare; ogni dispositivo si registrerà di nuovo.",
+      "serverKeyMissing": "Questa istanza non ha ENCRYPTION_KEY impostata, quindi non puo aprire la coppia di chiavi push memorizzata. La rotazione non aiuta se la chiave manca: imposta ENCRYPTION_KEY nel deployment e riavvia, e le notifiche push torneranno a funzionare con i dispositivi esistenti."
     },
     "dialogs": {
       "rotateTitle": "Ruotare la coppia di chiavi push?",

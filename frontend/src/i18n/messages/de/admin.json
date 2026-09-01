@@ -129,7 +129,8 @@
         "description": "Benachrichtigungen auf Telefon oder Desktop, auch wenn Monize geschlossen ist. Benötigt weder Firebase noch ein Google-Play- oder Apple-Developer-Konto.",
         "toggleLabel": "Browser-Push für diese Instanz aktivieren",
         "missingKeys": "Diese Instanz hat kein Push-Schlüsselpaar. Setzen Sie ENCRYPTION_KEY und starten Sie neu: Monize erzeugt das Paar beim nächsten Start selbst.",
-        "keyUnreadable": "Diese Instanz kann ihr gespeichertes Push-Schlüsselpaar nicht entschlüsseln, es kann nichts zugestellt werden. Erneuern Sie das Schlüsselpaar unten."
+        "keyUnreadable": "Diese Instanz kann ihr gespeichertes Push-Schlüsselpaar nicht entschlüsseln, es kann nichts zugestellt werden. Erneuern Sie das Schlüsselpaar unten.",
+        "serverKeyMissing": "Für diese Instanz ist kein ENCRYPTION_KEY gesetzt, daher kann das gespeicherte Push-Schlüsselpaar nicht geöffnet werden. Setzen Sie ENCRYPTION_KEY im Deployment und starten Sie neu — ein Rotieren hilft bei fehlendem Schlüssel nicht."
       },
       "email": {
         "name": "E-Mail",
@@ -152,7 +153,8 @@
       "rotateButton": "Schlüsselpaar erneuern",
       "rotatingButton": "Wird erneuert ...",
       "missingEncryptionKey": "Diese Instanz hat kein Push-Schlüsselpaar, weil ENCRYPTION_KEY nicht gesetzt ist und der private Schlüssel unverschlüsselt gespeichert werden müsste. Setzen Sie die Variable und starten Sie neu: Monize erzeugt das Paar selbst.",
-      "keyUnreadable": "Diese Instanz besitzt ein Push-Schlüsselpaar, das sie nicht mehr entschlüsseln kann – es kann nichts zugestellt werden. Das passiert, wenn sich ENCRYPTION_KEY bei laufender Datenbank ändert oder ein Backup auf einer anderen Instanz wiederhergestellt wird. Erneuern Sie das Schlüsselpaar; alle Geräte registrieren sich danach neu."
+      "keyUnreadable": "Diese Instanz besitzt ein Push-Schlüsselpaar, das sie nicht mehr entschlüsseln kann – es kann nichts zugestellt werden. Das passiert, wenn sich ENCRYPTION_KEY bei laufender Datenbank ändert oder ein Backup auf einer anderen Instanz wiederhergestellt wird. Erneuern Sie das Schlüsselpaar; alle Geräte registrieren sich danach neu.",
+      "serverKeyMissing": "Für diese Instanz ist kein ENCRYPTION_KEY gesetzt, daher kann sie das gespeicherte Push-Schlüsselpaar nicht öffnen. Ein Rotieren hilft bei fehlendem Schlüssel nicht: Setzen Sie ENCRYPTION_KEY im Deployment und starten Sie neu — Push funktioniert dann mit den bestehenden Geräten weiter."
     },
     "dialogs": {
       "rotateTitle": "Push-Schlüsselpaar erneuern?",

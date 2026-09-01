@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
 import { TABLE_BODY_CLASS } from '@/components/ui/Table';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import type { AdminPushConfig } from '@/lib/admin-notifications';
 
 /**
@@ -82,25 +83,15 @@ export function PushChannelsPanel({ channels }: PushChannelsPanelProps) {
           </div>
 
           {channel.toggle && (
-            <button
-              type="button"
-              role="switch"
-              aria-checked={channel.toggle.checked}
-              aria-label={channel.toggle.label}
+            // The project's one switch. Hand-rolled here it came out 44px wide
+            // against ToggleSwitch's 36 -- visibly a different control from every
+            // other switch in Settings, with its own focus-ring offset colour.
+            <ToggleSwitch
+              checked={channel.toggle.checked}
+              onChange={() => channel.toggle?.onChange()}
               disabled={channel.toggle.disabled}
-              onClick={channel.toggle.onChange}
-              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 dark:focus-visible:ring-offset-gray-900 ${
-                channel.toggle.checked
-                  ? 'bg-blue-600'
-                  : 'bg-gray-200 dark:bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  channel.toggle.checked ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
+              label={channel.toggle.label}
+            />
           )}
         </div>
       ))}
@@ -174,7 +165,13 @@ export function VapidIdentityPanel({
 
       {config.keyUnreadable && (
         <p className="mt-4 text-sm text-amber-700 dark:text-amber-400">
-          {t('identity.keyUnreadable')}
+          {/* Which repair depends on WHY the key cannot be read: rotating fixes a
+              key that changed under a live database, and is refused outright
+              when the server has no ENCRYPTION_KEY -- so the rotate message was
+              an instruction guaranteed to fail in one of the two states. */}
+          {config.encryptionAvailable === false
+            ? t('identity.serverKeyMissing')
+            : t('identity.keyUnreadable')}
         </p>
       )}
 

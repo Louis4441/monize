@@ -72,6 +72,23 @@ describe('NotificationList', () => {
     vi.clearAllMocks();
   });
 
+  // The one string on every row, and the one the rename left in English while
+  // the title and body beside it were composed in the reader's locale.
+  it('renders the timestamp through the locale, not a hand-written suffix', async () => {
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+
+    render(
+      <NotificationList
+        {...defaultProps}
+        notifications={[makeNotification({ createdAt: twoHoursAgo })]}
+      />,
+    );
+
+    // Intl's own wording for the reader's locale (English here), never `2h ago`.
+    expect(screen.getByText(/2 hours ago/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^\d+h ago$/)).not.toBeInTheDocument();
+  });
+
   it('renders the notification list container', () => {
     render(<NotificationList {...defaultProps} />);
 
