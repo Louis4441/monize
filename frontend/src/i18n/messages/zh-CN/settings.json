@@ -133,6 +133,16 @@
     "timeFormatLabel": "时间格式",
     "recentTransactionsLabel": "快速填充中的近期交易数量",
     "recentTransactionsHelp": "交易表单中收款人字段旁历史按钮弹出框中显示的条目数量。",
+    "mapProviderLabel": "地址使用的地图服务",
+    "mapProviderHelp": "点击地址时打开哪个地图服务。设备默认将根据您的平台决定：iPhone 和 iPad 上使用 Apple 地图，Android 上使用您的默认地图应用，其他情况使用 OpenStreetMap。",
+    "mapProviderOptions": {
+      "device": "设备默认",
+      "apple": "Apple Maps",
+      "bing": "Bing Maps",
+      "google": "Google Maps",
+      "openstreetmap": "OpenStreetMap",
+      "waze": "Waze"
+    },
     "saveButton": "保存偏好设置",
     "savingButton": "保存中...",
     "toasts": {

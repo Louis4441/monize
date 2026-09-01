@@ -133,6 +133,16 @@
     "timeFormatLabel": "Formato de hora",
     "recentTransactionsLabel": "Transacciones recientes en completado rápido",
     "recentTransactionsHelp": "Número de entradas mostradas en el historial emergente junto al campo Beneficiario en los formularios de transacciones.",
+    "mapProviderLabel": "Proveedor de mapas para direcciones",
+    "mapProviderHelp": "Qué servicio de mapas se abre al hacer clic en una dirección. El predeterminado del dispositivo usa su plataforma: Apple Maps en iPhone y iPad, su aplicación de mapas predeterminada en Android, y OpenStreetMap en el resto.",
+    "mapProviderOptions": {
+      "device": "Predeterminado del dispositivo",
+      "apple": "Apple Maps",
+      "bing": "Bing Maps",
+      "google": "Google Maps",
+      "openstreetmap": "OpenStreetMap",
+      "waze": "Waze"
+    },
     "saveButton": "Guardar preferencias",
     "savingButton": "Guardando...",
     "toasts": {

@@ -11,6 +11,29 @@
  * normaliser -- so nothing here trusts its input.
  */
 
+/**
+ * Map services an address link can be sent to, as stored in the user's
+ * `defaultMapProvider` preference.
+ *
+ * 'device' is the platform hand-off that predates the setting -- Apple Maps on
+ * iOS, a `geo:` URI on Android (which opens whichever map app the phone is set
+ * to), OpenStreetMap everywhere else. It is a value rather than an absence so a
+ * user can deliberately choose it again after picking something specific.
+ *
+ * Mirrors MAP_PROVIDERS in the backend's update-preferences DTO, which is what
+ * the API and the database CHECK constraint validate against.
+ */
+export const MAP_PROVIDERS = [
+  'device',
+  'openstreetmap',
+  'google',
+  'apple',
+  'bing',
+  'waze',
+] as const;
+
+export type MapProvider = (typeof MAP_PROVIDERS)[number];
+
 /** Which maps application the viewer's device will open. */
 export type MapPlatform = 'ios' | 'android' | 'other';
 
@@ -54,6 +77,11 @@ export function addressQuery(address: string): string {
 
 export interface MapsUrlInput {
   address: string;
+  /**
+   * The user's chosen map service. Absent or 'device' keeps the platform
+   * hand-off, which is what everyone got before the preference existed.
+   */
+  provider?: MapProvider;
   /** Injectable for tests; defaults to the current device. */
   platform?: MapPlatform;
 }
@@ -66,13 +94,37 @@ export interface MapsUrlInput {
  * good at. Returns null when there is no address to search for, so a caller
  * renders text rather than a link to nowhere.
  */
-export function mapsUrl({ address, platform }: MapsUrlInput): string | null {
+export function mapsUrl({
+  address,
+  provider,
+  platform,
+}: MapsUrlInput): string | null {
   const query = addressQuery(address);
   if (!query) return null;
 
-  const target = platform ?? detectMapPlatform();
   const label = encodeURIComponent(query);
 
+  switch (provider) {
+    case 'openstreetmap':
+      return `https://www.openstreetmap.org/search?query=${label}`;
+    case 'google':
+      // The documented Maps URLs form, which every platform's Google app
+      // registers as a deep link.
+      return `https://www.google.com/maps/search/?api=1&query=${label}`;
+    case 'apple':
+      return `https://maps.apple.com/?q=${label}`;
+    case 'bing':
+      return `https://www.bing.com/maps?where1=${label}`;
+    case 'waze':
+      return `https://waze.com/ul?q=${label}`;
+    default:
+      break;
+  }
+
+  // 'device' and anything unrecognised (a value stored by a newer build, say)
+  // fall through to the platform hand-off rather than to a hardcoded service:
+  // guessing is what this branch is for, and it is the documented default.
+  const target = platform ?? detectMapPlatform();
   if (target === 'ios') return `https://maps.apple.com/?q=${label}`;
   // geo:0,0?q=<query> is the documented form for searching by text rather than
   // dropping a pin at literal 0,0.

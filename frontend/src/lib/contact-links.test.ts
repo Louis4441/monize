@@ -76,6 +76,64 @@ describe('mapsUrl', () => {
     expect(url).toContain(encodeURIComponent('1912 Pike Pl, Seattle, WA'));
   });
 
+  describe('with an explicit provider', () => {
+    it.each([
+      ['openstreetmap', 'https://www.openstreetmap.org/search?query='],
+      ['google', 'https://www.google.com/maps/search/?api=1&query='],
+      ['apple', 'https://maps.apple.com/?q='],
+      ['bing', 'https://www.bing.com/maps?where1='],
+      ['waze', 'https://waze.com/ul?q='],
+    ] as const)('sends %s to its own search URL', (provider, prefix) => {
+      expect(mapsUrl({ address, provider, platform: 'ios' })).toBe(
+        `${prefix}${encodeURIComponent(address)}`,
+      );
+    });
+
+    it('overrides the platform rather than deferring to it', () => {
+      // The whole point of the preference: an iPhone user who picked Google
+      // must not be sent to Apple Maps.
+      expect(mapsUrl({ address, provider: 'google', platform: 'ios' })).toContain(
+        'google.com/maps',
+      );
+      expect(
+        mapsUrl({ address, provider: 'apple', platform: 'android' }),
+      ).toContain('maps.apple.com');
+    });
+  });
+
+  describe("falling back to the platform", () => {
+    it.each([
+      ['ios', 'https://maps.apple.com/?q='],
+      ['android', 'geo:0,0?q='],
+      ['other', 'https://www.openstreetmap.org/search?query='],
+    ] as const)("uses the %s hand-off for 'device'", (platform, prefix) => {
+      expect(mapsUrl({ address, provider: 'device', platform })).toBe(
+        `${prefix}${encodeURIComponent(address)}`,
+      );
+    });
+
+    it('treats an absent provider exactly as device', () => {
+      // Preferences load asynchronously, so the first render passes nothing.
+      // It must behave as it did before the preference existed.
+      for (const platform of ['ios', 'android', 'other'] as const) {
+        expect(mapsUrl({ address, platform })).toBe(
+          mapsUrl({ address, provider: 'device', platform }),
+        );
+      }
+    });
+
+    it('falls back for a provider it does not recognise', () => {
+      // A value written by a newer build must not produce a broken link.
+      expect(
+        mapsUrl({
+          address,
+          provider: 'yandex' as never,
+          platform: 'other',
+        }),
+      ).toContain('openstreetmap.org');
+    });
+  });
+
   it('returns null when there is no address to search for', () => {
     expect(mapsUrl({ address: '  ', platform: 'ios' })).toBeNull();
   });

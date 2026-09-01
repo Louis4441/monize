@@ -1,6 +1,7 @@
 import { validate } from "class-validator";
 import { plainToInstance } from "class-transformer";
-import { UpdatePreferencesDto } from "./update-preferences.dto";
+import { MAP_PROVIDERS, UpdatePreferencesDto } from "./update-preferences.dto";
+import { UserPreference } from "../entities/user-preference.entity";
 
 async function languageError(language: string) {
   const dto = plainToInstance(UpdatePreferencesDto, { language });
@@ -45,5 +46,49 @@ describe("UpdatePreferencesDto aiBubbleEnabled validation", () => {
 
   it.each(["yes", "true", 1, 0])("rejects %s", async (value) => {
     expect(await aiBubbleError(value)).toBeDefined();
+  });
+});
+
+async function mapProviderError(defaultMapProvider: string) {
+  const dto = plainToInstance(UpdatePreferencesDto, { defaultMapProvider });
+  const errors = await validate(dto);
+  return errors.find((e) => e.property === "defaultMapProvider");
+}
+
+describe("UpdatePreferencesDto map provider validation", () => {
+  it.each([...MAP_PROVIDERS])("accepts %s", async (provider) => {
+    expect(await mapProviderError(provider)).toBeUndefined();
+  });
+
+  it.each(["yandex", "Google", "", "openstreetmaps", "device "])(
+    "rejects %s",
+    async (provider) => {
+      expect(await mapProviderError(provider)).toBeDefined();
+    },
+  );
+
+  it("accepts an omitted provider, so an unrelated update need not send one", async () => {
+    const dto = plainToInstance(UpdatePreferencesDto, {
+      dateFormat: "YYYY-MM-DD",
+    });
+    const errors = await validate(dto);
+    expect(
+      errors.find((e) => e.property === "defaultMapProvider"),
+    ).toBeUndefined();
+  });
+
+  it("lists exactly the values the entity column accepts", () => {
+    // The entity writes its union out longhand so the varchar-capacity guard
+    // can measure it, so the two lists are separate statements of one fact.
+    // This is what stops them drifting -- and with them, the database CHECK.
+    const fromEntity: UserPreference["defaultMapProvider"][] = [
+      "device",
+      "openstreetmap",
+      "google",
+      "apple",
+      "bing",
+      "waze",
+    ];
+    expect([...MAP_PROVIDERS].sort()).toEqual([...fromEntity].sort());
   });
 });

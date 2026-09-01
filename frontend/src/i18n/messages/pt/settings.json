@@ -133,6 +133,16 @@
     "timeFormatLabel": "Formato de Hora",
     "recentTransactionsLabel": "Transações recentes no preenchimento rápido",
     "recentTransactionsHelp": "Número de entradas mostradas no menu do botão de histórico junto ao campo Beneficiário nos formulários de transação.",
+    "mapProviderLabel": "Fornecedor de mapas para moradas",
+    "mapProviderHelp": "Que serviço de mapas abre quando clica numa morada. A predefinição do dispositivo segue a sua plataforma: Apple Mapas no iPhone e iPad, a sua aplicação de mapas predefinida no Android e OpenStreetMap nos restantes casos.",
+    "mapProviderOptions": {
+      "device": "Predefinição do dispositivo",
+      "apple": "Apple Maps",
+      "bing": "Bing Maps",
+      "google": "Google Maps",
+      "openstreetmap": "OpenStreetMap",
+      "waze": "Waze"
+    },
     "saveButton": "Guardar Preferências",
     "savingButton": "A guardar...",
     "toasts": {

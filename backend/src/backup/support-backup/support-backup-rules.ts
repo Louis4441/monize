@@ -87,6 +87,7 @@ export const RULES: Record<string, TableRules> = {
     lock_reconciled_transactions: keep,
     language: keep,
     last_client_timezone: drop, // location hint
+    default_map_provider: keep,
     created_at: keep,
     updated_at: keep,
   },

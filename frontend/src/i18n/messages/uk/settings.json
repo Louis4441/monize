@@ -133,6 +133,16 @@
     "timeFormatLabel": "Формат часу",
     "recentTransactionsLabel": "Нещодавні транзакції в швидкому заповненні",
     "recentTransactionsHelp": "Кількість записів, що відображаються у спливаючому вікні кнопки «Історія» поряд із полем «Одержувач платежу» у формах транзакцій.",
+    "mapProviderLabel": "Картографічний сервіс для адрес",
+    "mapProviderHelp": "Який картографічний сервіс відкривається, коли ви натискаєте на адресу. Варіант «Типовий для пристрою» залежить від платформи: Apple Карти на iPhone та iPad, типовий застосунок карт на Android, в інших випадках OpenStreetMap.",
+    "mapProviderOptions": {
+      "device": "Типовий для пристрою",
+      "apple": "Apple Maps",
+      "bing": "Bing Maps",
+      "google": "Google Maps",
+      "openstreetmap": "OpenStreetMap",
+      "waze": "Waze"
+    },
     "saveButton": "Зберегти налаштування",
     "savingButton": "Збереження...",
     "toasts": {

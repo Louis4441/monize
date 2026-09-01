@@ -133,6 +133,16 @@
     "timeFormatLabel": "Format czasu",
     "recentTransactionsLabel": "Ostatnie transakcje w szybkim uzupełnianiu",
     "recentTransactionsHelp": "Liczba wpisów wyświetlanych w okienku przycisku historii obok pola Odbiorca w formularzach transakcji.",
+    "mapProviderLabel": "Dostawca map dla adresów",
+    "mapProviderHelp": "Która usługa map otwiera się po kliknięciu adresu. Domyślne ustawienie urządzenia zależy od platformy: Mapy Apple na iPhonie i iPadzie, domyślna aplikacja map na Androidzie, a w pozostałych przypadkach OpenStreetMap.",
+    "mapProviderOptions": {
+      "device": "Domyślne urządzenia",
+      "apple": "Apple Maps",
+      "bing": "Bing Maps",
+      "google": "Google Maps",
+      "openstreetmap": "OpenStreetMap",
+      "waze": "Waze"
+    },
     "saveButton": "Zapisz preferencje",
     "savingButton": "Zapisywanie...",
     "toasts": {

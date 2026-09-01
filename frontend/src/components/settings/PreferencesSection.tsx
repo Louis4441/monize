@@ -8,6 +8,7 @@ import { Select } from '@/components/ui/Select';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { userSettingsApi } from '@/lib/user-settings';
+import type { MapProvider } from '@/lib/contact-links';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { UserPreferences, UpdatePreferencesData } from '@/types/auth';
 import { getErrorMessage } from '@/lib/errors';
@@ -69,6 +70,21 @@ const QUOTE_PROVIDER_OPTIONS = [
   { value: 'msn', label: 'MSN Money' },
 ];
 
+/**
+ * Map services an address link can open, in the order the dropdown shows them:
+ * the platform hand-off first, since it is the default, then the services
+ * alphabetically. The values mirror MAP_PROVIDERS in `@/lib/contact-links`,
+ * which is what builds the URL.
+ */
+const MAP_PROVIDER_OPTIONS: { value: MapProvider; labelKey: string }[] = [
+  { value: 'device', labelKey: 'mapProviderOptions.device' },
+  { value: 'apple', labelKey: 'mapProviderOptions.apple' },
+  { value: 'bing', labelKey: 'mapProviderOptions.bing' },
+  { value: 'google', labelKey: 'mapProviderOptions.google' },
+  { value: 'openstreetmap', labelKey: 'mapProviderOptions.openstreetmap' },
+  { value: 'waze', labelKey: 'mapProviderOptions.waze' },
+];
+
 const RECENT_TRANSACTIONS_LIMIT_OPTIONS = [
   { value: '3', label: '3' },
   { value: '5', label: '5' },
@@ -108,6 +124,9 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
   );
   const [recentTransactionsLimit, setRecentTransactionsLimit] = useState(
     preferences.recentTransactionsLimit ?? 5,
+  );
+  const [defaultMapProvider, setDefaultMapProvider] = useState<MapProvider>(
+    preferences.defaultMapProvider ?? 'device',
   );
   const [language, setLanguage] = useState(preferences.language ?? 'en');
   const [isUpdatingPreferences, setIsUpdatingPreferences] = useState(false);
@@ -152,6 +171,7 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
         preferredExchanges: preferredExchanges.filter(Boolean),
         defaultQuoteProvider,
         recentTransactionsLimit,
+        defaultMapProvider,
       };
 
       const updated = await userSettingsApi.updatePreferences(data);
@@ -357,6 +377,23 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
             </span>
           </label>
           <InfoTooltip text={t('showWhatsNewTooltip')} />
+        </div>
+
+        <div>
+          <Select
+            label={t('mapProviderLabel')}
+            options={MAP_PROVIDER_OPTIONS.map((option) => ({
+              value: option.value,
+              label: t(option.labelKey),
+            }))}
+            value={defaultMapProvider}
+            onChange={(e) =>
+              setDefaultMapProvider(e.target.value as MapProvider)
+            }
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            {t('mapProviderHelp')}
+          </p>
         </div>
       </div>
 

@@ -133,6 +133,16 @@
     "timeFormatLabel": "Định dạng giờ",
     "recentTransactionsLabel": "Giao tác gần đây trong điền nhanh",
     "recentTransactionsHelp": "Số mục được hiển thị trong cửa sổ bật lên lịch sử bên cạnh trường Người nhận trên biểu mẫu giao tác.",
+    "mapProviderLabel": "Nhà cung cấp bản đồ cho địa chỉ",
+    "mapProviderHelp": "Dịch vụ bản đồ nào sẽ mở khi bạn nhấp vào một địa chỉ. Mặc định của thiết bị theo nền tảng của bạn: Apple Maps trên iPhone và iPad, ứng dụng bản đồ mặc định của bạn trên Android, và OpenStreetMap ở những nơi khác.",
+    "mapProviderOptions": {
+      "device": "Mặc định của thiết bị",
+      "apple": "Apple Maps",
+      "bing": "Bing Maps",
+      "google": "Google Maps",
+      "openstreetmap": "OpenStreetMap",
+      "waze": "Waze"
+    },
     "saveButton": "Lưu sở thích",
     "savingButton": "Đang lưu...",
     "toasts": {

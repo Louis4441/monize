@@ -71,6 +71,7 @@ const mockPreferences: UserPreferences = {
   showWhatsNew: true,
   lockReconciledTransactions: false,
   language: 'en',
+  defaultMapProvider: 'device',
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: '2024-01-01T00:00:00Z',
 };
@@ -184,7 +185,50 @@ describe('PreferencesSection', () => {
       });
     });
 
-    it('sends the stored value untouched when nothing is changed', async () => {
+    it('sends the chosen map provider when changed and saved', async () => {
+    (userSettingsApi.updatePreferences as ReturnType<typeof vi.fn>).mockResolvedValue(mockPreferences);
+
+    render(
+      <PreferencesSection
+        preferences={mockPreferences}
+        onPreferencesUpdated={mockOnPreferencesUpdated}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Map provider for addresses'), {
+      target: { value: 'google' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Preferences' }));
+
+    await waitFor(() => {
+      expect(userSettingsApi.updatePreferences).toHaveBeenCalledWith(
+        expect.objectContaining({ defaultMapProvider: 'google' }),
+      );
+    });
+  });
+
+  it('resends the stored map provider when an unrelated preference is saved', async () => {
+    // This section bulk-PATCHes every field it owns, so one left out of the
+    // payload is silently reset the next time anything else is saved.
+    (userSettingsApi.updatePreferences as ReturnType<typeof vi.fn>).mockResolvedValue(mockPreferences);
+
+    render(
+      <PreferencesSection
+        preferences={{ ...mockPreferences, defaultMapProvider: 'waze' }}
+        onPreferencesUpdated={mockOnPreferencesUpdated}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save Preferences' }));
+
+    await waitFor(() => {
+      expect(userSettingsApi.updatePreferences).toHaveBeenCalledWith(
+        expect.objectContaining({ defaultMapProvider: 'waze' }),
+      );
+    });
+  });
+
+  it('sends the stored value untouched when nothing is changed', async () => {
       // The bulk save resends every field it owns, so a preference it forgot
       // to include would be silently reset on the next unrelated save.
       (userSettingsApi.updatePreferences as ReturnType<typeof vi.fn>).mockResolvedValue(mockPreferences);

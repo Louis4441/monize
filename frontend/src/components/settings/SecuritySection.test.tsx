@@ -92,6 +92,7 @@ const mockPreferences: UserPreferences = {
   showWhatsNew: true,
   lockReconciledTransactions: false,
   language: 'en',
+  defaultMapProvider: 'device',
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: '2024-01-01T00:00:00Z',
 };

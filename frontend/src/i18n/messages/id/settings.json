@@ -133,6 +133,16 @@
     "timeFormatLabel": "Format Waktu",
     "recentTransactionsLabel": "Transaksi terbaru dalam isi-cepat",
     "recentTransactionsHelp": "Jumlah entri yang ditampilkan di popover tombol riwayat di samping kolom Penerima pada formulir transaksi.",
+    "mapProviderLabel": "Penyedia peta untuk alamat",
+    "mapProviderHelp": "Layanan peta mana yang terbuka saat Anda mengeklik alamat. Bawaan perangkat mengikuti platform Anda: Apple Maps di iPhone dan iPad, aplikasi peta bawaan Anda di Android, dan OpenStreetMap di tempat lain.",
+    "mapProviderOptions": {
+      "device": "Bawaan perangkat",
+      "apple": "Apple Maps",
+      "bing": "Bing Maps",
+      "google": "Google Maps",
+      "openstreetmap": "OpenStreetMap",
+      "waze": "Waze"
+    },
     "saveButton": "Simpan Preferensi",
     "savingButton": "Menyimpan...",
     "toasts": {

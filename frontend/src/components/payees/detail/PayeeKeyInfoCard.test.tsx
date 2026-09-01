@@ -4,6 +4,13 @@ import { render } from '@/test/render';
 import { PayeeKeyInfoCard } from './PayeeKeyInfoCard';
 import type { PayeeDetail } from '@/types/payee';
 
+const mapProvider = { current: undefined as string | undefined };
+
+vi.mock('@/store/preferencesStore', () => ({
+  usePreferencesStore: (selector: (state: unknown) => unknown) =>
+    selector({ preferences: { defaultMapProvider: mapProvider.current } }),
+}));
+
 function detailFixture(overrides: Partial<PayeeDetail> = {}): PayeeDetail {
   return {
     payee: {
@@ -202,6 +209,42 @@ describe('PayeeKeyInfoCard contact details', () => {
     expect(link.getAttribute('href')).toContain(
       encodeURIComponent('1912 Pike Pl, Seattle'),
     );
+  });
+
+  it('sends the address to the map provider the user chose', () => {
+    mapProvider.current = 'google';
+
+    render(
+      <PayeeKeyInfoCard
+        detail={withContact({ address: '1912 Pike Pl, Seattle' })}
+        categoryLabelMap={new Map()}
+        onSelectDate={vi.fn()}
+        onSelectAccount={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole('link', { name: /1912 Pike Pl/ }).getAttribute('href'),
+    ).toContain('google.com/maps');
+  });
+
+  it('falls back to the platform hand-off when no provider is stored', () => {
+    // Preferences may not have loaded yet, and a user who never touched the
+    // setting must keep the behaviour they had before it existed.
+    mapProvider.current = undefined;
+
+    render(
+      <PayeeKeyInfoCard
+        detail={withContact({ address: '1912 Pike Pl, Seattle' })}
+        categoryLabelMap={new Map()}
+        onSelectDate={vi.fn()}
+        onSelectAccount={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole('link', { name: /1912 Pike Pl/ }).getAttribute('href'),
+    ).toContain('openstreetmap.org');
   });
 
   it('renders an undialable phone number as plain text rather than a link', () => {

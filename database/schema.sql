@@ -982,12 +982,15 @@ CREATE TABLE user_preferences (
     lock_reconciled_transactions BOOLEAN NOT NULL DEFAULT false, -- strict mode: refuse any alteration of a RECONCILED transaction
     language VARCHAR(10) NOT NULL DEFAULT 'en', -- UI language; ISO 639-1 or BCP 47 tag matched against SUPPORTED_LOCALES
     last_client_timezone VARCHAR(64), -- Most recently reported X-Client-Timezone, used by cron jobs when timezone='browser'
+    default_map_provider VARCHAR(20) NOT NULL DEFAULT 'device', -- which map service an address link opens; 'device' means decide from the platform
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT user_preferences_default_quote_provider_check
       CHECK (default_quote_provider IN ('yahoo','msn')),
     CONSTRAINT user_preferences_recent_transactions_limit_check
-      CHECK (recent_transactions_limit BETWEEN 1 AND 20)
+      CHECK (recent_transactions_limit BETWEEN 1 AND 20),
+    CONSTRAINT user_preferences_default_map_provider_check
+      CHECK (default_map_provider IN ('device','openstreetmap','google','apple','bing','waze'))
 );
 
 -- Auto Backup Settings (per-user configuration for automatic backups to a folder)

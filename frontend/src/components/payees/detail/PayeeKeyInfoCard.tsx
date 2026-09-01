@@ -6,6 +6,7 @@ import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { externalUrlLabel, toSafeExternalUrl } from '@/lib/external-url';
 import { mailtoHref, mapsUrl, telHref } from '@/lib/contact-links';
+import { useMapProvider } from '@/hooks/useMapProvider';
 import type { PayeeDetail } from '@/types/payee';
 
 interface PayeeKeyInfoCardProps {
@@ -36,13 +37,16 @@ export function PayeeKeyInfoCard({
   const t = useTranslations('payeeDetail');
   const { formatDate } = useDateFormat();
   const { formatCurrency } = useNumberFormat();
+  const mapProvider = useMapProvider();
 
   const { payee, stats, largestTransaction, overpaymentForAccounts } = detail;
   const websiteUrl = toSafeExternalUrl(payee.website);
   // Each contact value is turned into a link by its own guard, and a value the
   // guard rejects still renders as text rather than disappearing -- a stored
   // "call the shop" is worth showing even though it cannot be dialled.
-  const addressLink = payee.address ? mapsUrl({ address: payee.address }) : null;
+  const addressLink = payee.address
+    ? mapsUrl({ address: payee.address, provider: mapProvider })
+    : null;
   const phoneLink = telHref(payee.phone);
   const emailLink = mailtoHref(payee.email);
 
