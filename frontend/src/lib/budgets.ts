@@ -1,10 +1,7 @@
 import apiClient from './api';
 import {
-  AlertCategory,
-  AlertSeverity,
   Budget,
   BudgetCategory,
-  BudgetAlert,
   BudgetPeriod,
   BudgetSummary,
   BudgetVelocity,
@@ -169,52 +166,6 @@ export const budgetsApi = {
     return response.data;
   },
 
-  // Notifications. They stopped being budget alerts when the first
-  // BACKUP_FAILED row landed in the table, so the endpoints moved off
-  // /budgets/alerts; these wrappers keep their names until the component rename.
-  getAlerts: async (unreadOnly = false): Promise<BudgetAlert[]> => {
-    const response = await apiClient.get<BudgetAlert[]>('/notifications', {
-      params: { unreadOnly },
-    });
-    return response.data;
-  },
-
-  markAlertRead: async (alertId: string): Promise<BudgetAlert> => {
-    const response = await apiClient.patch<BudgetAlert>(
-      `/notifications/${alertId}/read`,
-    );
-    return response.data;
-  },
-
-  markAllAlertsRead: async (): Promise<{ updated: number }> => {
-    const response = await apiClient.patch<{ updated: number }>(
-      '/notifications/read-all',
-    );
-    return response.data;
-  },
-
-  deleteAlert: async (alertId: string): Promise<void> => {
-    await apiClient.delete(`/notifications/${alertId}`);
-  },
-
-  // Dismisses every live notification matching the filter, server-side --
-  // including rows beyond the list endpoint's 50-row window. The active filter
-  // travels explicitly on the command, never as a list of on-screen ids.
-  dismissAlerts: async (filters: {
-    severity?: AlertSeverity;
-    category?: AlertCategory;
-  }): Promise<{ dismissed: number }> => {
-    const response = await apiClient.delete<{ dismissed: number }>(
-      '/notifications',
-      {
-        params: {
-          ...(filters.severity ? { severity: filters.severity } : {}),
-          ...(filters.category ? { category: filters.category } : {}),
-        },
-      },
-    );
-    return response.data;
-  },
 
   // Reports
   getTrend: async (

@@ -4,40 +4,40 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { useClickOutside } from '@/hooks/useClickOutside';
-import { budgetsApi } from '@/lib/budgets';
+import { notificationsApi } from '@/lib/notifications';
 import {
-  AlertFilters,
-  NO_ALERT_FILTERS,
-  hasActiveAlertFilters,
-  matchesAlertFilters,
-} from '@/lib/alert-filters';
+  NotificationFilters,
+  NO_NOTIFICATION_FILTERS,
+  hasActiveNotificationFilters,
+  matchesNotificationFilters,
+} from '@/lib/notification-filters';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import type { BudgetAlert } from '@/types/budget';
-import { BudgetAlertList } from './BudgetAlertList';
+import type { Notification } from '@/types/notification';
+import { NotificationList } from './NotificationList';
 
-export function BudgetAlertBadge() {
-  const t = useTranslations('budgets');
-  const [alerts, setAlerts] = useState<BudgetAlert[]>([]);
+export function NotificationBell() {
+  const t = useTranslations('notifications');
+  const [notifications, setAlerts] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [dismissingIds, setDismissingIds] = useState<Set<string>>(new Set());
   const [collapsingIds, setCollapsingIds] = useState<Set<string>>(new Set());
-  const [filters, setFilters] = useState<AlertFilters>(NO_ALERT_FILTERS);
+  const [filters, setFilters] = useState<NotificationFilters>(NO_NOTIFICATION_FILTERS);
   const [confirmingDeleteAll, setConfirmingDeleteAll] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const undoTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
-  // The bell's count is about every alert, not the filtered view.
-  const unreadCount = alerts.filter((a) => !a.isRead && !dismissingIds.has(a.id)).length;
-  const visibleAlerts = alerts.filter((a) => matchesAlertFilters(a, filters));
+  // The bell's count is about every notification, not the filtered view.
+  const unreadCount = notifications.filter((a) => !a.isRead && !dismissingIds.has(a.id)).length;
+  const visibleNotifications = notifications.filter((a) => matchesNotificationFilters(a, filters));
 
   const fetchAlerts = useCallback(async () => {
     try {
       setIsLoading(true);
-      const data = await budgetsApi.getAlerts();
+      const data = await notificationsApi.list();
       setAlerts(data);
     } catch {
-      // Silently fail on alert fetch
+      // Silently fail on notification fetch
     } finally {
       setIsLoading(false);
     }
@@ -53,11 +53,11 @@ export function BudgetAlertBadge() {
     enabled: !confirmingDeleteAll,
   });
 
-  const handleMarkRead = async (alertId: string) => {
+  const handleMarkRead = async (notificationId: string) => {
     try {
-      await budgetsApi.markAlertRead(alertId);
+      await notificationsApi.markRead(notificationId);
       setAlerts((prev) =>
-        prev.map((a) => (a.id === alertId ? { ...a, isRead: true } : a)),
+        prev.map((a) => (a.id === notificationId ? { ...a, isRead: true } : a)),
       );
     } catch {
       // Silently fail
@@ -66,7 +66,7 @@ export function BudgetAlertBadge() {
 
   const handleMarkAllRead = async () => {
     try {
-      await budgetsApi.markAllAlertsRead();
+      await notificationsApi.markAllRead();
       setAlerts((prev) => prev.map((a) => ({ ...a, isRead: true })));
     } catch {
       // Silently fail
@@ -81,76 +81,76 @@ export function BudgetAlertBadge() {
     };
   }, []);
 
-  const handleDismiss = (alertId: string) => {
-    // Enter undo phase - show "Undo" in place of the alert content
-    setDismissingIds((prev) => new Set(prev).add(alertId));
+  const handleDismiss = (notificationId: string) => {
+    // Enter undo phase - show "Undo" in place of the notification content
+    setDismissingIds((prev) => new Set(prev).add(notificationId));
 
     // After 5 seconds, start collapse animation then remove
     const timer = setTimeout(() => {
-      undoTimers.current.delete(alertId);
+      undoTimers.current.delete(notificationId);
       setDismissingIds((prev) => {
         const next = new Set(prev);
-        next.delete(alertId);
+        next.delete(notificationId);
         return next;
       });
-      setCollapsingIds((prev) => new Set(prev).add(alertId));
+      setCollapsingIds((prev) => new Set(prev).add(notificationId));
 
       // After collapse animation completes, remove from array + API call
       setTimeout(() => {
         setCollapsingIds((prev) => {
           const next = new Set(prev);
-          next.delete(alertId);
+          next.delete(notificationId);
           return next;
         });
-        setAlerts((prev) => prev.filter((a) => a.id !== alertId));
-        budgetsApi.deleteAlert(alertId).catch(() => {});
+        setAlerts((prev) => prev.filter((a) => a.id !== notificationId));
+        notificationsApi.dismiss(notificationId).catch(() => {});
       }, 300);
     }, 5000);
 
-    undoTimers.current.set(alertId, timer);
+    undoTimers.current.set(notificationId, timer);
   };
 
-  const handleUndoDismiss = (alertId: string) => {
-    const timer = undoTimers.current.get(alertId);
+  const handleUndoDismiss = (notificationId: string) => {
+    const timer = undoTimers.current.get(notificationId);
     if (timer) {
       clearTimeout(timer);
-      undoTimers.current.delete(alertId);
+      undoTimers.current.delete(notificationId);
     }
     setDismissingIds((prev) => {
       const next = new Set(prev);
-      next.delete(alertId);
+      next.delete(notificationId);
       return next;
     });
   };
 
   /**
    * Dismiss everything matching the active filter, server-side. The filter
-   * itself travels on the command, so it also reaches matching alerts beyond
+   * itself travels on the command, so it also reaches matching notifications beyond
    * the fetched window -- the toast reports the server's count, which can be
    * more than the rows that were on screen.
    */
   const handleConfirmDeleteAll = async () => {
     setConfirmingDeleteAll(false);
     try {
-      const { dismissed } = await budgetsApi.dismissAlerts({
+      const { dismissed } = await notificationsApi.dismissAll({
         severity: filters.severity ?? undefined,
         category: filters.category ?? undefined,
       });
-      const removed = alerts.filter((a) => matchesAlertFilters(a, filters));
-      for (const alert of removed) {
-        const timer = undoTimers.current.get(alert.id);
+      const removed = notifications.filter((a) => matchesNotificationFilters(a, filters));
+      for (const notification of removed) {
+        const timer = undoTimers.current.get(notification.id);
         if (timer) {
           clearTimeout(timer);
-          undoTimers.current.delete(alert.id);
+          undoTimers.current.delete(notification.id);
         }
       }
       const removedIds = new Set(removed.map((a) => a.id));
       setDismissingIds((prev) => new Set([...prev].filter((id) => !removedIds.has(id))));
       setCollapsingIds((prev) => new Set([...prev].filter((id) => !removedIds.has(id))));
-      setAlerts((prev) => prev.filter((a) => !matchesAlertFilters(a, filters)));
-      toast.success(t('alerts.deleted', { count: dismissed }));
+      setAlerts((prev) => prev.filter((a) => !matchesNotificationFilters(a, filters)));
+      toast.success(t('deleted', { count: dismissed }));
     } catch {
-      toast.error(t('alerts.deleteFailed'));
+      toast.error(t('deleteFailed'));
     }
   };
 
@@ -159,9 +159,9 @@ export function BudgetAlertBadge() {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="relative p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
-        title={t('alerts.buttonTitle')}
-        aria-label={t('alerts.buttonAriaLabel')}
-        data-testid="alert-badge-button"
+        title={t('buttonTitle')}
+        aria-label={t('buttonAriaLabel')}
+        data-testid="notification-badge-button"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -188,8 +188,8 @@ export function BudgetAlertBadge() {
       </button>
 
       {isOpen && (
-        <BudgetAlertList
-          alerts={visibleAlerts}
+        <NotificationList
+          notifications={visibleNotifications}
           isLoading={isLoading}
           onMarkRead={handleMarkRead}
           onMarkAllRead={handleMarkAllRead}
@@ -206,11 +206,11 @@ export function BudgetAlertBadge() {
 
       <ConfirmDialog
         isOpen={confirmingDeleteAll}
-        title={t('alerts.deleteAllConfirmTitle')}
+        title={t('deleteAllConfirmTitle')}
         message={
-          hasActiveAlertFilters(filters)
-            ? t('alerts.deleteAllConfirmMessageFiltered')
-            : t('alerts.deleteAllConfirmMessageAll')
+          hasActiveNotificationFilters(filters)
+            ? t('deleteAllConfirmMessageFiltered')
+            : t('deleteAllConfirmMessageAll')
         }
         variant="danger"
         onConfirm={handleConfirmDeleteAll}

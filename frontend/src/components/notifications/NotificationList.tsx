@@ -3,14 +3,15 @@
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
-import type { AlertFilters } from '@/lib/alert-filters';
-import { hasActiveAlertFilters } from '@/lib/alert-filters';
+import type { NotificationFilters } from '@/lib/notification-filters';
+import { hasActiveNotificationFilters } from '@/lib/notification-filters';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
-import type { AlertCategory, BudgetAlert, AlertSeverity } from '@/types/budget';
+import type { NotificationFilterCategory, Notification, NotificationSeverity } from '@/types/notification';
+import { safeNotificationTarget } from '@/lib/notification-target';
 
 /**
- * The structured payload a `BILL_DUE` alert carries, so the reader sees it in
+ * The structured payload a `BILL_DUE` notification carries, so the reader sees it in
  * their own language.
  *
  * A stored sentence cannot be translated after the fact: the row is written by a
@@ -28,7 +29,7 @@ interface BillDueAlertData {
 }
 
 /**
- * The structured payload a system alert carries (`data.system === true`),
+ * The structured payload a system notification carries (`data.system === true`),
  * following the same rule as `BillDueAlertData`: the row stores English
  * fallbacks, the UI composes localized copy from these facts. Fields are
  * per-type; every one is optional so an older or foreign row falls back to
@@ -51,14 +52,21 @@ interface SystemAlertData {
 }
 
 /**
- * Where clicking an alert takes the reader, per type. `null` means the click
+ * Where clicking an notification takes the reader, per type. `null` means the click
  * marks it read and closes the dropdown, nothing more -- there is no page
- * that says more than the alert itself (the provider pair), or no page to
- * point at (a budget alert whose budgetId is null, which used to push the
+ * that says more than the notification itself (the provider pair), or no page to
+ * point at (a budget notification whose budgetId is null, which used to push the
  * broken route /budgets/null).
  */
-function alertRoute(alert: BudgetAlert): string | null {
-  switch (alert.alertType) {
+function notificationRoute(notification: Notification): string | null {
+  // The server's answer wins: the producer knows which budget, bill or security
+  // the row is about, and the client only knows its type. Rows written before
+  // `target` existed carry none, and during a rolling deploy the list holds both
+  // shapes at once -- so the table below is the fallback, not the rule.
+  const target = safeNotificationTarget(notification.target);
+  if (target) return target;
+
+  switch (notification.type) {
     case 'BILL_DUE':
     case 'SCHEDULED_POST_FAILED':
       return '/bills';
@@ -71,46 +79,46 @@ function alertRoute(alert: BudgetAlert): string | null {
     case 'PROVIDER_RECOVERED':
       return null;
     default:
-      return alert.budgetId ? `/budgets/${alert.budgetId}` : null;
+      return notification.budgetId ? `/budgets/${notification.budgetId}` : null;
   }
 }
 
 /**
- * The structured payload of a system alert, or null for anything else --
+ * The structured payload of a system notification, or null for anything else --
  * including a row written before the payload existed, which falls back to
  * its stored English.
  */
-function systemAlertData(alert: BudgetAlert): SystemAlertData | null {
-  const data = alert.data as SystemAlertData | undefined;
+function systemAlertData(notification: Notification): SystemAlertData | null {
+  const data = notification.data as SystemAlertData | undefined;
   if (!data || data.system !== true) return null;
   return data;
 }
 
-interface BudgetAlertListProps {
-  /** The alerts matching the active filter -- the owner filters, this renders. */
-  alerts: BudgetAlert[];
+interface NotificationListProps {
+  /** The notifications matching the active filter -- the owner filters, this renders. */
+  notifications: Notification[];
   isLoading: boolean;
-  onMarkRead: (alertId: string) => void;
+  onMarkRead: (notificationId: string) => void;
   onMarkAllRead: () => void;
-  onDismiss: (alertId: string) => void;
-  onUndoDismiss: (alertId: string) => void;
+  onDismiss: (notificationId: string) => void;
+  onUndoDismiss: (notificationId: string) => void;
   dismissingIds: Set<string>;
   collapsingIds: Set<string>;
   onClose: () => void;
-  filters: AlertFilters;
-  onFiltersChange: (filters: AlertFilters) => void;
+  filters: NotificationFilters;
+  onFiltersChange: (filters: NotificationFilters) => void;
   /** Asks the owner to confirm and dismiss everything matching `filters`. */
   onDeleteAll: () => void;
 }
 
-const SEVERITY_FILTER_OPTIONS: readonly AlertSeverity[] = [
+const SEVERITY_FILTER_OPTIONS: readonly NotificationSeverity[] = [
   'critical',
   'warning',
   'info',
   'success',
 ];
 
-const CATEGORY_FILTER_OPTIONS: readonly AlertCategory[] = [
+const CATEGORY_FILTER_OPTIONS: readonly NotificationFilterCategory[] = [
   'financial',
   'system',
 ];
@@ -118,7 +126,7 @@ const CATEGORY_FILTER_OPTIONS: readonly AlertCategory[] = [
 const FILTER_CHIP_CLASS =
   'flex-shrink-0 transition-colors motion-reduce:transition-none';
 
-function severityStyles(severity: AlertSeverity): {
+function severityStyles(severity: NotificationSeverity): {
   bg: string;
   text: string;
   border: string;
@@ -156,27 +164,27 @@ function severityStyles(severity: AlertSeverity): {
   }
 }
 
-function severityLabel(severity: AlertSeverity, t: (key: string) => string): string {
+function severityLabel(severity: NotificationSeverity, t: (key: string) => string): string {
   switch (severity) {
     case 'critical':
-      return t('alerts.severity.critical');
+      return t('severity.critical');
     case 'warning':
-      return t('alerts.severity.warning');
+      return t('severity.warning');
     case 'success':
-      return t('alerts.severity.success');
+      return t('severity.success');
     default:
-      return t('alerts.severity.info');
+      return t('severity.info');
   }
 }
 
 /**
- * Whether this alert carries enough structured data to be composed locally.
+ * Whether this notification carries enough structured data to be composed locally.
  * An older row (written before the fields existed) falls back to its stored
  * English -- absent is "no information", not a licence to render nothing.
  */
-function billDueData(alert: BudgetAlert): BillDueAlertData | null {
-  if (alert.alertType !== 'BILL_DUE') return null;
-  const data = alert.data as BillDueAlertData | undefined;
+function billDueData(notification: Notification): BillDueAlertData | null {
+  if (notification.type !== 'BILL_DUE') return null;
+  const data = notification.data as BillDueAlertData | undefined;
   if (!data || typeof data.dueDate !== 'string') return null;
   return data;
 }
@@ -184,9 +192,9 @@ function billDueData(alert: BudgetAlert): BillDueAlertData | null {
 /**
  * Whole days from today to `dueDate`, on the reader's own clock.
  *
- * Counted at render time rather than read from the row: an alert lives until it
+ * Counted at render time rather than read from the row: an notification lives until it
  * is dismissed, so a stored "in 3 days" goes on saying three days for as long
- * as the alert is on screen.
+ * as the notification is on screen.
  */
 function daysUntil(dueDate: string): number {
   const due = new Date(`${dueDate}T00:00:00`);
@@ -217,8 +225,8 @@ function timeAgo(dateStr: string): string {
   return 'just now';
 }
 
-export function BudgetAlertList({
-  alerts,
+export function NotificationList({
+  notifications,
   isLoading,
   onMarkRead,
   onMarkAllRead,
@@ -230,25 +238,25 @@ export function BudgetAlertList({
   filters,
   onFiltersChange,
   onDeleteAll,
-}: BudgetAlertListProps) {
-  const t = useTranslations('budgets');
+}: NotificationListProps) {
+  const t = useTranslations('notifications');
   const router = useRouter();
   const { formatCurrency } = useNumberFormat();
 
   /**
-   * A bill-due alert's headline, in the reader's language. `null` for anything
+   * A bill-due notification's headline, in the reader's language. `null` for anything
    * else -- and for an older row whose data predates these fields -- so the
    * caller falls back to the stored English.
    */
-  const billDueTitle = (alert: BudgetAlert): string | null => {
-    const data = billDueData(alert);
+  const billDueTitle = (notification: Notification): string | null => {
+    const data = billDueData(notification);
     if (!data) return null;
     const payee = data.payeeName ?? '';
     const days = daysUntil(data.dueDate!);
-    if (days < 0) return t('alerts.billDue.titleOverdue', { payee });
-    if (days === 0) return t('alerts.billDue.titleToday', { payee });
-    if (days === 1) return t('alerts.billDue.titleTomorrow', { payee });
-    return t('alerts.billDue.titleInDays', { payee, days });
+    if (days < 0) return t('billDue.titleOverdue', { payee });
+    if (days === 0) return t('billDue.titleToday', { payee });
+    if (days === 1) return t('billDue.titleTomorrow', { payee });
+    return t('billDue.titleInDays', { payee, days });
   };
 
   /**
@@ -256,60 +264,60 @@ export function BudgetAlertList({
    * cannot be worked out. Never the persisted snapshot, and never a blank where
    * a figure belongs (issue #1247).
    */
-  const billDueMessage = (alert: BudgetAlert): string | null => {
-    const data = billDueData(alert);
+  const billDueMessage = (notification: Notification): string | null => {
+    const data = billDueData(notification);
     if (!data) return null;
     if (data.amount == null || data.amountComplete === false) {
-      return t('alerts.billDue.amountUnavailable', { date: data.dueDate! });
+      return t('billDue.amountUnavailable', { date: data.dueDate! });
     }
-    return t('alerts.billDue.amountDue', {
+    return t('billDue.amountDue', {
       amount: formatCurrency(data.amount, data.currencyCode),
       date: data.dueDate!,
     });
   };
 
   /**
-   * A system alert's headline in the reader's language, or null for other
+   * A system notification's headline in the reader's language, or null for other
    * types and for rows without the structured payload (stored English wins).
    */
-  const systemAlertTitle = (alert: BudgetAlert): string | null => {
-    const data = systemAlertData(alert);
+  const systemAlertTitle = (notification: Notification): string | null => {
+    const data = systemAlertData(notification);
     if (!data) return null;
-    switch (alert.alertType) {
+    switch (notification.type) {
       case 'BACKUP_FAILED':
-        return t('alerts.system.backupFailed.title');
+        return t('system.backupFailed.title');
       case 'BACKUP_PARTIAL':
-        return t('alerts.system.backupPartial.title');
+        return t('system.backupPartial.title');
       case 'ENCRYPTION_KEY_MISSING':
-        return t('alerts.system.encryptionKeyMissing.title');
+        return t('system.encryptionKeyMissing.title');
       case 'SMTP_FAILURE':
-        return t('alerts.system.smtpFailure.title');
+        return t('system.smtpFailure.title');
       case 'PROVIDER_OUTAGE':
         return data.providerLabel
-          ? t('alerts.system.providerOutage.title', { provider: data.providerLabel })
+          ? t('system.providerOutage.title', { provider: data.providerLabel })
           : null;
       case 'PROVIDER_RECOVERED':
         return data.providerLabel
-          ? t('alerts.system.providerRecovered.title', { provider: data.providerLabel })
+          ? t('system.providerRecovered.title', { provider: data.providerLabel })
           : null;
       case 'SCHEDULED_POST_FAILED':
         return data.scheduledName
-          ? t('alerts.system.scheduledPostFailed.title', { name: data.scheduledName })
+          ? t('system.scheduledPostFailed.title', { name: data.scheduledName })
           : null;
       default:
         return null;
     }
   };
 
-  /** The system alert's body, same contract as `systemAlertTitle`. */
-  const systemAlertMessage = (alert: BudgetAlert): string | null => {
-    const data = systemAlertData(alert);
+  /** The system notification's body, same contract as `systemAlertTitle`. */
+  const systemAlertMessage = (notification: Notification): string | null => {
+    const data = systemAlertData(notification);
     if (!data) return null;
     const user = data.affectedUserEmail ?? data.affectedUserId ?? '';
-    switch (alert.alertType) {
+    switch (notification.type) {
       case 'BACKUP_FAILED':
         return user
-          ? t('alerts.system.backupFailed.message', { user, error: data.error ?? '' })
+          ? t('system.backupFailed.message', { user, error: data.error ?? '' })
           : null;
       case 'BACKUP_PARTIAL': {
         if (!user) return null;
@@ -325,7 +333,7 @@ export function BudgetAlertList({
           ) {
             return null;
           }
-          return t('alerts.system.backupPartial.messageAttachments', {
+          return t('system.backupPartial.messageAttachments', {
             user,
             missing: data.missingAttachments,
             inconsistent: data.inconsistentAttachments,
@@ -335,13 +343,13 @@ export function BudgetAlertList({
         // The cause is the actionable half of these two (a permission, a full
         // volume), so it travels into the copy rather than being dropped.
         if (data.reason === 'promotion' && data.error !== undefined) {
-          return t('alerts.system.backupPartial.messagePromotion', {
+          return t('system.backupPartial.messagePromotion', {
             user,
             error: data.error,
           });
         }
         if (data.reason === 'retention' && data.error !== undefined) {
-          return t('alerts.system.backupPartial.messageRetention', {
+          return t('system.backupPartial.messageRetention', {
             user,
             error: data.error,
           });
@@ -349,20 +357,20 @@ export function BudgetAlertList({
         return null;
       }
       case 'ENCRYPTION_KEY_MISSING':
-        return t('alerts.system.encryptionKeyMissing.message');
+        return t('system.encryptionKeyMissing.message');
       case 'SMTP_FAILURE':
-        return t('alerts.system.smtpFailure.message', { error: data.lastError ?? '' });
+        return t('system.smtpFailure.message', { error: data.lastError ?? '' });
       case 'PROVIDER_OUTAGE':
         return data.providerLabel
-          ? t('alerts.system.providerOutage.message', { provider: data.providerLabel })
+          ? t('system.providerOutage.message', { provider: data.providerLabel })
           : null;
       case 'PROVIDER_RECOVERED':
         return data.providerLabel
-          ? t('alerts.system.providerRecovered.message', { provider: data.providerLabel })
+          ? t('system.providerRecovered.message', { provider: data.providerLabel })
           : null;
       case 'SCHEDULED_POST_FAILED':
         return data.dueDate
-          ? t('alerts.system.scheduledPostFailed.message', {
+          ? t('system.scheduledPostFailed.message', {
               date: data.dueDate,
               error: data.error ?? '',
             })
@@ -372,29 +380,29 @@ export function BudgetAlertList({
     }
   };
 
-  const unreadCount = alerts.filter((a) => !a.isRead && !dismissingIds.has(a.id)).length;
+  const unreadCount = notifications.filter((a) => !a.isRead && !dismissingIds.has(a.id)).length;
 
-  const handleAlertClick = (alert: BudgetAlert) => {
-    if (!alert.isRead) {
-      onMarkRead(alert.id);
+  const handleAlertClick = (notification: Notification) => {
+    if (!notification.isRead) {
+      onMarkRead(notification.id);
     }
     onClose();
-    const route = alertRoute(alert);
+    const route = notificationRoute(notification);
     if (route) {
       router.push(route);
     }
   };
 
-  const filtered = hasActiveAlertFilters(filters);
+  const filtered = hasActiveNotificationFilters(filters);
 
-  const toggleSeverity = (severity: AlertSeverity) => {
+  const toggleSeverity = (severity: NotificationSeverity) => {
     onFiltersChange({
       ...filters,
       severity: filters.severity === severity ? null : severity,
     });
   };
 
-  const toggleCategory = (category: AlertCategory) => {
+  const toggleCategory = (category: NotificationFilterCategory) => {
     onFiltersChange({
       ...filters,
       category: filters.category === category ? null : category,
@@ -409,19 +417,19 @@ export function BudgetAlertList({
     // this mounts inside always carries a `transform`, which makes the header
     // -- not the viewport -- the containing block for `position: fixed`, so a
     // bottom anchor caps the panel at the header's own ~56px box (it only
-    // *looked* full when alert rows overflowed it). An explicit viewport
+    // *looked* full when notification rows overflowed it). An explicit viewport
     // height grows past the containing block instead.
     <div
       className="fixed inset-x-0 top-0 h-dvh sm:absolute sm:inset-auto sm:right-0 sm:mt-1 sm:h-auto sm:w-[30rem] bg-white dark:bg-gray-800 sm:rounded-lg shadow-lg dark:shadow-gray-700/50 sm:border border-gray-200 dark:border-gray-700 z-50 sm:max-h-[28rem] flex flex-col"
-      data-testid="alert-list"
+      data-testid="notification-list"
     >
       {/* Header */}
       <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-          {t('alerts.title')}
+          {t('title')}
           {unreadCount > 0 && (
             <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
-              {t('alerts.unread', { count: unreadCount })}
+              {t('unread', { count: unreadCount })}
             </span>
           )}
         </h3>
@@ -432,16 +440,16 @@ export function BudgetAlertList({
               className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
               data-testid="mark-all-read"
             >
-              {t('alerts.markAllRead')}
+              {t('markAllRead')}
             </button>
           )}
-          {alerts.length > 0 && (
+          {notifications.length > 0 && (
             <button
               onClick={onDeleteAll}
               className="text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
-              data-testid="delete-all-alerts"
+              data-testid="delete-all-notifications"
             >
-              {t('alerts.deleteAll')}
+              {t('deleteAll')}
             </button>
           )}
           {/* On mobile the panel covers the screen, so clicking outside is
@@ -450,8 +458,8 @@ export function BudgetAlertList({
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 sm:hidden"
-            aria-label={t('alerts.closeAriaLabel')}
-            data-testid="close-alerts"
+            aria-label={t('closeAriaLabel')}
+            data-testid="close-notifications"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -474,7 +482,7 @@ export function BudgetAlertList({
       {/* Filters */}
       <div
         className="flex flex-col gap-1.5 px-4 py-2 border-b border-gray-200 dark:border-gray-700"
-        data-testid="alert-filters"
+        data-testid="notification-filters"
       >
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
           {SEVERITY_FILTER_OPTIONS.map((severity) => (
@@ -485,7 +493,7 @@ export function BudgetAlertList({
               onClick={() => toggleSeverity(severity)}
               aria-pressed={filters.severity === severity}
               className={FILTER_CHIP_CLASS}
-              data-testid={`alert-filter-severity-${severity}`}
+              data-testid={`notification-filter-severity-${severity}`}
             >
               {severityLabel(severity, t)}
             </Badge>
@@ -500,11 +508,11 @@ export function BudgetAlertList({
               onClick={() => toggleCategory(category)}
               aria-pressed={filters.category === category}
               className={FILTER_CHIP_CLASS}
-              data-testid={`alert-filter-category-${category}`}
+              data-testid={`notification-filter-category-${category}`}
             >
               {category === 'financial'
-                ? t('alerts.filter.financial')
-                : t('alerts.filter.system')}
+                ? t('filter.financial')
+                : t('filter.system')}
             </Badge>
           ))}
         </div>
@@ -515,14 +523,14 @@ export function BudgetAlertList({
           full-screen mobile panel that is most of the screen, while the
           desktop dropdown is content-sized and unaffected. */}
       <div className="overflow-y-auto overscroll-contain flex-1 flex flex-col">
-        {isLoading && alerts.length === 0 ? (
+        {isLoading && notifications.length === 0 ? (
           <div className="flex-1 flex flex-col justify-center px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-            {t('alerts.loading')}
+            {t('loading')}
           </div>
-        ) : alerts.length === 0 ? (
+        ) : notifications.length === 0 ? (
           <div
             className="flex-1 flex flex-col justify-center px-4"
-            data-testid="no-alerts"
+            data-testid="no-notifications"
           >
             <EmptyState
               icon={
@@ -540,18 +548,18 @@ export function BudgetAlertList({
                   />
                 </svg>
               }
-              title={filtered ? t('alerts.emptyFiltered') : t('alerts.empty')}
+              title={filtered ? t('emptyFiltered') : t('empty')}
             />
           </div>
         ) : (
           <div>
-            {alerts.map((alert) => {
-              const styles = severityStyles(alert.severity);
-              const isDismissing = dismissingIds.has(alert.id);
-              const isCollapsing = collapsingIds.has(alert.id);
+            {notifications.map((notification) => {
+              const styles = severityStyles(notification.severity);
+              const isDismissing = dismissingIds.has(notification.id);
+              const isCollapsing = collapsingIds.has(notification.id);
               return (
                 <div
-                  key={alert.id}
+                  key={notification.id}
                   className={`transition-all duration-300 overflow-hidden ${
                     isCollapsing ? 'max-h-0 opacity-0' : 'max-h-28'
                   }`}
@@ -559,31 +567,31 @@ export function BudgetAlertList({
                   {isDismissing ? (
                     <div
                       className="border-b border-gray-100 dark:border-gray-700/50 px-4 py-3 flex items-center justify-center"
-                      data-testid={`undo-alert-${alert.id}`}
+                      data-testid={`undo-notification-${notification.id}`}
                     >
                       <button
-                        onClick={() => onUndoDismiss(alert.id)}
+                        onClick={() => onUndoDismiss(notification.id)}
                         className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                        data-testid={`undo-dismiss-${alert.id}`}
+                        data-testid={`undo-dismiss-${notification.id}`}
                       >
-                        {t('alerts.undo')}
+                        {t('undo')}
                       </button>
                     </div>
                   ) : (
                     <div
                       className={`relative group border-b border-gray-100 dark:border-gray-700/50 ${
-                        !alert.isRead ? 'bg-gray-50/50 dark:bg-gray-700/20' : ''
+                        !notification.isRead ? 'bg-gray-50/50 dark:bg-gray-700/20' : ''
                       }`}
                     >
                       <button
-                        onClick={() => handleAlertClick(alert)}
+                        onClick={() => handleAlertClick(notification)}
                         className="w-full text-left px-4 py-3 pr-9 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                        data-testid={`alert-item-${alert.id}`}
+                        data-testid={`notification-item-${notification.id}`}
                       >
                         <div className="flex items-start gap-3">
                           {/* Unread dot */}
                           <div className="mt-1.5 flex-shrink-0">
-                            {!alert.isRead ? (
+                            {!notification.isRead ? (
                               <div
                                 className={`w-2 h-2 rounded-full ${styles.dot}`}
                                 data-testid="unread-dot"
@@ -599,17 +607,17 @@ export function BudgetAlertList({
                                 className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${styles.bg} ${styles.text}`}
                                 data-testid="severity-badge"
                               >
-                                {severityLabel(alert.severity, t)}
+                                {severityLabel(notification.severity, t)}
                               </span>
                               <span className="text-[11px] text-gray-400 dark:text-gray-500">
-                                {timeAgo(alert.createdAt)}
+                                {timeAgo(notification.createdAt)}
                               </span>
                             </div>
                             <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                              {billDueTitle(alert) ?? systemAlertTitle(alert) ?? alert.title}
+                              {billDueTitle(notification) ?? systemAlertTitle(notification) ?? notification.title}
                             </p>
                             <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mt-0.5">
-                              {billDueMessage(alert) ?? systemAlertMessage(alert) ?? alert.message}
+                              {billDueMessage(notification) ?? systemAlertMessage(notification) ?? notification.message}
                             </p>
                           </div>
                         </div>
@@ -617,11 +625,11 @@ export function BudgetAlertList({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onDismiss(alert.id);
+                          onDismiss(notification.id);
                         }}
                         className="absolute top-2 right-2 p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-                        data-testid={`dismiss-alert-${alert.id}`}
-                        aria-label={t('alerts.dismissAriaLabel')}
+                        data-testid={`dismiss-notification-${notification.id}`}
+                        aria-label={t('dismissAriaLabel')}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
                           <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />

@@ -1,0 +1,69 @@
+{
+  "title": "Avvisi",
+  "unread": "{count} non letti",
+  "markAllRead": "Segna tutti come letti",
+  "loading": "Caricamento avvisi...",
+  "empty": "Nessun avviso",
+  "undo": "Annulla",
+  "buttonTitle": "Avvisi",
+  "buttonAriaLabel": "Avvisi",
+  "dismissAriaLabel": "Ignora avviso",
+  "closeAriaLabel": "Chiudi avvisi",
+  "emptyFiltered": "Nessun avviso corrisponde al filtro attuale",
+  "deleteAll": "Elimina tutti",
+  "deleteAllConfirmTitle": "Elimina avvisi",
+  "deleteAllConfirmMessageAll": "Eliminare tutti gli avvisi? Questa operazione non può essere annullata.",
+  "deleteAllConfirmMessageFiltered": "Eliminare tutti gli avvisi corrispondenti al filtro attuale, inclusi quelli non visualizzati? Questa operazione non può essere annullata.",
+  "deleted": "{count, plural, one {# avviso eliminato} other {# avvisi eliminati}}",
+  "deleteFailed": "Impossibile eliminare gli avvisi",
+  "filter": {
+    "financial": "Finanziari",
+    "system": "Sistema"
+  },
+  "severity": {
+    "critical": "Critico",
+    "warning": "Attenzione",
+    "success": "Buone notizie",
+    "info": "Info"
+  },
+  "billDue": {
+    "titleOverdue": "{payee} scaduto",
+    "titleToday": "{payee} in scadenza oggi",
+    "titleTomorrow": "{payee} in scadenza domani",
+    "titleInDays": "{payee} in scadenza tra {days} giorni",
+    "amountDue": "{amount} da pagare il {date}",
+    "amountUnavailable": "Importo non disponibile (nessun tasso di cambio attuale), in scadenza il {date}"
+  },
+  "system": {
+    "backupFailed": {
+      "title": "Backup automatico non riuscito",
+      "message": "Il backup automatico per {user} non è riuscito: {error}"
+    },
+    "backupPartial": {
+      "title": "Backup automatico incompleto",
+      "messageAttachments": "Il backup per {user} è stato scritto, ma {missing} allegati su {expected} non sono stati inclusi e {inconsistent} non corrispondevano ai loro metadati. I backup completi sono stati preservati.",
+      "messagePromotion": "Il backup giornaliero per {user} è riuscito, ma la copia settimanale o mensile non è stata scritta: {error}",
+      "messageRetention": "Il backup per {user} è riuscito, ma i vecchi file di backup non sono stati eliminati: {error}"
+    },
+    "encryptionKeyMissing": {
+      "title": "Chiave di cifratura non configurata",
+      "message": "ENCRYPTION_KEY non è impostata: i backup vengono scritti in chiaro e i segreti non possono essere salvati. Una versione futura non si avvierà senza di essa."
+    },
+    "smtpFailure": {
+      "title": "L'invio delle email non funziona",
+      "message": "Monize non è riuscito a inviare email: {error}. Notifiche e promemoria non vengono recapitati."
+    },
+    "providerOutage": {
+      "title": "{provider} non risponde",
+      "message": "I dati di mercato di {provider} non sono disponibili. Prezzi e dati degli indici potrebbero non essere aggiornati finché non risponderà di nuovo."
+    },
+    "providerRecovered": {
+      "title": "{provider} risponde di nuovo",
+      "message": "L'interruzione è terminata e i dati di mercato di {provider} vengono di nuovo aggiornati."
+    },
+    "scheduledPostFailed": {
+      "title": "{name} non è stata registrata",
+      "message": "La tua transazione pianificata in scadenza il {date} non è stata registrata automaticamente: {error}. Puoi registrarla manualmente da Fatture & Versamenti."
+    }
+  }
+}

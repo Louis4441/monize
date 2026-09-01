@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@/test/render';
-import { BudgetAlertList } from './BudgetAlertList';
-import { NO_ALERT_FILTERS } from '@/lib/alert-filters';
-import type { BudgetAlert } from '@/types/budget';
+import { NotificationList } from './NotificationList';
+import { NO_NOTIFICATION_FILTERS } from '@/lib/notification-filters';
+import type { Notification } from '@/types/notification';
 
 const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({
@@ -35,12 +35,12 @@ const daysFromToday = (offset: number): string => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 };
 
-const makeAlert = (overrides: Partial<BudgetAlert> = {}): BudgetAlert => ({
-  id: 'alert-1',
+const makeNotification = (overrides: Partial<Notification> = {}): Notification => ({
+  id: 'notification-1',
   userId: 'user-1',
   budgetId: 'budget-1',
   budgetCategoryId: 'bc-1',
-  alertType: 'THRESHOLD_WARNING',
+  type: 'THRESHOLD_WARNING',
   severity: 'warning',
   title: 'Groceries reaching budget limit',
   message: 'You have used 85% of your Groceries budget.',
@@ -52,9 +52,9 @@ const makeAlert = (overrides: Partial<BudgetAlert> = {}): BudgetAlert => ({
   ...overrides,
 });
 
-describe('BudgetAlertList', () => {
+describe('NotificationList', () => {
   const defaultProps = {
-    alerts: [] as BudgetAlert[],
+    notifications: [] as Notification[],
     isLoading: false,
     onMarkRead: vi.fn(),
     onMarkAllRead: vi.fn(),
@@ -63,7 +63,7 @@ describe('BudgetAlertList', () => {
     dismissingIds: new Set<string>(),
     collapsingIds: new Set<string>(),
     onClose: vi.fn(),
-    filters: NO_ALERT_FILTERS,
+    filters: NO_NOTIFICATION_FILTERS,
     onFiltersChange: vi.fn(),
     onDeleteAll: vi.fn(),
   };
@@ -72,46 +72,46 @@ describe('BudgetAlertList', () => {
     vi.clearAllMocks();
   });
 
-  it('renders the alert list container', () => {
-    render(<BudgetAlertList {...defaultProps} />);
+  it('renders the notification list container', () => {
+    render(<NotificationList {...defaultProps} />);
 
-    expect(screen.getByTestId('alert-list')).toBeInTheDocument();
-    expect(screen.getByText('Alerts')).toBeInTheDocument();
+    expect(screen.getByTestId('notification-list')).toBeInTheDocument();
+    expect(screen.getByText('Notifications')).toBeInTheDocument();
   });
 
   it('shows loading state', () => {
-    render(<BudgetAlertList {...defaultProps} isLoading={true} />);
+    render(<NotificationList {...defaultProps} isLoading={true} />);
 
-    expect(screen.getByText('Loading alerts...')).toBeInTheDocument();
+    expect(screen.getByText('Loading notifications...')).toBeInTheDocument();
   });
 
-  it('shows empty state when no alerts', () => {
-    render(<BudgetAlertList {...defaultProps} />);
+  it('shows empty state when no notifications', () => {
+    render(<NotificationList {...defaultProps} />);
 
-    expect(screen.getByTestId('no-alerts')).toHaveTextContent('No alerts');
+    expect(screen.getByTestId('no-notifications')).toHaveTextContent('No notifications');
   });
 
-  it('renders alert items', () => {
-    const alerts = [
-      makeAlert({ id: 'a1', title: 'Groceries over budget', severity: 'critical' }),
-      makeAlert({ id: 'a2', title: 'Dining near limit', severity: 'warning' }),
+  it('renders notification items', () => {
+    const notifications = [
+      makeNotification({ id: 'a1', title: 'Groceries over budget', severity: 'critical' }),
+      makeNotification({ id: 'a2', title: 'Dining near limit', severity: 'warning' }),
     ];
 
-    render(<BudgetAlertList {...defaultProps} alerts={alerts} />);
+    render(<NotificationList {...defaultProps} notifications={notifications} />);
 
     expect(screen.getByText('Groceries over budget')).toBeInTheDocument();
     expect(screen.getByText('Dining near limit')).toBeInTheDocument();
   });
 
-  it('shows severity badges for each alert', () => {
-    const alerts = [
-      makeAlert({ id: 'a1', severity: 'critical' }),
-      makeAlert({ id: 'a2', severity: 'warning' }),
-      makeAlert({ id: 'a3', severity: 'success' }),
-      makeAlert({ id: 'a4', severity: 'info' }),
+  it('shows severity badges for each notification', () => {
+    const notifications = [
+      makeNotification({ id: 'a1', severity: 'critical' }),
+      makeNotification({ id: 'a2', severity: 'warning' }),
+      makeNotification({ id: 'a3', severity: 'success' }),
+      makeNotification({ id: 'a4', severity: 'info' }),
     ];
 
-    render(<BudgetAlertList {...defaultProps} alerts={alerts} />);
+    render(<NotificationList {...defaultProps} notifications={notifications} />);
 
     const badges = screen.getAllByTestId('severity-badge');
     expect(badges).toHaveLength(4);
@@ -121,52 +121,52 @@ describe('BudgetAlertList', () => {
     expect(badges[3]).toHaveTextContent('Info');
   });
 
-  it('shows unread dots for unread alerts', () => {
-    const alerts = [
-      makeAlert({ id: 'a1', isRead: false }),
-      makeAlert({ id: 'a2', isRead: true }),
+  it('shows unread dots for unread notifications', () => {
+    const notifications = [
+      makeNotification({ id: 'a1', isRead: false }),
+      makeNotification({ id: 'a2', isRead: true }),
     ];
 
-    render(<BudgetAlertList {...defaultProps} alerts={alerts} />);
+    render(<NotificationList {...defaultProps} notifications={notifications} />);
 
     const unreadDots = screen.getAllByTestId('unread-dot');
     expect(unreadDots).toHaveLength(1);
   });
 
   it('shows unread count in header', () => {
-    const alerts = [
-      makeAlert({ id: 'a1', isRead: false }),
-      makeAlert({ id: 'a2', isRead: false }),
-      makeAlert({ id: 'a3', isRead: true }),
+    const notifications = [
+      makeNotification({ id: 'a1', isRead: false }),
+      makeNotification({ id: 'a2', isRead: false }),
+      makeNotification({ id: 'a3', isRead: true }),
     ];
 
-    render(<BudgetAlertList {...defaultProps} alerts={alerts} />);
+    render(<NotificationList {...defaultProps} notifications={notifications} />);
 
     expect(screen.getByText('2 unread')).toBeInTheDocument();
   });
 
-  it('shows mark all read button when there are unread alerts', () => {
-    const alerts = [makeAlert({ id: 'a1', isRead: false })];
+  it('shows mark all read button when there are unread notifications', () => {
+    const notifications = [makeNotification({ id: 'a1', isRead: false })];
 
-    render(<BudgetAlertList {...defaultProps} alerts={alerts} />);
+    render(<NotificationList {...defaultProps} notifications={notifications} />);
 
     expect(screen.getByTestId('mark-all-read')).toBeInTheDocument();
   });
 
-  it('hides mark all read button when all alerts are read', () => {
-    const alerts = [makeAlert({ id: 'a1', isRead: true })];
+  it('hides mark all read button when all notifications are read', () => {
+    const notifications = [makeNotification({ id: 'a1', isRead: true })];
 
-    render(<BudgetAlertList {...defaultProps} alerts={alerts} />);
+    render(<NotificationList {...defaultProps} notifications={notifications} />);
 
     expect(screen.queryByTestId('mark-all-read')).not.toBeInTheDocument();
   });
 
   it('calls onMarkAllRead when mark all read is clicked', () => {
     const onMarkAllRead = vi.fn();
-    const alerts = [makeAlert({ id: 'a1', isRead: false })];
+    const notifications = [makeNotification({ id: 'a1', isRead: false })];
 
     render(
-      <BudgetAlertList {...defaultProps} alerts={alerts} onMarkAllRead={onMarkAllRead} />,
+      <NotificationList {...defaultProps} notifications={notifications} onMarkAllRead={onMarkAllRead} />,
     );
 
     fireEvent.click(screen.getByTestId('mark-all-read'));
@@ -174,46 +174,46 @@ describe('BudgetAlertList', () => {
     expect(onMarkAllRead).toHaveBeenCalled();
   });
 
-  it('calls onMarkRead and navigates when unread alert is clicked', () => {
+  it('calls onMarkRead and navigates when unread notification is clicked', () => {
     const onMarkRead = vi.fn();
     const onClose = vi.fn();
-    const alerts = [
-      makeAlert({ id: 'a1', budgetId: 'budget-123', isRead: false }),
+    const notifications = [
+      makeNotification({ id: 'a1', budgetId: 'budget-123', isRead: false }),
     ];
 
     render(
-      <BudgetAlertList
+      <NotificationList
         {...defaultProps}
-        alerts={alerts}
+        notifications={notifications}
         onMarkRead={onMarkRead}
         onClose={onClose}
       />,
     );
 
-    fireEvent.click(screen.getByTestId('alert-item-a1'));
+    fireEvent.click(screen.getByTestId('notification-item-a1'));
 
     expect(onMarkRead).toHaveBeenCalledWith('a1');
     expect(onClose).toHaveBeenCalled();
     expect(mockPush).toHaveBeenCalledWith('/budgets/budget-123');
   });
 
-  it('navigates without marking read when read alert is clicked', () => {
+  it('navigates without marking read when read notification is clicked', () => {
     const onMarkRead = vi.fn();
     const onClose = vi.fn();
-    const alerts = [
-      makeAlert({ id: 'a1', budgetId: 'budget-456', isRead: true }),
+    const notifications = [
+      makeNotification({ id: 'a1', budgetId: 'budget-456', isRead: true }),
     ];
 
     render(
-      <BudgetAlertList
+      <NotificationList
         {...defaultProps}
-        alerts={alerts}
+        notifications={notifications}
         onMarkRead={onMarkRead}
         onClose={onClose}
       />,
     );
 
-    fireEvent.click(screen.getByTestId('alert-item-a1'));
+    fireEvent.click(screen.getByTestId('notification-item-a1'));
 
     expect(onMarkRead).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
@@ -222,34 +222,34 @@ describe('BudgetAlertList', () => {
 
   it('calls onDismiss when dismiss button is clicked', () => {
     const onDismiss = vi.fn();
-    const alerts = [makeAlert({ id: 'a1' })];
+    const notifications = [makeNotification({ id: 'a1' })];
 
-    render(<BudgetAlertList {...defaultProps} alerts={alerts} onDismiss={onDismiss} />);
+    render(<NotificationList {...defaultProps} notifications={notifications} onDismiss={onDismiss} />);
 
-    fireEvent.click(screen.getByTestId('dismiss-alert-a1'));
+    fireEvent.click(screen.getByTestId('dismiss-notification-a1'));
 
     expect(onDismiss).toHaveBeenCalledWith('a1');
   });
 
   it('does not navigate when dismiss button is clicked', () => {
     const onClose = vi.fn();
-    const alerts = [makeAlert({ id: 'a1' })];
+    const notifications = [makeNotification({ id: 'a1' })];
 
-    render(<BudgetAlertList {...defaultProps} alerts={alerts} onClose={onClose} />);
+    render(<NotificationList {...defaultProps} notifications={notifications} onClose={onClose} />);
 
-    fireEvent.click(screen.getByTestId('dismiss-alert-a1'));
+    fireEvent.click(screen.getByTestId('dismiss-notification-a1'));
 
     expect(onClose).not.toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('navigates to bills page when BILL_DUE alert is clicked', () => {
+  it('navigates to bills page when BILL_DUE notification is clicked', () => {
     const onMarkRead = vi.fn();
     const onClose = vi.fn();
-    const alerts = [
-      makeAlert({
-        id: 'bill-alert-1',
-        alertType: 'BILL_DUE',
+    const notifications = [
+      makeNotification({
+        id: 'bill-notification-1',
+        type: 'BILL_DUE',
         severity: 'info',
         title: 'Netflix due tomorrow',
         message: 'USD 15.99 due on 2026-02-21',
@@ -259,42 +259,42 @@ describe('BudgetAlertList', () => {
     ];
 
     render(
-      <BudgetAlertList
+      <NotificationList
         {...defaultProps}
-        alerts={alerts}
+        notifications={notifications}
         onMarkRead={onMarkRead}
         onClose={onClose}
       />,
     );
 
-    fireEvent.click(screen.getByTestId('alert-item-bill-alert-1'));
+    fireEvent.click(screen.getByTestId('notification-item-bill-notification-1'));
 
-    expect(onMarkRead).toHaveBeenCalledWith('bill-alert-1');
+    expect(onMarkRead).toHaveBeenCalledWith('bill-notification-1');
     expect(onClose).toHaveBeenCalled();
     expect(mockPush).toHaveBeenCalledWith('/bills');
   });
 
-  // ---- BILL_DUE copy comes from the alert's data, in the reader's language ----
+  // ---- BILL_DUE copy comes from the notification's data, in the reader's language ----
   //
   // The row is written by a cron under no request locale, so a stored sentence
   // cannot be translated after the fact (issue #1247). `title`/`message` stay on
   // the row as the fallback for a consumer with no catalog.
 
-  const billDueAlert = (data: Record<string, unknown>): BudgetAlert =>
-    makeAlert({
-      id: 'alert-bill',
-      alertType: 'BILL_DUE',
+  const billDueAlert = (data: Record<string, unknown>): Notification =>
+    makeNotification({
+      id: 'notification-bill',
+      type: 'BILL_DUE',
       severity: 'info',
       title: 'STORED ENGLISH TITLE',
       message: 'STORED ENGLISH MESSAGE',
       data,
     });
 
-  it('composes a bill-due alert from its structured data', () => {
+  it('composes a bill-due notification from its structured data', () => {
     render(
-      <BudgetAlertList
+      <NotificationList
         {...defaultProps}
-        alerts={[
+        notifications={[
           billDueAlert({
             billId: 'st-1',
             payeeName: 'Power Co',
@@ -317,9 +317,9 @@ describe('BudgetAlertList', () => {
 
   it('says the amount is unavailable rather than leaving a blank or a stale figure', () => {
     render(
-      <BudgetAlertList
+      <NotificationList
         {...defaultProps}
-        alerts={[
+        notifications={[
           billDueAlert({
             billId: 'st-1',
             payeeName: 'Monthly ETF buy',
@@ -343,9 +343,9 @@ describe('BudgetAlertList', () => {
 
   it('says tomorrow rather than "in 1 days"', () => {
     render(
-      <BudgetAlertList
+      <NotificationList
         {...defaultProps}
-        alerts={[
+        notifications={[
           billDueAlert({
             payeeName: 'Netflix',
             amount: 15.99,
@@ -367,9 +367,9 @@ describe('BudgetAlertList', () => {
    */
   it('says overdue once the due date has passed', () => {
     render(
-      <BudgetAlertList
+      <NotificationList
         {...defaultProps}
-        alerts={[
+        notifications={[
           billDueAlert({
             payeeName: 'Power Co',
             amount: 312.65,
@@ -388,9 +388,9 @@ describe('BudgetAlertList', () => {
     // Absent is "no information", not a licence to render nothing: a row from an
     // older release carries only its English sentence.
     render(
-      <BudgetAlertList
+      <NotificationList
         {...defaultProps}
-        alerts={[billDueAlert({ billId: 'st-1', payeeName: 'Power Co' })]}
+        notifications={[billDueAlert({ billId: 'st-1', payeeName: 'Power Co' })]}
       />,
     );
 
@@ -398,50 +398,50 @@ describe('BudgetAlertList', () => {
     expect(screen.getByText('STORED ENGLISH MESSAGE')).toBeInTheDocument();
   });
 
-  it('displays alert message text', () => {
-    const alerts = [
-      makeAlert({
+  it('displays notification message text', () => {
+    const notifications = [
+      makeNotification({
         id: 'a1',
         message: 'You have used 85% of your Groceries budget ($425 of $500).',
       }),
     ];
 
-    render(<BudgetAlertList {...defaultProps} alerts={alerts} />);
+    render(<NotificationList {...defaultProps} notifications={notifications} />);
 
     expect(
       screen.getByText('You have used 85% of your Groceries budget ($425 of $500).'),
     ).toBeInTheDocument();
   });
 
-  it('shows inline undo when alert is in dismissingIds', () => {
-    const alerts = [
-      makeAlert({ id: 'a1' }),
-      makeAlert({ id: 'a2', title: 'Second alert' }),
+  it('shows inline undo when notification is in dismissingIds', () => {
+    const notifications = [
+      makeNotification({ id: 'a1' }),
+      makeNotification({ id: 'a2', title: 'Second notification' }),
     ];
 
     render(
-      <BudgetAlertList
+      <NotificationList
         {...defaultProps}
-        alerts={alerts}
+        notifications={notifications}
         dismissingIds={new Set(['a1'])}
       />,
     );
 
-    // Dismissed alert shows undo, not normal content
-    expect(screen.queryByTestId('alert-item-a1')).not.toBeInTheDocument();
+    // Dismissed notification shows undo, not normal content
+    expect(screen.queryByTestId('notification-item-a1')).not.toBeInTheDocument();
     expect(screen.getByTestId('undo-dismiss-a1')).toBeInTheDocument();
-    // Other alert is still normal
-    expect(screen.getByTestId('alert-item-a2')).toBeInTheDocument();
+    // Other notification is still normal
+    expect(screen.getByTestId('notification-item-a2')).toBeInTheDocument();
   });
 
   it('calls onUndoDismiss when undo is clicked', () => {
     const onUndoDismiss = vi.fn();
-    const alerts = [makeAlert({ id: 'a1' })];
+    const notifications = [makeNotification({ id: 'a1' })];
 
     render(
-      <BudgetAlertList
+      <NotificationList
         {...defaultProps}
-        alerts={alerts}
+        notifications={notifications}
         dismissingIds={new Set(['a1'])}
         onUndoDismiss={onUndoDismiss}
       />,
@@ -452,16 +452,16 @@ describe('BudgetAlertList', () => {
     expect(onUndoDismiss).toHaveBeenCalledWith('a1');
   });
 
-  it('excludes dismissing alerts from unread count', () => {
-    const alerts = [
-      makeAlert({ id: 'a1', isRead: false }),
-      makeAlert({ id: 'a2', isRead: false }),
+  it('excludes dismissing notifications from unread count', () => {
+    const notifications = [
+      makeNotification({ id: 'a1', isRead: false }),
+      makeNotification({ id: 'a2', isRead: false }),
     ];
 
     render(
-      <BudgetAlertList
+      <NotificationList
         {...defaultProps}
-        alerts={alerts}
+        notifications={notifications}
         dismissingIds={new Set(['a1'])}
       />,
     );
@@ -469,14 +469,14 @@ describe('BudgetAlertList', () => {
     expect(screen.getByText('1 unread')).toBeInTheDocument();
   });
 
-  // ---- System alerts (data.system === true) ----
+  // ---- System notifications (data.system === true) ----
   //
   // Same contract as BILL_DUE: the row stores English fallbacks written by a
   // cron with no request locale; the UI composes localized copy from `data`.
 
-  const systemAlert = (overrides: Partial<BudgetAlert>): BudgetAlert =>
-    makeAlert({
-      id: 'alert-sys',
+  const systemNotification = (overrides: Partial<Notification>): Notification =>
+    makeNotification({
+      id: 'notification-sys',
       budgetId: null,
       budgetCategoryId: null,
       severity: 'warning',
@@ -485,9 +485,9 @@ describe('BudgetAlertList', () => {
       ...overrides,
     });
 
-  describe('system alerts', () => {
+  describe('system notifications', () => {
     it('routes backup and mail issues to settings', () => {
-      for (const alertType of [
+      for (const type of [
         'BACKUP_FAILED',
         'BACKUP_PARTIAL',
         'ENCRYPTION_KEY_MISSING',
@@ -495,12 +495,12 @@ describe('BudgetAlertList', () => {
       ] as const) {
         mockPush.mockClear();
         const { unmount } = render(
-          <BudgetAlertList
+          <NotificationList
             {...defaultProps}
-            alerts={[systemAlert({ id: 'sys-1', alertType, data: {} })]}
+            notifications={[systemNotification({ id: 'sys-1', type, data: {} })]}
           />,
         );
-        fireEvent.click(screen.getByTestId('alert-item-sys-1'));
+        fireEvent.click(screen.getByTestId('notification-item-sys-1'));
         expect(mockPush).toHaveBeenCalledWith('/settings');
         unmount();
       }
@@ -508,56 +508,113 @@ describe('BudgetAlertList', () => {
 
     it('routes a scheduled-post failure to bills', () => {
       render(
-        <BudgetAlertList
+        <NotificationList
           {...defaultProps}
-          alerts={[
-            systemAlert({ id: 'sys-1', alertType: 'SCHEDULED_POST_FAILED', data: {} }),
+          notifications={[
+            systemNotification({ id: 'sys-1', type: 'SCHEDULED_POST_FAILED', data: {} }),
           ]}
         />,
       );
-      fireEvent.click(screen.getByTestId('alert-item-sys-1'));
+      fireEvent.click(screen.getByTestId('notification-item-sys-1'));
       expect(mockPush).toHaveBeenCalledWith('/bills');
     });
 
-    it('marks a provider alert read and closes without navigating -- no page says more than the alert', () => {
+    it('marks a provider notification read and closes without navigating -- no page says more than the notification', () => {
       const onMarkRead = vi.fn();
       const onClose = vi.fn();
       render(
-        <BudgetAlertList
+        <NotificationList
           {...defaultProps}
-          alerts={[
-            systemAlert({ id: 'sys-1', alertType: 'PROVIDER_OUTAGE', data: {} }),
+          notifications={[
+            systemNotification({ id: 'sys-1', type: 'PROVIDER_OUTAGE', data: {} }),
           ]}
           onMarkRead={onMarkRead}
           onClose={onClose}
         />,
       );
-      fireEvent.click(screen.getByTestId('alert-item-sys-1'));
+      fireEvent.click(screen.getByTestId('notification-item-sys-1'));
       expect(onMarkRead).toHaveBeenCalledWith('sys-1');
       expect(onClose).toHaveBeenCalled();
       expect(mockPush).not.toHaveBeenCalled();
     });
 
-    it('never pushes /budgets/null for a budget-typed alert whose budgetId is null', () => {
+    // The producer knows which page its notification is about; the client only
+    // knows the type. So the server's target wins over the type table.
+    it('follows the server target in preference to the type it would derive', () => {
       render(
-        <BudgetAlertList
+        <NotificationList
           {...defaultProps}
-          alerts={[
-            systemAlert({ id: 'sys-1', alertType: 'THRESHOLD_WARNING', data: {} }),
+          notifications={[
+            systemNotification({
+              id: 'sys-1',
+              type: 'SCHEDULED_POST_FAILED',
+              data: {},
+              target: '/scheduled-transactions/st-7',
+            }),
           ]}
         />,
       );
-      fireEvent.click(screen.getByTestId('alert-item-sys-1'));
+      fireEvent.click(screen.getByTestId('notification-item-sys-1'));
+      expect(mockPush).toHaveBeenCalledWith('/scheduled-transactions/st-7');
+    });
+
+    // A rolling deploy has both shapes in one list, so the type table is the
+    // fallback rather than dead code.
+    it('falls back to the type table for a row written before targets existed', () => {
+      render(
+        <NotificationList
+          {...defaultProps}
+          notifications={[
+            systemNotification({ id: 'sys-1', type: 'SCHEDULED_POST_FAILED', data: {} }),
+          ]}
+        />,
+      );
+      fireEvent.click(screen.getByTestId('notification-item-sys-1'));
+      expect(mockPush).toHaveBeenCalledWith('/bills');
+    });
+
+    // `router.push` with an absolute URL is an open redirect, and a target the
+    // client cannot vouch for is dropped rather than followed -- the fallback
+    // then answers, so the reader still lands somewhere useful.
+    it('ignores a target that is not a same-origin path', () => {
+      render(
+        <NotificationList
+          {...defaultProps}
+          notifications={[
+            systemNotification({
+              id: 'sys-1',
+              type: 'SCHEDULED_POST_FAILED',
+              data: {},
+              target: '//evil.example/steal',
+            }),
+          ]}
+        />,
+      );
+      fireEvent.click(screen.getByTestId('notification-item-sys-1'));
+      expect(mockPush).toHaveBeenCalledWith('/bills');
+      expect(mockPush).not.toHaveBeenCalledWith('//evil.example/steal');
+    });
+
+    it('never pushes /budgets/null for a budget-typed notification whose budgetId is null', () => {
+      render(
+        <NotificationList
+          {...defaultProps}
+          notifications={[
+            systemNotification({ id: 'sys-1', type: 'THRESHOLD_WARNING', data: {} }),
+          ]}
+        />,
+      );
+      fireEvent.click(screen.getByTestId('notification-item-sys-1'));
       expect(mockPush).not.toHaveBeenCalled();
     });
 
     it('composes a backup failure from its data, naming the affected user and the error', () => {
       render(
-        <BudgetAlertList
+        <NotificationList
           {...defaultProps}
-          alerts={[
-            systemAlert({
-              alertType: 'BACKUP_FAILED',
+          notifications={[
+            systemNotification({
+              type: 'BACKUP_FAILED',
               severity: 'critical',
               data: {
                 system: true,
@@ -580,11 +637,11 @@ describe('BudgetAlertList', () => {
 
     it('falls back to the user id when the email lookup failed', () => {
       render(
-        <BudgetAlertList
+        <NotificationList
           {...defaultProps}
-          alerts={[
-            systemAlert({
-              alertType: 'BACKUP_FAILED',
+          notifications={[
+            systemNotification({
+              type: 'BACKUP_FAILED',
               data: {
                 system: true,
                 affectedUserId: 'u-1',
@@ -626,11 +683,11 @@ describe('BudgetAlertList', () => {
         ],
       ] as const) {
         const { unmount } = render(
-          <BudgetAlertList
+          <NotificationList
             {...defaultProps}
-            alerts={[
-              systemAlert({
-                alertType: 'BACKUP_PARTIAL',
+            notifications={[
+              systemNotification({
+                type: 'BACKUP_PARTIAL',
                 data: { ...base, ...data },
               }),
             ]}
@@ -647,11 +704,11 @@ describe('BudgetAlertList', () => {
       // match their metadata -- a stored English message that was correct,
       // replaced by a localized one that was not.
       render(
-        <BudgetAlertList
+        <NotificationList
           {...defaultProps}
-          alerts={[
-            systemAlert({
-              alertType: 'BACKUP_PARTIAL',
+          notifications={[
+            systemNotification({
+              type: 'BACKUP_PARTIAL',
               data: {
                 system: true,
                 affectedUserEmail: 'ken@example.com',
@@ -671,11 +728,11 @@ describe('BudgetAlertList', () => {
 
     it('falls back to the stored English when a partial payload lacks its counts', () => {
       render(
-        <BudgetAlertList
+        <NotificationList
           {...defaultProps}
-          alerts={[
-            systemAlert({
-              alertType: 'BACKUP_PARTIAL',
+          notifications={[
+            systemNotification({
+              type: 'BACKUP_PARTIAL',
               data: {
                 system: true,
                 affectedUserEmail: 'ken@example.com',
@@ -690,17 +747,17 @@ describe('BudgetAlertList', () => {
 
     it('composes the provider pair from the stored label', () => {
       render(
-        <BudgetAlertList
+        <NotificationList
           {...defaultProps}
-          alerts={[
-            systemAlert({
+          notifications={[
+            systemNotification({
               id: 'sys-out',
-              alertType: 'PROVIDER_OUTAGE',
+              type: 'PROVIDER_OUTAGE',
               data: { system: true, providerLabel: 'Yahoo Finance' },
             }),
-            systemAlert({
+            systemNotification({
               id: 'sys-rec',
-              alertType: 'PROVIDER_RECOVERED',
+              type: 'PROVIDER_RECOVERED',
               severity: 'success',
               data: { system: true, providerLabel: 'Yahoo Finance' },
             }),
@@ -717,11 +774,11 @@ describe('BudgetAlertList', () => {
 
     it('composes a scheduled-post failure with the schedule name, date and error', () => {
       render(
-        <BudgetAlertList
+        <NotificationList
           {...defaultProps}
-          alerts={[
-            systemAlert({
-              alertType: 'SCHEDULED_POST_FAILED',
+          notifications={[
+            systemNotification({
+              type: 'SCHEDULED_POST_FAILED',
               data: {
                 system: true,
                 scheduledId: 'st-1',
@@ -743,9 +800,9 @@ describe('BudgetAlertList', () => {
 
     it('falls back to the stored English for a row without the structured payload', () => {
       render(
-        <BudgetAlertList
+        <NotificationList
           {...defaultProps}
-          alerts={[systemAlert({ alertType: 'BACKUP_FAILED', data: {} })]}
+          notifications={[systemNotification({ type: 'BACKUP_FAILED', data: {} })]}
         />,
       );
       expect(screen.getByText('STORED ENGLISH TITLE')).toBeInTheDocument();
@@ -755,26 +812,26 @@ describe('BudgetAlertList', () => {
 
   describe('filters', () => {
     it('renders one chip per severity and per category', () => {
-      render(<BudgetAlertList {...defaultProps} />);
+      render(<NotificationList {...defaultProps} />);
 
       for (const severity of ['critical', 'warning', 'info', 'success']) {
         expect(
-          screen.getByTestId(`alert-filter-severity-${severity}`),
+          screen.getByTestId(`notification-filter-severity-${severity}`),
         ).toHaveAttribute('aria-pressed', 'false');
       }
       for (const category of ['financial', 'system']) {
         expect(
-          screen.getByTestId(`alert-filter-category-${category}`),
+          screen.getByTestId(`notification-filter-category-${category}`),
         ).toHaveAttribute('aria-pressed', 'false');
       }
     });
 
     it('renders the category chips on their own row below the severity chips', () => {
-      render(<BudgetAlertList {...defaultProps} />);
+      render(<NotificationList {...defaultProps} />);
 
-      const severityRow = screen.getByTestId('alert-filter-severity-critical')
+      const severityRow = screen.getByTestId('notification-filter-severity-critical')
         .parentElement as HTMLElement;
-      const categoryRow = screen.getByTestId('alert-filter-category-system')
+      const categoryRow = screen.getByTestId('notification-filter-category-system')
         .parentElement as HTMLElement;
       expect(severityRow).not.toBe(categoryRow);
       // Same stacked container, severity row first.
@@ -783,9 +840,9 @@ describe('BudgetAlertList', () => {
     });
 
     it('activates a severity filter on click', () => {
-      render(<BudgetAlertList {...defaultProps} />);
+      render(<NotificationList {...defaultProps} />);
 
-      fireEvent.click(screen.getByTestId('alert-filter-severity-critical'));
+      fireEvent.click(screen.getByTestId('notification-filter-severity-critical'));
 
       expect(defaultProps.onFiltersChange).toHaveBeenCalledWith({
         severity: 'critical',
@@ -795,13 +852,13 @@ describe('BudgetAlertList', () => {
 
     it('clears an active severity filter on a second click', () => {
       render(
-        <BudgetAlertList
+        <NotificationList
           {...defaultProps}
           filters={{ severity: 'critical', category: null }}
         />,
       );
 
-      const chip = screen.getByTestId('alert-filter-severity-critical');
+      const chip = screen.getByTestId('notification-filter-severity-critical');
       expect(chip).toHaveAttribute('aria-pressed', 'true');
       fireEvent.click(chip);
 
@@ -813,13 +870,13 @@ describe('BudgetAlertList', () => {
 
     it('activates a category filter without touching the severity filter', () => {
       render(
-        <BudgetAlertList
+        <NotificationList
           {...defaultProps}
           filters={{ severity: 'warning', category: null }}
         />,
       );
 
-      fireEvent.click(screen.getByTestId('alert-filter-category-system'));
+      fireEvent.click(screen.getByTestId('notification-filter-category-system'));
 
       expect(defaultProps.onFiltersChange).toHaveBeenCalledWith({
         severity: 'warning',
@@ -829,13 +886,13 @@ describe('BudgetAlertList', () => {
 
     it('clears an active category filter on a second click', () => {
       render(
-        <BudgetAlertList
+        <NotificationList
           {...defaultProps}
           filters={{ severity: null, category: 'financial' }}
         />,
       );
 
-      fireEvent.click(screen.getByTestId('alert-filter-category-financial'));
+      fireEvent.click(screen.getByTestId('notification-filter-category-financial'));
 
       expect(defaultProps.onFiltersChange).toHaveBeenCalledWith({
         severity: null,
@@ -843,35 +900,35 @@ describe('BudgetAlertList', () => {
       });
     });
 
-    it('tells an empty filtered view apart from having no alerts at all', () => {
+    it('tells an empty filtered view apart from having no notifications at all', () => {
       render(
-        <BudgetAlertList
+        <NotificationList
           {...defaultProps}
           filters={{ severity: 'critical', category: null }}
         />,
       );
 
-      expect(screen.getByTestId('no-alerts')).toHaveTextContent(
-        'No alerts match the current filter',
+      expect(screen.getByTestId('no-notifications')).toHaveTextContent(
+        'No notifications match the current filter',
       );
     });
   });
 
   describe('delete all', () => {
-    it('offers delete-all only when alerts are shown', () => {
-      const { rerender } = render(<BudgetAlertList {...defaultProps} />);
-      expect(screen.queryByTestId('delete-all-alerts')).not.toBeInTheDocument();
+    it('offers delete-all only when notifications are shown', () => {
+      const { rerender } = render(<NotificationList {...defaultProps} />);
+      expect(screen.queryByTestId('delete-all-notifications')).not.toBeInTheDocument();
 
       rerender(
-        <BudgetAlertList {...defaultProps} alerts={[makeAlert()]} />,
+        <NotificationList {...defaultProps} notifications={[makeNotification()]} />,
       );
-      expect(screen.getByTestId('delete-all-alerts')).toBeInTheDocument();
+      expect(screen.getByTestId('delete-all-notifications')).toBeInTheDocument();
     });
 
     it('asks the owner to delete on click', () => {
-      render(<BudgetAlertList {...defaultProps} alerts={[makeAlert()]} />);
+      render(<NotificationList {...defaultProps} notifications={[makeNotification()]} />);
 
-      fireEvent.click(screen.getByTestId('delete-all-alerts'));
+      fireEvent.click(screen.getByTestId('delete-all-notifications'));
 
       expect(defaultProps.onDeleteAll).toHaveBeenCalledTimes(1);
     });
@@ -879,9 +936,9 @@ describe('BudgetAlertList', () => {
 
   describe('mobile layout', () => {
     it('covers the whole screen below the sm breakpoint and stays a dropdown above it', () => {
-      render(<BudgetAlertList {...defaultProps} />);
+      render(<NotificationList {...defaultProps} />);
 
-      const container = screen.getByTestId('alert-list');
+      const container = screen.getByTestId('notification-list');
       // Full width plus an explicit viewport height is the full-screen mobile
       // treatment; the sm:-scoped classes restore the desktop dropdown card.
       expect(container.className).toContain('fixed inset-x-0 top-0');
@@ -896,18 +953,18 @@ describe('BudgetAlertList', () => {
       // inside the sliding AppHeader, whose ever-present transform makes the
       // header the containing block for position:fixed -- a bottom anchor
       // caps the panel at the header's own ~56px box, so it collapsed
-      // whenever there were no alert rows overflowing it.
+      // whenever there were no notification rows overflowing it.
       expect(container.className).not.toMatch(/(?:^|\s)inset-0(?:\s|$)/);
       expect(container.className).not.toMatch(/(?:^|\s)bottom-0(?:\s|$)/);
     });
 
     it('centers the empty state in the leftover height instead of pinning it to the top', () => {
-      render(<BudgetAlertList {...defaultProps} />);
+      render(<NotificationList {...defaultProps} />);
 
       // The full-screen mobile panel leaves most of the screen below the
       // header; the empty state claims that space and centers in it. The
       // desktop dropdown is content-sized, so the same classes are a no-op.
-      const empty = screen.getByTestId('no-alerts');
+      const empty = screen.getByTestId('no-notifications');
       expect(empty.className).toContain('flex-1');
       expect(empty.className).toContain('justify-center');
       const body = empty.parentElement as HTMLElement;
@@ -916,9 +973,9 @@ describe('BudgetAlertList', () => {
     });
 
     it('renders a mobile-only close button that closes the panel', () => {
-      render(<BudgetAlertList {...defaultProps} />);
+      render(<NotificationList {...defaultProps} />);
 
-      const close = screen.getByTestId('close-alerts');
+      const close = screen.getByTestId('close-notifications');
       expect(close.className).toContain('sm:hidden');
       fireEvent.click(close);
 

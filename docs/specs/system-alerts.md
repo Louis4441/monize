@@ -117,7 +117,7 @@ A system alert is written by a cron with no request locale, so the row
 stores **English** `title`/`message` as the fallback and the facts in
 `data` (with `system: true`); the bell dropdown composes localized copy
 client-side from `data`, exactly as `BILL_DUE` does
-(`frontend/src/components/budgets/BudgetAlertList.tsx`). The admin email
+(`frontend/src/components/notifications/NotificationList.tsx`). The admin email
 renders per-recipient framing through `emailTranslator` around the stored
 English title/message (`systemAlertTemplate`).
 

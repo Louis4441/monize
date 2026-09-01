@@ -337,7 +337,7 @@ Mobile Chrome sizes the viewport that `position: fixed` elements attach to from 
 
 ### A header panel is `fixed` inside a transformed ancestor -- give it a height, never a bottom anchor
 
-The sliding `AppHeader` always carries a `transform` (`useHideOnScroll`), which makes the header -- not the viewport -- the containing block for every `position: fixed` descendant. A panel mounted in the header (the alerts dropdown, `ActionHistoryPanel`) that anchors with `bottom-0`/`inset-0` is therefore capped at the header's own ~56px box: the full-screen alerts panel only *looked* full while alert rows overflowed it, and collapsed when empty. Size such a panel with an explicit height (`h-dvh` for the mobile full-screen treatment) and edge offsets that grow past the containing block; `BudgetAlertList.test.tsx` pins the class shape.
+The sliding `AppHeader` always carries a `transform` (`useHideOnScroll`), which makes the header -- not the viewport -- the containing block for every `position: fixed` descendant. A panel mounted in the header (the notifications dropdown, `ActionHistoryPanel`) that anchors with `bottom-0`/`inset-0` is therefore capped at the header's own ~56px box: the full-screen notifications panel only *looked* full while rows overflowed it, and collapsed when empty. Size such a panel with an explicit height (`h-dvh` for the mobile full-screen treatment) and edge offsets that grow past the containing block; `NotificationList.test.tsx` pins the class shape.
 
 ### A control that needs an AI provider is not offered without one -- `useAiConfigured()`
 

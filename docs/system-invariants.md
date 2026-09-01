@@ -1603,7 +1603,7 @@ Required tests      Occurrence identity and window: scheduled-occurrences.spec.t
                     Frontend: UpcomingBillsReport.test.tsx (per-occurrence
                     override in the list, the calendar, the CSV and the PDF, and
                     an unresolvable occurrence withholding the total),
-                    BudgetAlertList.test.tsx (localized bill-due copy, including
+                    NotificationList.test.tsx (localized bill-due copy, including
                     the unavailable-amount case), UpcomingBills.test.tsx and
                     BudgetUpcomingBills.test.tsx (moved next occurrence),
                     plus scheduled-utils, BudgetVelocityWidget,

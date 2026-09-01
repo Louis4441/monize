@@ -1,0 +1,69 @@
+{
+  "title": "提醒",
+  "unread": "{count} 条未读",
+  "markAllRead": "全部标为已读",
+  "loading": "正在加载提醒...",
+  "empty": "无提醒",
+  "undo": "撤销",
+  "buttonTitle": "提醒",
+  "buttonAriaLabel": "提醒",
+  "dismissAriaLabel": "关闭提醒",
+  "closeAriaLabel": "关闭提醒面板",
+  "emptyFiltered": "没有符合当前筛选条件的提醒",
+  "deleteAll": "全部删除",
+  "deleteAllConfirmTitle": "删除提醒",
+  "deleteAllConfirmMessageAll": "删除所有提醒？此操作无法撤销。",
+  "deleteAllConfirmMessageFiltered": "删除所有符合当前筛选条件的提醒（包括未显示的）？此操作无法撤销。",
+  "deleted": "已删除 {count} 条提醒",
+  "deleteFailed": "无法删除提醒",
+  "filter": {
+    "financial": "财务",
+    "system": "系统"
+  },
+  "severity": {
+    "critical": "严重",
+    "warning": "警告",
+    "success": "好消息",
+    "info": "信息"
+  },
+  "billDue": {
+    "titleOverdue": "{payee} 已逾期",
+    "titleToday": "{payee} 今天到期",
+    "titleTomorrow": "{payee} 明天到期",
+    "titleInDays": "{payee} 将在 {days} 天后到期",
+    "amountDue": "{date} 应付 {amount}",
+    "amountUnavailable": "金额不可用（无当前汇率），到期日 {date}"
+  },
+  "system": {
+    "backupFailed": {
+      "title": "自动备份失败",
+      "message": "{user} 的自动备份失败：{error}"
+    },
+    "backupPartial": {
+      "title": "自动备份不完整",
+      "messageAttachments": "{user} 的备份已写入，但 {expected} 个附件中有 {missing} 个无法包含，另有 {inconsistent} 个与其元数据不匹配。完整备份已保留。",
+      "messagePromotion": "{user} 的每日备份成功，但其每周或每月副本无法写入：{error}",
+      "messageRetention": "{user} 的备份成功，但旧的备份文件无法清理：{error}"
+    },
+    "encryptionKeyMissing": {
+      "title": "未配置加密密钥",
+      "message": "未设置 ENCRYPTION_KEY，备份将以未加密方式写入，且无法保存机密信息。未来版本将在缺少该密钥时拒绝启动。"
+    },
+    "smtpFailure": {
+      "title": "邮件发送失败",
+      "message": "Monize 无法发送邮件：{error}。通知和提醒未能送达。"
+    },
+    "providerOutage": {
+      "title": "{provider} 无响应",
+      "message": "无法获取 {provider} 的市场数据。在其恢复响应之前，价格和指数数据可能已过时。"
+    },
+    "providerRecovered": {
+      "title": "{provider} 已恢复响应",
+      "message": "故障已结束，{provider} 的市场数据正在重新更新。"
+    },
+    "scheduledPostFailed": {
+      "title": "无法登记 {name}",
+      "message": "您到期日为 {date} 的定期交易未能自动登记：{error}。您可以在“账单与存款”中手动登记。"
+    }
+  }
+}
