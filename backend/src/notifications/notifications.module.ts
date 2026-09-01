@@ -6,6 +6,7 @@ import { NotificationsController } from "./notifications.controller";
 import { UsersModule } from "../users/users.module";
 import { ScheduledTransactionsModule } from "../scheduled-transactions/scheduled-transactions.module";
 import { SystemAlertsModule } from "../system-alerts/system-alerts.module";
+import { NotificationCenterModule } from "../notification-center/notification-center.module";
 
 @Module({
   imports: [
@@ -19,6 +20,10 @@ import { SystemAlertsModule } from "../system-alerts/system-alerts.module";
     // companion rows beside its emails. `forwardRef` because SystemAlertsModule
     // imports this module back for EmailService.
     forwardRef(() => SystemAlertsModule),
+    // For NotificationPreferenceService: the bill reminder gates its email on
+    // the PAYMENTS channel matrix. No forwardRef -- NotificationCenterModule
+    // depends on nothing but the connection, so it cannot cycle back.
+    NotificationCenterModule,
   ],
   providers: [EmailService, BillReminderService, ProviderOutageAlertService],
   controllers: [NotificationsController],

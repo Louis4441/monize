@@ -6,6 +6,7 @@ import { NotificationPreference } from "./entities/notification-preference.entit
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { NotificationService } from "./notification.service";
 import { NotificationPreferenceService } from "./notification-preference.service";
+import { NotificationPreferenceController } from "./notification-preference.controller";
 
 /**
  * The durable `notifications` table and the one service that reads and writes
@@ -31,6 +32,7 @@ import { NotificationPreferenceService } from "./notification-preference.service
       UserPreference,
     ]),
   ],
+  controllers: [NotificationPreferenceController],
   providers: [NotificationService, NotificationPreferenceService],
   exports: [NotificationService, NotificationPreferenceService],
 })

@@ -13,8 +13,10 @@ import {
   Notification,
   NotificationType,
   NotificationSeverity,
+  NotificationCategory,
 } from "../notification-center/entities/notification.entity";
 import { NotificationService } from "../notification-center/notification.service";
+import { NotificationPreferenceService } from "../notification-center/notification-preference.service";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
 import { User } from "../users/entities/user.entity";
@@ -81,6 +83,8 @@ export class BudgetAlertService {
     private readonly i18n: I18nService,
     // Every notification this service produces goes through the one write door.
     private notifications: NotificationService,
+    // Email for budget alerts is gated by the BUDGETS channel matrix.
+    private readonly notificationPreferences: NotificationPreferenceService,
   ) {}
 
   @Cron("0 7 * * *")
@@ -619,12 +623,21 @@ export class BudgetAlertService {
     if (!this.emailService.getStatus().configured) return false;
 
     try {
+      // A budget alert is the BUDGETS category; email is gated by that channel
+      // matrix and the global email master switch together (the resolver reads
+      // both). Runs under the user's own withUserContext.
+      const emailEnabled = await this.notificationPreferences.resolveEmail(
+        userId,
+        NotificationCategory.BUDGETS,
+      );
+      if (!emailEnabled) return false;
+
+      // The user's stored locale for the alert copy, composed off-request.
       const prefs = await withScopedDb(this.dataSource, (m) =>
         m.getRepository(UserPreference).findOne({
           where: { userId },
         }),
       );
-      if (prefs && !prefs.notificationEmail) return false;
 
       const user = await withScopedDb(this.dataSource, (m) =>
         m.getRepository(User).findOne({
@@ -688,7 +701,12 @@ export class BudgetAlertService {
         where: { userId },
       }),
     );
-    if (prefs && !prefs.notificationEmail) return false;
+    const emailEnabled = await this.notificationPreferences.resolveEmail(
+      userId,
+      NotificationCategory.BUDGETS,
+    );
+    if (!emailEnabled) return false;
+    // The digest has its own toggle beyond the channel matrix.
     if (prefs && prefs.budgetDigestEnabled === false) return false;
 
     const user = await withScopedDb(this.dataSource, (m) =>

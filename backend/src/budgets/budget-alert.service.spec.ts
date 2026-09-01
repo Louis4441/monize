@@ -5,6 +5,7 @@ import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
 import { BudgetAlertService } from "./budget-alert.service";
 import { NotificationService } from "../notification-center/notification.service";
+import { NotificationPreferenceService } from "../notification-center/notification-preference.service";
 import { Budget, BudgetType, BudgetStrategy } from "./entities/budget.entity";
 import {
   BudgetCategory,
@@ -289,6 +290,20 @@ describe("BudgetAlertService", () => {
           },
         },
         { provide: DataSource, useValue: scopedDataSource },
+        {
+          // Mirror the real resolver's master-gate: with no per-category row,
+          // resolveEmail == the user's notification_email. So the existing
+          // notificationEmail fixtures keep controlling the email path.
+          provide: NotificationPreferenceService,
+          useValue: {
+            resolveEmail: jest.fn(async (userId: string) => {
+              const prefs = await preferencesRepository.findOne({
+                where: { userId },
+              });
+              return prefs ? prefs.notificationEmail !== false : true;
+            }),
+          },
+        },
       ],
     }).compile();
 

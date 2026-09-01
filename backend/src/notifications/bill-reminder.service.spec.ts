@@ -16,6 +16,7 @@ import { ScheduledTransactionOverride } from "../scheduled-transactions/entities
 import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+import { NotificationPreferenceService } from "../notification-center/notification-preference.service";
 import {
   createJobClaimMock,
   TEST_LEASE_TOKEN,
@@ -110,6 +111,20 @@ describe("BillReminderService", () => {
           useValue: {
             translate: (key: string, opts?: { defaultValue?: string }) =>
               opts?.defaultValue ?? key,
+          },
+        },
+        {
+          // Mirror the real resolver's master-gate: with no per-category row,
+          // resolveEmail == the user's notification_email, so the existing
+          // preferencesRepo fixtures keep controlling the email path.
+          provide: NotificationPreferenceService,
+          useValue: {
+            resolveEmail: jest.fn(async (userId: string) => {
+              const prefs = await preferencesRepo.findOne({
+                where: { userId },
+              });
+              return prefs ? prefs.notificationEmail !== false : true;
+            }),
           },
         },
       ],
