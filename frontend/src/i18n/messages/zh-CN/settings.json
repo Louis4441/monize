@@ -267,6 +267,7 @@
         "enableFailed": "无法启用推送通知",
         "permissionDenied": "此浏览器正在阻止 Monize 的通知。请在网站设置中允许后重试。",
         "permissionDismissed": "未启用通知。浏览器询问时请选择“允许”。",
+        "permissionNoPrompt": "未启用通知。如果没有出现授权提示，请将 Monize 从主屏幕移除，通过“共享”中的“添加到主屏幕”重新添加，然后再试一次。",
         "removed": "已移除设备",
         "removeFailed": "无法移除设备",
         "testSent": "{count, plural, other {测试通知已发送至 # 台设备}}",

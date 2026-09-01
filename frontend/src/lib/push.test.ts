@@ -14,6 +14,8 @@ import {
   enablePushOnThisDevice,
   fingerprintEndpoint,
   getPushSupport,
+  isInstalledIosWebApp,
+  requestNotificationPermission,
   pushApi,
   toSubscriptionPayload,
   urlBase64ToUint8Array,
@@ -256,6 +258,113 @@ describe('getPushSupport', () => {
   });
 });
 
+describe('isInstalledIosWebApp', () => {
+  const fake = (
+    userAgent: string,
+    extras: Record<string, unknown> = {},
+    standalone?: boolean,
+  ) => ({
+    win: {
+      matchMedia: () => ({ matches: false }),
+      navigator: { standalone },
+    } as unknown as Window,
+    nav: {
+      userAgent,
+      platform: 'iPhone',
+      maxTouchPoints: 0,
+      ...extras,
+    } as unknown as Navigator,
+  });
+
+  it('recognises an iPhone launched from the Home Screen', () => {
+    const { win, nav } = fake(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Safari/605',
+      {},
+      true,
+    );
+
+    expect(isInstalledIosWebApp(win, nav)).toBe(true);
+  });
+
+  it('does not claim an iPhone browser tab is the installed app', () => {
+    const { win, nav } = fake(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Safari/605',
+    );
+
+    expect(isInstalledIosWebApp(win, nav)).toBe(false);
+  });
+
+  // iPadOS reports itself as a Mac, so the touch points are what give it away --
+  // and a real Mac in standalone display mode must not be mistaken for it.
+  it('separates an installed iPad from a desktop Safari', () => {
+    const ipad = fake(
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605',
+      { platform: 'MacIntel', maxTouchPoints: 5 },
+      true,
+    );
+    const mac = fake(
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605',
+      { platform: 'MacIntel', maxTouchPoints: 0 },
+      true,
+    );
+
+    expect(isInstalledIosWebApp(ipad.win, ipad.nav)).toBe(true);
+    expect(isInstalledIosWebApp(mac.win, mac.nav)).toBe(false);
+  });
+});
+
+describe('requestNotificationPermission', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('resolves from the returned promise', async () => {
+    vi.stubGlobal('Notification', {
+      permission: 'default',
+      requestPermission: vi.fn(async () => 'granted'),
+    });
+
+    await expect(requestNotificationPermission()).resolves.toBe('granted');
+  });
+
+  // Older WebKit implements only the callback form and returns undefined, on
+  // which `await` yields undefined -- read as a refusal the user never made.
+  it('resolves from the legacy callback when nothing is returned', async () => {
+    vi.stubGlobal('Notification', {
+      permission: 'default',
+      requestPermission: vi.fn((cb: (p: NotificationPermission) => void) => {
+        cb('granted');
+        return undefined;
+      }),
+    });
+
+    await expect(requestNotificationPermission()).resolves.toBe('granted');
+  });
+
+  it('settles once on a browser that answers both ways', async () => {
+    vi.stubGlobal('Notification', {
+      permission: 'default',
+      requestPermission: vi.fn((cb: (p: NotificationPermission) => void) => {
+        cb('granted');
+        return Promise.resolve('denied' as NotificationPermission);
+      }),
+    });
+
+    // The first answer wins, and the second cannot overwrite it: a promise that
+    // has already resolved ignores a later resolve, which is the property this
+    // pins rather than a preference for one of the two values.
+    await expect(requestNotificationPermission()).resolves.toBe('granted');
+  });
+
+  // A rejection is not an answer; the browser's own state is.
+  it('falls back to the stored permission when the request rejects', async () => {
+    vi.stubGlobal('Notification', {
+      permission: 'denied',
+      requestPermission: vi.fn(() => Promise.reject(new Error('no'))),
+    });
+
+    await expect(requestNotificationPermission()).resolves.toBe('denied');
+  });
+});
+
 describe('fingerprintEndpoint', () => {
   it('matches the prefix length the server publishes', async () => {
     const fingerprint = await fingerprintEndpoint(ENDPOINT);
@@ -325,6 +434,24 @@ describe('enabling and disabling push on this device', () => {
       applicationServerKey: urlBase64ToUint8Array(PUBLIC_KEY),
     });
     expect(device.id).toBe('d-1');
+  });
+
+  // A browser that only implements `requestPermission(callback)` returns
+  // undefined, and awaiting that yields undefined -- which is not 'granted', so
+  // the user was told to grant a permission they had just granted, with the
+  // prompt they answered still on screen.
+  it('registers on a browser that only implements the callback form', async () => {
+    requestPermission.mockImplementation(
+      (cb: (p: NotificationPermission) => void) => {
+        cb('granted');
+        return undefined;
+      },
+    );
+
+    const device = await enablePushOnThisDevice(PUBLIC_KEY, 'iPhone');
+
+    expect(device.id).toBe('d-1');
+    expect(subscribe).toHaveBeenCalled();
   });
 
   // 'denied' and 'dismissed' need different words: the first is a decision only

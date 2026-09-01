@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@/test/render';
 import { PushDevicesPanel, defaultDeviceName } from './PushDevicesPanel';
+import toast from 'react-hot-toast';
 import { PushPermissionError, type PushDevice } from '@/lib/push';
 
 vi.mock('@/lib/logger', () => ({
@@ -24,6 +25,7 @@ const mockEnable = vi.fn();
 const mockDisable = vi.fn();
 const mockCurrentFingerprint = vi.fn();
 const mockGetPushSupport = vi.fn();
+const mockIsInstalledIosWebApp = vi.fn();
 
 vi.mock('@/lib/push', () => ({
   pushApi: {
@@ -39,6 +41,7 @@ vi.mock('@/lib/push', () => ({
   disablePushOnThisDevice: (...args: any[]) => mockDisable(...args),
   currentDeviceFingerprint: () => mockCurrentFingerprint(),
   getPushSupport: () => mockGetPushSupport(),
+  isInstalledIosWebApp: () => mockIsInstalledIosWebApp(),
   // Declared inside the factory: `vi.mock` is hoisted above every top-level
   // binding in this file, so a class defined outside it is not yet initialised
   // when the factory runs.
@@ -80,6 +83,7 @@ describe('PushDevicesPanel', () => {
     mockListDevices.mockResolvedValue([]);
     mockCurrentFingerprint.mockResolvedValue(null);
     mockGetPushSupport.mockReturnValue({ supported: true });
+    mockIsInstalledIosWebApp.mockReturnValue(false);
     mockEnable.mockResolvedValue(device());
     mockSendTest.mockResolvedValue({ attempted: 1, delivered: 1, devices: [] });
   });
@@ -320,7 +324,7 @@ describe('PushDevicesPanel', () => {
   it.each([
     ['denied', /blocking notifications for Monize/i],
     ['dismissed', /Choose Allow when the browser asks/i],
-  ])('reports a %s permission in its own words', async (reason) => {
+  ])('reports a %s permission in its own words', async (reason, expected) => {
     mockEnable.mockRejectedValue(
       new PushPermissionError(reason as 'denied' | 'dismissed'),
     );
@@ -331,7 +335,55 @@ describe('PushDevicesPanel', () => {
       await screen.findByRole('button', { name: /enable on this device/i }),
     );
 
-    await waitFor(() => expect(mockEnable).toHaveBeenCalled());
+    // The message itself, not merely that the attempt was made: the two
+    // refusals send the user to different places, and a test that stops at
+    // the call cannot tell them apart.
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringMatching(expected as RegExp),
+      ),
+    );
+  });
+
+  // A prompt that never appears is what an installed iOS web app does when the
+  // click's user activation has been spent -- and it reaches the app as the
+  // same 'dismissed' the user gets for closing a dialogue. Telling that user to
+  // "choose Allow when the browser asks" sends them to wait for a dialogue that
+  // is not coming.
+  it('tells an installed iOS web app what to do when no prompt appeared', async () => {
+    mockIsInstalledIosWebApp.mockReturnValue(true);
+    mockEnable.mockRejectedValue(new PushPermissionError('dismissed'));
+
+    render(<PushDevicesPanel />);
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: /enable on this device/i }),
+    );
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringMatching(/If no prompt appeared/i),
+      ),
+    );
+  });
+
+  // The prompt only appears while the click's transient activation lasts, so
+  // the registration has to START inside the handler. jsdom does not model user
+  // activation, so this cannot prove the browser behaviour -- what it does
+  // catch is the shape that loses it: an `await` placed before the call, which
+  // is how a handler acquires a suspension point without anyone noticing.
+  it('starts the permission request synchronously on the click', async () => {
+    render(<PushDevicesPanel />);
+    const button = await screen.findByRole('button', {
+      name: /enable on this device/i,
+    });
+
+    mockEnable.mockClear();
+    fireEvent.click(button);
+
+    expect(mockEnable).toHaveBeenCalledTimes(1);
+    // Let the handler's async tail land inside act.
+    await waitFor(() => expect(mockListDevices).toHaveBeenCalledTimes(2));
   });
 
   // Removing this browser's own device has to unsubscribe locally too, or the

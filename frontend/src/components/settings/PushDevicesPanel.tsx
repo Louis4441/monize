@@ -10,6 +10,7 @@ import {
   disablePushOnThisDevice,
   enablePushOnThisDevice,
   getPushSupport,
+  isInstalledIosWebApp,
   pushApi,
   PushPermissionError,
   type PushConfig,
@@ -120,26 +121,49 @@ export function PushDevicesPanel() {
   );
   const liveDevices = devices.filter((device) => !device.disabledAt);
 
-  const handleEnable = async () => {
+  // Deliberately NOT an async function. The permission prompt only appears
+  // while the click's transient activation lasts, and iOS spends that on the
+  // first suspension -- so the work is started synchronously, before the state
+  // update, and only the reporting happens after an await. Written as
+  // `async () => { setIsEnabling(true); await enablePushOnThisDevice(...) }`
+  // this asked for a permission the user was then told they had not granted,
+  // with no prompt ever shown.
+  const handleEnable = () => {
     if (!config?.publicKey) return;
+    const enabling = enablePushOnThisDevice(
+      config.publicKey,
+      defaultDeviceName(),
+    );
     setIsEnabling(true);
-    try {
-      await enablePushOnThisDevice(config.publicKey, defaultDeviceName());
-      await refreshDevices();
-      toast.success(t('toasts.enabled'));
-    } catch (error) {
-      if (error instanceof PushPermissionError) {
-        toast.error(
-          error.reason === 'denied'
-            ? t('toasts.permissionDenied')
-            : t('toasts.permissionDismissed'),
-        );
-      } else {
-        toast.error(getErrorMessage(error, t('toasts.enableFailed')));
+    void (async () => {
+      try {
+        await enabling;
+        await refreshDevices();
+        toast.success(t('toasts.enabled'));
+      } catch (error) {
+        if (error instanceof PushPermissionError) {
+          toast.error(permissionMessage(error));
+        } else {
+          toast.error(getErrorMessage(error, t('toasts.enableFailed')));
+        }
+      } finally {
+        setIsEnabling(false);
       }
-    } finally {
-      setIsEnabling(false);
-    }
+    })();
+  };
+
+  /**
+   * Which refusal to report. `denied` is a decision the user can undo in site
+   * settings. `dismissed` normally means they closed the prompt -- except on an
+   * installed iOS web app, where it is also what a prompt that never appeared
+   * looks like, and telling that user to "choose Allow when the browser asks"
+   * sends them to look for a dialogue that is not coming.
+   */
+  const permissionMessage = (error: PushPermissionError): string => {
+    if (error.reason === 'denied') return t('toasts.permissionDenied');
+    return isInstalledIosWebApp()
+      ? t('toasts.permissionNoPrompt')
+      : t('toasts.permissionDismissed');
   };
 
   const handleRemove = async (device: PushDevice) => {

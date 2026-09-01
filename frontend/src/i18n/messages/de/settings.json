@@ -267,6 +267,7 @@
         "enableFailed": "Push-Benachrichtigungen konnten nicht aktiviert werden",
         "permissionDenied": "Dieser Browser blockiert Benachrichtigungen für Monize. Erlauben Sie sie in den Website-Einstellungen und versuchen Sie es erneut.",
         "permissionDismissed": "Benachrichtigungen wurden nicht aktiviert. Wählen Sie „Zulassen“, wenn der Browser fragt.",
+        "permissionNoPrompt": "Benachrichtigungen wurden nicht aktiviert. Falls keine Abfrage erschien, entfernen Sie Monize vom Home-Bildschirm, fügen Sie es erneut hinzu (Teilen, dann Zum Home-Bildschirm) und versuchen Sie es noch einmal.",
         "removed": "Gerät entfernt",
         "removeFailed": "Gerät konnte nicht entfernt werden",
         "testSent": "{count, plural, one {Testbenachrichtigung an 1 Gerät gesendet} other {Testbenachrichtigung an # Geräte gesendet}}",

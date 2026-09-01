@@ -267,6 +267,7 @@
         "enableFailed": "Could not enable push notifications",
         "permissionDenied": "This browser is blocking notifications for Monize. Allow them in the browser’s site settings, then try again.",
         "permissionDismissed": "Notifications were not enabled. Choose Allow when the browser asks.",
+        "permissionNoPrompt": "Notifications were not enabled. If no prompt appeared, remove Monize from the Home Screen, add it again (Share, then Add to Home Screen) and try once more.",
         "removed": "Device removed",
         "removeFailed": "Could not remove the device",
         "testSent": "{count, plural, one {Test notification sent to 1 device} other {Test notification sent to # devices}}",

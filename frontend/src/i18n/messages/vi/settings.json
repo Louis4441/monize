@@ -267,6 +267,7 @@
         "enableFailed": "Không thể bật thông báo đẩy",
         "permissionDenied": "Trình duyệt này đang chặn thông báo của Monize. Hãy cho phép trong cài đặt trang web rồi thử lại.",
         "permissionDismissed": "Thông báo chưa được bật. Hãy chọn Cho phép khi trình duyệt hỏi.",
+        "permissionNoPrompt": "Thông báo chưa được bật. Nếu không có hộp thoại xin quyền nào xuất hiện, hãy xóa Monize khỏi Màn hình chính, thêm lại (Chia sẻ, rồi Thêm vào MH chính) và thử lại.",
         "removed": "Đã xóa thiết bị",
         "removeFailed": "Không thể xóa thiết bị",
         "testSent": "{count, plural, other {Đã gửi thông báo thử nghiệm tới # thiết bị}}",

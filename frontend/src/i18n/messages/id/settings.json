@@ -267,6 +267,7 @@
         "enableFailed": "Tidak dapat mengaktifkan notifikasi push",
         "permissionDenied": "Peramban ini memblokir notifikasi Monize. Izinkan di pengaturan situs lalu coba lagi.",
         "permissionDismissed": "Notifikasi tidak diaktifkan. Pilih Izinkan saat peramban bertanya.",
+        "permissionNoPrompt": "Notifikasi tidak diaktifkan. Jika tidak ada permintaan izin yang muncul, hapus Monize dari Layar Utama, tambahkan lagi (Bagikan, lalu Tambahkan ke Layar Utama), dan coba sekali lagi.",
         "removed": "Perangkat dihapus",
         "removeFailed": "Tidak dapat menghapus perangkat",
         "testSent": "{count, plural, other {Notifikasi uji coba dikirim ke # perangkat}}",

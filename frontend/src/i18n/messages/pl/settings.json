@@ -267,6 +267,7 @@
         "enableFailed": "Nie udało się włączyć powiadomień push",
         "permissionDenied": "Ta przeglądarka blokuje powiadomienia Monize. Zezwól na nie w ustawieniach witryny i spróbuj ponownie.",
         "permissionDismissed": "Powiadomienia nie zostały włączone. Wybierz Zezwól, gdy przeglądarka zapyta.",
+        "permissionNoPrompt": "Powiadomienia nie zostały włączone. Jeśli pytanie o zgodę się nie pojawiło, usuń Monize z ekranu początkowego, dodaj ją ponownie (Udostępnij, a następnie Dodaj do ekranu początkowego) i spróbuj jeszcze raz.",
         "removed": "Usunięto urządzenie",
         "removeFailed": "Nie udało się usunąć urządzenia",
         "testSent": "{count, plural, one {Wysłano powiadomienie testowe na 1 urządzenie} few {Wysłano powiadomienie testowe na # urządzenia} many {Wysłano powiadomienie testowe na # urządzeń} other {Wysłano powiadomienie testowe na # urządzenia}}",

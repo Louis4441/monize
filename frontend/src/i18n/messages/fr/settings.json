@@ -267,6 +267,7 @@
         "enableFailed": "Impossible d'activer les notifications push",
         "permissionDenied": "Ce navigateur bloque les notifications de Monize. Autorisez-les dans les paramètres du site puis réessayez.",
         "permissionDismissed": "Les notifications n'ont pas été activées. Choisissez Autoriser lorsque le navigateur vous le demande.",
+        "permissionNoPrompt": "Les notifications n'ont pas été activées. Si aucune demande n'est apparue, retirez Monize de l'écran d'accueil, rajoutez-le (Partager, puis Sur l'écran d'accueil) et réessayez.",
         "removed": "Appareil supprimé",
         "removeFailed": "Impossible de supprimer l'appareil",
         "testSent": "{count, plural, one {Notification de test envoyée à 1 appareil} other {Notification de test envoyée à # appareils}}",

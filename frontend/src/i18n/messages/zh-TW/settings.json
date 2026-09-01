@@ -267,6 +267,7 @@
         "enableFailed": "無法啟用推播通知",
         "permissionDenied": "此瀏覽器正在封鎖 Monize 的通知。請在網站設定中允許後再試。",
         "permissionDismissed": "未啟用通知。瀏覽器詢問時請選擇「允許」。",
+        "permissionNoPrompt": "未啟用通知。若沒有出現授權提示，請將 Monize 從主畫面移除，透過「分享」中的「加入主畫面」重新加入，然後再試一次。",
         "removed": "已移除裝置",
         "removeFailed": "無法移除裝置",
         "testSent": "{count, plural, other {測試通知已傳送至 # 台裝置}}",

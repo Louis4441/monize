@@ -127,6 +127,20 @@ function isIos(nav: Navigator): boolean {
   );
 }
 
+/**
+ * Whether this is Monize running as an installed iOS web app.
+ *
+ * The one platform where "the prompt never appeared" is a real outcome rather
+ * than a user dismissing it, so it is the one platform whose refusal message
+ * has to say something different. See `requestNotificationPermission`.
+ */
+export function isInstalledIosWebApp(
+  win: Window = window,
+  nav: Navigator = navigator,
+): boolean {
+  return isIos(nav) && isStandalone(win);
+}
+
 function isStandalone(win: Window): boolean {
   const iosStandalone = (win.navigator as Navigator & { standalone?: boolean })
     .standalone;
@@ -249,11 +263,57 @@ export class PushPermissionError extends Error {
 }
 
 /**
+ * Ask for notification permission across both spellings of the API.
+ *
+ * `Notification.requestPermission()` returns a promise in every current
+ * browser and `undefined` in the older WebKit builds that only implement the
+ * callback form -- and `await undefined` is `undefined`, which is not
+ * `'granted'`, so the caller reports a refusal the user was never asked for.
+ * The callback argument is still in the specification and is ignored by
+ * browsers that return a promise, so passing both covers either shape without
+ * a feature test that cannot be written before the call.
+ *
+ * Deliberately unbounded: an open permission prompt the user has not answered
+ * is not a timeout, and resolving early would register a device the browser
+ * will never deliver to.
+ *
+ * **Must be reached from a live user gesture.** On iOS the prompt is dropped
+ * silently -- resolving `'default'` with nothing shown -- once the transient
+ * activation from the click has been spent, which is why the caller starts
+ * this before any `await` and before any state update.
+ */
+export function requestNotificationPermission(): Promise<NotificationPermission> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = (permission: NotificationPermission) => {
+      if (settled) return;
+      settled = true;
+      resolve(permission);
+    };
+    const returned = Notification.requestPermission(settle) as
+      | Promise<NotificationPermission>
+      | undefined;
+    if (typeof returned?.then === 'function') {
+      // A rejection is not an answer, so fall back to what the browser now
+      // holds rather than inventing one.
+      returned.then(settle, () => settle(Notification.permission));
+    }
+  });
+}
+
+/**
  * Ask the browser for permission and register this device.
  *
  * The permission request is made here, on a user's click, and never on page
  * load: a prompt that arrives before anyone has asked for notifications is the
  * one users answer with "Block", and `denied` is not something the app can undo.
+ *
+ * It is also the FIRST thing this function does, and callers must reach it
+ * without an `await` in between: the browser only shows the prompt while the
+ * click's transient activation lasts, and iOS spends that on the first
+ * suspension -- after which `requestPermission` resolves `'default'` with
+ * nothing shown and the user is told to grant a permission they were never
+ * asked for.
  *
  * Re-uses an existing browser subscription when there is one, and replaces it
  * when it was minted under a different key -- after an instance rotates its key
@@ -270,7 +330,7 @@ export async function enablePushOnThisDevice(
   publicKey: string,
   deviceName?: string,
 ): Promise<PushDevice> {
-  const permission = await Notification.requestPermission();
+  const permission = await requestNotificationPermission();
   if (permission === 'denied') throw new PushPermissionError('denied');
   if (permission !== 'granted') throw new PushPermissionError('dismissed');
 

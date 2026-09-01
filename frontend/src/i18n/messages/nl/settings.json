@@ -267,6 +267,7 @@
         "enableFailed": "Pushmeldingen konden niet worden ingeschakeld",
         "permissionDenied": "Deze browser blokkeert meldingen van Monize. Sta ze toe in de site-instellingen en probeer het opnieuw.",
         "permissionDismissed": "Meldingen zijn niet ingeschakeld. Kies Toestaan wanneer de browser het vraagt.",
+        "permissionNoPrompt": "Meldingen zijn niet ingeschakeld. Als er geen venster verscheen, verwijder Monize van het beginscherm, voeg het opnieuw toe (Deel, dan Zet op beginscherm) en probeer het nogmaals.",
         "removed": "Apparaat verwijderd",
         "removeFailed": "Apparaat kon niet worden verwijderd",
         "testSent": "{count, plural, one {Testmelding verstuurd naar 1 apparaat} other {Testmelding verstuurd naar # apparaten}}",

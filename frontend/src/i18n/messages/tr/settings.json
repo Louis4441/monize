@@ -267,6 +267,7 @@
         "enableFailed": "Anlık bildirimler etkinleştirilemedi",
         "permissionDenied": "Bu tarayıcı Monize bildirimlerini engelliyor. Site ayarlarından izin verip yeniden deneyin.",
         "permissionDismissed": "Bildirimler etkinleştirilmedi. Tarayıcı sorduğunda İzin Ver'i seçin.",
+        "permissionNoPrompt": "Bildirimler etkinleştirilmedi. Herhangi bir izin isteği görünmediyse Monize uygulamasını ana ekrandan kaldırın, Paylaş ve ardından Ana Ekrana Ekle ile yeniden ekleyin ve tekrar deneyin.",
         "removed": "Cihaz kaldırıldı",
         "removeFailed": "Cihaz kaldırılamadı",
         "testSent": "{count, plural, one {Test bildirimi 1 cihaza gönderildi} other {Test bildirimi # cihaza gönderildi}}",

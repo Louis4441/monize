@@ -267,6 +267,7 @@
         "enableFailed": "Não foi possível ativar as notificações push",
         "permissionDenied": "Este navegador está a bloquear as notificações do Monize. Permita-as nas definições do site e tente novamente.",
         "permissionDismissed": "As notificações não foram ativadas. Escolha Permitir quando o navegador perguntar.",
+        "permissionNoPrompt": "As notificações não foram ativadas. Se não apareceu nenhum pedido, remova o Monize do ecrã principal, volte a adicioná-lo (Partilhar e depois Adicionar ao ecrã principal) e tente novamente.",
         "removed": "Dispositivo removido",
         "removeFailed": "Não foi possível remover o dispositivo",
         "testSent": "{count, plural, one {Notificação de teste enviada para 1 dispositivo} other {Notificação de teste enviada para # dispositivos}}",

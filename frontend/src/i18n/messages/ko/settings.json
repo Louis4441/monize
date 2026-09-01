@@ -267,6 +267,7 @@
         "enableFailed": "푸시 알림을 켤 수 없습니다",
         "permissionDenied": "이 브라우저가 Monize 알림을 차단하고 있습니다. 사이트 설정에서 허용한 뒤 다시 시도하세요.",
         "permissionDismissed": "알림이 켜지지 않았습니다. 브라우저가 물으면 허용을 선택하세요.",
+        "permissionNoPrompt": "알림이 활성화되지 않았습니다. 권한 요청 창이 표시되지 않았다면 홈 화면에서 Monize를 삭제한 뒤 공유 > 홈 화면에 추가로 다시 추가하고 한 번 더 시도하세요.",
         "removed": "기기를 삭제했습니다",
         "removeFailed": "기기를 삭제할 수 없습니다",
         "testSent": "{count, plural, other {기기 #대에 테스트 알림을 보냈습니다}}",
