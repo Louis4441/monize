@@ -238,6 +238,7 @@
     "push": {
       "heading": "Browser-Push",
       "description": "Dieses Gerät registrieren, damit Monize es auch bei geschlossener App erreichen kann. Bisher wird auf diesem Weg nur die Testbenachrichtigung zugestellt; alles andere landet weiterhin in der Glocke.",
+      "permissionHint": "Wenn Sie dies aktivieren, fragt Ihr Browser um Erlaubnis, Benachrichtigungen anzuzeigen. Vorher wird nichts gesendet.",
       "enableButton": "Auf diesem Gerät aktivieren",
       "enablingButton": "Wird aktiviert ...",
       "sendTestButton": "Testbenachrichtigung senden",
@@ -267,8 +268,9 @@
         "enabled": "Push-Benachrichtigungen auf diesem Gerät aktiviert",
         "enableFailed": "Push-Benachrichtigungen konnten nicht aktiviert werden",
         "permissionDenied": "Dieser Browser blockiert Benachrichtigungen für Monize. Erlauben Sie sie in den Website-Einstellungen und versuchen Sie es erneut.",
+        "permissionDeniedIos": "Benachrichtigungen sind für Monize blockiert. Öffnen Sie die iOS-Einstellungen, dann Mitteilungen, dann Monize, um sie zu erlauben.",
         "permissionDismissed": "Benachrichtigungen wurden nicht aktiviert. Wählen Sie „Zulassen“, wenn der Browser fragt.",
-        "permissionNoPrompt": "Benachrichtigungen wurden nicht aktiviert. Falls keine Abfrage erschien, entfernen Sie Monize vom Home-Bildschirm, fügen Sie es erneut hinzu (Teilen, dann Zum Home-Bildschirm) und versuchen Sie es noch einmal.",
+        "permissionNoPrompt": "Benachrichtigungen wurden nicht aktiviert, und es erschien keine Abfrage. Öffnen Sie die iOS-Einstellungen, dann Mitteilungen, dann Monize, und erlauben Sie sie dort. Falls Monize nicht aufgeführt ist, entfernen Sie es vom Home-Bildschirm, fügen Sie es erneut hinzu (Teilen, dann Zum Home-Bildschirm) und versuchen Sie es noch einmal.",
         "removed": "Gerät entfernt",
         "removeFailed": "Gerät konnte nicht entfernt werden",
         "testSent": "{count, plural, one {Testbenachrichtigung an 1 Gerät gesendet} other {Testbenachrichtigung an # Geräte gesendet}}",

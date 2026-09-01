@@ -238,6 +238,7 @@
     "push": {
       "heading": "Browserpush",
       "description": "Registreer dit apparaat zodat Monize het ook kan bereiken als de app gesloten is. Voorlopig wordt alleen de testmelding zo bezorgd; al het andere komt nog steeds in de bel.",
+      "permissionHint": "Als je dit aanzet, vraagt je browser toestemming om meldingen te tonen. Er wordt niets verzonden voordat je die geeft.",
       "enableButton": "Inschakelen op dit apparaat",
       "enablingButton": "Inschakelen...",
       "sendTestButton": "Testmelding versturen",
@@ -267,8 +268,9 @@
         "enabled": "Pushmeldingen ingeschakeld op dit apparaat",
         "enableFailed": "Pushmeldingen konden niet worden ingeschakeld",
         "permissionDenied": "Deze browser blokkeert meldingen van Monize. Sta ze toe in de site-instellingen en probeer het opnieuw.",
+        "permissionDeniedIos": "Meldingen zijn geblokkeerd voor Monize. Open iOS-instellingen, dan Meldingen, dan Monize, om ze toe te staan.",
         "permissionDismissed": "Meldingen zijn niet ingeschakeld. Kies Toestaan wanneer de browser het vraagt.",
-        "permissionNoPrompt": "Meldingen zijn niet ingeschakeld. Als er geen venster verscheen, verwijder Monize van het beginscherm, voeg het opnieuw toe (Deel, dan Zet op beginscherm) en probeer het nogmaals.",
+        "permissionNoPrompt": "Meldingen zijn niet aangezet en er verscheen geen verzoek. Open iOS-instellingen, dan Meldingen, dan Monize, en sta ze daar toe. Staat Monize er niet bij, verwijder het dan van het beginscherm, voeg het opnieuw toe (Deel, dan Zet op beginscherm) en probeer het nog eens.",
         "removed": "Apparaat verwijderd",
         "removeFailed": "Apparaat kon niet worden verwijderd",
         "testSent": "{count, plural, one {Testmelding verstuurd naar 1 apparaat} other {Testmelding verstuurd naar # apparaten}}",

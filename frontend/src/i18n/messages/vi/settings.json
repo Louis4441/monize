@@ -238,6 +238,7 @@
     "push": {
       "heading": "Đẩy từ trình duyệt",
       "description": "Đăng ký thiết bị này để Monize có thể gửi tới nó ngay cả khi ứng dụng đã đóng. Hiện chỉ có thông báo thử nghiệm được gửi theo đường này; mọi thứ khác vẫn đến ở chuông.",
+      "permissionHint": "Khi bạn bật, trình duyệt sẽ xin quyền hiển thị thông báo. Không có gì được gửi trước khi bạn cho phép.",
       "enableButton": "Bật trên thiết bị này",
       "enablingButton": "Đang bật...",
       "sendTestButton": "Gửi thông báo thử nghiệm",
@@ -267,8 +268,9 @@
         "enabled": "Đã bật thông báo đẩy trên thiết bị này",
         "enableFailed": "Không thể bật thông báo đẩy",
         "permissionDenied": "Trình duyệt này đang chặn thông báo của Monize. Hãy cho phép trong cài đặt trang web rồi thử lại.",
+        "permissionDeniedIos": "Thông báo đang bị chặn với Monize. Mở Cài đặt iOS, rồi Thông báo, rồi Monize để cho phép.",
         "permissionDismissed": "Thông báo chưa được bật. Hãy chọn Cho phép khi trình duyệt hỏi.",
-        "permissionNoPrompt": "Thông báo chưa được bật. Nếu không có hộp thoại xin quyền nào xuất hiện, hãy xóa Monize khỏi Màn hình chính, thêm lại (Chia sẻ, rồi Thêm vào MH chính) và thử lại.",
+        "permissionNoPrompt": "Thông báo chưa được bật và không có hộp thoại nào xuất hiện. Mở Cài đặt iOS, rồi Thông báo, rồi Monize, và cho phép ở đó. Nếu không thấy Monize trong danh sách, hãy xóa khỏi Màn hình chính, thêm lại (Chia sẻ, rồi Thêm vào Màn hình chính) và thử lần nữa.",
         "removed": "Đã xóa thiết bị",
         "removeFailed": "Không thể xóa thiết bị",
         "testSent": "{count, plural, other {Đã gửi thông báo thử nghiệm tới # thiết bị}}",

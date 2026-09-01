@@ -238,6 +238,7 @@
     "push": {
       "heading": "Tarayıcı anlık bildirimi",
       "description": "Bu cihazı kaydedin, böylece uygulama kapalıyken de Monize ona ulaşabilir. Şimdilik bu yolla yalnızca test bildirimi teslim ediliyor; diğer her şey yine zil simgesine geliyor.",
+      "permissionHint": "Bunu açtığınızda tarayıcınız bildirim gösterme izni ister. İzin verilene kadar hiçbir şey gönderilmez.",
       "enableButton": "Bu cihazda etkinleştir",
       "enablingButton": "Etkinleştiriliyor...",
       "sendTestButton": "Test bildirimi gönder",
@@ -267,8 +268,9 @@
         "enabled": "Bu cihazda anlık bildirimler etkinleştirildi",
         "enableFailed": "Anlık bildirimler etkinleştirilemedi",
         "permissionDenied": "Bu tarayıcı Monize bildirimlerini engelliyor. Site ayarlarından izin verip yeniden deneyin.",
+        "permissionDeniedIos": "Monize için bildirimler engellenmiş. İzin vermek için iOS Ayarlar'ı, sonra Bildirimler'i, sonra Monize'yi açın.",
         "permissionDismissed": "Bildirimler etkinleştirilmedi. Tarayıcı sorduğunda İzin Ver'i seçin.",
-        "permissionNoPrompt": "Bildirimler etkinleştirilmedi. Herhangi bir izin isteği görünmediyse Monize uygulamasını ana ekrandan kaldırın, Paylaş ve ardından Ana Ekrana Ekle ile yeniden ekleyin ve tekrar deneyin.",
+        "permissionNoPrompt": "Bildirimler açılmadı ve hiçbir istek görünmedi. iOS Ayarlar'ı açın, sonra Bildirimler, sonra Monize, ve orada izin verin. Monize listede yoksa ana ekrandan kaldırın, yeniden ekleyin (Paylaş, sonra Ana Ekrana Ekle) ve bir daha deneyin.",
         "removed": "Cihaz kaldırıldı",
         "removeFailed": "Cihaz kaldırılamadı",
         "testSent": "{count, plural, one {Test bildirimi 1 cihaza gönderildi} other {Test bildirimi # cihaza gönderildi}}",

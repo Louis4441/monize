@@ -381,6 +381,39 @@ states the user changes *elsewhere* and then comes back, so the panel re-reads
 them when the page becomes visible. Read once on mount, it kept telling the user
 the browser had refused after they had allowed it, with the Enable button hidden.
 
+### The notification permission is asked for once, from a click
+
+`Notification.requestPermission()` appears in exactly one file -- `lib/push.ts`,
+reached through `enablePushOnThisDevice` -- and
+`lib/push-permission-request.guard.test.ts` fails on a second call site. The rule
+is not politeness, it is what works: **there is no way to grant this permission at
+install time** (no manifest field, no API), and a request without a user gesture
+is refused rather than shown -- Firefox has required one since 72, Chrome quiets
+the prompt for origins with a poor grant rate, and iOS shows it only inside an
+installed web app. A permission an origin loses this way cannot be asked for
+again, which is why the news-site pattern (ask on page load) is the one shape this
+must never take.
+
+So "install with notifications" is really **ask at the right moment, with a
+button**, and `pushPromptState` (`lib/push.ts`) decides that moment.
+`PushEnableBanner` renders its three answers app-wide, and two of them carry no
+button because nothing a button could do would help: an iPhone in a Safari tab
+needs the Home Screen app first, and a browser already refusing can only be
+undone in its own settings -- **iOS Settings, then Notifications, then Monize**
+for an installed app, not any site settings. Those two states are exactly what
+the product had nothing to say about, and the reported experience was a user
+deleting the PWA to find out.
+
+Two mechanics that keep it honest. `handleEnable` is **not** an `async` function
+in either surface: iOS spends the click's transient activation on the first
+suspension, so the request has to be the first thing the handler does -- written
+`async () => { setBusy(true); await enable() }` it asks for a permission the user
+is then told they did not grant, with no prompt ever shown. And the dismissal is
+remembered per account **and** per kind (`monize.push.promptDismissed`): the
+account for the reason the registered-endpoint marker carries one, and the kind
+because waving away the offer says nothing about wanting to know, later, that the
+browser has started blocking Monize.
+
 ### A password field declares what may be autofilled into it
 
 Every `<Input type="password">` carries an `autoComplete`: `current-password` when it really is this account's password, `new-password` when one is being set here, `off` when it is not a credential of this site at all. Omitting it is not neutral -- a password manager fills a bare box with the saved credential, and the form submits it as typed: the AI provider's API key field silently replaced the stored key ("Saved" on screen, provider dead, row shows `****` either way), and the backup export password is the same shape and worse. `ui-conventions.test.ts` fails on a password input with no `autoComplete`, and on a value outside those three.

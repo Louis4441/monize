@@ -283,7 +283,15 @@ export function PushDevicesPanel() {
    * sends them to look for a dialogue that is not coming.
    */
   const permissionMessage = (error: PushPermissionError): string => {
-    if (error.reason === 'denied') return t('toasts.permissionDenied');
+    if (error.reason === 'denied') {
+      // On an installed iOS app the block is in iOS Settings, not in any
+      // browser's site settings -- and sending the reader to look for a menu
+      // their device does not have is how "there is no information anywhere
+      // about how to do it" happens.
+      return isInstalledIosWebApp()
+        ? t('toasts.permissionDeniedIos')
+        : t('toasts.permissionDenied');
+    }
     return isInstalledIosWebApp()
       ? t('toasts.permissionNoPrompt')
       : t('toasts.permissionDismissed');
@@ -425,6 +433,15 @@ export function PushDevicesPanel() {
             </li>
           ))}
         </ul>
+      )}
+
+      {/* Said BEFORE the click, not after it fails. The reported experience was
+          clicking Enable and being told permission had not been granted, by an
+          app that had never mentioned a permission was involved. */}
+      {!registeredHere && !unsupportedReason && (
+        <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
+          {t('permissionHint')}
+        </p>
       )}
 
       <div className="flex flex-wrap gap-2">

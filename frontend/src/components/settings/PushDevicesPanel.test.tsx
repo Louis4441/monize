@@ -579,7 +579,7 @@ describe('PushDevicesPanel', () => {
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(
-        expect.stringMatching(/If no prompt appeared/i),
+        expect.stringMatching(/no prompt appeared[\s\S]*iOS Settings/i),
       ),
     );
   });

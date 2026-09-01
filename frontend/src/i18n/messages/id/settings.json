@@ -238,6 +238,7 @@
     "push": {
       "heading": "Push peramban",
       "description": "Daftarkan perangkat ini agar Monize dapat menghubunginya bahkan saat aplikasi ditutup. Untuk saat ini hanya notifikasi uji yang dikirim lewat jalur ini; sisanya tetap masuk ke bel.",
+      "permissionHint": "Saat Anda mengaktifkannya, peramban akan meminta izin untuk menampilkan notifikasi. Tidak ada yang dikirim sebelum Anda mengizinkan.",
       "enableButton": "Aktifkan di perangkat ini",
       "enablingButton": "Mengaktifkan...",
       "sendTestButton": "Kirim notifikasi uji coba",
@@ -267,8 +268,9 @@
         "enabled": "Notifikasi push diaktifkan di perangkat ini",
         "enableFailed": "Tidak dapat mengaktifkan notifikasi push",
         "permissionDenied": "Peramban ini memblokir notifikasi Monize. Izinkan di pengaturan situs lalu coba lagi.",
+        "permissionDeniedIos": "Notifikasi diblokir untuk Monize. Buka Pengaturan iOS, lalu Notifikasi, lalu Monize, untuk mengizinkannya.",
         "permissionDismissed": "Notifikasi tidak diaktifkan. Pilih Izinkan saat peramban bertanya.",
-        "permissionNoPrompt": "Notifikasi tidak diaktifkan. Jika tidak ada permintaan izin yang muncul, hapus Monize dari Layar Utama, tambahkan lagi (Bagikan, lalu Tambahkan ke Layar Utama), dan coba sekali lagi.",
+        "permissionNoPrompt": "Notifikasi tidak diaktifkan dan tidak ada permintaan yang muncul. Buka Pengaturan iOS, lalu Notifikasi, lalu Monize, dan izinkan di sana. Jika Monize tidak ada dalam daftar, hapus dari Layar Utama, tambahkan kembali (Bagikan, lalu Tambah ke Layar Utama) lalu coba sekali lagi.",
         "removed": "Perangkat dihapus",
         "removeFailed": "Tidak dapat menghapus perangkat",
         "testSent": "{count, plural, other {Notifikasi uji coba dikirim ke # perangkat}}",

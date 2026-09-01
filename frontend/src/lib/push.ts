@@ -614,6 +614,125 @@ export function readRegisteredEndpoint(): RegisteredEndpointMarker | null {
 }
 
 /**
+ * Whether Monize should ASK for notifications, and what it can honestly offer.
+ *
+ * There is no way to grant this permission at install time: the web app manifest
+ * has no such field, and `Notification.requestPermission()` is the only door --
+ * per origin, from a user gesture. So "install with notifications" is really
+ * "ask at the right moment, with a button", and the moment is what this decides.
+ *
+ * It is deliberately NOT what a news site does. Those call
+ * `requestPermission()` on page load, which browsers now punish rather than
+ * honour: Firefox has required a user gesture since 72 and shows nothing
+ * without one, Chrome quiets the prompt for origins with a poor grant rate, and
+ * iOS shows it only inside an installed web app. So the browser prompt here is
+ * always behind a click on our own copy, which explains what the notifications
+ * are for first.
+ *
+ * Three answers, because the reader's next action differs in each -- and the
+ * two that offer no button are the ones Monize had nothing to say about at all:
+ * an iPhone user in a Safari tab, and anybody who has already refused.
+ */
+export type PushPromptState =
+  /** One click away: our copy, then the browser's own prompt. */
+  | { kind: 'enable' }
+  /** iOS in a browser tab. Push needs the Home Screen app first. */
+  | { kind: 'install-ios' }
+  /** Refused. Only the browser's own settings can undo it. */
+  | { kind: 'blocked'; installedIosWebApp: boolean }
+  /** Nothing worth saying: already registered, unavailable, or not yet known. */
+  | null;
+
+export function pushPromptState(input: {
+  /** Whether this deployment offers push at all, and can. */
+  channelAvailable: boolean;
+  /** `getPushSupport()`, or null before it has been read. */
+  support: PushSupport | null;
+  /** Whether this browser already holds a live registration for the reader. */
+  registeredHere: boolean;
+  /** Whether this window is Monize installed on iOS. */
+  installedIosWebApp: boolean;
+}): PushPromptState {
+  const { channelAvailable, support, registeredHere, installedIosWebApp } =
+    input;
+  // An unavailable channel is an administrator's business, not a banner's; a
+  // device already registered has nothing to be asked for; and `null` support
+  // means the read has not happened, which is not the same as a refusal.
+  if (!channelAvailable || registeredHere || support === null) return null;
+  if (support.supported) return { kind: 'enable' };
+  if (support.reason === 'denied') return { kind: 'blocked', installedIosWebApp };
+  if (support.reason === 'ios-browser') return { kind: 'install-ios' };
+  // 'unsupported': there is no instruction that would help, so there is no ask.
+  return null;
+}
+
+const PROMPT_DISMISSED_KEY = 'monize.push.promptDismissed';
+
+interface PromptDismissal {
+  userId: string;
+  kinds: string[];
+}
+
+/**
+ * Whether this reader has already waved a given prompt away.
+ *
+ * Per account as well as per kind, for the reason the registered-endpoint marker
+ * is: `localStorage` belongs to a browser profile and this decision belongs to a
+ * person, so one account dismissing the ask must not silence it for the next
+ * person to sign in. Per KIND because the three states ask for different things:
+ * waving away "enable" says nothing about wanting to know that the browser is
+ * blocking Monize later on.
+ */
+export function pushPromptDismissed(
+  userId: string | null,
+  kind: string,
+): boolean {
+  if (userId === null) return false;
+  const stored = readDismissal();
+  return stored !== null && stored.userId === userId && stored.kinds.includes(kind);
+}
+
+export function rememberPushPromptDismissal(
+  userId: string | null,
+  kind: string,
+): void {
+  if (userId === null) return;
+  const stored = readDismissal();
+  const kinds =
+    stored !== null && stored.userId === userId
+      ? [...new Set([...stored.kinds, kind])]
+      : [kind];
+  try {
+    window.localStorage.setItem(
+      PROMPT_DISMISSED_KEY,
+      JSON.stringify({ userId, kinds } satisfies PromptDismissal),
+    );
+  } catch {
+    // Storage blocked. The banner then reappears next load, which is the
+    // behaviour before it could be dismissed -- annoying, never destructive.
+  }
+}
+
+function readDismissal(): PromptDismissal | null {
+  try {
+    const raw = window.localStorage.getItem(PROMPT_DISMISSED_KEY);
+    if (raw === null) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed === null || typeof parsed !== 'object') return null;
+    const value = parsed as Partial<PromptDismissal>;
+    if (typeof value.userId !== 'string' || !Array.isArray(value.kinds)) {
+      return null;
+    }
+    return {
+      userId: value.userId,
+      kinds: value.kinds.filter((kind): kind is string => typeof kind === 'string'),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * What this browser's push registration is, relative to the server's rows.
  *
  * `rotated` and `revoked` are the two ways "the server has no live row for the

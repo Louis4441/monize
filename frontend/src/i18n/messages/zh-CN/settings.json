@@ -238,6 +238,7 @@
     "push": {
       "heading": "浏览器推送",
       "description": "注册此设备，Monize 即可在应用关闭时也送达通知。目前通过这条通道送达的只有测试通知，其余仍然出现在铃铛里。",
+      "permissionHint": "开启后，浏览器会请求显示通知的权限。在你允许之前不会发送任何内容。",
       "enableButton": "在此设备上启用",
       "enablingButton": "正在启用...",
       "sendTestButton": "发送测试通知",
@@ -267,8 +268,9 @@
         "enabled": "已在此设备上启用推送通知",
         "enableFailed": "无法启用推送通知",
         "permissionDenied": "此浏览器正在阻止 Monize 的通知。请在网站设置中允许后重试。",
+        "permissionDeniedIos": "Monize 的通知已被阻止。请打开 iOS“设置”，然后“通知”，再选择 Monize 以允许。",
         "permissionDismissed": "未启用通知。浏览器询问时请选择“允许”。",
-        "permissionNoPrompt": "未启用通知。如果没有出现授权提示，请将 Monize 从主屏幕移除，通过“共享”中的“添加到主屏幕”重新添加，然后再试一次。",
+        "permissionNoPrompt": "通知未开启，也没有出现任何请求。请打开 iOS“设置”，然后“通知”，再选择 Monize 并允许。如果列表中没有 Monize，请从主屏幕移除后重新添加（“分享”，然后“添加到主屏幕”），再试一次。",
         "removed": "已移除设备",
         "removeFailed": "无法移除设备",
         "testSent": "{count, plural, other {测试通知已发送至 # 台设备}}",

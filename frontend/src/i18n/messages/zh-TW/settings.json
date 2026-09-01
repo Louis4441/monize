@@ -238,6 +238,7 @@
     "push": {
       "heading": "瀏覽器推播",
       "description": "註冊此裝置，Monize 就能在應用程式關閉時也送達通知。目前透過這條通道送達的只有測試通知，其餘仍會出現在鈴鐺裡。",
+      "permissionHint": "開啟後，瀏覽器會請求顯示通知的權限。在你允許之前不會傳送任何內容。",
       "enableButton": "在此裝置啟用",
       "enablingButton": "啟用中...",
       "sendTestButton": "傳送測試通知",
@@ -267,8 +268,9 @@
         "enabled": "已在此裝置啟用推播通知",
         "enableFailed": "無法啟用推播通知",
         "permissionDenied": "此瀏覽器正在封鎖 Monize 的通知。請在網站設定中允許後再試。",
+        "permissionDeniedIos": "Monize 的通知已被封鎖。請開啟 iOS「設定」，然後「通知」，再選擇 Monize 以允許。",
         "permissionDismissed": "未啟用通知。瀏覽器詢問時請選擇「允許」。",
-        "permissionNoPrompt": "未啟用通知。若沒有出現授權提示，請將 Monize 從主畫面移除，透過「分享」中的「加入主畫面」重新加入，然後再試一次。",
+        "permissionNoPrompt": "通知未開啟，也沒有出現任何請求。請開啟 iOS「設定」，然後「通知」，再選擇 Monize 並允許。如果清單中沒有 Monize，請從主畫面移除後重新加入（「分享」，然後「加入主畫面」），再試一次。",
         "removed": "已移除裝置",
         "removeFailed": "無法移除裝置",
         "testSent": "{count, plural, other {測試通知已傳送至 # 台裝置}}",

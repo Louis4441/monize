@@ -238,6 +238,7 @@
     "push": {
       "heading": "[XX-Browser push-XX]",
       "description": "[XX-Register this device so Monize can reach it even when the app is closed. Only the test notification is delivered this way so far; everything else still arrives in the bell.-XX]",
+      "permissionHint": "[XX-When you turn this on, your browser asks for permission to show notifications. Nothing is sent until you allow it.-XX]",
       "enableButton": "[XX-Enable on this device-XX]",
       "enablingButton": "[XX-Enabling...-XX]",
       "sendTestButton": "[XX-Send test notification-XX]",
@@ -267,8 +268,9 @@
         "enabled": "[XX-Push notifications enabled on this device-XX]",
         "enableFailed": "[XX-Could not enable push notifications-XX]",
         "permissionDenied": "[XX-This browser is blocking notifications for Monize. Allow them in the browser’s site settings, then try again.-XX]",
+        "permissionDeniedIos": "[XX-Notifications are blocked for Monize. Open iOS Settings, then Notifications, then Monize to allow them.-XX]",
         "permissionDismissed": "[XX-Notifications were not enabled. Choose Allow when the browser asks.-XX]",
-        "permissionNoPrompt": "[XX-Notifications were not enabled. If no prompt appeared, remove Monize from the Home Screen, add it again (Share, then Add to Home Screen) and try once more.-XX]",
+        "permissionNoPrompt": "[XX-Notifications were not enabled, and no prompt appeared. Open iOS Settings, then Notifications, then Monize, and allow them there. If Monize is not listed, remove it from the Home Screen, add it again (Share, then Add to Home Screen) and try once more.-XX]",
         "removed": "[XX-Device removed-XX]",
         "removeFailed": "[XX-Could not remove the device-XX]",
         "testSent": "[XX-{count, plural, one {Test notification sent to 1 device} other {Test notification sent to # devices}}-XX]",
