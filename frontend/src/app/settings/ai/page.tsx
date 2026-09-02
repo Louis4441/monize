@@ -106,7 +106,10 @@ function AiSettingsContent() {
         )}
 
         <AiBubbleToggle disabled={isDemoMode} />
-        <PayeeContactLookupToggle disabled={isDemoMode} />
+        <PayeeContactLookupToggle
+          disabled={isDemoMode}
+          aiConfigured={status?.configured ?? false}
+        />
 
         <ProviderList
           configs={configs}

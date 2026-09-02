@@ -291,6 +291,21 @@ describe("PayeesService", () => {
       );
     });
 
+    it("does not dispatch when the caller will offer the lookup itself", async () => {
+      // The transaction page's quick-create runs the lookup and shows the
+      // confirmation dialogue. A background write here would pay for a second
+      // lookup and store values before the user has seen them.
+      await service.create(
+        userId,
+        { name: "Acme" },
+        {
+          deferContactLookup: true,
+        },
+      );
+
+      expect(contactEnrichment.dispatchAfterCreate).not.toHaveBeenCalled();
+    });
+
     it.each([
       ["website", { website: "acme.example" }],
       ["address", { address: "1 Main St" }],

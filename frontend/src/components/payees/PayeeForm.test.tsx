@@ -34,6 +34,13 @@ vi.mock('@/store/preferencesStore', () => ({
     selector({ preferences: { payeeContactLookupEnabled: mockLookupEnabled } }),
 }));
 
+// Whether an AI provider exists decides whether the lookup is offered at all;
+// the hook is mocked so each test states which world it is in.
+let mockAiConfigured = true;
+vi.mock('@/hooks/useAiConfigured', () => ({
+  useAiConfigured: () => ({ configured: mockAiConfigured, resolved: true }),
+}));
+
 describe('PayeeForm', () => {
   const categories = [
     { id: 'c1', name: 'Food', parentId: null },
@@ -390,11 +397,32 @@ describe('PayeeForm', () => {
       lookupContact.mockReset();
       lookupContact.mockResolvedValue({ reason: 'ok', suggestions: [suggestion] } as any);
       mockLookupEnabled = true;
+      mockAiConfigured = true;
     });
 
     function renderCreate() {
       render(<PayeeForm categories={categories} onSubmit={onSubmit} onCancel={onCancel} />);
     }
+
+    it('offers no lookup at all when no AI provider is configured', async () => {
+      // The provider is what answers, so without one the button would open on
+      // nothing and the blur would spend a request establishing that.
+      mockAiConfigured = false;
+      renderCreate();
+
+      expect(
+        screen.queryByRole('button', { name: 'Look up details' }),
+      ).not.toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.blur(screen.getByLabelText('Payee Name'), {
+          target: { value: 'Starbucks' },
+        });
+      });
+
+      expect(lookupContact).not.toHaveBeenCalled();
+    });
+
     const nameInput = () => screen.getByLabelText('Payee Name') as HTMLInputElement;
     const field = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
 

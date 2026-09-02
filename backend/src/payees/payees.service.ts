@@ -59,6 +59,15 @@ export interface CreatePayeeOptions {
    * lookup, which would otherwise repeat work the user already approved.
    */
   contactLookup?: ContactLookupStamp;
+
+  /**
+   * The caller is offering the lookup to the user itself (the transaction
+   * page's payee quick-create runs it and shows the confirmation dialogue), so
+   * the automatic background lookup must not also run and write. Without it
+   * the same payee is looked up twice -- two paid calls -- and the values the
+   * dialogue offers have already been stored behind the user.
+   */
+  deferContactLookup?: boolean;
 }
 
 export interface PreviewCreateOptions {
@@ -289,17 +298,21 @@ export class PayeesService {
       descriptionParams: { name: saved.name },
     });
 
-    // A payee created with no contact details at all -- a quick-create from
-    // the transaction form, a name-only AI/MCP row -- is looked up in the
-    // background, when the user has enabled that. Three conditions, each
-    // load-bearing: the preview path already looked up (its stamp travels in
-    // `options`); something was supplied (the user's own values are never
-    // second-guessed); and there is no ambient transaction, because this
+    // A payee created with no contact details at all -- a name-only AI/MCP
+    // row, a payee the server created while saving a transaction -- is looked
+    // up in the background, when the user has enabled that. Four conditions,
+    // each load-bearing: the preview path already looked up (its stamp travels
+    // in `options`); the caller is running the lookup itself and will ask the
+    // user (`deferContactLookup`), so a background write would both duplicate
+    // the cost and pre-empt the answer they are about to confirm; something
+    // was supplied (the user's own values are never second-guessed); and there
+    // is no ambient transaction, because this
     // runs after `withScopedDb` resolved, and "resolved" only means
     // "committed" when nobody upstream opened a transaction we joined -- a
     // dispatch inside one would look for a row nobody else can see yet.
     if (
       !options.contactLookup &&
+      !options.deferContactLookup &&
       !website &&
       !address &&
       !email &&

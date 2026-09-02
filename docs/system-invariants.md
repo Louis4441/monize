@@ -1946,8 +1946,16 @@ Enforcement         One statement, ENRICHMENT_UPDATE_SQL in
                     its own withScopedDb resolved with no ambient manager
                     (getActiveScopedManager() === undefined). The AI/MCP preview
                     looks up before the card and hands its stamp to the commit,
-                    which stores it instead of looking up again. The form path
-                    persists nothing until the user saves.
+                    which stores it instead of looking up again. A client that
+                    will show the answer for confirmation says so on the create
+                    (CreatePayeeDto.deferContactLookup, read by
+                    PayeesController as a CreatePayeeOptions field and never
+                    stored on the row), so the background lookup does not pay
+                    for a second call nor write values the user is still being
+                    asked about: the transaction page's payee quick-create runs
+                    POST /payees/:id/lookup-contact itself and opens the same
+                    confirmation dialogue. The form path persists nothing until
+                    the user saves.
                     A lookup given the payee's own stored details may answer with
                     a FULLER value for a field that already has one (the branch
                     address behind a stored "Toronto"), and may answer with more
@@ -1981,8 +1989,10 @@ Required tests      payee-contact-enrichment.service.spec.ts (COALESCE and
                     predicate shape, stamp-on-answer only, favicon keyed on the
                     website), payees.service.spec.ts (dispatch after the
                     transaction, never inside one, never with a supplied field
-                    or a preview stamp, notes carried in as context, and the
-                    detail-screen lookup writing nothing),
+                    or a preview stamp, never when the caller defers it, notes
+                    carried in as context, and the detail-screen lookup writing
+                    nothing), payees.controller.spec.ts (deferContactLookup
+                    travels as an option, never as a payee field),
                     contact-suggestion.sanitize.spec.ts (a refinement is named,
                     an echo is dropped, candidates are capped and must be
                     distinguishable), lookup-context.spec.ts (what leaves the
@@ -1991,7 +2001,9 @@ Required tests      payee-contact-enrichment.service.spec.ts (COALESCE and
                     typed) and PayeeKeyInfoCard.test.tsx (nothing is written
                     until the dialogue is confirmed, a cancel writes nothing, and
                     the picked candidate is the one saved),
-                    raw-sql-columns.spec.ts (column names against schema.sql). Owed: a two-connection race with a
+                    TransactionForm.test.tsx (a payee created there defers the
+                    background lookup, runs its own and saves nothing until the
+                    dialogue is confirmed), raw-sql-columns.spec.ts (column names against schema.sql). Owed: a two-connection race with a
                     concurrent user edit, per docs/verification-contract.md.
 Status              enforced
 ```

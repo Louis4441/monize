@@ -160,13 +160,7 @@ export class PayeeContactEnrichmentService {
     };
 
     const written = await withScopedDb(this.dataSource, (m) =>
-      this.write(
-        m,
-        userId,
-        payeeId,
-        values,
-        suggestion?.source ?? null,
-      ),
+      this.write(m, userId, payeeId, values, suggestion?.source ?? null),
     );
     if (!written || written.filled.length === 0) {
       return { reason: outcome.reason, filled: [] };

@@ -49,6 +49,9 @@ import { Category } from '@/types/category';
 import { Account, TransferCandidate } from '@/types/account';
 import { Tag } from '@/types/tag';
 import { ReactivatePayeeDialog } from '@/components/payees/ReactivatePayeeDialog';
+import { ContactLookupDialog } from '@/components/payees/ContactLookupDialog';
+import { useAiConfigured } from '@/hooks/useAiConfigured';
+import { usePayeeContactLookup } from '@/hooks/usePayeeContactLookup';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { buildCategoryTree } from '@/lib/categoryUtils';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -189,6 +192,26 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
   // Tracks whether the current categoryId was set by the asset-account auto-fill
   // (so we can clear it when switching away to a non-asset account).
   const categoryWasAutoSetRef = useRef<boolean>(!initSource && !!defaultCategoryId);
+
+  // ─── new payee's contact details ──────────────────────────────────────
+  //
+  // Creating a payee here gives it a name and nothing else, so the lookup runs
+  // on the payee that was just created and offers what it found. Nothing is
+  // stored until the user confirms: the create tells the server not to run its
+  // own background lookup (`deferContactLookup`), because two lookups would be
+  // two paid calls and the second one would write values behind the dialogue
+  // the user is still reading.
+  const payeeLookupEnabled = usePreferencesStore(
+    (s) => s.preferences?.payeeContactLookupEnabled ?? false,
+  );
+  const { configured: aiConfigured } = useAiConfigured();
+  // Both conditions, because either one missing makes the lookup impossible:
+  // the preference is the user asking for it, the provider is what answers.
+  const offerContactLookup = payeeLookupEnabled && aiConfigured;
+  const contactLookup = usePayeeContactLookup({
+    onApplied: (saved) =>
+      setPayees((prev) => prev.map((p) => (p.id === saved.id ? saved : p))),
+  });
 
   // Reactivation modal state
   const [inactivePayeeMatch, setInactivePayeeMatch] = useState<Payee | null>(null);
@@ -660,7 +683,10 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
         return;
       }
 
-      const newPayee = await payeesApi.create({ name: name.trim() });
+      const newPayee = await payeesApi.create({
+        name: name.trim(),
+        ...(offerContactLookup ? { deferContactLookup: true } : {}),
+      });
       // Add to payees list
       setPayees(prev => [...prev, newPayee]);
       // Select the new payee
@@ -668,6 +694,11 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
       setValue('payeeId', newPayee.id, { shouldDirty: true, shouldValidate: true });
       setValue('payeeName', newPayee.name, { shouldDirty: true, shouldValidate: true });
       toast.success(t('form.toasts.payeeCreated', { name }));
+      if (offerContactLookup) {
+        // The user did not ask for this lookup by name, so a "nothing found"
+        // or a failure stays quiet -- they came here to enter a transaction.
+        void contactLookup.lookUp(newPayee, { announce: false });
+      }
     } catch (error) {
       logger.error('Failed to create payee:', error);
       toast.error(getErrorMessage(error, t('form.toasts.payeeCreateFailed')));
@@ -1728,6 +1759,19 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
         onSubmitOptionChange={(id) => setSubmitMode(id === 'new' ? 'new' : 'close')}
         submitOptionsLabel={t('form.submitOptions')}
       />
+
+      {/* What the lookup found for the payee just created -- an offer, saved
+          only for the fields the user ticks. */}
+      {contactLookup.target && (
+        <ContactLookupDialog
+          isOpen
+          payee={contactLookup.target}
+          suggestions={contactLookup.candidates}
+          saving={contactLookup.saving}
+          onCancel={contactLookup.dismiss}
+          onConfirm={contactLookup.apply}
+        />
+      )}
 
       {/* Reactivate Payee Dialog */}
       <ReactivatePayeeDialog

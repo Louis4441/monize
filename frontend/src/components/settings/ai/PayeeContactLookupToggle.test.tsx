@@ -35,14 +35,22 @@ beforeEach(() => {
 });
 
 describe('PayeeContactLookupToggle', () => {
+  it('is not offered at all when no AI provider is configured', () => {
+    // Nothing would run the lookup, so the switch would be a setting whose
+    // only effect is nothing happening.
+    const { container } = render(<PayeeContactLookupToggle />);
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+  });
+
   it('renders the heading and an off switch by default', () => {
-    render(<PayeeContactLookupToggle />);
+    render(<PayeeContactLookupToggle aiConfigured />);
     expect(screen.getByText('Automatic payee contact lookup')).toBeInTheDocument();
     expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
   });
 
   it('says what the lookup sends and who pays for it', () => {
-    render(<PayeeContactLookupToggle />);
+    render(<PayeeContactLookupToggle aiConfigured />);
     // The name is not all that is sent: the payee's own notes and contact
     // fields go with it as context, and the copy has to say so.
     const subtitle = screen.getByText(/The payee name is sent/);
@@ -58,7 +66,7 @@ describe('PayeeContactLookupToggle', () => {
       payeeContactLookupEnabled: true,
     });
 
-    render(<PayeeContactLookupToggle />);
+    render(<PayeeContactLookupToggle aiConfigured />);
     fireEvent.click(screen.getByRole('switch'));
 
     expect(updatePreferencesStore).toHaveBeenCalledWith({ payeeContactLookupEnabled: true });
@@ -73,7 +81,7 @@ describe('PayeeContactLookupToggle', () => {
   it('reverts the optimistic change and shows an error when the save fails', async () => {
     (userSettingsApi.updatePreferences as Mock).mockRejectedValue(new Error('nope'));
 
-    render(<PayeeContactLookupToggle />);
+    render(<PayeeContactLookupToggle aiConfigured />);
     fireEvent.click(screen.getByRole('switch'));
 
     await waitFor(() => {
@@ -88,7 +96,7 @@ describe('PayeeContactLookupToggle', () => {
 
   it('renders on and disables the switch when asked', () => {
     mockPreferences = { payeeContactLookupEnabled: true };
-    render(<PayeeContactLookupToggle disabled />);
+    render(<PayeeContactLookupToggle aiConfigured disabled />);
     const toggle = screen.getByRole('switch');
     expect(toggle).toHaveAttribute('aria-checked', 'true');
     expect(toggle).toBeDisabled();

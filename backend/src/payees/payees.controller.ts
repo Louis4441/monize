@@ -80,7 +80,11 @@ export class PayeesController {
     @Request() req,
     @Body() createPayeeDto: CreatePayeeDto,
   ): Promise<Payee> {
-    return this.payeesService.create(req.user.id, createPayeeDto);
+    // `deferContactLookup` says what the caller will do, not what the payee
+    // is, so it travels as an option and never reaches the row: spreading it
+    // into the entity would put a non-column onto the insert.
+    const { deferContactLookup, ...dto } = createPayeeDto;
+    return this.payeesService.create(req.user.id, dto, { deferContactLookup });
   }
 
   @Get()

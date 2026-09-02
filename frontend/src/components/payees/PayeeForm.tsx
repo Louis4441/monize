@@ -22,6 +22,7 @@ import { Category } from '@/types/category';
 import { buildCategoryTree } from '@/lib/categoryUtils';
 import { payeesApi } from '@/lib/payees';
 import { usePreferencesStore } from '@/store/preferencesStore';
+import { useAiConfigured } from '@/hooks/useAiConfigured';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -127,6 +128,10 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
   const lookupEnabled = usePreferencesStore(
     (s) => s.preferences?.payeeContactLookupEnabled ?? false,
   );
+  // The lookup runs on the user's AI provider. With none configured there is
+  // nothing behind the button, so it is not offered at all -- and the blur
+  // never spends a request establishing that.
+  const { configured: aiConfigured } = useAiConfigured();
   const [lookupState, setLookupState] = useState<LookupState>({ status: 'idle' });
   const [suggestedFields, setSuggestedFields] = useState<ReadonlySet<ContactLookupField>>(
     () => new Set(),
@@ -284,11 +289,11 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
       void nameField.onBlur(event);
       // Automatic only for a new payee, and only when the user opted in; an
       // existing payee's values are theirs, so a lookup there is the button.
-      if (!payee && lookupEnabled) {
+      if (!payee && lookupEnabled && aiConfigured) {
         void runLookup(event.target.value);
       }
     },
-    [nameField, payee, lookupEnabled, runLookup],
+    [nameField, payee, lookupEnabled, aiConfigured, runLookup],
   );
 
   const handleFormSubmit = useCallback((data: PayeeFormData) => {
@@ -375,15 +380,17 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
             onBlur={handleNameBlur}
           />
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="md"
-          disabled={lookupState.status === 'searching'}
-          onClick={() => void runLookup(getValues('name') ?? '', { force: true })}
-        >
-          {t('form.lookup.button')}
-        </Button>
+        {aiConfigured && (
+          <Button
+            type="button"
+            variant="outline"
+            size="md"
+            disabled={lookupState.status === 'searching'}
+            onClick={() => void runLookup(getValues('name') ?? '', { force: true })}
+          >
+            {t('form.lookup.button')}
+          </Button>
+        )}
       </div>
 
       {lookupState.status === 'searching' && (

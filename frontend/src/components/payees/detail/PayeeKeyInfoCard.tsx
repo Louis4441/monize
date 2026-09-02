@@ -1,19 +1,17 @@
 'use client';
 
-import { useState } from 'react';
-import toast from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
 import { KeyValueList, type KeyValueRow } from '@/components/ui/KeyValueList';
-import { payeesApi } from '@/lib/payees';
-import { getErrorMessage } from '@/lib/errors';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { externalUrlLabel, toSafeExternalUrl } from '@/lib/external-url';
 import { mailtoHref, mapsUrl, telHref } from '@/lib/contact-links';
 import { useMapProvider } from '@/hooks/useMapProvider';
-import { ContactLookupDialog } from './ContactLookupDialog';
-import type { ContactLookupField, PayeeContactSuggestion, PayeeDetail } from '@/types/payee';
+import { useAiConfigured } from '@/hooks/useAiConfigured';
+import { usePayeeContactLookup } from '@/hooks/usePayeeContactLookup';
+import { ContactLookupDialog } from '../ContactLookupDialog';
+import type { PayeeDetail } from '@/types/payee';
 
 interface PayeeKeyInfoCardProps {
   detail: PayeeDetail;
@@ -50,64 +48,12 @@ export function PayeeKeyInfoCard({
   const { formatDate } = useDateFormat();
   const { formatCurrency } = useNumberFormat();
   const mapProvider = useMapProvider();
-  const [lookingUp, setLookingUp] = useState(false);
-  const [saving, setSaving] = useState(false);
-  /**
-   * The candidates the lookup returned, held open in the confirmation
-   * dialogue. The lookup writes nothing (INV-PAYEE-001), so this is the whole
-   * of what it produced until the user confirms; more than one entry means the
-   * name matched more than one organisation or branch and they pick.
-   */
-  const [candidates, setCandidates] = useState<PayeeContactSuggestion[]>([]);
+  // The lookup runs on the user's AI provider, so without one there is nothing
+  // behind the button: it is not offered rather than offered and refused.
+  const { configured: aiConfigured } = useAiConfigured();
+  const lookup = usePayeeContactLookup({ onApplied: () => onContactLookedUp?.() });
 
   const { payee, stats, largestTransaction, overpaymentForAccounts } = detail;
-
-  // Proposes; it does not save. Each reason gets its own message -- "could not
-  // look" must never read as "nothing found" -- and an answer opens the
-  // confirmation dialogue rather than writing anything.
-  const handleLookup = async () => {
-    if (lookingUp) return;
-    setLookingUp(true);
-    try {
-      const result = await payeesApi.lookupContactForPayee(payee.id);
-      if (result.reason === 'ok' && result.suggestions.length > 0) {
-        setCandidates(result.suggestions);
-      } else if (result.reason === 'ok' || result.reason === 'none') {
-        toast(t('contactLookup.nothingNew'));
-      } else if (result.reason === 'no_provider') {
-        toast.error(t('contactLookup.noProvider'));
-      } else {
-        // 'failed', and any reason a future server adds: never silence one.
-        toast.error(result.detail ?? t('contactLookup.failed'));
-      }
-    } catch (error) {
-      toast.error(getErrorMessage(error, t('contactLookup.failed')));
-    } finally {
-      setLookingUp(false);
-    }
-  };
-
-  // The confirmation is an ordinary payee edit, through the ordinary update
-  // endpoint -- which is why it may replace a stored value when the lookup
-  // itself may not.
-  const applyConfirmed = async (
-    values: Partial<Record<ContactLookupField, string>>,
-  ) => {
-    if (saving) return;
-    setSaving(true);
-    try {
-      await payeesApi.update(payee.id, values);
-      setCandidates([]);
-      toast.success(
-        t('contactLookup.applied', { count: Object.keys(values).length }),
-      );
-      await onContactLookedUp?.();
-    } catch (error) {
-      toast.error(getErrorMessage(error, t('contactLookup.applyFailed')));
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const websiteUrl = toSafeExternalUrl(payee.website);
   // Each contact value is turned into a link by its own guard, and a value the
@@ -272,25 +218,31 @@ export function PayeeKeyInfoCard({
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           {t('keyInfo.title')}
         </h3>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={handleLookup}
-          disabled={lookingUp}
-        >
-          {lookingUp ? t('contactLookup.inProgress') : t('contactLookup.button')}
-        </Button>
+        {aiConfigured && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void lookup.lookUp(payee)}
+            disabled={lookup.lookingUp}
+          >
+            {lookup.lookingUp
+              ? t('contactLookup.inProgress')
+              : t('contactLookup.button')}
+          </Button>
+        )}
       </div>
       <KeyValueList rows={rows} />
-      <ContactLookupDialog
-        isOpen={candidates.length > 0}
-        payee={payee}
-        suggestions={candidates}
-        saving={saving}
-        onCancel={() => setCandidates([])}
-        onConfirm={applyConfirmed}
-      />
+      {lookup.target && (
+        <ContactLookupDialog
+          isOpen
+          payee={lookup.target}
+          suggestions={lookup.candidates}
+          saving={lookup.saving}
+          onCancel={lookup.dismiss}
+          onConfirm={lookup.apply}
+        />
+      )}
     </div>
   );
 }

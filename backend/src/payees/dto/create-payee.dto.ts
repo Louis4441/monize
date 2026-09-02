@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
 import {
+  IsBoolean,
   IsString,
   IsOptional,
   MaxLength,
@@ -105,4 +106,14 @@ export class CreatePayeeDto {
   @MaxLength(50)
   @SanitizeHtml()
   phone?: string | null;
+
+  @ApiProperty({
+    example: true,
+    required: false,
+    description:
+      "The caller will offer the contact lookup to the user itself, so the automatic background lookup must not run for this payee. Set by a client that shows the suggestions for confirmation (the transaction page's payee quick-create); it never reaches the stored row.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  deferContactLookup?: boolean;
 }

@@ -90,7 +90,26 @@ describe("PayeesController", () => {
       const result = await controller.create(mockReq, dto as any);
 
       expect(result).toEqual(expected);
-      expect(mockPayeesService.create).toHaveBeenCalledWith("user-1", dto);
+      expect(mockPayeesService.create).toHaveBeenCalledWith("user-1", dto, {
+        deferContactLookup: undefined,
+      });
+    });
+
+    it("passes deferContactLookup as an option, never as a payee field", async () => {
+      // It says what the caller will do, not what the payee is: reaching the
+      // service's DTO it would be spread onto the entity insert.
+      mockPayeesService.create.mockResolvedValue({ id: "payee-1" });
+
+      await controller.create(mockReq, {
+        name: "Grocery Store",
+        deferContactLookup: true,
+      } as any);
+
+      expect(mockPayeesService.create).toHaveBeenCalledWith(
+        "user-1",
+        { name: "Grocery Store" },
+        { deferContactLookup: true },
+      );
     });
   });
 

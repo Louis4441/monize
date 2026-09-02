@@ -767,7 +767,7 @@
     },
     "payeeLookup": {
       "title": "Tự động tra cứu thông tin liên hệ của người nhận",
-      "subtitle": "Khi bạn thêm người nhận, trang web, địa chỉ, email và số điện thoại sẽ được tra cứu qua nhà cung cấp AI đã cấu hình. Biểu mẫu Người nhận mới sẽ điền các đề xuất để bạn xem lại; người nhận được thêm theo tên từ một giao dịch sẽ được điền ở chế độ nền. Tên người nhận được gửi đi cùng với ghi chú, trang web, địa chỉ, email và số điện thoại đã có, để việc tra cứu phân biệt đúng doanh nghiệp và đúng địa điểm. Mỗi lần tra cứu có thể chạy các tìm kiếm web được tính phí cho nhà cung cấp đó, và người được ủy quyền sử dụng nhà cung cấp của chủ tài khoản.",
+      "subtitle": "Khi bạn thêm người nhận, trang web, địa chỉ, email và số điện thoại sẽ được tra cứu qua nhà cung cấp AI đã cấu hình. Biểu mẫu Người nhận mới sẽ điền các đề xuất để bạn xem lại, và người nhận bạn thêm từ trang giao dịch sẽ hiển thị các đề xuất để bạn xác nhận; người nhận được tạo giúp bạn khi lưu một giao dịch sẽ được điền ở chế độ nền. Tên người nhận được gửi đi cùng với ghi chú, trang web, địa chỉ, email và số điện thoại đã có, để việc tra cứu phân biệt đúng doanh nghiệp và đúng địa điểm. Mỗi lần tra cứu có thể chạy các tìm kiếm web được tính phí cho nhà cung cấp đó, và người được ủy quyền sử dụng nhà cung cấp của chủ tài khoản.",
       "toggleLabel": "Bật tự động tra cứu thông tin liên hệ",
       "enabled": "Đã bật tự động tra cứu thông tin liên hệ",
       "disabled": "Đã tắt tự động tra cứu thông tin liên hệ",

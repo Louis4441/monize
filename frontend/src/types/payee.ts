@@ -180,6 +180,12 @@ export interface CreatePayeeData {
   address?: string | null;
   email?: string | null;
   phone?: string | null;
+  /**
+   * The caller runs the contact lookup itself and shows the user what it
+   * found, so the server must not also run its background one. Set by the
+   * transaction page's payee quick-create; never stored on the payee.
+   */
+  deferContactLookup?: boolean;
 }
 
 export type ApplyCategoryToTransactions = 'none' | 'uncategorized' | 'all';

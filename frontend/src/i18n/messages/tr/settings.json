@@ -767,7 +767,7 @@
     },
     "payeeLookup": {
       "title": "Alacaklı iletişim bilgilerini otomatik arama",
-      "subtitle": "Bir alacaklı eklediğinizde web sitesi, adresi, e-postası ve telefonu yapılandırdığınız yapay zeka sağlayıcısı üzerinden aranır. Yeni Alacaklı formu önerileri incelemeniz için doldurur; bir işlemden adıyla eklenen alacaklı arka planda doldurulur. Aramanın doğru işletmeyi ve doğru konumu ayırt edebilmesi için alacaklı adının yanı sıra hâlihazırda girilmiş notlar, web sitesi, adres, e-posta ve telefon da gönderilir; her arama o sağlayıcıya faturalandırılan web aramaları çalıştırabilir ve bir temsilci hesap sahibinin sağlayıcısını kullanır.",
+      "subtitle": "Bir alacaklı eklediğinizde web sitesi, adresi, e-postası ve telefonu yapılandırdığınız yapay zeka sağlayıcısı üzerinden aranır. Yeni Alacaklı formu önerileri incelemeniz için doldurur ve işlemler sayfasından eklediğiniz bir alacaklı, önerileri onaylamanız için gösterir; bir işlem kaydedilirken sizin için oluşturulan alacaklı arka planda doldurulur. Aramanın doğru işletmeyi ve doğru konumu ayırt edebilmesi için alacaklı adının yanı sıra hâlihazırda girilmiş notlar, web sitesi, adres, e-posta ve telefon da gönderilir; her arama o sağlayıcıya faturalandırılan web aramaları çalıştırabilir ve bir temsilci hesap sahibinin sağlayıcısını kullanır.",
       "toggleLabel": "İletişim bilgilerini otomatik aramayı etkinleştir",
       "enabled": "İletişim bilgilerini otomatik arama etkinleştirildi",
       "disabled": "İletişim bilgilerini otomatik arama devre dışı bırakıldı",

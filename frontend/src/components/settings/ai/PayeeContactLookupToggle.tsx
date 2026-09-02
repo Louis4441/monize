@@ -11,6 +11,12 @@ import { getErrorMessage } from '@/lib/errors';
 
 interface PayeeContactLookupToggleProps {
   disabled?: boolean;
+  /**
+   * Whether this user has an AI provider at all. The lookup has nothing to run
+   * on without one, so the setting is not offered rather than offered and
+   * silently ineffective -- the provider list below is where that is fixed.
+   */
+  aiConfigured?: boolean;
 }
 
 /**
@@ -18,7 +24,10 @@ interface PayeeContactLookupToggleProps {
  * `payeeContactLookupEnabled` preference from the store, so the switch takes
  * effect on the next payee immediately (optimistic), reverting on save error.
  */
-export function PayeeContactLookupToggle({ disabled = false }: PayeeContactLookupToggleProps) {
+export function PayeeContactLookupToggle({
+  disabled = false,
+  aiConfigured = false,
+}: PayeeContactLookupToggleProps) {
   const t = useTranslations('settings.aiSettings.payeeLookup');
   const preferences = usePreferencesStore((s) => s.preferences);
   const updatePreferencesStore = usePreferencesStore((s) => s.updatePreferences);
@@ -42,6 +51,8 @@ export function PayeeContactLookupToggle({ disabled = false }: PayeeContactLooku
       setSaving(false);
     }
   };
+
+  if (!aiConfigured) return null;
 
   return (
     <Card padding="md" className="mb-6">
