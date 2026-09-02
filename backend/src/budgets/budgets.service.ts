@@ -13,7 +13,7 @@ import {
   NotificationType,
   NotificationSeverity,
 } from "../notification-center/entities/notification.entity";
-import { NotificationService } from "../notification-center/notification.service";
+import { NotificationDispatchService } from "../notifications/notification-dispatch.service";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
 import { Category } from "../categories/entities/category.entity";
@@ -106,10 +106,14 @@ export class BudgetsService {
     // budget's figures are in the budget's: the two are reconciled here rather
     // than by dropping the currency and hoping they match (issue #1247).
     private exchangeRates: ExchangeRateService,
-    // Every notification this service produces goes through the one door, so
-    // the column bounds, the conflict handling and the period default are not
-    // re-decided here.
-    private notifications: NotificationService,
+    // The bill-due producer fans out through the dispatch seam (still the one
+    // write door beneath it, so the column bounds, conflict handling and period
+    // default are not re-decided here) -- so a materialized BILL_DUE reaches the
+    // user's push / notification-email per the PAYMENTS matrix, not only the
+    // bell. Runs on the notification-list read, so the fan-out cost is bounded:
+    // dedup makes most reads create nothing, and for a user with no push device
+    // and no alert-email opted in it is a single preference read per new row.
+    private dispatch: NotificationDispatchService,
   ) {}
 
   async create(
@@ -747,7 +751,7 @@ export class BudgetsService {
           ? NotificationSeverity.WARNING
           : NotificationSeverity.INFO;
 
-      await this.notifications.create(userId, {
+      await this.dispatch.notify(userId, {
         type: NotificationType.BILL_DUE,
         severity,
         // `title`/`message` are the English fallbacks for a reader with no

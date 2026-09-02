@@ -5,10 +5,8 @@ import { NotFoundException, BadRequestException } from "@nestjs/common";
 import { BudgetsService } from "./budgets.service";
 import { ScheduledEffectiveAmountService } from "../scheduled-transactions/scheduled-effective-amount.service";
 import { ScheduledOccurrenceService } from "../scheduled-transactions/scheduled-occurrence.service";
-import {
-  CreateNotificationInput,
-  NotificationService,
-} from "../notification-center/notification.service";
+import { CreateNotificationInput } from "../notification-center/notification.service";
+import { NotificationDispatchService } from "../notifications/notification-dispatch.service";
 import { InvestmentTransactionsService } from "../securities/investment-transactions.service";
 import {
   createInvestmentFxMock,
@@ -48,7 +46,7 @@ describe("BudgetsService", () => {
   let budgetsRepository: Record<string, jest.Mock>;
   let budgetCategoriesRepository: Record<string, jest.Mock>;
   let budgetAlertsRepository: Record<string, jest.Mock>;
-  let notificationService: Partial<jest.Mocked<NotificationService>>;
+  let dispatchService: Partial<jest.Mocked<NotificationDispatchService>>;
   let transactionsRepository: Record<string, jest.Mock>;
   let splitsRepository: Record<string, jest.Mock>;
   let categoriesRepository: Record<string, jest.Mock>;
@@ -164,8 +162,11 @@ describe("BudgetsService", () => {
       remove: jest.fn(),
     };
 
-    notificationService = {
-      create: jest.fn().mockResolvedValue(null),
+    // BudgetsService fans BILL_DUE out through the dispatch seam now; `notify`
+    // takes the same input `create` did, so the ensureBillDue assertions read it
+    // the same way (the row shape is the write door's, tested there).
+    dispatchService = {
+      notify: jest.fn().mockResolvedValue(null),
     };
     budgetAlertsRepository = {
       find: jest.fn().mockResolvedValue([]),
@@ -285,7 +286,7 @@ describe("BudgetsService", () => {
         // Typed rather than a bare jest.fn() record: `create` returns the stored
         // row or null, and an untyped double would let a test assert against a
         // shape the real door cannot produce.
-        { provide: NotificationService, useValue: notificationService },
+        { provide: NotificationDispatchService, useValue: dispatchService },
       ],
     }).compile();
 
@@ -1228,15 +1229,16 @@ describe("BudgetsService", () => {
   describe("ensureBillDueNotifications", () => {
     /**
      * The bill reminder producer, which the notification centre calls before
-     * serving a list read. It goes through `NotificationService.create` rather
-     * than saving an entity itself, so what these assert is the notification it
-     * ASKS for -- the row shape (bounds, conflict handling, period default)
-     * belongs to the door and is tested there.
+     * serving a list read. It goes through `NotificationDispatchService.notify`
+     * (which writes through the one door and then fans out to push / alert-email
+     * per the PAYMENTS matrix) rather than saving an entity itself, so what these
+     * assert is the notification it ASKS for -- the row shape (bounds, conflict
+     * handling, period default) belongs to the door and is tested there.
      */
     let created: jest.Mock;
 
     beforeEach(() => {
-      created = notificationService.create as jest.Mock;
+      created = dispatchService.notify as jest.Mock;
       created.mockClear();
       created.mockResolvedValue({ id: "new-notification-1" } as Notification);
       // No BILL_DUE notification exists yet unless a test says otherwise.
