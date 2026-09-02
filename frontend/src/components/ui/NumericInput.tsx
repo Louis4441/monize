@@ -64,7 +64,12 @@ export const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
     const nfSeparators = useNumberFormat().numberSeparators;
     const sepDecimal = nfSeparators?.decimal ?? '.';
     const sepGroup = nfSeparators?.group ?? ',';
-    const numberSeparators = { decimal: sepDecimal, group: sepGroup };
+    const numberSeparators = {
+      decimal: sepDecimal,
+      group: sepGroup,
+      ...(nfSeparators?.nativeDecimal ? { nativeDecimal: nfSeparators.nativeDecimal } : {}),
+      ...(nfSeparators?.nativeGroup ? { nativeGroup: nfSeparators.nativeGroup } : {}),
+    };
 
     // Format value to specified decimal places, in the user's decimal separator
     // (no grouping) so the field round-trips a value they can read. Memoized on
@@ -118,6 +123,7 @@ export const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
       // disambiguate them (parseLocaleNumber's job, not the filter's).
       let filtered = filterNumberTyping(e.target.value, {
         allowNegative,
+        separators: numberSeparators,
       });
 
       // Limit decimal places while typing, measured from the locale decimal

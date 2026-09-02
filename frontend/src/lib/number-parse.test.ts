@@ -5,10 +5,12 @@ import {
   formatNumberForEdit,
   getNumberSeparators,
   normalizeExpression,
+  normalizeNumeralText,
   parseLocaleNumber,
   stripGroupSeparator,
   type NumberSeparators,
 } from './number-parse';
+import { roundToDecimals } from '@/lib/format';
 
 const EN: NumberSeparators = { decimal: '.', group: ',' };
 // Polish groups with a no-break space; comma is the decimal.
@@ -192,5 +194,86 @@ describe('formatAmountLocalized', () => {
     expect(formatAmountLocalized(NaN, 2, EN, 'en-US')).toBe('');
     // An invalid locale falls back to the en-US formatter rather than throwing.
     expect(formatAmountLocalized(1234.5, 2, EN, 'not-a-locale')).toBe('1,234.50');
+  });
+});
+
+// Egyptian Arabic: native digits are Arabic-Indic and the native separators are
+// U+066B / U+066C, while the latn form the input fields work in is "." / ",".
+const AR: NumberSeparators = { decimal: '.', group: ',', nativeDecimal: '\u066B', nativeGroup: '\u066C' };
+
+describe('getNumberSeparators: latn form plus native symbols', () => {
+  it('reports latn separators and the differing native symbols for ar-EG', () => {
+    expect(getNumberSeparators('ar-EG')).toEqual(AR);
+  });
+
+  it('omits native symbols where the latn and native forms coincide', () => {
+    expect(getNumberSeparators('de-DE')).toEqual({ decimal: ',', group: '.' });
+    expect(getNumberSeparators('en-US')).toEqual({ decimal: '.', group: ',' });
+  });
+});
+
+describe('normalizeNumeralText', () => {
+  it('maps Unicode decimal digits of any script to ASCII', () => {
+    expect(normalizeNumeralText('\u0661\u0662\u0660\u0660', EN)).toBe('1200'); // Arabic-Indic
+    expect(normalizeNumeralText('\u06F1\u06F2\u06F3\u06F4', EN)).toBe('1234'); // Persian
+    expect(normalizeNumeralText('\u0967\u0968\u0969', EN)).toBe('123'); // Devanagari
+  });
+
+  it('maps the native decimal/group symbols to the latn ones, drops bidi marks, maps U+2212', () => {
+    expect(normalizeNumeralText('\u0661\u066C\u0662\u0660\u0660\u066B\u0669\u0669', AR)).toBe('1,200.99');
+    expect(normalizeNumeralText('\u061C-\u0664\u0662\u066B\u0661\u0660', AR)).toBe('-42.10');
+    expect(normalizeNumeralText('\u200E\u2212\u06F4\u06F2\u066B\u06F1\u06F0', AR)).toBe('-42.10');
+  });
+
+  it('passes latn text through unchanged (the en-US path is untouched)', () => {
+    expect(normalizeNumeralText('1,234.56', EN)).toBe('1,234.56');
+    expect(normalizeNumeralText('100*1.13', EN)).toBe('100*1.13');
+  });
+});
+
+describe('ar-EG input pipeline (browser-locale numbering system)', () => {
+  it('parses native and latn text alike', () => {
+    expect(parseLocaleNumber('\u0661\u066C\u0662\u0660\u0660\u066B\u0669\u0669', AR)).toBe(1200.99);
+    expect(parseLocaleNumber('1200\u066B995', AR)).toBe(1200.995); // was 1200995
+    expect(parseLocaleNumber('1200.99', AR)).toBe(1200.99);
+  });
+
+  it('filter keeps a native paste as a parseable latn string instead of discarding it', () => {
+    // The audit scenario: focused native text plus one typed ASCII digit.
+    expect(filterNumberTyping('\u0661\u0662\u0660\u0660\u066B\u0669\u06695', { separators: AR })).toBe('1200.995');
+    expect(filterNumberTyping('1200\u066B995', { separators: AR })).toBe('1200.995');
+  });
+
+  it('calculator canonicalizes native digits and separators', () => {
+    expect(normalizeExpression('\u0661\u0660\u0660*\u0661\u066B\u0661\u0663', AR)).toBe('100*1.13');
+    expect(normalizeExpression('1200\u066B99+0.01', AR)).toBe('1200.99+0.01');
+  });
+
+  it('formats the editable field in latn digits and read-only surfaces natively', () => {
+    expect(formatAmountLocalized(1200.99, 2, AR, 'ar-EG', { latnDigits: true })).toBe('1,200.99');
+    expect(formatAmountLocalized(1200.99, 2, AR, 'ar-EG')).toBe('\u0661\u066C\u0662\u0660\u0660\u066B\u0669\u0669');
+  });
+
+  it('strips the group separator from a native display on focus', () => {
+    expect(stripGroupSeparator('\u0661\u066C\u0662\u0660\u0660\u066B\u0669\u0669', AR)).toBe('1200.99');
+  });
+});
+
+describe('round trip: what the input pipeline formats, it parses back', () => {
+  // The invariant behind every locale case above: text emitted by the field's
+  // own display, by a native read-only display, or by the blur edit-format must
+  // parse back to the same number, for Latin and non-Latin numbering systems.
+  const locales = ['en-US', 'pl', 'de-DE', 'hi', 'ar-EG', 'fa-IR'];
+  const values = [0, 5.5, 1200.99, 1234567.89, -42.1];
+  it.each(locales)('%s', (locale) => {
+    const seps = getNumberSeparators(locale);
+    for (const v of values) {
+      const expected = roundToDecimals(v, 2);
+      expect(parseLocaleNumber(formatAmountLocalized(v, 2, seps, locale, { latnDigits: true }), seps)).toBe(expected);
+      expect(parseLocaleNumber(formatAmountLocalized(v, 2, seps, locale), seps)).toBe(expected);
+      expect(parseLocaleNumber(formatNumberForEdit(v, 2, seps), seps)).toBe(expected);
+      const typed = filterNumberTyping(formatAmountLocalized(v, 2, seps, locale), { allowNegative: true, separators: seps });
+      expect(parseLocaleNumber(typed, seps)).toBe(expected);
+    }
   });
 });

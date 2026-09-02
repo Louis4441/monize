@@ -79,9 +79,16 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
     // formatDisplay) do not rebuild every render.
     const sepDecimal = nf.numberSeparators?.decimal ?? '.';
     const sepGroup = nf.numberSeparators?.group ?? ',';
+    const sepNativeDecimal = nf.numberSeparators?.nativeDecimal;
+    const sepNativeGroup = nf.numberSeparators?.nativeGroup;
     const numberSeparators = useMemo(
-      () => ({ decimal: sepDecimal, group: sepGroup }),
-      [sepDecimal, sepGroup],
+      () => ({
+        decimal: sepDecimal,
+        group: sepGroup,
+        ...(sepNativeDecimal ? { nativeDecimal: sepNativeDecimal } : {}),
+        ...(sepNativeGroup ? { nativeGroup: sepNativeGroup } : {}),
+      }),
+      [sepDecimal, sepGroup, sepNativeDecimal, sepNativeGroup],
     );
     const numberLocale = nf.numberLocale;
 
@@ -89,7 +96,8 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
     // helper the read-only surfaces use, so the field and its labels agree.
     const formatDisplay = useCallback(
       (v: number | undefined | null): string =>
-        formatAmountLocalized(v, 2, numberSeparators, numberLocale),
+        // Latin digits: an editable field shows exactly the text it parses back.
+        formatAmountLocalized(v, 2, numberSeparators, numberLocale, { latnDigits: true }),
       [numberSeparators, numberLocale],
     );
 
@@ -99,8 +107,9 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
         filterNumberTyping(raw, {
           allowNegative: allowNegative || allowCalculator,
           allowOperators: allowCalculator,
+          separators: numberSeparators,
         }),
-      [allowNegative, allowCalculator],
+      [allowNegative, allowCalculator, numberSeparators],
     );
     // Round to cents on parse, restoring parseAmount's contract: a money field
     // stores what it displays (2dp). The value handed to the parent must not

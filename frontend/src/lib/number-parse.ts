@@ -16,24 +16,60 @@
  * The design keeps the en-US path byte-identical: with a `.` decimal and a `,`
  * group separator (the runtime default under test), every function below does
  * exactly what the old helpers did.
+ *
+ * ONE character contract for editable text: the input pipeline works in the
+ * locale's LATIN-digit form (`numberingSystem: 'latn'`), so a field always shows
+ * and accepts ASCII digits with that locale's latn separators -- for `ar-EG`
+ * that is "1,200.99", not "١٬٢٠٠٫٩٩". Text the user pastes may still carry the
+ * locale's NATIVE digits and separators (a read-only column, another app), so
+ * every entry point first runs `normalizeNumeralText`, which maps any Unicode
+ * decimal digit to ASCII and the locale's native decimal/group symbols to the
+ * latn ones. Without this, a browser locale such as `ar-EG` (reachable through
+ * the "Browser" number-format setting) produced text the ASCII-only filter then
+ * discarded: editing "1200٫99" collapsed it to the one digit just typed, and the
+ * calculator turned "1200٫995" into 1200995.
  */
 
 import { formatAmountWithCommas, roundToDecimals } from '@/lib/format';
 
 export interface NumberSeparators {
-  /** The decimal separator, e.g. "." (en) or "," (pl, de, fr). */
+  /** The decimal separator in the locale's LATIN-digit form, e.g. "." (en, ar-EG) or "," (pl, de, fr). */
   decimal: string;
-  /** The grouping separator, e.g. "," (en) or a no-break space (pl). */
+  /** The grouping separator in the locale's LATIN-digit form, e.g. "," (en) or a no-break space (pl). */
   group: string;
+  /**
+   * The locale's NATIVE decimal symbol when it differs from `decimal` (ar-EG:
+   * U+066B). Pasted native text is normalized from it; absent for latn locales.
+   */
+  nativeDecimal?: string;
+  /** The locale's NATIVE grouping symbol when it differs from `group` (ar-EG: U+066C). */
+  nativeGroup?: string;
 }
 
 const separatorsCache = new Map<string, NumberSeparators>();
 
+/** Read the decimal/group parts a formatter emits for a grouped sample number. */
+function separatorParts(
+  locale: string | undefined,
+  options: Intl.NumberFormatOptions,
+): { decimal: string; group: string } {
+  let decimal = '.';
+  let group = ',';
+  const parts = new Intl.NumberFormat(locale, { useGrouping: true, ...options }).formatToParts(11111.1);
+  for (const part of parts) {
+    if (part.type === 'decimal') decimal = part.value;
+    else if (part.type === 'group') group = part.value;
+  }
+  return { decimal, group };
+}
+
 /**
- * The decimal and grouping separators a locale uses, derived from `Intl` so
- * they match how the same locale DISPLAYS a number. Memoized because
- * `formatToParts` is not free and this is read per keystroke. `undefined` hands
- * off to the runtime default (en-US under test/CI).
+ * The separators a locale uses, in its LATIN-digit form (`numberingSystem:
+ * 'latn'`) -- the form the input fields display and parse -- plus the locale's
+ * NATIVE symbols where they differ, so pasted native text can be normalized. For
+ * de/pl/hi/en the two forms coincide; for ar-EG/fa-IR latn is "."/"," while the
+ * native symbols are U+066B/U+066C. Memoized because `formatToParts` is not free
+ * and this is read per keystroke. `undefined` hands off to the runtime default.
  */
 export function getNumberSeparators(
   locale: string | undefined,
@@ -42,22 +78,67 @@ export function getNumberSeparators(
   const cached = separatorsCache.get(key);
   if (cached) return cached;
 
-  let decimal = '.';
-  let group = ',';
+  let latn = { decimal: '.', group: ',' };
+  let native = latn;
   try {
-    const parts = new Intl.NumberFormat(locale, {
-      useGrouping: true,
-    }).formatToParts(11111.1);
-    for (const part of parts) {
-      if (part.type === 'decimal') decimal = part.value;
-      else if (part.type === 'group') group = part.value;
-    }
+    latn = separatorParts(locale, { numberingSystem: 'latn' });
+    native = separatorParts(locale, {});
   } catch {
     // Keep the en-US defaults for an unknown locale.
   }
-  const result: NumberSeparators = { decimal, group };
+  const result: NumberSeparators = { decimal: latn.decimal, group: latn.group };
+  if (native.decimal !== latn.decimal) result.nativeDecimal = native.decimal;
+  if (native.group !== latn.group) result.nativeGroup = native.group;
   separatorsCache.set(key, result);
   return result;
+}
+
+// Any Unicode decimal digit (category Nd). Built at runtime so the ES2017
+// compile target does not reject the property escape; every supported browser
+// evaluates it.
+const UNICODE_DIGIT = new RegExp('\\p{Nd}', 'u');
+// Bidi control marks Intl inserts around a negative in RTL locales (ar-EG emits
+// U+061C before the minus); they carry no numeric meaning and must not hide the
+// sign from the parser.
+const BIDI_MARKS = /[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/;
+
+/**
+ * The ASCII value of any Unicode decimal digit. Nd digits come in runs of ten
+ * consecutive code points in order 0-9, so a digit's value is how many Nd code
+ * points precede it in its run (mod 10, because some blocks place several runs
+ * back to back, e.g. the mathematical digits).
+ */
+function asciiDigit(ch: string): string {
+  const cp = ch.codePointAt(0) ?? 0;
+  let n = 0;
+  while (cp - n - 1 >= 0 && UNICODE_DIGIT.test(String.fromCodePoint(cp - n - 1))) n++;
+  return String(n % 10);
+}
+
+/**
+ * Normalize numeric text to the locale's LATIN-digit form before it reaches the
+ * filter, the parser, the calculator or the focus-strip: every Unicode decimal
+ * digit becomes its ASCII digit, the locale's native decimal/group symbols
+ * become the latn `decimal`/`group`, a Unicode minus sign becomes "-", and bidi
+ * marks are dropped. Text already in latn form passes through unchanged, so the
+ * en-US path is untouched. This is what lets a value copied from a native-digit
+ * read-only column ("١٬٢٠٠٫٩٩") paste back into a field as 1200.99.
+ */
+export function normalizeNumeralText(
+  raw: string,
+  separators: NumberSeparators,
+): string {
+  let out = '';
+  for (const ch of raw) {
+    if (ch >= '0' && ch <= '9') out += ch;
+    else if (separators.nativeDecimal && ch === separators.nativeDecimal) out += separators.decimal;
+    else if (separators.nativeGroup && ch === separators.nativeGroup) out += separators.group;
+    else if (ch === '\u2212') out += '-';
+    else if (BIDI_MARKS.test(ch)) continue;
+    else if (UNICODE_DIGIT.test(ch)) out += asciiDigit(ch);
+    else out += ch;
+  }
+  return out;
 }
 
 // Every character treated as whitespace for parsing, including the no-break and
@@ -90,8 +171,9 @@ export function parseLocaleNumber(
   separators: NumberSeparators,
 ): number | undefined {
   if (raw == null) return undefined;
-  const negative = raw.trim().startsWith('-');
-  const cleaned = raw.replace(WHITESPACE, '').replace(/[^0-9.,]/g, '');
+  const text = normalizeNumeralText(raw, separators);
+  const negative = text.trim().startsWith('-');
+  const cleaned = text.replace(WHITESPACE, '').replace(/[^0-9.,]/g, '');
   if (cleaned === '') return undefined;
 
   const parsed = parseFloat(canonicalNumeric(cleaned, separators));
@@ -191,12 +273,19 @@ export function filterNumberTyping(
   options: {
     allowNegative?: boolean;
     allowOperators?: boolean;
+    /**
+     * The locale's separators, used to normalize pasted NATIVE digits/symbols to
+     * the latn form the keep-list below understands. Digits are normalized even
+     * without it; only the native decimal/group mapping needs the locale.
+     */
+    separators?: NumberSeparators;
   } = {},
 ): string {
-  const { allowNegative = false, allowOperators = false } = options;
+  const { allowNegative = false, allowOperators = false, separators } = options;
+  const src = normalizeNumeralText(raw, separators ?? { decimal: '.', group: ',' });
   let out = '';
-  for (let i = 0; i < raw.length; i++) {
-    const ch = raw[i];
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
     if (ch >= '0' && ch <= '9') out += ch;
     else if (ch === '.' || ch === ',') out += ch;
     else if (ch === '-' && (allowNegative || allowOperators)) out += ch;
@@ -229,11 +318,12 @@ export function stripGroupSeparator(
   separators: NumberSeparators,
 ): string {
   const group = separators.group;
-  if (group === '.' || group === ',') return value.split(group).join('');
+  const text = normalizeNumeralText(value, separators);
+  if (group === '.' || group === ',') return text.split(group).join('');
   // A whitespace group (no-break/narrow spaces) plus any literal non-whitespace
   // group char a locale uses (e.g. the Swiss apostrophe U+2019), so the field
   // clears its grouping on focus whatever the locale's separator is.
-  const stripped = value.replace(WHITESPACE, '');
+  const stripped = text.replace(WHITESPACE, '');
   return group ? stripped.split(group).join('') : stripped;
 }
 
@@ -249,13 +339,15 @@ const fixedFormatterCache = new Map<string, Intl.NumberFormat>();
 function getFixedFormatter(
   locale: string | undefined,
   decimals: number,
+  latnDigits: boolean,
 ): Intl.NumberFormat {
-  const key = `${locale ?? ''}|${decimals}`;
+  const key = `${locale ?? ''}|${decimals}|${latnDigits ? 'latn' : 'native'}`;
   let formatter = fixedFormatterCache.get(key);
   if (!formatter) {
     formatter = new Intl.NumberFormat(locale, {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
+      ...(latnDigits ? { numberingSystem: 'latn' } : {}),
     });
     fixedFormatterCache.set(key, formatter);
   }
@@ -278,12 +370,19 @@ function getFixedFormatter(
  * en-US formatter rather than throwing during render. Callers pass their (already
  * defensively defaulted) separators and effective locale, so a component with a
  * partial `useNumberFormat` mock never needs the formatter itself.
+ *
+ * `latnDigits` selects the LATIN-digit form (`numberingSystem: 'latn'`) -- what
+ * an EDITABLE field must show, so its text is exactly what `parseLocaleNumber`
+ * reads back ("1,200.99" under ar-EG). Read-only surfaces leave it off and show
+ * the locale's native digits like the rest of the app's `formatCurrency` does;
+ * pasting that native text into a field still parses via `normalizeNumeralText`.
  */
 export function formatAmountLocalized(
   value: number | undefined | null,
   decimals: number,
   separators: NumberSeparators,
   locale: string | undefined,
+  options: { latnDigits?: boolean } = {},
 ): string {
   if (value === undefined || value === null || isNaN(value)) return '';
   // Delegate to the en-US display seam only for the plain en locales that group
@@ -295,7 +394,9 @@ export function formatAmountLocalized(
     return formatAmountWithCommas(value, decimals);
   }
   try {
-    return getFixedFormatter(locale, decimals).format(roundToDecimals(value, decimals));
+    return getFixedFormatter(locale, decimals, options.latnDigits === true).format(
+      roundToDecimals(value, decimals),
+    );
   } catch {
     // Invalid locale string: keep the en-US formatter rather than throwing.
     return formatAmountWithCommas(value, decimals);
@@ -333,7 +434,7 @@ export function normalizeExpression(
   raw: string,
   separators: NumberSeparators,
 ): string {
-  let out = raw.replace(WHITESPACE, '');
+  let out = normalizeNumeralText(raw, separators).replace(WHITESPACE, '');
   if (separators.group && separators.group !== '.' && separators.group !== ',') {
     out = out.split(separators.group).join('');
   }
