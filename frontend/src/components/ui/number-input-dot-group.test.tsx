@@ -22,6 +22,16 @@ function CurrencyHarness() {
   );
 }
 
+function CalcHarness() {
+  const [value, setValue] = useState<number | undefined>(undefined);
+  return (
+    <>
+      <CurrencyInput label="Amount" value={value} onChange={setValue} />
+      <output data-testid="value">{value === undefined ? 'undefined' : String(value)}</output>
+    </>
+  );
+}
+
 function RateHarness() {
   const [value, setValue] = useState<number | undefined>(undefined);
   return (
@@ -49,6 +59,15 @@ describe('number inputs under a dot-group locale (de)', () => {
     const input = screen.getByLabelText('Amount');
     fireEvent.change(input, { target: { value: '1200,99' } });
     expect(screen.getByTestId('value')).toHaveTextContent('1200.99');
+  });
+
+  it('calculator evaluates a dot-decimal expression as a decimal, not 100x', () => {
+    render(<CalcHarness />);
+    const input = screen.getByLabelText('Amount');
+    // "100*1.13" must be 113, not 11300 -- the calculator agrees with the field.
+    fireEvent.change(input, { target: { value: '100*1.13' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(screen.getByTestId('value')).toHaveTextContent('113');
   });
 
   it('NumericInput reads a dot-decimal rate as 5.5, not 55', () => {

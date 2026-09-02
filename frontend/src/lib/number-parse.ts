@@ -94,55 +94,54 @@ export function parseLocaleNumber(
   const cleaned = raw.replace(WHITESPACE, '').replace(/[^0-9.,]/g, '');
   if (cleaned === '') return undefined;
 
+  const parsed = parseFloat(canonicalNumeric(cleaned, separators));
+  if (!isFinite(parsed)) return undefined;
+  return negative && parsed > 0 ? -parsed : parsed;
+}
+
+/**
+ * Turn a cleaned numeric token (digits plus `.`/`,` only, no sign/whitespace)
+ * into the canonical `.`-decimal, no-grouping string `parseFloat` understands.
+ * This is the one place the separator disambiguation lives, so the field parser
+ * (`parseLocaleNumber`) and the calculator (`normalizeExpression`) cannot
+ * disagree about what "1.13" or "1.234" means in a given locale.
+ */
+function canonicalNumeric(cleaned: string, separators: NumberSeparators): string {
   const hasDot = cleaned.includes('.');
   const hasComma = cleaned.includes(',');
-
-  let normalized: string;
   if (hasDot && hasComma) {
     const decimalChar =
       cleaned.lastIndexOf('.') > cleaned.lastIndexOf(',') ? '.' : ',';
     const groupChar = decimalChar === '.' ? ',' : '.';
-    normalized = cleaned.split(groupChar).join('').replace(decimalChar, '.');
-  } else {
-    const sep = hasDot ? '.' : hasComma ? ',' : '';
-    if (sep === '') {
-      normalized = cleaned;
-    } else {
-      const parts = cleaned.split(sep);
-      const groups = parts.length - 1;
-      if (sep === separators.decimal) {
-        // The locale's DECIMAL separator: a single one ("1.5", "1.234" in en) is
-        // the decimal point. Repeated occurrences are the decimal point only if
-        // they cannot be valid grouping -- "1.000.000" pasted by a European reads
-        // as 1000000, but "1.2.3" is a typo whose last separator is the decimal.
-        normalized =
-          groups === 1
-            ? parts.join('.')
-            : looksLikeGrouping(parts)
-              ? parts.join('')
-              : joinLastAsDecimal(parts);
-      } else {
-        // The locale's GROUPING separator (or a stray non-locale symbol).
-        // Repeated occurrences are grouping whatever the group sizes -- uniform
-        // "1,000,000"/"1.234.567" AND Indian lakh "12,34,567" (2-2-3), which is
-        // also how a lakh-grouped displayed value pastes back. A SINGLE separator
-        // is grouping only when it forms one valid 3-digit group ("1,234",
-        // "1.234" in de); otherwise it is the decimal point, so "1200.99"/"5.5"
-        // in a dot-group locale (and a stray "1200.99" in a space-group locale)
-        // read as decimals rather than inflating ~100x.
-        normalized =
-          groups > 1
-            ? parts.join('')
-            : looksLikeGrouping(parts)
-              ? parts.join('')
-              : parts.join('.');
-      }
-    }
+    return cleaned.split(groupChar).join('').replace(decimalChar, '.');
   }
-
-  const parsed = parseFloat(normalized);
-  if (!isFinite(parsed)) return undefined;
-  return negative && parsed > 0 ? -parsed : parsed;
+  const sep = hasDot ? '.' : hasComma ? ',' : '';
+  if (sep === '') return cleaned;
+  const parts = cleaned.split(sep);
+  const groups = parts.length - 1;
+  if (sep === separators.decimal) {
+    // The locale's DECIMAL separator: a single one ("1.5", "1.234" in en) is the
+    // decimal point. Repeated occurrences are the decimal point only if they
+    // cannot be valid grouping -- "1.000.000" pasted by a European reads as
+    // 1000000, but "1.2.3" is a typo whose last separator is the decimal.
+    return groups === 1
+      ? parts.join('.')
+      : looksLikeGrouping(parts)
+        ? parts.join('')
+        : joinLastAsDecimal(parts);
+  }
+  // The locale's GROUPING separator (or a stray non-locale symbol). Repeated
+  // occurrences are grouping whatever the group sizes -- uniform "1,000,000"/
+  // "1.234.567" AND Indian lakh "12,34,567" (2-2-3), which is also how a
+  // lakh-grouped displayed value pastes back. A SINGLE separator is grouping only
+  // when it forms one valid 3-digit group ("1,234", "1.234" in de); otherwise it
+  // is the decimal point, so "1200.99"/"5.5" in a dot-group locale (and a stray
+  // "1200.99" in a space-group locale) read as decimals rather than inflating.
+  return groups > 1
+    ? parts.join('')
+    : looksLikeGrouping(parts)
+      ? parts.join('')
+      : parts.join('.');
 }
 
 /**
@@ -222,9 +221,12 @@ export function stripGroupSeparator(
   separators: NumberSeparators,
 ): string {
   const group = separators.group;
-  return group === '.' || group === ','
-    ? value.split(group).join('')
-    : value.replace(WHITESPACE, '');
+  if (group === '.' || group === ',') return value.split(group).join('');
+  // A whitespace group (no-break/narrow spaces) plus any literal non-whitespace
+  // group char a locale uses (e.g. the Swiss apostrophe U+2019), so the field
+  // clears its grouping on focus whatever the locale's separator is.
+  const stripped = value.replace(WHITESPACE, '');
+  return group ? stripped.split(group).join('') : stripped;
 }
 
 /**
@@ -290,11 +292,12 @@ export function formatNumberForEdit(
 
 /**
  * Normalize a calculator EXPRESSION into the canonical `.`-decimal form the
- * evaluator understands. Per-locale the decimal and grouping separators are
- * distinct, so this is unambiguous: drop the grouping separator (and grouping
- * whitespace), then map the locale decimal separator to `.`. Operators are kept.
- * For en-US (`.` decimal, `,` group) this strips commas and keeps dots -- the
- * old behaviour.
+ * evaluator understands, keeping operators. Each number TOKEN is canonicalized
+ * through the same digit-count disambiguation the field parser uses, so the
+ * calculator and the field agree: in a dot-group locale (de/fr) "100*1.13"
+ * evaluates to 113, not 11300 (the old "comma decimal -> strip every dot" rule
+ * treated the dot as grouping and inflated it ~100x). For en-US this still
+ * strips grouping commas and keeps the dot decimal.
  */
 export function normalizeExpression(
   raw: string,
@@ -304,12 +307,9 @@ export function normalizeExpression(
   if (separators.group && separators.group !== '.' && separators.group !== ',') {
     out = out.split(separators.group).join('');
   }
-  if (separators.decimal === ',') {
-    // Comma is the decimal; a dot can only be a (stray) grouping separator here.
-    out = out.split('.').join('').split(',').join('.');
-  } else {
-    // Dot is the decimal; comma is the grouping separator.
-    out = out.split(',').join('');
-  }
-  return out;
+  // Replace each maximal run of digits/`.`/`,` with its canonical dot-decimal
+  // form; operators and parentheses between tokens are untouched.
+  return out.replace(/[0-9.,]+/g, (token) =>
+    /[0-9]/.test(token) ? canonicalNumeric(token, separators) : token,
+  );
 }

@@ -61,8 +61,9 @@ export const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
     // may not carry the separators; en-US keeps the previous behaviour. Read the
     // primitive fields so `formatValue`/`parseValue` are stable across renders
     // (the object identity from `?? {}` is not).
-    const sepDecimal = useNumberFormat().numberSeparators?.decimal ?? '.';
-    const sepGroup = useNumberFormat().numberSeparators?.group ?? ',';
+    const nfSeparators = useNumberFormat().numberSeparators;
+    const sepDecimal = nfSeparators?.decimal ?? '.';
+    const sepGroup = nfSeparators?.group ?? ',';
     const numberSeparators = { decimal: sepDecimal, group: sepGroup };
 
     // Format value to specified decimal places, in the user's decimal separator

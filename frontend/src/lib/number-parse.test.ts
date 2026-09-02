@@ -146,6 +146,14 @@ describe('normalizeExpression', () => {
     expect(normalizeExpression('1,234*2', EN)).toBe('1234*2');
     expect(normalizeExpression('100*1.13', EN)).toBe('100*1.13');
   });
+
+  it('reads a dot-typed decimal in a dot-group locale, agreeing with the field', () => {
+    // Regression: the calculator must not inflate "1.13" to 113 in de/fr. Each
+    // number token is disambiguated by digit count, like parseLocaleNumber.
+    expect(normalizeExpression('100*1.13', DE)).toBe('100*1.13'); // -> 113, not 11300
+    // A valid de group "1.234" is still 1234 -- same as the field reads it.
+    expect(normalizeExpression('1.234*2', DE)).toBe('1234*2');
+  });
 });
 
 describe('formatAmountLocalized', () => {
