@@ -2187,7 +2187,7 @@ Required tests      push-subscription.service.spec.ts asserts no statement on
                     schema, so push_subscriptions is bucketed as direct by its
                     user_id column and its policy, its ENABLE and its cross-user
                     INSERT rejection are all asserted automatically -- and the
-                    harness picks up migration 171 by content marker (it
+                    harness picks up migration 178 by content marker (it
                     references app_current_user_id).
 Status              enforced
 ```
@@ -2540,7 +2540,7 @@ Statement           The per-category `push` toggle reaches web-push devices only
                     and `unifiedpush` reaches UnifiedPush devices only. A user
                     with `push` on and `unifiedpush` off is never delivered to
                     on a distributor endpoint, and the reverse.
-Source of truth     push_subscriptions.transport (migration 177), read by
+Source of truth     push_subscriptions.transport (migration 184), read by
                     PushSubscriptionService.sendToUser's transport filter;
                     NotificationDispatchService.fanOut builds the set from
                     resolveNotificationDelivery.
@@ -2601,7 +2601,7 @@ Statement           A distributor endpoint is validated exactly as a browser
                     CHECK constraint and the client union.
 Source of truth     src/push/dto/create-push-subscription.dto.ts (`@IsIn`);
                     push_subscriptions_transport_check in database/schema.sql
-                    and migration 177; PUSH_TRANSPORTS in the entity and in
+                    and migration 184; PUSH_TRANSPORTS in the entity and in
                     frontend/src/lib/push.ts.
 Enforcement         The one controller line that registers a subscription passes
                     the validated DTO; push-transport.contract.spec.ts holds the

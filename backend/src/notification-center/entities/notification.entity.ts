@@ -178,7 +178,7 @@ const dateTransformer = {
 /**
  * One durable notification, whatever produced it.
  *
- * Renamed from `budget_alerts` by migration 172: the table stopped being about
+ * Renamed from `budget_alerts` by migration 179: the table stopped being about
  * budgets when the first BACKUP_FAILED row landed in it, and a name that lies is
  * how a second table gets created beside it. `NotificationService` is the only
  * door that writes one.

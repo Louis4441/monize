@@ -3,7 +3,7 @@
 --
 -- Push is the other notification-mode fan-out beside the immediate email, and
 -- shares the same throttle gate. It lands now with the Phase 5 dispatch that
--- reads it (unlike email_notification, which was stored ahead in migration 174):
+-- reads it (unlike email_notification, which was stored ahead in migration 181):
 -- resolvePush consults this column, and NotificationDispatchService fans out to
 -- the user's live devices when it is on.
 --

@@ -75,7 +75,7 @@ BEGIN
         -- A name in this list can be renamed by a later migration, and this file
         -- is replayed on top of schema.sql on every boot and in CI -- where the
         -- old name is simply gone and the format() below would abort the whole
-        -- replay. budget_alerts became notifications in migration 172, which
+        -- replay. budget_alerts became notifications in migration 179, which
         -- re-creates this exact policy under the new name, so skipping is not a
         -- policy left off: on a database old enough for the old name to still be
         -- here, the loop runs as it always did.

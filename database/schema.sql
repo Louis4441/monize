@@ -1646,7 +1646,7 @@ CREATE TABLE budget_period_categories (
 CREATE INDEX idx_bpc_period ON budget_period_categories(budget_period_id);
 CREATE INDEX idx_bpc_category ON budget_period_categories(category_id);
 
--- Every durable notification, whatever produced it (migration 172, renamed from
+-- Every durable notification, whatever produced it (migration 179, renamed from
 -- budget_alerts). The table stopped being about budgets some time ago:
 -- BACKUP_FAILED, SMTP_FAILURE, PROVIDER_OUTAGE and SCHEDULED_POST_FAILED live
 -- here with budget_id NULL, and this is what the bell in the header reads. One
@@ -1660,7 +1660,7 @@ CREATE INDEX idx_bpc_category ON budget_period_categories(category_id);
 -- second mechanism to drift against. There is no `category` column either: what
 -- a notification is *about* is a pure function of alert_type, so it is derived
 -- by `notificationCategoryOf` rather than stored beside the value it is derived
--- from. Migration 172 has the full reasoning for all four.
+-- from. Migration 179 has the full reasoning for all four.
 CREATE TABLE notifications (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -1716,7 +1716,7 @@ CREATE UNIQUE INDEX idx_notifications_dedupe
     ON notifications(user_id, dedupe_key)
     WHERE dedupe_key IS NOT NULL;
 
--- Per-category notification channel preferences (migration 173,
+-- Per-category notification channel preferences (migration 180,
 -- docs/specs/notification-preferences.md). One row per (user, category); an
 -- absent row means the default matrix. Phase 1 carries only the live channel,
 -- email; push, unifiedpush and the throttle window land with the dispatch that
@@ -1725,20 +1725,20 @@ CREATE UNIQUE INDEX idx_notifications_dedupe
 CREATE TABLE notification_preferences (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     category VARCHAR(20) NOT NULL,
-    -- Report-mode email (batch/digest); live and unthrottled (migration 173).
+    -- Report-mode email (batch/digest); live and unthrottled (migration 180).
     email BOOLEAN NOT NULL DEFAULT true,
     -- Notification-mode email (immediate, one per event); stored now, delivered
-    -- with the push dispatch in Phase 5 (migration 174).
+    -- with the push dispatch in Phase 5 (migration 181).
     email_notification BOOLEAN NOT NULL DEFAULT false,
     -- Per-category cooldown for the notification-mode fan-out; 0 disables.
-    -- Stored now, enforced in Phase 5 (migration 174).
+    -- Stored now, enforced in Phase 5 (migration 181).
     throttle_minutes INTEGER NOT NULL DEFAULT 0,
     -- Per-category web push, the other notification-mode fan-out; read by the
-    -- Phase 5 dispatch (migration 176). DEFAULT FALSE: a matrix cell cannot turn
+    -- Phase 5 dispatch (migration 183). DEFAULT FALSE: a matrix cell cannot turn
     -- a device on, so push stays off until a device is enabled and the category
     -- toggled.
     push BOOLEAN NOT NULL DEFAULT false,
-    -- Per-category UnifiedPush/ntfy channel (migration 177); the same encrypted
+    -- Per-category UnifiedPush/ntfy channel (migration 184); the same encrypted
     -- Web Push wire as `push`, delivered to a distributor endpoint. DEFAULT
     -- FALSE for the push reason: off until a UnifiedPush subscription exists.
     unifiedpush BOOLEAN NOT NULL DEFAULT false,
@@ -1749,7 +1749,7 @@ CREATE TABLE notification_preferences (
 
 CREATE TRIGGER update_notification_preferences_updated_at BEFORE UPDATE ON notification_preferences FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Repeating / one-time notification reminders (migration 175,
+-- Repeating / one-time notification reminders (migration 182,
 -- docs/specs/notification-preferences.md Section 13). One row per active reminder
 -- a user asked for; it carries the template a fire re-emits, so a fire never
 -- reloads the (possibly dismissed) source notification. Each fire re-emits
@@ -2273,7 +2273,7 @@ CREATE UNIQUE INDEX idx_gem_strategy_signals_period ON gem_strategy_signals(stra
 CREATE INDEX idx_gem_strategy_signals_user ON gem_strategy_signals(user_id);
 
 -- ---------------------------------------------------------------------------
--- Web Push transport (migration 171).
+-- Web Push transport (migration 178).
 --
 -- push_instance_config is the deployment's push identity: one VAPID key pair
 -- per Monize instance, generated on first start so a self-hosted administrator
@@ -2313,7 +2313,7 @@ CREATE TABLE push_subscriptions (
     endpoint_hash VARCHAR(64) NOT NULL,
     p256dh VARCHAR(255) NOT NULL,
     auth VARCHAR(255) NOT NULL,
-    -- Which wire this subscription is delivered on (migration 177). 'webpush' is
+    -- Which wire this subscription is delivered on (migration 184). 'webpush' is
     -- a browser vendor's push service; 'unifiedpush' is a distributor endpoint
     -- (ntfy/NextPush), the same encrypted Web Push protocol either way. The
     -- per-user channel toggles gate the two independently.

@@ -137,7 +137,7 @@ describe("migration 140 preflight over legacy data", () => {
     // Brings the synchronize-built schema up to the real one's shape, which
     // includes applying 133 itself.
     await applyRlsPolicies(dataSource);
-    // ...and 172, which renames budget_alerts to notifications. Migration 140
+    // ...and 179, which renames budget_alerts to notifications. Migration 140
     // predates that rename and is guarded on the old name, so a database still
     // legacy enough to need 140's repair is one where the table is still called
     // budget_alerts. Renaming it back is part of reconstructing that database,

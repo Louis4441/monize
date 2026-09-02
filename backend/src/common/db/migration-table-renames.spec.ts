@@ -1,7 +1,7 @@
 /**
  * A renamed table is a name three other things still spell out.
  *
- * `budget_alerts` became `notifications` in migration 172, and the rename is the
+ * `budget_alerts` became `notifications` in migration 179, and the rename is the
  * first one this repository has done. Three places went on naming the old table
  * and only one of them fails loudly:
  *

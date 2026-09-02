@@ -151,7 +151,7 @@ describe("notification type partition", () => {
   });
 
   it("has no stored category column to disagree with the derivation", () => {
-    // Migration 172 deliberately does not add one; see its header. A column
+    // Migration 179 deliberately does not add one; see its header. A column
     // here would make this function advisory, and the first producer to forget
     // it would file a budget alert under SYSTEM with nothing failing.
     expect(notificationsTableSql()).not.toMatch(/^\s*category\s+/im);

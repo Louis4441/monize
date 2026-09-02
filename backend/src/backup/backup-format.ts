@@ -216,7 +216,7 @@ export function backupTables(data: BackupData): BackupTables {
  * either: `validateBackupFormat` compares it for equality, so bumping it would
  * reject every existing artifact instead of reading one.
  *
- * `budget_alerts` became `notifications` in migration 172.
+ * `budget_alerts` became `notifications` in migration 179.
  */
 export const LEGACY_TABLE_KEYS: Readonly<Record<string, readonly string[]>> = {
   notifications: ["budget_alerts"],

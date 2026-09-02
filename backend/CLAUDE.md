@@ -333,7 +333,7 @@ are deliberately not centralized**: a producer's own de-duplication query is
 about its candidates, not about the reader's list.
 
 `category` is derived (`notificationCategoryOf`), never stored -- see migration
-172's header for why, and `notification-category.spec.ts` asserts the column's
+179's header for why, and `notification-category.spec.ts` asserts the column's
 absence against `schema.sql`.
 
 **What a push notification COLLAPSES onto is the producer's decision, and the

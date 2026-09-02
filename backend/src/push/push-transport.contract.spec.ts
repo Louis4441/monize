@@ -19,7 +19,7 @@ import { PUSH_TRANSPORTS } from "./entities/push-subscription.entity";
  * which is a dead branch in the schema rather than a defect, but the same
  * drift.
  *
- * Migration 177 and schema.sql both declare the constraint under the same name;
+ * Migration 184 and schema.sql both declare the constraint under the same name;
  * schema.sql is the one read here because it is what a fresh install boots
  * from and what `scripts/verify-schema.sh` holds the migrations equal to.
  */
@@ -47,7 +47,7 @@ describe("push transport contract (PUSH_TRANSPORTS <-> schema CHECK)", () => {
   });
 
   it("the default wire is one the CHECK admits", () => {
-    // `webpush` is the column default in schema.sql and migration 177 and the
+    // `webpush` is the column default in schema.sql and migration 184 and the
     // value a client that sends no transport is stored under; a default outside
     // the set would make every browser subscribe fail on the CHECK.
     const schema = readFileSync(SCHEMA_PATH, "utf8");

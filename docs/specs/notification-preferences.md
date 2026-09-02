@@ -288,7 +288,7 @@ and behind a per-group toggle, defaulting off until validated on real devices.
 ## 8. Current system (as-is)
 
 - **One table, one write door.** `notifications` (renamed from `budget_alerts`
-  by migration 172). `NotificationService.create(userId, input)` is the sole
+  by migration 179). `NotificationService.create(userId, input)` is the sole
   writer (`notification-write-door.spec.ts` enforces it): a raw
   `INSERT ... ON CONFLICT DO NOTHING RETURNING id` (no conflict target, so it
   covers both the budget fingerprint index and the `dedupe_key` index), then a
@@ -343,7 +343,7 @@ and behind a per-group toggle, defaulting off until validated on real devices.
 
 ## 9. Data model and migration
 
-**Phase 1 table (migration 173)** -- `notification_preferences`, user-owned:
+**Phase 1 table (migration 180)** -- `notification_preferences`, user-owned:
 
 ```sql
 CREATE TABLE IF NOT EXISTS notification_preferences (
@@ -353,7 +353,7 @@ CREATE TABLE IF NOT EXISTS notification_preferences (
     PRIMARY KEY (user_id, category)
 );
 -- RLS: policy notification_preferences_isolation on user_id + ENABLE (Section 6
--- pattern from migrations 171/172). Classify in support-backup-rules.ts.
+-- pattern from migrations 178/179). Classify in support-backup-rules.ts.
 ```
 
 Only the columns Phase 1 consumes exist (`email`). Later phases add columns in
@@ -479,7 +479,7 @@ explicit Stop from the app; the push carrier for R4's "Stop from the
 notification" and the interrupting email/push fan-out are Phase 5, and the design
 below is built so Phase 4 needs no rework when they land.
 
-### 13.1 Data model (migration 175)
+### 13.1 Data model (migration 182)
 
 `notification_reminders`, user-owned, one row per active reminder a user asked
 for. It carries the **template** the fire re-emits, so a fire never has to reload
@@ -869,7 +869,7 @@ transport badge, renames, removes, and exposes the channel toggle); it does not
 mint the keys, because the client that will decrypt owns them. Copy says so
 rather than offering a browser button that could never receive.
 
-### 15.2 Data model (migration 177)
+### 15.2 Data model (migration 184)
 
 - `push_subscriptions.transport VARCHAR(20) NOT NULL DEFAULT 'webpush'`, with a
   `CHECK (transport IN ('webpush','unifiedpush'))` (idempotent: `DROP CONSTRAINT

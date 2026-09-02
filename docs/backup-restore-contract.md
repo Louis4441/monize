@@ -945,7 +945,7 @@ Known and unresolved; none of these is a bug report waiting to be filed:
   restore logs a warning naming the table and the row count, since rows in the
   artifact that do not come back are exactly what a restore may not be silent
   about. So far the map holds one entry, `notifications` ← `budget_alerts`
-  (migration 172).
+  (migration 179).
   `backup-format.spec.ts` covers the moves and
   `backend/src/common/db/migration-table-renames.spec.ts` reads the renames out
   of the migrations themselves, so the next rename is checked without being

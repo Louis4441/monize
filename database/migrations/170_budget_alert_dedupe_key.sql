@@ -10,7 +10,7 @@
 -- INSERT ... ON CONFLICT DO NOTHING RETURNING id the cross-replica arbiter for
 -- both the row and its email (only the insert winner sends). Budget-generated
 -- alerts keep dedupe_key NULL and stay governed by the fingerprint index.
--- Guarded on the table's existence because migration 172 renames budget_alerts
+-- Guarded on the table's existence because migration 179 renames budget_alerts
 -- to `notifications` and carries the column and the index across with it. A
 -- database that has not reached 172 still calls the table budget_alerts and runs
 -- this exactly as it always did; one that has -- a fresh install built from
@@ -22,7 +22,7 @@ DO $migration_170_dedupe$
 BEGIN
     IF to_regclass('public.budget_alerts') IS NULL THEN
         RAISE NOTICE
-            'budget_alerts has been renamed to notifications (migration 172), which carries dedupe_key and its index; skipping';
+            'budget_alerts has been renamed to notifications (migration 179), which carries dedupe_key and its index; skipping';
         RETURN;
     END IF;
 
