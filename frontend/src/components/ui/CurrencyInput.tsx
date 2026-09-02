@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, forwardRef, InputHTM
 import { useTranslations } from 'next-intl';
 import { CalculatorIcon } from '@heroicons/react/24/outline';
 import { cn, inputBaseClasses, inputErrorClasses } from '@/lib/utils';
-import { hasCalculatorOperators, evaluateExpression } from '@/lib/format';
+import { hasCalculatorOperators, evaluateExpression, roundToCents } from '@/lib/format';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import {
   filterNumberTyping,
@@ -102,8 +102,15 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
         }),
       [allowNegative, allowCalculator, numberSeparators],
     );
+    // Round to cents on parse, restoring parseAmount's contract: a money field
+    // stores what it displays (2dp). The value handed to the parent must not
+    // carry sub-cent precision the 2dp display hides. The calculator/evaluate
+    // path is deliberately left unrounded, matching the pre-refactor behaviour.
     const parse = useCallback(
-      (raw: string): number | undefined => parseLocaleNumber(raw, numberSeparators),
+      (raw: string): number | undefined => {
+        const n = parseLocaleNumber(raw, numberSeparators);
+        return n === undefined ? undefined : roundToCents(n);
+      },
       [numberSeparators],
     );
     const evaluate = useCallback(

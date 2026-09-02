@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   filterNumberTyping,
+  formatAmountLocalized,
   formatNumberForEdit,
   getNumberSeparators,
   normalizeExpression,
@@ -46,6 +47,29 @@ describe('parseLocaleNumber', () => {
     expect(parseLocaleNumber('1200.99', PL)).toBe(1200.99);
   });
 
+  it('reads a dot decimal correctly in a DOT-GROUP locale (no 100x inflation)', () => {
+    // Regression: "." is the German GROUP separator, but a trailing run that is
+    // not 3 digits cannot be a thousands group, so these are decimals, not 100x.
+    expect(parseLocaleNumber('1200.99', DE)).toBe(1200.99);
+    expect(parseLocaleNumber('5.5', DE)).toBe(5.5); // e.g. a 5.5% rate, not 55
+    expect(parseLocaleNumber('0.75', DE)).toBe(0.75);
+    // Valid grouping is still grouping: "1.234" and "1.234.567" are 1234 / 1234567.
+    expect(parseLocaleNumber('1.234', DE)).toBe(1234);
+    expect(parseLocaleNumber('1.234.567', DE)).toBe(1234567);
+    // The native comma-decimal forms keep working.
+    expect(parseLocaleNumber('1200,99', DE)).toBe(1200.99);
+    expect(parseLocaleNumber('5,5', DE)).toBe(5.5);
+  });
+
+  it('reads a dot as the DECIMAL point in en-US, never as grouping', () => {
+    // "." is the en-US decimal separator: "1.234" is one-point-two-three-four,
+    // not 1234 (that would be the dot-group reading, which must not leak into en).
+    expect(parseLocaleNumber('1.234', EN)).toBe(1.234);
+    expect(parseLocaleNumber('1.5', EN)).toBe(1.5);
+    // A European-style dot-grouped paste still resolves to the whole number.
+    expect(parseLocaleNumber('1.000.000', EN)).toBe(1000000);
+  });
+
   it('uses the LAST separator as the decimal when both appear', () => {
     expect(parseLocaleNumber('1.234,56', DE)).toBe(1234.56);
     expect(parseLocaleNumber('1,234.56', EN)).toBe(1234.56);
@@ -60,8 +84,11 @@ describe('parseLocaleNumber', () => {
 });
 
 describe('filterNumberTyping', () => {
-  it('drops the en-US grouping comma, keeps the dot (unchanged en-US behaviour)', () => {
-    expect(filterNumberTyping('1,234.56', { groupSeparator: ',' })).toBe('1234.56');
+  it('keeps both separators (parse disambiguates) and drops junk', () => {
+    // Both "." and "," survive typing so parseLocaleNumber can disambiguate them
+    // -- eagerly stripping a "." destroyed a dot-decimal in a dot-group locale.
+    expect(filterNumberTyping('1,234.56', { groupSeparator: ',' })).toBe('1,234.56');
+    expect(filterNumberTyping('1.200,99', { groupSeparator: '.' })).toBe('1.200,99');
     expect(filterNumberTyping('abc12.3', { groupSeparator: ',' })).toBe('12.3');
   });
 
@@ -99,5 +126,39 @@ describe('normalizeExpression', () => {
   it('strips en-US grouping commas and keeps dots', () => {
     expect(normalizeExpression('1,234*2', EN)).toBe('1234*2');
     expect(normalizeExpression('100*1.13', EN)).toBe('100*1.13');
+  });
+});
+
+describe('formatAmountLocalized', () => {
+  it('formats en-US through the comma formatter (grouped, fixed decimals)', () => {
+    expect(formatAmountLocalized(1234.5, 2, EN, 'en-US')).toBe('1,234.50');
+    expect(formatAmountLocalized(1234.5, 2, EN, undefined)).toBe('1,234.50');
+    // The decimals argument is honoured (a price at 4dp).
+    expect(formatAmountLocalized(1.2, 4, EN, 'en-US')).toBe('1.2000');
+  });
+
+  it('formats a comma-decimal locale with its own separators', () => {
+    // pl groups with a no-break space and a comma decimal.
+    const pl = formatAmountLocalized(1234.5, 2, PL, 'pl');
+    expect(pl).toContain(',50');
+    expect(pl).not.toContain('.'); // no dot decimal for a pl reader
+    // de groups with a dot, comma decimal.
+    expect(formatAmountLocalized(1234.5, 2, DE, 'de-DE')).toBe('1.234,50');
+  });
+
+  it('gives an Indian locale lakh grouping, not en-US grouping', () => {
+    // hi shares "." decimal and "," group with en-US but groups by lakh, so it
+    // must take the Intl branch rather than the en-US delegation.
+    expect(formatAmountLocalized(1234567, 0, { decimal: '.', group: ',' }, 'hi')).toBe(
+      '12,34,567',
+    );
+  });
+
+  it('returns empty for a missing value and survives an invalid locale', () => {
+    expect(formatAmountLocalized(undefined, 2, EN, 'en-US')).toBe('');
+    expect(formatAmountLocalized(null, 2, EN, 'en-US')).toBe('');
+    expect(formatAmountLocalized(NaN, 2, EN, 'en-US')).toBe('');
+    // An invalid locale falls back to the en-US formatter rather than throwing.
+    expect(formatAmountLocalized(1234.5, 2, EN, 'not-a-locale')).toBe('1,234.50');
   });
 });

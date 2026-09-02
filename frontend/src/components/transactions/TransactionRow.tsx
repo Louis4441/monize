@@ -24,7 +24,7 @@ import { foreignTransactionFee } from '@/lib/fx-fees';
 import { transferDirection } from '@/lib/transfer-label';
 import { usePayeeDisplay } from '@/hooks/usePayeeDisplay';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
-import { formatAmountLocalized } from '@/lib/number-parse';
+import { useLocalizedAmount } from '@/hooks/useLocalizedAmount';
 import type { StaleUnreconciledReason } from '@/lib/stale-reconciliation';
 
 const INVESTMENT_ACTION_LABELS: Record<string, string> = {
@@ -256,11 +256,9 @@ export const TransactionRow = memo(function TransactionRow({
   // The reconciliation chips live in the reconcile catalog so the register and
   // the reconcile table say the same thing about the same row.
   const tr = useTranslations('reconcile');
-  const { formatCurrency, numberSeparators, numberLocale } = useNumberFormat();
-  const seps = numberSeparators ?? { decimal: '.', group: ',' };
+  const { formatCurrency } = useNumberFormat();
   // Read-only amounts, grouped in the user's number locale (en-US unchanged).
-  const formatAmountLocal = (v: number | undefined | null, d: number = 2) =>
-    formatAmountLocalized(v, d, seps, numberLocale);
+  const formatAmountLocal = useLocalizedAmount();
   const isVoid = transaction.status === TransactionStatus.VOID;
 
   // When this row is the deep-link target, scroll it into view once it mounts

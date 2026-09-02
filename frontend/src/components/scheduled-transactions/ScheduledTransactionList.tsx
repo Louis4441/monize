@@ -10,7 +10,7 @@ import { parseLocalDate } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/errors';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
-import { formatAmountLocalized } from '@/lib/number-parse';
+import { useLocalizedAmount } from '@/hooks/useLocalizedAmount';
 import { getDecimalPlacesForCurrency } from '@/lib/format';
 import {
   overrideEffectiveAmount,
@@ -171,10 +171,7 @@ const ScheduledTransactionRow = memo(function ScheduledTransactionRow({
 }: ScheduledTransactionRowProps) {
   const rowRef = useScrollIntoViewWhen<HTMLTableRowElement>(!!isHighlighted);
   const t = useTranslations('scheduledTransactions');
-  const { numberSeparators, numberLocale } = useNumberFormat();
-  const seps = numberSeparators ?? { decimal: '.', group: ',' };
-  const formatAmountLocal = (v: number | undefined | null, d: number = 2) =>
-    formatAmountLocalized(v, d, seps, numberLocale);
+  const formatAmountLocal = useLocalizedAmount();
   const actions = buildScheduledActions(
     transaction,
     isProcessing,

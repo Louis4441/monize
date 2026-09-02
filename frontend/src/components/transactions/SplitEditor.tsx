@@ -15,8 +15,7 @@ import { Tag } from '@/types/tag';
 import { CreateSplitData, InvestmentSplitDetails } from '@/types/transaction';
 import { buildCategoryTree } from '@/lib/categoryUtils';
 import { roundToCents, roundToDecimals, getCurrencySymbol, getDecimalPlacesForCurrency } from '@/lib/format';
-import { useNumberFormat } from '@/hooks/useNumberFormat';
-import { formatAmountLocalized } from '@/lib/number-parse';
+import { useLocalizedAmount } from '@/hooks/useLocalizedAmount';
 import { buildAccountDropdownOptions } from '@/lib/account-utils';
 import { useAccountOptionLabel } from '@/hooks/useMainAccountName';
 import { InvestmentSplitFields } from './InvestmentSplitFields';
@@ -92,11 +91,8 @@ export function SplitEditor({
   onCreateCategory,
 }: SplitEditorProps) {
   const t = useTranslations('transactions');
-  const { numberSeparators, numberLocale } = useNumberFormat();
-  const seps = numberSeparators ?? { decimal: '.', group: ',' };
   // Read-only amounts, grouped in the user's number locale (en-US unchanged).
-  const formatAmountLocal = (v: number | undefined | null, d: number = 2) =>
-    formatAmountLocalized(v, d, seps, numberLocale);
+  const formatAmountLocal = useLocalizedAmount();
   const accountOptionLabel = useAccountOptionLabel({ withCurrency: false });
   const investmentSplitsEnabled = parentAccountSubType === 'INVESTMENT_CASH';
   const currencySymbol = getCurrencySymbol(currencyCode);

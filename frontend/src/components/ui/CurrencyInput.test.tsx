@@ -59,6 +59,19 @@ describe('CurrencyInput', () => {
     expect(onChange).toHaveBeenCalled();
   });
 
+  it('rounds a sub-cent typed amount to cents (parseAmount contract)', () => {
+    // A money field stores what it displays (2dp); the value handed to the parent
+    // must not carry sub-cent precision the 2dp display hides.
+    const onChange = vi.fn();
+    render(<Controlled label="Amount" initial={undefined} onChange={onChange} />);
+    const input = screen.getByLabelText('Amount');
+    fireEvent.change(input, { target: { value: '1.239' } });
+    expect(onChange).toHaveBeenLastCalledWith(1.24);
+    fireEvent.blur(input);
+    expect(input).toHaveValue('1.24');
+    expect(onChange).toHaveBeenLastCalledWith(1.24);
+  });
+
   it('has displayName', () => {
     expect(CurrencyInput.displayName).toBe('CurrencyInput');
   });
