@@ -297,7 +297,8 @@
       "categoryHeader": "Powiadomienie",
       "channels": {
         "inApp": "W aplikacji",
-        "email": "E-mail"
+        "emailReport": "E-mail (raport)",
+        "emailNotification": "E-mail (powiadomienie)"
       },
       "categories": {
         "PAYMENTS": "Rachunki i zaplanowane",
@@ -305,7 +306,12 @@
       },
       "inAppAlways": "Zawsze widoczne w dzwonku",
       "emailToggleLabel": "E-mail dla: {category}",
-      "saveFailed": "Nie udało się zapisać tego ustawienia"
+      "saveFailed": "Nie udało się zapisać tego ustawienia",
+      "throttle": {
+        "label": "Odstęp"
+      },
+      "comingSoon": "Wkrótce",
+      "comingSoonNote": "Natychmiastowe e-maile i odstęp pojawią się z powiadomieniami push."
     }
   },
   "help": {

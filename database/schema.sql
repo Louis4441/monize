@@ -1725,7 +1725,14 @@ CREATE UNIQUE INDEX idx_notifications_dedupe
 CREATE TABLE notification_preferences (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     category VARCHAR(20) NOT NULL,
+    -- Report-mode email (batch/digest); live and unthrottled (migration 173).
     email BOOLEAN NOT NULL DEFAULT true,
+    -- Notification-mode email (immediate, one per event); stored now, delivered
+    -- with the push dispatch in Phase 5 (migration 174).
+    email_notification BOOLEAN NOT NULL DEFAULT false,
+    -- Per-category cooldown for the notification-mode fan-out; 0 disables.
+    -- Stored now, enforced in Phase 5 (migration 174).
+    throttle_minutes INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, category)

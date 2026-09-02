@@ -297,7 +297,8 @@
       "categoryHeader": "[XX-Notification-XX]",
       "channels": {
         "inApp": "[XX-In-app-XX]",
-        "email": "[XX-Email-XX]"
+        "emailReport": "[XX-Email (report)-XX]",
+        "emailNotification": "[XX-Email (notification)-XX]"
       },
       "categories": {
         "PAYMENTS": "[XX-Bills and scheduled-XX]",
@@ -305,7 +306,12 @@
       },
       "inAppAlways": "[XX-Always shown in the bell-XX]",
       "emailToggleLabel": "[XX-Email for {category}-XX]",
-      "saveFailed": "[XX-Could not save that setting-XX]"
+      "saveFailed": "[XX-Could not save that setting-XX]",
+      "throttle": {
+        "label": "[XX-Cooldown-XX]"
+      },
+      "comingSoon": "[XX-Coming soon-XX]",
+      "comingSoonNote": "[XX-Immediate notification emails and the cooldown arrive with push notifications.-XX]"
     }
   },
   "help": {

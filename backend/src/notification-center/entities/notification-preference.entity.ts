@@ -30,8 +30,31 @@ export class NotificationPreference {
   @PrimaryColumn({ type: "varchar", length: 20 })
   category: NotificationCategory;
 
+  /**
+   * Report-mode email: the batch/digest emails that ship today (weekly/monthly
+   * summaries, the daily bill reminder, budget-alert's batched critical email).
+   * Live and never throttled -- a report is the batching. This is the channel
+   * `resolveEmail` gates. Defaults on (an absent row keeps today's delivery).
+   */
   @Column({ type: "boolean", default: true })
   email: boolean;
+
+  /**
+   * Notification-mode email: an immediate, one-per-event email, the channel the
+   * throttle governs. No delivery path yet -- it lands with the push dispatch
+   * (Phase 5), so the column is stored but rendered "coming soon" and defaults
+   * off. See `docs/specs/notification-preferences.md` section 4.
+   */
+  @Column({ name: "email_notification", type: "boolean", default: false })
+  emailNotification: boolean;
+
+  /**
+   * Per-category cooldown for the notification-mode fan-out, in minutes; 0
+   * disables. Stored now, enforced in Phase 5 with the dispatch it gates. It
+   * never suppresses the in-app row (the bell shows every notification).
+   */
+  @Column({ name: "throttle_minutes", type: "int", default: 0 })
+  throttleMinutes: number;
 
   @CreateDateColumn({ name: "created_at" })
   createdAt: Date;

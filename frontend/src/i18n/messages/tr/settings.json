@@ -297,7 +297,8 @@
       "categoryHeader": "Bildirim",
       "channels": {
         "inApp": "Uygulamada",
-        "email": "E-posta"
+        "emailReport": "E-posta (rapor)",
+        "emailNotification": "E-posta (bildirim)"
       },
       "categories": {
         "PAYMENTS": "Faturalar ve planlananlar",
@@ -305,7 +306,12 @@
       },
       "inAppAlways": "Zilde her zaman görünür",
       "emailToggleLabel": "{category} için e-posta",
-      "saveFailed": "Bu ayar kaydedilemedi"
+      "saveFailed": "Bu ayar kaydedilemedi",
+      "throttle": {
+        "label": "Bekleme"
+      },
+      "comingSoon": "Yakında",
+      "comingSoonNote": "Anlık bildirim e-postaları ve bekleme, push bildirimleriyle birlikte gelir."
     }
   },
   "help": {

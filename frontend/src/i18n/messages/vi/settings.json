@@ -297,7 +297,8 @@
       "categoryHeader": "Thông báo",
       "channels": {
         "inApp": "Trong ứng dụng",
-        "email": "Email"
+        "emailReport": "Email (báo cáo)",
+        "emailNotification": "Email (thông báo)"
       },
       "categories": {
         "PAYMENTS": "Hóa đơn và đã lên lịch",
@@ -305,7 +306,12 @@
       },
       "inAppAlways": "Luôn hiển thị trong chuông",
       "emailToggleLabel": "Email cho {category}",
-      "saveFailed": "Không thể lưu cài đặt đó"
+      "saveFailed": "Không thể lưu cài đặt đó",
+      "throttle": {
+        "label": "Giãn cách"
+      },
+      "comingSoon": "Sắp có",
+      "comingSoonNote": "Email thông báo tức thời và giãn cách sẽ đi kèm với thông báo đẩy."
     }
   },
   "help": {

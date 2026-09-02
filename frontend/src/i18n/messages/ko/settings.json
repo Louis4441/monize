@@ -297,7 +297,8 @@
       "categoryHeader": "알림",
       "channels": {
         "inApp": "앱 내",
-        "email": "이메일"
+        "emailReport": "이메일 (보고서)",
+        "emailNotification": "이메일 (알림)"
       },
       "categories": {
         "PAYMENTS": "청구서 및 예약",
@@ -305,7 +306,12 @@
       },
       "inAppAlways": "벨에 항상 표시됨",
       "emailToggleLabel": "{category} 이메일",
-      "saveFailed": "설정을 저장할 수 없습니다"
+      "saveFailed": "설정을 저장할 수 없습니다",
+      "throttle": {
+        "label": "간격"
+      },
+      "comingSoon": "곧 제공",
+      "comingSoonNote": "즉시 알림 이메일과 간격은 푸시 알림과 함께 제공됩니다."
     }
   },
   "help": {

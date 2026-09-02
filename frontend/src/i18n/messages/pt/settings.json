@@ -297,7 +297,8 @@
       "categoryHeader": "Notificação",
       "channels": {
         "inApp": "Na aplicação",
-        "email": "Email"
+        "emailReport": "Email (relatório)",
+        "emailNotification": "Email (notificação)"
       },
       "categories": {
         "PAYMENTS": "Contas e agendados",
@@ -305,7 +306,12 @@
       },
       "inAppAlways": "Sempre visível no sino",
       "emailToggleLabel": "Email para {category}",
-      "saveFailed": "Não foi possível guardar essa definição"
+      "saveFailed": "Não foi possível guardar essa definição",
+      "throttle": {
+        "label": "Intervalo"
+      },
+      "comingSoon": "Em breve",
+      "comingSoonNote": "Os emails de notificação imediata e o intervalo chegam com as notificações push."
     }
   },
   "help": {

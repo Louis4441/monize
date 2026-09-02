@@ -297,7 +297,8 @@
       "categoryHeader": "Notifica",
       "channels": {
         "inApp": "Nell'app",
-        "email": "Email"
+        "emailReport": "Email (report)",
+        "emailNotification": "Email (notifica)"
       },
       "categories": {
         "PAYMENTS": "Bollette e programmati",
@@ -305,7 +306,12 @@
       },
       "inAppAlways": "Sempre visibile nella campanella",
       "emailToggleLabel": "Email per {category}",
-      "saveFailed": "Impossibile salvare questa impostazione"
+      "saveFailed": "Impossibile salvare questa impostazione",
+      "throttle": {
+        "label": "Intervallo"
+      },
+      "comingSoon": "Presto",
+      "comingSoonNote": "Le email di notifica immediata e l'intervallo arrivano con le notifiche push."
     }
   },
   "help": {

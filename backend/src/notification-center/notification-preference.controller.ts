@@ -34,7 +34,7 @@ export class NotificationPreferenceController {
   }
 
   @Put(":category")
-  setEmail(
+  update(
     @Request() req: { user: { id: string } },
     @Param("category", new ParseEnumPipe(NotificationCategory))
     category: NotificationCategory,
@@ -47,6 +47,10 @@ export class NotificationPreferenceController {
         `Category ${category} is not configurable here`,
       );
     }
-    return this.preferences.setEmail(req.user.id, category, dto.email);
+    return this.preferences.updatePreference(req.user.id, category, {
+      email: dto.email,
+      emailNotification: dto.emailNotification,
+      throttleMinutes: dto.throttleMinutes,
+    });
   }
 }

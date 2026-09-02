@@ -297,7 +297,8 @@
       "categoryHeader": "सूचना",
       "channels": {
         "inApp": "ऐप में",
-        "email": "ईमेल"
+        "emailReport": "ईमेल (रिपोर्ट)",
+        "emailNotification": "ईमेल (सूचना)"
       },
       "categories": {
         "PAYMENTS": "बिल और शेड्यूल",
@@ -305,7 +306,12 @@
       },
       "inAppAlways": "घंटी में हमेशा दिखती है",
       "emailToggleLabel": "{category} के लिए ईमेल",
-      "saveFailed": "यह सेटिंग सहेजी नहीं जा सकी"
+      "saveFailed": "यह सेटिंग सहेजी नहीं जा सकी",
+      "throttle": {
+        "label": "अंतराल"
+      },
+      "comingSoon": "जल्द ही",
+      "comingSoonNote": "तत्काल सूचना ईमेल और अंतराल पुश सूचनाओं के साथ आएंगे।"
     }
   },
   "help": {

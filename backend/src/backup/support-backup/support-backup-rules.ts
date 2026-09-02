@@ -546,7 +546,9 @@ export const RULES: Record<string, TableRules> = {
   notification_preferences: {
     user_id: keep,
     category: keep, // a derived NotificationCategory value, not free text
-    email: keep,
+    email: keep, // report-mode email flag
+    email_notification: keep, // notification-mode email flag
+    throttle_minutes: keep, // an integer cooldown, not identifying
     created_at: keep,
     updated_at: keep,
   },

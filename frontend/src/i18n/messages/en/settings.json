@@ -297,7 +297,8 @@
       "categoryHeader": "Notification",
       "channels": {
         "inApp": "In-app",
-        "email": "Email"
+        "emailReport": "Email (report)",
+        "emailNotification": "Email (notification)"
       },
       "categories": {
         "PAYMENTS": "Bills and scheduled",
@@ -305,7 +306,12 @@
       },
       "inAppAlways": "Always shown in the bell",
       "emailToggleLabel": "Email for {category}",
-      "saveFailed": "Could not save that setting"
+      "saveFailed": "Could not save that setting",
+      "throttle": {
+        "label": "Cooldown"
+      },
+      "comingSoon": "Coming soon",
+      "comingSoonNote": "Immediate notification emails and the cooldown arrive with push notifications."
     }
   },
   "help": {

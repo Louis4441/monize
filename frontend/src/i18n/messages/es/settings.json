@@ -297,7 +297,8 @@
       "categoryHeader": "Notificación",
       "channels": {
         "inApp": "En la app",
-        "email": "Correo"
+        "emailReport": "Correo (informe)",
+        "emailNotification": "Correo (notificación)"
       },
       "categories": {
         "PAYMENTS": "Facturas y programados",
@@ -305,7 +306,12 @@
       },
       "inAppAlways": "Siempre visible en la campana",
       "emailToggleLabel": "Correo para {category}",
-      "saveFailed": "No se pudo guardar ese ajuste"
+      "saveFailed": "No se pudo guardar ese ajuste",
+      "throttle": {
+        "label": "Espera"
+      },
+      "comingSoon": "Próximamente",
+      "comingSoonNote": "Los correos de notificación inmediata y la espera llegan con las notificaciones push."
     }
   },
   "help": {

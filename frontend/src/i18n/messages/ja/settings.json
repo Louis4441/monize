@@ -297,7 +297,8 @@
       "categoryHeader": "通知",
       "channels": {
         "inApp": "アプリ内",
-        "email": "メール"
+        "emailReport": "メール（レポート）",
+        "emailNotification": "メール（通知）"
       },
       "categories": {
         "PAYMENTS": "請求と予定",
@@ -305,7 +306,12 @@
       },
       "inAppAlways": "ベルには常に表示されます",
       "emailToggleLabel": "{category} のメール",
-      "saveFailed": "設定を保存できませんでした"
+      "saveFailed": "設定を保存できませんでした",
+      "throttle": {
+        "label": "間隔"
+      },
+      "comingSoon": "近日公開",
+      "comingSoonNote": "即時通知メールと間隔はプッシュ通知とともに提供されます。"
     }
   },
   "help": {

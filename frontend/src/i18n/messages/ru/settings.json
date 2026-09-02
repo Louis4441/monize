@@ -297,7 +297,8 @@
       "categoryHeader": "Уведомление",
       "channels": {
         "inApp": "В приложении",
-        "email": "Эл. почта"
+        "emailReport": "Эл. почта (отчёт)",
+        "emailNotification": "Эл. почта (уведомление)"
       },
       "categories": {
         "PAYMENTS": "Счета и запланированное",
@@ -305,7 +306,12 @@
       },
       "inAppAlways": "Всегда видно в колокольчике",
       "emailToggleLabel": "Эл. почта для «{category}»",
-      "saveFailed": "Не удалось сохранить эту настройку"
+      "saveFailed": "Не удалось сохранить эту настройку",
+      "throttle": {
+        "label": "Пауза"
+      },
+      "comingSoon": "Скоро",
+      "comingSoonNote": "Мгновенные уведомления по эл. почте и пауза появятся вместе с push-уведомлениями."
     }
   },
   "help": {

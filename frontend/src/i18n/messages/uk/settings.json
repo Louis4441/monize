@@ -297,7 +297,8 @@
       "categoryHeader": "Сповіщення",
       "channels": {
         "inApp": "У застосунку",
-        "email": "Ел. пошта"
+        "emailReport": "Ел. пошта (звіт)",
+        "emailNotification": "Ел. пошта (сповіщення)"
       },
       "categories": {
         "PAYMENTS": "Рахунки та заплановані",
@@ -305,7 +306,12 @@
       },
       "inAppAlways": "Завжди видно в дзвіночку",
       "emailToggleLabel": "Ел. пошта для «{category}»",
-      "saveFailed": "Не вдалося зберегти це налаштування"
+      "saveFailed": "Не вдалося зберегти це налаштування",
+      "throttle": {
+        "label": "Пауза"
+      },
+      "comingSoon": "Незабаром",
+      "comingSoonNote": "Миттєві листи-сповіщення та пауза з’являться разом із push-сповіщеннями."
     }
   },
   "help": {

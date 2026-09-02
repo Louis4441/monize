@@ -297,7 +297,8 @@
       "categoryHeader": "通知",
       "channels": {
         "inApp": "应用内",
-        "email": "邮件"
+        "emailReport": "邮件（报告）",
+        "emailNotification": "邮件（通知）"
       },
       "categories": {
         "PAYMENTS": "账单与计划",
@@ -305,7 +306,12 @@
       },
       "inAppAlways": "始终显示在铃铛中",
       "emailToggleLabel": "{category} 的邮件",
-      "saveFailed": "无法保存该设置"
+      "saveFailed": "无法保存该设置",
+      "throttle": {
+        "label": "间隔"
+      },
+      "comingSoon": "即将推出",
+      "comingSoonNote": "即时通知邮件和间隔将随推送通知一起提供。"
     }
   },
   "help": {

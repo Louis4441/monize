@@ -297,7 +297,8 @@
       "categoryHeader": "Notifikasi",
       "channels": {
         "inApp": "Dalam aplikasi",
-        "email": "Email"
+        "emailReport": "Email (laporan)",
+        "emailNotification": "Email (notifikasi)"
       },
       "categories": {
         "PAYMENTS": "Tagihan dan terjadwal",
@@ -305,7 +306,12 @@
       },
       "inAppAlways": "Selalu tampil di lonceng",
       "emailToggleLabel": "Email untuk {category}",
-      "saveFailed": "Tidak dapat menyimpan setelan itu"
+      "saveFailed": "Tidak dapat menyimpan setelan itu",
+      "throttle": {
+        "label": "Jeda"
+      },
+      "comingSoon": "Segera",
+      "comingSoonNote": "Email notifikasi langsung dan jeda hadir bersama notifikasi push."
     }
   },
   "help": {

@@ -123,51 +123,49 @@ login/2FA notification types exist), so it enters with those producers.
 
 ---
 
-## 4. Throttling / grouping rules (R7)
+## 4. Two email modes, and what the throttle gates (R7)
 
-> **UNRESOLVED -- this section as written contradicts Section 3, and the first
-> implementation attempt (reverted) followed this section and violated the
-> ruling.** Section 3 is the maintainer's explicit ruling: "in_app is always on
-> ... the throttle below **never suppresses an in-app row**"; the bell shows
-> every notification. This section's "returns the null shape" means **no row is
-> written** -- so a throttled notification vanished from the bell, not just from
-> email/push. The two cannot both hold. The **in_app row must always be written**
-> (Section 3 wins), so the throttle has to gate the **fan-out channels**
-> (email/push), never the row. Because the only live fan-out today is email --
-> already producer-gated by `resolveEmail(category)` -- and `budget-alert`
-> *batches* several alerts into one immediate email, moving the throttle to a
-> fan-out gate is a producer-side change (and a batching-semantics decision) the
-> maintainer must sign off before it is built. The paragraph below is kept as the
-> original (wrong) description and must be rewritten to "gate the fan-out, keep
-> the row" once that decision is made.
+**Resolved (maintainer, replacing the earlier contradictory draft).** The first
+throttle attempt made the write door *drop the row* when throttled, which
+contradicted Section 3's ruling that the in-app row is always written -- so a
+throttled notification vanished from the bell. That attempt was reverted. The
+model below is the reconciliation.
 
-A per-group `throttle_minutes` window. When a producer is about to create a
-notification of group G for user U, the write door checks whether a
-**non-dismissed** notification of group G for U was created within the last
-`throttle_minutes`. If so, the new one is **suppressed** (returns the "somebody
-else holds this" null shape the door already uses for a dedupe conflict), except:
+Email is delivered in **two modes**, and the matrix carries a column for each:
 
-- `throttle_minutes = 0` disables throttling for that group (bills, investments,
-  goals default to 0 because each event is its own subject the user wants).
-- Throttling is **per group, per user**, evaluated *inside the same transaction*
-  as the insert (a check that can refuse belongs in the write transaction --
-  `backend/CLAUDE.md` "Rejection happens before the write"), and under the
-  advisory/uniqueness guard the door already holds, so two producers racing the
-  same window cannot both pass.
-- Throttling suppresses **delivery of a new row**, never the existing one; and it
-  never suppresses a *higher-severity* escalation of the same subject (a `critical`
-  after a `warning` in the same window is delivered, because silence on an
-  escalation is the dangerous direction). Severity is already on the row.
+- **`email_report` -- report mode (the batch/digest, exactly as today).** The
+  weekly budget digest, the monthly summary, the daily bill reminder, and
+  `budget-alert`'s batched immediate-critical email are all reports: several
+  events summarised into one message on a schedule (or one per cron run).
+  Reports are **never throttled** -- a report *is* the batching -- and they are
+  gated only by their `email_report` column (plus their own digest toggles).
+  This is the channel `resolveEmail(category)` gates today; the Phase 1 matrix
+  column is renamed to make that honest.
+- **`email_notification` -- notification mode (immediate, one message per
+  notification).** This is the channel the throttle governs. It does **not
+  exist as a delivery path yet**: it lands with the push dispatch (Section 5 /
+  Phase 5), because push is the other notification-mode fan-out and the two
+  share the same gate. Until then the column is **stored but rendered
+  "coming soon"** (the UnifiedPush pattern in Section 1), so no migration is
+  needed later.
 
-This is a **rate limit layered on top of** the existing exact-duplicate dedupe
-(the fingerprint / dedupe-key unique index), not a replacement: dedupe stops the
-identical row, throttle stops a *different* row of the same group too soon.
+**The throttle gates the notification-mode fan-out, never the in-app row and
+never a report.** In-app is always written (Section 3). When a
+notification-mode delivery (immediate email or push) is about to go out for
+group G and user U, it is suppressed if a **non-dismissed** notification of G
+was created within the last `throttle_minutes` -- except a strictly
+*higher-severity escalation*, which always goes (silence on an escalation is the
+dangerous direction). The in-app row for the suppressed one still exists in the
+bell; only the interrupting fan-out is skipped. `throttle_minutes = 0` disables
+the window for that group.
 
-The window is a preference, so it is resolved through
-`resolveNotificationPreference`. `docs/concurrency-and-idempotency.md` gains an
-entry: "notification group throttle -- windowed count inside the write
-transaction, mechanism = the notifications insert transaction + the existing
-dedupe index".
+This is a **rate limit on the interrupting channels**, layered on top of the
+exact-duplicate dedupe (the fingerprint / dedupe-key unique index): dedupe stops
+the identical row, the throttle stops a *different* same-group interruption too
+soon. `throttle_minutes` is stored now (inert), and its enforcement -- a windowed
+check at the notification-mode fan-out, its concurrency mechanism, and how it
+reads across `budget-alert`'s batching -- is specified and built in Phase 5 with
+the push dispatch, not in the write door's row creation.
 
 ---
 

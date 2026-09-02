@@ -297,7 +297,8 @@
       "categoryHeader": "Notification",
       "channels": {
         "inApp": "Dans l'appli",
-        "email": "E-mail"
+        "emailReport": "E-mail (rapport)",
+        "emailNotification": "E-mail (notification)"
       },
       "categories": {
         "PAYMENTS": "Factures et planifiés",
@@ -305,7 +306,12 @@
       },
       "inAppAlways": "Toujours visible dans la cloche",
       "emailToggleLabel": "E-mail pour {category}",
-      "saveFailed": "Impossible d'enregistrer ce réglage"
+      "saveFailed": "Impossible d'enregistrer ce réglage",
+      "throttle": {
+        "label": "Délai"
+      },
+      "comingSoon": "Bientôt",
+      "comingSoonNote": "Les e-mails de notification immédiate et le délai arrivent avec les notifications push."
     }
   },
   "help": {

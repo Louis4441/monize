@@ -297,7 +297,8 @@
       "categoryHeader": "通知",
       "channels": {
         "inApp": "應用程式內",
-        "email": "電子郵件"
+        "emailReport": "郵件（報告）",
+        "emailNotification": "郵件（通知）"
       },
       "categories": {
         "PAYMENTS": "帳單與排程",
@@ -305,7 +306,12 @@
       },
       "inAppAlways": "始終顯示在鈴鐺中",
       "emailToggleLabel": "{category} 的電子郵件",
-      "saveFailed": "無法儲存該設定"
+      "saveFailed": "無法儲存該設定",
+      "throttle": {
+        "label": "間隔"
+      },
+      "comingSoon": "即將推出",
+      "comingSoonNote": "即時通知郵件和間隔將隨推播通知一起提供。"
     }
   },
   "help": {

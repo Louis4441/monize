@@ -297,7 +297,8 @@
       "categoryHeader": "Melding",
       "channels": {
         "inApp": "In de app",
-        "email": "E-mail"
+        "emailReport": "E-mail (rapport)",
+        "emailNotification": "E-mail (melding)"
       },
       "categories": {
         "PAYMENTS": "Rekeningen en gepland",
@@ -305,7 +306,12 @@
       },
       "inAppAlways": "Altijd zichtbaar in de bel",
       "emailToggleLabel": "E-mail voor {category}",
-      "saveFailed": "Kon die instelling niet opslaan"
+      "saveFailed": "Kon die instelling niet opslaan",
+      "throttle": {
+        "label": "Wachttijd"
+      },
+      "comingSoon": "Binnenkort",
+      "comingSoonNote": "Directe meldings-e-mails en de wachttijd komen met pushmeldingen."
     }
   },
   "help": {

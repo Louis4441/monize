@@ -4,24 +4,24 @@ import { render } from '@/test/render';
 import { NotificationPreferencesMatrix } from './NotificationPreferencesMatrix';
 
 const list = vi.fn();
-const setEmail = vi.fn();
+const update = vi.fn();
 vi.mock('@/lib/notification-preferences', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/notification-preferences')>()),
   notificationPreferencesApi: {
     list: (...a: unknown[]) => list(...a),
-    setEmail: (...a: unknown[]) => setEmail(...a),
+    update: (...a: unknown[]) => update(...a),
   },
 }));
 
 describe('NotificationPreferencesMatrix', () => {
   beforeEach(() => {
     list.mockReset().mockResolvedValue([
-      { category: 'PAYMENTS', email: true },
-      { category: 'BUDGETS', email: false },
+      { category: 'PAYMENTS', email: true, emailNotification: false, throttleMinutes: 0 },
+      { category: 'BUDGETS', email: false, emailNotification: false, throttleMinutes: 0 },
     ]);
-    setEmail
+    update
       .mockReset()
-      .mockResolvedValue({ category: 'PAYMENTS', email: false });
+      .mockResolvedValue({ category: 'PAYMENTS', email: false, emailNotification: false, throttleMinutes: 0 });
   });
   afterEach(() => cleanup());
 
@@ -32,27 +32,35 @@ describe('NotificationPreferencesMatrix', () => {
     await act(async () => {}); // drain the mount fetch
   }
 
-  it('renders a row per exposed category', async () => {
+  it('renders a report-email switch per category, with in-app locked on', async () => {
     await renderMatrix();
     expect(screen.getByText('Bills and scheduled')).toBeInTheDocument();
     expect(screen.getByText('Budgets')).toBeInTheDocument();
-    // In-app is always on: two rows, so two switches (the email column only).
+    // Only the report email is a live control: two rows, so two switches.
     expect(screen.getAllByRole('switch')).toHaveLength(2);
   });
 
-  it('persists the new value for the toggled category', async () => {
+  it('shows notification email and cooldown as coming soon (no live control)', async () => {
+    await renderMatrix();
+    // Two rows x two coming-soon cells (notification email + cooldown) = four.
+    expect(screen.getAllByText('Coming soon')).toHaveLength(4);
+    // No cooldown select is rendered yet.
+    expect(screen.queryByRole('combobox')).toBeNull();
+  });
+
+  it('persists the report-email toggle for the category', async () => {
     await renderMatrix();
     const switches = screen.getAllByRole('switch');
     await act(async () => {
-      fireEvent.click(switches[0]); // PAYMENTS, currently on
+      fireEvent.click(switches[0]); // PAYMENTS report email, currently on
     });
     await waitFor(() =>
-      expect(setEmail).toHaveBeenCalledWith('PAYMENTS', false),
+      expect(update).toHaveBeenCalledWith('PAYMENTS', { email: false }),
     );
   });
 
   it('reverts the toggle when the save fails', async () => {
-    setEmail.mockRejectedValue(new Error('boom'));
+    update.mockRejectedValue(new Error('boom'));
     await renderMatrix();
     const paymentsSwitch = screen.getAllByRole('switch')[0];
     expect(paymentsSwitch.getAttribute('aria-checked')).toBe('true');
