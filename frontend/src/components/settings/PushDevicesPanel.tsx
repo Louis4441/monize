@@ -429,6 +429,11 @@ export function PushDevicesPanel() {
                       {t('thisDevice')}
                     </span>
                   )}
+                  {device.transport === 'unifiedpush' && (
+                    <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                      {t('unifiedpushBadge')}
+                    </span>
+                  )}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   {device.disabledAt

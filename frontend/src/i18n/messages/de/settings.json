@@ -258,6 +258,7 @@
       "sendingTestButton": "Wird gesendet ...",
       "removeButton": "Entfernen",
       "thisDevice": "Dieses Gerät",
+      "unifiedpushBadge": "UnifiedPush",
       "unnamedDevice": "Unbenanntes Gerät",
       "lastSeen": "Zuletzt aktiv {when}",
       "noLiveDevices": "Noch kein Gerät registriert. Aktivieren Sie Push auf diesem Gerät, um einen Test zu senden.",
@@ -299,7 +300,8 @@
         "inApp": "In der App",
         "emailReport": "E-Mail (Bericht)",
         "emailNotification": "E-Mail (Warnung)",
-        "push": "Push"
+        "push": "Push",
+        "unifiedpush": "UnifiedPush"
       },
       "categories": {
         "PAYMENTS": "Rechnungen und Geplantes",
@@ -326,8 +328,10 @@
       },
       "emailNotificationToggleLabel": "Warn-E-Mail für {category}",
       "pushToggleLabel": "Push für {category}",
+      "unifiedpushToggleLabel": "UnifiedPush für {category}",
       "emailUnavailable": "Aktivieren Sie oben die E-Mail-Benachrichtigungen, um diese per E-Mail zu senden.",
-      "pushUnavailable": "Aktivieren Sie zuerst Push auf diesem Gerät (siehe unten)."
+      "pushUnavailable": "Aktivieren Sie zuerst Push auf diesem Gerät (siehe unten).",
+      "unifiedpushUnavailable": "Registriere einen UnifiedPush-Endpunkt in deiner Distributor-App, um diesen Kanal zu nutzen."
     }
   },
   "help": {

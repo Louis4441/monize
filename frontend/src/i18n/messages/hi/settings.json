@@ -258,6 +258,7 @@
       "sendingTestButton": "भेजा जा रहा है...",
       "removeButton": "हटाएं",
       "thisDevice": "यह डिवाइस",
+      "unifiedpushBadge": "UnifiedPush",
       "unnamedDevice": "बिना नाम का डिवाइस",
       "lastSeen": "अंतिम सक्रियता {when}",
       "noLiveDevices": "अभी कोई डिवाइस पंजीकृत नहीं है। परीक्षण भेजने के लिए इस डिवाइस पर पुश चालू करें।",
@@ -299,7 +300,8 @@
         "inApp": "ऐप में",
         "emailReport": "ईमेल (रिपोर्ट)",
         "emailNotification": "ई-मेल (अलर्ट)",
-        "push": "पुश"
+        "push": "पुश",
+        "unifiedpush": "UnifiedPush"
       },
       "categories": {
         "PAYMENTS": "बिल और शेड्यूल",
@@ -326,8 +328,10 @@
       },
       "emailNotificationToggleLabel": "{category} के लिए अलर्ट ई-मेल",
       "pushToggleLabel": "{category} के लिए पुश",
+      "unifiedpushToggleLabel": "{category} के लिए UnifiedPush",
       "emailUnavailable": "इन्हें ई-मेल से भेजने के लिए ऊपर ई-मेल सूचनाएँ चालू करें।",
-      "pushUnavailable": "पहले इस डिवाइस पर पुश सक्षम करें (नीचे देखें)।"
+      "pushUnavailable": "पहले इस डिवाइस पर पुश सक्षम करें (नीचे देखें)।",
+      "unifiedpushUnavailable": "इस चैनल का उपयोग करने के लिए अपने डिस्ट्रीब्यूटर ऐप से एक UnifiedPush एंडपॉइंट पंजीकृत करें।"
     }
   },
   "help": {

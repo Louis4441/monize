@@ -258,6 +258,7 @@
       "sendingTestButton": "Отправка...",
       "removeButton": "Удалить",
       "thisDevice": "Это устройство",
+      "unifiedpushBadge": "UnifiedPush",
       "unnamedDevice": "Устройство без имени",
       "lastSeen": "Последняя активность {when}",
       "noLiveDevices": "Устройства ещё не зарегистрированы. Включите push на этом устройстве, чтобы отправить тест.",
@@ -299,7 +300,8 @@
         "inApp": "В приложении",
         "emailReport": "Эл. почта (отчёт)",
         "emailNotification": "Эл. почта (оповещение)",
-        "push": "Push"
+        "push": "Push",
+        "unifiedpush": "UnifiedPush"
       },
       "categories": {
         "PAYMENTS": "Счета и запланированное",
@@ -326,8 +328,10 @@
       },
       "emailNotificationToggleLabel": "Оповещение по эл. почте для «{category}»",
       "pushToggleLabel": "Push для «{category}»",
+      "unifiedpushToggleLabel": "UnifiedPush для {category}",
       "emailUnavailable": "Включите уведомления по эл. почте выше, чтобы отправлять их по эл. почте.",
-      "pushUnavailable": "Сначала включите push на этом устройстве (см. ниже)."
+      "pushUnavailable": "Сначала включите push на этом устройстве (см. ниже).",
+      "unifiedpushUnavailable": "Зарегистрируйте конечную точку UnifiedPush в приложении-дистрибьюторе, чтобы использовать этот канал."
     }
   },
   "help": {

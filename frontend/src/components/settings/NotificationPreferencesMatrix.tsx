@@ -48,10 +48,13 @@ export function NotificationPreferencesMatrix({
   const [rows, setRows] = useState<NotificationChannelPreference[] | null>(null);
   const [savingCategory, setSavingCategory] =
     useState<NotificationCategory | null>(null);
-  // A live device is what makes the push column a real control. Absent or a
-  // failed lookup reads as "no device" (0), which errs toward disabling push
-  // rather than offering a toggle that could never deliver.
-  const [liveDeviceCount, setLiveDeviceCount] = useState(0);
+  // A live device on a wire is what makes that wire's column a real control.
+  // Counted per transport, because push (web push) and unifiedpush are gated
+  // independently: a browser with a web-push device but no UnifiedPush endpoint
+  // can toggle push, not unifiedpush. Absent or a failed lookup reads as "no
+  // device" (0), erring toward disabling a toggle that could never deliver.
+  const [liveWebPushCount, setLiveWebPushCount] = useState(0);
+  const [liveUnifiedPushCount, setLiveUnifiedPushCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,8 +80,15 @@ export function NotificationPreferencesMatrix({
       .listDevices()
       .then((devices) => {
         if (!cancelled) {
-          setLiveDeviceCount(
-            devices.filter((device) => device.disabledAt === null).length,
+          const live = devices.filter((device) => device.disabledAt === null);
+          // A device from before the transport field reads as web push, today's
+          // only wire -- never as UnifiedPush, so an old row cannot light a
+          // column whose endpoint does not exist.
+          setLiveWebPushCount(
+            live.filter((d) => (d.transport ?? 'webpush') === 'webpush').length,
+          );
+          setLiveUnifiedPushCount(
+            live.filter((d) => d.transport === 'unifiedpush').length,
           );
         }
       })
@@ -126,7 +136,8 @@ export function NotificationPreferencesMatrix({
 
   if (rows === null || rows.length === 0) return null;
 
-  const pushAvailable = liveDeviceCount >= 1;
+  const pushAvailable = liveWebPushCount >= 1;
+  const unifiedPushAvailable = liveUnifiedPushCount >= 1;
 
   // A cell for a channel this category does not expose as a control. The dash is
   // decorative; the meaning is carried by the localized label for assistive tech.
@@ -168,6 +179,9 @@ export function NotificationPreferencesMatrix({
                 {t('channels.push')}
               </th>
               <th className="pb-2 text-center font-medium">
+                {t('channels.unifiedpush')}
+              </th>
+              <th className="pb-2 text-center font-medium">
                 {t('throttle.label')}
               </th>
             </tr>
@@ -186,7 +200,8 @@ export function NotificationPreferencesMatrix({
               // meaningful once a SUPPORTED interrupting channel is on for the row.
               const interrupting =
                 (support.emailNotification && row.emailNotification) ||
-                (support.push && row.push);
+                (support.push && row.push) ||
+                (support.unifiedpush && row.unifiedpush);
               return (
                 <tr
                   key={row.category}
@@ -265,6 +280,29 @@ export function NotificationPreferencesMatrix({
                       notApplicableCell
                     )}
                   </td>
+                  <td className="py-2">
+                    {support.unifiedpush ? (
+                      <div className="flex justify-center">
+                        <ToggleSwitch
+                          checked={row.unifiedpush}
+                          disabled={saving || !unifiedPushAvailable}
+                          onChange={() =>
+                            applyPatch(
+                              row.category,
+                              { unifiedpush: !row.unifiedpush },
+                              row,
+                            )
+                          }
+                          label={t('unifiedpushToggleLabel', {
+                            category: categoryLabel,
+                          })}
+                          size="sm"
+                        />
+                      </div>
+                    ) : (
+                      notApplicableCell
+                    )}
+                  </td>
                   <td className="py-2 text-center">
                     <select
                       value={String(row.throttleMinutes)}
@@ -298,6 +336,7 @@ export function NotificationPreferencesMatrix({
         <li>{t('throttle.hint')}</li>
         {!emailAvailable && <li>{t('emailUnavailable')}</li>}
         {!pushAvailable && <li>{t('pushUnavailable')}</li>}
+        {!unifiedPushAvailable && <li>{t('unifiedpushUnavailable')}</li>}
       </ul>
     </div>
   );

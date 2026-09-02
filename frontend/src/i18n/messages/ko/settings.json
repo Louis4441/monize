@@ -258,6 +258,7 @@
       "sendingTestButton": "보내는 중...",
       "removeButton": "삭제",
       "thisDevice": "이 기기",
+      "unifiedpushBadge": "UnifiedPush",
       "unnamedDevice": "이름 없는 기기",
       "lastSeen": "마지막 활동 {when}",
       "noLiveDevices": "아직 등록된 기기가 없습니다. 테스트를 보내려면 이 기기에서 푸시를 켜세요.",
@@ -299,7 +300,8 @@
         "inApp": "앱 내",
         "emailReport": "이메일 (보고서)",
         "emailNotification": "이메일(알림)",
-        "push": "푸시"
+        "push": "푸시",
+        "unifiedpush": "UnifiedPush"
       },
       "categories": {
         "PAYMENTS": "청구서 및 예약",
@@ -326,8 +328,10 @@
       },
       "emailNotificationToggleLabel": "{category} 알림 이메일",
       "pushToggleLabel": "{category} 푸시",
+      "unifiedpushToggleLabel": "{category} UnifiedPush",
       "emailUnavailable": "이메일로 보내려면 위에서 이메일 알림을 켜세요.",
-      "pushUnavailable": "먼저 이 기기에서 푸시를 켜세요(아래 참조)."
+      "pushUnavailable": "먼저 이 기기에서 푸시를 켜세요(아래 참조).",
+      "unifiedpushUnavailable": "이 채널을 사용하려면 배포자 앱에서 UnifiedPush 엔드포인트를 등록하세요."
     }
   },
   "help": {

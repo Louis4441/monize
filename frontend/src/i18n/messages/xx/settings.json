@@ -258,6 +258,7 @@
       "sendingTestButton": "[XX-Sending...-XX]",
       "removeButton": "[XX-Remove-XX]",
       "thisDevice": "[XX-This device-XX]",
+      "unifiedpushBadge": "[XX-UnifiedPush-XX]",
       "unnamedDevice": "[XX-Unnamed device-XX]",
       "lastSeen": "[XX-Last active {when}-XX]",
       "noLiveDevices": "[XX-No device is registered yet. Enable push on this device to send a test.-XX]",
@@ -299,7 +300,8 @@
         "inApp": "[XX-In-app-XX]",
         "emailReport": "[XX-Email (report)-XX]",
         "emailNotification": "[XX-Email (alert)-XX]",
-        "push": "[XX-Push-XX]"
+        "push": "[XX-Push-XX]",
+        "unifiedpush": "[XX-UnifiedPush-XX]"
       },
       "categories": {
         "PAYMENTS": "[XX-Bills and scheduled-XX]",
@@ -311,9 +313,11 @@
       "emailToggleLabel": "[XX-Report email for {category}-XX]",
       "emailNotificationToggleLabel": "[XX-Alert email for {category}-XX]",
       "pushToggleLabel": "[XX-Push for {category}-XX]",
+      "unifiedpushToggleLabel": "[XX-UnifiedPush for {category}-XX]",
       "saveFailed": "[XX-Could not save that setting-XX]",
       "emailUnavailable": "[XX-Turn on email notifications above to send these by email.-XX]",
       "pushUnavailable": "[XX-Enable push on this device first (see below).-XX]",
+      "unifiedpushUnavailable": "[XX-Register a UnifiedPush endpoint from your distributor app to use this channel.-XX]",
       "throttle": {
         "label": "[XX-Cooldown-XX]",
         "ariaLabel": "[XX-Cooldown for {category}-XX]",

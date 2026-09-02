@@ -6,6 +6,15 @@ import { useAuthStore } from '@/store/authStore';
 /** Why a device stopped being reachable. Mirrors the backend enum. */
 export type PushDisabledReason = 'GONE' | 'KEY_ROTATED' | 'FAILING';
 
+/**
+ * The wire a device is on. `'webpush'` is a browser vendor's push service;
+ * `'unifiedpush'` is a UnifiedPush distributor endpoint (ntfy/NextPush) -- the
+ * same encrypted Web Push protocol, gated by a separate channel toggle. Mirrors
+ * the backend `PushTransport`. Absent on a response from before it, so read it
+ * defensively (treat a missing value as `'webpush'`, today's only wire).
+ */
+export type PushTransport = 'webpush' | 'unifiedpush';
+
 export interface PushDevice {
   id: string;
   /**
@@ -16,6 +25,8 @@ export interface PushDevice {
   endpointFingerprint: string;
   deviceName: string | null;
   userAgent: string | null;
+  /** Which wire this device is on; absent means `'webpush'` (an older backend). */
+  transport?: PushTransport;
   createdAt: string;
   lastSeenAt: string;
   lastSuccessAt: string | null;

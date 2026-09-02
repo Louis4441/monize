@@ -19,23 +19,27 @@ vi.mock('@/lib/push', async (importOriginal) => ({
   pushApi: { listDevices: (...a: unknown[]) => listDevices(...a) },
 }));
 
+// A live web-push device (absent transport reads as webpush); a disabled one;
+// and a live UnifiedPush device for the unifiedpush-column test.
 const liveDevice = { id: 'd1', disabledAt: null };
 const disabledDevice = { id: 'd2', disabledAt: '2026-09-01T00:00:00Z' };
+const liveUnifiedDevice = { id: 'd3', disabledAt: null, transport: 'unifiedpush' };
 
 describe('NotificationPreferencesMatrix', () => {
-  const allChannels = { email: true, emailNotification: true, push: true };
-  const pushOnly = { email: false, emailNotification: false, push: true };
+  const allChannels = { email: true, emailNotification: true, push: true, unifiedpush: true };
+  const pushOnly = { email: false, emailNotification: false, push: true, unifiedpush: true };
 
   beforeEach(() => {
     list.mockReset().mockResolvedValue([
-      { category: 'PAYMENTS', email: true, emailNotification: false, push: false, throttleMinutes: 0, supportedChannels: allChannels },
-      { category: 'BUDGETS', email: false, emailNotification: true, push: false, throttleMinutes: 15, supportedChannels: allChannels },
-      { category: 'SYSTEM', email: false, emailNotification: false, push: false, throttleMinutes: 0, supportedChannels: pushOnly },
+      { category: 'PAYMENTS', email: true, emailNotification: false, push: false, unifiedpush: false, throttleMinutes: 0, supportedChannels: allChannels },
+      { category: 'BUDGETS', email: false, emailNotification: true, push: false, unifiedpush: false, throttleMinutes: 15, supportedChannels: allChannels },
+      { category: 'SYSTEM', email: false, emailNotification: false, push: false, unifiedpush: false, throttleMinutes: 0, supportedChannels: pushOnly },
     ]);
     update
       .mockReset()
-      .mockResolvedValue({ category: 'PAYMENTS', email: false, emailNotification: false, push: false, throttleMinutes: 0 });
-    // One live device by default, so the push column is a real control.
+      .mockResolvedValue({ category: 'PAYMENTS', email: false, emailNotification: false, push: false, unifiedpush: false, throttleMinutes: 0 });
+    // One live web-push device by default, so the push column is a real control;
+    // no UnifiedPush device, so that column self-gates disabled.
     listDevices.mockReset().mockResolvedValue([liveDevice, disabledDevice]);
   });
   afterEach(() => cleanup());
@@ -52,8 +56,9 @@ describe('NotificationPreferencesMatrix', () => {
     expect(screen.getByText('Bills and scheduled')).toBeInTheDocument();
     expect(screen.getByText('Budgets')).toBeInTheDocument();
     expect(screen.getByText('System alerts')).toBeInTheDocument();
-    // report + alert + push for the two full rows (6), push only for SYSTEM (1).
-    expect(screen.getAllByRole('switch')).toHaveLength(7);
+    // report + alert + push + unifiedpush for the two full rows (8), push +
+    // unifiedpush only for SYSTEM (2) = 10.
+    expect(screen.getAllByRole('switch')).toHaveLength(10);
     // One cooldown select per row.
     expect(screen.getAllByRole('combobox')).toHaveLength(3);
   });
@@ -61,19 +66,44 @@ describe('NotificationPreferencesMatrix', () => {
   it('renders SYSTEM as push-only, marking the two email cells not applicable', async () => {
     await renderMatrix();
     // Two email columns x SYSTEM row = two "not applicable" cells; the full rows
-    // expose all three channels, so no other cell is marked.
+    // expose all four channels, so no other cell is marked.
     expect(
       screen.getAllByText('Not applicable for this notification type'),
     ).toHaveLength(2);
-    // SYSTEM's one switch is push, and it self-gates on a live device.
+    // SYSTEM exposes push and unifiedpush (indices 8, 9). Push self-gates on the
+    // live web-push device; unifiedpush is disabled with no UnifiedPush device.
     const switches = screen.getAllByRole('switch');
-    expect(switches).toHaveLength(7);
-    // The last switch (SYSTEM push) is a real control, a device being live.
-    expect(switches[6]).not.toBeDisabled();
-    await act(async () => fireEvent.click(switches[6]));
+    expect(switches).toHaveLength(10);
+    expect(switches[8]).not.toBeDisabled(); // SYSTEM push
+    expect(switches[9]).toBeDisabled(); // SYSTEM unifiedpush (no UP device)
+    await act(async () => fireEvent.click(switches[8]));
     await waitFor(() =>
       expect(update).toHaveBeenCalledWith('SYSTEM', { push: true }),
     );
+  });
+
+  it('enables the UnifiedPush column only when a UnifiedPush device is live', async () => {
+    listDevices.mockResolvedValue([liveDevice, liveUnifiedDevice]);
+    await renderMatrix();
+    const switches = screen.getAllByRole('switch');
+    // PAYMENTS: report(0) alert(1) push(2) unifiedpush(3).
+    expect(switches[3]).not.toBeDisabled();
+    await act(async () => fireEvent.click(switches[3]));
+    await waitFor(() =>
+      expect(update).toHaveBeenCalledWith('PAYMENTS', { unifiedpush: true }),
+    );
+  });
+
+  it('disables the UnifiedPush column and explains why when no UnifiedPush device is live', async () => {
+    await renderMatrix();
+    // No UnifiedPush device by default -> the column is disabled with a hint.
+    const switches = screen.getAllByRole('switch');
+    expect(switches[3]).toBeDisabled(); // PAYMENTS unifiedpush
+    expect(
+      screen.getByText(
+        'Register a UnifiedPush endpoint from your distributor app to use this channel.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('gates the email columns on email availability', async () => {

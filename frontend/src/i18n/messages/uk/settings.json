@@ -258,6 +258,7 @@
       "sendingTestButton": "Надсилання...",
       "removeButton": "Видалити",
       "thisDevice": "Цей пристрій",
+      "unifiedpushBadge": "UnifiedPush",
       "unnamedDevice": "Пристрій без назви",
       "lastSeen": "Остання активність {when}",
       "noLiveDevices": "Пристроїв ще не зареєстровано. Увімкніть push на цьому пристрої, щоб надіслати тест.",
@@ -299,7 +300,8 @@
         "inApp": "У застосунку",
         "emailReport": "Ел. пошта (звіт)",
         "emailNotification": "Ел. пошта (сповіщення)",
-        "push": "Push"
+        "push": "Push",
+        "unifiedpush": "UnifiedPush"
       },
       "categories": {
         "PAYMENTS": "Рахунки та заплановані",
@@ -326,8 +328,10 @@
       },
       "emailNotificationToggleLabel": "Ел. лист-сповіщення для «{category}»",
       "pushToggleLabel": "Push для «{category}»",
+      "unifiedpushToggleLabel": "UnifiedPush для {category}",
       "emailUnavailable": "Увімкніть сповіщення електронною поштою вище, щоб надсилати їх поштою.",
-      "pushUnavailable": "Спочатку увімкніть push на цьому пристрої (див. нижче)."
+      "pushUnavailable": "Спочатку увімкніть push на цьому пристрої (див. нижче).",
+      "unifiedpushUnavailable": "Зареєструйте кінцеву точку UnifiedPush у застосунку-дистриб'юторі, щоб користуватися цим каналом."
     }
   },
   "help": {

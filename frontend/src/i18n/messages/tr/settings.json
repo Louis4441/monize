@@ -258,6 +258,7 @@
       "sendingTestButton": "Gönderiliyor...",
       "removeButton": "Kaldır",
       "thisDevice": "Bu cihaz",
+      "unifiedpushBadge": "UnifiedPush",
       "unnamedDevice": "Adsız cihaz",
       "lastSeen": "Son etkinlik {when}",
       "noLiveDevices": "Henüz kayıtlı cihaz yok. Test göndermek için bu cihazda anlık bildirimleri açın.",
@@ -299,7 +300,8 @@
         "inApp": "Uygulamada",
         "emailReport": "E-posta (rapor)",
         "emailNotification": "E-posta (uyarı)",
-        "push": "Push"
+        "push": "Push",
+        "unifiedpush": "UnifiedPush"
       },
       "categories": {
         "PAYMENTS": "Faturalar ve planlananlar",
@@ -326,8 +328,10 @@
       },
       "emailNotificationToggleLabel": "{category} için uyarı e-postası",
       "pushToggleLabel": "{category} için push",
+      "unifiedpushToggleLabel": "{category} için UnifiedPush",
       "emailUnavailable": "Bunları e-postayla göndermek için yukarıdan e-posta bildirimlerini açın.",
-      "pushUnavailable": "Önce bu cihazda push'u etkinleştirin (aşağıya bakın)."
+      "pushUnavailable": "Önce bu cihazda push'u etkinleştirin (aşağıya bakın).",
+      "unifiedpushUnavailable": "Bu kanalı kullanmak için dağıtıcı uygulamanızdan bir UnifiedPush uç noktası kaydedin."
     }
   },
   "help": {

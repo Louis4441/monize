@@ -258,6 +258,7 @@
       "sendingTestButton": "Versturen...",
       "removeButton": "Verwijderen",
       "thisDevice": "Dit apparaat",
+      "unifiedpushBadge": "UnifiedPush",
       "unnamedDevice": "Naamloos apparaat",
       "lastSeen": "Laatst actief {when}",
       "noLiveDevices": "Nog geen apparaat geregistreerd. Schakel push in op dit apparaat om een test te versturen.",
@@ -299,7 +300,8 @@
         "inApp": "In de app",
         "emailReport": "E-mail (rapport)",
         "emailNotification": "E-mail (waarschuwing)",
-        "push": "Push"
+        "push": "Push",
+        "unifiedpush": "UnifiedPush"
       },
       "categories": {
         "PAYMENTS": "Rekeningen en gepland",
@@ -326,8 +328,10 @@
       },
       "emailNotificationToggleLabel": "Waarschuwings-e-mail voor {category}",
       "pushToggleLabel": "Push voor {category}",
+      "unifiedpushToggleLabel": "UnifiedPush voor {category}",
       "emailUnavailable": "Schakel hierboven e-mailmeldingen in om deze per e-mail te versturen.",
-      "pushUnavailable": "Schakel push eerst in op dit apparaat (zie hieronder)."
+      "pushUnavailable": "Schakel push eerst in op dit apparaat (zie hieronder).",
+      "unifiedpushUnavailable": "Registreer een UnifiedPush-endpoint vanuit je distributor-app om dit kanaal te gebruiken."
     }
   },
   "help": {

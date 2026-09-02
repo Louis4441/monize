@@ -51,6 +51,7 @@ function parseBackendChannelSupport(): Record<string, CategoryChannelSupport> {
       email: bool('email'),
       emailNotification: bool('emailNotification'),
       push: bool('push'),
+      unifiedpush: bool('unifiedpush'),
     };
   }
   return out;

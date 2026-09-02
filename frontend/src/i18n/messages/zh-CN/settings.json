@@ -258,6 +258,7 @@
       "sendingTestButton": "正在发送...",
       "removeButton": "移除",
       "thisDevice": "此设备",
+      "unifiedpushBadge": "UnifiedPush",
       "unnamedDevice": "未命名设备",
       "lastSeen": "最后活动 {when}",
       "noLiveDevices": "尚未注册任何设备。请在此设备上启用推送后再发送测试。",
@@ -299,7 +300,8 @@
         "inApp": "应用内",
         "emailReport": "邮件（报告）",
         "emailNotification": "邮件（提醒）",
-        "push": "推送"
+        "push": "推送",
+        "unifiedpush": "UnifiedPush"
       },
       "categories": {
         "PAYMENTS": "账单与计划",
@@ -326,8 +328,10 @@
       },
       "emailNotificationToggleLabel": "{category} 的提醒邮件",
       "pushToggleLabel": "{category} 的推送",
+      "unifiedpushToggleLabel": "{category} 的 UnifiedPush",
       "emailUnavailable": "在上方开启邮件通知，即可通过邮件发送。",
-      "pushUnavailable": "请先在此设备上启用推送（见下方）。"
+      "pushUnavailable": "请先在此设备上启用推送（见下方）。",
+      "unifiedpushUnavailable": "从你的分发器应用注册一个 UnifiedPush 端点以使用此通道。"
     }
   },
   "help": {

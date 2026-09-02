@@ -258,6 +258,7 @@
       "sendingTestButton": "Mengirim...",
       "removeButton": "Hapus",
       "thisDevice": "Perangkat ini",
+      "unifiedpushBadge": "UnifiedPush",
       "unnamedDevice": "Perangkat tanpa nama",
       "lastSeen": "Terakhir aktif {when}",
       "noLiveDevices": "Belum ada perangkat terdaftar. Aktifkan push di perangkat ini untuk mengirim uji coba.",
@@ -299,7 +300,8 @@
         "inApp": "Dalam aplikasi",
         "emailReport": "Email (laporan)",
         "emailNotification": "Email (peringatan)",
-        "push": "Push"
+        "push": "Push",
+        "unifiedpush": "UnifiedPush"
       },
       "categories": {
         "PAYMENTS": "Tagihan dan terjadwal",
@@ -326,8 +328,10 @@
       },
       "emailNotificationToggleLabel": "Email peringatan untuk {category}",
       "pushToggleLabel": "Push untuk {category}",
+      "unifiedpushToggleLabel": "UnifiedPush untuk {category}",
       "emailUnavailable": "Aktifkan notifikasi email di atas untuk mengirimnya melalui email.",
-      "pushUnavailable": "Aktifkan push di perangkat ini terlebih dahulu (lihat di bawah)."
+      "pushUnavailable": "Aktifkan push di perangkat ini terlebih dahulu (lihat di bawah).",
+      "unifiedpushUnavailable": "Daftarkan endpoint UnifiedPush dari aplikasi distributor Anda untuk menggunakan saluran ini."
     }
   },
   "help": {

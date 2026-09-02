@@ -258,6 +258,7 @@
       "sendingTestButton": "Đang gửi...",
       "removeButton": "Xóa",
       "thisDevice": "Thiết bị này",
+      "unifiedpushBadge": "UnifiedPush",
       "unnamedDevice": "Thiết bị chưa đặt tên",
       "lastSeen": "Hoạt động lần cuối {when}",
       "noLiveDevices": "Chưa có thiết bị nào được đăng ký. Hãy bật đẩy trên thiết bị này để gửi thử nghiệm.",
@@ -299,7 +300,8 @@
         "inApp": "Trong ứng dụng",
         "emailReport": "Email (báo cáo)",
         "emailNotification": "Email (cảnh báo)",
-        "push": "Push"
+        "push": "Push",
+        "unifiedpush": "UnifiedPush"
       },
       "categories": {
         "PAYMENTS": "Hóa đơn và đã lên lịch",
@@ -326,8 +328,10 @@
       },
       "emailNotificationToggleLabel": "Email cảnh báo cho {category}",
       "pushToggleLabel": "Push cho {category}",
+      "unifiedpushToggleLabel": "UnifiedPush cho {category}",
       "emailUnavailable": "Bật thông báo qua email ở trên để gửi chúng qua email.",
-      "pushUnavailable": "Trước tiên hãy bật push trên thiết bị này (xem bên dưới)."
+      "pushUnavailable": "Trước tiên hãy bật push trên thiết bị này (xem bên dưới).",
+      "unifiedpushUnavailable": "Đăng ký một endpoint UnifiedPush từ ứng dụng phân phối của bạn để sử dụng kênh này."
     }
   },
   "help": {

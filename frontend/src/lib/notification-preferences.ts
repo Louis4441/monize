@@ -26,6 +26,8 @@ export interface CategoryChannelSupport {
   emailNotification: boolean;
   /** Web push. */
   push: boolean;
+  /** UnifiedPush/ntfy (the same wire as push, to a distributor endpoint). */
+  unifiedpush: boolean;
 }
 
 /**
@@ -39,9 +41,9 @@ export const NOTIFICATION_CATEGORY_CHANNELS: Record<
   NotificationCategory,
   CategoryChannelSupport
 > = {
-  PAYMENTS: { email: true, emailNotification: true, push: true },
-  BUDGETS: { email: true, emailNotification: true, push: true },
-  SYSTEM: { email: false, emailNotification: false, push: true },
+  PAYMENTS: { email: true, emailNotification: true, push: true, unifiedpush: true },
+  BUDGETS: { email: true, emailNotification: true, push: true, unifiedpush: true },
+  SYSTEM: { email: false, emailNotification: false, push: true, unifiedpush: true },
 };
 
 /**
@@ -67,6 +69,7 @@ export interface NotificationChannelPreference {
   email: boolean;
   emailNotification: boolean;
   push: boolean;
+  unifiedpush: boolean;
   throttleMinutes: number;
   /**
    * Which channels this category exposes as live controls, from the server.
@@ -81,6 +84,7 @@ export interface NotificationPreferencePatch {
   email?: boolean;
   emailNotification?: boolean;
   push?: boolean;
+  unifiedpush?: boolean;
   throttleMinutes?: number;
 }
 

@@ -258,6 +258,7 @@
       "sendingTestButton": "送信中...",
       "removeButton": "削除",
       "thisDevice": "この端末",
+      "unifiedpushBadge": "UnifiedPush",
       "unnamedDevice": "名前のない端末",
       "lastSeen": "最終アクティブ: {when}",
       "noLiveDevices": "まだ端末が登録されていません。テストを送信するには、この端末でプッシュを有効にしてください。",
@@ -299,7 +300,8 @@
         "inApp": "アプリ内",
         "emailReport": "メール（レポート）",
         "emailNotification": "メール（アラート）",
-        "push": "プッシュ"
+        "push": "プッシュ",
+        "unifiedpush": "UnifiedPush"
       },
       "categories": {
         "PAYMENTS": "請求と予定",
@@ -326,8 +328,10 @@
       },
       "emailNotificationToggleLabel": "{category} のアラートメール",
       "pushToggleLabel": "{category} のプッシュ",
+      "unifiedpushToggleLabel": "{category} の UnifiedPush",
       "emailUnavailable": "これらをメールで送信するには、上のメール通知をオンにしてください。",
-      "pushUnavailable": "まずこのデバイスでプッシュを有効にしてください（下記参照）。"
+      "pushUnavailable": "まずこのデバイスでプッシュを有効にしてください（下記参照）。",
+      "unifiedpushUnavailable": "このチャネルを使用するには、ディストリビューターアプリから UnifiedPush エンドポイントを登録してください。"
     }
   },
   "help": {
