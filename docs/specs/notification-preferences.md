@@ -445,3 +445,160 @@ D6. **Security opt-in**: default on for in_app+email but fully user-toggleable.
 Every default above is a **reviewable decision, not a fact about the domain** --
 a human (the maintainer) confirms the matrix defaults and the throttle windows
 before this ships to users, per the org rule that AI output is auxiliary.
+
+---
+
+## 13. Phase 4 implementation -- repeating / one-time reminders (R3, R4)
+
+This refines Section 5 into the shipping design. Phase 4 delivers reminders
+end to end on the **in-app** channel (always written, Section 3) with an
+explicit Stop from the app; the push carrier for R4's "Stop from the
+notification" and the interrupting email/push fan-out are Phase 5, and the design
+below is built so Phase 4 needs no rework when they land.
+
+### 13.1 Data model (migration 175)
+
+`notification_reminders`, user-owned, one row per active reminder a user asked
+for. It carries the **template** the fire re-emits, so a fire never has to reload
+the (possibly dismissed) source notification:
+
+```sql
+CREATE TABLE IF NOT EXISTS notification_reminders (
+    id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id                UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    -- The notification whose subject this nags about. SET NULL (not CASCADE):
+    -- the reminder is stopped when the source is dismissed, and losing the link
+    -- must not silently delete the reminder mid-fire.
+    source_notification_id UUID REFERENCES notifications(id) ON DELETE SET NULL,
+    -- The template the fire re-emits, mirroring a notification's public fields.
+    alert_type             VARCHAR(30) NOT NULL,   -- NotificationType to re-emit
+    severity               VARCHAR(20) NOT NULL,   -- NotificationSeverity
+    title                  VARCHAR(255) NOT NULL,
+    message                TEXT NOT NULL,
+    data                   JSONB NOT NULL DEFAULT '{}',
+    target                 VARCHAR(255),
+    -- Base for the per-fire dedupe key; each fire appends the fire ordinal so
+    -- every re-emit is a fresh bell row (Section 13.3).
+    dedupe_base            VARCHAR(80),
+    repeat_mode            VARCHAR(10) NOT NULL,   -- 'once' | 'repeat'
+    interval_minutes       INTEGER NOT NULL,       -- >= REMINDER_MIN_INTERVAL_MINUTES
+    next_fire_at           TIMESTAMP NOT NULL,
+    last_fired_at          TIMESTAMP,
+    fire_count             INTEGER NOT NULL DEFAULT 0,
+    stopped_at             TIMESTAMP,
+    created_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+-- The cron scans due, non-stopped rows across all users each minute.
+CREATE INDEX IF NOT EXISTS idx_notification_reminders_due
+    ON notification_reminders (next_fire_at) WHERE stopped_at IS NULL;
+-- RLS: uniform direct policy on user_id + ENABLE (numbered after 123); the
+-- GUC-aware updated_at trigger, like every table carrying the column.
+```
+
+`repeat_mode` is the row's own mode and is only ever `once` or `repeat` -- the
+preference-level `off` from Section 5 means *no reminder row exists*, so it is
+not a stored value here. `notification_reminders` is exported by backups (user
+data): `export-table-queries.ts`, `restore-plan.ts` after `notifications` (the
+`source_notification_id` FK), and classified in the support backup.
+
+### 13.2 The firing cron -- one atomic claim, no advisory lock
+
+`@Cron` every minute (the interval floor is 5, so a one-minute tick is cheap and
+precise). Every replica runs it, so the claim must be idempotent across replicas
+**without** an advisory lock -- a single conditional `UPDATE ... RETURNING` is
+the mechanism (`docs/concurrency-and-idempotency.md`, "atomic delta / CAS"):
+
+```sql
+UPDATE notification_reminders
+   SET next_fire_at = CURRENT_TIMESTAMP + (interval_minutes * INTERVAL '1 minute'),
+       last_fired_at = CURRENT_TIMESTAMP,
+       fire_count    = fire_count + 1,
+       stopped_at    = CASE WHEN repeat_mode = 'once'
+                            THEN CURRENT_TIMESTAMP ELSE NULL END
+ WHERE stopped_at IS NULL AND next_fire_at <= CURRENT_TIMESTAMP
+ RETURNING id, user_id, alert_type, severity, title, message, data, target,
+           dedupe_base, fire_count;
+```
+
+The claim advances `next_fire_at` in the **same statement** that reads the row,
+so a second replica's `UPDATE` blocks on the row lock, re-evaluates the `WHERE`
+against the committed new value (now future, or `stopped_at` set), and skips it:
+each due row is claimed exactly once. It runs under `withSystemContext` (a
+cross-user sweep); each claimed row is then re-emitted under
+`withUserContext(row.userId)`. **Order matters and is deliberate:** the claim
+commits *before* the re-emit, so a re-emit that fails skips this occurrence
+(at-most-once per interval, self-healing next tick) rather than risking a
+double-fire -- the safe direction for a notification. `next_fire_at` is set to
+`now + interval` rather than `previous + interval` so a cron that missed several
+ticks fires once and reschedules, never a catch-up burst.
+
+### 13.3 What a fire re-emits (through the one write door)
+
+Each fire calls `NotificationService.create` (Section 8, unchanged) with:
+
+- `type`, `severity`, `title`, `message`, `data`, `target` from the row;
+- `data.reminderId = row.id` merged in, so the bell row carries a Stop control
+  and the push (Phase 5) can carry the `reminderId` its Stop action needs;
+- `dedupeKey = "${dedupe_base ?? alert_type}:rem:${id}:${fireCount}"` (bounded to
+  120) -- the fire ordinal makes **every re-emit a distinct row**, so the bell
+  shows a fresh unread nag each interval rather than `ON CONFLICT DO NOTHING`
+  swallowing it against the still-live previous one. A re-emit carries no
+  `budgetId`/`budgetCategoryId`: it uses the `dedupe_key` index, never the budget
+  fingerprint index, so it cannot collide with the source's fingerprint.
+
+When Phase 5 lands, that same `create` is what the dispatch bridge observes, so a
+repeat nag interrupts by push/email subject to the matrix and throttle -- no
+change to the reminder path.
+
+### 13.4 Stopping (R4)
+
+All three doors land on `stopReminder(userId, id)` (idempotent: stopping a
+stopped reminder is a no-op, not a 404-after-the-fact):
+
+1. **From the app** -- `POST /notifications/reminders/:id/stop` (JWT), and a Stop
+   control on any bell row carrying `data.reminderId`.
+2. **From the push notification (Phase 5 carrier)** -- the SW `notificationclick`
+   handler, on `event.action === "stop-reminder"`, `fetch`es that same endpoint
+   same-origin with the CSRF header. The handler is written now (inert until a
+   push carries the action) so Phase 5 only has to populate `actions`.
+3. **Source dismissed / condition cleared** -- `stopRemindersFor(userId,
+   sourceNotificationId)` is called from `NotificationService.dismiss` so a nag
+   cannot outlive the notification it nags about. (Producers that clear an
+   underlying condition call it too, as their features land.)
+
+### 13.5 Invariants
+
+- **INV-REMINDER-001** a reminder fires at most once per interval per replica-set
+  (the atomic claim), and a missed tick does not burst.
+- **INV-REMINDER-002** `interval_minutes >= REMINDER_MIN_INTERVAL_MINUTES` (= 5),
+  enforced by the DTO `@Min(5)` and clamped up server-side; a stored value below
+  it is never fired below the floor.
+- **INV-REMINDER-003** a stopped reminder (`stopped_at` set) never fires again;
+  stopping is idempotent and ownership is in the `WHERE`.
+- **INV-REMINDER-004** a reminder is stopped when its source notification is
+  dismissed, so it cannot outlive its cause.
+- **INV-REMINDER-005** each fire is a distinct in-app row (the fire-ordinal
+  dedupe key); the in-app row is always written, matching Section 3.
+
+### 13.6 Test matrix (all offline-runnable -- unit + source-scan)
+
+- Claim: two concurrent `fireDue` calls fire each due row once (asserted via the
+  atomic UPDATE's `RETURNING` set, mocked to a single-claim contract).
+- Clamp: `interval_minutes` below 5 rejected by the DTO and clamped by the
+  service; a stored 2 is fired as 5, never as 2.
+- `once` fires exactly once then sets `stopped_at`; `repeat` reschedules.
+- Stop: idempotent, ownership-scoped, and a stopped reminder is skipped by the
+  next claim.
+- Source dismissed -> `stopRemindersFor` stops the reminder; re-emit after stop
+  writes nothing.
+- Re-emit: fire N writes a fresh bell row (distinct dedupe key), never collides
+  with the source, and merges `data.reminderId`.
+- RLS smoke: the cron claim runs under system context, each re-emit under the
+  affected user's context; request-path methods under the caller's.
+- Backup: `notification_reminders` exported and restored (FK ordering after
+  `notifications`), classified in the support backup.
+- i18n parity for the new UI strings; pseudo fresh.
+
+Every window and default here remains a **reviewable decision** the maintainer
+confirms before shipping, per the org rule that AI output is auxiliary.
