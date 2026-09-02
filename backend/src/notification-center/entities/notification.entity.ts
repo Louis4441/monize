@@ -104,6 +104,41 @@ export function notificationCategoryOf(
   return NotificationCategory.BUDGETS;
 }
 
+/**
+ * The alert types belonging to a category, derived from `notificationCategoryOf`
+ * rather than listed -- so the reverse mapping cannot disagree with the forward
+ * one (there is no category column; the throttle window has to filter the
+ * `notifications` table by the types the category expands to). Every type lands
+ * in exactly one category's set. `notification-category.spec.ts` proves the
+ * round trip.
+ */
+export function typesForCategory(
+  category: NotificationCategory,
+): NotificationType[] {
+  return Object.values(NotificationType).filter(
+    (type) => notificationCategoryOf(type) === category,
+  );
+}
+
+/**
+ * Total order on severity, for the throttle's escalation exception: a new
+ * notification of a category is suppressed within the window UNLESS it is
+ * strictly more severe than every non-dismissed one already there, because
+ * silence on an escalation (a `critical` after a `warning`) is the dangerous
+ * direction. `success` is a positive milestone, ranked below the warnings it is
+ * never an escalation of.
+ */
+const SEVERITY_RANK: Record<NotificationSeverity, number> = {
+  [NotificationSeverity.INFO]: 0,
+  [NotificationSeverity.SUCCESS]: 1,
+  [NotificationSeverity.WARNING]: 2,
+  [NotificationSeverity.CRITICAL]: 3,
+};
+
+export function severityRank(severity: NotificationSeverity): number {
+  return SEVERITY_RANK[severity] ?? 0;
+}
+
 const dateTransformer = {
   from: (value: string | Date): string => {
     if (!value) return value as string;

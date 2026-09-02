@@ -33,6 +33,15 @@ export class NotificationPreference {
   @Column({ type: "boolean", default: true })
   email: boolean;
 
+  /**
+   * Per-category throttle window in minutes; 0 disables (the default, so an
+   * absent row throttles nothing). The write door suppresses a new notification
+   * of this category created within the window of a non-dismissed one, except a
+   * higher-severity escalation. See `docs/specs/notification-preferences.md`.
+   */
+  @Column({ name: "throttle_minutes", type: "int", default: 0 })
+  throttleMinutes: number;
+
   @CreateDateColumn({ name: "created_at" })
   createdAt: Date;
 

@@ -1,6 +1,7 @@
 import {
   NotificationPreferenceService,
   NOTIFICATION_PREFERENCE_CATEGORIES,
+  THROTTLE_MAX_MINUTES,
 } from "./notification-preference.service";
 import { NotificationCategory } from "./entities/notification.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
@@ -12,28 +13,17 @@ describe("NotificationPreferenceService", () => {
   let service: NotificationPreferenceService;
   let userPrefRepo: Record<string, jest.Mock>;
   let notifPrefRepo: Record<string, jest.Mock>;
-  let insertBuilder: {
-    insert: jest.Mock;
-    values: jest.Mock;
-    orUpdate: jest.Mock;
-    execute: jest.Mock;
-  };
+  let query: jest.Mock;
 
   beforeEach(() => {
     userPrefRepo = { findOne: jest.fn().mockResolvedValue(null) };
-    // The upsert chain setEmail uses: insert().values().orUpdate().execute().
-    insertBuilder = {
-      insert: jest.fn(() => insertBuilder),
-      values: jest.fn(() => insertBuilder),
-      orUpdate: jest.fn(() => insertBuilder),
-      execute: jest.fn().mockResolvedValue({}),
-    };
     notifPrefRepo = {
       findOne: jest.fn().mockResolvedValue(null),
       find: jest.fn().mockResolvedValue([]),
-      createQueryBuilder: jest.fn(() => insertBuilder),
     };
+    query = jest.fn().mockResolvedValue([]);
     const manager = {
+      query,
       getRepository: (entity: unknown) =>
         entity === UserPreference ? userPrefRepo : notifPrefRepo,
     };
@@ -91,55 +81,149 @@ describe("NotificationPreferenceService", () => {
     });
   });
 
+  describe("resolveThrottleMinutes", () => {
+    it("defaults to 0 (no throttle) when there is no row", async () => {
+      expect(
+        await service.resolveThrottleMinutes(
+          "u1",
+          NotificationCategory.BUDGETS,
+        ),
+      ).toBe(0);
+    });
+
+    it("returns the stored window", async () => {
+      notifPrefRepo.findOne.mockResolvedValue({ throttleMinutes: 15 });
+      expect(
+        await service.resolveThrottleMinutes(
+          "u1",
+          NotificationCategory.BUDGETS,
+        ),
+      ).toBe(15);
+    });
+
+    it("clamps a stored window above the cap", async () => {
+      notifPrefRepo.findOne.mockResolvedValue({
+        throttleMinutes: THROTTLE_MAX_MINUTES + 500,
+      });
+      expect(
+        await service.resolveThrottleMinutes(
+          "u1",
+          NotificationCategory.BUDGETS,
+        ),
+      ).toBe(THROTTLE_MAX_MINUTES);
+    });
+
+    it("floors a negative stored window at 0", async () => {
+      notifPrefRepo.findOne.mockResolvedValue({ throttleMinutes: -5 });
+      expect(
+        await service.resolveThrottleMinutes(
+          "u1",
+          NotificationCategory.BUDGETS,
+        ),
+      ).toBe(0);
+    });
+  });
+
   describe("list", () => {
-    it("returns one entry per matrix category, defaulting on", async () => {
+    it("returns one entry per matrix category, email on and throttle 0", async () => {
       expect(await service.list("u1")).toEqual(
         NOTIFICATION_PREFERENCE_CATEGORIES.map((category) => ({
           category,
           email: true,
+          throttleMinutes: 0,
         })),
       );
     });
 
-    it("reflects a stored per-category off and is not master-gated", async () => {
+    it("reflects stored per-category state and is not master-gated", async () => {
       // Master off must NOT bleed into the displayed per-category state.
       userPrefRepo.findOne.mockResolvedValue({ notificationEmail: false });
       notifPrefRepo.find.mockResolvedValue([
-        { category: NotificationCategory.PAYMENTS, email: false },
+        {
+          category: NotificationCategory.PAYMENTS,
+          email: false,
+          throttleMinutes: 30,
+        },
       ]);
       const res = await service.list("u1");
+      const payments = res.find(
+        (r) => r.category === NotificationCategory.PAYMENTS,
+      );
+      expect(payments).toEqual({
+        category: NotificationCategory.PAYMENTS,
+        email: false,
+        throttleMinutes: 30,
+      });
       expect(
-        res.find((r) => r.category === NotificationCategory.PAYMENTS)?.email,
-      ).toBe(false);
-      expect(
-        res.find((r) => r.category === NotificationCategory.BUDGETS)?.email,
-      ).toBe(true);
+        res.find((r) => r.category === NotificationCategory.BUDGETS),
+      ).toEqual({
+        category: NotificationCategory.BUDGETS,
+        email: true,
+        throttleMinutes: 0,
+      });
     });
   });
 
-  describe("setEmail", () => {
-    it("upserts the (user, category) row atomically", async () => {
-      const result = await service.setEmail(
+  describe("updatePreference", () => {
+    it("upserts with COALESCE so an omitted field keeps its stored value", async () => {
+      notifPrefRepo.findOne.mockResolvedValue({
+        email: false,
+        throttleMinutes: 0,
+      });
+      const result = await service.updatePreference(
+        "u1",
+        NotificationCategory.PAYMENTS,
+        { email: false },
+      );
+      const [sql, params] = query.mock.calls[0];
+      // A single insert-with-conflict, not read-then-insert.
+      expect(String(sql)).toContain(
+        "ON CONFLICT (user_id, category) DO UPDATE",
+      );
+      // email present -> its param; throttle omitted -> NULL, so COALESCE keeps
+      // the stored throttle_minutes.
+      expect(params).toEqual([
         "u1",
         NotificationCategory.PAYMENTS,
         false,
-      );
-      // A single insert-with-conflict, not read-then-insert, so two concurrent
-      // first writes cannot both INSERT and collide on the primary key.
-      expect(insertBuilder.values).toHaveBeenCalledWith({
-        userId: "u1",
-        category: NotificationCategory.PAYMENTS,
-        email: false,
-      });
-      expect(insertBuilder.orUpdate).toHaveBeenCalledWith(
-        ["email"],
-        ["user_id", "category"],
-      );
-      expect(insertBuilder.execute).toHaveBeenCalled();
+        null,
+      ]);
       expect(result).toEqual({
         category: NotificationCategory.PAYMENTS,
         email: false,
+        throttleMinutes: 0,
       });
+    });
+
+    it("clamps a throttle window above the cap before writing", async () => {
+      notifPrefRepo.findOne.mockResolvedValue({
+        email: true,
+        throttleMinutes: THROTTLE_MAX_MINUTES,
+      });
+      await service.updatePreference("u1", NotificationCategory.BUDGETS, {
+        throttleMinutes: THROTTLE_MAX_MINUTES + 999,
+      });
+      const params = query.mock.calls[0][1];
+      // email omitted -> NULL; throttle clamped to the cap.
+      expect(params).toEqual([
+        "u1",
+        NotificationCategory.BUDGETS,
+        null,
+        THROTTLE_MAX_MINUTES,
+      ]);
+    });
+
+    it("writes 0 for a throttle window of 0 (disable), not NULL", async () => {
+      // 0 is an explicit choice ("no throttle"), distinct from "field omitted".
+      notifPrefRepo.findOne.mockResolvedValue({
+        email: true,
+        throttleMinutes: 0,
+      });
+      await service.updatePreference("u1", NotificationCategory.BUDGETS, {
+        throttleMinutes: 0,
+      });
+      const params = query.mock.calls[0][1];
+      expect(params).toEqual(["u1", NotificationCategory.BUDGETS, null, 0]);
     });
   });
 });

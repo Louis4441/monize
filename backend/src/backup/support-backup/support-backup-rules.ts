@@ -547,6 +547,7 @@ export const RULES: Record<string, TableRules> = {
     user_id: keep,
     category: keep, // a derived NotificationCategory value, not free text
     email: keep,
+    throttle_minutes: keep, // an integer window, not identifying
     created_at: keep,
     updated_at: keep,
   },

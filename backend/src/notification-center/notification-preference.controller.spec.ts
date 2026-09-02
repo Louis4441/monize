@@ -4,7 +4,7 @@ import { NotificationPreferenceController } from "./notification-preference.cont
 import { NotificationCategory } from "./entities/notification.entity";
 
 describe("NotificationPreferenceController", () => {
-  const preferences = { list: jest.fn(), setEmail: jest.fn() };
+  const preferences = { list: jest.fn(), updatePreference: jest.fn() };
   const controller = new NotificationPreferenceController(preferences as never);
   const req = { user: { id: "u1" } };
 
@@ -16,19 +16,33 @@ describe("NotificationPreferenceController", () => {
     expect(preferences.list).toHaveBeenCalledWith("u1");
   });
 
-  it("sets email for an exposed category, keyed on the JWT user", () => {
-    controller.setEmail(req, NotificationCategory.PAYMENTS, { email: false });
-    expect(preferences.setEmail).toHaveBeenCalledWith(
+  it("updates an exposed category, keyed on the JWT user", () => {
+    controller.update(req, NotificationCategory.PAYMENTS, {
+      email: false,
+      throttleMinutes: 15,
+    });
+    expect(preferences.updatePreference).toHaveBeenCalledWith(
       "u1",
       NotificationCategory.PAYMENTS,
-      false,
+      { email: false, throttleMinutes: 15 },
+    );
+  });
+
+  it("passes a partial update through untouched (only the field sent)", () => {
+    controller.update(req, NotificationCategory.BUDGETS, {
+      throttleMinutes: 30,
+    });
+    expect(preferences.updatePreference).toHaveBeenCalledWith(
+      "u1",
+      NotificationCategory.BUDGETS,
+      { email: undefined, throttleMinutes: 30 },
     );
   });
 
   it("refuses a real category the matrix does not expose yet", () => {
     expect(() =>
-      controller.setEmail(req, NotificationCategory.SYSTEM, { email: true }),
+      controller.update(req, NotificationCategory.SYSTEM, { email: true }),
     ).toThrow(BadRequestException);
-    expect(preferences.setEmail).not.toHaveBeenCalled();
+    expect(preferences.updatePreference).not.toHaveBeenCalled();
   });
 });

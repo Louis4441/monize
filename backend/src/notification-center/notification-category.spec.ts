@@ -19,6 +19,8 @@ import {
   NotificationType,
   SYSTEM_NOTIFICATION_TYPES,
   notificationCategoryOf,
+  typesForCategory,
+  severityRank,
 } from "./entities/notification.entity";
 import {
   DEDUPE_KEY_MAX_LENGTH,
@@ -124,6 +126,41 @@ describe("notification type partition", () => {
           t !== NotificationType.BILL_DUE &&
           !SYSTEM_NOTIFICATION_TYPES.includes(t),
       ).sort(),
+    );
+  });
+
+  it("typesForCategory is the exact inverse of notificationCategoryOf", () => {
+    // The throttle window filters `notifications` by the types a category
+    // expands to, so a reverse mapping that disagreed with the forward one
+    // would throttle the wrong rows. Prove the round trip in both directions:
+    // every type is in exactly its own category's set, and each set contains
+    // only types that map back to it.
+    for (const category of Object.values(NotificationCategory)) {
+      const types = typesForCategory(category);
+      expect(new Set(types).size).toBe(types.length); // no duplicates
+      for (const type of types) {
+        expect(notificationCategoryOf(type)).toBe(category);
+      }
+    }
+    // Union over the categories is every type exactly once (a partition).
+    const union = Object.values(NotificationCategory)
+      .flatMap((category) => typesForCategory(category))
+      .sort();
+    expect(union).toEqual([...ALL_TYPES].sort());
+  });
+
+  it("severityRank is a strict escalation order", () => {
+    // The throttle's escalation exception ranks a critical above a warning
+    // above the rest; success is a positive milestone, never an escalation of a
+    // warning, so it sits below them.
+    expect(severityRank(NotificationSeverity.INFO)).toBeLessThan(
+      severityRank(NotificationSeverity.SUCCESS),
+    );
+    expect(severityRank(NotificationSeverity.SUCCESS)).toBeLessThan(
+      severityRank(NotificationSeverity.WARNING),
+    );
+    expect(severityRank(NotificationSeverity.WARNING)).toBeLessThan(
+      severityRank(NotificationSeverity.CRITICAL),
     );
   });
 
