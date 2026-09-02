@@ -12,6 +12,7 @@ import {
   formatNumberForEdit,
   normalizeExpression,
   parseLocaleNumber,
+  stripGroupSeparator,
 } from '@/lib/number-parse';
 import { Modal } from './Modal';
 import { Button } from './Button';
@@ -98,9 +99,8 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
         filterNumberTyping(raw, {
           allowNegative: allowNegative || allowCalculator,
           allowOperators: allowCalculator,
-          groupSeparator: numberSeparators.group,
         }),
-      [allowNegative, allowCalculator, numberSeparators],
+      [allowNegative, allowCalculator],
     );
     // Round to cents on parse, restoring parseAmount's contract: a money field
     // stores what it displays (2dp). The value handed to the parent must not
@@ -264,13 +264,9 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
     const handleFocus = (e: FocusEvent<HTMLInputElement>) => {
       setIsFocused(true);
       // Strip the grouping separator for easier editing, and clear if zero.
-      const group = numberSeparators.group;
       const zero = formatNumberForEdit(0, 2, numberSeparators);
       setDisplayValue(prev => {
-        const stripped =
-          group === '.' || group === ','
-            ? prev.split(group).join('')
-            : prev.replace(/[\s    ]/g, '');
+        const stripped = stripGroupSeparator(prev, numberSeparators);
         return stripped === zero || stripped === '0' ? '' : stripped;
       });
       onFocus?.(e);

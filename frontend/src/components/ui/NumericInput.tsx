@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, forwardRef, InputHTMLAttributes, FocusEvent } from 'react';
+import { useState, useEffect, useCallback, forwardRef, InputHTMLAttributes, FocusEvent } from 'react';
 import { cn, inputBaseClasses, inputErrorClasses } from '@/lib/utils';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { filterNumberTyping, formatNumberForEdit, parseLocaleNumber } from '@/lib/number-parse';
@@ -58,14 +58,22 @@ export const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
     ref
   ) => {
     // Defensive default: a partial mock (or an older build mid rolling deploy)
-    // may not carry the separators; en-US keeps the previous behaviour.
-    const numberSeparators = useNumberFormat().numberSeparators ?? { decimal: '.', group: ',' };
+    // may not carry the separators; en-US keeps the previous behaviour. Read the
+    // primitive fields so `formatValue`/`parseValue` are stable across renders
+    // (the object identity from `?? {}` is not).
+    const sepDecimal = useNumberFormat().numberSeparators?.decimal ?? '.';
+    const sepGroup = useNumberFormat().numberSeparators?.group ?? ',';
+    const numberSeparators = { decimal: sepDecimal, group: sepGroup };
 
     // Format value to specified decimal places, in the user's decimal separator
-    // (no grouping) so the field round-trips a value they can read.
-    function formatValue(val: number | undefined | null, decimals: number): string {
-      return formatNumberForEdit(val, decimals, numberSeparators);
-    }
+    // (no grouping) so the field round-trips a value they can read. Memoized on
+    // the separators so the sync effect below re-runs when the number locale
+    // changes -- the same fix CurrencyInput's formatDisplay carries.
+    const formatValue = useCallback(
+      (val: number | undefined | null, decimals: number): string =>
+        formatNumberForEdit(val, decimals, { decimal: sepDecimal, group: sepGroup }),
+      [sepDecimal, sepGroup],
+    );
 
     // Local display state - allows free typing
     const [displayValue, setDisplayValue] = useState(() => formatValue(value, decimalPlaces));
@@ -86,13 +94,14 @@ export const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
       return roundToDecimals(parsed, decimalPlaces);
     }
 
-    // Sync from parent when value changes externally (e.g., form reset)
+    // Sync from parent when value changes externally (e.g., form reset), and
+    // reformat if the number locale changes (formatValue is keyed on it).
     /* eslint-disable react-hooks/set-state-in-effect -- syncing display from prop changes */
     useEffect(() => {
       if (!isFocused) {
         setDisplayValue(formatValue(value, decimalPlaces));
       }
-    }, [value, isFocused, decimalPlaces]);
+    }, [value, isFocused, decimalPlaces, formatValue]);
     /* eslint-enable react-hooks/set-state-in-effect */
 
     const inputId = id || `input-${label?.toLowerCase().replace(/\s+/g, '-')}`;
@@ -104,16 +113,14 @@ export const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
     }
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      // Filter to valid characters, keeping the user's decimal separator and
-      // dropping their grouping separator.
+      // Filter to valid characters, keeping both decimal candidates so parse can
+      // disambiguate them (parseLocaleNumber's job, not the filter's).
       let filtered = filterNumberTyping(e.target.value, {
         allowNegative,
-        groupSeparator: numberSeparators.group,
       });
 
       // Limit decimal places while typing, measured from the locale decimal
-      // separator (the only decimal that can be present after filtering out the
-      // grouping separator).
+      // separator (the grouping separator, if any, is disambiguated on parse).
       const dec = numberSeparators.decimal;
       const idx = filtered.indexOf(dec);
       if (idx !== -1 && filtered.length - idx - dec.length > decimalPlaces) {

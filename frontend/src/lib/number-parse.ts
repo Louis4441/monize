@@ -190,13 +190,6 @@ export function filterNumberTyping(
   options: {
     allowNegative?: boolean;
     allowOperators?: boolean;
-    /**
-     * Accepted for call-site symmetry with the other helpers; NOT used to strip.
-     * A `.`/`,` group separator is also a decimal candidate, so stripping it here
-     * (before `parseLocaleNumber` runs) was the ~100x dot-group bug. Whitespace
-     * groups are already dropped by the keep-list.
-     */
-    groupSeparator?: string;
   } = {},
 ): string {
   const { allowNegative = false, allowOperators = false } = options;
@@ -215,6 +208,23 @@ export function filterNumberTyping(
     }
   }
   return out;
+}
+
+/**
+ * Remove the locale's grouping separator from a formatted value so it can be
+ * edited as a plain number (what a field does on focus). A `.`/`,` group is
+ * removed by an exact split; a whitespace group (no-break/narrow spaces) is
+ * removed with the same `WHITESPACE` set the parser treats as grouping, so the
+ * focus-strip and `parseLocaleNumber` cannot disagree about what a group is.
+ */
+export function stripGroupSeparator(
+  value: string,
+  separators: NumberSeparators,
+): string {
+  const group = separators.group;
+  return group === '.' || group === ','
+    ? value.split(group).join('')
+    : value.replace(WHITESPACE, '');
 }
 
 /**

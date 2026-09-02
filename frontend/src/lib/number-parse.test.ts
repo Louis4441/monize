@@ -6,6 +6,7 @@ import {
   getNumberSeparators,
   normalizeExpression,
   parseLocaleNumber,
+  stripGroupSeparator,
   type NumberSeparators,
 } from './number-parse';
 
@@ -94,24 +95,35 @@ describe('filterNumberTyping', () => {
   it('keeps both separators (parse disambiguates) and drops junk', () => {
     // Both "." and "," survive typing so parseLocaleNumber can disambiguate them
     // -- eagerly stripping a "." destroyed a dot-decimal in a dot-group locale.
-    expect(filterNumberTyping('1,234.56', { groupSeparator: ',' })).toBe('1,234.56');
-    expect(filterNumberTyping('1.200,99', { groupSeparator: '.' })).toBe('1.200,99');
-    expect(filterNumberTyping('abc12.3', { groupSeparator: ',' })).toBe('12.3');
+    expect(filterNumberTyping('1,234.56')).toBe('1,234.56');
+    expect(filterNumberTyping('1.200,99')).toBe('1.200,99');
+    expect(filterNumberTyping('abc12.3')).toBe('12.3');
   });
 
   it('keeps a comma decimal and drops a no-break-space group', () => {
-    expect(filterNumberTyping('1 234,56', { groupSeparator: ' ' })).toBe('1234,56');
-    expect(filterNumberTyping('5,5', { groupSeparator: ' ' })).toBe('5,5');
+    expect(filterNumberTyping('1 234,56')).toBe('1234,56');
+    expect(filterNumberTyping('5,5')).toBe('5,5');
   });
 
   it('keeps a leading minus only when allowed', () => {
-    expect(filterNumberTyping('-5,5', { allowNegative: true, groupSeparator: ' ' })).toBe('-5,5');
-    expect(filterNumberTyping('-5,5', { groupSeparator: ' ' })).toBe('5,5');
+    expect(filterNumberTyping('-5,5', { allowNegative: true })).toBe('-5,5');
+    expect(filterNumberTyping('-5,5')).toBe('5,5');
   });
 
   it('keeps and normalizes operators when allowed', () => {
-    expect(filterNumberTyping('100*1,13', { allowOperators: true, groupSeparator: ' ' })).toBe('100*1,13');
+    expect(filterNumberTyping('100*1,13', { allowOperators: true })).toBe('100*1,13');
     expect(filterNumberTyping('100×2', { allowOperators: true })).toBe('100*2');
+  });
+});
+
+describe('stripGroupSeparator', () => {
+  it('removes a dot/comma group but keeps the decimal separator', () => {
+    expect(stripGroupSeparator('1,234.56', EN)).toBe('1234.56');
+    expect(stripGroupSeparator('1.234,56', DE)).toBe('1234,56');
+  });
+
+  it('removes a whitespace group (no-break/narrow spaces)', () => {
+    expect(stripGroupSeparator('1 234,56', PL)).toBe('1234,56');
   });
 });
 
