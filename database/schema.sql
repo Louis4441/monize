@@ -1773,6 +1773,10 @@ CREATE INDEX idx_notification_reminders_due
 CREATE INDEX idx_notification_reminders_source
     ON notification_reminders (source_notification_id)
     WHERE source_notification_id IS NOT NULL;
+-- At most one active reminder per (user, source).
+CREATE UNIQUE INDEX idx_notification_reminders_active_source
+    ON notification_reminders (user_id, source_notification_id)
+    WHERE stopped_at IS NULL AND source_notification_id IS NOT NULL;
 
 CREATE TRIGGER update_notification_reminders_updated_at BEFORE UPDATE ON notification_reminders FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 

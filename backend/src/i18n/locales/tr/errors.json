@@ -341,7 +341,8 @@
     "smtpNotConfigured": "SMTP yapılandırılmamış. SMTP ortam değişkenlerini ayarlayın.",
     "noEmailOnFile": "Bu kullanıcı için kayıtlı e-posta adresi yok.",
     "categoryNotConfigurable": "{{ category }} kategorisi burada yapılandırılamaz",
-    "emptyPreferenceUpdate": "En az bir tercih alanı gereklidir"
+    "emptyPreferenceUpdate": "En az bir tercih alanı gereklidir",
+    "tooManyReminders": "En fazla {{ max }} etkin hatırlatıcınız olabilir. Yenisini eklemeden önce birini durdurun."
   },
   "push": {
     "channelUnavailable": "Bu Monize örneğinde anlık bildirimler kullanılamıyor.",

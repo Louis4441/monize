@@ -62,6 +62,15 @@ CREATE INDEX IF NOT EXISTS idx_notification_reminders_source
     ON notification_reminders (source_notification_id)
     WHERE source_notification_id IS NOT NULL;
 
+-- At most one ACTIVE reminder per (user, source): a second "remind me" on the
+-- same notification (a double-submit, or a re-configure) must not create a
+-- parallel nag. Stopped reminders are excluded so the user can set a new one
+-- after stopping; NULL sources are excluded (there are none today, and a future
+-- standalone reminder is not keyed on a source).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_reminders_active_source
+    ON notification_reminders (user_id, source_notification_id)
+    WHERE stopped_at IS NULL AND source_notification_id IS NOT NULL;
+
 DROP POLICY IF EXISTS notification_reminders_isolation ON notification_reminders;
 CREATE POLICY notification_reminders_isolation ON notification_reminders
     USING (user_id = (SELECT app_current_user_id()) OR (SELECT app_bypass_rls()))

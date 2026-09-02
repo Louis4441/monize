@@ -341,7 +341,8 @@
     "smtpNotConfigured": "SMTP не настроен. Задайте переменные окружения SMTP.",
     "noEmailOnFile": "Для этого пользователя нет адреса электронной почты.",
     "categoryNotConfigurable": "Категория {{ category }} здесь не настраивается",
-    "emptyPreferenceUpdate": "Требуется хотя бы одно поле настройки"
+    "emptyPreferenceUpdate": "Требуется хотя бы одно поле настройки",
+    "tooManyReminders": "У вас может быть не более {{ max }} активных напоминаний. Остановите одно, прежде чем добавить другое."
   },
   "push": {
     "channelUnavailable": "Push-уведомления недоступны в этом экземпляре Monize.",

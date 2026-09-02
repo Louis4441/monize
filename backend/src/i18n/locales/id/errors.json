@@ -341,7 +341,8 @@
     "smtpNotConfigured": "SMTP belum dikonfigurasi. Atur variabel lingkungan SMTP.",
     "noEmailOnFile": "Tidak ada alamat email yang tercatat untuk pengguna ini.",
     "categoryNotConfigurable": "Kategori {{ category }} tidak dapat dikonfigurasi di sini",
-    "emptyPreferenceUpdate": "Setidaknya satu bidang preferensi diperlukan"
+    "emptyPreferenceUpdate": "Setidaknya satu bidang preferensi diperlukan",
+    "tooManyReminders": "Anda dapat memiliki maksimal {{ max }} pengingat aktif. Hentikan satu sebelum menambahkan yang lain."
   },
   "push": {
     "channelUnavailable": "Notifikasi push tidak tersedia di instans Monize ini.",

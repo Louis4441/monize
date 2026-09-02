@@ -341,7 +341,8 @@
     "smtpNotConfigured": "SMTP n'est pas configuré. Définissez les variables d'environnement SMTP.",
     "noEmailOnFile": "Aucune adresse e-mail enregistrée pour cet utilisateur.",
     "categoryNotConfigurable": "La catégorie {{ category }} n'est pas configurable ici",
-    "emptyPreferenceUpdate": "Au moins un champ de préférence est requis"
+    "emptyPreferenceUpdate": "Au moins un champ de préférence est requis",
+    "tooManyReminders": "Vous pouvez avoir au maximum {{ max }} rappels actifs. Arrêtez-en un avant d'en ajouter un autre."
   },
   "push": {
     "channelUnavailable": "Les notifications push ne sont pas disponibles sur cette instance Monize.",

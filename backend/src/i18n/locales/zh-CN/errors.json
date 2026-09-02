@@ -341,7 +341,8 @@
     "smtpNotConfigured": "SMTP 未配置。请设置 SMTP 环境变量。",
     "noEmailOnFile": "此用户没有邮箱地址记录。",
     "categoryNotConfigurable": "类别 {{ category }} 无法在此配置",
-    "emptyPreferenceUpdate": "至少需要一个偏好设置字段"
+    "emptyPreferenceUpdate": "至少需要一个偏好设置字段",
+    "tooManyReminders": "您最多可以有 {{ max }} 个活动提醒。请先停止一个再添加。"
   },
   "push": {
     "channelUnavailable": "此 Monize 实例不提供推送通知。",

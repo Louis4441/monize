@@ -567,12 +567,36 @@ stopped reminder is a no-op, not a 404-after-the-fact):
    control on any bell row carrying `data.reminderId`.
 2. **From the push notification (Phase 5 carrier)** -- the SW `notificationclick`
    handler, on `event.action === "stop-reminder"`, `fetch`es that same endpoint
-   same-origin with the CSRF header. The handler is written now (inert until a
-   push carries the action) so Phase 5 only has to populate `actions`.
-3. **Source dismissed / condition cleared** -- `stopRemindersFor(userId,
-   sourceNotificationId)` is called from `NotificationService.dismiss` so a nag
-   cannot outlive the notification it nags about. (Producers that clear an
-   underlying condition call it too, as their features land.)
+   same-origin with the CSRF header (read from the Cookie Store where the browser
+   offers it). The handler is written now (inert until a push carries the action)
+   so Phase 5 only has to populate `actions`. It checks the response: if the stop
+   did not take -- a network error, or a 403 where the worker could not read the
+   CSRF cookie (Firefox/Safari expose no Cookie Store to a worker) -- it opens the
+   app at the notification's target so the user can finish stopping it there,
+   rather than being left with a nag that keeps firing. The fuller door #2 UX (a
+   single retry, then a "could not stop -- open Monize" follow-up notification)
+   ships with the Phase 5 push dispatch that actually sends the action.
+3. **Source gone / condition cleared** -- the firing cron's sweep stops any
+   reminder whose source was **dismissed** *or* **deleted**. The source FK is
+   `ON DELETE SET NULL`, so a source that is read-but-never-dismissed and then
+   purged after `RETENTION_DAYS` leaves the reminder orphaned
+   (`source_notification_id` NULL); the sweep stops orphaned reminders too, so a
+   nag cannot outlive its cause even when the cause is deleted rather than
+   dismissed. `stopRemindersFor(userId, sourceNotificationId)` is the explicit
+   door a producer calls when it clears an underlying condition (the bill posts,
+   the balance recovers); those producers land in later phases, and the sweep is
+   the safety net until they do.
+
+**One active reminder per source, and a per-user cap.** A second "remind me" on
+the same notification re-configures the one active reminder rather than adding a
+parallel nag -- enforced by the partial unique index
+`idx_notification_reminders_active_source (user_id, source_notification_id)
+WHERE stopped_at IS NULL AND source_notification_id IS NOT NULL`, with a
+concurrent double-submit recovered by re-reading the winner's row. A genuinely
+new reminder counts against `MAX_ACTIVE_REMINDERS_PER_USER` (50), because the
+every-minute cron scans and fires O(active reminders per user) -- an uncapped
+count is the same resource lever an unbounded device list or request array is
+(INV-REMINDER-006).
 
 ### 13.5 Invariants
 
@@ -587,6 +611,11 @@ stopped reminder is a no-op, not a 404-after-the-fact):
   dismissed, so it cannot outlive its cause.
 - **INV-REMINDER-005** each fire is a distinct in-app row (the fire-ordinal
   dedupe key); the in-app row is always written, matching Section 3.
+- **INV-REMINDER-006** at most one active reminder exists per (user, source)
+  (partial unique index), and a user holds at most
+  `MAX_ACTIVE_REMINDERS_PER_USER` active reminders (the every-minute cron's work
+  is O(active reminders), so the count is bounded like every other
+  user-controlled resource).
 
 ### 13.6 Test matrix (all offline-runnable -- unit + source-scan)
 

@@ -350,7 +350,8 @@
     "smtpNotConfigured": "[XX-SMTP is not configured. Set SMTP environment variables.-XX]",
     "noEmailOnFile": "[XX-No email address on file for this user.-XX]",
     "categoryNotConfigurable": "[XX-Category {{ category }} is not configurable here-XX]",
-    "emptyPreferenceUpdate": "[XX-At least one preference field is required-XX]"
+    "emptyPreferenceUpdate": "[XX-At least one preference field is required-XX]",
+    "tooManyReminders": "[XX-You can have at most {{ max }} active reminders. Stop one before adding another.-XX]"
   },
   "push": {
     "channelUnavailable": "[XX-Push notifications are not available on this Monize instance.-XX]",

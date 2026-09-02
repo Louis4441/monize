@@ -1,4 +1,4 @@
-import { NotFoundException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 
 import {
   NotificationReminderService,
@@ -7,7 +7,10 @@ import {
 import { NotificationService } from "./notification.service";
 import { Notification } from "./entities/notification.entity";
 import { ReminderRepeatMode } from "./entities/notification-reminder.entity";
-import { REMINDER_MIN_INTERVAL_MINUTES } from "./notification-reminder.constants";
+import {
+  MAX_ACTIVE_REMINDERS_PER_USER,
+  REMINDER_MIN_INTERVAL_MINUTES,
+} from "./notification-reminder.constants";
 import * as scopedDb from "../common/db/scoped-db";
 import * as withContext from "../common/db/with-context";
 
@@ -25,7 +28,9 @@ describe("NotificationReminderService", () => {
     sourceRepo = { findOne: jest.fn().mockResolvedValue(null) };
     reminderRepo = {
       find: jest.fn().mockResolvedValue([]),
-      create: jest.fn((v) => v),
+      // Default: no existing active reminder for the source, and well under cap.
+      findOne: jest.fn().mockResolvedValue(null),
+      count: jest.fn().mockResolvedValue(0),
       save: jest.fn(async (v) => ({
         id: "rem-1",
         createdAt: new Date("2026-09-02T00:00:00Z"),
@@ -89,7 +94,7 @@ describe("NotificationReminderService", () => {
           dismissedAt: expect.anything(),
         },
       });
-      const saved = reminderRepo.create.mock.calls[0][0];
+      const saved = reminderRepo.save.mock.calls[0][0];
       expect(saved).toMatchObject({
         userId: "u1",
         sourceNotificationId: "src-1",
@@ -116,7 +121,7 @@ describe("NotificationReminderService", () => {
         repeatMode: ReminderRepeatMode.ONCE,
         intervalMinutes: 30,
       });
-      expect(reminderRepo.create.mock.calls[0][0].dedupeBase).toBe(
+      expect(reminderRepo.save.mock.calls[0][0].dedupeBase).toBe(
         "PROVIDER_OUTAGE:yahoo",
       );
     });
@@ -132,7 +137,7 @@ describe("NotificationReminderService", () => {
         intervalMinutes: 30,
       });
       expect(
-        reminderRepo.create.mock.calls[0][0].dedupeBase.length,
+        reminderRepo.save.mock.calls[0][0].dedupeBase.length,
       ).toBeLessThanOrEqual(DEDUPE_BASE_MAX_LENGTH);
     });
 
@@ -143,7 +148,7 @@ describe("NotificationReminderService", () => {
         repeatMode: ReminderRepeatMode.REPEAT,
         intervalMinutes: 2,
       });
-      expect(reminderRepo.create.mock.calls[0][0].intervalMinutes).toBe(
+      expect(reminderRepo.save.mock.calls[0][0].intervalMinutes).toBe(
         REMINDER_MIN_INTERVAL_MINUTES,
       );
     });
@@ -158,6 +163,97 @@ describe("NotificationReminderService", () => {
         }),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(reminderRepo.save).not.toHaveBeenCalled();
+    });
+
+    it("re-configures the one active reminder instead of adding a parallel nag, bypassing the cap", async () => {
+      sourceRepo.findOne.mockResolvedValue(source);
+      // An active reminder already exists for this source.
+      reminderRepo.findOne.mockResolvedValue({
+        id: "existing",
+        userId: "u1",
+        sourceNotificationId: "src-1",
+        fireCount: 7,
+        stoppedAt: null,
+      });
+      await service.create("u1", {
+        sourceNotificationId: "src-1",
+        repeatMode: ReminderRepeatMode.ONCE,
+        intervalMinutes: 30,
+      });
+      const saved = reminderRepo.save.mock.calls[0][0];
+      // The same row is updated (not a new one), its schedule and fire count reset.
+      expect(saved.id).toBe("existing");
+      expect(saved.repeatMode).toBe(ReminderRepeatMode.ONCE);
+      expect(saved.intervalMinutes).toBe(30);
+      expect(saved.fireCount).toBe(0);
+      expect(saved.stoppedAt).toBeNull();
+      // A re-configure is not a new reminder, so the cap is not consulted.
+      expect(reminderRepo.count).not.toHaveBeenCalled();
+    });
+
+    it("refuses a genuinely new reminder past the per-user cap", async () => {
+      sourceRepo.findOne.mockResolvedValue(source);
+      reminderRepo.findOne.mockResolvedValue(null); // no existing for this source
+      reminderRepo.count.mockResolvedValue(MAX_ACTIVE_REMINDERS_PER_USER);
+      await expect(
+        service.create("u1", {
+          sourceNotificationId: "src-1",
+          repeatMode: ReminderRepeatMode.REPEAT,
+          intervalMinutes: 15,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(reminderRepo.save).not.toHaveBeenCalled();
+    });
+
+    it("recovers from a concurrent unique-index conflict by re-reading the winner", async () => {
+      sourceRepo.findOne.mockResolvedValue(source);
+      // First pass: no existing -> insert -> loses the race (23505 on the index).
+      // Second pass: the winner's row is now visible -> update it.
+      reminderRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce({
+        id: "winner",
+        userId: "u1",
+        sourceNotificationId: "src-1",
+        stoppedAt: null,
+      });
+      reminderRepo.save
+        .mockRejectedValueOnce({
+          code: "23505",
+          constraint: "idx_notification_reminders_active_source",
+        })
+        .mockResolvedValueOnce({
+          id: "winner",
+          createdAt: new Date("2026-09-02T00:00:00Z"),
+          nextFireAt: new Date("2026-09-02T00:15:00Z"),
+          lastFiredAt: null,
+          fireCount: 0,
+          sourceNotificationId: "src-1",
+          type: "BILL_DUE",
+          severity: "warning",
+          title: "Rent due",
+          message: "Rent is due in 3 days",
+          target: "/bills",
+          repeatMode: ReminderRepeatMode.REPEAT,
+          intervalMinutes: 15,
+        });
+      const view = await service.create("u1", {
+        sourceNotificationId: "src-1",
+        repeatMode: ReminderRepeatMode.REPEAT,
+        intervalMinutes: 15,
+      });
+      expect(view.id).toBe("winner");
+      expect(reminderRepo.save).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not swallow a non-conflict save error", async () => {
+      sourceRepo.findOne.mockResolvedValue(source);
+      reminderRepo.save.mockRejectedValue(new Error("disk full"));
+      await expect(
+        service.create("u1", {
+          sourceNotificationId: "src-1",
+          repeatMode: ReminderRepeatMode.REPEAT,
+          intervalMinutes: 15,
+        }),
+      ).rejects.toThrow("disk full");
     });
   });
 

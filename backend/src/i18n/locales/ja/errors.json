@@ -341,7 +341,8 @@
     "smtpNotConfigured": "SMTPが設定されていません。SMTP環境変数を設定してください。",
     "noEmailOnFile": "このユーザーにはメールアドレスが登録されていません。",
     "categoryNotConfigurable": "カテゴリ {{ category }} はここでは設定できません",
-    "emptyPreferenceUpdate": "少なくとも1つの設定項目が必要です"
+    "emptyPreferenceUpdate": "少なくとも1つの設定項目が必要です",
+    "tooManyReminders": "アクティブなリマインダーは最大 {{ max }} 件までです。追加する前に1件停止してください。"
   },
   "push": {
     "channelUnavailable": "この Monize インスタンスではプッシュ通知を利用できません。",

@@ -341,7 +341,8 @@
     "smtpNotConfigured": "SMTP не налаштовано. Встановіть змінні середовища SMTP.",
     "noEmailOnFile": "Для цього користувача не зазначено електронну адресу.",
     "categoryNotConfigurable": "Категорія {{ category }} тут не налаштовується",
-    "emptyPreferenceUpdate": "Потрібно принаймні одне поле налаштувань"
+    "emptyPreferenceUpdate": "Потрібно принаймні одне поле налаштувань",
+    "tooManyReminders": "У вас може бути щонайбільше {{ max }} активних нагадувань. Зупиніть одне, перш ніж додати інше."
   },
   "push": {
     "channelUnavailable": "Push-сповіщення недоступні в цьому екземплярі Monize.",

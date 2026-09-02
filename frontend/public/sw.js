@@ -289,65 +289,83 @@ function readCsrfTokenFromStore() {
 // Stop a repeating reminder from its push Stop action. Same-origin, credentialed
 // (the session cookie rides along), and idempotent server-side: a forged or
 // already-stopped id is a no-op scoped to the caller, never a cross-user write.
+//
+// Resolves to whether the stop actually took (a 2xx). It never rejects: a
+// network error, or a 403 where the CSRF cookie was unreadable (Firefox/Safari
+// expose no Cookie Store to the worker), resolves `false` so the caller can fall
+// back to opening the app rather than silently leaving the nag running.
 function stopReminderFromAction(reminderId) {
-  return readCsrfTokenFromStore().then(function (token) {
-    var headers = {};
-    if (token) headers['X-CSRF-Token'] = token;
-    return fetch(
-      '/api/v1/notifications/reminders/' +
-        encodeURIComponent(reminderId) +
-        '/stop',
-      { method: 'POST', credentials: 'include', headers: headers }
-    );
-  });
+  return readCsrfTokenFromStore()
+    .then(function (token) {
+      var headers = {};
+      if (token) headers['X-CSRF-Token'] = token;
+      return fetch(
+        '/api/v1/notifications/reminders/' +
+          encodeURIComponent(reminderId) +
+          '/stop',
+        { method: 'POST', credentials: 'include', headers: headers }
+      );
+    })
+    .then(function (response) {
+      return !!response && response.ok;
+    })
+    .catch(function () {
+      return false;
+    });
+}
+
+// Focus an open same-origin window and navigate it, or open one. Shared by the
+// ordinary body click and the Stop-action fallback.
+function focusOrOpen(url) {
+  return self.clients
+    .matchAll({ type: 'window', includeUncontrolled: true })
+    .then(function (clientList) {
+      for (var i = 0; i < clientList.length; i++) {
+        var client = clientList[i];
+        if (new URL(client.url).origin !== self.location.origin) continue;
+        if (typeof client.navigate === 'function') {
+          return client
+            .navigate(url)
+            .then(function (navigated) {
+              return (navigated || client).focus();
+            })
+            .catch(function () {
+              return client.focus();
+            });
+        }
+        return client.focus();
+      }
+      return self.clients.openWindow(url);
+    });
 }
 
 self.addEventListener('notificationclick', function (event) {
   event.notification.close();
 
   var data = event.notification.data || {};
+  // Re-validated rather than trusted: the stored data IS the payload, so it is
+  // no more trustworthy here than it was on arrival.
+  var url = new URL(safeNotificationPath(data.target), self.location.origin)
+    .href;
 
   // A Stop action on a reminder push (Phase 5 populates `actions` and
-  // `data.reminderId`; this branch is inert until then). It stops the reminder
-  // and does NOT open a window -- the user asked to silence it, not to visit it.
+  // `data.reminderId`; this branch is inert until then). Silence the reminder
+  // without opening a window -- unless the stop did not take, in which case open
+  // the app at the notification's target so the user can finish stopping it
+  // there rather than being left with a nag that keeps firing.
   if (event.action === 'stop-reminder') {
     var reminderId = data.reminderId;
     if (typeof reminderId === 'string' && reminderId) {
       event.waitUntil(
-        stopReminderFromAction(reminderId).catch(function () {})
+        stopReminderFromAction(reminderId).then(function (stopped) {
+          if (!stopped) return focusOrOpen(url);
+        })
       );
     }
     return;
   }
-  // Re-validated rather than trusted: the stored data IS the payload, so it is
-  // no more trustworthy here than it was on arrival.
-  var url = new URL(
-    safeNotificationPath(data.target),
-    self.location.origin
-  ).href;
 
-  event.waitUntil(
-    self.clients
-      .matchAll({ type: 'window', includeUncontrolled: true })
-      .then(function (clientList) {
-        // Focus an open window rather than opening a second one, and navigate it
-        // where the app can. A client that cannot navigate is still better
-        // focused than ignored.
-        for (var i = 0; i < clientList.length; i++) {
-          var client = clientList[i];
-          if (new URL(client.url).origin !== self.location.origin) continue;
-          if (typeof client.navigate === 'function') {
-            return client.navigate(url).then(function (navigated) {
-              return (navigated || client).focus();
-            }).catch(function () {
-              return client.focus();
-            });
-          }
-          return client.focus();
-        }
-        return self.clients.openWindow(url);
-      })
-  );
+  event.waitUntil(focusOrOpen(url));
 });
 
 function escapeHtml(value) {

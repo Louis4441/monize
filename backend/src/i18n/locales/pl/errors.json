@@ -341,7 +341,8 @@
     "smtpNotConfigured": "SMTP nie jest skonfigurowany. Ustaw zmienne środowiskowe SMTP.",
     "noEmailOnFile": "Brak zapisanego adresu e-mail dla tego użytkownika.",
     "categoryNotConfigurable": "Kategoria {{ category }} nie jest tutaj konfigurowalna",
-    "emptyPreferenceUpdate": "Wymagane jest co najmniej jedno pole preferencji"
+    "emptyPreferenceUpdate": "Wymagane jest co najmniej jedno pole preferencji",
+    "tooManyReminders": "Możesz mieć maksymalnie {{ max }} aktywnych przypomnień. Zatrzymaj jedno przed dodaniem kolejnego."
   },
   "push": {
     "channelUnavailable": "Powiadomienia push nie są dostępne w tej instancji Monize.",

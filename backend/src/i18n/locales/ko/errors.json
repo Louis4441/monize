@@ -341,7 +341,8 @@
     "smtpNotConfigured": "SMTP가 구성되지 않았습니다. SMTP 환경 변수를 설정하세요.",
     "noEmailOnFile": "이 사용자에 대해 등록된 이메일 주소가 없습니다.",
     "categoryNotConfigurable": "{{ category }} 카테고리는 여기서 설정할 수 없습니다",
-    "emptyPreferenceUpdate": "하나 이상의 기본 설정 필드가 필요합니다"
+    "emptyPreferenceUpdate": "하나 이상의 기본 설정 필드가 필요합니다",
+    "tooManyReminders": "활성 알림은 최대 {{ max }}개까지 가능합니다. 추가하기 전에 하나를 중지하세요."
   },
   "push": {
     "channelUnavailable": "이 Monize 인스턴스에서는 푸시 알림을 사용할 수 없습니다.",

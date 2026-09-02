@@ -341,7 +341,8 @@
     "smtpNotConfigured": "SMTP कॉन्फ़िगर नहीं है। SMTP पर्यावरण चर सेट करें।",
     "noEmailOnFile": "इस उपयोगकर्ता के लिए कोई ईमेल पता दर्ज नहीं है।",
     "categoryNotConfigurable": "श्रेणी {{ category }} यहाँ कॉन्फ़िगर करने योग्य नहीं है",
-    "emptyPreferenceUpdate": "कम से कम एक प्राथमिकता फ़ील्ड आवश्यक है"
+    "emptyPreferenceUpdate": "कम से कम एक प्राथमिकता फ़ील्ड आवश्यक है",
+    "tooManyReminders": "आपके पास अधिकतम {{ max }} सक्रिय अनुस्मारक हो सकते हैं। दूसरा जोड़ने से पहले एक रोकें।"
   },
   "push": {
     "channelUnavailable": "इस Monize इंस्टेंस पर पुश सूचनाएं उपलब्ध नहीं हैं।",

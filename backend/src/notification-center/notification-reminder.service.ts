@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { DataSource, EntityManager, IsNull } from "typeorm";
 
@@ -21,6 +26,7 @@ import {
 } from "./notification.service";
 import { CreateNotificationReminderDto } from "./dto/create-notification-reminder.dto";
 import {
+  MAX_ACTIVE_REMINDERS_PER_USER,
   REMINDER_MAX_INTERVAL_MINUTES,
   REMINDER_MIN_INTERVAL_MINUTES,
 } from "./notification-reminder.constants";
@@ -86,12 +92,19 @@ export class NotificationReminderService {
   ) {}
 
   /**
-   * Create a reminder for one of the caller's own live notifications.
+   * Create -- or re-configure -- a reminder for one of the caller's own live
+   * notifications.
    *
    * The notification's content is read server-side from the source row (owned by
    * the caller) and copied into the template -- never taken from the request --
-   * and the load and the insert share one transaction so a source that vanishes
+   * and the load and the write share one transaction so a source that vanishes
    * between the two cannot leave a reminder pointing at nothing.
+   *
+   * At most one ACTIVE reminder exists per (user, source): a second "remind me"
+   * on the same notification re-configures the existing one rather than adding a
+   * parallel nag (the `idx_notification_reminders_active_source` unique index is
+   * the backstop against a concurrent double-submit). Only a genuinely new
+   * reminder counts against the per-user cap.
    */
   async create(
     userId: string,
@@ -119,34 +132,96 @@ export class NotificationReminderService {
         );
       }
 
-      const repo = manager.getRepository(NotificationReminder);
-      const reminder = repo.create({
-        userId,
-        sourceNotificationId: source.id,
-        type: source.type,
-        severity: source.severity,
-        title: source.title,
-        message: source.message,
-        data: source.data ?? {},
-        target: source.target,
-        // The source's own dedupe key names its subject where it has one (system
-        // notifications), else its type -- the fire ordinal makes each re-emit
-        // distinct regardless.
-        dedupeBase: (source.dedupeKey ?? source.type).slice(
-          0,
-          DEDUPE_BASE_MAX_LENGTH,
-        ),
-        repeatMode: dto.repeatMode,
-        intervalMinutes,
-        // The source already delivered the first occurrence; the first nag comes
-        // one interval later.
-        nextFireAt: new Date(Date.now() + intervalMinutes * 60_000),
-        fireCount: 0,
-      });
-      return repo.save(reminder);
+      try {
+        return await this.upsertForSource(
+          manager,
+          userId,
+          source,
+          dto.repeatMode,
+          intervalMinutes,
+        );
+      } catch (error) {
+        // A concurrent create for the same source lost the unique-index race:
+        // re-read the row the winner wrote and apply this caller's settings
+        // (last write wins), rather than surfacing a 500.
+        if (isActiveReminderConflict(error)) {
+          return this.upsertForSource(
+            manager,
+            userId,
+            source,
+            dto.repeatMode,
+            intervalMinutes,
+          );
+        }
+        throw error;
+      }
     });
 
     return toReminderView(row);
+  }
+
+  /**
+   * Insert a reminder for this source, or re-configure the one active reminder
+   * that already exists for it. The template is refreshed from the (current)
+   * source on every call. A new row is subject to the per-user cap; a
+   * re-configuration is not.
+   */
+  private async upsertForSource(
+    manager: EntityManager,
+    userId: string,
+    source: Notification,
+    repeatMode: ReminderRepeatMode,
+    intervalMinutes: number,
+  ): Promise<NotificationReminder> {
+    const repo = manager.getRepository(NotificationReminder);
+    const existing = await repo.findOne({
+      where: {
+        userId,
+        sourceNotificationId: source.id,
+        stoppedAt: IsNull(),
+      },
+    });
+
+    const reminder = existing ?? new NotificationReminder();
+    reminder.userId = userId;
+    reminder.sourceNotificationId = source.id;
+    reminder.type = source.type;
+    reminder.severity = source.severity;
+    reminder.title = source.title;
+    reminder.message = source.message;
+    reminder.data = source.data ?? {};
+    reminder.target = source.target;
+    // The source's own dedupe key names its subject where it has one (system
+    // notifications), else its type -- the fire ordinal makes each re-emit
+    // distinct regardless.
+    reminder.dedupeBase = (source.dedupeKey ?? source.type).slice(
+      0,
+      DEDUPE_BASE_MAX_LENGTH,
+    );
+    reminder.repeatMode = repeatMode;
+    reminder.intervalMinutes = intervalMinutes;
+    // The source already delivered the first occurrence; the first nag comes one
+    // interval later. A re-configure restarts the schedule and the fire count.
+    reminder.nextFireAt = new Date(Date.now() + intervalMinutes * 60_000);
+    reminder.fireCount = 0;
+    reminder.stoppedAt = null;
+
+    if (!existing) {
+      const active = await repo.count({
+        where: { userId, stoppedAt: IsNull() },
+      });
+      if (active >= MAX_ACTIVE_REMINDERS_PER_USER) {
+        throw new BadRequestException(
+          tr(
+            "errors.notifications.tooManyReminders",
+            `You can have at most ${MAX_ACTIVE_REMINDERS_PER_USER} active reminders. Stop one before adding another.`,
+            { max: MAX_ACTIVE_REMINDERS_PER_USER },
+          ),
+        );
+      }
+    }
+
+    return repo.save(reminder);
   }
 
   /** The caller's active reminders, newest first. */
@@ -223,20 +298,26 @@ export class NotificationReminderService {
   @Cron("* * * * *")
   async fireDue(): Promise<void> {
     try {
-      // Stop any reminder whose source was dismissed since the last tick, before
-      // the claim so a dismissed-source nag cannot be claimed this tick. A
-      // cross-user sweep, so it seeds its own system context (task C2).
+      // Stop any reminder whose cause is gone, before the claim so it cannot be
+      // claimed this tick. Two shapes: the source was dismissed, or the source
+      // was deleted -- the FK is ON DELETE SET NULL, so a purged read-but-never-
+      // dismissed source leaves the reminder orphaned (source_notification_id
+      // NULL), and a nag with no live cause must not run forever. Every reminder
+      // has a source today, so NULL means orphaned. A cross-user sweep, so it
+      // seeds its own system context (task C2).
       await withSystemContext(() =>
         withScopedDb(this.dataSource, (manager) =>
           manager.query(
             `UPDATE notification_reminders r
                 SET stopped_at = CURRENT_TIMESTAMP
               WHERE r.stopped_at IS NULL
-                AND r.source_notification_id IS NOT NULL
-                AND EXISTS (
-                  SELECT 1 FROM notifications n
-                   WHERE n.id = r.source_notification_id
-                     AND n.dismissed_at IS NOT NULL
+                AND (
+                  r.source_notification_id IS NULL
+                  OR EXISTS (
+                    SELECT 1 FROM notifications n
+                     WHERE n.id = r.source_notification_id
+                       AND n.dismissed_at IS NOT NULL
+                  )
                 )`,
           ),
         ),
@@ -358,6 +439,31 @@ export class NotificationReminderService {
       Math.max(REMINDER_MIN_INTERVAL_MINUTES, Math.round(minutes)),
     );
   }
+}
+
+/** The unique index that keeps one active reminder per (user, source). */
+const ACTIVE_SOURCE_INDEX = "idx_notification_reminders_active_source";
+
+/**
+ * A unique-violation on the active-per-source index, and only that -- so a
+ * concurrent double-submit is recovered by re-reading and updating the winner's
+ * row, while any other error still surfaces. Scoped to the index name rather
+ * than a bare 23505, so a different constraint is never mistaken for this one.
+ */
+function isActiveReminderConflict(error: unknown): boolean {
+  const wrapped = error as {
+    code?: unknown;
+    constraint?: unknown;
+    message?: unknown;
+    driverError?: { code?: unknown; constraint?: unknown; message?: unknown };
+  };
+  const code = wrapped?.code ?? wrapped?.driverError?.code;
+  if (code !== "23505") return false;
+  const constraint = wrapped?.constraint ?? wrapped?.driverError?.constraint;
+  const message = `${wrapped?.message ?? ""} ${wrapped?.driverError?.message ?? ""}`;
+  return (
+    constraint === ACTIVE_SOURCE_INDEX || message.includes(ACTIVE_SOURCE_INDEX)
+  );
 }
 
 function toReminderView(row: NotificationReminder): NotificationReminderView {
