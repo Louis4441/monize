@@ -1,4 +1,5 @@
-import type { LoanScheduleResult } from '@/lib/loan-schedule';
+import type { LoanScheduleInput, LoanScheduleResult } from '@/lib/loan-schedule-types';
+import { getPeriodicRate, getPeriodsPerYear } from '@/lib/loan-frequency';
 
 /**
  * A debt whose outstanding magnitude is at or below this is settled. It matches
@@ -61,6 +62,54 @@ export interface LoanFigures {
  * interest is a known zero -- never `null`, which would report a finished loan
  * as one that could not be worked out.
  */
+/**
+ * Why a loan's projection does not reach payoff, or `null` when it does (or when
+ * there is no projection to explain). The payoff date and remaining interest are
+ * `null` in both non-payoff cases, and the two have opposite fixes, so a surface
+ * that only prints "unknown" leaves the user with no way forward:
+ *
+ * - `payment-below-interest` -- the installment is below the interest at the
+ *   current rate, so the balance never falls. `payment` and `periodInterest`
+ *   are the two figures to compare; usually the payment is stale or unset, which
+ *   the user can fix (record the real installment, or set the payment amount).
+ * - `beyond-horizon` -- the payment covers interest but the term runs past the
+ *   projection horizon. A property of the loan, not a data problem.
+ */
+export type LoanNotAmortizingReason =
+  | {
+      kind: 'payment-below-interest';
+      /** The installment the projection is seeded with. */
+      payment: number;
+      /** One period's interest at the current rate on the current balance. */
+      periodInterest: number;
+      /** The annual rate the interest is computed at (percent). */
+      annualRate: number;
+    }
+  | { kind: 'beyond-horizon' };
+
+export function loanNotAmortizingReason(
+  input: LoanScheduleInput | null,
+  baseline: LoanScheduleResult | null,
+): LoanNotAmortizingReason | null {
+  if (!input || !baseline || baseline.paidOff) return null;
+  if (baseline.coveredInterest) return { kind: 'beyond-horizon' };
+  const periodsPerYear = getPeriodsPerYear(input.frequency);
+  const periodInterest =
+    input.startingBalance *
+    getPeriodicRate(
+      input.annualRate,
+      periodsPerYear,
+      input.isCanadian ?? false,
+      input.isVariableRate ?? false,
+    );
+  return {
+    kind: 'payment-below-interest',
+    payment: input.paymentAmount,
+    periodInterest: Math.round(periodInterest * 100) / 100,
+    annualRate: input.annualRate,
+  };
+}
+
 export function deriveLoanFigures({
   currentBalance,
   currentInstallment,

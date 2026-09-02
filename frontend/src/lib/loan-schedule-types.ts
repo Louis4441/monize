@@ -163,6 +163,16 @@ export interface LoanScheduleResult {
   numPayments: number;
   paidOff: boolean;
   /**
+   * Whether every period's payment covered that period's interest. When false
+   * the installment is below the interest at the rate in effect, so the balance
+   * never falls and the loan cannot amortize -- a distinct reason from a term
+   * simply longer than the projection horizon (both leave `paidOff` false). The
+   * surface uses this to explain WHY payoff and remaining interest are unknown:
+   * a payment that does not cover interest is usually a stale or unset
+   * installment the user can fix, not a property of the loan.
+   */
+  coveredInterest: boolean;
+  /**
    * The regular installment in effect at the end of the schedule. Equal to the
    * contractual payment for SHORTEN_TERM; the recomputed lower payment for
    * LOWER_INSTALLMENT (PL *obniżenie raty*).

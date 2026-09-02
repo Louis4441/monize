@@ -314,6 +314,8 @@ function debtMagnitude(signedBalance: number): number {
 /** The last regular installment actually observed, and whether it is complete. */
 export interface ObservedInstallment {
   amount: number;
+  /** The date (YYYY-MM-DD) of the regular installment this figure comes from. */
+  date: string;
   /**
    * True when the row's interest is KNOWN -- either recorded (a split, or a
    * paired separate expense) or known to be zero because the rate in effect on
@@ -356,6 +358,7 @@ export function observedInstallment(
   // exactly -- "`null` is not the safe answer either", from the other side.
   return {
     amount,
+    date: lastRegular.date.split('T')[0],
     complete: lastRegular.interest > 0 || lastRegular.annualRate === 0,
   };
 }
@@ -475,11 +478,13 @@ interface SeedPayment {
  * The payment comes from the most authoritative source that states one, and only
  * the unranked candidates are tested against the first period's interest:
  *
- *   1. a payment stated by an applicable `manual` or `inferred` rate-change row,
- *      used unconditionally -- it is the recorded answer to "what is being paid
- *      now", so one that no longer covers the interest is a fact about the loan
- *      (a rate rise the installment has not caught up with) and the schedule
- *      must be allowed to refuse rather than be handed a different number;
+ *   1. a payment stated by an applicable `manual` or `inferred` rate-change row
+ *      -- the recorded answer to "what is being paid now", so one that no longer
+ *      covers the interest is a fact about the loan (a rate rise the installment
+ *      has not caught up with) and the schedule must be allowed to refuse rather
+ *      than be handed a different number. It yields to rank 2 only when a
+ *      complete installment was actually paid AFTER the row stating it: that
+ *      later payment is the newer statement (see `observedIsNewer` below);
  *   2. otherwise a COMPLETE observed installment -- `principal + interest` of the
  *      last regular payment, where that interest is known -- also unconditionally,
  *      for the same reason: it is a complete statement of what is being paid;
@@ -602,8 +607,24 @@ function resolveSeedPayment(
   // not a lower payment, it is an incomplete one, and the contractual figure is
   // the only complete payment fact such a loan has. This is the only case the
   // fallback is for.
+  // A payment stated in a rate-change row is authoritative -- UNLESS a complete
+  // installment was actually paid AFTER the row that stated it. A stated payment
+  // is a snapshot of the contractual installment on that day; a real payment
+  // made later is a newer statement of what is owed. This matters most for a
+  // loan whose lender re-amortizes after each overpayment (a lower installment):
+  // one stated 1,200.99 in 2022 kept reading as "the installment" on every
+  // surface while the bank had long since dropped it to ~860 -- and the projection,
+  // seeded from the stale figure, described payments nobody was making. The
+  // reverse ordering is still protected: a row recorded AFTER the last payment
+  // (a rate rise with a new contractual installment not yet paid) keeps
+  // precedence over the older observation. Strict `>` -- on a tie the recorded
+  // statement wins.
+  const observedIsNewer =
+    observed?.complete === true &&
+    effective.paymentEffectiveDate != null &&
+    observed.date > effective.paymentEffectiveDate;
   let payment: number | null;
-  if (effective.paymentAmount != null) {
+  if (effective.paymentAmount != null && !observedIsNewer) {
     payment = effective.paymentAmount;
   } else if (observed?.complete) {
     payment = observed.amount;
@@ -678,6 +699,68 @@ export function buildLoanProjectionInput(
   // that does not.
   todayYmd: string = financialTodayYmd(undefined),
 ): LoanScheduleInput | null {
+  return evaluateLoanProjection(account, history, rateChanges, anchor, todayYmd)
+    .input;
+}
+
+/**
+ * Why the forward projection cannot be built, or `null` when it can. Each value
+ * is a SEPARATE, separately-fixable cause, so the surface can tell the user
+ * which one applies instead of hiding the panel with no explanation:
+ *
+ * - `paid-off` -- nothing outstanding to amortize (balance <= 0.01).
+ * - `no-frequency` -- the account has no payment frequency set.
+ * - `no-rate` -- no rate recorded anywhere (neither `account.interestRate` nor
+ *   an applicable rate-change row). A per-row rate reconstructed from the
+ *   interest charged still shows in the schedule table, so the table can carry
+ *   a rate while the projection cannot -- see `assignObservedRates`.
+ * - `no-payment` -- no complete installment resolves: there is no complete
+ *   observed regular payment (a loan whose regular installments are booked as
+ *   categorized expenses on the source account, never as transfers to the loan
+ *   account, has no regular row here at all) AND no stored contractual payment.
+ */
+export type LoanProjectionUnavailableReason =
+  | 'paid-off'
+  | 'no-frequency'
+  | 'no-rate'
+  | 'no-payment';
+
+/**
+ * The reason `buildLoanProjectionInput` cannot produce a schedule, or `null`
+ * when it can. Shares ONE evaluation with `buildLoanProjectionInput`
+ * (`evaluateLoanProjection`), so the two can never disagree about whether a
+ * projection exists -- a surface renders the simulator when this is `null` and
+ * this explanation when it is not, rather than silently drawing nothing.
+ */
+export function diagnoseLoanProjection(
+  account: Account,
+  history: LoanHistoryResult,
+  rateChanges: RateTimelineRow[] = [],
+  anchor?: LoanProjectionAnchor | null,
+  todayYmd: string = financialTodayYmd(undefined),
+): LoanProjectionUnavailableReason | null {
+  return evaluateLoanProjection(account, history, rateChanges, anchor, todayYmd)
+    .reason;
+}
+
+interface LoanProjectionEvaluation {
+  input: LoanScheduleInput | null;
+  reason: LoanProjectionUnavailableReason | null;
+}
+
+/**
+ * The projection gate, evaluated once: either the schedule input, or the reason
+ * it cannot be built. `input` and `reason` are mutually exclusive -- exactly one
+ * is non-null -- so the "can we project" decision lives in a single place and
+ * `buildLoanProjectionInput` / `diagnoseLoanProjection` cannot drift apart.
+ */
+function evaluateLoanProjection(
+  account: Account,
+  history: LoanHistoryResult,
+  rateChanges: RateTimelineRow[],
+  anchor: LoanProjectionAnchor | null | undefined,
+  todayYmd: string,
+): LoanProjectionEvaluation {
   const usableAnchor = usableProjectionAnchor(anchor, todayYmd);
   // Gated on the RESOLVED terms, not on the account's scalars. Gating on the
   // scalars asked the wrong question: this function goes on to resolve both the
@@ -696,12 +779,11 @@ export function buildLoanProjectionInput(
   // the pre-payoff balance and print an Est. Payoff years away. Today's
   // balance is what says the loan is finished, and it kept saying so before
   // the anchor existed.
-  if (
-    startingDebt <= 0.01 ||
-    history.currentBalance <= 0.01 ||
-    !account.paymentFrequency
-  ) {
-    return null;
+  if (startingDebt <= 0.01 || history.currentBalance <= 0.01) {
+    return { input: null, reason: 'paid-off' };
+  }
+  if (!account.paymentFrequency) {
+    return { input: null, reason: 'no-frequency' };
   }
 
   const seed = resolveSeedPayment(
@@ -711,8 +793,14 @@ export function buildLoanProjectionInput(
     usableAnchor,
     todayYmd,
   );
-  if (seed.payment == null || seed.payment <= 0 || seed.annualRate == null) {
-    return null;
+  // A missing rate and a missing payment are different causes with different
+  // fixes, so they are reported apart rather than folded into one `null`. The
+  // combined null condition is unchanged from the single guard this replaced.
+  if (seed.annualRate == null) {
+    return { input: null, reason: 'no-rate' };
+  }
+  if (seed.payment == null || seed.payment <= 0) {
+    return { input: null, reason: 'no-payment' };
   }
 
   // Only the future-dated steps are taken from here; the current terms are the
@@ -721,14 +809,17 @@ export function buildLoanProjectionInput(
   const futureTimeline = buildRateTimeline(rateChanges, todayYmd, seed.annualRate);
 
   return {
-    startingBalance: startingDebt,
-    annualRate: seed.annualRate,
-    paymentAmount: seed.payment,
-    frequency: account.paymentFrequency as ScheduleFrequency,
-    isCanadian: account.isCanadianMortgage || false,
-    isVariableRate: account.isVariableRate || false,
-    firstPaymentDate: seed.firstPaymentDate,
-    rateChanges: futureTimeline.rateChanges,
+    input: {
+      startingBalance: startingDebt,
+      annualRate: seed.annualRate,
+      paymentAmount: seed.payment,
+      frequency: account.paymentFrequency as ScheduleFrequency,
+      isCanadian: account.isCanadianMortgage || false,
+      isVariableRate: account.isVariableRate || false,
+      firstPaymentDate: seed.firstPaymentDate,
+      rateChanges: futureTimeline.rateChanges,
+    },
+    reason: null,
   };
 }
 
@@ -1068,7 +1159,16 @@ function pairSeparateInterestByDate(
   for (const tx of interestTransactions) {
     if (tx.isTransfer) continue; // interest is never a transfer to the loan
     const amount = Math.abs(Number(tx.amount));
-    if (!(amount > 0)) continue;
+    // Skip only a non-numeric amount, never an exact zero. A zero-value row is
+    // a REAL recorded event -- a payment holiday ("rata zawieszona") posts a
+    // 0 against the interest category -- and a measured zero is not absence
+    // (the same rule this module holds for interest and rates). Dropping
+    // exactly 0 while keeping -0.01 made a suspended installment vanish from
+    // the schedule while a one-groszy rounding of the very same row appeared.
+    // A zero pairs into a date's interest as 0 (no effect) and, when it pairs
+    // to no payment, becomes its own interest-only row -- which is what shows
+    // the holiday.
+    if (!Number.isFinite(amount)) continue;
     const nearest =
       sortedDates.length > 0
         ? nearestDateKey(tx.transactionDate.split('T')[0], sortedDates, tolerance)

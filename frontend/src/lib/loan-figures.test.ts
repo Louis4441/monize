@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { deriveLoanFigures, isDebtSettled } from './loan-figures';
-import type { LoanScheduleResult } from './loan-schedule';
+import {
+  deriveLoanFigures,
+  isDebtSettled,
+  loanNotAmortizingReason,
+} from './loan-figures';
+import type { LoanScheduleInput, LoanScheduleResult } from './loan-schedule';
 
 function makeBaseline(overrides: Partial<LoanScheduleResult> = {}): LoanScheduleResult {
   return {
@@ -11,7 +15,24 @@ function makeBaseline(overrides: Partial<LoanScheduleResult> = {}): LoanSchedule
     totalExtraPrincipal: 0,
     numPayments: 60,
     paidOff: true,
+    coveredInterest: true,
     finalPaymentAmount: 1500,
+    ...overrides,
+  };
+}
+
+function makeInput(
+  overrides: Partial<LoanScheduleInput> = {},
+): LoanScheduleInput {
+  return {
+    startingBalance: 135662.61,
+    annualRate: 5.5,
+    paymentAmount: 591.67,
+    frequency: 'MONTHLY',
+    isCanadian: false,
+    isVariableRate: false,
+    firstPaymentDate: new Date('2026-09-05'),
+    rateChanges: [],
     ...overrides,
   };
 }
@@ -98,5 +119,37 @@ describe('deriveLoanFigures', () => {
       deriveLoanFigures({ currentBalance: -1000, currentInstallment: 0, baseline: null })
         .currentPayment,
     ).toBeNull();
+  });
+});
+
+describe('loanNotAmortizingReason', () => {
+  it('is null when there is no projection or it pays off', () => {
+    expect(loanNotAmortizingReason(null, makeBaseline())).toBeNull();
+    expect(loanNotAmortizingReason(makeInput(), null)).toBeNull();
+    expect(
+      loanNotAmortizingReason(makeInput(), makeBaseline({ paidOff: true })),
+    ).toBeNull();
+  });
+
+  it("reports 'payment-below-interest' with the two figures to compare", () => {
+    // 135662.61 * 5.5% / 12 = 621.79; the 591.67 installment is below it.
+    const reason = loanNotAmortizingReason(
+      makeInput(),
+      makeBaseline({ paidOff: false, coveredInterest: false }),
+    );
+    expect(reason).toEqual({
+      kind: 'payment-below-interest',
+      payment: 591.67,
+      periodInterest: 621.79,
+      annualRate: 5.5,
+    });
+  });
+
+  it("reports 'beyond-horizon' when the payment covers interest but the term is too long", () => {
+    const reason = loanNotAmortizingReason(
+      makeInput({ paymentAmount: 700 }),
+      makeBaseline({ paidOff: false, coveredInterest: true }),
+    );
+    expect(reason).toEqual({ kind: 'beyond-horizon' });
   });
 });

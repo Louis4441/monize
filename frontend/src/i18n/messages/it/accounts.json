@@ -455,7 +455,14 @@
       "budgetLabel": "Pagamento mensile totale",
       "budgetHint": "Destina ogni mese un totale fisso al prestito; il versamento extra è ciò che resta dopo la rata. Quando la rata cala, il versamento cresce per mantenere lo stesso totale.",
       "budgetBelowInstallment": "È inferiore alla rata attuale ({amount}); aumentalo per versare di più.",
-      "windowInverted": "La data di inizio è successiva alla data di fine, quindi questo piano non si applica mai."
+      "windowInverted": "La data di inizio è successiva alla data di fine, quindi questo piano non si applica mai.",
+      "unavailable": {
+        "title": "La simulazione dell'estinzione anticipata non può ancora essere calcolata per questo prestito.",
+        "reasonPaidOff": "Questo prestito non ha saldo residuo, quindi non c'è più nulla da ammortizzare.",
+        "reasonNoFrequency": "Per questo prestito non è impostata una frequenza di pagamento. Aggiungila nelle impostazioni del conto.",
+        "reasonNoRate": "Per questo prestito non è salvato un tasso di interesse. Imposta il tasso nelle impostazioni del conto oppure registra una variazione di tasso con data odierna o precedente. Un tasso mostrato per riga nel piano qui sotto è ricostruito dagli interessi addebitati e non è un tasso salvato.",
+        "reasonNoPayment": "L'importo della rata non può essere determinato. Registra le rate regolari come trasferimenti verso il conto del prestito (capitale, con gli interessi come riga di suddivisione o come spesa categorizzata separata), oppure imposta l'importo del pagamento nelle impostazioni del conto. I pagamenti registrati come spese ordinarie sul conto di origine non raggiungono mai il conto del prestito, quindi il piano non può vederli."
+      }
     },
     "comparison": {
       "newPayoff": "Nuova data di estinzione",
@@ -616,6 +623,11 @@
       "memoLabel": "Memo di rimborso anticipato",
       "memoPlaceholder": "es. Capitale aggiuntivo",
       "memoHelp": "I pagamenti il cui memo contiene questo testo vengono conteggiati come rimborsi anticipati (senza distinzione tra maiuscole e minuscole)."
+    },
+    "notAmortizing": {
+      "title": "Questo prestito non si estingue, quindi la data di estinzione stimata e gli interessi residui sono sconosciuti.",
+      "paymentBelowInterest": "La rata ({payment}) è inferiore agli interessi mensili (circa {interest}) al {rate}%, quindi il saldo non scende mai. Registra la rata reale (la voce nella cronologia dei tassi o l'importo di pagamento del conto) in modo che copra gli interessi.",
+      "beyondHorizon": "La rata copre gli interessi, ma la durata supera l'orizzonte di proiezione, quindi la data di estinzione e gli interessi residui non vengono mostrati."
     }
   }
 }

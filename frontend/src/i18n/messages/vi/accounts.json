@@ -455,7 +455,14 @@
       "budgetLabel": "Tổng thanh toán hàng tháng",
       "budgetHint": "Mỗi tháng chi một tổng cố định cho khoản vay; phần trả thêm là phần còn lại sau khoản trả. Khi khoản trả giảm, phần trả thêm tăng để giữ tổng không đổi.",
       "budgetBelowInstallment": "Thấp hơn khoản trả hiện tại ({amount}); tăng lên để trả thêm.",
-      "windowInverted": "Ngày bắt đầu nằm sau ngày kết thúc nên kế hoạch này không bao giờ được áp dụng."
+      "windowInverted": "Ngày bắt đầu nằm sau ngày kết thúc nên kế hoạch này không bao giờ được áp dụng.",
+      "unavailable": {
+        "title": "Chưa thể tính mô phỏng trả nợ trước hạn cho khoản vay này.",
+        "reasonPaidOff": "Khoản vay này không còn dư nợ, nên không còn gì để khấu hao.",
+        "reasonNoFrequency": "Khoản vay này chưa đặt tần suất thanh toán. Hãy thêm trong cài đặt tài khoản.",
+        "reasonNoRate": "Khoản vay này chưa lưu lãi suất. Hãy đặt lãi suất trong cài đặt tài khoản, hoặc ghi một thay đổi lãi suất có ngày hôm nay hoặc trước đó. Lãi suất hiển thị theo từng dòng trong lịch bên dưới được tái tạo từ tiền lãi đã tính và không phải là lãi suất đã lưu.",
+        "reasonNoPayment": "Không thể xác định số tiền trả góp. Hãy ghi các kỳ trả góp thường xuyên dưới dạng chuyển khoản vào tài khoản khoản vay (gốc, với lãi là dòng tách hoặc một khoản chi có phân loại riêng), hoặc đặt số tiền thanh toán trong cài đặt tài khoản. Các khoản thanh toán được ghi là chi tiêu thông thường trên tài khoản nguồn không bao giờ đến được tài khoản khoản vay, nên lịch không thể thấy chúng."
+      }
     },
     "comparison": {
       "newPayoff": "Ngày trả hết mới",
@@ -616,6 +623,11 @@
       "memoLabel": "Ghi nhớ khoản trả thêm gốc",
       "memoPlaceholder": "vd. Gốc bổ sung",
       "memoHelp": "Các khoản thanh toán có ghi nhớ chứa nội dung này được tính là khoản trả thêm gốc (không phân biệt chữ hoa/thường)."
+    },
+    "notAmortizing": {
+      "title": "Khoản vay này không được trả hết, nên ngày trả hết dự kiến và tiền lãi còn lại là chưa xác định.",
+      "paymentBelowInterest": "Kỳ trả góp ({payment}) thấp hơn tiền lãi hằng tháng (khoảng {interest}) ở mức {rate}%, nên số dư không bao giờ giảm. Hãy ghi kỳ trả góp thực tế (mục trong lịch sử lãi suất hoặc số tiền thanh toán của tài khoản) để nó bù đắp tiền lãi.",
+      "beyondHorizon": "Kỳ trả góp bù đắp tiền lãi, nhưng thời hạn vượt quá tầm dự báo, nên ngày trả hết và tiền lãi còn lại không được hiển thị."
     }
   }
 }

@@ -559,6 +559,7 @@ describe('resolveEffectiveLoanTerms', () => {
     expect(resolveEffectiveLoanTerms(rows, '2024-01-01', 4)).toEqual({
       annualRate: 6.2,
       paymentAmount: 2500,
+      paymentEffectiveDate: '2022-01-01',
       snapshotPaymentAmount: null,
     });
   });
@@ -572,6 +573,7 @@ describe('resolveEffectiveLoanTerms', () => {
     expect(resolveEffectiveLoanTerms(rows, '2021-01-01', 4)).toEqual({
       annualRate: 4,
       paymentAmount: null,
+      paymentEffectiveDate: null,
       snapshotPaymentAmount: null,
     });
     expect(buildRateTimeline(rows, '2021-01-01', 4).startingAnnualRate).toBe(5.5);
@@ -589,6 +591,7 @@ describe('resolveEffectiveLoanTerms', () => {
     expect(resolveEffectiveLoanTerms(initialOnly, '2024-01-01', 4)).toEqual({
       annualRate: 3.9,
       paymentAmount: null,
+      paymentEffectiveDate: null,
       snapshotPaymentAmount: 450,
     });
   });
@@ -602,6 +605,7 @@ describe('resolveEffectiveLoanTerms', () => {
     expect(resolveEffectiveLoanTerms(withInitial, '2024-01-01', 4)).toEqual({
       annualRate: 6,
       paymentAmount: 2500,
+      paymentEffectiveDate: '2022-01-01',
       snapshotPaymentAmount: 100,
     });
   });
@@ -622,6 +626,7 @@ describe('resolveEffectiveLoanTerms', () => {
     expect(resolveEffectiveLoanTerms([], '2024-01-01', 4.25)).toEqual({
       annualRate: 4.25,
       paymentAmount: null,
+      paymentEffectiveDate: null,
       snapshotPaymentAmount: null,
     });
   });

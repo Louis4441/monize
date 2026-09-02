@@ -302,6 +302,7 @@ export function generateBudgetSchedule(
     totalExtraPrincipal: round2(totalExtraPrincipal),
     numPayments: rows.length,
     paidOff,
+    coveredInterest,
     finalPaymentAmount: round2(lastInstallment),
   };
 }
@@ -560,6 +561,7 @@ export function generateLoanSchedule(
     totalExtraPrincipal: round2(totalExtraPrincipal),
     numPayments: rows.length,
     paidOff,
+    coveredInterest,
     finalPaymentAmount: round2(currentPayment),
   };
 }

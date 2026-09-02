@@ -33,8 +33,12 @@ import { useLoanRateEditing } from '@/components/accounts/loan-detail/useLoanRat
 import {
   buildLoanProjectionInput,
   deriveLoanPaymentHistory,
+  diagnoseLoanProjection,
   resolveCurrentLoanTerms,
 } from '@/lib/loan-history';
+import { SimulatorUnavailableNotice } from '@/components/accounts/loan-detail/SimulatorUnavailableNotice';
+import { LoanNotAmortizingNotice } from '@/components/accounts/loan-detail/LoanNotAmortizingNotice';
+import { loanNotAmortizingReason } from '@/lib/loan-figures';
 import { computePastImpact } from '@/lib/loan-past-impact';
 import {
   OverpaymentPlan,
@@ -161,9 +165,36 @@ export function LoanDetailView({
     [account, history, rateChanges, projectionAnchor, todayYmd],
   );
 
+  // When there is no projection, why -- so the simulator's absence is explained
+  // rather than a blank space. Shares the projection gate's own evaluation, so
+  // this reason and `projectionInput` cannot disagree about whether a schedule
+  // exists.
+  const projectionUnavailableReason = useMemo(
+    () =>
+      projectionInput
+        ? null
+        : diagnoseLoanProjection(
+            account,
+            history,
+            rateChanges,
+            projectionAnchor,
+            todayYmd,
+          ),
+    [projectionInput, account, history, rateChanges, projectionAnchor, todayYmd],
+  );
+
   const baseline = useMemo(
     () => (projectionInput ? generateLoanSchedule(projectionInput) : null),
     [projectionInput],
+  );
+
+  // The projection built but does not reach payoff (so the payoff date and
+  // remaining interest are unknown). Why -- so the "unknown" on the cards is
+  // explained rather than left as a dead end. Reads the same baseline the cards
+  // do, so it never claims a reason the figures do not have.
+  const notAmortizing = useMemo(
+    () => loanNotAmortizingReason(projectionInput, baseline),
+    [projectionInput, baseline],
   );
 
   const scenario = useMemo(
@@ -329,10 +360,22 @@ export function LoanDetailView({
         baseline={baseline}
       />
 
+      {notAmortizing && (
+        <LoanNotAmortizingNotice
+          reason={notAmortizing}
+          currencyCode={account.currencyCode}
+        />
+      )}
+
       <PastImpactSection account={account} impact={impact} />
 
       {/* Active loan: the Rate History panel sits full-width above the
-          Overpayment Simulator, never beside it. */}
+          Overpayment Simulator, never beside it. When the loan cannot be
+          projected, the simulator's place shows why (the Rate History panel
+          then moves full-width below the schedule, in the block near the end). */}
+      {!projectionInput && projectionUnavailableReason && (
+        <SimulatorUnavailableNotice reason={projectionUnavailableReason} />
+      )}
       {projectionInput && (
         <div className="flex flex-col gap-6">
           <RateHistorySidebar

@@ -455,7 +455,14 @@
       "budgetLabel": "Totale maandelijkse betaling",
       "budgetHint": "Besteed elke maand een vast totaal aan de lening; de extra aflossing is wat er na de termijn overblijft. Daalt de termijn, dan groeit de extra aflossing zodat het totaal gelijk blijft.",
       "budgetBelowInstallment": "Dat is lager dan de huidige termijn ({amount}); verhoog het om extra af te lossen.",
-      "windowInverted": "De startdatum ligt na de einddatum, dus dit plan wordt nooit toegepast."
+      "windowInverted": "De startdatum ligt na de einddatum, dus dit plan wordt nooit toegepast.",
+      "unavailable": {
+        "title": "De simulatie van extra aflossing kan voor deze lening nog niet worden berekend.",
+        "reasonPaidOff": "Deze lening heeft geen openstaand saldo, dus er is niets meer om af te lossen.",
+        "reasonNoFrequency": "Voor deze lening is geen betaalfrequentie ingesteld. Voeg deze toe in de accountinstellingen.",
+        "reasonNoRate": "Voor deze lening is geen rentepercentage opgeslagen. Stel de rente in bij de accountinstellingen of leg een rentewijziging vast met de datum van vandaag of eerder. Een per rij in het schema getoonde rente is gereconstrueerd uit de in rekening gebrachte rente en is geen opgeslagen rente.",
+        "reasonNoPayment": "Het termijnbedrag kan niet worden bepaald. Leg de reguliere termijnen vast als overboekingen naar de leningrekening (hoofdsom, met rente als splitsingsregel of als aparte gecategoriseerde uitgave), of stel het betaalbedrag in bij de accountinstellingen. Betalingen die als gewone uitgaven op de bronrekening worden geboekt, bereiken de leningrekening nooit, dus het schema kan ze niet zien."
+      }
     },
     "comparison": {
       "newPayoff": "Nieuwe aflossingsdatum",
@@ -616,6 +623,11 @@
       "memoLabel": "Memo voor extra aflossing",
       "memoPlaceholder": "bijv. Extra aflossing",
       "memoHelp": "Betalingen waarvan het memo deze tekst bevat, tellen als extra aflossingen (niet hoofdlettergevoelig)."
+    },
+    "notAmortizing": {
+      "title": "Deze lening wordt niet afgelost, dus de geschatte afloscdatum en de resterende rente zijn onbekend.",
+      "paymentBelowInterest": "De termijn ({payment}) is lager dan de maandelijkse rente (ongeveer {interest}) bij {rate}%, dus het saldo daalt nooit. Leg de werkelijke termijn vast (de invoer in de rentegeschiedenis of het betaalbedrag van de rekening) zodat deze de rente dekt.",
+      "beyondHorizon": "De termijn dekt de rente, maar de looptijd reikt voorbij de prognosehorizon, dus de aflosdatum en de resterende rente worden niet getoond."
     }
   }
 }
