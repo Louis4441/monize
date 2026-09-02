@@ -16,7 +16,11 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ListTopToolbar } from '@/components/ui/ListTopToolbar';
 import { TransactionRow } from './TransactionRow';
 import { registerDateColumnPadding } from './register-date-columns';
-import { registerColumnClass, REGISTER_TABLE_CONTAINER } from './register-columns';
+import {
+  registerColumnClass,
+  REGISTER_PAYEE_CELL_FLOOR,
+  REGISTER_TABLE_CONTAINER,
+} from './register-columns';
 import { TransactionActionSheet } from './TransactionActionSheet';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -562,7 +566,11 @@ export function TransactionList({
               {!isSingleAccountView && (
                 <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('account')}`}>{t('list.header.account')}</th>
               )}
-              <th className={`${headerPadding} ${compactPadding.payee} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>{t('list.header.payee')}</th>
+              {/* The floor travels with the header: a column's minimum is the
+                  largest of its cells', so a `<th>` that does not carry it
+                  would leave the label and the values it labels disagreeing
+                  about where the column starts. */}
+              <th className={`${headerPadding} ${compactPadding.payee} ${REGISTER_PAYEE_CELL_FLOOR} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>{t('list.header.payee')}</th>
               <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('category')}`}>{t('list.header.category')}</th>
               <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('description')}`}>{t('list.header.description')}</th>
               <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('refNumber')}`}>{t('list.header.refNumber')}</th>

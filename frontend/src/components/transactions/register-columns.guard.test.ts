@@ -5,6 +5,7 @@ import {
   PRIORITY_MIN_WIDTH_PX,
   REGISTER_TABLE_CONTAINER,
   REGISTER_DESCRIPTION_CELL_FLEX,
+  REGISTER_PAYEE_CELL_FLOOR,
   REGISTER_PAYEE_NAME_CAP,
   registerColumnClass,
   type RegisterColumnId,
@@ -257,6 +258,69 @@ describe('the register column contract', () => {
       'A width cap on the payee name comes from REGISTER_PAYEE_NAME_CAP, ' +
         'never a hand-written sm:max-w-[...] -- a fixed cap is what kept the ' +
         'longest payee from rendering while Description held the slack.',
+    ).toEqual([]);
+  });
+
+  it('floors the payee column so Description cannot take what it needs', () => {
+    // The defect: `w-full` on Description is a claim on 100% of the table,
+    // and an auto-layout table settles that claim against the content columns
+    // in PROPORTION TO THEIR CONTENT -- it does not merely mop up the spare
+    // width. So filtering the register to one payee, which shortens Payee,
+    // Category, Ref # and the amounts together, handed Description the
+    // difference: measured on a 1710px register, Payee 270px -> 212px and
+    // Description 386px -> 517px, truncating the payee that had just been
+    // filtered for while Description rendered a column of "-". A floor on the
+    // payee column is what makes Description absorb only the leftover.
+    const shape = REGISTER_PAYEE_CELL_FLOOR.match(
+      /^sm:min-w-\[max\((\d+)px,(\d+)cqw\)\]$/,
+    );
+    expect(shape, 'a scaling floor with a px minimum, from `sm` up').toBeTruthy();
+    const [, floorPx, floorShare] = shape!.map(Number);
+
+    // `sm:` is not decoration. `min-width` beats `max-width`, so an unscoped
+    // floor would override the payee cell's phone caps (max-w-[100px] /
+    // max-w-[160px]) and blow the phone layout open.
+    expect(REGISTER_PAYEE_CELL_FLOOR.startsWith('sm:')).toBe(true);
+
+    // A floor is what the payee is guaranteed; the cap is how far it may
+    // grow. A floor that reached the cap would freeze the column at one width
+    // and pad it with blank space whenever the payees are short.
+    const capShape = REGISTER_PAYEE_NAME_CAP.match(
+      /^sm:max-w-\[max\((\d+)px,(\d+)cqw\)\]/,
+    );
+    expect(capShape, 'the cap still has the shape this compares against').toBeTruthy();
+    const [, capFloorPx, capBaseShare] = capShape!.map(Number);
+    expect(floorShare, 'the floor stays below the cap it lives under').toBeLessThan(
+      capBaseShare,
+    );
+    expect(floorPx, 'and its px minimum does too').toBeLessThan(capFloorPx);
+    expect(floorPx, 'but is still wide enough to read a payee in').toBeGreaterThanOrEqual(
+      200,
+    );
+
+    // Both register files carry it: the header and the cells decide one
+    // column's minimum between them, so a `<th>` without the floor would put
+    // the label and the values it labels over different columns.
+    for (const [path, content] of Object.entries(REGISTER_SOURCES)) {
+      expect(
+        withoutComments(content).includes('REGISTER_PAYEE_CELL_FLOOR'),
+        `${path} floors the payee column from the shared constant`,
+      ).toBe(true);
+    }
+
+    // And no register file hand-writes one instead.
+    const offenders = Object.entries(REGISTER_SOURCES).flatMap(([path, content]) =>
+      withoutComments(content)
+        .split('\n')
+        .map((line, index) => ({ line, number: index + 1 }))
+        .filter(({ line }) => /sm:min-w-\[/.test(line))
+        .map(({ line, number }) => `${path}:${number}: ${line.trim()}`),
+    );
+    expect(
+      offenders,
+      'The payee column floor comes from REGISTER_PAYEE_CELL_FLOOR, never a ' +
+        'hand-written sm:min-w-[...] -- the header and the row have to agree ' +
+        'on it, and two copies are how they stop agreeing.',
     ).toEqual([]);
   });
 

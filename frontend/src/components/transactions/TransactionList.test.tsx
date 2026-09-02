@@ -4,6 +4,7 @@ import { TransactionList } from './TransactionList';
 import { Transaction, TransactionStatus } from '@/types/transaction';
 import { useDensityStore } from '@/store/densityStore';
 import { useDateDisplayStore } from '@/store/dateDisplayStore';
+import { REGISTER_PAYEE_CELL_FLOOR } from './register-columns';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import toast from 'react-hot-toast';
 
@@ -3322,5 +3323,43 @@ describe('TransactionList compact mobile dates', () => {
     await waitFor(() => {
       expect(useDateDisplayStore.getState().compactMobileDates).toBe(true);
     });
+  });
+});
+
+describe('the payee column floor', () => {
+  // The register is filtered to one payee and every column beside it gets
+  // shorter at once -- one payee name, one category, no reference numbers,
+  // smaller amounts. Description carries `w-full`, which an auto-layout table
+  // settles against the content columns in proportion to their content, so
+  // that shrinkage became Description's: measured at a 1710px register, Payee
+  // 270px -> 212px and Description 386px -> 517px, cutting off the very payee
+  // the user had just filtered for. jsdom does no layout, so what is checkable
+  // here is that the floor reaches the DOM -- on the header AND the cells,
+  // because a column's minimum is the largest of its cells' and half a floor
+  // is no floor.
+  it('declares the floor on the payee header and its cells alike', () => {
+    const { container } = render(
+      <TransactionList transactions={[createTransaction()]} />,
+    );
+
+    const payeeHeader = container.querySelectorAll('thead th')[2];
+    const payeeCell = container.querySelectorAll('tbody td')[2];
+
+    expect(payeeHeader).toHaveTextContent('Payee');
+    expect(payeeHeader.className).toContain(REGISTER_PAYEE_CELL_FLOOR);
+    expect(payeeCell.className).toContain(REGISTER_PAYEE_CELL_FLOOR);
+  });
+
+  it('leaves the phone caps in charge below sm', () => {
+    // `min-width` beats `max-width`, so the floor is `sm:`-scoped: below it
+    // the payee cell's phone cap still decides, or a 240px floor would prise
+    // the phone layout open.
+    const { container } = render(
+      <TransactionList transactions={[createTransaction()]} />,
+    );
+    const payeeCell = container.querySelectorAll('tbody td')[2];
+
+    expect(REGISTER_PAYEE_CELL_FLOOR.startsWith('sm:')).toBe(true);
+    expect(payeeCell.className).toContain('max-w-[100px]');
   });
 });
