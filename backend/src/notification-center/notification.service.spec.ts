@@ -59,7 +59,6 @@ describe("NotificationService", () => {
   let manager: ManagerMock;
   let dataSource: DataSourceMock;
   let notifications: Record<string, jest.Mock>;
-  let preferences: { resolveThrottleMinutes: jest.Mock };
   let service: NotificationService;
 
   /** The INSERTs the door issued, as [sql, params]. */
@@ -97,13 +96,7 @@ describe("NotificationService", () => {
     manager = mocks.manager;
     dataSource = mocks.dataSource;
     manager.query.mockResolvedValue([{ id: "n-new" }]);
-    // Throttle off by default: the throttle branch never runs, so every
-    // existing create test exercises exactly today's path.
-    preferences = { resolveThrottleMinutes: jest.fn().mockResolvedValue(0) };
-    service = new NotificationService(
-      dataSource as never,
-      preferences as never,
-    );
+    service = new NotificationService(dataSource as never);
   });
 
   describe("create", () => {
@@ -283,125 +276,6 @@ describe("NotificationService", () => {
           dedupe_key: "BILL:st-1",
         });
       });
-    });
-  });
-
-  describe("throttle window", () => {
-    // Dispatch manager.query by statement: the advisory lock, the in-window
-    // severity probe, and the insert are three different reads.
-    function wireQuery(inWindow: { severity: NotificationSeverity }[] = []) {
-      manager.query.mockImplementation((sql: unknown) => {
-        const text = String(sql);
-        if (text.includes("pg_advisory_xact_lock"))
-          return Promise.resolve([{}]);
-        if (text.includes("SELECT severity FROM notifications"))
-          return Promise.resolve(inWindow);
-        if (text.includes("INSERT INTO notifications"))
-          return Promise.resolve([{ id: "n-new" }]);
-        return Promise.resolve([]);
-      });
-    }
-
-    const budgetInput = (severity: NotificationSeverity) => ({
-      type: NotificationType.THRESHOLD_WARNING, // BUDGETS category
-      severity,
-      title: "Groceries at 80%",
-      message: "80%",
-      budgetId: "b-1",
-    });
-
-    it("skips the throttle path entirely when the window is 0", async () => {
-      preferences.resolveThrottleMinutes.mockResolvedValue(0);
-      await service.create("user-1", budgetInput(NotificationSeverity.WARNING));
-      const advisory = manager.query.mock.calls.filter(([sql]) =>
-        String(sql).includes("pg_advisory_xact_lock"),
-      );
-      expect(advisory).toHaveLength(0);
-      expect(inserts()).toHaveLength(1);
-    });
-
-    it("takes a per-(user, category) advisory lock before probing", async () => {
-      preferences.resolveThrottleMinutes.mockResolvedValue(15);
-      wireQuery([]);
-      await service.create("user-1", budgetInput(NotificationSeverity.WARNING));
-      const advisory = manager.query.mock.calls.find(([sql]) =>
-        String(sql).includes("pg_advisory_xact_lock"),
-      );
-      expect(advisory?.[1]).toEqual(["notif-throttle:user-1:BUDGETS"]);
-    });
-
-    it("delivers when nothing of the category is in the window", async () => {
-      preferences.resolveThrottleMinutes.mockResolvedValue(15);
-      wireQuery([]);
-      notifications.findOne.mockResolvedValue(row({ id: "n-new" }));
-      const created = await service.create(
-        "user-1",
-        budgetInput(NotificationSeverity.WARNING),
-      );
-      expect(created).not.toBeNull();
-      expect(inserts()).toHaveLength(1);
-    });
-
-    it("suppresses a same-severity row already in the window", async () => {
-      preferences.resolveThrottleMinutes.mockResolvedValue(15);
-      wireQuery([{ severity: NotificationSeverity.WARNING }]);
-      const created = await service.create(
-        "user-1",
-        budgetInput(NotificationSeverity.WARNING),
-      );
-      expect(created).toBeNull();
-      expect(inserts()).toHaveLength(0);
-    });
-
-    it("suppresses a lower-severity row when the window holds a higher one", async () => {
-      preferences.resolveThrottleMinutes.mockResolvedValue(15);
-      wireQuery([{ severity: NotificationSeverity.CRITICAL }]);
-      const created = await service.create(
-        "user-1",
-        budgetInput(NotificationSeverity.INFO),
-      );
-      expect(created).toBeNull();
-      expect(inserts()).toHaveLength(0);
-    });
-
-    it("delivers a strictly higher-severity escalation of the same window", async () => {
-      // A critical after a warning must get through -- silence on an escalation
-      // is the dangerous direction.
-      preferences.resolveThrottleMinutes.mockResolvedValue(15);
-      wireQuery([{ severity: NotificationSeverity.WARNING }]);
-      notifications.findOne.mockResolvedValue(
-        row({ id: "n-new", severity: NotificationSeverity.CRITICAL }),
-      );
-      const created = await service.create(
-        "user-1",
-        budgetInput(NotificationSeverity.CRITICAL),
-      );
-      expect(created).not.toBeNull();
-      expect(inserts()).toHaveLength(1);
-    });
-
-    it("probes the window over the category's alert types and the cutoff", async () => {
-      preferences.resolveThrottleMinutes.mockResolvedValue(15);
-      wireQuery([]);
-      const before = Date.now();
-      await service.create("user-1", budgetInput(NotificationSeverity.WARNING));
-      const probe = manager.query.mock.calls.find(([sql]) =>
-        String(sql).includes("SELECT severity FROM notifications"),
-      );
-      const [userId, types, cutoff] = probe?.[1] as [
-        string,
-        NotificationType[],
-        Date,
-      ];
-      expect(userId).toBe("user-1");
-      // BUDGETS expands to every non-bill, non-system type; BILL_DUE is not one.
-      expect(types).toContain(NotificationType.THRESHOLD_WARNING);
-      expect(types).not.toContain(NotificationType.BILL_DUE);
-      expect(types).not.toContain(NotificationType.BACKUP_FAILED);
-      // ~15 minutes before now.
-      expect(before - cutoff.getTime()).toBeGreaterThanOrEqual(
-        15 * 60_000 - 50,
-      );
     });
   });
 

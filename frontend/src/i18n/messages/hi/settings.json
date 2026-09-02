@@ -305,14 +305,7 @@
       },
       "inAppAlways": "घंटी में हमेशा दिखती है",
       "emailToggleLabel": "{category} के लिए ईमेल",
-      "saveFailed": "यह सेटिंग सहेजी नहीं जा सकी",
-      "throttle": {
-        "label": "अंतराल",
-        "off": "बंद",
-        "minutes": "{minutes} मिनट",
-        "hours": "{hours} घंटे",
-        "ariaLabel": "{category} के लिए अंतराल"
-      }
+      "saveFailed": "यह सेटिंग सहेजी नहीं जा सकी"
     }
   },
   "help": {

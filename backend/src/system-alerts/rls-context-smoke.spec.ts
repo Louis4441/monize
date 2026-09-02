@@ -79,14 +79,8 @@ describe("System alerts RLS identity smoke (real withScopedDb)", () => {
       { claimOnce: jest.fn().mockResolvedValue(true) } as never,
       // The real write door, on the same connection: the point of this file is
       // which identity each statement runs under, and the door is where the
-      // INSERT now lives. Throttle off (resolveThrottleMinutes -> 0) so the
-      // door takes its unthrottled path.
-      new NotificationService(
-        mocks.dataSource as never,
-        {
-          resolveThrottleMinutes: async () => 0,
-        } as never,
-      ),
+      // INSERT now lives.
+      new NotificationService(mocks.dataSource as never),
     );
   });
 

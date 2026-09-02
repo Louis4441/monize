@@ -305,14 +305,7 @@
       },
       "inAppAlways": "Selalu tampil di lonceng",
       "emailToggleLabel": "Email untuk {category}",
-      "saveFailed": "Tidak dapat menyimpan setelan itu",
-      "throttle": {
-        "label": "Jeda",
-        "off": "Mati",
-        "minutes": "{minutes} mnt",
-        "hours": "{hours} jam",
-        "ariaLabel": "Jeda untuk {category}"
-      }
+      "saveFailed": "Tidak dapat menyimpan setelan itu"
     }
   },
   "help": {

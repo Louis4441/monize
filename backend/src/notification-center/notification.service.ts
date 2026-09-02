@@ -13,10 +13,7 @@ import {
   NotificationType,
   SYSTEM_NOTIFICATION_TYPES,
   notificationCategoryOf,
-  severityRank,
-  typesForCategory,
 } from "./entities/notification.entity";
-import { NotificationPreferenceService } from "./notification-preference.service";
 import { DismissNotificationsQueryDto } from "./dto/dismiss-notifications-query.dto";
 
 // The three column widths the door truncates on. Each is checked against
@@ -129,57 +126,20 @@ function todayIsoDate(): string {
 export class NotificationService {
   private readonly logger = new Logger(NotificationService.name);
 
-  constructor(
-    private readonly dataSource: DataSource,
-    private readonly preferences: NotificationPreferenceService,
-  ) {}
+  constructor(private readonly dataSource: DataSource) {}
 
   /**
    * Write one notification, or report that somebody already holds it.
    *
    * Returns the stored row -- read back inside the same transaction as the
    * insert, so what the caller emails about is what the database has -- or
-   * `null` when a unique index refused it, or when the per-category throttle
-   * window suppressed it (both are the same "not yours to deliver" answer the
-   * callers already handle).
+   * `null` when a unique index refused it.
    */
   async create(
     userId: string,
     input: CreateNotificationInput,
   ): Promise<Notification | null> {
     return withScopedDb(this.dataSource, async (manager) => {
-      // Per-category throttle (spec section 4): a rate limit layered on top of
-      // the dedupe index. Resolved and enforced inside this insert transaction,
-      // under a per-(user, category) advisory lock so two producers racing the
-      // same window cannot both pass. Default 0 (no throttle) skips all of it,
-      // so the common path is unchanged.
-      const category = notificationCategoryOf(input.type);
-      const throttleMinutes = await this.preferences.resolveThrottleMinutes(
-        userId,
-        category,
-      );
-      if (throttleMinutes > 0) {
-        // hashtextextended returns the bigint the lock key wants directly, as
-        // the GEM signal materialization lock does (docs/concurrency-and-
-        // idempotency.md section 6). The whole thing being serialized is the
-        // windowed decision for this (user, category), not a single row.
-        await manager.query(
-          "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-          [`notif-throttle:${userId}:${category}`],
-        );
-        if (
-          await this.throttleSuppresses(
-            manager,
-            userId,
-            category,
-            input.severity,
-            throttleMinutes,
-          )
-        ) {
-          return null;
-        }
-      }
-
       const rows = returnedRows<{ id: string }>(
         await manager.query(
           `INSERT INTO notifications
@@ -216,46 +176,6 @@ export class NotificationService {
           .findOne({ where: { id } })) ?? null
       );
     });
-  }
-
-  /**
-   * Whether the throttle window should suppress a new notification of this
-   * category. True when a NON-DISMISSED notification of the same category was
-   * created within the window and the new one is not a higher-severity
-   * escalation of it -- silence on an escalation (a `critical` after a
-   * `warning`) is the dangerous direction, so a strictly-more-severe row always
-   * gets through.
-   *
-   * There is no `category` column, so the window is measured over the alert
-   * types the category expands to (`typesForCategory`, derived from the same
-   * forward mapping the row's own category comes from). The cutoff is the app
-   * clock rather than a SQL interval so the boundary is a plain parameter, and
-   * the check runs on the caller's `manager` -- the same transaction as the
-   * insert, under the advisory lock taken above.
-   */
-  private async throttleSuppresses(
-    manager: EntityManager,
-    userId: string,
-    category: NotificationCategory,
-    newSeverity: NotificationSeverity,
-    throttleMinutes: number,
-  ): Promise<boolean> {
-    const cutoff = new Date(Date.now() - throttleMinutes * 60_000);
-    const rows = returnedRows<{ severity: NotificationSeverity }>(
-      await manager.query(
-        `SELECT severity FROM notifications
-           WHERE user_id = $1
-             AND alert_type = ANY($2)
-             AND dismissed_at IS NULL
-             AND created_at >= $3`,
-        [userId, typesForCategory(category), cutoff],
-      ),
-    );
-    if (rows.length === 0) return false;
-    const maxExistingRank = Math.max(
-      ...rows.map((row) => severityRank(row.severity)),
-    );
-    return severityRank(newSeverity) <= maxExistingRank;
   }
 
   /**

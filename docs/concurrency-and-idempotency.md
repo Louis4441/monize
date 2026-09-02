@@ -338,7 +338,6 @@ worth keeping: CONC-003 can only be checked against a list of all writers.
 | `accounts/accounts.service.ts` `update` | `Account` row | Concurrent balance modification |
 | `accounts/accounts.service.ts` `close` | `Account` row | Race between the balance check and the close |
 | `strategies/gem-signal.service.ts` | advisory, per `strategyId` | Materialization interleaving with a settings save |
-| `notification-center/notification.service.ts` `create` | advisory, per `(user, category)` | The per-category throttle window is a windowed count-then-insert; the lock (taken only when `throttle_minutes > 0`) stops two producers racing the same window from both passing the check. Mechanism: `pg_advisory_xact_lock` inside the insert transaction, above the existing dedupe unique index. |
 
 ### Conditional claims that exist
 

@@ -305,14 +305,7 @@
       },
       "inAppAlways": "[XX-Always shown in the bell-XX]",
       "emailToggleLabel": "[XX-Email for {category}-XX]",
-      "saveFailed": "[XX-Could not save that setting-XX]",
-      "throttle": {
-        "label": "[XX-Cooldown-XX]",
-        "off": "[XX-Off-XX]",
-        "minutes": "[XX-{minutes} min-XX]",
-        "hours": "[XX-{hours} h-XX]",
-        "ariaLabel": "[XX-Cooldown for {category}-XX]"
-      }
+      "saveFailed": "[XX-Could not save that setting-XX]"
     }
   },
   "help": {

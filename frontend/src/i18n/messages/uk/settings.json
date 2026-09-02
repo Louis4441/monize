@@ -305,14 +305,7 @@
       },
       "inAppAlways": "Завжди видно в дзвіночку",
       "emailToggleLabel": "Ел. пошта для «{category}»",
-      "saveFailed": "Не вдалося зберегти це налаштування",
-      "throttle": {
-        "label": "Пауза",
-        "off": "Вимк.",
-        "minutes": "{minutes} хв",
-        "hours": "{hours} год",
-        "ariaLabel": "Пауза для «{category}»"
-      }
+      "saveFailed": "Не вдалося зберегти це налаштування"
     }
   },
   "help": {

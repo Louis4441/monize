@@ -305,14 +305,7 @@
       },
       "inAppAlways": "벨에 항상 표시됨",
       "emailToggleLabel": "{category} 이메일",
-      "saveFailed": "설정을 저장할 수 없습니다",
-      "throttle": {
-        "label": "간격",
-        "off": "끔",
-        "minutes": "{minutes}분",
-        "hours": "{hours}시간",
-        "ariaLabel": "{category} 간격"
-      }
+      "saveFailed": "설정을 저장할 수 없습니다"
     }
   },
   "help": {

@@ -256,15 +256,7 @@ describe("BudgetAlertService", () => {
         // standing in for the writer would assert the call instead of the row.
         {
           provide: NotificationService,
-          // Throttle off (resolveThrottleMinutes -> 0), so the write door takes
-          // exactly today's path and these tests assert the row, not throttling.
-          useFactory: () =>
-            new NotificationService(
-              scopedDataSource as never,
-              {
-                resolveThrottleMinutes: async () => 0,
-              } as never,
-            ),
+          useFactory: () => new NotificationService(scopedDataSource as never),
         },
         { provide: getRepositoryToken(Budget), useValue: budgetsRepository },
         {

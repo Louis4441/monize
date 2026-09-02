@@ -152,13 +152,7 @@ describe("SystemAlertService", () => {
       // The real door, on the same mocked connection: what these tests are
       // about is the SQL that lands and which recipient emails, and a double
       // standing in for the writer would assert the call instead of the row.
-      // Throttle off (resolveThrottleMinutes -> 0) so the door is unthrottled.
-      new NotificationService(
-        dataSource as never,
-        {
-          resolveThrottleMinutes: async () => 0,
-        } as never,
-      ),
+      new NotificationService(dataSource as never),
     );
   });
 

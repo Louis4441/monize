@@ -305,14 +305,7 @@
       },
       "inAppAlways": "Altijd zichtbaar in de bel",
       "emailToggleLabel": "E-mail voor {category}",
-      "saveFailed": "Kon die instelling niet opslaan",
-      "throttle": {
-        "label": "Wachttijd",
-        "off": "Uit",
-        "minutes": "{minutes} min",
-        "hours": "{hours} u",
-        "ariaLabel": "Wachttijd voor {category}"
-      }
+      "saveFailed": "Kon die instelling niet opslaan"
     }
   },
   "help": {

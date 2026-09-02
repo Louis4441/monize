@@ -305,14 +305,7 @@
       },
       "inAppAlways": "Sempre visibile nella campanella",
       "emailToggleLabel": "Email per {category}",
-      "saveFailed": "Impossibile salvare questa impostazione",
-      "throttle": {
-        "label": "Intervallo",
-        "off": "No",
-        "minutes": "{minutes} min",
-        "hours": "{hours} h",
-        "ariaLabel": "Intervallo per {category}"
-      }
+      "saveFailed": "Impossibile salvare questa impostazione"
     }
   },
   "help": {

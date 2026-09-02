@@ -305,14 +305,7 @@
       },
       "inAppAlways": "Sempre visível no sino",
       "emailToggleLabel": "Email para {category}",
-      "saveFailed": "Não foi possível salvar essa configuração",
-      "throttle": {
-        "label": "Intervalo",
-        "off": "Não",
-        "minutes": "{minutes} min",
-        "hours": "{hours} h",
-        "ariaLabel": "Intervalo para {category}"
-      }
+      "saveFailed": "Não foi possível salvar essa configuração"
     }
   },
   "help": {

@@ -1726,8 +1726,6 @@ CREATE TABLE notification_preferences (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     category VARCHAR(20) NOT NULL,
     email BOOLEAN NOT NULL DEFAULT true,
-    -- Per-category throttle window in minutes; 0 disables (migration 174).
-    throttle_minutes INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, category)

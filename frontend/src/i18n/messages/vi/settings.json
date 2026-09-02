@@ -305,14 +305,7 @@
       },
       "inAppAlways": "Luôn hiển thị trong chuông",
       "emailToggleLabel": "Email cho {category}",
-      "saveFailed": "Không thể lưu cài đặt đó",
-      "throttle": {
-        "label": "Giãn cách",
-        "off": "Tắt",
-        "minutes": "{minutes} phút",
-        "hours": "{hours} giờ",
-        "ariaLabel": "Giãn cách cho {category}"
-      }
+      "saveFailed": "Không thể lưu cài đặt đó"
     }
   },
   "help": {
