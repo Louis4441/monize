@@ -339,7 +339,9 @@
   "notifications": {
     "notFound": "Notificatie met ID {{ id }} niet gevonden",
     "smtpNotConfigured": "SMTP is niet geconfigureerd. Stel SMTP-omgevingsvariabelen in.",
-    "noEmailOnFile": "Geen e-mailadres bekend voor deze gebruiker."
+    "noEmailOnFile": "Geen e-mailadres bekend voor deze gebruiker.",
+    "categoryNotConfigurable": "Categorie {{ category }} is hier niet configureerbaar",
+    "emptyPreferenceUpdate": "Ten minste één voorkeursveld is vereist"
   },
   "push": {
     "channelUnavailable": "Pushmeldingen zijn niet beschikbaar op deze Monize-instantie.",

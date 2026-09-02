@@ -339,7 +339,9 @@
   "notifications": {
     "notFound": "ID {{ id }} の通知が見つかりません",
     "smtpNotConfigured": "SMTPが設定されていません。SMTP環境変数を設定してください。",
-    "noEmailOnFile": "このユーザーにはメールアドレスが登録されていません。"
+    "noEmailOnFile": "このユーザーにはメールアドレスが登録されていません。",
+    "categoryNotConfigurable": "カテゴリ {{ category }} はここでは設定できません",
+    "emptyPreferenceUpdate": "少なくとも1つの設定項目が必要です"
   },
   "push": {
     "channelUnavailable": "この Monize インスタンスではプッシュ通知を利用できません。",

@@ -305,7 +305,7 @@
         "BUDGETS": "Budgets"
       },
       "inAppAlways": "Toujours visible dans la cloche",
-      "emailToggleLabel": "E-mail pour {category}",
+      "emailToggleLabel": "E-mail (rapport) pour {category}",
       "saveFailed": "Impossible d'enregistrer ce réglage",
       "throttle": {
         "label": "Délai"

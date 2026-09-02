@@ -11,6 +11,7 @@ import {
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 
+import { tr } from "../i18n/translate";
 import { NotificationCategory } from "./entities/notification.entity";
 import {
   NotificationPreferenceService,
@@ -44,7 +45,26 @@ export class NotificationPreferenceController {
       // A real NotificationCategory the matrix does not expose yet (SYSTEM):
       // storing it would be a preference nothing reads.
       throw new BadRequestException(
-        `Category ${category} is not configurable here`,
+        tr(
+          "errors.notifications.categoryNotConfigurable",
+          `Category ${category} is not configurable here`,
+          { category },
+        ),
+      );
+    }
+    // Every field is optional so channels move independently, but an empty body
+    // is a request that asks for nothing -- reject it rather than write a
+    // default-valued row for a category the user never configured.
+    if (
+      dto.email === undefined &&
+      dto.emailNotification === undefined &&
+      dto.throttleMinutes === undefined
+    ) {
+      throw new BadRequestException(
+        tr(
+          "errors.notifications.emptyPreferenceUpdate",
+          "At least one preference field is required",
+        ),
       );
     }
     return this.preferences.updatePreference(req.user.id, category, {

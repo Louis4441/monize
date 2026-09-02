@@ -1,6 +1,6 @@
 import { IsBoolean, IsInt, IsOptional, Max, Min } from "class-validator";
 
-import { THROTTLE_MAX_MINUTES } from "../notification-preference.service";
+import { THROTTLE_MAX_MINUTES } from "../notification-preference.constants";
 
 /**
  * A partial update to one category's preferences. Every field is optional so a

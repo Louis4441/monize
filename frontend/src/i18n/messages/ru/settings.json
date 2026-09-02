@@ -305,7 +305,7 @@
         "BUDGETS": "Бюджеты"
       },
       "inAppAlways": "Всегда видно в колокольчике",
-      "emailToggleLabel": "Эл. почта для «{category}»",
+      "emailToggleLabel": "Эл. почта (отчёт) для «{category}»",
       "saveFailed": "Не удалось сохранить эту настройку",
       "throttle": {
         "label": "Пауза"

@@ -339,7 +339,9 @@
   "notifications": {
     "notFound": "Уведомление с ID {{ id }} не найдено",
     "smtpNotConfigured": "SMTP не настроен. Задайте переменные окружения SMTP.",
-    "noEmailOnFile": "Для этого пользователя нет адреса электронной почты."
+    "noEmailOnFile": "Для этого пользователя нет адреса электронной почты.",
+    "categoryNotConfigurable": "Категория {{ category }} здесь не настраивается",
+    "emptyPreferenceUpdate": "Требуется хотя бы одно поле настройки"
   },
   "push": {
     "channelUnavailable": "Push-уведомления недоступны в этом экземпляре Monize.",

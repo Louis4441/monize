@@ -305,7 +305,7 @@
         "BUDGETS": "Presupuestos"
       },
       "inAppAlways": "Siempre visible en la campana",
-      "emailToggleLabel": "Correo para {category}",
+      "emailToggleLabel": "Correo (informe) para {category}",
       "saveFailed": "No se pudo guardar ese ajuste",
       "throttle": {
         "label": "Espera"

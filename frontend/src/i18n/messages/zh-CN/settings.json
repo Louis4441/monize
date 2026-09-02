@@ -305,7 +305,7 @@
         "BUDGETS": "预算"
       },
       "inAppAlways": "始终显示在铃铛中",
-      "emailToggleLabel": "{category} 的邮件",
+      "emailToggleLabel": "{category} 的报告邮件",
       "saveFailed": "无法保存该设置",
       "throttle": {
         "label": "间隔"

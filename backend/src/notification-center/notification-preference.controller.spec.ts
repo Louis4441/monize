@@ -48,4 +48,11 @@ describe("NotificationPreferenceController", () => {
     ).toThrow(BadRequestException);
     expect(preferences.updatePreference).not.toHaveBeenCalled();
   });
+
+  it("refuses an empty body rather than writing a default row", () => {
+    expect(() =>
+      controller.update(req, NotificationCategory.PAYMENTS, {}),
+    ).toThrow(BadRequestException);
+    expect(preferences.updatePreference).not.toHaveBeenCalled();
+  });
 });

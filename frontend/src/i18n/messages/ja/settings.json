@@ -305,7 +305,7 @@
         "BUDGETS": "予算"
       },
       "inAppAlways": "ベルには常に表示されます",
-      "emailToggleLabel": "{category} のメール",
+      "emailToggleLabel": "{category} のレポートメール",
       "saveFailed": "設定を保存できませんでした",
       "throttle": {
         "label": "間隔"

@@ -305,7 +305,7 @@
         "BUDGETS": "Bütçeler"
       },
       "inAppAlways": "Zilde her zaman görünür",
-      "emailToggleLabel": "{category} için e-posta",
+      "emailToggleLabel": "{category} için rapor e-postası",
       "saveFailed": "Bu ayar kaydedilemedi",
       "throttle": {
         "label": "Bekleme"

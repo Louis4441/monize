@@ -339,7 +339,9 @@
   "notifications": {
     "notFound": "{{ id }} kimliğine sahip bildirim bulunamadı",
     "smtpNotConfigured": "SMTP yapılandırılmamış. SMTP ortam değişkenlerini ayarlayın.",
-    "noEmailOnFile": "Bu kullanıcı için kayıtlı e-posta adresi yok."
+    "noEmailOnFile": "Bu kullanıcı için kayıtlı e-posta adresi yok.",
+    "categoryNotConfigurable": "{{ category }} kategorisi burada yapılandırılamaz",
+    "emptyPreferenceUpdate": "En az bir tercih alanı gereklidir"
   },
   "push": {
     "channelUnavailable": "Bu Monize örneğinde anlık bildirimler kullanılamıyor.",

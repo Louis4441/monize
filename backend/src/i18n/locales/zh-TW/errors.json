@@ -339,7 +339,9 @@
   "notifications": {
     "notFound": "找不到 ID 為 {{ id }} 的通知",
     "smtpNotConfigured": "未設定 SMTP。請設定 SMTP 環境變數。",
-    "noEmailOnFile": "此使用者沒有電子郵件地址記錄。"
+    "noEmailOnFile": "此使用者沒有電子郵件地址記錄。",
+    "categoryNotConfigurable": "類別 {{ category }} 無法在此設定",
+    "emptyPreferenceUpdate": "至少需要一個偏好設定欄位"
   },
   "push": {
     "channelUnavailable": "此 Monize 執行個體未提供推播通知。",

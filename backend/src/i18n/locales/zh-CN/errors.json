@@ -339,7 +339,9 @@
   "notifications": {
     "notFound": "未找到 ID 为 {{ id }} 的通知",
     "smtpNotConfigured": "SMTP 未配置。请设置 SMTP 环境变量。",
-    "noEmailOnFile": "此用户没有邮箱地址记录。"
+    "noEmailOnFile": "此用户没有邮箱地址记录。",
+    "categoryNotConfigurable": "类别 {{ category }} 无法在此配置",
+    "emptyPreferenceUpdate": "至少需要一个偏好设置字段"
   },
   "push": {
     "channelUnavailable": "此 Monize 实例不提供推送通知。",

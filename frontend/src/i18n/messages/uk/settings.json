@@ -305,7 +305,7 @@
         "BUDGETS": "Бюджети"
       },
       "inAppAlways": "Завжди видно в дзвіночку",
-      "emailToggleLabel": "Ел. пошта для «{category}»",
+      "emailToggleLabel": "Ел. пошта (звіт) для «{category}»",
       "saveFailed": "Не вдалося зберегти це налаштування",
       "throttle": {
         "label": "Пауза"

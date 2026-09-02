@@ -339,7 +339,9 @@
   "notifications": {
     "notFound": "Không tìm thấy thông báo với ID {{ id }}",
     "smtpNotConfigured": "SMTP chưa được cấu hình. Hãy thiết lập các biến môi trường SMTP.",
-    "noEmailOnFile": "Không có địa chỉ email nào được lưu cho người dùng này."
+    "noEmailOnFile": "Không có địa chỉ email nào được lưu cho người dùng này.",
+    "categoryNotConfigurable": "Danh mục {{ category }} không thể cấu hình tại đây",
+    "emptyPreferenceUpdate": "Cần ít nhất một trường tùy chọn"
   },
   "push": {
     "channelUnavailable": "Thông báo đẩy không khả dụng trên phiên bản Monize này.",

@@ -305,7 +305,7 @@
         "BUDGETS": "Budgets"
       },
       "inAppAlways": "Immer in der Glocke sichtbar",
-      "emailToggleLabel": "E-Mail für {category}",
+      "emailToggleLabel": "Bericht-E-Mail für {category}",
       "saveFailed": "Diese Einstellung konnte nicht gespeichert werden",
       "throttle": {
         "label": "Sperrzeit"

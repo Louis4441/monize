@@ -305,7 +305,7 @@
         "BUDGETS": "बजट"
       },
       "inAppAlways": "घंटी में हमेशा दिखती है",
-      "emailToggleLabel": "{category} के लिए ईमेल",
+      "emailToggleLabel": "{category} के लिए रिपोर्ट ईमेल",
       "saveFailed": "यह सेटिंग सहेजी नहीं जा सकी",
       "throttle": {
         "label": "अंतराल"

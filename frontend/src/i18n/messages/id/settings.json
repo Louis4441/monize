@@ -305,7 +305,7 @@
         "BUDGETS": "Anggaran"
       },
       "inAppAlways": "Selalu tampil di lonceng",
-      "emailToggleLabel": "Email untuk {category}",
+      "emailToggleLabel": "Email laporan untuk {category}",
       "saveFailed": "Tidak dapat menyimpan setelan itu",
       "throttle": {
         "label": "Jeda"

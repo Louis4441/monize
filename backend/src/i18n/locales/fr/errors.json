@@ -339,7 +339,9 @@
   "notifications": {
     "notFound": "Notification avec l'ID {{ id }} introuvable",
     "smtpNotConfigured": "SMTP n'est pas configuré. Définissez les variables d'environnement SMTP.",
-    "noEmailOnFile": "Aucune adresse e-mail enregistrée pour cet utilisateur."
+    "noEmailOnFile": "Aucune adresse e-mail enregistrée pour cet utilisateur.",
+    "categoryNotConfigurable": "La catégorie {{ category }} n'est pas configurable ici",
+    "emptyPreferenceUpdate": "Au moins un champ de préférence est requis"
   },
   "push": {
     "channelUnavailable": "Les notifications push ne sont pas disponibles sur cette instance Monize.",

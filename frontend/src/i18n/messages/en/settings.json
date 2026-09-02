@@ -305,7 +305,7 @@
         "BUDGETS": "Budgets"
       },
       "inAppAlways": "Always shown in the bell",
-      "emailToggleLabel": "Email for {category}",
+      "emailToggleLabel": "Report email for {category}",
       "saveFailed": "Could not save that setting",
       "throttle": {
         "label": "Cooldown"

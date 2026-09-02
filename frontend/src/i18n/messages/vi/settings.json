@@ -305,7 +305,7 @@
         "BUDGETS": "Ngân sách"
       },
       "inAppAlways": "Luôn hiển thị trong chuông",
-      "emailToggleLabel": "Email cho {category}",
+      "emailToggleLabel": "Email báo cáo cho {category}",
       "saveFailed": "Không thể lưu cài đặt đó",
       "throttle": {
         "label": "Giãn cách"

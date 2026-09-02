@@ -305,7 +305,7 @@
         "BUDGETS": "[XX-Budgets-XX]"
       },
       "inAppAlways": "[XX-Always shown in the bell-XX]",
-      "emailToggleLabel": "[XX-Email for {category}-XX]",
+      "emailToggleLabel": "[XX-Report email for {category}-XX]",
       "saveFailed": "[XX-Could not save that setting-XX]",
       "throttle": {
         "label": "[XX-Cooldown-XX]"

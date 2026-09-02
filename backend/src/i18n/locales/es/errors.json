@@ -339,7 +339,9 @@
   "notifications": {
     "notFound": "Notificación con ID {{ id }} no encontrada",
     "smtpNotConfigured": "SMTP no está configurado. Establece las variables de entorno SMTP.",
-    "noEmailOnFile": "No hay dirección de correo electrónico registrada para este usuario."
+    "noEmailOnFile": "No hay dirección de correo electrónico registrada para este usuario.",
+    "categoryNotConfigurable": "La categoría {{ category }} no se puede configurar aquí",
+    "emptyPreferenceUpdate": "Se requiere al menos un campo de preferencia"
   },
   "push": {
     "channelUnavailable": "Las notificaciones push no están disponibles en esta instancia de Monize.",

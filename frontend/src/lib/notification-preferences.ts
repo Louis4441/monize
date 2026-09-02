@@ -12,13 +12,6 @@ export const NOTIFICATION_PREFERENCE_CATEGORIES: readonly NotificationCategory[]
   ['PAYMENTS', 'BUDGETS'];
 
 /**
- * The cooldown windows the matrix offers, in minutes. 0 is "off"; the rest are
- * a minimum gap between notification-mode deliveries of a category. A stored
- * value off this list is still honoured -- the control adds it as an option.
- */
-export const THROTTLE_PRESET_MINUTES = [0, 5, 15, 30, 60, 180] as const;
-
-/**
  * One category's stored channel state.
  *
  * `email` is the REPORT-mode email (batch/digest -- live, unthrottled).

@@ -5,6 +5,9 @@ import { withScopedDb } from "../common/db/scoped-db";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { NotificationCategory } from "./entities/notification.entity";
 import { NotificationPreference } from "./entities/notification-preference.entity";
+import { THROTTLE_MAX_MINUTES } from "./notification-preference.constants";
+
+export { THROTTLE_MAX_MINUTES };
 
 /**
  * The categories the preference matrix exposes and a producer consults today.
@@ -18,13 +21,6 @@ import { NotificationPreference } from "./entities/notification-preference.entit
  */
 export const NOTIFICATION_PREFERENCE_CATEGORIES: readonly NotificationCategory[] =
   [NotificationCategory.PAYMENTS, NotificationCategory.BUDGETS];
-
-/**
- * The longest throttle window the matrix accepts, in minutes (24h). A window
- * beyond a day suppresses so much it reads as "off" done wrong; 0 is the real
- * "off". The DTO enforces the bound and the service clamps defensively.
- */
-export const THROTTLE_MAX_MINUTES = 1440;
 
 /**
  * One category's resolved channel state for the settings matrix.

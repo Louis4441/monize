@@ -305,7 +305,7 @@
         "BUDGETS": "Budżety"
       },
       "inAppAlways": "Zawsze widoczne w dzwonku",
-      "emailToggleLabel": "E-mail dla: {category}",
+      "emailToggleLabel": "E-mail (raport) dla: {category}",
       "saveFailed": "Nie udało się zapisać tego ustawienia",
       "throttle": {
         "label": "Odstęp"

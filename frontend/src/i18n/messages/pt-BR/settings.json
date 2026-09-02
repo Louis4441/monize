@@ -305,7 +305,7 @@
         "BUDGETS": "Orçamentos"
       },
       "inAppAlways": "Sempre visível no sino",
-      "emailToggleLabel": "Email para {category}",
+      "emailToggleLabel": "Email (relatório) para {category}",
       "saveFailed": "Não foi possível salvar essa configuração",
       "throttle": {
         "label": "Intervalo"

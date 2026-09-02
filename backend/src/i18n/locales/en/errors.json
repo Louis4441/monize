@@ -348,7 +348,9 @@
   "notifications": {
     "notFound": "Notification with ID {{ id }} not found",
     "smtpNotConfigured": "SMTP is not configured. Set SMTP environment variables.",
-    "noEmailOnFile": "No email address on file for this user."
+    "noEmailOnFile": "No email address on file for this user.",
+    "categoryNotConfigurable": "Category {{ category }} is not configurable here",
+    "emptyPreferenceUpdate": "At least one preference field is required"
   },
   "push": {
     "channelUnavailable": "Push notifications are not available on this Monize instance.",

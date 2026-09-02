@@ -305,7 +305,7 @@
         "BUDGETS": "預算"
       },
       "inAppAlways": "始終顯示在鈴鐺中",
-      "emailToggleLabel": "{category} 的電子郵件",
+      "emailToggleLabel": "{category} 的報告郵件",
       "saveFailed": "無法儲存該設定",
       "throttle": {
         "label": "間隔"

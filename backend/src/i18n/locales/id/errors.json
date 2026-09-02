@@ -339,7 +339,9 @@
   "notifications": {
     "notFound": "Notifikasi dengan ID {{ id }} tidak ditemukan",
     "smtpNotConfigured": "SMTP belum dikonfigurasi. Atur variabel lingkungan SMTP.",
-    "noEmailOnFile": "Tidak ada alamat email yang tercatat untuk pengguna ini."
+    "noEmailOnFile": "Tidak ada alamat email yang tercatat untuk pengguna ini.",
+    "categoryNotConfigurable": "Kategori {{ category }} tidak dapat dikonfigurasi di sini",
+    "emptyPreferenceUpdate": "Setidaknya satu bidang preferensi diperlukan"
   },
   "push": {
     "channelUnavailable": "Notifikasi push tidak tersedia di instans Monize ini.",

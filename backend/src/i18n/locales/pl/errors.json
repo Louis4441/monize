@@ -339,7 +339,9 @@
   "notifications": {
     "notFound": "Nie znaleziono powiadomienia o ID {{ id }}",
     "smtpNotConfigured": "SMTP nie jest skonfigurowany. Ustaw zmienne środowiskowe SMTP.",
-    "noEmailOnFile": "Brak zapisanego adresu e-mail dla tego użytkownika."
+    "noEmailOnFile": "Brak zapisanego adresu e-mail dla tego użytkownika.",
+    "categoryNotConfigurable": "Kategoria {{ category }} nie jest tutaj konfigurowalna",
+    "emptyPreferenceUpdate": "Wymagane jest co najmniej jedno pole preferencji"
   },
   "push": {
     "channelUnavailable": "Powiadomienia push nie są dostępne w tej instancji Monize.",
