@@ -305,7 +305,14 @@
       },
       "inAppAlways": "Zawsze widoczne w dzwonku",
       "emailToggleLabel": "E-mail dla: {category}",
-      "saveFailed": "Nie udało się zapisać tego ustawienia"
+      "saveFailed": "Nie udało się zapisać tego ustawienia",
+      "throttle": {
+        "label": "Odstęp",
+        "off": "Wył.",
+        "minutes": "{minutes} min",
+        "hours": "{hours} h",
+        "ariaLabel": "Odstęp dla: {category}"
+      }
     }
   },
   "help": {

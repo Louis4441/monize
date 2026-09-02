@@ -305,7 +305,14 @@
       },
       "inAppAlways": "Always shown in the bell",
       "emailToggleLabel": "Email for {category}",
-      "saveFailed": "Could not save that setting"
+      "saveFailed": "Could not save that setting",
+      "throttle": {
+        "label": "Cooldown",
+        "off": "Off",
+        "minutes": "{minutes} min",
+        "hours": "{hours} h",
+        "ariaLabel": "Cooldown for {category}"
+      }
     }
   },
   "help": {

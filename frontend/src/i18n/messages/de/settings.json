@@ -305,7 +305,14 @@
       },
       "inAppAlways": "Immer in der Glocke sichtbar",
       "emailToggleLabel": "E-Mail für {category}",
-      "saveFailed": "Diese Einstellung konnte nicht gespeichert werden"
+      "saveFailed": "Diese Einstellung konnte nicht gespeichert werden",
+      "throttle": {
+        "label": "Sperrzeit",
+        "off": "Aus",
+        "minutes": "{minutes} Min.",
+        "hours": "{hours} Std.",
+        "ariaLabel": "Sperrzeit für {category}"
+      }
     }
   },
   "help": {

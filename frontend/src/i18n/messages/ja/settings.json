@@ -305,7 +305,14 @@
       },
       "inAppAlways": "ベルには常に表示されます",
       "emailToggleLabel": "{category} のメール",
-      "saveFailed": "設定を保存できませんでした"
+      "saveFailed": "設定を保存できませんでした",
+      "throttle": {
+        "label": "間隔",
+        "off": "オフ",
+        "minutes": "{minutes}分",
+        "hours": "{hours}時間",
+        "ariaLabel": "{category} の間隔"
+      }
     }
   },
   "help": {

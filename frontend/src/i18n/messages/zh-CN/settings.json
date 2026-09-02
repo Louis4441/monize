@@ -305,7 +305,14 @@
       },
       "inAppAlways": "始终显示在铃铛中",
       "emailToggleLabel": "{category} 的邮件",
-      "saveFailed": "无法保存该设置"
+      "saveFailed": "无法保存该设置",
+      "throttle": {
+        "label": "间隔",
+        "off": "关闭",
+        "minutes": "{minutes} 分钟",
+        "hours": "{hours} 小时",
+        "ariaLabel": "{category} 的间隔"
+      }
     }
   },
   "help": {

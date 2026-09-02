@@ -305,7 +305,14 @@
       },
       "inAppAlways": "始終顯示在鈴鐺中",
       "emailToggleLabel": "{category} 的電子郵件",
-      "saveFailed": "無法儲存該設定"
+      "saveFailed": "無法儲存該設定",
+      "throttle": {
+        "label": "間隔",
+        "off": "關閉",
+        "minutes": "{minutes} 分鐘",
+        "hours": "{hours} 小時",
+        "ariaLabel": "{category} 的間隔"
+      }
     }
   },
   "help": {

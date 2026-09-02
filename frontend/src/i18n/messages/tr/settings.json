@@ -305,7 +305,14 @@
       },
       "inAppAlways": "Zilde her zaman görünür",
       "emailToggleLabel": "{category} için e-posta",
-      "saveFailed": "Bu ayar kaydedilemedi"
+      "saveFailed": "Bu ayar kaydedilemedi",
+      "throttle": {
+        "label": "Bekleme",
+        "off": "Kapalı",
+        "minutes": "{minutes} dk",
+        "hours": "{hours} sa",
+        "ariaLabel": "{category} için bekleme"
+      }
     }
   },
   "help": {

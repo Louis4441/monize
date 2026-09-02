@@ -305,7 +305,14 @@
       },
       "inAppAlways": "Всегда видно в колокольчике",
       "emailToggleLabel": "Эл. почта для «{category}»",
-      "saveFailed": "Не удалось сохранить эту настройку"
+      "saveFailed": "Не удалось сохранить эту настройку",
+      "throttle": {
+        "label": "Пауза",
+        "off": "Выкл.",
+        "minutes": "{minutes} мин",
+        "hours": "{hours} ч",
+        "ariaLabel": "Пауза для «{category}»"
+      }
     }
   },
   "help": {

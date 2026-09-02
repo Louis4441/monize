@@ -305,7 +305,14 @@
       },
       "inAppAlways": "Siempre visible en la campana",
       "emailToggleLabel": "Correo para {category}",
-      "saveFailed": "No se pudo guardar ese ajuste"
+      "saveFailed": "No se pudo guardar ese ajuste",
+      "throttle": {
+        "label": "Espera",
+        "off": "No",
+        "minutes": "{minutes} min",
+        "hours": "{hours} h",
+        "ariaLabel": "Espera para {category}"
+      }
     }
   },
   "help": {

@@ -305,7 +305,14 @@
       },
       "inAppAlways": "Toujours visible dans la cloche",
       "emailToggleLabel": "E-mail pour {category}",
-      "saveFailed": "Impossible d'enregistrer ce réglage"
+      "saveFailed": "Impossible d'enregistrer ce réglage",
+      "throttle": {
+        "label": "Délai",
+        "off": "Non",
+        "minutes": "{minutes} min",
+        "hours": "{hours} h",
+        "ariaLabel": "Délai pour {category}"
+      }
     }
   },
   "help": {
