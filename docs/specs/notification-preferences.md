@@ -125,6 +125,22 @@ login/2FA notification types exist), so it enters with those producers.
 
 ## 4. Throttling / grouping rules (R7)
 
+> **UNRESOLVED -- this section as written contradicts Section 3, and the first
+> implementation attempt (reverted) followed this section and violated the
+> ruling.** Section 3 is the maintainer's explicit ruling: "in_app is always on
+> ... the throttle below **never suppresses an in-app row**"; the bell shows
+> every notification. This section's "returns the null shape" means **no row is
+> written** -- so a throttled notification vanished from the bell, not just from
+> email/push. The two cannot both hold. The **in_app row must always be written**
+> (Section 3 wins), so the throttle has to gate the **fan-out channels**
+> (email/push), never the row. Because the only live fan-out today is email --
+> already producer-gated by `resolveEmail(category)` -- and `budget-alert`
+> *batches* several alerts into one immediate email, moving the throttle to a
+> fan-out gate is a producer-side change (and a batching-semantics decision) the
+> maintainer must sign off before it is built. The paragraph below is kept as the
+> original (wrong) description and must be rewritten to "gate the fan-out, keep
+> the row" once that decision is made.
+
 A per-group `throttle_minutes` window. When a producer is about to create a
 notification of group G for user U, the write door checks whether a
 **non-dismissed** notification of group G for U was created within the last
