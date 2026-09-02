@@ -1733,6 +1733,11 @@ CREATE TABLE notification_preferences (
     -- Per-category cooldown for the notification-mode fan-out; 0 disables.
     -- Stored now, enforced in Phase 5 (migration 174).
     throttle_minutes INTEGER NOT NULL DEFAULT 0,
+    -- Per-category web push, the other notification-mode fan-out; read by the
+    -- Phase 5 dispatch (migration 176). DEFAULT FALSE: a matrix cell cannot turn
+    -- a device on, so push stays off until a device is enabled and the category
+    -- toggled.
+    push BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, category)

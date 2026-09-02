@@ -71,12 +71,13 @@ describe("NotificationPreferenceService", () => {
   });
 
   describe("list", () => {
-    it("returns the default shape per category: report email on, notification off, throttle 0", async () => {
+    it("returns the default shape per category: report email on, notification off, push off, throttle 0", async () => {
       expect(await service.list("u1")).toEqual(
         NOTIFICATION_PREFERENCE_CATEGORIES.map((category) => ({
           category,
           email: true,
           emailNotification: false,
+          push: false,
           throttleMinutes: 0,
         })),
       );
@@ -90,6 +91,7 @@ describe("NotificationPreferenceService", () => {
           category: NotificationCategory.PAYMENTS,
           email: false,
           emailNotification: true,
+          push: true,
           throttleMinutes: 30,
         },
       ]);
@@ -100,6 +102,7 @@ describe("NotificationPreferenceService", () => {
         category: NotificationCategory.PAYMENTS,
         email: false,
         emailNotification: true,
+        push: true,
         throttleMinutes: 30,
       });
       expect(
@@ -108,6 +111,7 @@ describe("NotificationPreferenceService", () => {
         category: NotificationCategory.BUDGETS,
         email: true,
         emailNotification: false,
+        push: false,
         throttleMinutes: 0,
       });
     });
@@ -133,6 +137,7 @@ describe("NotificationPreferenceService", () => {
       notifPrefRepo.findOne.mockResolvedValue({
         email: false,
         emailNotification: false,
+        push: false,
         throttleMinutes: 0,
       });
       const result = await service.updatePreference(
@@ -144,12 +149,14 @@ describe("NotificationPreferenceService", () => {
       expect(String(sql)).toContain(
         "ON CONFLICT (user_id, category) DO UPDATE",
       );
-      // Only email present -> its param; the other two omitted pass NULL, so
-      // COALESCE keeps their stored values.
+      // Only email present -> its param; the others omitted pass NULL, so
+      // COALESCE keeps their stored values. Order: email, emailNotification,
+      // throttle, push.
       expect(params).toEqual([
         "u1",
         NotificationCategory.PAYMENTS,
         false,
+        null,
         null,
         null,
       ]);
@@ -157,6 +164,7 @@ describe("NotificationPreferenceService", () => {
         category: NotificationCategory.PAYMENTS,
         email: false,
         emailNotification: false,
+        push: false,
         throttleMinutes: 0,
       });
     });
@@ -165,6 +173,7 @@ describe("NotificationPreferenceService", () => {
       notifPrefRepo.findOne.mockResolvedValue({
         email: true,
         emailNotification: true,
+        push: false,
         throttleMinutes: 15,
       });
       await service.updatePreference("u1", NotificationCategory.BUDGETS, {
@@ -172,13 +181,36 @@ describe("NotificationPreferenceService", () => {
         throttleMinutes: 15,
       });
       const params = query.mock.calls[0][1];
-      // email omitted -> NULL; notification email and throttle set.
+      // email and push omitted -> NULL; notification email and throttle set.
       expect(params).toEqual([
         "u1",
         NotificationCategory.BUDGETS,
         null,
         true,
         15,
+        null,
+      ]);
+    });
+
+    it("writes the push channel independently", async () => {
+      notifPrefRepo.findOne.mockResolvedValue({
+        email: true,
+        emailNotification: false,
+        push: true,
+        throttleMinutes: 0,
+      });
+      await service.updatePreference("u1", NotificationCategory.PAYMENTS, {
+        push: true,
+      });
+      const params = query.mock.calls[0][1];
+      // Only push present -> the sixth param; the rest NULL.
+      expect(params).toEqual([
+        "u1",
+        NotificationCategory.PAYMENTS,
+        null,
+        null,
+        null,
+        true,
       ]);
     });
 
@@ -186,6 +218,7 @@ describe("NotificationPreferenceService", () => {
       notifPrefRepo.findOne.mockResolvedValue({
         email: true,
         emailNotification: false,
+        push: false,
         throttleMinutes: THROTTLE_MAX_MINUTES,
       });
       await service.updatePreference("u1", NotificationCategory.BUDGETS, {
@@ -198,6 +231,7 @@ describe("NotificationPreferenceService", () => {
         null,
         null,
         THROTTLE_MAX_MINUTES,
+        null,
       ]);
     });
 
@@ -205,6 +239,7 @@ describe("NotificationPreferenceService", () => {
       notifPrefRepo.findOne.mockResolvedValue({
         email: true,
         emailNotification: false,
+        push: false,
         throttleMinutes: 0,
       });
       await service.updatePreference("u1", NotificationCategory.BUDGETS, {
@@ -217,7 +252,57 @@ describe("NotificationPreferenceService", () => {
         null,
         null,
         0,
+        null,
       ]);
+    });
+  });
+
+  describe("resolveEmailNotification (notification-mode email gate)", () => {
+    it("defaults OFF when there is no row (opt-in, D9)", async () => {
+      expect(
+        await service.resolveEmailNotification(
+          "u1",
+          NotificationCategory.PAYMENTS,
+        ),
+      ).toBe(false);
+    });
+
+    it("returns the stored flag when the master switch is on", async () => {
+      userPrefRepo.findOne.mockResolvedValue({ notificationEmail: true });
+      notifPrefRepo.findOne.mockResolvedValue({ emailNotification: true });
+      expect(
+        await service.resolveEmailNotification(
+          "u1",
+          NotificationCategory.BUDGETS,
+        ),
+      ).toBe(true);
+    });
+
+    it("is killed by the email master switch, like report email", async () => {
+      userPrefRepo.findOne.mockResolvedValue({ notificationEmail: false });
+      notifPrefRepo.findOne.mockResolvedValue({ emailNotification: true });
+      expect(
+        await service.resolveEmailNotification(
+          "u1",
+          NotificationCategory.BUDGETS,
+        ),
+      ).toBe(false);
+    });
+  });
+
+  describe("resolvePush (push gate)", () => {
+    it("defaults OFF when there is no row", async () => {
+      expect(
+        await service.resolvePush("u1", NotificationCategory.PAYMENTS),
+      ).toBe(false);
+    });
+
+    it("returns the stored flag and is NOT gated by the email master switch", async () => {
+      userPrefRepo.findOne.mockResolvedValue({ notificationEmail: false });
+      notifPrefRepo.findOne.mockResolvedValue({ push: true });
+      expect(
+        await service.resolvePush("u1", NotificationCategory.BUDGETS),
+      ).toBe(true);
     });
   });
 });

@@ -549,6 +549,7 @@ export const RULES: Record<string, TableRules> = {
     email: keep, // report-mode email flag
     email_notification: keep, // notification-mode email flag
     throttle_minutes: keep, // an integer cooldown, not identifying
+    push: keep, // web push channel flag
     created_at: keep,
     updated_at: keep,
   },

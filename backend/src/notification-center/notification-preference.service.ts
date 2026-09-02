@@ -34,6 +34,7 @@ export interface NotificationChannelPreference {
   category: NotificationCategory;
   email: boolean;
   emailNotification: boolean;
+  push: boolean;
   throttleMinutes: number;
 }
 
@@ -41,6 +42,7 @@ export interface NotificationChannelPreference {
 export interface NotificationPreferencePatch {
   email?: boolean;
   emailNotification?: boolean;
+  push?: boolean;
   throttleMinutes?: number;
 }
 
@@ -88,6 +90,47 @@ export class NotificationPreferenceService {
   }
 
   /**
+   * Whether NOTIFICATION-mode email (immediate, one-per-event) should be
+   * delivered for this category. Same master-switch kill as `resolveEmail` (it
+   * is still email), but the per-category default is OFF -- the notification
+   * email is opt-in, so a preference-less user gets none (spec section 14, D9).
+   * The throttle is applied by the dispatch, not here.
+   */
+  async resolveEmailNotification(
+    userId: string,
+    category: NotificationCategory,
+  ): Promise<boolean> {
+    return withScopedDb(this.dataSource, async (manager) => {
+      const master = await manager.getRepository(UserPreference).findOne({
+        where: { userId },
+      });
+      if (master && !master.notificationEmail) return false;
+      const row = await manager.getRepository(NotificationPreference).findOne({
+        where: { userId, category },
+      });
+      return row ? row.emailNotification : false;
+    });
+  }
+
+  /**
+   * Whether web push should be delivered for this category. Default OFF, and NOT
+   * gated by the email master switch (push is a different channel). Feasibility
+   * -- whether the instance has push configured and the user has a live device
+   * -- is decided by the sender, not here; this answers only the preference.
+   */
+  async resolvePush(
+    userId: string,
+    category: NotificationCategory,
+  ): Promise<boolean> {
+    return withScopedDb(this.dataSource, async (manager) => {
+      const row = await manager.getRepository(NotificationPreference).findOne({
+        where: { userId, category },
+      });
+      return row ? row.push : false;
+    });
+  }
+
+  /**
    * The per-category stored state for every matrix category, for the settings
    * UI. Deliberately NOT master-gated: the matrix shows the user's own
    * per-category choices, and the global email toggle is a separate control on
@@ -128,6 +171,7 @@ export class NotificationPreferenceService {
     const email = patch.email === undefined ? null : patch.email;
     const emailNotification =
       patch.emailNotification === undefined ? null : patch.emailNotification;
+    const push = patch.push === undefined ? null : patch.push;
     const throttle =
       patch.throttleMinutes === undefined
         ? null
@@ -136,15 +180,17 @@ export class NotificationPreferenceService {
     return withScopedDb(this.dataSource, async (manager) => {
       await manager.query(
         `INSERT INTO notification_preferences
-           (user_id, category, email, email_notification, throttle_minutes)
-         VALUES ($1, $2, COALESCE($3, true), COALESCE($4, false), COALESCE($5, 0))
+           (user_id, category, email, email_notification, throttle_minutes, push)
+         VALUES ($1, $2, COALESCE($3, true), COALESCE($4, false),
+                 COALESCE($5, 0), COALESCE($6, false))
          ON CONFLICT (user_id, category) DO UPDATE SET
            email = COALESCE($3, notification_preferences.email),
            email_notification =
              COALESCE($4, notification_preferences.email_notification),
            throttle_minutes =
-             COALESCE($5, notification_preferences.throttle_minutes)`,
-        [userId, category, email, emailNotification, throttle],
+             COALESCE($5, notification_preferences.throttle_minutes),
+           push = COALESCE($6, notification_preferences.push)`,
+        [userId, category, email, emailNotification, throttle, push],
       );
       const row = await manager.getRepository(NotificationPreference).findOne({
         where: { userId, category },
@@ -162,6 +208,7 @@ export class NotificationPreferenceService {
       category,
       email: row ? row.email : true,
       emailNotification: row ? row.emailNotification : false,
+      push: row ? row.push : false,
       throttleMinutes: row ? this.clampThrottle(row.throttleMinutes) : 0,
     };
   }

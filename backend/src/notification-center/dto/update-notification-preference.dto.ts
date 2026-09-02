@@ -18,6 +18,11 @@ export class UpdateNotificationPreferenceDto {
   @IsBoolean()
   emailNotification?: boolean;
 
+  /** Per-category web push (the other notification-mode fan-out). */
+  @IsOptional()
+  @IsBoolean()
+  push?: boolean;
+
   /** Cooldown window in minutes; 0 disables. Bounded so it cannot suppress for longer than a day. */
   @IsOptional()
   @IsInt()

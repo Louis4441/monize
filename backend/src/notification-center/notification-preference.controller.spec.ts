@@ -20,12 +20,18 @@ describe("NotificationPreferenceController", () => {
     controller.update(req, NotificationCategory.PAYMENTS, {
       email: false,
       emailNotification: true,
+      push: true,
       throttleMinutes: 15,
     });
     expect(preferences.updatePreference).toHaveBeenCalledWith(
       "u1",
       NotificationCategory.PAYMENTS,
-      { email: false, emailNotification: true, throttleMinutes: 15 },
+      {
+        email: false,
+        emailNotification: true,
+        push: true,
+        throttleMinutes: 15,
+      },
     );
   });
 
@@ -37,6 +43,7 @@ describe("NotificationPreferenceController", () => {
       {
         email: false,
         emailNotification: undefined,
+        push: undefined,
         throttleMinutes: undefined,
       },
     );

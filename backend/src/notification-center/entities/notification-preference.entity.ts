@@ -56,6 +56,15 @@ export class NotificationPreference {
   @Column({ name: "throttle_minutes", type: "int", default: 0 })
   throttleMinutes: number;
 
+  /**
+   * Per-category web push: the other notification-mode fan-out beside the
+   * immediate email, read by the Phase 5 dispatch and governed by the same
+   * throttle. Defaults off -- a matrix cell cannot turn a device on, so push
+   * stays off until the user enables a device and toggles the category.
+   */
+  @Column({ type: "boolean", default: false })
+  push: boolean;
+
   @CreateDateColumn({ name: "created_at" })
   createdAt: Date;
 

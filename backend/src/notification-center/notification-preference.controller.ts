@@ -58,6 +58,7 @@ export class NotificationPreferenceController {
     if (
       dto.email === undefined &&
       dto.emailNotification === undefined &&
+      dto.push === undefined &&
       dto.throttleMinutes === undefined
     ) {
       throw new BadRequestException(
@@ -70,6 +71,7 @@ export class NotificationPreferenceController {
     return this.preferences.updatePreference(req.user.id, category, {
       email: dto.email,
       emailNotification: dto.emailNotification,
+      push: dto.push,
       throttleMinutes: dto.throttleMinutes,
     });
   }
