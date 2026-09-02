@@ -138,6 +138,11 @@
     "inProgress": "Wyszukiwanie...",
     "filled": "{count, plural, one {Uzupełniono # daną kontaktową} few {Uzupełniono # dane kontaktowe} many {Uzupełniono # danych kontaktowych} other {Uzupełniono # danych kontaktowych}}",
     "nothingNew": "Nie znaleziono nowych danych kontaktowych.",
+    "refinementIntro": "Znaleziono pełniejszą wersję danych, które ten odbiorca już ma. Nic nie zostało zmienione; zastosuj ją, aby zastąpić zapisane dane.",
+    "refinementApply": "Zastosuj",
+    "refinementDismiss": "Odrzuć",
+    "refinementApplied": "Zaktualizowano dane kontaktowe",
+    "refinementFailed": "Nie udało się zaktualizować danych kontaktowych",
     "noProvider": "Skonfiguruj dostawcę AI w Ustawieniach AI, aby wyszukiwać dane kontaktowe.",
     "failed": "Nie udało się ukończyć wyszukiwania. Spróbuj ponownie później."
   }

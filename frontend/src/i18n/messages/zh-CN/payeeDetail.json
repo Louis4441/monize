@@ -138,6 +138,11 @@
     "inProgress": "正在查找...",
     "filled": "{count, plural, other {已填写 # 项联系信息}}",
     "nothingNew": "未找到新的联系信息。",
+    "refinementIntro": "找到了该收款人已有信息的更完整版本。尚未更改任何内容；应用后将替换已保存的内容。",
+    "refinementApply": "应用",
+    "refinementDismiss": "忽略",
+    "refinementApplied": "联系信息已更新",
+    "refinementFailed": "无法更新联系信息",
     "noProvider": "请在 AI 设置中配置 AI 提供商以查找联系信息。",
     "failed": "查找未能完成，请稍后重试。"
   }

@@ -138,6 +138,11 @@
     "inProgress": "Recherche...",
     "filled": "{count, plural, one {# coordonnée renseignée} other {# coordonnées renseignées}}",
     "nothingNew": "Aucune nouvelle coordonnée n'a été trouvée.",
+    "refinementIntro": "Une version plus complète de coordonnées que ce bénéficiaire possède déjà a été trouvée. Rien n'a été modifié ; appliquez-la pour remplacer ce qui est enregistré.",
+    "refinementApply": "Appliquer",
+    "refinementDismiss": "Ignorer",
+    "refinementApplied": "Coordonnées mises à jour",
+    "refinementFailed": "Impossible de mettre à jour les coordonnées",
     "noProvider": "Configurez un fournisseur d'IA dans les paramètres IA pour rechercher les coordonnées.",
     "failed": "La recherche n'a pas pu aboutir. Réessayez plus tard."
   }

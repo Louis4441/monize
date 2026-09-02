@@ -138,6 +138,11 @@
     "inProgress": "Aranıyor...",
     "filled": "{count, plural, one {# iletişim bilgisi dolduruldu} other {# iletişim bilgisi dolduruldu}}",
     "nothingNew": "Yeni iletişim bilgisi bulunamadı.",
+    "refinementIntro": "Bu alacaklının hâlihazırda sahip olduğu bilgilerin daha eksiksiz bir hâli bulundu. Hiçbir şey değiştirilmedi; kayıtlı değeri değiştirmek için uygulayın.",
+    "refinementApply": "Uygula",
+    "refinementDismiss": "Yoksay",
+    "refinementApplied": "İletişim bilgileri güncellendi",
+    "refinementFailed": "İletişim bilgileri güncellenemedi",
     "noProvider": "İletişim bilgilerini aramak için Yapay Zeka Ayarları'nda bir yapay zeka sağlayıcısı yapılandırın.",
     "failed": "Arama tamamlanamadı. Daha sonra tekrar deneyin."
   }

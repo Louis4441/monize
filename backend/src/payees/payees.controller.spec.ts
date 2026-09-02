@@ -752,7 +752,29 @@ describe("PayeesController", () => {
       expect(result).toBe(outcome);
       expect(mockContactLookupService.lookup).toHaveBeenCalledWith(
         "user-1",
-        { name: "Acme" },
+        { name: "Acme", known: undefined },
+        { ignorePreference: true },
+      );
+    });
+
+    it("passes the form's own values through as context, and stores none of them", async () => {
+      mockContactLookupService.lookup.mockResolvedValue({
+        reason: "none",
+        suggestion: null,
+      });
+
+      await controller.lookupContact(mockReq, {
+        name: "Acme",
+        address: "Toronto",
+        notes: "the Dundas branch",
+      });
+
+      expect(mockContactLookupService.lookup).toHaveBeenCalledWith(
+        "user-1",
+        {
+          name: "Acme",
+          known: { address: "Toronto", notes: "the Dundas branch" },
+        },
         { ignorePreference: true },
       );
     });

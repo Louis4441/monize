@@ -96,7 +96,8 @@
       "button": "Procurar contactos",
       "searching": "A procurar contactos...",
       "suggested": "Sugerido pela pesquisa:",
-      "clear": "Limpar sugestões",
+      "replaced": "Substituído pela pesquisa:",
+      "clear": "Anular as alterações da pesquisa",
       "nothingFound": "Não foram encontrados contactos públicos para este nome.",
       "noProvider": "Configure um fornecedor de IA nas <link>Definições de IA</link> para procurar contactos.",
       "failed": "Não foi possível concluir a pesquisa. Tente novamente mais tarde."

@@ -96,7 +96,8 @@
       "button": "Buscar datos",
       "searching": "Buscando datos de contacto...",
       "suggested": "Sugerido por la búsqueda:",
-      "clear": "Descartar sugerencias",
+      "replaced": "Reemplazado por la búsqueda:",
+      "clear": "Deshacer los cambios de la búsqueda",
       "nothingFound": "No se encontraron datos de contacto públicos para este nombre.",
       "noProvider": "Configure un proveedor de IA en <link>Ajustes de IA</link> para buscar datos de contacto.",
       "failed": "No se pudo completar la búsqueda. Inténtelo de nuevo más tarde."

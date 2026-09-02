@@ -138,6 +138,11 @@
     "inProgress": "Looking up...",
     "filled": "Filled in {count, plural, one {# contact detail} other {# contact details}}",
     "nothingNew": "No new contact details were found.",
+    "refinementIntro": "A fuller version of details this payee already has was found. Nothing has been changed; apply it to replace what is stored.",
+    "refinementApply": "Apply",
+    "refinementDismiss": "Dismiss",
+    "refinementApplied": "Contact details updated",
+    "refinementFailed": "Could not update the contact details",
     "noProvider": "Configure an AI provider in AI Settings to look up contact details.",
     "failed": "The lookup could not be completed. Try again later."
   }

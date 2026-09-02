@@ -96,7 +96,8 @@
       "button": "Buscar dados",
       "searching": "Buscando dados de contato...",
       "suggested": "Sugerido pela busca:",
-      "clear": "Limpar sugestões",
+      "replaced": "Substituído pela busca:",
+      "clear": "Desfazer as alterações da busca",
       "nothingFound": "Nenhum dado de contato público foi encontrado para este nome.",
       "noProvider": "Configure um provedor de IA nas <link>Configurações de IA</link> para buscar dados de contato.",
       "failed": "Não foi possível concluir a busca. Tente novamente mais tarde."

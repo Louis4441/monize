@@ -96,7 +96,8 @@
       "button": "Cari detail",
       "searching": "Mencari detail kontak...",
       "suggested": "Disarankan dari pencarian:",
-      "clear": "Hapus saran",
+      "replaced": "Diganti oleh pencarian:",
+      "clear": "Urungkan perubahan pencarian",
       "nothingFound": "Tidak ditemukan detail kontak publik untuk nama ini.",
       "noProvider": "Konfigurasikan penyedia AI di <link>Pengaturan AI</link> untuk mencari detail kontak.",
       "failed": "Pencarian tidak dapat diselesaikan. Coba lagi nanti."

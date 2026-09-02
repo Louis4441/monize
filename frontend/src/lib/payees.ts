@@ -10,6 +10,7 @@ import {
   DeactivationPreviewParams,
   DeactivationCandidate,
   PayeeDetail,
+  PayeeContactLookupContext,
   PayeeContactLookupResult,
   PayeeContactRerunResult,
   PayeeStatusFilter,
@@ -44,13 +45,17 @@ export const payeesApi = {
 
   // Look a name up without saving anything (the form's prefill). Takes an
   // AbortSignal so a superseded request can be cancelled rather than adopted.
+  // `context` is whatever the form already holds (a half-typed address, a
+  // note): it steers the lookup to the right organisation and the right
+  // branch of it, and this endpoint stores none of it.
   lookupContact: async (
     name: string,
+    context?: PayeeContactLookupContext,
     signal?: AbortSignal,
   ): Promise<PayeeContactLookupResult> => {
     const response = await apiClient.post<PayeeContactLookupResult>(
       '/payees/lookup-contact',
-      { name },
+      { name, ...context },
       { signal },
     );
     return response.data;

@@ -138,6 +138,11 @@
     "inProgress": "Buscando...",
     "filled": "{count, plural, one {# dado de contato preenchido} other {# dados de contato preenchidos}}",
     "nothingNew": "Nenhum dado de contato novo foi encontrado.",
+    "refinementIntro": "Foi encontrada uma versão mais completa de dados que este beneficiário já tem. Nada foi alterado; aplique para substituir o que está salvo.",
+    "refinementApply": "Aplicar",
+    "refinementDismiss": "Dispensar",
+    "refinementApplied": "Dados de contato atualizados",
+    "refinementFailed": "Não foi possível atualizar os dados de contato",
     "noProvider": "Configure um provedor de IA nas Configurações de IA para buscar dados de contato.",
     "failed": "Não foi possível concluir a busca. Tente novamente mais tarde."
   }

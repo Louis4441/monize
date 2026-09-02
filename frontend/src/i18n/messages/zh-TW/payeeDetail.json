@@ -138,6 +138,11 @@
     "inProgress": "正在查詢...",
     "filled": "{count, plural, other {已填寫 # 項聯絡資訊}}",
     "nothingNew": "找不到新的聯絡資訊。",
+    "refinementIntro": "找到了此收款人既有資料的更完整版本。尚未變更任何內容；套用後將取代已儲存的內容。",
+    "refinementApply": "套用",
+    "refinementDismiss": "忽略",
+    "refinementApplied": "聯絡資訊已更新",
+    "refinementFailed": "無法更新聯絡資訊",
     "noProvider": "請在 AI 設定中設定 AI 供應商以查詢聯絡資訊。",
     "failed": "查詢無法完成，請稍後再試。"
   }

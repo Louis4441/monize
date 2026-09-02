@@ -7,7 +7,7 @@ import { payeesApi } from '@/lib/payees';
 import type { PayeeDetail } from '@/types/payee';
 
 vi.mock('@/lib/payees', () => ({
-  payeesApi: { lookupContactForPayee: vi.fn() },
+  payeesApi: { lookupContactForPayee: vi.fn(), update: vi.fn() },
 }));
 
 const mapProvider = { current: undefined as string | undefined };
@@ -324,6 +324,12 @@ describe('PayeeKeyInfoCard contact details', () => {
 
     beforeEach(() => {
       lookup.mockReset();
+      vi.mocked(payeesApi.update).mockReset();
+      // The toast doubles are module-level, so a call from an earlier case
+      // would otherwise be read as this one's.
+      vi.mocked(toast).mockClear();
+      vi.mocked(toast.success).mockClear();
+      vi.mocked(toast.error).mockClear();
     });
 
     it('shows the looked-up badge only when a lookup wrote a field', () => {
@@ -396,6 +402,70 @@ describe('PayeeKeyInfoCard contact details', () => {
         expect(toast).toHaveBeenCalledWith('No new contact details were found.'),
       );
       expect(onContactLookedUp).not.toHaveBeenCalled();
+    });
+
+    it('offers a fuller value for a field that already has one, rather than writing it', async () => {
+      const stored = {
+        ...detailFixture().payee,
+        address: 'Toronto',
+      };
+      lookup.mockResolvedValue({
+        reason: 'ok',
+        filled: [],
+        refinements: { address: '483 Bay St\nToronto, Ontario M5G 2C9\nCanada' },
+        payee: stored,
+      });
+      const onContactLookedUp = vi.fn();
+      render(
+        <PayeeKeyInfoCard
+          detail={detailFixture({ payee: stored })}
+          categoryLabelMap={categoryLabelMap}
+          onSelectDate={vi.fn()}
+          onSelectAccount={vi.fn()}
+          onContactLookedUp={onContactLookedUp}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Look up contact details' }));
+
+      expect(
+        await screen.findByText('483 Bay St Toronto, Ontario M5G 2C9 Canada', {
+          collapseWhitespace: true,
+        }),
+      ).toBeInTheDocument();
+      // Nothing was written, so nothing is reloaded and the stored value stands.
+      expect(onContactLookedUp).not.toHaveBeenCalled();
+      expect(payeesApi.update).not.toHaveBeenCalled();
+      // An offer on screen is not "nothing new".
+      expect(toast).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+      await waitFor(() =>
+        expect(payeesApi.update).toHaveBeenCalledWith('payee-1', {
+          address: '483 Bay St\nToronto, Ontario M5G 2C9\nCanada',
+        }),
+      );
+      await waitFor(() => expect(onContactLookedUp).toHaveBeenCalled());
+    });
+
+    it('drops a refinement the user dismisses without touching the payee', async () => {
+      const stored = { ...detailFixture().payee, phone: '+1 555 000 0000' };
+      lookup.mockResolvedValue({
+        reason: 'ok',
+        filled: [],
+        refinements: { phone: '+1 416 555 0100' },
+        payee: stored,
+      });
+      renderCard(detailFixture({ payee: stored }));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Look up contact details' }));
+      expect(await screen.findByText('+1 416 555 0100')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+      await waitFor(() =>
+        expect(screen.queryByText('+1 416 555 0100')).not.toBeInTheDocument(),
+      );
+      expect(payeesApi.update).not.toHaveBeenCalled();
     });
 
     it('shows a failure with its own detail, never as nothing found', async () => {

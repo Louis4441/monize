@@ -1,8 +1,11 @@
 import { isEmail } from "class-validator";
 import { normalizeWebsite } from "../../common/normalize-website";
 import { sanitizePromptValue, stripHtml } from "../../common/sanitization.util";
+import { PayeeLookupContext } from "./lookup-context";
 import {
+  CONTACT_LOOKUP_FIELDS,
   ContactLookupConfidence,
+  ContactLookupField,
   ContactLookupSource,
   PayeeContactSuggestion,
   UNVERIFIED_CONTACT_LOOKUP_SOURCES,
@@ -116,6 +119,77 @@ function sanitizeNotes(value: unknown): string | null {
 }
 
 /**
+ * Is this suggested value the same fact the user already holds? Compared per
+ * field the way the field is written rather than byte for byte, because
+ * "starbucks.com" and "https://starbucks.com/" are one website and
+ * "+1 416-555-0100" and "(416) 555-0100" are one number -- a suggestion equal
+ * to what is on record is not a refinement, and counting it as one would show
+ * the user a "found" that changes nothing.
+ */
+function isSameContactValue(
+  field: ContactLookupField,
+  suggested: string,
+  known: string,
+): boolean {
+  switch (field) {
+    case "website": {
+      const a = normalizeWebsite(suggested);
+      const b = normalizeWebsite(known);
+      if (!a || !b) return false;
+      // Trailing slash and case are presentation, not identity.
+      return (
+        a.toLowerCase().replace(/\/+$/, "") ===
+        b.toLowerCase().replace(/\/+$/, "")
+      );
+    }
+    case "email":
+      return suggested.trim().toLowerCase() === known.trim().toLowerCase();
+    case "phone": {
+      // A country code is presentation too: "+1 416 555 0100" and
+      // "(416) 555-0100" are one number, so a digit string that ends with the
+      // other is the same number written more fully -- not a new fact.
+      const a = suggested.replace(/\D/g, "");
+      const b = known.replace(/\D/g, "");
+      if (a.length < MIN_PHONE_DIGITS || b.length < MIN_PHONE_DIGITS) {
+        return a === b && a.length > 0;
+      }
+      return a.length >= b.length ? a.endsWith(b) : b.endsWith(a);
+    }
+    case "address":
+      return (
+        normalizeAddressForCompare(suggested) ===
+        normalizeAddressForCompare(known)
+      );
+  }
+}
+
+/** Line breaks, punctuation and case are how an address is written, not which one it is. */
+function normalizeAddressForCompare(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[\s,.]+/g, " ")
+    .trim();
+}
+
+/**
+ * Which of the suggested values refine something the user already holds. A
+ * field the user has not filled in is a fill, not a refinement, and never
+ * appears here.
+ */
+function refinedFields(
+  suggestion: Record<ContactLookupField, string | null>,
+  known: PayeeLookupContext,
+): ContactLookupField[] {
+  return CONTACT_LOOKUP_FIELDS.filter((field) => {
+    const value = suggestion[field];
+    const current = known[field];
+    return Boolean(
+      value && current && !isSameContactValue(field, value, current),
+    );
+  });
+}
+
+/**
  * Turn whatever a data source returned into a suggestion the payee form and
  * the enrichment UPDATE can take verbatim -- or `null` when nothing survives.
  *
@@ -128,10 +202,17 @@ function sanitizeNotes(value: unknown): string | null {
  * phone only at high confidence, because model memory is worst at exactly
  * those two -- a plausible street address for the wrong branch is worse than
  * an empty field.
+ *
+ * `known` is what the user already holds. With it, a field is answered three
+ * ways instead of two: a fill (they had nothing), a refinement (they had
+ * something and this is a different, fuller value -- listed in `refined` and
+ * never written by a lookup), or an echo (the same fact they already have),
+ * which is dropped so it cannot be reported as something found.
  */
 export function sanitizeContactSuggestion(
   raw: unknown,
   source: ContactLookupSource,
+  known?: PayeeLookupContext,
 ): PayeeContactSuggestion | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const record = raw as Record<string, unknown>;
@@ -140,21 +221,31 @@ export function sanitizeContactSuggestion(
   const unverified = UNVERIFIED_CONTACT_LOOKUP_SOURCES.includes(source);
   const keepLocalDetails = !unverified || confidence === "high";
 
-  const suggestion: PayeeContactSuggestion = {
+  const values: Record<ContactLookupField, string | null> = {
     website: sanitizeWebsite(record.website),
     address: keepLocalDetails ? sanitizeAddress(record.address) : null,
     email: sanitizeEmail(record.email),
     phone: keepLocalDetails ? sanitizePhone(record.phone) : null,
+  };
+
+  // A value the user already holds, restated, is not something found: drop it
+  // so `hasAny` below cannot turn an echo into an "ok" outcome.
+  const refined = known ? refinedFields(values, known) : [];
+  if (known) {
+    for (const field of CONTACT_LOOKUP_FIELDS) {
+      if (known[field] && !refined.includes(field)) values[field] = null;
+    }
+  }
+
+  const suggestion: PayeeContactSuggestion = {
+    ...values,
     source,
     confidence,
     notes: sanitizeNotes(record.notes),
+    refined,
   };
 
-  const hasAny =
-    suggestion.website !== null ||
-    suggestion.address !== null ||
-    suggestion.email !== null ||
-    suggestion.phone !== null;
+  const hasAny = CONTACT_LOOKUP_FIELDS.some((field) => values[field] !== null);
   return hasAny ? suggestion : null;
 }
 

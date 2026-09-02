@@ -121,6 +121,26 @@ export interface PayeeContactSuggestion {
   source: ContactLookupSource;
   confidence: 'high' | 'medium' | 'low' | null;
   notes: string | null;
+  /**
+   * Fields whose value here refines one the caller already had -- the full
+   * street address behind a typed "Toronto" -- rather than filling an empty
+   * one. Mirrors the backend's `PayeeContactSuggestion.refined`. The form
+   * applies these where the user can see and undo them before saving; nothing
+   * persists them behind the user's back (INV-PAYEE-001).
+   */
+  refined: ContactLookupField[];
+}
+
+/**
+ * What the form already holds, sent with a lookup so it answers for the right
+ * organisation in the right place. Never stored by the lookup endpoint.
+ */
+export interface PayeeContactLookupContext {
+  website?: string;
+  address?: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
 }
 
 /**
@@ -139,6 +159,12 @@ export interface PayeeContactRerunResult {
   reason: ContactLookupReason;
   detail?: string;
   filled: ContactLookupField[];
+  /**
+   * Fuller values found for fields the payee already holds. The server does
+   * not write these -- it offers them, and the user applies them as their own
+   * edit. Absent when there are none.
+   */
+  refinements?: Partial<Record<ContactLookupField, string>>;
   payee: Payee;
 }
 

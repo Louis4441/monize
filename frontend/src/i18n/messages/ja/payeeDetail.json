@@ -138,6 +138,11 @@
     "inProgress": "検索中...",
     "filled": "{count, plural, other {連絡先情報を#件入力しました}}",
     "nothingNew": "新しい連絡先情報は見つかりませんでした。",
+    "refinementIntro": "この支払先がすでに持っている情報について、より詳しい内容が見つかりました。まだ何も変更していません。保存されている内容を置き換えるには適用してください。",
+    "refinementApply": "適用",
+    "refinementDismiss": "閉じる",
+    "refinementApplied": "連絡先情報を更新しました",
+    "refinementFailed": "連絡先情報を更新できませんでした",
     "noProvider": "連絡先情報を検索するには、AI設定でAIプロバイダーを設定してください。",
     "failed": "検索を完了できませんでした。後でもう一度お試しください。"
   }

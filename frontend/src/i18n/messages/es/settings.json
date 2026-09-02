@@ -767,7 +767,7 @@
     },
     "payeeLookup": {
       "title": "Búsqueda automática de datos de contacto del beneficiario",
-      "subtitle": "Al añadir un beneficiario, busca su sitio web, dirección, correo y teléfono a través del proveedor de IA configurado. El formulario de nuevo beneficiario rellena las sugerencias para que las revise; un beneficiario añadido por nombre desde una transacción se completa en segundo plano. Solo se envía el nombre del beneficiario, cada búsqueda puede realizar búsquedas web facturadas a ese proveedor, y un delegado usa el proveedor del titular de la cuenta.",
+      "subtitle": "Al añadir un beneficiario, busca su sitio web, dirección, correo y teléfono a través del proveedor de IA configurado. El formulario de nuevo beneficiario rellena las sugerencias para que las revise; un beneficiario añadido por nombre desde una transacción se completa en segundo plano. Se envía el nombre del beneficiario junto con las notas, el sitio web, la dirección, el correo y el teléfono que ya tenga, para que la búsqueda distinga el negocio y la ubicación correctos. Cada búsqueda puede realizar búsquedas web facturadas a ese proveedor, y un delegado usa el proveedor del titular de la cuenta.",
       "toggleLabel": "Activar la búsqueda automática de datos de contacto",
       "enabled": "Búsqueda automática de datos de contacto activada",
       "disabled": "Búsqueda automática de datos de contacto desactivada",

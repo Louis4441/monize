@@ -9,6 +9,7 @@ import { FaviconService } from "../../common/favicon/favicon.service";
 import { brandLogoColumns } from "../../common/favicon/brand-logo.columns";
 import { Payee } from "../entities/payee.entity";
 import { LookupQueue } from "./lookup-queue";
+import { buildLookupContext, PayeeLookupContext } from "./lookup-context";
 import { PayeeContactLookupService } from "./payee-contact-lookup.service";
 import {
   CONTACT_LOOKUP_FIELDS,
@@ -65,12 +66,40 @@ export interface ContactEnrichmentResult {
   detail?: string;
   /** The contact fields this run wrote. Empty when nothing was written. */
   filled: ContactLookupField[];
+  /**
+   * Fuller values found for fields the payee already holds -- the full street
+   * address behind a stored "Toronto". Never written here (INV-PAYEE-001):
+   * they are offered to the user, who applies them as their own edit. Absent
+   * when there are none.
+   */
+  refinements?: Partial<Record<ContactLookupField, string>>;
 }
 
 type ContactColumns = Record<ContactLookupField, string | null>;
 
 interface EnrichmentRow extends ContactColumns {
   contact_lookup_source: string | null;
+}
+
+/**
+ * The fuller values worth offering the user: a field the lookup refined that
+ * the row still holds a value for. Nothing here is ever written -- the
+ * enrichment UPDATE is COALESCE per column (INV-PAYEE-001) -- so this is the
+ * only way a refinement reaches anyone, and a field the write filled is a
+ * fill rather than a refinement and is reported as such.
+ */
+function collectRefinements(
+  outcome: ContactLookupOutcome,
+  before?: ContactColumns,
+): Partial<Record<ContactLookupField, string>> | undefined {
+  const suggestion = outcome.suggestion;
+  if (!suggestion || !before) return undefined;
+  const refinements: Partial<Record<ContactLookupField, string>> = {};
+  for (const field of suggestion.refined) {
+    const value = suggestion[field];
+    if (value && before[field] != null) refinements[field] = value;
+  }
+  return Object.keys(refinements).length > 0 ? refinements : undefined;
 }
 
 /**
@@ -101,12 +130,17 @@ export class PayeeContactEnrichmentService {
    * created the payee has already returned; nothing here can reach the
    * caller, so a failure is logged and nothing else.
    */
-  dispatchAfterCreate(userId: string, payeeId: string, name: string): void {
+  dispatchAfterCreate(
+    userId: string,
+    payeeId: string,
+    name: string,
+    known?: PayeeLookupContext,
+  ): void {
     if (this.inFlight.has(payeeId)) return;
     const run = this.queue
       .run(`payee ${payeeId}`, () =>
         withUserContext(userId, () =>
-          this.enrichAfterCreate(userId, payeeId, name),
+          this.enrichAfterCreate(userId, payeeId, name, known),
         ),
       )
       .catch((error: unknown) => {
@@ -126,15 +160,18 @@ export class PayeeContactEnrichmentService {
     userId: string,
     payeeId: string,
     name: string,
+    known?: PayeeLookupContext,
   ): Promise<ContactEnrichmentResult> {
-    const outcome = await this.lookupService.lookup(userId, { name });
+    const outcome = await this.lookupService.lookup(userId, { name, known });
     return this.apply(userId, payeeId, name, outcome, true);
   }
 
   /**
    * The user asked for this payee to be looked up. Fills empty fields only,
    * whether or not an earlier attempt already stamped the row, and whether
-   * or not the automatic lookup is enabled -- the click is the consent.
+   * or not the automatic lookup is enabled -- the click is the consent. A
+   * fuller value for a field that is already filled comes back as a
+   * refinement for the user to apply, never as a write.
    */
   async rerun(
     userId: string,
@@ -143,7 +180,10 @@ export class PayeeContactEnrichmentService {
     const payee = await this.loadPayee(userId, payeeId);
     const outcome = await this.lookupService.lookup(
       userId,
-      { name: payee.name },
+      // Everything the row already holds goes in as context: the lookup has to
+      // answer for this organisation in this place, not for a same-named one
+      // on another continent.
+      { name: payee.name, known: buildLookupContext(payee) },
       { ignorePreference: true },
     );
     const result = await this.apply(
@@ -204,8 +244,13 @@ export class PayeeContactEnrichmentService {
         firstAttemptOnly,
       ),
     );
+    // Decided against the row as it stood at the write, not against the
+    // context the lookup was given: the value may have been edited in between,
+    // and a refinement of something that is no longer there is not one.
+    const refinements = collectRefinements(outcome, written?.before);
+    const offered = refinements ? { refinements } : {};
     if (!written || written.filled.length === 0) {
-      return { reason: outcome.reason, filled: [] };
+      return { reason: outcome.reason, filled: [], ...offered };
     }
 
     this.actionHistoryService.record(userId, {
@@ -230,7 +275,7 @@ export class PayeeContactEnrichmentService {
     if (written.filled.includes("website") && written.after.website) {
       await this.cacheFavicon(userId, payeeId, written.after.website);
     }
-    return { reason: outcome.reason, filled: written.filled };
+    return { reason: outcome.reason, filled: written.filled, ...offered };
   }
 
   /**

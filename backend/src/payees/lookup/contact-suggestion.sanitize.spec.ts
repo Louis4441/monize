@@ -23,6 +23,85 @@ describe("sanitizeContactSuggestion", () => {
       source: "ai-web-search",
       confidence: "high",
       notes: "From the official site.",
+      refined: [],
+    });
+  });
+
+  describe("against details the user already holds", () => {
+    it("marks a fuller value for a field the user filled in as a refinement", () => {
+      const result = sanitizeContactSuggestion(
+        {
+          ...full,
+          address: "483 Bay St\nToronto, Ontario M5G 2C9\nCanada",
+        },
+        "ai-web-search",
+        { address: "Toronto" },
+      );
+      expect(result).toMatchObject({
+        address: "483 Bay St\nToronto, Ontario M5G 2C9\nCanada",
+        refined: ["address"],
+      });
+    });
+
+    it("does not call a fill of an empty field a refinement", () => {
+      const result = sanitizeContactSuggestion(full, "ai-web-search", {
+        notes: "the Dundas branch",
+      });
+      expect(result?.refined).toEqual([]);
+      expect(result?.address).toBe("1 Main St, Springfield");
+    });
+
+    it.each([
+      ["website", "https://acme.example/", "acme.example"],
+      ["email", "Hello@Acme.Example", "hello@acme.example"],
+      ["phone", "(555) 010-2000 ", "+1 555 010 2000"],
+      ["phone", "+1 555 010 2000", "555 010 2000"],
+      ["address", "1 main st,  springfield", "1 Main St, Springfield"],
+    ])(
+      "drops a %s that only restates what the user already has",
+      (field, suggested, known) => {
+        const result = sanitizeContactSuggestion(
+          { ...full, [field]: suggested },
+          "ai-web-search",
+          { [field]: known },
+        );
+        expect(result?.[field as "address"]).toBeNull();
+        expect(result?.refined).toEqual([]);
+      },
+    );
+
+    it("returns null when every answer only echoes what the user holds", () => {
+      expect(
+        sanitizeContactSuggestion(full, "ai-web-search", {
+          website: "acme.example",
+          address: "1 Main St, Springfield",
+          email: "hello@acme.example",
+          phone: "555 010 2000",
+        }),
+      ).toBeNull();
+    });
+
+    it("keeps a phone with no digits in common as a refinement", () => {
+      const result = sanitizeContactSuggestion(
+        { ...full, phone: "+1 416 555 0100" },
+        "ai-web-search",
+        { phone: "+1 555 010 2000" },
+      );
+      expect(result).toMatchObject({
+        phone: "+1 416 555 0100",
+        refined: ["phone"],
+      });
+    });
+
+    it("never refines a field the trust rules already dropped", () => {
+      // An unverified source keeps address and phone only at high confidence.
+      const result = sanitizeContactSuggestion(
+        { ...full, confidence: "medium", address: "Elsewhere entirely" },
+        "ai-knowledge",
+        { address: "Toronto" },
+      );
+      expect(result?.address).toBeNull();
+      expect(result?.refined).toEqual([]);
     });
   });
 

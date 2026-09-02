@@ -239,6 +239,7 @@ describe("PayeesService", () => {
       source: "ai-web-search" as const,
       confidence: "high" as const,
       notes: null,
+      refined: [],
     };
 
     beforeEach(() => {
@@ -270,6 +271,21 @@ describe("PayeesService", () => {
         userId,
         "new-payee",
         "Acme",
+        undefined,
+      );
+    });
+
+    it("carries a note into the background lookup as context", async () => {
+      await service.create(userId, {
+        name: "Acme",
+        notes: "the Dundas branch",
+      });
+
+      expect(contactEnrichment.dispatchAfterCreate).toHaveBeenCalledWith(
+        userId,
+        "new-payee",
+        "Acme",
+        { notes: "the Dundas branch" },
       );
     });
 

@@ -61,7 +61,11 @@ export class AiPayeeContactLookupProvider implements PayeeContactLookupProvider 
           messages: [
             {
               role: "user",
-              content: buildPayeeLookupUserMessage(input.name, input.hint),
+              content: buildPayeeLookupUserMessage(
+                input.name,
+                input.hint,
+                input.known,
+              ),
             },
           ],
           temperature: 0,
@@ -89,6 +93,6 @@ export class AiPayeeContactLookupProvider implements PayeeContactLookupProvider 
       : response.viaRelay
         ? "ai-relay"
         : "ai-knowledge";
-    return sanitizeContactSuggestion(parsed, source);
+    return sanitizeContactSuggestion(parsed, source, input.known);
   }
 }

@@ -69,6 +69,7 @@ export class PayeeContactLookupService {
       suggestion = await this.provider.lookup(userId, {
         name: input.name,
         hint: input.hint ?? preferences.hint,
+        known: input.known,
       });
     } catch (error) {
       if (error instanceof ContactLookupUnavailableError) {
@@ -91,7 +92,15 @@ export class PayeeContactLookupService {
       suggestion.website && (await validateUrlIsSafe(suggestion.website))
         ? suggestion.website
         : null;
-    const checked: PayeeContactSuggestion = { ...suggestion, website };
+    const checked: PayeeContactSuggestion = {
+      ...suggestion,
+      website,
+      // A website the URL check dropped is not a refinement of anything.
+      refined:
+        website === null
+          ? suggestion.refined.filter((field) => field !== "website")
+          : suggestion.refined,
+    };
     if (
       checked.website === null &&
       checked.address === null &&

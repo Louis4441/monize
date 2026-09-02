@@ -138,6 +138,11 @@
     "inProgress": "조회 중...",
     "filled": "{count, plural, other {연락처 정보 #개를 채웠습니다}}",
     "nothingNew": "새로운 연락처 정보를 찾지 못했습니다.",
+    "refinementIntro": "이 거래처가 이미 가지고 있는 정보의 더 완전한 형태를 찾았습니다. 아직 아무것도 변경하지 않았습니다. 저장된 값을 대체하려면 적용하세요.",
+    "refinementApply": "적용",
+    "refinementDismiss": "무시",
+    "refinementApplied": "연락처 정보가 업데이트되었습니다",
+    "refinementFailed": "연락처 정보를 업데이트할 수 없습니다",
     "noProvider": "연락처 정보를 조회하려면 AI 설정에서 AI 공급자를 구성하세요.",
     "failed": "조회를 완료할 수 없습니다. 나중에 다시 시도하세요."
   }

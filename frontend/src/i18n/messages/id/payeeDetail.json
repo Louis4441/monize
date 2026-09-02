@@ -138,6 +138,11 @@
     "inProgress": "Mencari...",
     "filled": "{count, plural, other {# detail kontak diisi}}",
     "nothingNew": "Tidak ditemukan detail kontak baru.",
+    "refinementIntro": "Ditemukan versi yang lebih lengkap dari detail yang sudah dimiliki penerima ini. Tidak ada yang diubah; terapkan untuk mengganti yang tersimpan.",
+    "refinementApply": "Terapkan",
+    "refinementDismiss": "Abaikan",
+    "refinementApplied": "Detail kontak diperbarui",
+    "refinementFailed": "Tidak dapat memperbarui detail kontak",
     "noProvider": "Konfigurasikan penyedia AI di Pengaturan AI untuk mencari detail kontak.",
     "failed": "Pencarian tidak dapat diselesaikan. Coba lagi nanti."
   }

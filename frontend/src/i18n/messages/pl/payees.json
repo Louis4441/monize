@@ -96,7 +96,8 @@
       "button": "Wyszukaj dane",
       "searching": "Wyszukiwanie danych kontaktowych...",
       "suggested": "Zaproponowane przez wyszukiwanie:",
-      "clear": "Wyczyść propozycje",
+      "replaced": "Zastąpione przez wyszukiwanie:",
+      "clear": "Cofnij zmiany wyszukiwania",
       "nothingFound": "Nie znaleziono publicznych danych kontaktowych dla tej nazwy.",
       "noProvider": "Skonfiguruj dostawcę AI w <link>Ustawieniach AI</link>, aby wyszukiwać dane kontaktowe.",
       "failed": "Nie udało się ukończyć wyszukiwania. Spróbuj ponownie później."

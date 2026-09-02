@@ -40,6 +40,7 @@ describe("PayeeContactEnrichmentService", () => {
     source: "ai-web-search",
     confidence: "high",
     notes: null,
+    refined: [],
   };
   const emptyRow = {
     id: payeeId,
@@ -267,7 +268,7 @@ describe("PayeeContactEnrichmentService", () => {
 
       expect(lookup.lookup).toHaveBeenCalledWith(
         userId,
-        { name: "Acme" },
+        { name: "Acme", known: undefined },
         { ignorePreference: true },
       );
       expect(updateSql()).not.toContain("contact_lookup_at IS NULL");
@@ -277,6 +278,85 @@ describe("PayeeContactEnrichmentService", () => {
         filled: ["website", "address", "email", "phone"],
         payee: expect.objectContaining({ website: "https://acme.example" }),
       });
+    });
+
+    it("sends the payee's own stored details in as context", async () => {
+      payeeRepo.findOne.mockReset();
+      const stored = {
+        ...emptyRow,
+        name: "Acme",
+        userId,
+        address: "Toronto",
+        notes: "the Dundas branch",
+      };
+      payeeRepo.findOne.mockResolvedValue(stored);
+
+      await service.rerun(userId, payeeId);
+
+      expect(lookup.lookup).toHaveBeenCalledWith(
+        userId,
+        {
+          name: "Acme",
+          known: { address: "Toronto", notes: "the Dundas branch" },
+        },
+        { ignorePreference: true },
+      );
+    });
+
+    it("offers a refinement instead of writing it, and does not call that nothing", async () => {
+      payeeRepo.findOne.mockReset();
+      const stored = { ...emptyRow, name: "Acme", userId, address: "Toronto" };
+      payeeRepo.findOne.mockResolvedValue(stored);
+      lookup.lookup.mockResolvedValue({
+        reason: "ok",
+        suggestion: {
+          ...suggestion,
+          website: null,
+          email: null,
+          phone: null,
+          address: "483 Bay St\nToronto, Ontario M5G 2C9\nCanada",
+          refined: ["address"],
+        },
+      });
+      // The COALESCE keeps the stored value, which is the invariant this is
+      // testing: the refinement travels beside the write, never inside it.
+      manager.query.mockResolvedValue(
+        returned({ address: "Toronto", contact_lookup_source: null }),
+      );
+
+      const result = await service.rerun(userId, payeeId);
+
+      expect(result).toMatchObject({
+        reason: "ok",
+        filled: [],
+        refinements: {
+          address: "483 Bay St\nToronto, Ontario M5G 2C9\nCanada",
+        },
+      });
+      // $4 is the address parameter; the statement still offers it, and
+      // COALESCE is what refuses it.
+      expect(updateSql()).toContain("address = COALESCE(address, $4)");
+    });
+
+    it("does not offer a refinement for a field that is empty by the time of the write", async () => {
+      payeeRepo.findOne.mockReset();
+      // The lookup was given "Toronto" as context, but the user cleared the
+      // field while it ran: there is nothing left to refine, so the value is
+      // a plain fill.
+      payeeRepo.findOne.mockResolvedValue({
+        ...emptyRow,
+        name: "Acme",
+        userId,
+      });
+      lookup.lookup.mockResolvedValue({
+        reason: "ok",
+        suggestion: { ...suggestion, refined: ["address"] },
+      });
+
+      const result = await service.rerun(userId, payeeId);
+
+      expect(result.refinements).toBeUndefined();
+      expect(result.filled).toContain("address");
     });
 
     it("throws NotFound for a payee the user does not own", async () => {

@@ -110,6 +110,24 @@ describe("AiPayeeContactLookupProvider", () => {
       source: "ai-web-search",
       confidence: "medium",
       notes: "official site",
+      refined: [],
+    });
+  });
+
+  it("puts the caller's known details in the prompt and judges the answer against them", async () => {
+    const result = await provider.lookup(userId, {
+      name: "Acme",
+      known: { address: "Springfield", notes: "the Elm St branch" },
+    });
+
+    const request = aiService.completeWithWebSearch.mock.calls[0][1];
+    expect(request.messages[0].content).toContain("- address: Springfield");
+    expect(request.messages[0].content).toContain("- notes: the Elm St branch");
+    // "1 Main St" is a different address from the recorded "Springfield", so
+    // it is offered as a refinement rather than as a fill.
+    expect(result).toMatchObject({
+      address: "1 Main St",
+      refined: ["address"],
     });
   });
 

@@ -96,7 +96,8 @@
       "button": "Angaben nachschlagen",
       "searching": "Kontaktangaben werden gesucht...",
       "suggested": "Vorschlag aus der Suche:",
-      "clear": "Vorschläge verwerfen",
+      "replaced": "Von der Suche ersetzt:",
+      "clear": "Änderungen der Suche rückgängig machen",
       "nothingFound": "Für diesen Namen wurden keine öffentlichen Kontaktangaben gefunden.",
       "noProvider": "Richten Sie in den <link>KI-Einstellungen</link> einen KI-Anbieter ein, um Kontaktangaben nachzuschlagen.",
       "failed": "Die Suche konnte nicht abgeschlossen werden. Versuchen Sie es später erneut."

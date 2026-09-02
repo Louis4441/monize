@@ -37,6 +37,7 @@ import { normalizeWebsite } from "../common/normalize-website";
 import { FaviconService, FetchedLogo } from "../common/favicon/favicon.service";
 import { brandLogoColumns } from "../common/favicon/brand-logo.columns";
 import { PayeeContactLookupService } from "./lookup/payee-contact-lookup.service";
+import { buildLookupContext } from "./lookup/lookup-context";
 import { PayeeContactEnrichmentService } from "./lookup/payee-contact-enrichment.service";
 import { ContactLookupSource } from "./lookup/payee-contact-lookup.types";
 
@@ -304,7 +305,15 @@ export class PayeesService {
       !phone &&
       getActiveScopedManager() === undefined
     ) {
-      this.contactEnrichment.dispatchAfterCreate(userId, saved.id, saved.name);
+      // No contact detail was supplied, but a note may still say which
+      // organisation and which place this is ("Toronto branch") -- context
+      // for the lookup, never a field it writes.
+      this.contactEnrichment.dispatchAfterCreate(
+        userId,
+        saved.id,
+        saved.name,
+        buildLookupContext({ notes: saved.notes }),
+      );
     }
     return saved;
   }

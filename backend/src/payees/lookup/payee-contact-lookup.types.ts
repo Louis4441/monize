@@ -9,6 +9,8 @@
  * factory from an operator setting -- see `payee-contact-lookup.module.ts`.
  */
 
+import { PayeeLookupContext } from "./lookup-context";
+
 /**
  * Where a looked-up value came from. Persisted in `payees.contact_lookup_source`
  * (the CHECK constraint in migration 173 lists the same values) and mirrored in
@@ -39,6 +41,12 @@ export interface PayeeContactLookupInput {
   name: string;
   /** Optional disambiguation, e.g. the user's country. Never persisted. */
   hint?: string;
+  /**
+   * What the caller already holds about this payee (the form's current
+   * values, or the stored row). Used to pick the right organisation and the
+   * right branch of it, never written back -- see `PayeeLookupContext`.
+   */
+  known?: PayeeLookupContext;
 }
 
 /** The four contact fields a lookup may fill. */
@@ -59,6 +67,16 @@ export interface PayeeContactSuggestion {
   confidence: ContactLookupConfidence | null;
   /** The model's one-line justification. Shown, never persisted. */
   notes: string | null;
+  /**
+   * Fields whose value here is a *refinement* of one the caller already had
+   * -- the full street address behind a typed "Toronto" -- rather than a fill
+   * for an empty field. A refinement is never written by a lookup
+   * (INV-PAYEE-001): the form applies it where the user can still see and undo
+   * it before saving, and the detail card offers it for the user to apply.
+   * A suggested value equal to the known one is not a refinement and is
+   * dropped, so it can never be counted as something found.
+   */
+  refined: ContactLookupField[];
 }
 
 export interface PayeeContactLookupProvider {

@@ -13,7 +13,11 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { externalUrlLabel, toSafeExternalUrl } from '@/lib/external-url';
 import { mailtoHref, mapsUrl, telHref } from '@/lib/contact-links';
 import { useMapProvider } from '@/hooks/useMapProvider';
-import type { PayeeDetail } from '@/types/payee';
+import {
+  CONTACT_LOOKUP_FIELDS,
+  type ContactLookupField,
+  type PayeeDetail,
+} from '@/types/payee';
 
 interface PayeeKeyInfoCardProps {
   detail: PayeeDetail;
@@ -51,25 +55,41 @@ export function PayeeKeyInfoCard({
   const { formatCurrency } = useNumberFormat();
   const mapProvider = useMapProvider();
   const [lookingUp, setLookingUp] = useState(false);
+  const [applyingRefinements, setApplyingRefinements] = useState(false);
+  /**
+   * Fuller values the lookup found for fields the payee already holds -- the
+   * branch's full address behind a stored "Toronto". The server does not write
+   * these (INV-PAYEE-001: a lookup never overwrites the user's value), so they
+   * are shown here and applied only if the user says so, as their own edit.
+   */
+  const [refinements, setRefinements] = useState<
+    Partial<Record<ContactLookupField, string>>
+  >({});
 
   const { payee, stats, largestTransaction, overpaymentForAccounts } = detail;
 
   // Fills only the contact fields still empty (the server's UPDATE is
-  // COALESCE per column); a stored value is replaced from the edit form, never
-  // from here. Each reason gets its own message -- "could not look" must never
-  // read as "nothing found".
+  // COALESCE per column); a stored value is replaced only by the user, from
+  // the offer below or the edit form. Each reason gets its own message --
+  // "could not look" must never read as "nothing found".
   const handleLookup = async () => {
     if (lookingUp) return;
     setLookingUp(true);
     try {
       const result = await payeesApi.lookupContactForPayee(payee.id);
+      const offered = result.refinements ?? {};
+      const offeredFields = CONTACT_LOOKUP_FIELDS.filter((field) => offered[field]);
+      setRefinements(offered);
       if (result.reason === 'ok' && result.filled.length > 0) {
         toast.success(t('contactLookup.filled', { count: result.filled.length }));
       } else if (result.reason === 'ok' || result.reason === 'none') {
-        toast(t('contactLookup.nothingNew'));
+        // Only say "nothing new" when there genuinely is nothing: an offer on
+        // screen is something new, it just is not something written.
+        if (offeredFields.length === 0) toast(t('contactLookup.nothingNew'));
       } else if (result.reason === 'no_provider') {
         toast.error(t('contactLookup.noProvider'));
       } else {
+        // 'failed', and any reason a future server adds: never silence one.
         toast.error(result.detail ?? t('contactLookup.failed'));
       }
       if (result.filled.length > 0) {
@@ -81,6 +101,26 @@ export function PayeeKeyInfoCard({
       setLookingUp(false);
     }
   };
+
+  // The user accepting an offer is an ordinary payee edit, through the
+  // ordinary update endpoint -- which is why it may replace a stored value
+  // when the lookup itself may not.
+  const applyRefinements = async () => {
+    if (applyingRefinements) return;
+    setApplyingRefinements(true);
+    try {
+      await payeesApi.update(payee.id, refinements);
+      setRefinements({});
+      toast.success(t('contactLookup.refinementApplied'));
+      await onContactLookedUp?.();
+    } catch (error) {
+      toast.error(getErrorMessage(error, t('contactLookup.refinementFailed')));
+    } finally {
+      setApplyingRefinements(false);
+    }
+  };
+
+  const offeredFields = CONTACT_LOOKUP_FIELDS.filter((field) => refinements[field]);
   const websiteUrl = toSafeExternalUrl(payee.website);
   // Each contact value is turned into a link by its own guard, and a value the
   // guard rejects still renders as text rather than disappearing -- a stored
@@ -270,6 +310,47 @@ export function PayeeKeyInfoCard({
         </Button>
       </div>
       <KeyValueList rows={rows} />
+      {offeredFields.length > 0 && (
+        <div
+          className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-700 dark:bg-amber-900/30"
+          role="status"
+        >
+          <p className="text-gray-700 dark:text-gray-200">
+            {t('contactLookup.refinementIntro')}
+          </p>
+          <dl className="mt-2 space-y-2">
+            {offeredFields.map((field) => (
+              <div key={field}>
+                <dt className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
+                  {t(`keyInfo.${field}`)}
+                </dt>
+                <dd className="whitespace-pre-line text-gray-900 dark:text-gray-100">
+                  {refinements[field]}
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              onClick={applyRefinements}
+              disabled={applyingRefinements}
+            >
+              {t('contactLookup.refinementApply')}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setRefinements({})}
+              disabled={applyingRefinements}
+            >
+              {t('contactLookup.refinementDismiss')}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

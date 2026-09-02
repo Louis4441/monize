@@ -138,6 +138,11 @@
     "inProgress": "Đang tra cứu...",
     "filled": "{count, plural, other {Đã điền # thông tin liên hệ}}",
     "nothingNew": "Không tìm thấy thông tin liên hệ mới.",
+    "refinementIntro": "Đã tìm thấy phiên bản đầy đủ hơn của thông tin mà người nhận này đã có. Chưa có gì thay đổi; hãy áp dụng để thay thế giá trị đã lưu.",
+    "refinementApply": "Áp dụng",
+    "refinementDismiss": "Bỏ qua",
+    "refinementApplied": "Đã cập nhật thông tin liên hệ",
+    "refinementFailed": "Không thể cập nhật thông tin liên hệ",
     "noProvider": "Hãy cấu hình nhà cung cấp AI trong Cài đặt AI để tra cứu thông tin liên hệ.",
     "failed": "Không thể hoàn tất tra cứu. Vui lòng thử lại sau."
   }

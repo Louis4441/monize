@@ -15,6 +15,7 @@ import {
   ApplyCategoryToTransactions,
   ContactLookupField,
   ContactLookupReason,
+  PayeeContactLookupContext,
   CONTACT_LOOKUP_FIELDS,
 } from '@/types/payee';
 import { Category } from '@/types/category';
@@ -58,6 +59,12 @@ type PayeeFormData = z.infer<ReturnType<typeof buildPayeeSchema>>;
 
 /** A name shorter than this is not worth a paid lookup on blur. */
 const MIN_LOOKUP_NAME_LENGTH = 3;
+
+/**
+ * The form fields the lookup is given as context. Not the same list as the
+ * fields it can fill: `notes` is context only, and nothing ever writes it.
+ */
+const LOOKUP_CONTEXT_FIELDS = ['website', 'address', 'email', 'phone', 'notes'] as const;
 
 type LookupState =
   | { status: 'idle' }
@@ -124,10 +131,32 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
   const [suggestedFields, setSuggestedFields] = useState<ReadonlySet<ContactLookupField>>(
     () => new Set(),
   );
+  // Fields the lookup *replaced*, against the value it replaced. A refinement
+  // only reaches a field the user filled in themselves ("Toronto" becoming the
+  // branch's full address), so the original is kept for the undo -- clearing it
+  // to blank would lose what they typed.
+  const [replacedFields, setReplacedFields] = useState<ReadonlySet<ContactLookupField>>(
+    () => new Set(),
+  );
   const suggestedRef = useRef<Set<ContactLookupField>>(new Set());
+  const replacedRef = useRef<Map<ContactLookupField, string>>(new Map());
   const applyingRef = useRef(false);
   const lookupRef = useRef<{ name: string; controller: AbortController } | null>(null);
   const lastLookedUpNameRef = useRef('');
+
+  /**
+   * What the form already holds, sent with every lookup. It decides which
+   * organisation and which of its locations the answer is about -- a payee
+   * whose address reads "Toronto" must not come back with a branch in Sydney.
+   */
+  const collectContext = useCallback((): PayeeContactLookupContext => {
+    const context: PayeeContactLookupContext = {};
+    for (const field of LOOKUP_CONTEXT_FIELDS) {
+      const value = (getValues(field) ?? '').trim();
+      if (value) context[field] = value;
+    }
+    return context;
+  }, [getValues]);
 
   const runLookup = useCallback(
     async (rawName: string, { force = false } = {}) => {
@@ -142,7 +171,11 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
 
       let result;
       try {
-        result = await payeesApi.lookupContact(name, request.controller.signal);
+        result = await payeesApi.lookupContact(
+          name,
+          collectContext(),
+          request.controller.signal,
+        );
       } catch {
         // An aborted request has already been superseded; anything else is a
         // failure the user must see as one, never as "nothing found".
@@ -158,33 +191,61 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
         setLookupState({ status: 'done', reason: result.reason, detail: result.detail });
         return;
       }
+      // Two different things happen to a field, and the user is told which.
+      // An empty field is filled. A field they typed is *replaced* only when
+      // the server says its answer refines that value -- a fuller address for
+      // the place they named -- and the value they typed is kept for the undo.
+      const suggestion = result.suggestion;
+      const refined = new Set(suggestion.refined);
       const filled = new Set<ContactLookupField>();
+      const replaced = new Map<ContactLookupField, string>();
       applyingRef.current = true;
       try {
         for (const field of CONTACT_LOOKUP_FIELDS) {
-          const value = result.suggestion[field];
-          if (value && !getValues(field)) {
+          const value = suggestion[field];
+          if (!value) continue;
+          const current = getValues(field) ?? '';
+          if (!current) {
             setValue(field, value, { shouldDirty: true });
             filled.add(field);
+          } else if (refined.has(field) && current !== value) {
+            setValue(field, value, { shouldDirty: true });
+            // A second lookup replaces the first one's answer, so the value to
+            // restore is still the one the user typed. An edit in between
+            // clears the entry (the watcher below), and `current` is then
+            // theirs again.
+            replaced.set(field, replacedRef.current.get(field) ?? current);
           }
         }
       } finally {
         applyingRef.current = false;
       }
       suggestedRef.current = filled;
+      replacedRef.current = replaced;
       setSuggestedFields(new Set(filled));
-      setLookupState({ status: 'done', reason: filled.size > 0 ? 'ok' : 'none' });
+      setReplacedFields(new Set(replaced.keys()));
+      setLookupState({
+        status: 'done',
+        reason: filled.size > 0 || replaced.size > 0 ? 'ok' : 'none',
+      });
     },
-    [getValues, setValue],
+    [collectContext, getValues, setValue],
   );
 
-  // A field the user edits stops being a suggestion, whatever they typed.
+  // A field the user edits stops being a suggestion (or a replacement),
+  // whatever they typed: the value is theirs again, and the undo must not put
+  // the lookup's answer back over it.
   useEffect(() => {
     const subscription = watch((_values, { name }) => {
       if (applyingRef.current || !name) return;
-      if (suggestedRef.current.has(name as ContactLookupField)) {
-        suggestedRef.current.delete(name as ContactLookupField);
+      const field = name as ContactLookupField;
+      if (suggestedRef.current.has(field)) {
+        suggestedRef.current.delete(field);
         setSuggestedFields(new Set(suggestedRef.current));
+      }
+      if (replacedRef.current.has(field)) {
+        replacedRef.current.delete(field);
+        setReplacedFields(new Set(replacedRef.current.keys()));
       }
     });
     return () => subscription.unsubscribe();
@@ -192,17 +253,25 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
 
   useEffect(() => () => lookupRef.current?.controller.abort(), []);
 
-  const clearSuggestions = useCallback(() => {
+  // Undo, not clear: a filled field goes back to empty and a replaced one goes
+  // back to what the user typed. Emptying a replaced field would throw away
+  // the very value that told the lookup where to look.
+  const undoLookup = useCallback(() => {
     applyingRef.current = true;
     try {
       for (const field of suggestedRef.current) {
         setValue(field, '', { shouldDirty: true });
       }
+      for (const [field, original] of replacedRef.current) {
+        setValue(field, original, { shouldDirty: true });
+      }
     } finally {
       applyingRef.current = false;
     }
     suggestedRef.current = new Set();
+    replacedRef.current = new Map();
     setSuggestedFields(new Set());
+    setReplacedFields(new Set());
     setLookupState({ status: 'idle' });
   }, [setValue]);
 
@@ -324,19 +393,41 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
           <span>{t('form.lookup.searching')}</span>
         </div>
       )}
-      {lookupState.status === 'done' && lookupState.reason === 'ok' && suggestedFields.size > 0 && (
-        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-          <span>{t('form.lookup.suggested')}</span>
-          {CONTACT_LOOKUP_FIELDS.filter((field) => suggestedFields.has(field)).map((field) => (
-            <Badge key={field} variant="blue">
-              {t(`form.${field}Label`)}
-            </Badge>
-          ))}
-          <Button type="button" variant="ghost" size="sm" onClick={clearSuggestions}>
-            {t('form.lookup.clear')}
-          </Button>
-        </div>
-      )}
+      {lookupState.status === 'done' &&
+        lookupState.reason === 'ok' &&
+        (suggestedFields.size > 0 || replacedFields.size > 0) && (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+            {suggestedFields.size > 0 && (
+              <>
+                <span>{t('form.lookup.suggested')}</span>
+                {CONTACT_LOOKUP_FIELDS.filter((field) => suggestedFields.has(field)).map(
+                  (field) => (
+                    <Badge key={field} variant="blue">
+                      {t(`form.${field}Label`)}
+                    </Badge>
+                  ),
+                )}
+              </>
+            )}
+            {/* Named separately: a field the user typed into has been changed,
+                which is a different thing from an empty one being filled. */}
+            {replacedFields.size > 0 && (
+              <>
+                <span>{t('form.lookup.replaced')}</span>
+                {CONTACT_LOOKUP_FIELDS.filter((field) => replacedFields.has(field)).map(
+                  (field) => (
+                    <Badge key={field} variant="amber">
+                      {t(`form.${field}Label`)}
+                    </Badge>
+                  ),
+                )}
+              </>
+            )}
+            <Button type="button" variant="ghost" size="sm" onClick={undoLookup}>
+              {t('form.lookup.clear')}
+            </Button>
+          </div>
+        )}
       {lookupState.status === 'done' && lookupState.reason === 'none' && (
         <p className="text-sm text-gray-500 dark:text-gray-400">{t('form.lookup.nothingFound')}</p>
       )}

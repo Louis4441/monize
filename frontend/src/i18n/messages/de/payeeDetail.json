@@ -138,6 +138,11 @@
     "inProgress": "Wird gesucht...",
     "filled": "{count, plural, one {# Kontaktangabe ausgefüllt} other {# Kontaktangaben ausgefüllt}}",
     "nothingNew": "Es wurden keine neuen Kontaktangaben gefunden.",
+    "refinementIntro": "Es wurde eine vollständigere Fassung von Angaben gefunden, die dieser Zahlungsempfänger bereits hat. Es wurde nichts geändert; übernehmen Sie sie, um die gespeicherten Angaben zu ersetzen.",
+    "refinementApply": "Übernehmen",
+    "refinementDismiss": "Verwerfen",
+    "refinementApplied": "Kontaktangaben aktualisiert",
+    "refinementFailed": "Die Kontaktangaben konnten nicht aktualisiert werden",
     "noProvider": "Richten Sie in den KI-Einstellungen einen KI-Anbieter ein, um Kontaktangaben nachzuschlagen.",
     "failed": "Die Suche konnte nicht abgeschlossen werden. Versuchen Sie es später erneut."
   }

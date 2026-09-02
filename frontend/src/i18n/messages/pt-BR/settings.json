@@ -767,7 +767,7 @@
     },
     "payeeLookup": {
       "title": "Busca automática de dados de contato do beneficiário",
-      "subtitle": "Ao adicionar um beneficiário, o site, o endereço, o e-mail e o telefone são buscados pelo provedor de IA configurado. O formulário de novo beneficiário preenche as sugestões para você revisar; um beneficiário adicionado pelo nome a partir de uma transação é preenchido em segundo plano. Apenas o nome do beneficiário é enviado, cada busca pode executar pesquisas na web cobradas desse provedor, e um delegado usa o provedor do titular da conta.",
+      "subtitle": "Ao adicionar um beneficiário, o site, o endereço, o e-mail e o telefone são buscados pelo provedor de IA configurado. O formulário de novo beneficiário preenche as sugestões para você revisar; um beneficiário adicionado pelo nome a partir de uma transação é preenchido em segundo plano. O nome do beneficiário é enviado, junto com as anotações, o site, o endereço, o e-mail e o telefone que já existirem, para que a busca diferencie a empresa certa e o local certo. Cada busca pode executar pesquisas na web cobradas desse provedor, e um delegado usa o provedor do titular da conta.",
       "toggleLabel": "Ativar a busca automática de dados de contato",
       "enabled": "Busca automática de dados de contato ativada",
       "disabled": "Busca automática de dados de contato desativada",

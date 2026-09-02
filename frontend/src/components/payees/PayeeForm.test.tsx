@@ -381,6 +381,7 @@ describe('PayeeForm', () => {
       source: 'ai-web-search',
       confidence: 'high',
       notes: null,
+      refined: [],
     };
     const lookupContact = vi.mocked(payeesApi.lookupContact);
 
@@ -409,12 +410,12 @@ describe('PayeeForm', () => {
 
       await waitFor(() => expect(field('Website').value).toBe('https://acme.example'));
       expect(lookupContact).toHaveBeenCalledTimes(1);
-      expect(lookupContact).toHaveBeenCalledWith('Acme', expect.any(AbortSignal));
+      expect(lookupContact).toHaveBeenCalledWith('Acme', {}, expect.any(AbortSignal));
       expect(field('Address').value).toBe('1 Main St');
       expect(field('Email').value).toBe('hi@acme.example');
       expect(field('Phone').value).toBe('+1 555 010 2000');
       expect(screen.getByText('Suggested by lookup:')).toBeInTheDocument();
-      expect(screen.getByText('Clear suggestions')).toBeInTheDocument();
+      expect(screen.getByText('Undo lookup changes')).toBeInTheDocument();
     });
 
     it('never overwrites a value the user typed', async () => {
@@ -461,7 +462,7 @@ describe('PayeeForm', () => {
       expect(field('Phone').value).toBe('');
     });
 
-    it('clears only the suggested fields', async () => {
+    it('undoes only the suggested fields', async () => {
       renderCreate();
       await act(async () => {
         fireEvent.change(field('Email'), { target: { value: 'mine@example.com' } });
@@ -470,7 +471,7 @@ describe('PayeeForm', () => {
       await waitFor(() => expect(field('Website').value).toBe('https://acme.example'));
 
       await act(async () => {
-        fireEvent.click(screen.getByText('Clear suggestions'));
+        fireEvent.click(screen.getByText('Undo lookup changes'));
       });
 
       expect(field('Website').value).toBe('');
@@ -523,7 +524,96 @@ describe('PayeeForm', () => {
       await act(async () => {
         fireEvent.click(screen.getByText('Look up details'));
       });
-      await waitFor(() => expect(lookupContact).toHaveBeenCalledWith('Acme', expect.any(AbortSignal)));
+      await waitFor(() =>
+        expect(lookupContact).toHaveBeenCalledWith('Acme', {}, expect.any(AbortSignal)),
+      );
+    });
+
+    it('sends the notes, address and other values the form already holds as context', async () => {
+      renderCreate();
+      await act(async () => {
+        fireEvent.change(field('Address'), { target: { value: '  Toronto  ' } });
+        fireEvent.change(field('Notes (optional)'), { target: { value: 'the Dundas branch' } });
+      });
+      await blurName('Acme');
+
+      await waitFor(() => expect(lookupContact).toHaveBeenCalledTimes(1));
+      expect(lookupContact).toHaveBeenCalledWith(
+        'Acme',
+        { address: 'Toronto', notes: 'the Dundas branch' },
+        expect.any(AbortSignal),
+      );
+    });
+
+    it('replaces a value the lookup refined, names it separately, and restores it on undo', async () => {
+      lookupContact.mockResolvedValue({
+        reason: 'ok',
+        suggestion: {
+          ...suggestion,
+          address: '100 Dundas St W\nToronto, Ontario M5G 1Z9\nCanada',
+          refined: ['address'],
+        },
+      } as any);
+      renderCreate();
+      await act(async () => {
+        fireEvent.change(field('Address'), { target: { value: 'Toronto' } });
+      });
+      await blurName('Acme');
+
+      await waitFor(() =>
+        expect(field('Address').value).toBe('100 Dundas St W\nToronto, Ontario M5G 1Z9\nCanada'),
+      );
+      expect(screen.getByText('Replaced by lookup:')).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Undo lookup changes'));
+      });
+      // The undo puts back what the user typed -- it is what told the lookup
+      // where to look, and blanking it would lose that.
+      expect(field('Address').value).toBe('Toronto');
+      expect(field('Website').value).toBe('');
+    });
+
+    it('restores the value the user typed after a second lookup replaces the first answer', async () => {
+      const refinedTo = (address: string) => ({
+        reason: 'ok',
+        suggestion: { ...suggestion, address, refined: ['address'] },
+      });
+      lookupContact
+        .mockResolvedValueOnce(refinedTo('100 Queen St W, Toronto') as any)
+        .mockResolvedValueOnce(refinedTo('483 Bay St, Toronto') as any);
+      renderCreate();
+      await act(async () => {
+        fireEvent.change(field('Address'), { target: { value: 'Toronto' } });
+      });
+      await blurName('Acme');
+      await waitFor(() => expect(field('Address').value).toBe('100 Queen St W, Toronto'));
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Look up details'));
+      });
+      await waitFor(() => expect(field('Address').value).toBe('483 Bay St, Toronto'));
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Undo lookup changes'));
+      });
+      expect(field('Address').value).toBe('Toronto');
+    });
+
+    it('leaves a filled field alone when the server did not call the answer a refinement', async () => {
+      lookupContact.mockResolvedValue({
+        reason: 'ok',
+        suggestion: { ...suggestion, address: 'Somewhere else entirely', refined: [] },
+      } as any);
+      renderCreate();
+      await act(async () => {
+        fireEvent.change(field('Address'), { target: { value: 'Toronto' } });
+      });
+      await blurName('Acme');
+
+      await waitFor(() => expect(field('Phone').value).toBe('+1 555 010 2000'));
+      expect(field('Address').value).toBe('Toronto');
+      expect(screen.queryByText('Replaced by lookup:')).not.toBeInTheDocument();
     });
 
     it('never looks up on blur when editing, and the button fills only the empty fields', async () => {
@@ -547,7 +637,11 @@ describe('PayeeForm', () => {
         fireEvent.click(screen.getByText('Look up details'));
       });
       await waitFor(() => expect(field('Phone').value).toBe('+1 555 010 2000'));
-      expect(lookupContact).toHaveBeenCalledWith('Acme Renamed', expect.any(AbortSignal));
+      expect(lookupContact).toHaveBeenCalledWith(
+        'Acme Renamed',
+        { website: 'https://stored.example' },
+        expect.any(AbortSignal),
+      );
       expect(field('Website').value).toBe('https://stored.example');
     });
   });

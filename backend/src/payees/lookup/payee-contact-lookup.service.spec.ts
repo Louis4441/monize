@@ -36,6 +36,7 @@ describe("PayeeContactLookupService", () => {
     source: "ai-web-search",
     confidence: "high",
     notes: null,
+    refined: [],
   };
 
   beforeEach(async () => {
@@ -102,6 +103,7 @@ describe("PayeeContactLookupService", () => {
     expect(provider.lookup).toHaveBeenCalledWith(userId, {
       name: "Acme",
       hint: "the user's locale is en-CA; their default currency is CAD",
+      known: undefined,
     });
   });
 
@@ -111,6 +113,39 @@ describe("PayeeContactLookupService", () => {
     expect(provider.lookup).toHaveBeenCalledWith(userId, {
       name: "Acme",
       hint: "Springfield",
+      known: undefined,
+    });
+  });
+
+  it("hands the caller's known details to the adapter", async () => {
+    await service.lookup(userId, {
+      name: "Acme",
+      known: { address: "Toronto", notes: "the Dundas branch" },
+    });
+
+    expect(provider.lookup).toHaveBeenCalledWith(
+      userId,
+      expect.objectContaining({
+        known: { address: "Toronto", notes: "the Dundas branch" },
+      }),
+    );
+  });
+
+  it("drops a refined website the URL check refused, and the refinement with it", async () => {
+    mockValidateUrlIsSafe.mockResolvedValue(false);
+    provider.lookup.mockResolvedValue({
+      ...suggestion,
+      refined: ["website", "address"],
+    });
+
+    await expect(
+      service.lookup(userId, {
+        name: "Acme",
+        known: { website: "https://old.example", address: "Toronto" },
+      }),
+    ).resolves.toMatchObject({
+      reason: "ok",
+      suggestion: { website: null, refined: ["address"] },
     });
   });
 

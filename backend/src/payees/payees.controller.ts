@@ -43,6 +43,7 @@ import { ApplyCategorySuggestionsDto } from "./dto/apply-category-suggestions.dt
 import { DeactivatePayeesDto } from "./dto/deactivate-payees.dto";
 import { LookupPayeeContactDto } from "./dto/lookup-payee-contact.dto";
 import { PayeeContactLookupService } from "./lookup/payee-contact-lookup.service";
+import { buildLookupContext } from "./lookup/lookup-context";
 import {
   ContactEnrichmentResult,
   PayeeContactEnrichmentService,
@@ -274,7 +275,9 @@ export class PayeesController {
   ): Promise<ContactLookupOutcome> {
     return this.contactLookupService.lookup(
       req.user.id,
-      { name: dto.name },
+      // Whatever the form already holds goes in as context, so the answer is
+      // about this organisation in this place. None of it is stored here.
+      { name: dto.name, known: buildLookupContext(dto) },
       // The button is the consent: this is a lookup the user asked for by
       // name, whether or not they enabled the automatic one.
       { ignorePreference: true },
@@ -562,7 +565,9 @@ export class PayeesController {
   /**
    * Look an existing payee up and fill whichever of its contact fields are
    * still empty. A stored value is never replaced (the UPDATE is COALESCE per
-   * column); to replace one the user clears it in the edit form first.
+   * column); the payee's own stored details go into the lookup as context, and
+   * a fuller value found for a field that already has one comes back in
+   * `refinements` for the user to apply, rather than being written.
    */
   @Post(":id/lookup-contact")
   @AllowDelegate()
@@ -575,7 +580,7 @@ export class PayeesController {
   @ApiResponse({
     status: 200,
     description:
-      "{ payee, reason, filled } -- filled lists the fields this run wrote",
+      "{ payee, reason, filled, refinements } -- filled lists the fields this run wrote; refinements are fuller values offered for fields that already had one",
   })
   @ApiResponse({ status: 404, description: "Payee not found" })
   lookupContactForPayee(

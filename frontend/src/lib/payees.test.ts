@@ -218,13 +218,25 @@ describe('payeesApi', () => {
       data: { reason: 'none', suggestion: null },
     });
     const controller = new AbortController();
-    const result = await payeesApi.lookupContact('Acme', controller.signal);
+    const result = await payeesApi.lookupContact('Acme', undefined, controller.signal);
     expect(apiClient.post).toHaveBeenCalledWith(
       '/payees/lookup-contact',
       { name: 'Acme' },
       { signal: controller.signal },
     );
     expect(result.reason).toBe('none');
+  });
+
+  it('lookupContact sends the context the caller already holds beside the name', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: { reason: 'none', suggestion: null },
+    });
+    await payeesApi.lookupContact('Acme', { address: 'Toronto', notes: 'the Dundas branch' });
+    expect(apiClient.post).toHaveBeenCalledWith(
+      '/payees/lookup-contact',
+      { name: 'Acme', address: 'Toronto', notes: 'the Dundas branch' },
+      { signal: undefined },
+    );
   });
 
   it('lookupContactForPayee posts to /payees/:id/lookup-contact', async () => {

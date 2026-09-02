@@ -96,7 +96,8 @@
       "button": "Rechercher les coordonnées",
       "searching": "Recherche des coordonnées...",
       "suggested": "Suggéré par la recherche :",
-      "clear": "Effacer les suggestions",
+      "replaced": "Remplacé par la recherche :",
+      "clear": "Annuler les modifications de la recherche",
       "nothingFound": "Aucune coordonnée publique n'a été trouvée pour ce nom.",
       "noProvider": "Configurez un fournisseur d'IA dans les <link>paramètres IA</link> pour rechercher les coordonnées.",
       "failed": "La recherche n'a pas pu aboutir. Réessayez plus tard."

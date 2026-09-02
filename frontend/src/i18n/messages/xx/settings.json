@@ -767,7 +767,7 @@
     },
     "payeeLookup": {
       "title": "[XX-Automatic payee contact lookup-XX]",
-      "subtitle": "[XX-When you add a payee, look up its website, address, email and phone through your configured AI provider. The New Payee form fills in the suggestions for you to review; a payee added by name from a transaction is filled in the background. Only the payee name is sent, each lookup may run web searches billed to that provider, and a delegate uses the account owner's provider.-XX]",
+      "subtitle": "[XX-When you add a payee, look up its website, address, email and phone through your configured AI provider. The New Payee form fills in the suggestions for you to review; a payee added by name from a transaction is filled in the background. The payee name is sent, along with any notes, website, address, email and phone it already has, so the lookup can tell the right business and the right location apart. Each lookup may run web searches billed to that provider, and a delegate uses the account owner's provider.-XX]",
       "toggleLabel": "[XX-Enable automatic payee contact lookup-XX]",
       "enabled": "[XX-Automatic payee contact lookup enabled-XX]",
       "disabled": "[XX-Automatic payee contact lookup disabled-XX]",

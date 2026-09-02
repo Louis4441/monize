@@ -1948,6 +1948,17 @@ Enforcement         One statement, enrichmentUpdateSql in
                     looks up before the card and hands its stamp to the commit,
                     which stores it instead of looking up again. The form path
                     persists nothing until the user saves.
+                    A lookup given the payee's own stored details may answer with
+                    a FULLER value for a field that already has one (the branch
+                    address behind a stored "Toronto"). That is a REFINEMENT, and
+                    the statement above still refuses it: sanitizeContactSuggestion
+                    names those fields in PayeeContactSuggestion.refined, the
+                    enrichment returns them as ContactEnrichmentResult.refinements
+                    beside (never inside) the write, and they reach the user as an
+                    offer -- the detail card's Apply, which is an ordinary payee
+                    UPDATE the user asked for, and the form's replace-and-undo,
+                    which persists nothing until Save. A suggested value equal to
+                    what the user already holds is dropped rather than counted.
 Concurrency scope   per payee
 Retry semantics     A re-dispatch, a second replica or a retried request matches
                     zero rows on the automatic path; the user-initiated re-run
@@ -1964,7 +1975,13 @@ Required tests      payee-contact-enrichment.service.spec.ts (COALESCE and
                     predicate shape, stamp-on-answer only, favicon keyed on the
                     website), payees.service.spec.ts (dispatch after the
                     transaction, never inside one, never with a supplied field
-                    or a preview stamp), raw-sql-columns.spec.ts (column names
+                    or a preview stamp, notes carried in as context),
+                    contact-suggestion.sanitize.spec.ts (a refinement is named,
+                    an echo is dropped), lookup-context.spec.ts (what leaves the
+                    row for the prompt), frontend PayeeForm.test.tsx (a replaced
+                    field is named separately and the undo restores what the user
+                    typed) and PayeeKeyInfoCard.test.tsx (a refinement is offered,
+                    not written), raw-sql-columns.spec.ts (column names
                     against schema.sql). Owed: a two-connection race with a
                     concurrent user edit, per docs/verification-contract.md.
 Status              enforced
