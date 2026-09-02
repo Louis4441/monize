@@ -23,6 +23,7 @@ import {
 import { NotificationPreferenceService } from "../notification-center/notification-preference.service";
 import { PushSubscriptionService } from "../push/push-subscription.service";
 import { PushPayload } from "../push/web-push-sender.service";
+import { PushTransport } from "../push/entities/push-subscription.entity";
 import { EmailService } from "./email.service";
 import { notificationImmediateTemplate } from "./email-templates";
 
@@ -93,7 +94,13 @@ export class NotificationDispatchService {
       userId,
       category,
     );
-    if (!delivery.push && !delivery.emailNotification) return;
+    if (
+      !delivery.push &&
+      !delivery.unifiedpush &&
+      !delivery.emailNotification
+    ) {
+      return;
+    }
 
     // The throttle gates BOTH interrupting channels; an escalation always goes.
     // A window of 0 disables the throttle for this category. The advisory lock
@@ -107,8 +114,15 @@ export class NotificationDispatchService {
       (await this.isThrottled(userId, category, row, delivery.throttleMinutes));
     if (suppressed) return;
 
-    if (delivery.push) {
-      await this.push.sendToUser(userId, this.toPushPayload(row));
+    // The two push channels ride the same encrypted Web Push wire and differ
+    // only by which devices they reach, so one fan-out with the enabled
+    // transport set (webpush for `push`, unifiedpush for `unifiedpush`) --
+    // gated independently, delivered once.
+    const transports: PushTransport[] = [];
+    if (delivery.push) transports.push("webpush");
+    if (delivery.unifiedpush) transports.push("unifiedpush");
+    if (transports.length > 0) {
+      await this.push.sendToUser(userId, this.toPushPayload(row), transports);
     }
     if (delivery.emailNotification) {
       await this.sendEmail(userId, row);

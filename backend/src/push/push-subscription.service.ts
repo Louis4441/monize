@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { DataSource, EntityManager, IsNull } from "typeorm";
+import { DataSource, EntityManager, In, IsNull } from "typeorm";
 import * as crypto from "crypto";
 import { I18nService } from "nestjs-i18n";
 import { Cron } from "@nestjs/schedule";
@@ -20,6 +20,7 @@ import { PushConfigService } from "./push-config.service";
 import {
   PushDisabledReason,
   PushSubscription,
+  PushTransport,
 } from "./entities/push-subscription.entity";
 import {
   MAX_CONSECUTIVE_FAILURES,
@@ -48,6 +49,8 @@ export interface PushDeviceDto {
   endpointFingerprint: string;
   deviceName: string | null;
   userAgent: string | null;
+  /** Which wire this device is on: web push, or a UnifiedPush distributor. */
+  transport: PushTransport;
   createdAt: string;
   lastSeenAt: string;
   lastSuccessAt: string | null;
@@ -281,14 +284,15 @@ export class PushSubscriptionService {
       const inserted = await manager.query(
         `INSERT INTO push_subscriptions
            (user_id, endpoint, endpoint_hash, p256dh, auth, device_name,
-            user_agent, vapid_public_key, created_at, last_seen_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            user_agent, vapid_public_key, transport, created_at, last_seen_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
          ON CONFLICT (endpoint_hash) DO UPDATE
             SET p256dh = EXCLUDED.p256dh,
                 auth = EXCLUDED.auth,
                 device_name = COALESCE(EXCLUDED.device_name, push_subscriptions.device_name),
                 user_agent = EXCLUDED.user_agent,
                 vapid_public_key = EXCLUDED.vapid_public_key,
+                transport = EXCLUDED.transport,
                 last_seen_at = CURRENT_TIMESTAMP,
                 failure_count = 0,
                 disabled_at = NULL,
@@ -306,6 +310,7 @@ export class PushSubscriptionService {
             ? input.userAgent.slice(0, MAX_USER_AGENT_LENGTH)
             : null,
           input.vapidPublicKey,
+          input.dto.transport ?? "webpush",
         ],
       );
       return returnedRows<{ id: string }>(inserted);
@@ -456,17 +461,31 @@ export class PushSubscriptionService {
    * `{ attempted: 0, delivered: 0 }`, not a 400. It seeds no context of its own;
    * the caller's ambient context (a cron's `withUserContext`, a request) carries
    * through the reads.
+   *
+   * `transports` restricts the fan-out to devices on those wires. The two push
+   * channels are gated independently (`push` -> `'webpush'` devices, `unifiedpush`
+   * -> `'unifiedpush'` devices), so the dispatch passes exactly the set the
+   * matrix turned on; an empty set is "nothing to send" without a query. Omitted
+   * means every wire, which is what `sendTest` wants ("does any device work").
    */
   async sendToUser(
     userId: string,
     payload: PushPayload,
+    transports?: PushTransport[],
   ): Promise<{ attempted: number; delivered: number }> {
     const config = await this.pushConfig.getPublicConfig();
     if (!config.enabled) return { attempted: 0, delivered: 0 };
+    if (transports && transports.length === 0) {
+      return { attempted: 0, delivered: 0 };
+    }
 
     const targets = await withScopedDb(this.dataSource, (manager) =>
       manager.getRepository(PushSubscription).find({
-        where: { userId, disabledAt: IsNull() },
+        where: {
+          userId,
+          disabledAt: IsNull(),
+          ...(transports ? { transport: In(transports) } : {}),
+        },
         order: { lastSeenAt: "DESC" },
       }),
     );
@@ -700,6 +719,7 @@ function toDeviceDto(row: PushSubscription): PushDeviceDto {
     endpointFingerprint: row.endpointHash.slice(0, ENDPOINT_FINGERPRINT_LENGTH),
     deviceName: row.deviceName,
     userAgent: row.userAgent,
+    transport: row.transport,
     createdAt: new Date(row.createdAt).toISOString(),
     lastSeenAt: new Date(row.lastSeenAt).toISOString(),
     lastSuccessAt: row.lastSuccessAt

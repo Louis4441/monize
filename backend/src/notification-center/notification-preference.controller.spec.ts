@@ -30,6 +30,7 @@ describe("NotificationPreferenceController", () => {
         email: false,
         emailNotification: true,
         push: true,
+        unifiedpush: undefined,
         throttleMinutes: 15,
       },
     );
@@ -44,6 +45,7 @@ describe("NotificationPreferenceController", () => {
         email: false,
         emailNotification: undefined,
         push: undefined,
+        unifiedpush: undefined,
         throttleMinutes: undefined,
       },
     );
@@ -58,6 +60,7 @@ describe("NotificationPreferenceController", () => {
         email: undefined,
         emailNotification: undefined,
         push: true,
+        unifiedpush: undefined,
         throttleMinutes: undefined,
       },
     );

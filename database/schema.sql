@@ -1738,6 +1738,10 @@ CREATE TABLE notification_preferences (
     -- a device on, so push stays off until a device is enabled and the category
     -- toggled.
     push BOOLEAN NOT NULL DEFAULT false,
+    -- Per-category UnifiedPush/ntfy channel (migration 177); the same encrypted
+    -- Web Push wire as `push`, delivered to a distributor endpoint. DEFAULT
+    -- FALSE for the push reason: off until a UnifiedPush subscription exists.
+    unifiedpush BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, category)
@@ -2309,6 +2313,13 @@ CREATE TABLE push_subscriptions (
     endpoint_hash VARCHAR(64) NOT NULL,
     p256dh VARCHAR(255) NOT NULL,
     auth VARCHAR(255) NOT NULL,
+    -- Which wire this subscription is delivered on (migration 177). 'webpush' is
+    -- a browser vendor's push service; 'unifiedpush' is a distributor endpoint
+    -- (ntfy/NextPush), the same encrypted Web Push protocol either way. The
+    -- per-user channel toggles gate the two independently.
+    transport VARCHAR(20) NOT NULL DEFAULT 'webpush'
+        CONSTRAINT push_subscriptions_transport_check
+        CHECK (transport IN ('webpush', 'unifiedpush')),
     device_name VARCHAR(100),
     user_agent VARCHAR(255),
     -- The instance identity this subscription was minted under. A rotation

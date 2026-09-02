@@ -23,6 +23,11 @@ export class UpdateNotificationPreferenceDto {
   @IsBoolean()
   push?: boolean;
 
+  /** Per-category UnifiedPush/ntfy (the same wire as push, to a distributor). */
+  @IsOptional()
+  @IsBoolean()
+  unifiedpush?: boolean;
+
   /** Cooldown window in minutes; 0 disables. Bounded so it cannot suppress for longer than a day. */
   @IsOptional()
   @IsInt()

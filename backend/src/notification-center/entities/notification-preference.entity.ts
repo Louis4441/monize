@@ -65,6 +65,16 @@ export class NotificationPreference {
   @Column({ type: "boolean", default: false })
   push: boolean;
 
+  /**
+   * Per-category UnifiedPush/ntfy channel: the same encrypted Web Push wire as
+   * `push`, delivered to a distributor endpoint instead of a browser vendor's
+   * push service (spec section 15). Read by the dispatch beside `push` and
+   * governed by the same throttle. Defaults off -- a matrix cell cannot register
+   * a distributor, so it stays off until a UnifiedPush subscription exists.
+   */
+  @Column({ type: "boolean", default: false })
+  unifiedpush: boolean;
+
   @CreateDateColumn({ name: "created_at" })
   createdAt: Date;
 

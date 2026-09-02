@@ -1,6 +1,16 @@
 import { Entity, Column, Index, PrimaryGeneratedColumn } from "typeorm";
 
 /**
+ * The wire a subscription is delivered on. Both are the same encrypted Web Push
+ * protocol (RFC 8291 under this instance's VAPID key), so `WebPushSender` handles
+ * both; the tag exists only so the per-user `push` / `unifiedpush` channel
+ * toggles can gate them independently. The set is mirrored on the DB CHECK
+ * constraint (`push_subscriptions_transport_check`).
+ */
+export const PUSH_TRANSPORTS = ["webpush", "unifiedpush"] as const;
+export type PushTransport = (typeof PUSH_TRANSPORTS)[number];
+
+/**
  * Why a subscription stops being usable. Stored so the device list can say
  * which of the three happened instead of rendering a bare "unavailable" -- the
  * repairs differ (re-enable push in the browser, subscribe again after a key
@@ -61,6 +71,16 @@ export class PushSubscription {
 
   @Column({ type: "varchar", length: 255 })
   auth: string;
+
+  /**
+   * Which wire this subscription is delivered on. `'webpush'` is a browser
+   * vendor's push service; `'unifiedpush'` is a UnifiedPush distributor endpoint
+   * (ntfy/NextPush) -- the same encrypted Web Push protocol either way, so
+   * `WebPushSender` handles both. The per-user `push` / `unifiedpush` channel
+   * toggles gate the two independently (spec section 15).
+   */
+  @Column({ type: "varchar", length: 20, default: "webpush" })
+  transport: PushTransport;
 
   @Column({ name: "device_name", type: "varchar", length: 100, nullable: true })
   deviceName: string | null;

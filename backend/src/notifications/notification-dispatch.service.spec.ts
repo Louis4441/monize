@@ -41,6 +41,7 @@ describe("NotificationDispatchService", () => {
     resolveDelivery = jest.fn().mockResolvedValue({
       emailNotification: false,
       push: false,
+      unifiedpush: false,
       throttleMinutes: 0,
     });
     sendToUser = jest.fn().mockResolvedValue({ attempted: 1, delivered: 1 });
@@ -104,15 +105,16 @@ describe("NotificationDispatchService", () => {
     expect(sendMail).not.toHaveBeenCalled();
   });
 
-  it("pushes a privacy-minimal payload when push is on", async () => {
+  it("pushes a privacy-minimal payload to web-push devices when push is on", async () => {
     resolveDelivery.mockResolvedValue({
       emailNotification: false,
       push: true,
+      unifiedpush: false,
       throttleMinutes: 0,
     });
     await service.notify("u1", {} as never);
     expect(sendToUser).toHaveBeenCalledTimes(1);
-    const [userId, payload] = sendToUser.mock.calls[0];
+    const [userId, payload, transports] = sendToUser.mock.calls[0];
     expect(userId).toBe("u1");
     expect(payload).toEqual({
       type: NotificationType.OVER_BUDGET,
@@ -121,6 +123,47 @@ describe("NotificationDispatchService", () => {
       target: "/budgets/b1",
       // no dedupeKey -> the row id, never a name/amount.
       collapseKey: "n1",
+    });
+    // push on, unifiedpush off -> web-push devices only.
+    expect(transports).toEqual(["webpush"]);
+  });
+
+  describe("push transports (INV-PUSH-007)", () => {
+    // The two push channels ride one wire and differ only by which devices they
+    // reach, so the fan-out is one call carrying the enabled transport set.
+    const deliver = (push: boolean, unifiedpush: boolean) =>
+      resolveDelivery.mockResolvedValue({
+        emailNotification: false,
+        push,
+        unifiedpush,
+        throttleMinutes: 0,
+      });
+
+    it("push on, unifiedpush off -> web-push devices only", async () => {
+      deliver(true, false);
+      await service.notify("u1", {} as never);
+      expect(sendToUser).toHaveBeenCalledTimes(1);
+      expect(sendToUser.mock.calls[0][2]).toEqual(["webpush"]);
+    });
+
+    it("push off, unifiedpush on -> UnifiedPush devices only", async () => {
+      deliver(false, true);
+      await service.notify("u1", {} as never);
+      expect(sendToUser).toHaveBeenCalledTimes(1);
+      expect(sendToUser.mock.calls[0][2]).toEqual(["unifiedpush"]);
+    });
+
+    it("both on -> both wires in one fan-out", async () => {
+      deliver(true, true);
+      await service.notify("u1", {} as never);
+      expect(sendToUser).toHaveBeenCalledTimes(1);
+      expect(sendToUser.mock.calls[0][2]).toEqual(["webpush", "unifiedpush"]);
+    });
+
+    it("both off (email off too) -> no fan-out", async () => {
+      deliver(false, false);
+      await service.notify("u1", {} as never);
+      expect(sendToUser).not.toHaveBeenCalled();
     });
   });
 

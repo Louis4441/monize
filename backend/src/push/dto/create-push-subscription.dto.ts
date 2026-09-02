@@ -1,10 +1,20 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsOptional, IsString, MaxLength, MinLength } from "class-validator";
+import {
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from "class-validator";
 import { SanitizeHtml } from "../../common/decorators/sanitize-html.decorator";
 import {
   IsPushEndpoint,
   MAX_PUSH_ENDPOINT_LENGTH,
 } from "../validators/push-endpoint.validator";
+import {
+  PUSH_TRANSPORTS,
+  PushTransport,
+} from "../entities/push-subscription.entity";
 
 /**
  * What the browser's `PushSubscription.toJSON()` yields, flattened.
@@ -57,4 +67,17 @@ export class CreatePushSubscriptionDto {
   @MaxLength(100)
   @SanitizeHtml()
   deviceName?: string;
+
+  /**
+   * The wire this subscription is delivered on. Absent means `'webpush'` (a
+   * browser vendor's push service, today's only caller). A UnifiedPush client
+   * registering a distributor endpoint sends `'unifiedpush'`. Both are the same
+   * encrypted Web Push protocol, so only the channel gating differs (spec
+   * section 15). Bounded to the known set -- an unknown transport is a bug, not
+   * a row to store, and the DB CHECK would reject it anyway.
+   */
+  @ApiPropertyOptional({ enum: PUSH_TRANSPORTS })
+  @IsOptional()
+  @IsIn(PUSH_TRANSPORTS)
+  transport?: PushTransport;
 }

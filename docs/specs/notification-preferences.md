@@ -45,9 +45,10 @@ R8. (maintainer, #1291) history expires automatically [done: `purgeOld`];
     per-device push toggles; localisation follows the user's language.
 
 Non-goals (explicitly deferred by the maintainer): restored/cloned-environment
-safety for subscriptions; a Firebase/APNs path. UnifiedPush is scaffolded but
-its transport is out of scope for the first cut (the matrix column renders as
-"coming soon" and stores the preference so no migration is needed later).
+safety for subscriptions; a Firebase/APNs path. UnifiedPush was scaffolded as a
+"coming soon" column in the first cut; the maintainer has since asked for the
+**full transport**, now specified in **Section 15** (encrypted Web Push to a
+UnifiedPush distributor endpoint, `WebPushSender` reused).
 
 ---
 
@@ -823,3 +824,94 @@ This section is a **plan, not an implementation**. Per the org rule that AI
 output is auxiliary and must not autonomously make decisions with downstream
 effects, the seam, the throttle concurrency choice, and the producer-migration
 order are put to the maintainer here rather than built unattended.
+
+---
+
+## 15. The UnifiedPush transport (maintainer-confirmed, promoting the deferred column)
+
+Section 1 deferred UnifiedPush as a "coming soon" column. The maintainer has
+since asked for the **full transport**, and confirmed the model: **encrypted Web
+Push delivered to a UnifiedPush distributor endpoint**, never a plaintext ntfy
+publish. The privacy line is the reason -- a notification body can carry an
+amount or a payee, and a finance app must not hand that to a third-party relay in
+the clear.
+
+### 15.1 What UnifiedPush is here, and what it is not
+
+A UnifiedPush subscription **is a Web Push subscription**: an `endpoint` at a
+distributor (ntfy, NextPush, a self-hosted UnifiedPush provider) plus the two
+keys (`p256dh`, `auth`) that RFC 8291 encrypts to, signed under this instance's
+VAPID key pair exactly as a browser subscription is. The *only* things that make
+it a distinct **channel** are (a) the endpoint host is a distributor rather than
+a browser vendor's push service, and (b) a per-subscription `transport` tag so a
+per-user `unifiedpush` channel toggle can gate it independently of web push.
+
+Because the wire protocol is identical, **`WebPushSender` is reused unchanged**
+-- delivery isolation (INV-PUSH, `backend/CLAUDE.md`) holds: it stays the one
+file in `src/` importing `web-push`, and a business feature still asks the
+notification layer for a notification, never a transport. There is no second
+sender, no ntfy-native JSON publish, and no new outbound-request shape: the
+endpoint is still a URL the server POSTs an encrypted body to, validated with the
+same `IsPushEndpoint` (https floor + SSRF resolve), so no new CWE-918 surface.
+
+**What it is not.** A browser PWA cannot *receive* at an arbitrary endpoint --
+`pushManager.subscribe()` is bound to the browser's own push service. So a
+UnifiedPush subscription is registered by a **UnifiedPush-capable client** (a
+native/wrapped Monize build, or a browser whose own push service already is a
+self-hosted UnifiedPush endpoint -- which the ordinary `push` channel already
+covers). The client posts its endpoint and keys through the same
+`POST /push/subscribe`, tagging `transport: "unifiedpush"`. The web settings
+surface **manages and gates** UnifiedPush subscriptions (lists them with a
+transport badge, renames, removes, and exposes the channel toggle); it does not
+mint the keys, because the client that will decrypt owns them. Copy says so
+rather than offering a browser button that could never receive.
+
+### 15.2 Data model (migration 177)
+
+- `push_subscriptions.transport VARCHAR(20) NOT NULL DEFAULT 'webpush'`, with a
+  `CHECK (transport IN ('webpush','unifiedpush'))` (idempotent: `DROP CONSTRAINT
+  IF EXISTS` before `ADD CONSTRAINT`). Default `'webpush'` so every existing row
+  keeps today's behaviour. The table is in `EXCLUDED_FROM_EXPORT`
+  (`export-table-queries.ts`) -- a device credential minted under this
+  deployment's VAPID key -- so the column needs no backup classification.
+- `notification_preferences.unifiedpush BOOLEAN NOT NULL DEFAULT false`. `DEFAULT
+  FALSE` for the push reason: a matrix cell cannot register a distributor, so the
+  channel stays off until a UnifiedPush subscription exists and the category is
+  toggled. Exported, so `unifiedpush: keep` in `support-backup-rules.ts` (a flag,
+  not identifying).
+
+No new SQL function, so `required-db-functions.ts` is untouched. Both tables keep
+their existing RLS policies -- adding a column changes no policy. `schema.sql`
+updated in the same commit; migration replays as a no-op on a fresh schema.
+
+### 15.3 Delivery gating (the dispatch reads two push channels)
+
+`NOTIFICATION_CATEGORY_CHANNELS` gains `unifiedpush` per category (same support as
+`push`: PAYMENTS/BUDGETS expose it, SYSTEM exposes it -- an admin's infra alert is
+as reasonable on a UnifiedPush device as a web-push one). `resolveNotificationDelivery`
+returns `unifiedpush` beside `push`, forced off where unsupported, never
+email-master-gated (a different channel), defaulting off.
+
+`PushSubscriptionService.sendToUser` takes an optional **transport filter**;
+`sendTest` keeps sending to every live device (a test is "does any device
+work"). The dispatch's `fanOut` computes the enabled transport set from the
+resolved delivery -- `webpush` when `delivery.push`, `unifiedpush` when
+`delivery.unifiedpush` -- and calls `sendToUser` once with that set; the
+`if (!push && !emailNotification) return` short-circuit gains `&& !unifiedpush`.
+The throttle gates all interrupting channels alike, unchanged.
+
+### 15.4 Invariants and test obligations
+
+- **INV-PUSH-006** UnifiedPush reuses `WebPushSender`: `push-secret.guard.spec.ts`
+  still finds exactly one `web-push` importer; no second sender appears.
+- **INV-PUSH-007** a `transport` tag gates delivery: a user with `push` on and
+  `unifiedpush` off receives on web-push subscriptions only, and the reverse; the
+  four combinations are a matrix test, not a representative one.
+- **INV-PUSH-008** an unsupported channel is forced off in
+  `resolveNotificationDelivery` for `unifiedpush` exactly as for `push`.
+- **INV-PUSH-009** a UnifiedPush endpoint is `IsPushEndpoint`-validated (https +
+  SSRF), never a bare `@IsUrl()`.
+- Contract: `NOTIFICATION_CATEGORY_CHANNELS` (backend) and its client mirror stay
+  equal (`notification-preferences.contract.test.ts`), now over four channels.
+- The matrix's `unifiedpush` column gates on `>= 1` live UnifiedPush
+  subscription, the same shape as the push column's device gating.

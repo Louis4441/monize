@@ -79,6 +79,7 @@ describe("NotificationPreferenceService", () => {
           email: true,
           emailNotification: false,
           push: false,
+          unifiedpush: false,
           throttleMinutes: 0,
           supportedChannels: NOTIFICATION_CATEGORY_CHANNELS[category],
         })),
@@ -94,6 +95,7 @@ describe("NotificationPreferenceService", () => {
           email: false,
           emailNotification: true,
           push: true,
+          unifiedpush: true,
           throttleMinutes: 30,
         },
       ]);
@@ -105,6 +107,7 @@ describe("NotificationPreferenceService", () => {
         email: false,
         emailNotification: true,
         push: true,
+        unifiedpush: true,
         throttleMinutes: 30,
         supportedChannels:
           NOTIFICATION_CATEGORY_CHANNELS[NotificationCategory.PAYMENTS],
@@ -116,13 +119,14 @@ describe("NotificationPreferenceService", () => {
         email: true,
         emailNotification: false,
         push: false,
+        unifiedpush: false,
         throttleMinutes: 0,
         supportedChannels:
           NOTIFICATION_CATEGORY_CHANNELS[NotificationCategory.BUDGETS],
       });
     });
 
-    it("exposes SYSTEM as a push-only category (email channels not applicable)", async () => {
+    it("exposes SYSTEM as a push-only category (email channels not applicable, both push wires live)", async () => {
       const system = (await service.list("u1")).find(
         (r) => r.category === NotificationCategory.SYSTEM,
       );
@@ -131,11 +135,13 @@ describe("NotificationPreferenceService", () => {
         email: true,
         emailNotification: false,
         push: false,
+        unifiedpush: false,
         throttleMinutes: 0,
         supportedChannels: {
           email: false,
           emailNotification: false,
           push: true,
+          unifiedpush: true,
         },
       });
     });
@@ -162,6 +168,7 @@ describe("NotificationPreferenceService", () => {
         email: false,
         emailNotification: false,
         push: false,
+        unifiedpush: false,
         throttleMinutes: 0,
       });
       const result = await service.updatePreference(
@@ -175,11 +182,12 @@ describe("NotificationPreferenceService", () => {
       );
       // Only email present -> its param; the others omitted pass NULL, so
       // COALESCE keeps their stored values. Order: email, emailNotification,
-      // throttle, push.
+      // throttle, push, unifiedpush.
       expect(params).toEqual([
         "u1",
         NotificationCategory.PAYMENTS,
         false,
+        null,
         null,
         null,
         null,
@@ -189,6 +197,7 @@ describe("NotificationPreferenceService", () => {
         email: false,
         emailNotification: false,
         push: false,
+        unifiedpush: false,
         throttleMinutes: 0,
         supportedChannels:
           NOTIFICATION_CATEGORY_CHANNELS[NotificationCategory.PAYMENTS],
@@ -207,13 +216,15 @@ describe("NotificationPreferenceService", () => {
         throttleMinutes: 15,
       });
       const params = query.mock.calls[0][1];
-      // email and push omitted -> NULL; notification email and throttle set.
+      // email, push and unifiedpush omitted -> NULL; notification email and
+      // throttle set.
       expect(params).toEqual([
         "u1",
         NotificationCategory.BUDGETS,
         null,
         true,
         15,
+        null,
         null,
       ]);
     });
@@ -233,6 +244,31 @@ describe("NotificationPreferenceService", () => {
       expect(params).toEqual([
         "u1",
         NotificationCategory.PAYMENTS,
+        null,
+        null,
+        null,
+        true,
+        null,
+      ]);
+    });
+
+    it("writes the unifiedpush channel independently (the seventh param)", async () => {
+      notifPrefRepo.findOne.mockResolvedValue({
+        email: true,
+        emailNotification: false,
+        push: false,
+        unifiedpush: true,
+        throttleMinutes: 0,
+      });
+      await service.updatePreference("u1", NotificationCategory.PAYMENTS, {
+        unifiedpush: true,
+      });
+      const params = query.mock.calls[0][1];
+      // Only unifiedpush present -> the seventh param; the rest NULL.
+      expect(params).toEqual([
+        "u1",
+        NotificationCategory.PAYMENTS,
+        null,
         null,
         null,
         null,
@@ -258,6 +294,7 @@ describe("NotificationPreferenceService", () => {
         null,
         THROTTLE_MAX_MINUTES,
         null,
+        null,
       ]);
     });
 
@@ -279,18 +316,24 @@ describe("NotificationPreferenceService", () => {
         null,
         0,
         null,
+        null,
       ]);
     });
   });
 
   describe("resolveNotificationDelivery (the dispatch's one read)", () => {
-    it("defaults everything off: no email, no push, no throttle", async () => {
+    it("defaults everything off: no email, no push, no unifiedpush, no throttle", async () => {
       expect(
         await service.resolveNotificationDelivery(
           "u1",
           NotificationCategory.PAYMENTS,
         ),
-      ).toEqual({ emailNotification: false, push: false, throttleMinutes: 0 });
+      ).toEqual({
+        emailNotification: false,
+        push: false,
+        unifiedpush: false,
+        throttleMinutes: 0,
+      });
     });
 
     it("returns the stored flags and clamped throttle when the master is on", async () => {
@@ -298,6 +341,7 @@ describe("NotificationPreferenceService", () => {
       notifPrefRepo.findOne.mockResolvedValue({
         emailNotification: true,
         push: true,
+        unifiedpush: true,
         throttleMinutes: 15,
       });
       expect(
@@ -305,14 +349,20 @@ describe("NotificationPreferenceService", () => {
           "u1",
           NotificationCategory.BUDGETS,
         ),
-      ).toEqual({ emailNotification: true, push: true, throttleMinutes: 15 });
+      ).toEqual({
+        emailNotification: true,
+        push: true,
+        unifiedpush: true,
+        throttleMinutes: 15,
+      });
     });
 
-    it("kills the immediate email on the master switch but NOT push", async () => {
+    it("kills the immediate email on the master switch but NOT push or unifiedpush", async () => {
       userPrefRepo.findOne.mockResolvedValue({ notificationEmail: false });
       notifPrefRepo.findOne.mockResolvedValue({
         emailNotification: true,
         push: true,
+        unifiedpush: true,
         throttleMinutes: 0,
       });
       expect(
@@ -320,7 +370,12 @@ describe("NotificationPreferenceService", () => {
           "u1",
           NotificationCategory.BUDGETS,
         ),
-      ).toEqual({ emailNotification: false, push: true, throttleMinutes: 0 });
+      ).toEqual({
+        emailNotification: false,
+        push: true,
+        unifiedpush: true,
+        throttleMinutes: 0,
+      });
     });
 
     it("clamps a stored throttle window above the cap", async () => {
@@ -344,6 +399,7 @@ describe("NotificationPreferenceService", () => {
       notifPrefRepo.findOne.mockResolvedValue({
         emailNotification: true,
         push: true,
+        unifiedpush: true,
         throttleMinutes: 0,
       });
       expect(
@@ -351,7 +407,12 @@ describe("NotificationPreferenceService", () => {
           "u1",
           NotificationCategory.SYSTEM,
         ),
-      ).toEqual({ emailNotification: false, push: true, throttleMinutes: 0 });
+      ).toEqual({
+        emailNotification: false,
+        push: true,
+        unifiedpush: true,
+        throttleMinutes: 0,
+      });
     });
   });
 });

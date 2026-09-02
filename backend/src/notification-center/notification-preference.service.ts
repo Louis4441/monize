@@ -37,6 +37,12 @@ export interface CategoryChannelSupport {
   emailNotification: boolean;
   /** Web push, fanned out by the dispatch seam. */
   push: boolean;
+  /**
+   * UnifiedPush/ntfy: the same encrypted Web Push wire as `push`, to a
+   * distributor endpoint (spec section 15). A separate control because a user
+   * chooses the two transports independently.
+   */
+  unifiedpush: boolean;
 }
 
 /**
@@ -57,16 +63,19 @@ export const NOTIFICATION_CATEGORY_CHANNELS: Record<
     email: true,
     emailNotification: true,
     push: true,
+    unifiedpush: true,
   },
   [NotificationCategory.BUDGETS]: {
     email: true,
     emailNotification: true,
     push: true,
+    unifiedpush: true,
   },
   [NotificationCategory.SYSTEM]: {
     email: false,
     emailNotification: false,
     push: true,
+    unifiedpush: true,
   },
 };
 
@@ -83,6 +92,7 @@ export interface NotificationChannelPreference {
   email: boolean;
   emailNotification: boolean;
   push: boolean;
+  unifiedpush: boolean;
   throttleMinutes: number;
   /**
    * Which channels this category exposes as live controls. Server-authoritative
@@ -97,6 +107,7 @@ export interface NotificationPreferencePatch {
   email?: boolean;
   emailNotification?: boolean;
   push?: boolean;
+  unifiedpush?: boolean;
   throttleMinutes?: number;
 }
 
@@ -164,6 +175,7 @@ export class NotificationPreferenceService {
   ): Promise<{
     emailNotification: boolean;
     push: boolean;
+    unifiedpush: boolean;
     throttleMinutes: number;
   }> {
     const support = NOTIFICATION_CATEGORY_CHANNELS[category];
@@ -183,6 +195,11 @@ export class NotificationPreferenceService {
               : false
             : false,
         push: support.push ? (row ? row.push : false) : false,
+        unifiedpush: support.unifiedpush
+          ? row
+            ? row.unifiedpush
+            : false
+          : false,
         throttleMinutes: row ? this.clampThrottle(row.throttleMinutes) : 0,
       };
     });
@@ -230,6 +247,8 @@ export class NotificationPreferenceService {
     const emailNotification =
       patch.emailNotification === undefined ? null : patch.emailNotification;
     const push = patch.push === undefined ? null : patch.push;
+    const unifiedpush =
+      patch.unifiedpush === undefined ? null : patch.unifiedpush;
     const throttle =
       patch.throttleMinutes === undefined
         ? null
@@ -238,17 +257,27 @@ export class NotificationPreferenceService {
     return withScopedDb(this.dataSource, async (manager) => {
       await manager.query(
         `INSERT INTO notification_preferences
-           (user_id, category, email, email_notification, throttle_minutes, push)
+           (user_id, category, email, email_notification, throttle_minutes,
+            push, unifiedpush)
          VALUES ($1, $2, COALESCE($3, true), COALESCE($4, false),
-                 COALESCE($5, 0), COALESCE($6, false))
+                 COALESCE($5, 0), COALESCE($6, false), COALESCE($7, false))
          ON CONFLICT (user_id, category) DO UPDATE SET
            email = COALESCE($3, notification_preferences.email),
            email_notification =
              COALESCE($4, notification_preferences.email_notification),
            throttle_minutes =
              COALESCE($5, notification_preferences.throttle_minutes),
-           push = COALESCE($6, notification_preferences.push)`,
-        [userId, category, email, emailNotification, throttle, push],
+           push = COALESCE($6, notification_preferences.push),
+           unifiedpush = COALESCE($7, notification_preferences.unifiedpush)`,
+        [
+          userId,
+          category,
+          email,
+          emailNotification,
+          throttle,
+          push,
+          unifiedpush,
+        ],
       );
       const row = await manager.getRepository(NotificationPreference).findOne({
         where: { userId, category },
@@ -267,6 +296,7 @@ export class NotificationPreferenceService {
       email: row ? row.email : true,
       emailNotification: row ? row.emailNotification : false,
       push: row ? row.push : false,
+      unifiedpush: row ? row.unifiedpush : false,
       throttleMinutes: row ? this.clampThrottle(row.throttleMinutes) : 0,
       supportedChannels: NOTIFICATION_CATEGORY_CHANNELS[category],
     };

@@ -61,6 +61,7 @@ export class NotificationPreferenceController {
       dto.email === undefined &&
       dto.emailNotification === undefined &&
       dto.push === undefined &&
+      dto.unifiedpush === undefined &&
       dto.throttleMinutes === undefined
     ) {
       throw new BadRequestException(
@@ -74,6 +75,7 @@ export class NotificationPreferenceController {
       email: dto.email,
       emailNotification: dto.emailNotification,
       push: dto.push,
+      unifiedpush: dto.unifiedpush,
       throttleMinutes: dto.throttleMinutes,
     });
   }
