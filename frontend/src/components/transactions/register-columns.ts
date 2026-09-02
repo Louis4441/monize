@@ -45,6 +45,18 @@
  *   The cap survives only below the low tier, where there is no Description
  *   to yield and an uncapped payee would push Amount and Balance into the
  *   horizontal scroll instead.
+ * - **A yielding column takes the leftover, so the columns above it have to
+ *   say what they need.** `w-full` does not mean "take what is spare": it is
+ *   a claim on 100% of the table, and an auto-layout table settles that claim
+ *   against the content columns *in proportion to their content*, scaling
+ *   them below what they hold. So the width Description gets depends on how
+ *   long the OTHER columns' content is, and filtering the register to one
+ *   payee -- which shortens Payee, Category, Ref # and the amounts all at
+ *   once -- handed Description the difference: on a 1710px register Payee
+ *   went 270px -> 212px and Description 386px -> 517px, truncating the very
+ *   payee that had just been filtered for while Description sat empty. Payee
+ *   therefore declares a floor (`REGISTER_PAYEE_CELL_FLOOR`) and Description
+ *   absorbs only what is left above it.
  */
 export const REGISTER_COLUMN_ORDER = [
   'date',
@@ -187,5 +199,29 @@ export const REGISTER_DESCRIPTION_CELL_FLEX = 'w-full max-w-0';
  * Below `sm` the phone caps on the payee *cell* apply instead (see the cell
  * in TransactionRow).
  */
+/**
+ * The floor under the payee COLUMN -- the width Description may not take from
+ * it. It sits on the payee `<th>` and `<td>` (a column's minimum is the
+ * largest of its cells', so header and body must agree or the label and the
+ * values it labels sit over different columns).
+ *
+ * It has to be a length. `min-width: max-content` and `min-width: fit-content`
+ * are both ignored on a table cell by the auto-layout algorithm -- measured,
+ * not assumed -- so "never below the payee's own content" is not expressible;
+ * a length share of the register is. Like every other figure here it scales in
+ * `cqw` with a px floor, so a narrow register keeps a readable payee and a
+ * wide one gives it more.
+ *
+ * It is deliberately smaller than `REGISTER_PAYEE_NAME_CAP`'s base share: a
+ * floor is what the payee is guaranteed, the cap is how far it may grow, and a
+ * floor that met the cap would freeze the column at one width and pad it with
+ * blank space whenever the payees are short.
+ *
+ * `sm:` only, like the cap -- below it the phone caps on the payee cell apply,
+ * and `min-width` beats `max-width`, so an unscoped floor would silently
+ * override them and blow the phone layout open.
+ */
+export const REGISTER_PAYEE_CELL_FLOOR = 'sm:min-w-[max(240px,16cqw)]';
+
 export const REGISTER_PAYEE_NAME_CAP =
   'sm:max-w-[max(280px,35cqw)] @min-[1536px]:max-w-[60cqw]';

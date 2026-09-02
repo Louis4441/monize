@@ -11,6 +11,7 @@ import { registerDateColumnPadding } from '@/components/transactions/register-da
 import {
   registerColumnClass,
   REGISTER_DESCRIPTION_CELL_FLEX,
+  REGISTER_PAYEE_CELL_FLOOR,
   REGISTER_PAYEE_NAME_CAP,
 } from '@/components/transactions/register-columns';
 import { PayeeLogo } from '@/components/payees/PayeeLogo';
@@ -349,8 +350,12 @@ export const TransactionRow = memo(function TransactionRow({
       {/* Two things give the payee room when the year is hidden: this
           phone-width cap widens, and the inset between this column and the
           date closes (registerDateColumnPadding). It stays a cap, with
-          truncate below, so a long payee cannot push Amount off screen. */}
-      <td className={`${cellPadding} ${compactPadding.payee} ${compactDates ? 'max-w-[160px]' : 'max-w-[100px]'} sm:max-w-none overflow-hidden`}>
+          truncate below, so a long payee cannot push Amount off screen.
+          REGISTER_PAYEE_CELL_FLOOR is the other half: Description's w-full is
+          a claim on the whole table settled against this column's content, so
+          without a floor a filtered register hands Description the width the
+          payee was using (see register-columns.ts). */}
+      <td className={`${cellPadding} ${compactPadding.payee} ${compactDates ? 'max-w-[160px]' : 'max-w-[100px]'} sm:max-w-none ${REGISTER_PAYEE_CELL_FLOOR} overflow-hidden`}>
         <div className="flex items-center gap-2 min-w-0">
           {/* Brand badge beside the name, never inside the button: the button's
               text is the payee name, and a decorative glyph in it changes what
