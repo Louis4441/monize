@@ -94,6 +94,9 @@
     "largestValue": "{amount} vào {date}",
     "overpaymentFor": "Người nhận khoản trả thêm cho",
     "website": "Trang web",
+    "address": "Địa chỉ",
+    "phone": "Điện thoại",
+    "email": "Email",
     "notes": "Ghi chú"
   },
   "tabs": {

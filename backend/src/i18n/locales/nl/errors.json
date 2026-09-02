@@ -350,6 +350,7 @@
   "payees": {
     "nameConflict": "Er bestaat al een begunstigde met de naam \"{{ name }}\"",
     "nameRequired": "Naam van begunstigde is verplicht",
+    "invalidEmail": "\"{{ email }}\" is geen geldig e-mailadres",
     "notFound": "Begunstigde met ID {{ id }} niet gevonden",
     "logoNotFound": "Geen logo beschikbaar voor deze begunstigde",
     "categoryIdsNotOwned": "Categorie-ID's niet gevonden of niet eigendom van gebruiker: {{ ids }}",

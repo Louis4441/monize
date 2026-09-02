@@ -94,6 +94,9 @@
     "largestValue": "{amount} il {date}",
     "overpaymentFor": "Beneficiario dei versamenti extra per",
     "website": "Sito web",
+    "address": "Indirizzo",
+    "phone": "Telefono",
+    "email": "E-mail",
     "notes": "Note"
   },
   "tabs": {

@@ -94,6 +94,9 @@
     "largestValue": "{amount} on {date}",
     "overpaymentFor": "Overpayment Payee For",
     "website": "Website",
+    "address": "Address",
+    "phone": "Phone",
+    "email": "Email",
     "notes": "Notes"
   },
   "tabs": {

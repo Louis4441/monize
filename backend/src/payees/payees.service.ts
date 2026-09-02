@@ -5,6 +5,7 @@ import {
   BadRequestException,
   Logger,
 } from "@nestjs/common";
+import { isEmail } from "class-validator";
 import { tr } from "../i18n/translate";
 import { DataSource, Like, In, Not, IsNull } from "typeorm";
 import { Payee } from "./entities/payee.entity";
@@ -52,6 +53,10 @@ export interface CreatePayeePreview {
    * it; `null` means clear it.
    */
   website?: string | null;
+  /** Contact fields, with the same undefined/null contract as {@link website}. */
+  address?: string | null;
+  email?: string | null;
+  phone?: string | null;
 }
 
 /**
@@ -66,6 +71,13 @@ export interface UpdatePayeePreview {
   defaultCategoryName: string | null;
   /** See {@link CreatePayeePreview.website}. */
   website?: string | null;
+  /**
+   * Contact fields, with the same contract as {@link website}: `undefined`
+   * leaves the stored value alone, `null` clears it.
+   */
+  address?: string | null;
+  email?: string | null;
+  phone?: string | null;
 }
 
 /** Resolved preview of a proposed payee deletion. */
@@ -95,6 +107,55 @@ function normalizePayeeName(value: string): string {
     .trim();
 }
 
+/**
+ * What a contact field the user emptied should be stored as.
+ *
+ * The form resends every field on each save, so a cleared input arrives as "" --
+ * which must become NULL rather than an empty string, or "has an address" reads
+ * true for a payee with none and the map renders an empty query. Undefined is
+ * left alone: it means the caller did not mention the field at all.
+ */
+function normalizeContactField(
+  value: string | null | undefined,
+): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
+/**
+ * The contact fields as a preview would store them, with the email checked.
+ *
+ * The check belongs here because a preview has to compute what the commit will
+ * do: `CreatePayeeDto` rejects a malformed email, so without this the user
+ * would be shown a confirmation card, approve it, and only then get a
+ * validation failure from a request they had already agreed to.
+ */
+function previewContactFields(input: {
+  address?: string | null;
+  email?: string | null;
+  phone?: string | null;
+}): { address?: string | null; email?: string | null; phone?: string | null } {
+  const email = normalizeContactField(input.email);
+  if (email && !isEmail(email)) {
+    throw new BadRequestException(
+      tr(
+        "errors.payees.invalidEmail",
+        `"${email}" is not a valid email address`,
+        {
+          email,
+        },
+      ),
+    );
+  }
+  return {
+    address: normalizeContactField(input.address),
+    email,
+    phone: normalizeContactField(input.phone),
+  };
+}
+
 @Injectable()
 export class PayeesService {
   private readonly logger = new Logger(PayeesService.name);
@@ -117,6 +178,11 @@ export class PayeesService {
       ? await this.faviconService.fetchFavicon(website)
       : null;
 
+    // The contact fields the form sends as "" mean "empty", not "a blank
+    // string" -- see normalizeContactField.
+    const address = normalizeContactField(createPayeeDto.address) ?? null;
+    const email = normalizeContactField(createPayeeDto.email) ?? null;
+    const phone = normalizeContactField(createPayeeDto.phone) ?? null;
     const saved = await withScopedDb(this.dataSource, async (m) => {
       const repo = m.getRepository(Payee);
       // Check if payee with same name already exists for this user
@@ -144,6 +210,9 @@ export class PayeesService {
         // null -- so the columns are only written when there was an address
         // to resolve.
         ...(website ? brandLogoColumns(logo) : {}),
+        address,
+        email,
+        phone,
         userId,
       });
 
@@ -159,6 +228,9 @@ export class PayeesService {
         name: saved.name,
         notes: saved.notes,
         website: saved.website,
+        address: saved.address,
+        email: saved.email,
+        phone: saved.phone,
         defaultCategoryId: saved.defaultCategoryId,
         isActive: saved.isActive,
       },
@@ -180,9 +252,13 @@ export class PayeesService {
       name: string;
       defaultCategoryId?: string | null;
       website?: string | null;
+      address?: string | null;
+      email?: string | null;
+      phone?: string | null;
     },
   ): Promise<CreatePayeePreview> {
     const name = stripHtml(input.name)?.trim() || "";
+    const contact = previewContactFields(input);
     // Normalise here, not at commit time: a preview has to compute what the
     // commit will do, so the card shows "https://acme.com" for a typed
     // "acme.com" rather than a value the save would then change.
@@ -220,7 +296,13 @@ export class PayeesService {
         defaultCategoryName = names.get(cat.id) ?? cat.name;
       }
 
-      return { name, defaultCategoryId, defaultCategoryName, website };
+      return {
+        name,
+        defaultCategoryId,
+        defaultCategoryName,
+        website,
+        ...contact,
+      };
     });
   }
 
@@ -286,6 +368,9 @@ export class PayeesService {
       name: string;
       categoryName?: string | null;
       website?: string | null;
+      address?: string | null;
+      email?: string | null;
+      phone?: string | null;
     },
   ): Promise<CreatePayeePreview> {
     let defaultCategoryId: string | null = null;
@@ -298,6 +383,9 @@ export class PayeesService {
       name: input.name,
       defaultCategoryId,
       website: input.website,
+      address: input.address,
+      email: input.email,
+      phone: input.phone,
     });
   }
 
@@ -313,6 +401,9 @@ export class PayeesService {
       newName?: string;
       categoryName?: string | null;
       website?: string | null;
+      address?: string | null;
+      email?: string | null;
+      phone?: string | null;
     },
   ): Promise<UpdatePayeePreview> {
     const payee = await this.resolvePayeeForManage(userId, input.name);
@@ -374,6 +465,7 @@ export class PayeesService {
       defaultCategoryId,
       defaultCategoryName,
       website,
+      ...previewContactFields(input),
     };
   }
 
@@ -715,6 +807,9 @@ export class PayeesService {
       name: payee.name,
       notes: payee.notes,
       website: payee.website,
+      address: payee.address,
+      email: payee.email,
+      phone: payee.phone,
       defaultCategoryId: payee.defaultCategoryId,
       isActive: payee.isActive,
     };
@@ -773,6 +868,13 @@ export class PayeesService {
         Object.assign(updateFields, brandLogoColumns(logo));
       }
     }
+    if (updatePayeeDto.email !== undefined)
+      updateFields.email = normalizeContactField(updatePayeeDto.email) ?? null;
+    if (updatePayeeDto.phone !== undefined)
+      updateFields.phone = normalizeContactField(updatePayeeDto.phone) ?? null;
+    if (updatePayeeDto.address !== undefined)
+      updateFields.address =
+        normalizeContactField(updatePayeeDto.address) ?? null;
     if (updatePayeeDto.isActive !== undefined)
       updateFields.isActive = updatePayeeDto.isActive;
 
@@ -843,6 +945,10 @@ export class PayeesService {
       afterData: {
         name: refreshed.name,
         notes: refreshed.notes,
+        website: refreshed.website,
+        address: refreshed.address,
+        email: refreshed.email,
+        phone: refreshed.phone,
         defaultCategoryId: refreshed.defaultCategoryId,
         isActive: refreshed.isActive,
       },
@@ -860,11 +966,17 @@ export class PayeesService {
 
   async remove(userId: string, id: string): Promise<void> {
     const payee = await this.findOne(userId, id);
+    // Undo re-inserts exactly the columns this snapshot carries, so a field
+    // missing from it does not come back -- the same reason `update` snapshots
+    // the contact fields on both sides.
     const beforeData = {
       id: payee.id,
       name: payee.name,
       notes: payee.notes,
       website: payee.website,
+      address: payee.address,
+      email: payee.email,
+      phone: payee.phone,
       defaultCategoryId: payee.defaultCategoryId,
       isActive: payee.isActive,
     };

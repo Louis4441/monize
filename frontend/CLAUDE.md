@@ -147,6 +147,20 @@ The header's link arrays and the per-route Heroicon map are declared side by sid
 
 `WIDGET_ICONS` gives every registered widget a distinct Heroicon (`widget-meta.test.tsx` enforces coverage), rendered as the tinted `WidgetIconPuck` -- blue ramp only, so themes re-tint it. Widgets on `WidgetCard` get it from their `widgetId`; a widget drawing its own header uses `WidgetHeading`, which also owns the title-button markup.
 
+### The device can override a stored preference, and the predicate is never the viewport
+
+Two settings mean "unless this device knows better". `DateInput` is a text box on
+desktop *regardless of the format preference*, because the pointer decides the
+mode (touch keeps the native picker). `mapsUrl` (`lib/contact-links.ts`) ignores
+the stored `defaultMapProvider` on iOS and Android, because a device with its own
+map app should open it -- the preference describes what a desktop browser does.
+
+Both checks live in the one function that produces the result, never at a call
+site: a second caller that skipped it would be a rule nobody enforces. And both
+ask about the *platform* (`detectMapPlatform`, `pointer: coarse`), never
+`useIsMobile` -- that is a 639px viewport query, so a narrow desktop window would
+flip the behaviour mid-session.
+
 ### Date entry -- `DateInput`, never a raw `<input type="date">`
 
 `components/ui/DateInput.tsx` is the only place a raw date input is allowed; `ui-conventions.test.ts` fails the build if another appears. It carries lenient parsing of typed text, keyboard shortcuts, and `CalendarPopover`. Key behaviors:

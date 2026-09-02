@@ -218,6 +218,13 @@ CREATE TABLE payees (
     logo_content_type VARCHAR(100),
     has_logo BOOLEAN NOT NULL DEFAULT false,
     logo_fetched_at TIMESTAMP,
+    -- Contact information. address is free text (one field, not structured
+    -- parts) because formats are locale-specific and its only consumer is a
+    -- maps link that takes a single query string. phone is stored as written --
+    -- country codes, spaces, brackets and extensions all survive.
+    address TEXT,
+    email VARCHAR(255),
+    phone VARCHAR(50),
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, name)
@@ -975,12 +982,15 @@ CREATE TABLE user_preferences (
     lock_reconciled_transactions BOOLEAN NOT NULL DEFAULT false, -- strict mode: refuse any alteration of a RECONCILED transaction
     language VARCHAR(10) NOT NULL DEFAULT 'en', -- UI language; ISO 639-1 or BCP 47 tag matched against SUPPORTED_LOCALES
     last_client_timezone VARCHAR(64), -- Most recently reported X-Client-Timezone, used by cron jobs when timezone='browser'
+    default_map_provider VARCHAR(20) NOT NULL DEFAULT 'device', -- which map service an address link opens; 'device' means decide from the platform
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT user_preferences_default_quote_provider_check
       CHECK (default_quote_provider IN ('yahoo','msn')),
     CONSTRAINT user_preferences_recent_transactions_limit_check
-      CHECK (recent_transactions_limit BETWEEN 1 AND 20)
+      CHECK (recent_transactions_limit BETWEEN 1 AND 20),
+    CONSTRAINT user_preferences_default_map_provider_check
+      CHECK (default_map_provider IN ('device','openstreetmap','google','apple','bing','waze'))
 );
 
 -- Auto Backup Settings (per-user configuration for automatic backups to a folder)

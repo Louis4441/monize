@@ -94,6 +94,9 @@
     "largestValue": "{amount} el {date}",
     "overpaymentFor": "Beneficiario de amortización anticipada de",
     "website": "Sitio web",
+    "address": "Dirección",
+    "phone": "Teléfono",
+    "email": "Correo electrónico",
     "notes": "Notas"
   },
   "tabs": {

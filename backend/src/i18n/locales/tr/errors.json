@@ -350,6 +350,7 @@
   "payees": {
     "nameConflict": "\"{{ name }}\" adlı alacaklı zaten mevcut",
     "nameRequired": "Alacaklı adı gereklidir",
+    "invalidEmail": "\"{{ email }}\" geçerli bir e-posta adresi değil",
     "notFound": "{{ id }} kimliğine sahip alacaklı bulunamadı",
     "logoNotFound": "Bu alıcı için logo yok",
     "categoryIdsNotOwned": "Kategori kimlikleri bulunamadı veya kullanıcıya ait değil: {{ ids }}",

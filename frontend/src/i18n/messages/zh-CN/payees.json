@@ -82,6 +82,9 @@
     "categoryLabel": "默认分类",
     "notesLabel": "备注（可选）",
     "websiteLabel": "网站",
+    "addressLabel": "地址",
+    "emailLabel": "电子邮件",
+    "phoneLabel": "电话",
     "submitCreate": "创建收款人",
     "submitUpdate": "更新收款人",
     "applyCategoryLabel": "将此分类应用于现有交易",
@@ -270,7 +273,8 @@
   },
   "selectCategoryPlaceholder": "选择分类...",
   "validation": {
-    "nameRequired": "收款人名称为必填项"
+    "nameRequired": "收款人名称为必填项",
+    "emailInvalid": "请输入有效的电子邮件地址"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "应用默认分类？",

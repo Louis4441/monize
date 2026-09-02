@@ -94,6 +94,9 @@
     "largestValue": "{date} tarihinde {amount}",
     "overpaymentFor": "Şu hesabın ek ödeme alacaklısı",
     "website": "Web sitesi",
+    "address": "Adres",
+    "phone": "Telefon",
+    "email": "E-posta",
     "notes": "Notlar"
   },
   "tabs": {

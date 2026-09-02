@@ -82,6 +82,9 @@
     "categoryLabel": "Categoria predefinita",
     "notesLabel": "Note (opzionale)",
     "websiteLabel": "Sito web",
+    "addressLabel": "Indirizzo",
+    "emailLabel": "E-mail",
+    "phoneLabel": "Telefono",
     "submitCreate": "Crea beneficiario",
     "submitUpdate": "Aggiorna beneficiario",
     "applyCategoryLabel": "Applica questa categoria alle transazioni esistenti",
@@ -270,7 +273,8 @@
   },
   "selectCategoryPlaceholder": "Seleziona categoria...",
   "validation": {
-    "nameRequired": "Il nome del beneficiario è obbligatorio"
+    "nameRequired": "Il nome del beneficiario è obbligatorio",
+    "emailInvalid": "Inserisci un indirizzo e-mail valido"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "Applicare le categorie predefinite?",

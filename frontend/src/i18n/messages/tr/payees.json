@@ -82,6 +82,9 @@
     "categoryLabel": "Varsayılan Kategori",
     "notesLabel": "Notlar (isteğe bağlı)",
     "websiteLabel": "Web sitesi",
+    "addressLabel": "Adres",
+    "emailLabel": "E-posta",
+    "phoneLabel": "Telefon",
     "submitCreate": "Alacaklı Oluştur",
     "submitUpdate": "Alacaklıyı Güncelle",
     "applyCategoryLabel": "Bu kategoriyi mevcut işlemlere uygula",
@@ -270,7 +273,8 @@
   },
   "selectCategoryPlaceholder": "Kategori seçin...",
   "validation": {
-    "nameRequired": "Alacaklı adı gereklidir"
+    "nameRequired": "Alacaklı adı gereklidir",
+    "emailInvalid": "Geçerli bir e-posta adresi girin"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "Varsayılan kategoriler uygulansin mı?",

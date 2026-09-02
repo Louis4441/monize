@@ -78,6 +78,23 @@ export class Payee {
   @Column({ type: "timestamp", name: "logo_fetched_at", nullable: true })
   logoFetchedAt: Date | null;
 
+  /**
+   * Free-text postal address. One field rather than structured parts: formats
+   * are locale-specific, and the only consumer is a maps handoff that takes a
+   * single query string anyway.
+   */
+  @ApiPropertyOptional({ example: "1912 Pike Pl, Seattle, WA 98101" })
+  @Column({ type: "text", nullable: true })
+  address: string | null;
+
+  @ApiPropertyOptional({ example: "hello@starbucks.com" })
+  @Column({ type: "varchar", length: 255, nullable: true })
+  email: string | null;
+
+  @ApiPropertyOptional({ example: "+1 206-448-8762" })
+  @Column({ type: "varchar", length: 50, nullable: true })
+  phone: string | null;
+
   @ApiProperty({ example: true, description: "Whether the payee is active" })
   @Column({ type: "boolean", name: "is_active", default: true })
   isActive: boolean;

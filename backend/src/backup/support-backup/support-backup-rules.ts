@@ -87,6 +87,7 @@ export const RULES: Record<string, TableRules> = {
     lock_reconciled_transactions: keep,
     language: keep,
     last_client_timezone: drop, // location hint
+    default_map_provider: keep,
     created_at: keep,
     updated_at: keep,
   },
@@ -121,6 +122,11 @@ export const RULES: Record<string, TableRules> = {
     logo_content_type: drop,
     has_logo: konst(false),
     logo_fetched_at: drop,
+    // Contact details are direct personal data and name the payee outright,
+    // which is the whole point of masking the name.
+    address: drop,
+    email: drop,
+    phone: drop,
     is_active: keep,
     created_at: keep,
   },

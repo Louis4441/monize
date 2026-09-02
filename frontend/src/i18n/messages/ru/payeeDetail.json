@@ -94,6 +94,9 @@
     "largestValue": "{amount} — {date}",
     "overpaymentFor": "Получатель досрочных платежей для",
     "website": "Сайт",
+    "address": "Адрес",
+    "phone": "Телефон",
+    "email": "Электронная почта",
     "notes": "Примечания"
   },
   "tabs": {

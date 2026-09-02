@@ -5,6 +5,7 @@ import {
   MaxLength,
   IsUUID,
   IsUrl,
+  IsEmail,
   ValidateIf,
 } from "class-validator";
 import { SanitizeHtml } from "../../common/decorators/sanitize-html.decorator";
@@ -61,4 +62,47 @@ export class CreatePayeeDto {
     require_tld: true,
   })
   website?: string | null;
+
+  @ApiProperty({
+    example: "1912 Pike Pl, Seattle, WA 98101",
+    required: false,
+    description:
+      "Free-text postal address, rendered as a link that opens the reader's maps app.",
+  })
+  @IsOptional()
+  // Same "" -> clear contract as `website` above: the form sends an empty
+  // string for a field the user emptied, and the service reads it as a clear.
+  @ValidateIf((_o, value) => value !== null && value !== "")
+  @IsString()
+  @MaxLength(500)
+  @SanitizeHtml()
+  address?: string | null;
+
+  @ApiProperty({
+    example: "hello@starbucks.com",
+    required: false,
+    description: "Contact email, rendered as a mailto link.",
+  })
+  @IsOptional()
+  // `@IsOptional` waives undefined and null but not "", and the form sends ""
+  // to clear -- without this every save with a blank email would 400.
+  @ValidateIf((_o, value) => value !== null && value !== "")
+  @IsEmail()
+  @MaxLength(255)
+  email?: string | null;
+
+  @ApiProperty({
+    example: "+1 206-448-8762",
+    required: false,
+    description: "Contact phone number, rendered as a tel link.",
+  })
+  @IsOptional()
+  @ValidateIf((_o, value) => value !== null && value !== "")
+  @IsString()
+  // Length cap only: international numbers carry country codes, spaces,
+  // parentheses and extensions, so a format check would reject valid numbers.
+  // The value is only ever displayed and turned into a tel: href.
+  @MaxLength(50)
+  @SanitizeHtml()
+  phone?: string | null;
 }

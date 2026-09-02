@@ -94,6 +94,9 @@
     "largestValue": "{amount} pada {date}",
     "overpaymentFor": "Penerima Pembayaran Ekstra untuk",
     "website": "Situs web",
+    "address": "Alamat",
+    "phone": "Telepon",
+    "email": "Email",
     "notes": "Catatan"
   },
   "tabs": {

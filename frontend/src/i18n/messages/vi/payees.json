@@ -82,6 +82,9 @@
     "categoryLabel": "Danh mục mặc định",
     "notesLabel": "Ghi chú (tùy chọn)",
     "websiteLabel": "Trang web",
+    "addressLabel": "Địa chỉ",
+    "emailLabel": "Email",
+    "phoneLabel": "Điện thoại",
     "submitCreate": "Tạo người nhận",
     "submitUpdate": "Cập nhật người nhận",
     "applyCategoryLabel": "Áp dụng danh mục này cho các giao dịch hiện có",
@@ -270,7 +273,8 @@
   },
   "selectCategoryPlaceholder": "Chọn danh mục...",
   "validation": {
-    "nameRequired": "Tên người nhận là bắt buộc"
+    "nameRequired": "Tên người nhận là bắt buộc",
+    "emailInvalid": "Nhập địa chỉ email hợp lệ"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "Áp dụng danh mục mặc định?",

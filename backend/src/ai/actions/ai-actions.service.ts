@@ -468,6 +468,9 @@ export class AiActionsService {
           name: r.name,
           defaultCategoryId: r.defaultCategoryId ?? undefined,
           website: r.website,
+          address: r.address,
+          email: r.email,
+          phone: r.phone,
         });
         const payee = await this.payeesService.create(userId, dto);
         return payee.id;
@@ -478,6 +481,9 @@ export class AiActionsService {
           name: r.name,
           defaultCategoryId: r.defaultCategoryId,
           website: r.website,
+          address: r.address,
+          email: r.email,
+          phone: r.phone,
         });
         const payee = await this.payeesService.update(userId, r.payeeId, dto);
         return payee.id;
@@ -720,6 +726,9 @@ export class AiActionsService {
       name: descriptor.name,
       defaultCategoryId: descriptor.defaultCategoryId ?? undefined,
       website: descriptor.website,
+      address: descriptor.address,
+      email: descriptor.email,
+      phone: descriptor.phone,
     });
     const payee = await this.payeesService.create(userId, dto);
     return { type: "create_payee", id: payee.id };
@@ -734,6 +743,9 @@ export class AiActionsService {
       defaultCategoryId: descriptor.defaultCategoryId,
       // Raw: undefined leaves the stored address alone, null clears it.
       website: descriptor.website,
+      address: descriptor.address,
+      email: descriptor.email,
+      phone: descriptor.phone,
     });
     const payee = await this.payeesService.update(
       userId,

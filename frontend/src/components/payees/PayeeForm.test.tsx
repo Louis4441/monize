@@ -289,4 +289,76 @@ describe('PayeeForm', () => {
       expect(submit.mock.calls[0][0].applyCategoryToTransactions).toBeUndefined();
     });
   });
+
+  describe('contact details', () => {
+    it('submits the address, email and phone', async () => {
+      const submit = vi.fn().mockResolvedValue(undefined);
+      await act(async () => {
+        render(
+          <PayeeForm categories={categories} onSubmit={submit} onCancel={onCancel} />,
+        );
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Payee Name'), {
+          target: { value: 'Starbucks' },
+        });
+        fireEvent.change(screen.getByLabelText('Address'), {
+          target: { value: '1912 Pike Pl\nSeattle, WA' },
+        });
+        fireEvent.change(screen.getByLabelText('Email'), {
+          target: { value: 'hello@starbucks.com' },
+        });
+        fireEvent.change(screen.getByLabelText('Phone'), {
+          target: { value: '+1 206-448-8762' },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByText('Create Payee'));
+      });
+
+      expect(submit.mock.calls[0][0]).toMatchObject({
+        address: '1912 Pike Pl\nSeattle, WA',
+        email: 'hello@starbucks.com',
+        phone: '+1 206-448-8762',
+      });
+    });
+
+    it('submits an emptied field as "", which is how the backend clears it', async () => {
+      const submit = vi.fn().mockResolvedValue(undefined);
+      const payee = {
+        id: 'p1',
+        name: 'Starbucks',
+        defaultCategoryId: '',
+        notes: '',
+        address: '1912 Pike Pl',
+        email: 'hello@starbucks.com',
+        phone: '555',
+      } as any;
+      await act(async () => {
+        render(
+          <PayeeForm
+            payee={payee}
+            categories={categories}
+            onSubmit={submit}
+            onCancel={onCancel}
+          />,
+        );
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Address'), {
+          target: { value: '' },
+        });
+        fireEvent.change(screen.getByLabelText('Email'), {
+          target: { value: '' },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByText('Update Payee'));
+      });
+
+      // An empty email must pass validation: it is a clear, not a bad address.
+      expect(submit).toHaveBeenCalledTimes(1);
+      expect(submit.mock.calls[0][0]).toMatchObject({ address: '', email: '' });
+    });
+  });
 });

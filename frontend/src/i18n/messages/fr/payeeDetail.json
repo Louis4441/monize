@@ -94,6 +94,9 @@
     "largestValue": "{amount} le {date}",
     "overpaymentFor": "Bénéficiaire de remboursement anticipé pour",
     "website": "Site web",
+    "address": "Adresse",
+    "phone": "Téléphone",
+    "email": "E-mail",
     "notes": "Notes"
   },
   "tabs": {

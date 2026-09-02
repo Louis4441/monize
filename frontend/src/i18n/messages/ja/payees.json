@@ -82,6 +82,9 @@
     "categoryLabel": "デフォルトカテゴリ",
     "notesLabel": "メモ（任意）",
     "websiteLabel": "ウェブサイト",
+    "addressLabel": "住所",
+    "emailLabel": "メールアドレス",
+    "phoneLabel": "電話番号",
     "submitCreate": "支払先を作成",
     "submitUpdate": "支払先を更新",
     "applyCategoryLabel": "このカテゴリを既存の取引に適用",
@@ -270,7 +273,8 @@
   },
   "selectCategoryPlaceholder": "カテゴリを選択...",
   "validation": {
-    "nameRequired": "支払先名は必須です"
+    "nameRequired": "支払先名は必須です",
+    "emailInvalid": "有効なメールアドレスを入力してください"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "デフォルトカテゴリを適用しますか？",

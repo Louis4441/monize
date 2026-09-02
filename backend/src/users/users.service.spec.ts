@@ -674,6 +674,7 @@ describe("UsersService", () => {
       ["showCreatedAt", true],
       ["timeFormat", "24h"],
       ["defaultQuoteProvider", "yahoo"],
+      ["defaultMapProvider", "google"],
       ["recentTransactionsLimit", 25],
       ["language", "fr"],
       ["colorTheme", "latte"],

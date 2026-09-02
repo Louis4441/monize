@@ -137,6 +137,88 @@ describe("PayeeToolPrepService", () => {
       expect(d.previewRows[0]).toMatchObject({ status: "error", name: null });
     });
   });
+  describe("contact fields", () => {
+    it("passes a create row's contact fields to the preview", async () => {
+      payees.previewCreatePayee.mockResolvedValue({
+        name: "Acme",
+        defaultCategoryId: null,
+        defaultCategoryName: null,
+        address: "1 Main St",
+        email: "hi@acme.com",
+        phone: "555",
+      });
+
+      await prep.prepareCreatePayeeSingle(USER, {
+        name: "Acme",
+        address: "1 Main St",
+        email: "hi@acme.com",
+        phone: "555",
+      });
+
+      expect(payees.previewCreatePayee).toHaveBeenCalledWith(
+        USER,
+        expect.objectContaining({
+          address: "1 Main St",
+          email: "hi@acme.com",
+          phone: "555",
+        }),
+      );
+    });
+
+    it("passes an update row's contact fields, including the empty string that clears one", async () => {
+      payees.previewUpdatePayee.mockResolvedValue({
+        payeeId: "p1",
+        name: "Acme",
+        defaultCategoryId: null,
+        defaultCategoryName: null,
+        address: null,
+      });
+
+      await prep.prepareUpdatePayeeSingle(USER, {
+        name: "Acme",
+        address: "",
+        phone: "555",
+      });
+
+      expect(payees.previewUpdatePayee).toHaveBeenCalledWith(
+        USER,
+        expect.objectContaining({ address: "", phone: "555" }),
+      );
+    });
+
+    it("carries the contact fields onto the signed batch rows", () => {
+      // The batch row is what a confirmed action writes: a field resolved at
+      // preview time but dropped here would be shown on the card and then not
+      // saved.
+      expect(
+        PayeeToolPrepService.createToBatchRow({
+          name: "Acme",
+          defaultCategoryId: null,
+          defaultCategoryName: null,
+          address: "1 Main St",
+          email: "hi@acme.com",
+          phone: "555",
+        }),
+      ).toEqual(
+        expect.objectContaining({
+          address: "1 Main St",
+          email: "hi@acme.com",
+          phone: "555",
+        }),
+      );
+
+      expect(
+        PayeeToolPrepService.updateToBatchRow({
+          payeeId: "p1",
+          name: "Acme",
+          defaultCategoryId: null,
+          defaultCategoryName: null,
+          address: null,
+        }),
+      ).toEqual(expect.objectContaining({ address: null }));
+    });
+  });
+
   describe("website", () => {
     it("passes a create row's website to the preview", async () => {
       payees.previewCreatePayee.mockResolvedValue({

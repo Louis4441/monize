@@ -248,6 +248,10 @@ export const managePayeesSchema = z.object({
         // mirroring categoryName. Zod strips unknown keys, so a field absent
         // here is silently dropped rather than rejected.
         website: z.string().max(2048).optional(),
+        // Same empty-string-clears contract as website above.
+        address: z.string().max(500).optional(),
+        email: z.string().max(255).optional(),
+        phone: z.string().max(50).optional(),
       }),
     )
     .min(1)

@@ -94,6 +94,9 @@
     "largestValue": "{amount} op {date}",
     "overpaymentFor": "Begunstigde voor extra aflossing van",
     "website": "Website",
+    "address": "Adres",
+    "phone": "Telefoon",
+    "email": "E-mail",
     "notes": "Notities"
   },
   "tabs": {

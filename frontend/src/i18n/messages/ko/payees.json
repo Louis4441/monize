@@ -82,6 +82,9 @@
     "categoryLabel": "기본 카테고리",
     "notesLabel": "메모 (선택)",
     "websiteLabel": "웹사이트",
+    "addressLabel": "주소",
+    "emailLabel": "이메일",
+    "phoneLabel": "전화번호",
     "submitCreate": "수취인 만들기",
     "submitUpdate": "수취인 업데이트",
     "applyCategoryLabel": "기존 거래에 이 카테고리 적용",
@@ -270,7 +273,8 @@
   },
   "selectCategoryPlaceholder": "카테고리 선택...",
   "validation": {
-    "nameRequired": "수취인 이름이 필요합니다"
+    "nameRequired": "수취인 이름이 필요합니다",
+    "emailInvalid": "유효한 이메일 주소를 입력하세요"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "기본 카테고리를 적용하시겠습니까?",

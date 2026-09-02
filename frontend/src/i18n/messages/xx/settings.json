@@ -133,6 +133,16 @@
     "timeFormatLabel": "[XX-Time Format-XX]",
     "recentTransactionsLabel": "[XX-Recent transactions in quick-fill-XX]",
     "recentTransactionsHelp": "[XX-Number of entries shown in the history button popover next to the Payee field on transaction forms.-XX]",
+    "mapProviderLabel": "[XX-Map provider for addresses-XX]",
+    "mapProviderHelp": "[XX-Which map service opens when you click an address in a desktop browser. Phones and tablets always open their own map app, whatever you choose here. Automatic uses OpenStreetMap on desktop.-XX]",
+    "mapProviderOptions": {
+      "device": "[XX-Automatic-XX]",
+      "apple": "[XX-Apple Maps-XX]",
+      "bing": "[XX-Bing Maps-XX]",
+      "google": "[XX-Google Maps-XX]",
+      "openstreetmap": "[XX-OpenStreetMap-XX]",
+      "waze": "[XX-Waze-XX]"
+    },
     "saveButton": "[XX-Save Preferences-XX]",
     "savingButton": "[XX-Saving...-XX]",
     "toasts": {

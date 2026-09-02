@@ -157,6 +157,30 @@ export class UserPreference {
   })
   defaultQuoteProvider: "yahoo" | "msn";
 
+  /**
+   * Which map service an address link opens. "device" means decide from the
+   * platform, which is what every user got before this column existed.
+   *
+   * The union is written out here rather than imported from MAP_PROVIDERS in
+   * the DTO because `entity-varchar-capacity.spec.ts` reads this annotation to
+   * check the longest allowed literal against the column width; an aliased type
+   * would leave that guard with nothing to measure. The two lists are held
+   * together by `update-preferences.dto.spec.ts`.
+   */
+  @Column({
+    name: "default_map_provider",
+    type: "varchar",
+    length: 20,
+    default: "device",
+  })
+  defaultMapProvider:
+    | "device"
+    | "openstreetmap"
+    | "google"
+    | "apple"
+    | "bing"
+    | "waze";
+
   @Column({
     name: "recent_transactions_limit",
     type: "smallint",

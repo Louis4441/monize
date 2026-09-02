@@ -15,6 +15,25 @@ import {
 } from "class-validator";
 import { IsDashboardWidgetConfig } from "../validators/is-dashboard-widget-config.validator";
 
+/**
+ * Map services an address link can be sent to.
+ *
+ * "device" is the platform hand-off that predates this setting: Apple Maps on
+ * iOS, a `geo:` URI on Android (which opens whichever map app the phone is set
+ * to), OpenStreetMap everywhere else. It is a value rather than an absence so a
+ * user can deliberately return to it.
+ */
+export const MAP_PROVIDERS = [
+  "device",
+  "openstreetmap",
+  "google",
+  "apple",
+  "bing",
+  "waze",
+] as const;
+
+export type MapProvider = (typeof MAP_PROVIDERS)[number];
+
 export class UpdatePreferencesDto {
   @ApiPropertyOptional({
     description: "Default currency code (ISO 4217)",
@@ -248,6 +267,16 @@ export class UpdatePreferencesDto {
   @IsOptional()
   @IsIn(["yahoo", "msn"])
   defaultQuoteProvider?: "yahoo" | "msn";
+
+  @ApiPropertyOptional({
+    description:
+      "Which map service an address link opens. 'device' decides from the platform: Apple Maps on iOS, the phone's default map app on Android, OpenStreetMap elsewhere.",
+    example: "device",
+    enum: MAP_PROVIDERS,
+  })
+  @IsOptional()
+  @IsIn([...MAP_PROVIDERS])
+  defaultMapProvider?: MapProvider;
 
   @ApiPropertyOptional({
     description:

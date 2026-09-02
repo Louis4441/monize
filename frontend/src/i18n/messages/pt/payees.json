@@ -82,6 +82,9 @@
     "categoryLabel": "Categoria Predefinida",
     "notesLabel": "Notas (opcional)",
     "websiteLabel": "Site",
+    "addressLabel": "Morada",
+    "emailLabel": "E-mail",
+    "phoneLabel": "Telefone",
     "submitCreate": "Criar Beneficiário",
     "submitUpdate": "Atualizar Beneficiário",
     "applyCategoryLabel": "Aplicar esta categoria às transações existentes",
@@ -270,7 +273,8 @@
   },
   "selectCategoryPlaceholder": "Selecionar categoria...",
   "validation": {
-    "nameRequired": "O nome do beneficiário é obrigatório"
+    "nameRequired": "O nome do beneficiário é obrigatório",
+    "emailInvalid": "Introduza um endereço de e-mail válido"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "Aplicar categorias predefinidas?",

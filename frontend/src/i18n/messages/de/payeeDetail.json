@@ -94,6 +94,9 @@
     "largestValue": "{amount} am {date}",
     "overpaymentFor": "Sondertilgungs-Empfänger für",
     "website": "Website",
+    "address": "Adresse",
+    "phone": "Telefon",
+    "email": "E-Mail",
     "notes": "Notizen"
   },
   "tabs": {

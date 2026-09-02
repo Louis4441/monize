@@ -133,6 +133,16 @@
     "timeFormatLabel": "Formato de Hora",
     "recentTransactionsLabel": "Transações recentes no preenchimento rápido",
     "recentTransactionsHelp": "Número de entradas mostradas no menu do botão de histórico ao lado do campo Beneficiário nos formulários de transação.",
+    "mapProviderLabel": "Provedor de mapas para endereços",
+    "mapProviderHelp": "Qual serviço de mapas abre quando você clica em um endereço em um navegador de computador. Celulares e tablets sempre abrem o próprio aplicativo de mapas, independentemente do que você escolher aqui. Automático usa o OpenStreetMap no computador.",
+    "mapProviderOptions": {
+      "device": "Automático",
+      "apple": "Apple Maps",
+      "bing": "Bing Maps",
+      "google": "Google Maps",
+      "openstreetmap": "OpenStreetMap",
+      "waze": "Waze"
+    },
     "saveButton": "Salvar Preferências",
     "savingButton": "Salvando...",
     "toasts": {

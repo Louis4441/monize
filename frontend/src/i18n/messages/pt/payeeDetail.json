@@ -94,6 +94,9 @@
     "largestValue": "{amount} em {date}",
     "overpaymentFor": "Beneficiário de amortização extra de",
     "website": "Site",
+    "address": "Morada",
+    "phone": "Telefone",
+    "email": "E-mail",
     "notes": "Notas"
   },
   "tabs": {

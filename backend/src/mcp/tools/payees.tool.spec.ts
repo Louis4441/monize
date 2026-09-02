@@ -187,6 +187,106 @@ describe("McpPayeesTools", () => {
       });
     });
 
+    it("passes the contact fields through to the prep layer and the write", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
+      prepService.prepareCreatePayeeSingle.mockResolvedValue({
+        name: "Acme",
+        defaultCategoryId: null,
+        defaultCategoryName: null,
+        address: "1 Main St, Springfield",
+        email: "hi@acme.com",
+        phone: "+1 555-0100",
+      });
+
+      await handlers["manage_payees"](
+        {
+          operation: "create",
+          items: [
+            {
+              name: "Acme",
+              address: "1 Main St, Springfield",
+              email: "hi@acme.com",
+              phone: "+1 555-0100",
+            },
+          ],
+        },
+        { sessionId: "s1" },
+      );
+
+      expect(prepService.prepareCreatePayeeSingle).toHaveBeenCalledWith(
+        "u1",
+        expect.objectContaining({
+          address: "1 Main St, Springfield",
+          email: "hi@acme.com",
+          phone: "+1 555-0100",
+        }),
+      );
+      expect(payeesService.create).toHaveBeenCalledWith(
+        "u1",
+        expect.objectContaining({
+          address: "1 Main St, Springfield",
+          email: "hi@acme.com",
+          phone: "+1 555-0100",
+        }),
+      );
+    });
+
+    it("shows the contact fields on the confirmation card", async () => {
+      // The card is the whole point of the confirmation step: a field written
+      // by the approval but absent from the text is a change nobody agreed to.
+      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
+      server.server.getClientCapabilities.mockReturnValue({
+        elicitation: { form: {} },
+      });
+      prepService.prepareCreatePayeeSingle.mockResolvedValue({
+        name: "Acme",
+        defaultCategoryId: null,
+        defaultCategoryName: null,
+        address: "1 Main St",
+        email: "hi@acme.com",
+        phone: "555",
+      });
+
+      await handlers["manage_payees"](
+        {
+          operation: "create",
+          items: [{ name: "Acme", address: "1 Main St" }],
+        },
+        { sessionId: "s1" },
+      );
+
+      const card =
+        elicitInput.mock.calls[elicitInput.mock.calls.length - 1]?.[0] ?? "";
+      const text = typeof card === "string" ? card : JSON.stringify(card);
+      expect(text).toContain("1 Main St");
+      expect(text).toContain("hi@acme.com");
+      expect(text).toContain("555");
+    });
+
+    it("says a cleared contact field is being cleared rather than omitting it", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
+      server.server.getClientCapabilities.mockReturnValue({
+        elicitation: { form: {} },
+      });
+      prepService.prepareUpdatePayeeSingle.mockResolvedValue({
+        payeeId: "p1",
+        name: "Acme",
+        defaultCategoryId: null,
+        defaultCategoryName: null,
+        address: null,
+      });
+
+      await handlers["manage_payees"](
+        { operation: "update", items: [{ name: "Acme", address: "" }] },
+        { sessionId: "s1" },
+      );
+
+      const card =
+        elicitInput.mock.calls[elicitInput.mock.calls.length - 1]?.[0] ?? "";
+      const text = typeof card === "string" ? card : JSON.stringify(card);
+      expect(text).toContain("(cleared)");
+    });
+
     it("updates a single payee on success", async () => {
       resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
       const result = await handlers["manage_payees"](

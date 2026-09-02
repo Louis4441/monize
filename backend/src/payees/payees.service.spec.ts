@@ -46,6 +46,9 @@ describe("PayeesService", () => {
     logoContentType: null,
     hasLogo: false,
     logoFetchedAt: null,
+    address: null,
+    email: null,
+    phone: null,
     defaultCategory: { id: "cat-1", name: "Food & Drink" } as any,
     isActive: true,
     createdAt: new Date("2025-01-01"),
@@ -62,6 +65,9 @@ describe("PayeesService", () => {
     logoContentType: null,
     hasLogo: false,
     logoFetchedAt: null,
+    address: null,
+    email: null,
+    phone: null,
     defaultCategory: null as any,
     isActive: true,
     createdAt: new Date("2025-01-02"),
@@ -216,6 +222,9 @@ describe("PayeesService", () => {
       expect(payeesRepository.create).toHaveBeenCalledWith({
         ...dto,
         website: null,
+        address: null,
+        email: null,
+        phone: null,
         userId,
       });
       expect(payeesRepository.save).toHaveBeenCalled();
@@ -264,6 +273,9 @@ describe("PayeesService", () => {
       expect(payeesRepository.create).toHaveBeenCalledWith({
         name: "MinimalPayee",
         website: null,
+        address: null,
+        email: null,
+        phone: null,
         userId,
       });
     });
@@ -471,6 +483,9 @@ describe("PayeesService", () => {
         name: "NewPlace",
         defaultCategoryId: "cat-2",
         website: null,
+        address: null,
+        email: null,
+        phone: null,
         userId,
       });
       expect(payeesRepository.save).toHaveBeenCalled();
@@ -485,6 +500,9 @@ describe("PayeesService", () => {
         name: "NewPlace",
         defaultCategoryId: undefined,
         website: null,
+        address: null,
+        email: null,
+        phone: null,
         userId,
       });
     });
@@ -2443,6 +2461,210 @@ describe("PayeesService", () => {
       });
     });
   });
+  // ─── contact information ─────────────────────────────────────────────
+
+  describe("contact information", () => {
+    describe("create", () => {
+      it("stores the contact fields", async () => {
+        payeesRepository.findOne.mockResolvedValue(null);
+
+        await service.create(userId, {
+          name: "Starbucks",
+          address: "1912 Pike Pl, Seattle",
+          email: "hello@starbucks.com",
+          phone: "+1 206-448-8762",
+        } as any);
+
+        expect(payeesRepository.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            address: "1912 Pike Pl, Seattle",
+            email: "hello@starbucks.com",
+            phone: "+1 206-448-8762",
+          }),
+        );
+      });
+
+      it("stores a blank contact field as null rather than an empty string", async () => {
+        // "has an address" must not read true for a payee with none, or the
+        // detail page renders an empty row and a link to nowhere.
+        payeesRepository.findOne.mockResolvedValue(null);
+
+        await service.create(userId, {
+          name: "Cash",
+          address: "   ",
+          email: "",
+          phone: "",
+        } as any);
+
+        expect(payeesRepository.create).toHaveBeenCalledWith(
+          expect.objectContaining({ address: null, email: null, phone: null }),
+        );
+      });
+    });
+
+    describe("update", () => {
+      it("stores a changed address", async () => {
+        payeesRepository.findOne.mockResolvedValue({
+          ...mockPayee,
+          address: "1 Old Street",
+        });
+
+        await service.update(userId, "payee-1", { address: "2 New Street" });
+
+        expect(txManager.update).toHaveBeenCalledWith(
+          Payee,
+          { id: "payee-1", userId },
+          expect.objectContaining({ address: "2 New Street" }),
+        );
+      });
+
+      it("clears an emptied address, email and phone", async () => {
+        payeesRepository.findOne.mockResolvedValue({
+          ...mockPayee,
+          address: "1912 Pike Pl",
+          email: "hello@example.com",
+          phone: "555",
+        });
+
+        await service.update(userId, "payee-1", {
+          address: "",
+          email: "",
+          phone: "",
+        });
+
+        expect(txManager.update).toHaveBeenCalledWith(
+          Payee,
+          { id: "payee-1", userId },
+          expect.objectContaining({ address: null, email: null, phone: null }),
+        );
+      });
+
+      it("leaves the contact fields alone when they are absent", async () => {
+        payeesRepository.findOne.mockResolvedValue({
+          ...mockPayee,
+          address: "1912 Pike Pl",
+          email: "hello@example.com",
+        });
+
+        await service.update(userId, "payee-1", { notes: "Just a note" });
+
+        expect(txManager.update).toHaveBeenCalledWith(
+          Payee,
+          { id: "payee-1", userId },
+          expect.not.objectContaining({ address: expect.anything() }),
+        );
+      });
+    });
+
+    describe("action history", () => {
+      it("snapshots the contact fields of a deleted payee", async () => {
+        // Undo re-inserts the row from beforeData alone, column by column, so a
+        // contact field missing from the snapshot is gone for good.
+        payeesRepository.findOne.mockResolvedValue({
+          ...mockPayee,
+          address: "1912 Pike Pl",
+          email: "hello@example.com",
+          phone: "+1 206-448-8762",
+        });
+
+        await service.remove(userId, "payee-1");
+
+        const record = (service as any).actionHistoryService
+          .record as jest.Mock;
+        const [, params] = record.mock.calls[record.mock.calls.length - 1];
+        expect(params.action).toBe("delete");
+        expect(params.beforeData).toEqual(
+          expect.objectContaining({
+            address: "1912 Pike Pl",
+            email: "hello@example.com",
+            phone: "+1 206-448-8762",
+          }),
+        );
+      });
+
+      it("snapshots the contact fields on both sides of an update", async () => {
+        // Undo restores beforeData, so a field missing from it silently
+        // survives the undo.
+        payeesRepository.findOne.mockResolvedValue({
+          ...mockPayee,
+          address: "1 Old Street",
+          email: "old@example.com",
+          phone: "111",
+        });
+
+        await service.update(userId, "payee-1", { address: "2 New Street" });
+
+        const record = (service as any).actionHistoryService
+          .record as jest.Mock;
+        const [, params] = record.mock.calls[record.mock.calls.length - 1];
+        expect(params.beforeData).toEqual(
+          expect.objectContaining({
+            address: "1 Old Street",
+            email: "old@example.com",
+            phone: "111",
+          }),
+        );
+        expect(params.afterData).toEqual(
+          expect.objectContaining({
+            address: expect.anything(),
+            email: expect.anything(),
+            phone: expect.anything(),
+          }),
+        );
+      });
+    });
+
+    describe("preview", () => {
+      it("rejects a malformed email before a card is shown", async () => {
+        // A preview has to compute what the commit will do: CreatePayeeDto
+        // rejects a bad email, so letting one through here would show the user
+        // a card, take their approval, and only then fail the write.
+        payeesRepository.findOne.mockResolvedValue(null);
+
+        await expect(
+          service.previewCreatePayee(userId, {
+            name: "Acme",
+            email: "not an email",
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
+
+      it("carries the contact fields onto the create preview", async () => {
+        payeesRepository.findOne.mockResolvedValue(null);
+
+        const preview = await service.previewCreatePayee(userId, {
+          name: "Acme",
+          address: "  1 Main St  ",
+          email: "hi@acme.com",
+          phone: " 555 ",
+        });
+
+        expect(preview).toEqual(
+          expect.objectContaining({
+            // Trimmed here, so the card shows what the commit will store.
+            address: "1 Main St",
+            email: "hi@acme.com",
+            phone: "555",
+          }),
+        );
+      });
+
+      it("reads an emptied contact field as a clear, not as absent", async () => {
+        payeesRepository.findOne.mockResolvedValue(null);
+
+        const preview = await service.previewCreatePayee(userId, {
+          name: "Acme",
+          address: "",
+        });
+
+        expect(preview.address).toBeNull();
+        // A field nobody mentioned stays undefined so the card can tell the
+        // two apart.
+        expect(preview.phone).toBeUndefined();
+      });
+    });
+  });
+
   // ─── brand favicon ───────────────────────────────────────────────────
 
   describe("brand favicon", () => {

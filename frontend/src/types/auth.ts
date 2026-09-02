@@ -1,4 +1,5 @@
 import type { ColorTheme } from '@/lib/color-themes';
+import type { MapProvider } from '@/lib/contact-links';
 
 /**
  * The acting-context profile (`GET /auth/profile`, `GET /users/me`). While a
@@ -157,6 +158,8 @@ export interface UserPreferences {
   timeFormat: '24h' | '12h';
   preferredExchanges: string[];
   defaultQuoteProvider: 'yahoo' | 'msn';
+  /** Which map service an address link opens; 'device' decides from the platform. */
+  defaultMapProvider: MapProvider;
   recentTransactionsLimit: number;
   aiBubbleEnabled: boolean;
   showWhatsNew: boolean;
@@ -248,6 +251,7 @@ export interface UpdatePreferencesData {
   timeFormat?: '24h' | '12h';
   preferredExchanges?: string[];
   defaultQuoteProvider?: 'yahoo' | 'msn';
+  defaultMapProvider?: MapProvider;
   recentTransactionsLimit?: number;
   aiBubbleEnabled?: boolean;
   showWhatsNew?: boolean;

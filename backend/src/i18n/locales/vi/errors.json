@@ -350,6 +350,7 @@
   "payees": {
     "nameConflict": "Người nhận với tên \"{{ name }}\" đã tồn tại",
     "nameRequired": "Tên người nhận là bắt buộc",
+    "invalidEmail": "\"{{ email }}\" không phải là địa chỉ email hợp lệ",
     "notFound": "Không tìm thấy người nhận với ID {{ id }}",
     "logoNotFound": "Không có biểu trưng cho người nhận thanh toán này",
     "categoryIdsNotOwned": "Không tìm thấy ID danh mục hoặc không thuộc sở hữu của người dùng: {{ ids }}",

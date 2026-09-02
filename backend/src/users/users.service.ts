@@ -253,6 +253,9 @@ export class UsersService {
     if (dto.defaultQuoteProvider !== undefined) {
       patch.defaultQuoteProvider = dto.defaultQuoteProvider;
     }
+    if (dto.defaultMapProvider !== undefined) {
+      patch.defaultMapProvider = dto.defaultMapProvider;
+    }
     if (dto.recentTransactionsLimit !== undefined) {
       patch.recentTransactionsLimit = dto.recentTransactionsLimit;
     }

@@ -4,7 +4,7 @@ import { getMetadataStorage, validate } from "class-validator";
 import { plainToInstance } from "class-transformer";
 
 /**
- * Guard: an optional URL field must accept the empty string.
+ * Guard: an optional format-validated field must accept the empty string.
  *
  * `@IsOptional()` waives validation for `undefined` and `null` only. A text
  * input the user never touched arrives as `""`, so a format validator sitting
@@ -19,11 +19,23 @@ import { plainToInstance } from "class-transformer";
  * than trusting the next author to remember, in the shape of
  * `frontend/src/test/ui-conventions.test.ts`.
  *
- * Scoped to URLs on purpose. Optional UUID and date properties are cleared by
- * sending `null` throughout this codebase, and there are around a hundred of
- * them, so extending the rule there would be a large behavioural change wearing
- * a test's clothes rather than a guard.
+ * Scoped to the *string format* validators a text input can feed -- `@IsUrl`
+ * and `@IsEmail` -- on purpose. Both reject `""` while `@IsOptional()` waives
+ * only `undefined`/`null`, so both break a form the same way. Optional UUID and
+ * date properties are cleared by sending `null` throughout this codebase, and
+ * there are around a hundred of them, so extending the rule there would be a
+ * large behavioural change wearing a test's clothes rather than a guard.
  */
+
+/**
+ * The constraint names this guard sweeps, each paired with a value that trips
+ * it. A property is "format validated" if it reports the constraint for that
+ * value -- see `formatProperties` for why this is asked behaviourally.
+ */
+const FORMAT_PROBES: ReadonlyArray<{ constraint: string; value: string }> = [
+  { constraint: "isUrl", value: "definitely not a url" },
+  { constraint: "isEmail", value: "definitely not an email" },
+];
 
 /** Every `*.dto.ts` file under src/, so each one can be imported below. */
 function dtoFiles(): string[] {
@@ -54,10 +66,12 @@ function dtoModules(): unknown[] {
   return dtoFiles().map((path) => require(path));
 }
 
-interface UrlProperty {
+interface FormatProperty {
   readonly cls: new () => object;
   readonly name: string;
   readonly property: string;
+  /** Which constraint found it, so a failure message says what was violated. */
+  readonly constraint: string;
 }
 
 /** Errors reported against one property, ignoring the rest of the payload. */
@@ -74,9 +88,9 @@ async function errorsFor(
 }
 
 /**
- * Every DTO property that validates as a URL, found by asking each property what
- * it thinks of a string that is plainly not one and keeping those that answer
- * `isUrl`.
+ * Every DTO property that validates a string format, found by asking each
+ * property what it thinks of a value that is plainly not one and keeping those
+ * that answer with the matching constraint.
  *
  * Behavioural rather than metadata-shaped on purpose: class-validator files
  * every decorator built on `registerDecorator` under `customValidation`, so the
@@ -84,9 +98,9 @@ async function errorsFor(
  * does. This also finds a property that inherits the decorator through
  * `PartialType` or a base class, which source-scanning would miss.
  */
-async function urlProperties(): Promise<UrlProperty[]> {
+async function formatProperties(): Promise<FormatProperty[]> {
   const storage = getMetadataStorage();
-  const found: UrlProperty[] = [];
+  const found: FormatProperty[] = [];
   for (const module of dtoModules()) {
     for (const exported of Object.values(module as Record<string, unknown>)) {
       if (typeof exported !== "function") continue;
@@ -97,9 +111,12 @@ async function urlProperties(): Promise<UrlProperty[]> {
           .map((meta) => meta.propertyName),
       );
       for (const property of properties) {
-        const verdict = await errorsFor(cls, property, "definitely not a url");
-        if (verdict.includes("isUrl")) {
-          found.push({ cls, name: cls.name, property });
+        for (const { constraint, value } of FORMAT_PROBES) {
+          const verdict = await errorsFor(cls, property, value);
+          if (verdict.includes(constraint)) {
+            found.push({ cls, name: cls.name, property, constraint });
+            break;
+          }
         }
       }
     }
@@ -108,10 +125,10 @@ async function urlProperties(): Promise<UrlProperty[]> {
 }
 
 /**
- * Optional-looking URL properties that are *right* to reject a blank, with the
- * reason. Both are `PartialType` update DTOs over a NOT NULL column: the value
- * cannot be stored empty, so rejecting "" is the honest answer and the form
- * requires the field client-side to match.
+ * Optional-looking format properties that are *right* to reject a blank, with
+ * the reason. Each is an update DTO over a NOT NULL column: the value cannot be
+ * stored empty, so rejecting "" is the honest answer and the form requires the
+ * field client-side to match.
  *
  * The exemption is spelled out rather than inferred because nothing visible from
  * a DTO says whether its column is nullable. Ending up on this list should be a
@@ -122,18 +139,26 @@ const INTENTIONALLY_REJECTS_BLANK: Record<string, string> = {
     "institutions.website is NOT NULL and resolves the brand favicon",
   "UpdateSecurityDocumentDto.url":
     "security_documents.url is NOT NULL -- a document with no address is not a document",
+  "UpdateProfileDto.email":
+    "users.email is NOT NULL and is the login identifier -- an account with no email cannot sign in",
 };
 
-describe("optional URL fields accept the empty string a form sends", () => {
-  it("finds the URL-validated DTO properties, so the sweep is not vacuous", async () => {
+describe("optional format-validated fields accept the empty string a form sends", () => {
+  it("finds the format-validated DTO properties, so the sweep is not vacuous", async () => {
     // Were the discovery to break, the sweep below would pass over an empty
     // list and this guard would silently stop guarding.
-    expect((await urlProperties()).length).toBeGreaterThan(0);
+    const found = await formatProperties();
+    expect(found.length).toBeGreaterThan(0);
+    // Both probes have to find something, or a whole constraint could stop
+    // being swept while the count above still looks healthy.
+    for (const { constraint } of FORMAT_PROBES) {
+      expect(found.map((entry) => entry.constraint)).toContain(constraint);
+    }
   });
 
-  it("waives the URL check on every optional address", async () => {
+  it("waives the format check on every optional field", async () => {
     const offenders: string[] = [];
-    for (const { cls, name, property } of await urlProperties()) {
+    for (const { cls, name, property } of await formatProperties()) {
       const label = `${name}.${property}`;
       if (label in INTENTIONALLY_REJECTS_BLANK) continue;
 
@@ -157,7 +182,7 @@ describe("optional URL fields accept the empty string a form sends", () => {
     // The teeth: an exemption that stops applying has to leave the list, so the
     // list can only ever get shorter.
     const rejectsBlank: string[] = [];
-    for (const { cls, name, property } of await urlProperties()) {
+    for (const { cls, name, property } of await formatProperties()) {
       const whenBlank = await errorsFor(cls, property, "");
       if (whenBlank.length > 0) rejectsBlank.push(`${name}.${property}`);
     }

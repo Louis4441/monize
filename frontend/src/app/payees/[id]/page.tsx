@@ -641,7 +641,9 @@ function PayeeDetailContent() {
                     onSelectDate={(date) =>
                       goToRegister({ startDate: date, endDate: date })
                     }
-                    onSelectAccount={(accountId) => router.push(`/accounts/${accountId}`)}
+                    onSelectAccount={(accountId) =>
+                      router.push(`/accounts/${accountId}`)
+                    }
                   />
                 </div>
 

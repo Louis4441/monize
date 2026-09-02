@@ -133,6 +133,16 @@
     "timeFormatLabel": "시간 형식",
     "recentTransactionsLabel": "빠른 채우기의 최근 거래 수",
     "recentTransactionsHelp": "거래 양식의 수취인 필드 옆 기록 버튼 팝오버에 표시되는 항목 수입니다.",
+    "mapProviderLabel": "주소에 사용할 지도 제공자",
+    "mapProviderHelp": "데스크톱 브라우저에서 주소를 클릭했을 때 열리는 지도 서비스입니다. 휴대전화와 태블릿은 여기서 무엇을 선택하든 항상 기기 자체의 지도 앱을 엽니다. 자동은 데스크톱에서 OpenStreetMap을 사용합니다.",
+    "mapProviderOptions": {
+      "device": "자동",
+      "apple": "Apple Maps",
+      "bing": "Bing Maps",
+      "google": "Google Maps",
+      "openstreetmap": "OpenStreetMap",
+      "waze": "Waze"
+    },
     "saveButton": "환경설정 저장",
     "savingButton": "저장 중...",
     "toasts": {

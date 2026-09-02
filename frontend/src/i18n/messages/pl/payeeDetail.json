@@ -94,6 +94,9 @@
     "largestValue": "{amount} dnia {date}",
     "overpaymentFor": "Odbiorca nadpłat dla",
     "website": "Strona internetowa",
+    "address": "Adres",
+    "phone": "Telefon",
+    "email": "E-mail",
     "notes": "Notatki"
   },
   "tabs": {

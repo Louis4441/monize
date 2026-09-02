@@ -94,6 +94,9 @@
     "largestValue": "{date} に {amount}",
     "overpaymentFor": "繰上返済の支払先となる口座",
     "website": "ウェブサイト",
+    "address": "住所",
+    "phone": "電話番号",
+    "email": "メールアドレス",
     "notes": "メモ"
   },
   "tabs": {

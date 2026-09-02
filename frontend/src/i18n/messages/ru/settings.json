@@ -133,6 +133,16 @@
     "timeFormatLabel": "Формат времени",
     "recentTransactionsLabel": "Последние проводки в быстром заполнении",
     "recentTransactionsHelp": "Количество записей, отображаемых во всплывающем окне кнопки истории рядом с полем Получатель в формах проводок.",
+    "mapProviderLabel": "Картографический сервис для адресов",
+    "mapProviderHelp": "Какой картографический сервис открывается при нажатии на адрес в браузере на компьютере. Телефоны и планшеты всегда открывают собственное приложение карт, независимо от выбора здесь. «Автоматически» использует OpenStreetMap на компьютере.",
+    "mapProviderOptions": {
+      "device": "Автоматически",
+      "apple": "Apple Maps",
+      "bing": "Bing Maps",
+      "google": "Google Maps",
+      "openstreetmap": "OpenStreetMap",
+      "waze": "Waze"
+    },
     "saveButton": "Сохранить настройки",
     "savingButton": "Сохранение...",
     "toasts": {

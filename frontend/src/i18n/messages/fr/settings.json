@@ -133,6 +133,16 @@
     "timeFormatLabel": "Format d'heure",
     "recentTransactionsLabel": "Transactions récentes dans la saisie rapide",
     "recentTransactionsHelp": "Nombre d'entrées affichées dans le popover de l'historique à côté du champ Bénéficiaire dans les formulaires de transaction.",
+    "mapProviderLabel": "Fournisseur de cartes pour les adresses",
+    "mapProviderHelp": "Quel service de cartographie s'ouvre lorsque vous cliquez sur une adresse dans un navigateur de bureau. Les téléphones et les tablettes ouvrent toujours leur propre application de cartes, quel que soit votre choix ici. Automatique utilise OpenStreetMap sur ordinateur.",
+    "mapProviderOptions": {
+      "device": "Automatique",
+      "apple": "Apple Maps",
+      "bing": "Bing Maps",
+      "google": "Google Maps",
+      "openstreetmap": "OpenStreetMap",
+      "waze": "Waze"
+    },
     "saveButton": "Enregistrer les préférences",
     "savingButton": "Enregistrement...",
     "toasts": {

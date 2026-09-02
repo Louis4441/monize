@@ -133,6 +133,16 @@
     "timeFormatLabel": "時間格式",
     "recentTransactionsLabel": "快速填字中的最近交易",
     "recentTransactionsHelp": "在交易表單收款人欄位旁的歷史按鈕彈出視窗中顯示的記錄數量。",
+    "mapProviderLabel": "地址使用的地圖服務",
+    "mapProviderHelp": "在桌面瀏覽器中點擊地址時開啟哪個地圖服務。無論您在此處如何選擇，手機和平板電腦一律會開啟自己的地圖應用程式。自動將在桌面端使用 OpenStreetMap。",
+    "mapProviderOptions": {
+      "device": "自動",
+      "apple": "Apple Maps",
+      "bing": "Bing Maps",
+      "google": "Google Maps",
+      "openstreetmap": "OpenStreetMap",
+      "waze": "Waze"
+    },
     "saveButton": "儲存偏好設定",
     "savingButton": "儲存中...",
     "toasts": {

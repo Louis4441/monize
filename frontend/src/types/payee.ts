@@ -20,6 +20,10 @@ export interface Payee {
   hasLogo: boolean;
   /** Last time the favicon was looked for, successfully or not. */
   logoFetchedAt: string | null;
+  /** Free-text postal address. One field, not structured parts. */
+  address: string | null;
+  email: string | null;
+  phone: string | null;
   isActive: boolean;
   createdAt: string;
   transactionCount?: number;
@@ -86,6 +90,13 @@ export interface CreatePayeeData {
   notes?: string;
   /** Accepts a bare domain; the backend stores it absolute. */
   website?: string | null;
+  /**
+   * Contact details. An empty string clears the stored value, which is what a
+   * form field the user emptied sends; omitting the key leaves it alone.
+   */
+  address?: string | null;
+  email?: string | null;
+  phone?: string | null;
 }
 
 export type ApplyCategoryToTransactions = 'none' | 'uncategorized' | 'all';

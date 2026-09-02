@@ -350,6 +350,7 @@
   "payees": {
     "nameConflict": "Un bénéficiaire avec le nom « {{ name }} » existe déjà",
     "nameRequired": "Le nom du bénéficiaire est requis",
+    "invalidEmail": "\"{{ email }}\" n'est pas une adresse e-mail valide",
     "notFound": "Bénéficiaire avec l'ID {{ id }} introuvable",
     "logoNotFound": "Aucun logo disponible pour ce bénéficiaire",
     "categoryIdsNotOwned": "IDs de catégorie introuvables ou n'appartenant pas à l'utilisateur : {{ ids }}",

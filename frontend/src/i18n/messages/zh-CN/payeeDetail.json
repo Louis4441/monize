@@ -94,6 +94,9 @@
     "largestValue": "{date} 的 {amount}",
     "overpaymentFor": "作为以下账户的额外还款收款人",
     "website": "网站",
+    "address": "地址",
+    "phone": "电话",
+    "email": "电子邮件",
     "notes": "备注"
   },
   "tabs": {

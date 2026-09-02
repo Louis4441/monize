@@ -1,8 +1,15 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
 import { render } from '@/test/render';
 import { PayeeKeyInfoCard } from './PayeeKeyInfoCard';
 import type { PayeeDetail } from '@/types/payee';
+
+const mapProvider = { current: undefined as string | undefined };
+
+vi.mock('@/store/preferencesStore', () => ({
+  usePreferencesStore: (selector: (state: unknown) => unknown) =>
+    selector({ preferences: { defaultMapProvider: mapProvider.current } }),
+}));
 
 function detailFixture(overrides: Partial<PayeeDetail> = {}): PayeeDetail {
   return {
@@ -19,6 +26,9 @@ function detailFixture(overrides: Partial<PayeeDetail> = {}): PayeeDetail {
       website: null,
       hasLogo: false,
       logoFetchedAt: null,
+      address: null,
+      email: null,
+      phone: null,
       isActive: true,
       createdAt: '2024-01-15T00:00:00.000Z',
     },
@@ -106,6 +116,9 @@ describe('PayeeKeyInfoCard', () => {
           website: null,
           hasLogo: false,
           logoFetchedAt: null,
+          address: null,
+          email: null,
+          phone: null,
           isActive: true,
           createdAt: '2024-01-15T00:00:00.000Z',
         },
@@ -125,5 +138,174 @@ describe('PayeeKeyInfoCard', () => {
     expect(screen.queryByText('Largest Transaction')).toBeNull();
     expect(screen.queryByText('Overpayment Payee For')).toBeNull();
     expect(screen.queryByText('Notes')).toBeNull();
+  });
+});
+
+describe('PayeeKeyInfoCard contact details', () => {
+  // The ref is module-level, so without this the tests depend on running in
+  // order and one leaks its provider into the next.
+  beforeEach(() => {
+    mapProvider.current = undefined;
+  });
+
+  const withContact = (overrides: Partial<PayeeDetail['payee']>) =>
+    detailFixture({
+      payee: { ...detailFixture().payee, ...overrides },
+    });
+
+  it('shows nothing for a payee with no contact details', () => {
+    // KeyValueList drops empty rows, which is what makes "only if populated"
+    // free -- assert it rather than assuming it.
+    render(
+      <PayeeKeyInfoCard
+        detail={detailFixture()}
+        categoryLabelMap={new Map()}
+        onSelectDate={vi.fn()}
+        onSelectAccount={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText('Address')).not.toBeInTheDocument();
+    expect(screen.queryByText('Phone')).not.toBeInTheDocument();
+    expect(screen.queryByText('Email')).not.toBeInTheDocument();
+  });
+
+  it('links a phone number to the dialer', () => {
+    render(
+      <PayeeKeyInfoCard
+        detail={withContact({ phone: '+1 (555) 010-1234' })}
+        categoryLabelMap={new Map()}
+        onSelectDate={vi.fn()}
+        onSelectAccount={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('link', { name: '+1 (555) 010-1234' })).toHaveAttribute(
+      'href',
+      'tel:+15550101234',
+    );
+  });
+
+  it('links an email to the mail composer', () => {
+    render(
+      <PayeeKeyInfoCard
+        detail={withContact({ email: 'hello@example.com' })}
+        categoryLabelMap={new Map()}
+        onSelectDate={vi.fn()}
+        onSelectAccount={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole('link', { name: 'hello@example.com' }),
+    ).toHaveAttribute('href', 'mailto:hello%40example.com');
+  });
+
+  it('links an address to a maps application', () => {
+    render(
+      <PayeeKeyInfoCard
+        detail={withContact({ address: '1912 Pike Pl, Seattle' })}
+        categoryLabelMap={new Map()}
+        onSelectDate={vi.fn()}
+        onSelectAccount={vi.fn()}
+      />,
+    );
+
+    const link = screen.getByRole('link', { name: /1912 Pike Pl/ });
+    expect(link.getAttribute('href')).toContain(
+      encodeURIComponent('1912 Pike Pl, Seattle'),
+    );
+  });
+
+  it('sends the address to the map provider the user chose', () => {
+    mapProvider.current = 'google';
+
+    render(
+      <PayeeKeyInfoCard
+        detail={withContact({ address: '1912 Pike Pl, Seattle' })}
+        categoryLabelMap={new Map()}
+        onSelectDate={vi.fn()}
+        onSelectAccount={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole('link', { name: /1912 Pike Pl/ }).getAttribute('href'),
+    ).toContain('google.com/maps');
+  });
+
+  it('hands off to the phone map app even when a provider is stored', () => {
+    // The preference applies to desktop only. jsdom reports a desktop UA, so
+    // the platform has to be stubbed to exercise the branch a phone takes.
+    // userAgent lives on Navigator.prototype, so there is no own descriptor to
+    // put back -- defining one shadows the prototype and deleting it is what
+    // undoes that. Restoring an undefined descriptor would leave the stub in
+    // place for every test after this one.
+    const original = Object.getOwnPropertyDescriptor(
+      window.navigator,
+      'userAgent',
+    );
+    Object.defineProperty(window.navigator, 'userAgent', {
+      value:
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
+      configurable: true,
+    });
+    mapProvider.current = 'google';
+
+    try {
+      render(
+        <PayeeKeyInfoCard
+          detail={withContact({ address: '1912 Pike Pl, Seattle' })}
+          categoryLabelMap={new Map()}
+          onSelectDate={vi.fn()}
+          onSelectAccount={vi.fn()}
+        />,
+      );
+
+      expect(
+        screen.getByRole('link', { name: /1912 Pike Pl/ }).getAttribute('href'),
+      ).toContain('maps.apple.com');
+    } finally {
+      if (original) {
+        Object.defineProperty(window.navigator, 'userAgent', original);
+      } else {
+        delete (window.navigator as { userAgent?: unknown }).userAgent;
+      }
+    }
+  });
+
+  it('falls back to the platform hand-off when no provider is stored', () => {
+    // Preferences may not have loaded yet, and a user who never touched the
+    // setting must keep the behaviour they had before it existed.
+    mapProvider.current = undefined;
+
+    render(
+      <PayeeKeyInfoCard
+        detail={withContact({ address: '1912 Pike Pl, Seattle' })}
+        categoryLabelMap={new Map()}
+        onSelectDate={vi.fn()}
+        onSelectAccount={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole('link', { name: /1912 Pike Pl/ }).getAttribute('href'),
+    ).toContain('openstreetmap.org');
+  });
+
+  it('renders an undialable phone number as plain text rather than a link', () => {
+    render(
+      <PayeeKeyInfoCard
+        detail={withContact({ phone: 'call the shop' })}
+        categoryLabelMap={new Map()}
+        onSelectDate={vi.fn()}
+        onSelectAccount={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('call the shop')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'call the shop' }),
+    ).not.toBeInTheDocument();
   });
 });

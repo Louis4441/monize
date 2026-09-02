@@ -82,6 +82,9 @@
     "categoryLabel": "Standaardcategorie",
     "notesLabel": "Notities (optioneel)",
     "websiteLabel": "Website",
+    "addressLabel": "Adres",
+    "emailLabel": "E-mail",
+    "phoneLabel": "Telefoon",
     "submitCreate": "Begunstigde aanmaken",
     "submitUpdate": "Begunstigde bijwerken",
     "applyCategoryLabel": "Deze categorie toepassen op bestaande transacties",
@@ -270,7 +273,8 @@
   },
   "selectCategoryPlaceholder": "Selecteer categorie...",
   "validation": {
-    "nameRequired": "Naam begunstigde is verplicht"
+    "nameRequired": "Naam begunstigde is verplicht",
+    "emailInvalid": "Voer een geldig e-mailadres in"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "Standaardcategorieën toepassen?",

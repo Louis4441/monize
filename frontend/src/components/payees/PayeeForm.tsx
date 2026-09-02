@@ -17,11 +17,29 @@ import { useFormDirtyNotify } from '@/hooks/useFormDirtyNotify';
 import { FormActions } from '@/components/ui/FormActions';
 import { PayeeAliasManager } from './PayeeAliasManager';
 
-const buildPayeeSchema = (t: (key: string) => string) => z.object({
+/**
+ * Exported so the validation rules can be tested directly: `PayeeForm.test.tsx`
+ * mocks `zodResolver` away (so its submit handlers see real field values), which
+ * makes every rule in here invisible from that suite.
+ */
+export const buildPayeeSchema = (t: (key: string) => string) => z.object({
   name: z.string().min(1, t('validation.nameRequired')).max(255),
   defaultCategoryId: z.string().optional(),
   notes: z.string().optional(),
   website: z.string().max(2048).optional(),
+  address: z.string().max(500).optional(),
+  // Refined rather than `.email().or(z.literal(''))`: an emptied field submits
+  // "" and that is how a contact detail is cleared, so the blank has to pass --
+  // but a union's error message is a generic "invalid input", which would put
+  // the wrong text under the field. One predicate keeps both.
+  email: z
+    .string()
+    .max(255)
+    .optional()
+    .refine((value) => !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), {
+      message: t('validation.emailInvalid'),
+    }),
+  phone: z.string().max(50).optional(),
 });
 
 type PayeeFormData = z.infer<ReturnType<typeof buildPayeeSchema>>;
@@ -59,6 +77,9 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
           defaultCategoryId: payee.defaultCategoryId || '',
           notes: payee.notes || '',
           website: payee.website || '',
+          address: payee.address || '',
+          email: payee.email || '',
+          phone: payee.phone || '',
         }
       : {
           defaultCategoryId: '',
@@ -136,8 +157,12 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
     return parent ? `${parent.name}: ${cat.name}` : cat.name;
   }, [defaultCategoryId, categories]);
 
+  // noValidate on the form: the email and phone inputs keep their types so a
+  // phone offers the right keyboard, but validation is this form's own -- the
+  // browser's native bubble is unlocalized and, by blocking the submit event,
+  // would stop react-hook-form reporting the real message.
   return (
-    <form onSubmit={onFormSubmit} className="space-y-4">
+    <form onSubmit={onFormSubmit} className="space-y-4" noValidate>
       <Input
         label={t('form.nameLabel')}
         error={errors.name?.message}
@@ -181,6 +206,43 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
         placeholder="starbucks.com"
         error={errors.website?.message}
         {...register('website')}
+      />
+
+      {/* Free text, and multi-line because that is how an address is written.
+          Nothing geocodes it: the detail page hands the whole string to the
+          reader's maps application, which takes a single query anyway. */}
+      <div>
+        <label
+          htmlFor="payee-address"
+          className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+        >
+          {t('form.addressLabel')}
+        </label>
+        <textarea
+          id="payee-address"
+          rows={3}
+          className="block w-full rounded-md border-gray-300 shadow-sm focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus-visible:border-blue-400 dark:focus-visible:ring-blue-400"
+          {...register('address')}
+        />
+        {errors.address && (
+          <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+            {errors.address.message}
+          </p>
+        )}
+      </div>
+
+      <Input
+        label={t('form.emailLabel')}
+        type="email"
+        error={errors.email?.message}
+        {...register('email')}
+      />
+
+      <Input
+        label={t('form.phoneLabel')}
+        type="tel"
+        error={errors.phone?.message}
+        {...register('phone')}
       />
 
       {payee ? (
