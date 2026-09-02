@@ -638,3 +638,169 @@ count is the same resource lever an unbounded device list or request array is
 
 Every window and default here remains a **reviewable decision** the maintainer
 confirms before shipping, per the org rule that AI output is auxiliary.
+
+---
+
+## 14. Phase 5 design -- push dispatch, notification email, throttle, chart (R2, R5, R7)
+
+This section is the **design for the largest and highest-risk slice**, and it is
+written for the maintainer to confirm *before* implementation, because it (a)
+wires a fan-out onto the `NotificationService.create` path -- the write door a
+throttle attempt was already reverted from once (Section 4) -- and (b) changes
+the module graph and every producer that opts into fan-out. Nothing in this
+section is built yet; Phase 4 shipped without needing any of it.
+
+### 14.1 The dispatch seam -- where a fan-out attaches without a cycle
+
+The project has **no event emitter** (`@nestjs/event-emitter` is not a
+dependency), so the seam is an explicit service, not a listener. A
+`NotificationDispatchService` exposes:
+
+```
+notify(userId, input): Promise<Notification | null>
+```
+
+which calls `NotificationService.create(userId, input)` and, **only when a row
+was written** (`!= null` -- the ON CONFLICT winner), performs the fan-out:
+notification-mode email and push, each gated by the matrix and the throttle
+(14.3, 14.4). `create` stays the **sole writer** (the write-door guard is
+untouched); `notify` is a layer *above* it, so the in-app row is still always
+written and the fan-out never gates it (Section 3 preserved).
+
+**Module placement (the no-cycle proof).** `NotificationDispatchService` lives in
+`NotificationsModule` (`src/notifications/`), which already imports
+`NotificationCenterModule` (leaf) and holds `EmailService`. It additionally
+imports `PushModule` (also a leaf: it depends only on `EncryptionModule`,
+`DataSource`, `I18nService`). Two leaves plus the local `EmailService` means
+**no `forwardRef` and no cycle** -- `src/module-graph.spec.ts` is the proof
+obligation. `NotificationDispatchService` injects `NotificationService`,
+`NotificationPreferenceService`, `EmailService`, and the push fan-out (14.2), and
+`NotificationsModule` exports it.
+
+**Producer migration is incremental and explicit.** A producer opts into fan-out
+by calling `dispatch.notify(...)` instead of `notifications.create(...)`. That is
+a per-producer module-wiring change (the producer's module imports
+`NotificationsModule` for `NotificationDispatchService`), reviewed one producer
+at a time -- **not** a global switch. A producer that only wants the bell row
+keeps calling `create` directly. The write door does not become two doors: both
+paths write through `create`; `notify` only adds the fan-out after it.
+
+**Context.** `notify` runs in the producer's ambient RLS context (a cron body's
+`withUserContext`, a request's interceptor context), exactly as `create` does
+today; it seeds none of its own. The fan-out's own DB reads (devices, the
+throttle window) inherit that context.
+
+### 14.2 The push fan-out primitive -- `sendToUser`
+
+`PushSubscriptionService.sendToUser(userId, payload): Promise<{ attempted,
+delivered }>` fans a payload out over the user's live devices, reusing the exact
+machinery `sendTest` already has (the concurrency-bounded batches,
+`recordOutcome`, the retire-on-`MAX_CONSECUTIVE_FAILURES` bound). The batching
+loop is extracted into a shared private `fanOut(...)`; `sendTest` keeps its
+request-facing throws (no devices -> 400) while `sendToUser` is **non-throwing**
+(no devices / channel off -> `{ attempted: 0, delivered: 0 }`), because a push is
+an external side effect that must never roll back the notification it is about
+(INV-PUSH, `docs/external-side-effects.md`). It is built **with** its dispatch
+consumer (14.1), never shipped alone (the no-dead-code rule).
+
+### 14.3 Notification-mode email goes live
+
+`resolveEmailNotification(userId, category)` reads the `email_notification`
+column (stored since Phase 2, Section 4) under the same master-switch discipline
+as `resolveEmail`. When true, `notify` renders a per-notification email through
+`EmailService` + a new `notificationImmediate` template, in the recipient's
+locale via `emailTranslator` (copy composed outside a request). This is a
+notification-mode delivery, so it is **subject to the throttle** (14.4); the
+report-mode `email` column (digests) stays live and unthrottled exactly as today.
+
+### 14.4 The throttle as the fan-out gate
+
+Before a notification-mode delivery (immediate email or push) for group G and
+user U, suppress it if a **non-dismissed** notification of G was created within
+the last `throttle_minutes` -- **except a strictly higher-severity escalation**,
+which always goes (silence on an escalation is the dangerous direction). The
+in-app row for the suppressed one still exists; only the interrupting channel is
+skipped (Section 4). `throttle_minutes = 0` disables the window.
+
+- **Mechanism:** a windowed `SELECT` on the authoritative `notifications` table
+  (`user_id = U`, category(G) via the `alert_type` set, `dismissed_at IS NULL`,
+  `created_at > now - throttle_minutes`, `severity` rank below the current one),
+  read inside the dispatch. This layers on top of the exact-duplicate dedupe (the
+  fingerprint / dedupe-key unique index already stops the identical row); the
+  throttle stops a *different* same-group interruption too soon.
+- **Concurrency, stated honestly:** the throttle is a **best-effort rate limit on
+  external side effects**, not an exactly-once guarantee -- two replicas firing
+  the same group within the window can both pass the `SELECT` and both send. Push
+  collapses device-side on `collapseKey` (so a double push is one notification);
+  a double email does not collapse, so where that matters the dispatch takes a
+  per-`(user, category)` advisory lock (`pg_advisory_xact_lock`) around the
+  check-and-send, at the cost of serialising that user's fan-out. **Decision D7:
+  advisory lock on the email path or accept rare duplicates** -- the maintainer
+  picks; the default proposal is the lock, since a duplicate financial email is
+  worse than a serialised send.
+- **`budget-alert`'s batching:** `budget-alert` already batches immediate-critical
+  emails per cron run (a report, not a notification), so it stays on the
+  report-mode path and is **not** double-sent by the notification-mode throttle.
+  The dispatch reads across that batching by keying the window on the in-app rows
+  it wrote, not on the emails.
+
+### 14.5 The push matrix column goes live
+
+The matrix's `push` column (rendered "coming soon" in Phase 2) becomes a real
+per-category toggle. **A matrix cell cannot turn a device on** (permission needs
+a user gesture, Section on push enablement), so the column is enabled only when
+the user has >= 1 live device; otherwise it renders "enable push on this device
+first" linking to the existing push panel. The `unifiedpush` column stays
+"coming soon" until its transport ships.
+
+### 14.6 Chart-in-push (R5) -- feasibility and the security envelope
+
+Per Section 7: Android-Chrome-only progressive enhancement, default off, ships
+last. A `prices` notification (a future producer) may set
+`payload.image = '/api/v1/push/chart/<token>.png'`, where `<token>` is a
+**single-use, short-TTL, HMAC-signed** reference to a pre-rendered PNG the
+backend holds -- no user input in the path (CWE-22: the token is validated and
+resolves server-side to a stored artifact, never a filesystem path built from
+input). The fetch is **unauthenticated** (the browser, not our page, fetches it
+when it expands the notification), which is why the token is unguessable and
+expires. The SW passes `image` straight to `showNotification`. Where `image` is
+unsupported the notification is text-only and the deep link opens the full chart
+on `/securities/<id>`: **the number and the link are the contract; the chart is a
+nicety.** No `prices` producer exists yet, so this lands with the first
+price-alert producer, behind a per-group toggle defaulting off.
+
+### 14.7 Invariants and the test obligations
+
+- **INV-DISPATCH-001** `create` remains the sole writer; `notify` never writes a
+  row itself (write-door guard unchanged).
+- **INV-DISPATCH-002** the in-app row is written for every `notify`, regardless
+  of matrix or throttle (Section 3); a category with push+email off still bells.
+- **INV-DISPATCH-003** the throttle gates only notification-mode fan-out, never
+  the in-app row and never a report; an escalation is never throttled.
+- **INV-DISPATCH-004** a failed push/email never rolls back the notification
+  (`sendToUser` / the email send are non-throwing to `notify`).
+- **INV-MODULE** `NotificationsModule` importing `PushModule` introduces no
+  require cycle (`module-graph.spec.ts`).
+- Tests: `module-graph.spec.ts` (no cycle); a dispatch spec proving each of the
+  four dispatch invariants; a throttle matrix (within/just-after the window, an
+  escalation, `throttle=0`, a dismissed prior row not counting); the real-DB
+  advisory-lock behaviour if D7 chooses the lock; the push matrix column's
+  device-gating; and the chart token's single-use + TTL + CWE-22 path validation.
+
+### 14.8 Decisions the maintainer confirms before this is built
+
+- **D7** throttle-email concurrency: advisory lock (proposed) vs. accept rare
+  duplicate emails.
+- **D8** which producers opt into fan-out first (proposed: `budget-alert`
+  immediate-critical as notification-mode, plus `SCHEDULED_POST_FAILED`), and
+  whether any existing report email should move to notification-mode.
+- **D9** notification-mode email default per category (Section 3 table has email
+  on only for security/system as *report* mode; notification-mode defaults off
+  everywhere until confirmed).
+- **D10** chart-in-push: confirm it ships only with a real price-alert producer,
+  Android-only, default off.
+
+This section is a **plan, not an implementation**. Per the org rule that AI
+output is auxiliary and must not autonomously make decisions with downstream
+effects, the seam, the throttle concurrency choice, and the producer-migration
+order are put to the maintainer here rather than built unattended.
