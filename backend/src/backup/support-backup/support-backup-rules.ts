@@ -85,6 +85,7 @@ export const RULES: Record<string, TableRules> = {
     recent_transactions_limit: keep,
     ai_bubble_enabled: keep,
     lock_reconciled_transactions: keep,
+    payee_contact_lookup_enabled: keep,
     language: keep,
     last_client_timezone: drop, // location hint
     default_map_provider: keep,
