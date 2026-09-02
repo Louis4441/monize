@@ -49,9 +49,26 @@ describe("NotificationPreferenceController", () => {
     );
   });
 
-  it("refuses a real category the matrix does not expose yet", () => {
+  it("updates the SYSTEM category (a per-user system alert fans out on it)", () => {
+    controller.update(req, NotificationCategory.SYSTEM, { push: true });
+    expect(preferences.updatePreference).toHaveBeenCalledWith(
+      "u1",
+      NotificationCategory.SYSTEM,
+      {
+        email: undefined,
+        emailNotification: undefined,
+        push: true,
+        throttleMinutes: undefined,
+      },
+    );
+  });
+
+  it("refuses a category the matrix does not expose", () => {
+    // Every current enum member is exposed, so the defensive guard is exercised
+    // with a value that could only reach it past the ParseEnumPipe -- a future
+    // category added to the enum before it is wired into the matrix.
     expect(() =>
-      controller.update(req, NotificationCategory.SYSTEM, { email: true }),
+      controller.update(req, "GOALS" as NotificationCategory, { email: true }),
     ).toThrow(BadRequestException);
     expect(preferences.updatePreference).not.toHaveBeenCalled();
   });

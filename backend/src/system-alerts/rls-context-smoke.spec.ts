@@ -69,6 +69,10 @@ describe("System alerts RLS identity smoke (real withScopedDb)", () => {
       }
       return [];
     });
+    // The real write door, on the same connection: the point of this file is
+    // which identity each statement runs under, and the door is where the
+    // INSERT now lives.
+    const writeDoor = new NotificationService(mocks.dataSource as never);
     service = new SystemAlertService(
       mocks.dataSource as never,
       // SMTP unconfigured: the email leg is covered by the unit spec, and
@@ -77,10 +81,15 @@ describe("System alerts RLS identity smoke (real withScopedDb)", () => {
       { translate: jest.fn() } as never,
       // No emailDedupeKey is passed below, so the claim is never consulted.
       { claimOnce: jest.fn().mockResolvedValue(true) } as never,
-      // The real write door, on the same connection: the point of this file is
-      // which identity each statement runs under, and the door is where the
-      // INSERT now lives.
-      new NotificationService(mocks.dataSource as never),
+      writeDoor,
+      // The per-user path fans out through dispatch, whose own identity reads
+      // have their own suite. Forward `notify` to the write door so this file
+      // stays about the ONE statement that writes and the identity it runs
+      // under -- the `withUserContext` around `notify` is what seeds it.
+      {
+        notify: (userId: string, input: unknown) =>
+          writeDoor.create(userId, input as never),
+      } as never,
     );
   });
 

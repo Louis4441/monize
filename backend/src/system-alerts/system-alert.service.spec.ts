@@ -141,6 +141,10 @@ describe("SystemAlertService", () => {
       sendMail: jest.fn().mockResolvedValue(undefined),
     };
     jobClaims = { claimOnce: jest.fn().mockResolvedValue(true) };
+    // The real door, on the same mocked connection: what these tests are about is
+    // the SQL that lands and which recipient emails, and a double standing in for
+    // the writer would assert the call instead of the row.
+    const writeDoor = new NotificationService(dataSource as never);
     service = new SystemAlertService(
       dataSource as never,
       emailService as never,
@@ -149,10 +153,16 @@ describe("SystemAlertService", () => {
           options?.defaultValue ?? _key,
       } as never,
       jobClaims as never,
-      // The real door, on the same mocked connection: what these tests are
-      // about is the SQL that lands and which recipient emails, and a double
-      // standing in for the writer would assert the call instead of the row.
-      new NotificationService(dataSource as never),
+      writeDoor,
+      // The per-user path goes through the dispatch seam. Forward `notify` to the
+      // real write door so the guarded insert still lands (and `created` still
+      // reflects the ON CONFLICT result) without pulling the push / email fan-out
+      // into these SQL-shape tests -- the fan-out has its own suite
+      // (`notification-dispatch.service.spec.ts`).
+      {
+        notify: (userId: string, input: unknown) =>
+          writeDoor.create(userId, input as never),
+      } as never,
     );
   });
 

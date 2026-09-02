@@ -1,6 +1,7 @@
 import { NotificationDispatchService } from "./notification-dispatch.service";
 import {
   Notification,
+  NotificationCategory,
   NotificationSeverity,
   NotificationType,
 } from "../notification-center/entities/notification.entity";
@@ -121,6 +122,28 @@ describe("NotificationDispatchService", () => {
       // no dedupeKey -> the row id, never a name/amount.
       collapseKey: "n1",
     });
+  });
+
+  it("resolves delivery against the row's own category (a SYSTEM per-user alert)", async () => {
+    // SCHEDULED_POST_FAILED is a SYSTEM-category alert now fanned out per user;
+    // the matrix decision must be read for SYSTEM, not the budget default.
+    create.mockResolvedValue(
+      row({
+        type: NotificationType.SCHEDULED_POST_FAILED,
+        dedupeKey: "SCHEDULED_POST_FAILED:st-1:2026-09-02",
+      }),
+    );
+    resolveDelivery.mockResolvedValue({
+      emailNotification: false,
+      push: true,
+      throttleMinutes: 0,
+    });
+    await service.notify("u1", {} as never);
+    expect(resolveDelivery).toHaveBeenCalledWith(
+      "u1",
+      NotificationCategory.SYSTEM,
+    );
+    expect(sendToUser).toHaveBeenCalledTimes(1);
   });
 
   it("uses the dedupe key as the collapse key when present", async () => {

@@ -24,6 +24,7 @@ import {
   DEDUPE_KEY_MAX_LENGTH,
   NotificationService,
 } from "../notification-center/notification.service";
+import { NotificationDispatchService } from "../notifications/notification-dispatch.service";
 
 // The column bounds live with the writer that enforces them; re-exported here
 // because the email-dedupe claim key is bounded by the same column width and
@@ -122,8 +123,15 @@ export class SystemAlertService {
     // Every notification this service raises goes through the one write door,
     // which owns the column bounds, the conflict handling and the period
     // default -- so a system alert and a budget alert cannot land as differently
-    // shaped rows.
+    // shaped rows. The admin fan-out writes through it directly (its email is
+    // the dedicated admin path below); a per-user alert goes through the
+    // dispatch seam instead so it can also reach push/notification-email.
     private readonly notifications: NotificationService,
+    // A per-user alert (`SCHEDULED_POST_FAILED`) fans out to the affected user's
+    // push and notification-email through the same seam a budget alert uses, so
+    // one user's opt-in governs both. No forwardRef: NotificationDispatchService
+    // cannot reach this file back through imports (module-graph.spec).
+    private readonly dispatch: NotificationDispatchService,
   ) {}
 
   /**
@@ -147,17 +155,33 @@ export class SystemAlertService {
 
   /**
    * Raise a system alert for one affected user (e.g. their scheduled
-   * transaction failed to post). In-app only -- no email on this path.
+   * transaction failed to post).
+   *
+   * Fans out through the dispatch seam, so the in-app row is always written
+   * (through the one write door `notify` sits above) and the affected user's own
+   * push / notification-email opt-in for the SYSTEM category decides the rest --
+   * a scheduled transaction not posting is their money not moving, actionable by
+   * them. The fan-out is best-effort and never throws out of `notify`; the
+   * `withUserContext` seeds this out-of-request path's RLS identity, which the
+   * write and every fan-out read inherit.
    */
   async raiseUserAlert(
     userId: string,
     input: Omit<SystemAlertInput, "email">,
   ): Promise<{ created: boolean }> {
     try {
-      const id = await withUserContext(userId, () =>
-        this.insertAlert(userId, input),
+      const row = await withUserContext(userId, () =>
+        this.dispatch.notify(userId, {
+          type: input.type,
+          severity: input.severity,
+          title: input.title,
+          message: input.message,
+          data: input.data,
+          target: input.target,
+          dedupeKey: input.dedupeKey,
+        }),
       );
-      return { created: id !== null };
+      return { created: row !== null };
     } catch (error) {
       this.logger.error(
         `Could not raise ${input.type} alert for user ${userId}: ` +

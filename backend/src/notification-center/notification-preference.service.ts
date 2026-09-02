@@ -14,13 +14,21 @@ export { THROTTLE_MAX_MINUTES };
  *
  * Deliberately NOT every {@link NotificationCategory}: the matrix shows a row
  * only where a producer actually reads the resolved value, so a toggle can
- * never be a control that changes nothing. `SYSTEM` is absent because its email
- * is an admin fan-out (a cross-user recipient query), which lands with its own
- * care in a later slice; adding it here is one line plus that wiring. See
- * `docs/specs/notification-preferences.md`.
+ * never be a control that changes nothing. `SYSTEM` earns its row because the
+ * per-user `SCHEDULED_POST_FAILED` alert now fans out through
+ * `NotificationDispatchService`, which reads this category's resolved push/email
+ * decision -- a scheduled transaction failing to post is the affected user's
+ * money not moving, so an opt-in push/email is a real control. The row governs a
+ * user's OWN system notifications; the admin fan-out (`raiseAdminAlert`, a
+ * cross-user recipient query) keeps its dedicated admin email and is not gated
+ * by this matrix. See `docs/specs/notification-preferences.md`.
  */
 export const NOTIFICATION_PREFERENCE_CATEGORIES: readonly NotificationCategory[] =
-  [NotificationCategory.PAYMENTS, NotificationCategory.BUDGETS];
+  [
+    NotificationCategory.PAYMENTS,
+    NotificationCategory.BUDGETS,
+    NotificationCategory.SYSTEM,
+  ];
 
 /**
  * One category's resolved channel state for the settings matrix.
