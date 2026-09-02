@@ -513,25 +513,32 @@ the mechanism (`docs/concurrency-and-idempotency.md`, "atomic delta / CAS"):
 UPDATE notification_reminders
    SET next_fire_at = CURRENT_TIMESTAMP + (interval_minutes * INTERVAL '1 minute'),
        last_fired_at = CURRENT_TIMESTAMP,
-       fire_count    = fire_count + 1,
-       stopped_at    = CASE WHEN repeat_mode = 'once'
-                            THEN CURRENT_TIMESTAMP ELSE NULL END
+       fire_count    = fire_count + 1
  WHERE stopped_at IS NULL AND next_fire_at <= CURRENT_TIMESTAMP
  RETURNING id, user_id, alert_type, severity, title, message, data, target,
-           dedupe_base, fire_count;
+           dedupe_base, repeat_mode, fire_count;
 ```
 
 The claim advances `next_fire_at` in the **same statement** that reads the row,
 so a second replica's `UPDATE` blocks on the row lock, re-evaluates the `WHERE`
-against the committed new value (now future, or `stopped_at` set), and skips it:
-each due row is claimed exactly once. It runs under `withSystemContext` (a
-cross-user sweep); each claimed row is then re-emitted under
-`withUserContext(row.userId)`. **Order matters and is deliberate:** the claim
-commits *before* the re-emit, so a re-emit that fails skips this occurrence
-(at-most-once per interval, self-healing next tick) rather than risking a
-double-fire -- the safe direction for a notification. `next_fire_at` is set to
-`now + interval` rather than `previous + interval` so a cron that missed several
-ticks fires once and reschedules, never a catch-up burst.
+against the committed new value (now future), and skips it: each due row is
+claimed exactly once. It runs under `withSystemContext` (a cross-user sweep);
+each claimed row is then re-emitted under `withUserContext(row.userId)`. **Order
+matters and is deliberate:** the claim commits *before* the re-emit, so a re-emit
+that fails skips this occurrence and re-fires one interval later rather than
+risking a double-fire -- the safe direction for a notification. `next_fire_at` is
+set to `now + interval` rather than `previous + interval` so a cron that missed
+several ticks fires once and reschedules, never a catch-up burst.
+
+**A `once` reminder is NOT consumed by the claim.** Setting `stopped_at` here
+would commit before the delivery, so a failed re-emit would lose the single
+follow-up with no retry (a `once` reminder claimed and then unable to write its
+notification). Instead the claim only advances the schedule, and the `once` stop
+runs **inside the same transaction that writes the notification** (Section 13.3):
+`NotificationService.create`'s nested `withScopedDb` joins the re-emit's, so the
+INSERT and the `UPDATE ... SET stopped_at ... WHERE id = $1 AND stopped_at IS
+NULL` commit together. A failure rolls back both, leaving the reminder claimable
+next interval -- it delivers exactly once, never zero and never twice.
 
 ### 13.3 What a fire re-emits (through the one write door)
 

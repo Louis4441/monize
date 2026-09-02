@@ -199,6 +199,7 @@ describe("NotificationReminderService", () => {
         data: { budget: "x" },
         target: "/bills",
         dedupe_base: "BILL_DUE",
+        repeat_mode: "repeat",
         fire_count: 3,
         ...overrides,
       };
@@ -230,15 +231,47 @@ describe("NotificationReminderService", () => {
       expect(input.budgetId).toBeUndefined();
     });
 
-    it("passes ONCE to the claim so a one-shot reminder stops itself", async () => {
-      query
-        .mockResolvedValueOnce([[], 0])
-        .mockResolvedValueOnce([[], 0]);
+    it("does NOT consume a one-shot in the claim (a failed delivery must be able to retry)", async () => {
+      query.mockResolvedValueOnce([[], 0]).mockResolvedValueOnce([[], 0]);
       await service.fireDue();
-      // The claim UPDATE is the second query; its param is the ONCE sentinel.
-      const claimCall = query.mock.calls[1];
-      expect(String(claimCall[0])).toContain("repeat_mode = $1");
-      expect(claimCall[1]).toEqual([ReminderRepeatMode.ONCE]);
+      // The claim UPDATE is the second query. It advances next_fire_at and
+      // fire_count but never sets stopped_at -- the one-shot is stopped only
+      // after its delivery is written (reEmit), so a failed delivery retries.
+      const claimSql = String(query.mock.calls[1][0]);
+      expect(claimSql).toContain("next_fire_at = CURRENT_TIMESTAMP");
+      // The claim WHERE still guards on stopped_at, but it never SETS it, and
+      // no longer branches on repeat_mode = $1 (the removed ONCE consumption).
+      expect(claimSql).toContain("stopped_at IS NULL");
+      expect(claimSql).not.toContain("stopped_at = CURRENT_TIMESTAMP");
+      expect(claimSql).not.toContain("repeat_mode = $1");
+      expect(claimSql).toContain("repeat_mode"); // returned, for reEmit's decision
+    });
+
+    it("stops a one-shot in the SAME transaction as its delivery, not before", async () => {
+      query
+        .mockResolvedValueOnce([[], 0]) // sweep
+        .mockResolvedValueOnce([[claim({ repeat_mode: "once" })], 1]) // claim
+        .mockResolvedValueOnce([[{ id: "rem-1" }], 1]); // reEmit's stop UPDATE
+      await service.fireDue();
+
+      // The delivery was written...
+      expect(notifications.create).toHaveBeenCalledTimes(1);
+      // ...and the stop ran, ownership-scoped and guarded on stopped_at IS NULL,
+      // as the third query (after sweep + claim), i.e. inside reEmit.
+      const stopCall = query.mock.calls[2];
+      expect(String(stopCall[0])).toContain("stopped_at = CURRENT_TIMESTAMP");
+      expect(String(stopCall[0])).toContain("stopped_at IS NULL");
+      expect(stopCall[1]).toEqual(["rem-1", "u1"]);
+    });
+
+    it("does not stop a repeating reminder after firing", async () => {
+      query
+        .mockResolvedValueOnce([[], 0]) // sweep
+        .mockResolvedValueOnce([[claim({ repeat_mode: "repeat" })], 1]); // claim
+      await service.fireDue();
+      expect(notifications.create).toHaveBeenCalledTimes(1);
+      // Only sweep + claim ran; no stop UPDATE for a repeat.
+      expect(query).toHaveBeenCalledTimes(2);
     });
 
     it("isolates a failing re-emit: one user's failure does not skip the rest", async () => {
@@ -248,7 +281,10 @@ describe("NotificationReminderService", () => {
       query
         .mockResolvedValueOnce([[], 0])
         .mockResolvedValueOnce([
-          [claim({ id: "r1", user_id: "uA" }), claim({ id: "r2", user_id: "uB" })],
+          [
+            claim({ id: "r1", user_id: "uA" }),
+            claim({ id: "r2", user_id: "uB" }),
+          ],
           2,
         ]);
       await expect(service.fireDue()).resolves.toBeUndefined();

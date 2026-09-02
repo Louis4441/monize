@@ -56,6 +56,7 @@ interface ClaimedReminderRow {
   data: Record<string, unknown> | null;
   target: string | null;
   dedupe_base: string | null;
+  repeat_mode: string;
   fire_count: number;
 }
 
@@ -209,8 +210,15 @@ export class NotificationReminderService {
    * second replica's UPDATE blocks on the row lock, re-checks the `WHERE` against
    * the committed new value, and skips it -- each due row is claimed exactly
    * once. The claim commits BEFORE the re-emit, so a re-emit that fails skips
-   * this occurrence (at-most-once, self-healing next tick) rather than risking a
+   * this occurrence and re-fires one interval later rather than risking a
    * double-fire.
+   *
+   * A `once` reminder is NOT stopped by the claim: consuming it here would commit
+   * before the delivery, so a failed re-emit would lose the single follow-up with
+   * no retry. It is stopped inside the same transaction that writes its
+   * notification (`reEmit`), so the delivery and the stop cannot disagree --
+   * a failure rolls back both and the next interval retries, delivering exactly
+   * once.
    */
   @Cron("* * * * *")
   async fireDue(): Promise<void> {
@@ -245,13 +253,10 @@ export class NotificationReminderService {
                   SET next_fire_at = CURRENT_TIMESTAMP
                                      + (interval_minutes * INTERVAL '1 minute'),
                       last_fired_at = CURRENT_TIMESTAMP,
-                      fire_count = fire_count + 1,
-                      stopped_at = CASE WHEN repeat_mode = $1
-                                        THEN CURRENT_TIMESTAMP ELSE NULL END
+                      fire_count = fire_count + 1
                 WHERE stopped_at IS NULL AND next_fire_at <= CURRENT_TIMESTAMP
               RETURNING id, user_id, alert_type, severity, title, message,
-                        data, target, dedupe_base, fire_count`,
-              [ReminderRepeatMode.ONCE],
+                        data, target, dedupe_base, repeat_mode, fire_count`,
             ),
           ),
         ),
@@ -283,7 +288,16 @@ export class NotificationReminderService {
     }
   }
 
-  /** Re-emit one claimed reminder as a fresh in-app row through the write door. */
+  /**
+   * Re-emit one claimed reminder as a fresh in-app row through the write door,
+   * and stop it in the SAME transaction when it is a one-shot.
+   *
+   * Runs under the caller's `withUserContext`. The write door's `create` opens a
+   * nested `withScopedDb` that JOINS the outer one here, so the notification
+   * INSERT and the `once` stop commit together: a failed delivery rolls back the
+   * stop too, leaving the reminder claimable again next interval (it delivers
+   * exactly once rather than being consumed on a transient failure).
+   */
   private async reEmit(claim: ClaimedReminderRow): Promise<void> {
     const base = claim.dedupe_base ?? claim.alert_type;
     // `base:rem:<uuid>:<n>` -- the fire ordinal makes every re-emit distinct, so
@@ -293,16 +307,30 @@ export class NotificationReminderService {
     const suffix = `:rem:${claim.id}:${claim.fire_count}`;
     const dedupeKey = `${base.slice(0, DEDUPE_KEY_MAX_LENGTH - suffix.length)}${suffix}`;
 
-    await this.notifications.create(claim.user_id, {
-      type: claim.alert_type as NotificationType,
-      severity: claim.severity as NotificationSeverity,
-      title: claim.title,
-      message: claim.message,
-      // The reminder id travels on the row so the bell can offer a Stop control
-      // and the push (Phase 5) can carry the id its Stop action needs.
-      data: { ...(claim.data ?? {}), reminderId: claim.id },
-      target: claim.target,
-      dedupeKey,
+    await withScopedDb(this.dataSource, async (manager) => {
+      await this.notifications.create(claim.user_id, {
+        type: claim.alert_type as NotificationType,
+        severity: claim.severity as NotificationSeverity,
+        title: claim.title,
+        message: claim.message,
+        // The reminder id travels on the row so the bell can offer a Stop control
+        // and the push (Phase 5) can carry the id its Stop action needs.
+        data: { ...(claim.data ?? {}), reminderId: claim.id },
+        target: claim.target,
+        dedupeKey,
+      });
+
+      // A one-shot is stopped only once its follow-up is written, in this same
+      // transaction. Guarded on `stopped_at IS NULL` so a concurrent stop (the
+      // app, or the source-dismissed sweep) is not clobbered.
+      if (claim.repeat_mode === ReminderRepeatMode.ONCE) {
+        await manager.query(
+          `UPDATE notification_reminders
+              SET stopped_at = CURRENT_TIMESTAMP
+            WHERE id = $1 AND user_id = $2 AND stopped_at IS NULL`,
+          [claim.id, claim.user_id],
+        );
+      }
     });
   }
 
