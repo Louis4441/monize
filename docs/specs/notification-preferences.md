@@ -274,12 +274,21 @@ and behind a per-group toggle, defaulting off until validated on real devices.
   (`BILL_DUE`), 7 system (`BACKUP_FAILED`, `BACKUP_PARTIAL`,
   `ENCRYPTION_KEY_MISSING`, `PROVIDER_OUTAGE`, `PROVIDER_RECOVERED`,
   `SMTP_FAILURE`, `SCHEDULED_POST_FAILED`).
-- **Email is per-producer, gated by `user_preferences.notification_email`.**
-  Producers: `budget-alert.service.ts` (immediate + weekly digest),
-  `system-alert.service.ts` (admin fan-out, `queryAdminRecipients.emailEnabled`),
-  `bill-reminder.service.ts` (daily digest, gated on `notificationEmail`,
-  email-only, no in-app row). Locale for any off-request copy resolves through
-  `emailTranslator(i18n, lang)` + `resolveUserEmailLocale`.
+- **Email is per-producer, gated through `NotificationPreferenceService.resolveEmail(userId, category)`** (which reads the per-category row AND the
+  `user_preferences.notification_email` master switch). Producers:
+  `budget-alert.service.ts` (immediate + weekly digest, BUDGETS),
+  `budget-period-cron.service.ts` (monthly summary, BUDGETS -- shares
+  `budget_digest_enabled` with the weekly digest),
+  `bill-reminder.service.ts` (daily digest, PAYMENTS, email-only, no in-app row),
+  `accounts/mortgage-reminder.service.ts` (renewal reminder, PAYMENTS,
+  email-only). `system-alert.service.ts` is the one email sender that is NOT
+  category-gated: it is an admin fan-out (SYSTEM, not exposed in the matrix),
+  gated by `queryAdminRecipients.emailEnabled` in SQL. Locale for any
+  off-request copy resolves through `emailTranslator(i18n, lang)` +
+  `resolveUserEmailLocale`. `notification-email-gate.guard.spec.ts` is the
+  source scan that keeps every category producer on the resolver and pins each
+  one's category -- the earlier omission of the monthly summary and the mortgage
+  reminder from this inventory is exactly what it now prevents (audit Finding 1).
 - **Push is built but unwired.** `WebPushSender.send` is called only by
   `PushSubscriptionService.sendTest` (the `POST /push/test` button). There is no
   `sendToUser`, and nothing bridges `NotificationService.create -> push`.
@@ -343,10 +352,15 @@ Phase 1 (this slice):
 - `backend/src/notification-center/notification-preference.controller.ts` (new)
   -- `GET /notifications/preferences`, `PUT /notifications/preferences/:category`
   (JWT, `ParseEnumPipe` on category, DTO `{email: boolean}`).
-- Wire the three email producers to `resolveEmail(userId, category)` instead of
-  the bare `notification_email` read; keep `notification_email` as the default
-  seed and the global master switch (email off globally still wins -- the
-  per-category matrix narrows, never widens, an off master).
+- Wire every category email producer to `resolveEmail(userId, category)` instead
+  of the bare `notification_email` read -- `bill-reminder` and
+  `mortgage-reminder` (PAYMENTS), `budget-alert` immediate + weekly digest and
+  `budget-period-cron` monthly summary (BUDGETS); keep `notification_email` as
+  the default seed and the global master switch (email off globally still wins --
+  the per-category matrix narrows, never widens, an off master).
+  `system-alert` (SYSTEM) stays on its SQL recipient gate.
+  `notification-email-gate.guard.spec.ts` enforces both halves: no email sender
+  gates on the bare master switch, and each category producer names its category.
 - `frontend/src/components/settings/NotificationPreferencesMatrix.tsx` (new) --
   the category x channel grid (in_app locked-on, email toggle per category),
   mounted in `NotificationsSection.tsx` in place of the single email toggle.
@@ -373,8 +387,12 @@ spec is written but noted as un-run here, no PostgreSQL in this environment):
 - Write door unchanged: `create` still writes the in-app row regardless of the
   email matrix (bell shows all) -- a regression test that a category with email
   off still produces a bell row.
-- Each of the three email producers: email sent iff `resolveEmail` true; the
-  in-app row is created either way.
+- Each category email producer: email sent iff `resolveEmail` true; the in-app
+  row (where the producer writes one) is created either way. The per-category
+  gate has its own regression per producer (a BUDGETS/PAYMENTS off with the
+  master on suppresses that email), and `notification-email-gate.guard.spec.ts`
+  scans the tree so a fifth producer cannot ship gating on the bare master
+  switch or naming the wrong category.
 - Contract: frontend category list + defaults equal the backend
   (`notification-preferences.contract.test.ts`), like the existing
   `notification.contract.test.ts`.

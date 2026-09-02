@@ -96,6 +96,7 @@ describe("budgets module RLS context smoke (real withScopedDb)", () => {
       emailService as never,
       configService as never,
       i18n as never,
+      { resolveEmail: jest.fn().mockResolvedValue(true) } as never,
     );
     const errorSpy = jest
       .spyOn(service["logger"], "error")

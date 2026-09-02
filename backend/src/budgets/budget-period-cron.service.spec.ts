@@ -11,6 +11,8 @@ import { Budget, BudgetType, BudgetStrategy } from "./entities/budget.entity";
 import { BudgetPeriod, PeriodStatus } from "./entities/budget-period.entity";
 import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
+import { NotificationPreferenceService } from "../notification-center/notification-preference.service";
+import { NotificationCategory } from "../notification-center/entities/notification.entity";
 import {
   createScopedDbMocks,
   DataSourceMock,
@@ -31,6 +33,7 @@ describe("BudgetPeriodCronService", () => {
   let budgetReportsService: Record<string, jest.Mock>;
   let emailService: Record<string, jest.Mock>;
   let configService: Record<string, jest.Mock>;
+  let notificationPreferences: { resolveEmail: jest.Mock };
 
   const mockBudget: Budget = {
     id: "budget-1",
@@ -169,6 +172,18 @@ describe("BudgetPeriodCronService", () => {
       findOne: jest.fn().mockResolvedValue(null),
     };
 
+    // Mirror the real resolver's master-gate: with no per-category row,
+    // resolveEmail == the user's notification_email, so the existing
+    // preferencesRepository fixtures keep controlling the email path.
+    notificationPreferences = {
+      resolveEmail: jest.fn(async (userId: string) => {
+        const prefs = await preferencesRepository.findOne({
+          where: { userId },
+        });
+        return prefs ? prefs.notificationEmail !== false : true;
+      }),
+    };
+
     budgetPeriodService = {
       closePeriod: jest.fn().mockResolvedValue(mockClosedPeriod),
     };
@@ -250,6 +265,10 @@ describe("BudgetPeriodCronService", () => {
           },
         },
         { provide: DataSource, useValue: scopedDataSource },
+        {
+          provide: NotificationPreferenceService,
+          useValue: notificationPreferences,
+        },
       ],
     }).compile();
 
@@ -471,6 +490,27 @@ describe("BudgetPeriodCronService", () => {
 
       await service.sendMonthlySummaryEmails(closedPeriods);
 
+      expect(usersRepository.findOne).not.toHaveBeenCalled();
+      expect(emailService.sendMail).not.toHaveBeenCalled();
+    });
+
+    it("skips users whose BUDGETS email channel is off, master on", async () => {
+      // The monthly summary is a BUDGETS email: a per-category off must
+      // suppress it even while the global master switch is on and the digest
+      // toggle is on (audit Finding 1 -- it used to gate on the master only).
+      preferencesRepository.findOne.mockResolvedValue({
+        userId: "11111111-1111-1111-1111-111111111111",
+        notificationEmail: true,
+        budgetDigestEnabled: true,
+      });
+      notificationPreferences.resolveEmail.mockResolvedValue(false);
+
+      await service.sendMonthlySummaryEmails(closedPeriods);
+
+      expect(notificationPreferences.resolveEmail).toHaveBeenCalledWith(
+        "11111111-1111-1111-1111-111111111111",
+        NotificationCategory.BUDGETS,
+      );
       expect(usersRepository.findOne).not.toHaveBeenCalled();
       expect(emailService.sendMail).not.toHaveBeenCalled();
     });
