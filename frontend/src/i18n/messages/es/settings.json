@@ -292,13 +292,14 @@
       }
     },
     "preferences": {
-      "heading": "Avisarme también por correo",
-      "description": "La campana siempre muestra todas las notificaciones. Elige qué tipos envía Monize también por correo.",
+      "heading": "Cómo notificarme",
+      "description": "La campana siempre muestra todas las notificaciones. Elige cuáles envía Monize también por correo o push, y con qué frecuencia.",
       "categoryHeader": "Notificación",
       "channels": {
         "inApp": "En la app",
         "emailReport": "Correo (informe)",
-        "emailNotification": "Correo (notificación)"
+        "emailNotification": "Correo (alerta)",
+        "push": "Push"
       },
       "categories": {
         "PAYMENTS": "Facturas y programados",
@@ -308,10 +309,23 @@
       "emailToggleLabel": "Correo (informe) para {category}",
       "saveFailed": "No se pudo guardar ese ajuste",
       "throttle": {
-        "label": "Espera"
+        "label": "Espera",
+        "ariaLabel": "Tiempo de espera para {category}",
+        "hint": "Omite una alerta o push si ya se envió una del mismo grupo dentro de este intervalo.",
+        "options": {
+          "0": "Desactivado",
+          "5": "5 minutos",
+          "15": "15 minutos",
+          "30": "30 minutos",
+          "60": "1 hora",
+          "360": "6 horas",
+          "1440": "24 horas"
+        }
       },
-      "comingSoon": "Próximamente",
-      "comingSoonNote": "Los correos de notificación inmediata y la espera llegan con las notificaciones push."
+      "emailNotificationToggleLabel": "Correo de alerta para {category}",
+      "pushToggleLabel": "Push para {category}",
+      "emailUnavailable": "Activa arriba las notificaciones por correo para enviarlas por correo.",
+      "pushUnavailable": "Primero activa el push en este dispositivo (más abajo)."
     }
   },
   "help": {

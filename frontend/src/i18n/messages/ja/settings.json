@@ -292,13 +292,14 @@
       }
     },
     "preferences": {
-      "heading": "メールでも通知する",
-      "description": "ベルには常にすべての通知が表示されます。どの種類を Monize がメールでも送るか選んでください。",
+      "heading": "通知方法",
+      "description": "ベルには常にすべての通知が表示されます。Monize がメールまたはプッシュでも送信する種類と、その頻度を選択します。",
       "categoryHeader": "通知",
       "channels": {
         "inApp": "アプリ内",
         "emailReport": "メール（レポート）",
-        "emailNotification": "メール（通知）"
+        "emailNotification": "メール（アラート）",
+        "push": "プッシュ"
       },
       "categories": {
         "PAYMENTS": "請求と予定",
@@ -308,10 +309,23 @@
       "emailToggleLabel": "{category} のレポートメール",
       "saveFailed": "設定を保存できませんでした",
       "throttle": {
-        "label": "間隔"
+        "label": "間隔",
+        "ariaLabel": "{category} のクールダウン",
+        "hint": "同じグループの通知がこの時間内に送信済みの場合、アラートやプッシュをスキップします。",
+        "options": {
+          "0": "オフ",
+          "5": "5分",
+          "15": "15分",
+          "30": "30分",
+          "60": "1時間",
+          "360": "6時間",
+          "1440": "24時間"
+        }
       },
-      "comingSoon": "近日公開",
-      "comingSoonNote": "即時通知メールと間隔はプッシュ通知とともに提供されます。"
+      "emailNotificationToggleLabel": "{category} のアラートメール",
+      "pushToggleLabel": "{category} のプッシュ",
+      "emailUnavailable": "これらをメールで送信するには、上のメール通知をオンにしてください。",
+      "pushUnavailable": "まずこのデバイスでプッシュを有効にしてください（下記参照）。"
     }
   },
   "help": {

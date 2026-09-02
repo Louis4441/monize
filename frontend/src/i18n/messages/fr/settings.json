@@ -292,13 +292,14 @@
       }
     },
     "preferences": {
-      "heading": "M'avertir aussi par e-mail",
-      "description": "La cloche affiche toujours toutes les notifications. Choisissez lesquelles Monize envoie aussi par e-mail.",
+      "heading": "Comment me notifier",
+      "description": "La cloche affiche toujours toutes les notifications. Choisissez lesquelles Monize envoie aussi par e-mail ou push, et à quelle fréquence.",
       "categoryHeader": "Notification",
       "channels": {
         "inApp": "Dans l'appli",
         "emailReport": "E-mail (rapport)",
-        "emailNotification": "E-mail (notification)"
+        "emailNotification": "E-mail (alerte)",
+        "push": "Push"
       },
       "categories": {
         "PAYMENTS": "Factures et planifiés",
@@ -308,10 +309,23 @@
       "emailToggleLabel": "E-mail (rapport) pour {category}",
       "saveFailed": "Impossible d'enregistrer ce réglage",
       "throttle": {
-        "label": "Délai"
+        "label": "Délai",
+        "ariaLabel": "Délai pour {category}",
+        "hint": "Ignorer une alerte ou un push si un autre du même groupe a été envoyé dans cet intervalle.",
+        "options": {
+          "0": "Désactivé",
+          "5": "5 minutes",
+          "15": "15 minutes",
+          "30": "30 minutes",
+          "60": "1 heure",
+          "360": "6 heures",
+          "1440": "24 heures"
+        }
       },
-      "comingSoon": "Bientôt",
-      "comingSoonNote": "Les e-mails de notification immédiate et le délai arrivent avec les notifications push."
+      "emailNotificationToggleLabel": "E-mail d'alerte pour {category}",
+      "pushToggleLabel": "Push pour {category}",
+      "emailUnavailable": "Activez les notifications par e-mail ci-dessus pour les envoyer par e-mail.",
+      "pushUnavailable": "Activez d'abord le push sur cet appareil (voir ci-dessous)."
     }
   },
   "help": {

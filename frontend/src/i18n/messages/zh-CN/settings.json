@@ -292,13 +292,14 @@
       }
     },
     "preferences": {
-      "heading": "同时通过邮件通知我",
-      "description": "铃铛始终显示所有通知。选择 Monize 还会通过邮件发送哪些类型。",
+      "heading": "如何通知我",
+      "description": "铃铛始终显示所有通知。选择 Monize 还通过邮件或推送发送哪些类型，以及频率。",
       "categoryHeader": "通知",
       "channels": {
         "inApp": "应用内",
         "emailReport": "邮件（报告）",
-        "emailNotification": "邮件（通知）"
+        "emailNotification": "邮件（提醒）",
+        "push": "推送"
       },
       "categories": {
         "PAYMENTS": "账单与计划",
@@ -308,10 +309,23 @@
       "emailToggleLabel": "{category} 的报告邮件",
       "saveFailed": "无法保存该设置",
       "throttle": {
-        "label": "间隔"
+        "label": "间隔",
+        "ariaLabel": "{category} 的冷却时间",
+        "hint": "如果同组通知已在此时间窗内发送，则跳过提醒或推送。",
+        "options": {
+          "0": "关闭",
+          "5": "5 分钟",
+          "15": "15 分钟",
+          "30": "30 分钟",
+          "60": "1 小时",
+          "360": "6 小时",
+          "1440": "24 小时"
+        }
       },
-      "comingSoon": "即将推出",
-      "comingSoonNote": "即时通知邮件和间隔将随推送通知一起提供。"
+      "emailNotificationToggleLabel": "{category} 的提醒邮件",
+      "pushToggleLabel": "{category} 的推送",
+      "emailUnavailable": "在上方开启邮件通知，即可通过邮件发送。",
+      "pushUnavailable": "请先在此设备上启用推送（见下方）。"
     }
   },
   "help": {

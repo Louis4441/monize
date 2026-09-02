@@ -292,13 +292,14 @@
       }
     },
     "preferences": {
-      "heading": "Beni e-postayla da bilgilendir",
-      "description": "Zil her zaman tüm bildirimleri gösterir. Monize'ın hangi türleri e-postayla da göndereceğini seçin.",
+      "heading": "Beni nasıl bilgilendirelim",
+      "description": "Zil her zaman tüm bildirimleri gösterir. Monize'ın hangi türleri ayrıca e-posta veya push ile ve ne sıklıkla göndereceğini seçin.",
       "categoryHeader": "Bildirim",
       "channels": {
         "inApp": "Uygulamada",
         "emailReport": "E-posta (rapor)",
-        "emailNotification": "E-posta (bildirim)"
+        "emailNotification": "E-posta (uyarı)",
+        "push": "Push"
       },
       "categories": {
         "PAYMENTS": "Faturalar ve planlananlar",
@@ -308,10 +309,23 @@
       "emailToggleLabel": "{category} için rapor e-postası",
       "saveFailed": "Bu ayar kaydedilemedi",
       "throttle": {
-        "label": "Bekleme"
+        "label": "Bekleme",
+        "ariaLabel": "{category} için bekleme süresi",
+        "hint": "Aynı gruptan biri bu süre içinde gönderildiyse bir uyarı veya push'u atla.",
+        "options": {
+          "0": "Kapalı",
+          "5": "5 dakika",
+          "15": "15 dakika",
+          "30": "30 dakika",
+          "60": "1 saat",
+          "360": "6 saat",
+          "1440": "24 saat"
+        }
       },
-      "comingSoon": "Yakında",
-      "comingSoonNote": "Anlık bildirim e-postaları ve bekleme, push bildirimleriyle birlikte gelir."
+      "emailNotificationToggleLabel": "{category} için uyarı e-postası",
+      "pushToggleLabel": "{category} için push",
+      "emailUnavailable": "Bunları e-postayla göndermek için yukarıdan e-posta bildirimlerini açın.",
+      "pushUnavailable": "Önce bu cihazda push'u etkinleştirin (aşağıya bakın)."
     }
   },
   "help": {

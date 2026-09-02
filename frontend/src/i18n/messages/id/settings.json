@@ -292,13 +292,14 @@
       }
     },
     "preferences": {
-      "heading": "Beri tahu saya lewat email juga",
-      "description": "Lonceng selalu menampilkan semua notifikasi. Pilih jenis mana yang juga dikirim Monize ke email Anda.",
+      "heading": "Cara memberi tahu saya",
+      "description": "Bel selalu menampilkan setiap notifikasi. Pilih jenis mana yang juga dikirim Monize melalui email atau push, dan seberapa sering.",
       "categoryHeader": "Notifikasi",
       "channels": {
         "inApp": "Dalam aplikasi",
         "emailReport": "Email (laporan)",
-        "emailNotification": "Email (notifikasi)"
+        "emailNotification": "Email (peringatan)",
+        "push": "Push"
       },
       "categories": {
         "PAYMENTS": "Tagihan dan terjadwal",
@@ -308,10 +309,23 @@
       "emailToggleLabel": "Email laporan untuk {category}",
       "saveFailed": "Tidak dapat menyimpan setelan itu",
       "throttle": {
-        "label": "Jeda"
+        "label": "Jeda",
+        "ariaLabel": "Jeda untuk {category}",
+        "hint": "Lewati peringatan atau push jika satu dari grup yang sama sudah dikirim dalam jendela ini.",
+        "options": {
+          "0": "Nonaktif",
+          "5": "5 menit",
+          "15": "15 menit",
+          "30": "30 menit",
+          "60": "1 jam",
+          "360": "6 jam",
+          "1440": "24 jam"
+        }
       },
-      "comingSoon": "Segera",
-      "comingSoonNote": "Email notifikasi langsung dan jeda hadir bersama notifikasi push."
+      "emailNotificationToggleLabel": "Email peringatan untuk {category}",
+      "pushToggleLabel": "Push untuk {category}",
+      "emailUnavailable": "Aktifkan notifikasi email di atas untuk mengirimnya melalui email.",
+      "pushUnavailable": "Aktifkan push di perangkat ini terlebih dahulu (lihat di bawah)."
     }
   },
   "help": {

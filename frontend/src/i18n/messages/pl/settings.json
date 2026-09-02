@@ -292,13 +292,14 @@
       }
     },
     "preferences": {
-      "heading": "Powiadamiaj mnie też e-mailem",
-      "description": "Dzwonek zawsze pokazuje wszystkie powiadomienia. Wybierz, które rodzaje Monize wyśle również na e-mail.",
+      "heading": "Jak mnie powiadamiać",
+      "description": "Dzwonek zawsze pokazuje wszystkie powiadomienia. Wybierz, które rodzaje Monize wyśle również e-mailem lub push, i jak często.",
       "categoryHeader": "Powiadomienie",
       "channels": {
         "inApp": "W aplikacji",
         "emailReport": "E-mail (raport)",
-        "emailNotification": "E-mail (powiadomienie)"
+        "emailNotification": "E-mail (alert)",
+        "push": "Push"
       },
       "categories": {
         "PAYMENTS": "Rachunki i zaplanowane",
@@ -308,10 +309,23 @@
       "emailToggleLabel": "E-mail (raport) dla: {category}",
       "saveFailed": "Nie udało się zapisać tego ustawienia",
       "throttle": {
-        "label": "Odstęp"
+        "label": "Odstęp",
+        "ariaLabel": "Odstęp dla: {category}",
+        "hint": "Pomiń alert lub push, jeśli w tym oknie pojawił się już inny z tej samej grupy.",
+        "options": {
+          "0": "Wyłączone",
+          "5": "5 minut",
+          "15": "15 minut",
+          "30": "30 minut",
+          "60": "1 godzina",
+          "360": "6 godzin",
+          "1440": "24 godziny"
+        }
       },
-      "comingSoon": "Wkrótce",
-      "comingSoonNote": "Natychmiastowe e-maile i odstęp pojawią się z powiadomieniami push."
+      "emailNotificationToggleLabel": "E-mail alertowy dla: {category}",
+      "pushToggleLabel": "Push dla: {category}",
+      "emailUnavailable": "Włącz powyżej powiadomienia e-mail, aby wysyłać je e-mailem.",
+      "pushUnavailable": "Najpierw włącz push na tym urządzeniu (patrz niżej)."
     }
   },
   "help": {

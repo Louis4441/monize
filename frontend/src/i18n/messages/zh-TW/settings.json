@@ -292,13 +292,14 @@
       }
     },
     "preferences": {
-      "heading": "同時以電子郵件通知我",
-      "description": "鈴鐺始終顯示所有通知。選擇 Monize 還會以電子郵件寄送哪些類型。",
+      "heading": "如何通知我",
+      "description": "鈴鐺一律顯示所有通知。選擇 Monize 還要透過電子郵件或推播傳送哪些類型，以及頻率。",
       "categoryHeader": "通知",
       "channels": {
         "inApp": "應用程式內",
         "emailReport": "郵件（報告）",
-        "emailNotification": "郵件（通知）"
+        "emailNotification": "電子郵件（提醒）",
+        "push": "推播"
       },
       "categories": {
         "PAYMENTS": "帳單與排程",
@@ -308,10 +309,23 @@
       "emailToggleLabel": "{category} 的報告郵件",
       "saveFailed": "無法儲存該設定",
       "throttle": {
-        "label": "間隔"
+        "label": "間隔",
+        "ariaLabel": "{category} 的冷卻時間",
+        "hint": "若同組通知已在此時間範圍內發送，則略過提醒或推播。",
+        "options": {
+          "0": "關閉",
+          "5": "5 分鐘",
+          "15": "15 分鐘",
+          "30": "30 分鐘",
+          "60": "1 小時",
+          "360": "6 小時",
+          "1440": "24 小時"
+        }
       },
-      "comingSoon": "即將推出",
-      "comingSoonNote": "即時通知郵件和間隔將隨推播通知一起提供。"
+      "emailNotificationToggleLabel": "{category} 的提醒電子郵件",
+      "pushToggleLabel": "{category} 的推播",
+      "emailUnavailable": "在上方開啟電子郵件通知，即可透過電子郵件傳送。",
+      "pushUnavailable": "請先在此裝置上啟用推播（見下方）。"
     }
   },
   "help": {

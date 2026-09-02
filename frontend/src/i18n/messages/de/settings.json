@@ -292,13 +292,14 @@
       }
     },
     "preferences": {
-      "heading": "Auch per E-Mail benachrichtigen",
-      "description": "Die Glocke zeigt immer alle Benachrichtigungen. Wähle, welche Arten Monize zusätzlich per E-Mail sendet.",
+      "heading": "Wie ich benachrichtigt werde",
+      "description": "Die Glocke zeigt immer jede Benachrichtigung. Wählen Sie, welche Arten Monize zusätzlich per E-Mail oder Push sendet und wie oft.",
       "categoryHeader": "Benachrichtigung",
       "channels": {
         "inApp": "In der App",
         "emailReport": "E-Mail (Bericht)",
-        "emailNotification": "E-Mail (Benachrichtigung)"
+        "emailNotification": "E-Mail (Warnung)",
+        "push": "Push"
       },
       "categories": {
         "PAYMENTS": "Rechnungen und Geplantes",
@@ -308,10 +309,23 @@
       "emailToggleLabel": "Bericht-E-Mail für {category}",
       "saveFailed": "Diese Einstellung konnte nicht gespeichert werden",
       "throttle": {
-        "label": "Sperrzeit"
+        "label": "Sperrzeit",
+        "ariaLabel": "Abklingzeit für {category}",
+        "hint": "Eine Warnung oder Push überspringen, wenn innerhalb dieses Zeitfensters bereits eine aus derselben Gruppe kam.",
+        "options": {
+          "0": "Aus",
+          "5": "5 Minuten",
+          "15": "15 Minuten",
+          "30": "30 Minuten",
+          "60": "1 Stunde",
+          "360": "6 Stunden",
+          "1440": "24 Stunden"
+        }
       },
-      "comingSoon": "Demnächst",
-      "comingSoonNote": "Sofortige Benachrichtigungs-E-Mails und die Sperrzeit kommen mit Push-Benachrichtigungen."
+      "emailNotificationToggleLabel": "Warn-E-Mail für {category}",
+      "pushToggleLabel": "Push für {category}",
+      "emailUnavailable": "Aktivieren Sie oben die E-Mail-Benachrichtigungen, um diese per E-Mail zu senden.",
+      "pushUnavailable": "Aktivieren Sie zuerst Push auf diesem Gerät (siehe unten)."
     }
   },
   "help": {

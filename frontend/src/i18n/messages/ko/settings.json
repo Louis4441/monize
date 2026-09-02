@@ -292,13 +292,14 @@
       }
     },
     "preferences": {
-      "heading": "이메일로도 알림 받기",
-      "description": "벨에는 항상 모든 알림이 표시됩니다. Monize가 어떤 종류를 이메일로도 보낼지 선택하세요.",
+      "heading": "알림 방법",
+      "description": "벨에는 항상 모든 알림이 표시됩니다. Monize가 이메일이나 푸시로도 보낼 종류와 빈도를 선택하세요.",
       "categoryHeader": "알림",
       "channels": {
         "inApp": "앱 내",
         "emailReport": "이메일 (보고서)",
-        "emailNotification": "이메일 (알림)"
+        "emailNotification": "이메일(알림)",
+        "push": "푸시"
       },
       "categories": {
         "PAYMENTS": "청구서 및 예약",
@@ -308,10 +309,23 @@
       "emailToggleLabel": "{category} 보고서 이메일",
       "saveFailed": "설정을 저장할 수 없습니다",
       "throttle": {
-        "label": "간격"
+        "label": "간격",
+        "ariaLabel": "{category} 대기 시간",
+        "hint": "같은 그룹의 알림이 이 시간 안에 발생하면 알림 또는 푸시를 건너뜁니다.",
+        "options": {
+          "0": "끄기",
+          "5": "5분",
+          "15": "15분",
+          "30": "30분",
+          "60": "1시간",
+          "360": "6시간",
+          "1440": "24시간"
+        }
       },
-      "comingSoon": "곧 제공",
-      "comingSoonNote": "즉시 알림 이메일과 간격은 푸시 알림과 함께 제공됩니다."
+      "emailNotificationToggleLabel": "{category} 알림 이메일",
+      "pushToggleLabel": "{category} 푸시",
+      "emailUnavailable": "이메일로 보내려면 위에서 이메일 알림을 켜세요.",
+      "pushUnavailable": "먼저 이 기기에서 푸시를 켜세요(아래 참조)."
     }
   },
   "help": {

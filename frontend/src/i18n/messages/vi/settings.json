@@ -292,13 +292,14 @@
       }
     },
     "preferences": {
-      "heading": "Cũng thông báo cho tôi qua email",
-      "description": "Chuông luôn hiển thị mọi thông báo. Chọn loại nào Monize cũng gửi tới email của bạn.",
+      "heading": "Cách thông báo cho tôi",
+      "description": "Chuông luôn hiển thị mọi thông báo. Chọn loại nào Monize cũng gửi qua email hoặc push, và tần suất.",
       "categoryHeader": "Thông báo",
       "channels": {
         "inApp": "Trong ứng dụng",
         "emailReport": "Email (báo cáo)",
-        "emailNotification": "Email (thông báo)"
+        "emailNotification": "Email (cảnh báo)",
+        "push": "Push"
       },
       "categories": {
         "PAYMENTS": "Hóa đơn và đã lên lịch",
@@ -308,10 +309,23 @@
       "emailToggleLabel": "Email báo cáo cho {category}",
       "saveFailed": "Không thể lưu cài đặt đó",
       "throttle": {
-        "label": "Giãn cách"
+        "label": "Giãn cách",
+        "ariaLabel": "Thời gian chờ cho {category}",
+        "hint": "Bỏ qua một cảnh báo hoặc push nếu một cái cùng nhóm đã gửi trong khoảng thời gian này.",
+        "options": {
+          "0": "Tắt",
+          "5": "5 phút",
+          "15": "15 phút",
+          "30": "30 phút",
+          "60": "1 giờ",
+          "360": "6 giờ",
+          "1440": "24 giờ"
+        }
       },
-      "comingSoon": "Sắp có",
-      "comingSoonNote": "Email thông báo tức thời và giãn cách sẽ đi kèm với thông báo đẩy."
+      "emailNotificationToggleLabel": "Email cảnh báo cho {category}",
+      "pushToggleLabel": "Push cho {category}",
+      "emailUnavailable": "Bật thông báo qua email ở trên để gửi chúng qua email.",
+      "pushUnavailable": "Trước tiên hãy bật push trên thiết bị này (xem bên dưới)."
     }
   },
   "help": {

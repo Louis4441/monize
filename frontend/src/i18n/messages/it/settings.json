@@ -292,13 +292,14 @@
       }
     },
     "preferences": {
-      "heading": "Avvisami anche via email",
-      "description": "La campanella mostra sempre tutte le notifiche. Scegli quali tipi Monize invia anche via email.",
+      "heading": "Come notificarmi",
+      "description": "La campanella mostra sempre ogni notifica. Scegli quali tipi Monize invia anche via email o push, e con quale frequenza.",
       "categoryHeader": "Notifica",
       "channels": {
         "inApp": "Nell'app",
         "emailReport": "Email (report)",
-        "emailNotification": "Email (notifica)"
+        "emailNotification": "Email (avviso)",
+        "push": "Push"
       },
       "categories": {
         "PAYMENTS": "Bollette e programmati",
@@ -308,10 +309,23 @@
       "emailToggleLabel": "Email (report) per {category}",
       "saveFailed": "Impossibile salvare questa impostazione",
       "throttle": {
-        "label": "Intervallo"
+        "label": "Intervallo",
+        "ariaLabel": "Intervallo per {category}",
+        "hint": "Salta un avviso o un push se uno dello stesso gruppo è già stato inviato in questo intervallo.",
+        "options": {
+          "0": "Disattivato",
+          "5": "5 minuti",
+          "15": "15 minuti",
+          "30": "30 minuti",
+          "60": "1 ora",
+          "360": "6 ore",
+          "1440": "24 ore"
+        }
       },
-      "comingSoon": "Presto",
-      "comingSoonNote": "Le email di notifica immediata e l'intervallo arrivano con le notifiche push."
+      "emailNotificationToggleLabel": "Email di avviso per {category}",
+      "pushToggleLabel": "Push per {category}",
+      "emailUnavailable": "Attiva le notifiche email qui sopra per inviarle via email.",
+      "pushUnavailable": "Attiva prima il push su questo dispositivo (vedi sotto)."
     }
   },
   "help": {
