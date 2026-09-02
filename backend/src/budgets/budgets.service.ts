@@ -796,6 +796,13 @@ export class BudgetsService {
           // writes against the router tree.
           target: "/bills",
           periodStart: dueDate,
+          // The occurrence's identity, so the database arbitrates what the read
+          // above only observes: two overlapping bell reads (a second tab, an
+          // owner beside a delegate) both miss the row and both write; with
+          // budget_id NULL the fingerprint index cannot refuse the second, and
+          // each duplicate also pushed and emailed. The write door's ON CONFLICT
+          // DO NOTHING hands the loser null, and null fans out nothing.
+          dedupeKey: `BILL_DUE:${bill.id}:${occurrence.originalDate}`,
         },
         { fanOut: "detached" },
       );

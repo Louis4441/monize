@@ -289,7 +289,18 @@
         "removeFailed": "Apparaat kon niet worden verwijderd",
         "testSent": "{count, plural, one {Testmelding verstuurd naar 1 apparaat} other {Testmelding verstuurd naar # apparaten}}",
         "testPartial": "De testmelding bereikte {delivered} van {attempted} apparaten",
-        "testFailed": "De testmelding kon niet worden afgeleverd"
+        "testFailed": "De testmelding kon niet worden afgeleverd",
+        "pushServiceRefused": "De pushdienst van de browser heeft de registratie geweigerd. Probeer het zo opnieuw; blijft het mislukken, controleer dan de pushinstellingen van de browser.",
+        "pushServiceRefusedBrave": "Brave blokkeert de pushdienst standaard. Open in Brave Instellingen, dan Privacy en beveiliging, zet \"Google-services gebruiken voor pushberichten\" aan, herstart de browser en probeer het opnieuw."
+      },
+      "testResults": {
+        "heading": "Laatste test, per apparaat",
+        "status": {
+          "sent": "afgeleverd bij de pushdienst",
+          "expired": "abonnement verlopen; schakel push op dat apparaat opnieuw in",
+          "transient": "niet afgeleverd (tijdelijke fout); probeer het opnieuw",
+          "unconfigured": "deze instantie kan pushberichten nu niet ondertekenen"
+        }
       }
     },
     "preferences": {

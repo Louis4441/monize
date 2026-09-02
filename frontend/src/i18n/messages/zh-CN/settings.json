@@ -289,7 +289,18 @@
         "removeFailed": "无法移除设备",
         "testSent": "{count, plural, other {测试通知已发送至 # 台设备}}",
         "testPartial": "测试通知送达 {attempted} 台设备中的 {delivered} 台",
-        "testFailed": "无法投递测试通知"
+        "testFailed": "无法投递测试通知",
+        "pushServiceRefused": "浏览器的推送服务拒绝了注册。请稍后重试；如果持续失败，请检查浏览器的推送设置。",
+        "pushServiceRefusedBrave": "Brave 默认屏蔽推送服务。在 Brave 中打开“设置”，然后“隐私和安全”，开启“使用 Google 服务进行推送消息传递”，重启浏览器后重试。"
+      },
+      "testResults": {
+        "heading": "上次测试（按设备）",
+        "status": {
+          "sent": "已送达推送服务",
+          "expired": "订阅已过期；请在该设备上重新启用推送",
+          "transient": "未送达（临时错误）；请重试",
+          "unconfigured": "此实例目前无法为推送消息签名"
+        }
       }
     },
     "preferences": {

@@ -1288,6 +1288,11 @@ describe("BudgetsService", () => {
         "user-1",
         expect.objectContaining({
           type: NotificationType.BILL_DUE,
+          // The occurrence identity, so a concurrent second materialization is
+          // refused by the dedupe index rather than pushed twice.
+          dedupeKey: expect.stringMatching(
+            /^BILL_DUE:[^:]+:\d{4}-\d{2}-\d{2}$/,
+          ),
           title: expect.stringContaining("Netflix Inc"),
           message: expect.stringContaining("15.99"),
         }),

@@ -2663,15 +2663,21 @@ Statement           A per-category cooldown suppresses only notification-mode
                     push/email; never the in-app row, never a report email, and
                     never a notification whose severity strictly exceeds every
                     prior in the window.
-Source of truth     NotificationDispatchService.isThrottled, under
-                    pg_advisory_xact_lock(notif-fanout:<user>:<category>).
-Enforcement         The advisory lock serialises concurrent deciders across
-                    replicas (D7) so two same-category winners cannot both read
-                    "no prior"; the EXISTS query carries severitiesAtOrAbove so
-                    an escalation never matches.
-                    notification-dispatch.service.spec.ts holds the lock on both
-                    the push and the email path, the window-0 short-circuit, and
-                    the escalation set.
+Source of truth     NotificationDispatchService.notify: when the throttle is
+                    active, pg_advisory_xact_lock(notif-fanout:<user>:<category>)
+                    is taken BEFORE the row is written, and priorInWindow decides
+                    on the same manager, in the same transaction.
+Enforcement         The lock is held across the write and the decision, so the
+                    later of two same-category deciders on different replicas
+                    blocks until the earlier row is committed and then sees it
+                    (D7). Taken after the commit -- the first version -- it
+                    serialised nothing: B could commit and decide before A's row
+                    was visible, and A then decided against B's later created_at.
+                    The EXISTS query carries severitiesAtOrAbove so an
+                    escalation never matches.
+                    notification-dispatch.service.spec.ts holds the lock -> write
+                    -> decide order, the lock on both the push and the email
+                    path, the window-0 short-circuit, and the escalation set.
 Concurrency scope   per (user, category), across replicas
 Failure response    A suppressed fan-out is a skipped send; the row is already
                     committed.

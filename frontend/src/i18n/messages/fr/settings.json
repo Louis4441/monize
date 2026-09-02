@@ -289,7 +289,18 @@
         "removeFailed": "Impossible de supprimer l'appareil",
         "testSent": "{count, plural, one {Notification de test envoyée à 1 appareil} other {Notification de test envoyée à # appareils}}",
         "testPartial": "La notification de test a atteint {delivered} appareils sur {attempted}",
-        "testFailed": "Impossible de distribuer la notification de test"
+        "testFailed": "Impossible de distribuer la notification de test",
+        "pushServiceRefused": "Le service push du navigateur a refusé l'inscription. Réessayez dans un instant ; si l'échec persiste, vérifiez les paramètres push du navigateur.",
+        "pushServiceRefusedBrave": "Brave bloque le service push par défaut. Dans Brave, ouvrez Paramètres, puis Confidentialité et sécurité, activez « Utiliser les services Google pour la messagerie push », redémarrez le navigateur et réessayez."
+      },
+      "testResults": {
+        "heading": "Dernier test, par appareil",
+        "status": {
+          "sent": "remis au service push",
+          "expired": "abonnement expiré ; réactivez le push sur cet appareil",
+          "transient": "non remis (erreur temporaire) ; réessayez",
+          "unconfigured": "cette instance ne peut pas signer les messages push pour le moment"
+        }
       }
     },
     "preferences": {

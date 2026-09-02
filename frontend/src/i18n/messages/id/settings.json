@@ -289,7 +289,18 @@
         "removeFailed": "Tidak dapat menghapus perangkat",
         "testSent": "{count, plural, other {Notifikasi uji coba dikirim ke # perangkat}}",
         "testPartial": "Notifikasi uji coba menjangkau {delivered} dari {attempted} perangkat",
-        "testFailed": "Tidak dapat mengirim notifikasi uji coba"
+        "testFailed": "Tidak dapat mengirim notifikasi uji coba",
+        "pushServiceRefused": "Layanan push browser menolak pendaftaran. Coba lagi sebentar; jika terus gagal, periksa pengaturan push browser.",
+        "pushServiceRefusedBrave": "Brave memblokir layanan push secara bawaan. Di Brave, buka Setelan, lalu Privasi dan keamanan, aktifkan \"Gunakan layanan Google untuk pesan push\", mulai ulang browser, lalu coba lagi."
+      },
+      "testResults": {
+        "heading": "Pengujian terakhir, per perangkat",
+        "status": {
+          "sent": "terkirim ke layanan push",
+          "expired": "langganan kedaluwarsa; aktifkan push di perangkat itu lagi",
+          "transient": "tidak terkirim (kesalahan sementara); coba lagi",
+          "unconfigured": "instans ini tidak dapat menandatangani pesan push saat ini"
+        }
       }
     },
     "preferences": {

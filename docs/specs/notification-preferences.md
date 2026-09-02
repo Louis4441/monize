@@ -570,9 +570,11 @@ INSERT and the `UPDATE ... SET stopped_at ... WHERE id = $1 AND stopped_at IS
 NULL` commit together. A failure rolls back both, leaving the reminder claimable
 next interval -- it delivers exactly once, never zero and never twice.
 
-### 13.3 What a fire re-emits (through the one write door)
+### 13.3 What a fire re-emits (through the dispatch seam)
 
-Each fire calls `NotificationService.create` (Section 8, unchanged) with:
+Each fire calls `NotificationDispatchService.notify` (Section 14), which writes
+through the one write door (Section 8, unchanged) and then fans out per the
+matrix and throttle, with:
 
 - `type`, `severity`, `title`, `message`, `data`, `target` from the row;
 - `data.reminderId = row.id` merged in, so the bell row carries a Stop control
@@ -584,9 +586,15 @@ Each fire calls `NotificationService.create` (Section 8, unchanged) with:
   `budgetId`/`budgetCategoryId`: it uses the `dedupe_key` index, never the budget
   fingerprint index, so it cannot collide with the source's fingerprint.
 
-When Phase 5 lands, that same `create` is what the dispatch bridge observes, so a
-repeat nag interrupts by push/email subject to the matrix and throttle -- no
-change to the reminder path.
+A repeat nag therefore interrupts by push and immediate email subject to the
+matrix and throttle, and the push carries `data.reminderId` for its Stop action
+(Section 13.4). The cron lives in `notifications/notification-reminder-cron.service.ts`,
+beside the dispatch, because `NotificationCenterModule` is a leaf that cannot
+import the delivery side. Two same-transaction follow-ups ride `notify`'s
+`onWritten` hook: the previous nag of the same reminder is **dismissed** (one live
+nag per reminder -- a month of un-opened five-minute repeats is not a month of
+unread rows crowding the bell, and the purge retires the dismissed ones), and a
+`once` reminder is stopped in the transaction that writes its follow-up.
 
 ### 13.4 Stopping (R4)
 
@@ -774,8 +782,11 @@ skipped (Section 4). `throttle_minutes = 0` disables the window.
   the same group within the window can both pass the `SELECT` and both send. Push
   collapses device-side on `collapseKey` (so a double push is one notification);
   a double email does not collapse, so where that matters the dispatch takes a
-  per-`(user, category)` advisory lock (`pg_advisory_xact_lock`) around the
-  check-and-send, at the cost of serialising that user's fan-out. **Decision D7:
+  per-`(user, category)` advisory lock (`pg_advisory_xact_lock`) **before the row
+  is written**, in the transaction that writes it, and decides on that same
+  connection -- a lock taken after the commit serialises nothing, because the
+  other replica's row may commit between the write and the decision -- at the
+  cost of serialising that user's same-category writes. **Decision D7:
   advisory lock on the email path or accept rare duplicates** -- the maintainer
   picks; the default proposal is the lock, since a duplicate financial email is
   worse than a serialised send.
@@ -881,7 +892,7 @@ UnifiedPush subscription is registered by a **UnifiedPush-capable client** (a
 native/wrapped Monize build, or a browser whose own push service already is a
 self-hosted UnifiedPush endpoint -- which the ordinary `push` channel already
 covers). The client posts its endpoint and keys through the same
-`POST /push/subscribe`, tagging `transport: "unifiedpush"`. The web settings
+`POST /push/subscriptions`, tagging `transport: "unifiedpush"`. The web settings
 surface **manages and gates** UnifiedPush subscriptions (lists them with a
 transport badge, renames, removes, and exposes the channel toggle); it does not
 mint the keys, because the client that will decrypt owns them. Copy says so

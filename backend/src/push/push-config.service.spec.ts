@@ -370,6 +370,23 @@ describe("PushConfigService", () => {
       await expect(service.getVapidIdentity()).resolves.toBeNull();
     });
 
+    it("logs the unreadable pair once, not once per fan-out", async () => {
+      configRepo.findOne.mockResolvedValue(
+        storedConfig({ vapidPrivateKeyEnc: "unreadable(PRIV-STORED)" }),
+      );
+      await service.getVapidIdentity();
+      await service.getVapidIdentity();
+      await service.getVapidIdentity();
+      expect(service["logger"].error).toHaveBeenCalledTimes(1);
+
+      // A different stored pair that is also unreadable is a new fact.
+      configRepo.findOne.mockResolvedValue(
+        storedConfig({ vapidPrivateKeyEnc: "unreadable(OTHER)" }),
+      );
+      await service.getVapidIdentity();
+      expect(service["logger"].error).toHaveBeenCalledTimes(2);
+    });
+
     // `canDecrypt` derives its key with scryptSync -- tens of milliseconds by
     // design, and its own doc comment says not to put it on a list path. This
     // answer is needed on every config read, subscribe and send, so the derived

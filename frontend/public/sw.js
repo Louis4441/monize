@@ -201,6 +201,10 @@ self.addEventListener('push', function (event) {
         // payload without one is saying its type IS the subject.
         tag: collapseTag(payload),
         data: { target: target },
+        // A test push exists to be looked at: keep it until dismissed rather
+        // than letting a desktop banner auto-hide it in seconds. Real alerts
+        // keep the platform's default so they do not pile up.
+        requireInteraction: payload.type === 'TEST',
       }
     )
   );

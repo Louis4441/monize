@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent, act, cleanup } from '@/test/render'
 import toast from 'react-hot-toast';
 import { PushPermissionError,
   defaultDeviceName,
+  PushServiceError,
 } from '@/lib/push';
 import { useAuthStore } from '@/store/authStore';
 import { PushEnableBanner } from './PushEnableBanner';
@@ -258,6 +259,23 @@ describe('PushEnableBanner', () => {
     await act(async () => {});
 
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
+  });
+
+  // Permission granted and the push service still said no: on Brave that is
+  // one privacy switch away, and the toast has to say which one.
+  it('names the Brave push-service switch when the push service refuses under Brave', async () => {
+    mockEnable.mockRejectedValue(new PushServiceError(true));
+
+    await renderBanner();
+    await act(async () => {
+      fireEvent.click(await screen.findByRole('button', { name: /turn on/i }));
+    });
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringMatching(/Brave[\s\S]*Google services for push messaging/),
+      ),
+    );
   });
 
   // Installing the app is the closest the platform gets to "install with

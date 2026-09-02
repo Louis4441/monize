@@ -289,7 +289,18 @@
         "removeFailed": "Impossibile rimuovere il dispositivo",
         "testSent": "{count, plural, one {Notifica di prova inviata a 1 dispositivo} other {Notifica di prova inviata a # dispositivi}}",
         "testPartial": "La notifica di prova ha raggiunto {delivered} dispositivi su {attempted}",
-        "testFailed": "Impossibile consegnare la notifica di prova"
+        "testFailed": "Impossibile consegnare la notifica di prova",
+        "pushServiceRefused": "Il servizio push del browser ha rifiutato la registrazione. Riprova tra poco; se continua a fallire, controlla le impostazioni push del browser.",
+        "pushServiceRefusedBrave": "Brave blocca il servizio push per impostazione predefinita. In Brave apri Impostazioni, poi Privacy e sicurezza, attiva «Usa i servizi Google per la messaggistica push», riavvia il browser e riprova."
+      },
+      "testResults": {
+        "heading": "Ultimo test, per dispositivo",
+        "status": {
+          "sent": "consegnato al servizio push",
+          "expired": "iscrizione scaduta; riattiva il push su quel dispositivo",
+          "transient": "non consegnato (errore temporaneo); riprova",
+          "unconfigured": "questa istanza al momento non può firmare i messaggi push"
+        }
       }
     },
     "preferences": {

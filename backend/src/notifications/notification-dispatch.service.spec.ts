@@ -252,7 +252,11 @@ describe("NotificationDispatchService", () => {
       push: true,
       throttleMinutes: 0,
     });
-    await service.notify("u1", {} as never);
+    // The category is derived from the INPUT's type (it is what the row is
+    // written with), before the write, so the D7 lock can be keyed on it.
+    await service.notify("u1", {
+      type: NotificationType.SCHEDULED_POST_FAILED,
+    } as never);
     expect(resolveDelivery).toHaveBeenCalledWith(
       "u1",
       NotificationCategory.PAYMENTS,
@@ -349,6 +353,54 @@ describe("NotificationDispatchService", () => {
           String(c[0]).includes("pg_advisory_xact_lock"),
         ),
       ).toHaveLength(1);
+    });
+
+    it("takes the lock BEFORE the row is written and decides AFTER it, in one transaction (D7)", async () => {
+      // Taken after create() had committed, the lock serialised nothing: B could
+      // commit and decide before A's row was visible, then A decided against
+      // B's later created_at, and both sent. So the order is the claim.
+      resolveDelivery.mockResolvedValue({
+        emailNotification: false,
+        push: true,
+        throttleMinutes: 15,
+      });
+      const order: string[] = [];
+      query.mockImplementation(async (sql: string) => {
+        order.push(
+          String(sql).includes("pg_advisory_xact_lock") ? "lock" : "decide",
+        );
+        return [{ suppress: false }];
+      });
+      create.mockImplementation(async () => {
+        order.push("create");
+        return row();
+      });
+      await service.notify("u1", {} as never);
+      expect(order).toEqual(["lock", "create", "decide"]);
+    });
+
+    it("runs the caller's onWritten follow-up inside the write transaction, and never for a refused row", async () => {
+      resolveDelivery.mockResolvedValue({
+        emailNotification: false,
+        push: false,
+        unifiedpush: false,
+        throttleMinutes: 0,
+      });
+      const onWritten = jest.fn().mockResolvedValue(undefined);
+      const stored = row();
+      create.mockResolvedValue(stored);
+      await service.notify("u1", {} as never, { onWritten });
+      expect(onWritten).toHaveBeenCalledTimes(1);
+      const [manager, written] = onWritten.mock.calls[0];
+      expect(written).toBe(stored);
+      expect(manager).toHaveProperty("query");
+
+      onWritten.mockClear();
+      create.mockResolvedValue(null);
+      await expect(
+        service.notify("u1", {} as never, { onWritten }),
+      ).resolves.toBeNull();
+      expect(onWritten).not.toHaveBeenCalled();
     });
 
     it("passes the escalation set: only priors at or above this severity suppress", async () => {

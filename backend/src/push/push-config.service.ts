@@ -345,14 +345,25 @@ export class PushConfigService implements OnApplicationBootstrap {
     if (!identity) {
       // A stored pair this instance cannot open is its own diagnosis: it
       // happens when ENCRYPTION_KEY changes under a live database. Saying so
-      // beats an AES-GCM authentication failure surfacing as a generic 500.
-      this.logger.error(
-        `The stored VAPID private key cannot be decrypted with this instance's ${ENCRYPTION_KEY_ENV}. Rotate the key pair on the admin notifications page to recover; every device will re-subscribe.`,
-      );
+      // beats an AES-GCM authentication failure surfacing as a generic 500 --
+      // once per stored pair, not once per call: every notification fan-out
+      // asks here, so a misconfigured key would otherwise print one identical
+      // line per alert per user per cron run (issue #1265's shape). The admin
+      // page carries the same fact as `keyUnreadable` for as long as it holds.
+      if (this.unreadableLogged !== config.vapidPrivateKeyEnc) {
+        this.unreadableLogged = config.vapidPrivateKeyEnc;
+        this.logger.error(
+          `The stored VAPID private key cannot be decrypted with this instance's ${ENCRYPTION_KEY_ENV}. Rotate the key pair on the admin notifications page to recover; every device will re-subscribe.`,
+        );
+      }
       return null;
     }
+    this.unreadableLogged = null;
     return identity;
   }
+
+  /** The ciphertext the unreadable-key error was last logged for, so it is logged once per pair. */
+  private unreadableLogged: string | null | undefined = null;
 
   async setWebPushEnabled(enabled: boolean): Promise<AdminPushConfig> {
     const updated = await withSystemContext(() =>

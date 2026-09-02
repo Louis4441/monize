@@ -245,15 +245,20 @@ export interface LegacyTableRename {
   readonly discarded: { table: string; supersededBy: string; rows: number }[];
 }
 
-export function renameLegacyTableKeys(data: BackupData): LegacyTableRename {
-  const tables = backupTables(data);
+export function renameLegacyTableKeys(
+  data: BackupData,
+): LegacyTableRename & { data: BackupData } {
   const renamed: string[] = [];
   const discarded: LegacyTableRename["discarded"] = [];
+  // Built as a new object, never by deleting keys on the caller's document
+  // ("immutability always"): the caller keeps the parsed artifact it was handed
+  // and continues with the returned one, so nothing changes shape under it.
+  let tables: BackupTables = { ...backupTables(data) };
   for (const [current, legacyNames] of Object.entries(LEGACY_TABLE_KEYS)) {
     for (const legacy of legacyNames) {
-      const rows = tables[legacy];
-      if (rows === undefined) continue;
-      delete tables[legacy];
+      if (!(legacy in tables)) continue;
+      const { [legacy]: rows, ...withoutLegacy } = tables;
+      tables = withoutLegacy;
       // Only a row array is moved. A malformed artifact carrying a scalar or an
       // object under the legacy key would otherwise arrive under the current
       // one, turning an absent table (which every later phase handles) into a
@@ -269,9 +274,9 @@ export function renameLegacyTableKeys(data: BackupData): LegacyTableRename {
         }
         continue;
       }
-      tables[current] = rows;
+      tables = { ...tables, [current]: rows };
       renamed.push(`${legacy} -> ${current}`);
     }
   }
-  return { renamed, discarded };
+  return { data: tables as unknown as BackupData, renamed, discarded };
 }

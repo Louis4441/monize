@@ -4,26 +4,17 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { Cron } from "@nestjs/schedule";
 import { DataSource, EntityManager, IsNull } from "typeorm";
 
 import { withScopedDb } from "../common/db/scoped-db";
-import { withSystemContext, withUserContext } from "../common/db/with-context";
 import { returnedRows } from "../common/db/query-result";
 import { tr } from "../i18n/translate";
-import {
-  Notification,
-  NotificationSeverity,
-  NotificationType,
-} from "./entities/notification.entity";
+import { Notification } from "./entities/notification.entity";
 import {
   NotificationReminder,
   ReminderRepeatMode,
 } from "./entities/notification-reminder.entity";
-import {
-  NotificationService,
-  DEDUPE_KEY_MAX_LENGTH,
-} from "./notification.service";
+import { NotificationService } from "./notification.service";
 import { CreateNotificationReminderDto } from "./dto/create-notification-reminder.dto";
 import {
   MAX_ACTIVE_REMINDERS_PER_USER,
@@ -51,21 +42,6 @@ export interface NotificationReminderView {
   createdAt: string;
 }
 
-/** One claimed, due row as the atomic UPDATE returns it (snake_case, new values). */
-interface ClaimedReminderRow {
-  id: string;
-  user_id: string;
-  alert_type: string;
-  severity: string;
-  title: string;
-  message: string;
-  data: Record<string, unknown> | null;
-  target: string | null;
-  dedupe_base: string | null;
-  repeat_mode: string;
-  fire_count: number;
-}
-
 /**
  * Repeating / one-time notification reminders
  * (`docs/specs/notification-preferences.md` Section 13).
@@ -74,13 +50,12 @@ interface ClaimedReminderRow {
  * user stops it or its source is dismissed. Each fire re-emits through the ONE
  * write door (`NotificationService.create`) with a per-fire dedupe key, so every
  * re-delivery is a fresh in-app row -- the in-app channel is always written
- * (Section 3), and the push/email fan-out a repeat interrupts lands in Phase 5
- * on that same `create` call with no change here.
- *
- * The dependency is one-way -- this service uses `NotificationService`, never the
- * reverse -- so `NotificationCenterModule` stays the leaf it is documented to be.
- * Auto-stop-on-dismiss is done by the cron's own sweep rather than a call from
- * the dismiss path, for exactly that reason.
+ * (Section 3) -- and the firing itself lives in
+ * `notifications/notification-reminder-cron.service.ts`, beside the dispatch
+ * seam it re-emits through, so a repeat nag also pushes and emails per the
+ * matrix. This leaf keeps the CRUD and the stop door: `NotificationCenterModule`
+ * depends on nothing but the connection, and a cron that imports the delivery
+ * side cannot live in it without pulling the whole producer cycle in.
  */
 @Injectable()
 export class NotificationReminderService {
@@ -262,159 +237,6 @@ export class NotificationReminderService {
       this.stopByOwner(manager, userId, id),
     );
     return { stopped };
-  }
-
-  /**
-   * Fire every due reminder, once per interval per replica-set.
-   *
-   * Every replica runs this, so the claim is a single conditional
-   * `UPDATE ... RETURNING` (`docs/concurrency-and-idempotency.md`, atomic CAS):
-   * it advances `next_fire_at` in the same statement that reads the row, so a
-   * second replica's UPDATE blocks on the row lock, re-checks the `WHERE` against
-   * the committed new value, and skips it -- each due row is claimed exactly
-   * once. The claim commits BEFORE the re-emit, so a re-emit that fails skips
-   * this occurrence and re-fires one interval later rather than risking a
-   * double-fire.
-   *
-   * A `once` reminder is NOT stopped by the claim: consuming it here would commit
-   * before the delivery, so a failed re-emit would lose the single follow-up with
-   * no retry. It is stopped inside the same transaction that writes its
-   * notification (`reEmit`), so the delivery and the stop cannot disagree --
-   * a failure rolls back both and the next interval retries, delivering exactly
-   * once.
-   */
-  @Cron("* * * * *")
-  async fireDue(): Promise<void> {
-    try {
-      // Stop any reminder whose cause is gone, before the claim so it cannot be
-      // claimed this tick. Two shapes: the source was dismissed, or the source
-      // was deleted -- the FK is ON DELETE SET NULL, so a purged read-but-never-
-      // dismissed source leaves the reminder orphaned (source_notification_id
-      // NULL), and a nag with no live cause must not run forever. Every reminder
-      // has a source today, so NULL means orphaned. A cross-user sweep, so it
-      // seeds its own system context (task C2).
-      await withSystemContext(() =>
-        withScopedDb(this.dataSource, (manager) =>
-          manager.query(
-            `UPDATE notification_reminders r
-                SET stopped_at = CURRENT_TIMESTAMP
-              WHERE r.stopped_at IS NULL
-                AND (
-                  r.source_notification_id IS NULL
-                  OR EXISTS (
-                    SELECT 1 FROM notifications n
-                     WHERE n.id = r.source_notification_id
-                       AND n.dismissed_at IS NOT NULL
-                  )
-                )`,
-          ),
-        ),
-      );
-
-      // Claim due rows atomically. next_fire_at is set to now + interval (not
-      // previous + interval) so a cron that missed several ticks fires once and
-      // reschedules, never a catch-up burst.
-      const claimed = await withSystemContext(() =>
-        withScopedDb(this.dataSource, async (manager) =>
-          returnedRows<ClaimedReminderRow>(
-            await manager.query(
-              `UPDATE notification_reminders
-                  SET next_fire_at = CURRENT_TIMESTAMP
-                                     + (interval_minutes * INTERVAL '1 minute'),
-                      last_fired_at = CURRENT_TIMESTAMP,
-                      fire_count = fire_count + 1
-                WHERE stopped_at IS NULL AND next_fire_at <= CURRENT_TIMESTAMP
-              RETURNING id, user_id, alert_type, severity, title, message,
-                        data, target, dedupe_base, repeat_mode, fire_count`,
-            ),
-          ),
-        ),
-      );
-
-      if (claimed.length === 0) return;
-
-      let fired = 0;
-      for (const claim of claimed) {
-        // Each re-emit is isolated: one user's failure must not skip the rest.
-        try {
-          await withUserContext(claim.user_id, () => this.reEmit(claim));
-          fired += 1;
-        } catch (error) {
-          this.logger.error(
-            `Failed to re-emit reminder ${claim.id}`,
-            error instanceof Error ? error.stack : error,
-          );
-        }
-      }
-      if (fired > 0) {
-        this.logger.log(`Re-emitted ${fired} due reminder(s)`);
-      }
-    } catch (error) {
-      this.logger.error(
-        "Failed to fire due reminders",
-        error instanceof Error ? error.stack : error,
-      );
-    }
-  }
-
-  /**
-   * Re-emit one claimed reminder as a fresh in-app row through the write door,
-   * and stop it in the SAME transaction when it is a one-shot.
-   *
-   * Runs under the caller's `withUserContext`. The write door's `create` opens a
-   * nested `withScopedDb` that JOINS the outer one here, so the notification
-   * INSERT and the `once` stop commit together: a failed delivery rolls back the
-   * stop too, leaving the reminder claimable again next interval (it delivers
-   * exactly once rather than being consumed on a transient failure).
-   */
-  private async reEmit(claim: ClaimedReminderRow): Promise<void> {
-    const base = claim.dedupe_base ?? claim.alert_type;
-    // `base:rem:<uuid>:<n>` -- the fire ordinal makes every re-emit distinct, so
-    // ON CONFLICT DO NOTHING never swallows a nag against the still-live previous
-    // one. Bounded to the column, dropping from the base rather than the ordinal
-    // (the ordinal is what keeps it unique).
-    const suffix = `:rem:${claim.id}:${claim.fire_count}`;
-    const dedupeKey = `${base.slice(0, DEDUPE_KEY_MAX_LENGTH - suffix.length)}${suffix}`;
-
-    await withScopedDb(this.dataSource, async (manager) => {
-      const written = await this.notifications.create(claim.user_id, {
-        type: claim.alert_type as NotificationType,
-        severity: claim.severity as NotificationSeverity,
-        title: claim.title,
-        message: claim.message,
-        // The reminder id travels on the row so the bell can offer a Stop
-        // control. A re-emit writes only the in-app row today: routing it
-        // through NotificationDispatchService (so a repeat can also push, and a
-        // push can carry the id its Stop action needs) would make this leaf
-        // module import the delivery side and pull the whole producer cycle in,
-        // so it waits until the reminder producer moves out of the leaf.
-        data: { ...(claim.data ?? {}), reminderId: claim.id },
-        target: claim.target,
-        dedupeKey,
-      });
-
-      // A one-shot is stopped only once its follow-up is written, in this same
-      // transaction. Guarded on `stopped_at IS NULL` so a concurrent stop (the
-      // app, or the source-dismissed sweep) is not clobbered.
-      if (claim.repeat_mode === ReminderRepeatMode.ONCE) {
-        if (!written) {
-          // `null` from the write door means the dedupe key is already held, so
-          // THIS fire delivered nothing. Consuming the one-shot now would stop
-          // it having delivered nothing; leave it claimable and let the next
-          // interval try the next ordinal.
-          this.logger.warn(
-            `Reminder ${claim.id}: follow-up ${claim.fire_count} was not written (dedupe key already held); leaving the one-shot claimable`,
-          );
-          return;
-        }
-        await manager.query(
-          `UPDATE notification_reminders
-              SET stopped_at = CURRENT_TIMESTAMP
-            WHERE id = $1 AND user_id = $2 AND stopped_at IS NULL`,
-          [claim.id, claim.user_id],
-        );
-      }
-    });
   }
 
   /** One place the stop UPDATE lives, so `stop` and any future caller agree. */

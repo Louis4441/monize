@@ -26,11 +26,11 @@ export enum ReminderRepeatMode {
  * (`docs/specs/notification-preferences.md` Section 13).
  *
  * The row carries the TEMPLATE a fire re-emits -- the same public fields a
- * notification row has -- so a fire re-emits through the one write door
- * (`NotificationService.create`) without reloading the source, which the user
- * may have dismissed. There is no transport here: a fire writes a fresh in-app
- * row (always written, Section 3), and the push/email fan-out a repeat
- * interrupts lands in Phase 5 on the same `create` call.
+ * notification row has -- so a fire re-emits without reloading the source,
+ * which the user may have dismissed. The firing cron
+ * (`notifications/notification-reminder-cron.service.ts`) re-emits through the
+ * dispatch seam (`NotificationDispatchService.notify`): a fresh in-app row
+ * (always written, Section 3), then push/email per the matrix and throttle.
  */
 @Entity("notification_reminders")
 export class NotificationReminder {

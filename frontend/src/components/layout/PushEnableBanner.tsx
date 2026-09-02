@@ -16,6 +16,7 @@ import {
   pushPromptState,
   rememberPushPromptDismissal,
   PushPermissionError,
+  PushServiceError,
   type PushConfig,
   type PushPromptState,
   type PushSupport,
@@ -195,6 +196,12 @@ export function PushEnableBanner() {
           );
           // The browser now refuses, so the banner has a different thing to say.
           setSupport(getPushSupport());
+        } else if (error instanceof PushServiceError) {
+          toast.error(
+            error.brave
+              ? tPermission('pushServiceRefusedBrave')
+              : tPermission('pushServiceRefused'),
+          );
         } else {
           logger.error('Failed to enable push from the banner:', error);
           toast.error(tPermission('enableFailed'));

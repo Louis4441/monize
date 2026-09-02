@@ -289,7 +289,18 @@
         "removeFailed": "無法移除裝置",
         "testSent": "{count, plural, other {測試通知已傳送至 # 台裝置}}",
         "testPartial": "測試通知送達 {attempted} 台裝置中的 {delivered} 台",
-        "testFailed": "無法傳送測試通知"
+        "testFailed": "無法傳送測試通知",
+        "pushServiceRefused": "瀏覽器的推播服務拒絕了註冊。請稍後再試；若持續失敗，請檢查瀏覽器的推播設定。",
+        "pushServiceRefusedBrave": "Brave 預設會封鎖推播服務。在 Brave 中開啟「設定」，然後「隱私權和安全性」，開啟「使用 Google 服務進行推播訊息」，重新啟動瀏覽器後再試一次。"
+      },
+      "testResults": {
+        "heading": "上次測試（依裝置）",
+        "status": {
+          "sent": "已送達推播服務",
+          "expired": "訂閱已過期；請在該裝置上重新啟用推播",
+          "transient": "未送達（暫時性錯誤）；請再試一次",
+          "unconfigured": "此執行個體目前無法簽署推播訊息"
+        }
       }
     },
     "preferences": {

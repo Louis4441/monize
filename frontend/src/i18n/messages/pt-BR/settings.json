@@ -289,7 +289,18 @@
         "removeFailed": "Não foi possível remover o dispositivo",
         "testSent": "{count, plural, one {Notificação de teste enviada para 1 dispositivo} other {Notificação de teste enviada para # dispositivos}}",
         "testPartial": "A notificação de teste chegou a {delivered} de {attempted} dispositivos",
-        "testFailed": "Não foi possível entregar a notificação de teste"
+        "testFailed": "Não foi possível entregar a notificação de teste",
+        "pushServiceRefused": "O serviço push do navegador recusou o registro. Tente novamente em instantes; se continuar falhando, verifique as configurações de push do navegador.",
+        "pushServiceRefusedBrave": "O Brave bloqueia o serviço push por padrão. No Brave, abra Configurações, depois Privacidade e segurança, ative \"Usar serviços do Google para mensagens push\", reinicie o navegador e tente novamente."
+      },
+      "testResults": {
+        "heading": "Último teste, por dispositivo",
+        "status": {
+          "sent": "entregue ao serviço push",
+          "expired": "assinatura expirada; ative o push nesse dispositivo novamente",
+          "transient": "não entregue (erro temporário); tente novamente",
+          "unconfigured": "esta instância não consegue assinar mensagens push no momento"
+        }
       }
     },
     "preferences": {

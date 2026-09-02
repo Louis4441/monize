@@ -14,6 +14,7 @@ import {
   pushPromptState,
   readRegisteredEndpoint,
   type PushConfig,
+  isBraveBrowser,
 } from '@/lib/push';
 import { createLogger } from '@/lib/logger';
 import { getErrorMessage } from '@/lib/errors';
@@ -231,6 +232,15 @@ export function PushDiagnostics() {
         readerUserId: userId,
       });
       add('classifyPushRegistration', registration.kind);
+      if (await isBraveBrowser()) {
+        // The UA claims Chrome; only navigator.brave says otherwise. Brave
+        // blocks Google's push service by default, which is what a granted
+        // permission with "no-subscription" and a push-service error looks like.
+        add(
+          'browser',
+          'Brave (push needs "Use Google services for push messaging" in brave://settings/privacy)',
+        );
+      }
     } catch (error) {
       add('server devices', `error: ${getErrorMessage(error, 'failed')}`);
     }
@@ -308,6 +318,10 @@ export function PushDiagnostics() {
       await registration.showNotification('Monize', {
         body: t('localTestBody'),
         tag,
+        // Stay until dismissed: a desktop banner that auto-hides after a few
+        // seconds reads as "appeared for a moment and vanished", and the point
+        // of the probe is that the reader gets to look at it.
+        requireInteraction: true,
       });
       await new Promise((resolve) =>
         setTimeout(resolve, TEST_DISPLAY_GRACE_MS),

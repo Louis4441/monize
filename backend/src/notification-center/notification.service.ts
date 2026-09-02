@@ -4,7 +4,7 @@ import { DataSource, EntityManager, In, IsNull, LessThan, Not } from "typeorm";
 
 import { withScopedDb } from "../common/db/scoped-db";
 import { withSystemContext } from "../common/db/with-context";
-import { returnedRows } from "../common/db/query-result";
+import { affectedRowCount, returnedRows } from "../common/db/query-result";
 import { tr } from "../i18n/translate";
 import {
   Notification,
@@ -283,6 +283,36 @@ export class NotificationService {
         .update(where, { dismissedAt: new Date() }),
     );
     return { dismissed: result.affected || 0 };
+  }
+
+  /**
+   * Dismiss every live row an earlier fire of the same reminder wrote, except
+   * the one just written: a repeat nag supersedes its predecessor, so the bell
+   * holds one live nag per reminder and `purgeOld` can retire the rest. Without
+   * it a month of un-opened five-minute repeats was eight thousand unread rows
+   * that nothing ever dismissed, crowding every other notification out of the
+   * bell window. Joins the caller's transaction (the reminder cron calls it
+   * from `notify`'s same-transaction hook), and ownership is in the WHERE.
+   * Lives here because this file is the notifications table's one writer.
+   */
+  async dismissSupersededReminderRows(
+    userId: string,
+    reminderId: string,
+    keepNotificationId: string,
+  ): Promise<number> {
+    return withScopedDb(this.dataSource, async (manager) =>
+      affectedRowCount(
+        await manager.query(
+          `UPDATE notifications
+              SET dismissed_at = CURRENT_TIMESTAMP
+            WHERE user_id = $1
+              AND dismissed_at IS NULL
+              AND id <> $2
+              AND data->>'reminderId' = $3`,
+          [userId, keepNotificationId, reminderId],
+        ),
+      ),
+    );
   }
 
   /**

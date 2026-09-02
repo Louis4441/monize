@@ -17,10 +17,12 @@ import {
   releaseLocalPushSubscription,
   retireServerRowFor,
   PushPermissionError,
+  PushServiceError,
   defaultDeviceName,
   type PushConfig,
   type PushDevice,
   type PushSupport,
+  type PushTestDeviceResult,
 } from '@/lib/push';
 import { useAuthStore } from '@/store/authStore';
 import { createLogger } from '@/lib/logger';
@@ -48,6 +50,7 @@ export function PushDevicesPanel() {
   const [devicesFailed, setDevicesFailed] = useState(false);
   const [devices, setDevices] = useState<PushDevice[]>([]);
   const [thisDevice, setThisDevice] = useState<string | null>(null);
+  const [lastTest, setLastTest] = useState<PushTestDeviceResult[] | null>(null);
   const [support, setSupport] = useState<PushSupport | null>(null);
   // Android hides notifications behind an OS toggle that no web API reveals
   // (Notification.permission, permissions.query and pushManager.permissionState
@@ -277,6 +280,14 @@ export function PushDevicesPanel() {
       } catch (error) {
         if (error instanceof PushPermissionError) {
           toast.error(permissionMessage(error));
+        } else if (error instanceof PushServiceError) {
+          // Permission granted, worker active, and the push service still said
+          // no. On Brave that is one privacy switch away; say which.
+          toast.error(
+            error.brave
+              ? t('toasts.pushServiceRefusedBrave')
+              : t('toasts.pushServiceRefused'),
+          );
         } else {
           toast.error(getErrorMessage(error, t('toasts.enableFailed')));
         }
@@ -332,6 +343,9 @@ export function PushDevicesPanel() {
     setIsSendingTest(true);
     try {
       const result = await pushApi.sendTest();
+      // Every live device is attempted; the list below says what each one did,
+      // because "sent to 2 devices" cannot tell the reader WHICH two.
+      setLastTest(result.devices);
       await refreshDevices();
       if (result.delivered === result.attempted) {
         toast.success(t('toasts.testSent', { count: result.delivered }));
@@ -491,6 +505,23 @@ export function PushDevicesPanel() {
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
           {t('noLiveDevices')}
         </p>
+      )}
+
+      {lastTest && lastTest.length > 0 && (
+        <div className="mt-3" data-testid="push-test-results">
+          <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+            {t('testResults.heading')}
+          </p>
+          <ul className="mt-1 space-y-0.5 text-xs text-gray-600 dark:text-gray-400">
+            {lastTest.map((device) => (
+              <li key={device.id}>
+                {device.deviceName ?? t('unnamedDevice')}
+                {': '}
+                {t(`testResults.status.${device.status}`)}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </PushBlock>
   );

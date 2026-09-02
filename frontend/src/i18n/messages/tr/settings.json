@@ -289,7 +289,18 @@
         "removeFailed": "Cihaz kaldırılamadı",
         "testSent": "{count, plural, one {Test bildirimi 1 cihaza gönderildi} other {Test bildirimi # cihaza gönderildi}}",
         "testPartial": "Test bildirimi {attempted} cihazın {delivered} tanesine ulaştı",
-        "testFailed": "Test bildirimi teslim edilemedi"
+        "testFailed": "Test bildirimi teslim edilemedi",
+        "pushServiceRefused": "Tarayıcının push hizmeti kaydı reddetti. Biraz sonra yeniden deneyin; başarısız olmaya devam ederse tarayıcının push ayarlarını kontrol edin.",
+        "pushServiceRefusedBrave": "Brave, push hizmetini varsayılan olarak engeller. Brave'de Ayarlar, ardından Gizlilik ve güvenlik bölümünü açın, \"Push mesajları için Google hizmetlerini kullan\" seçeneğini açın, tarayıcıyı yeniden başlatın ve yeniden deneyin."
+      },
+      "testResults": {
+        "heading": "Son test, cihaz başına",
+        "status": {
+          "sent": "push hizmetine iletildi",
+          "expired": "abonelik süresi doldu; o cihazda push'u yeniden etkinleştirin",
+          "transient": "iletilmedi (geçici hata); yeniden deneyin",
+          "unconfigured": "bu örnek şu anda push mesajlarını imzalayamıyor"
+        }
       }
     },
     "preferences": {

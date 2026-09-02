@@ -689,6 +689,31 @@ describe('PushDevicesPanel', () => {
     await waitFor(() => expect(mockSendTest).toHaveBeenCalled());
     expect(mockListDevices).toHaveBeenCalledTimes(2);
   });
+
+  it('lists what each device did with the test, so "sent to 2" says which two', async () => {
+    mockListDevices.mockResolvedValue([device()]);
+    mockSendTest.mockResolvedValue({
+      attempted: 2,
+      delivered: 1,
+      devices: [
+        { id: 'd-1', deviceName: 'Chrome on Android', status: 'sent' },
+        { id: 'd-2', deviceName: null, status: 'expired' },
+      ],
+    });
+
+    render(<PushDevicesPanel />);
+    fireEvent.click(
+      await screen.findByRole('button', { name: /send test notification/i }),
+    );
+
+    const results = await screen.findByTestId('push-test-results');
+    expect(results).toHaveTextContent('Chrome on Android');
+    expect(results).toHaveTextContent(/delivered to the push service/i);
+    // A nameless device is named by the same fallback the list uses, and its
+    // outcome tells the reader what to do about it.
+    expect(results).toHaveTextContent(/unnamed device/i);
+    expect(results).toHaveTextContent(/subscription expired/i);
+  });
 });
 
 describe('PushDevicesPanel and a browser-rotated subscription', () => {

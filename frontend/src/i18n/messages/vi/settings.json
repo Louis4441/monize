@@ -289,7 +289,18 @@
         "removeFailed": "Không thể xóa thiết bị",
         "testSent": "{count, plural, other {Đã gửi thông báo thử nghiệm tới # thiết bị}}",
         "testPartial": "Thông báo thử nghiệm đã tới {delivered} trên {attempted} thiết bị",
-        "testFailed": "Không thể gửi thông báo thử nghiệm"
+        "testFailed": "Không thể gửi thông báo thử nghiệm",
+        "pushServiceRefused": "Dịch vụ push của trình duyệt đã từ chối đăng ký. Hãy thử lại sau ít phút; nếu vẫn lỗi, kiểm tra cài đặt push của trình duyệt.",
+        "pushServiceRefusedBrave": "Brave chặn dịch vụ push theo mặc định. Trong Brave, mở Cài đặt, rồi Quyền riêng tư và bảo mật, bật \"Sử dụng dịch vụ của Google cho tin nhắn push\", khởi động lại trình duyệt và thử lại."
+      },
+      "testResults": {
+        "heading": "Lần thử gần nhất, theo thiết bị",
+        "status": {
+          "sent": "đã gửi tới dịch vụ push",
+          "expired": "đăng ký đã hết hạn; bật lại push trên thiết bị đó",
+          "transient": "chưa gửi được (lỗi tạm thời); thử lại",
+          "unconfigured": "phiên bản này hiện không thể ký tin nhắn push"
+        }
       }
     },
     "preferences": {

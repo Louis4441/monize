@@ -330,6 +330,78 @@ export function requestNotificationPermission(): Promise<NotificationPermission>
 }
 
 /**
+ * The browser's push service refused to mint a subscription: permission was
+ * granted, the service worker is active, and `pushManager.subscribe` still
+ * rejected ("Registration failed - push service error"). On Brave that is the
+ * default state -- it blocks Google's push service until "Use Google services
+ * for push messaging" is switched on in its privacy settings -- so the error
+ * carries whether this is Brave, and the copy can send the reader to the one
+ * switch that fixes it rather than to a generic "try again".
+ */
+export class PushServiceError extends Error {
+  readonly brave: boolean;
+
+  constructor(brave: boolean, cause?: unknown) {
+    super(
+      brave
+        ? 'The push service refused the registration (Brave blocks it until Google push messaging is enabled).'
+        : 'The push service refused the registration.',
+    );
+    this.name = 'PushServiceError';
+    this.brave = brave;
+    if (cause !== undefined) {
+      (this as { cause?: unknown }).cause = cause;
+    }
+  }
+}
+
+/** Brave exposes itself only through `navigator.brave.isBrave()`; the UA says Chrome. */
+export async function isBraveBrowser(
+  nav: Navigator | undefined = typeof navigator === 'undefined'
+    ? undefined
+    : navigator,
+): Promise<boolean> {
+  const brave = (nav as { brave?: { isBrave?: () => Promise<boolean> } } | undefined)
+    ?.brave;
+  if (!brave || typeof brave.isBrave !== 'function') return false;
+  try {
+    return (await brave.isBrave()) === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * `pushManager.subscribe`, with the one failure this app can explain named. A
+ * refusal from the push service (AbortError, or Chromium's "push service error"
+ * message) becomes a `PushServiceError`; anything else is rethrown as it was.
+ */
+async function subscribeOrExplain(
+  registration: ServiceWorkerRegistration,
+  applicationServerKey: Uint8Array<ArrayBuffer>,
+): Promise<PushSubscription> {
+  try {
+    return await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey,
+    });
+  } catch (error) {
+    if (isPushServiceRefusal(error)) {
+      throw new PushServiceError(await isBraveBrowser(), error);
+    }
+    throw error;
+  }
+}
+
+function isPushServiceRefusal(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return (
+    error.name === 'AbortError' ||
+    /push service error|registration failed/i.test(error.message)
+  );
+}
+
+/**
  * Ask the browser for permission and register this device.
  *
  * The permission request is made here, on a user's click, and never on page
@@ -392,10 +464,7 @@ export async function enablePushOnThisDevice(
   // belong to a row that is perfectly fine.
   let minted = false;
   if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey,
-    });
+    subscription = await subscribeOrExplain(registration, applicationServerKey);
     minted = true;
   }
 
@@ -419,10 +488,10 @@ export async function enablePushOnThisDevice(
     // ROW. A's row stays theirs, is undeliverable from this moment, and retires
     // itself on its next delivery (410 from the push service -> GONE).
     await safeUnsubscribe(subscription);
-    const replacement = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
+    const replacement = await subscribeOrExplain(
+      registration,
       applicationServerKey,
-    });
+    );
     try {
       return await postSubscription(replacement, publicKey, deviceName);
     } catch (retryError) {

@@ -289,7 +289,18 @@
         "removeFailed": "Gerät konnte nicht entfernt werden",
         "testSent": "{count, plural, one {Testbenachrichtigung an 1 Gerät gesendet} other {Testbenachrichtigung an # Geräte gesendet}}",
         "testPartial": "Testbenachrichtigung erreichte {delivered} von {attempted} Geräten",
-        "testFailed": "Testbenachrichtigung konnte nicht zugestellt werden"
+        "testFailed": "Testbenachrichtigung konnte nicht zugestellt werden",
+        "pushServiceRefused": "Der Push-Dienst des Browsers hat die Registrierung abgelehnt. Versuchen Sie es gleich noch einmal; schlägt es weiterhin fehl, prüfen Sie die Push-Einstellungen des Browsers.",
+        "pushServiceRefusedBrave": "Brave blockiert den Push-Dienst standardmäßig. Öffnen Sie in Brave die Einstellungen, dann Datenschutz und Sicherheit, aktivieren Sie „Google-Dienste für Push-Benachrichtigungen verwenden“, starten Sie den Browser neu und versuchen Sie es erneut."
+      },
+      "testResults": {
+        "heading": "Letzter Test, pro Gerät",
+        "status": {
+          "sent": "an den Push-Dienst zugestellt",
+          "expired": "Abonnement abgelaufen; Push auf diesem Gerät erneut aktivieren",
+          "transient": "nicht zugestellt (vorübergehender Fehler); erneut versuchen",
+          "unconfigured": "diese Instanz kann Push-Nachrichten derzeit nicht signieren"
+        }
       }
     },
     "preferences": {

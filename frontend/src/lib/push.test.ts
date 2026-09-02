@@ -25,6 +25,8 @@ import {
   toSubscriptionPayload,
   urlBase64ToUint8Array,
   defaultDeviceName,
+  PushServiceError,
+  isBraveBrowser,
 } from './push';
 
 vi.mock('./api', () => ({
@@ -1154,5 +1156,45 @@ describe('defaultDeviceName', () => {
     expect(
       defaultDeviceName({ userAgent: 'curl/8' } as Navigator),
     ).toBeUndefined();
+  });
+});
+
+describe('isBraveBrowser', () => {
+  it('is false when the browser does not expose navigator.brave', async () => {
+    expect(await isBraveBrowser({} as Navigator)).toBe(false);
+    expect(await isBraveBrowser(undefined)).toBe(false);
+  });
+
+  it('asks navigator.brave.isBrave(), which is the only thing that tells Brave from Chrome', async () => {
+    const brave = { brave: { isBrave: async () => true } } as unknown as Navigator;
+    expect(await isBraveBrowser(brave)).toBe(true);
+    const notBrave = {
+      brave: { isBrave: async () => false },
+    } as unknown as Navigator;
+    expect(await isBraveBrowser(notBrave)).toBe(false);
+  });
+
+  it('treats a probe that throws as not Brave rather than as an error', async () => {
+    const broken = {
+      brave: {
+        isBrave: async () => {
+          throw new Error('nope');
+        },
+      },
+    } as unknown as Navigator;
+    expect(await isBraveBrowser(broken)).toBe(false);
+  });
+});
+
+describe('PushServiceError', () => {
+  it('names the refusal and carries whether Brave is the cause', () => {
+    const generic = new PushServiceError(false);
+    expect(generic).toBeInstanceOf(Error);
+    expect(generic.name).toBe('PushServiceError');
+    expect(generic.brave).toBe(false);
+    const brave = new PushServiceError(true, new Error('Registration failed - push service error'));
+    expect(brave.brave).toBe(true);
+    expect(brave.message).toMatch(/Brave/);
+    expect((brave as { cause?: Error }).cause?.message).toMatch(/push service error/);
   });
 });

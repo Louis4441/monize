@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { DataSource } from "typeorm";
+import { DataSource, EntityManager } from "typeorm";
 import { I18nService } from "nestjs-i18n";
 
 import { withScopedDb } from "../common/db/scoped-db";
@@ -52,6 +52,14 @@ export const PUSH_CATEGORY_COPY: Readonly<
 };
 
 export interface NotifyOptions {
+  /**
+   * A same-transaction follow-up write, run right after the row is written and
+   * before the transaction commits -- never when `create` returned `null`. The
+   * reminder cron uses it to stop a one-shot in the transaction that writes its
+   * follow-up, so the delivery and the stop cannot disagree. Keep it to writes
+   * that must share the row's fate; the fan-out itself runs after the commit.
+   */
+  onWritten?: (manager: EntityManager, row: Notification) => Promise<void>;
   /**
    * `"await"` (the default) resolves after push and email were attempted --
    * right for a cron, which may wait for its deliveries. `"detached"` resolves
@@ -113,27 +121,77 @@ export class NotificationDispatchService {
     input: CreateNotificationInput,
     options: NotifyOptions = {},
   ): Promise<Notification | null> {
-    const row = await this.notifications.create(userId, input);
-    if (!row) return null;
+    const category = notificationCategoryOf(input.type);
+    const delivery = await this.preferences.resolveNotificationDelivery(
+      userId,
+      category,
+    );
+    const interrupting =
+      delivery.push || delivery.unifiedpush || delivery.emailNotification;
+    const throttled = interrupting && delivery.throttleMinutes > 0;
 
-    const delivery = this.fanOut(userId, row).catch((error: unknown) => {
+    // The row, the caller's follow-up write and the throttle decision share one
+    // transaction, and when the throttle is active the (user, category) advisory
+    // lock (D7) is taken BEFORE the row is written. Taken after the commit, as a
+    // first version did, it serialised nothing: replica B could commit and
+    // decide before A's row was visible, then A decided against B's later
+    // created_at -- and both sent. Held across write and decision, the later
+    // decider blocks until the earlier row is committed and sees it.
+    const written = await withScopedDb(this.dataSource, async (manager) => {
+      if (throttled) {
+        await manager.query(
+          "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+          [`notif-fanout:${userId}:${category}`],
+        );
+      }
+      const row = await this.notifications.create(userId, input);
+      if (!row) return null;
+      if (options.onWritten) await options.onWritten(manager, row);
+      const suppressed =
+        throttled &&
+        (await this.priorInWindow(
+          manager,
+          userId,
+          category,
+          row,
+          delivery.throttleMinutes,
+        ));
+      return { row, suppressed };
+    });
+    if (!written) return null;
+    const { row, suppressed } = written;
+
+    const fanOut = this.fanOut(
+      userId,
+      row,
+      category,
+      delivery,
+      suppressed,
+    ).catch((error: unknown) => {
       // Never let a delivery failure escape: the bell row stands regardless.
       this.logger.error(
         `Fan-out failed for notification ${row.id}`,
         error instanceof Error ? error.stack : error,
       );
     });
-    if (options.fanOut !== "detached") await delivery;
+    if (options.fanOut !== "detached") await fanOut;
     return row;
   }
 
-  /** The notification-mode fan-out: the matrix decides the channels, the throttle gates them. */
-  private async fanOut(userId: string, row: Notification): Promise<void> {
-    const category = notificationCategoryOf(row.type);
-    const delivery = await this.preferences.resolveNotificationDelivery(
-      userId,
-      category,
-    );
+  /**
+   * The notification-mode fan-out: the matrix decided the channels and the
+   * throttle decision was taken under the lock, in the transaction that wrote
+   * the row; this runs after that commit and only sends.
+   */
+  private async fanOut(
+    userId: string,
+    row: Notification,
+    category: NotificationCategory,
+    delivery: Awaited<
+      ReturnType<NotificationPreferenceService["resolveNotificationDelivery"]>
+    >,
+    suppressed: boolean,
+  ): Promise<void> {
     if (
       !delivery.push &&
       !delivery.unifiedpush &&
@@ -141,17 +199,9 @@ export class NotificationDispatchService {
     ) {
       return;
     }
-
-    // The throttle gates BOTH interrupting channels; an escalation always goes.
-    // A window of 0 disables the throttle for this category. The advisory lock
-    // (D7) is taken whenever the throttle is active, on the push path as well as
-    // the email one: two replicas can each win a DIFFERENT same-category row and
-    // both read "no prior", and device-side collapse only merges re-sends of the
-    // SAME row (its collapseKey is the row id / dedupe key), so two distinct rows
-    // would show as two pushes the throttle meant to hold to one.
-    const suppressed =
-      delivery.throttleMinutes > 0 &&
-      (await this.isThrottled(userId, category, row, delivery.throttleMinutes));
+    // The throttle gates BOTH interrupting channels; an escalation always goes
+    // (`priorInWindow` carries the severity set). A window of 0 disables the
+    // throttle for this category.
     if (suppressed) return;
 
     // The two push channels ride the same encrypted Web Push wire and differ
@@ -211,13 +261,14 @@ export class NotificationDispatchService {
    * escalation is never suppressed). "Same category" is a filter on the type set
    * the category maps to (the category is not stored).
    *
-   * A per-(user, category) transaction advisory lock serialises concurrent
-   * deciders (D7), so two same-group events racing across replicas cannot both
-   * read "no prior" and both send -- the later decider blocks until the earlier
-   * commits its row, then sees it and suppresses. Taken on every throttled path,
-   * push included, because distinct rows do not collapse on the device.
+   * Runs on the manager that holds the (user, category) advisory lock and wrote
+   * the row, so two same-group events racing across replicas cannot both read
+   * "no prior": the later decider blocks on the lock until the earlier row is
+   * committed, then sees it and suppresses. Taken on every throttled path, push
+   * included, because distinct rows do not collapse on the device.
    */
-  private async isThrottled(
+  private async priorInWindow(
+    manager: EntityManager,
     userId: string,
     category: NotificationCategory,
     row: Notification,
@@ -226,33 +277,27 @@ export class NotificationDispatchService {
     const windowStart = new Date(
       new Date(row.createdAt).getTime() - throttleMinutes * 60_000,
     );
-    return withScopedDb(this.dataSource, async (manager) => {
+    const rows = returnedRows<{ suppress: boolean }>(
       await manager.query(
-        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-        [`notif-fanout:${userId}:${category}`],
-      );
-      const rows = returnedRows<{ suppress: boolean }>(
-        await manager.query(
-          `SELECT EXISTS (
-             SELECT 1 FROM notifications
-              WHERE user_id = $1
-                AND alert_type = ANY($2)
-                AND dismissed_at IS NULL
-                AND created_at > $3
-                AND created_at < $4
-                AND severity = ANY($5)
-           ) AS suppress`,
-          [
-            userId,
-            typesForCategory(category),
-            windowStart,
-            row.createdAt,
-            severitiesAtOrAbove(row.severity),
-          ],
-        ),
-      );
-      return rows[0]?.suppress === true;
-    });
+        `SELECT EXISTS (
+           SELECT 1 FROM notifications
+            WHERE user_id = $1
+              AND alert_type = ANY($2)
+              AND dismissed_at IS NULL
+              AND created_at > $3
+              AND created_at < $4
+              AND severity = ANY($5)
+         ) AS suppress`,
+        [
+          userId,
+          typesForCategory(category),
+          windowStart,
+          row.createdAt,
+          severitiesAtOrAbove(row.severity),
+        ],
+      ),
+    );
+    return rows[0]?.suppress === true;
   }
 
   /**

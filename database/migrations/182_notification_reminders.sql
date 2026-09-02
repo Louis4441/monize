@@ -4,10 +4,10 @@
 -- One row per active reminder a user asked for. The row carries the TEMPLATE the
 -- fire re-emits (the same public fields a notification row has), so a fire never
 -- has to reload the source notification, which the user may have dismissed. Each
--- fire re-emits through the one write door (NotificationService.create) with a
--- per-fire dedupe key, so every re-delivery is a fresh in-app row -- the in-app
--- channel is always written (Section 3), and the push/email fan-out that a repeat
--- interrupts lands in Phase 5 without touching this path.
+-- fire re-emits through the dispatch seam (NotificationDispatchService.notify,
+-- which writes through the one write door) with a per-fire dedupe key, so every
+-- re-delivery is a fresh in-app row -- the in-app channel is always written
+-- (Section 3) -- fanned out by push/email per the matrix and throttle.
 --
 -- source_notification_id is ON DELETE SET NULL, not CASCADE: the reminder is
 -- stopped when its source is dismissed (a nag cannot outlive its cause), and a

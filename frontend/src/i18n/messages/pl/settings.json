@@ -289,7 +289,18 @@
         "removeFailed": "Nie udało się usunąć urządzenia",
         "testSent": "{count, plural, one {Wysłano powiadomienie testowe na 1 urządzenie} few {Wysłano powiadomienie testowe na # urządzenia} many {Wysłano powiadomienie testowe na # urządzeń} other {Wysłano powiadomienie testowe na # urządzenia}}",
         "testPartial": "Powiadomienie testowe dotarło do {delivered} z {attempted} urządzeń",
-        "testFailed": "Nie udało się dostarczyć powiadomienia testowego"
+        "testFailed": "Nie udało się dostarczyć powiadomienia testowego",
+        "pushServiceRefused": "Usługa push przeglądarki odrzuciła rejestrację. Spróbuj ponownie za chwilę; jeśli błąd się powtarza, sprawdź ustawienia push w przeglądarce.",
+        "pushServiceRefusedBrave": "Brave domyślnie blokuje usługę push. W Brave otwórz Ustawienia, potem Prywatność i bezpieczeństwo, włącz „Używaj usług Google do obsługi wiadomości push”, zrestartuj przeglądarkę i spróbuj ponownie."
+      },
+      "testResults": {
+        "heading": "Ostatni test, na urządzenie",
+        "status": {
+          "sent": "dostarczono do usługi push",
+          "expired": "subskrypcja wygasła; włącz push na tym urządzeniu ponownie",
+          "transient": "nie dostarczono (błąd przejściowy); spróbuj ponownie",
+          "unconfigured": "ta instancja nie może teraz podpisywać wiadomości push"
+        }
       }
     },
     "preferences": {

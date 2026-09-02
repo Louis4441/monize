@@ -27,16 +27,20 @@ describe("renameLegacyTableKeys", () => {
   it("moves a legacy key onto the name the restore uses", () => {
     const data = artifact({ budget_alerts: [{ id: "n-1" }] });
 
-    expect(renameLegacyTableKeys(data)).toEqual({
+    const result = renameLegacyTableKeys(data);
+    expect(result).toMatchObject({
       renamed: ["budget_alerts -> notifications"],
       discarded: [],
     });
-    const tables = backupTables(data);
+    const tables = backupTables(result.data);
     expect(tables.notifications).toEqual([{ id: "n-1" }]);
     // The old key is gone rather than left beside the new one: the insert path
     // is allowlisted by table name and would refuse it, and a reader finding
     // both cannot tell which one the restore used.
     expect("budget_alerts" in tables).toBe(false);
+    // ...and the caller's document is untouched ("immutability always").
+    expect(backupTables(data).budget_alerts).toEqual([{ id: "n-1" }]);
+    expect("notifications" in backupTables(data)).toBe(false);
   });
 
   it("moves an empty table, because empty is not absent", () => {
@@ -45,21 +49,20 @@ describe("renameLegacyTableKeys", () => {
     // case may not be harmless.
     const data = artifact({ budget_alerts: [] });
 
-    expect(renameLegacyTableKeys(data)).toEqual({
+    const result = renameLegacyTableKeys(data);
+    expect(result).toMatchObject({
       renamed: ["budget_alerts -> notifications"],
       discarded: [],
     });
-    expect(backupTables(data).notifications).toEqual([]);
+    expect(backupTables(result.data).notifications).toEqual([]);
   });
 
   it("leaves a current artifact untouched and reports nothing moved", () => {
     const data = artifact({ notifications: [{ id: "n-1" }] });
 
-    expect(renameLegacyTableKeys(data)).toEqual({
-      renamed: [],
-      discarded: [],
-    });
-    expect(backupTables(data).notifications).toEqual([{ id: "n-1" }]);
+    const result = renameLegacyTableKeys(data);
+    expect(result).toMatchObject({ renamed: [], discarded: [] });
+    expect(backupTables(result.data).notifications).toEqual([{ id: "n-1" }]);
   });
 
   it("keeps the current key when an artifact carries both", () => {
@@ -70,9 +73,9 @@ describe("renameLegacyTableKeys", () => {
       notifications: [{ id: "n-1" }],
     });
 
-    renameLegacyTableKeys(data);
+    const result = renameLegacyTableKeys(data);
 
-    const tables = backupTables(data);
+    const tables = backupTables(result.data);
     expect(tables.notifications).toEqual([{ id: "n-1" }]);
     expect("budget_alerts" in tables).toBe(false);
   });
@@ -86,7 +89,7 @@ describe("renameLegacyTableKeys", () => {
       notifications: [{ id: "n-1" }],
     });
 
-    expect(renameLegacyTableKeys(data)).toEqual({
+    expect(renameLegacyTableKeys(data)).toMatchObject({
       renamed: [],
       discarded: [
         { table: "budget_alerts", supersededBy: "notifications", rows: 2 },
@@ -102,7 +105,7 @@ describe("renameLegacyTableKeys", () => {
       notifications: [{ id: "n-1" }],
     });
 
-    expect(renameLegacyTableKeys(data)).toEqual({
+    expect(renameLegacyTableKeys(data)).toMatchObject({
       renamed: [],
       discarded: [],
     });
@@ -114,7 +117,7 @@ describe("renameLegacyTableKeys", () => {
     // key: `insertRows` skips the second and truncates on the first.
     const data = artifact({ transactions: [] });
 
-    expect(renameLegacyTableKeys(data)).toEqual({
+    expect(renameLegacyTableKeys(data)).toMatchObject({
       renamed: [],
       discarded: [],
     });

@@ -46,8 +46,12 @@ export function NotificationPreferencesMatrix({
 }: NotificationPreferencesMatrixProps) {
   const t = useTranslations('settings.notifications.preferences');
   const [rows, setRows] = useState<NotificationChannelPreference[] | null>(null);
-  const [savingCategory, setSavingCategory] =
-    useState<NotificationCategory | null>(null);
+  // One slot per category, not one slot: two rows saving at once must not
+  // re-enable each other's toggles mid-flight, and a later failure must revert
+  // against the snapshot of ITS row, not one a sibling's finally() released.
+  const [savingCategories, setSavingCategories] = useState<
+    ReadonlySet<NotificationCategory>
+  >(new Set());
   // A live device on a wire is what makes that wire's column a real control.
   // Counted per transport, because push (web push) and unifiedpush are gated
   // independently: a browser with a web-push device but no UnifiedPush endpoint
@@ -109,7 +113,7 @@ export function NotificationPreferencesMatrix({
       patch: NotificationPreferencePatch,
       previous: NotificationChannelPreference,
     ) => {
-      setSavingCategory(category);
+      setSavingCategories((prev) => new Set([...prev, category]));
       setRows(
         (prev) =>
           prev?.map((r) =>
@@ -127,7 +131,11 @@ export function NotificationPreferencesMatrix({
           );
           toast.error(t('saveFailed'));
         } finally {
-          setSavingCategory(null);
+          setSavingCategories((prev) => {
+            const next = new Set(prev);
+            next.delete(category);
+            return next;
+          });
         }
       })();
     },
@@ -189,7 +197,7 @@ export function NotificationPreferencesMatrix({
           <tbody>
             {rows.map((row) => {
               const categoryLabel = t(`categories.${row.category}`);
-              const saving = savingCategory === row.category;
+              const saving = savingCategories.has(row.category);
               // Which channels this category exposes as live controls -- from the
               // server (supportedChannels); the static map only shadows a row on
               // a response from a backend that predates the field.

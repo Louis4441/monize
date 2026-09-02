@@ -289,7 +289,18 @@
         "removeFailed": "기기를 삭제할 수 없습니다",
         "testSent": "{count, plural, other {기기 #대에 테스트 알림을 보냈습니다}}",
         "testPartial": "테스트 알림이 기기 {attempted}대 중 {delivered}대에 도착했습니다",
-        "testFailed": "테스트 알림을 전달하지 못했습니다"
+        "testFailed": "테스트 알림을 전달하지 못했습니다",
+        "pushServiceRefused": "브라우저의 푸시 서비스가 등록을 거부했습니다. 잠시 후 다시 시도하세요. 계속 실패하면 브라우저의 푸시 설정을 확인하세요.",
+        "pushServiceRefusedBrave": "Brave는 기본적으로 푸시 서비스를 차단합니다. Brave에서 설정, 개인정보 보호 및 보안을 열고 \"푸시 메시지에 Google 서비스 사용\"을 켠 뒤 브라우저를 다시 시작하고 다시 시도하세요."
+      },
+      "testResults": {
+        "heading": "마지막 테스트, 기기별",
+        "status": {
+          "sent": "푸시 서비스에 전달됨",
+          "expired": "구독이 만료됨. 해당 기기에서 푸시를 다시 켜세요",
+          "transient": "전달되지 않음(일시적 오류). 다시 시도하세요",
+          "unconfigured": "이 인스턴스는 현재 푸시 메시지에 서명할 수 없습니다"
+        }
       }
     },
     "preferences": {
