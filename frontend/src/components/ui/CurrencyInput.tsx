@@ -4,10 +4,11 @@ import { useState, useEffect, useRef, useCallback, useMemo, forwardRef, InputHTM
 import { useTranslations } from 'next-intl';
 import { CalculatorIcon } from '@heroicons/react/24/outline';
 import { cn, inputBaseClasses, inputErrorClasses } from '@/lib/utils';
-import { hasCalculatorOperators, evaluateExpression, formatAmountWithCommas } from '@/lib/format';
+import { hasCalculatorOperators, evaluateExpression } from '@/lib/format';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import {
   filterNumberTyping,
+  formatAmountLocalized,
   formatNumberForEdit,
   normalizeExpression,
   parseLocaleNumber,
@@ -68,30 +69,27 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
   ) => {
     const t = useTranslations('common');
     const nf = useNumberFormat();
-    const numberLocale = nf.numberLocale;
     // Defensive default: a partial mock (or an older build mid rolling deploy)
-    // may not carry the separators; en-US keeps the previous behaviour.
-    const numberSeparators = nf.numberSeparators ?? { decimal: '.', group: ',' };
+    // may not carry the separators; en-US keeps the previous behaviour. Memoized
+    // on the primitive fields, NOT the object identity: the real hook returns a
+    // module-cached object (stable), but a partial test mock returns a fresh
+    // literal each render -- keying on the strings keeps the reference stable
+    // under both, so the callbacks below (and the sync effect that depends on
+    // formatDisplay) do not rebuild every render.
+    const sepDecimal = nf.numberSeparators?.decimal ?? '.';
+    const sepGroup = nf.numberSeparators?.group ?? ',';
+    const numberSeparators = useMemo(
+      () => ({ decimal: sepDecimal, group: sepGroup }),
+      [sepDecimal, sepGroup],
+    );
+    const numberLocale = nf.numberLocale;
 
-    // Grouped, two-decimal display in the user's number locale -- "1,234.56" in
-    // en-US, "1 234,56" in pl. Byte-identical to the previous en-US formatter
-    // when the locale resolves to en-US (the runtime default).
+    // Grouped, two-decimal display in the user's number locale -- the same
+    // helper the read-only surfaces use, so the field and its labels agree.
     const formatDisplay = useCallback(
-      (v: number | undefined | null): string => {
-        if (v === undefined || v === null || isNaN(v)) return '';
-        // en-US / default separators go through the shared formatter, which is
-        // the seam existing tests mock; other locales format with Intl in the
-        // user's own convention ("1 234,56").
-        if (numberSeparators.decimal === '.' && numberSeparators.group === ',') {
-          return formatAmountWithCommas(v);
-        }
-        const rounded = Math.round(v * 100) / 100;
-        return new Intl.NumberFormat(numberLocale, {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }).format(rounded);
-      },
-      [numberLocale, numberSeparators.decimal, numberSeparators.group],
+      (v: number | undefined | null): string =>
+        formatAmountLocalized(v, 2, numberSeparators, numberLocale),
+      [numberSeparators, numberLocale],
     );
 
     // Filter a raw string while typing, and parse it, in the user's convention.
@@ -102,7 +100,7 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
           allowOperators: allowCalculator,
           groupSeparator: numberSeparators.group,
         }),
-      [allowNegative, allowCalculator, numberSeparators.group],
+      [allowNegative, allowCalculator, numberSeparators],
     );
     const parse = useCallback(
       (raw: string): number | undefined => parseLocaleNumber(raw, numberSeparators),
@@ -359,7 +357,7 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
             id={inputId}
             type="text"
             inputMode="decimal"
-            placeholder="0.00"
+            placeholder={formatNumberForEdit(0, 2, numberSeparators)}
             value={displayValue}
             onChange={handleChange}
             onBlur={handleBlur}

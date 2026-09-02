@@ -19,11 +19,12 @@ import { StatusCellButton } from '@/components/transactions/StatusCellButton';
 import { CategoryBudgetStatus } from '@/types/budget';
 import { DensityLevel } from '@/hooks/useTableDensity';
 import { HIGHLIGHT_FLASH, HIGHLIGHT_FLASH_CELL } from '@/hooks/useHighlightTarget';
-import { formatAmountWithCommas, getDecimalPlacesForCurrency } from '@/lib/format';
+import { getDecimalPlacesForCurrency } from '@/lib/format';
 import { foreignTransactionFee } from '@/lib/fx-fees';
 import { transferDirection } from '@/lib/transfer-label';
 import { usePayeeDisplay } from '@/hooks/usePayeeDisplay';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { formatAmountLocalized } from '@/lib/number-parse';
 import type { StaleUnreconciledReason } from '@/lib/stale-reconciliation';
 
 const INVESTMENT_ACTION_LABELS: Record<string, string> = {
@@ -255,7 +256,11 @@ export const TransactionRow = memo(function TransactionRow({
   // The reconciliation chips live in the reconcile catalog so the register and
   // the reconcile table say the same thing about the same row.
   const tr = useTranslations('reconcile');
-  const { formatCurrency } = useNumberFormat();
+  const { formatCurrency, numberSeparators, numberLocale } = useNumberFormat();
+  const seps = numberSeparators ?? { decimal: '.', group: ',' };
+  // Read-only amounts, grouped in the user's number locale (en-US unchanged).
+  const formatAmountLocal = (v: number | undefined | null, d: number = 2) =>
+    formatAmountLocalized(v, d, seps, numberLocale);
   const isVoid = transaction.status === TransactionStatus.VOID;
 
   // When this row is the deep-link target, scroll it into view once it mounts
@@ -463,14 +468,14 @@ export const TransactionRow = memo(function TransactionRow({
                       <span className="text-blue-600 dark:text-blue-400">
                         {transferDirection(split.amount) === 'to'
                           ? `\u2192 ${split.transferAccount.name}`
-                          : `${split.transferAccount.name} \u2192`}: {formatAmountWithCommas(Math.abs(Number(split.amount)), getDecimalPlacesForCurrency(transaction.currencyCode))}
+                          : `${split.transferAccount.name} \u2192`}: {formatAmountLocal(Math.abs(Number(split.amount)), getDecimalPlacesForCurrency(transaction.currencyCode))}
                       </span>
                     ) : split.investmentTransaction ? (
                       <span className="text-emerald-600 dark:text-emerald-400">
-                        {describeInvestmentSplit(split, t('list.row.uncategorized'))}: {formatAmountWithCommas(Math.abs(Number(split.amount)), getDecimalPlacesForCurrency(transaction.currencyCode))}
+                        {describeInvestmentSplit(split, t('list.row.uncategorized'))}: {formatAmountLocal(Math.abs(Number(split.amount)), getDecimalPlacesForCurrency(transaction.currencyCode))}
                       </span>
                     ) : (
-                      <>{split.category?.name || t('list.row.uncategorized')}: {formatAmountWithCommas(Math.abs(Number(split.amount)), getDecimalPlacesForCurrency(transaction.currencyCode))}</>
+                      <>{split.category?.name || t('list.row.uncategorized')}: {formatAmountLocal(Math.abs(Number(split.amount)), getDecimalPlacesForCurrency(transaction.currencyCode))}</>
                     )}
                   </div>
                 ))}
@@ -606,7 +611,7 @@ export const TransactionRow = memo(function TransactionRow({
       <td className={`${cellPadding} whitespace-nowrap text-sm font-medium text-right ${isVoid ? 'line-through' : ''}`}>
         {displayAmount !== undefined ? (
           <span
-            title={t('list.row.filteredAmountTitle', { amount: formatAmountWithCommas(Math.abs(transaction.amount), getDecimalPlacesForCurrency(transaction.currencyCode)) })}
+            title={t('list.row.filteredAmountTitle', { amount: formatAmountLocal(Math.abs(transaction.amount), getDecimalPlacesForCurrency(transaction.currencyCode)) })}
             className="inline-flex items-center gap-1 justify-end"
           >
             {formatAmount(displayAmount, transaction.currencyCode)}
@@ -620,7 +625,7 @@ export const TransactionRow = memo(function TransactionRow({
           transaction.originalAmount !== null && (
             <div className="text-xs font-normal text-gray-500 dark:text-gray-400">
               {transaction.originalCurrencyCode}{' '}
-              {formatAmountWithCommas(
+              {formatAmountLocal(
                 Math.abs(Number(transaction.originalAmount)),
                 getDecimalPlacesForCurrency(transaction.originalCurrencyCode),
               )}

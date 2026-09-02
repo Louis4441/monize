@@ -18,6 +18,8 @@
  * exactly what the old helpers did.
  */
 
+import { formatAmountWithCommas, roundToDecimals } from '@/lib/format';
+
 export interface NumberSeparators {
   /** The decimal separator, e.g. "." (en) or "," (pl, de, fr). */
   decimal: string;
@@ -160,6 +162,35 @@ export function filterNumberTyping(
     out = out.split(groupSeparator).join('');
   }
   return out;
+}
+
+/**
+ * Format an amount for read-only DISPLAY (grouped, fixed decimals) in the user's
+ * number locale, WITHOUT a currency symbol -- "1,234.56" in en-US, "1 234,56" in
+ * pl. The read-only counterpart to what `CurrencyInput` shows; use it wherever a
+ * plain amount is printed and the currency symbol is composed separately,
+ * instead of a bare `formatAmountWithCommas` (which is hardcoded en-US).
+ *
+ * The en-US / default-separator path delegates to `formatAmountWithCommas` so
+ * its display seam -- and the tests that mock it -- is preserved unchanged; only
+ * a genuinely non-en locale takes the `Intl` branch. Callers pass their (already
+ * defensively defaulted) separators and effective locale, so a component with a
+ * partial `useNumberFormat` mock never needs the formatter itself.
+ */
+export function formatAmountLocalized(
+  value: number | undefined | null,
+  decimals: number,
+  separators: NumberSeparators,
+  locale: string | undefined,
+): string {
+  if (value === undefined || value === null || isNaN(value)) return '';
+  if (separators.decimal === '.' && separators.group === ',') {
+    return formatAmountWithCommas(value, decimals);
+  }
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(roundToDecimals(value, decimals));
 }
 
 /**

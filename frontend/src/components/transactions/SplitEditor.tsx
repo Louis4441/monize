@@ -14,7 +14,9 @@ import { Account } from '@/types/account';
 import { Tag } from '@/types/tag';
 import { CreateSplitData, InvestmentSplitDetails } from '@/types/transaction';
 import { buildCategoryTree } from '@/lib/categoryUtils';
-import { roundToCents, roundToDecimals, getCurrencySymbol, formatAmountWithCommas, getDecimalPlacesForCurrency } from '@/lib/format';
+import { roundToCents, roundToDecimals, getCurrencySymbol, getDecimalPlacesForCurrency } from '@/lib/format';
+import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { formatAmountLocalized } from '@/lib/number-parse';
 import { buildAccountDropdownOptions } from '@/lib/account-utils';
 import { useAccountOptionLabel } from '@/hooks/useMainAccountName';
 import { InvestmentSplitFields } from './InvestmentSplitFields';
@@ -90,6 +92,11 @@ export function SplitEditor({
   onCreateCategory,
 }: SplitEditorProps) {
   const t = useTranslations('transactions');
+  const { numberSeparators, numberLocale } = useNumberFormat();
+  const seps = numberSeparators ?? { decimal: '.', group: ',' };
+  // Read-only amounts, grouped in the user's number locale (en-US unchanged).
+  const formatAmountLocal = (v: number | undefined | null, d: number = 2) =>
+    formatAmountLocalized(v, d, seps, numberLocale);
   const accountOptionLabel = useAccountOptionLabel({ withCurrency: false });
   const investmentSplitsEnabled = parentAccountSubType === 'INVESTMENT_CASH';
   const currencySymbol = getCurrencySymbol(currencyCode);
@@ -679,13 +686,13 @@ export function SplitEditor({
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('splitEditor.total')}</span>
                 <span className={`font-medium ${isBalanced ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                  {activeSymbol}{formatAmountWithCommas(displaySplitsTotal, activeDecimals)}
+                  {activeSymbol}{formatAmountLocal(displaySplitsTotal, activeDecimals)}
                 </span>
                 {isBalanced ? (
                   <span className="text-xs text-green-600 dark:text-green-400">{t('splitEditor.balanced')}</span>
                 ) : (
                   <span className="text-xs text-red-600 dark:text-red-400">
-                    {t('splitEditor.remaining', { symbol: activeSymbol, amount: formatAmountWithCommas(displayRemaining, activeDecimals) })}
+                    {t('splitEditor.remaining', { symbol: activeSymbol, amount: formatAmountLocal(displayRemaining, activeDecimals) })}
                   </span>
                 )}
               </div>
@@ -696,7 +703,7 @@ export function SplitEditor({
                   disabled={disabled}
                   className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline disabled:opacity-50 whitespace-nowrap"
                 >
-                  {t('splitEditor.setTotal', { symbol: activeSymbol, amount: formatAmountWithCommas(displaySplitsTotal, activeDecimals) })}
+                  {t('splitEditor.setTotal', { symbol: activeSymbol, amount: formatAmountLocal(displaySplitsTotal, activeDecimals) })}
                 </button>
               )}
             </div>
@@ -904,13 +911,13 @@ export function SplitEditor({
                         isBalanced ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                       }`}
                     >
-                      {activeSymbol}{formatAmountWithCommas(displaySplitsTotal, activeDecimals)}
+                      {activeSymbol}{formatAmountLocal(displaySplitsTotal, activeDecimals)}
                     </span>
                     {isBalanced ? (
                       <span className="text-xs text-green-600 dark:text-green-400">{t('splitEditor.balanced')}</span>
                     ) : (
                       <span className="text-xs text-red-600 dark:text-red-400 whitespace-nowrap">
-                        {t('splitEditor.needAmount', { symbol: activeSymbol, amount: formatAmountWithCommas(displayTransactionAmount, activeDecimals), remaining: formatAmountWithCommas(displayRemaining, activeDecimals) })}
+                        {t('splitEditor.needAmount', { symbol: activeSymbol, amount: formatAmountLocal(displayTransactionAmount, activeDecimals), remaining: formatAmountLocal(displayRemaining, activeDecimals) })}
                       </span>
                     )}
                   </div>
@@ -921,7 +928,7 @@ export function SplitEditor({
                       disabled={disabled}
                       className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline disabled:opacity-50 whitespace-nowrap"
                     >
-                      {t('splitEditor.setTotal', { symbol: activeSymbol, amount: formatAmountWithCommas(displaySplitsTotal, activeDecimals) })}
+                      {t('splitEditor.setTotal', { symbol: activeSymbol, amount: formatAmountLocal(displaySplitsTotal, activeDecimals) })}
                     </button>
                   )}
                 </div>

@@ -177,6 +177,8 @@ flip the behaviour mid-session.
 
 `ui-conventions.test.ts` fails the build on any `<input type="number">` or `<Input type="number">` -- resolving the tag each `type="number"` belongs to, because recharts' `<XAxis type="number">` is not an input and is left alone.
 
+**Both components read and write in the user's number locale, and that is the only place a number is parsed from typed text.** A comma-decimal user (pl, de, fr, ...) types and pastes "1200,99", not "1200.99", and the field must round-trip it -- the two fields resolve the decimal/grouping separators from `useNumberFormat().numberSeparators` and go through `lib/number-parse.ts` (`parseLocaleNumber`, `filterNumberTyping`, `formatNumberForEdit`, `normalizeExpression`). Never hand-roll a `replace(/[^0-9.-]/g, '')` filter or a `parseFloat` on raw input text -- that is the dot-only assumption these helpers exist to remove, and it silently drops a comma decimal (turning 1200,99 into 120099). The en-US path is byte-identical (decimal `.`, group `,`), and `formatAmountWithCommas` stays the display seam `CurrencyInput` delegates to for that case; the shared `number-parse` helpers default to en-US separators so a partial mock or an older build never crashes.
+
 Both components take a *number* (`value: number | undefined`, `onChange: (value: number | undefined) => void`):
 
 - **`register()` does not fit.** Wrap in react-hook-form's `Controller` and pass `value`/`onChange`/`onBlur`/`ref` (plus `name={field.name}`, or `name`-based test selectors stop matching). Where the schema stores a string, bridge inside the render callback.
