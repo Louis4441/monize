@@ -239,14 +239,20 @@ export class SystemAlertService {
   }
 
   /**
-   * One guarded insert. `null` means another replica (or an earlier run in the
-   * same dedupe bucket) already holds this alert for this recipient.
+   * One guarded insert, fanned out. `null` means another replica (or an earlier
+   * run in the same dedupe bucket) already holds this alert for this recipient.
+   *
+   * Goes through the dispatch seam so an admin who turned SYSTEM push on gets the
+   * alert on their device too -- SYSTEM exposes push only, so the seam sends no
+   * email here (the admin email is the severity-driven `emailAdmin` path below,
+   * not a matrix-gated one). The write door still sits beneath dispatch, so the
+   * row shape and the ON CONFLICT arbitration are unchanged.
    */
   private async insertAlert(
     userId: string,
     input: Omit<SystemAlertInput, "email">,
   ): Promise<string | null> {
-    const row = await this.notifications.create(userId, {
+    const row = await this.dispatch.notify(userId, {
       type: input.type,
       severity: input.severity,
       title: input.title,

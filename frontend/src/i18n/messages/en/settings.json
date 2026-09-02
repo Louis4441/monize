@@ -303,9 +303,11 @@
       },
       "categories": {
         "PAYMENTS": "Bills and scheduled",
-        "BUDGETS": "Budgets"
+        "BUDGETS": "Budgets",
+        "SYSTEM": "System alerts"
       },
       "inAppAlways": "Always shown in the bell",
+      "channelNotApplicable": "Not applicable for this notification type",
       "emailToggleLabel": "Report email for {category}",
       "emailNotificationToggleLabel": "Alert email for {category}",
       "pushToggleLabel": "Push for {category}",

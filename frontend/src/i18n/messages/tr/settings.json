@@ -303,9 +303,11 @@
       },
       "categories": {
         "PAYMENTS": "Faturalar ve planlananlar",
-        "BUDGETS": "Bütçeler"
+        "BUDGETS": "Bütçeler",
+        "SYSTEM": "Sistem uyarıları"
       },
       "inAppAlways": "Zilde her zaman görünür",
+      "channelNotApplicable": "Bu bildirim türü için geçerli değil",
       "emailToggleLabel": "{category} için rapor e-postası",
       "saveFailed": "Bu ayar kaydedilemedi",
       "throttle": {

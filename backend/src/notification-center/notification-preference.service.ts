@@ -10,21 +10,65 @@ import { THROTTLE_MAX_MINUTES } from "./notification-preference.constants";
 export { THROTTLE_MAX_MINUTES };
 
 /**
- * The categories the preference matrix exposes and a producer consults today.
+ * The categories the preference matrix exposes.
  *
- * Deliberately NOT every {@link NotificationCategory}: the matrix shows a row
- * only where a producer actually reads the resolved value on EVERY channel it
- * offers, so no cell is a control that changes nothing. PAYMENTS and BUDGETS
- * each have a dispatching producer for their interrupting channels (push /
- * alert-email): budget alerts for BUDGETS, and the SCHEDULED_POST_FAILED alert
- * for PAYMENTS (which is why that alert is categorized PAYMENTS, not SYSTEM).
- * SYSTEM is absent because its remaining types are admin fan-outs whose email is
- * a cross-user recipient query with its own dedicated path, and no per-user push
- * producer reads a SYSTEM matrix cell -- exposing it would be a dead control.
- * See `docs/specs/notification-preferences.md`.
+ * Deliberately NOT every {@link NotificationCategory}, and each row exposes only
+ * the channels a producer actually reads (see {@link NOTIFICATION_CATEGORY_CHANNELS}),
+ * so no cell is a control that changes nothing. PAYMENTS and BUDGETS each have a
+ * dispatching producer for their interrupting channels (budget alerts for
+ * BUDGETS; the SCHEDULED_POST_FAILED alert and bill-due reminders for PAYMENTS).
+ * SYSTEM is the admin infra alerts (backup, provider, SMTP): a per-user PUSH
+ * control (its rows fan out through the dispatch seam), while its email stays a
+ * severity-driven admin fan-out that is not user-gated -- so SYSTEM exposes push
+ * only. See `docs/specs/notification-preferences.md`.
  */
 export const NOTIFICATION_PREFERENCE_CATEGORIES: readonly NotificationCategory[] =
-  [NotificationCategory.PAYMENTS, NotificationCategory.BUDGETS];
+  [
+    NotificationCategory.PAYMENTS,
+    NotificationCategory.BUDGETS,
+    NotificationCategory.SYSTEM,
+  ];
+
+/** Which channels a matrix category delivers on, as live per-user controls. */
+export interface CategoryChannelSupport {
+  /** REPORT-mode email (digest), gated by `resolveEmail`. */
+  email: boolean;
+  /** NOTIFICATION-mode immediate email, fanned out by the dispatch seam. */
+  emailNotification: boolean;
+  /** Web push, fanned out by the dispatch seam. */
+  push: boolean;
+}
+
+/**
+ * The channels each matrix category exposes as a live control -- the machine-
+ * readable form of "the matrix shows a cell only where a producer reads it".
+ * A cell whose channel is unsupported here renders as "not applicable" and its
+ * resolved delivery is forced off ({@link resolveNotificationDelivery}), so a
+ * stored value on it can never become a delivery nobody asked for. SYSTEM's
+ * email is the admin fan-out's own severity-driven path, not a user toggle, so
+ * only its push is a control. This map is mirrored on the client and held equal
+ * by `notification-preferences.contract.test.ts`.
+ */
+export const NOTIFICATION_CATEGORY_CHANNELS: Record<
+  NotificationCategory,
+  CategoryChannelSupport
+> = {
+  [NotificationCategory.PAYMENTS]: {
+    email: true,
+    emailNotification: true,
+    push: true,
+  },
+  [NotificationCategory.BUDGETS]: {
+    email: true,
+    emailNotification: true,
+    push: true,
+  },
+  [NotificationCategory.SYSTEM]: {
+    email: false,
+    emailNotification: false,
+    push: true,
+  },
+};
 
 /**
  * One category's resolved channel state for the settings matrix.
@@ -40,6 +84,12 @@ export interface NotificationChannelPreference {
   emailNotification: boolean;
   push: boolean;
   throttleMinutes: number;
+  /**
+   * Which channels this category exposes as live controls. Server-authoritative
+   * so the client renders a cell as a toggle only where a producer reads it; an
+   * unsupported cell shows "not applicable" (see NOTIFICATION_CATEGORY_CHANNELS).
+   */
+  supportedChannels: CategoryChannelSupport;
 }
 
 /** A partial update to one category's preferences. */
@@ -102,8 +152,11 @@ export class NotificationPreferenceService {
    *
    * The email flag is killed by the `notification_email` master switch (it is
    * still email) and defaults OFF (opt-in, D9); push is NOT email-master-gated
-   * (a different channel) and defaults OFF; the throttle defaults 0. Feasibility
-   * -- SMTP configured, a live device -- is the sender's call, not this one.
+   * (a different channel) and defaults OFF; the throttle defaults 0. A channel
+   * this category does not expose ({@link NOTIFICATION_CATEGORY_CHANNELS}) is
+   * forced OFF whatever the stored row says, so a value written to an unsupported
+   * cell can never become a delivery. Feasibility -- SMTP configured, a live
+   * device -- is the sender's call, not this one.
    */
   async resolveNotificationDelivery(
     userId: string,
@@ -113,6 +166,7 @@ export class NotificationPreferenceService {
     push: boolean;
     throttleMinutes: number;
   }> {
+    const support = NOTIFICATION_CATEGORY_CHANNELS[category];
     return withScopedDb(this.dataSource, async (manager) => {
       const master = await manager.getRepository(UserPreference).findOne({
         where: { userId },
@@ -122,12 +176,13 @@ export class NotificationPreferenceService {
         where: { userId, category },
       });
       return {
-        emailNotification: emailKilled
-          ? false
-          : row
-            ? row.emailNotification
+        emailNotification:
+          support.emailNotification && !emailKilled
+            ? row
+              ? row.emailNotification
+              : false
             : false,
-        push: row ? row.push : false,
+        push: support.push ? (row ? row.push : false) : false,
         throttleMinutes: row ? this.clampThrottle(row.throttleMinutes) : 0,
       };
     });
@@ -213,6 +268,7 @@ export class NotificationPreferenceService {
       emailNotification: row ? row.emailNotification : false,
       push: row ? row.push : false,
       throttleMinutes: row ? this.clampThrottle(row.throttleMinutes) : 0,
+      supportedChannels: NOTIFICATION_CATEGORY_CHANNELS[category],
     };
   }
 

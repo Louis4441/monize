@@ -121,6 +121,19 @@ adding a group is one `NotificationCategory` member plus its producer.
 Security is opt-in per the maintainer; there is no security *category* yet (no
 login/2FA notification types exist), so it enters with those producers.
 
+**A cell is a control only where a producer reads it.** Not every category
+exposes every channel. `NOTIFICATION_CATEGORY_CHANNELS` (backend) maps each
+matrix category to which of `email` (report), `email_notification` and `push`
+are live controls, and the API returns that per row as `supportedChannels` so
+the grid is server-authoritative. PAYMENTS and BUDGETS expose all three;
+**SYSTEM exposes push only** -- its email is the admin fan-out's own
+severity-driven, SQL-gated path (Section 8), not a user toggle. An unsupported
+cell renders "not applicable" and `resolveNotificationDelivery` forces its
+resolved delivery off whatever the stored row says, so a value written to an
+unsupported cell can never become a delivery nobody asked for. The map is
+mirrored on the client (`frontend/src/lib/notification-preferences.ts`) and held
+equal by `notification-preferences.contract.test.ts`.
+
 ---
 
 ## 4. Two email modes, and what the throttle gates (R7)
@@ -296,8 +309,12 @@ and behind a per-group toggle, defaulting off until validated on real devices.
   `bill-reminder.service.ts` (daily digest, PAYMENTS, email-only, no in-app row),
   `accounts/mortgage-reminder.service.ts` (renewal reminder, PAYMENTS,
   email-only). `system-alert.service.ts` is the one email sender that is NOT
-  category-gated: it is an admin fan-out (SYSTEM, not exposed in the matrix),
-  gated by `queryAdminRecipients.emailEnabled` in SQL. Locale for any
+  category-gated: its EMAIL is a severity-driven admin fan-out gated by
+  `queryAdminRecipients.emailEnabled` in SQL, never by the matrix. Its rows do
+  fan out through the dispatch seam, so SYSTEM is a matrix category that exposes
+  **push only** (`NOTIFICATION_CATEGORY_CHANNELS`): an admin who turns SYSTEM
+  push on receives the alert on their device, while the two email columns render
+  "not applicable" and `resolveNotificationDelivery` forces them off. Locale for any
   off-request copy resolves through `emailTranslator(i18n, lang)` +
   `resolveUserEmailLocale`. `notification-email-gate.guard.spec.ts` is the
   source scan that keeps every category producer on the resolver and pins each
@@ -372,7 +389,9 @@ Phase 1 (this slice):
   `budget-period-cron` monthly summary (BUDGETS); keep `notification_email` as
   the default seed and the global master switch (email off globally still wins --
   the per-category matrix narrows, never widens, an off master).
-  `system-alert` (SYSTEM) stays on its SQL recipient gate.
+  `system-alert` (SYSTEM) keeps its SQL recipient gate for EMAIL; its rows fan
+  out through the dispatch seam so SYSTEM push is a live per-admin control
+  (SYSTEM exposes push only).
   `notification-email-gate.guard.spec.ts` enforces both halves: no email sender
   gates on the bare master switch, and each category producer names its category.
 - `frontend/src/components/settings/NotificationPreferencesMatrix.tsx` (new) --

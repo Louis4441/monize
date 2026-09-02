@@ -303,9 +303,11 @@
       },
       "categories": {
         "PAYMENTS": "Facturas y programados",
-        "BUDGETS": "Presupuestos"
+        "BUDGETS": "Presupuestos",
+        "SYSTEM": "Alertas del sistema"
       },
       "inAppAlways": "Siempre visible en la campana",
+      "channelNotApplicable": "No aplicable a este tipo de notificación",
       "emailToggleLabel": "Correo (informe) para {category}",
       "saveFailed": "No se pudo guardar ese ajuste",
       "throttle": {

@@ -6,10 +6,43 @@ import type { NotificationCategory } from '@/types/notification';
  * {@link NotificationCategory}, mirroring the backend
  * `NOTIFICATION_PREFERENCE_CATEGORIES` and held equal by
  * `notification-preferences.contract.test.ts`. Only categories a producer
- * actually reads are shown, so a toggle never controls nothing.
+ * actually reads are shown, so a toggle never controls nothing. SYSTEM is the
+ * admin infra alerts (backup, provider, SMTP): a push-only control (its email
+ * is a severity-driven admin fan-out, not a user toggle).
  */
 export const NOTIFICATION_PREFERENCE_CATEGORIES: readonly NotificationCategory[] =
-  ['PAYMENTS', 'BUDGETS'];
+  ['PAYMENTS', 'BUDGETS', 'SYSTEM'];
+
+/**
+ * Which channels a matrix category exposes as a live control -- the client
+ * mirror of the backend `CategoryChannelSupport`. A cell whose channel is
+ * unsupported renders "not applicable" rather than a toggle, because the server
+ * forces its resolved delivery off whatever the stored value.
+ */
+export interface CategoryChannelSupport {
+  /** REPORT-mode email (digest). */
+  email: boolean;
+  /** NOTIFICATION-mode immediate email. */
+  emailNotification: boolean;
+  /** Web push. */
+  push: boolean;
+}
+
+/**
+ * The channels each matrix category exposes as a live control. Mirrors the
+ * backend `NOTIFICATION_CATEGORY_CHANNELS` and is held equal to it by
+ * `notification-preferences.contract.test.ts` -- but the authoritative value
+ * for a given row is `supportedChannels` on the API response, which this only
+ * shadows for a category whose row has not loaded.
+ */
+export const NOTIFICATION_CATEGORY_CHANNELS: Record<
+  NotificationCategory,
+  CategoryChannelSupport
+> = {
+  PAYMENTS: { email: true, emailNotification: true, push: true },
+  BUDGETS: { email: true, emailNotification: true, push: true },
+  SYSTEM: { email: false, emailNotification: false, push: true },
+};
 
 /**
  * The cooldown windows the matrix offers, in minutes. `0` is the real "off";
@@ -35,6 +68,12 @@ export interface NotificationChannelPreference {
   emailNotification: boolean;
   push: boolean;
   throttleMinutes: number;
+  /**
+   * Which channels this category exposes as live controls, from the server.
+   * A cell whose channel is not supported renders "not applicable" instead of a
+   * toggle; absent on a response from before this field, so read it defensively.
+   */
+  supportedChannels?: CategoryChannelSupport;
 }
 
 /** A partial update: send only the field(s) that changed. */

@@ -154,11 +154,11 @@ describe("SystemAlertService", () => {
       } as never,
       jobClaims as never,
       writeDoor,
-      // The per-user path goes through the dispatch seam. Forward `notify` to the
-      // real write door so the guarded insert still lands (and `created` still
-      // reflects the ON CONFLICT result) without pulling the push / email fan-out
-      // into these SQL-shape tests -- the fan-out has its own suite
-      // (`notification-dispatch.service.spec.ts`).
+      // Both the admin fan-out (insertAlert) and the per-user path go through the
+      // dispatch seam now. Forward `notify` to the real write door so the guarded
+      // insert still lands (and `created` still reflects the ON CONFLICT result)
+      // without pulling the push / email fan-out into these SQL-shape tests -- the
+      // fan-out has its own suite (`notification-dispatch.service.spec.ts`).
       {
         notify: (userId: string, input: unknown) =>
           writeDoor.create(userId, input as never),

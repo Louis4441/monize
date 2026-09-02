@@ -7,6 +7,7 @@ import { CheckIcon } from '@heroicons/react/24/solid';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import {
   notificationPreferencesApi,
+  NOTIFICATION_CATEGORY_CHANNELS,
   THROTTLE_OPTION_MINUTES,
   type NotificationChannelPreference,
   type NotificationPreferencePatch,
@@ -127,6 +128,20 @@ export function NotificationPreferencesMatrix({
 
   const pushAvailable = liveDeviceCount >= 1;
 
+  // A cell for a channel this category does not expose as a control. The dash is
+  // decorative; the meaning is carried by the localized label for assistive tech.
+  const notApplicableCell = (
+    <div className="flex justify-center">
+      <span
+        className="inline-flex items-center justify-center text-gray-300 dark:text-gray-600"
+        title={t('channelNotApplicable')}
+      >
+        <span aria-hidden="true">&mdash;</span>
+        <span className="sr-only">{t('channelNotApplicable')}</span>
+      </span>
+    </div>
+  );
+
   return (
     <div className="border-t border-gray-200 pt-4 dark:border-gray-700">
       <h3 className="mb-1 text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -161,9 +176,17 @@ export function NotificationPreferencesMatrix({
             {rows.map((row) => {
               const categoryLabel = t(`categories.${row.category}`);
               const saving = savingCategory === row.category;
+              // Which channels this category exposes as live controls -- from the
+              // server (supportedChannels); the static map only shadows a row on
+              // a response from a backend that predates the field.
+              const support =
+                row.supportedChannels ??
+                NOTIFICATION_CATEGORY_CHANNELS[row.category];
               // The cooldown gates the interrupting channels, so it is only
-              // meaningful once one of them is on for this row.
-              const interrupting = row.emailNotification || row.push;
+              // meaningful once a SUPPORTED interrupting channel is on for the row.
+              const interrupting =
+                (support.emailNotification && row.emailNotification) ||
+                (support.push && row.push);
               return (
                 <tr
                   key={row.category}
@@ -182,49 +205,65 @@ export function NotificationPreferencesMatrix({
                     </span>
                   </td>
                   <td className="py-2">
-                    <div className="flex justify-center">
-                      <ToggleSwitch
-                        checked={row.email}
-                        disabled={saving || !emailAvailable}
-                        onChange={() =>
-                          applyPatch(row.category, { email: !row.email }, row)
-                        }
-                        label={t('emailToggleLabel', { category: categoryLabel })}
-                        size="sm"
-                      />
-                    </div>
+                    {support.email ? (
+                      <div className="flex justify-center">
+                        <ToggleSwitch
+                          checked={row.email}
+                          disabled={saving || !emailAvailable}
+                          onChange={() =>
+                            applyPatch(row.category, { email: !row.email }, row)
+                          }
+                          label={t('emailToggleLabel', {
+                            category: categoryLabel,
+                          })}
+                          size="sm"
+                        />
+                      </div>
+                    ) : (
+                      notApplicableCell
+                    )}
                   </td>
                   <td className="py-2">
-                    <div className="flex justify-center">
-                      <ToggleSwitch
-                        checked={row.emailNotification}
-                        disabled={saving || !emailAvailable}
-                        onChange={() =>
-                          applyPatch(
-                            row.category,
-                            { emailNotification: !row.emailNotification },
-                            row,
-                          )
-                        }
-                        label={t('emailNotificationToggleLabel', {
-                          category: categoryLabel,
-                        })}
-                        size="sm"
-                      />
-                    </div>
+                    {support.emailNotification ? (
+                      <div className="flex justify-center">
+                        <ToggleSwitch
+                          checked={row.emailNotification}
+                          disabled={saving || !emailAvailable}
+                          onChange={() =>
+                            applyPatch(
+                              row.category,
+                              { emailNotification: !row.emailNotification },
+                              row,
+                            )
+                          }
+                          label={t('emailNotificationToggleLabel', {
+                            category: categoryLabel,
+                          })}
+                          size="sm"
+                        />
+                      </div>
+                    ) : (
+                      notApplicableCell
+                    )}
                   </td>
                   <td className="py-2">
-                    <div className="flex justify-center">
-                      <ToggleSwitch
-                        checked={row.push}
-                        disabled={saving || !pushAvailable}
-                        onChange={() =>
-                          applyPatch(row.category, { push: !row.push }, row)
-                        }
-                        label={t('pushToggleLabel', { category: categoryLabel })}
-                        size="sm"
-                      />
-                    </div>
+                    {support.push ? (
+                      <div className="flex justify-center">
+                        <ToggleSwitch
+                          checked={row.push}
+                          disabled={saving || !pushAvailable}
+                          onChange={() =>
+                            applyPatch(row.category, { push: !row.push }, row)
+                          }
+                          label={t('pushToggleLabel', {
+                            category: categoryLabel,
+                          })}
+                          size="sm"
+                        />
+                      </div>
+                    ) : (
+                      notApplicableCell
+                    )}
                   </td>
                   <td className="py-2 text-center">
                     <select

@@ -303,9 +303,11 @@
       },
       "categories": {
         "PAYMENTS": "Hóa đơn và đã lên lịch",
-        "BUDGETS": "Ngân sách"
+        "BUDGETS": "Ngân sách",
+        "SYSTEM": "Cảnh báo hệ thống"
       },
       "inAppAlways": "Luôn hiển thị trong chuông",
+      "channelNotApplicable": "Không áp dụng cho loại thông báo này",
       "emailToggleLabel": "Email báo cáo cho {category}",
       "saveFailed": "Không thể lưu cài đặt đó",
       "throttle": {

@@ -303,9 +303,11 @@
       },
       "categories": {
         "PAYMENTS": "Рахунки та заплановані",
-        "BUDGETS": "Бюджети"
+        "BUDGETS": "Бюджети",
+        "SYSTEM": "Системні сповіщення"
       },
       "inAppAlways": "Завжди видно в дзвіночку",
+      "channelNotApplicable": "Не застосовно для цього типу сповіщень",
       "emailToggleLabel": "Ел. пошта (звіт) для «{category}»",
       "saveFailed": "Не вдалося зберегти це налаштування",
       "throttle": {

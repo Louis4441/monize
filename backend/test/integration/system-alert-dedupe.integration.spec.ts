@@ -49,8 +49,9 @@ describe("system alert dedupe against a real database", () => {
 
   const emailsSent: Array<{ to: string; subject: string }> = [];
 
-  const alertService = (): SystemAlertService =>
-    new SystemAlertService(
+  const alertService = (): SystemAlertService => {
+    const writeDoor = new NotificationService(dataSource);
+    return new SystemAlertService(
       dataSource,
       {
         getStatus: () => ({ configured: true }),
@@ -69,8 +70,17 @@ describe("system alert dedupe against a real database", () => {
       // The real write door on the real connection: what this file proves is
       // that PostgreSQL's own planner refuses the second insert, which is a
       // property of the statement the door issues.
-      new NotificationService(dataSource),
+      writeDoor,
+      // The admin fan-out goes through the dispatch seam. Forward `notify` to the
+      // same real write door so the guarded insert still lands on the real
+      // connection (the ON CONFLICT arbitration this file proves), without pulling
+      // the push / notification-email fan-out into a dedupe test.
+      {
+        notify: (userId: string, alert: unknown) =>
+          writeDoor.create(userId, alert as never),
+      } as never,
     );
+  };
 
   const input = (dedupeKey: string) => ({
     type: NotificationType.BACKUP_FAILED,

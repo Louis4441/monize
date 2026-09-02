@@ -303,9 +303,11 @@
       },
       "categories": {
         "PAYMENTS": "[XX-Bills and scheduled-XX]",
-        "BUDGETS": "[XX-Budgets-XX]"
+        "BUDGETS": "[XX-Budgets-XX]",
+        "SYSTEM": "[XX-System alerts-XX]"
       },
       "inAppAlways": "[XX-Always shown in the bell-XX]",
+      "channelNotApplicable": "[XX-Not applicable for this notification type-XX]",
       "emailToggleLabel": "[XX-Report email for {category}-XX]",
       "emailNotificationToggleLabel": "[XX-Alert email for {category}-XX]",
       "pushToggleLabel": "[XX-Push for {category}-XX]",

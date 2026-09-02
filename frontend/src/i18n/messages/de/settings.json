@@ -303,9 +303,11 @@
       },
       "categories": {
         "PAYMENTS": "Rechnungen und Geplantes",
-        "BUDGETS": "Budgets"
+        "BUDGETS": "Budgets",
+        "SYSTEM": "Systemwarnungen"
       },
       "inAppAlways": "Immer in der Glocke sichtbar",
+      "channelNotApplicable": "Für diese Benachrichtigungsart nicht zutreffend",
       "emailToggleLabel": "Bericht-E-Mail für {category}",
       "saveFailed": "Diese Einstellung konnte nicht gespeichert werden",
       "throttle": {

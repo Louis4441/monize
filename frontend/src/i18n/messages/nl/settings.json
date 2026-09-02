@@ -303,9 +303,11 @@
       },
       "categories": {
         "PAYMENTS": "Rekeningen en gepland",
-        "BUDGETS": "Budgetten"
+        "BUDGETS": "Budgetten",
+        "SYSTEM": "Systeemwaarschuwingen"
       },
       "inAppAlways": "Altijd zichtbaar in de bel",
+      "channelNotApplicable": "Niet van toepassing op dit type melding",
       "emailToggleLabel": "Rapport-e-mail voor {category}",
       "saveFailed": "Kon die instelling niet opslaan",
       "throttle": {

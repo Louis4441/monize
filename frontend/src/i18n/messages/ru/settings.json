@@ -303,9 +303,11 @@
       },
       "categories": {
         "PAYMENTS": "Счета и запланированное",
-        "BUDGETS": "Бюджеты"
+        "BUDGETS": "Бюджеты",
+        "SYSTEM": "Системные оповещения"
       },
       "inAppAlways": "Всегда видно в колокольчике",
+      "channelNotApplicable": "Неприменимо для этого типа уведомлений",
       "emailToggleLabel": "Эл. почта (отчёт) для «{category}»",
       "saveFailed": "Не удалось сохранить эту настройку",
       "throttle": {

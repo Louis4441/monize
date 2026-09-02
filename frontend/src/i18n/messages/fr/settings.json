@@ -303,9 +303,11 @@
       },
       "categories": {
         "PAYMENTS": "Factures et planifiés",
-        "BUDGETS": "Budgets"
+        "BUDGETS": "Budgets",
+        "SYSTEM": "Alertes système"
       },
       "inAppAlways": "Toujours visible dans la cloche",
+      "channelNotApplicable": "Non applicable à ce type de notification",
       "emailToggleLabel": "E-mail (rapport) pour {category}",
       "saveFailed": "Impossible d'enregistrer ce réglage",
       "throttle": {

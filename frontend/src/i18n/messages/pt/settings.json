@@ -303,9 +303,11 @@
       },
       "categories": {
         "PAYMENTS": "Contas e agendados",
-        "BUDGETS": "Orçamentos"
+        "BUDGETS": "Orçamentos",
+        "SYSTEM": "Alertas do sistema"
       },
       "inAppAlways": "Sempre visível no sino",
+      "channelNotApplicable": "Não aplicável a este tipo de notificação",
       "emailToggleLabel": "Email (relatório) para {category}",
       "saveFailed": "Não foi possível guardar essa definição",
       "throttle": {

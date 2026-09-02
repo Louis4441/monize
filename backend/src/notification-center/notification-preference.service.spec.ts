@@ -1,6 +1,7 @@
 import {
   NotificationPreferenceService,
   NOTIFICATION_PREFERENCE_CATEGORIES,
+  NOTIFICATION_CATEGORY_CHANNELS,
   THROTTLE_MAX_MINUTES,
 } from "./notification-preference.service";
 import { NotificationCategory } from "./entities/notification.entity";
@@ -71,7 +72,7 @@ describe("NotificationPreferenceService", () => {
   });
 
   describe("list", () => {
-    it("returns the default shape per category: report email on, notification off, push off, throttle 0", async () => {
+    it("returns the default shape per category: report email on, notification off, push off, throttle 0, with each category's supported channels", async () => {
       expect(await service.list("u1")).toEqual(
         NOTIFICATION_PREFERENCE_CATEGORIES.map((category) => ({
           category,
@@ -79,6 +80,7 @@ describe("NotificationPreferenceService", () => {
           emailNotification: false,
           push: false,
           throttleMinutes: 0,
+          supportedChannels: NOTIFICATION_CATEGORY_CHANNELS[category],
         })),
       );
     });
@@ -104,6 +106,8 @@ describe("NotificationPreferenceService", () => {
         emailNotification: true,
         push: true,
         throttleMinutes: 30,
+        supportedChannels:
+          NOTIFICATION_CATEGORY_CHANNELS[NotificationCategory.PAYMENTS],
       });
       expect(
         res.find((r) => r.category === NotificationCategory.BUDGETS),
@@ -113,6 +117,26 @@ describe("NotificationPreferenceService", () => {
         emailNotification: false,
         push: false,
         throttleMinutes: 0,
+        supportedChannels:
+          NOTIFICATION_CATEGORY_CHANNELS[NotificationCategory.BUDGETS],
+      });
+    });
+
+    it("exposes SYSTEM as a push-only category (email channels not applicable)", async () => {
+      const system = (await service.list("u1")).find(
+        (r) => r.category === NotificationCategory.SYSTEM,
+      );
+      expect(system).toEqual({
+        category: NotificationCategory.SYSTEM,
+        email: true,
+        emailNotification: false,
+        push: false,
+        throttleMinutes: 0,
+        supportedChannels: {
+          email: false,
+          emailNotification: false,
+          push: true,
+        },
       });
     });
 
@@ -166,6 +190,8 @@ describe("NotificationPreferenceService", () => {
         emailNotification: false,
         push: false,
         throttleMinutes: 0,
+        supportedChannels:
+          NOTIFICATION_CATEGORY_CHANNELS[NotificationCategory.PAYMENTS],
       });
     });
 
@@ -308,6 +334,24 @@ describe("NotificationPreferenceService", () => {
         NotificationCategory.BUDGETS,
       );
       expect(res.throttleMinutes).toBe(THROTTLE_MAX_MINUTES);
+    });
+
+    it("forces SYSTEM's immediate email off whatever the row says, and honours push", async () => {
+      // SYSTEM does not expose email as a user control (NOTIFICATION_CATEGORY_CHANNELS),
+      // so a value written to that unsupported cell can never become a delivery --
+      // even with the master switch on.
+      userPrefRepo.findOne.mockResolvedValue({ notificationEmail: true });
+      notifPrefRepo.findOne.mockResolvedValue({
+        emailNotification: true,
+        push: true,
+        throttleMinutes: 0,
+      });
+      expect(
+        await service.resolveNotificationDelivery(
+          "u1",
+          NotificationCategory.SYSTEM,
+        ),
+      ).toEqual({ emailNotification: false, push: true, throttleMinutes: 0 });
     });
   });
 });

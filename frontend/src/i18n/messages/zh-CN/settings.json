@@ -303,9 +303,11 @@
       },
       "categories": {
         "PAYMENTS": "账单与计划",
-        "BUDGETS": "预算"
+        "BUDGETS": "预算",
+        "SYSTEM": "系统警报"
       },
       "inAppAlways": "始终显示在铃铛中",
+      "channelNotApplicable": "不适用于此通知类型",
       "emailToggleLabel": "{category} 的报告邮件",
       "saveFailed": "无法保存该设置",
       "throttle": {

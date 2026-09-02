@@ -303,9 +303,11 @@
       },
       "categories": {
         "PAYMENTS": "Bollette e programmati",
-        "BUDGETS": "Budget"
+        "BUDGETS": "Budget",
+        "SYSTEM": "Avvisi di sistema"
       },
       "inAppAlways": "Sempre visibile nella campanella",
+      "channelNotApplicable": "Non applicabile a questo tipo di notifica",
       "emailToggleLabel": "Email (report) per {category}",
       "saveFailed": "Impossibile salvare questa impostazione",
       "throttle": {

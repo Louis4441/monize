@@ -303,9 +303,11 @@
       },
       "categories": {
         "PAYMENTS": "Rachunki i zaplanowane",
-        "BUDGETS": "Budżety"
+        "BUDGETS": "Budżety",
+        "SYSTEM": "Alerty systemowe"
       },
       "inAppAlways": "Zawsze widoczne w dzwonku",
+      "channelNotApplicable": "Nie dotyczy tego typu powiadomienia",
       "emailToggleLabel": "E-mail (raport) dla: {category}",
       "saveFailed": "Nie udało się zapisać tego ustawienia",
       "throttle": {

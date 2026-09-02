@@ -303,9 +303,11 @@
       },
       "categories": {
         "PAYMENTS": "請求と予定",
-        "BUDGETS": "予算"
+        "BUDGETS": "予算",
+        "SYSTEM": "システムアラート"
       },
       "inAppAlways": "ベルには常に表示されます",
+      "channelNotApplicable": "この通知タイプには適用されません",
       "emailToggleLabel": "{category} のレポートメール",
       "saveFailed": "設定を保存できませんでした",
       "throttle": {

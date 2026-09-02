@@ -23,10 +23,14 @@ const liveDevice = { id: 'd1', disabledAt: null };
 const disabledDevice = { id: 'd2', disabledAt: '2026-09-01T00:00:00Z' };
 
 describe('NotificationPreferencesMatrix', () => {
+  const allChannels = { email: true, emailNotification: true, push: true };
+  const pushOnly = { email: false, emailNotification: false, push: true };
+
   beforeEach(() => {
     list.mockReset().mockResolvedValue([
-      { category: 'PAYMENTS', email: true, emailNotification: false, push: false, throttleMinutes: 0 },
-      { category: 'BUDGETS', email: false, emailNotification: true, push: false, throttleMinutes: 15 },
+      { category: 'PAYMENTS', email: true, emailNotification: false, push: false, throttleMinutes: 0, supportedChannels: allChannels },
+      { category: 'BUDGETS', email: false, emailNotification: true, push: false, throttleMinutes: 15, supportedChannels: allChannels },
+      { category: 'SYSTEM', email: false, emailNotification: false, push: false, throttleMinutes: 0, supportedChannels: pushOnly },
     ]);
     update
       .mockReset()
@@ -43,14 +47,33 @@ describe('NotificationPreferencesMatrix', () => {
     await act(async () => {}); // drain the mount fetches (prefs + devices)
   }
 
-  it('renders every category with three channel switches and a cooldown select', async () => {
+  it('renders every category with its supported channel switches and a cooldown select', async () => {
     await renderMatrix();
     expect(screen.getByText('Bills and scheduled')).toBeInTheDocument();
     expect(screen.getByText('Budgets')).toBeInTheDocument();
-    // report + alert + push, per row (2 rows) = 6 switches.
-    expect(screen.getAllByRole('switch')).toHaveLength(6);
+    expect(screen.getByText('System alerts')).toBeInTheDocument();
+    // report + alert + push for the two full rows (6), push only for SYSTEM (1).
+    expect(screen.getAllByRole('switch')).toHaveLength(7);
     // One cooldown select per row.
-    expect(screen.getAllByRole('combobox')).toHaveLength(2);
+    expect(screen.getAllByRole('combobox')).toHaveLength(3);
+  });
+
+  it('renders SYSTEM as push-only, marking the two email cells not applicable', async () => {
+    await renderMatrix();
+    // Two email columns x SYSTEM row = two "not applicable" cells; the full rows
+    // expose all three channels, so no other cell is marked.
+    expect(
+      screen.getAllByText('Not applicable for this notification type'),
+    ).toHaveLength(2);
+    // SYSTEM's one switch is push, and it self-gates on a live device.
+    const switches = screen.getAllByRole('switch');
+    expect(switches).toHaveLength(7);
+    // The last switch (SYSTEM push) is a real control, a device being live.
+    expect(switches[6]).not.toBeDisabled();
+    await act(async () => fireEvent.click(switches[6]));
+    await waitFor(() =>
+      expect(update).toHaveBeenCalledWith('SYSTEM', { push: true }),
+    );
   });
 
   it('gates the email columns on email availability', async () => {

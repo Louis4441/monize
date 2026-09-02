@@ -303,9 +303,11 @@
       },
       "categories": {
         "PAYMENTS": "Tagihan dan terjadwal",
-        "BUDGETS": "Anggaran"
+        "BUDGETS": "Anggaran",
+        "SYSTEM": "Peringatan sistem"
       },
       "inAppAlways": "Selalu tampil di lonceng",
+      "channelNotApplicable": "Tidak berlaku untuk jenis notifikasi ini",
       "emailToggleLabel": "Email laporan untuk {category}",
       "saveFailed": "Tidak dapat menyimpan setelan itu",
       "throttle": {

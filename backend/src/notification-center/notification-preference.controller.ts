@@ -42,8 +42,10 @@ export class NotificationPreferenceController {
     @Body() dto: UpdateNotificationPreferenceDto,
   ) {
     if (!NOTIFICATION_PREFERENCE_CATEGORIES.includes(category)) {
-      // A real NotificationCategory the matrix does not expose (SYSTEM): storing
-      // it would be a preference nothing reads.
+      // A real NotificationCategory the matrix does not expose (every current
+      // member is exposed, so this guards a future category added to the enum
+      // before it is wired into the matrix): storing it would be a preference
+      // nothing reads.
       throw new BadRequestException(
         tr(
           "errors.notifications.categoryNotConfigurable",
