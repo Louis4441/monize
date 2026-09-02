@@ -12,14 +12,26 @@ describe("NotificationPreferenceService", () => {
   let service: NotificationPreferenceService;
   let userPrefRepo: Record<string, jest.Mock>;
   let notifPrefRepo: Record<string, jest.Mock>;
+  let insertBuilder: {
+    insert: jest.Mock;
+    values: jest.Mock;
+    orUpdate: jest.Mock;
+    execute: jest.Mock;
+  };
 
   beforeEach(() => {
     userPrefRepo = { findOne: jest.fn().mockResolvedValue(null) };
+    // The upsert chain setEmail uses: insert().values().orUpdate().execute().
+    insertBuilder = {
+      insert: jest.fn(() => insertBuilder),
+      values: jest.fn(() => insertBuilder),
+      orUpdate: jest.fn(() => insertBuilder),
+      execute: jest.fn().mockResolvedValue({}),
+    };
     notifPrefRepo = {
       findOne: jest.fn().mockResolvedValue(null),
       find: jest.fn().mockResolvedValue([]),
-      save: jest.fn().mockImplementation((x) => Promise.resolve(x)),
-      create: jest.fn().mockImplementation((x) => x),
+      createQueryBuilder: jest.fn(() => insertBuilder),
     };
     const manager = {
       getRepository: (entity: unknown) =>
@@ -65,6 +77,18 @@ describe("NotificationPreferenceService", () => {
         await service.resolveEmail("u1", NotificationCategory.BUDGETS),
       ).toBe(true);
     });
+
+    it("treats a NULL master switch as off, like the producers it replaced", async () => {
+      // notification_email is a nullable column. The old guard was
+      // `!prefs.notificationEmail`, so NULL blocked; `=== false` would have let
+      // it through. Keep the conservative reading and never consult the row.
+      userPrefRepo.findOne.mockResolvedValue({ notificationEmail: null });
+      notifPrefRepo.findOne.mockResolvedValue({ email: true });
+      expect(
+        await service.resolveEmail("u1", NotificationCategory.PAYMENTS),
+      ).toBe(false);
+      expect(notifPrefRepo.findOne).not.toHaveBeenCalled();
+    });
   });
 
   describe("list", () => {
@@ -94,26 +118,28 @@ describe("NotificationPreferenceService", () => {
   });
 
   describe("setEmail", () => {
-    it("updates an existing row", async () => {
-      const row = {
+    it("upserts the (user, category) row atomically", async () => {
+      const result = await service.setEmail(
+        "u1",
+        NotificationCategory.PAYMENTS,
+        false,
+      );
+      // A single insert-with-conflict, not read-then-insert, so two concurrent
+      // first writes cannot both INSERT and collide on the primary key.
+      expect(insertBuilder.values).toHaveBeenCalledWith({
         userId: "u1",
         category: NotificationCategory.PAYMENTS,
-        email: true,
-      };
-      notifPrefRepo.findOne.mockResolvedValue(row);
-      await service.setEmail("u1", NotificationCategory.PAYMENTS, false);
-      expect(row.email).toBe(false);
-      expect(notifPrefRepo.save).toHaveBeenCalledWith(row);
-    });
-
-    it("creates a row when absent", async () => {
-      await service.setEmail("u1", NotificationCategory.BUDGETS, false);
-      expect(notifPrefRepo.create).toHaveBeenCalledWith({
-        userId: "u1",
-        category: NotificationCategory.BUDGETS,
         email: false,
       });
-      expect(notifPrefRepo.save).toHaveBeenCalled();
+      expect(insertBuilder.orUpdate).toHaveBeenCalledWith(
+        ["email"],
+        ["user_id", "category"],
+      );
+      expect(insertBuilder.execute).toHaveBeenCalled();
+      expect(result).toEqual({
+        category: NotificationCategory.PAYMENTS,
+        email: false,
+      });
     });
   });
 });

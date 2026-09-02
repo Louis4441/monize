@@ -56,8 +56,11 @@ export class NotificationPreferenceService {
       const master = await manager.getRepository(UserPreference).findOne({
         where: { userId },
       });
-      // The master is a kill switch: a per-category "on" never widens it.
-      if (master && master.notificationEmail === false) return false;
+      // The master is a kill switch: a per-category "on" never widens it. Test
+      // falsiness, not `=== false`: notification_email is a nullable column, and
+      // the producers this replaced blocked on `!prefs.notificationEmail`, so a
+      // NULL master stays "off" here rather than silently flipping to "send".
+      if (master && !master.notificationEmail) return false;
       const row = await manager.getRepository(NotificationPreference).findOne({
         where: { userId, category },
       });
@@ -84,21 +87,28 @@ export class NotificationPreferenceService {
     });
   }
 
-  /** Set the email preference for one category, creating the row if absent. */
+  /**
+   * Set the email preference for one category, creating the row if absent.
+   *
+   * A single `INSERT ... ON CONFLICT (user_id, category) DO UPDATE` rather than
+   * read-then-insert: two concurrent writes for the same pair (a second tab or
+   * device, a retried request) would otherwise both miss the row and the second
+   * INSERT would violate the primary key. The upsert makes the write atomic.
+   */
   async setEmail(
     userId: string,
     category: NotificationCategory,
     email: boolean,
   ): Promise<NotificationChannelPreference> {
     return withScopedDb(this.dataSource, async (manager) => {
-      const repo = manager.getRepository(NotificationPreference);
-      const existing = await repo.findOne({ where: { userId, category } });
-      if (existing) {
-        existing.email = email;
-        await repo.save(existing);
-      } else {
-        await repo.save(repo.create({ userId, category, email }));
-      }
+      await manager
+        .getRepository(NotificationPreference)
+        .createQueryBuilder()
+        .insert()
+        .values({ userId, category, email })
+        // updated_at is bumped by the BEFORE UPDATE trigger on the conflict path.
+        .orUpdate(["email"], ["user_id", "category"])
+        .execute();
       return { category, email };
     });
   }

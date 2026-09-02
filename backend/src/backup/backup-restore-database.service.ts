@@ -112,6 +112,15 @@ export class BackupRestoreDatabaseService {
     await manager.query("DELETE FROM notifications WHERE user_id = $1", [
       userId,
     ]);
+    // Per-category channel preferences. The insert path is ON CONFLICT DO
+    // NOTHING keyed on (user_id, category), so without this pre-clear a restore
+    // over an existing account keeps the local preference rows and silently
+    // drops the backup's -- every other user-owned restore-plan table clears
+    // here for exactly that reason.
+    await manager.query(
+      "DELETE FROM notification_preferences WHERE user_id = $1",
+      [userId],
+    );
     await manager.query(
       `DELETE FROM budget_period_categories WHERE budget_period_id IN
        (SELECT bp.id FROM budget_periods bp
