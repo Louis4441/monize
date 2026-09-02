@@ -43,7 +43,12 @@ describe('PayeeContactLookupToggle', () => {
 
   it('says what the lookup sends and who pays for it', () => {
     render(<PayeeContactLookupToggle />);
-    const subtitle = screen.getByText(/Only the payee name is sent/);
+    // The name is not all that is sent: the payee's own notes and contact
+    // fields go with it as context, and the copy has to say so.
+    const subtitle = screen.getByText(/The payee name is sent/);
+    expect(subtitle).toHaveTextContent(
+      /along with any notes, website, address, email and phone it already has/,
+    );
     expect(subtitle).toHaveTextContent(/billed to that provider/);
     expect(subtitle).toHaveTextContent(/account owner's provider/);
   });
