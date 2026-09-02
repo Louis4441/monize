@@ -132,28 +132,40 @@ export class NotificationReminderService {
         );
       }
 
+      // The unique-index race is recovered INSIDE this transaction, so the
+      // losing INSERT must not abort it: PostgreSQL refuses every statement
+      // after an error until the transaction -- or a savepoint -- is rolled
+      // back (25P02, "current transaction is aborted"), and the re-read of the
+      // winner's row is a statement. The savepoint is what makes the retry
+      // reachable; without it the recovery path was a second error dressed as
+      // a 500. Same shape as the QIF import's per-row savepoint.
+      await manager.query(`SAVEPOINT ${UPSERT_SAVEPOINT}`);
       try {
-        return await this.upsertForSource(
+        const saved = await this.upsertForSource(
           manager,
           userId,
           source,
           dto.repeatMode,
           intervalMinutes,
         );
+        await manager.query(`RELEASE SAVEPOINT ${UPSERT_SAVEPOINT}`);
+        return saved;
       } catch (error) {
+        // Anything but the active-per-source conflict surfaces as it is; the
+        // ambient transaction rolls back whole, savepoint included.
+        if (!isActiveReminderConflict(error)) throw error;
         // A concurrent create for the same source lost the unique-index race:
+        // roll back to the savepoint so the transaction is usable again, then
         // re-read the row the winner wrote and apply this caller's settings
         // (last write wins), rather than surfacing a 500.
-        if (isActiveReminderConflict(error)) {
-          return this.upsertForSource(
-            manager,
-            userId,
-            source,
-            dto.repeatMode,
-            intervalMinutes,
-          );
-        }
-        throw error;
+        await manager.query(`ROLLBACK TO SAVEPOINT ${UPSERT_SAVEPOINT}`);
+        return this.upsertForSource(
+          manager,
+          userId,
+          source,
+          dto.repeatMode,
+          intervalMinutes,
+        );
       }
     });
 
@@ -245,33 +257,6 @@ export class NotificationReminderService {
   async stop(userId: string, id: string): Promise<{ stopped: boolean }> {
     const stopped = await withScopedDb(this.dataSource, (manager) =>
       this.stopByOwner(manager, userId, id),
-    );
-    return { stopped };
-  }
-
-  /**
-   * Stop every reminder whose source notification is this one -- the door for a
-   * producer that clears the underlying condition (the bill posts, the balance
-   * recovers). Ownership is in the `WHERE`.
-   */
-  async stopRemindersFor(
-    userId: string,
-    sourceNotificationId: string,
-  ): Promise<{ stopped: number }> {
-    const stopped = await withScopedDb(
-      this.dataSource,
-      async (manager) =>
-        returnedRows<{ id: string }>(
-          await manager.query(
-            `UPDATE notification_reminders
-              SET stopped_at = CURRENT_TIMESTAMP
-            WHERE user_id = $1
-              AND source_notification_id = $2
-              AND stopped_at IS NULL
-          RETURNING id`,
-            [userId, sourceNotificationId],
-          ),
-        ).length,
     );
     return { stopped };
   }
@@ -447,6 +432,9 @@ export class NotificationReminderService {
 
 /** The unique index that keeps one active reminder per (user, source). */
 const ACTIVE_SOURCE_INDEX = "idx_notification_reminders_active_source";
+
+/** The savepoint `create` wraps its first upsert attempt in (a fixed identifier, never input). */
+const UPSERT_SAVEPOINT = "notification_reminder_upsert";
 
 /**
  * A unique-violation on the active-per-source index, and only that -- so a

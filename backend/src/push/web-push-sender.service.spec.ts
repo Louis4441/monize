@@ -9,6 +9,7 @@ import {
   PUSH_REQUEST_DEADLINE_MS,
   PUSH_REQUEST_TIMEOUT_MS,
   PushPayload,
+  PushTarget,
 } from "./web-push-sender.service";
 import { PushConfigService, VAPID_SUBJECT } from "./push-config.service";
 import { PushDisabledReason } from "./entities/push-subscription.entity";
@@ -37,7 +38,7 @@ const validateUrlIsSafeWithin = jest.requireMock(
 
 const IDENTITY = { publicKey: "PUB-CURRENT", privateKey: "PRIV" };
 
-function target(overrides: Partial<Parameters<WebPushSender["send"]>[0]> = {}) {
+function target(overrides: Partial<PushTarget> = {}) {
   return {
     endpoint: "https://fcm.googleapis.com/fcm/send/abc",
     p256dh: "p256dh-value",
@@ -136,6 +137,23 @@ describe("WebPushSender", () => {
     jest.spyOn(sender["logger"], "warn").mockImplementation(() => undefined);
   });
 
+  // The production caller fans out through an opened batch; one target is the
+  // simplest batch, and every outcome below is a claim about one delivery.
+  const sendOne = (t: ReturnType<typeof target>, p: typeof PAYLOAD) =>
+    sender.openBatch().then((batch) => batch.send(t, p));
+
+  it("reads the instance identity once for a whole batch, and not at all for nothing", async () => {
+    sendNotification.mockResolvedValue(undefined);
+    const batch = await sender.openBatch();
+    await Promise.all([
+      batch.send(target(), PAYLOAD),
+      batch.send(target(), PAYLOAD),
+      batch.send(target(), PAYLOAD),
+    ]);
+    expect(pushConfig.getVapidIdentity).toHaveBeenCalledTimes(1);
+    expect(sendNotification).toHaveBeenCalledTimes(3);
+  });
+
   /**
    * The endpoint is a host the CALLER registered -- `IsPushEndpoint` proves it is
    * https and public, not that it is a push service -- so a peer that never
@@ -159,7 +177,7 @@ describe("WebPushSender", () => {
       );
       jest.useFakeTimers();
 
-      const pending = sender.send(target(), PAYLOAD);
+      const pending = sendOne(target(), PAYLOAD);
       await jest.advanceTimersByTimeAsync(PUSH_REQUEST_DEADLINE_MS + 1);
 
       // Reported as transient, which is what actually happened: the bounded
@@ -173,7 +191,7 @@ describe("WebPushSender", () => {
     it("hands the delivery an agent whose sockets it can close", async () => {
       sendNotification.mockResolvedValue(undefined);
 
-      await sender.send(target(), PAYLOAD);
+      await sendOne(target(), PAYLOAD);
 
       const [, , options] = sendNotification.mock.calls[0];
       // Not the global agent: the deadline destroys sockets, and destroying a
@@ -184,7 +202,7 @@ describe("WebPushSender", () => {
     it("keeps the inactivity timeout as well, for a peer that simply goes quiet", async () => {
       sendNotification.mockResolvedValue(undefined);
 
-      await sender.send(target(), PAYLOAD);
+      await sendOne(target(), PAYLOAD);
 
       const [, , options] = sendNotification.mock.calls[0];
       expect(options.timeout).toBe(PUSH_REQUEST_TIMEOUT_MS);
@@ -201,7 +219,7 @@ describe("WebPushSender", () => {
   it("signs with the instance identity and reports a send", async () => {
     sendNotification.mockResolvedValue(undefined);
 
-    await expect(sender.send(target(), PAYLOAD)).resolves.toEqual({
+    await expect(sendOne(target(), PAYLOAD)).resolves.toEqual({
       status: "sent",
     });
 
@@ -229,7 +247,7 @@ describe("WebPushSender", () => {
   it("refuses to send to an endpoint that no longer resolves publicly", async () => {
     validateUrlIsSafeWithin.mockResolvedValue(false);
 
-    await expect(sender.send(target(), PAYLOAD)).resolves.toMatchObject({
+    await expect(sendOne(target(), PAYLOAD)).resolves.toMatchObject({
       status: "transient",
     });
     expect(sendNotification).not.toHaveBeenCalled();
@@ -241,7 +259,7 @@ describe("WebPushSender", () => {
   // itself lives with the check (`safe-url-dns.spec.ts` drives a resolver that
   // never answers); what this file owns is that the sender asks for it.
   it("asks for the check under the recheck bound", async () => {
-    await sender.send(target(), PAYLOAD);
+    await sendOne(target(), PAYLOAD);
 
     expect(validateUrlIsSafeWithin).toHaveBeenCalledWith(
       target().endpoint,
@@ -254,7 +272,7 @@ describe("WebPushSender", () => {
   it("does not send when the check gave up", async () => {
     validateUrlIsSafeWithin.mockResolvedValue(false);
 
-    await expect(sender.send(target(), PAYLOAD)).resolves.toMatchObject({
+    await expect(sendOne(target(), PAYLOAD)).resolves.toMatchObject({
       status: "transient",
     });
     expect(sendNotification).not.toHaveBeenCalled();
@@ -264,7 +282,7 @@ describe("WebPushSender", () => {
   it("does not send when the check itself fails", async () => {
     validateUrlIsSafeWithin.mockRejectedValue(new Error("resolver exploded"));
 
-    await expect(sender.send(target(), PAYLOAD)).resolves.toMatchObject({
+    await expect(sendOne(target(), PAYLOAD)).resolves.toMatchObject({
       status: "transient",
     });
     expect(sendNotification).not.toHaveBeenCalled();
@@ -273,7 +291,7 @@ describe("WebPushSender", () => {
   it("reports unconfigured, and sends nothing, when the instance has no usable identity", async () => {
     pushConfig.getVapidIdentity.mockResolvedValue(null);
 
-    await expect(sender.send(target(), PAYLOAD)).resolves.toEqual({
+    await expect(sendOne(target(), PAYLOAD)).resolves.toEqual({
       status: "unconfigured",
     });
     expect(sendNotification).not.toHaveBeenCalled();
@@ -281,7 +299,7 @@ describe("WebPushSender", () => {
 
   it("refuses a subscription minted under a superseded key pair without calling out", async () => {
     await expect(
-      sender.send(target({ vapidPublicKey: "PUB-OLD" }), PAYLOAD),
+      sendOne(target({ vapidPublicKey: "PUB-OLD" }), PAYLOAD),
     ).resolves.toEqual({
       status: "expired",
       reason: PushDisabledReason.KEY_ROTATED,
@@ -298,7 +316,7 @@ describe("WebPushSender", () => {
         Object.assign(new Error("gone"), { statusCode }),
       );
 
-      await expect(sender.send(target(), PAYLOAD)).resolves.toEqual({
+      await expect(sendOne(target(), PAYLOAD)).resolves.toEqual({
         status: "expired",
         reason: PushDisabledReason.GONE,
         statusCode,
@@ -315,7 +333,7 @@ describe("WebPushSender", () => {
         Object.assign(new Error("nope"), { statusCode }),
       );
 
-      const outcome = await sender.send(target(), PAYLOAD);
+      const outcome = await sendOne(target(), PAYLOAD);
 
       expect(outcome).toEqual({
         status: "transient",
@@ -334,7 +352,7 @@ describe("WebPushSender", () => {
       Object.assign(new Error("Too Many Requests"), { statusCode: 429 }),
     );
 
-    await expect(sender.send(target(), PAYLOAD)).resolves.toEqual({
+    await expect(sendOne(target(), PAYLOAD)).resolves.toEqual({
       status: "transient",
       message: "Too Many Requests",
       statusCode: 429,
@@ -351,7 +369,7 @@ describe("WebPushSender", () => {
         Object.assign(new Error("nope"), { statusCode }),
       );
 
-      const outcome = await sender.send(target(), PAYLOAD);
+      const outcome = await sendOne(target(), PAYLOAD);
 
       expect(outcome).toMatchObject({ status: "transient", statusCode });
       expect(outcome).not.toHaveProperty("throttled");
@@ -361,7 +379,7 @@ describe("WebPushSender", () => {
   it("treats a transport error with no status code as transient", async () => {
     sendNotification.mockRejectedValue(new Error("socket hang up"));
 
-    await expect(sender.send(target(), PAYLOAD)).resolves.toEqual({
+    await expect(sendOne(target(), PAYLOAD)).resolves.toEqual({
       status: "transient",
       message: "socket hang up",
       statusCode: undefined,
@@ -371,7 +389,7 @@ describe("WebPushSender", () => {
   it("never throws, whatever the transport rejects with", async () => {
     sendNotification.mockRejectedValue("a bare string");
 
-    await expect(sender.send(target(), PAYLOAD)).resolves.toEqual({
+    await expect(sendOne(target(), PAYLOAD)).resolves.toEqual({
       status: "transient",
       message: "unknown push failure",
       statusCode: undefined,

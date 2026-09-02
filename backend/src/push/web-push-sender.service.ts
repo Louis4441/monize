@@ -2,7 +2,11 @@ import { Injectable, Logger } from "@nestjs/common";
 import * as webpush from "web-push";
 import * as https from "node:https";
 import type { Socket } from "node:net";
-import { PushConfigService, VAPID_SUBJECT } from "./push-config.service";
+import {
+  PushConfigService,
+  VAPID_SUBJECT,
+  VapidIdentity,
+} from "./push-config.service";
 import { PushDisabledReason } from "./entities/push-subscription.entity";
 import { validateUrlIsSafeWithin } from "../ai/validators/safe-url.validator";
 
@@ -143,6 +147,11 @@ export interface PushPayload {
   collapseKey: string | null;
 }
 
+/** A sender bound to one resolved instance identity; see {@link WebPushSender.openBatch}. */
+export interface PushBatch {
+  send(target: PushTarget, payload: PushPayload): Promise<PushSendOutcome>;
+}
+
 export type PushSendOutcome =
   /** Accepted by the push service. */
   | { status: "sent" }
@@ -182,11 +191,30 @@ export class WebPushSender {
 
   constructor(private readonly pushConfig: PushConfigService) {}
 
-  async send(
+  /**
+   * One fan-out, one identity read. `getVapidIdentity` is a database read (plus
+   * a decrypt on a cache miss) and `sendToUser` delivers to every device the
+   * account has, so resolving it per delivery cost a fan-out N reads for one
+   * answer. The caller opens a batch and sends through it; the decrypted key
+   * never leaves this file (`push-secret.guard.spec.ts`), which is why this is a
+   * bound closure and not an identity handed back to the caller.
+   *
+   * The identity is the one current when the batch opened. A rotation that
+   * lands mid-batch is caught per delivery anyway: every subscription still
+   * names the public key it was minted under, and a mismatch is `expired`.
+   */
+  async openBatch(): Promise<PushBatch> {
+    const identity = await this.pushConfig.getVapidIdentity();
+    return {
+      send: (target, payload) => this.sendWith(identity, target, payload),
+    };
+  }
+
+  private async sendWith(
+    identity: VapidIdentity | null,
     target: PushTarget,
     payload: PushPayload,
   ): Promise<PushSendOutcome> {
-    const identity = await this.pushConfig.getVapidIdentity();
     if (!identity) return { status: "unconfigured" };
 
     // A subscription minted under a superseded key pair cannot be delivered to:

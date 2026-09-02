@@ -679,7 +679,20 @@ export class UsersService {
     ]);
     deleted.securities = result[1] ?? 0;
 
-    // Budget data
+    // Reminders first, while their source link still says whose nag each one
+    // is. A reminder is a TEMPLATE the cron re-emits, so one left behind would
+    // go on writing fresh notifications -- and pushing and emailing them --
+    // after the user asked for their data to be gone. The account survives
+    // this flow, so the users(id) CASCADE never fires, and deleting the
+    // notifications below would only SET NULL the link, not stop the nag.
+    // (`notification_preferences` is deliberately kept: it is a setting, like
+    // `user_preferences`, not data about the user's money.)
+    result = await manager.query(
+      `DELETE FROM notification_reminders WHERE user_id = $1`,
+      [userId],
+    );
+    deleted.notificationReminders = result[1] ?? 0;
+
     result = await manager.query(
       `DELETE FROM notifications WHERE user_id = $1`,
       [userId],

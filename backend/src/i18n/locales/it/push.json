@@ -2,5 +2,19 @@
   "test": {
     "title": "Notifica di prova Monize",
     "body": "Le notifiche push funzionano su questo dispositivo."
+  },
+  "notification": {
+    "payments": {
+      "title": "Promemoria di pagamento",
+      "body": "Una bolletta o un pagamento programmato richiede la tua attenzione. Apri Monize per i dettagli."
+    },
+    "budgets": {
+      "title": "Avviso di budget",
+      "body": "Uno dei tuoi budget richiede la tua attenzione. Apri Monize per i dettagli."
+    },
+    "system": {
+      "title": "Avviso di sistema",
+      "body": "Monize ha un avviso di sistema per te. Apri l'app per i dettagli."
+    }
   }
 }

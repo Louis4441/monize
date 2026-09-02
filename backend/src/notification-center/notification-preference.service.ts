@@ -138,6 +138,12 @@ export class NotificationPreferenceService {
     userId: string,
     category: NotificationCategory,
   ): Promise<boolean> {
+    // A channel this category does not expose is OFF whatever a row says -- the
+    // same rule `resolveNotificationDelivery` applies to its three channels.
+    // Without it the absent-row default of `true` below turned an unsupported
+    // cell (SYSTEM has no report-mode email) into a delivery nobody could switch
+    // off, because the matrix never shows the cell.
+    if (!NOTIFICATION_CATEGORY_CHANNELS[category].email) return false;
     return withScopedDb(this.dataSource, async (manager) => {
       const master = await manager.getRepository(UserPreference).findOne({
         where: { userId },

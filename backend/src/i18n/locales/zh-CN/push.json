@@ -2,5 +2,19 @@
   "test": {
     "title": "Monize 测试通知",
     "body": "推送通知在此设备上运行正常。"
+  },
+  "notification": {
+    "payments": {
+      "title": "付款提醒",
+      "body": "有一笔账单或计划付款需要您关注。打开 Monize 查看详情。"
+    },
+    "budgets": {
+      "title": "预算提醒",
+      "body": "您的某个预算需要关注。打开 Monize 查看详情。"
+    },
+    "system": {
+      "title": "系统通知",
+      "body": "Monize 有一条系统通知给您。打开应用查看详情。"
+    }
   }
 }

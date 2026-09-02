@@ -2,5 +2,19 @@
   "test": {
     "title": "[XX-Monize test notification-XX]",
     "body": "[XX-Push notifications are working on this device.-XX]"
+  },
+  "notification": {
+    "payments": {
+      "title": "[XX-Payment reminder-XX]",
+      "body": "[XX-A bill or scheduled payment needs your attention. Open Monize for the details.-XX]"
+    },
+    "budgets": {
+      "title": "[XX-Budget alert-XX]",
+      "body": "[XX-One of your budgets needs your attention. Open Monize for the details.-XX]"
+    },
+    "system": {
+      "title": "[XX-System notice-XX]",
+      "body": "[XX-Monize has a system notice for you. Open the app for the details.-XX]"
+    }
   }
 }

@@ -242,6 +242,26 @@ describe("NotificationReminderService", () => {
       });
       expect(view.id).toBe("winner");
       expect(reminderRepo.save).toHaveBeenCalledTimes(2);
+      // The retry is only reachable if the failed INSERT was rolled back to a
+      // savepoint first: after 23505 PostgreSQL aborts the transaction and the
+      // re-read would fail with 25P02. So the choreography is the claim.
+      expect(query.mock.calls.map(([sql]) => String(sql))).toEqual([
+        "SAVEPOINT notification_reminder_upsert",
+        "ROLLBACK TO SAVEPOINT notification_reminder_upsert",
+      ]);
+    });
+
+    it("releases the savepoint when the first attempt goes through", async () => {
+      sourceRepo.findOne.mockResolvedValue(source);
+      await service.create("u1", {
+        sourceNotificationId: "src-1",
+        repeatMode: ReminderRepeatMode.REPEAT,
+        intervalMinutes: 15,
+      });
+      expect(query.mock.calls.map(([sql]) => String(sql))).toEqual([
+        "SAVEPOINT notification_reminder_upsert",
+        "RELEASE SAVEPOINT notification_reminder_upsert",
+      ]);
     });
 
     it("does not swallow a non-conflict save error", async () => {
@@ -254,6 +274,13 @@ describe("NotificationReminderService", () => {
           intervalMinutes: 15,
         }),
       ).rejects.toThrow("disk full");
+      // No rollback-to-savepoint for a foreign error: the whole transaction
+      // rolls back, and a retry of an unknown failure would be a guess.
+      expect(
+        query.mock.calls.some(([sql]) =>
+          String(sql).startsWith("ROLLBACK TO SAVEPOINT"),
+        ),
+      ).toBe(false);
     });
   });
 
@@ -269,17 +296,6 @@ describe("NotificationReminderService", () => {
     it("is idempotent: an already-stopped or foreign id returns stopped:false, never throws", async () => {
       query.mockResolvedValue([[], 0]);
       expect(await service.stop("u1", "rem-1")).toEqual({ stopped: false });
-    });
-  });
-
-  describe("stopRemindersFor", () => {
-    it("stops every live reminder pointing at a dismissed source, scoped to the owner", async () => {
-      query.mockResolvedValue([[{ id: "a" }, { id: "b" }], 2]);
-      expect(await service.stopRemindersFor("u1", "src-1")).toEqual({
-        stopped: 2,
-      });
-      const [, params] = query.mock.calls[0];
-      expect(params).toEqual(["u1", "src-1"]);
     });
   });
 

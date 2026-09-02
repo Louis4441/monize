@@ -511,11 +511,13 @@ export class PushSubscriptionService {
     targets: PushSubscription[],
   ): Promise<PushTestDeviceResult[]> {
     const devices: PushTestDeviceResult[] = [];
+    // One identity read for the whole fan-out; the sender keeps the key.
+    const sender = await this.sender.openBatch();
     for (let i = 0; i < targets.length; i += PUSH_TEST_CONCURRENCY) {
       const batch = targets.slice(i, i + PUSH_TEST_CONCURRENCY);
       const results = await Promise.all(
         batch.map(async (target) => {
-          const outcome = await this.sender.send(
+          const outcome = await sender.send(
             {
               endpoint: target.endpoint,
               p256dh: target.p256dh,

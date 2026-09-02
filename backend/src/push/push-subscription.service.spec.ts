@@ -81,7 +81,8 @@ describe("PushSubscriptionService", () => {
   let manager: ReturnType<typeof createScopedDbMocks>["manager"];
   let dataSource: ReturnType<typeof createScopedDbMocks>["dataSource"];
   let pushConfig: { getPublicConfig: jest.Mock };
-  let sender: { send: jest.Mock };
+  let send: jest.Mock;
+  let sender: { openBatch: jest.Mock; send: jest.Mock };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -105,7 +106,11 @@ describe("PushSubscriptionService", () => {
         configured: true,
       }),
     };
-    sender = { send: jest.fn().mockResolvedValue({ status: "sent" }) };
+    // `openBatch` hands back the one bound sender a fan-out delivers through;
+    // `sender.send` here is that inner mock, so the assertions below read as
+    // "what was delivered" without restating the batch handshake each time.
+    send = jest.fn().mockResolvedValue({ status: "sent" });
+    sender = { openBatch: jest.fn(async () => ({ send })), send };
     service = new PushSubscriptionService(
       dataSource as never,
       pushConfig as unknown as PushConfigService,

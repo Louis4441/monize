@@ -9,6 +9,7 @@ import { PageLayout } from '@/components/layout/PageLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Card } from '@/components/ui/Card';
 import {
   PushChannelsPanel,
   VapidIdentityPanel,
@@ -224,22 +225,28 @@ function AdminNotificationsContent() {
         {isLoading ? (
           <LoadingSpinner text={t('loading')} />
         ) : loadFailed || !config ? (
-          <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-900">
+          <Card padding="md">
             <p className="text-sm text-gray-600 dark:text-gray-300">
               {t('loadUnavailable')}
             </p>
-          </div>
+          </Card>
         ) : (
           <div className="space-y-6">
-            <section className="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900">
-              <h2 className="border-b border-gray-200 px-4 py-3 text-sm font-semibold text-gray-900 sm:px-6 dark:border-gray-700 dark:text-gray-100">
+            <Card as="section" className="overflow-hidden" aria-labelledby="admin-push-channels-heading">
+              <h2
+                id="admin-push-channels-heading"
+                className="border-b border-gray-200 px-4 py-3 text-sm font-semibold text-gray-900 sm:px-6 dark:border-gray-700 dark:text-gray-100"
+              >
                 {t('channelsHeading')}
               </h2>
               <PushChannelsPanel channels={channels} />
-            </section>
+            </Card>
 
-            <section className="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900">
-              <h2 className="border-b border-gray-200 px-4 py-3 text-sm font-semibold text-gray-900 sm:px-6 dark:border-gray-700 dark:text-gray-100">
+            <Card as="section" className="overflow-hidden" aria-labelledby="admin-push-identity-heading">
+              <h2
+                id="admin-push-identity-heading"
+                className="border-b border-gray-200 px-4 py-3 text-sm font-semibold text-gray-900 sm:px-6 dark:border-gray-700 dark:text-gray-100"
+              >
                 {t('identityHeading')}
               </h2>
               <VapidIdentityPanel
@@ -247,7 +254,7 @@ function AdminNotificationsContent() {
                 isRotating={isRotating}
                 onRotate={() => setConfirmRotate(true)}
               />
-            </section>
+            </Card>
 
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {t('perAccountNote')}

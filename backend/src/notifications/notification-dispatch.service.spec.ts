@@ -1,4 +1,10 @@
-import { NotificationDispatchService } from "./notification-dispatch.service";
+import { readFileSync } from "fs";
+import { join } from "path";
+
+import {
+  NotificationDispatchService,
+  PUSH_CATEGORY_COPY,
+} from "./notification-dispatch.service";
 import {
   Notification,
   NotificationCategory,
@@ -15,6 +21,7 @@ describe("NotificationDispatchService", () => {
   let create: jest.Mock;
   let resolveDelivery: jest.Mock;
   let sendToUser: jest.Mock;
+  let translate: jest.Mock;
   let sendMail: jest.Mock;
   let getStatus: jest.Mock;
   let query: jest.Mock;
@@ -52,6 +59,9 @@ describe("NotificationDispatchService", () => {
       findOne: jest.fn().mockResolvedValue({ email: "u1@example.com" }),
     };
     prefRepo = { findOne: jest.fn().mockResolvedValue({ language: "en" }) };
+    translate = jest.fn(
+      (_k: string, o?: { defaultValue?: string }) => o?.defaultValue,
+    );
 
     const manager = {
       query,
@@ -69,10 +79,7 @@ describe("NotificationDispatchService", () => {
       { sendToUser } as never,
       { getStatus, sendMail } as never,
       { get: (_k: string, d: string) => d } as never,
-      {
-        translate: (_k: string, o?: { defaultValue?: string }) =>
-          o?.defaultValue,
-      } as never,
+      { translate } as never,
     );
   });
 
@@ -118,14 +125,65 @@ describe("NotificationDispatchService", () => {
     expect(userId).toBe("u1");
     expect(payload).toEqual({
       type: NotificationType.OVER_BUDGET,
-      title: "Groceries over budget",
-      body: "You have spent 105% of Groceries.",
+      // The category's copy, never the row's: "Groceries over budget" and the
+      // 105% stay in the app. The wire is encrypted; the lock screen is not.
+      title: PUSH_CATEGORY_COPY.BUDGETS.title,
+      body: PUSH_CATEGORY_COPY.BUDGETS.body,
       target: "/budgets/b1",
       // no dedupeKey -> the row id, never a name/amount.
       collapseKey: "n1",
     });
+    expect(JSON.stringify(payload)).not.toContain("Groceries");
+    expect(JSON.stringify(payload)).not.toContain("105");
     // push on, unifiedpush off -> web-push devices only.
     expect(transports).toEqual(["webpush"]);
+  });
+
+  it("renders the push copy in the recipient's stored language, resolved once with the email's", async () => {
+    resolveDelivery.mockResolvedValue({
+      emailNotification: true,
+      push: true,
+      unifiedpush: false,
+      throttleMinutes: 0,
+    });
+    prefRepo.findOne.mockResolvedValue({ language: "pl" });
+    await service.notify("u1", {} as never);
+    const pushCalls = translate.mock.calls.filter(([key]) =>
+      String(key).startsWith("push.notification."),
+    );
+    expect(pushCalls.map(([key]) => key)).toEqual([
+      "push.notification.budgets.title",
+      "push.notification.budgets.body",
+    ]);
+    for (const [, options] of pushCalls) {
+      expect(options).toMatchObject({ lang: "pl" });
+    }
+    // One recipient read serves both channels: the email frame and the push
+    // body cannot disagree about the reader's language.
+    expect(prefRepo.findOne).toHaveBeenCalledTimes(1);
+    expect(sendMail).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the en catalogue equal to the English fallbacks, for every category", () => {
+    // `emailTranslator` returns the fallback when a key is missing, so a typo in
+    // the catalogue would ship English to every locale and no test would notice
+    // -- unless the two are held equal here.
+    const catalogue = JSON.parse(
+      readFileSync(
+        join(__dirname, "..", "i18n", "locales", "en", "push.json"),
+        "utf8",
+      ),
+    ) as { notification: Record<string, { title: string; body: string }> };
+    for (const category of Object.values(NotificationCategory)) {
+      expect(catalogue.notification[category.toLowerCase()]).toEqual(
+        PUSH_CATEGORY_COPY[category],
+      );
+    }
+    expect(Object.keys(catalogue.notification).sort()).toEqual(
+      Object.values(NotificationCategory)
+        .map((c) => c.toLowerCase())
+        .sort(),
+    );
   });
 
   describe("push transports (INV-PUSH-007)", () => {
@@ -358,8 +416,11 @@ describe("NotificationDispatchService", () => {
         fanOut: "detached",
       });
       // Resolved with the row before the push settled -- the caller's response
-      // is not held by the delivery -- and the push was still started.
+      // is not held by the delivery -- and the push is still started: the
+      // fan-out's own reads (preferences, recipient locale) run on the
+      // detached promise, so give the event loop one turn before looking.
       expect(row?.id).toBe("n1");
+      await flush();
       expect(sendToUser).toHaveBeenCalledTimes(1);
       settle();
       await flush();

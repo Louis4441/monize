@@ -2,5 +2,19 @@
   "test": {
     "title": "Powiadomienie testowe Monize",
     "body": "Powiadomienia push działają na tym urządzeniu."
+  },
+  "notification": {
+    "payments": {
+      "title": "Przypomnienie o płatności",
+      "body": "Rachunek lub zaplanowana płatność wymaga Twojej uwagi. Otwórz Monize, aby zobaczyć szczegóły."
+    },
+    "budgets": {
+      "title": "Alert budżetowy",
+      "body": "Jeden z Twoich budżetów wymaga uwagi. Otwórz Monize, aby zobaczyć szczegóły."
+    },
+    "system": {
+      "title": "Komunikat systemowy",
+      "body": "Monize ma dla Ciebie komunikat systemowy. Otwórz aplikację, aby zobaczyć szczegóły."
+    }
   }
 }

@@ -69,6 +69,21 @@ describe("NotificationPreferenceService", () => {
       ).toBe(false);
       expect(notifPrefRepo.findOne).not.toHaveBeenCalled();
     });
+
+    it("is OFF for a category that does not expose report-mode email, whatever is stored", async () => {
+      // SYSTEM exposes push only (NOTIFICATION_CATEGORY_CHANNELS). The absent-row
+      // default of `true` must not reach it, and neither must a stored `true`:
+      // the matrix never shows the cell, so nobody could switch it back off.
+      expect(NOTIFICATION_CATEGORY_CHANNELS.SYSTEM.email).toBe(false);
+      userPrefRepo.findOne.mockResolvedValue({ notificationEmail: true });
+      notifPrefRepo.findOne.mockResolvedValue({ email: true });
+      expect(
+        await service.resolveEmail("u1", NotificationCategory.SYSTEM),
+      ).toBe(false);
+      // Decided from the support table alone; no preference read is needed.
+      expect(userPrefRepo.findOne).not.toHaveBeenCalled();
+      expect(notifPrefRepo.findOne).not.toHaveBeenCalled();
+    });
   });
 
   describe("list", () => {

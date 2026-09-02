@@ -1400,6 +1400,24 @@ describe("UsersService", () => {
       expect(
         queries.some((q: string) => q.includes("DELETE FROM notifications")),
       ).toBe(true);
+      // A reminder is a template the cron re-emits; left behind, it would keep
+      // writing (and pushing) fresh notifications after "delete my data". The
+      // account survives, so no CASCADE reaches it -- and it goes BEFORE the
+      // notifications delete, which would otherwise SET NULL its source link.
+      const reminders = queries.findIndex((q: string) =>
+        q.includes("DELETE FROM notification_reminders"),
+      );
+      const notifications = queries.findIndex((q: string) =>
+        q.includes("DELETE FROM notifications"),
+      );
+      expect(reminders).toBeGreaterThanOrEqual(0);
+      expect(reminders).toBeLessThan(notifications);
+      // Preferences are settings, not data: the matrix survives like user_preferences.
+      expect(
+        queries.some((q: string) =>
+          q.includes("DELETE FROM notification_preferences"),
+        ),
+      ).toBe(false);
       // The account survives this flow, so nothing cascades: a device left
       // behind keeps its endpoint and both encryption keys, and anything a
       // producer sends still arrives on the phone of somebody who asked for

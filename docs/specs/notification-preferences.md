@@ -226,8 +226,11 @@ Stopping (R4), three doors, all landing on the same `stopReminder(userId, id)`:
 
 Safety: a reminder is stopped when its `source_notification_id` is dismissed or
 the underlying condition clears (the bill posts, the balance recovers), so a nag
-cannot outlive its cause. The producer that clears the condition calls
-`stopRemindersFor(sourceNotificationId)`.
+cannot outlive its cause. The one mechanism is the firing cron's sweep over
+dismissed and orphaned sources (Section 13.3, door 3): a producer that clears a
+condition dismisses the source notification through `NotificationService.dismiss`
+and the sweep stops the reminder on its next minute. There is deliberately no
+second stop door for producers -- a second door is a second rule.
 
 `notification_reminders` is user-owned and RLS-scoped like every other table.
 
@@ -605,10 +608,11 @@ stopped reminder is a no-op, not a 404-after-the-fact):
    purged after `RETENTION_DAYS` leaves the reminder orphaned
    (`source_notification_id` NULL); the sweep stops orphaned reminders too, so a
    nag cannot outlive its cause even when the cause is deleted rather than
-   dismissed. `stopRemindersFor(userId, sourceNotificationId)` is the explicit
-   door a producer calls when it clears an underlying condition (the bill posts,
-   the balance recovers); those producers land in later phases, and the sweep is
-   the safety net until they do.
+   dismissed. A producer that clears an underlying condition (the bill posts,
+   the balance recovers) dismisses the source notification and lets the sweep do
+   the stopping; no such producer exists yet. A dedicated stop-by-source door for
+   producers shipped without a caller and was removed in review rather than kept
+   as a promise nothing tested end to end.
 
 **One active reminder per source, and a per-user cap.** A second "remind me" on
 the same notification re-configures the one active reminder rather than adding a
@@ -649,7 +653,7 @@ count is the same resource lever an unbounded device list or request array is
 - `once` fires exactly once then sets `stopped_at`; `repeat` reschedules.
 - Stop: idempotent, ownership-scoped, and a stopped reminder is skipped by the
   next claim.
-- Source dismissed -> `stopRemindersFor` stops the reminder; re-emit after stop
+- Source dismissed -> the cron's sweep stops the reminder; re-emit after stop
   writes nothing.
 - Re-emit: fire N writes a fresh bell row (distinct dedupe key), never collides
   with the source, and merges `data.reminderId`.
@@ -751,6 +755,16 @@ skipped (Section 4). `throttle_minutes = 0` disables the window.
   read inside the dispatch. This layers on top of the exact-duplicate dedupe (the
   fingerprint / dedupe-key unique index already stops the identical row); the
   throttle stops a *different* same-group interruption too soon.
+- **Push copy:** the payload's `title`/`body` are the *category's* generic copy
+  (`push.notification.<category>`, English fallbacks in `PUSH_CATEGORY_COPY`),
+  rendered with `emailTranslator` in the recipient's stored locale -- the row's
+  own title and message are producer-composed English and may carry amounts or
+  names, and a Web Push body is composed outside any request, so it follows the
+  email rule. The wire is encrypted end to end (Section 15), the lock screen is
+  not; the in-app row, one tap away through `target`, carries the detail.
+  `collapseKey` stays the row's dedupe key or id. The immediate email keeps the
+  row's copy inside a localized frame (known gap: the row's copy itself is
+  English for every producer today).
 - **Concurrency, stated honestly:** the throttle is a **best-effort rate limit on
   external side effects**, not an exactly-once guarantee -- two replicas firing
   the same group within the window can both pass the `SELECT` and both send. Push

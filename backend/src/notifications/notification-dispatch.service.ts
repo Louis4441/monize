@@ -28,6 +28,29 @@ import { EmailService } from "./email.service";
 import { notificationImmediateTemplate } from "./email-templates";
 
 /** How `notify` treats the fan-out relative to its own promise. */
+/**
+ * The per-category push copy, as English fallbacks; the catalogue key is
+ * `push.notification.<category>` (lower-cased). One entry per category is
+ * enforced by the type, and `notification-dispatch.service.spec.ts` holds the
+ * `en` catalogue equal to these so the fallback and the catalogue cannot drift.
+ */
+export const PUSH_CATEGORY_COPY: Readonly<
+  Record<NotificationCategory, { title: string; body: string }>
+> = {
+  [NotificationCategory.PAYMENTS]: {
+    title: "Payment reminder",
+    body: "A bill or scheduled payment needs your attention. Open Monize for the details.",
+  },
+  [NotificationCategory.BUDGETS]: {
+    title: "Budget alert",
+    body: "One of your budgets needs your attention. Open Monize for the details.",
+  },
+  [NotificationCategory.SYSTEM]: {
+    title: "System notice",
+    body: "Monize has a system notice for you. Open the app for the details.",
+  },
+};
+
 export interface NotifyOptions {
   /**
    * `"await"` (the default) resolves after push and email were attempted --
@@ -138,12 +161,37 @@ export class NotificationDispatchService {
     const transports: PushTransport[] = [];
     if (delivery.push) transports.push("webpush");
     if (delivery.unifiedpush) transports.push("unifiedpush");
+
+    // Both interrupting channels are composed here, outside any request, so the
+    // recipient's stored locale is resolved once and shared: the push copy and
+    // the email frame must not disagree about the reader's language.
+    const recipient = await this.resolveRecipient(userId);
     if (transports.length > 0) {
-      await this.push.sendToUser(userId, this.toPushPayload(row), transports);
+      await this.push.sendToUser(
+        userId,
+        this.toPushPayload(row, category, recipient.lang),
+        transports,
+      );
     }
     if (delivery.emailNotification) {
-      await this.sendEmail(userId, row);
+      await this.sendEmail(recipient, row);
     }
+  }
+
+  /** The recipient's address and stored language, in one tenant read. */
+  private async resolveRecipient(
+    userId: string,
+  ): Promise<{ email: string | null; lang: string }> {
+    return withScopedDb(this.dataSource, async (manager) => {
+      const user = await manager
+        .getRepository(User)
+        .findOne({ where: { id: userId } });
+      const lang = await resolveUserEmailLocale(
+        manager.getRepository(UserPreference),
+        userId,
+      );
+      return { email: user?.email ?? null, lang };
+    });
   }
 
   /**
@@ -197,12 +245,31 @@ export class NotificationDispatchService {
     });
   }
 
-  /** The push payload for a notification -- privacy-minimal, no amounts or names. */
-  private toPushPayload(row: Notification): PushPayload {
+  /**
+   * The push payload for a notification. Its `title`/`body` are the CATEGORY's
+   * generic copy in the recipient's stored locale, not the row's own title and
+   * message. Two reasons, either sufficient. The row's copy is composed by its
+   * producer in English -- a budget alert names the category and the amounts --
+   * and a Web Push body is rendered outside any request, so it follows the
+   * email rule: `emailTranslator` against `user_preferences.language` (backend
+   * CLAUDE.md, "Copy composed outside a request"). And the wire is encrypted end
+   * to end (RFC 8291) but the lock screen is not, so the screen shows the
+   * category and nothing of the money; the in-app row, one tap away through
+   * `target`, carries the detail. The English fallbacks live in
+   * {@link PUSH_CATEGORY_COPY} and the catalogue under `push.notification`.
+   */
+  private toPushPayload(
+    row: Notification,
+    category: NotificationCategory,
+    lang: string,
+  ): PushPayload {
+    const t = emailTranslator(this.i18n, lang);
+    const copy = PUSH_CATEGORY_COPY[category];
+    const key = `push.notification.${category.toLowerCase()}`;
     return {
       type: row.type,
-      title: row.title,
-      body: row.message,
+      title: t(`${key}.title`, copy.title),
+      body: t(`${key}.body`, copy.body),
       target: row.target ?? undefined,
       // The subject this collapses onto: a system row's dedupe key, else the
       // row's own id (unique, so two distinct alerts never hide one another).
@@ -212,21 +279,12 @@ export class NotificationDispatchService {
   }
 
   /** Render and send the immediate email in the recipient's locale, best-effort. */
-  private async sendEmail(userId: string, row: Notification): Promise<void> {
+  private async sendEmail(
+    recipient: { email: string | null; lang: string },
+    row: Notification,
+  ): Promise<void> {
     if (!this.email.getStatus().configured) return;
-
-    const recipient = await withScopedDb(this.dataSource, async (manager) => {
-      const user = await manager
-        .getRepository(User)
-        .findOne({ where: { id: userId } });
-      if (!user?.email) return null;
-      const lang = await resolveUserEmailLocale(
-        manager.getRepository(UserPreference),
-        userId,
-      );
-      return { email: user.email, lang };
-    });
-    if (!recipient) return;
+    if (!recipient.email) return;
 
     const appUrl = this.config.get<string>(
       "PUBLIC_APP_URL",
