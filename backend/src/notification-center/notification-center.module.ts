@@ -3,10 +3,13 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 
 import { Notification } from "./entities/notification.entity";
 import { NotificationPreference } from "./entities/notification-preference.entity";
+import { NotificationReminder } from "./entities/notification-reminder.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { NotificationService } from "./notification.service";
 import { NotificationPreferenceService } from "./notification-preference.service";
 import { NotificationPreferenceController } from "./notification-preference.controller";
+import { NotificationReminderService } from "./notification-reminder.service";
+import { NotificationReminderController } from "./notification-reminder.controller";
 
 /**
  * The durable `notifications` table and the one service that reads and writes
@@ -29,11 +32,23 @@ import { NotificationPreferenceController } from "./notification-preference.cont
     TypeOrmModule.forFeature([
       Notification,
       NotificationPreference,
+      NotificationReminder,
       UserPreference,
     ]),
   ],
-  controllers: [NotificationPreferenceController],
-  providers: [NotificationService, NotificationPreferenceService],
-  exports: [NotificationService, NotificationPreferenceService],
+  controllers: [
+    NotificationPreferenceController,
+    NotificationReminderController,
+  ],
+  providers: [
+    NotificationService,
+    NotificationPreferenceService,
+    NotificationReminderService,
+  ],
+  exports: [
+    NotificationService,
+    NotificationPreferenceService,
+    NotificationReminderService,
+  ],
 })
 export class NotificationCenterModule {}

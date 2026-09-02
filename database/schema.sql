@@ -1740,6 +1740,42 @@ CREATE TABLE notification_preferences (
 
 CREATE TRIGGER update_notification_preferences_updated_at BEFORE UPDATE ON notification_preferences FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+-- Repeating / one-time notification reminders (migration 175,
+-- docs/specs/notification-preferences.md Section 13). One row per active reminder
+-- a user asked for; it carries the template a fire re-emits, so a fire never
+-- reloads the (possibly dismissed) source notification. Each fire re-emits
+-- through NotificationService.create with a per-fire dedupe key (a fresh in-app
+-- row every interval). source_notification_id is ON DELETE SET NULL so a deleted
+-- source stops the nag rather than deleting the reminder mid-fire.
+CREATE TABLE notification_reminders (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    source_notification_id UUID REFERENCES notifications(id) ON DELETE SET NULL,
+    alert_type VARCHAR(30) NOT NULL,
+    severity VARCHAR(20) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    data JSONB DEFAULT '{}',
+    target VARCHAR(255),
+    dedupe_base VARCHAR(80),
+    repeat_mode VARCHAR(10) NOT NULL,
+    interval_minutes INTEGER NOT NULL,
+    next_fire_at TIMESTAMP NOT NULL,
+    last_fired_at TIMESTAMP,
+    fire_count INTEGER NOT NULL DEFAULT 0,
+    stopped_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_notification_reminders_due
+    ON notification_reminders (next_fire_at) WHERE stopped_at IS NULL;
+CREATE INDEX idx_notification_reminders_source
+    ON notification_reminders (source_notification_id)
+    WHERE source_notification_id IS NOT NULL;
+
+CREATE TRIGGER update_notification_reminders_updated_at BEFORE UPDATE ON notification_reminders FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- Triggers for budget tables updated_at
 CREATE TRIGGER update_budgets_updated_at BEFORE UPDATE ON budgets FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_budget_categories_updated_at BEFORE UPDATE ON budget_categories FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -2347,6 +2383,7 @@ DECLARE
         'loan_scenarios',
         'monte_carlo_scenarios',
         'notification_preferences',
+        'notification_reminders',
         'notifications',
         'payee_aliases',
         'push_subscriptions',

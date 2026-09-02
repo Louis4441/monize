@@ -109,6 +109,14 @@ export class BackupRestoreDatabaseService {
     await manager.query("DELETE FROM securities WHERE user_id = $1", [userId]);
 
     // Budget data
+    // Reminders before notifications is not required (source_notification_id is
+    // ON DELETE SET NULL), but both are cleared: the insert path is ON CONFLICT
+    // DO NOTHING, so without this pre-clear a restore over an existing account
+    // keeps the local reminder rows and drops the backup's.
+    await manager.query(
+      "DELETE FROM notification_reminders WHERE user_id = $1",
+      [userId],
+    );
     await manager.query("DELETE FROM notifications WHERE user_id = $1", [
       userId,
     ]);
