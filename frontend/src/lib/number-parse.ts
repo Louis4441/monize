@@ -230,6 +230,31 @@ export function stripGroupSeparator(
 }
 
 /**
+ * Cache of `Intl.NumberFormat` instances keyed by locale + fixed decimals.
+ * Constructing one is comparatively expensive and `formatAmountLocalized` runs
+ * per row in the register hot path, so -- like `useNumberFormat`'s own
+ * `formatterCache` -- reuse them. Kept here (rather than importing that one) to
+ * avoid a `number-parse` <-> `useNumberFormat` import cycle.
+ */
+const fixedFormatterCache = new Map<string, Intl.NumberFormat>();
+
+function getFixedFormatter(
+  locale: string | undefined,
+  decimals: number,
+): Intl.NumberFormat {
+  const key = `${locale ?? ''}|${decimals}`;
+  let formatter = fixedFormatterCache.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(locale, {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+    fixedFormatterCache.set(key, formatter);
+  }
+  return formatter;
+}
+
+/**
  * Format an amount for read-only DISPLAY (grouped, fixed decimals) in the user's
  * number locale, WITHOUT a currency symbol -- "1,234.56" in en-US, "1 234,56" in
  * pl. The read-only counterpart to what `CurrencyInput` shows; use it wherever a
@@ -262,10 +287,7 @@ export function formatAmountLocalized(
     return formatAmountWithCommas(value, decimals);
   }
   try {
-    return new Intl.NumberFormat(locale, {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    }).format(roundToDecimals(value, decimals));
+    return getFixedFormatter(locale, decimals).format(roundToDecimals(value, decimals));
   } catch {
     // Invalid locale string: keep the en-US formatter rather than throwing.
     return formatAmountWithCommas(value, decimals);
