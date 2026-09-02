@@ -26,6 +26,25 @@
     "success": "Buenas noticias",
     "info": "Información"
   },
+  "reminder": {
+    "remindAriaLabel": "Recordarme esto",
+    "stopAriaLabel": "Detener este recordatorio",
+    "stopped": "Recordatorio detenido",
+    "stopFailed": "No se pudo detener el recordatorio",
+    "created": "Recordatorio establecido",
+    "createFailed": "No se pudo establecer el recordatorio",
+    "dialogTitle": "Recordarme",
+    "dialogDescription": "Recibe esta notificación de nuevo más tarde hasta que actúes.",
+    "modeLabel": "Con qué frecuencia",
+    "modeRepeat": "Repetir hasta que lo detenga",
+    "modeOnce": "Solo una vez más",
+    "intervalLabelRepeat": "Recordarme cada",
+    "intervalLabelOnce": "Recordarme después de",
+    "durationMinutes": "{minutes, plural, one {# minuto} other {# minutos}}",
+    "durationHours": "{hours, plural, one {# hora} other {# horas}}",
+    "cancel": "Cancelar",
+    "confirm": "Establecer recordatorio"
+  },
   "billDue": {
     "titleOverdue": "{payee} vencido",
     "titleToday": "{payee} vence hoy",

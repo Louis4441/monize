@@ -26,6 +26,25 @@
     "success": "Buone notizie",
     "info": "Info"
   },
+  "reminder": {
+    "remindAriaLabel": "Ricordamelo",
+    "stopAriaLabel": "Interrompi questo promemoria",
+    "stopped": "Promemoria interrotto",
+    "stopFailed": "Impossibile interrompere il promemoria",
+    "created": "Promemoria impostato",
+    "createFailed": "Impossibile impostare il promemoria",
+    "dialogTitle": "Ricordamelo",
+    "dialogDescription": "Ricevi di nuovo questa notifica più tardi finché non intervieni.",
+    "modeLabel": "Con quale frequenza",
+    "modeRepeat": "Ripeti finché non lo interrompo",
+    "modeOnce": "Solo un'altra volta",
+    "intervalLabelRepeat": "Ricordamelo ogni",
+    "intervalLabelOnce": "Ricordamelo dopo",
+    "durationMinutes": "{minutes, plural, one {# minuto} other {# minuti}}",
+    "durationHours": "{hours, plural, one {# ora} other {# ore}}",
+    "cancel": "Annulla",
+    "confirm": "Imposta promemoria"
+  },
   "billDue": {
     "titleOverdue": "{payee} scaduto",
     "titleToday": "{payee} in scadenza oggi",

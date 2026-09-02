@@ -26,6 +26,25 @@
     "success": "Dobre wieści",
     "info": "Informacja"
   },
+  "reminder": {
+    "remindAriaLabel": "Przypomnij mi o tym",
+    "stopAriaLabel": "Zatrzymaj to przypomnienie",
+    "stopped": "Przypomnienie zatrzymane",
+    "stopFailed": "Nie udało się zatrzymać przypomnienia",
+    "created": "Przypomnienie ustawione",
+    "createFailed": "Nie udało się ustawić przypomnienia",
+    "dialogTitle": "Przypomnij mi",
+    "dialogDescription": "Otrzymaj to powiadomienie ponownie później, dopóki nie podejmiesz działania.",
+    "modeLabel": "Jak często",
+    "modeRepeat": "Powtarzaj, aż zatrzymam",
+    "modeOnce": "Tylko jeszcze raz",
+    "intervalLabelRepeat": "Przypominaj co",
+    "intervalLabelOnce": "Przypomnij za",
+    "durationMinutes": "{minutes, plural, one {# minuta} few {# minuty} many {# minut} other {# minuty}}",
+    "durationHours": "{hours, plural, one {# godzina} few {# godziny} many {# godzin} other {# godziny}}",
+    "cancel": "Anuluj",
+    "confirm": "Ustaw przypomnienie"
+  },
   "billDue": {
     "titleOverdue": "{payee} – termin minął",
     "titleToday": "{payee} – termin dzisiaj",

@@ -26,6 +26,25 @@
     "success": "Good News",
     "info": "Info"
   },
+  "reminder": {
+    "remindAriaLabel": "Remind me about this",
+    "stopAriaLabel": "Stop this reminder",
+    "stopped": "Reminder stopped",
+    "stopFailed": "The reminder could not be stopped",
+    "created": "Reminder set",
+    "createFailed": "The reminder could not be set",
+    "dialogTitle": "Remind me",
+    "dialogDescription": "Get this notification again later until you act on it.",
+    "modeLabel": "How often",
+    "modeRepeat": "Repeat until I stop it",
+    "modeOnce": "Just once more",
+    "intervalLabelRepeat": "Remind me every",
+    "intervalLabelOnce": "Remind me after",
+    "durationMinutes": "{minutes, plural, one {# minute} other {# minutes}}",
+    "durationHours": "{hours, plural, one {# hour} other {# hours}}",
+    "cancel": "Cancel",
+    "confirm": "Set reminder"
+  },
   "billDue": {
     "titleOverdue": "{payee} overdue",
     "titleToday": "{payee} due today",

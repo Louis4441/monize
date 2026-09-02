@@ -26,6 +26,25 @@
     "success": "[XX-Good News-XX]",
     "info": "[XX-Info-XX]"
   },
+  "reminder": {
+    "remindAriaLabel": "[XX-Remind me about this-XX]",
+    "stopAriaLabel": "[XX-Stop this reminder-XX]",
+    "stopped": "[XX-Reminder stopped-XX]",
+    "stopFailed": "[XX-The reminder could not be stopped-XX]",
+    "created": "[XX-Reminder set-XX]",
+    "createFailed": "[XX-The reminder could not be set-XX]",
+    "dialogTitle": "[XX-Remind me-XX]",
+    "dialogDescription": "[XX-Get this notification again later until you act on it.-XX]",
+    "modeLabel": "[XX-How often-XX]",
+    "modeRepeat": "[XX-Repeat until I stop it-XX]",
+    "modeOnce": "[XX-Just once more-XX]",
+    "intervalLabelRepeat": "[XX-Remind me every-XX]",
+    "intervalLabelOnce": "[XX-Remind me after-XX]",
+    "durationMinutes": "[XX-{minutes, plural, one {# minute} other {# minutes}}-XX]",
+    "durationHours": "[XX-{hours, plural, one {# hour} other {# hours}}-XX]",
+    "cancel": "[XX-Cancel-XX]",
+    "confirm": "[XX-Set reminder-XX]"
+  },
   "billDue": {
     "titleOverdue": "[XX-{payee} overdue-XX]",
     "titleToday": "[XX-{payee} due today-XX]",

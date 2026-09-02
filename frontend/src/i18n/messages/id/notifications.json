@@ -26,6 +26,25 @@
     "success": "Kabar Baik",
     "info": "Info"
   },
+  "reminder": {
+    "remindAriaLabel": "Ingatkan saya tentang ini",
+    "stopAriaLabel": "Hentikan pengingat ini",
+    "stopped": "Pengingat dihentikan",
+    "stopFailed": "Pengingat tidak dapat dihentikan",
+    "created": "Pengingat diatur",
+    "createFailed": "Pengingat tidak dapat diatur",
+    "dialogTitle": "Ingatkan saya",
+    "dialogDescription": "Dapatkan notifikasi ini lagi nanti hingga Anda menindaklanjutinya.",
+    "modeLabel": "Seberapa sering",
+    "modeRepeat": "Ulangi sampai saya hentikan",
+    "modeOnce": "Sekali lagi saja",
+    "intervalLabelRepeat": "Ingatkan saya setiap",
+    "intervalLabelOnce": "Ingatkan saya setelah",
+    "durationMinutes": "{minutes, plural, other {# menit}}",
+    "durationHours": "{hours, plural, other {# jam}}",
+    "cancel": "Batal",
+    "confirm": "Atur pengingat"
+  },
   "billDue": {
     "titleOverdue": "{payee} terlambat",
     "titleToday": "{payee} jatuh tempo hari ini",

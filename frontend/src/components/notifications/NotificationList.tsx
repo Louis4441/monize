@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import type { NotificationFilterCategory, Notification, NotificationSeverity } from '@/types/notification';
 import { safeNotificationTarget } from '@/lib/notification-target';
+import { RemindMeButton } from './RemindMeButton';
 
 /**
  * The structured payload a `BILL_DUE` notification carries, so the reader sees it in
@@ -573,7 +574,7 @@ export function NotificationList({
                     >
                       <button
                         onClick={() => handleAlertClick(notification)}
-                        className="w-full text-left px-4 py-3 pr-9 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                        className="w-full text-left px-4 py-3 pr-16 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                         data-testid={`notification-item-${notification.id}`}
                       >
                         <div className="flex items-start gap-3">
@@ -610,19 +611,24 @@ export function NotificationList({
                           </div>
                         </div>
                       </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDismiss(notification.id);
-                        }}
-                        className="absolute top-2 right-2 p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-                        data-testid={`dismiss-notification-${notification.id}`}
-                        aria-label={t('dismissAriaLabel')}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                          <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-                        </svg>
-                      </button>
+                      {/* Action controls, siblings of the click button (never
+                          nested inside it): remind/stop, then dismiss. */}
+                      <div className="absolute top-2 right-2 flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
+                        <RemindMeButton notification={notification} />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDismiss(notification.id);
+                          }}
+                          className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                          data-testid={`dismiss-notification-${notification.id}`}
+                          aria-label={t('dismissAriaLabel')}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                            <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

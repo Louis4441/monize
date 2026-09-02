@@ -26,6 +26,25 @@
     "success": "Хорошие новости",
     "info": "Информация"
   },
+  "reminder": {
+    "remindAriaLabel": "Напомнить мне об этом",
+    "stopAriaLabel": "Остановить это напоминание",
+    "stopped": "Напоминание остановлено",
+    "stopFailed": "Не удалось остановить напоминание",
+    "created": "Напоминание установлено",
+    "createFailed": "Не удалось установить напоминание",
+    "dialogTitle": "Напомнить мне",
+    "dialogDescription": "Получите это уведомление снова позже, пока не отреагируете.",
+    "modeLabel": "Как часто",
+    "modeRepeat": "Повторять, пока не остановлю",
+    "modeOnce": "Только ещё раз",
+    "intervalLabelRepeat": "Напоминать каждые",
+    "intervalLabelOnce": "Напомнить через",
+    "durationMinutes": "{minutes, plural, one {# минута} few {# минуты} many {# минут} other {# минуты}}",
+    "durationHours": "{hours, plural, one {# час} few {# часа} many {# часов} other {# часа}}",
+    "cancel": "Отмена",
+    "confirm": "Установить напоминание"
+  },
   "billDue": {
     "titleOverdue": "{payee}: срок оплаты прошёл",
     "titleToday": "{payee}: срок оплаты сегодня",

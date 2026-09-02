@@ -26,6 +26,25 @@
     "success": "좋은 소식",
     "info": "정보"
   },
+  "reminder": {
+    "remindAriaLabel": "이것을 알림 설정",
+    "stopAriaLabel": "이 알림 중지",
+    "stopped": "알림이 중지되었습니다",
+    "stopFailed": "알림을 중지할 수 없습니다",
+    "created": "알림이 설정되었습니다",
+    "createFailed": "알림을 설정할 수 없습니다",
+    "dialogTitle": "알림 설정",
+    "dialogDescription": "조치를 취할 때까지 나중에 이 알림을 다시 받습니다.",
+    "modeLabel": "빈도",
+    "modeRepeat": "중지할 때까지 반복",
+    "modeOnce": "한 번만 더",
+    "intervalLabelRepeat": "다음 간격마다 알림",
+    "intervalLabelOnce": "다음 시간 후에 알림",
+    "durationMinutes": "{minutes, plural, other {# 분}}",
+    "durationHours": "{hours, plural, other {# 시간}}",
+    "cancel": "취소",
+    "confirm": "알림 설정"
+  },
   "billDue": {
     "titleOverdue": "{payee} 결제 기한 초과",
     "titleToday": "{payee} 오늘 결제 예정",

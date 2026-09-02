@@ -26,6 +26,25 @@
     "success": "Goed nieuws",
     "info": "Info"
   },
+  "reminder": {
+    "remindAriaLabel": "Herinner mij hieraan",
+    "stopAriaLabel": "Deze herinnering stoppen",
+    "stopped": "Herinnering gestopt",
+    "stopFailed": "De herinnering kon niet worden gestopt",
+    "created": "Herinnering ingesteld",
+    "createFailed": "De herinnering kon niet worden ingesteld",
+    "dialogTitle": "Herinner mij",
+    "dialogDescription": "Ontvang deze melding later opnieuw totdat je actie onderneemt.",
+    "modeLabel": "Hoe vaak",
+    "modeRepeat": "Herhalen tot ik stop",
+    "modeOnce": "Nog een keer",
+    "intervalLabelRepeat": "Herinner mij elke",
+    "intervalLabelOnce": "Herinner mij na",
+    "durationMinutes": "{minutes, plural, one {# minuut} other {# minuten}}",
+    "durationHours": "{hours, plural, one {# uur} other {# uur}}",
+    "cancel": "Annuleren",
+    "confirm": "Herinnering instellen"
+  },
   "billDue": {
     "titleOverdue": "{payee} achterstallig",
     "titleToday": "{payee} vandaag verschuldigd",

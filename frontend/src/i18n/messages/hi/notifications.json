@@ -26,6 +26,25 @@
     "success": "अच्छी खबर",
     "info": "जानकारी"
   },
+  "reminder": {
+    "remindAriaLabel": "मुझे इसकी याद दिलाएं",
+    "stopAriaLabel": "यह अनुस्मारक रोकें",
+    "stopped": "अनुस्मारक रोक दिया गया",
+    "stopFailed": "अनुस्मारक रोका नहीं जा सका",
+    "created": "अनुस्मारक सेट किया गया",
+    "createFailed": "अनुस्मारक सेट नहीं किया जा सका",
+    "dialogTitle": "मुझे याद दिलाएं",
+    "dialogDescription": "जब तक आप कार्रवाई नहीं करते, यह सूचना बाद में फिर से पाएं।",
+    "modeLabel": "कितनी बार",
+    "modeRepeat": "जब तक मैं रोकूं, दोहराएं",
+    "modeOnce": "बस एक बार और",
+    "intervalLabelRepeat": "हर बार याद दिलाएं",
+    "intervalLabelOnce": "इसके बाद याद दिलाएं",
+    "durationMinutes": "{minutes, plural, one {# मिनट} other {# मिनट}}",
+    "durationHours": "{hours, plural, one {# घंटा} other {# घंटे}}",
+    "cancel": "रद्द करें",
+    "confirm": "अनुस्मारक सेट करें"
+  },
   "billDue": {
     "titleOverdue": "{payee} अतिदेय",
     "titleToday": "{payee} आज देय",

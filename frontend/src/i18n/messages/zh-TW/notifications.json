@@ -26,6 +26,25 @@
     "success": "好消息",
     "info": "資訊"
   },
+  "reminder": {
+    "remindAriaLabel": "提醒我此事",
+    "stopAriaLabel": "停止此提醒",
+    "stopped": "提醒已停止",
+    "stopFailed": "無法停止提醒",
+    "created": "提醒已設定",
+    "createFailed": "無法設定提醒",
+    "dialogTitle": "提醒我",
+    "dialogDescription": "稍後再次收到此通知，直到你處理為止。",
+    "modeLabel": "頻率",
+    "modeRepeat": "重複直到我停止",
+    "modeOnce": "只再一次",
+    "intervalLabelRepeat": "提醒我，每隔",
+    "intervalLabelOnce": "在此之後提醒我",
+    "durationMinutes": "{minutes, plural, other {# 分鐘}}",
+    "durationHours": "{hours, plural, other {# 小時}}",
+    "cancel": "取消",
+    "confirm": "設定提醒"
+  },
   "billDue": {
     "titleOverdue": "{payee} 已逾期",
     "titleToday": "{payee} 今天到期",

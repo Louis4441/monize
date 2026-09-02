@@ -26,6 +26,25 @@
     "success": "Гарні новини",
     "info": "Інформація"
   },
+  "reminder": {
+    "remindAriaLabel": "Нагадати мені про це",
+    "stopAriaLabel": "Зупинити це нагадування",
+    "stopped": "Нагадування зупинено",
+    "stopFailed": "Не вдалося зупинити нагадування",
+    "created": "Нагадування встановлено",
+    "createFailed": "Не вдалося встановити нагадування",
+    "dialogTitle": "Нагадати мені",
+    "dialogDescription": "Отримайте це сповіщення знову пізніше, доки не відреагуєте.",
+    "modeLabel": "Як часто",
+    "modeRepeat": "Повторювати, доки не зупиню",
+    "modeOnce": "Лише ще раз",
+    "intervalLabelRepeat": "Нагадувати кожні",
+    "intervalLabelOnce": "Нагадати через",
+    "durationMinutes": "{minutes, plural, one {# хвилина} few {# хвилини} many {# хвилин} other {# хвилини}}",
+    "durationHours": "{hours, plural, one {# година} few {# години} many {# годин} other {# години}}",
+    "cancel": "Скасувати",
+    "confirm": "Встановити нагадування"
+  },
   "billDue": {
     "titleOverdue": "{payee}: термін минув",
     "titleToday": "{payee}: сплатити сьогодні",

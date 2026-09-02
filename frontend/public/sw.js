@@ -266,10 +266,59 @@ self.addEventListener('pushsubscriptionchange', function (event) {
   );
 });
 
+// Read the CSRF double-submit cookie so the worker can authorize a state-changing
+// POST. The app injects this header from `document.cookie`; the worker has no
+// `document`, so it uses the Cookie Store API where the browser offers it
+// (Chromium). Where it does not, the token is null and the request is sent
+// without it -- the server then refuses, which for a best-effort Stop is an
+// acceptable no-op rather than a broken guarantee.
+function readCsrfTokenFromStore() {
+  if (self.cookieStore && typeof self.cookieStore.get === 'function') {
+    return self.cookieStore
+      .get('csrf_token')
+      .then(function (cookie) {
+        return cookie ? cookie.value : null;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+  return Promise.resolve(null);
+}
+
+// Stop a repeating reminder from its push Stop action. Same-origin, credentialed
+// (the session cookie rides along), and idempotent server-side: a forged or
+// already-stopped id is a no-op scoped to the caller, never a cross-user write.
+function stopReminderFromAction(reminderId) {
+  return readCsrfTokenFromStore().then(function (token) {
+    var headers = {};
+    if (token) headers['X-CSRF-Token'] = token;
+    return fetch(
+      '/api/v1/notifications/reminders/' +
+        encodeURIComponent(reminderId) +
+        '/stop',
+      { method: 'POST', credentials: 'include', headers: headers }
+    );
+  });
+}
+
 self.addEventListener('notificationclick', function (event) {
   event.notification.close();
 
   var data = event.notification.data || {};
+
+  // A Stop action on a reminder push (Phase 5 populates `actions` and
+  // `data.reminderId`; this branch is inert until then). It stops the reminder
+  // and does NOT open a window -- the user asked to silence it, not to visit it.
+  if (event.action === 'stop-reminder') {
+    var reminderId = data.reminderId;
+    if (typeof reminderId === 'string' && reminderId) {
+      event.waitUntil(
+        stopReminderFromAction(reminderId).catch(function () {})
+      );
+    }
+    return;
+  }
   // Re-validated rather than trusted: the stored data IS the payload, so it is
   // no more trustworthy here than it was on arrival.
   var url = new URL(

@@ -26,6 +26,25 @@
     "success": "İyi Haber",
     "info": "Bilgi"
   },
+  "reminder": {
+    "remindAriaLabel": "Bunu bana hatırlat",
+    "stopAriaLabel": "Bu hatırlatıcıyı durdur",
+    "stopped": "Hatırlatıcı durduruldu",
+    "stopFailed": "Hatırlatıcı durdurulamadı",
+    "created": "Hatırlatıcı ayarlandı",
+    "createFailed": "Hatırlatıcı ayarlanamadı",
+    "dialogTitle": "Bana hatırlat",
+    "dialogDescription": "Harekete geçene kadar bu bildirimi daha sonra tekrar al.",
+    "modeLabel": "Ne sıklıkla",
+    "modeRepeat": "Ben durdurana kadar tekrarla",
+    "modeOnce": "Sadece bir kez daha",
+    "intervalLabelRepeat": "Bana hatırlat, her",
+    "intervalLabelOnce": "Şu süre sonra hatırlat",
+    "durationMinutes": "{minutes, plural, one {# dakika} other {# dakika}}",
+    "durationHours": "{hours, plural, one {# saat} other {# saat}}",
+    "cancel": "İptal",
+    "confirm": "Hatırlatıcı ayarla"
+  },
   "billDue": {
     "titleOverdue": "{payee} gecikmiş",
     "titleToday": "{payee} bugün ödenecek",
