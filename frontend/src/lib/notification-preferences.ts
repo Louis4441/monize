@@ -9,20 +9,31 @@ import type { NotificationCategory } from '@/types/notification';
  * actually reads are shown, so a toggle never controls nothing.
  */
 export const NOTIFICATION_PREFERENCE_CATEGORIES: readonly NotificationCategory[] =
-  ['PAYMENTS', 'BUDGETS'];
+  ['PAYMENTS', 'BUDGETS', 'SYSTEM'];
+
+/**
+ * The cooldown windows the matrix offers, in minutes. `0` is the real "off";
+ * the ceiling mirrors the backend `THROTTLE_MAX_MINUTES` (24h) -- a window
+ * beyond a day suppresses so much it reads as "off" done wrong. Each option is
+ * labelled by a full catalog string a translator can localise.
+ */
+export const THROTTLE_OPTION_MINUTES: readonly number[] = [
+  0, 5, 15, 30, 60, 360, 1440,
+];
 
 /**
  * One category's stored channel state.
  *
  * `email` is the REPORT-mode email (batch/digest -- live, unthrottled).
- * `emailNotification` is the NOTIFICATION-mode email (immediate) and
- * `throttleMinutes` its cooldown; both are stored now and become live with the
- * push dispatch (Phase 5), so the matrix renders them "coming soon".
+ * `emailNotification` is the NOTIFICATION-mode email (immediate, one per event),
+ * `push` the browser push, and `throttleMinutes` the cooldown that gates both
+ * interrupting channels. All four are live (Phase 5).
  */
 export interface NotificationChannelPreference {
   category: NotificationCategory;
   email: boolean;
   emailNotification: boolean;
+  push: boolean;
   throttleMinutes: number;
 }
 
@@ -30,6 +41,7 @@ export interface NotificationChannelPreference {
 export interface NotificationPreferencePatch {
   email?: boolean;
   emailNotification?: boolean;
+  push?: boolean;
   throttleMinutes?: number;
 }
 

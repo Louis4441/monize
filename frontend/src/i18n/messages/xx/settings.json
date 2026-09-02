@@ -292,26 +292,41 @@
       }
     },
     "preferences": {
-      "heading": "[XX-Also notify me by email-XX]",
-      "description": "[XX-The bell always shows every notification. Choose which kinds Monize also sends to your email.-XX]",
+      "heading": "[XX-How to notify me-XX]",
+      "description": "[XX-The bell always shows every notification. Choose which kinds Monize also sends by email or push, and how often.-XX]",
       "categoryHeader": "[XX-Notification-XX]",
       "channels": {
         "inApp": "[XX-In-app-XX]",
         "emailReport": "[XX-Email (report)-XX]",
-        "emailNotification": "[XX-Email (notification)-XX]"
+        "emailNotification": "[XX-Email (alert)-XX]",
+        "push": "[XX-Push-XX]"
       },
       "categories": {
         "PAYMENTS": "[XX-Bills and scheduled-XX]",
-        "BUDGETS": "[XX-Budgets-XX]"
+        "BUDGETS": "[XX-Budgets-XX]",
+        "SYSTEM": "[XX-System-XX]"
       },
       "inAppAlways": "[XX-Always shown in the bell-XX]",
       "emailToggleLabel": "[XX-Report email for {category}-XX]",
+      "emailNotificationToggleLabel": "[XX-Alert email for {category}-XX]",
+      "pushToggleLabel": "[XX-Push for {category}-XX]",
       "saveFailed": "[XX-Could not save that setting-XX]",
+      "emailUnavailable": "[XX-Turn on email notifications above to send these by email.-XX]",
+      "pushUnavailable": "[XX-Enable push on this device first (see below).-XX]",
       "throttle": {
-        "label": "[XX-Cooldown-XX]"
-      },
-      "comingSoon": "[XX-Coming soon-XX]",
-      "comingSoonNote": "[XX-Immediate notification emails and the cooldown arrive with push notifications.-XX]"
+        "label": "[XX-Cooldown-XX]",
+        "ariaLabel": "[XX-Cooldown for {category}-XX]",
+        "hint": "[XX-Skip an alert or push when one from the same group fired within this window.-XX]",
+        "options": {
+          "0": "[XX-Off-XX]",
+          "5": "[XX-5 minutes-XX]",
+          "15": "[XX-15 minutes-XX]",
+          "30": "[XX-30 minutes-XX]",
+          "60": "[XX-1 hour-XX]",
+          "360": "[XX-6 hours-XX]",
+          "1440": "[XX-24 hours-XX]"
+        }
+      }
     }
   },
   "help": {

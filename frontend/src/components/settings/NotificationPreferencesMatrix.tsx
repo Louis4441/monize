@@ -7,30 +7,50 @@ import { CheckIcon } from '@heroicons/react/24/solid';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import {
   notificationPreferencesApi,
+  THROTTLE_OPTION_MINUTES,
   type NotificationChannelPreference,
   type NotificationPreferencePatch,
 } from '@/lib/notification-preferences';
+import { pushApi } from '@/lib/push';
 import type { NotificationCategory } from '@/types/notification';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('NotificationPreferencesMatrix');
 
+interface NotificationPreferencesMatrixProps {
+  /**
+   * Whether the email channel can deliver: SMTP is configured AND the master
+   * email switch is on. The two email columns self-gate on it -- a per-category
+   * email choice cannot widen a channel the master switch has closed.
+   */
+  emailAvailable: boolean;
+}
+
 /**
- * The per-category channel matrix. Rendered only where email is already on
- * globally (inside the SMTP-gated, master-email-on block of
- * NotificationsSection), so there is no master-gating to reason about here.
+ * The per-category channel matrix. In-app is always on (the bell shows every
+ * notification); email has two modes (the REPORT digest and the immediate
+ * ALERT), push is the browser channel, and the cooldown gates the two
+ * interrupting channels (alert email + push).
  *
- * In-app is always on (the bell shows every notification). Email has two modes:
- * the REPORT email (batch/digest -- the live, user-toggled channel) and the
- * NOTIFICATION email (immediate, one per event), which lands with the push
- * dispatch (Phase 5) and is rendered "coming soon" alongside its cooldown. See
- * `docs/specs/notification-preferences.md` section 4.
+ * It renders independent of the email master switch on purpose: push is a
+ * separate channel (delivery isolation, discussion #1291), so nesting the whole
+ * matrix inside the email-on block would hide push preferences whenever email is
+ * off or unconfigured. Each column instead self-gates -- the email columns on
+ * `emailAvailable`, the push column on there being a live device (a matrix cell
+ * cannot grant the push permission, spec section 14.5). See
+ * `docs/specs/notification-preferences.md`.
  */
-export function NotificationPreferencesMatrix() {
+export function NotificationPreferencesMatrix({
+  emailAvailable,
+}: NotificationPreferencesMatrixProps) {
   const t = useTranslations('settings.notifications.preferences');
   const [rows, setRows] = useState<NotificationChannelPreference[] | null>(null);
   const [savingCategory, setSavingCategory] =
     useState<NotificationCategory | null>(null);
+  // A live device is what makes the push column a real control. Absent or a
+  // failed lookup reads as "no device" (0), which errs toward disabling push
+  // rather than offering a toggle that could never deliver.
+  const [liveDeviceCount, setLiveDeviceCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,9 +70,28 @@ export function NotificationPreferencesMatrix() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    pushApi
+      .listDevices()
+      .then((devices) => {
+        if (!cancelled) {
+          setLiveDeviceCount(
+            devices.filter((device) => device.disabledAt === null).length,
+          );
+        }
+      })
+      .catch((error) => {
+        // No device information means no push column, not an error.
+        logger.debug('Could not load push devices', error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Optimistic: reflect the choice immediately, revert the whole row if the
-  // save fails. Only the report email is editable today; the helper is written
-  // for a patch so the notification-email column can reuse it in Phase 5.
+  // save fails. One helper for every channel and the cooldown alike.
   const applyPatch = useCallback(
     (
       category: NotificationCategory,
@@ -86,6 +125,8 @@ export function NotificationPreferencesMatrix() {
 
   if (rows === null || rows.length === 0) return null;
 
+  const pushAvailable = liveDeviceCount >= 1;
+
   return (
     <div className="border-t border-gray-200 pt-4 dark:border-gray-700">
       <h3 className="mb-1 text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -109,68 +150,116 @@ export function NotificationPreferencesMatrix() {
                 {t('channels.emailNotification')}
               </th>
               <th className="pb-2 text-center font-medium">
+                {t('channels.push')}
+              </th>
+              <th className="pb-2 text-center font-medium">
                 {t('throttle.label')}
               </th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr
-                key={row.category}
-                className="border-t border-gray-100 dark:border-gray-800"
-              >
-                <td className="py-2 text-gray-700 dark:text-gray-300">
-                  {t(`categories.${row.category}`)}
-                </td>
-                <td className="py-2 text-center">
-                  <span
-                    className="inline-flex items-center justify-center text-blue-600 dark:text-blue-400"
-                    title={t('inAppAlways')}
-                  >
-                    <CheckIcon className="h-4 w-4" aria-hidden="true" />
-                    <span className="sr-only">{t('inAppAlways')}</span>
-                  </span>
-                </td>
-                <td className="py-2">
-                  <div className="flex justify-center">
-                    <ToggleSwitch
-                      checked={row.email}
-                      disabled={savingCategory === row.category}
-                      onChange={() =>
-                        applyPatch(row.category, { email: !row.email }, row)
+            {rows.map((row) => {
+              const categoryLabel = t(`categories.${row.category}`);
+              const saving = savingCategory === row.category;
+              // The cooldown gates the interrupting channels, so it is only
+              // meaningful once one of them is on for this row.
+              const interrupting = row.emailNotification || row.push;
+              return (
+                <tr
+                  key={row.category}
+                  className="border-t border-gray-100 dark:border-gray-800"
+                >
+                  <td className="py-2 text-gray-700 dark:text-gray-300">
+                    {categoryLabel}
+                  </td>
+                  <td className="py-2 text-center">
+                    <span
+                      className="inline-flex items-center justify-center text-blue-600 dark:text-blue-400"
+                      title={t('inAppAlways')}
+                    >
+                      <CheckIcon className="h-4 w-4" aria-hidden="true" />
+                      <span className="sr-only">{t('inAppAlways')}</span>
+                    </span>
+                  </td>
+                  <td className="py-2">
+                    <div className="flex justify-center">
+                      <ToggleSwitch
+                        checked={row.email}
+                        disabled={saving || !emailAvailable}
+                        onChange={() =>
+                          applyPatch(row.category, { email: !row.email }, row)
+                        }
+                        label={t('emailToggleLabel', { category: categoryLabel })}
+                        size="sm"
+                      />
+                    </div>
+                  </td>
+                  <td className="py-2">
+                    <div className="flex justify-center">
+                      <ToggleSwitch
+                        checked={row.emailNotification}
+                        disabled={saving || !emailAvailable}
+                        onChange={() =>
+                          applyPatch(
+                            row.category,
+                            { emailNotification: !row.emailNotification },
+                            row,
+                          )
+                        }
+                        label={t('emailNotificationToggleLabel', {
+                          category: categoryLabel,
+                        })}
+                        size="sm"
+                      />
+                    </div>
+                  </td>
+                  <td className="py-2">
+                    <div className="flex justify-center">
+                      <ToggleSwitch
+                        checked={row.push}
+                        disabled={saving || !pushAvailable}
+                        onChange={() =>
+                          applyPatch(row.category, { push: !row.push }, row)
+                        }
+                        label={t('pushToggleLabel', { category: categoryLabel })}
+                        size="sm"
+                      />
+                    </div>
+                  </td>
+                  <td className="py-2 text-center">
+                    <select
+                      value={String(row.throttleMinutes)}
+                      disabled={saving || !interrupting}
+                      onChange={(event) =>
+                        applyPatch(
+                          row.category,
+                          { throttleMinutes: Number(event.target.value) },
+                          row,
+                        )
                       }
-                      label={t('emailToggleLabel', {
-                        category: t(`categories.${row.category}`),
+                      aria-label={t('throttle.ariaLabel', {
+                        category: categoryLabel,
                       })}
-                      size="sm"
-                    />
-                  </div>
-                </td>
-                {/* Notification email and cooldown land with the push dispatch
-                    (Phase 5); until then they are stored but shown "coming
-                    soon", the same pattern UnifiedPush uses. */}
-                <td className="py-2 text-center">
-                  <ComingSoon label={t('comingSoon')} />
-                </td>
-                <td className="py-2 text-center">
-                  <ComingSoon label={t('comingSoon')} />
-                </td>
-              </tr>
-            ))}
+                      className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                    >
+                      {THROTTLE_OPTION_MINUTES.map((minutes) => (
+                        <option key={minutes} value={minutes}>
+                          {t(`throttle.options.${minutes}`)}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
-        {t('comingSoonNote')}
-      </p>
+      <ul className="mt-2 space-y-1 text-xs text-gray-400 dark:text-gray-500">
+        <li>{t('throttle.hint')}</li>
+        {!emailAvailable && <li>{t('emailUnavailable')}</li>}
+        {!pushAvailable && <li>{t('pushUnavailable')}</li>}
+      </ul>
     </div>
-  );
-}
-
-function ComingSoon({ label }: { label: string }) {
-  return (
-    <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-400 dark:bg-gray-800 dark:text-gray-500">
-      {label}
-    </span>
   );
 }

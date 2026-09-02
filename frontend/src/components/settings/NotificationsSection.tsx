@@ -129,7 +129,6 @@ export function NotificationsSection({
 
           {notificationEmail && (
             <>
-              <NotificationPreferencesMatrix />
               <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                 <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
                   {t('budgetNotificationsHeading')}
@@ -198,6 +197,14 @@ export function NotificationsSection({
           </div>
         </div>
       )}
+
+      {/* The channel matrix spans email AND push, so it renders independent of
+          the email master switch: push preferences must be reachable when email
+          is off or unconfigured (delivery isolation). Its email columns gate on
+          `emailAvailable`; its push column gates on a live device. */}
+      <NotificationPreferencesMatrix
+        emailAvailable={smtpConfigured && notificationEmail}
+      />
 
       <PushDevicesPanel />
       <PushDiagnostics />

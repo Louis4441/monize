@@ -292,26 +292,41 @@
       }
     },
     "preferences": {
-      "heading": "Also notify me by email",
-      "description": "The bell always shows every notification. Choose which kinds Monize also sends to your email.",
+      "heading": "How to notify me",
+      "description": "The bell always shows every notification. Choose which kinds Monize also sends by email or push, and how often.",
       "categoryHeader": "Notification",
       "channels": {
         "inApp": "In-app",
         "emailReport": "Email (report)",
-        "emailNotification": "Email (notification)"
+        "emailNotification": "Email (alert)",
+        "push": "Push"
       },
       "categories": {
         "PAYMENTS": "Bills and scheduled",
-        "BUDGETS": "Budgets"
+        "BUDGETS": "Budgets",
+        "SYSTEM": "System"
       },
       "inAppAlways": "Always shown in the bell",
       "emailToggleLabel": "Report email for {category}",
+      "emailNotificationToggleLabel": "Alert email for {category}",
+      "pushToggleLabel": "Push for {category}",
       "saveFailed": "Could not save that setting",
+      "emailUnavailable": "Turn on email notifications above to send these by email.",
+      "pushUnavailable": "Enable push on this device first (see below).",
       "throttle": {
-        "label": "Cooldown"
-      },
-      "comingSoon": "Coming soon",
-      "comingSoonNote": "Immediate notification emails and the cooldown arrive with push notifications."
+        "label": "Cooldown",
+        "ariaLabel": "Cooldown for {category}",
+        "hint": "Skip an alert or push when one from the same group fired within this window.",
+        "options": {
+          "0": "Off",
+          "5": "5 minutes",
+          "15": "15 minutes",
+          "30": "30 minutes",
+          "60": "1 hour",
+          "360": "6 hours",
+          "1440": "24 hours"
+        }
+      }
     }
   },
   "help": {
