@@ -70,6 +70,13 @@ describe('parseLocaleNumber', () => {
     expect(parseLocaleNumber('1.000.000', EN)).toBe(1000000);
   });
 
+  it('reads Indian lakh grouping (2-2-3), not a decimal', () => {
+    // Repeated group separators are grouping whatever the group sizes -- this is
+    // how a lakh-grouped displayed value (hi/en-IN) pastes back in.
+    expect(parseLocaleNumber('12,34,567', EN)).toBe(1234567);
+    expect(parseLocaleNumber('1,23,456', EN)).toBe(123456);
+  });
+
   it('uses the LAST separator as the decimal when both appear', () => {
     expect(parseLocaleNumber('1.234,56', DE)).toBe(1234.56);
     expect(parseLocaleNumber('1,234.56', EN)).toBe(1234.56);

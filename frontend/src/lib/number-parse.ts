@@ -109,28 +109,33 @@ export function parseLocaleNumber(
       normalized = cleaned;
     } else {
       const parts = cleaned.split(sep);
+      const groups = parts.length - 1;
       if (sep === separators.decimal) {
         // The locale's DECIMAL separator: a single one ("1.5", "1.234" in en) is
         // the decimal point. Repeated occurrences are the decimal point only if
         // they cannot be valid grouping -- "1.000.000" pasted by a European reads
         // as 1000000, but "1.2.3" is a typo whose last separator is the decimal.
         normalized =
-          parts.length === 2
+          groups === 1
             ? parts.join('.')
             : looksLikeGrouping(parts)
               ? parts.join('')
               : joinLastAsDecimal(parts);
       } else {
-        // The locale's GROUPING separator (or a stray non-locale symbol): it is
-        // grouping only when the digit runs are valid 3-digit groups ("1,234",
-        // "1.234.567", "1.234" in de). A trailing run that is not exactly 3
-        // digits cannot be a group, so "1200.99"/"5.5" in a dot-group locale and
-        // a stray "1200.99" in a space-group locale read as decimals.
-        normalized = looksLikeGrouping(parts)
-          ? parts.join('')
-          : parts.length === 2
-            ? parts.join('.')
-            : joinLastAsDecimal(parts);
+        // The locale's GROUPING separator (or a stray non-locale symbol).
+        // Repeated occurrences are grouping whatever the group sizes -- uniform
+        // "1,000,000"/"1.234.567" AND Indian lakh "12,34,567" (2-2-3), which is
+        // also how a lakh-grouped displayed value pastes back. A SINGLE separator
+        // is grouping only when it forms one valid 3-digit group ("1,234",
+        // "1.234" in de); otherwise it is the decimal point, so "1200.99"/"5.5"
+        // in a dot-group locale (and a stray "1200.99" in a space-group locale)
+        // read as decimals rather than inflating ~100x.
+        normalized =
+          groups > 1
+            ? parts.join('')
+            : looksLikeGrouping(parts)
+              ? parts.join('')
+              : parts.join('.');
       }
     }
   }
