@@ -29,6 +29,7 @@ describe("PayeeContactLookupService", () => {
   const userId = "user-1";
 
   const suggestion: PayeeContactSuggestion = {
+    label: null,
     website: "https://acme.example",
     address: "1 Main St",
     email: "hi@acme.example",
@@ -42,7 +43,7 @@ describe("PayeeContactLookupService", () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     mockValidateUrlIsSafe.mockResolvedValue(true);
-    provider = { lookup: jest.fn().mockResolvedValue(suggestion) };
+    provider = { lookup: jest.fn().mockResolvedValue([suggestion]) };
     preferenceRepo = {
       findOne: jest.fn().mockResolvedValue({
         userId,
@@ -70,7 +71,7 @@ describe("PayeeContactLookupService", () => {
 
     await expect(service.lookup(userId, { name: "Acme" })).resolves.toEqual({
       reason: "disabled",
-      suggestion: null,
+      suggestions: [],
     });
     expect(provider.lookup).not.toHaveBeenCalled();
   });
@@ -94,7 +95,7 @@ describe("PayeeContactLookupService", () => {
 
     await expect(
       service.lookup(userId, { name: "Acme" }, { ignorePreference: true }),
-    ).resolves.toEqual({ reason: "ok", suggestion });
+    ).resolves.toEqual({ reason: "ok", suggestions: [suggestion] });
   });
 
   it("passes the stored locale and currency as the hint when the caller gave none", async () => {
@@ -133,10 +134,9 @@ describe("PayeeContactLookupService", () => {
 
   it("drops a refined website the URL check refused, and the refinement with it", async () => {
     mockValidateUrlIsSafe.mockResolvedValue(false);
-    provider.lookup.mockResolvedValue({
-      ...suggestion,
-      refined: ["website", "address"],
-    });
+    provider.lookup.mockResolvedValue([
+      { ...suggestion, refined: ["website", "address"] },
+    ]);
 
     await expect(
       service.lookup(userId, {
@@ -145,16 +145,18 @@ describe("PayeeContactLookupService", () => {
       }),
     ).resolves.toMatchObject({
       reason: "ok",
-      suggestion: { website: null, refined: ["address"] },
+      suggestions: [
+        expect.objectContaining({ website: null, refined: ["address"] }),
+      ],
     });
   });
 
   it("returns none when the provider found nothing", async () => {
-    provider.lookup.mockResolvedValue(null);
+    provider.lookup.mockResolvedValue([]);
 
     await expect(service.lookup(userId, { name: "Acme" })).resolves.toEqual({
       reason: "none",
-      suggestion: null,
+      suggestions: [],
     });
   });
 
@@ -163,23 +165,57 @@ describe("PayeeContactLookupService", () => {
 
     await expect(service.lookup(userId, { name: "Acme" })).resolves.toEqual({
       reason: "ok",
-      suggestion: { ...suggestion, website: null },
+      suggestions: [{ ...suggestion, website: null }],
     });
     expect(mockValidateUrlIsSafe).toHaveBeenCalledWith("https://acme.example");
   });
 
   it("returns none when dropping the website leaves nothing", async () => {
     mockValidateUrlIsSafe.mockResolvedValue(false);
-    provider.lookup.mockResolvedValue({
-      ...suggestion,
-      address: null,
-      email: null,
-      phone: null,
-    });
+    provider.lookup.mockResolvedValue([
+      { ...suggestion, address: null, email: null, phone: null },
+    ]);
 
     await expect(service.lookup(userId, { name: "Acme" })).resolves.toEqual({
       reason: "none",
-      suggestion: null,
+      suggestions: [],
+    });
+  });
+
+  it("keeps every candidate the adapter offered, best first", async () => {
+    const second = {
+      ...suggestion,
+      label: "Acme, Springfield",
+      address: "9 Elm St",
+    };
+    provider.lookup.mockResolvedValue([suggestion, second]);
+
+    await expect(service.lookup(userId, { name: "Acme" })).resolves.toEqual({
+      reason: "ok",
+      suggestions: [suggestion, second],
+    });
+  });
+
+  it("drops a candidate that fails the URL check outright, keeping the rest", async () => {
+    // The alternate's only detail is a website, and it is the one refused.
+    mockValidateUrlIsSafe.mockImplementation((url: string) =>
+      Promise.resolve(url === "https://acme.example"),
+    );
+    provider.lookup.mockResolvedValue([
+      suggestion,
+      {
+        ...suggestion,
+        label: "Acme, Springfield",
+        website: "http://127.0.0.1",
+        address: null,
+        email: null,
+        phone: null,
+      },
+    ]);
+
+    await expect(service.lookup(userId, { name: "Acme" })).resolves.toEqual({
+      reason: "ok",
+      suggestions: [suggestion],
     });
   });
 
@@ -191,7 +227,7 @@ describe("PayeeContactLookupService", () => {
 
     await expect(service.lookup(userId, { name: "Acme" })).resolves.toEqual({
       reason: "no_provider",
-      suggestion: null,
+      suggestions: [],
     });
     expect(warn).not.toHaveBeenCalled();
     warn.mockRestore();
@@ -207,7 +243,7 @@ describe("PayeeContactLookupService", () => {
 
     await expect(service.lookup(userId, { name: "Acme" })).resolves.toEqual({
       reason: "failed",
-      suggestion: null,
+      suggestions: [],
       detail: "Your MCP relay agent is not connected.",
     });
   });
@@ -218,7 +254,7 @@ describe("PayeeContactLookupService", () => {
 
     await expect(service.lookup(userId, { name: "Acme" })).resolves.toEqual({
       reason: "failed",
-      suggestion: null,
+      suggestions: [],
     });
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toContain("fetch failed");

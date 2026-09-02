@@ -44,10 +44,7 @@ import { DeactivatePayeesDto } from "./dto/deactivate-payees.dto";
 import { LookupPayeeContactDto } from "./dto/lookup-payee-contact.dto";
 import { PayeeContactLookupService } from "./lookup/payee-contact-lookup.service";
 import { buildLookupContext } from "./lookup/lookup-context";
-import {
-  ContactEnrichmentResult,
-  PayeeContactEnrichmentService,
-} from "./lookup/payee-contact-enrichment.service";
+import { PayeeContactEnrichmentService } from "./lookup/payee-contact-enrichment.service";
 import { ContactLookupOutcome } from "./lookup/payee-contact-lookup.types";
 import { Payee } from "./entities/payee.entity";
 import { PayeeAlias } from "./entities/payee-alias.entity";
@@ -563,11 +560,17 @@ export class PayeesController {
   }
 
   /**
-   * Look an existing payee up and fill whichever of its contact fields are
-   * still empty. A stored value is never replaced (the UPDATE is COALESCE per
-   * column); the payee's own stored details go into the lookup as context, and
-   * a fuller value found for a field that already has one comes back in
-   * `refinements` for the user to apply, rather than being written.
+   * Look an existing payee up and propose what could change, writing nothing.
+   *
+   * The detail screen shows the answer in a confirmation dialogue -- with a
+   * picker when the name means more than one organisation or branch -- and
+   * the user's confirmation goes through `PATCH /payees/:id`, as their own
+   * edit. That is what lets a confirmed value replace a stored one while the
+   * lookup itself never may (INV-PAYEE-001).
+   *
+   * Always 200 for a payee the caller owns: the feature being off, no
+   * provider and a failed lookup are states the dialogue explains
+   * differently, not errors.
    */
   @Post(":id/lookup-contact")
   @AllowDelegate()
@@ -575,19 +578,19 @@ export class PayeesController {
   @Throttle({ default: { ttl: 60000, limit: 10 } })
   @ApiOperation({
     summary:
-      "Look up the payee's contact details and fill in the ones still empty",
+      "Look up a payee's contact details and return the candidates, without saving",
   })
   @ApiResponse({
     status: 200,
     description:
-      "{ payee, reason, filled, refinements } -- filled lists the fields this run wrote; refinements are fuller values offered for fields that already had one",
+      "{ suggestions, reason } -- suggestions is empty unless reason is 'ok', and carries more than one entry only when the name matches more than one organisation or branch",
   })
   @ApiResponse({ status: 404, description: "Payee not found" })
   lookupContactForPayee(
     @Request() req,
     @Param("id", ParseUUIDPipe) id: string,
-  ): Promise<ContactEnrichmentResult & { payee: Payee }> {
-    return this.contactEnrichmentService.rerun(req.user.id, id);
+  ): Promise<ContactLookupOutcome> {
+    return this.payeesService.lookupContactForPayee(req.user.id, id);
   }
 
   @Get("inactive/match")

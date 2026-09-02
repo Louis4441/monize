@@ -97,9 +97,7 @@
     "address": "Indirizzo",
     "phone": "Telefono",
     "email": "E-mail",
-    "notes": "Note",
-    "contactLookup": "Recapiti",
-    "contactLookupValue": "Cercati automaticamente il {date}"
+    "notes": "Note"
   },
   "tabs": {
     "ariaLabel": "Sezioni del beneficiario",
@@ -136,14 +134,18 @@
   "contactLookup": {
     "button": "Cerca recapiti",
     "inProgress": "Ricerca in corso...",
-    "filled": "{count, plural, one {# recapito compilato} other {# recapiti compilati}}",
     "nothingNew": "Nessun nuovo recapito trovato.",
-    "refinementIntro": "È stata trovata una versione più completa di dati che questo beneficiario ha già. Non è stato modificato nulla; applicala per sostituire quanto salvato.",
-    "refinementApply": "Applica",
-    "refinementDismiss": "Ignora",
-    "refinementApplied": "Dati di contatto aggiornati",
-    "refinementFailed": "Impossibile aggiornare i dati di contatto",
     "noProvider": "Configura un provider IA nelle Impostazioni IA per cercare i recapiti.",
-    "failed": "Non è stato possibile completare la ricerca. Riprova più tardi."
+    "failed": "Non è stato possibile completare la ricerca. Riprova più tardi.",
+    "dialogTitle": "Conferma i dati di contatto",
+    "dialogSubtitle": "Nulla viene salvato per {name} finché non confermi.",
+    "pickMatch": "Quel nome corrisponde a {count, plural, one {# attività} other {# attività}}. Scegli quella a cui paghi:",
+    "unlabelledMatch": "Corrispondenza senza nome",
+    "willAdd": "Aggiungi",
+    "willReplace": "Sostituisci",
+    "cancel": "Annulla",
+    "confirm": "{count, plural, one {Salva # modifica} other {Salva # modifiche}}",
+    "applied": "{count, plural, one {# dato di contatto salvato} other {# dati di contatto salvati}}",
+    "applyFailed": "Impossibile salvare i dati di contatto"
   }
 }

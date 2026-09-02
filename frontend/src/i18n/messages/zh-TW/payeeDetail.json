@@ -97,9 +97,7 @@
     "address": "地址",
     "phone": "電話",
     "email": "電子郵件",
-    "notes": "備註",
-    "contactLookup": "聯絡資訊",
-    "contactLookupValue": "於 {date} 自動查詢"
+    "notes": "備註"
   },
   "tabs": {
     "ariaLabel": "收款人各區塊",
@@ -136,14 +134,18 @@
   "contactLookup": {
     "button": "查詢聯絡資訊",
     "inProgress": "正在查詢...",
-    "filled": "{count, plural, other {已填寫 # 項聯絡資訊}}",
     "nothingNew": "找不到新的聯絡資訊。",
-    "refinementIntro": "找到了此收款人既有資料的更完整版本。尚未變更任何內容；套用後將取代已儲存的內容。",
-    "refinementApply": "套用",
-    "refinementDismiss": "忽略",
-    "refinementApplied": "聯絡資訊已更新",
-    "refinementFailed": "無法更新聯絡資訊",
     "noProvider": "請在 AI 設定中設定 AI 供應商以查詢聯絡資訊。",
-    "failed": "查詢無法完成，請稍後再試。"
+    "failed": "查詢無法完成，請稍後再試。",
+    "dialogTitle": "確認聯絡資訊",
+    "dialogSubtitle": "在您確認之前，不會為 {name} 儲存任何內容。",
+    "pickMatch": "該名稱符合 {count, plural, other {# 家商家}}。請選擇您付款的那一家：",
+    "unlabelledMatch": "未命名的相符項目",
+    "willAdd": "新增",
+    "willReplace": "取代",
+    "cancel": "取消",
+    "confirm": "{count, plural, other {儲存 # 項變更}}",
+    "applied": "{count, plural, other {已儲存 # 項聯絡資訊}}",
+    "applyFailed": "無法儲存聯絡資訊"
   }
 }

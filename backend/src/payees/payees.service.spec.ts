@@ -18,6 +18,7 @@ import {
 } from "../test-helpers/scoped-db-testing";
 import { FaviconService } from "../common/favicon/favicon.service";
 import { PayeeContactLookupService } from "./lookup/payee-contact-lookup.service";
+import { ContactLookupSuggestions } from "./lookup/payee-contact-lookup.types";
 import { PayeeContactEnrichmentService } from "./lookup/payee-contact-enrichment.service";
 import { getActiveScopedManager, withScopedDb } from "../common/db/scoped-db";
 
@@ -236,6 +237,7 @@ describe("PayeesService", () => {
       address: "1 Main St",
       email: "hi@acme.example",
       phone: "+1 555 010 2000",
+      label: null,
       source: "ai-web-search" as const,
       confidence: "high" as const,
       notes: null,
@@ -369,7 +371,10 @@ describe("PayeesService", () => {
       });
 
       it("merges a found suggestion and returns the stamp the commit will store", async () => {
-        contactLookup.lookup.mockResolvedValue({ reason: "ok", suggestion });
+        contactLookup.lookup.mockResolvedValue({
+          reason: "ok",
+          suggestions: [suggestion],
+        });
 
         const preview = await service.previewCreate(
           userId,
@@ -396,7 +401,7 @@ describe("PayeesService", () => {
       it("returns a null-source stamp when the lookup answered with nothing", async () => {
         contactLookup.lookup.mockResolvedValue({
           reason: "none",
-          suggestion: null,
+          suggestions: [],
         });
 
         const preview = await service.previewCreate(
@@ -415,7 +420,7 @@ describe("PayeesService", () => {
       it.each(["disabled", "no_provider", "failed"] as const)(
         "returns no stamp for %s, so the commit may still look up in the background",
         async (reason) => {
-          contactLookup.lookup.mockResolvedValue({ reason, suggestion: null });
+          contactLookup.lookup.mockResolvedValue({ reason, suggestions: [] });
 
           const preview = await service.previewCreate(
             userId,
@@ -428,7 +433,10 @@ describe("PayeesService", () => {
       );
 
       it("previewCreatePayee passes the option through", async () => {
-        contactLookup.lookup.mockResolvedValue({ reason: "ok", suggestion });
+        contactLookup.lookup.mockResolvedValue({
+          reason: "ok",
+          suggestions: [suggestion],
+        });
 
         const preview = await service.previewCreatePayee(
           userId,
@@ -438,6 +446,61 @@ describe("PayeesService", () => {
 
         expect(preview.contactLookup?.source).toBe("ai-web-search");
       });
+    });
+  });
+
+  // ─── lookupContactForPayee ───────────────────────────────────────────
+
+  describe("lookupContactForPayee", () => {
+    it("looks the stored payee up with its own details as context, and writes nothing", async () => {
+      payeesRepository.findOne.mockResolvedValue({
+        ...mockPayee,
+        name: "Acme",
+        address: "Toronto",
+        notes: "the Dundas branch",
+      });
+      const outcome = {
+        reason: "ok" as const,
+        suggestions: [
+          {
+            label: null,
+            website: "https://acme.example",
+            address: null,
+            email: null,
+            phone: null,
+            source: "ai-web-search" as const,
+            confidence: "high" as const,
+            notes: null,
+            refined: [],
+          },
+        ] as ContactLookupSuggestions,
+      };
+      contactLookup.lookup.mockResolvedValue(outcome);
+
+      await expect(
+        service.lookupContactForPayee(userId, "payee-1"),
+      ).resolves.toBe(outcome);
+      expect(contactLookup.lookup).toHaveBeenCalledWith(
+        userId,
+        {
+          name: "Acme",
+          known: { address: "Toronto", notes: "the Dundas branch" },
+        },
+        { ignorePreference: true },
+      );
+      // The detail screen's button proposes; the user's confirmation is an
+      // ordinary update, so nothing here touches the row.
+      expect(payeesRepository.save).not.toHaveBeenCalled();
+      expect(txManager.query).not.toHaveBeenCalled();
+    });
+
+    it("throws NotFound for a payee the caller does not own", async () => {
+      payeesRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.lookupContactForPayee(userId, "payee-1"),
+      ).rejects.toThrow(NotFoundException);
+      expect(contactLookup.lookup).not.toHaveBeenCalled();
     });
   });
 

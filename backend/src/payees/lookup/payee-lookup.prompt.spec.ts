@@ -2,6 +2,7 @@ import {
   buildPayeeLookupUserMessage,
   PAYEE_LOOKUP_SYSTEM_PROMPT,
 } from "./payee-lookup.prompt";
+import { MAX_CONTACT_LOOKUP_MATCHES } from "./payee-contact-lookup.types";
 
 describe("buildPayeeLookupUserMessage", () => {
   it("is the name alone when the caller holds nothing else", () => {
@@ -48,6 +49,26 @@ describe("buildPayeeLookupUserMessage", () => {
 });
 
 describe("PAYEE_LOOKUP_SYSTEM_PROMPT", () => {
+  it("asks for a match list, capped, and only where the name really is ambiguous", () => {
+    expect(PAYEE_LOOKUP_SYSTEM_PROMPT).toContain('{"matches": [...]}');
+    expect(PAYEE_LOOKUP_SYSTEM_PROMPT).toContain(
+      `Return up to ${MAX_CONTACT_LOOKUP_MATCHES}, best first`,
+    );
+    expect(PAYEE_LOOKUP_SYSTEM_PROMPT).toContain("Never pad the list");
+  });
+
+  it("requires a label wherever there is more than one match to tell apart", () => {
+    expect(PAYEE_LOOKUP_SYSTEM_PROMPT).toContain(
+      "Required when there is more than one match",
+    );
+  });
+
+  it("answers a generic name with no matches rather than a list of guesses", () => {
+    expect(PAYEE_LOOKUP_SYSTEM_PROMPT).toContain(
+      "return an empty matches array",
+    );
+  });
+
   it("tells the model that recorded details constrain the answer rather than being one", () => {
     expect(PAYEE_LOOKUP_SYSTEM_PROMPT).toContain(
       "a bare city, region or country is a constraint and not an answer",

@@ -12,7 +12,6 @@ import {
   PayeeDetail,
   PayeeContactLookupContext,
   PayeeContactLookupResult,
-  PayeeContactRerunResult,
   PayeeStatusFilter,
   PayeeAlias,
   CreatePayeeAliasData,
@@ -61,12 +60,14 @@ export const payeesApi = {
     return response.data;
   },
 
-  // Look an existing payee up and fill whichever contact fields are still empty
-  lookupContactForPayee: async (id: string): Promise<PayeeContactRerunResult> => {
-    const response = await apiClient.post<PayeeContactRerunResult>(
+  // Look an existing payee up and return the candidates. This writes nothing:
+  // the detail screen confirms the change with the user, and their
+  // confirmation goes through `update` as their own edit -- so no cache is
+  // invalidated here either.
+  lookupContactForPayee: async (id: string): Promise<PayeeContactLookupResult> => {
+    const response = await apiClient.post<PayeeContactLookupResult>(
       `/payees/${id}/lookup-contact`,
     );
-    invalidateCache('payees:');
     return response.data;
   },
 

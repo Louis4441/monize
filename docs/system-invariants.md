@@ -1936,7 +1936,7 @@ Statement           A looked-up website, address, email or phone is written only
 Source of truth     The payees row: the four contact columns, contact_lookup_at
                     (the attempt) and contact_lookup_source (which lookup wrote
                     at least one field).
-Enforcement         One statement, enrichmentUpdateSql in
+Enforcement         One statement, ENRICHMENT_UPDATE_SQL in
                     payee-contact-enrichment.service.ts: every contact column is
                     COALESCE(column, $n); contact_lookup_source moves only when
                     the statement itself set a field (the CASE reads the
@@ -1950,15 +1950,21 @@ Enforcement         One statement, enrichmentUpdateSql in
                     persists nothing until the user saves.
                     A lookup given the payee's own stored details may answer with
                     a FULLER value for a field that already has one (the branch
-                    address behind a stored "Toronto"). That is a REFINEMENT, and
-                    the statement above still refuses it: sanitizeContactSuggestion
-                    names those fields in PayeeContactSuggestion.refined, the
-                    enrichment returns them as ContactEnrichmentResult.refinements
-                    beside (never inside) the write, and they reach the user as an
-                    offer -- the detail card's Apply, which is an ordinary payee
-                    UPDATE the user asked for, and the form's replace-and-undo,
-                    which persists nothing until Save. A suggested value equal to
-                    what the user already holds is dropped rather than counted.
+                    address behind a stored "Toronto"), and may answer with more
+                    than one candidate where the name means more than one
+                    organisation or branch. Neither reaches the row by itself.
+                    POST /payees/:id/lookup-contact WRITES NOTHING -- it returns
+                    the candidates (PayeesService.lookupContactForPayee), the
+                    detail screen shows them in a confirmation dialogue naming
+                    each field as an add or a replace beside the value it would
+                    replace, and the user's confirmation goes through
+                    PATCH /payees/:id as their own edit. That is the only path by
+                    which a looked-up value replaces a stored one, and it is a
+                    user edit rather than a lookup write. A suggested value equal
+                    to what the user already holds is dropped by
+                    sanitizeContactSuggestion rather than counted; a fuller one is
+                    named in PayeeContactSuggestion.refined, which the payee form
+                    uses to replace-and-undo before Save.
 Concurrency scope   per payee
 Retry semantics     A re-dispatch, a second replica or a retried request matches
                     zero rows on the automatic path; the user-initiated re-run
@@ -1975,14 +1981,17 @@ Required tests      payee-contact-enrichment.service.spec.ts (COALESCE and
                     predicate shape, stamp-on-answer only, favicon keyed on the
                     website), payees.service.spec.ts (dispatch after the
                     transaction, never inside one, never with a supplied field
-                    or a preview stamp, notes carried in as context),
+                    or a preview stamp, notes carried in as context, and the
+                    detail-screen lookup writing nothing),
                     contact-suggestion.sanitize.spec.ts (a refinement is named,
-                    an echo is dropped), lookup-context.spec.ts (what leaves the
+                    an echo is dropped, candidates are capped and must be
+                    distinguishable), lookup-context.spec.ts (what leaves the
                     row for the prompt), frontend PayeeForm.test.tsx (a replaced
                     field is named separately and the undo restores what the user
-                    typed) and PayeeKeyInfoCard.test.tsx (a refinement is offered,
-                    not written), raw-sql-columns.spec.ts (column names
-                    against schema.sql). Owed: a two-connection race with a
+                    typed) and PayeeKeyInfoCard.test.tsx (nothing is written
+                    until the dialogue is confirmed, a cancel writes nothing, and
+                    the picked candidate is the one saved),
+                    raw-sql-columns.spec.ts (column names against schema.sql). Owed: a two-connection race with a
                     concurrent user edit, per docs/verification-contract.md.
 Status              enforced
 ```

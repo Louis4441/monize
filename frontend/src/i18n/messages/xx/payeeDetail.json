@@ -97,9 +97,7 @@
     "address": "[XX-Address-XX]",
     "phone": "[XX-Phone-XX]",
     "email": "[XX-Email-XX]",
-    "notes": "[XX-Notes-XX]",
-    "contactLookup": "[XX-Contact Details-XX]",
-    "contactLookupValue": "[XX-Looked up automatically on {date}-XX]"
+    "notes": "[XX-Notes-XX]"
   },
   "tabs": {
     "ariaLabel": "[XX-Payee detail sections-XX]",
@@ -136,14 +134,18 @@
   "contactLookup": {
     "button": "[XX-Look up contact details-XX]",
     "inProgress": "[XX-Looking up...-XX]",
-    "filled": "[XX-Filled in {count, plural, one {# contact detail} other {# contact details}}-XX]",
     "nothingNew": "[XX-No new contact details were found.-XX]",
-    "refinementIntro": "[XX-A fuller version of details this payee already has was found. Nothing has been changed; apply it to replace what is stored.-XX]",
-    "refinementApply": "[XX-Apply-XX]",
-    "refinementDismiss": "[XX-Dismiss-XX]",
-    "refinementApplied": "[XX-Contact details updated-XX]",
-    "refinementFailed": "[XX-Could not update the contact details-XX]",
     "noProvider": "[XX-Configure an AI provider in AI Settings to look up contact details.-XX]",
-    "failed": "[XX-The lookup could not be completed. Try again later.-XX]"
+    "failed": "[XX-The lookup could not be completed. Try again later.-XX]",
+    "dialogTitle": "[XX-Confirm contact details-XX]",
+    "dialogSubtitle": "[XX-Nothing is saved for {name} until you confirm.-XX]",
+    "pickMatch": "[XX-That name matches {count, plural, one {# business} other {# businesses}}. Choose the one you pay:-XX]",
+    "unlabelledMatch": "[XX-Unnamed match-XX]",
+    "willAdd": "[XX-Add-XX]",
+    "willReplace": "[XX-Replace-XX]",
+    "cancel": "[XX-Cancel-XX]",
+    "confirm": "[XX-Save {count, plural, one {# change} other {# changes}}-XX]",
+    "applied": "[XX-{count, plural, one {Saved # contact detail} other {Saved # contact details}}-XX]",
+    "applyFailed": "[XX-Could not save the contact details-XX]"
   }
 }

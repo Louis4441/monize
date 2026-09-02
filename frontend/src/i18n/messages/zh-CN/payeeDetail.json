@@ -97,9 +97,7 @@
     "address": "地址",
     "phone": "电话",
     "email": "电子邮件",
-    "notes": "备注",
-    "contactLookup": "联系信息",
-    "contactLookupValue": "于 {date} 自动查找"
+    "notes": "备注"
   },
   "tabs": {
     "ariaLabel": "收款人各部分",
@@ -136,14 +134,18 @@
   "contactLookup": {
     "button": "查找联系信息",
     "inProgress": "正在查找...",
-    "filled": "{count, plural, other {已填写 # 项联系信息}}",
     "nothingNew": "未找到新的联系信息。",
-    "refinementIntro": "找到了该收款人已有信息的更完整版本。尚未更改任何内容；应用后将替换已保存的内容。",
-    "refinementApply": "应用",
-    "refinementDismiss": "忽略",
-    "refinementApplied": "联系信息已更新",
-    "refinementFailed": "无法更新联系信息",
     "noProvider": "请在 AI 设置中配置 AI 提供商以查找联系信息。",
-    "failed": "查找未能完成，请稍后重试。"
+    "failed": "查找未能完成，请稍后重试。",
+    "dialogTitle": "确认联系信息",
+    "dialogSubtitle": "在您确认之前，不会为 {name} 保存任何内容。",
+    "pickMatch": "该名称匹配到 {count, plural, other {# 家商家}}。请选择您付款的那一家：",
+    "unlabelledMatch": "未命名的匹配项",
+    "willAdd": "添加",
+    "willReplace": "替换",
+    "cancel": "取消",
+    "confirm": "{count, plural, other {保存 # 项更改}}",
+    "applied": "{count, plural, other {已保存 # 项联系信息}}",
+    "applyFailed": "无法保存联系信息"
   }
 }

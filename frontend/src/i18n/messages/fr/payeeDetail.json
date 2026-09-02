@@ -97,9 +97,7 @@
     "address": "Adresse",
     "phone": "Téléphone",
     "email": "E-mail",
-    "notes": "Notes",
-    "contactLookup": "Coordonnées",
-    "contactLookupValue": "Recherchées automatiquement le {date}"
+    "notes": "Notes"
   },
   "tabs": {
     "ariaLabel": "Sections du bénéficiaire",
@@ -136,14 +134,18 @@
   "contactLookup": {
     "button": "Rechercher les coordonnées",
     "inProgress": "Recherche...",
-    "filled": "{count, plural, one {# coordonnée renseignée} other {# coordonnées renseignées}}",
     "nothingNew": "Aucune nouvelle coordonnée n'a été trouvée.",
-    "refinementIntro": "Une version plus complète de coordonnées que ce bénéficiaire possède déjà a été trouvée. Rien n'a été modifié ; appliquez-la pour remplacer ce qui est enregistré.",
-    "refinementApply": "Appliquer",
-    "refinementDismiss": "Ignorer",
-    "refinementApplied": "Coordonnées mises à jour",
-    "refinementFailed": "Impossible de mettre à jour les coordonnées",
     "noProvider": "Configurez un fournisseur d'IA dans les paramètres IA pour rechercher les coordonnées.",
-    "failed": "La recherche n'a pas pu aboutir. Réessayez plus tard."
+    "failed": "La recherche n'a pas pu aboutir. Réessayez plus tard.",
+    "dialogTitle": "Confirmer les coordonnées",
+    "dialogSubtitle": "Rien n'est enregistré pour {name} tant que vous n'avez pas confirmé.",
+    "pickMatch": "Ce nom correspond à {count, plural, one {# entreprise} other {# entreprises}}. Choisissez celle que vous payez :",
+    "unlabelledMatch": "Correspondance sans nom",
+    "willAdd": "Ajouter",
+    "willReplace": "Remplacer",
+    "cancel": "Annuler",
+    "confirm": "{count, plural, one {Enregistrer # modification} other {Enregistrer # modifications}}",
+    "applied": "{count, plural, one {# coordonnée enregistrée} other {# coordonnées enregistrées}}",
+    "applyFailed": "Impossible d'enregistrer les coordonnées"
   }
 }

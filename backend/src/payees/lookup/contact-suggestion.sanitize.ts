@@ -4,6 +4,7 @@ import { sanitizePromptValue, stripHtml } from "../../common/sanitization.util";
 import { PayeeLookupContext } from "./lookup-context";
 import {
   CONTACT_LOOKUP_FIELDS,
+  MAX_CONTACT_LOOKUP_MATCHES,
   ContactLookupConfidence,
   ContactLookupField,
   ContactLookupSource,
@@ -24,6 +25,7 @@ export const CONTACT_FIELD_MAX_LENGTH = {
 } as const;
 
 const NOTES_MAX_LENGTH = 300;
+const LABEL_MAX_LENGTH = 120;
 
 /** Strings a model writes when it means "nothing". */
 const EMPTY_SENTINELS = new Set([
@@ -109,6 +111,14 @@ function sanitizeConfidence(value: unknown): ContactLookupConfidence | null {
   return value === "high" || value === "medium" || value === "low"
     ? value
     : null;
+}
+
+/** The picker's one line per candidate; same treatment as notes. */
+function sanitizeLabel(value: unknown): string | null {
+  const raw = text(value);
+  if (!raw) return null;
+  const cleaned = sanitizePromptValue(stripHtml(raw) ?? "");
+  return cleaned ? cleaned.slice(0, LABEL_MAX_LENGTH) : null;
 }
 
 function sanitizeNotes(value: unknown): string | null {
@@ -238,6 +248,7 @@ export function sanitizeContactSuggestion(
   }
 
   const suggestion: PayeeContactSuggestion = {
+    label: sanitizeLabel(record.label),
     ...values,
     source,
     confidence,
@@ -268,4 +279,43 @@ export function parseContactJson(
   } catch {
     return null;
   }
+}
+
+/**
+ * The candidates in a source's answer, best first, each already through
+ * `sanitizeContactSuggestion`. Empty when nothing survives.
+ *
+ * The shape is `{ matches: [...] }`, which is what the prompt asks for; a
+ * bare object is read as a single match, because a model that answers the
+ * older shape is answering, not failing. Two rules the caller depends on:
+ * the list is capped at `MAX_CONTACT_LOOKUP_MATCHES`, and a candidate the
+ * user could not tell apart from the one before it (no `label`, or the same
+ * one) is dropped rather than offered -- a picker whose rows read alike is
+ * worse than no picker.
+ */
+export function sanitizeContactSuggestions(
+  raw: unknown,
+  source: ContactLookupSource,
+  known?: PayeeLookupContext,
+): PayeeContactSuggestion[] {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return [];
+  const record = raw as Record<string, unknown>;
+  const rawMatches = Array.isArray(record.matches) ? record.matches : [record];
+
+  const suggestions: PayeeContactSuggestion[] = [];
+  const seenLabels = new Set<string>();
+  for (const rawMatch of rawMatches) {
+    if (suggestions.length >= MAX_CONTACT_LOOKUP_MATCHES) break;
+    const suggestion = sanitizeContactSuggestion(rawMatch, source, known);
+    if (!suggestion) continue;
+    if (suggestions.length > 0) {
+      const label = suggestion.label?.toLowerCase();
+      if (!label || seenLabels.has(label)) continue;
+      seenLabels.add(label);
+    } else if (suggestion.label) {
+      seenLabels.add(suggestion.label.toLowerCase());
+    }
+    suggestions.push(suggestion);
+  }
+  return suggestions;
 }

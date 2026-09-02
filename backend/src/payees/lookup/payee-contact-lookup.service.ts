@@ -5,6 +5,7 @@ import { validateUrlIsSafe } from "../../ai/validators/safe-url.validator";
 import { UserPreference } from "../../users/entities/user-preference.entity";
 import {
   ContactLookupOutcome,
+  ContactLookupSuggestions,
   ContactLookupUnavailableError,
   PAYEE_CONTACT_LOOKUP_PROVIDER,
   PayeeContactLookupInput,
@@ -61,12 +62,12 @@ export class PayeeContactLookupService {
   ): Promise<ContactLookupOutcome> {
     const preferences = await this.readPreferences(userId);
     if (!preferences.enabled && !options.ignorePreference) {
-      return { reason: "disabled", suggestion: null };
+      return { reason: "disabled", suggestions: [] };
     }
 
-    let suggestion: PayeeContactSuggestion | null;
+    let candidates: PayeeContactSuggestion[];
     try {
-      suggestion = await this.provider.lookup(userId, {
+      candidates = await this.provider.lookup(userId, {
         name: input.name,
         hint: input.hint ?? preferences.hint,
         known: input.known,
@@ -74,20 +75,37 @@ export class PayeeContactLookupService {
     } catch (error) {
       if (error instanceof ContactLookupUnavailableError) {
         return error.reason === "no_provider"
-          ? { reason: "no_provider", suggestion: null }
-          : { reason: "failed", suggestion: null, detail: error.detail };
+          ? { reason: "no_provider", suggestions: [] }
+          : { reason: "failed", suggestions: [], detail: error.detail };
       }
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(
         `Contact lookup failed for payee "${input.name}": ${message}`,
       );
-      return { reason: "failed", suggestion: null };
+      return { reason: "failed", suggestions: [] };
     }
 
-    if (!suggestion) {
-      return { reason: "none", suggestion: null };
+    const checked: PayeeContactSuggestion[] = [];
+    for (const candidate of candidates) {
+      const vetted = await this.vetWebsite(candidate);
+      if (vetted) checked.push(vetted);
     }
+    const [best, ...rest] = checked;
+    if (!best) {
+      return { reason: "none", suggestions: [] };
+    }
+    const suggestions: ContactLookupSuggestions = [best, ...rest];
+    return { reason: "ok", suggestions };
+  }
 
+  /**
+   * Resolve the candidate's website through `validateUrlIsSafe` and drop it
+   * when it does not survive, along with any claim that it refined one the
+   * user holds. A candidate left with nothing at all is not a candidate.
+   */
+  private async vetWebsite(
+    suggestion: PayeeContactSuggestion,
+  ): Promise<PayeeContactSuggestion | null> {
     const website =
       suggestion.website && (await validateUrlIsSafe(suggestion.website))
         ? suggestion.website
@@ -95,21 +113,17 @@ export class PayeeContactLookupService {
     const checked: PayeeContactSuggestion = {
       ...suggestion,
       website,
-      // A website the URL check dropped is not a refinement of anything.
       refined:
         website === null
           ? suggestion.refined.filter((field) => field !== "website")
           : suggestion.refined,
     };
-    if (
-      checked.website === null &&
-      checked.address === null &&
-      checked.email === null &&
-      checked.phone === null
-    ) {
-      return { reason: "none", suggestion: null };
-    }
-    return { reason: "ok", suggestion: checked };
+    const hasAny =
+      checked.website !== null ||
+      checked.address !== null ||
+      checked.email !== null ||
+      checked.phone !== null;
+    return hasAny ? checked : null;
   }
 
   /**

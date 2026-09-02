@@ -97,9 +97,7 @@
     "address": "Morada",
     "phone": "Telefone",
     "email": "E-mail",
-    "notes": "Notas",
-    "contactLookup": "Contactos",
-    "contactLookupValue": "Procurados automaticamente em {date}"
+    "notes": "Notas"
   },
   "tabs": {
     "ariaLabel": "Secções do beneficiário",
@@ -136,14 +134,18 @@
   "contactLookup": {
     "button": "Procurar contactos",
     "inProgress": "A procurar...",
-    "filled": "{count, plural, one {# contacto preenchido} other {# contactos preenchidos}}",
     "nothingNew": "Não foram encontrados contactos novos.",
-    "refinementIntro": "Foi encontrada uma versão mais completa de dados que este beneficiário já tem. Nada foi alterado; aplique-a para substituir o que está guardado.",
-    "refinementApply": "Aplicar",
-    "refinementDismiss": "Ignorar",
-    "refinementApplied": "Dados de contacto atualizados",
-    "refinementFailed": "Não foi possível atualizar os dados de contacto",
     "noProvider": "Configure um fornecedor de IA nas Definições de IA para procurar contactos.",
-    "failed": "Não foi possível concluir a pesquisa. Tente novamente mais tarde."
+    "failed": "Não foi possível concluir a pesquisa. Tente novamente mais tarde.",
+    "dialogTitle": "Confirmar os dados de contacto",
+    "dialogSubtitle": "Nada é guardado para {name} até confirmar.",
+    "pickMatch": "Esse nome corresponde a {count, plural, one {# empresa} other {# empresas}}. Escolha aquela a quem paga:",
+    "unlabelledMatch": "Correspondência sem nome",
+    "willAdd": "Adicionar",
+    "willReplace": "Substituir",
+    "cancel": "Cancelar",
+    "confirm": "{count, plural, one {Guardar # alteração} other {Guardar # alterações}}",
+    "applied": "{count, plural, one {# dado de contacto guardado} other {# dados de contacto guardados}}",
+    "applyFailed": "Não foi possível guardar os dados de contacto"
   }
 }

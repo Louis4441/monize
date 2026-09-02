@@ -17,7 +17,7 @@ describe("PayeesController", () => {
 
   beforeEach(async () => {
     mockContactLookupService = { lookup: jest.fn() };
-    mockContactEnrichmentService = { rerun: jest.fn() };
+    mockContactEnrichmentService = { dispatchAfterCreate: jest.fn() };
     mockAutoMergeService = {
       previewAutoMerge: jest.fn(),
       applyAutoMerge: jest.fn(),
@@ -49,6 +49,7 @@ describe("PayeesController", () => {
       remove: jest.fn(),
       getLogo: jest.fn(),
       refreshLogo: jest.fn(),
+      lookupContactForPayee: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -781,21 +782,24 @@ describe("PayeesController", () => {
   });
 
   describe("lookupContactForPayee()", () => {
-    it("re-runs the enrichment for the payee", async () => {
-      const result = {
+    it("returns the candidates for the payee and writes nothing", async () => {
+      const outcome = {
         reason: "ok",
-        filled: ["phone"],
-        payee: { id: "payee-1" },
+        suggestions: [{ label: null, website: "https://acme.example" }],
       };
-      mockContactEnrichmentService.rerun.mockResolvedValue(result);
+      mockPayeesService.lookupContactForPayee.mockResolvedValue(outcome);
 
       await expect(
         controller.lookupContactForPayee(mockReq, "payee-1"),
-      ).resolves.toBe(result);
-      expect(mockContactEnrichmentService.rerun).toHaveBeenCalledWith(
+      ).resolves.toBe(outcome);
+      expect(mockPayeesService.lookupContactForPayee).toHaveBeenCalledWith(
         "user-1",
         "payee-1",
       );
+      // The write is the user's own confirmed edit, through PATCH /payees/:id.
+      expect(
+        mockContactEnrichmentService.dispatchAfterCreate,
+      ).not.toHaveBeenCalled();
     });
   });
 });

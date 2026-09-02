@@ -58,7 +58,17 @@ export const CONTACT_LOOKUP_FIELDS = [
 ] as const;
 export type ContactLookupField = (typeof CONTACT_LOOKUP_FIELDS)[number];
 
+/** At most this many candidates are offered for one name. */
+export const MAX_CONTACT_LOOKUP_MATCHES = 3;
+
 export interface PayeeContactSuggestion {
+  /**
+   * What tells this candidate apart from the others -- "Starbucks, 483 Bay
+   * St, Toronto". Present only where the lookup found more than one
+   * organisation or location the name could mean; the picker has nothing else
+   * to show, so a candidate without one is not offered beside another.
+   */
+  label: string | null;
   website: string | null;
   address: string | null;
   email: string | null;
@@ -81,13 +91,15 @@ export interface PayeeContactSuggestion {
 
 export interface PayeeContactLookupProvider {
   /**
-   * Resolves `null` when nothing trustworthy was found. May throw; the
-   * coordinator catches and classifies.
+   * The candidates the source found, best first, or an empty array when it
+   * found nothing trustworthy. More than one only where the name genuinely
+   * means more than one organisation or location -- the user picks. May
+   * throw; the coordinator catches and classifies.
    */
   lookup(
     userId: string,
     input: PayeeContactLookupInput,
-  ): Promise<PayeeContactSuggestion | null>;
+  ): Promise<PayeeContactSuggestion[]>;
 }
 
 export const PAYEE_CONTACT_LOOKUP_PROVIDER = Symbol(
@@ -107,14 +119,29 @@ export type ContactLookupReason =
   | "no_provider"
   | "failed";
 
+/**
+ * The candidates an `ok` outcome carries: at least one, best first. A tuple
+ * rather than an array so a caller that needs "the answer" -- the automatic
+ * paths, which have nobody to ask -- can read `suggestions[0]` without a
+ * null check, while a caller with a user in front of it offers the rest.
+ */
+export type ContactLookupSuggestions = [
+  PayeeContactSuggestion,
+  ...PayeeContactSuggestion[],
+];
+
 export type ContactLookupOutcome =
-  | { reason: "ok"; suggestion: PayeeContactSuggestion; detail?: undefined }
-  | { reason: "none"; suggestion: null; detail?: undefined }
-  | { reason: "disabled"; suggestion: null; detail?: undefined }
-  | { reason: "no_provider"; suggestion: null; detail?: undefined }
+  | {
+      reason: "ok";
+      suggestions: ContactLookupSuggestions;
+      detail?: undefined;
+    }
+  | { reason: "none"; suggestions: []; detail?: undefined }
+  | { reason: "disabled"; suggestions: []; detail?: undefined }
+  | { reason: "no_provider"; suggestions: []; detail?: undefined }
   | {
       reason: "failed";
-      suggestion: null;
+      suggestions: [];
       /**
        * A message the user can act on, when there is one -- the relay's own
        * "agent is not connected" for instance. Absent for a generic failure.

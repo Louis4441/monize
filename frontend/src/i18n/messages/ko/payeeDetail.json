@@ -97,9 +97,7 @@
     "address": "주소",
     "phone": "전화번호",
     "email": "이메일",
-    "notes": "메모",
-    "contactLookup": "연락처 정보",
-    "contactLookupValue": "{date}에 자동 조회됨"
+    "notes": "메모"
   },
   "tabs": {
     "ariaLabel": "수취인 섹션",
@@ -136,14 +134,18 @@
   "contactLookup": {
     "button": "연락처 정보 조회",
     "inProgress": "조회 중...",
-    "filled": "{count, plural, other {연락처 정보 #개를 채웠습니다}}",
     "nothingNew": "새로운 연락처 정보를 찾지 못했습니다.",
-    "refinementIntro": "이 거래처가 이미 가지고 있는 정보의 더 완전한 형태를 찾았습니다. 아직 아무것도 변경하지 않았습니다. 저장된 값을 대체하려면 적용하세요.",
-    "refinementApply": "적용",
-    "refinementDismiss": "무시",
-    "refinementApplied": "연락처 정보가 업데이트되었습니다",
-    "refinementFailed": "연락처 정보를 업데이트할 수 없습니다",
     "noProvider": "연락처 정보를 조회하려면 AI 설정에서 AI 공급자를 구성하세요.",
-    "failed": "조회를 완료할 수 없습니다. 나중에 다시 시도하세요."
+    "failed": "조회를 완료할 수 없습니다. 나중에 다시 시도하세요.",
+    "dialogTitle": "연락처 정보 확인",
+    "dialogSubtitle": "확인하기 전까지 {name}에는 아무것도 저장되지 않습니다.",
+    "pickMatch": "이 이름은 {count, plural, other {# 곳의 업체}}와 일치합니다. 결제하는 곳을 선택하세요:",
+    "unlabelledMatch": "이름 없는 후보",
+    "willAdd": "추가",
+    "willReplace": "대체",
+    "cancel": "취소",
+    "confirm": "{count, plural, other {변경 사항 # 건 저장}}",
+    "applied": "{count, plural, other {연락처 정보 # 건을 저장했습니다}}",
+    "applyFailed": "연락처 정보를 저장할 수 없습니다"
   }
 }

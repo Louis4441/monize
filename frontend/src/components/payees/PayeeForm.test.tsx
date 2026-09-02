@@ -382,12 +382,13 @@ describe('PayeeForm', () => {
       confidence: 'high',
       notes: null,
       refined: [],
+      label: null,
     };
     const lookupContact = vi.mocked(payeesApi.lookupContact);
 
     beforeEach(() => {
       lookupContact.mockReset();
-      lookupContact.mockResolvedValue({ reason: 'ok', suggestion } as any);
+      lookupContact.mockResolvedValue({ reason: 'ok', suggestions: [suggestion] } as any);
       mockLookupEnabled = true;
     });
 
@@ -446,7 +447,7 @@ describe('PayeeForm', () => {
         )
         .mockResolvedValueOnce({
           reason: 'ok',
-          suggestion: { ...suggestion, website: 'https://second.example', phone: null },
+          suggestions: [{ ...suggestion, website: 'https://second.example', phone: null }],
         } as any);
       renderCreate();
 
@@ -455,7 +456,7 @@ describe('PayeeForm', () => {
       await waitFor(() => expect(field('Website').value).toBe('https://second.example'));
 
       await act(async () => {
-        resolveFirst({ reason: 'ok', suggestion });
+        resolveFirst({ reason: 'ok', suggestions: [suggestion] });
       });
       // The first answer arrived last and was not adopted.
       expect(field('Website').value).toBe('https://second.example');
@@ -484,7 +485,7 @@ describe('PayeeForm', () => {
     it('shows a failure as a failure, never as nothing found', async () => {
       lookupContact.mockResolvedValue({
         reason: 'failed',
-        suggestion: null,
+        suggestions: [],
         detail: 'Your MCP relay agent is not connected.',
       } as any);
       renderCreate();
@@ -497,7 +498,7 @@ describe('PayeeForm', () => {
     });
 
     it('explains a missing provider with a link to AI Settings', async () => {
-      lookupContact.mockResolvedValue({ reason: 'no_provider', suggestion: null } as any);
+      lookupContact.mockResolvedValue({ reason: 'no_provider', suggestions: [] } as any);
       renderCreate();
       await blurName('Acme');
 
@@ -506,7 +507,7 @@ describe('PayeeForm', () => {
     });
 
     it('says when nothing was found', async () => {
-      lookupContact.mockResolvedValue({ reason: 'none', suggestion: null } as any);
+      lookupContact.mockResolvedValue({ reason: 'none', suggestions: [] } as any);
       renderCreate();
       await blurName('Acme');
 
@@ -548,11 +549,13 @@ describe('PayeeForm', () => {
     it('replaces a value the lookup refined, names it separately, and restores it on undo', async () => {
       lookupContact.mockResolvedValue({
         reason: 'ok',
-        suggestion: {
-          ...suggestion,
-          address: '100 Dundas St W\nToronto, Ontario M5G 1Z9\nCanada',
-          refined: ['address'],
-        },
+        suggestions: [
+          {
+            ...suggestion,
+            address: '100 Dundas St W\nToronto, Ontario M5G 1Z9\nCanada',
+            refined: ['address'],
+          },
+        ],
       } as any);
       renderCreate();
       await act(async () => {
@@ -577,7 +580,7 @@ describe('PayeeForm', () => {
     it('restores the value the user typed after a second lookup replaces the first answer', async () => {
       const refinedTo = (address: string) => ({
         reason: 'ok',
-        suggestion: { ...suggestion, address, refined: ['address'] },
+        suggestions: [{ ...suggestion, address, refined: ['address'] }],
       });
       lookupContact
         .mockResolvedValueOnce(refinedTo('100 Queen St W, Toronto') as any)
@@ -603,7 +606,7 @@ describe('PayeeForm', () => {
     it('leaves a filled field alone when the server did not call the answer a refinement', async () => {
       lookupContact.mockResolvedValue({
         reason: 'ok',
-        suggestion: { ...suggestion, address: 'Somewhere else entirely', refined: [] },
+        suggestions: [{ ...suggestion, address: 'Somewhere else entirely', refined: [] }],
       } as any);
       renderCreate();
       await act(async () => {

@@ -37,6 +37,7 @@ import { normalizeWebsite } from "../common/normalize-website";
 import { FaviconService, FetchedLogo } from "../common/favicon/favicon.service";
 import { brandLogoColumns } from "../common/favicon/brand-logo.columns";
 import { PayeeContactLookupService } from "./lookup/payee-contact-lookup.service";
+import { ContactLookupOutcome } from "./lookup/payee-contact-lookup.types";
 import { buildLookupContext } from "./lookup/lookup-context";
 import { PayeeContactEnrichmentService } from "./lookup/payee-contact-enrichment.service";
 import { ContactLookupSource } from "./lookup/payee-contact-lookup.types";
@@ -357,14 +358,17 @@ export class PayeesService {
     ) {
       const outcome = await this.contactLookup.lookup(userId, { name });
       if (outcome.reason === "ok") {
-        website = outcome.suggestion.website ?? undefined;
+        // A preview card is built before anyone can be asked, so it takes the
+        // best match; the alternates are for a surface with a user on it.
+        const best = outcome.suggestions[0];
+        website = best.website ?? undefined;
         contact = {
-          address: outcome.suggestion.address ?? undefined,
-          email: outcome.suggestion.email ?? undefined,
-          phone: outcome.suggestion.phone ?? undefined,
+          address: best.address ?? undefined,
+          email: best.email ?? undefined,
+          phone: best.phone ?? undefined,
         };
         contactLookup = {
-          source: outcome.suggestion.source,
+          source: best.source,
           attemptedAt: new Date(),
         };
       } else if (outcome.reason === "none") {
@@ -702,6 +706,29 @@ export class PayeesService {
     }
 
     return payee;
+  }
+
+  /**
+   * Look an existing payee's contact details up WITHOUT writing anything.
+   *
+   * The detail screen's button is a proposal, not a save: the user confirms
+   * what changes (and, where the name means more than one organisation or
+   * branch, which of them they are paying) and the confirmation goes through
+   * `update` as their own edit. So this method reads the row -- for the
+   * ownership check and for the context that tells the lookup which place is
+   * meant -- and returns the candidates.
+   */
+  async lookupContactForPayee(
+    userId: string,
+    payeeId: string,
+  ): Promise<ContactLookupOutcome> {
+    const payee = await this.findOne(userId, payeeId);
+    return this.contactLookup.lookup(
+      userId,
+      { name: payee.name, known: buildLookupContext(payee) },
+      // The click is the consent, whether or not the automatic lookup is on.
+      { ignorePreference: true },
+    );
   }
 
   /**

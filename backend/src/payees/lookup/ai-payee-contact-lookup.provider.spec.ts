@@ -102,16 +102,47 @@ describe("AiPayeeContactLookupProvider", () => {
   });
 
   it("stamps a searched answer ai-web-search and keeps every field", async () => {
-    await expect(provider.lookup(userId, { name: "Acme" })).resolves.toEqual({
-      website: "https://acme.example",
-      address: "1 Main St",
-      email: "hi@acme.example",
-      phone: "+1 555 010 2000",
-      source: "ai-web-search",
-      confidence: "medium",
-      notes: "official site",
-      refined: [],
-    });
+    await expect(provider.lookup(userId, { name: "Acme" })).resolves.toEqual([
+      {
+        label: null,
+        website: "https://acme.example",
+        address: "1 Main St",
+        email: "hi@acme.example",
+        phone: "+1 555 010 2000",
+        source: "ai-web-search",
+        confidence: "medium",
+        notes: "official site",
+        refined: [],
+      },
+    ]);
+  });
+
+  it("returns every distinguishable match the model offered, best first", async () => {
+    aiService.completeWithWebSearch.mockResolvedValue(
+      answer({
+        content: JSON.stringify({
+          matches: [
+            {
+              label: "Acme, 1 Main St, Springfield",
+              website: "acme.example",
+              confidence: "high",
+            },
+            {
+              label: "Acme Holdings, Toronto",
+              website: "acme-holdings.example",
+              confidence: "medium",
+            },
+          ],
+        }),
+      }),
+    );
+
+    await expect(
+      provider.lookup(userId, { name: "Acme" }),
+    ).resolves.toMatchObject([
+      { label: "Acme, 1 Main St, Springfield" },
+      { label: "Acme Holdings, Toronto" },
+    ]);
   });
 
   it("puts the caller's known details in the prompt and judges the answer against them", async () => {
@@ -125,10 +156,9 @@ describe("AiPayeeContactLookupProvider", () => {
     expect(request.messages[0].content).toContain("- notes: the Elm St branch");
     // "1 Main St" is a different address from the recorded "Springfield", so
     // it is offered as a refinement rather than as a fill.
-    expect(result).toMatchObject({
-      address: "1 Main St",
-      refined: ["address"],
-    });
+    expect(result).toMatchObject([
+      { address: "1 Main St", refined: ["address"] },
+    ]);
   });
 
   it("stamps an unsearched answer ai-knowledge and applies the trust rule", async () => {
@@ -138,13 +168,15 @@ describe("AiPayeeContactLookupProvider", () => {
 
     await expect(
       provider.lookup(userId, { name: "Acme" }),
-    ).resolves.toMatchObject({
-      source: "ai-knowledge",
-      website: "https://acme.example",
-      email: "hi@acme.example",
-      address: null,
-      phone: null,
-    });
+    ).resolves.toMatchObject([
+      {
+        source: "ai-knowledge",
+        website: "https://acme.example",
+        email: "hi@acme.example",
+        address: null,
+        phone: null,
+      },
+    ]);
   });
 
   it("stamps a relay answer ai-relay with the same trust rule", async () => {
@@ -154,19 +186,19 @@ describe("AiPayeeContactLookupProvider", () => {
 
     await expect(
       provider.lookup(userId, { name: "Acme" }),
-    ).resolves.toMatchObject({
-      source: "ai-relay",
-      address: null,
-      phone: null,
-    });
+    ).resolves.toMatchObject([
+      { source: "ai-relay", address: null, phone: null },
+    ]);
   });
 
-  it("returns null for a non-JSON answer", async () => {
+  it("returns no candidates for a non-JSON answer", async () => {
     aiService.completeWithWebSearch.mockResolvedValue(
       answer({ content: "I could not find anything." }),
     );
 
-    await expect(provider.lookup(userId, { name: "Acme" })).resolves.toBeNull();
+    await expect(provider.lookup(userId, { name: "Acme" })).resolves.toEqual(
+      [],
+    );
   });
 
   it("throws no_provider before calling the model when no provider is configured", async () => {

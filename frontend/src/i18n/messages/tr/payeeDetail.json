@@ -97,9 +97,7 @@
     "address": "Adres",
     "phone": "Telefon",
     "email": "E-posta",
-    "notes": "Notlar",
-    "contactLookup": "İletişim bilgileri",
-    "contactLookupValue": "{date} tarihinde otomatik olarak arandı"
+    "notes": "Notlar"
   },
   "tabs": {
     "ariaLabel": "Alacaklı bölümleri",
@@ -136,14 +134,18 @@
   "contactLookup": {
     "button": "İletişim bilgilerini ara",
     "inProgress": "Aranıyor...",
-    "filled": "{count, plural, one {# iletişim bilgisi dolduruldu} other {# iletişim bilgisi dolduruldu}}",
     "nothingNew": "Yeni iletişim bilgisi bulunamadı.",
-    "refinementIntro": "Bu alacaklının hâlihazırda sahip olduğu bilgilerin daha eksiksiz bir hâli bulundu. Hiçbir şey değiştirilmedi; kayıtlı değeri değiştirmek için uygulayın.",
-    "refinementApply": "Uygula",
-    "refinementDismiss": "Yoksay",
-    "refinementApplied": "İletişim bilgileri güncellendi",
-    "refinementFailed": "İletişim bilgileri güncellenemedi",
     "noProvider": "İletişim bilgilerini aramak için Yapay Zeka Ayarları'nda bir yapay zeka sağlayıcısı yapılandırın.",
-    "failed": "Arama tamamlanamadı. Daha sonra tekrar deneyin."
+    "failed": "Arama tamamlanamadı. Daha sonra tekrar deneyin.",
+    "dialogTitle": "İletişim bilgilerini onayla",
+    "dialogSubtitle": "Siz onaylayana kadar {name} için hiçbir şey kaydedilmez.",
+    "pickMatch": "Bu ad {count, plural, other {# işletmeyle}} eşleşiyor. Ödeme yaptığınızı seçin:",
+    "unlabelledMatch": "Adı olmayan eşleşme",
+    "willAdd": "Ekle",
+    "willReplace": "Değiştir",
+    "cancel": "İptal",
+    "confirm": "{count, plural, other {# değişikliği kaydet}}",
+    "applied": "{count, plural, other {# iletişim bilgisi kaydedildi}}",
+    "applyFailed": "İletişim bilgileri kaydedilemedi"
   }
 }

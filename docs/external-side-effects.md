@@ -258,7 +258,7 @@ row. The provider call runs outside any transaction, on the tail of the
 request that created the payee (`PayeeContactEnrichmentService.dispatchAfterCreate`,
 dispatched by `PayeesService.create` only once its own `withScopedDb` has
 resolved and no ambient transaction exists). The effect is one conditional
-statement, `enrichmentUpdateSql`: every contact column is `COALESCE(column,
+statement, `ENRICHMENT_UPDATE_SQL`: every contact column is `COALESCE(column,
 $n)` so nothing already stored is touched (INV-PAYEE-001), and the automatic
 path adds `WHERE contact_lookup_at IS NULL`, which is the idempotency key --
 a second replica, a retried request or a re-dispatch affects zero rows

@@ -97,9 +97,7 @@
     "address": "Alamat",
     "phone": "Telepon",
     "email": "Email",
-    "notes": "Catatan",
-    "contactLookup": "Detail kontak",
-    "contactLookupValue": "Dicari otomatis pada {date}"
+    "notes": "Catatan"
   },
   "tabs": {
     "ariaLabel": "Bagian penerima",
@@ -136,14 +134,18 @@
   "contactLookup": {
     "button": "Cari detail kontak",
     "inProgress": "Mencari...",
-    "filled": "{count, plural, other {# detail kontak diisi}}",
     "nothingNew": "Tidak ditemukan detail kontak baru.",
-    "refinementIntro": "Ditemukan versi yang lebih lengkap dari detail yang sudah dimiliki penerima ini. Tidak ada yang diubah; terapkan untuk mengganti yang tersimpan.",
-    "refinementApply": "Terapkan",
-    "refinementDismiss": "Abaikan",
-    "refinementApplied": "Detail kontak diperbarui",
-    "refinementFailed": "Tidak dapat memperbarui detail kontak",
     "noProvider": "Konfigurasikan penyedia AI di Pengaturan AI untuk mencari detail kontak.",
-    "failed": "Pencarian tidak dapat diselesaikan. Coba lagi nanti."
+    "failed": "Pencarian tidak dapat diselesaikan. Coba lagi nanti.",
+    "dialogTitle": "Konfirmasi detail kontak",
+    "dialogSubtitle": "Tidak ada yang disimpan untuk {name} sampai Anda mengonfirmasi.",
+    "pickMatch": "Nama itu cocok dengan {count, plural, other {# bisnis}}. Pilih yang Anda bayar:",
+    "unlabelledMatch": "Kecocokan tanpa nama",
+    "willAdd": "Tambahkan",
+    "willReplace": "Ganti",
+    "cancel": "Batal",
+    "confirm": "{count, plural, other {Simpan # perubahan}}",
+    "applied": "{count, plural, other {# detail kontak disimpan}}",
+    "applyFailed": "Tidak dapat menyimpan detail kontak"
   }
 }

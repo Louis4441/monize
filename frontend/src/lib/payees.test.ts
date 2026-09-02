@@ -1,9 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import apiClient from './api';
 import { payeesApi } from './payees';
+import { invalidateCache } from './apiCache';
 
 vi.mock('./api', () => ({
   default: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
+}));
+vi.mock('./apiCache', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./apiCache')>()),
+  invalidateCache: vi.fn(),
 }));
 
 describe('payeesApi', () => {
@@ -239,12 +244,14 @@ describe('payeesApi', () => {
     );
   });
 
-  it('lookupContactForPayee posts to /payees/:id/lookup-contact', async () => {
+  it('lookupContactForPayee posts to /payees/:id/lookup-contact and drops no cache', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({
-      data: { reason: 'ok', filled: ['phone'], payee: { id: 'p-1' } },
+      data: { reason: 'ok', suggestions: [{ label: null, phone: '+1 416 555 0100' }] },
     });
     const result = await payeesApi.lookupContactForPayee('p-1');
     expect(apiClient.post).toHaveBeenCalledWith('/payees/p-1/lookup-contact');
-    expect(result.filled).toEqual(['phone']);
+    expect(result.suggestions).toHaveLength(1);
+    // Nothing was written, so nothing cached is stale.
+    expect(invalidateCache).not.toHaveBeenCalledWith('payees:');
   });
 });

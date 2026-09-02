@@ -187,7 +187,11 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
       if (lookupRef.current !== request) return;
       lookupRef.current = null;
 
-      if (result.reason !== 'ok' || !result.suggestion) {
+      // The form has the user right there, but the picker belongs to the
+      // detail screen's confirmation dialogue: here the best match is applied
+      // into the fields, where every value is visible and editable before Save.
+      const [suggestion] = result.suggestions;
+      if (result.reason !== 'ok' || !suggestion) {
         setLookupState({ status: 'done', reason: result.reason, detail: result.detail });
         return;
       }
@@ -195,7 +199,6 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
       // An empty field is filled. A field they typed is *replaced* only when
       // the server says its answer refines that value -- a fuller address for
       // the place they named -- and the value they typed is kept for the undo.
-      const suggestion = result.suggestion;
       const refined = new Set(suggestion.refined);
       const filled = new Set<ContactLookupField>();
       const replaced = new Map<ContactLookupField, string>();

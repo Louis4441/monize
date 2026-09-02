@@ -97,9 +97,7 @@
     "address": "住所",
     "phone": "電話番号",
     "email": "メールアドレス",
-    "notes": "メモ",
-    "contactLookup": "連絡先情報",
-    "contactLookupValue": "{date}に自動検索"
+    "notes": "メモ"
   },
   "tabs": {
     "ariaLabel": "支払先のセクション",
@@ -136,14 +134,18 @@
   "contactLookup": {
     "button": "連絡先情報を検索",
     "inProgress": "検索中...",
-    "filled": "{count, plural, other {連絡先情報を#件入力しました}}",
     "nothingNew": "新しい連絡先情報は見つかりませんでした。",
-    "refinementIntro": "この支払先がすでに持っている情報について、より詳しい内容が見つかりました。まだ何も変更していません。保存されている内容を置き換えるには適用してください。",
-    "refinementApply": "適用",
-    "refinementDismiss": "閉じる",
-    "refinementApplied": "連絡先情報を更新しました",
-    "refinementFailed": "連絡先情報を更新できませんでした",
     "noProvider": "連絡先情報を検索するには、AI設定でAIプロバイダーを設定してください。",
-    "failed": "検索を完了できませんでした。後でもう一度お試しください。"
+    "failed": "検索を完了できませんでした。後でもう一度お試しください。",
+    "dialogTitle": "連絡先情報の確認",
+    "dialogSubtitle": "確認するまで、{name} には何も保存されません。",
+    "pickMatch": "この名前は{count, plural, other {#件の事業者}}に一致します。支払っている先を選んでください:",
+    "unlabelledMatch": "名称のない候補",
+    "willAdd": "追加",
+    "willReplace": "置き換え",
+    "cancel": "キャンセル",
+    "confirm": "{count, plural, other {#件の変更を保存}}",
+    "applied": "{count, plural, other {連絡先情報を#件保存しました}}",
+    "applyFailed": "連絡先情報を保存できませんでした"
   }
 }

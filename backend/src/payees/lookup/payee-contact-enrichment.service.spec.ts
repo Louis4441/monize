@@ -1,4 +1,4 @@
-import { Logger, NotFoundException } from "@nestjs/common";
+import { Logger } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { DataSource } from "typeorm";
 import { ActionHistoryService } from "../../action-history/action-history.service";
@@ -37,6 +37,7 @@ describe("PayeeContactEnrichmentService", () => {
     address: "1 Main St",
     email: "hi@acme.example",
     phone: "+1 555 010 2000",
+    label: null,
     source: "ai-web-search",
     confidence: "high",
     notes: null,
@@ -64,7 +65,9 @@ describe("PayeeContactEnrichmentService", () => {
     jest.clearAllMocks();
     payeeRepo = { findOne: jest.fn().mockResolvedValue(emptyRow) };
     lookup = {
-      lookup: jest.fn().mockResolvedValue({ reason: "ok", suggestion }),
+      lookup: jest
+        .fn()
+        .mockResolvedValue({ reason: "ok", suggestions: [suggestion] }),
     };
     history = { record: jest.fn().mockResolvedValue(null) };
     favicon = { fetchFavicon: jest.fn().mockResolvedValue(null) };
@@ -193,7 +196,7 @@ describe("PayeeContactEnrichmentService", () => {
     });
 
     it("stamps the attempt with all-null values when the lookup found nothing", async () => {
-      lookup.lookup.mockResolvedValue({ reason: "none", suggestion: null });
+      lookup.lookup.mockResolvedValue({ reason: "none", suggestions: [] });
       manager.query.mockResolvedValue(returned({}));
 
       const result = await service.enrichAfterCreate(userId, payeeId, "Acme");
@@ -216,7 +219,7 @@ describe("PayeeContactEnrichmentService", () => {
       async (reason) => {
         lookup.lookup.mockResolvedValue({
           reason,
-          suggestion: null,
+          suggestions: [],
           ...(reason === "failed" ? { detail: "agent offline" } : {}),
         } as ContactLookupOutcome);
 
@@ -251,124 +254,6 @@ describe("PayeeContactEnrichmentService", () => {
     });
   });
 
-  describe("rerun", () => {
-    beforeEach(() => {
-      payeeRepo.findOne
-        .mockResolvedValueOnce({ ...emptyRow, name: "Acme", userId })
-        .mockResolvedValueOnce(emptyRow)
-        .mockResolvedValueOnce({
-          ...emptyRow,
-          name: "Acme",
-          website: "https://acme.example",
-        });
-    });
-
-    it("ignores the preference, fills gaps regardless of an earlier stamp, and returns the payee", async () => {
-      const result = await service.rerun(userId, payeeId);
-
-      expect(lookup.lookup).toHaveBeenCalledWith(
-        userId,
-        { name: "Acme", known: undefined },
-        { ignorePreference: true },
-      );
-      expect(updateSql()).not.toContain("contact_lookup_at IS NULL");
-      expect(updateSql()).toMatch(/WHERE id = \$1 AND user_id = \$2/);
-      expect(result).toMatchObject({
-        reason: "ok",
-        filled: ["website", "address", "email", "phone"],
-        payee: expect.objectContaining({ website: "https://acme.example" }),
-      });
-    });
-
-    it("sends the payee's own stored details in as context", async () => {
-      payeeRepo.findOne.mockReset();
-      const stored = {
-        ...emptyRow,
-        name: "Acme",
-        userId,
-        address: "Toronto",
-        notes: "the Dundas branch",
-      };
-      payeeRepo.findOne.mockResolvedValue(stored);
-
-      await service.rerun(userId, payeeId);
-
-      expect(lookup.lookup).toHaveBeenCalledWith(
-        userId,
-        {
-          name: "Acme",
-          known: { address: "Toronto", notes: "the Dundas branch" },
-        },
-        { ignorePreference: true },
-      );
-    });
-
-    it("offers a refinement instead of writing it, and does not call that nothing", async () => {
-      payeeRepo.findOne.mockReset();
-      const stored = { ...emptyRow, name: "Acme", userId, address: "Toronto" };
-      payeeRepo.findOne.mockResolvedValue(stored);
-      lookup.lookup.mockResolvedValue({
-        reason: "ok",
-        suggestion: {
-          ...suggestion,
-          website: null,
-          email: null,
-          phone: null,
-          address: "483 Bay St\nToronto, Ontario M5G 2C9\nCanada",
-          refined: ["address"],
-        },
-      });
-      // The COALESCE keeps the stored value, which is the invariant this is
-      // testing: the refinement travels beside the write, never inside it.
-      manager.query.mockResolvedValue(
-        returned({ address: "Toronto", contact_lookup_source: null }),
-      );
-
-      const result = await service.rerun(userId, payeeId);
-
-      expect(result).toMatchObject({
-        reason: "ok",
-        filled: [],
-        refinements: {
-          address: "483 Bay St\nToronto, Ontario M5G 2C9\nCanada",
-        },
-      });
-      // $4 is the address parameter; the statement still offers it, and
-      // COALESCE is what refuses it.
-      expect(updateSql()).toContain("address = COALESCE(address, $4)");
-    });
-
-    it("does not offer a refinement for a field that is empty by the time of the write", async () => {
-      payeeRepo.findOne.mockReset();
-      // The lookup was given "Toronto" as context, but the user cleared the
-      // field while it ran: there is nothing left to refine, so the value is
-      // a plain fill.
-      payeeRepo.findOne.mockResolvedValue({
-        ...emptyRow,
-        name: "Acme",
-        userId,
-      });
-      lookup.lookup.mockResolvedValue({
-        reason: "ok",
-        suggestion: { ...suggestion, refined: ["address"] },
-      });
-
-      const result = await service.rerun(userId, payeeId);
-
-      expect(result.refinements).toBeUndefined();
-      expect(result.filled).toContain("address");
-    });
-
-    it("throws NotFound for a payee the user does not own", async () => {
-      payeeRepo.findOne.mockReset().mockResolvedValue(null);
-
-      await expect(service.rerun(userId, payeeId)).rejects.toThrow(
-        NotFoundException,
-      );
-      expect(lookup.lookup).not.toHaveBeenCalled();
-    });
-  });
-
   describe("dispatchAfterCreate", () => {
     it("runs the enrichment under the user's own context", async () => {
       service.dispatchAfterCreate(userId, payeeId, "Acme");
@@ -385,7 +270,7 @@ describe("PayeeContactEnrichmentService", () => {
       let release!: () => void;
       lookup.lookup.mockReturnValue(
         new Promise((resolve) => {
-          release = () => resolve({ reason: "none", suggestion: null });
+          release = () => resolve({ reason: "none", suggestions: [] });
         }),
       );
 

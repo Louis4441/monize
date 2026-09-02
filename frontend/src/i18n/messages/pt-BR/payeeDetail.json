@@ -97,9 +97,7 @@
     "address": "Endereço",
     "phone": "Telefone",
     "email": "E-mail",
-    "notes": "Notas",
-    "contactLookup": "Dados de contato",
-    "contactLookupValue": "Buscados automaticamente em {date}"
+    "notes": "Notas"
   },
   "tabs": {
     "ariaLabel": "Seções do beneficiário",
@@ -136,14 +134,18 @@
   "contactLookup": {
     "button": "Buscar dados de contato",
     "inProgress": "Buscando...",
-    "filled": "{count, plural, one {# dado de contato preenchido} other {# dados de contato preenchidos}}",
     "nothingNew": "Nenhum dado de contato novo foi encontrado.",
-    "refinementIntro": "Foi encontrada uma versão mais completa de dados que este beneficiário já tem. Nada foi alterado; aplique para substituir o que está salvo.",
-    "refinementApply": "Aplicar",
-    "refinementDismiss": "Dispensar",
-    "refinementApplied": "Dados de contato atualizados",
-    "refinementFailed": "Não foi possível atualizar os dados de contato",
     "noProvider": "Configure um provedor de IA nas Configurações de IA para buscar dados de contato.",
-    "failed": "Não foi possível concluir a busca. Tente novamente mais tarde."
+    "failed": "Não foi possível concluir a busca. Tente novamente mais tarde.",
+    "dialogTitle": "Confirmar os dados de contato",
+    "dialogSubtitle": "Nada é salvo para {name} até você confirmar.",
+    "pickMatch": "Esse nome corresponde a {count, plural, one {# empresa} other {# empresas}}. Escolha aquela para quem você paga:",
+    "unlabelledMatch": "Correspondência sem nome",
+    "willAdd": "Adicionar",
+    "willReplace": "Substituir",
+    "cancel": "Cancelar",
+    "confirm": "{count, plural, one {Salvar # alteração} other {Salvar # alterações}}",
+    "applied": "{count, plural, one {# dado de contato salvo} other {# dados de contato salvos}}",
+    "applyFailed": "Não foi possível salvar os dados de contato"
   }
 }

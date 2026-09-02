@@ -3,7 +3,7 @@ import { ModuleRef } from "@nestjs/core";
 import { AiService } from "../../ai/ai.service";
 import {
   parseContactJson,
-  sanitizeContactSuggestion,
+  sanitizeContactSuggestions,
 } from "./contact-suggestion.sanitize";
 import {
   buildPayeeLookupUserMessage,
@@ -46,7 +46,7 @@ export class AiPayeeContactLookupProvider implements PayeeContactLookupProvider 
   async lookup(
     userId: string,
     input: PayeeContactLookupInput,
-  ): Promise<PayeeContactSuggestion | null> {
+  ): Promise<PayeeContactSuggestion[]> {
     const configs = await this.aiService.getActiveConfigs(userId);
     if (configs.length === 0) {
       throw new ContactLookupUnavailableError("no_provider");
@@ -86,13 +86,13 @@ export class AiPayeeContactLookupProvider implements PayeeContactLookupProvider 
     }
 
     const parsed = parseContactJson(response.content);
-    if (!parsed) return null;
+    if (!parsed) return [];
 
     const source: ContactLookupSource = response.searched
       ? "ai-web-search"
       : response.viaRelay
         ? "ai-relay"
         : "ai-knowledge";
-    return sanitizeContactSuggestion(parsed, source, input.known);
+    return sanitizeContactSuggestions(parsed, source, input.known);
   }
 }

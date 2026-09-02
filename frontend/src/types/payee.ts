@@ -114,6 +114,14 @@ export const CONTACT_LOOKUP_FIELDS: readonly ContactLookupField[] = [
 ];
 
 export interface PayeeContactSuggestion {
+  /**
+   * What tells this candidate apart from the others -- "Starbucks, 483 Bay
+   * St, Toronto". Only present where the lookup found more than one
+   * organisation or branch the name could mean; the picker has nothing else
+   * to show, so the server never offers an unlabelled candidate beside
+   * another.
+   */
+  label: string | null;
   website: string | null;
   address: string | null;
   email: string | null;
@@ -144,28 +152,19 @@ export interface PayeeContactLookupContext {
 }
 
 /**
- * `POST /payees/lookup-contact`. Always a 200: `reason` says what happened,
- * and only `failed` may carry a `detail` the user can act on (their relay
- * agent is offline, for instance). A `failed` is never "nothing found".
+ * What both lookup endpoints answer. Always a 200: `reason` says what
+ * happened, and only `failed` may carry a `detail` the user can act on (their
+ * relay agent is offline, for instance). A `failed` is never "nothing found".
+ *
+ * `suggestions` is empty unless `reason` is `ok`, and holds more than one
+ * entry only where the name means more than one organisation or branch -- the
+ * detail screen's dialogue then asks which one. The first entry is the best
+ * match, which is what a surface with nobody to ask takes.
  */
 export interface PayeeContactLookupResult {
   reason: ContactLookupReason;
-  suggestion: PayeeContactSuggestion | null;
+  suggestions: PayeeContactSuggestion[];
   detail?: string;
-}
-
-/** `POST /payees/:id/lookup-contact`: which fields this run filled in. */
-export interface PayeeContactRerunResult {
-  reason: ContactLookupReason;
-  detail?: string;
-  filled: ContactLookupField[];
-  /**
-   * Fuller values found for fields the payee already holds. The server does
-   * not write these -- it offers them, and the user applies them as their own
-   * edit. Absent when there are none.
-   */
-  refinements?: Partial<Record<ContactLookupField, string>>;
-  payee: Payee;
 }
 
 export interface CreatePayeeData {

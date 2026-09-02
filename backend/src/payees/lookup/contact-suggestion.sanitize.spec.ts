@@ -1,7 +1,9 @@
+import { MAX_CONTACT_LOOKUP_MATCHES } from "./payee-contact-lookup.types";
 import {
   CONTACT_FIELD_MAX_LENGTH,
   parseContactJson,
   sanitizeContactSuggestion,
+  sanitizeContactSuggestions,
 } from "./contact-suggestion.sanitize";
 
 const full = {
@@ -16,6 +18,7 @@ const full = {
 describe("sanitizeContactSuggestion", () => {
   it("normalizes a bare domain to https and keeps every valid field", () => {
     expect(sanitizeContactSuggestion(full, "ai-web-search")).toEqual({
+      label: null,
       website: "https://acme.example",
       address: "1 Main St, Springfield",
       email: "hello@acme.example",
@@ -337,4 +340,92 @@ describe("parseContactJson", () => {
       expect(parseContactJson(content)).toBeNull();
     },
   );
+});
+
+describe("sanitizeContactSuggestions", () => {
+  const match = (label: string, website: string) => ({
+    ...full,
+    label,
+    website,
+  });
+
+  it("reads a bare object as a single match, so an older answer still answers", () => {
+    expect(sanitizeContactSuggestions(full, "ai-web-search")).toMatchObject([
+      { website: "https://acme.example", label: null },
+    ]);
+  });
+
+  it("keeps the matches in the order the source gave them", () => {
+    expect(
+      sanitizeContactSuggestions(
+        {
+          matches: [
+            match("Acme, Springfield", "acme.example"),
+            match("Acme Holdings, Toronto", "acme-holdings.example"),
+          ],
+        },
+        "ai-web-search",
+      ),
+    ).toMatchObject([
+      { label: "Acme, Springfield", website: "https://acme.example" },
+      {
+        label: "Acme Holdings, Toronto",
+        website: "https://acme-holdings.example",
+      },
+    ]);
+  });
+
+  it("caps the list, because a picker is a choice and not a search result page", () => {
+    const many = Array.from({ length: 8 }, (_v, i) =>
+      match(`Acme ${i}`, `acme${i}.example`),
+    );
+    expect(
+      sanitizeContactSuggestions({ matches: many }, "ai-web-search"),
+    ).toHaveLength(MAX_CONTACT_LOOKUP_MATCHES);
+  });
+
+  it("drops an alternate the user could not tell apart from another", () => {
+    const result = sanitizeContactSuggestions(
+      {
+        matches: [
+          match("Acme, Springfield", "acme.example"),
+          // No label at all, and a label already used: neither is offerable.
+          { ...full, label: null, website: "acme-two.example" },
+          match("acme, springfield", "acme-three.example"),
+        ],
+      },
+      "ai-web-search",
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0].label).toBe("Acme, Springfield");
+  });
+
+  it("keeps an unlabelled single answer, which needs no telling apart", () => {
+    const result = sanitizeContactSuggestions(
+      { matches: [{ ...full, label: null }] },
+      "ai-web-search",
+    );
+    expect(result).toHaveLength(1);
+  });
+
+  it("drops a match that survives nothing, without dropping the ones that do", () => {
+    expect(
+      sanitizeContactSuggestions(
+        {
+          matches: [
+            { label: "Nothing here", website: "unknown", address: "n/a" },
+            match("Acme, Springfield", "acme.example"),
+          ],
+        },
+        "ai-web-search",
+      ),
+    ).toMatchObject([{ label: "Acme, Springfield" }]);
+  });
+
+  it("returns nothing for an empty match list", () => {
+    expect(
+      sanitizeContactSuggestions({ matches: [] }, "ai-web-search"),
+    ).toEqual([]);
+    expect(sanitizeContactSuggestions(null, "ai-web-search")).toEqual([]);
+  });
 });

@@ -97,9 +97,7 @@
     "address": "Địa chỉ",
     "phone": "Điện thoại",
     "email": "Email",
-    "notes": "Ghi chú",
-    "contactLookup": "Thông tin liên hệ",
-    "contactLookupValue": "Tra cứu tự động vào {date}"
+    "notes": "Ghi chú"
   },
   "tabs": {
     "ariaLabel": "Các phần của người nhận",
@@ -136,14 +134,18 @@
   "contactLookup": {
     "button": "Tra cứu thông tin liên hệ",
     "inProgress": "Đang tra cứu...",
-    "filled": "{count, plural, other {Đã điền # thông tin liên hệ}}",
     "nothingNew": "Không tìm thấy thông tin liên hệ mới.",
-    "refinementIntro": "Đã tìm thấy phiên bản đầy đủ hơn của thông tin mà người nhận này đã có. Chưa có gì thay đổi; hãy áp dụng để thay thế giá trị đã lưu.",
-    "refinementApply": "Áp dụng",
-    "refinementDismiss": "Bỏ qua",
-    "refinementApplied": "Đã cập nhật thông tin liên hệ",
-    "refinementFailed": "Không thể cập nhật thông tin liên hệ",
     "noProvider": "Hãy cấu hình nhà cung cấp AI trong Cài đặt AI để tra cứu thông tin liên hệ.",
-    "failed": "Không thể hoàn tất tra cứu. Vui lòng thử lại sau."
+    "failed": "Không thể hoàn tất tra cứu. Vui lòng thử lại sau.",
+    "dialogTitle": "Xác nhận thông tin liên hệ",
+    "dialogSubtitle": "Không có gì được lưu cho {name} cho đến khi bạn xác nhận.",
+    "pickMatch": "Tên đó khớp với {count, plural, other {# doanh nghiệp}}. Hãy chọn nơi bạn thanh toán:",
+    "unlabelledMatch": "Kết quả không có tên",
+    "willAdd": "Thêm",
+    "willReplace": "Thay thế",
+    "cancel": "Hủy",
+    "confirm": "{count, plural, other {Lưu # thay đổi}}",
+    "applied": "{count, plural, other {Đã lưu # thông tin liên hệ}}",
+    "applyFailed": "Không thể lưu thông tin liên hệ"
   }
 }
