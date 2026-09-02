@@ -18,6 +18,7 @@ mcp/
   mcp-context.ts             # resolve, requireScope, toolResult/toolError, sanitization
   mcp-annotations.ts         # shared tool annotation presets (READ_ONLY/CREATE/UPDATE)
   mcp-write-limiter.ts       # per-user daily write cap for mutating tools
+  mcp-elicitation-support.ts # what each session's client does with elicitation
   tool-output-schemas.ts     # one Zod output schema (raw shape) per tool
   tools/<domain>.tool.ts     # tool definitions, grouped by domain
   resources/<name>.resource.ts
@@ -64,10 +65,20 @@ Checklist for a new tool:
 2. Add the tool to its domain `tools/*.tool.ts` with the five config fields above.
 3. Add its output schema to `tool-output-schemas.ts` (conventions below) and import it.
 4. Pick the right annotation preset (below).
-5. If it mutates data, derive scope `"write"`, enforce the daily write limit via `McpWriteLimiter` (see `transactions.tool.ts`), and sanitize user strings with `stripHtml(...)` before persisting. Gate the write behind a user confirmation with `confirmWrite(server, message, extra.requestId)` (pass `extra.requestId` so the elicitation is delivered on the tool call's own SSE stream, not the standalone GET stream); persist only on `"accepted"`/`"unsupported"`, return a `toolError` without writing on `"declined"`. `"unsupported"` means the client can't show a dialog -- it still gates every tool call with its own approval prompt, so proceeding is not a consent bypass.
+5. If it mutates data, derive scope `"write"`, enforce the daily write limit via `McpWriteLimiter` (see `transactions.tool.ts`), and sanitize user strings with `stripHtml(...)` before persisting. Gate the write behind a user confirmation with `confirmWrite(server, message, extra.requestId)` (pass `extra.requestId` so the elicitation is delivered on the tool call's own SSE stream, not the standalone GET stream); persist only on `"accepted"`/`"unsupported"`, return a `toolError` without writing on `"declined"`. `"unsupported"` means no dialog reached a human -- the client still gates every tool call with its own approval prompt, so proceeding is not a consent bypass.
    - **Relay first.** When the call is serving a prompt the user typed in the Monize web chat (reverse relay), confirm there instead: build the signed `PendingAiAction` with `AiActionBuilderService` (shared with the AI Assistant tool executor) and emit it. If the card is shown in the browser (committed via `/ai/actions/confirm` on approval), return `RELAY_PREVIEW_SHOWN` and do NOT write or `confirmWrite`; otherwise fall through to `confirmWrite`.
 6. Update `mcp-server.service.ts` count and `mcp.module.ts` if it's a new provider class.
 7. Add/extend tests (below). `mcp-annotations.spec.ts` enforces that every tool has title + input/output schema + annotations with the right read/write hints -- bump `EXPECTED_TOOL_COUNT` and `WRITE_TOOLS`/`IDEMPOTENT_WRITES`.
+
+## An advertised capability is not evidence; observed behaviour is
+
+`confirmWrite` used to read `getClientCapabilities().elicitation.form` as proof that a confirmation dialog could be shown, and therefore treated every failure of that dialog as the user saying no. `@modelcontextprotocol/sdk` >= 1.23 rewrites the legacy 2025-06-18 shape `{"elicitation":{}}` into `{"elicitation":{"form":{}}}` before `getClientCapabilities()` ever sees it, so the check stopped separating a client that shows dialogs from one that answers `-32601` or never answers at all -- and every write through such a client was refused, or hung until the client abandoned the tool call. **A capability the SDK synthesizes cannot carry a decision.**
+
+So the outcome decides, not the advertisement:
+
+- Only a returned `action` is a user's answer. A rejection whose code says the client answered for itself (`clientAnsweredForItself` in `mcp-elicitation-support.ts`: method not found, invalid request/params, parse error, connection closed, request timeout) is `"unsupported"`; an unaccounted-for failure shape stays `"declined"`, so a case nobody has reasoned about refuses the write.
+- Behaviour is remembered per session, in a `WeakMap` keyed on the session's `McpServer` so the record dies with the session. A client caught answering for itself is not asked again (the round trip costs `CONFIRM_TIMEOUT_MS` per row otherwise); a client that has answered once is never demoted, so a later unanswered dialog on it is `"declined"`.
+- **The wait must expire before the client abandons the tool call waiting on it.** Claude's MCP tool deadline is 60s; a five-minute server-side wait produced no result at all, only an opaque client-side timeout. `mcp-context.spec.ts` fails if `CONFIRM_TIMEOUT_MS` leaves that range, and pins the SDK normalization above so it cannot silently become load-bearing again.
 
 ## A relay turn belongs to one MCP session, for a bounded time
 

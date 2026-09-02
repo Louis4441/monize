@@ -1,4 +1,9 @@
 import {
+  ClientCapabilitiesSchema,
+  ErrorCode,
+  McpError,
+} from "@modelcontextprotocol/sdk/types.js";
+import {
   confirmWrite,
   hasScope,
   requireScope,
@@ -244,12 +249,126 @@ describe("mcp-context", () => {
       );
     });
 
-    it("returns 'declined' (never silently proceeds) when a supported dialog errors or times out", async () => {
-      const elicit = jest.fn().mockRejectedValue(new Error("timed out"));
+    it("returns 'declined' (never silently proceeds) when a supported dialog fails in an unaccounted-for way", async () => {
+      const elicit = jest.fn().mockRejectedValue(new Error("boom"));
       const server = fakeServer({ capabilities: caps, elicit });
       await expect(confirmWrite(server, "Confirm?", "req-1")).resolves.toBe(
         "declined",
       );
+    });
+
+    // The regression these guard: `@modelcontextprotocol/sdk` >= 1.23 rewrites a
+    // bare `{"elicitation":{}}` into `{"elicitation":{"form":{}}}`, so the
+    // capability pre-check stopped separating a client that shows dialogs from
+    // one that answers -32601 or never answers at all. Every such client then
+    // looked form-capable, its non-answer was read as the user saying no, and
+    // every write through Claude was refused (or hung past the client's own
+    // tool deadline). Only observed behaviour can tell them apart.
+    describe("a client that answers for itself", () => {
+      it("pins the SDK normalization the old capability check relied on", () => {
+        expect(ClientCapabilitiesSchema.parse({ elicitation: {} })).toEqual({
+          elicitation: { form: {} },
+        });
+      });
+
+      it.each([
+        ["method not found", ErrorCode.MethodNotFound],
+        ["request timeout", ErrorCode.RequestTimeout],
+        ["connection closed", ErrorCode.ConnectionClosed],
+        ["invalid request", ErrorCode.InvalidRequest],
+        ["invalid params", ErrorCode.InvalidParams],
+        ["parse error", ErrorCode.ParseError],
+      ])("returns 'unsupported' on %s", async (_label, code) => {
+        const elicit = jest
+          .fn()
+          .mockRejectedValue(new McpError(code, "client answered for itself"));
+        const server = fakeServer({ capabilities: caps, elicit });
+        await expect(confirmWrite(server, "Confirm?", "req-1")).resolves.toBe(
+          "unsupported",
+        );
+      });
+
+      it("stops asking it for the rest of the session", async () => {
+        const elicit = jest
+          .fn()
+          .mockRejectedValue(
+            new McpError(ErrorCode.MethodNotFound, "Method not found"),
+          );
+        const server = fakeServer({ capabilities: caps, elicit });
+        await confirmWrite(server, "Confirm?", "req-1");
+        await expect(confirmWrite(server, "Confirm?", "req-2")).resolves.toBe(
+          "unsupported",
+        );
+        expect(elicit).toHaveBeenCalledTimes(1);
+      });
+
+      it("keeps the session's memory to itself", async () => {
+        const silent = fakeServer({
+          capabilities: caps,
+          elicit: jest
+            .fn()
+            .mockRejectedValue(
+              new McpError(ErrorCode.MethodNotFound, "Method not found"),
+            ),
+        });
+        await confirmWrite(silent, "Confirm?", "req-1");
+
+        const capable = fakeServer({
+          capabilities: caps,
+          elicit: jest.fn().mockResolvedValue({ action: "decline" }),
+        });
+        await expect(confirmWrite(capable, "Confirm?", "req-1")).resolves.toBe(
+          "declined",
+        );
+      });
+    });
+
+    describe("a client that has already shown a dialog", () => {
+      it("refuses a later unanswered one rather than writing", async () => {
+        const elicit = jest
+          .fn()
+          .mockResolvedValueOnce({ action: "accept" })
+          .mockRejectedValueOnce(
+            McpError.fromError(ErrorCode.RequestTimeout, "Request timed out"),
+          );
+        const server = fakeServer({ capabilities: caps, elicit });
+        await expect(confirmWrite(server, "Confirm?", "req-1")).resolves.toBe(
+          "accepted",
+        );
+        await expect(confirmWrite(server, "Confirm?", "req-2")).resolves.toBe(
+          "declined",
+        );
+      });
+
+      it("is not demoted by that failure", async () => {
+        const elicit = jest
+          .fn()
+          .mockResolvedValueOnce({ action: "accept" })
+          .mockRejectedValueOnce(
+            McpError.fromError(ErrorCode.RequestTimeout, "Request timed out"),
+          )
+          .mockResolvedValueOnce({ action: "accept" });
+        const server = fakeServer({ capabilities: caps, elicit });
+        await confirmWrite(server, "Confirm?", "req-1");
+        await confirmWrite(server, "Confirm?", "req-2");
+        await expect(confirmWrite(server, "Confirm?", "req-3")).resolves.toBe(
+          "accepted",
+        );
+        expect(elicit).toHaveBeenCalledTimes(3);
+      });
+    });
+
+    // The wait has to end before the client abandons the tool call that is
+    // waiting on it, or an unanswerable dialog produces no result at all --
+    // which is how a five-minute wait surfaced as an opaque client-side
+    // "timed out after 60s" with no write and no explanation.
+    it("waits less than the shortest client tool deadline", async () => {
+      const elicit = jest.fn().mockResolvedValue({ action: "accept" });
+      const server = fakeServer({ capabilities: caps, elicit });
+      await confirmWrite(server, "Confirm?", "req-1");
+      const { timeout } = elicit.mock.calls[0][1];
+      expect(timeout).toBeGreaterThan(20_000);
+      expect(timeout).toBeLessThan(60_000);
     });
   });
 });
