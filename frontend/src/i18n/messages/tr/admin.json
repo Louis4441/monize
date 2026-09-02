@@ -140,8 +140,8 @@
       },
       "ntfy": {
         "name": "ntfy ve UnifiedPush",
-        "description": "Google veya Apple altyapısına bağlı kalmak istemeyenler için kendi sunucunuzda barındırılan teslimat.",
-        "notYetAvailable": "Henüz kullanılamıyor. Tarayıcı anlık bildirimi yerleştikten sonra planlanıyor."
+        "description": "Aynı şifreli push, Google veya Apple altyapısı yerine kendi barındırdığınız bir UnifiedPush dağıtıcısına (ntfy, NextPush) teslim edilir. Bu örneğin push anahtar çiftini ve anahtarını paylaşır; herkes uç noktasını kendi UnifiedPush uygulamasından kaydeder ve kanalı Ayarlar’dan açar.",
+        "followsWebPush": "Tarayıcı push’u kapalıyken veya anahtar çifti kullanılamıyorken kullanılamaz — bu kanal aynı anahtar çiftiyle teslim edilir."
       }
     },
     "identity": {

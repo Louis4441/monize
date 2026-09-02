@@ -140,8 +140,8 @@
       },
       "ntfy": {
         "name": "ntfy und UnifiedPush",
-        "description": "Selbst gehostete Zustellung für alle, die nicht von Google- oder Apple-Infrastruktur abhängen möchten.",
-        "notYetAvailable": "Noch nicht verfügbar. Geplant, sobald Browser-Push etabliert ist."
+        "description": "Dieselben verschlüsselten Push-Nachrichten, zugestellt über einen selbst gehosteten UnifiedPush-Distributor (ntfy, NextPush) statt über die Infrastruktur von Google oder Apple. Der Kanal nutzt das Push-Schlüsselpaar und den Schalter dieser Instanz; jede Person registriert ihren Endpunkt in ihrer UnifiedPush-App und schaltet den Kanal in den Einstellungen ein.",
+        "followsWebPush": "Nicht verfügbar, solange Browser-Push aus ist oder sein Schlüsselpaar nicht verwendet werden kann — dieser Kanal wird mit demselben Schlüsselpaar zugestellt."
       }
     },
     "identity": {

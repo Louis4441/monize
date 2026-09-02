@@ -140,8 +140,8 @@
       },
       "ntfy": {
         "name": "ntfy i UnifiedPush",
-        "description": "Dostarczanie we własnej infrastrukturze dla osób, które wolą nie zależeć od Google ani Apple.",
-        "notYetAvailable": "Jeszcze niedostępne. Planowane, gdy push w przeglądarce się ustabilizuje."
+        "description": "Te same zaszyfrowane powiadomienia push, dostarczane do samodzielnie hostowanego dystrybutora UnifiedPush (ntfy, NextPush) zamiast infrastruktury Google lub Apple. Kanał współdzieli parę kluczy push i przełącznik tej instancji; każda osoba rejestruje swój endpoint w aplikacji UnifiedPush i włącza kanał w Ustawieniach.",
+        "followsWebPush": "Niedostępny, dopóki push w przeglądarce jest wyłączony lub jego para kluczy nie może być użyta — ten kanał jest dostarczany tą samą parą kluczy."
       }
     },
     "identity": {

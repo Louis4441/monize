@@ -140,8 +140,8 @@
       },
       "ntfy": {
         "name": "ntfy と UnifiedPush",
-        "description": "Google や Apple のインフラに依存したくない方のためのセルフホスト配信。",
-        "notYetAvailable": "まだ利用できません。ブラウザープッシュが定着した後に予定しています。"
+        "description": "同じ暗号化プッシュを、Google や Apple のインフラではなくセルフホストの UnifiedPush ディストリビューター（ntfy、NextPush）に配信します。このインスタンスのプッシュ鍵ペアとスイッチを共有し、各ユーザーは自分の UnifiedPush アプリからエンドポイントを登録し、設定でチャネルを有効にします。",
+        "followsWebPush": "ブラウザプッシュがオフ、または鍵ペアが使用できない間は利用できません — このチャネルは同じ鍵ペアで配信されます。"
       }
     },
     "identity": {

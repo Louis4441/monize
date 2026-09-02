@@ -140,8 +140,8 @@
       },
       "ntfy": {
         "name": "ntfy 및 UnifiedPush",
-        "description": "Google이나 Apple 인프라에 의존하고 싶지 않은 사용자를 위한 자체 호스팅 전달 방식입니다.",
-        "notYetAvailable": "아직 제공되지 않습니다. 브라우저 푸시가 자리 잡은 뒤 계획되어 있습니다."
+        "description": "동일한 암호화 푸시를 Google이나 Apple 인프라 대신 자체 호스팅 UnifiedPush 배포자(ntfy, NextPush)로 전달합니다. 이 인스턴스의 푸시 키 쌍과 스위치를 공유하며, 각 사용자는 자신의 UnifiedPush 앱에서 엔드포인트를 등록하고 설정에서 채널을 켭니다.",
+        "followsWebPush": "브라우저 푸시가 꺼져 있거나 키 쌍을 사용할 수 없는 동안에는 사용할 수 없습니다 — 이 채널은 동일한 키 쌍으로 전달됩니다."
       }
     },
     "identity": {

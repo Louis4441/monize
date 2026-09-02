@@ -140,8 +140,8 @@
       },
       "ntfy": {
         "name": "ntfy 与 UnifiedPush",
-        "description": "面向不愿依赖 Google 或 Apple 基础设施的用户的自托管投递方式。",
-        "notYetAvailable": "尚未提供。计划在浏览器推送稳定之后推出。"
+        "description": "同样的加密推送，投递到自托管的 UnifiedPush 分发器（ntfy、NextPush），而不是 Google 或 Apple 的基础设施。它与本实例共用推送密钥对和开关；每个人在自己的 UnifiedPush 应用中注册端点，并在设置中开启该通道。",
+        "followsWebPush": "浏览器推送关闭或其密钥对无法使用时不可用 — 此通道使用同一密钥对投递。"
       }
     },
     "identity": {

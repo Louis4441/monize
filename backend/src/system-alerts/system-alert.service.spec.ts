@@ -54,6 +54,13 @@ describe("SystemAlertService", () => {
   let dataSource: DataSourceMock;
   let emailService: { getStatus: jest.Mock; sendMail: jest.Mock };
   let jobClaims: { claimOnce: jest.Mock };
+  /**
+   * The dispatch seam's `notify`, recorded AND forwarded to the real write door.
+   * Recording is what makes "the row travels through dispatch" a tested fact:
+   * a double that only forwarded was indistinguishable from the door itself, so
+   * reverting insertAlert to `notifications.create` left every test green.
+   */
+  let dispatchNotify: jest.Mock;
   let service: SystemAlertService;
 
   /**
@@ -145,6 +152,14 @@ describe("SystemAlertService", () => {
     // the SQL that lands and which recipient emails, and a double standing in for
     // the writer would assert the call instead of the row.
     const writeDoor = new NotificationService(dataSource as never);
+    // Both the admin fan-out (insertAlert) and the per-user path go through the
+    // dispatch seam. Forward `notify` to the real write door so the guarded
+    // insert still lands (and `created` still reflects the ON CONFLICT result)
+    // without pulling the push / email fan-out into these SQL-shape tests -- the
+    // fan-out has its own suite (`notification-dispatch.service.spec.ts`).
+    dispatchNotify = jest.fn((userId: string, input: unknown) =>
+      writeDoor.create(userId, input as never),
+    );
     service = new SystemAlertService(
       dataSource as never,
       emailService as never,
@@ -154,15 +169,7 @@ describe("SystemAlertService", () => {
       } as never,
       jobClaims as never,
       writeDoor,
-      // Both the admin fan-out (insertAlert) and the per-user path go through the
-      // dispatch seam now. Forward `notify` to the real write door so the guarded
-      // insert still lands (and `created` still reflects the ON CONFLICT result)
-      // without pulling the push / email fan-out into these SQL-shape tests -- the
-      // fan-out has its own suite (`notification-dispatch.service.spec.ts`).
-      {
-        notify: (userId: string, input: unknown) =>
-          writeDoor.create(userId, input as never),
-      } as never,
+      { notify: dispatchNotify } as never,
     );
   });
 
@@ -192,6 +199,31 @@ describe("SystemAlertService", () => {
         "admin-1",
         "admin-2",
       ]);
+    });
+
+    it("raises every admin's row THROUGH the dispatch seam, so SYSTEM push can reach them", async () => {
+      // The row shape is the door's; what this proves is the PATH. An admin who
+      // turned SYSTEM push on receives the alert on their device only because
+      // insertAlert asks dispatch, not the door -- and a double that merely
+      // forwarded could not tell the two apart.
+      route({
+        admins: [adminRow(), adminRow({ id: "admin-2", email: "b@e.f" })],
+      });
+      const alert = input();
+      await service.raiseAdminAlert(alert);
+
+      expect(dispatchNotify).toHaveBeenCalledTimes(2);
+      expect(dispatchNotify.mock.calls.map((call) => call[0])).toEqual([
+        "admin-1",
+        "admin-2",
+      ]);
+      expect(dispatchNotify.mock.calls[0][1]).toEqual(
+        expect.objectContaining({
+          type: alert.type,
+          severity: alert.severity,
+          dedupeKey: alert.dedupeKey,
+        }),
+      );
     });
 
     it("emails only the insert winners: a conflict loser's recipient gets nothing", async () => {

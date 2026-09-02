@@ -140,8 +140,8 @@
       },
       "ntfy": {
         "name": "ntfy y UnifiedPush",
-        "description": "Entrega autoalojada para quien prefiere no depender de la infraestructura de Google o Apple.",
-        "notYetAvailable": "Todavía no disponible. Previsto cuando el push del navegador esté consolidado."
+        "description": "Las mismas notificaciones push cifradas, entregadas a un distribuidor UnifiedPush autoalojado (ntfy, NextPush) en lugar de la infraestructura de Google o Apple. Comparte el par de claves push y el interruptor de esta instancia; cada persona registra su endpoint desde su aplicación UnifiedPush y activa el canal en Ajustes.",
+        "followsWebPush": "No disponible mientras el push del navegador esté desactivado o su par de claves no pueda usarse — este canal se entrega con el mismo par de claves."
       }
     },
     "identity": {

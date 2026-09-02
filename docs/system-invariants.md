@@ -125,10 +125,18 @@ implied.
 | INV-PUSH-003 | A key rotation retires every subscription minted under the superseded pair | enforced |
 | INV-PUSH-004 | A push failure never rolls back what produced it, and a dead subscription stops being attempted | enforced |
 | INV-PUSH-005 | A push subscription is instance-bound state, never portable backup data | enforced |
+| INV-PUSH-007 | UnifiedPush is delivered by the one Web Push sender; no second transport importer exists | enforced |
+| INV-PUSH-008 | A subscription's transport gates its delivery: the `push` and `unifiedpush` channels reach only their own wire's devices | enforced |
+| INV-PUSH-009 | A channel a category does not expose is forced off at resolution, whatever the stored row says | enforced |
+| INV-PUSH-010 | A UnifiedPush endpoint is validated as a server-outbound URL, and its transport is bounded to one list held equal across DTO, schema and client | enforced |
 | INV-CRON-001 | One logical cron effect per schedule tick, across replicas | partial |
 | INV-PROVIDER-001 | An unreachable provider stops being called, and produces at most one alert pair per outage | enforced |
 | INV-ALERT-001 | A system alert row lands at most once per (recipient, dedupe key), and only the insert winner emails | enforced |
 | INV-NOTIFY-001 | Every notification a producer creates is written by NotificationService.create; the restore's dynamic-table insert is outside the scan | partial |
+| INV-DISPATCH-001 | The dispatch seam never writes a notification row itself; `create` stays the sole writer | enforced |
+| INV-DISPATCH-002 | The in-app row is written for every `notify`, whatever the matrix or the throttle says | enforced |
+| INV-DISPATCH-003 | The throttle gates only the notification-mode fan-out, never the in-app row or a report, and never an escalation | enforced |
+| INV-DISPATCH-004 | A failed push or email never rolls back, or surfaces through, the notification it is about | enforced |
 | INV-RLS-001 | Enforced mode refuses to run on a role that can bypass RLS | enforced |
 | INV-CACHE-001 | A money-moving write invalidates every derived cache | enforced |
 | INV-PAYEE-001 | A contact lookup never overwrites a value the user entered, and the automatic one runs at most once per payee | enforced |
@@ -2501,6 +2509,197 @@ Status              partial -- every producer goes through the door and the scan
                     scan understanding RESTORE_PLAN; neither is done, so this
                     entry says so rather than claiming a coverage it does not
                     have.
+```
+
+### INV-PUSH-007 -- UnifiedPush rides the one Web Push sender
+
+```text
+Statement           A UnifiedPush subscription is a Web Push subscription (an
+                    endpoint at a distributor plus the RFC 8291 keys, signed
+                    under this instance's VAPID pair), so it is delivered by
+                    WebPushSender and nothing else; no second transport importer
+                    exists in src/.
+Source of truth     src/push/web-push-sender.service.ts (the only importer of
+                    `web-push`); docs/specs/notification-preferences.md §15.
+Enforcement         push-secret.guard.spec.ts scans src/ for a second `web-push`
+                    importer or `sendNotification` caller and fails on one.
+Concurrency scope   n/a -- a static property of the source
+Failure response    n/a
+Required tests      push-secret.guard.spec.ts
+Why it exists       Delivery isolation (discussion #1291): a business feature asks
+                    for a notification and never imports a transport, so a new
+                    wire arrives without any producer changing -- and a second
+                    sender would be a second place the private key is handed to.
+Status              enforced
+```
+
+### INV-PUSH-008 -- a transport gates its own wire's devices
+
+```text
+Statement           The per-category `push` toggle reaches web-push devices only
+                    and `unifiedpush` reaches UnifiedPush devices only. A user
+                    with `push` on and `unifiedpush` off is never delivered to
+                    on a distributor endpoint, and the reverse.
+Source of truth     push_subscriptions.transport (migration 177), read by
+                    PushSubscriptionService.sendToUser's transport filter;
+                    NotificationDispatchService.fanOut builds the set from
+                    resolveNotificationDelivery.
+Enforcement         Two halves, each tested: the dispatch passes exactly the
+                    enabled set (notification-dispatch.service.spec.ts, the
+                    four-combination matrix) and the service applies it as
+                    `transport IN (...)` on the device query, with an empty set
+                    reaching no database at all
+                    (push-subscription.service.spec.ts). `sendTest` deliberately
+                    passes no filter: a test send asks whether ANY device works.
+Concurrency scope   per user, per notification
+Failure response    A device on a wire the user gated off is never queried, so
+                    there is nothing to fail.
+Required tests      notification-dispatch.service.spec.ts (the set);
+                    push-subscription.service.spec.ts (the filter, the empty set,
+                    the stored transport on subscribe).
+Why it exists       The two channels ride one encrypted wire and differ only by
+                    which devices they reach -- so the FILTER is the consent
+                    boundary. Without a service-layer test the first revision of
+                    §15 shipped with the filter undetected by any mutation.
+Status              enforced
+```
+
+### INV-PUSH-009 -- an unsupported channel is forced off at resolution
+
+```text
+Statement           A channel a matrix category does not expose
+                    (NOTIFICATION_CATEGORY_CHANNELS) resolves to OFF in
+                    resolveNotificationDelivery whatever the stored row holds,
+                    so a value written to an unsupported cell can never become a
+                    delivery nobody asked for.
+Source of truth     NOTIFICATION_CATEGORY_CHANNELS in
+                    notification-preference.service.ts, mirrored on the client
+                    and returned per row as `supportedChannels`.
+Enforcement         resolveNotificationDelivery ANDs every channel with its
+                    support flag; notification-preference.service.spec.ts proves
+                    SYSTEM's email stays off with the master switch on and a
+                    stored `true`; notification-preferences.contract.test.ts
+                    holds the client mirror equal, reading every channel the
+                    backend declares rather than a fixed list.
+Concurrency scope   n/a
+Failure response    n/a
+Required tests      notification-preference.service.spec.ts;
+                    notification-preferences.contract.test.ts.
+Why it exists       SYSTEM exposes push only -- its email is the admin fan-out's
+                    own severity-driven path -- and a cell that renders "not
+                    applicable" must also be one whose stored value is inert.
+Status              enforced
+```
+
+### INV-PUSH-010 -- a UnifiedPush endpoint is a server-outbound URL, bounded to one transport list
+
+```text
+Statement           A distributor endpoint is validated exactly as a browser
+                    endpoint is (IsPushEndpoint: https floor + SSRF resolve
+                    bounded inside the check), and `transport` is bounded to
+                    PUSH_TRANSPORTS -- one list held equal across the DTO, the
+                    CHECK constraint and the client union.
+Source of truth     src/push/dto/create-push-subscription.dto.ts (`@IsIn`);
+                    push_subscriptions_transport_check in database/schema.sql
+                    and migration 177; PUSH_TRANSPORTS in the entity and in
+                    frontend/src/lib/push.ts.
+Enforcement         The one controller line that registers a subscription passes
+                    the validated DTO; push-transport.contract.spec.ts holds the
+                    constant equal to the CHECK's literal set and the default,
+                    and push-transport.contract.test.ts (frontend) holds the
+                    client array equal to the entity's.
+Concurrency scope   n/a
+Failure response    A transport outside the list is refused by the DTO before
+                    any write; a drift between the copies fails the contract
+                    tests rather than surfacing as a 23514 the subscriber sees
+                    as a generic 500.
+Required tests      push-endpoint validator specs (unchanged);
+                    push-transport.contract.spec.ts;
+                    push-transport.contract.test.ts.
+Why it exists       An endpoint is a URL the server will POST to (CWE-918), and
+                    a list that means something is written once in the place
+                    that can check it.
+Status              enforced
+```
+
+### INV-DISPATCH-001 -- the dispatch seam never writes a row
+
+```text
+Statement           NotificationDispatchService.notify writes nothing itself; it
+                    calls NotificationService.create and fans out from what the
+                    door returned.
+Source of truth     src/notifications/notification-dispatch.service.ts
+Enforcement         notification-write-door.spec.ts (the scan admits no writer
+                    but the door); notification-dispatch.service.spec.ts asserts
+                    `create` is what is called with the producer's input.
+Concurrency scope   n/a
+Failure response    n/a
+Required tests      notification-write-door.spec.ts;
+                    notification-dispatch.service.spec.ts.
+Status              enforced
+```
+
+### INV-DISPATCH-002 -- the in-app row is always written
+
+```text
+Statement           Every `notify` writes the bell row regardless of the matrix
+                    or the throttle: a category with push and email both off
+                    still bells, and a throttled fan-out still leaves the row.
+Source of truth     notify: `create` runs before, and independently of, fanOut.
+Enforcement         notification-dispatch.service.spec.ts ("always writes the
+                    in-app row even with push and email both off").
+Concurrency scope   per notification
+Failure response    The row stands; only the fan-out is skipped.
+Required tests      notification-dispatch.service.spec.ts.
+Why it exists       The maintainer's ruling (spec §3/§4): the bell is the record;
+                    a first throttle draft dropped the row and was reverted.
+Status              enforced
+```
+
+### INV-DISPATCH-003 -- the throttle gates the fan-out only, and never an escalation
+
+```text
+Statement           A per-category cooldown suppresses only notification-mode
+                    push/email; never the in-app row, never a report email, and
+                    never a notification whose severity strictly exceeds every
+                    prior in the window.
+Source of truth     NotificationDispatchService.isThrottled, under
+                    pg_advisory_xact_lock(notif-fanout:<user>:<category>).
+Enforcement         The advisory lock serialises concurrent deciders across
+                    replicas (D7) so two same-category winners cannot both read
+                    "no prior"; the EXISTS query carries severitiesAtOrAbove so
+                    an escalation never matches.
+                    notification-dispatch.service.spec.ts holds the lock on both
+                    the push and the email path, the window-0 short-circuit, and
+                    the escalation set.
+Concurrency scope   per (user, category), across replicas
+Failure response    A suppressed fan-out is a skipped send; the row is already
+                    committed.
+Required tests      notification-dispatch.service.spec.ts.
+Status              enforced
+```
+
+### INV-DISPATCH-004 -- a delivery failure never reaches the producer
+
+```text
+Statement           A failed push or email neither rolls back nor surfaces
+                    through the notification it is about: `notify` resolves with
+                    the committed row and logs the failure, whether the caller
+                    awaited the fan-out or detached it.
+Source of truth     notify's `.catch` on the fan-out promise;
+                    PushSubscriptionService.sendToUser is non-throwing.
+Enforcement         notification-dispatch.service.spec.ts ("never lets a fan-out
+                    failure escape", and the detached-mode failure case).
+                    The row is committed by `create` before any fan-out runs, so
+                    there is nothing a rollback could reach.
+Concurrency scope   per notification
+Failure response    Logged once with the row id; the bell row stands.
+Required tests      notification-dispatch.service.spec.ts.
+Why it exists       A read-path producer (bill reminders on GET /notifications)
+                    detaches the fan-out so a stalled push endpoint cannot hold
+                    the reader; the guarantee has to hold on that path exactly
+                    as on the awaited one.
+Status              enforced
 ```
 
 ### INV-RLS-001 -- enforced mode refuses a privileged role

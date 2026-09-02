@@ -1291,6 +1291,9 @@ describe("BudgetsService", () => {
           title: expect.stringContaining("Netflix Inc"),
           message: expect.stringContaining("15.99"),
         }),
+        // Detached: this producer runs on the notification list READ, and a
+        // stalled push endpoint must not hold that response.
+        { fanOut: "detached" },
       );
     });
 
@@ -1345,6 +1348,7 @@ describe("BudgetsService", () => {
         expect.objectContaining({
           message: expect.stringContaining("312.65"),
         }),
+        { fanOut: "detached" },
       );
     });
 

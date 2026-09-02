@@ -31,6 +31,13 @@ function parseBackendCategories(): string[] {
   return [...block[1].matchAll(/NotificationCategory\.(\w+)/g)].map((m) => m[1]);
 }
 
+/**
+ * Every `channel: true|false` pair the backend writes, not a fixed list of
+ * names: a parser that read four named fields would silently drop a fifth
+ * backend channel and the `toEqual` below would still pass against a client
+ * mirror missing it. Read generically, a new backend channel fails here until
+ * the mirror (and therefore `CategoryChannelSupport`, and the matrix) carries it.
+ */
 function parseBackendChannelSupport(): Record<string, CategoryChannelSupport> {
   const source = backendSource();
   const block = source.match(
@@ -42,17 +49,14 @@ function parseBackendChannelSupport(): Record<string, CategoryChannelSupport> {
     /\[NotificationCategory\.(\w+)\]:\s*\{([^}]*)\}/g,
   )) {
     const [, category, body] = entry;
-    const bool = (field: string): boolean => {
-      const m = body.match(new RegExp(`${field}:\\s*(true|false)`));
-      if (!m) throw new Error(`backend ${category}.${field} not found`);
-      return m[1] === 'true';
-    };
-    out[category] = {
-      email: bool('email'),
-      emailNotification: bool('emailNotification'),
-      push: bool('push'),
-      unifiedpush: bool('unifiedpush'),
-    };
+    const support: Record<string, boolean> = {};
+    for (const pair of body.matchAll(/(\w+):\s*(true|false)/g)) {
+      support[pair[1]] = pair[2] === 'true';
+    }
+    if (Object.keys(support).length === 0) {
+      throw new Error(`backend ${category} declares no channels`);
+    }
+    out[category] = support as unknown as CategoryChannelSupport;
   }
   return out;
 }

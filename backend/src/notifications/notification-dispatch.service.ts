@@ -27,6 +27,21 @@ import { PushTransport } from "../push/entities/push-subscription.entity";
 import { EmailService } from "./email.service";
 import { notificationImmediateTemplate } from "./email-templates";
 
+/** How `notify` treats the fan-out relative to its own promise. */
+export interface NotifyOptions {
+  /**
+   * `"await"` (the default) resolves after push and email were attempted --
+   * right for a cron, which may wait for its deliveries. `"detached"` resolves
+   * as soon as the row is committed and lets the fan-out run behind the caller:
+   * for a producer on a request's READ path (bill reminders materialize on
+   * `GET /notifications`), a stalled push endpoint -- up to
+   * `PUSH_REQUEST_DEADLINE_MS` per device -- must not hold the reader past the
+   * client's own timeout. Either way the fan-out never throws out of `notify`,
+   * and a detached failure is logged exactly as an awaited one is.
+   */
+  fanOut?: "await" | "detached";
+}
+
 /**
  * The dispatch seam (spec section 14.1): a layer ABOVE the write door that adds
  * the notification-mode fan-out (immediate email + push) after a notification is
@@ -66,24 +81,26 @@ export class NotificationDispatchService {
    *
    * Call it OUTSIDE any transaction whose failure it would report, exactly like
    * `create` -- it runs in the producer's ambient RLS context and seeds none of
-   * its own.
+   * its own. A detached fan-out ({@link NotifyOptions.fanOut}) keeps that
+   * ambient identity and opens its own short `withScopedDb` transactions for
+   * every read it makes; nothing of it joins the caller's response.
    */
   async notify(
     userId: string,
     input: CreateNotificationInput,
+    options: NotifyOptions = {},
   ): Promise<Notification | null> {
     const row = await this.notifications.create(userId, input);
     if (!row) return null;
 
-    try {
-      await this.fanOut(userId, row);
-    } catch (error) {
+    const delivery = this.fanOut(userId, row).catch((error: unknown) => {
       // Never let a delivery failure escape: the bell row stands regardless.
       this.logger.error(
         `Fan-out failed for notification ${row.id}`,
         error instanceof Error ? error.stack : error,
       );
-    }
+    });
+    if (options.fanOut !== "detached") await delivery;
     return row;
   }
 

@@ -140,8 +140,8 @@
       },
       "ntfy": {
         "name": "ntfy và UnifiedPush",
-        "description": "Gửi thông báo tự lưu trữ cho những ai không muốn phụ thuộc vào hạ tầng của Google hay Apple.",
-        "notYetAvailable": "Chưa khả dụng. Dự kiến sau khi đẩy từ trình duyệt ổn định."
+        "description": "Cùng một push được mã hóa, gửi tới bộ phân phối UnifiedPush tự lưu trữ (ntfy, NextPush) thay vì hạ tầng của Google hay Apple. Kênh này dùng chung cặp khóa push và công tắc của phiên bản này; mỗi người đăng ký endpoint từ ứng dụng UnifiedPush của mình và bật kênh trong Cài đặt.",
+        "followsWebPush": "Không khả dụng khi push trình duyệt đang tắt hoặc cặp khóa của nó không thể dùng — kênh này được gửi bằng cùng cặp khóa đó."
       }
     },
     "identity": {

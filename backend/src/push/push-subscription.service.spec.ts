@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { I18nService } from "nestjs-i18n";
+import { In } from "typeorm";
 import {
   PushSubscriptionService,
   ENDPOINT_FINGERPRINT_LENGTH,
@@ -388,6 +389,34 @@ describe("PushSubscriptionService", () => {
       )!;
       expect(insert[1][7]).toBe("PUB");
     });
+
+    // The wire is a fact about the client that registered: a UnifiedPush client
+    // says so, a browser says nothing and gets today's only wire. Column 9 of the
+    // INSERT is `transport` (the list is checked against schema.sql by
+    // raw-sql-columns.spec.ts).
+    it("stores the transport the client registered, defaulting a silent client to webpush", async () => {
+      await service.subscribe(USER, DTO, "Mozilla/5.0");
+      const browser = manager.query.mock.calls.find(([sql]) =>
+        String(sql).includes("INSERT INTO push_subscriptions"),
+      )!;
+      expect(browser[1][8]).toBe("webpush");
+
+      manager.query.mockClear();
+      await service.subscribe(
+        USER,
+        { ...DTO, transport: "unifiedpush" },
+        "ntfy-android/2.11",
+      );
+      const distributor = manager.query.mock.calls.find(([sql]) =>
+        String(sql).includes("INSERT INTO push_subscriptions"),
+      )!;
+      expect(distributor[1][8]).toBe("unifiedpush");
+      // And the refresh arm carries it too, so a re-registration cannot silently
+      // move a device onto the other channel's gate.
+      expect(String(distributor[0])).toContain(
+        "transport = EXCLUDED.transport",
+      );
+    });
   });
 
   describe("listForUser", () => {
@@ -680,6 +709,42 @@ describe("PushSubscriptionService", () => {
       expect(sender.send).toHaveBeenCalledTimes(1);
       expect(sender.send.mock.calls[0][1]).toEqual(payload);
       expect(result).toEqual({ attempted: 1, delivered: 1 });
+    });
+
+    // Transport gating (spec section 15): the two push channels ride one wire and
+    // differ only by which devices they reach, so the FILTER is the mechanism --
+    // a user with `push` on and `unifiedpush` off must not be reached on a
+    // UnifiedPush device. The dispatch spec proves the set it passes; these prove
+    // the service applies it.
+    it("narrows the device query to the transports the dispatch enabled", async () => {
+      subscriptionRepo.find.mockResolvedValue([
+        storedDevice({ transport: "unifiedpush" }),
+      ]);
+      await service.sendToUser(USER, payload as never, ["unifiedpush"]);
+      expect(subscriptionRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            userId: USER,
+            transport: In(["unifiedpush"]),
+          }),
+        }),
+      );
+      expect(sender.send).toHaveBeenCalledTimes(1);
+    });
+
+    it("queries every wire when no filter is given (what sendTest wants)", async () => {
+      subscriptionRepo.find.mockResolvedValue([storedDevice()]);
+      await service.sendToUser(USER, payload as never);
+      const where = subscriptionRepo.find.mock.calls[0][0].where;
+      expect(where).not.toHaveProperty("transport");
+    });
+
+    it("an empty transport set sends nothing and never reaches the database", async () => {
+      await expect(
+        service.sendToUser(USER, payload as never, []),
+      ).resolves.toEqual({ attempted: 0, delivered: 0 });
+      expect(subscriptionRepo.find).not.toHaveBeenCalled();
+      expect(sender.send).not.toHaveBeenCalled();
     });
   });
 

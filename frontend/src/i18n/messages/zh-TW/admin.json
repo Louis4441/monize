@@ -140,8 +140,8 @@
       },
       "ntfy": {
         "name": "ntfy 與 UnifiedPush",
-        "description": "為不願依賴 Google 或 Apple 基礎設施的使用者提供的自架傳送方式。",
-        "notYetAvailable": "尚未提供。預計在瀏覽器推播穩定之後推出。"
+        "description": "同樣的加密推播，投遞到自架的 UnifiedPush 分發器（ntfy、NextPush），而非 Google 或 Apple 的基礎設施。它與本執行個體共用推播金鑰對和開關；每個人在自己的 UnifiedPush 應用程式中註冊端點，並在設定中開啟此頻道。",
+        "followsWebPush": "瀏覽器推播關閉或其金鑰對無法使用時不可用 — 此頻道以同一金鑰對投遞。"
       }
     },
     "identity": {

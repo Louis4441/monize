@@ -23,7 +23,7 @@ R1. Notifications are organised into **groups**: security, system, balances,
     transactions, investments, securities prices, budgets, bills, goals.
 
 R2. A **matrix** of group x channel decides delivery. Channels: in-app (bell),
-    email, web push, UnifiedPush/ntfy (future).
+    email, web push, UnifiedPush/ntfy (Section 15).
 
 R3. A notification may be delivered **once** or **repeatedly** on an interval.
     The interval is user-defined, with a **minimum of 5 minutes**.
@@ -97,7 +97,8 @@ Rationale: in-app is always the record (a user opts a group *out* of the bell
 deliberately, which is allowed but off the default path). email defaults on only
 where the message is important and infrequent (security, system). push defaults
 off because it requires per-device enablement first (a matrix cell cannot turn a
-device on). `unifiedpush` is stored but inert until the transport ships.
+device on). `unifiedpush` defaults off for the same reason -- a cell cannot
+register a distributor endpoint -- and ships live with its transport (Section 15).
 
 **in_app is always on; it is the record.** The maintainer's ruling is that the
 bell shows *all* unread notifications, so `in_app` is not a user-toggled column
@@ -321,9 +322,11 @@ and behind a per-group toggle, defaulting off until validated on real devices.
   source scan that keeps every category producer on the resolver and pins each
   one's category -- the earlier omission of the monthly summary and the mortgage
   reminder from this inventory is exactly what it now prevents (audit Finding 1).
-- **Push is built but unwired.** `WebPushSender.send` is called only by
-  `PushSubscriptionService.sendTest` (the `POST /push/test` button). There is no
-  `sendToUser`, and nothing bridges `NotificationService.create -> push`.
+- **Push was built but unwired at survey time.** `WebPushSender.send` was called
+  only by `PushSubscriptionService.sendTest` (the `POST /push/test` button); there
+  was no `sendToUser`, and nothing bridged `NotificationService.create -> push`.
+  (Superseded: Phase 5 added `sendToUser` and the dispatch seam, Section 14; the
+  UnifiedPush wire rides the same sender, Section 15.)
   `PushPayload.collapseKey` is required and privacy-minimal (no amounts). The
   service worker's `push`/`notificationclick` handlers exist; `collapseTag` does
   device-side collapse; **no `actions` and no `image` are used yet**.
@@ -770,8 +773,8 @@ The matrix's `push` column (rendered "coming soon" in Phase 2) becomes a real
 per-category toggle. **A matrix cell cannot turn a device on** (permission needs
 a user gesture, Section on push enablement), so the column is enabled only when
 the user has >= 1 live device; otherwise it renders "enable push on this device
-first" linking to the existing push panel. The `unifiedpush` column stays
-"coming soon" until its transport ships.
+first" linking to the existing push panel. The `unifiedpush` column went live with
+its transport (Section 15), gated the same way on a live UnifiedPush device.
 
 ### 14.6 Chart-in-push (R5) -- feasibility and the security envelope
 
@@ -902,15 +905,22 @@ The throttle gates all interrupting channels alike, unchanged.
 
 ### 15.4 Invariants and test obligations
 
-- **INV-PUSH-006** UnifiedPush reuses `WebPushSender`: `push-secret.guard.spec.ts`
+IDs continue the `docs/system-invariants.md` register (INV-PUSH-006 is already
+"a channel is offered only while its key can be used"; these four are registered
+there with their enforcement status).
+
+- **INV-PUSH-007** UnifiedPush reuses `WebPushSender`: `push-secret.guard.spec.ts`
   still finds exactly one `web-push` importer; no second sender appears.
-- **INV-PUSH-007** a `transport` tag gates delivery: a user with `push` on and
+- **INV-PUSH-008** a `transport` tag gates delivery: a user with `push` on and
   `unifiedpush` off receives on web-push subscriptions only, and the reverse; the
-  four combinations are a matrix test, not a representative one.
-- **INV-PUSH-008** an unsupported channel is forced off in
+  four combinations are a matrix test at the dispatch (which set is passed) AND a
+  service test (the filter is applied, an empty set reaches no database).
+- **INV-PUSH-009** an unsupported channel is forced off in
   `resolveNotificationDelivery` for `unifiedpush` exactly as for `push`.
-- **INV-PUSH-009** a UnifiedPush endpoint is `IsPushEndpoint`-validated (https +
-  SSRF), never a bare `@IsUrl()`.
+- **INV-PUSH-010** a UnifiedPush endpoint is `IsPushEndpoint`-validated (https +
+  SSRF), never a bare `@IsUrl()`; `transport` is bounded to `PUSH_TRANSPORTS` by
+  the DTO and by the `push_subscriptions_transport_check` CHECK, and the two
+  lists are held equal by `push-transport.contract.spec.ts`.
 - Contract: `NOTIFICATION_CATEGORY_CHANNELS` (backend) and its client mirror stay
   equal (`notification-preferences.contract.test.ts`), now over four channels.
 - The matrix's `unifiedpush` column gates on `>= 1` live UnifiedPush

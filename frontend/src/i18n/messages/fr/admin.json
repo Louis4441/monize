@@ -140,8 +140,8 @@
       },
       "ntfy": {
         "name": "ntfy et UnifiedPush",
-        "description": "Distribution auto-hébergée pour qui préfère ne pas dépendre de l'infrastructure Google ou Apple.",
-        "notYetAvailable": "Pas encore disponible. Prévu une fois le push du navigateur établi."
+        "description": "Les mêmes notifications push chiffrées, livrées à un distributeur UnifiedPush auto-hébergé (ntfy, NextPush) plutôt qu’à l’infrastructure de Google ou d’Apple. Il partage la paire de clés push et l’interrupteur de cette instance ; chaque personne enregistre son point de terminaison depuis son application UnifiedPush et active le canal dans les Paramètres.",
+        "followsWebPush": "Indisponible tant que le push du navigateur est désactivé ou que sa paire de clés est inutilisable — ce canal est livré avec la même paire de clés."
       }
     },
     "identity": {

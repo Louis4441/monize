@@ -145,6 +145,26 @@ describe('PushDevicesPanel', () => {
     expect(screen.getAllByText('This device')).toHaveLength(1);
   });
 
+  it('badges a UnifiedPush device with its transport, and a web-push device with nothing', async () => {
+    mockListDevices.mockResolvedValue([
+      device(),
+      device({
+        id: 'd-2',
+        endpointFingerprint: OTHER_DEVICE,
+        deviceName: 'ntfy on Android',
+        transport: 'unifiedpush',
+      }),
+    ]);
+    mockCurrentFingerprint.mockResolvedValue(THIS_DEVICE);
+
+    render(<PushDevicesPanel />);
+
+    await screen.findByText('ntfy on Android');
+    // Exactly one badge: the distributor device wears it, the browser row (an
+    // absent transport reads as web push) does not.
+    expect(screen.getAllByText('UnifiedPush')).toHaveLength(1);
+  });
+
   // The regression: a retired row is not a registration. After a rotation the
   // device is listed with the copy telling the user to enable push again, and
   // hiding the button on the strength of that row left them with the

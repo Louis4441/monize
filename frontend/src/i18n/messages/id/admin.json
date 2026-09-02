@@ -140,8 +140,8 @@
       },
       "ntfy": {
         "name": "ntfy dan UnifiedPush",
-        "description": "Pengiriman swakelola bagi yang lebih suka tidak bergantung pada infrastruktur Google atau Apple.",
-        "notYetAvailable": "Belum tersedia. Direncanakan setelah push peramban mapan."
+        "description": "Push terenkripsi yang sama, dikirim ke distributor UnifiedPush yang dihosting sendiri (ntfy, NextPush) alih-alih infrastruktur Google atau Apple. Kanal ini memakai pasangan kunci push dan sakelar instans ini; setiap orang mendaftarkan endpoint dari aplikasi UnifiedPush mereka dan mengaktifkan kanal di Pengaturan.",
+        "followsWebPush": "Tidak tersedia selama push browser dimatikan atau pasangan kuncinya tidak dapat digunakan — kanal ini dikirim dengan pasangan kunci yang sama."
       }
     },
     "identity": {

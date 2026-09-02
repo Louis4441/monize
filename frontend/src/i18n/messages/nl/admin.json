@@ -140,8 +140,8 @@
       },
       "ntfy": {
         "name": "ntfy en UnifiedPush",
-        "description": "Zelfgehoste bezorging voor wie liever niet afhankelijk is van de infrastructuur van Google of Apple.",
-        "notYetAvailable": "Nog niet beschikbaar. Gepland zodra browserpush is ingeburgerd."
+        "description": "Dezelfde versleutelde push, bezorgd via een zelf gehoste UnifiedPush-distributor (ntfy, NextPush) in plaats van de infrastructuur van Google of Apple. Het kanaal deelt het push-sleutelpaar en de schakelaar van deze instantie; iedereen registreert het eigen endpoint vanuit de UnifiedPush-app en zet het kanaal aan in Instellingen.",
+        "followsWebPush": "Niet beschikbaar zolang browserpush uit staat of het sleutelpaar niet gebruikt kan worden — dit kanaal wordt met hetzelfde sleutelpaar bezorgd."
       }
     },
     "identity": {

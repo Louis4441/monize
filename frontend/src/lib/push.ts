@@ -12,8 +12,13 @@ export type PushDisabledReason = 'GONE' | 'KEY_ROTATED' | 'FAILING';
  * same encrypted Web Push protocol, gated by a separate channel toggle. Mirrors
  * the backend `PushTransport`. Absent on a response from before it, so read it
  * defensively (treat a missing value as `'webpush'`, today's only wire).
+ *
+ * The array is the source the type derives from, so `push-transport.contract.test.ts`
+ * can hold it equal to the backend entity's `PUSH_TRANSPORTS` (which the DB CHECK
+ * is in turn held equal to) -- a type alone cannot be compared at test time.
  */
-export type PushTransport = 'webpush' | 'unifiedpush';
+export const PUSH_TRANSPORTS = ['webpush', 'unifiedpush'] as const;
+export type PushTransport = (typeof PUSH_TRANSPORTS)[number];
 
 export interface PushDevice {
   id: string;

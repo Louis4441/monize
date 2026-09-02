@@ -140,8 +140,8 @@
       },
       "ntfy": {
         "name": "[XX-ntfy and UnifiedPush-XX]",
-        "description": "[XX-Self-hosted delivery for people who would rather not depend on Google or Apple infrastructure.-XX]",
-        "notYetAvailable": "[XX-Not available yet. Planned once browser push is established.-XX]"
+        "description": "[XX-The same encrypted push, delivered to a self-hosted UnifiedPush distributor (ntfy, NextPush) instead of Google or Apple infrastructure. It shares this instance’s push key pair and switch; each person registers their endpoint from their UnifiedPush app and turns the channel on in Settings.-XX]",
+        "followsWebPush": "[XX-Unavailable while browser push is off or its key pair cannot be used — this channel is delivered with the same key pair.-XX]"
       }
     },
     "identity": {

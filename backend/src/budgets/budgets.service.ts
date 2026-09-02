@@ -110,9 +110,11 @@ export class BudgetsService {
     // write door beneath it, so the column bounds, conflict handling and period
     // default are not re-decided here) -- so a materialized BILL_DUE reaches the
     // user's push / notification-email per the PAYMENTS matrix, not only the
-    // bell. Runs on the notification-list read, so the fan-out cost is bounded:
-    // dedup makes most reads create nothing, and for a user with no push device
-    // and no alert-email opted in it is a single preference read per new row.
+    // bell. Runs on the notification-list READ, so the fan-out is DETACHED from
+    // the response (`fanOut: "detached"`): the row is awaited because the list
+    // about to be served must hold it, the delivery is not, because one stalled
+    // push endpoint would otherwise hold the bell past the client's timeout.
+    // Dedup makes most reads create nothing at all.
     private dispatch: NotificationDispatchService,
   ) {}
 
@@ -751,43 +753,52 @@ export class BudgetsService {
           ? NotificationSeverity.WARNING
           : NotificationSeverity.INFO;
 
-      await this.dispatch.notify(userId, {
-        type: NotificationType.BILL_DUE,
-        severity,
-        // `title`/`message` are the English fallbacks for a reader with no
-        // client to render them (the email digest, an API consumer). The UI
-        // composes both from `type` and `data` in the reader's own language --
-        // a stored sentence cannot be translated after the fact, and the
-        // missing-rate case is exactly the one a non-English reader hits.
-        title: `${payeeName} due${daysUntilDue === 0 ? " today" : daysUntilDue === 1 ? " tomorrow" : ` in ${daysUntilDue} days`}`,
-        message:
-          amount === null
-            ? `Amount unavailable (no current exchange rate), due on ${dueDate}`
-            : `${formatCurrency(amount, occurrence.currencyCode)} due on ${dueDate}`,
-        // Structured, so the UI can compose the copy in the reader's language
-        // -- and deliberately without `daysUntilDue`: "due in 3 days" was true
-        // when this row was written and stops being true the next morning,
-        // while the row lives until it is dismissed. The client counts from
-        // `dueDate` against its own clock.
-        data: {
-          billId: bill.id,
-          payeeName,
-          amount,
-          amountComplete: amount !== null,
-          dueDate,
-          originalDate: occurrence.originalDate,
-          currencyCode: occurrence.currencyCode,
+      // The ROW is awaited -- the list the caller is about to read must hold it.
+      // The fan-out is detached: this runs on `GET /notifications`, and a push
+      // delivery is bounded by PUSH_REQUEST_DEADLINE_MS per device, so awaiting
+      // it here let one stalled endpoint hold the bell read past the client's
+      // own timeout (a cron may wait for its pushes; a reader may not).
+      await this.dispatch.notify(
+        userId,
+        {
+          type: NotificationType.BILL_DUE,
+          severity,
+          // `title`/`message` are the English fallbacks for a reader with no
+          // client to render them (the email digest, an API consumer). The UI
+          // composes both from `type` and `data` in the reader's own language --
+          // a stored sentence cannot be translated after the fact, and the
+          // missing-rate case is exactly the one a non-English reader hits.
+          title: `${payeeName} due${daysUntilDue === 0 ? " today" : daysUntilDue === 1 ? " tomorrow" : ` in ${daysUntilDue} days`}`,
+          message:
+            amount === null
+              ? `Amount unavailable (no current exchange rate), due on ${dueDate}`
+              : `${formatCurrency(amount, occurrence.currencyCode)} due on ${dueDate}`,
+          // Structured, so the UI can compose the copy in the reader's language
+          // -- and deliberately without `daysUntilDue`: "due in 3 days" was true
+          // when this row was written and stops being true the next morning,
+          // while the row lives until it is dismissed. The client counts from
+          // `dueDate` against its own clock.
+          data: {
+            billId: bill.id,
+            payeeName,
+            amount,
+            amountComplete: amount !== null,
+            dueDate,
+            originalDate: occurrence.originalDate,
+            currencyCode: occurrence.currencyCode,
+          },
+          // Where the bell sends the reader. `/bills` and not
+          // `/scheduled-transactions/<id>`, which is not a route: the app router
+          // has no such segment, and because a stored target WINS over the
+          // client's type table, inventing one replaced a working destination
+          // with the not-found page. There is no per-bill route to deep-link to;
+          // `notification-target.contract.test.ts` checks every target a producer
+          // writes against the router tree.
+          target: "/bills",
+          periodStart: dueDate,
         },
-        // Where the bell sends the reader. `/bills` and not
-        // `/scheduled-transactions/<id>`, which is not a route: the app router
-        // has no such segment, and because a stored target WINS over the
-        // client's type table, inventing one replaced a working destination
-        // with the not-found page. There is no per-bill route to deep-link to;
-        // `notification-target.contract.test.ts` checks every target a producer
-        // writes against the router tree.
-        target: "/bills",
-        periodStart: dueDate,
-      });
+        { fanOut: "detached" },
+      );
     }
   }
 

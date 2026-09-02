@@ -140,8 +140,8 @@
       },
       "ntfy": {
         "name": "ntfy e UnifiedPush",
-        "description": "Consegna self-hosted per chi preferisce non dipendere dall'infrastruttura di Google o Apple.",
-        "notYetAvailable": "Non ancora disponibile. Previsto una volta consolidato il push del browser."
+        "description": "Le stesse notifiche push cifrate, consegnate a un distributore UnifiedPush self-hosted (ntfy, NextPush) invece che all’infrastruttura di Google o Apple. Condivide la coppia di chiavi push e l’interruttore di questa istanza; ogni persona registra il proprio endpoint dalla propria app UnifiedPush e attiva il canale nelle Impostazioni.",
+        "followsWebPush": "Non disponibile finché il push del browser è disattivato o la sua coppia di chiavi non è utilizzabile — questo canale è consegnato con la stessa coppia di chiavi."
       }
     },
     "identity": {

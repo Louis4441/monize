@@ -312,4 +312,79 @@ describe("NotificationDispatchService", () => {
     await expect(service.notify("u1", {} as never)).resolves.toBeTruthy();
     expect(spy).toHaveBeenCalled();
   });
+
+  describe("fanOut option (a read-path producer must not wait on a stalled push)", () => {
+    const pushOn = () =>
+      resolveDelivery.mockResolvedValue({
+        emailNotification: false,
+        push: true,
+        unifiedpush: false,
+        throttleMinutes: 0,
+      });
+    const flush = () => new Promise<void>((r) => setImmediate(r));
+
+    it("awaits the fan-out by default, so a cron attempts its pushes before moving on", async () => {
+      pushOn();
+      let settle!: () => void;
+      sendToUser.mockReturnValue(
+        new Promise<void>((resolve) => {
+          settle = () => resolve();
+        }),
+      );
+      let resolved = false;
+      const pending = service.notify("u1", {} as never).then((row) => {
+        resolved = true;
+        return row;
+      });
+      await flush();
+      // The push was started and notify is still waiting on it.
+      expect(sendToUser).toHaveBeenCalledTimes(1);
+      expect(resolved).toBe(false);
+      settle();
+      await expect(pending).resolves.toEqual(
+        expect.objectContaining({ id: "n1" }),
+      );
+    });
+
+    it("detached: resolves with the committed row while the push is still in flight", async () => {
+      pushOn();
+      let settle!: () => void;
+      sendToUser.mockReturnValue(
+        new Promise<void>((resolve) => {
+          settle = () => resolve();
+        }),
+      );
+      const row = await service.notify("u1", {} as never, {
+        fanOut: "detached",
+      });
+      // Resolved with the row before the push settled -- the caller's response
+      // is not held by the delivery -- and the push was still started.
+      expect(row?.id).toBe("n1");
+      expect(sendToUser).toHaveBeenCalledTimes(1);
+      settle();
+      await flush();
+    });
+
+    it("detached: a fan-out failure is still logged, never surfaced to the caller", async () => {
+      pushOn();
+      let fail!: (error: Error) => void;
+      sendToUser.mockReturnValue(
+        new Promise<void>((_resolve, reject) => {
+          fail = reject;
+        }),
+      );
+      const spy = jest
+        .spyOn(service["logger"], "error")
+        .mockImplementation(() => undefined);
+      await expect(
+        service.notify("u1", {} as never, { fanOut: "detached" }),
+      ).resolves.toBeTruthy();
+      fail(new Error("push stalled"));
+      await flush();
+      expect(spy).toHaveBeenCalledWith(
+        "Fan-out failed for notification n1",
+        expect.any(String),
+      );
+    });
+  });
 });

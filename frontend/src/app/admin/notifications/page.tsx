@@ -197,8 +197,21 @@ function AdminNotificationsContent() {
           id: 'ntfy',
           name: t('channels.ntfy.name'),
           description: t('channels.ntfy.description'),
-          state: 'unconfigured',
-          unavailableNote: t('channels.ntfy.notYetAvailable'),
+          // The same encrypted Web Push wire and the same key pair as browser
+          // push (spec section 15), so its state IS the browser-push state: an
+          // instance that cannot sign, or whose administrator switched push off,
+          // cannot deliver to a distributor either. Drawing it independently
+          // would tell an operator a channel is open that the switch above shut.
+          state:
+            config.configured && !config.keyUnreadable
+              ? config.enabled
+                ? 'on'
+                : 'off'
+              : 'unconfigured',
+          unavailableNote:
+            config.configured && !config.keyUnreadable && config.enabled
+              ? undefined
+              : t('channels.ntfy.followsWebPush'),
         },
       ]
     : [];

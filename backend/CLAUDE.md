@@ -275,9 +275,12 @@ Seven rules, each with a test in `payee-contact-enrichment.service.spec.ts`, `co
 `WebPushSender` (`src/push/web-push-sender.service.ts`) is the only file in
 `src/` that imports `web-push` or calls `sendNotification`, and
 `push-secret.guard.spec.ts` fails on a second one. Budgets, bills, backups and
-imports call the notification layer and let it decide the wire -- that is what
-will let ntfy or UnifiedPush arrive later without any of them changing
-(discussion #1291, "delivery isolation"). The VAPID private key follows from the
+imports call the notification layer and let it decide the wire -- which is how
+UnifiedPush arrived (`docs/specs/notification-preferences.md` section 15) without
+any of them changing: a UnifiedPush subscription is a Web Push subscription
+whose endpoint is a distributor, tagged `transport = 'unifiedpush'` and gated by
+its own matrix channel, delivered by the same sender (discussion #1291,
+"delivery isolation"). The VAPID private key follows from the
 same boundary: it is read only by `PushConfigService`, handed only to the sender,
 and no response shape in `src/push/` declares a private field. See INV-PUSH-001
 through INV-PUSH-005.
