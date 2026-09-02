@@ -442,7 +442,7 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
               value={calcExpression}
               onChange={handleCalcExpressionChange}
               onKeyDown={(e) => { if (e.key === 'Enter') applyCalculation(); }}
-              placeholder={`e.g. 100*${formatNumberForEdit(1.13, 2, numberSeparators)}`}
+              placeholder={`100*${formatNumberForEdit(1.13, 2, numberSeparators)}`}
               className={cn(inputBaseClasses, 'text-lg font-mono mb-3')}
             />
 

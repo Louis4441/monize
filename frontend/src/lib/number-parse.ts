@@ -113,7 +113,9 @@ function canonicalNumeric(cleaned: string, separators: NumberSeparators): string
     const decimalChar =
       cleaned.lastIndexOf('.') > cleaned.lastIndexOf(',') ? '.' : ',';
     const groupChar = decimalChar === '.' ? ',' : '.';
-    return cleaned.split(groupChar).join('').replace(decimalChar, '.');
+    // split/join (not replace) so the result is position-independent for
+    // malformed multi-separator input, matching the single-separator branch.
+    return cleaned.split(groupChar).join('').split(decimalChar).join('.');
   }
   const sep = hasDot ? '.' : hasComma ? ',' : '';
   if (sep === '') return cleaned;
@@ -199,6 +201,12 @@ export function filterNumberTyping(
     else if (ch === '.' || ch === ',') out += ch;
     else if (ch === '-' && (allowNegative || allowOperators)) out += ch;
     else if (allowOperators && (ch === '+' || ch === '*' || ch === '/' || ch === '(' || ch === ')')) {
+      out += ch;
+    } else if (allowOperators && ch === ' ') {
+      // Keep spaces around operators readable while typing a calculator
+      // expression (the old filterCalculatorInput did); normalizeExpression
+      // strips them before evaluating. A plain number field drops the space,
+      // where it would be a grouping separator.
       out += ch;
     } else if (allowOperators && (ch === 'x' || ch === 'X' || ch === '×')) {
       out += '*';

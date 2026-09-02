@@ -114,6 +114,11 @@ describe('filterNumberTyping', () => {
     expect(filterNumberTyping('100*1,13', { allowOperators: true })).toBe('100*1,13');
     expect(filterNumberTyping('100×2', { allowOperators: true })).toBe('100*2');
   });
+
+  it('keeps spaces around operators in the calculator, drops them in a plain field', () => {
+    expect(filterNumberTyping('100 + 20', { allowOperators: true })).toBe('100 + 20');
+    expect(filterNumberTyping('1 2')).toBe('12'); // no operators: space is a group sep
+  });
 });
 
 describe('stripGroupSeparator', () => {
