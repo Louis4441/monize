@@ -574,6 +574,8 @@ describe("BillReminderService", () => {
               address: null,
               email: null,
               phone: null,
+              contactLookupAt: null,
+              contactLookupSource: null,
               isActive: true,
               defaultCategory: null as any,
               createdAt: new Date(),

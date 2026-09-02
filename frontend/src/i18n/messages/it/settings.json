@@ -764,6 +764,14 @@
         "step3": "Le risposte vengono trasmesse nella chat. Un indicatore di stato mostra se il tuo agente è connesso.",
         "note": "Non viene eseguito nulla finché il tuo agente non è connesso e in ascolto. La chat mostra le istruzioni di connessione."
       }
+    },
+    "payeeLookup": {
+      "title": "Ricerca automatica dei recapiti del beneficiario",
+      "subtitle": "Quando aggiungi un beneficiario, cerca sito web, indirizzo, e-mail e telefono tramite il provider IA configurato. Il modulo Nuovo beneficiario compila i suggerimenti perché tu li riveda; un beneficiario aggiunto per nome da una transazione viene completato in background. Viene inviato solo il nome del beneficiario, ogni ricerca può eseguire ricerche web addebitate a quel provider e un delegato usa il provider del titolare del conto.",
+      "toggleLabel": "Abilita la ricerca automatica dei recapiti",
+      "enabled": "Ricerca automatica dei recapiti abilitata",
+      "disabled": "Ricerca automatica dei recapiti disabilitata",
+      "saveFailed": "Impossibile aggiornare l'impostazione di ricerca dei recapiti"
     }
   },
   "sharedAccessPage": {

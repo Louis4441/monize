@@ -99,6 +99,7 @@
       "deletedInvestmentReport": "Beleggingsrapport \"{name}\" verwijderd",
       "createdPayee": "Begunstigde \"{name}\" aangemaakt",
       "updatedPayee": "Begunstigde \"{name}\" bijgewerkt",
+      "lookedUpPayeeContact": "Contactgegevens van begunstigde \"{name}\" opgezocht",
       "deletedPayee": "Begunstigde \"{name}\" verwijderd",
       "createdReport": "Rapport \"{name}\" aangemaakt",
       "updatedReport": "Rapport \"{name}\" bijgewerkt",

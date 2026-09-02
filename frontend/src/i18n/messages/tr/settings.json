@@ -764,6 +764,14 @@
         "step3": "Yanıtlar sohbete geri akışla gelir. Bir durum noktası, aracınızın bağlı olup olmadığını gösterir.",
         "note": "Aracınız bağlanıp dinlemeye başlayana kadar hiçbir şey çalışmaz. Sohbet, bağlantı talimatlarını gösterir."
       }
+    },
+    "payeeLookup": {
+      "title": "Alacaklı iletişim bilgilerini otomatik arama",
+      "subtitle": "Bir alacaklı eklediğinizde web sitesi, adresi, e-postası ve telefonu yapılandırdığınız yapay zeka sağlayıcısı üzerinden aranır. Yeni Alacaklı formu önerileri incelemeniz için doldurur; bir işlemden adıyla eklenen alacaklı arka planda doldurulur. Yalnızca alacaklı adı gönderilir, her arama o sağlayıcıya faturalandırılan web aramaları çalıştırabilir ve bir temsilci hesap sahibinin sağlayıcısını kullanır.",
+      "toggleLabel": "İletişim bilgilerini otomatik aramayı etkinleştir",
+      "enabled": "İletişim bilgilerini otomatik arama etkinleştirildi",
+      "disabled": "İletişim bilgilerini otomatik arama devre dışı bırakıldı",
+      "saveFailed": "İletişim bilgisi arama ayarı güncellenemedi"
     }
   },
   "sharedAccessPage": {

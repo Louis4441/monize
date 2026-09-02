@@ -99,6 +99,7 @@
       "deletedInvestmentReport": "Видалено інвестиційний звіт \"{name}\"",
       "createdPayee": "Створено одержувача \"{name}\"",
       "updatedPayee": "Оновлено одержувача \"{name}\"",
+      "lookedUpPayeeContact": "Знайдено контактні дані отримувача «{name}»",
       "deletedPayee": "Видалено одержувача \"{name}\"",
       "createdReport": "Створено звіт \"{name}\"",
       "updatedReport": "Оновлено звіт \"{name}\"",

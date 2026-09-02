@@ -189,6 +189,9 @@ function looksLikeToolCallPrefix(text: string): boolean {
 
 export class OpenAiCompatibleProvider extends OpenAiProvider {
   override readonly name = "openai-compatible";
+  // The Responses API and its web_search tool are OpenAI's own; a compatible
+  // server (vLLM, LM Studio, LiteLLM...) is chat.completions only.
+  override readonly supportsWebSearch = false;
 
   constructor(apiKey: string, baseUrl: string, model: string) {
     super(apiKey, model, baseUrl);

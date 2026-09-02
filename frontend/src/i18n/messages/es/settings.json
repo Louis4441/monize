@@ -764,6 +764,14 @@
         "step3": "Las respuestas se transmiten de vuelta al chat. Un indicador de estado muestra si su agente está conectado.",
         "note": "No se ejecuta nada hasta que su agente esté conectado y escuchando. El chat muestra las instrucciones de conexión."
       }
+    },
+    "payeeLookup": {
+      "title": "Búsqueda automática de datos de contacto del beneficiario",
+      "subtitle": "Al añadir un beneficiario, busca su sitio web, dirección, correo y teléfono a través del proveedor de IA configurado. El formulario de nuevo beneficiario rellena las sugerencias para que las revise; un beneficiario añadido por nombre desde una transacción se completa en segundo plano. Solo se envía el nombre del beneficiario, cada búsqueda puede realizar búsquedas web facturadas a ese proveedor, y un delegado usa el proveedor del titular de la cuenta.",
+      "toggleLabel": "Activar la búsqueda automática de datos de contacto",
+      "enabled": "Búsqueda automática de datos de contacto activada",
+      "disabled": "Búsqueda automática de datos de contacto desactivada",
+      "saveFailed": "No se pudo actualizar el ajuste de búsqueda de datos de contacto"
     }
   },
   "sharedAccessPage": {

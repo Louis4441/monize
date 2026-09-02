@@ -152,6 +152,14 @@ export class UpdatePreferencesDto {
 
   @ApiPropertyOptional({
     description:
+      "Look up a new payee's website, address, email and phone through the configured AI provider",
+  })
+  @IsOptional()
+  @IsBoolean()
+  payeeContactLookupEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description:
       "Show the What's New release-notes popup automatically after an upgrade",
   })
   @IsOptional()

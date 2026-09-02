@@ -97,7 +97,9 @@
     "address": "Địa chỉ",
     "phone": "Điện thoại",
     "email": "Email",
-    "notes": "Ghi chú"
+    "notes": "Ghi chú",
+    "contactLookup": "Thông tin liên hệ",
+    "contactLookupValue": "Tra cứu tự động vào {date}"
   },
   "tabs": {
     "ariaLabel": "Các phần của người nhận",
@@ -130,5 +132,13 @@
     "needsMoreHistory": "Cần ít nhất {years} năm lịch sử để phân biệt mẫu theo mùa với sự tình cờ.",
     "empty": "Chưa có chi tiêu để phân tách theo tháng",
     "monthTooltip": "{month}: trung bình {amount} qua {years, plural, one {# năm} other {# năm}}"
+  },
+  "contactLookup": {
+    "button": "Tra cứu thông tin liên hệ",
+    "inProgress": "Đang tra cứu...",
+    "filled": "{count, plural, other {Đã điền # thông tin liên hệ}}",
+    "nothingNew": "Không tìm thấy thông tin liên hệ mới.",
+    "noProvider": "Hãy cấu hình nhà cung cấp AI trong Cài đặt AI để tra cứu thông tin liên hệ.",
+    "failed": "Không thể hoàn tất tra cứu. Vui lòng thử lại sau."
   }
 }

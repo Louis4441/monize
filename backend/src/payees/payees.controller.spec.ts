@@ -3,15 +3,21 @@ import { PayeesController } from "./payees.controller";
 import { PayeesService } from "./payees.service";
 import { PayeeDetailService } from "./payee-detail.service";
 import { PayeeAutoMergeService } from "./payee-auto-merge.service";
+import { PayeeContactLookupService } from "./lookup/payee-contact-lookup.service";
+import { PayeeContactEnrichmentService } from "./lookup/payee-contact-enrichment.service";
 
 describe("PayeesController", () => {
   let controller: PayeesController;
   let mockPayeesService: Record<string, jest.Mock>;
   let mockPayeeDetailService: Record<string, jest.Mock>;
   let mockAutoMergeService: Record<string, jest.Mock>;
+  let mockContactLookupService: Record<string, jest.Mock>;
+  let mockContactEnrichmentService: Record<string, jest.Mock>;
   const mockReq = { user: { id: "user-1" } };
 
   beforeEach(async () => {
+    mockContactLookupService = { lookup: jest.fn() };
+    mockContactEnrichmentService = { rerun: jest.fn() };
     mockAutoMergeService = {
       previewAutoMerge: jest.fn(),
       applyAutoMerge: jest.fn(),
@@ -59,6 +65,14 @@ describe("PayeesController", () => {
         {
           provide: PayeeAutoMergeService,
           useValue: mockAutoMergeService,
+        },
+        {
+          provide: PayeeContactLookupService,
+          useValue: mockContactLookupService,
+        },
+        {
+          provide: PayeeContactEnrichmentService,
+          useValue: mockContactEnrichmentService,
         },
       ],
     }).compile();
@@ -722,6 +736,41 @@ describe("PayeesController", () => {
       await controller.refreshLogo(mockReq, "payee-1");
 
       expect(mockPayeesService.refreshLogo).toHaveBeenCalledWith(
+        "user-1",
+        "payee-1",
+      );
+    });
+  });
+
+  describe("lookupContact()", () => {
+    it("looks the name up without persisting, ignoring the opt-in preference", async () => {
+      const outcome = { reason: "none", suggestion: null };
+      mockContactLookupService.lookup.mockResolvedValue(outcome);
+
+      const result = await controller.lookupContact(mockReq, { name: "Acme" });
+
+      expect(result).toBe(outcome);
+      expect(mockContactLookupService.lookup).toHaveBeenCalledWith(
+        "user-1",
+        { name: "Acme" },
+        { ignorePreference: true },
+      );
+    });
+  });
+
+  describe("lookupContactForPayee()", () => {
+    it("re-runs the enrichment for the payee", async () => {
+      const result = {
+        reason: "ok",
+        filled: ["phone"],
+        payee: { id: "payee-1" },
+      };
+      mockContactEnrichmentService.rerun.mockResolvedValue(result);
+
+      await expect(
+        controller.lookupContactForPayee(mockReq, "payee-1"),
+      ).resolves.toBe(result);
+      expect(mockContactEnrichmentService.rerun).toHaveBeenCalledWith(
         "user-1",
         "payee-1",
       );

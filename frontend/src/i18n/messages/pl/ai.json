@@ -87,6 +87,8 @@
     "address": "Adres",
     "email": "E-mail",
     "phone": "Telefon",
+    "contactLookup": "Dane kontaktowe",
+    "contactLookupSuggested": "Zaproponowane przez wyszukiwanie — sprawdź przed zatwierdzeniem",
     "none": "Brak",
     "approve": "Zatwierdź",
     "cancel": "Anuluj",

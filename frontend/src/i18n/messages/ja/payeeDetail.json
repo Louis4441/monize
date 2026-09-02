@@ -97,7 +97,9 @@
     "address": "住所",
     "phone": "電話番号",
     "email": "メールアドレス",
-    "notes": "メモ"
+    "notes": "メモ",
+    "contactLookup": "連絡先情報",
+    "contactLookupValue": "{date}に自動検索"
   },
   "tabs": {
     "ariaLabel": "支払先のセクション",
@@ -130,5 +132,13 @@
     "needsMoreHistory": "季節的な傾向を偶然と区別するには、少なくとも{years}年分の履歴が必要です。",
     "empty": "月別に分ける支出がまだありません",
     "monthTooltip": "{month}: {years, plural, one {# 年} other {# 年}}平均で {amount}"
+  },
+  "contactLookup": {
+    "button": "連絡先情報を検索",
+    "inProgress": "検索中...",
+    "filled": "{count, plural, other {連絡先情報を#件入力しました}}",
+    "nothingNew": "新しい連絡先情報は見つかりませんでした。",
+    "noProvider": "連絡先情報を検索するには、AI設定でAIプロバイダーを設定してください。",
+    "failed": "検索を完了できませんでした。後でもう一度お試しください。"
   }
 }

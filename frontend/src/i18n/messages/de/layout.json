@@ -99,6 +99,7 @@
       "deletedInvestmentReport": "Anlagebericht \"{name}\" gelöscht",
       "createdPayee": "Zahlungsempfänger \"{name}\" erstellt",
       "updatedPayee": "Zahlungsempfänger \"{name}\" aktualisiert",
+      "lookedUpPayeeContact": "Kontaktangaben für Zahlungsempfänger \"{name}\" nachgeschlagen",
       "deletedPayee": "Zahlungsempfänger \"{name}\" gelöscht",
       "createdReport": "Bericht \"{name}\" erstellt",
       "updatedReport": "Bericht \"{name}\" aktualisiert",

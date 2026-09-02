@@ -99,6 +99,7 @@
       "deletedInvestmentReport": "投資レポート「{name}」を削除しました",
       "createdPayee": "支払先「{name}」を作成しました",
       "updatedPayee": "支払先「{name}」を更新しました",
+      "lookedUpPayeeContact": "支払先「{name}」の連絡先情報を検索しました",
       "deletedPayee": "支払先「{name}」を削除しました",
       "createdReport": "レポート「{name}」を作成しました",
       "updatedReport": "レポート「{name}」を更新しました",

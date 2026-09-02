@@ -99,6 +99,7 @@
       "deletedInvestmentReport": "Laporan investasi \"{name}\" dihapus",
       "createdPayee": "Penerima \"{name}\" dibuat",
       "updatedPayee": "Penerima \"{name}\" diperbarui",
+      "lookedUpPayeeContact": "Mencari detail kontak penerima \"{name}\"",
       "deletedPayee": "Penerima \"{name}\" dihapus",
       "createdReport": "Laporan \"{name}\" dibuat",
       "updatedReport": "Laporan \"{name}\" diperbarui",

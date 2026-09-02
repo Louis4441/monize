@@ -1,7 +1,13 @@
 'use client';
 
+import { useState } from 'react';
+import toast from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { KeyValueList, type KeyValueRow } from '@/components/ui/KeyValueList';
+import { payeesApi } from '@/lib/payees';
+import { getErrorMessage } from '@/lib/errors';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { externalUrlLabel, toSafeExternalUrl } from '@/lib/external-url';
@@ -21,6 +27,11 @@ interface PayeeKeyInfoCardProps {
   onSelectDate: (date: string) => void;
   /** Open an account's detail page (for the overpayment designation). */
   onSelectAccount: (accountId: string) => void;
+  /**
+   * Called after an on-demand contact lookup wrote to the payee, so the page
+   * reloads the detail it is rendering from.
+   */
+  onContactLookedUp?: () => void | Promise<void>;
 }
 
 /**
@@ -33,13 +44,43 @@ export function PayeeKeyInfoCard({
   categoryLabelMap,
   onSelectDate,
   onSelectAccount,
+  onContactLookedUp,
 }: PayeeKeyInfoCardProps) {
   const t = useTranslations('payeeDetail');
   const { formatDate } = useDateFormat();
   const { formatCurrency } = useNumberFormat();
   const mapProvider = useMapProvider();
+  const [lookingUp, setLookingUp] = useState(false);
 
   const { payee, stats, largestTransaction, overpaymentForAccounts } = detail;
+
+  // Fills only the contact fields still empty (the server's UPDATE is
+  // COALESCE per column); a stored value is replaced from the edit form, never
+  // from here. Each reason gets its own message -- "could not look" must never
+  // read as "nothing found".
+  const handleLookup = async () => {
+    if (lookingUp) return;
+    setLookingUp(true);
+    try {
+      const result = await payeesApi.lookupContactForPayee(payee.id);
+      if (result.reason === 'ok' && result.filled.length > 0) {
+        toast.success(t('contactLookup.filled', { count: result.filled.length }));
+      } else if (result.reason === 'ok' || result.reason === 'none') {
+        toast(t('contactLookup.nothingNew'));
+      } else if (result.reason === 'no_provider') {
+        toast.error(t('contactLookup.noProvider'));
+      } else {
+        toast.error(result.detail ?? t('contactLookup.failed'));
+      }
+      if (result.filled.length > 0) {
+        await onContactLookedUp?.();
+      }
+    } catch (error) {
+      toast.error(getErrorMessage(error, t('contactLookup.failed')));
+    } finally {
+      setLookingUp(false);
+    }
+  };
   const websiteUrl = toSafeExternalUrl(payee.website);
   // Each contact value is turned into a link by its own guard, and a value the
   // guard rejects still renders as text rather than disappearing -- a stored
@@ -195,13 +236,39 @@ export function PayeeKeyInfoCard({
       label: t('keyInfo.notes'),
       value: payee.notes || null,
     },
+    {
+      // Keyed on the source, not the timestamp: an attempt that found nothing
+      // stamps the date and leaves the source null, and there is nothing to
+      // badge about that.
+      key: 'contactLookup',
+      label: t('keyInfo.contactLookup'),
+      value:
+        payee.contactLookupSource && payee.contactLookupAt ? (
+          <Badge variant="blue">
+            {t('keyInfo.contactLookupValue', {
+              date: formatDate(payee.contactLookupAt),
+            })}
+          </Badge>
+        ) : null,
+    },
   ];
 
   return (
     <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800 dark:shadow-gray-700/50">
-      <h3 className="mb-3 text-lg font-semibold text-gray-900 dark:text-gray-100">
-        {t('keyInfo.title')}
-      </h3>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          {t('keyInfo.title')}
+        </h3>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleLookup}
+          disabled={lookingUp}
+        >
+          {lookingUp ? t('contactLookup.inProgress') : t('contactLookup.button')}
+        </Button>
+      </div>
       <KeyValueList rows={rows} />
     </div>
   );

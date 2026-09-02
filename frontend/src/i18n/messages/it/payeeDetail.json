@@ -97,7 +97,9 @@
     "address": "Indirizzo",
     "phone": "Telefono",
     "email": "E-mail",
-    "notes": "Note"
+    "notes": "Note",
+    "contactLookup": "Recapiti",
+    "contactLookupValue": "Cercati automaticamente il {date}"
   },
   "tabs": {
     "ariaLabel": "Sezioni del beneficiario",
@@ -130,5 +132,13 @@
     "needsMoreHistory": "Servono almeno {years} anni di cronologia per distinguere uno schema stagionale dal caso.",
     "empty": "Nessuna spesa da suddividere per mese",
     "monthTooltip": "{month}: {amount} in media su {years, plural, one {# anno} other {# anni}}"
+  },
+  "contactLookup": {
+    "button": "Cerca recapiti",
+    "inProgress": "Ricerca in corso...",
+    "filled": "{count, plural, one {# recapito compilato} other {# recapiti compilati}}",
+    "nothingNew": "Nessun nuovo recapito trovato.",
+    "noProvider": "Configura un provider IA nelle Impostazioni IA per cercare i recapiti.",
+    "failed": "Non è stato possibile completare la ricerca. Riprova più tardi."
   }
 }

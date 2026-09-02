@@ -26,6 +26,8 @@ import {
 import {
   AiCompletionRequest,
   AiCompletionResponse,
+  AiWebSearchOptions,
+  AiWebSearchResponse,
   AiProvider,
   AiTextBlock,
 } from "./providers/ai-provider.interface";
@@ -48,6 +50,20 @@ const DEFAULT_MAX_AI_PROVIDERS_PER_USER = 10;
  * and never learns which model the agent runs.
  */
 const RELAY_MODEL_LABEL = "relay-agent";
+
+/**
+ * The relay agent is a chat-style assistant with tools of its own. A
+ * web-search completion cannot switch its search on, so it is asked to.
+ */
+function withRelaySearchInstruction(
+  systemPrompt: string,
+  search: AiWebSearchOptions,
+): string {
+  const instruction =
+    `If you have a web search tool, use it (at most ${search.maxUses} ` +
+    "searches) to verify your answer rather than answering from memory.";
+  return systemPrompt ? `${systemPrompt}\n\n${instruction}` : instruction;
+}
 
 @Injectable()
 export class AiService {
@@ -442,6 +458,79 @@ export class AiService {
     request: AiCompletionRequest,
     feature: string,
   ): Promise<AiCompletionResponse> {
+    return this.completeAcrossProviders(userId, feature, (config, isRelay) =>
+      isRelay
+        ? this.completeViaRelay(userId, request)
+        : this.providerFactory.createProvider(config).complete(request),
+    );
+  }
+
+  /**
+   * A single tool-free completion that may consult the web, served by every
+   * provider the user has configured, in priority order with fallthrough --
+   * the same loop as `complete()`:
+   *
+   * - a provider with its own server-side search (Anthropic, OpenAI) runs it
+   *   through `completeWithWebSearch`;
+   * - the MCP relay hands the prompt to the user's own agent, told to use its
+   *   web search if it has one, and the answer is marked `viaRelay` because
+   *   the agent cannot report whether it searched;
+   * - any other provider answers from model knowledge through `complete()`
+   *   in JSON mode, with `searched: false`.
+   *
+   * The caller decides how much to trust each of those three answers.
+   */
+  async completeWithWebSearch(
+    userId: string,
+    request: AiCompletionRequest,
+    search: AiWebSearchOptions,
+    feature: string,
+  ): Promise<AiWebSearchResponse> {
+    const jsonRequest: AiCompletionRequest = {
+      ...request,
+      responseFormat: "json",
+    };
+    return this.completeAcrossProviders(
+      userId,
+      feature,
+      async (config, isRelay): Promise<AiWebSearchResponse> => {
+        if (isRelay) {
+          const relayed = await this.completeViaRelay(userId, {
+            ...jsonRequest,
+            systemPrompt: withRelaySearchInstruction(
+              jsonRequest.systemPrompt,
+              search,
+            ),
+          });
+          return {
+            ...relayed,
+            searched: false,
+            searchCount: 0,
+            viaRelay: true,
+          };
+        }
+        const provider = this.providerFactory.createProvider(config);
+        if (provider.supportsWebSearch && provider.completeWithWebSearch) {
+          return provider.completeWithWebSearch(jsonRequest, search);
+        }
+        const plain = await provider.complete(jsonRequest);
+        return { ...plain, searched: false, searchCount: 0 };
+      },
+    );
+  }
+
+  /**
+   * The one provider loop: try each active config in priority order, log
+   * usage for every attempt (success or failure), fall through on failure,
+   * and surface the relay's own error when the relay was the only option.
+   * `complete()` and `completeWithWebSearch()` differ only in what one
+   * attempt does, so that is the parameter.
+   */
+  private async completeAcrossProviders<T extends AiCompletionResponse>(
+    userId: string,
+    feature: string,
+    attempt: (config: AiProviderConfig, isRelay: boolean) => Promise<T>,
+  ): Promise<T> {
     const configs = await this.getActiveConfigs(userId);
 
     if (configs.length === 0) {
@@ -464,9 +553,7 @@ export class AiService {
         // through the user's own agent, the same prompt/response round-trip
         // the chat uses. Failures (agent offline, timed out) fall through to
         // the next provider like any other provider failure.
-        const response = isRelay
-          ? await this.completeViaRelay(userId, request)
-          : await this.providerFactory.createProvider(config).complete(request);
+        const response = await attempt(config, isRelay);
         const durationMs = Date.now() - startTime;
 
         await this.usageService.logUsage({
@@ -672,7 +759,7 @@ export class AiService {
     );
   }
 
-  private async getActiveConfigs(userId: string): Promise<AiProviderConfig[]> {
+  async getActiveConfigs(userId: string): Promise<AiProviderConfig[]> {
     const userConfigs = await withScopedDb(this.dataSource, (manager) =>
       manager.getRepository(AiProviderConfig).find({
         where: { userId, isActive: true },

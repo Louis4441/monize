@@ -147,10 +147,11 @@ describe("McpPayeesTools", () => {
         { operation: "create", items: [{ name: "New Payee" }] },
         { sessionId: "s1" },
       );
-      expect(payeesService.create).toHaveBeenCalledWith("u1", {
-        name: "New Payee",
-        defaultCategoryId: undefined,
-      });
+      expect(payeesService.create).toHaveBeenCalledWith(
+        "u1",
+        { name: "New Payee", defaultCategoryId: undefined },
+        {},
+      );
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.id).toBe("p2");
       expect(parsed.count).toBe(1);
@@ -173,18 +174,22 @@ describe("McpPayeesTools", () => {
         { sessionId: "s1" },
       );
 
-      expect(prepService.prepareCreatePayeeSingle).toHaveBeenCalledWith("u1", {
-        name: "Acme",
-        categoryName: undefined,
-        website: "acme.com",
-      });
+      expect(prepService.prepareCreatePayeeSingle).toHaveBeenCalledWith(
+        "u1",
+        { name: "Acme", categoryName: undefined, website: "acme.com" },
+        { lookupContact: true },
+      );
       // The normalised address from the preview is what gets stored, so the
       // saved payee matches the card the user approved.
-      expect(payeesService.create).toHaveBeenCalledWith("u1", {
-        name: "Acme",
-        defaultCategoryId: undefined,
-        website: "https://acme.com",
-      });
+      expect(payeesService.create).toHaveBeenCalledWith(
+        "u1",
+        {
+          name: "Acme",
+          defaultCategoryId: undefined,
+          website: "https://acme.com",
+        },
+        {},
+      );
     });
 
     it("passes the contact fields through to the prep layer and the write", async () => {
@@ -220,6 +225,7 @@ describe("McpPayeesTools", () => {
           email: "hi@acme.com",
           phone: "+1 555-0100",
         }),
+        { lookupContact: true },
       );
       expect(payeesService.create).toHaveBeenCalledWith(
         "u1",
@@ -228,6 +234,7 @@ describe("McpPayeesTools", () => {
           email: "hi@acme.com",
           phone: "+1 555-0100",
         }),
+        {},
       );
     });
 

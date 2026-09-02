@@ -97,7 +97,9 @@
     "address": "Morada",
     "phone": "Telefone",
     "email": "E-mail",
-    "notes": "Notas"
+    "notes": "Notas",
+    "contactLookup": "Contactos",
+    "contactLookupValue": "Procurados automaticamente em {date}"
   },
   "tabs": {
     "ariaLabel": "Secções do beneficiário",
@@ -130,5 +132,13 @@
     "needsMoreHistory": "São necessários pelo menos {years} anos de histórico para distinguir um padrão sazonal do acaso.",
     "empty": "Ainda não há despesas para dividir por mês",
     "monthTooltip": "{month}: {amount} em média em {years, plural, one {# ano} other {# anos}}"
+  },
+  "contactLookup": {
+    "button": "Procurar contactos",
+    "inProgress": "A procurar...",
+    "filled": "{count, plural, one {# contacto preenchido} other {# contactos preenchidos}}",
+    "nothingNew": "Não foram encontrados contactos novos.",
+    "noProvider": "Configure um fornecedor de IA nas Definições de IA para procurar contactos.",
+    "failed": "Não foi possível concluir a pesquisa. Tente novamente mais tarde."
   }
 }

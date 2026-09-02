@@ -91,7 +91,16 @@
     "applyCategoryNone": "Não alterar as transações existentes",
     "applyCategoryUncategorized": "Apenas transações sem categoria ({count})",
     "applyCategoryAll": "Todas as transações ({count})",
-    "applyCategoryHelp": "As transferências e as transações divididas nunca são alteradas."
+    "applyCategoryHelp": "As transferências e as transações divididas nunca são alteradas.",
+    "lookup": {
+      "button": "Procurar contactos",
+      "searching": "A procurar contactos...",
+      "suggested": "Sugerido pela pesquisa:",
+      "clear": "Limpar sugestões",
+      "nothingFound": "Não foram encontrados contactos públicos para este nome.",
+      "noProvider": "Configure um fornecedor de IA nas <link>Definições de IA</link> para procurar contactos.",
+      "failed": "Não foi possível concluir a pesquisa. Tente novamente mais tarde."
+    }
   },
   "merge": {
     "title": "Unir Beneficiário",

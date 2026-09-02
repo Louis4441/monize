@@ -99,6 +99,7 @@
       "deletedInvestmentReport": "Удалён инвестиционный отчёт \"{name}\"",
       "createdPayee": "Создан получатель \"{name}\"",
       "updatedPayee": "Обновлён получатель \"{name}\"",
+      "lookedUpPayeeContact": "Найдены контактные данные получателя «{name}»",
       "deletedPayee": "Удалён получатель \"{name}\"",
       "createdReport": "Создан отчёт \"{name}\"",
       "updatedReport": "Обновлён отчёт \"{name}\"",

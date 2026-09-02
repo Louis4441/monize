@@ -97,7 +97,9 @@
     "address": "주소",
     "phone": "전화번호",
     "email": "이메일",
-    "notes": "메모"
+    "notes": "메모",
+    "contactLookup": "연락처 정보",
+    "contactLookupValue": "{date}에 자동 조회됨"
   },
   "tabs": {
     "ariaLabel": "수취인 섹션",
@@ -130,5 +132,13 @@
     "needsMoreHistory": "계절적 패턴을 우연과 구분하려면 최소 {years}년의 기록이 필요합니다.",
     "empty": "월별로 나눌 지출이 아직 없습니다",
     "monthTooltip": "{month}: {years, plural, one {#년} other {#년}} 평균 {amount}"
+  },
+  "contactLookup": {
+    "button": "연락처 정보 조회",
+    "inProgress": "조회 중...",
+    "filled": "{count, plural, other {연락처 정보 #개를 채웠습니다}}",
+    "nothingNew": "새로운 연락처 정보를 찾지 못했습니다.",
+    "noProvider": "연락처 정보를 조회하려면 AI 설정에서 AI 공급자를 구성하세요.",
+    "failed": "조회를 완료할 수 없습니다. 나중에 다시 시도하세요."
   }
 }

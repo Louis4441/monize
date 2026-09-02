@@ -10,6 +10,8 @@ import {
   DeactivationPreviewParams,
   DeactivationCandidate,
   PayeeDetail,
+  PayeeContactLookupResult,
+  PayeeContactRerunResult,
   PayeeStatusFilter,
   PayeeAlias,
   CreatePayeeAliasData,
@@ -36,6 +38,29 @@ export const payeesApi = {
   // Re-fetch the payee's brand favicon from its current website
   refreshLogo: async (id: string): Promise<Payee> => {
     const response = await apiClient.post<Payee>(`/payees/${id}/refresh-logo`);
+    invalidateCache('payees:');
+    return response.data;
+  },
+
+  // Look a name up without saving anything (the form's prefill). Takes an
+  // AbortSignal so a superseded request can be cancelled rather than adopted.
+  lookupContact: async (
+    name: string,
+    signal?: AbortSignal,
+  ): Promise<PayeeContactLookupResult> => {
+    const response = await apiClient.post<PayeeContactLookupResult>(
+      '/payees/lookup-contact',
+      { name },
+      { signal },
+    );
+    return response.data;
+  },
+
+  // Look an existing payee up and fill whichever contact fields are still empty
+  lookupContactForPayee: async (id: string): Promise<PayeeContactRerunResult> => {
+    const response = await apiClient.post<PayeeContactRerunResult>(
+      `/payees/${id}/lookup-contact`,
+    );
     invalidateCache('payees:');
     return response.data;
   },

@@ -764,6 +764,14 @@
         "step3": "Les réponses sont diffusées dans le chat. Un voyant d'état indique si votre agent est connecté.",
         "note": "Rien ne s'exécute tant que votre agent n'est pas connecté et à l'écoute. Le chat affiche les instructions de connexion."
       }
+    },
+    "payeeLookup": {
+      "title": "Recherche automatique des coordonnées du bénéficiaire",
+      "subtitle": "À l'ajout d'un bénéficiaire, recherche son site web, son adresse, son e-mail et son téléphone via le fournisseur d'IA configuré. Le formulaire de nouveau bénéficiaire préremplit les suggestions pour relecture ; un bénéficiaire ajouté par son nom depuis une transaction est complété en arrière-plan. Seul le nom du bénéficiaire est envoyé, chaque recherche peut lancer des recherches web facturées à ce fournisseur, et un délégué utilise le fournisseur du titulaire du compte.",
+      "toggleLabel": "Activer la recherche automatique des coordonnées",
+      "enabled": "Recherche automatique des coordonnées activée",
+      "disabled": "Recherche automatique des coordonnées désactivée",
+      "saveFailed": "Impossible de mettre à jour le paramètre de recherche des coordonnées"
     }
   },
   "sharedAccessPage": {

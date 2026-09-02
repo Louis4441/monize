@@ -9,6 +9,8 @@ import {
   AiToolStreamChunk,
   AiMessage,
   AiContentBlock,
+  AiWebSearchOptions,
+  AiWebSearchResponse,
   ModelVerificationResult,
 } from "./ai-provider.interface";
 import {
@@ -18,11 +20,13 @@ import {
 } from "./content-blocks.util";
 import { longRunningFetch } from "./long-running-fetch";
 import { toolsField } from "./tools-field.util";
+import { serverToolsField } from "./web-search-tool.util";
 
 export class OpenAiProvider implements AiProvider {
   readonly name: string = "openai";
   readonly supportsStreaming = true;
   readonly supportsToolUse = true;
+  readonly supportsWebSearch: boolean = true;
 
   protected readonly client: OpenAI;
   protected readonly modelId: string;
@@ -153,6 +157,95 @@ export class OpenAiProvider implements AiProvider {
       },
       model: response.model,
       provider: this.name,
+    };
+  }
+
+  /**
+   * One tool-free completion with OpenAI's hosted web search, through the
+   * Responses API (chat.completions has no server-side search). The tool type
+   * has moved once already (`web_search_preview` -> `web_search`), so a 400
+   * rejecting the current type is retried with the older one; if the model
+   * takes neither, the request degrades to a plain JSON completion with
+   * `searched: false` rather than failing the caller.
+   *
+   * OpenAI has no `max_uses`; `search.maxUses` is passed as an instruction.
+   */
+  async completeWithWebSearch(
+    request: AiCompletionRequest,
+    search: AiWebSearchOptions,
+  ): Promise<AiWebSearchResponse> {
+    const input: OpenAI.Responses.ResponseInput = request.messages
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: contentToPlainText(m.content),
+      }));
+    const instructions = [
+      request.systemPrompt,
+      `Use the web search tool at most ${search.maxUses} times.`,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    const send = (toolType: "web_search" | "web_search_preview") =>
+      this.client.responses.create({
+        model: this.modelId,
+        instructions,
+        input,
+        max_output_tokens: request.maxTokens || 1024,
+        ...serverToolsField<OpenAI.Responses.Tool>(
+          toolType === "web_search"
+            ? {
+                type: "web_search",
+                ...(search.allowedDomains && search.allowedDomains.length > 0
+                  ? { filters: { allowed_domains: search.allowedDomains } }
+                  : {}),
+              }
+            : { type: "web_search_preview" },
+        ),
+        ...(request.temperature !== undefined && {
+          temperature: request.temperature,
+        }),
+        ...(request.responseFormat === "json" && {
+          text: { format: { type: "json_object" as const } },
+        }),
+      });
+
+    let response: OpenAI.Responses.Response;
+    try {
+      response = await send("web_search");
+    } catch (error) {
+      if (!isToolTypeRejection(error)) {
+        throw error;
+      }
+      try {
+        response = await send("web_search_preview");
+      } catch (retryError) {
+        if (!isToolTypeRejection(retryError)) {
+          throw retryError;
+        }
+        const plain = await this.complete({
+          ...request,
+          responseFormat: "json",
+        });
+        return { ...plain, searched: false, searchCount: 0 };
+      }
+    }
+
+    const searchCount = response.output.filter(
+      (item) => item.type === "web_search_call",
+    ).length;
+
+    return {
+      content: response.output_text || "",
+      usage: {
+        inputTokens: response.usage?.input_tokens || 0,
+        outputTokens: response.usage?.output_tokens || 0,
+      },
+      model: response.model,
+      provider: this.name,
+      searched: searchCount > 0,
+      searchCount,
     };
   }
 
@@ -404,4 +497,16 @@ export class OpenAiProvider implements AiProvider {
       clearTimeout(timeout);
     }
   }
+}
+
+/**
+ * A 400 whose message names the search tool type is the model declining the
+ * tool, not the request; anything else (auth, rate limit, a bad model id) is
+ * rethrown as-is.
+ */
+function isToolTypeRejection(error: unknown): boolean {
+  const status = (error as { status?: unknown })?.status;
+  if (status !== 400) return false;
+  const message = error instanceof Error ? error.message : String(error);
+  return /web_search/.test(message);
 }

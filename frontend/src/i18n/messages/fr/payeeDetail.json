@@ -97,7 +97,9 @@
     "address": "Adresse",
     "phone": "Téléphone",
     "email": "E-mail",
-    "notes": "Notes"
+    "notes": "Notes",
+    "contactLookup": "Coordonnées",
+    "contactLookupValue": "Recherchées automatiquement le {date}"
   },
   "tabs": {
     "ariaLabel": "Sections du bénéficiaire",
@@ -130,5 +132,13 @@
     "needsMoreHistory": "Il faut au moins {years} ans d’historique pour distinguer une saisonnalité du hasard.",
     "empty": "Aucune dépense à répartir par mois pour le moment",
     "monthTooltip": "{month} : {amount} en moyenne sur {years, plural, one {# an} other {# ans}}"
+  },
+  "contactLookup": {
+    "button": "Rechercher les coordonnées",
+    "inProgress": "Recherche...",
+    "filled": "{count, plural, one {# coordonnée renseignée} other {# coordonnées renseignées}}",
+    "nothingNew": "Aucune nouvelle coordonnée n'a été trouvée.",
+    "noProvider": "Configurez un fournisseur d'IA dans les paramètres IA pour rechercher les coordonnées.",
+    "failed": "La recherche n'a pas pu aboutir. Réessayez plus tard."
   }
 }

@@ -644,6 +644,7 @@ function PayeeDetailContent() {
                     onSelectAccount={(accountId) =>
                       router.push(`/accounts/${accountId}`)
                     }
+                    onContactLookedUp={loadData}
                   />
                 </div>
 

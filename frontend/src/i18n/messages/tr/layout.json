@@ -99,6 +99,7 @@
       "deletedInvestmentReport": "\"{name}\" yatırım raporu silindi",
       "createdPayee": "\"{name}\" alacaklısı oluşturuldu",
       "updatedPayee": "\"{name}\" alacaklısı güncellendi",
+      "lookedUpPayeeContact": "\"{name}\" alacaklısının iletişim bilgileri arandı",
       "deletedPayee": "\"{name}\" alacaklısı silindi",
       "createdReport": "\"{name}\" raporu oluşturuldu",
       "updatedReport": "\"{name}\" raporu güncellendi",

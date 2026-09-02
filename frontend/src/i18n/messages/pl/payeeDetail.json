@@ -97,7 +97,9 @@
     "address": "Adres",
     "phone": "Telefon",
     "email": "E-mail",
-    "notes": "Notatki"
+    "notes": "Notatki",
+    "contactLookup": "Dane kontaktowe",
+    "contactLookupValue": "Wyszukane automatycznie {date}"
   },
   "tabs": {
     "ariaLabel": "Sekcje odbiorcy",
@@ -130,5 +132,13 @@
     "needsMoreHistory": "Potrzeba co najmniej {years} lat historii, aby odróżnić wzorzec sezonowy od przypadku.",
     "empty": "Brak wydatków do podziału na miesiące",
     "monthTooltip": "{month}: średnio {amount} z {years, plural, one {# roku} few {# lat} many {# lat} other {# lat}}"
+  },
+  "contactLookup": {
+    "button": "Wyszukaj dane kontaktowe",
+    "inProgress": "Wyszukiwanie...",
+    "filled": "{count, plural, one {Uzupełniono # daną kontaktową} few {Uzupełniono # dane kontaktowe} many {Uzupełniono # danych kontaktowych} other {Uzupełniono # danych kontaktowych}}",
+    "nothingNew": "Nie znaleziono nowych danych kontaktowych.",
+    "noProvider": "Skonfiguruj dostawcę AI w Ustawieniach AI, aby wyszukiwać dane kontaktowe.",
+    "failed": "Nie udało się ukończyć wyszukiwania. Spróbuj ponownie później."
   }
 }

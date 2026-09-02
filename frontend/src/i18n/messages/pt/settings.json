@@ -764,6 +764,14 @@
         "step3": "As respostas são transmitidas de volta ao chat. Um ponto de estado mostra se o seu agente está ligado.",
         "note": "Nada é executado até o seu agente estar ligado e à escuta. O chat mostra as instruções de ligação."
       }
+    },
+    "payeeLookup": {
+      "title": "Pesquisa automática dos contactos do beneficiário",
+      "subtitle": "Ao adicionar um beneficiário, o site, a morada, o e-mail e o telefone são procurados através do fornecedor de IA configurado. O formulário de novo beneficiário preenche as sugestões para revisão; um beneficiário adicionado por nome a partir de uma transação é preenchido em segundo plano. Apenas o nome do beneficiário é enviado, cada pesquisa pode executar pesquisas na web faturadas a esse fornecedor, e um delegado usa o fornecedor do titular da conta.",
+      "toggleLabel": "Ativar a pesquisa automática de contactos",
+      "enabled": "Pesquisa automática de contactos ativada",
+      "disabled": "Pesquisa automática de contactos desativada",
+      "saveFailed": "Não foi possível atualizar a definição de pesquisa de contactos"
     }
   },
   "sharedAccessPage": {

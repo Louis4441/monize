@@ -129,6 +129,8 @@ function detailFixture(overrides: Partial<PayeeDetail> = {}): PayeeDetail {
       website: null,
       hasLogo: false,
       logoFetchedAt: null,
+      contactLookupAt: null,
+      contactLookupSource: null,
       address: null,
       email: null,
       phone: null,

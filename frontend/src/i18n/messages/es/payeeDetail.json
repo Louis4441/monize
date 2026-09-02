@@ -97,7 +97,9 @@
     "address": "Dirección",
     "phone": "Teléfono",
     "email": "Correo electrónico",
-    "notes": "Notas"
+    "notes": "Notas",
+    "contactLookup": "Datos de contacto",
+    "contactLookupValue": "Buscado automáticamente el {date}"
   },
   "tabs": {
     "ariaLabel": "Secciones del beneficiario",
@@ -130,5 +132,13 @@
     "needsMoreHistory": "Se necesitan al menos {years} años de historial para distinguir un patrón estacional del ruido.",
     "empty": "Aún no hay gastos para desglosar por mes",
     "monthTooltip": "{month}: {amount} de media en {years, plural, one {# año} other {# años}}"
+  },
+  "contactLookup": {
+    "button": "Buscar datos de contacto",
+    "inProgress": "Buscando...",
+    "filled": "{count, plural, one {Se completó # dato de contacto} other {Se completaron # datos de contacto}}",
+    "nothingNew": "No se encontraron datos de contacto nuevos.",
+    "noProvider": "Configure un proveedor de IA en Ajustes de IA para buscar datos de contacto.",
+    "failed": "No se pudo completar la búsqueda. Inténtelo de nuevo más tarde."
   }
 }

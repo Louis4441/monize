@@ -48,6 +48,8 @@ function makePayee(overrides: Partial<Payee> & { id: string; name: string }): Pa
     website: null,
     hasLogo: false,
     logoFetchedAt: null,
+    contactLookupAt: null,
+    contactLookupSource: null,
     address: null,
     email: null,
     phone: null,

@@ -17,6 +17,8 @@ describe('ReactivatePayeeDialog', () => {
     website: null,
     hasLogo: false,
     logoFetchedAt: null,
+    contactLookupAt: null,
+    contactLookupSource: null,
     address: null,
     email: null,
     phone: null,

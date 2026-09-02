@@ -1,6 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, act } from '@/test/render';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, act, waitFor } from '@/test/render';
 import { PayeeForm } from './PayeeForm';
+import { payeesApi } from '@/lib/payees';
 
 // Pass the form's current values straight through so submit handlers receive
 // the real field values (name, defaultCategoryId, notes) rather than an empty
@@ -21,7 +22,16 @@ vi.mock('@/lib/payees', () => ({
     getAliases: vi.fn().mockResolvedValue([]),
     createAlias: vi.fn().mockResolvedValue({ id: 'a1', alias: 'test', payeeId: 'p1' }),
     deleteAlias: vi.fn().mockResolvedValue(undefined),
+    lookupContact: vi.fn().mockResolvedValue({ reason: 'none', suggestion: null }),
   },
+}));
+
+// The automatic lookup keys off the opt-in preference; the store is mocked so
+// each test decides whether it is on.
+let mockLookupEnabled = false;
+vi.mock('@/store/preferencesStore', () => ({
+  usePreferencesStore: (selector: (state: unknown) => unknown) =>
+    selector({ preferences: { payeeContactLookupEnabled: mockLookupEnabled } }),
 }));
 
 describe('PayeeForm', () => {
@@ -359,6 +369,186 @@ describe('PayeeForm', () => {
       // An empty email must pass validation: it is a clear, not a bad address.
       expect(submit).toHaveBeenCalledTimes(1);
       expect(submit.mock.calls[0][0]).toMatchObject({ address: '', email: '' });
+    });
+  });
+
+  describe('contact lookup', () => {
+    const suggestion = {
+      website: 'https://acme.example',
+      address: '1 Main St',
+      email: 'hi@acme.example',
+      phone: '+1 555 010 2000',
+      source: 'ai-web-search',
+      confidence: 'high',
+      notes: null,
+    };
+    const lookupContact = vi.mocked(payeesApi.lookupContact);
+
+    beforeEach(() => {
+      lookupContact.mockReset();
+      lookupContact.mockResolvedValue({ reason: 'ok', suggestion } as any);
+      mockLookupEnabled = true;
+    });
+
+    function renderCreate() {
+      render(<PayeeForm categories={categories} onSubmit={onSubmit} onCancel={onCancel} />);
+    }
+    const nameInput = () => screen.getByLabelText('Payee Name') as HTMLInputElement;
+    const field = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
+
+    async function blurName(value: string) {
+      await act(async () => {
+        fireEvent.change(nameInput(), { target: { value } });
+        fireEvent.blur(nameInput());
+      });
+    }
+
+    it('looks the name up on blur and fills the empty contact fields as suggestions', async () => {
+      renderCreate();
+      await blurName('Acme');
+
+      await waitFor(() => expect(field('Website').value).toBe('https://acme.example'));
+      expect(lookupContact).toHaveBeenCalledTimes(1);
+      expect(lookupContact).toHaveBeenCalledWith('Acme', expect.any(AbortSignal));
+      expect(field('Address').value).toBe('1 Main St');
+      expect(field('Email').value).toBe('hi@acme.example');
+      expect(field('Phone').value).toBe('+1 555 010 2000');
+      expect(screen.getByText('Suggested by lookup:')).toBeInTheDocument();
+      expect(screen.getByText('Clear suggestions')).toBeInTheDocument();
+    });
+
+    it('never overwrites a value the user typed', async () => {
+      renderCreate();
+      await act(async () => {
+        fireEvent.change(field('Website'), { target: { value: 'typed.example' } });
+      });
+      await blurName('Acme');
+
+      await waitFor(() => expect(field('Phone').value).toBe('+1 555 010 2000'));
+      expect(field('Website').value).toBe('typed.example');
+    });
+
+    it('does not look the same name up twice, and skips a name too short to be worth it', async () => {
+      renderCreate();
+      await blurName('Ac');
+      expect(lookupContact).not.toHaveBeenCalled();
+      await blurName('Acme');
+      await blurName('Acme');
+      expect(lookupContact).toHaveBeenCalledTimes(1);
+    });
+
+    it('drops an answer whose request was overtaken by a newer name', async () => {
+      let resolveFirst!: (value: unknown) => void;
+      lookupContact
+        .mockImplementationOnce(
+          () => new Promise((resolve) => { resolveFirst = resolve; }) as any,
+        )
+        .mockResolvedValueOnce({
+          reason: 'ok',
+          suggestion: { ...suggestion, website: 'https://second.example', phone: null },
+        } as any);
+      renderCreate();
+
+      await blurName('Acme');
+      await blurName('Acme Corp');
+      await waitFor(() => expect(field('Website').value).toBe('https://second.example'));
+
+      await act(async () => {
+        resolveFirst({ reason: 'ok', suggestion });
+      });
+      // The first answer arrived last and was not adopted.
+      expect(field('Website').value).toBe('https://second.example');
+      expect(field('Phone').value).toBe('');
+    });
+
+    it('clears only the suggested fields', async () => {
+      renderCreate();
+      await act(async () => {
+        fireEvent.change(field('Email'), { target: { value: 'mine@example.com' } });
+      });
+      await blurName('Acme');
+      await waitFor(() => expect(field('Website').value).toBe('https://acme.example'));
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Clear suggestions'));
+      });
+
+      expect(field('Website').value).toBe('');
+      expect(field('Address').value).toBe('');
+      expect(field('Phone').value).toBe('');
+      expect(field('Email').value).toBe('mine@example.com');
+      expect(screen.queryByText('Suggested by lookup:')).not.toBeInTheDocument();
+    });
+
+    it('shows a failure as a failure, never as nothing found', async () => {
+      lookupContact.mockResolvedValue({
+        reason: 'failed',
+        suggestion: null,
+        detail: 'Your MCP relay agent is not connected.',
+      } as any);
+      renderCreate();
+      await blurName('Acme');
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Your MCP relay agent is not connected.',
+      );
+      expect(screen.queryByText(/No public contact details/)).not.toBeInTheDocument();
+    });
+
+    it('explains a missing provider with a link to AI Settings', async () => {
+      lookupContact.mockResolvedValue({ reason: 'no_provider', suggestion: null } as any);
+      renderCreate();
+      await blurName('Acme');
+
+      const link = await screen.findByRole('link', { name: 'AI Settings' });
+      expect(link).toHaveAttribute('href', '/settings/ai');
+    });
+
+    it('says when nothing was found', async () => {
+      lookupContact.mockResolvedValue({ reason: 'none', suggestion: null } as any);
+      renderCreate();
+      await blurName('Acme');
+
+      expect(
+        await screen.findByText('No public contact details were found for this name.'),
+      ).toBeInTheDocument();
+    });
+
+    it('does not look up automatically when the preference is off, but the button still does', async () => {
+      mockLookupEnabled = false;
+      renderCreate();
+      await blurName('Acme');
+      expect(lookupContact).not.toHaveBeenCalled();
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Look up details'));
+      });
+      await waitFor(() => expect(lookupContact).toHaveBeenCalledWith('Acme', expect.any(AbortSignal)));
+    });
+
+    it('never looks up on blur when editing, and the button fills only the empty fields', async () => {
+      const payee = {
+        id: 'p1',
+        name: 'Acme',
+        defaultCategoryId: '',
+        notes: '',
+        website: 'https://stored.example',
+        address: '',
+        email: '',
+        phone: '',
+      } as any;
+      await act(async () => {
+        render(<PayeeForm payee={payee} categories={categories} onSubmit={onSubmit} onCancel={onCancel} />);
+      });
+      await blurName('Acme Renamed');
+      expect(lookupContact).not.toHaveBeenCalled();
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Look up details'));
+      });
+      await waitFor(() => expect(field('Phone').value).toBe('+1 555 010 2000'));
+      expect(lookupContact).toHaveBeenCalledWith('Acme Renamed', expect.any(AbortSignal));
+      expect(field('Website').value).toBe('https://stored.example');
     });
   });
 });

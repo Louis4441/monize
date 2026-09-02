@@ -87,6 +87,8 @@
     "address": "Địa chỉ",
     "email": "Email",
     "phone": "Điện thoại",
+    "contactLookup": "Thông tin liên hệ",
+    "contactLookupSuggested": "Được đề xuất từ tra cứu — hãy xem lại trước khi phê duyệt",
     "none": "Không có",
     "approve": "Phê duyệt",
     "cancel": "Hủy",

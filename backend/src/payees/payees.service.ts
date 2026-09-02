@@ -32,10 +32,41 @@ import {
   countUncategorizedTransactionsByPayee,
 } from "./payee-backfill.util";
 import { stripHtml } from "../common/sanitization.util";
-import { withScopedDb } from "../common/db/scoped-db";
+import { getActiveScopedManager, withScopedDb } from "../common/db/scoped-db";
 import { normalizeWebsite } from "../common/normalize-website";
 import { FaviconService, FetchedLogo } from "../common/favicon/favicon.service";
 import { brandLogoColumns } from "../common/favicon/brand-logo.columns";
+import { PayeeContactLookupService } from "./lookup/payee-contact-lookup.service";
+import { PayeeContactEnrichmentService } from "./lookup/payee-contact-enrichment.service";
+import { ContactLookupSource } from "./lookup/payee-contact-lookup.types";
+
+/**
+ * What a preview established about a contact lookup, carried to the commit
+ * so the row is stamped with the same provenance the card was built from.
+ */
+export interface ContactLookupStamp {
+  /** null when the lookup answered but found nothing. */
+  source: ContactLookupSource | null;
+  attemptedAt: Date;
+}
+
+export interface CreatePayeeOptions {
+  /**
+   * Provenance from a preview that already looked the payee up (AI/MCP
+   * confirmation flow). Written with the row; suppresses the background
+   * lookup, which would otherwise repeat work the user already approved.
+   */
+  contactLookup?: ContactLookupStamp;
+}
+
+export interface PreviewCreateOptions {
+  /**
+   * Fill contact details the caller did not supply through the user's
+   * contact lookup (when they have enabled it), so the confirmation card
+   * shows what the commit will store.
+   */
+  lookupContact?: boolean;
+}
 
 /**
  * Resolved, sanitized preview of a proposed new payee. Shared by the AI
@@ -57,6 +88,11 @@ export interface CreatePayeePreview {
   address?: string | null;
   email?: string | null;
   phone?: string | null;
+  /**
+   * Present when this preview ran a contact lookup (see
+   * {@link PreviewCreateOptions.lookupContact}); the commit stores it.
+   */
+  contactLookup?: ContactLookupStamp;
 }
 
 /**
@@ -164,9 +200,15 @@ export class PayeesService {
     private dataSource: DataSource,
     private actionHistoryService: ActionHistoryService,
     private faviconService: FaviconService,
+    private contactLookup: PayeeContactLookupService,
+    private contactEnrichment: PayeeContactEnrichmentService,
   ) {}
 
-  async create(userId: string, createPayeeDto: CreatePayeeDto): Promise<Payee> {
+  async create(
+    userId: string,
+    createPayeeDto: CreatePayeeDto,
+    options: CreatePayeeOptions = {},
+  ): Promise<Payee> {
     // The DTO accepts "starbucks.com"; a stored link needs its scheme or the
     // anchor resolves it relative to the current page -- and the favicon
     // resolver needs an absolute address too.
@@ -213,6 +255,12 @@ export class PayeesService {
         address,
         email,
         phone,
+        ...(options.contactLookup
+          ? {
+              contactLookupAt: options.contactLookup.attemptedAt,
+              contactLookupSource: options.contactLookup.source,
+            }
+          : {}),
         userId,
       });
 
@@ -238,6 +286,26 @@ export class PayeesService {
       descriptionKey: "createdPayee",
       descriptionParams: { name: saved.name },
     });
+
+    // A payee created with no contact details at all -- a quick-create from
+    // the transaction form, a name-only AI/MCP row -- is looked up in the
+    // background, when the user has enabled that. Three conditions, each
+    // load-bearing: the preview path already looked up (its stamp travels in
+    // `options`); something was supplied (the user's own values are never
+    // second-guessed); and there is no ambient transaction, because this
+    // runs after `withScopedDb` resolved, and "resolved" only means
+    // "committed" when nobody upstream opened a transaction we joined -- a
+    // dispatch inside one would look for a row nobody else can see yet.
+    if (
+      !options.contactLookup &&
+      !website &&
+      !address &&
+      !email &&
+      !phone &&
+      getActiveScopedManager() === undefined
+    ) {
+      this.contactEnrichment.dispatchAfterCreate(userId, saved.id, saved.name);
+    }
     return saved;
   }
 
@@ -256,13 +324,44 @@ export class PayeesService {
       email?: string | null;
       phone?: string | null;
     },
+    options: PreviewCreateOptions = {},
   ): Promise<CreatePayeePreview> {
     const name = stripHtml(input.name)?.trim() || "";
-    const contact = previewContactFields(input);
+    let contact = previewContactFields(input);
     // Normalise here, not at commit time: a preview has to compute what the
     // commit will do, so the card shows "https://acme.com" for a typed
     // "acme.com" rather than a value the save would then change.
-    const website = normalizeWebsite(input.website);
+    let website = normalizeWebsite(input.website);
+
+    // The lookup runs before the transaction below (it is a provider call)
+    // and only when the row carries no contact details at all: a value the
+    // caller typed is never second-guessed, and a preview that looked up
+    // hands its stamp to the commit so the card and the row agree.
+    let contactLookup: ContactLookupStamp | undefined;
+    if (
+      options.lookupContact &&
+      name &&
+      !website &&
+      !contact.address &&
+      !contact.email &&
+      !contact.phone
+    ) {
+      const outcome = await this.contactLookup.lookup(userId, { name });
+      if (outcome.reason === "ok") {
+        website = outcome.suggestion.website ?? undefined;
+        contact = {
+          address: outcome.suggestion.address ?? undefined,
+          email: outcome.suggestion.email ?? undefined,
+          phone: outcome.suggestion.phone ?? undefined,
+        };
+        contactLookup = {
+          source: outcome.suggestion.source,
+          attemptedAt: new Date(),
+        };
+      } else if (outcome.reason === "none") {
+        contactLookup = { source: null, attemptedAt: new Date() };
+      }
+    }
 
     return withScopedDb(this.dataSource, async (m) => {
       const existing = await m.getRepository(Payee).findOne({
@@ -302,6 +401,7 @@ export class PayeesService {
         defaultCategoryName,
         website,
         ...contact,
+        ...(contactLookup ? { contactLookup } : {}),
       };
     });
   }
@@ -372,6 +472,7 @@ export class PayeesService {
       email?: string | null;
       phone?: string | null;
     },
+    options: PreviewCreateOptions = {},
   ): Promise<CreatePayeePreview> {
     let defaultCategoryId: string | null = null;
     if (input.categoryName) {
@@ -379,14 +480,18 @@ export class PayeesService {
         await this.resolveCategoryByName(userId, input.categoryName)
       ).id;
     }
-    return this.previewCreate(userId, {
-      name: input.name,
-      defaultCategoryId,
-      website: input.website,
-      address: input.address,
-      email: input.email,
-      phone: input.phone,
-    });
+    return this.previewCreate(
+      userId,
+      {
+        name: input.name,
+        defaultCategoryId,
+        website: input.website,
+        address: input.address,
+        email: input.email,
+        phone: input.phone,
+      },
+      options,
+    );
   }
 
   /**

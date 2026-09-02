@@ -212,4 +212,27 @@ describe('payeesApi', () => {
       targetId: 'p-2',
     });
   });
+
+  it('lookupContact posts the name to /payees/lookup-contact with the abort signal', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: { reason: 'none', suggestion: null },
+    });
+    const controller = new AbortController();
+    const result = await payeesApi.lookupContact('Acme', controller.signal);
+    expect(apiClient.post).toHaveBeenCalledWith(
+      '/payees/lookup-contact',
+      { name: 'Acme' },
+      { signal: controller.signal },
+    );
+    expect(result.reason).toBe('none');
+  });
+
+  it('lookupContactForPayee posts to /payees/:id/lookup-contact', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: { reason: 'ok', filled: ['phone'], payee: { id: 'p-1' } },
+    });
+    const result = await payeesApi.lookupContactForPayee('p-1');
+    expect(apiClient.post).toHaveBeenCalledWith('/payees/p-1/lookup-contact');
+    expect(result.filled).toEqual(['phone']);
+  });
 });

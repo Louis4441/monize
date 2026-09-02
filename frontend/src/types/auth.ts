@@ -171,6 +171,12 @@ export interface UserPreferences {
    * RECONCILED -- so the way to make one is to turn this off in Settings.
    */
   lockReconciledTransactions: boolean;
+  /**
+   * Opt-in: look up a new payee's website, address, email and phone through
+   * the configured AI provider (prefilled for review in the payee form;
+   * written in the background for a name-only create).
+   */
+  payeeContactLookupEnabled: boolean;
   language: string;
   createdAt: string;
   updatedAt: string;
@@ -256,6 +262,7 @@ export interface UpdatePreferencesData {
   aiBubbleEnabled?: boolean;
   showWhatsNew?: boolean;
   lockReconciledTransactions?: boolean;
+  payeeContactLookupEnabled?: boolean;
   language?: string;
 }
 

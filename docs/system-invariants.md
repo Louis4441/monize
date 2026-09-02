@@ -124,6 +124,7 @@ implied.
 | INV-ALERT-001 | A system alert row lands at most once per (recipient, dedupe key), and only the insert winner emails | enforced |
 | INV-RLS-001 | Enforced mode refuses to run on a role that can bypass RLS | enforced |
 | INV-CACHE-001 | A money-moving write invalidates every derived cache | enforced |
+| INV-PAYEE-001 | A contact lookup never overwrites a value the user entered, and the automatic one runs at most once per payee | enforced |
 | INV-RELEASE-001 | The tested, imaged and tagged revisions are one revision | partial |
 
 ## Imports
@@ -1921,6 +1922,51 @@ Retry semantics     Deletes are idempotent on a missing key; a failed create's
                     bytes are swept.
 Crash semantics     A transient orphan on rollback is durably recoverable by the
                     sweeper, not silent.
+Status              enforced
+```
+
+### INV-PAYEE-001 -- a contact lookup never overwrites the user's value
+
+```text
+Statement           A looked-up website, address, email or phone is written only
+                    into a column that is NULL at the moment of the write; a
+                    value the user entered, before or during the lookup, is
+                    never replaced. The automatic (background) lookup runs at
+                    most once per payee across replicas and retries.
+Source of truth     The payees row: the four contact columns, contact_lookup_at
+                    (the attempt) and contact_lookup_source (which lookup wrote
+                    at least one field).
+Enforcement         One statement, enrichmentUpdateSql in
+                    payee-contact-enrichment.service.ts: every contact column is
+                    COALESCE(column, $n); contact_lookup_source moves only when
+                    the statement itself set a field (the CASE reads the
+                    pre-SET column values); the automatic path adds WHERE
+                    contact_lookup_at IS NULL. The provider call runs outside any
+                    transaction and PayeesService.create dispatches it only after
+                    its own withScopedDb resolved with no ambient manager
+                    (getActiveScopedManager() === undefined). The AI/MCP preview
+                    looks up before the card and hands its stamp to the commit,
+                    which stores it instead of looking up again. The form path
+                    persists nothing until the user saves.
+Concurrency scope   per payee
+Retry semantics     A re-dispatch, a second replica or a retried request matches
+                    zero rows on the automatic path; the user-initiated re-run
+                    omits the contact_lookup_at predicate and still only fills
+                    gaps. A failed attempt stamps nothing, so it may be retried.
+Crash semantics     A crash before the UPDATE leaves the row untouched and
+                    unstamped (a later attempt runs); after it, the row is
+                    complete. The favicon that follows a looked-up website is a
+                    separate best-effort write keyed on that website.
+Failure response    The coordinator never throws: disabled / no_provider /
+                    failed / none are returned and shown distinctly; a failure is
+                    never presented as "nothing found".
+Required tests      payee-contact-enrichment.service.spec.ts (COALESCE and
+                    predicate shape, stamp-on-answer only, favicon keyed on the
+                    website), payees.service.spec.ts (dispatch after the
+                    transaction, never inside one, never with a supplied field
+                    or a preview stamp), raw-sql-columns.spec.ts (column names
+                    against schema.sql). Owed: a two-connection race with a
+                    concurrent user edit, per docs/verification-contract.md.
 Status              enforced
 ```
 

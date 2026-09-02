@@ -91,7 +91,16 @@
     "applyCategoryNone": "[XX-Don't change existing transactions-XX]",
     "applyCategoryUncategorized": "[XX-Only transactions without a category ({count})-XX]",
     "applyCategoryAll": "[XX-All transactions ({count})-XX]",
-    "applyCategoryHelp": "[XX-Transfers and split transactions are never changed.-XX]"
+    "applyCategoryHelp": "[XX-Transfers and split transactions are never changed.-XX]",
+    "lookup": {
+      "button": "[XX-Look up details-XX]",
+      "searching": "[XX-Looking up contact details...-XX]",
+      "suggested": "[XX-Suggested by lookup:-XX]",
+      "clear": "[XX-Clear suggestions-XX]",
+      "nothingFound": "[XX-No public contact details were found for this name.-XX]",
+      "noProvider": "[XX-Configure an AI provider in <link>AI Settings</link> to look up contact details.-XX]",
+      "failed": "[XX-The lookup could not be completed. Try again later.-XX]"
+    }
   },
   "merge": {
     "title": "[XX-Merge Payee-XX]",

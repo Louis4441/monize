@@ -99,6 +99,7 @@
       "deletedInvestmentReport": "已刪除投資報表「{name}」",
       "createdPayee": "已建立收款人「{name}」",
       "updatedPayee": "已更新收款人「{name}」",
+      "lookedUpPayeeContact": "已查詢收款人「{name}」的聯絡資訊",
       "deletedPayee": "已刪除收款人「{name}」",
       "createdReport": "已建立報表「{name}」",
       "updatedReport": "已更新報表「{name}」",

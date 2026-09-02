@@ -764,6 +764,14 @@
         "step3": "Jawaban dialirkan kembali ke obrolan. Titik status menunjukkan apakah agen Anda terhubung.",
         "note": "Tidak ada yang berjalan hingga agen Anda terhubung dan mendengarkan. Obrolan menampilkan instruksi koneksi."
       }
+    },
+    "payeeLookup": {
+      "title": "Pencarian otomatis detail kontak penerima",
+      "subtitle": "Saat Anda menambahkan penerima, situs web, alamat, email, dan teleponnya dicari melalui penyedia AI yang dikonfigurasi. Formulir penerima baru mengisi saran untuk Anda tinjau; penerima yang ditambahkan berdasarkan nama dari sebuah transaksi diisi di latar belakang. Hanya nama penerima yang dikirim, setiap pencarian dapat menjalankan pencarian web yang ditagihkan ke penyedia tersebut, dan delegasi menggunakan penyedia pemilik akun.",
+      "toggleLabel": "Aktifkan pencarian otomatis detail kontak",
+      "enabled": "Pencarian otomatis detail kontak diaktifkan",
+      "disabled": "Pencarian otomatis detail kontak dinonaktifkan",
+      "saveFailed": "Tidak dapat memperbarui pengaturan pencarian detail kontak"
     }
   },
   "sharedAccessPage": {

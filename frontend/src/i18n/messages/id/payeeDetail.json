@@ -97,7 +97,9 @@
     "address": "Alamat",
     "phone": "Telepon",
     "email": "Email",
-    "notes": "Catatan"
+    "notes": "Catatan",
+    "contactLookup": "Detail kontak",
+    "contactLookupValue": "Dicari otomatis pada {date}"
   },
   "tabs": {
     "ariaLabel": "Bagian penerima",
@@ -130,5 +132,13 @@
     "needsMoreHistory": "Diperlukan setidaknya {years} tahun riwayat untuk membedakan pola musiman dari kebetulan.",
     "empty": "Belum ada pengeluaran untuk dirinci per bulan",
     "monthTooltip": "{month}: rata-rata {amount} selama {years, plural, one {# tahun} other {# tahun}}"
+  },
+  "contactLookup": {
+    "button": "Cari detail kontak",
+    "inProgress": "Mencari...",
+    "filled": "{count, plural, other {# detail kontak diisi}}",
+    "nothingNew": "Tidak ditemukan detail kontak baru.",
+    "noProvider": "Konfigurasikan penyedia AI di Pengaturan AI untuk mencari detail kontak.",
+    "failed": "Pencarian tidak dapat diselesaikan. Coba lagi nanti."
   }
 }

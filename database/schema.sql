@@ -225,9 +225,20 @@ CREATE TABLE payees (
     address TEXT,
     email VARCHAR(255),
     phone VARCHAR(50),
+    -- Provenance for contact details a lookup wrote rather than the user.
+    -- contact_lookup_at stamps an attempt that got an answer (found something
+    -- or established there was nothing), so the background enrichment runs at
+    -- most once per payee (its UPDATE is keyed on contact_lookup_at IS NULL).
+    -- contact_lookup_source is set only when at least one field was actually
+    -- written by a lookup; the detail page's badge keys off it.
+    contact_lookup_at TIMESTAMPTZ,
+    contact_lookup_source VARCHAR(32),
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id, name)
+    UNIQUE(user_id, name),
+    CONSTRAINT payees_contact_lookup_source_check
+      CHECK (contact_lookup_source IS NULL
+             OR contact_lookup_source IN ('ai-web-search','ai-knowledge','ai-relay','google-places'))
 );
 
 CREATE INDEX idx_payees_user ON payees(user_id);
@@ -980,6 +991,7 @@ CREATE TABLE user_preferences (
     recent_transactions_limit SMALLINT NOT NULL DEFAULT 5,
     ai_bubble_enabled BOOLEAN DEFAULT false, -- opt-in app-wide floating AI chat bubble
     lock_reconciled_transactions BOOLEAN NOT NULL DEFAULT false, -- strict mode: refuse any alteration of a RECONCILED transaction
+    payee_contact_lookup_enabled BOOLEAN NOT NULL DEFAULT false, -- opt-in: look up a new payee's website/address/email/phone through the user's AI provider
     language VARCHAR(10) NOT NULL DEFAULT 'en', -- UI language; ISO 639-1 or BCP 47 tag matched against SUPPORTED_LOCALES
     last_client_timezone VARCHAR(64), -- Most recently reported X-Client-Timezone, used by cron jobs when timezone='browser'
     default_map_provider VARCHAR(20) NOT NULL DEFAULT 'device', -- which map service an address link opens; 'device' means decide from the platform

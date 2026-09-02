@@ -764,6 +764,14 @@
         "step3": "[XX-Answers stream back into the chat. A status dot shows whether your agent is connected.-XX]",
         "note": "[XX-Nothing runs until your agent is connected and listening. The chat shows connection instructions.-XX]"
       }
+    },
+    "payeeLookup": {
+      "title": "[XX-Automatic payee contact lookup-XX]",
+      "subtitle": "[XX-When you add a payee, look up its website, address, email and phone through your configured AI provider. The New Payee form fills in the suggestions for you to review; a payee added by name from a transaction is filled in the background. Only the payee name is sent, each lookup may run web searches billed to that provider, and a delegate uses the account owner's provider.-XX]",
+      "toggleLabel": "[XX-Enable automatic payee contact lookup-XX]",
+      "enabled": "[XX-Automatic payee contact lookup enabled-XX]",
+      "disabled": "[XX-Automatic payee contact lookup disabled-XX]",
+      "saveFailed": "[XX-Could not update the payee contact lookup setting-XX]"
     }
   },
   "sharedAccessPage": {

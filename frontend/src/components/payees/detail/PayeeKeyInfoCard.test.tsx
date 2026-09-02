@@ -1,8 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
+import toast from 'react-hot-toast';
 import { render } from '@/test/render';
 import { PayeeKeyInfoCard } from './PayeeKeyInfoCard';
+import { payeesApi } from '@/lib/payees';
 import type { PayeeDetail } from '@/types/payee';
+
+vi.mock('@/lib/payees', () => ({
+  payeesApi: { lookupContactForPayee: vi.fn() },
+}));
 
 const mapProvider = { current: undefined as string | undefined };
 
@@ -26,6 +32,8 @@ function detailFixture(overrides: Partial<PayeeDetail> = {}): PayeeDetail {
       website: null,
       hasLogo: false,
       logoFetchedAt: null,
+      contactLookupAt: null,
+      contactLookupSource: null,
       address: null,
       email: null,
       phone: null,
@@ -116,6 +124,8 @@ describe('PayeeKeyInfoCard', () => {
           website: null,
           hasLogo: false,
           logoFetchedAt: null,
+          contactLookupAt: null,
+          contactLookupSource: null,
           address: null,
           email: null,
           phone: null,
@@ -307,5 +317,101 @@ describe('PayeeKeyInfoCard contact details', () => {
     expect(
       screen.queryByRole('link', { name: 'call the shop' }),
     ).not.toBeInTheDocument();
+  });
+
+  describe('contact lookup', () => {
+    const lookup = vi.mocked(payeesApi.lookupContactForPayee);
+
+    beforeEach(() => {
+      lookup.mockReset();
+    });
+
+    it('shows the looked-up badge only when a lookup wrote a field', () => {
+      renderCard(
+        detailFixture({
+          payee: {
+            ...detailFixture().payee,
+            phone: '+1 555 010 2000',
+            contactLookupAt: '2026-09-02T10:00:00.000Z',
+            contactLookupSource: 'ai-web-search',
+          },
+        }),
+      );
+      expect(screen.getByText(/Looked up automatically on/)).toBeInTheDocument();
+    });
+
+    it('shows no badge for an attempt that found nothing', () => {
+      renderCard(
+        detailFixture({
+          payee: {
+            ...detailFixture().payee,
+            contactLookupAt: '2026-09-02T10:00:00.000Z',
+            contactLookupSource: null,
+          },
+        }),
+      );
+      expect(screen.queryByText(/Looked up automatically on/)).not.toBeInTheDocument();
+    });
+
+    it('looks the payee up on demand and reloads when something was filled', async () => {
+      lookup.mockResolvedValue({
+        reason: 'ok',
+        filled: ['phone', 'email'],
+        payee: detailFixture().payee,
+      });
+      const onContactLookedUp = vi.fn();
+      render(
+        <PayeeKeyInfoCard
+          detail={detailFixture()}
+          categoryLabelMap={categoryLabelMap}
+          onSelectDate={vi.fn()}
+          onSelectAccount={vi.fn()}
+          onContactLookedUp={onContactLookedUp}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Look up contact details' }));
+
+      await waitFor(() => expect(onContactLookedUp).toHaveBeenCalled());
+      expect(lookup).toHaveBeenCalledWith('payee-1');
+      expect(toast.success).toHaveBeenCalledWith('Filled in 2 contact details');
+    });
+
+    it('says when nothing new was found and does not reload', async () => {
+      lookup.mockResolvedValue({ reason: 'none', filled: [], payee: detailFixture().payee });
+      const onContactLookedUp = vi.fn();
+      render(
+        <PayeeKeyInfoCard
+          detail={detailFixture()}
+          categoryLabelMap={categoryLabelMap}
+          onSelectDate={vi.fn()}
+          onSelectAccount={vi.fn()}
+          onContactLookedUp={onContactLookedUp}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Look up contact details' }));
+
+      await waitFor(() =>
+        expect(toast).toHaveBeenCalledWith('No new contact details were found.'),
+      );
+      expect(onContactLookedUp).not.toHaveBeenCalled();
+    });
+
+    it('shows a failure with its own detail, never as nothing found', async () => {
+      lookup.mockResolvedValue({
+        reason: 'failed',
+        detail: 'Your MCP relay agent is not connected.',
+        filled: [],
+        payee: detailFixture().payee,
+      });
+      renderCard();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Look up contact details' }));
+
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith('Your MCP relay agent is not connected.'),
+      );
+    });
   });
 });

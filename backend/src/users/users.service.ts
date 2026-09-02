@@ -219,6 +219,9 @@ export class UsersService {
     if (dto.lockReconciledTransactions !== undefined) {
       patch.lockReconciledTransactions = dto.lockReconciledTransactions;
     }
+    if (dto.payeeContactLookupEnabled !== undefined) {
+      patch.payeeContactLookupEnabled = dto.payeeContactLookupEnabled;
+    }
     if (dto.weekStartsOn !== undefined) {
       patch.weekStartsOn = dto.weekStartsOn;
     }

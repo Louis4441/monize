@@ -91,7 +91,16 @@
     "applyCategoryNone": "Nie zmieniaj istniejących transakcji",
     "applyCategoryUncategorized": "Tylko transakcje bez kategorii ({count})",
     "applyCategoryAll": "Wszystkie transakcje ({count})",
-    "applyCategoryHelp": "Przelewy i transakcje podzielone nigdy nie są zmieniane."
+    "applyCategoryHelp": "Przelewy i transakcje podzielone nigdy nie są zmieniane.",
+    "lookup": {
+      "button": "Wyszukaj dane",
+      "searching": "Wyszukiwanie danych kontaktowych...",
+      "suggested": "Zaproponowane przez wyszukiwanie:",
+      "clear": "Wyczyść propozycje",
+      "nothingFound": "Nie znaleziono publicznych danych kontaktowych dla tej nazwy.",
+      "noProvider": "Skonfiguruj dostawcę AI w <link>Ustawieniach AI</link>, aby wyszukiwać dane kontaktowe.",
+      "failed": "Nie udało się ukończyć wyszukiwania. Spróbuj ponownie później."
+    }
   },
   "merge": {
     "title": "Scal odbiorcę",

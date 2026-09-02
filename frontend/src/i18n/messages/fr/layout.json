@@ -99,6 +99,7 @@
       "deletedInvestmentReport": "Rapport d'investissement \"{name}\" supprimé",
       "createdPayee": "Bénéficiaire \"{name}\" créé",
       "updatedPayee": "Bénéficiaire \"{name}\" mis à jour",
+      "lookedUpPayeeContact": "Coordonnées du bénéficiaire « {name} » recherchées",
       "deletedPayee": "Bénéficiaire \"{name}\" supprimé",
       "createdReport": "Rapport \"{name}\" créé",
       "updatedReport": "Rapport \"{name}\" mis à jour",

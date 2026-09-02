@@ -91,7 +91,16 @@
     "applyCategoryNone": "Ne pas modifier les transactions existantes",
     "applyCategoryUncategorized": "Uniquement les transactions sans catégorie ({count})",
     "applyCategoryAll": "Toutes les transactions ({count})",
-    "applyCategoryHelp": "Les virements et les transactions ventilées ne sont jamais modifiés."
+    "applyCategoryHelp": "Les virements et les transactions ventilées ne sont jamais modifiés.",
+    "lookup": {
+      "button": "Rechercher les coordonnées",
+      "searching": "Recherche des coordonnées...",
+      "suggested": "Suggéré par la recherche :",
+      "clear": "Effacer les suggestions",
+      "nothingFound": "Aucune coordonnée publique n'a été trouvée pour ce nom.",
+      "noProvider": "Configurez un fournisseur d'IA dans les <link>paramètres IA</link> pour rechercher les coordonnées.",
+      "failed": "La recherche n'a pas pu aboutir. Réessayez plus tard."
+    }
   },
   "merge": {
     "title": "Fusionner le bénéficiaire",

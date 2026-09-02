@@ -91,7 +91,16 @@
     "applyCategoryNone": "Jangan ubah transaksi yang sudah ada",
     "applyCategoryUncategorized": "Hanya transaksi tanpa kategori ({count})",
     "applyCategoryAll": "Semua transaksi ({count})",
-    "applyCategoryHelp": "Transfer dan transaksi terbagi tidak pernah diubah."
+    "applyCategoryHelp": "Transfer dan transaksi terbagi tidak pernah diubah.",
+    "lookup": {
+      "button": "Cari detail",
+      "searching": "Mencari detail kontak...",
+      "suggested": "Disarankan dari pencarian:",
+      "clear": "Hapus saran",
+      "nothingFound": "Tidak ditemukan detail kontak publik untuk nama ini.",
+      "noProvider": "Konfigurasikan penyedia AI di <link>Pengaturan AI</link> untuk mencari detail kontak.",
+      "failed": "Pencarian tidak dapat diselesaikan. Coba lagi nanti."
+    }
   },
   "merge": {
     "title": "Gabungkan Penerima",

@@ -87,6 +87,8 @@
     "address": "Morada",
     "email": "E-mail",
     "phone": "Telefone",
+    "contactLookup": "Contactos",
+    "contactLookupSuggested": "Sugeridos pela pesquisa — reveja antes de aprovar",
     "none": "Nenhum",
     "approve": "Aprovar",
     "cancel": "Cancelar",

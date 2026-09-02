@@ -87,6 +87,8 @@
     "address": "住所",
     "email": "メールアドレス",
     "phone": "電話番号",
+    "contactLookup": "連絡先情報",
+    "contactLookupSuggested": "検索による候補 — 承認前に確認してください",
     "none": "なし",
     "approve": "承認",
     "cancel": "キャンセル",

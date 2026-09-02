@@ -97,7 +97,9 @@
     "address": "地址",
     "phone": "电话",
     "email": "电子邮件",
-    "notes": "备注"
+    "notes": "备注",
+    "contactLookup": "联系信息",
+    "contactLookupValue": "于 {date} 自动查找"
   },
   "tabs": {
     "ariaLabel": "收款人各部分",
@@ -130,5 +132,13 @@
     "needsMoreHistory": "至少需要 {years} 年的历史才能把季节性规律与偶然区分开。",
     "empty": "暂无支出可按月分解",
     "monthTooltip": "{month}：{years, plural, one {# 年} other {# 年}}平均 {amount}"
+  },
+  "contactLookup": {
+    "button": "查找联系信息",
+    "inProgress": "正在查找...",
+    "filled": "{count, plural, other {已填写 # 项联系信息}}",
+    "nothingNew": "未找到新的联系信息。",
+    "noProvider": "请在 AI 设置中配置 AI 提供商以查找联系信息。",
+    "failed": "查找未能完成，请稍后重试。"
   }
 }

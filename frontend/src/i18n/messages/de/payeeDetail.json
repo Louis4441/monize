@@ -97,7 +97,9 @@
     "address": "Adresse",
     "phone": "Telefon",
     "email": "E-Mail",
-    "notes": "Notizen"
+    "notes": "Notizen",
+    "contactLookup": "Kontaktangaben",
+    "contactLookupValue": "Automatisch nachgeschlagen am {date}"
   },
   "tabs": {
     "ariaLabel": "Zahlungsempfänger-Abschnitte",
@@ -130,5 +132,13 @@
     "needsMoreHistory": "Es sind mindestens {years} Jahre Historie nötig, um ein saisonales Muster von Zufall zu unterscheiden.",
     "empty": "Noch keine Ausgaben für eine Monatsaufteilung",
     "monthTooltip": "{month}: durchschnittlich {amount} über {years, plural, one {# Jahr} other {# Jahre}}"
+  },
+  "contactLookup": {
+    "button": "Kontaktangaben nachschlagen",
+    "inProgress": "Wird gesucht...",
+    "filled": "{count, plural, one {# Kontaktangabe ausgefüllt} other {# Kontaktangaben ausgefüllt}}",
+    "nothingNew": "Es wurden keine neuen Kontaktangaben gefunden.",
+    "noProvider": "Richten Sie in den KI-Einstellungen einen KI-Anbieter ein, um Kontaktangaben nachzuschlagen.",
+    "failed": "Die Suche konnte nicht abgeschlossen werden. Versuchen Sie es später erneut."
   }
 }

@@ -323,6 +323,14 @@ export function TransactionConfirmationCard({
         value: preview.phone || none,
       });
     }
+    // The contact details above came from a lookup, not from the user: say so,
+    // because approving stores them.
+    if (preview.contactLookupSource) {
+      rows.push({
+        label: t('confirmAction.contactLookup'),
+        value: t('confirmAction.contactLookupSuggested'),
+      });
+    }
   }
 
   const isSecurityResult =

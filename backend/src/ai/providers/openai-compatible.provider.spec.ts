@@ -186,6 +186,9 @@ describe("OpenAiCompatibleProvider", () => {
     expect(provider.name).toBe("openai-compatible");
     expect(provider.supportsStreaming).toBe(true);
     expect(provider.supportsToolUse).toBe(true);
+    // The Responses API's web_search is OpenAI's own; a compatible server
+    // serves a web-search request from model knowledge instead.
+    expect(provider.supportsWebSearch).toBe(false);
   });
 
   describe("completeWithTools()", () => {

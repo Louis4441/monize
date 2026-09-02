@@ -97,7 +97,9 @@
     "address": "[XX-Address-XX]",
     "phone": "[XX-Phone-XX]",
     "email": "[XX-Email-XX]",
-    "notes": "[XX-Notes-XX]"
+    "notes": "[XX-Notes-XX]",
+    "contactLookup": "[XX-Contact Details-XX]",
+    "contactLookupValue": "[XX-Looked up automatically on {date}-XX]"
   },
   "tabs": {
     "ariaLabel": "[XX-Payee detail sections-XX]",
@@ -130,5 +132,13 @@
     "needsMoreHistory": "[XX-At least {years} years of history are needed before a seasonal pattern can be told from noise.-XX]",
     "empty": "[XX-No spending to break down by month yet-XX]",
     "monthTooltip": "[XX-{month}: {amount} on average across {years, plural, one {# year} other {# years}}-XX]"
+  },
+  "contactLookup": {
+    "button": "[XX-Look up contact details-XX]",
+    "inProgress": "[XX-Looking up...-XX]",
+    "filled": "[XX-Filled in {count, plural, one {# contact detail} other {# contact details}}-XX]",
+    "nothingNew": "[XX-No new contact details were found.-XX]",
+    "noProvider": "[XX-Configure an AI provider in AI Settings to look up contact details.-XX]",
+    "failed": "[XX-The lookup could not be completed. Try again later.-XX]"
   }
 }

@@ -764,6 +764,14 @@
         "step3": "Câu trả lời được truyền trở lại trò chuyện. Một chấm trạng thái cho biết tác nhân của bạn đã kết nối hay chưa.",
         "note": "Không có gì chạy cho đến khi tác nhân của bạn được kết nối và lắng nghe. Trò chuyện hiển thị hướng dẫn kết nối."
       }
+    },
+    "payeeLookup": {
+      "title": "Tự động tra cứu thông tin liên hệ của người nhận",
+      "subtitle": "Khi bạn thêm người nhận, trang web, địa chỉ, email và số điện thoại sẽ được tra cứu qua nhà cung cấp AI đã cấu hình. Biểu mẫu Người nhận mới sẽ điền các đề xuất để bạn xem lại; người nhận được thêm theo tên từ một giao dịch sẽ được điền ở chế độ nền. Chỉ tên người nhận được gửi đi, mỗi lần tra cứu có thể chạy các tìm kiếm web được tính phí cho nhà cung cấp đó, và người được ủy quyền sử dụng nhà cung cấp của chủ tài khoản.",
+      "toggleLabel": "Bật tự động tra cứu thông tin liên hệ",
+      "enabled": "Đã bật tự động tra cứu thông tin liên hệ",
+      "disabled": "Đã tắt tự động tra cứu thông tin liên hệ",
+      "saveFailed": "Không thể cập nhật cài đặt tra cứu thông tin liên hệ"
     }
   },
   "sharedAccessPage": {

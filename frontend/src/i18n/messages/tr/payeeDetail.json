@@ -97,7 +97,9 @@
     "address": "Adres",
     "phone": "Telefon",
     "email": "E-posta",
-    "notes": "Notlar"
+    "notes": "Notlar",
+    "contactLookup": "İletişim bilgileri",
+    "contactLookupValue": "{date} tarihinde otomatik olarak arandı"
   },
   "tabs": {
     "ariaLabel": "Alacaklı bölümleri",
@@ -130,5 +132,13 @@
     "needsMoreHistory": "Mevsimsel bir deseni rastlantıdan ayırmak için en az {years} yıllık geçmiş gerekir.",
     "empty": "Aylara ayırmak için henüz harcama yok",
     "monthTooltip": "{month}: {years, plural, one {# yılda} other {# yılda}} ortalama {amount}"
+  },
+  "contactLookup": {
+    "button": "İletişim bilgilerini ara",
+    "inProgress": "Aranıyor...",
+    "filled": "{count, plural, one {# iletişim bilgisi dolduruldu} other {# iletişim bilgisi dolduruldu}}",
+    "nothingNew": "Yeni iletişim bilgisi bulunamadı.",
+    "noProvider": "İletişim bilgilerini aramak için Yapay Zeka Ayarları'nda bir yapay zeka sağlayıcısı yapılandırın.",
+    "failed": "Arama tamamlanamadı. Daha sonra tekrar deneyin."
   }
 }

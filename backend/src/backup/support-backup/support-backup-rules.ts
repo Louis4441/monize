@@ -127,6 +127,10 @@ export const RULES: Record<string, TableRules> = {
     address: drop,
     email: drop,
     phone: drop,
+    // A lookup's timestamp and source say when and how the (dropped) contact
+    // details were found; neither names the payee.
+    contact_lookup_at: keep,
+    contact_lookup_source: keep,
     is_active: keep,
     created_at: keep,
   },
