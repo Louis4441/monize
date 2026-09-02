@@ -159,9 +159,11 @@ export class SystemAlertService {
    *
    * Fans out through the dispatch seam, so the in-app row is always written
    * (through the one write door `notify` sits above) and the affected user's own
-   * push / notification-email opt-in for the SYSTEM category decides the rest --
-   * a scheduled transaction not posting is their money not moving, actionable by
-   * them. The fan-out is best-effort and never throws out of `notify`; the
+   * push / notification-email opt-in decides the rest. The one caller,
+   * SCHEDULED_POST_FAILED, is categorized PAYMENTS (it is about a scheduled
+   * payment), so the fan-out is governed by that matrix row -- a scheduled
+   * transaction not posting is their money not moving, actionable by them. The
+   * fan-out is best-effort and never throws out of `notify`; the
    * `withUserContext` seeds this out-of-request path's RLS identity, which the
    * write and every fan-out read inherit.
    */

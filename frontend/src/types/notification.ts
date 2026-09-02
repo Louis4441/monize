@@ -22,8 +22,8 @@ export type NotificationType =
   | 'INCOME_SHORTFALL'
   | 'POSITIVE_MILESTONE'
   | 'BILL_DUE'
-  // System-level notifications (budgetId null). Admin-facing except
-  // SCHEDULED_POST_FAILED, which goes to the affected user.
+  // System-level, admin-facing notifications (budgetId null). SCHEDULED_POST_FAILED
+  // is shaped like these but classified PAYMENTS (it is about a scheduled payment).
   | 'BACKUP_FAILED'
   | 'BACKUP_PARTIAL'
   | 'ENCRYPTION_KEY_MISSING'
@@ -48,7 +48,6 @@ export const SYSTEM_NOTIFICATION_TYPES: readonly NotificationType[] = [
   'PROVIDER_OUTAGE',
   'PROVIDER_RECOVERED',
   'SMTP_FAILURE',
-  'SCHEDULED_POST_FAILED',
 ];
 
 /**

@@ -9,7 +9,7 @@ import type { NotificationCategory } from '@/types/notification';
  * actually reads are shown, so a toggle never controls nothing.
  */
 export const NOTIFICATION_PREFERENCE_CATEGORIES: readonly NotificationCategory[] =
-  ['PAYMENTS', 'BUDGETS', 'SYSTEM'];
+  ['PAYMENTS', 'BUDGETS'];
 
 /**
  * The cooldown windows the matrix offers, in minutes. `0` is the real "off";

@@ -79,10 +79,11 @@ describe("notification type partition", () => {
    * `category` a per-category preference will key on, and the coarse
    * system-vs-financial split the list's filter and the dismiss-all command
    * already use. Both derive from `SYSTEM_NOTIFICATION_TYPES`, so they cannot
-   * drift by accident -- but `notificationCategoryOf` checks BILL_DUE FIRST, so
-   * a type added to the system set that the function special-cases earlier would
-   * be SYSTEM to one reader and financial to the other, and a filtered
-   * delete-all would remove rows the filter never showed.
+   * drift by accident -- but `notificationCategoryOf` special-cases BILL_DUE and
+   * SCHEDULED_POST_FAILED to PAYMENTS FIRST, so a type both special-cased there
+   * AND left in the system set would be financial to one reader and SYSTEM to the
+   * other, and a filtered delete-all would remove rows the filter never showed.
+   * Keeping them out of the system set is what holds the two in agreement.
    */
   it("agrees with the coarse split the filters use", () => {
     for (const type of ALL_TYPES) {
@@ -110,9 +111,13 @@ describe("notification type partition", () => {
       byCategory[notificationCategoryOf(type)].push(type);
     }
 
-    expect(byCategory[NotificationCategory.PAYMENTS]).toEqual([
-      NotificationType.BILL_DUE,
-    ]);
+    // BILL_DUE and SCHEDULED_POST_FAILED are both about a scheduled payment.
+    expect(byCategory[NotificationCategory.PAYMENTS].sort()).toEqual(
+      [
+        NotificationType.BILL_DUE,
+        NotificationType.SCHEDULED_POST_FAILED,
+      ].sort(),
+    );
     expect(byCategory[NotificationCategory.SYSTEM].sort()).toEqual(
       [...SYSTEM_NOTIFICATION_TYPES].sort(),
     );
@@ -122,6 +127,7 @@ describe("notification type partition", () => {
       ALL_TYPES.filter(
         (t) =>
           t !== NotificationType.BILL_DUE &&
+          t !== NotificationType.SCHEDULED_POST_FAILED &&
           !SYSTEM_NOTIFICATION_TYPES.includes(t),
       ).sort(),
     );

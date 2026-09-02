@@ -27,13 +27,18 @@ export enum NotificationType {
   BILL_DUE = "BILL_DUE",
   // System-level notifications (budget_id NULL, carrying a dedupe_key).
   // Admin-facing types are fanned out one row per administrator by
-  // SystemAlertService; SCHEDULED_POST_FAILED goes to the affected user.
+  // SystemAlertService.
   BACKUP_FAILED = "BACKUP_FAILED",
   BACKUP_PARTIAL = "BACKUP_PARTIAL",
   ENCRYPTION_KEY_MISSING = "ENCRYPTION_KEY_MISSING",
   PROVIDER_OUTAGE = "PROVIDER_OUTAGE",
   PROVIDER_RECOVERED = "PROVIDER_RECOVERED",
   SMTP_FAILURE = "SMTP_FAILURE",
+  // Structurally shaped like a system alert (budget_id NULL, dedupe_key) and
+  // raised through SystemAlertService for the affected user -- but its SUBJECT is
+  // a scheduled payment that did not post, so `notificationCategoryOf` files it
+  // under PAYMENTS, not SYSTEM. That is what makes the PAYMENTS matrix row's push
+  // and alert-email real controls (it is the category's dispatching producer).
   SCHEDULED_POST_FAILED = "SCHEDULED_POST_FAILED",
 }
 
@@ -42,6 +47,11 @@ export enum NotificationType {
  * of "system vs financial" (the dismiss-matching filter, the frontend's
  * mirrored copy in the frontend's notification types) derives from one set.
  * Financial is NOT IN this set -- never a second list.
+ *
+ * `SCHEDULED_POST_FAILED` is deliberately NOT here: though it is shaped like a
+ * system alert, it is about the user's own scheduled payment, so it reads as
+ * financial in the bell's system/financial split and is categorized PAYMENTS.
+ * The category test holds the fine `category` and this coarse split in agreement.
  */
 export const SYSTEM_NOTIFICATION_TYPES: readonly NotificationType[] = [
   NotificationType.BACKUP_FAILED,
@@ -50,7 +60,6 @@ export const SYSTEM_NOTIFICATION_TYPES: readonly NotificationType[] = [
   NotificationType.PROVIDER_OUTAGE,
   NotificationType.PROVIDER_RECOVERED,
   NotificationType.SMTP_FAILURE,
-  NotificationType.SCHEDULED_POST_FAILED,
 ];
 
 /**
@@ -97,7 +106,16 @@ export enum NotificationCategory {
 export function notificationCategoryOf(
   type: NotificationType,
 ): NotificationCategory {
-  if (type === NotificationType.BILL_DUE) return NotificationCategory.PAYMENTS;
+  // BILL_DUE and SCHEDULED_POST_FAILED are both about a scheduled payment, so
+  // they share the PAYMENTS row. This special case runs BEFORE the system check
+  // so a type can be structurally system-shaped (dedupe_key) yet financial by
+  // subject; the category test proves the two classifications never diverge.
+  if (
+    type === NotificationType.BILL_DUE ||
+    type === NotificationType.SCHEDULED_POST_FAILED
+  ) {
+    return NotificationCategory.PAYMENTS;
+  }
   if (SYSTEM_NOTIFICATION_TYPES.includes(type)) {
     return NotificationCategory.SYSTEM;
   }

@@ -27,12 +27,14 @@ const makeNotification = (overrides: Partial<Notification> = {}): Notification =
 describe('notificationFilterCategory', () => {
   it('classifies system notification types as system', () => {
     expect(notificationFilterCategory('BACKUP_FAILED')).toBe('system');
-    expect(notificationFilterCategory('SCHEDULED_POST_FAILED')).toBe('system');
     expect(notificationFilterCategory('SMTP_FAILURE')).toBe('system');
   });
 
-  it('classifies everything else as financial, BILL_DUE included', () => {
+  it('classifies everything else as financial, BILL_DUE and SCHEDULED_POST_FAILED included', () => {
     expect(notificationFilterCategory('BILL_DUE')).toBe('financial');
+    // A scheduled-post failure is about the user's own scheduled payment, so it
+    // reads as financial in the list's system/financial split (it is PAYMENTS).
+    expect(notificationFilterCategory('SCHEDULED_POST_FAILED')).toBe('financial');
     expect(notificationFilterCategory('OVER_BUDGET')).toBe('financial');
     expect(notificationFilterCategory('POSITIVE_MILESTONE')).toBe('financial');
   });

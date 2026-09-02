@@ -585,6 +585,10 @@ export class ScheduledTransactionsService {
                 `${scheduled.nextDueDate} failed to post automatically: ` +
                 `${String(error.message).slice(0, 300)}. You can post it ` +
                 "manually from Bills.",
+              // Where the bell -- and now the push / email fan-out -- sends the
+              // reader: the Bills page the copy tells them to post from. Without
+              // it the deep-link (Phase 3) falls back to the app root.
+              target: "/bills",
               data: {
                 system: true,
                 scheduledId: scheduled.id,

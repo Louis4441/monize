@@ -303,8 +303,7 @@
       },
       "categories": {
         "PAYMENTS": "Bills and scheduled",
-        "BUDGETS": "Budgets",
-        "SYSTEM": "System"
+        "BUDGETS": "Budgets"
       },
       "inAppAlways": "Always shown in the bell",
       "emailToggleLabel": "Report email for {category}",

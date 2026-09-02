@@ -124,9 +124,9 @@ describe("NotificationDispatchService", () => {
     });
   });
 
-  it("resolves delivery against the row's own category (a SYSTEM per-user alert)", async () => {
-    // SCHEDULED_POST_FAILED is a SYSTEM-category alert now fanned out per user;
-    // the matrix decision must be read for SYSTEM, not the budget default.
+  it("resolves delivery against the row's own category (SCHEDULED_POST_FAILED is PAYMENTS)", async () => {
+    // A scheduled-post failure is about a scheduled payment, so it shares the
+    // PAYMENTS row -- the matrix decision must be read for PAYMENTS, not SYSTEM.
     create.mockResolvedValue(
       row({
         type: NotificationType.SCHEDULED_POST_FAILED,
@@ -141,7 +141,7 @@ describe("NotificationDispatchService", () => {
     await service.notify("u1", {} as never);
     expect(resolveDelivery).toHaveBeenCalledWith(
       "u1",
-      NotificationCategory.SYSTEM,
+      NotificationCategory.PAYMENTS,
     );
     expect(sendToUser).toHaveBeenCalledTimes(1);
   });
@@ -206,20 +206,23 @@ describe("NotificationDispatchService", () => {
       expect(sendToUser).toHaveBeenCalled();
     });
 
-    it("takes the advisory lock on the email path (D7) but not for push-only", async () => {
-      // email on -> lock taken
+    it("takes the advisory lock on every throttled path, push included (D7)", async () => {
+      // email path -> lock taken
       resolveDelivery.mockResolvedValue({
         emailNotification: true,
         push: false,
         throttleMinutes: 15,
       });
       await service.notify("u1", {} as never);
-      const lockCalls = query.mock.calls.filter((c) =>
-        String(c[0]).includes("pg_advisory_xact_lock"),
-      );
-      expect(lockCalls).toHaveLength(1);
+      expect(
+        query.mock.calls.filter((c) =>
+          String(c[0]).includes("pg_advisory_xact_lock"),
+        ),
+      ).toHaveLength(1);
 
-      // push-only -> no lock
+      // push-only path -> lock ALSO taken: two replicas each winning a distinct
+      // same-category row would not collapse device-side (distinct collapse
+      // keys), so the decider is serialised here too.
       query.mockClear();
       resolveDelivery.mockResolvedValue({
         emailNotification: false,
@@ -231,7 +234,7 @@ describe("NotificationDispatchService", () => {
         query.mock.calls.filter((c) =>
           String(c[0]).includes("pg_advisory_xact_lock"),
         ),
-      ).toHaveLength(0);
+      ).toHaveLength(1);
     });
 
     it("passes the escalation set: only priors at or above this severity suppress", async () => {

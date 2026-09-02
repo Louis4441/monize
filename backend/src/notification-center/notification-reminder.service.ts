@@ -394,8 +394,12 @@ export class NotificationReminderService {
         severity: claim.severity as NotificationSeverity,
         title: claim.title,
         message: claim.message,
-        // The reminder id travels on the row so the bell can offer a Stop control
-        // and the push (Phase 5) can carry the id its Stop action needs.
+        // The reminder id travels on the row so the bell can offer a Stop
+        // control. A re-emit writes only the in-app row today: routing it
+        // through NotificationDispatchService (so a repeat can also push, and a
+        // push can carry the id its Stop action needs) would make this leaf
+        // module import the delivery side and pull the whole producer cycle in,
+        // so it waits until the reminder producer moves out of the leaf.
         data: { ...(claim.data ?? {}), reminderId: claim.id },
         target: claim.target,
         dedupeKey,

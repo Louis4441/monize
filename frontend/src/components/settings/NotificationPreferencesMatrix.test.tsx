@@ -27,7 +27,6 @@ describe('NotificationPreferencesMatrix', () => {
     list.mockReset().mockResolvedValue([
       { category: 'PAYMENTS', email: true, emailNotification: false, push: false, throttleMinutes: 0 },
       { category: 'BUDGETS', email: false, emailNotification: true, push: false, throttleMinutes: 15 },
-      { category: 'SYSTEM', email: false, emailNotification: false, push: true, throttleMinutes: 30 },
     ]);
     update
       .mockReset()
@@ -48,11 +47,10 @@ describe('NotificationPreferencesMatrix', () => {
     await renderMatrix();
     expect(screen.getByText('Bills and scheduled')).toBeInTheDocument();
     expect(screen.getByText('Budgets')).toBeInTheDocument();
-    expect(screen.getByText('System')).toBeInTheDocument();
-    // report + alert + push, per row (3 rows) = 9 switches.
-    expect(screen.getAllByRole('switch')).toHaveLength(9);
+    // report + alert + push, per row (2 rows) = 6 switches.
+    expect(screen.getAllByRole('switch')).toHaveLength(6);
     // One cooldown select per row.
-    expect(screen.getAllByRole('combobox')).toHaveLength(3);
+    expect(screen.getAllByRole('combobox')).toHaveLength(2);
   });
 
   it('gates the email columns on email availability', async () => {

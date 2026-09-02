@@ -96,18 +96,15 @@ export class NotificationDispatchService {
     if (!delivery.push && !delivery.emailNotification) return;
 
     // The throttle gates BOTH interrupting channels; an escalation always goes.
-    // The advisory lock (D7) is taken only when the email is in play, since a
-    // double push collapses on the device (collapseKey) but a double email does
-    // not. A window of 0 disables the throttle for this category.
+    // A window of 0 disables the throttle for this category. The advisory lock
+    // (D7) is taken whenever the throttle is active, on the push path as well as
+    // the email one: two replicas can each win a DIFFERENT same-category row and
+    // both read "no prior", and device-side collapse only merges re-sends of the
+    // SAME row (its collapseKey is the row id / dedupe key), so two distinct rows
+    // would show as two pushes the throttle meant to hold to one.
     const suppressed =
       delivery.throttleMinutes > 0 &&
-      (await this.isThrottled(
-        userId,
-        category,
-        row,
-        delivery.throttleMinutes,
-        delivery.emailNotification,
-      ));
+      (await this.isThrottled(userId, category, row, delivery.throttleMinutes));
     if (suppressed) return;
 
     if (delivery.push) {
@@ -125,28 +122,26 @@ export class NotificationDispatchService {
    * escalation is never suppressed). "Same category" is a filter on the type set
    * the category maps to (the category is not stored).
    *
-   * When `takeLock`, a per-(user, category) transaction advisory lock serialises
-   * concurrent deciders on the email path (D7), so two same-group events racing
-   * across replicas cannot both read "no prior" and both send -- the later
-   * decider sees the earlier's committed row and suppresses.
+   * A per-(user, category) transaction advisory lock serialises concurrent
+   * deciders (D7), so two same-group events racing across replicas cannot both
+   * read "no prior" and both send -- the later decider blocks until the earlier
+   * commits its row, then sees it and suppresses. Taken on every throttled path,
+   * push included, because distinct rows do not collapse on the device.
    */
   private async isThrottled(
     userId: string,
     category: NotificationCategory,
     row: Notification,
     throttleMinutes: number,
-    takeLock: boolean,
   ): Promise<boolean> {
     const windowStart = new Date(
       new Date(row.createdAt).getTime() - throttleMinutes * 60_000,
     );
     return withScopedDb(this.dataSource, async (manager) => {
-      if (takeLock) {
-        await manager.query(
-          "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-          [`notif-fanout:${userId}:${category}`],
-        );
-      }
+      await manager.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [`notif-fanout:${userId}:${category}`],
+      );
       const rows = returnedRows<{ suppress: boolean }>(
         await manager.query(
           `SELECT EXISTS (
