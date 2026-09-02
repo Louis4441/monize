@@ -193,5 +193,11 @@
     "greeting": "您好，{{ name }}，",
     "intro": "您的 Monize 部署出现了需要管理员关注的问题。",
     "footer": "此警报也会显示在应用的通知铃铛中。无论有多少个服务器副本发现该问题，每次事件最多只会生成一条警报。"
+  },
+  "notificationImmediate": {
+    "subject": "您有一条新的 Monize 通知",
+    "eyebrow": "Monize 通知",
+    "button": "在 Monize 中打开",
+    "footer": "您收到此邮件是因为此通知类型已开启即时邮件。可在设置、通知中更改。"
   }
 }

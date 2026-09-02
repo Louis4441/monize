@@ -5,6 +5,7 @@ import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
 import { BudgetAlertService } from "./budget-alert.service";
 import { NotificationService } from "../notification-center/notification.service";
+import { NotificationDispatchService } from "../notifications/notification-dispatch.service";
 import { NotificationPreferenceService } from "../notification-center/notification-preference.service";
 import { Budget, BudgetType, BudgetStrategy } from "./entities/budget.entity";
 import {
@@ -257,6 +258,17 @@ describe("BudgetAlertService", () => {
         {
           provide: NotificationService,
           useFactory: () => new NotificationService(scopedDataSource as never),
+        },
+        {
+          // The fan-out seam forwards to the real write door here, so the
+          // existing "which statement lands / which alerts email" assertions
+          // hold unchanged; the push/email fan-out has its own dedicated spec.
+          provide: NotificationDispatchService,
+          useFactory: (notifications: NotificationService) => ({
+            notify: (userId: string, input: unknown) =>
+              notifications.create(userId, input as never),
+          }),
+          inject: [NotificationService],
         },
         { provide: getRepositoryToken(Budget), useValue: budgetsRepository },
         {

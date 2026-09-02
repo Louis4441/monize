@@ -17,6 +17,52 @@ export function testEmailTemplate(
   `;
 }
 
+/** The accent colour for a notification-mode email, by severity. */
+function notificationAccentColour(severity: string): string {
+  switch (severity) {
+    case "critical":
+      return "#dc2626";
+    case "warning":
+      return "#d97706";
+    case "success":
+      return "#059669";
+    default:
+      return "#2563eb";
+  }
+}
+
+/**
+ * An immediate, one-per-event notification email (spec section 14.3).
+ *
+ * The shell -- greeting, the "open Monize" button, the footer -- is localized
+ * through the recipient's `EmailT`; the `title` and `message` are the
+ * notification row's own stored copy (its English fallback), the same text the
+ * bell shows a reader with no catalog. The full localized detail lives in the
+ * app, which the button links to. Both interpolated values are user-influenced
+ * (a payee name, a budget name), so both go through `escapeHtml`, and `url` is a
+ * server-built absolute link (`appUrl` + the validated same-origin target).
+ */
+export function notificationImmediateTemplate(
+  params: { title: string; message: string; url: string; severity: string },
+  t: EmailT = englishEmailT,
+): string {
+  const safeTitle = escapeHtml(params.title);
+  const safeMessage = escapeHtml(params.message);
+  const safeUrl = escapeHtml(params.url);
+  const accent = notificationAccentColour(params.severity);
+  return `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <p style="color: #6b7280; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 8px;">${t("emails.notificationImmediate.eyebrow", "Monize notification")}</p>
+      <h2 style="color: ${accent}; margin: 0 0 12px;">${safeTitle}</h2>
+      <p style="color: #374151; line-height: 1.5;">${safeMessage}</p>
+      <p style="margin: 24px 0;">
+        <a href="${safeUrl}" style="display: inline-block; padding: 10px 20px; background: ${accent}; color: #ffffff; border-radius: 6px; text-decoration: none; font-weight: 500;">${t("emails.notificationImmediate.button", "Open in Monize")}</a>
+      </p>
+      <p style="color: #9ca3af; font-size: 13px; margin-top: 24px;">${t("emails.notificationImmediate.footer", "You are receiving this because immediate email is on for this notification type. Change it in Settings, Notifications.")}</p>
+    </div>
+  `;
+}
+
 interface BillData {
   payee: string;
   /**

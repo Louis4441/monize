@@ -193,5 +193,11 @@
     "greeting": "Bonjour {{ name }},",
     "intro": "Un problème sur votre installation Monize requiert l'attention d'un administrateur.",
     "footer": "Cette alerte apparaît aussi dans la cloche de notifications de l'application. Elle est émise au plus une fois par incident, quel que soit le nombre de réplicas du serveur qui l'ont détecté."
+  },
+  "notificationImmediate": {
+    "subject": "Vous avez une nouvelle notification Monize",
+    "eyebrow": "Notification Monize",
+    "button": "Ouvrir dans Monize",
+    "footer": "Vous recevez ceci car l'e-mail immédiat est activé pour ce type de notification. Modifiez-le dans Paramètres, Notifications."
   }
 }

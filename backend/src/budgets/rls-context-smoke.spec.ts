@@ -67,6 +67,7 @@ describe("budgets module RLS context smoke (real withScopedDb)", () => {
       i18n as never,
       { create: jest.fn(), markEmailSent: jest.fn() } as never,
       { resolveEmail: jest.fn().mockResolvedValue(true) } as never,
+      { notify: jest.fn().mockResolvedValue(null) } as never,
     );
     const errorSpy = jest
       .spyOn(service["logger"], "error")
@@ -120,6 +121,7 @@ describe("budgets module RLS context smoke (real withScopedDb)", () => {
       i18n as never,
       { create: jest.fn(), markEmailSent: jest.fn() } as never,
       { resolveEmail: jest.fn().mockResolvedValue(true) } as never,
+      { notify: jest.fn().mockResolvedValue(null) } as never,
     );
 
     // Called with no ambient scope at all (no interceptor, no wrapper): the

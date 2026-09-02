@@ -23,6 +23,7 @@ import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
 import { EmailService } from "../notifications/email.service";
+import { NotificationDispatchService } from "../notifications/notification-dispatch.service";
 import {
   budgetAlertImmediateTemplate,
   budgetWeeklyDigestTemplate,
@@ -82,9 +83,16 @@ export class BudgetAlertService {
     private configService: ConfigService,
     private readonly i18n: I18nService,
     // Every notification this service produces goes through the one write door.
+    // `markEmailSent` is called directly; new alerts are written through the
+    // dispatch below so they also fan out to push and immediate email.
     private notifications: NotificationService,
     // Email for budget alerts is gated by the BUDGETS channel matrix.
     private readonly notificationPreferences: NotificationPreferenceService,
+    // The Phase 5 fan-out seam: writing a budget alert through `notify` adds the
+    // notification-mode push and immediate email (matrix- and throttle-gated) on
+    // top of the in-app row, without changing the batched critical email below,
+    // which is report-mode and stays as it is.
+    private readonly dispatch: NotificationDispatchService,
   ) {}
 
   @Cron("0 7 * * *")
@@ -343,7 +351,7 @@ export class BudgetAlertService {
       // `null` from the door means the fingerprint index refused the row --
       // another replica holds this alert -- so this processor sends nothing for
       // it. That is the whole arbitration; there is no second check.
-      const saved = await this.notifications.create(budget.userId, {
+      const saved = await this.dispatch.notify(budget.userId, {
         type: candidate.type,
         severity: candidate.severity,
         title: candidate.title,

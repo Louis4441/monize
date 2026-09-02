@@ -645,6 +645,44 @@ describe("PushSubscriptionService", () => {
     });
   });
 
+  describe("sendToUser (the dispatch fan-out primitive)", () => {
+    const payload = {
+      type: "OVER_BUDGET",
+      title: "t",
+      body: "b",
+      collapseKey: "k",
+    };
+
+    it("is a no-op, not a throw, when the channel is switched off", async () => {
+      pushConfig.getPublicConfig.mockResolvedValue({
+        enabled: false,
+        publicKey: null,
+        configured: false,
+      });
+      await expect(service.sendToUser(USER, payload as never)).resolves.toEqual(
+        { attempted: 0, delivered: 0 },
+      );
+      expect(sender.send).not.toHaveBeenCalled();
+    });
+
+    it("is a no-op when the user has no live device (never throws)", async () => {
+      subscriptionRepo.find.mockResolvedValue([]);
+      await expect(service.sendToUser(USER, payload as never)).resolves.toEqual(
+        { attempted: 0, delivered: 0 },
+      );
+      expect(sender.send).not.toHaveBeenCalled();
+    });
+
+    it("fans out to the caller's live devices with the given payload", async () => {
+      subscriptionRepo.find.mockResolvedValue([storedDevice()]);
+      manager.query.mockResolvedValue([[{ id: DEVICE_ID }], 1]);
+      const result = await service.sendToUser(USER, payload as never);
+      expect(sender.send).toHaveBeenCalledTimes(1);
+      expect(sender.send.mock.calls[0][1]).toEqual(payload);
+      expect(result).toEqual({ attempted: 1, delivered: 1 });
+    });
+  });
+
   describe("bounding one test send", () => {
     function devices(count: number) {
       return Array.from({ length: count }, (_, i) =>

@@ -257,52 +257,57 @@ describe("NotificationPreferenceService", () => {
     });
   });
 
-  describe("resolveEmailNotification (notification-mode email gate)", () => {
-    it("defaults OFF when there is no row (opt-in, D9)", async () => {
+  describe("resolveNotificationDelivery (the dispatch's one read)", () => {
+    it("defaults everything off: no email, no push, no throttle", async () => {
       expect(
-        await service.resolveEmailNotification(
+        await service.resolveNotificationDelivery(
           "u1",
           NotificationCategory.PAYMENTS,
         ),
-      ).toBe(false);
+      ).toEqual({ emailNotification: false, push: false, throttleMinutes: 0 });
     });
 
-    it("returns the stored flag when the master switch is on", async () => {
+    it("returns the stored flags and clamped throttle when the master is on", async () => {
       userPrefRepo.findOne.mockResolvedValue({ notificationEmail: true });
-      notifPrefRepo.findOne.mockResolvedValue({ emailNotification: true });
+      notifPrefRepo.findOne.mockResolvedValue({
+        emailNotification: true,
+        push: true,
+        throttleMinutes: 15,
+      });
       expect(
-        await service.resolveEmailNotification(
+        await service.resolveNotificationDelivery(
           "u1",
           NotificationCategory.BUDGETS,
         ),
-      ).toBe(true);
+      ).toEqual({ emailNotification: true, push: true, throttleMinutes: 15 });
     });
 
-    it("is killed by the email master switch, like report email", async () => {
+    it("kills the immediate email on the master switch but NOT push", async () => {
       userPrefRepo.findOne.mockResolvedValue({ notificationEmail: false });
-      notifPrefRepo.findOne.mockResolvedValue({ emailNotification: true });
+      notifPrefRepo.findOne.mockResolvedValue({
+        emailNotification: true,
+        push: true,
+        throttleMinutes: 0,
+      });
       expect(
-        await service.resolveEmailNotification(
+        await service.resolveNotificationDelivery(
           "u1",
           NotificationCategory.BUDGETS,
         ),
-      ).toBe(false);
-    });
-  });
-
-  describe("resolvePush (push gate)", () => {
-    it("defaults OFF when there is no row", async () => {
-      expect(
-        await service.resolvePush("u1", NotificationCategory.PAYMENTS),
-      ).toBe(false);
+      ).toEqual({ emailNotification: false, push: true, throttleMinutes: 0 });
     });
 
-    it("returns the stored flag and is NOT gated by the email master switch", async () => {
-      userPrefRepo.findOne.mockResolvedValue({ notificationEmail: false });
-      notifPrefRepo.findOne.mockResolvedValue({ push: true });
-      expect(
-        await service.resolvePush("u1", NotificationCategory.BUDGETS),
-      ).toBe(true);
+    it("clamps a stored throttle window above the cap", async () => {
+      notifPrefRepo.findOne.mockResolvedValue({
+        emailNotification: false,
+        push: true,
+        throttleMinutes: THROTTLE_MAX_MINUTES + 500,
+      });
+      const res = await service.resolveNotificationDelivery(
+        "u1",
+        NotificationCategory.BUDGETS,
+      );
+      expect(res.throttleMinutes).toBe(THROTTLE_MAX_MINUTES);
     });
   });
 });

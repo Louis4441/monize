@@ -17,25 +17,23 @@ describe("notification-center reminder RLS context smoke (real withScopedDb)", (
     const { dataSource, manager } = createScopedDbMocks();
     // sweep -> nothing; claim -> one due row for a user, which the re-emit then
     // processes under that user's context.
-    manager.query
-      .mockResolvedValueOnce([[], 0])
-      .mockResolvedValueOnce([
-        [
-          {
-            id: "rem-1",
-            user_id: "3f1f8a52-2f0e-4b6d-9a56-0d6a3f1c2b4e",
-            alert_type: "BILL_DUE",
-            severity: "warning",
-            title: "Rent due",
-            message: "Rent is due",
-            data: {},
-            target: "/bills",
-            dedupe_base: "BILL_DUE",
-            fire_count: 1,
-          },
-        ],
-        1,
-      ]);
+    manager.query.mockResolvedValueOnce([[], 0]).mockResolvedValueOnce([
+      [
+        {
+          id: "rem-1",
+          user_id: "3f1f8a52-2f0e-4b6d-9a56-0d6a3f1c2b4e",
+          alert_type: "BILL_DUE",
+          severity: "warning",
+          title: "Rent due",
+          message: "Rent is due",
+          data: {},
+          target: "/bills",
+          dedupe_base: "BILL_DUE",
+          fire_count: 1,
+        },
+      ],
+      1,
+    ]);
 
     // The write door is a mock: the re-emit only needs to be reached under the
     // per-user context, not to write a row.

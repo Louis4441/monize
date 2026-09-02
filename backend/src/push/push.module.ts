@@ -20,6 +20,9 @@ import { AdminNotificationsController } from "./admin-notifications.controller";
   imports: [EncryptionModule],
   providers: [PushConfigService, PushSubscriptionService, WebPushSender],
   controllers: [PushController, AdminNotificationsController],
-  exports: [PushConfigService, WebPushSender],
+  // PushSubscriptionService is exported for the Phase 5 dispatch's `sendToUser`
+  // fan-out (a business feature asks the notification layer to deliver something
+  // and never imports a transport; the dispatch is that layer).
+  exports: [PushConfigService, WebPushSender, PushSubscriptionService],
 })
 export class PushModule {}

@@ -193,5 +193,11 @@
     "greeting": "안녕하세요 {{ name }}님,",
     "intro": "Monize 설치 환경에 관리자의 확인이 필요한 문제가 있습니다.",
     "footer": "이 알림은 앱의 알림 종에도 표시됩니다. 서버 복제본 수와 관계없이 발생 건당 최대 한 번만 생성됩니다."
+  },
+  "notificationImmediate": {
+    "subject": "새로운 Monize 알림이 있습니다",
+    "eyebrow": "Monize 알림",
+    "button": "Monize에서 열기",
+    "footer": "이 알림 유형에 대해 즉시 이메일이 켜져 있어 이 메일을 받았습니다. 설정, 알림에서 변경하세요."
   }
 }

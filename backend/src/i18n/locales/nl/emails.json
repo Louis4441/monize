@@ -193,5 +193,11 @@
     "greeting": "Hoi {{ name }},",
     "intro": "Een probleem in je Monize-installatie vraagt om de aandacht van een beheerder.",
     "footer": "Deze waarschuwing wordt ook getoond in de notificatiebel van de app. Ze wordt hoogstens één keer per voorval aangemaakt, ongeacht het aantal serverreplica's dat het opmerkte."
+  },
+  "notificationImmediate": {
+    "subject": "U hebt een nieuwe Monize-melding",
+    "eyebrow": "Monize-melding",
+    "button": "Openen in Monize",
+    "footer": "U ontvangt dit omdat directe e-mail aan staat voor dit meldingstype. Wijzig dit in Instellingen, Meldingen."
   }
 }

@@ -104,6 +104,47 @@ export function notificationCategoryOf(
   return NotificationCategory.BUDGETS;
 }
 
+/**
+ * The types that belong to a category -- the inverse of
+ * {@link notificationCategoryOf}, derived from it so the two cannot disagree.
+ * The Phase 5 throttle needs it: a category is not stored, so "same group in the
+ * last N minutes" is a filter on the `alert_type` set the category maps to.
+ */
+export function typesForCategory(
+  category: NotificationCategory,
+): NotificationType[] {
+  return Object.values(NotificationType).filter(
+    (type) => notificationCategoryOf(type) === category,
+  );
+}
+
+/**
+ * How urgent a severity is, as an orderable rank -- so the throttle can let a
+ * strict escalation through (a higher severity than a recent one always fans
+ * out; silence on an escalation is the dangerous direction). `success` is a
+ * good-news milestone, ranked with `info`: it is never an escalation.
+ */
+export function severityRank(severity: NotificationSeverity): number {
+  switch (severity) {
+    case NotificationSeverity.CRITICAL:
+      return 2;
+    case NotificationSeverity.WARNING:
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+/** The severities at or above a given one -- the throttle's "not an escalation" set. */
+export function severitiesAtOrAbove(
+  severity: NotificationSeverity,
+): NotificationSeverity[] {
+  const rank = severityRank(severity);
+  return Object.values(NotificationSeverity).filter(
+    (candidate) => severityRank(candidate) >= rank,
+  );
+}
+
 const dateTransformer = {
   from: (value: string | Date): string => {
     if (!value) return value as string;

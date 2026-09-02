@@ -440,6 +440,57 @@ export class PushSubscriptionService {
       collapseKey: null,
     };
 
+    const devices = await this.fanOut(userId, payload, targets);
+    const delivered = devices.filter((d) => d.status === "sent").length;
+    return { attempted: targets.length, delivered, devices };
+  }
+
+  /**
+   * Deliver one payload to a user on every live device, without throwing.
+   *
+   * The notification-layer fan-out primitive (spec section 14.2): the Phase 5
+   * dispatch calls it after `NotificationService.create` wrote a row and the
+   * matrix says push is on. Unlike `sendTest`, it does NOT throw when the channel
+   * is off or the user has no device -- a push is an external side effect that
+   * must never roll back the notification it is about, so "nothing to send" is
+   * `{ attempted: 0, delivered: 0 }`, not a 400. It seeds no context of its own;
+   * the caller's ambient context (a cron's `withUserContext`, a request) carries
+   * through the reads.
+   */
+  async sendToUser(
+    userId: string,
+    payload: PushPayload,
+  ): Promise<{ attempted: number; delivered: number }> {
+    const config = await this.pushConfig.getPublicConfig();
+    if (!config.enabled) return { attempted: 0, delivered: 0 };
+
+    const targets = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(PushSubscription).find({
+        where: { userId, disabledAt: IsNull() },
+        order: { lastSeenAt: "DESC" },
+      }),
+    );
+    if (targets.length === 0) return { attempted: 0, delivered: 0 };
+
+    const devices = await this.fanOut(userId, payload, targets);
+    return {
+      attempted: targets.length,
+      delivered: devices.filter((d) => d.status === "sent").length,
+    };
+  }
+
+  /**
+   * The concurrency-bounded send loop shared by `sendTest` and `sendToUser`: the
+   * per-send deadline covers one delivery, and this bounds how many run at once
+   * (`PUSH_TEST_CONCURRENCY`), so one account's fan-out cannot hold a request or
+   * a cron for the product of the two. Each attempt's outcome is recorded
+   * (`recordOutcome`), retiring a device that has failed enough.
+   */
+  private async fanOut(
+    userId: string,
+    payload: PushPayload,
+    targets: PushSubscription[],
+  ): Promise<PushTestDeviceResult[]> {
     const devices: PushTestDeviceResult[] = [];
     for (let i = 0; i < targets.length; i += PUSH_TEST_CONCURRENCY) {
       const batch = targets.slice(i, i + PUSH_TEST_CONCURRENCY);
@@ -469,9 +520,7 @@ export class PushSubscriptionService {
       );
       devices.push(...results);
     }
-
-    const delivered = devices.filter((d) => d.status === "sent").length;
-    return { attempted: targets.length, delivered, devices };
+    return devices;
   }
 
   /**

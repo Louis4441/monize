@@ -90,43 +90,42 @@ export class NotificationPreferenceService {
   }
 
   /**
-   * Whether NOTIFICATION-mode email (immediate, one-per-event) should be
-   * delivered for this category. Same master-switch kill as `resolveEmail` (it
-   * is still email), but the per-category default is OFF -- the notification
-   * email is opt-in, so a preference-less user gets none (spec section 14, D9).
-   * The throttle is applied by the dispatch, not here.
+   * The notification-mode delivery decision for one category, in a single read:
+   * whether the immediate email and push fan-outs are on, and the throttle
+   * window that gates them. The one method the Phase 5 dispatch calls per
+   * notification (spec section 14) -- combined so a fan-out costs one preference
+   * read, not three.
+   *
+   * The email flag is killed by the `notification_email` master switch (it is
+   * still email) and defaults OFF (opt-in, D9); push is NOT email-master-gated
+   * (a different channel) and defaults OFF; the throttle defaults 0. Feasibility
+   * -- SMTP configured, a live device -- is the sender's call, not this one.
    */
-  async resolveEmailNotification(
+  async resolveNotificationDelivery(
     userId: string,
     category: NotificationCategory,
-  ): Promise<boolean> {
+  ): Promise<{
+    emailNotification: boolean;
+    push: boolean;
+    throttleMinutes: number;
+  }> {
     return withScopedDb(this.dataSource, async (manager) => {
       const master = await manager.getRepository(UserPreference).findOne({
         where: { userId },
       });
-      if (master && !master.notificationEmail) return false;
+      const emailKilled = !!master && !master.notificationEmail;
       const row = await manager.getRepository(NotificationPreference).findOne({
         where: { userId, category },
       });
-      return row ? row.emailNotification : false;
-    });
-  }
-
-  /**
-   * Whether web push should be delivered for this category. Default OFF, and NOT
-   * gated by the email master switch (push is a different channel). Feasibility
-   * -- whether the instance has push configured and the user has a live device
-   * -- is decided by the sender, not here; this answers only the preference.
-   */
-  async resolvePush(
-    userId: string,
-    category: NotificationCategory,
-  ): Promise<boolean> {
-    return withScopedDb(this.dataSource, async (manager) => {
-      const row = await manager.getRepository(NotificationPreference).findOne({
-        where: { userId, category },
-      });
-      return row ? row.push : false;
+      return {
+        emailNotification: emailKilled
+          ? false
+          : row
+            ? row.emailNotification
+            : false,
+        push: row ? row.push : false,
+        throttleMinutes: row ? this.clampThrottle(row.throttleMinutes) : 0,
+      };
     });
   }
 
