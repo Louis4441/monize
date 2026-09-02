@@ -4,7 +4,16 @@ import { useState, useEffect, useRef, useCallback, useMemo, forwardRef, InputHTM
 import { useTranslations } from 'next-intl';
 import { CalculatorIcon } from '@heroicons/react/24/outline';
 import { cn, inputBaseClasses, inputErrorClasses } from '@/lib/utils';
-import { formatAmountWithCommas, formatAmount, parseAmount, filterCurrencyInput, filterCalculatorInput, hasCalculatorOperators, evaluateExpression } from '@/lib/format';
+import { hasCalculatorOperators, evaluateExpression, roundToCents } from '@/lib/format';
+import { useNumberFormat } from '@/hooks/useNumberFormat';
+import {
+  filterNumberTyping,
+  formatAmountLocalized,
+  formatNumberForEdit,
+  normalizeExpression,
+  parseLocaleNumber,
+  stripGroupSeparator,
+} from '@/lib/number-parse';
 import { Modal } from './Modal';
 import { Button } from './Button';
 
@@ -60,8 +69,67 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
     ref
   ) => {
     const t = useTranslations('common');
+    const nf = useNumberFormat();
+    // Defensive default: a partial mock (or an older build mid rolling deploy)
+    // may not carry the separators; en-US keeps the previous behaviour. Memoized
+    // on the primitive fields, NOT the object identity: the real hook returns a
+    // module-cached object (stable), but a partial test mock returns a fresh
+    // literal each render -- keying on the strings keeps the reference stable
+    // under both, so the callbacks below (and the sync effect that depends on
+    // formatDisplay) do not rebuild every render.
+    const sepDecimal = nf.numberSeparators?.decimal ?? '.';
+    const sepGroup = nf.numberSeparators?.group ?? ',';
+    const sepNativeDecimal = nf.numberSeparators?.nativeDecimal;
+    const sepNativeGroup = nf.numberSeparators?.nativeGroup;
+    const numberSeparators = useMemo(
+      () => ({
+        decimal: sepDecimal,
+        group: sepGroup,
+        ...(sepNativeDecimal ? { nativeDecimal: sepNativeDecimal } : {}),
+        ...(sepNativeGroup ? { nativeGroup: sepNativeGroup } : {}),
+      }),
+      [sepDecimal, sepGroup, sepNativeDecimal, sepNativeGroup],
+    );
+    const numberLocale = nf.numberLocale;
+
+    // Grouped, two-decimal display in the user's number locale -- the same
+    // helper the read-only surfaces use, so the field and its labels agree.
+    const formatDisplay = useCallback(
+      (v: number | undefined | null): string =>
+        // Latin digits: an editable field shows exactly the text it parses back.
+        formatAmountLocalized(v, 2, numberSeparators, numberLocale, { latnDigits: true }),
+      [numberSeparators, numberLocale],
+    );
+
+    // Filter a raw string while typing, and parse it, in the user's convention.
+    const filterTyping = useCallback(
+      (raw: string): string =>
+        filterNumberTyping(raw, {
+          allowNegative: allowNegative || allowCalculator,
+          allowOperators: allowCalculator,
+          separators: numberSeparators,
+        }),
+      [allowNegative, allowCalculator, numberSeparators],
+    );
+    // Round to cents on parse, restoring parseAmount's contract: a money field
+    // stores what it displays (2dp). The value handed to the parent must not
+    // carry sub-cent precision the 2dp display hides. The calculator/evaluate
+    // path is deliberately left unrounded, matching the pre-refactor behaviour.
+    const parse = useCallback(
+      (raw: string): number | undefined => {
+        const n = parseLocaleNumber(raw, numberSeparators);
+        return n === undefined ? undefined : roundToCents(n);
+      },
+      [numberSeparators],
+    );
+    const evaluate = useCallback(
+      (raw: string): number | undefined =>
+        evaluateExpression(normalizeExpression(raw, numberSeparators)),
+      [numberSeparators],
+    );
+
     // Local display state - allows free typing
-    const [displayValue, setDisplayValue] = useState(() => formatAmountWithCommas(value));
+    const [displayValue, setDisplayValue] = useState(() => formatDisplay(value));
     const [isFocused, setIsFocused] = useState(false);
     const [calcOpen, setCalcOpen] = useState(false);
     const [calcExpression, setCalcExpression] = useState('');
@@ -77,12 +145,13 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
       }
     });
 
-    // Sync from parent when value changes externally (e.g., form reset)
+    // Sync from parent when value changes externally (e.g., form reset), and
+    // reformat if the number locale changes.
     useEffect(() => {
       if (!isFocused) {
-        setDisplayValue(formatAmountWithCommas(value));
+        setDisplayValue(formatDisplay(value));
       }
-    }, [value, isFocused]);
+    }, [value, isFocused, formatDisplay]);
 
     // Sync sign from parent value while focused (e.g., category auto-sign sets negative)
     useEffect(() => {
@@ -124,22 +193,16 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      // Use calculator filter if calculator is enabled, otherwise standard currency filter
-      let filtered = allowCalculator
-        ? filterCalculatorInput(e.target.value)
-        : filterCurrencyInput(e.target.value);
-
-      // Remove minus sign if negative not allowed (but keep for expressions like "100-10")
-      if (!allowNegative && !allowCalculator) {
-        filtered = filtered.replace(/-/g, '');
-      }
+      // Filter in the user's convention: keep their decimal separator, drop
+      // their grouping separator, keep operators when the calculator is on.
+      const filtered = filterTyping(e.target.value);
 
       setDisplayValue(filtered);
 
       // Only notify parent immediately if not a calculator expression
       // (expressions are evaluated on blur)
       if (!allowCalculator || !hasCalculatorOperators(filtered)) {
-        notifyIfChanged(parseAmount(filtered));
+        notifyIfChanged(parse(filtered));
       }
     };
 
@@ -151,7 +214,7 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
       // Check if this is a calculator expression
       if (allowCalculator && hasCalculatorOperators(displayValue)) {
         // Evaluate the expression
-        finalValue = evaluateExpression(displayValue);
+        finalValue = evaluate(displayValue);
 
         // Apply negative restriction to the result
         if (finalValue !== undefined && !allowNegative && finalValue < 0) {
@@ -159,7 +222,7 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
         }
       } else {
         // Standard parsing
-        finalValue = parseAmount(displayValue);
+        finalValue = parse(displayValue);
       }
 
       // Format and update
@@ -169,9 +232,9 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
         if (value !== undefined &&
             Math.abs(finalValue) === Math.abs(value) &&
             finalValue !== value) {
-          setDisplayValue(formatAmountWithCommas(value));
+          setDisplayValue(formatDisplay(value));
         } else {
-          setDisplayValue(formatAmountWithCommas(finalValue));
+          setDisplayValue(formatDisplay(finalValue));
           notifyIfChanged(finalValue);
         }
       } else if (displayValue.trim() === '') {
@@ -179,7 +242,7 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
         notifyIfChanged(undefined);
       } else {
         // Invalid input - reset to last valid value
-        setDisplayValue(formatAmountWithCommas(value));
+        setDisplayValue(formatDisplay(value));
       }
 
       // Call parent's onBlur if provided
@@ -196,12 +259,12 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
         hasCalculatorOperators(displayValue)
       ) {
         e.preventDefault();
-        let result = evaluateExpression(displayValue);
+        let result = evaluate(displayValue);
         if (result !== undefined) {
           if (!allowNegative && result < 0) {
             result = Math.abs(result);
           }
-          setDisplayValue(formatAmountWithCommas(result));
+          setDisplayValue(formatDisplay(result));
           notifyIfChanged(result);
         }
       }
@@ -209,10 +272,11 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
 
     const handleFocus = (e: FocusEvent<HTMLInputElement>) => {
       setIsFocused(true);
-      // Strip commas when focused for easier editing, and clear if zero
+      // Strip the grouping separator for easier editing, and clear if zero.
+      const zero = formatNumberForEdit(0, 2, numberSeparators);
       setDisplayValue(prev => {
-        const stripped = prev.replace(/,/g, '');
-        return stripped === '0.00' || stripped === '0' ? '' : stripped;
+        const stripped = stripGroupSeparator(prev, numberSeparators);
+        return stripped === zero || stripped === '0' ? '' : stripped;
       });
       onFocus?.(e);
     };
@@ -232,14 +296,14 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
     // --- Calculator modal logic ---
 
     const openCalculator = useCallback(() => {
-      const initial = value !== undefined && value !== 0 ? formatAmount(value) : '';
+      const initial = value !== undefined && value !== 0 ? formatNumberForEdit(value, 2, numberSeparators) : '';
       setCalcExpression(initial);
       setCalcOpen(true);
-    }, [value]);
+    }, [value, numberSeparators]);
 
     const handleCalcExpressionChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-      setCalcExpression(filterCalculatorInput(e.target.value));
-    }, []);
+      setCalcExpression(filterTyping(e.target.value));
+    }, [filterTyping]);
 
     const insertOperator = useCallback((operator: string) => {
       const input = calcInputRef.current;
@@ -249,29 +313,29 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
       const end = input.selectionEnd ?? calcExpression.length;
 
       const newValue = calcExpression.substring(0, start) + operator + calcExpression.substring(end);
-      const filtered = filterCalculatorInput(newValue);
+      const filtered = filterTyping(newValue);
 
       setCalcExpression(filtered);
       pendingCursorPos.current = start + operator.length;
-    }, [calcExpression]);
+    }, [calcExpression, filterTyping]);
 
     const calcPreview = useMemo(() => {
       if (!hasCalculatorOperators(calcExpression)) {
-        const parsed = parseAmount(calcExpression);
-        if (parsed !== undefined) return formatAmountWithCommas(parsed);
+        const parsed = parse(calcExpression);
+        if (parsed !== undefined) return formatDisplay(parsed);
         return null;
       }
-      const result = evaluateExpression(calcExpression);
+      const result = evaluate(calcExpression);
       if (result === undefined) return null;
-      return formatAmountWithCommas(result);
-    }, [calcExpression]);
+      return formatDisplay(result);
+    }, [calcExpression, parse, evaluate, formatDisplay]);
 
     const applyCalculation = useCallback(() => {
       let result: number | undefined;
       if (hasCalculatorOperators(calcExpression)) {
-        result = evaluateExpression(calcExpression);
+        result = evaluate(calcExpression);
       } else {
-        result = parseAmount(calcExpression);
+        result = parse(calcExpression);
       }
 
       if (result !== undefined) {
@@ -279,10 +343,10 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
           result = Math.abs(result);
         }
         onChange(result);
-        setDisplayValue(formatAmountWithCommas(result));
+        setDisplayValue(formatDisplay(result));
       }
       setCalcOpen(false);
-    }, [calcExpression, allowNegative, onChange]);
+    }, [calcExpression, allowNegative, onChange, parse, evaluate, formatDisplay]);
 
     return (
       <div className="w-full">
@@ -305,7 +369,7 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
             id={inputId}
             type="text"
             inputMode="decimal"
-            placeholder="0.00"
+            placeholder={formatNumberForEdit(0, 2, numberSeparators)}
             value={displayValue}
             onChange={handleChange}
             onBlur={handleBlur}
@@ -387,7 +451,7 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
               value={calcExpression}
               onChange={handleCalcExpressionChange}
               onKeyDown={(e) => { if (e.key === 'Enter') applyCalculation(); }}
-              placeholder="e.g. 100*1.13"
+              placeholder={`100*${formatNumberForEdit(1.13, 2, numberSeparators)}`}
               className={cn(inputBaseClasses, 'text-lg font-mono mb-3')}
             />
 

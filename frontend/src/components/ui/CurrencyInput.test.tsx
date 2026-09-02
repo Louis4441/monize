@@ -59,6 +59,19 @@ describe('CurrencyInput', () => {
     expect(onChange).toHaveBeenCalled();
   });
 
+  it('rounds a sub-cent typed amount to cents (parseAmount contract)', () => {
+    // A money field stores what it displays (2dp); the value handed to the parent
+    // must not carry sub-cent precision the 2dp display hides.
+    const onChange = vi.fn();
+    render(<Controlled label="Amount" initial={undefined} onChange={onChange} />);
+    const input = screen.getByLabelText('Amount');
+    fireEvent.change(input, { target: { value: '1.239' } });
+    expect(onChange).toHaveBeenLastCalledWith(1.24);
+    fireEvent.blur(input);
+    expect(input).toHaveValue('1.24');
+    expect(onChange).toHaveBeenLastCalledWith(1.24);
+  });
+
   it('has displayName', () => {
     expect(CurrencyInput.displayName).toBe('CurrencyInput');
   });
@@ -287,14 +300,14 @@ describe('CurrencyInput', () => {
     it('pre-fills expression with current value', () => {
       render(<CurrencyInput label="Amount" value={50} onChange={vi.fn()} />);
       fireEvent.click(screen.getByLabelText('Open calculator'));
-      const calcInput = screen.getByPlaceholderText('e.g. 100*1.13');
+      const calcInput = screen.getByPlaceholderText('100*1.13');
       expect(calcInput).toHaveValue('50.00');
     });
 
     it('pre-fills empty for zero value', () => {
       render(<CurrencyInput label="Amount" value={0} onChange={vi.fn()} />);
       fireEvent.click(screen.getByLabelText('Open calculator'));
-      const calcInput = screen.getByPlaceholderText('e.g. 100*1.13');
+      const calcInput = screen.getByPlaceholderText('100*1.13');
       expect(calcInput).toHaveValue('');
     });
 
@@ -311,7 +324,7 @@ describe('CurrencyInput', () => {
     it('inserts operator into expression via button', () => {
       render(<CurrencyInput label="Amount" value={0} onChange={vi.fn()} />);
       fireEvent.click(screen.getByLabelText('Open calculator'));
-      const calcInput = screen.getByPlaceholderText('e.g. 100*1.13');
+      const calcInput = screen.getByPlaceholderText('100*1.13');
       fireEvent.change(calcInput, { target: { value: '100' } });
       fireEvent.mouseDown(screen.getByLabelText('Add plus operator'));
       expect((calcInput as HTMLInputElement).value).toContain('+');
@@ -320,7 +333,7 @@ describe('CurrencyInput', () => {
     it('shows preview for valid expression', () => {
       render(<CurrencyInput label="Amount" value={0} onChange={vi.fn()} />);
       fireEvent.click(screen.getByLabelText('Open calculator'));
-      const calcInput = screen.getByPlaceholderText('e.g. 100*1.13');
+      const calcInput = screen.getByPlaceholderText('100*1.13');
       fireEvent.change(calcInput, { target: { value: '100+50' } });
       expect(screen.getByText('150.00')).toBeInTheDocument();
     });
@@ -329,7 +342,7 @@ describe('CurrencyInput', () => {
       const onChange = vi.fn();
       render(<CurrencyInput label="Amount" value={0} onChange={onChange} />);
       fireEvent.click(screen.getByLabelText('Open calculator'));
-      const calcInput = screen.getByPlaceholderText('e.g. 100*1.13');
+      const calcInput = screen.getByPlaceholderText('100*1.13');
       fireEvent.change(calcInput, { target: { value: '100*1.13' } });
       fireEvent.click(screen.getByText('Apply'));
       expect(onChange).toHaveBeenCalledWith(113);
@@ -340,7 +353,7 @@ describe('CurrencyInput', () => {
       const onChange = vi.fn();
       render(<CurrencyInput label="Amount" value={0} onChange={onChange} />);
       fireEvent.click(screen.getByLabelText('Open calculator'));
-      const calcInput = screen.getByPlaceholderText('e.g. 100*1.13');
+      const calcInput = screen.getByPlaceholderText('100*1.13');
       fireEvent.change(calcInput, { target: { value: '200+50' } });
       fireEvent.keyDown(calcInput, { key: 'Enter' });
       expect(onChange).toHaveBeenCalledWith(250);
@@ -350,7 +363,7 @@ describe('CurrencyInput', () => {
       const onChange = vi.fn();
       render(<CurrencyInput label="Amount" value={100} onChange={onChange} />);
       fireEvent.click(screen.getByLabelText('Open calculator'));
-      fireEvent.change(screen.getByPlaceholderText('e.g. 100*1.13'), { target: { value: '999' } });
+      fireEvent.change(screen.getByPlaceholderText('100*1.13'), { target: { value: '999' } });
       fireEvent.click(screen.getByText('Cancel'));
       expect(screen.queryByText('Calculator')).not.toBeInTheDocument();
       expect(onChange).not.toHaveBeenCalled();
@@ -367,7 +380,7 @@ describe('CurrencyInput', () => {
       render(<CurrencyInput label="Amount" value={100} onChange={onChange} />);
       fireEvent.click(screen.getByLabelText('Open calculator'));
       expect(screen.getByText('Calculator')).toBeInTheDocument();
-      const calcInput = screen.getByPlaceholderText('e.g. 100*1.13');
+      const calcInput = screen.getByPlaceholderText('100*1.13');
       fireEvent.change(calcInput, { target: { value: '999' } });
       fireEvent.keyDown(calcInput, { key: 'Escape' });
       expect(screen.queryByText('Calculator')).not.toBeInTheDocument();
@@ -377,7 +390,7 @@ describe('CurrencyInput', () => {
     it('closes modal on Enter key', () => {
       render(<CurrencyInput label="Amount" value={0} onChange={vi.fn()} />);
       fireEvent.click(screen.getByLabelText('Open calculator'));
-      const calcInput = screen.getByPlaceholderText('e.g. 100*1.13');
+      const calcInput = screen.getByPlaceholderText('100*1.13');
       fireEvent.change(calcInput, { target: { value: '100+50' } });
       fireEvent.keyDown(calcInput, { key: 'Enter' });
       expect(screen.queryByText('Calculator')).not.toBeInTheDocument();
@@ -387,7 +400,7 @@ describe('CurrencyInput', () => {
       const onChange = vi.fn();
       render(<CurrencyInput label="Amount" value={0} onChange={onChange} />);
       fireEvent.click(screen.getByLabelText('Open calculator'));
-      const calcInput = screen.getByPlaceholderText('e.g. 100*1.13');
+      const calcInput = screen.getByPlaceholderText('100*1.13');
       fireEvent.change(calcInput, { target: { value: '75' } });
       fireEvent.click(screen.getByText('Apply'));
       expect(onChange).toHaveBeenCalledWith(75);

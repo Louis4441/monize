@@ -10,7 +10,8 @@ import { parseLocalDate } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/errors';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
-import { formatAmountWithCommas, getDecimalPlacesForCurrency } from '@/lib/format';
+import { useLocalizedAmount } from '@/hooks/useLocalizedAmount';
+import { getDecimalPlacesForCurrency } from '@/lib/format';
 import {
   overrideEffectiveAmount,
   scheduleEffectiveAmount,
@@ -170,6 +171,7 @@ const ScheduledTransactionRow = memo(function ScheduledTransactionRow({
 }: ScheduledTransactionRowProps) {
   const rowRef = useScrollIntoViewWhen<HTMLTableRowElement>(!!isHighlighted);
   const t = useTranslations('scheduledTransactions');
+  const formatAmountLocal = useLocalizedAmount();
   const actions = buildScheduledActions(
     transaction,
     isProcessing,
@@ -309,7 +311,7 @@ const ScheduledTransactionRow = memo(function ScheduledTransactionRow({
                 title={t('list.foreignAmountTitle')}
               >
                 {transaction.originalCurrencyCode}{' '}
-                {formatAmountWithCommas(
+                {formatAmountLocal(
                   Math.abs(Number(transaction.originalAmount)),
                   getDecimalPlacesForCurrency(transaction.originalCurrencyCode),
                 )}
