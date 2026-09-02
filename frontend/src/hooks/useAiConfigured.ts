@@ -18,11 +18,14 @@ export interface AiConfiguredState {
 /**
  * Whether an AI provider is configured for this user.
  *
- * The payee contact lookup is the only thing the AI provider does outside the
- * assistant, so every surface offering it -- the payee form's button, the
- * detail card's button, the transaction page's quick-create, the settings
- * toggle -- asks here rather than showing a control whose only possible
- * outcome is "configure a provider first".
+ * Every surface that can only work through a provider asks here rather than
+ * showing a control whose one possible outcome is "configure a provider
+ * first": the payee lookup surfaces (the payee form's button, the detail
+ * card's button, the transaction page's quick-create) and their settings
+ * toggle, plus the floating chat bubble and its toggle -- the opt-in
+ * preference outlives the provider that justified it, so the bubble asks here
+ * too rather than putting a launcher on every page after the last provider is
+ * deleted.
  *
  * The read is cached and deduped in `aiApi.getStatus`, so mounting this in
  * several places costs one request, and a provider added or removed in

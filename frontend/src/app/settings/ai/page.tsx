@@ -105,7 +105,10 @@ function AiSettingsContent() {
           </div>
         )}
 
-        <AiBubbleToggle disabled={isDemoMode} />
+        <AiBubbleToggle
+          disabled={isDemoMode}
+          aiConfigured={status?.configured ?? false}
+        />
         <PayeeContactLookupToggle
           disabled={isDemoMode}
           aiConfigured={status?.configured ?? false}

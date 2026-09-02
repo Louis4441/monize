@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
 import { usePreferencesStore } from '@/store/preferencesStore';
+import { useAiConfigured } from '@/hooks/useAiConfigured';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { DragHandle } from '@/components/ui/DragHandle';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -127,6 +128,16 @@ export function AiChatBubble() {
   const isMobile = useIsMobile();
   const [view, setView] = useState<View>('closed');
 
+  /**
+   * Whether an AI provider can answer at all. The preference outlives the
+   * provider that justified it -- delete the last one and the opt-in is still
+   * on -- so without this a launcher sits on every page and opens a chat that
+   * can only fail. `configured` is false until the status answers, so the
+   * launcher never flashes and vanishes for a user who has no provider, and
+   * the read is the same cached one the payee lookup surfaces make.
+   */
+  const { configured: aiConfigured } = useAiConfigured();
+
   // Persisted desktop placement. Lazy-read from localStorage on mount (reading
   // storage for an initial useState value is allowed); null means "use the
   // default bottom-right corner", resolved lazily at render once we have a
@@ -197,6 +208,7 @@ export function AiChatBubble() {
   }, [view]);
 
   if (!enabled) return null;
+  if (!aiConfigured) return null;
   if (pathname && HIDE_ON.includes(pathname)) return null;
 
   if (view === 'closed') {

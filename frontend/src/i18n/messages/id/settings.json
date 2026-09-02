@@ -767,7 +767,7 @@
     },
     "payeeLookup": {
       "title": "Pencarian otomatis detail kontak penerima",
-      "subtitle": "Saat Anda menambahkan penerima, situs web, alamat, email, dan teleponnya dicari melalui penyedia AI yang dikonfigurasi. Formulir penerima baru mengisi saran untuk Anda tinjau, dan penerima yang Anda tambahkan dari halaman transaksi menampilkannya untuk Anda konfirmasi; penerima yang dibuat untuk Anda saat sebuah transaksi disimpan diisi di latar belakang. Nama penerima dikirim beserta catatan, situs web, alamat, email, dan telepon yang sudah ada, agar pencarian dapat membedakan bisnis dan lokasi yang tepat. Setiap pencarian dapat menjalankan pencarian web yang ditagihkan ke penyedia tersebut, dan delegasi menggunakan penyedia pemilik akun.",
+      "subtitle": "Cari otomatis situs web, alamat, email, dan nomor telepon penerima baru melalui penyedia AI yang Anda konfigurasikan.",
       "toggleLabel": "Aktifkan pencarian otomatis detail kontak",
       "enabled": "Pencarian otomatis detail kontak diaktifkan",
       "disabled": "Pencarian otomatis detail kontak dinonaktifkan",

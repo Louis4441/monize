@@ -767,7 +767,7 @@
     },
     "payeeLookup": {
       "title": "Automatyczne wyszukiwanie danych kontaktowych odbiorcy",
-      "subtitle": "Po dodaniu odbiorcy jego strona internetowa, adres, e-mail i telefon są wyszukiwane przez skonfigurowanego dostawcę AI. Formularz nowego odbiorcy wypełnia propozycje do sprawdzenia, a odbiorca dodany na stronie transakcji pokazuje je do potwierdzenia; odbiorca utworzony przy zapisywaniu transakcji jest uzupełniany w tle. Wysyłana jest nazwa odbiorcy wraz z istniejącymi już notatkami, stroną internetową, adresem, e-mailem i telefonem, aby wyszukiwanie odróżniło właściwą firmę i właściwą lokalizację. Każde wyszukiwanie może uruchamiać wyszukiwania w sieci rozliczane u tego dostawcy, a pełnomocnik korzysta z dostawcy właściciela konta.",
+      "subtitle": "Automatycznie wyszukuje stronę internetową, adres, e-mail i numer telefonu nowego odbiorcy za pomocą skonfigurowanego dostawcy AI.",
       "toggleLabel": "Włącz automatyczne wyszukiwanie danych kontaktowych",
       "enabled": "Automatyczne wyszukiwanie danych kontaktowych włączone",
       "disabled": "Automatyczne wyszukiwanie danych kontaktowych wyłączone",

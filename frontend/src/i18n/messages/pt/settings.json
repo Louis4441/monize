@@ -767,7 +767,7 @@
     },
     "payeeLookup": {
       "title": "Pesquisa automática dos contactos do beneficiário",
-      "subtitle": "Ao adicionar um beneficiário, o site, a morada, o e-mail e o telefone são procurados através do fornecedor de IA configurado. O formulário de novo beneficiário preenche as sugestões para revisão e um beneficiário que adicione na página de transações mostra-as para confirmação; um beneficiário criado por si ao guardar uma transação é preenchido em segundo plano. O nome do beneficiário é enviado, juntamente com as notas, o site, a morada, o e-mail e o telefone que já existam, para que a pesquisa distinga a empresa certa e o local certo. Cada pesquisa pode executar pesquisas na web faturadas a esse fornecedor, e um delegado usa o fornecedor do titular da conta.",
+      "subtitle": "Procura automaticamente o site, a morada, o e-mail e o número de telefone de um novo beneficiário através do seu fornecedor de IA configurado.",
       "toggleLabel": "Ativar a pesquisa automática de contactos",
       "enabled": "Pesquisa automática de contactos ativada",
       "disabled": "Pesquisa automática de contactos desativada",

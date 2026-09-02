@@ -767,7 +767,7 @@
     },
     "payeeLookup": {
       "title": "Automatische Suche nach Kontaktangaben des Zahlungsempfängers",
-      "subtitle": "Beim Anlegen eines Zahlungsempfängers werden Website, Adresse, E-Mail und Telefon über Ihren konfigurierten KI-Anbieter nachgeschlagen. Das Formular „Neuer Zahlungsempfänger“ trägt die Vorschläge zur Prüfung ein, und ein auf der Buchungsseite angelegter Zahlungsempfänger zeigt sie Ihnen zur Bestätigung; ein Zahlungsempfänger, der beim Speichern einer Buchung für Sie angelegt wird, wird im Hintergrund ergänzt. Gesendet werden der Name sowie bereits vorhandene Notizen, Website, Adresse, E-Mail und Telefon, damit die Suche das richtige Unternehmen und den richtigen Standort unterscheiden kann. Jede Suche kann Websuchen auslösen, die diesem Anbieter in Rechnung gestellt werden, und ein Stellvertreter nutzt den Anbieter des Kontoinhabers.",
+      "subtitle": "Sucht Website, Adresse, E-Mail-Adresse und Telefonnummer eines neuen Zahlungsempfängers automatisch über Ihren konfigurierten KI-Anbieter.",
       "toggleLabel": "Automatische Suche nach Kontaktangaben aktivieren",
       "enabled": "Automatische Suche nach Kontaktangaben aktiviert",
       "disabled": "Automatische Suche nach Kontaktangaben deaktiviert",

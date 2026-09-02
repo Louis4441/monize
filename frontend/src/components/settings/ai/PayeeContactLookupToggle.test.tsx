@@ -49,16 +49,15 @@ describe('PayeeContactLookupToggle', () => {
     expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
   });
 
-  it('says what the lookup sends and who pays for it', () => {
+  it('names the details it looks up and what it looks them up through', () => {
     render(<PayeeContactLookupToggle aiConfigured />);
-    // The name is not all that is sent: the payee's own notes and contact
-    // fields go with it as context, and the copy has to say so.
-    const subtitle = screen.getByText(/The payee name is sent/);
+    // A switch whose subtitle does not say what it fetches, or through what,
+    // is asking for consent to something unnamed.
+    const subtitle = screen.getByText(/Automatically look up a new payee/);
     expect(subtitle).toHaveTextContent(
-      /along with any notes, website, address, email and phone it already has/,
+      /website, address, email and phone number/,
     );
-    expect(subtitle).toHaveTextContent(/billed to that provider/);
-    expect(subtitle).toHaveTextContent(/account owner's provider/);
+    expect(subtitle).toHaveTextContent(/configured AI provider/);
   });
 
   it('enables the lookup optimistically and shows the success toast', async () => {

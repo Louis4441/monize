@@ -333,6 +333,14 @@ Mobile Chrome sizes the viewport that `position: fixed` elements attach to from 
 
 The sliding `AppHeader` always carries a `transform` (`useHideOnScroll`), which makes the header -- not the viewport -- the containing block for every `position: fixed` descendant. A panel mounted in the header (the alerts dropdown, `ActionHistoryPanel`) that anchors with `bottom-0`/`inset-0` is therefore capped at the header's own ~56px box: the full-screen alerts panel only *looked* full while alert rows overflowed it, and collapsed when empty. Size such a panel with an explicit height (`h-dvh` for the mobile full-screen treatment) and edge offsets that grow past the containing block; `BudgetAlertList.test.tsx` pins the class shape.
 
+### A control that needs an AI provider is not offered without one -- `useAiConfigured()`
+
+A provider is the prerequisite for the payee contact lookup and the assistant alike, so every surface offering either asks `hooks/useAiConfigured.ts` and renders nothing when the answer is no: the payee form's and detail card's lookup buttons, the transaction page's quick-create confirmation, and both AI settings toggles. A control whose one possible outcome is "configure a provider first" is worse than an absent one -- it costs a click to learn nothing.
+
+**A preference outlives the provider that justified it.** `aiBubbleEnabled` stays true after the last provider is deleted, so the floating chat bubble gates on the provider as well as on the opt-in; without that it sits on every page and opens a chat that can only fail. Any future preference guarding provider-backed work inherits the same pair.
+
+The hook answers `configured: false` until the status settles **and** for a status read that failed -- deliberately, because "we could not ask" is not "there is a provider", and it is also what keeps a control from flashing in and vanishing. Read the cached `aiApi.getStatus` through the hook rather than fetching status again: one request serves every mounted surface, and a provider added or removed in Settings drops that cache.
+
 ### A password field declares what may be autofilled into it
 
 Every `<Input type="password">` carries an `autoComplete`: `current-password` when it really is this account's password, `new-password` when one is being set here, `off` when it is not a credential of this site at all. Omitting it is not neutral -- a password manager fills a bare box with the saved credential, and the form submits it as typed: the AI provider's API key field silently replaced the stored key ("Saved" on screen, provider dead, row shows `****` either way), and the backup export password is the same shape and worse. `ui-conventions.test.ts` fails on a password input with no `autoComplete`, and on a value outside those three.

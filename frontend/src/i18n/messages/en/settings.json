@@ -767,7 +767,7 @@
     },
     "payeeLookup": {
       "title": "Automatic payee contact lookup",
-      "subtitle": "When you add a payee, look up its website, address, email and phone through your configured AI provider. The New Payee form fills in the suggestions for you to review, and a payee you add from the transaction page shows them for you to confirm; a payee created for you while a transaction is saved is filled in the background. The payee name is sent, along with any notes, website, address, email and phone it already has, so the lookup can tell the right business and the right location apart. Each lookup may run web searches billed to that provider, and a delegate uses the account owner's provider.",
+      "subtitle": "Automatically look up a new payee's website, address, email and phone number through your configured AI provider.",
       "toggleLabel": "Enable automatic payee contact lookup",
       "enabled": "Automatic payee contact lookup enabled",
       "disabled": "Automatic payee contact lookup disabled",
