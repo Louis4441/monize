@@ -2,18 +2,44 @@ import { BadRequestException } from "@nestjs/common";
 
 import { NotificationPreferenceController } from "./notification-preference.controller";
 import { NotificationCategory } from "./entities/notification.entity";
+import {
+  configurableCategoriesFor,
+  NOTIFICATION_PREFERENCE_CATEGORIES,
+} from "./notification-preference.service";
 
 describe("NotificationPreferenceController", () => {
   const preferences = { list: jest.fn(), updatePreference: jest.fn() };
   const controller = new NotificationPreferenceController(preferences as never);
-  const req = { user: { id: "u1" } };
+  const req = { user: { id: "u1", role: "user" } };
+  const adminReq = { user: { id: "a1", role: "admin" } };
 
   afterEach(() => jest.clearAllMocks());
 
-  it("lists the caller's own preferences", () => {
+  it("lists the caller's own preferences, without the SYSTEM row for a non-admin", () => {
     preferences.list.mockReturnValue(["x"]);
     expect(controller.list(req)).toEqual(["x"]);
-    expect(preferences.list).toHaveBeenCalledWith("u1");
+    expect(preferences.list).toHaveBeenCalledWith(
+      "u1",
+      configurableCategoriesFor(false),
+    );
+    expect(preferences.list.mock.calls[0][1]).not.toContain(
+      NotificationCategory.SYSTEM,
+    );
+  });
+
+  it("lists every matrix row, SYSTEM included, for an admin", () => {
+    controller.list(adminReq);
+    expect(preferences.list).toHaveBeenCalledWith(
+      "a1",
+      NOTIFICATION_PREFERENCE_CATEGORIES,
+    );
+  });
+
+  it("refuses a SYSTEM write from a non-admin -- a cell their matrix does not show", () => {
+    expect(() =>
+      controller.update(req, NotificationCategory.SYSTEM, { push: true }),
+    ).toThrow(BadRequestException);
+    expect(preferences.updatePreference).not.toHaveBeenCalled();
   });
 
   it("updates an exposed category, keyed on the JWT user", () => {
@@ -52,9 +78,9 @@ describe("NotificationPreferenceController", () => {
   });
 
   it("updates the SYSTEM category (its push is a live control for admins)", () => {
-    controller.update(req, NotificationCategory.SYSTEM, { push: true });
+    controller.update(adminReq, NotificationCategory.SYSTEM, { push: true });
     expect(preferences.updatePreference).toHaveBeenCalledWith(
-      "u1",
+      "a1",
       NotificationCategory.SYSTEM,
       {
         email: undefined,

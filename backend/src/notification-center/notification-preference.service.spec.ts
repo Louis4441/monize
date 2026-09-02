@@ -1,5 +1,6 @@
 import {
   NotificationPreferenceService,
+  configurableCategoriesFor,
   NOTIFICATION_PREFERENCE_CATEGORIES,
   NOTIFICATION_CATEGORY_CHANNELS,
   THROTTLE_MAX_MINUTES,
@@ -86,9 +87,43 @@ describe("NotificationPreferenceService", () => {
     });
   });
 
+  describe("configurableCategoriesFor", () => {
+    it("lists every matrix category for an admin", () => {
+      expect(configurableCategoriesFor(true)).toEqual(
+        NOTIFICATION_PREFERENCE_CATEGORIES,
+      );
+    });
+
+    it("omits SYSTEM for everyone else, whose alerts are never raised", () => {
+      const categories = configurableCategoriesFor(false);
+      expect(categories).not.toContain(NotificationCategory.SYSTEM);
+      expect(categories).toEqual(
+        NOTIFICATION_PREFERENCE_CATEGORIES.filter(
+          (c) => c !== NotificationCategory.SYSTEM,
+        ),
+      );
+      // The other rows are untouched -- this is a filter, not a second list.
+      expect(categories.length).toBe(
+        NOTIFICATION_PREFERENCE_CATEGORIES.length - 1,
+      );
+    });
+
+    it("returns only the requested categories from list()", async () => {
+      const result = await service.list("u1", configurableCategoriesFor(false));
+      expect(result.map((r) => r.category)).not.toContain(
+        NotificationCategory.SYSTEM,
+      );
+      expect(result).toHaveLength(
+        NOTIFICATION_PREFERENCE_CATEGORIES.length - 1,
+      );
+    });
+  });
+
   describe("list", () => {
     it("returns the default shape per category: report email on, notification off, push off, throttle 0, with each category's supported channels", async () => {
-      expect(await service.list("u1")).toEqual(
+      expect(
+        await service.list("u1", NOTIFICATION_PREFERENCE_CATEGORIES),
+      ).toEqual(
         NOTIFICATION_PREFERENCE_CATEGORIES.map((category) => ({
           category,
           email: true,
@@ -114,7 +149,7 @@ describe("NotificationPreferenceService", () => {
           throttleMinutes: 30,
         },
       ]);
-      const res = await service.list("u1");
+      const res = await service.list("u1", NOTIFICATION_PREFERENCE_CATEGORIES);
       expect(
         res.find((r) => r.category === NotificationCategory.PAYMENTS),
       ).toEqual({
@@ -142,9 +177,9 @@ describe("NotificationPreferenceService", () => {
     });
 
     it("exposes SYSTEM as a push-only category (email channels not applicable, both push wires live)", async () => {
-      const system = (await service.list("u1")).find(
-        (r) => r.category === NotificationCategory.SYSTEM,
-      );
+      const system = (
+        await service.list("u1", NOTIFICATION_PREFERENCE_CATEGORIES)
+      ).find((r) => r.category === NotificationCategory.SYSTEM);
       expect(system).toEqual({
         category: NotificationCategory.SYSTEM,
         email: true,
@@ -170,9 +205,9 @@ describe("NotificationPreferenceService", () => {
           throttleMinutes: THROTTLE_MAX_MINUTES + 500,
         },
       ]);
-      const budgets = (await service.list("u1")).find(
-        (r) => r.category === NotificationCategory.BUDGETS,
-      );
+      const budgets = (
+        await service.list("u1", NOTIFICATION_PREFERENCE_CATEGORIES)
+      ).find((r) => r.category === NotificationCategory.BUDGETS);
       expect(budgets?.throttleMinutes).toBe(THROTTLE_MAX_MINUTES);
     });
   });

@@ -2966,16 +2966,17 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- Verification helper (run manually; not part of the migration's effect):
 --   SELECT tablename, policyname FROM pg_policies
 --    WHERE schemaname = 'public' ORDER BY tablename;
--- Expected: 60 policies -- 26 direct + 4 real-user-keyed (112),
+-- Expected: 61 policies -- 26 direct + 4 real-user-keyed (112),
 --           15 indirect (113), 5 special (114),
 --           2 direct for the .mny import's staging + job tables (117),
 --           1 direct for security_documents (118),
 --           4 direct for the GEM strategy tables (124, 125),
 --           2 direct for job_claims and attachment_blob_tombstones,
 --           1 indirect for scheduled_transaction_postings (133),
---           1 direct for the OIDC step-up claim ledger (155), and
---           1 direct for push_subscriptions (171), and
---           1 direct for notification_preferences (173).
+--           1 direct for the OIDC step-up claim ledger (155),
+--           1 direct for push_subscriptions (178),
+--           1 direct for notification_preferences (180), and
+--           1 direct for notification_reminders (182).
 
 -- ---------------------------------------------------------------------------
 -- Enable row-level security (migration 123).

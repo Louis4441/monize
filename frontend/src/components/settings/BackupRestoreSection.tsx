@@ -1,5 +1,6 @@
 'use client';
 
+import { RESTORE_LABELS } from '@/lib/restore-labels';
 import { useEffect, useState, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
@@ -21,42 +22,6 @@ import { downloadBlob } from '@/lib/download';
 import { User } from '@/types/auth';
 import { takeOidcReauthArtifact } from '@/lib/stepUpToken';
 
-const RESTORE_LABELS: Record<string, string> = {
-  userPreferences: 'User Preferences',
-  userCurrencyPreferences: 'Currency Preferences',
-  categories: 'Categories',
-  payees: 'Payees',
-  payeeAliases: 'Payee Aliases',
-  accounts: 'Accounts',
-  tags: 'Tags',
-  scheduledTransactions: 'Scheduled Transactions',
-  scheduledTransactionSplits: 'Scheduled Transaction Splits',
-  scheduledTransactionOverrides: 'Scheduled Transaction Overrides',
-  scheduledTransactionSplitTags: 'Scheduled Transaction Split Tags',
-  securities: 'Securities',
-  securityPrices: 'Security Prices',
-  securityTags: 'Security Tags',
-  holdings: 'Holdings',
-  transactions: 'Transactions',
-  transactionSplits: 'Transaction Splits',
-  transactionTags: 'Transaction Tags',
-  transactionSplitTags: 'Transaction Split Tags',
-  investmentTransactions: 'Investment Transactions',
-  loanRateChanges: 'Loan Rate Changes',
-  loanScenarios: 'Loan Scenarios',
-  budgets: 'Budgets',
-  budgetCategories: 'Budget Categories',
-  budgetPeriods: 'Budget Periods',
-  budgetPeriodCategories: 'Budget Period Categories',
-  notifications: 'Notifications',
-  customReports: 'Custom Reports',
-  importColumnMappings: 'Import Column Mappings',
-  monthlyAccountBalances: 'Monthly Account Balances',
-  autoBackupSettings: 'Auto-Backup Settings',
-  aiProviderConfigs: 'AI Provider Configurations',
-  monteCarloScenarios: 'Monte Carlo Scenarios',
-  monteCarloCashFlows: 'Monte Carlo Cash Flows',
-};
 
 function isBackupPasswordRequired(error: unknown): boolean {
   if (!isAxiosError(error)) return false;

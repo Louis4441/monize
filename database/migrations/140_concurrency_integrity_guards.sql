@@ -233,7 +233,7 @@ CREATE POLICY scheduled_transaction_postings_isolation ON scheduled_transaction_
 -- Guarded on the table's existence because migration 179 renames budget_alerts
 -- to `notifications`. A database old enough to need this repair still calls it
 -- budget_alerts and runs the body exactly as it always did; one that has already
--- reached 172 -- a fresh install built from schema.sql, and the replay CI runs
+-- reached 179 -- a fresh install built from schema.sql, and the replay CI runs
 -- on top of it -- has nothing here to repair, and the statements would fail on a
 -- table that no longer exists. PL/pgSQL plans a statement only when it is
 -- reached, which is what makes the guard work at all: naming a missing table

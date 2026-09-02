@@ -213,9 +213,12 @@ export class NotificationReminderService {
     reminder.repeatMode = repeatMode;
     reminder.intervalMinutes = intervalMinutes;
     // The source already delivered the first occurrence; the first nag comes one
-    // interval later. A re-configure restarts the schedule and the fire count.
+    // interval later. A re-configure restarts the schedule but NOT the fire
+    // count: the count is the ordinal in every re-emitted row's dedupe key
+    // (`reEmit`), so a reset would replay keys the write door already holds and
+    // ON CONFLICT DO NOTHING would swallow the next fires in silence.
     reminder.nextFireAt = new Date(Date.now() + intervalMinutes * 60_000);
-    reminder.fireCount = 0;
+    if (!existing) reminder.fireCount = 0;
     reminder.stoppedAt = null;
 
     if (!existing) {
@@ -374,7 +377,7 @@ export class NotificationReminderService {
     const dedupeKey = `${base.slice(0, DEDUPE_KEY_MAX_LENGTH - suffix.length)}${suffix}`;
 
     await withScopedDb(this.dataSource, async (manager) => {
-      await this.notifications.create(claim.user_id, {
+      const written = await this.notifications.create(claim.user_id, {
         type: claim.alert_type as NotificationType,
         severity: claim.severity as NotificationSeverity,
         title: claim.title,
@@ -394,6 +397,16 @@ export class NotificationReminderService {
       // transaction. Guarded on `stopped_at IS NULL` so a concurrent stop (the
       // app, or the source-dismissed sweep) is not clobbered.
       if (claim.repeat_mode === ReminderRepeatMode.ONCE) {
+        if (!written) {
+          // `null` from the write door means the dedupe key is already held, so
+          // THIS fire delivered nothing. Consuming the one-shot now would stop
+          // it having delivered nothing; leave it claimable and let the next
+          // interval try the next ordinal.
+          this.logger.warn(
+            `Reminder ${claim.id}: follow-up ${claim.fire_count} was not written (dedupe key already held); leaving the one-shot claimable`,
+          );
+          return;
+        }
         await manager.query(
           `UPDATE notification_reminders
               SET stopped_at = CURRENT_TIMESTAMP

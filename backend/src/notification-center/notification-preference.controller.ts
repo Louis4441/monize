@@ -14,8 +14,8 @@ import { AuthGuard } from "@nestjs/passport";
 import { tr } from "../i18n/translate";
 import { NotificationCategory } from "./entities/notification.entity";
 import {
+  configurableCategoriesFor,
   NotificationPreferenceService,
-  NOTIFICATION_PREFERENCE_CATEGORIES,
 } from "./notification-preference.service";
 import { UpdateNotificationPreferenceDto } from "./dto/update-notification-preference.dto";
 
@@ -24,28 +24,37 @@ import { UpdateNotificationPreferenceDto } from "./dto/update-notification-prefe
  * settings only: the `userId` comes from the JWT, never a param, and a category
  * outside the exposed matrix is refused rather than silently stored.
  */
+interface AuthenticatedRequest {
+  user: { id: string; role?: string };
+}
+
+/** The role is the JWT's (`req.user.role`), never a request field. */
+function categoriesFor(req: AuthenticatedRequest) {
+  return configurableCategoriesFor(req.user.role === "admin");
+}
+
 @Controller("notifications/preferences")
 @UseGuards(AuthGuard("jwt"))
 export class NotificationPreferenceController {
   constructor(private readonly preferences: NotificationPreferenceService) {}
 
   @Get()
-  list(@Request() req: { user: { id: string } }) {
-    return this.preferences.list(req.user.id);
+  list(@Request() req: AuthenticatedRequest) {
+    return this.preferences.list(req.user.id, categoriesFor(req));
   }
 
   @Put(":category")
   update(
-    @Request() req: { user: { id: string } },
+    @Request() req: AuthenticatedRequest,
     @Param("category", new ParseEnumPipe(NotificationCategory))
     category: NotificationCategory,
     @Body() dto: UpdateNotificationPreferenceDto,
   ) {
-    if (!NOTIFICATION_PREFERENCE_CATEGORIES.includes(category)) {
-      // A real NotificationCategory the matrix does not expose (every current
-      // member is exposed, so this guards a future category added to the enum
-      // before it is wired into the matrix): storing it would be a preference
-      // nothing reads.
+    if (!categoriesFor(req).includes(category)) {
+      // Either a real NotificationCategory the matrix does not expose (a future
+      // enum member not yet wired into the matrix) or SYSTEM for a non-admin,
+      // whose alerts are never raised: storing it would be a preference nothing
+      // reads, and a cell the caller's own matrix does not show.
       throw new BadRequestException(
         tr(
           "errors.notifications.categoryNotConfigurable",

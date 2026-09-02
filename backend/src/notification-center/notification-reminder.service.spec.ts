@@ -181,11 +181,13 @@ describe("NotificationReminderService", () => {
         intervalMinutes: 30,
       });
       const saved = reminderRepo.save.mock.calls[0][0];
-      // The same row is updated (not a new one), its schedule and fire count reset.
+      // The same row is updated (not a new one) and its schedule restarts; the
+      // fire count is NOT reset -- it is the ordinal in each re-emit's dedupe
+      // key, and a reset would replay keys the write door already refuses.
       expect(saved.id).toBe("existing");
       expect(saved.repeatMode).toBe(ReminderRepeatMode.ONCE);
       expect(saved.intervalMinutes).toBe(30);
-      expect(saved.fireCount).toBe(0);
+      expect(saved.fireCount).toBe(7);
       expect(saved.stoppedAt).toBeNull();
       // A re-configure is not a new reminder, so the cap is not consulted.
       expect(reminderRepo.count).not.toHaveBeenCalled();
@@ -357,6 +359,24 @@ describe("NotificationReminderService", () => {
       expect(claimSql).not.toContain("stopped_at = CURRENT_TIMESTAMP");
       expect(claimSql).not.toContain("repeat_mode = $1");
       expect(claimSql).toContain("repeat_mode"); // returned, for reEmit's decision
+    });
+
+    it("does not consume a one-shot whose follow-up the write door refused (nothing was delivered)", async () => {
+      query
+        .mockResolvedValueOnce([[], 0]) // sweep
+        .mockResolvedValueOnce([[claim({ repeat_mode: "once" })], 1]); // claim
+      // ON CONFLICT DO NOTHING lost: the dedupe key is already held.
+      notifications.create.mockResolvedValue(null);
+      const warn = jest
+        .spyOn(service["logger"], "warn")
+        .mockImplementation(() => undefined);
+      await service.fireDue();
+      expect(notifications.create).toHaveBeenCalledTimes(1);
+      // No stop after the claim: only the sweep and the claim ran, so the
+      // reminder stays claimable for the next interval. (The sweep's own SQL
+      // also sets stopped_at, which is why the assertion counts statements.)
+      expect(query).toHaveBeenCalledTimes(2);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("rem-1"));
     });
 
     it("stops a one-shot in the SAME transaction as its delivery, not before", async () => {

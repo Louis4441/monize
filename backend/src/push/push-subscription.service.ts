@@ -29,6 +29,7 @@ import {
   PushPayload,
   PushSendOutcome,
   WebPushSender,
+  PushBatch,
 } from "./web-push-sender.service";
 import { CreatePushSubscriptionDto } from "./dto/create-push-subscription.dto";
 
@@ -445,7 +446,12 @@ export class PushSubscriptionService {
       collapseKey: null,
     };
 
-    const devices = await this.fanOut(userId, payload, targets);
+    const devices = await this.fanOut(
+      userId,
+      payload,
+      targets,
+      await this.sender.openBatch(),
+    );
     const delivered = devices.filter((d) => d.status === "sent").length;
     return { attempted: targets.length, delivered, devices };
   }
@@ -473,11 +479,14 @@ export class PushSubscriptionService {
     payload: PushPayload,
     transports?: PushTransport[],
   ): Promise<{ attempted: number; delivered: number }> {
-    const config = await this.pushConfig.getPublicConfig();
-    if (!config.enabled) return { attempted: 0, delivered: 0 };
     if (transports && transports.length === 0) {
       return { attempted: 0, delivered: 0 };
     }
+    // The one push_instance_config read of this fan-out: the batch's identity
+    // is the same fact `getPublicConfig().enabled` reports (configured, switched
+    // on, key readable), so asking both would read the row twice.
+    const batch = await this.sender.openBatch();
+    if (!batch.ready) return { attempted: 0, delivered: 0 };
 
     const targets = await withScopedDb(this.dataSource, (manager) =>
       manager.getRepository(PushSubscription).find({
@@ -491,7 +500,7 @@ export class PushSubscriptionService {
     );
     if (targets.length === 0) return { attempted: 0, delivered: 0 };
 
-    const devices = await this.fanOut(userId, payload, targets);
+    const devices = await this.fanOut(userId, payload, targets, batch);
     return {
       attempted: targets.length,
       delivered: devices.filter((d) => d.status === "sent").length,
@@ -503,16 +512,16 @@ export class PushSubscriptionService {
    * per-send deadline covers one delivery, and this bounds how many run at once
    * (`PUSH_TEST_CONCURRENCY`), so one account's fan-out cannot hold a request or
    * a cron for the product of the two. Each attempt's outcome is recorded
-   * (`recordOutcome`), retiring a device that has failed enough.
+   * (`recordOutcome`), retiring a device that has failed enough. The batch is
+   * the caller's one identity read; the sender keeps the key (push-secret.guard).
    */
   private async fanOut(
     userId: string,
     payload: PushPayload,
     targets: PushSubscription[],
+    sender: PushBatch,
   ): Promise<PushTestDeviceResult[]> {
     const devices: PushTestDeviceResult[] = [];
-    // One identity read for the whole fan-out; the sender keeps the key.
-    const sender = await this.sender.openBatch();
     for (let i = 0; i < targets.length; i += PUSH_TEST_CONCURRENCY) {
       const batch = targets.slice(i, i + PUSH_TEST_CONCURRENCY);
       const results = await Promise.all(

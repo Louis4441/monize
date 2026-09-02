@@ -29,6 +29,23 @@ export const NOTIFICATION_PREFERENCE_CATEGORIES: readonly NotificationCategory[]
     NotificationCategory.SYSTEM,
   ];
 
+/**
+ * The matrix categories one account can see and write. Every SYSTEM type is
+ * raised to administrators only (`SystemAlertService.raiseAdminAlert` is its one
+ * producer), so for anyone else the SYSTEM row would be a control that changes
+ * nothing -- the thing this file's rule forbids -- and it is neither listed nor
+ * writable for them. Derived from the one category list, never a second one.
+ */
+export function configurableCategoriesFor(
+  isAdmin: boolean,
+): readonly NotificationCategory[] {
+  return isAdmin
+    ? NOTIFICATION_PREFERENCE_CATEGORIES
+    : NOTIFICATION_PREFERENCE_CATEGORIES.filter(
+        (category) => category !== NotificationCategory.SYSTEM,
+      );
+}
+
 /** Which channels a matrix category delivers on, as live per-user controls. */
 export interface CategoryChannelSupport {
   /** REPORT-mode email (digest), gated by `resolveEmail`. */
@@ -212,19 +229,23 @@ export class NotificationPreferenceService {
   }
 
   /**
-   * The per-category stored state for every matrix category, for the settings
+   * The per-category stored state for the given matrix categories (the
+   * controller passes `configurableCategoriesFor(isAdmin)`), for the settings
    * UI. Deliberately NOT master-gated: the matrix shows the user's own
    * per-category choices, and the global email toggle is a separate control on
    * the same screen. Report email defaults on; notification email and throttle
    * default off.
    */
-  async list(userId: string): Promise<NotificationChannelPreference[]> {
+  async list(
+    userId: string,
+    categories: readonly NotificationCategory[],
+  ): Promise<NotificationChannelPreference[]> {
     return withScopedDb(this.dataSource, async (manager) => {
       const rows = await manager.getRepository(NotificationPreference).find({
         where: { userId },
       });
       const byCategory = new Map(rows.map((row) => [row.category, row]));
-      return NOTIFICATION_PREFERENCE_CATEGORIES.map((category) =>
+      return categories.map((category) =>
         this.toChannelPreference(category, byCategory.get(category)),
       );
     });

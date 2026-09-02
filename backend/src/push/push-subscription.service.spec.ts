@@ -110,7 +110,7 @@ describe("PushSubscriptionService", () => {
     // `sender.send` here is that inner mock, so the assertions below read as
     // "what was delivered" without restating the batch handshake each time.
     send = jest.fn().mockResolvedValue({ status: "sent" });
-    sender = { openBatch: jest.fn(async () => ({ send })), send };
+    sender = { openBatch: jest.fn(async () => ({ ready: true, send })), send };
     service = new PushSubscriptionService(
       dataSource as never,
       pushConfig as unknown as PushConfigService,
@@ -688,15 +688,23 @@ describe("PushSubscriptionService", () => {
     };
 
     it("is a no-op, not a throw, when the channel is switched off", async () => {
-      pushConfig.getPublicConfig.mockResolvedValue({
-        enabled: false,
-        publicKey: null,
-        configured: false,
-      });
+      // The batch's identity is the one config read; not ready means disabled,
+      // unconfigured or an unreadable key, and no device is even queried.
+      sender.openBatch.mockResolvedValue({ ready: false, send });
       await expect(service.sendToUser(USER, payload as never)).resolves.toEqual(
         { attempted: 0, delivered: 0 },
       );
       expect(sender.send).not.toHaveBeenCalled();
+      expect(subscriptionRepo.find).not.toHaveBeenCalled();
+      expect(pushConfig.getPublicConfig).not.toHaveBeenCalled();
+    });
+
+    it("reads push_instance_config once per fan-out, through the batch", async () => {
+      subscriptionRepo.find.mockResolvedValue([storedDevice()]);
+      manager.query.mockResolvedValue([[{ id: DEVICE_ID }], 1]);
+      await service.sendToUser(USER, payload as never);
+      expect(sender.openBatch).toHaveBeenCalledTimes(1);
+      expect(pushConfig.getPublicConfig).not.toHaveBeenCalled();
     });
 
     it("is a no-op when the user has no live device (never throws)", async () => {

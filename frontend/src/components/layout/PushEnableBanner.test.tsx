@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act, cleanup } from '@/test/render';
 import toast from 'react-hot-toast';
-import { PushPermissionError } from '@/lib/push';
+import { PushPermissionError,
+  defaultDeviceName,
+} from '@/lib/push';
 import { useAuthStore } from '@/store/authStore';
 import { PushEnableBanner } from './PushEnableBanner';
 
@@ -105,7 +107,9 @@ describe('PushEnableBanner', () => {
       fireEvent.click(screen.getByRole('button', { name: /turn on/i }));
     });
 
-    expect(mockEnable).toHaveBeenCalledWith('PUB');
+    // The same default name the settings panel sends, so the two enable paths
+    // create the same row instead of one named and one 'Unnamed device'.
+    expect(mockEnable).toHaveBeenCalledWith('PUB', defaultDeviceName());
     vi.unstubAllGlobals();
   });
 

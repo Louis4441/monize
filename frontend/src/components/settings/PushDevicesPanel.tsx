@@ -17,6 +17,7 @@ import {
   releaseLocalPushSubscription,
   retireServerRowFor,
   PushPermissionError,
+  defaultDeviceName,
   type PushConfig,
   type PushDevice,
   type PushSupport,
@@ -510,39 +511,4 @@ function PushBlock({
       {children}
     </div>
   );
-}
-
-/**
- * A name the user will recognise in their own device list, from the platform the
- * browser reports. Only ever a default -- the field is theirs to change later.
- */
-export function defaultDeviceName(
-  nav: Navigator = navigator,
-): string | undefined {
-  const ua = nav.userAgent;
-  if (!ua) return undefined;
-  const platform = /iPhone|iPad|iPod/.test(ua)
-    ? 'iOS'
-    : /Android/.test(ua)
-      ? 'Android'
-      : /Macintosh/.test(ua)
-        ? 'Mac'
-        : /Windows/.test(ua)
-          ? 'Windows'
-          : /Linux/.test(ua)
-            ? 'Linux'
-            : null;
-  const browser = /Edg\//.test(ua)
-    ? 'Edge'
-    : /OPR\//.test(ua)
-      ? 'Opera'
-      : /Chrome\//.test(ua)
-        ? 'Chrome'
-        : /Firefox\//.test(ua)
-          ? 'Firefox'
-          : /Safari\//.test(ua)
-            ? 'Safari'
-            : null;
-  if (!platform && !browser) return undefined;
-  return [browser, platform].filter(Boolean).join(' on ');
 }

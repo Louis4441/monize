@@ -24,6 +24,7 @@ import {
   pushApi,
   toSubscriptionPayload,
   urlBase64ToUint8Array,
+  defaultDeviceName,
 } from './push';
 
 vi.mock('./api', () => ({
@@ -1123,5 +1124,35 @@ describe('enabling and disabling push on this device', () => {
 
     expect(error).toBeInstanceOf(Error);
     expect(error.name).toBe('PushPermissionError');
+  });
+});
+
+describe('defaultDeviceName', () => {
+  it.each([
+    [
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Version/17.0 Safari/605.1',
+      'Safari on iOS',
+    ],
+    [
+      'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36',
+      'Chrome on Android',
+    ],
+    [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36 Edg/120',
+      'Edge on Windows',
+    ],
+    [
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Gecko/20100101 Firefox/121.0',
+      'Firefox on Mac',
+    ],
+  ])('names %s as %s', (userAgent, expected) => {
+    expect(defaultDeviceName({ userAgent } as Navigator)).toBe(expected);
+  });
+
+  it('offers no name rather than a wrong one for an unrecognised agent', () => {
+    expect(defaultDeviceName({ userAgent: '' } as Navigator)).toBeUndefined();
+    expect(
+      defaultDeviceName({ userAgent: 'curl/8' } as Navigator),
+    ).toBeUndefined();
   });
 });

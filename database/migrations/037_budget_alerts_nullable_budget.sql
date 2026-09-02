@@ -4,7 +4,7 @@
 -- to `notifications`, carrying both nullable columns with it. Every migration is
 -- replayed on top of schema.sql at container start and in CI, and a statement
 -- naming a table the schema no longer has aborts that replay -- so a database
--- that has reached 172 skips this, and one that has not runs it exactly as
+-- that has reached 179 skips this, and one that has not runs it exactly as
 -- before. PL/pgSQL plans a statement only when it is reached, which is what
 -- makes the guard work: naming a missing table outside a DO block is a parse
 -- error, not a skipped branch.

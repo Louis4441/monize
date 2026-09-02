@@ -165,7 +165,10 @@ export class NotificationDispatchService {
     // Both interrupting channels are composed here, outside any request, so the
     // recipient's stored locale is resolved once and shared: the push copy and
     // the email frame must not disagree about the reader's language.
-    const recipient = await this.resolveRecipient(userId);
+    const recipient = await this.resolveRecipient(
+      userId,
+      delivery.emailNotification,
+    );
     if (transports.length > 0) {
       await this.push.sendToUser(
         userId,
@@ -178,18 +181,25 @@ export class NotificationDispatchService {
     }
   }
 
-  /** The recipient's address and stored language, in one tenant read. */
+  /**
+   * The recipient's stored language and, only when the email channel is on,
+   * their address -- one tenant transaction either way. A push-only fan-out
+   * (SYSTEM, or a category with notification email off) never needs the users
+   * row, and the budget cron runs this once per new alert per user.
+   */
   private async resolveRecipient(
     userId: string,
+    withAddress: boolean,
   ): Promise<{ email: string | null; lang: string }> {
     return withScopedDb(this.dataSource, async (manager) => {
-      const user = await manager
-        .getRepository(User)
-        .findOne({ where: { id: userId } });
       const lang = await resolveUserEmailLocale(
         manager.getRepository(UserPreference),
         userId,
       );
+      if (!withAddress) return { email: null, lang };
+      const user = await manager
+        .getRepository(User)
+        .findOne({ where: { id: userId } });
       return { email: user?.email ?? null, lang };
     });
   }

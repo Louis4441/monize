@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@/test/render';
-import { PushDevicesPanel, defaultDeviceName } from './PushDevicesPanel';
+import { PushDevicesPanel } from './PushDevicesPanel';
 import toast from 'react-hot-toast';
 import { PushPermissionError, type PushDevice } from '@/lib/push';
 import { useAuthStore } from '@/store/authStore';
@@ -32,7 +32,10 @@ const mockRelease = vi.fn();
 const mockReadRegistered = vi.fn();
 const mockRetireRow = vi.fn();
 
-vi.mock('@/lib/push', () => ({
+vi.mock('@/lib/push', async (importOriginal) => ({
+  // The real module underneath (defaultDeviceName and friends); only the
+  // network-facing and browser-facing doors are replaced.
+  ...(await importOriginal<typeof import('@/lib/push')>()),
   pushApi: {
     getConfig: () => mockGetConfig(),
     listDevices: () => mockListDevices(),
@@ -749,35 +752,5 @@ describe('PushDevicesPanel and a browser-rotated subscription', () => {
     } finally {
       vi.unstubAllGlobals();
     }
-  });
-});
-
-describe('defaultDeviceName', () => {
-  it.each([
-    [
-      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Version/17.0 Safari/605.1',
-      'Safari on iOS',
-    ],
-    [
-      'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36',
-      'Chrome on Android',
-    ],
-    [
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36 Edg/120',
-      'Edge on Windows',
-    ],
-    [
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Gecko/20100101 Firefox/121.0',
-      'Firefox on Mac',
-    ],
-  ])('names %s as %s', (userAgent, expected) => {
-    expect(defaultDeviceName({ userAgent } as Navigator)).toBe(expected);
-  });
-
-  it('offers no name rather than a wrong one for an unrecognised agent', () => {
-    expect(defaultDeviceName({ userAgent: '' } as Navigator)).toBeUndefined();
-    expect(
-      defaultDeviceName({ userAgent: 'curl/8' } as Navigator),
-    ).toBeUndefined();
   });
 });

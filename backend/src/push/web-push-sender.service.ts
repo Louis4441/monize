@@ -147,8 +147,15 @@ export interface PushPayload {
   collapseKey: string | null;
 }
 
-/** A sender bound to one resolved instance identity; see {@link WebPushSender.openBatch}. */
+/**
+ * A sender bound to one resolved instance identity; see
+ * {@link WebPushSender.openBatch}. `ready` is false when the instance has no
+ * usable identity -- push disabled, never configured, or a key this instance
+ * cannot decrypt -- in which case every `send` answers `unconfigured`; a caller
+ * with nothing else to say reads it and skips the device query.
+ */
 export interface PushBatch {
+  readonly ready: boolean;
   send(target: PushTarget, payload: PushPayload): Promise<PushSendOutcome>;
 }
 
@@ -206,6 +213,7 @@ export class WebPushSender {
   async openBatch(): Promise<PushBatch> {
     const identity = await this.pushConfig.getVapidIdentity();
     return {
+      ready: identity !== null,
       send: (target, payload) => this.sendWith(identity, target, payload),
     };
   }

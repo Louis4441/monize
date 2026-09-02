@@ -139,6 +139,19 @@ describe("NotificationDispatchService", () => {
     expect(transports).toEqual(["webpush"]);
   });
 
+  it("reads no users row for a push-only fan-out (the address is the email channel's need)", async () => {
+    resolveDelivery.mockResolvedValue({
+      emailNotification: false,
+      push: true,
+      unifiedpush: false,
+      throttleMinutes: 0,
+    });
+    await service.notify("u1", {} as never);
+    expect(sendToUser).toHaveBeenCalledTimes(1);
+    expect(prefRepo.findOne).toHaveBeenCalledTimes(1); // the locale
+    expect(userRepo.findOne).not.toHaveBeenCalled();
+  });
+
   it("renders the push copy in the recipient's stored language, resolved once with the email's", async () => {
     resolveDelivery.mockResolvedValue({
       emailNotification: true,

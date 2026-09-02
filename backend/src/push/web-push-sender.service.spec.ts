@@ -152,6 +152,17 @@ describe("WebPushSender", () => {
     ]);
     expect(pushConfig.getVapidIdentity).toHaveBeenCalledTimes(1);
     expect(sendNotification).toHaveBeenCalledTimes(3);
+    expect(batch.ready).toBe(true);
+  });
+
+  it("reports a batch as not ready when the instance has no usable identity", async () => {
+    pushConfig.getVapidIdentity.mockResolvedValue(null);
+    const batch = await sender.openBatch();
+    expect(batch.ready).toBe(false);
+    await expect(batch.send(target(), PAYLOAD)).resolves.toEqual({
+      status: "unconfigured",
+    });
+    expect(sendNotification).not.toHaveBeenCalled();
   });
 
   /**

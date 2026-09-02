@@ -129,7 +129,11 @@ matrix category to which of `email` (report), `email_notification` and `push`
 are live controls, and the API returns that per row as `supportedChannels` so
 the grid is server-authoritative. PAYMENTS and BUDGETS expose all three;
 **SYSTEM exposes push only** -- its email is the admin fan-out's own
-severity-driven, SQL-gated path (Section 8), not a user toggle. An unsupported
+severity-driven, SQL-gated path (Section 8), not a user toggle -- and **its row
+is listed and writable for administrators only** (`configurableCategoriesFor`,
+keyed on the JWT role): every SYSTEM type is raised through `raiseAdminAlert`, so
+for anyone else the row would be a control over nothing, and a non-admin's
+matrix has two rows. An unsupported
 cell renders "not applicable" and `resolveNotificationDelivery` forces its
 resolved delivery off whatever the stored row says, so a value written to an
 unsupported cell can never become a delivery nobody asked for. The map is

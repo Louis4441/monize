@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import {
   currentDeviceFingerprint,
+  defaultDeviceName,
   enablePushOnThisDevice,
   getPushSupport,
   isInstalledIosWebApp,
@@ -173,7 +174,10 @@ export function PushEnableBanner() {
    */
   const handleEnable = () => {
     if (!config?.publicKey) return;
-    const enabling = enablePushOnThisDevice(config.publicKey);
+    const enabling = enablePushOnThisDevice(
+      config.publicKey,
+      defaultDeviceName(),
+    );
     setIsEnabling(true);
     void (async () => {
       try {

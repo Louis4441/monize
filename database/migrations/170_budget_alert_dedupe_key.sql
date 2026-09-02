@@ -12,7 +12,7 @@
 -- alerts keep dedupe_key NULL and stay governed by the fingerprint index.
 -- Guarded on the table's existence because migration 179 renames budget_alerts
 -- to `notifications` and carries the column and the index across with it. A
--- database that has not reached 172 still calls the table budget_alerts and runs
+-- database that has not reached 179 still calls the table budget_alerts and runs
 -- this exactly as it always did; one that has -- a fresh install built from
 -- schema.sql, and the replay CI runs on top of it -- already has both. PL/pgSQL
 -- plans a statement only when it is reached, which is what makes the guard work:
