@@ -1,6 +1,12 @@
 import { sanitizeToolResultStrings } from "../common/sanitization.util";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { RequestId } from "@modelcontextprotocol/sdk/types.js";
+import {
+  clientAnsweredForItself,
+  elicitationBehaviour,
+  recordElicitationAnswered,
+  recordElicitationSilent,
+} from "./mcp-elicitation-support";
 
 export interface McpUserContext {
   userId: string;
@@ -131,38 +137,57 @@ function normalizeNonFiniteNumbers(data: unknown): unknown {
 
 export type WriteConfirmation = "accepted" | "declined" | "unsupported";
 
-// A human needs time to read and decide, so override the SDK's short default
-// request timeout for the confirmation round-trip.
-const CONFIRM_TIMEOUT_MS = 5 * 60 * 1000;
+/**
+ * How long the confirmation dialog may stay unanswered.
+ *
+ * A human needs time to read and decide, so this overrides the SDK's short
+ * default request timeout -- but it must still expire BEFORE the client gives
+ * up on the `tools/call` that is waiting for it. Claude's MCP tool deadline is
+ * 60s, and the previous five-minute wait meant a client that never answers the
+ * elicitation produced no result at all: the tool call died at the client's own
+ * deadline with an opaque "timed out after 60s", no write and no explanation.
+ * Staying under the client deadline is what makes every branch below reportable.
+ */
+const CONFIRM_TIMEOUT_MS = 45 * 1000;
 
 /**
  * Ask the MCP client to confirm a write via elicitation -- the MCP-native
  * equivalent of the AI Assistant's approve/reject card. Returns:
  *  - "accepted": the user approved; proceed with the write.
- *  - "declined": the user rejected/cancelled, or a supported dialog
- *    failed/timed out; abort so a write never happens without an explicit
- *    accept.
- *  - "unsupported": the client advertises no form-elicitation capability, so no
- *    dialog can be shown and the caller falls back to its normal behavior. The
- *    client still gates every tool call with its own approval prompt, so this
- *    is not a consent bypass. Claude Desktop currently lands here: it does not
- *    advertise the elicitation capability (and returns -32601 for
- *    elicitation/create), so writes proceed under its own per-tool approval
- *    rather than an MCP-native confirm dialog.
+ *  - "declined": the user answered and the answer was no (reject/cancel), or
+ *    the dialog failed in a way we cannot account for; abort, so a write never
+ *    happens over a user's refusal.
+ *  - "unsupported": no dialog reached a human, so the caller falls back to its
+ *    normal behavior. The client still gates every tool call with its own
+ *    approval prompt, so this is not a consent bypass -- it is the only consent
+ *    step such a client has.
  *
- * We pre-check the capability (rather than relying solely on the thrown
- * "client does not support elicitation" error) so that only a genuine lack of
- * capability falls through to the write -- a dismissed or timed-out dialog on a
- * capable client must abort.
+ * **The advertised capability is not evidence that a dialog can be shown.**
+ * `@modelcontextprotocol/sdk` >= 1.23 normalizes the legacy 2025-06-18 shape
+ * `{"elicitation":{}}` into `{"elicitation":{"form":{}}}` before
+ * `getClientCapabilities()` ever sees it (`ElicitationCapabilitySchema`'s
+ * `z.preprocess`), so `elicitation.form` is now truthy for every client that
+ * advertises elicitation at all -- including the ones that answer -32601 to
+ * `elicitation/create`, and the ones that never answer it. That is the whole
+ * regression: on SDK <= 1.22 those clients fell through to "unsupported" and
+ * wrote under their own approval prompt; afterwards the same clients looked
+ * form-capable, so a failure to answer was read as the user saying no and every
+ * write through Claude was refused or hung until the client's own deadline.
+ * `mcp-context.spec.ts` pins the SDK's normalization so this cannot silently
+ * flip back into a load-bearing check.
+ *
+ * So the *outcome* carries the weight, not the capability: only a returned
+ * `action` is a user's answer. The pre-check is kept because a client
+ * advertising no elicitation at all still deserves to skip the round trip.
  *
  * `relatedRequestId` MUST be the in-flight tool call's request id (from the
  * handler's `extra.requestId`). Over the Streamable HTTP transport, a
  * server-to-client request with no related request id is routed to the
  * standalone GET SSE stream, which a tool-calling client (Claude Desktop, IDE
  * agents) does not keep open during a `tools/call` -- so the elicitation is
- * silently dropped and never shown, then times out as a decline. Threading the
- * tool call's id sends the elicitation back over that call's own POST SSE
- * stream, where the client is listening.
+ * silently dropped and never shown. Threading the tool call's id sends the
+ * elicitation back over that call's own POST SSE stream, where the client is
+ * listening.
  */
 export async function confirmWrite(
   server: McpServer,
@@ -171,6 +196,13 @@ export async function confirmWrite(
 ): Promise<WriteConfirmation> {
   const capabilities = server.server.getClientCapabilities();
   if (!capabilities?.elicitation?.form) {
+    return "unsupported";
+  }
+  // A client already caught answering for itself is not asked again: on a
+  // client that drops the request, the round trip costs CONFIRM_TIMEOUT_MS
+  // every time, which on a 25-row individual batch is the same paralysis in
+  // slow motion.
+  if (elicitationBehaviour(server) === "silent") {
     return "unsupported";
   }
   try {
@@ -182,9 +214,20 @@ export async function confirmWrite(
       },
       { timeout: CONFIRM_TIMEOUT_MS, relatedRequestId },
     );
+    recordElicitationAnswered(server);
     return result.action === "accept" ? "accepted" : "declined";
-  } catch {
-    return "declined";
+  } catch (err) {
+    if (!clientAnsweredForItself(err)) {
+      return "declined";
+    }
+    // A client that has already shown a dialog in this session can show
+    // another, so this failure is one unanswered dialog, not a client with no
+    // human behind it -- refuse rather than fall through to the write.
+    if (elicitationBehaviour(server) === "answers") {
+      return "declined";
+    }
+    recordElicitationSilent(server);
+    return "unsupported";
   }
 }
 
