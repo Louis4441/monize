@@ -120,13 +120,38 @@ describe("sanitizeContactSuggestion", () => {
   });
 
   describe("address", () => {
-    it("strips angle brackets, collapses whitespace and caps the length", () => {
+    it("keeps envelope line breaks, trimming each line and dropping blank ones", () => {
+      expect(
+        sanitizeContactSuggestion(
+          {
+            ...full,
+            address:
+              "1373 Avenue du Mont-Royal Est\r\n  Montreal,   Quebec H2J 1Y8\n\n\nCanada  ",
+          },
+          "ai-web-search",
+        ),
+      ).toMatchObject({
+        address:
+          "1373 Avenue du Mont-Royal Est\nMontreal, Quebec H2J 1Y8\nCanada",
+      });
+    });
+
+    it("rejects an address with more lines than an envelope has", () => {
+      expect(
+        sanitizeContactSuggestion(
+          { ...full, address: "a\nb\nc\nd\ne\nf\ng" },
+          "ai-web-search",
+        ),
+      ).toMatchObject({ address: null });
+    });
+
+    it("strips angle brackets, collapses spaces within a line and caps the length", () => {
       expect(
         sanitizeContactSuggestion(
           { ...full, address: "  1 Main St,\n  <i>Springfield</i>  " },
           "ai-web-search",
         ),
-      ).toMatchObject({ address: "1 Main St, iSpringfield/i" });
+      ).toMatchObject({ address: "1 Main St,\niSpringfield/i" });
       expect(
         sanitizeContactSuggestion(
           {

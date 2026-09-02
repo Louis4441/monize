@@ -81,14 +81,25 @@ function sanitizePhone(value: unknown): string | null {
   return digits >= MIN_PHONE_DIGITS ? cleaned : null;
 }
 
+/** An address longer than this many lines is prose, not an envelope. */
+const MAX_ADDRESS_LINES = 6;
+
+/**
+ * An address keeps its line breaks: the prompt asks for envelope lines, the
+ * form's textarea and the detail card (`whitespace-pre-line`) both show them,
+ * and a maps link takes the whole string either way. Spaces collapse only
+ * *within* a line; blank lines are dropped.
+ */
 function sanitizeAddress(value: unknown): string | null {
   const raw = text(value);
   if (!raw) return null;
-  const cleaned = (stripHtml(raw) ?? "").replace(/\s+/g, " ").trim();
-  if (!cleaned || cleaned.length > CONTACT_FIELD_MAX_LENGTH.address) {
-    return null;
-  }
-  return cleaned;
+  const lines = (stripHtml(raw) ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.replace(/[ \t]+/g, " ").trim())
+    .filter((line) => line.length > 0);
+  if (lines.length === 0 || lines.length > MAX_ADDRESS_LINES) return null;
+  const cleaned = lines.join("\n");
+  return cleaned.length > CONTACT_FIELD_MAX_LENGTH.address ? null : cleaned;
 }
 
 function sanitizeConfidence(value: unknown): ContactLookupConfidence | null {
