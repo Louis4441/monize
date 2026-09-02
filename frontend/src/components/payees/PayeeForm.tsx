@@ -158,13 +158,9 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
   }, [defaultCategoryId, categories]);
 
   // noValidate on the form: the email and phone inputs keep their types so a
-
-  // phone offers the right keyboard, but validation is this form's own --
-
-  // the browser's native bubble is unlocalized and, by blocking the submit
-
-  // event, would stop react-hook-form reporting the real message.
-
+  // phone offers the right keyboard, but validation is this form's own -- the
+  // browser's native bubble is unlocalized and, by blocking the submit event,
+  // would stop react-hook-form reporting the real message.
   return (
     <form onSubmit={onFormSubmit} className="space-y-4" noValidate>
       <Input
@@ -213,7 +209,8 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
       />
 
       {/* Free text, and multi-line because that is how an address is written.
-          The backend resolves it to a map location when it changes. */}
+          Nothing geocodes it: the detail page hands the whole string to the
+          reader's maps application, which takes a single query anyway. */}
       <div>
         <label
           htmlFor="payee-address"

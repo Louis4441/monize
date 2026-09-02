@@ -274,6 +274,83 @@ describe('BulkConfirmationCard', () => {
       expect(screen.getByText(/2 payees created/)).toBeInTheDocument();
     });
 
+    it('shows a cleared contact field instead of rendering the change as blank', () => {
+      // null means the edit clears the field and undefined means it does not
+      // touch it. Dropping both on truthiness -- which is what `.filter(Boolean)`
+      // does -- makes a row that empties every contact detail look identical to
+      // a row that changes nothing, and in bulk mode there is no second card to
+      // show what is really being approved.
+      render(
+        <BulkConfirmationCard
+          action={makeAction({
+            type: 'batch_actions',
+            descriptor: { type: 'batch_actions', operation: 'update_payee' },
+            preview: {
+              rows: [
+                {
+                  status: 'ok',
+                  name: 'Hydro One',
+                  categoryName: 'Utilities',
+                  email: null,
+                  phone: null,
+                },
+              ],
+            },
+          })}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByText('Utilities · None · None')).toBeInTheDocument();
+    });
+
+    it('omits a contact field the edit does not mention', () => {
+      render(
+        <BulkConfirmationCard
+          action={makeAction({
+            type: 'batch_actions',
+            descriptor: { type: 'batch_actions', operation: 'update_payee' },
+            preview: {
+              rows: [
+                { status: 'ok', name: 'Hydro One', categoryName: 'Utilities' },
+              ],
+            },
+          })}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByText('Utilities')).toBeInTheDocument();
+      expect(screen.queryByText(/None/)).not.toBeInTheDocument();
+    });
+
+    it('shows the address a bulk edit sets, since no individual card will', () => {
+      render(
+        <BulkConfirmationCard
+          action={makeAction({
+            type: 'batch_actions',
+            descriptor: { type: 'batch_actions', operation: 'update_payee' },
+            preview: {
+              rows: [
+                {
+                  status: 'ok',
+                  name: 'Starbucks',
+                  address: '1912 Pike Pl, Seattle',
+                  phone: '+1 206-448-8762',
+                },
+              ],
+            },
+          })}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      // Address last, so the value long enough to wrap does it at the end.
+      expect(
+        screen.getByText('+1 206-448-8762 · 1912 Pike Pl, Seattle'),
+      ).toBeInTheDocument();
+    });
+
     it('renders a delete_payee batch with the delete title', () => {
       render(
         <BulkConfirmationCard

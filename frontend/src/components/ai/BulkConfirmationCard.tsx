@@ -191,15 +191,25 @@ export function BulkConfirmationCard({
       return { primary, secondary: parts.join(' · ') };
     }
     if (isPayee) {
-      // The row has two slots, so the category, website and contact details
-      // share the second one rather than any of them going unshown. The
-      // address is deliberately left out: it is long enough to push the rest
-      // out of the slot, and the individual card carries it.
+      // The row has two slots, so the category and every optional field share
+      // the second one. The address is included and goes last, so the one value
+      // long enough to wrap does it at the end rather than in the middle.
+      //
+      // The two groups have different contracts and cannot be formatted the
+      // same way. `categoryName` is always resolved, so its null means "this
+      // payee has no default category" and is simply left out. The optional
+      // fields distinguish undefined (the edit does not touch this field) from
+      // null (the edit clears it), and a cleared field has to say so: dropping
+      // it on truthiness renders a deletion as blank space, so the user
+      // approves a change the card never showed them. The individual card draws
+      // the same distinction -- and in bulk mode this row is the only card
+      // there is.
+      const optional = [row.website, row.email, row.phone, row.address]
+        .filter((value) => value !== undefined)
+        .map((value) => value || t('confirmAction.none'));
       return {
         primary: row.name || '',
-        secondary: [row.categoryName, row.website, row.email, row.phone]
-          .filter(Boolean)
-          .join(' · '),
+        secondary: [row.categoryName, ...optional].filter(Boolean).join(' · '),
       };
     }
     if (isSecurity) {

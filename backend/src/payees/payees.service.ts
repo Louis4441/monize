@@ -966,11 +966,17 @@ export class PayeesService {
 
   async remove(userId: string, id: string): Promise<void> {
     const payee = await this.findOne(userId, id);
+    // Undo re-inserts exactly the columns this snapshot carries, so a field
+    // missing from it does not come back -- the same reason `update` snapshots
+    // the contact fields on both sides.
     const beforeData = {
       id: payee.id,
       name: payee.name,
       notes: payee.notes,
       website: payee.website,
+      address: payee.address,
+      email: payee.email,
+      phone: payee.phone,
       defaultCategoryId: payee.defaultCategoryId,
       isActive: payee.isActive,
     };

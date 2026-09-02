@@ -173,8 +173,19 @@ describe('telHref', () => {
   });
 
   it('drops an extension suffix rather than dialling it as digits', () => {
-    // "ext" contributes no digits, so only the number itself survives.
-    expect(telHref('555 0100 ext. 12')).toBe('tel:555010012');
+    // The extension's digits are not part of the number: folding them in gives
+    // 555010012, which is not a number anyone wrote down.
+    expect(telHref('555 0100 ext. 12')).toBe('tel:5550100');
+    expect(telHref('+1 206-448-8762 x99')).toBe('tel:+12064488762');
+  });
+
+  it('stops at a note or a second number rather than running them together', () => {
+    expect(telHref('555 0100 (mobile)')).toBe('tel:5550100');
+    expect(telHref('555-0100 / 555-0200')).toBe('tel:5550100');
+  });
+
+  it('keeps a country code that does not sit at the very start of the value', () => {
+    expect(telHref('Tel: +1 555-0100')).toBe('tel:+15550100');
   });
 
   it('returns null for a value holding no number at all', () => {

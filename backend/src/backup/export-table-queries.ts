@@ -167,6 +167,7 @@ export function buildExportTableQueries(
       // exactly as for institutions below.
       key: "payees",
       sql: `SELECT id, user_id, name, default_category_id, notes, website,
+                   address, email, phone,
                    encode(logo_data, 'base64') AS logo_data,
                    logo_content_type, has_logo, logo_fetched_at,
                    is_active, created_at

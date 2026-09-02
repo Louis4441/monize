@@ -141,18 +141,24 @@ export function mapsUrl({
 /**
  * A `tel:` href for a stored phone number, or null when it holds no number.
  *
- * Dialable characters only: a stored value may carry spaces, brackets, dashes
- * or a trailing "ext. 12", none of which belong in the href, and one that turns
- * out to hold no digits at all ("call the shop") must not become a link that
- * opens the dialer on nothing.
+ * Only the FIRST dialable run, not every digit in the value. Stripping the
+ * non-digits out of the whole string folds whatever trails the number into it:
+ * "555 0100 ext. 12" becomes tel:555010012, which dials a number nobody wrote
+ * down. The run therefore ends where one number has to end -- at a letter, a
+ * slash, a comma -- so an extension, a note ("555 0100 (mobile)") or a second
+ * number after it is left out rather than concatenated.
+ *
+ * A value holding no digits at all ("call the shop") returns null, so the
+ * caller renders text rather than a link that opens the dialer on nothing.
  */
 export function telHref(phone: string | null | undefined): string | null {
   if (!phone) return null;
-  const trimmed = phone.trim();
-  const leadingPlus = trimmed.startsWith('+');
-  const digits = trimmed.replace(/\D/g, '');
-  if (!digits) return null;
-  return `tel:${leadingPlus ? '+' : ''}${digits}`;
+  // The optional leading + belongs to the number wherever it sits, so it is
+  // captured beside the first digit rather than assumed to start the string.
+  const run = phone.trim().match(/(\+?)[0-9][0-9\s()+.-]*/);
+  if (!run) return null;
+  const digits = run[0].replace(/\D/g, '');
+  return `tel:${run[1] ? '+' : ''}${digits}`;
 }
 
 /**

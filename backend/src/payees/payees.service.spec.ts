@@ -2557,6 +2557,31 @@ describe("PayeesService", () => {
     });
 
     describe("action history", () => {
+      it("snapshots the contact fields of a deleted payee", async () => {
+        // Undo re-inserts the row from beforeData alone, column by column, so a
+        // contact field missing from the snapshot is gone for good.
+        payeesRepository.findOne.mockResolvedValue({
+          ...mockPayee,
+          address: "1912 Pike Pl",
+          email: "hello@example.com",
+          phone: "+1 206-448-8762",
+        });
+
+        await service.remove(userId, "payee-1");
+
+        const record = (service as any).actionHistoryService
+          .record as jest.Mock;
+        const [, params] = record.mock.calls[record.mock.calls.length - 1];
+        expect(params.action).toBe("delete");
+        expect(params.beforeData).toEqual(
+          expect.objectContaining({
+            address: "1912 Pike Pl",
+            email: "hello@example.com",
+            phone: "+1 206-448-8762",
+          }),
+        );
+      });
+
       it("snapshots the contact fields on both sides of an update", async () => {
         // Undo restores beforeData, so a field missing from it silently
         // survives the undo.
