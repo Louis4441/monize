@@ -768,6 +768,31 @@ describe('PreferencesSection', () => {
       ]);
     });
 
+    it('separates the groups with a rule, except the first', async () => {
+      const { container } = render(
+        <PreferencesSection
+          preferences={mockPreferences}
+          onPreferencesUpdated={mockOnPreferencesUpdated}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Application')).toBeInTheDocument();
+      });
+
+      // The wrapper of each group is its heading's parent. The first group
+      // opens the card, where a rule would read as a second heading under
+      // "Preferences"; every group after it is separated by one.
+      const wrappers = Array.from(container.querySelectorAll('h3')).map((h) => h.parentElement!);
+      expect(wrappers).toHaveLength(6);
+      expect(wrappers[0].className).not.toMatch(/border-t/);
+      for (const wrapper of wrappers.slice(1)) {
+        expect(wrapper.className).toMatch(/border-t/);
+        // A rule invisible in dark mode is not a rule.
+        expect(wrapper.className).toMatch(/dark:border-/);
+      }
+    });
+
     it('hides Time Format until Show Create Date is on, then shows it directly beneath', async () => {
       const { container } = render(
         <PreferencesSection

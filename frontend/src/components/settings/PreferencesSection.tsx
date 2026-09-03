@@ -98,6 +98,15 @@ const RECENT_TRANSACTIONS_LIMIT_OPTIONS = [
   { value: '20', label: '20' },
 ];
 
+/**
+ * The card's sixteen controls are split into groups, and the divider is what
+ * makes the split visible: `space-y-6` alone separates a group from its own
+ * rows by too little to read as a boundary. Matches the sub-section rule the
+ * other settings cards draw (NotificationsSection, SecuritySection).
+ */
+const GROUP_HEADING_CLASS = 'text-base font-semibold text-gray-900 dark:text-gray-100 mb-3';
+const GROUP_DIVIDER_CLASS = 'border-t border-gray-200 dark:border-gray-700 pt-6';
+
 interface PreferencesSectionProps {
   preferences: UserPreferences;
   onPreferencesUpdated: (prefs: UserPreferences) => void;
@@ -200,7 +209,7 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
 
       <div className="space-y-6">
         <div>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+          <h3 className={GROUP_HEADING_CLASS}>
             {t('groups.languageRegion')}
           </h3>
           <div className="space-y-4">
@@ -215,8 +224,8 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
           </div>
         </div>
 
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+        <div className={GROUP_DIVIDER_CLASS}>
+          <h3 className={GROUP_HEADING_CLASS}>
             {t('groups.appearance')}
           </h3>
           <div className="space-y-4">
@@ -226,8 +235,8 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
           </div>
         </div>
 
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+        <div className={GROUP_DIVIDER_CLASS}>
+          <h3 className={GROUP_HEADING_CLASS}>
             {t('groups.datesNumbers')}
           </h3>
           <div className="space-y-4">
@@ -297,8 +306,8 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
           </div>
         </div>
 
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+        <div className={GROUP_DIVIDER_CLASS}>
+          <h3 className={GROUP_HEADING_CLASS}>
             {t('groups.investments')}
           </h3>
           <div className="space-y-4">
@@ -363,8 +372,8 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
           </div>
         </div>
 
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+        <div className={GROUP_DIVIDER_CLASS}>
+          <h3 className={GROUP_HEADING_CLASS}>
             {t('groups.transactions')}
           </h3>
           <div className="space-y-4">
@@ -399,8 +408,8 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
           </div>
         </div>
 
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+        <div className={GROUP_DIVIDER_CLASS}>
+          <h3 className={GROUP_HEADING_CLASS}>
             {t('groups.application')}
           </h3>
           <div className="space-y-4">
