@@ -232,8 +232,13 @@ export class OpenAiProvider implements AiProvider {
       }
     }
 
+    // Same rule as AnthropicProvider.hasWebSearchResults: a search that ran
+    // and failed is not a search that answered. Counting it would report
+    // `searched: true` for an answer that came from model memory, and the
+    // payee lookup reads that as `ai-web-search` -- the one source it trusts
+    // with an address and a phone number at any confidence.
     const searchCount = response.output.filter(
-      (item) => item.type === "web_search_call",
+      (item) => item.type === "web_search_call" && item.status === "completed",
     ).length;
 
     return {

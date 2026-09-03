@@ -1069,6 +1069,36 @@ describe("OpenAiProvider.completeWithWebSearch", () => {
     expect(result).toMatchObject({ searched: false, searchCount: 0 });
   });
 
+  it.each(["failed", "in_progress", "searching"] as const)(
+    "reports searched=false when the only search call is %s",
+    async (status) => {
+      // An error result is not a result. Reported as searched, the payee
+      // lookup stamps the answer ai-web-search, which skips the trust rule
+      // that drops an unverified address and phone below high confidence.
+      mockResponsesCreate.mockResolvedValueOnce(
+        searchedResponse({
+          output: [
+            { type: "web_search_call", id: "ws_1", status },
+            {
+              type: "message",
+              id: "msg_1",
+              role: "assistant",
+              content: [{ type: "output_text", text: "{}" }],
+            },
+          ],
+          output_text: "{}",
+        }),
+      );
+      const provider = new OpenAiProvider("k", "gpt-5");
+
+      const result = await provider.completeWithWebSearch(request, {
+        maxUses: 3,
+      });
+
+      expect(result).toMatchObject({ searched: false, searchCount: 0 });
+    },
+  );
+
   it("falls back to web_search_preview when the current tool type is rejected", async () => {
     const rejection = Object.assign(
       new Error(
