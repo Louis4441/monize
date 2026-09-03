@@ -65,6 +65,11 @@ const WEEK_STARTS_ON_OPTIONS = [
   { value: '6', labelKey: 'weekDays.saturday' },
 ];
 
+const TIME_FORMAT_OPTIONS = [
+  { value: '24h', labelKey: 'timeFormatOptions.h24' },
+  { value: '12h', labelKey: 'timeFormatOptions.h12' },
+];
+
 const QUOTE_PROVIDER_OPTIONS = [
   { value: 'yahoo', label: 'Yahoo Finance' },
   { value: 'msn', label: 'MSN Money' },
@@ -193,207 +198,249 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
     <div className="bg-white dark:bg-gray-800 shadow dark:shadow-gray-700/50 rounded-lg p-6 mb-6">
       <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{t('heading')}</h2>
 
-      <div className="space-y-4">
-        <LanguageSelector value={language} onChange={setLanguage} />
-
-        <ThemeSelector value={theme} onChange={setTheme} />
-
-        <ColorThemeSelector value={colorTheme} onChange={setColorTheme} />
-
-        <Select
-          label={t('defaultCurrencyLabel')}
-          options={currencyOptions}
-          value={defaultCurrency}
-          onChange={(e) => setDefaultCurrency(e.target.value)}
-        />
-
+      <div className="space-y-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            {t('preferredExchangesLabel')}
-          </label>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-            {t('preferredExchangesHelp')}
-          </p>
-          <div className="grid grid-cols-3 gap-2">
-            {[0, 1, 2].map((i) => (
-              <Combobox
-                key={i}
-                options={EXCHANGE_OPTIONS
-                  .filter(
-                    (opt) =>
-                      !preferredExchanges.includes(opt.value) ||
-                      preferredExchanges[i] === opt.value,
-                  )
-                  .sort((a, b) => a.label.localeCompare(b.label))}
-                value={preferredExchanges[i] || ''}
-                onChange={(value) => {
-                  const updated = [...preferredExchanges];
-                  if (value) {
-                    updated[i] = value;
-                  } else {
-                    updated.splice(i, 1);
-                  }
-                  setPreferredExchanges(updated.filter(Boolean));
-                }}
-                placeholder={t('exchangePriorityPlaceholder', { n: i + 1 })}
-                alwaysShowSubtitle
-              />
-            ))}
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+            {t('groups.languageRegion')}
+          </h3>
+          <div className="space-y-4">
+            <LanguageSelector value={language} onChange={setLanguage} />
+
+            <Select
+              label={t('defaultCurrencyLabel')}
+              options={currencyOptions}
+              value={defaultCurrency}
+              onChange={(e) => setDefaultCurrency(e.target.value)}
+            />
           </div>
         </div>
 
         <div>
-          <Select
-            label={t('defaultQuoteProviderLabel')}
-            options={QUOTE_PROVIDER_OPTIONS}
-            value={defaultQuoteProvider}
-            onChange={(e) => setDefaultQuoteProvider(e.target.value as 'yahoo' | 'msn')}
-          />
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {t('defaultQuoteProviderHelp')}
-          </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {t('msnNoIntradayNote')}
-          </p>
-          {defaultQuoteProvider === 'msn' && msnReady === false && (
-            <p
-              role="alert"
-              className="text-sm text-red-600 dark:text-red-400 mt-2"
-              data-testid="msn-not-configured-error"
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+            {t('groups.appearance')}
+          </h3>
+          <div className="space-y-4">
+            <ThemeSelector value={theme} onChange={setTheme} />
+
+            <ColorThemeSelector value={colorTheme} onChange={setColorTheme} />
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+            {t('groups.datesNumbers')}
+          </h3>
+          <div className="space-y-4">
+            <Select
+              label={t('dateFormatLabel')}
+              options={dateFormatOptions}
+              value={dateFormat}
+              onChange={(e) => setDateFormat(e.target.value)}
+            />
+
+            <Select
+              label={t('numberFormatLabel')}
+              options={NUMBER_FORMAT_OPTIONS.map((o) => ({
+                value: o.value,
+                label:
+                  o.value === 'browser'
+                    ? t('numberFormatOptions.browser', { sample: numberFormatSample })
+                    : t(o.labelKey),
+              }))}
+              value={numberFormat}
+              onChange={(e) => setNumberFormat(e.target.value)}
+            />
+
+            <Combobox
+              label={t('timezoneLabel')}
+              options={[{ value: 'browser', label: t('timezoneBrowserOption', { tz: getBrowserTimezone() }) }, ...TIMEZONE_OPTIONS.slice(1)]}
+              value={timezone}
+              onChange={(value) => setTimezone(value)}
+              placeholder={t('timezonePlaceholder')}
+            />
+
+            <Select
+              label={t('weekStartsOnLabel')}
+              options={WEEK_STARTS_ON_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
+              value={String(weekStartsOn)}
+              onChange={(e) => setWeekStartsOn(Number(e.target.value))}
+            />
+
+            <div className="flex items-center">
+              <label
+                htmlFor="showCreatedAt"
+                className="flex items-center gap-2 cursor-pointer"
+              >
+                <ToggleSwitch
+                  checked={showCreatedAt}
+                  onChange={setShowCreatedAt}
+                  label={t('showCreatedAtLabel')}
+                />
+                <span className="text-sm text-gray-900 dark:text-gray-100">
+                  {t('showCreatedAtLabel')}
+                </span>
+              </label>
+              <InfoTooltip text={t('showCreatedAtTooltip')} />
+            </div>
+
+            {showCreatedAt && (
+              <Select
+                label={t('timeFormatLabel')}
+                options={TIME_FORMAT_OPTIONS.map((o) => ({
+                  value: o.value,
+                  label: t(o.labelKey),
+                }))}
+                value={timeFormat}
+                onChange={(e) => setTimeFormat(e.target.value as '24h' | '12h')}
+              />
+            )}
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+            {t('groups.investments')}
+          </h3>
+          <div className="space-y-4">
+            <div>
+              <Select
+                label={t('defaultQuoteProviderLabel')}
+                options={QUOTE_PROVIDER_OPTIONS}
+                value={defaultQuoteProvider}
+                onChange={(e) => setDefaultQuoteProvider(e.target.value as 'yahoo' | 'msn')}
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {t('defaultQuoteProviderHelp')}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {t('msnNoIntradayNote')}
+              </p>
+              {defaultQuoteProvider === 'msn' && msnReady === false && (
+                <p
+                  role="alert"
+                  className="text-sm text-red-600 dark:text-red-400 mt-2"
+                  data-testid="msn-not-configured-error"
+                >
+                  {t('msnNotConfigured')}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {t('preferredExchangesLabel')}
+              </label>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                {t('preferredExchangesHelp')}
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {[0, 1, 2].map((i) => (
+                  <Combobox
+                    key={i}
+                    options={EXCHANGE_OPTIONS
+                      .filter(
+                        (opt) =>
+                          !preferredExchanges.includes(opt.value) ||
+                          preferredExchanges[i] === opt.value,
+                      )
+                      .sort((a, b) => a.label.localeCompare(b.label))}
+                    value={preferredExchanges[i] || ''}
+                    onChange={(value) => {
+                      const updated = [...preferredExchanges];
+                      if (value) {
+                        updated[i] = value;
+                      } else {
+                        updated.splice(i, 1);
+                      }
+                      setPreferredExchanges(updated.filter(Boolean));
+                    }}
+                    placeholder={t('exchangePriorityPlaceholder', { n: i + 1 })}
+                    alwaysShowSubtitle
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+            {t('groups.transactions')}
+          </h3>
+          <div className="space-y-4">
+            <div>
+              <Select
+                label={t('recentTransactionsLabel')}
+                options={RECENT_TRANSACTIONS_LIMIT_OPTIONS}
+                value={String(recentTransactionsLimit)}
+                onChange={(e) => setRecentTransactionsLimit(Number(e.target.value))}
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {t('recentTransactionsHelp')}
+              </p>
+            </div>
+
+            <div className="flex items-center">
+              <label
+                htmlFor="lockReconciledTransactions"
+                className="flex items-center gap-2 cursor-pointer"
+              >
+                <ToggleSwitch
+                  checked={lockReconciledTransactions}
+                  onChange={setLockReconciledTransactions}
+                  label={t('lockReconciledLabel')}
+                />
+                <span className="text-sm text-gray-900 dark:text-gray-100">
+                  {t('lockReconciledLabel')}
+                </span>
+              </label>
+              <InfoTooltip text={t('lockReconciledTooltip')} />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+            {t('groups.application')}
+          </h3>
+          <div className="space-y-4">
+            <div>
+              <Select
+                label={t('mapProviderLabel')}
+                options={MAP_PROVIDER_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: t(option.labelKey),
+                }))}
+                value={defaultMapProvider}
+                onChange={(e) =>
+                  setDefaultMapProvider(e.target.value as MapProvider)
+                }
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {t('mapProviderHelp')}
+              </p>
+            </div>
+
+            <div
+              {...tourAnchor(TOUR_ANCHORS.settingsWhatsNewToggle)}
+              className="flex items-center"
             >
-              {t('msnNotConfigured')}
-            </p>
-          )}
-        </div>
-
-        <Select
-          label={t('dateFormatLabel')}
-          options={dateFormatOptions}
-          value={dateFormat}
-          onChange={(e) => setDateFormat(e.target.value)}
-        />
-
-        <Select
-          label={t('numberFormatLabel')}
-          options={NUMBER_FORMAT_OPTIONS.map((o) => ({
-            value: o.value,
-            label:
-              o.value === 'browser'
-                ? t('numberFormatOptions.browser', { sample: numberFormatSample })
-                : t(o.labelKey),
-          }))}
-          value={numberFormat}
-          onChange={(e) => setNumberFormat(e.target.value)}
-        />
-
-        <Combobox
-          label={t('timezoneLabel')}
-          options={[{ value: 'browser', label: t('timezoneBrowserOption', { tz: getBrowserTimezone() }) }, ...TIMEZONE_OPTIONS.slice(1)]}
-          value={timezone}
-          onChange={(value) => setTimezone(value)}
-          placeholder={t('timezonePlaceholder')}
-        />
-
-        <Select
-          label={t('weekStartsOnLabel')}
-          options={WEEK_STARTS_ON_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
-          value={String(weekStartsOn)}
-          onChange={(e) => setWeekStartsOn(Number(e.target.value))}
-        />
-
-        <div className="flex items-center">
-          <label
-            htmlFor="showCreatedAt"
-            className="flex items-center gap-2 cursor-pointer"
-          >
-            <ToggleSwitch
-              checked={showCreatedAt}
-              onChange={setShowCreatedAt}
-              label={t('showCreatedAtLabel')}
-            />
-            <span className="text-sm text-gray-900 dark:text-gray-100">
-              {t('showCreatedAtLabel')}
-            </span>
-          </label>
-          <InfoTooltip text={t('showCreatedAtTooltip')} />
-        </div>
-
-        {showCreatedAt && (
-          <Select
-            label={t('timeFormatLabel')}
-            options={[
-              { value: '24h', label: '24-hour (14:30)' },
-              { value: '12h', label: '12-hour (2:30 PM)' },
-            ]}
-            value={timeFormat}
-            onChange={(e) => setTimeFormat(e.target.value as '24h' | '12h')}
-          />
-        )}
-
-        <div>
-          <Select
-            label={t('recentTransactionsLabel')}
-            options={RECENT_TRANSACTIONS_LIMIT_OPTIONS}
-            value={String(recentTransactionsLimit)}
-            onChange={(e) => setRecentTransactionsLimit(Number(e.target.value))}
-          />
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {t('recentTransactionsHelp')}
-          </p>
-        </div>
-
-        <div className="flex items-center">
-          <label
-            htmlFor="lockReconciledTransactions"
-            className="flex items-center gap-2 cursor-pointer"
-          >
-            <ToggleSwitch
-              checked={lockReconciledTransactions}
-              onChange={setLockReconciledTransactions}
-              label={t('lockReconciledLabel')}
-            />
-            <span className="text-sm text-gray-900 dark:text-gray-100">
-              {t('lockReconciledLabel')}
-            </span>
-          </label>
-          <InfoTooltip text={t('lockReconciledTooltip')} />
-        </div>
-
-        <div
-          {...tourAnchor(TOUR_ANCHORS.settingsWhatsNewToggle)}
-          className="flex items-center"
-        >
-          <label
-            htmlFor="showWhatsNew"
-            className="flex items-center gap-2 cursor-pointer"
-          >
-            <ToggleSwitch
-              checked={showWhatsNew}
-              onChange={setShowWhatsNew}
-              label={t('showWhatsNewLabel')}
-            />
-            <span className="text-sm text-gray-900 dark:text-gray-100">
-              {t('showWhatsNewLabel')}
-            </span>
-          </label>
-          <InfoTooltip text={t('showWhatsNewTooltip')} />
-        </div>
-
-        <div>
-          <Select
-            label={t('mapProviderLabel')}
-            options={MAP_PROVIDER_OPTIONS.map((option) => ({
-              value: option.value,
-              label: t(option.labelKey),
-            }))}
-            value={defaultMapProvider}
-            onChange={(e) =>
-              setDefaultMapProvider(e.target.value as MapProvider)
-            }
-          />
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {t('mapProviderHelp')}
-          </p>
+              <label
+                htmlFor="showWhatsNew"
+                className="flex items-center gap-2 cursor-pointer"
+              >
+                <ToggleSwitch
+                  checked={showWhatsNew}
+                  onChange={setShowWhatsNew}
+                  label={t('showWhatsNewLabel')}
+                />
+                <span className="text-sm text-gray-900 dark:text-gray-100">
+                  {t('showWhatsNewLabel')}
+                </span>
+              </label>
+              <InfoTooltip text={t('showWhatsNewTooltip')} />
+            </div>
+          </div>
         </div>
       </div>
 
