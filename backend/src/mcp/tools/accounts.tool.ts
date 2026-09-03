@@ -12,6 +12,7 @@ import {
 } from "../mcp-context";
 import { listAccountsOutput } from "../tool-output-schemas";
 import { READ_ONLY } from "../mcp-annotations";
+import { uuidString } from "./schema-fragments";
 
 @Injectable()
 export class McpAccountsTools {
@@ -51,7 +52,7 @@ export class McpAccountsTools {
               "Optional: filter to specific account names (exact, case-insensitive). Omit to cover all accounts.",
             ),
           accountIds: z
-            .array(z.string().uuid())
+            .array(uuidString())
             .optional()
             .describe("Optional: filter to specific account IDs (UUIDs)."),
           nameQuery: z

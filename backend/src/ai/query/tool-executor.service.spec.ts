@@ -2573,9 +2573,10 @@ describe("ToolExecutorService", () => {
   describe("lookup_securities (read-only)", () => {
     it("returns the candidate list and a source, with no pending action", async () => {
       const result = await service.execute(userId, "lookup_securities", {
-        query: "apple",
+        search: "apple",
       });
 
+      // The tool's input field is `search`; the service contract keeps `query`.
       expect(securities.lookupSecuritiesForLlm).toHaveBeenCalledWith(userId, {
         query: "apple",
         exchange: undefined,
@@ -2593,7 +2594,7 @@ describe("ToolExecutorService", () => {
         new BadRequestException("Provide a ticker symbol or security name."),
       );
       const result = await service.execute(userId, "lookup_securities", {
-        query: "x",
+        search: "x",
       });
       expect(result.isError).toBe(true);
     });

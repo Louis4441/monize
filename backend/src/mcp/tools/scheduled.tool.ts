@@ -11,6 +11,7 @@ import {
 } from "../mcp-context";
 import { getUpcomingBillsOutput } from "../tool-output-schemas";
 import { READ_ONLY } from "../mcp-annotations";
+import { uuidString } from "./schema-fragments";
 
 const SCHEDULED_KIND_VALUES = [
   "bill",
@@ -49,7 +50,7 @@ export class McpScheduledTools {
               "Narrow to a single kind: 'bill', 'deposit', 'transfer', 'investment'. Omit or pass 'all' for everything.",
             ),
           accountIds: z
-            .array(z.string().uuid())
+            .array(uuidString())
             .max(50)
             .optional()
             .describe("Optional account IDs to filter to."),

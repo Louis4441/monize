@@ -28,6 +28,12 @@ import {
 import { McpWriteLimiter } from "../mcp-write-limiter";
 import { getPayeesOutput, managePayeesOutput } from "../tool-output-schemas";
 import { READ_ONLY, WRITE } from "../mcp-annotations";
+import {
+  manageOperation,
+  approvalMode,
+  dryRun,
+  itemsArray,
+} from "./schema-fragments";
 
 type ManagePayeeOperation = "create" | "update" | "delete";
 type ApprovalMode = "bulk" | "individual";
@@ -129,76 +135,59 @@ export class McpPayeesTools {
           "delete: { name } -- removes the payee (its transactions keep their stored payee name). " +
           "approvalMode = 'bulk' (default; one confirmation for the whole batch) or 'individual' (one confirmation per item); ignored for a single item. Set dryRun=true to preview every item without saving. The user is asked to confirm before anything is saved (web chat card via relay, or an MCP confirmation dialog).",
         inputSchema: {
-          operation: z
-            .enum(["create", "update", "delete"])
-            .describe("The operation to perform on every item."),
-          items: z
-            .array(
-              z.object({
-                name: z
-                  .string()
-                  .max(100)
-                  .describe(
-                    "create: the new payee name. update/delete: the existing payee's current name.",
-                  ),
-                newName: z
-                  .string()
-                  .max(100)
-                  .optional()
-                  .describe("update: the payee's new name."),
-                categoryName: z
-                  .string()
-                  .max(100)
-                  .optional()
-                  .describe(
-                    'create/update: default category name ("Parent: Child" for a subcategory). update: empty string clears it.',
-                  ),
-                website: z
-                  .string()
-                  .max(2048)
-                  .optional()
-                  .describe(
-                    'create/update: the payee\'s web address. A bare domain ("acme.com") is stored as "https://acme.com". update: empty string clears it.',
-                  ),
-                address: z
-                  .string()
-                  .max(500)
-                  .optional()
-                  .describe(
-                    "create/update: the payee's postal address as free text. update: empty string clears it.",
-                  ),
-                email: z
-                  .string()
-                  .max(255)
-                  .optional()
-                  .describe(
-                    "create/update: the payee's contact email address. update: empty string clears it.",
-                  ),
-                phone: z
-                  .string()
-                  .max(50)
-                  .optional()
-                  .describe(
-                    "create/update: the payee's contact phone number, in whatever format the user gives. update: empty string clears it.",
-                  ),
-              }),
-            )
-            .min(1)
-            .max(MAX_BULK_ACTION_ROWS)
-            .describe("The rows to act on (1-25)."),
-          approvalMode: z
-            .enum(["bulk", "individual"])
-            .optional()
-            .describe(
-              "How multi-item batches are approved: 'bulk' (default) one card for all; 'individual' one card per item. Ignored for a single item.",
-            ),
-          dryRun: z
-            .boolean()
-            .optional()
-            .default(false)
-            .describe(
-              "If true, validate and return a per-item preview without saving anything.",
-            ),
+          operation: manageOperation(),
+          items: itemsArray(
+            z.object({
+              name: z
+                .string()
+                .max(100)
+                .describe(
+                  "create: the new payee name. update/delete: the existing payee's current name.",
+                ),
+              newName: z
+                .string()
+                .max(100)
+                .optional()
+                .describe("update: the payee's new name."),
+              categoryName: z
+                .string()
+                .max(100)
+                .optional()
+                .describe(
+                  'create/update: default category name ("Parent: Child" for a subcategory). update: empty string clears it.',
+                ),
+              website: z
+                .string()
+                .max(2048)
+                .optional()
+                .describe(
+                  'create/update: the payee\'s web address. A bare domain ("acme.com") is stored as "https://acme.com". update: empty string clears it.',
+                ),
+              address: z
+                .string()
+                .max(500)
+                .optional()
+                .describe(
+                  "create/update: the payee's postal address as free text. update: empty string clears it.",
+                ),
+              email: z
+                .string()
+                .max(255)
+                .optional()
+                .describe(
+                  "create/update: the payee's contact email address. update: empty string clears it.",
+                ),
+              phone: z
+                .string()
+                .max(50)
+                .optional()
+                .describe(
+                  "create/update: the payee's contact phone number, in whatever format the user gives. update: empty string clears it.",
+                ),
+            }),
+          ),
+          approvalMode: approvalMode(),
+          dryRun: dryRun(),
         },
         outputSchema: managePayeesOutput,
       },

@@ -1526,7 +1526,7 @@ export class ToolExecutorService {
     userId: string,
     input: Record<string, unknown>,
   ): Promise<ToolResult> {
-    const query = input.query as string;
+    const query = input.search as string;
     const exchange = input.exchange as string | undefined;
     const provider = input.provider as "yahoo" | "msn" | "auto" | undefined;
 

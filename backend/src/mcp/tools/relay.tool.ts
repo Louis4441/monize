@@ -15,6 +15,7 @@ import {
   reportProgressOutput,
 } from "../tool-output-schemas";
 import { READ_ONLY } from "../mcp-annotations";
+import { uuidString } from "./schema-fragments";
 
 /**
  * Reverse-relay control tools. These do not touch the financial dataset -- they
@@ -88,10 +89,7 @@ export class McpRelayTools {
         description:
           "Deliver your answer for a prompt obtained from get_next_prompt back to the Monize web chat. Pass the promptId you received and the full answer text. Always post your final answer, even if the task ran long: { delivered: true } is returned even when the user's live request already timed out -- the answer is buffered and shown as soon as the web chat reconnects, so it is never wasted. { delivered: false } is rare and means the promptId is unknown or was already answered; only then move on without retrying.",
         inputSchema: {
-          promptId: z
-            .string()
-            .uuid()
-            .describe("The promptId from get_next_prompt"),
+          promptId: uuidString().describe("The promptId from get_next_prompt"),
           text: z
             .string()
             .max(50000)
@@ -126,10 +124,7 @@ export class McpRelayTools {
         description:
           "Stream a short, human-readable progress update to the Monize web chat while you work on a prompt from get_next_prompt. Shown live to the user as the assistant's running narration (e.g. 'Looking up the sporting goods category...' or 'Dry run looks good, sending the confirmation card.'). Call it whenever you start a lookup or make a decision, before the relevant tool call, and at least every minute or two during long reading/planning so the chat does not think you went quiet. Pass the promptId you are handling and one concise sentence. This does not answer the prompt -- still call post_response with the final answer when done. { delivered: false } means the web chat is not attached to your live narration right now (it may have stopped waiting after a silent gap). This is NOT a signal to abandon the prompt: keep working and still send your confirmation cards and your final post_response -- those ARE buffered and shown to the user when the chat reconnects, even though live progress lines are not. You may stop sending further progress lines once you see delivered:false, but you must still complete the task and post_response.",
         inputSchema: {
-          promptId: z
-            .string()
-            .uuid()
-            .describe("The promptId from get_next_prompt"),
+          promptId: uuidString().describe("The promptId from get_next_prompt"),
           text: z
             .string()
             .max(2000)

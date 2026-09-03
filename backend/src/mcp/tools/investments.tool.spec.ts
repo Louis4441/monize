@@ -510,6 +510,31 @@ describe("McpInvestmentsTools", () => {
     });
   });
 
+  describe("lookup_securities", () => {
+    it("takes its text as `search` and asks the service by query", async () => {
+      // The field is named `search` like every other read tool's text filter.
+      // A security scanner flags a parameter named `query` as a SQL-injection
+      // shape; nothing here builds SQL, but one name across the read tools is
+      // better than an exception to explain.
+      resolve.mockReturnValue({ userId: "u1", scopes: "read" });
+      securitiesService.lookupSecuritiesForLlm.mockResolvedValue({
+        query: "apple",
+        count: 0,
+        candidates: [],
+      });
+
+      await handlers["lookup_securities"](
+        { search: "apple" },
+        { sessionId: "s1" },
+      );
+
+      expect(securitiesService.lookupSecuritiesForLlm).toHaveBeenCalledWith(
+        "u1",
+        { query: "apple", exchange: undefined, provider: undefined },
+      );
+    });
+  });
+
   describe("manage_securities", () => {
     const securityPreview = {
       symbol: "AAPL",

@@ -58,6 +58,13 @@ import {
   manageTransactionsOutput,
 } from "../tool-output-schemas";
 import { READ_ONLY, WRITE } from "../mcp-annotations";
+import {
+  uuidString,
+  manageOperation,
+  approvalMode,
+  dryRun,
+  itemsArray,
+} from "./schema-fragments";
 
 type ManageOperation = "create" | "update" | "delete";
 
@@ -382,163 +389,144 @@ export class McpTransactionsTools {
           "attachments (create or update): add an 'attachments' array to save files permanently on the transaction; each entry is EITHER { attachmentUri } referencing a monize-attachment:// chat file relayed from the Monize web chat, OR { fileData, fileName } with inline base64 bytes. Images and PDFs only, max 5 MB each. Single-item calls only; not valid on transfers, delete, or dryRun. An attachments-only update (transactionId + attachments) is a valid edit. " +
           "approvalMode controls the confirmation: by default 6 or more items show one confirmation for the whole batch and 1-5 items show one confirmation per item; pass 'individual' to force one confirmation per item at any count; ignored for a single item. Set dryRun=true to preview every item without saving. The user is asked to confirm before anything is saved (web chat card via relay, or an MCP confirmation dialog).",
         inputSchema: {
-          operation: z
-            .enum(["create", "update", "delete"])
-            .describe("The operation to perform on every item."),
-          items: z
-            .array(
-              z.object({
-                accountName: z
-                  .string()
-                  .max(100)
-                  .optional()
-                  .describe("create (standard): account name."),
-                fromAccountName: z
-                  .string()
-                  .max(100)
-                  .optional()
-                  .describe("create (transfer): source account name."),
-                toAccountName: z
-                  .string()
-                  .max(100)
-                  .optional()
-                  .describe(
-                    "create (transfer): destination account name (presence makes the item a transfer).",
-                  ),
-                transactionId: z
-                  .string()
-                  .uuid()
-                  .optional()
-                  .describe("update/delete: transaction ID."),
-                amount: z
-                  .number()
-                  .min(-999999999999)
-                  .max(999999999999)
-                  .optional()
-                  .describe(
-                    "Signed amount (standard create/update) or positive transfer amount.",
-                  ),
-                date: z
-                  .string()
-                  .max(10)
-                  .optional()
-                  .describe("Transaction date (YYYY-MM-DD)."),
-                payeeName: z
-                  .string()
-                  .max(100)
-                  .optional()
-                  .describe(
-                    "Optional payee name (standard create/update; or a custom transfer label for create/update transfer). Matched to an existing payee when one exists, otherwise handled per createPayeeIfMissing. Omit (transfer) to leave the payee blank; blank transfer payees display as 'Transfer to/from <account>' resolved from the current account name.",
-                  ),
-                categoryName: z
-                  .string()
-                  .max(100)
-                  .optional()
-                  .describe(
-                    'Optional category name (standard create/update, or transfer create/update -- on a transfer it is stored on both legs), qualified as "Parent: Child" -- a bare subcategory name shared by two parents is rejected, not guessed.',
-                  ),
-                description: z
-                  .string()
-                  .max(500)
-                  .optional()
-                  .describe("Optional description or memo."),
-                createPayeeIfMissing: z
-                  .boolean()
-                  .optional()
-                  .describe(
-                    "When the payee name matches no existing payee, create a new payee (default true) or keep as free text (false). Applies to standard and transfer create/update.",
-                  ),
-                exchangeRate: z
-                  .number()
-                  .min(0)
-                  .max(1_000_000)
-                  .optional()
-                  .describe(
-                    "create (transfer): exchange rate for a cross-currency transfer.",
-                  ),
-                toAmount: z
-                  .number()
-                  .min(-999999999999)
-                  .max(999999999999)
-                  .optional()
-                  .describe(
-                    "create (transfer): explicit destination amount (overrides exchangeRate).",
-                  ),
-                splits: z
-                  .array(
-                    z.object({
-                      categoryName: z
-                        .string()
-                        .min(1)
-                        .max(100)
-                        .describe(
-                          'Category for this split line, qualified as "Parent: Child" for a subcategory (required when the subcategory name is shared by more than one parent).',
-                        ),
-                      amount: z
-                        .number()
-                        .min(-999999999999)
-                        .max(999999999999)
-                        .describe("Signed amount for this split line."),
-                      memo: z
-                        .string()
-                        .max(500)
-                        .optional()
-                        .describe("Optional memo for this split line."),
-                    }),
-                  )
-                  .max(50)
-                  .optional()
-                  .describe(
-                    "Category splits (create/update). >= 2 lines instead of a single categoryName; amounts must sum to the transaction amount. On an EXISTING split transaction, a category or amount change requires resending the complete split set (parent fields work without it); read the current lines first. Several items may each carry their own splits array in one call.",
-                  ),
-                attachments: z
-                  .array(
-                    z.object({
-                      attachmentUri: z
-                        .string()
-                        .max(300)
-                        .optional()
-                        .describe(
-                          "monize-attachment://<id> URI (or bare id) of a chat file relayed from the Monize web chat. Mutually exclusive with fileData.",
-                        ),
-                      fileData: z
-                        .string()
-                        .max(MAX_ATTACHMENT_BASE64_LENGTH)
-                        .optional()
-                        .describe(
-                          "Inline base64 file bytes (image or PDF, max 5 MB decoded). Requires fileName. Mutually exclusive with attachmentUri.",
-                        ),
-                      fileName: z
-                        .string()
-                        .max(255)
-                        .optional()
-                        .describe("Filename for fileData."),
-                    }),
-                  )
-                  .min(1)
-                  .max(MAX_ATTACHMENTS)
-                  .optional()
-                  .describe(
-                    "create/update: files to save permanently on the transaction (images/PDF only). Single-item calls only; not valid on transfers, delete, or dryRun.",
-                  ),
-              }),
-            )
-            .min(1)
-            .max(25)
-            .describe("The rows to act on (1-25)."),
-          approvalMode: z
-            .enum(["bulk", "individual"])
-            .optional()
-            .describe(
-              "How multi-item batches are approved: by default 6 or more items show one card for the whole batch and 1-5 items show one card per item; 'individual' forces one card per item at any count. Ignored for a single item.",
-            ),
-          dryRun: z
-            .boolean()
-            .optional()
-            .default(false)
-            .describe(
-              "If true, validate and return a per-item preview without saving anything.",
-            ),
+          operation: manageOperation(),
+          items: itemsArray(
+            z.object({
+              accountName: z
+                .string()
+                .max(100)
+                .optional()
+                .describe("create (standard): account name."),
+              fromAccountName: z
+                .string()
+                .max(100)
+                .optional()
+                .describe("create (transfer): source account name."),
+              toAccountName: z
+                .string()
+                .max(100)
+                .optional()
+                .describe(
+                  "create (transfer): destination account name (presence makes the item a transfer).",
+                ),
+              transactionId: uuidString()
+                .optional()
+                .describe("update/delete: transaction ID."),
+              amount: z
+                .number()
+                .min(-999999999999)
+                .max(999999999999)
+                .optional()
+                .describe(
+                  "Signed amount (standard create/update) or positive transfer amount.",
+                ),
+              date: z
+                .string()
+                .max(10)
+                .optional()
+                .describe("Transaction date (YYYY-MM-DD)."),
+              payeeName: z
+                .string()
+                .max(100)
+                .optional()
+                .describe(
+                  "Optional payee name (standard create/update; or a custom transfer label for create/update transfer). Matched to an existing payee when one exists, otherwise handled per createPayeeIfMissing. Omit (transfer) to leave the payee blank; blank transfer payees display as 'Transfer to/from <account>' resolved from the current account name.",
+                ),
+              categoryName: z
+                .string()
+                .max(100)
+                .optional()
+                .describe(
+                  'Optional category name (standard create/update, or transfer create/update -- on a transfer it is stored on both legs), qualified as "Parent: Child" -- a bare subcategory name shared by two parents is rejected, not guessed.',
+                ),
+              description: z
+                .string()
+                .max(500)
+                .optional()
+                .describe("Optional description or memo."),
+              createPayeeIfMissing: z
+                .boolean()
+                .optional()
+                .describe(
+                  "When the payee name matches no existing payee, create a new payee (default true) or keep as free text (false). Applies to standard and transfer create/update.",
+                ),
+              exchangeRate: z
+                .number()
+                .min(0)
+                .max(1_000_000)
+                .optional()
+                .describe(
+                  "create (transfer): exchange rate for a cross-currency transfer.",
+                ),
+              toAmount: z
+                .number()
+                .min(-999999999999)
+                .max(999999999999)
+                .optional()
+                .describe(
+                  "create (transfer): explicit destination amount (overrides exchangeRate).",
+                ),
+              splits: z
+                .array(
+                  z.object({
+                    categoryName: z
+                      .string()
+                      .min(1)
+                      .max(100)
+                      .describe(
+                        'Category for this split line, qualified as "Parent: Child" for a subcategory (required when the subcategory name is shared by more than one parent).',
+                      ),
+                    amount: z
+                      .number()
+                      .min(-999999999999)
+                      .max(999999999999)
+                      .describe("Signed amount for this split line."),
+                    memo: z
+                      .string()
+                      .max(500)
+                      .optional()
+                      .describe("Optional memo for this split line."),
+                  }),
+                )
+                .max(50)
+                .optional()
+                .describe(
+                  "Category splits (create/update). >= 2 lines instead of a single categoryName; amounts must sum to the transaction amount. On an EXISTING split transaction, a category or amount change requires resending the complete split set (parent fields work without it); read the current lines first. Several items may each carry their own splits array in one call.",
+                ),
+              attachments: z
+                .array(
+                  z.object({
+                    attachmentUri: z
+                      .string()
+                      .max(300)
+                      .optional()
+                      .describe(
+                        "monize-attachment://<id> URI (or bare id) of a chat file relayed from the Monize web chat. Mutually exclusive with fileData.",
+                      ),
+                    fileData: z
+                      .string()
+                      .max(MAX_ATTACHMENT_BASE64_LENGTH)
+                      .optional()
+                      .describe(
+                        "Inline base64 file bytes (image or PDF, max 5 MB decoded). Requires fileName. Mutually exclusive with attachmentUri.",
+                      ),
+                    fileName: z
+                      .string()
+                      .max(255)
+                      .optional()
+                      .describe("Filename for fileData."),
+                  }),
+                )
+                .min(1)
+                .max(MAX_ATTACHMENTS)
+                .optional()
+                .describe(
+                  "create/update: files to save permanently on the transaction (images/PDF only). Single-item calls only; not valid on transfers, delete, or dryRun.",
+                ),
+            }),
+          ),
+          approvalMode: approvalMode(),
+          dryRun: dryRun(),
         },
         outputSchema: manageTransactionsOutput,
       },

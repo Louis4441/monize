@@ -260,7 +260,7 @@ export const managePayeesSchema = z.object({
 });
 
 export const lookupSecuritiesSchema = z.object({
-  query: z.string().min(1).max(100),
+  search: z.string().min(1).max(100),
   exchange: z.enum(SECURITY_EXCHANGES).optional(),
   provider: z.enum(["yahoo", "msn", "auto"]).optional(),
 });

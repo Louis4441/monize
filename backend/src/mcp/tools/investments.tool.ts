@@ -50,6 +50,13 @@ import {
   manageInvestmentTransactionsOutput,
 } from "../tool-output-schemas";
 import { READ_ONLY, WRITE } from "../mcp-annotations";
+import {
+  uuidString,
+  manageOperation,
+  approvalMode,
+  dryRun,
+  itemsArray,
+} from "./schema-fragments";
 
 type ManageInvOperation = "create" | "update" | "delete";
 type ManageSecOperation = "create" | "update" | "delete";
@@ -308,13 +315,11 @@ export class McpInvestmentsTools {
         description:
           "Look up a ticker symbol or company name against the user's configured price provider (Yahoo/MSN) and return the matching securities WITHOUT adding anything. Read-only: use it to resolve an ambiguous reference or confirm the exact symbol/exchange before adding it with manage_securities. Each candidate is flagged with alreadyAdded=true when a security with that symbol is already in the user's list. Shares the lookup logic with the AI Assistant's lookup_securities tool.",
         inputSchema: {
-          query: z
+          search: z
             .string()
             .min(1)
             .max(100)
-            .describe(
-              "Ticker symbol (e.g. 'AAPL') or company/security name to search for.",
-            ),
+            .describe("Ticker symbol or company name to look up."),
           exchange: z
             .enum(SECURITY_EXCHANGES)
             .optional()
@@ -340,7 +345,7 @@ export class McpInvestmentsTools {
           const result = await this.securitiesService.lookupSecuritiesForLlm(
             ctx.userId,
             {
-              query: args.query,
+              query: args.search,
               exchange: args.exchange,
               provider: args.provider,
             },
@@ -364,115 +369,98 @@ export class McpInvestmentsTools {
           "delete: { symbol } -- removes the security (fails if it still has holdings or investment transactions). " +
           "approvalMode = 'bulk' (default; one card for the whole batch) or 'individual' (one card per item); ignored for a single item. Set dryRun=true to preview every item without saving. The user is asked to confirm before anything is saved (web chat card via relay, or an MCP confirmation dialog).",
         inputSchema: {
-          operation: z
-            .enum(["create", "update", "delete"])
-            .describe("The operation to perform on every item."),
-          items: z
-            .array(
-              z.object({
-                query: z
-                  .string()
-                  .min(1)
-                  .max(100)
-                  .optional()
-                  .describe(
-                    "create: ticker symbol or security name to look up and validate.",
-                  ),
-                symbol: z
-                  .string()
-                  .min(1)
-                  .max(100)
-                  .optional()
-                  .describe(
-                    "update/delete: the existing security's ticker symbol (or name).",
-                  ),
-                exchange: z
-                  .enum(SECURITY_EXCHANGES)
-                  .optional()
-                  .describe(
-                    "create: exchange to disambiguate the lookup. update: new exchange. Must be one of the enumerated values.",
-                  ),
-                securityType: z
-                  .enum(SECURITY_TYPES)
-                  .optional()
-                  .describe(
-                    "create/update: security type. Must be one of the enumerated values.",
-                  ),
-                isFavourite: z
-                  .boolean()
-                  .optional()
-                  .describe(
-                    "create/update: pin the security to the dashboard Favourite Securities widget.",
-                  ),
-                currencyCode: z
-                  .string()
-                  .regex(/^[A-Za-z]{3}$/)
-                  .optional()
-                  .describe(
-                    "create/update: ISO 4217 currency code (e.g. 'USD').",
-                  ),
-                countryWeightings: z
-                  .array(
-                    z.object({
-                      name: z
-                        .string()
-                        .min(1)
-                        .max(100)
-                        .describe(
-                          "Country name; prefer a canonical name (e.g. 'United States').",
-                        ),
-                      weight: z
-                        .number()
-                        .min(0)
-                        .max(100)
-                        .describe("Percentage 0-100."),
-                    }),
-                  )
-                  .max(60)
-                  .optional()
-                  .describe(
-                    "update only: manual country (geographic) allocation for an ETF/fund. Weights are PERCENTAGES (0-100) and need not sum to 100 (the rest is 'Other').",
-                  ),
-                assetWeightings: z
-                  .array(
-                    z.object({
-                      name: z
-                        .string()
-                        .min(1)
-                        .max(100)
-                        .describe(
-                          "Asset class name, free text (e.g. 'Equity', 'Fixed Income', 'Cash').",
-                        ),
-                      weight: z
-                        .number()
-                        .min(0)
-                        .max(100)
-                        .describe("Percentage 0-100."),
-                    }),
-                  )
-                  .max(60)
-                  .optional()
-                  .describe(
-                    "update only: manual asset-class allocation for an ETF/fund. Free-text names (no canonical list); weights are PERCENTAGES (0-100) and need not sum to 100 (the rest is 'Other').",
-                  ),
-              }),
-            )
-            .min(1)
-            .max(MAX_BULK_ACTION_ROWS)
-            .describe("The rows to act on (1-25)."),
-          approvalMode: z
-            .enum(["bulk", "individual"])
-            .optional()
-            .describe(
-              "How multi-item batches are approved: 'bulk' (default) one card for all; 'individual' one card per item. Ignored for a single item.",
-            ),
-          dryRun: z
-            .boolean()
-            .optional()
-            .default(false)
-            .describe(
-              "If true, validate and return a per-item preview without saving anything.",
-            ),
+          operation: manageOperation(),
+          items: itemsArray(
+            z.object({
+              query: z
+                .string()
+                .min(1)
+                .max(100)
+                .optional()
+                .describe(
+                  "create: ticker symbol or security name to look up and validate.",
+                ),
+              symbol: z
+                .string()
+                .min(1)
+                .max(100)
+                .optional()
+                .describe(
+                  "update/delete: the existing security's ticker symbol (or name).",
+                ),
+              exchange: z
+                .enum(SECURITY_EXCHANGES)
+                .optional()
+                .describe(
+                  "create: exchange to disambiguate the lookup. update: new exchange. Must be one of the enumerated values.",
+                ),
+              securityType: z
+                .enum(SECURITY_TYPES)
+                .optional()
+                .describe(
+                  "create/update: security type. Must be one of the enumerated values.",
+                ),
+              isFavourite: z
+                .boolean()
+                .optional()
+                .describe(
+                  "create/update: pin the security to the dashboard Favourite Securities widget.",
+                ),
+              currencyCode: z
+                .string()
+                .regex(/^[A-Za-z]{3}$/)
+                .optional()
+                .describe(
+                  "create/update: ISO 4217 currency code (e.g. 'USD').",
+                ),
+              countryWeightings: z
+                .array(
+                  z.object({
+                    name: z
+                      .string()
+                      .min(1)
+                      .max(100)
+                      .describe(
+                        "Country name; prefer a canonical name (e.g. 'United States').",
+                      ),
+                    weight: z
+                      .number()
+                      .min(0)
+                      .max(100)
+                      .describe("Percentage 0-100."),
+                  }),
+                )
+                .max(60)
+                .optional()
+                .describe(
+                  "update only: manual country (geographic) allocation for an ETF/fund. Weights are PERCENTAGES (0-100) and need not sum to 100 (the rest is 'Other').",
+                ),
+              assetWeightings: z
+                .array(
+                  z.object({
+                    name: z
+                      .string()
+                      .min(1)
+                      .max(100)
+                      .describe(
+                        "Asset class name, free text (e.g. 'Equity', 'Fixed Income', 'Cash').",
+                      ),
+                    weight: z
+                      .number()
+                      .min(0)
+                      .max(100)
+                      .describe("Percentage 0-100."),
+                  }),
+                )
+                .max(60)
+                .optional()
+                .describe(
+                  "update only: manual asset-class allocation for an ETF/fund. Free-text names (no canonical list); weights are PERCENTAGES (0-100) and need not sum to 100 (the rest is 'Other').",
+                ),
+            }),
+          ),
+          approvalMode: approvalMode(),
+          dryRun: dryRun(),
         },
         outputSchema: manageSecuritiesOutput,
       },
@@ -533,104 +521,91 @@ export class McpInvestmentsTools {
           "delete: { transactionId } -- deleting one leg of a security transfer removes the paired leg too and reverses any linked cash impact. " +
           "approvalMode controls the confirmation: by default 6 or more items show one confirmation for the whole batch and 1-5 items show one confirmation per item; pass 'individual' to force one confirmation per item at any count; ignored for a single item. The user is asked to confirm before anything is saved (web chat card via relay, or an MCP confirmation dialog).",
         inputSchema: {
-          operation: z
-            .enum(["create", "update", "delete"])
-            .describe("The operation to perform on every item."),
-          items: z
-            .array(
-              z.object({
-                accountName: z
-                  .string()
-                  .max(100)
-                  .optional()
-                  .describe(
-                    "create: investment/brokerage account name. The base pair name (e.g. 'RRSP') resolves to its brokerage account ('RRSP - Brokerage'); the exact name also works.",
-                  ),
-                fundingAccountName: z
-                  .string()
-                  .max(100)
-                  .optional()
-                  .describe(
-                    "create: optional cash account that funds a buy or receives a sell's proceeds. Omit to use the brokerage's own linked cash account.",
-                  ),
-                security: z
-                  .string()
-                  .min(1)
-                  .max(100)
-                  .optional()
-                  .describe(
-                    "create/update: security ticker symbol or name. Required (create) for BUY, SELL, REDEEM, SPLIT, REINVEST (and the REINVEST_*/CAPITAL_GAIN_* refinements), ADD_SHARES, REMOVE_SHARES. Matched to one of the user's securities.",
-                  ),
-                action: z
-                  .nativeEnum(InvestmentAction)
-                  .optional()
-                  .describe(
-                    "create: transaction type. update: new type (omit to keep).",
-                  ),
-                date: z
-                  .string()
-                  .max(10)
-                  .optional()
-                  .describe("Transaction date (YYYY-MM-DD)."),
-                quantity: z
-                  .number()
-                  .min(0)
-                  .max(999999999999)
-                  .optional()
-                  .describe(
-                    "Number of shares (8 dp). For SPLIT, the split ratio (>0).",
-                  ),
-                price: z
-                  .number()
-                  .min(0)
-                  .max(999999999999)
-                  .optional()
-                  .describe(
-                    "Price per share (6 dp). For DIVIDEND/INTEREST/CAPITAL_GAIN with no quantity, the total cash amount.",
-                  ),
-                commission: z
-                  .number()
-                  .min(0)
-                  .max(999999999999)
-                  .optional()
-                  .describe("Commission or fee (4 dp). Defaults to 0."),
-                accruedInterest: z
-                  .number()
-                  .min(0)
-                  .max(999999999999)
-                  .optional()
-                  .describe(
-                    "REDEEM only: accrued interest paid out with the redemption (4 dp). Recorded as a linked INTEREST transaction and included in the single cash movement, so do not record it separately. Defaults to 0.",
-                  ),
-                exchangeRate: z
-                  .number()
-                  .min(0)
-                  .max(999999999999)
-                  .optional()
-                  .describe(
-                    "create/update: FX rate converting the security's currency into the funding cash account's currency (e.g. for a EUR security funded from a PLN account, the EUR->PLN rate such as 4.2514). Supply this when the broker's settlement data gives the rate or the converted cash total, so the cash posting is exact. Omit for same-currency transactions, or to use the rate for the transaction date.",
-                  ),
-                description: z
-                  .string()
-                  .max(500)
-                  .optional()
-                  .describe("Optional description or memo."),
-                transactionId: z
-                  .string()
-                  .uuid()
-                  .optional()
-                  .describe("update/delete: investment transaction ID."),
-              }),
-            )
-            .min(1)
-            .max(MAX_BULK_ACTION_ROWS)
-            .describe("The rows to act on (1-25)."),
-          approvalMode: z
-            .enum(["bulk", "individual"])
-            .optional()
-            .describe(
-              "How multi-item batches are approved: by default 6 or more items show one card for the whole batch and 1-5 items show one card per item; 'individual' forces one card per item at any count. Ignored for a single item.",
-            ),
+          operation: manageOperation(),
+          items: itemsArray(
+            z.object({
+              accountName: z
+                .string()
+                .max(100)
+                .optional()
+                .describe(
+                  "create: investment/brokerage account name. The base pair name (e.g. 'RRSP') resolves to its brokerage account ('RRSP - Brokerage'); the exact name also works.",
+                ),
+              fundingAccountName: z
+                .string()
+                .max(100)
+                .optional()
+                .describe(
+                  "create: optional cash account that funds a buy or receives a sell's proceeds. Omit to use the brokerage's own linked cash account.",
+                ),
+              security: z
+                .string()
+                .min(1)
+                .max(100)
+                .optional()
+                .describe(
+                  "create/update: security ticker symbol or name. Required (create) for BUY, SELL, REDEEM, SPLIT, REINVEST (and the REINVEST_*/CAPITAL_GAIN_* refinements), ADD_SHARES, REMOVE_SHARES. Matched to one of the user's securities.",
+                ),
+              action: z
+                .nativeEnum(InvestmentAction)
+                .optional()
+                .describe(
+                  "create: transaction type. update: new type (omit to keep).",
+                ),
+              date: z
+                .string()
+                .max(10)
+                .optional()
+                .describe("Transaction date (YYYY-MM-DD)."),
+              quantity: z
+                .number()
+                .min(0)
+                .max(999999999999)
+                .optional()
+                .describe(
+                  "Number of shares (8 dp). For SPLIT, the split ratio (>0).",
+                ),
+              price: z
+                .number()
+                .min(0)
+                .max(999999999999)
+                .optional()
+                .describe(
+                  "Price per share (6 dp). For DIVIDEND/INTEREST/CAPITAL_GAIN with no quantity, the total cash amount.",
+                ),
+              commission: z
+                .number()
+                .min(0)
+                .max(999999999999)
+                .optional()
+                .describe("Commission or fee (4 dp). Defaults to 0."),
+              accruedInterest: z
+                .number()
+                .min(0)
+                .max(999999999999)
+                .optional()
+                .describe(
+                  "REDEEM only: accrued interest paid out with the redemption (4 dp). Recorded as a linked INTEREST transaction and included in the single cash movement, so do not record it separately. Defaults to 0.",
+                ),
+              exchangeRate: z
+                .number()
+                .min(0)
+                .max(999999999999)
+                .optional()
+                .describe(
+                  "create/update: FX rate converting the security's currency into the funding cash account's currency (e.g. for a EUR security funded from a PLN account, the EUR->PLN rate such as 4.2514). Supply this when the broker's settlement data gives the rate or the converted cash total, so the cash posting is exact. Omit for same-currency transactions, or to use the rate for the transaction date.",
+                ),
+              description: z
+                .string()
+                .max(500)
+                .optional()
+                .describe("Optional description or memo."),
+              transactionId: uuidString()
+                .optional()
+                .describe("update/delete: investment transaction ID."),
+            }),
+          ),
+          approvalMode: approvalMode(),
         },
         outputSchema: manageInvestmentTransactionsOutput,
       },

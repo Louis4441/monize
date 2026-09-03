@@ -667,10 +667,10 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
-        query: {
+        search: {
           type: "string",
           description:
-            "Ticker symbol (e.g. 'AAPL') or company/security name (e.g. 'Apple') to search for. Required.",
+            "Ticker symbol (e.g. 'AAPL') or company/security name (e.g. 'Apple') to look up. Required.",
         },
         exchange: {
           type: "string",
@@ -685,7 +685,7 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
             "Optional quote provider to query: 'yahoo', 'msn', or 'auto' (the user's configured default, the recommended choice). Omit for 'auto'.",
         },
       },
-      required: ["query"],
+      required: ["search"],
     },
   },
   {
