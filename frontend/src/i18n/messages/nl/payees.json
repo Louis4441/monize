@@ -91,7 +91,17 @@
     "applyCategoryNone": "Bestaande transacties niet wijzigen",
     "applyCategoryUncategorized": "Alleen transacties zonder categorie ({count})",
     "applyCategoryAll": "Alle transacties ({count})",
-    "applyCategoryHelp": "Overboekingen en gesplitste transacties worden nooit gewijzigd."
+    "applyCategoryHelp": "Overboekingen en gesplitste transacties worden nooit gewijzigd.",
+    "lookup": {
+      "button": "Gegevens opzoeken",
+      "searching": "Contactgegevens worden opgezocht...",
+      "suggested": "Voorgesteld door de zoekopdracht:",
+      "replaced": "Vervangen door de zoekopdracht:",
+      "clear": "Wijzigingen van de zoekopdracht ongedaan maken",
+      "nothingFound": "Er zijn geen openbare contactgegevens voor deze naam gevonden.",
+      "noProvider": "Stel een AI-provider in bij <link>AI-instellingen</link> om contactgegevens op te zoeken.",
+      "failed": "De zoekopdracht kon niet worden voltooid. Probeer het later opnieuw."
+    }
   },
   "merge": {
     "title": "Begunstigde samenvoegen",

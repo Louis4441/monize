@@ -90,6 +90,8 @@ describe("ReportsService", () => {
     address: null,
     email: null,
     phone: null,
+    contactLookupAt: null,
+    contactLookupSource: null,
     isActive: true,
     defaultCategory: null as any,
     createdAt: new Date("2025-01-01"),

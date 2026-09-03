@@ -62,6 +62,10 @@ const REFERENCE_DATA: ReadonlyArray<[string, string]> = [
     'exchange-rates:',
     'rate snapshots from the provider; a user transaction does not move a rate',
   ],
+  [
+    'ai:',
+    "the AI provider status -- whether this user has a provider that can answer a lookup at all. It follows the provider rows in Settings, which drop it themselves; a transaction cannot change it",
+  ],
 ];
 
 /** Prefix literals passed to any cache call, e.g. `'accounts:all'` -> `accounts:`. */

@@ -99,6 +99,7 @@
       "deletedInvestmentReport": "투자 보고서 \"{name}\" 삭제됨",
       "createdPayee": "수취인 \"{name}\" 생성됨",
       "updatedPayee": "수취인 \"{name}\" 업데이트됨",
+      "lookedUpPayeeContact": "거래처 \"{name}\"의 연락처 정보를 조회했습니다",
       "deletedPayee": "수취인 \"{name}\" 삭제됨",
       "createdReport": "보고서 \"{name}\" 생성됨",
       "updatedReport": "보고서 \"{name}\" 업데이트됨",

@@ -1114,6 +1114,7 @@ export class ToolExecutorService {
         const preview = await this.payeePrepService.prepareCreatePayeeSingle(
           userId,
           this.toPayeeCreateRow(items[0]),
+          { lookupContact: true },
         );
         return {
           data: PENDING_ACTION_TOOL_RESULT,

@@ -446,8 +446,38 @@ describe("AiActionsService", () => {
     expect(payees.create).toHaveBeenCalledWith(
       USER,
       expect.objectContaining({ name: "Acme", defaultCategoryId: CAT }),
+      {},
     );
     expect(result).toEqual({ type: "create_payee", id: "payee-new" });
+  });
+
+  it("hands a preview's contact lookup stamp to the create instead of looking up again", async () => {
+    const descriptor: CreatePayeeDescriptor = {
+      type: "create_payee",
+      userId: USER,
+      actionId: "act-payee-stamp",
+      expiresAt: Date.now() + 60_000,
+      name: "Acme",
+      defaultCategoryId: null,
+      website: "https://acme.com",
+      contactLookup: {
+        source: "ai-web-search",
+        attemptedAt: "2026-09-02T10:00:00.000Z",
+      },
+    };
+
+    await service.confirm(USER, dtoFor(descriptor));
+
+    expect(payees.create).toHaveBeenCalledWith(
+      USER,
+      expect.objectContaining({ website: "https://acme.com" }),
+      {
+        contactLookup: {
+          source: "ai-web-search",
+          attemptedAt: new Date("2026-09-02T10:00:00.000Z"),
+        },
+      },
+    );
   });
 
   it("writes an approved payee website through to the create", async () => {
@@ -466,6 +496,7 @@ describe("AiActionsService", () => {
     expect(payees.create).toHaveBeenCalledWith(
       USER,
       expect.objectContaining({ website: "https://acme.com" }),
+      {},
     );
   });
 

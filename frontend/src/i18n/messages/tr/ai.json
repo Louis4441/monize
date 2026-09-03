@@ -87,6 +87,8 @@
     "address": "Adres",
     "email": "E-posta",
     "phone": "Telefon",
+    "contactLookup": "İletişim bilgileri",
+    "contactLookupSuggested": "Aramanın önerdiği — onaylamadan önce inceleyin",
     "none": "Yok",
     "approve": "Onayla",
     "cancel": "İptal",

@@ -91,7 +91,17 @@
     "applyCategoryNone": "不更改现有交易",
     "applyCategoryUncategorized": "仅限无分类交易（{count}）",
     "applyCategoryAll": "所有交易（{count}）",
-    "applyCategoryHelp": "转账和拆分交易不会被更改。"
+    "applyCategoryHelp": "转账和拆分交易不会被更改。",
+    "lookup": {
+      "button": "查找信息",
+      "searching": "正在查找联系信息...",
+      "suggested": "来自查找的建议：",
+      "replaced": "已由查找替换：",
+      "clear": "撤销查找所做的更改",
+      "nothingFound": "未找到此名称的公开联系信息。",
+      "noProvider": "请在<link>AI 设置</link>中配置 AI 提供商以查找联系信息。",
+      "failed": "查找未能完成，请稍后重试。"
+    }
   },
   "merge": {
     "title": "合并收款人",

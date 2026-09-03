@@ -87,6 +87,8 @@
     "address": "地址",
     "email": "電子郵件",
     "phone": "電話",
+    "contactLookup": "聯絡資訊",
+    "contactLookupSuggested": "來自查詢的建議 — 請在核准前檢閱",
     "none": "無",
     "approve": "核准",
     "cancel": "取消",

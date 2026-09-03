@@ -2606,10 +2606,12 @@ describe("ToolExecutorService", () => {
         items: [{ name: "Acme", categoryName: "Dining" }],
       });
 
-      expect(payees.previewCreatePayee).toHaveBeenCalledWith(userId, {
-        name: "Acme",
-        categoryName: "Dining",
-      });
+      expect(payees.previewCreatePayee).toHaveBeenCalledWith(
+        userId,
+        { name: "Acme", categoryName: "Dining" },
+        // A single new payee is looked up before its card, when enabled.
+        { lookupContact: true },
+      );
       expect(result.pendingAction?.type).toBe("create_payee");
       expect(result.pendingAction?.preview).toMatchObject({
         name: "Acme",
@@ -2633,6 +2635,7 @@ describe("ToolExecutorService", () => {
       expect(payees.previewCreatePayee).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({ website: "acme.com" }),
+        { lookupContact: true },
       );
       // The card shows the normalised address, and the signed descriptor
       // carries it so approving actually writes it.

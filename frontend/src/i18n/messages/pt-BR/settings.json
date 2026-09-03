@@ -764,6 +764,14 @@
         "step3": "As respostas são transmitidas de volta ao chat. Um ponto de status mostra se seu agente está conectado.",
         "note": "Nada é executado até seu agente estar conectado e ouvindo. O chat mostra as instruções de conexão."
       }
+    },
+    "payeeLookup": {
+      "title": "Busca automática de dados de contato do beneficiário",
+      "subtitle": "Busca automaticamente o site, o endereço, o e-mail e o número de telefone de um novo beneficiário por meio do seu provedor de IA configurado. É enviado o nome do beneficiário, junto com quaisquer anotações, site, endereço, e-mail e telefone que ele já tenha, para que a busca distinga a empresa e o local corretos.",
+      "toggleLabel": "Ativar a busca automática de dados de contato",
+      "enabled": "Busca automática de dados de contato ativada",
+      "disabled": "Busca automática de dados de contato desativada",
+      "saveFailed": "Não foi possível atualizar a configuração de busca de dados de contato"
     }
   },
   "sharedAccessPage": {

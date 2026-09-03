@@ -764,6 +764,14 @@
         "step3": "Antwoorden worden terug naar de chat gestreamd. Een statusstip toont of uw agent verbonden is.",
         "note": "Er gebeurt niets totdat uw agent verbonden is en luistert. De chat toont verbindingsinstructies."
       }
+    },
+    "payeeLookup": {
+      "title": "Contactgegevens van begunstigde automatisch opzoeken",
+      "subtitle": "Zoekt automatisch de website, het adres, het e-mailadres en het telefoonnummer van een nieuwe begunstigde op via je geconfigureerde AI-provider. De naam van de begunstigde wordt verzonden, samen met eventuele notities, website, adres, e-mailadres en telefoonnummer die al zijn opgeslagen, zodat de zoekopdracht het juiste bedrijf op de juiste locatie herkent.",
+      "toggleLabel": "Automatisch opzoeken van contactgegevens inschakelen",
+      "enabled": "Automatisch opzoeken van contactgegevens ingeschakeld",
+      "disabled": "Automatisch opzoeken van contactgegevens uitgeschakeld",
+      "saveFailed": "De instelling voor het opzoeken van contactgegevens kon niet worden bijgewerkt"
     }
   },
   "sharedAccessPage": {

@@ -764,6 +764,14 @@
         "step3": "Antworten werden zurück in den Chat gestreamt. Ein Statuspunkt zeigt an, ob Ihr Agent verbunden ist.",
         "note": "Es läuft nichts, bis Ihr Agent verbunden ist und zuhört. Der Chat zeigt Verbindungsanweisungen an."
       }
+    },
+    "payeeLookup": {
+      "title": "Automatische Suche nach Kontaktangaben des Zahlungsempfängers",
+      "subtitle": "Sucht Website, Adresse, E-Mail-Adresse und Telefonnummer eines neuen Zahlungsempfängers automatisch über Ihren konfigurierten KI-Anbieter. Dabei werden der Name des Zahlungsempfängers sowie vorhandene Notizen, Website, Adresse, E-Mail-Adresse und Telefonnummer übermittelt, damit die Suche das richtige Unternehmen am richtigen Standort erkennt.",
+      "toggleLabel": "Automatische Suche nach Kontaktangaben aktivieren",
+      "enabled": "Automatische Suche nach Kontaktangaben aktiviert",
+      "disabled": "Automatische Suche nach Kontaktangaben deaktiviert",
+      "saveFailed": "Die Einstellung zur Kontaktsuche konnte nicht gespeichert werden"
     }
   },
   "sharedAccessPage": {

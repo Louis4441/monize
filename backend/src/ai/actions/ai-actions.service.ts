@@ -14,7 +14,7 @@ import {
   UploadedAttachmentFile,
 } from "../../attachments/attachments.service";
 import { RelayAttachmentStore } from "../relay/relay-attachment.store";
-import { PayeesService } from "../../payees/payees.service";
+import { PayeesService, CreatePayeeOptions } from "../../payees/payees.service";
 import { InvestmentTransactionsService } from "../../securities/investment-transactions.service";
 import { SecuritiesService } from "../../securities/securities.service";
 import { CreateTransactionDto } from "../../transactions/dto/create-transaction.dto";
@@ -730,7 +730,11 @@ export class AiActionsService {
       email: descriptor.email,
       phone: descriptor.phone,
     });
-    const payee = await this.payeesService.create(userId, dto);
+    const payee = await this.payeesService.create(
+      userId,
+      dto,
+      contactLookupOptions(descriptor),
+    );
     return { type: "create_payee", id: payee.id };
   }
 
@@ -1015,4 +1019,22 @@ export class AiActionsService {
       }
     }
   }
+}
+
+/**
+ * The provenance a preview's contact lookup left on the descriptor, in the
+ * shape `PayeesService.create` stores. Absent when the preview did not look
+ * up, in which case the create decides about a background lookup itself.
+ */
+export function contactLookupOptions(
+  descriptor: CreatePayeeDescriptor,
+): CreatePayeeOptions {
+  return descriptor.contactLookup
+    ? {
+        contactLookup: {
+          source: descriptor.contactLookup.source,
+          attemptedAt: new Date(descriptor.contactLookup.attemptedAt),
+        },
+      }
+    : {};
 }

@@ -99,6 +99,7 @@
       "deletedInvestmentReport": "Đã xóa báo cáo đầu tư \"{name}\"",
       "createdPayee": "Đã tạo người nhận \"{name}\"",
       "updatedPayee": "Đã cập nhật người nhận \"{name}\"",
+      "lookedUpPayeeContact": "Đã tra cứu thông tin liên hệ của người nhận \"{name}\"",
       "deletedPayee": "Đã xóa người nhận \"{name}\"",
       "createdReport": "Đã tạo báo cáo \"{name}\"",
       "updatedReport": "Đã cập nhật báo cáo \"{name}\"",

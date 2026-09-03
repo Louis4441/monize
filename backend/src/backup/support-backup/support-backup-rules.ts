@@ -85,6 +85,7 @@ export const RULES: Record<string, TableRules> = {
     recent_transactions_limit: keep,
     ai_bubble_enabled: keep,
     lock_reconciled_transactions: keep,
+    payee_contact_lookup_enabled: keep,
     language: keep,
     last_client_timezone: drop, // location hint
     default_map_provider: keep,
@@ -127,6 +128,10 @@ export const RULES: Record<string, TableRules> = {
     address: drop,
     email: drop,
     phone: drop,
+    // A lookup's timestamp and source say when and how the (dropped) contact
+    // details were found; neither names the payee.
+    contact_lookup_at: keep,
+    contact_lookup_source: keep,
     is_active: keep,
     created_at: keep,
   },

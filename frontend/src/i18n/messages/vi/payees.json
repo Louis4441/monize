@@ -91,7 +91,17 @@
     "applyCategoryNone": "Không thay đổi giao dịch hiện có",
     "applyCategoryUncategorized": "Chỉ các giao dịch chưa có danh mục ({count})",
     "applyCategoryAll": "Tất cả giao dịch ({count})",
-    "applyCategoryHelp": "Chuyển khoản và giao dịch chia nhỏ không bao giờ bị thay đổi."
+    "applyCategoryHelp": "Chuyển khoản và giao dịch chia nhỏ không bao giờ bị thay đổi.",
+    "lookup": {
+      "button": "Tra cứu thông tin",
+      "searching": "Đang tra cứu thông tin liên hệ...",
+      "suggested": "Được đề xuất từ tra cứu:",
+      "replaced": "Đã thay thế bởi tra cứu:",
+      "clear": "Hoàn tác thay đổi của tra cứu",
+      "nothingFound": "Không tìm thấy thông tin liên hệ công khai cho tên này.",
+      "noProvider": "Hãy cấu hình nhà cung cấp AI trong <link>Cài đặt AI</link> để tra cứu thông tin liên hệ.",
+      "failed": "Không thể hoàn tất tra cứu. Vui lòng thử lại sau."
+    }
   },
   "merge": {
     "title": "Gộp người nhận",

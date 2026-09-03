@@ -87,6 +87,8 @@
     "address": "Alamat",
     "email": "Email",
     "phone": "Telepon",
+    "contactLookup": "Detail kontak",
+    "contactLookupSuggested": "Disarankan dari pencarian — tinjau sebelum menyetujui",
     "none": "Tidak ada",
     "approve": "Setujui",
     "cancel": "Batal",

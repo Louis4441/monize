@@ -91,7 +91,17 @@
     "applyCategoryNone": "Non modificare le transazioni esistenti",
     "applyCategoryUncategorized": "Solo transazioni senza categoria ({count})",
     "applyCategoryAll": "Tutte le transazioni ({count})",
-    "applyCategoryHelp": "I trasferimenti e le transazioni suddivise non vengono mai modificati."
+    "applyCategoryHelp": "I trasferimenti e le transazioni suddivise non vengono mai modificati.",
+    "lookup": {
+      "button": "Cerca recapiti",
+      "searching": "Ricerca dei recapiti in corso...",
+      "suggested": "Suggerito dalla ricerca:",
+      "replaced": "Sostituito dalla ricerca:",
+      "clear": "Annulla le modifiche della ricerca",
+      "nothingFound": "Nessun recapito pubblico trovato per questo nome.",
+      "noProvider": "Configura un provider IA nelle <link>Impostazioni IA</link> per cercare i recapiti.",
+      "failed": "Non è stato possibile completare la ricerca. Riprova più tardi."
+    }
   },
   "merge": {
     "title": "Unisci beneficiario",

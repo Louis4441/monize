@@ -1,3 +1,4 @@
+import type { ContactLookupSource } from './payee';
 import type { InvestmentAction } from './investment';
 
 export type AiProviderType = 'anthropic' | 'openai' | 'ollama' | 'ollama-cloud' | 'openai-compatible' | 'mcp_relay';
@@ -286,6 +287,11 @@ export interface PendingActionPreview {
   payeeName?: string | null;
   /** True when approving a create_transaction will also create a new payee. */
   payeeWillBeCreated?: boolean;
+  /**
+   * Set on a create_payee card whose contact fields were looked up rather than
+   * supplied, so the card can label them as suggestions.
+   */
+  contactLookupSource?: ContactLookupSource | null;
   categoryName?: string | null;
   newCategoryName?: string | null;
   currentCategoryName?: string | null;

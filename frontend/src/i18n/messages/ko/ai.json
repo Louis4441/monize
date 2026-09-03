@@ -87,6 +87,8 @@
     "address": "주소",
     "email": "이메일",
     "phone": "전화번호",
+    "contactLookup": "연락처 정보",
+    "contactLookupSuggested": "조회로 제안됨 — 승인 전에 확인하세요",
     "none": "없음",
     "approve": "승인",
     "cancel": "취소",

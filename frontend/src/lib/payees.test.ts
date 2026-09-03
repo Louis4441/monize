@@ -1,9 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import apiClient from './api';
 import { payeesApi } from './payees';
+import { invalidateCache } from './apiCache';
 
 vi.mock('./api', () => ({
   default: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
+}));
+vi.mock('./apiCache', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./apiCache')>()),
+  invalidateCache: vi.fn(),
 }));
 
 describe('payeesApi', () => {
@@ -211,5 +216,42 @@ describe('payeesApi', () => {
       sourceId: 'p-1',
       targetId: 'p-2',
     });
+  });
+
+  it('lookupContact posts the name to /payees/lookup-contact with the abort signal', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: { reason: 'none', suggestion: null },
+    });
+    const controller = new AbortController();
+    const result = await payeesApi.lookupContact('Acme', undefined, controller.signal);
+    expect(apiClient.post).toHaveBeenCalledWith(
+      '/payees/lookup-contact',
+      { name: 'Acme' },
+      { signal: controller.signal },
+    );
+    expect(result.reason).toBe('none');
+  });
+
+  it('lookupContact sends the context the caller already holds beside the name', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: { reason: 'none', suggestion: null },
+    });
+    await payeesApi.lookupContact('Acme', { address: 'Toronto', notes: 'the Dundas branch' });
+    expect(apiClient.post).toHaveBeenCalledWith(
+      '/payees/lookup-contact',
+      { name: 'Acme', address: 'Toronto', notes: 'the Dundas branch' },
+      { signal: undefined },
+    );
+  });
+
+  it('lookupContactForPayee posts to /payees/:id/lookup-contact and drops no cache', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: { reason: 'ok', suggestions: [{ label: null, phone: '+1 416 555 0100' }] },
+    });
+    const result = await payeesApi.lookupContactForPayee('p-1');
+    expect(apiClient.post).toHaveBeenCalledWith('/payees/p-1/lookup-contact');
+    expect(result.suggestions).toHaveLength(1);
+    // Nothing was written, so nothing cached is stale.
+    expect(invalidateCache).not.toHaveBeenCalledWith('payees:');
   });
 });

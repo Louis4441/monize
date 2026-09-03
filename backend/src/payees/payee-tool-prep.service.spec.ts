@@ -52,10 +52,11 @@ describe("PayeeToolPrepService", () => {
       });
       const preview = await prep.prepareCreatePayeeSingle(USER, { name: "A" });
       expect(preview.name).toBe("A");
-      expect(payees.previewCreatePayee).toHaveBeenCalledWith(USER, {
-        name: "A",
-        categoryName: undefined,
-      });
+      expect(payees.previewCreatePayee).toHaveBeenCalledWith(
+        USER,
+        { name: "A", categoryName: undefined },
+        {},
+      );
     });
   });
 
@@ -162,6 +163,7 @@ describe("PayeeToolPrepService", () => {
           email: "hi@acme.com",
           phone: "555",
         }),
+        {},
       );
     });
 
@@ -233,11 +235,11 @@ describe("PayeeToolPrepService", () => {
         website: "acme.com",
       });
 
-      expect(payees.previewCreatePayee).toHaveBeenCalledWith(USER, {
-        name: "Acme",
-        categoryName: undefined,
-        website: "acme.com",
-      });
+      expect(payees.previewCreatePayee).toHaveBeenCalledWith(
+        USER,
+        { name: "Acme", categoryName: undefined, website: "acme.com" },
+        {},
+      );
     });
 
     it("passes an update row's website to the preview", async () => {

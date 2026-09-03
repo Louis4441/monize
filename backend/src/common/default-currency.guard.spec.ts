@@ -92,6 +92,11 @@ describe("the reporting-currency fallback", () => {
     // counterpart and the guard checks the two agree above.
     "users/user-preference-writer.ts":
       "seeds the row the fallback stands in for",
+    // Puts the user's own currency (and locale) into a lookup prompt as a
+    // disambiguation hint ("Hydro One" vs "Hydro-Québec"). No preference means
+    // no hint; a fallback would tell the model something the user never said.
+    "payees/lookup/payee-contact-lookup.service.ts":
+      "a prompt hint, not a reporting currency",
   };
 
   it("is the currency every surface falls back to", () => {

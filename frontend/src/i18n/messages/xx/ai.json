@@ -89,6 +89,8 @@
     "address": "[XX-Address-XX]",
     "email": "[XX-Email-XX]",
     "phone": "[XX-Phone-XX]",
+    "contactLookup": "[XX-Contact details-XX]",
+    "contactLookupSuggested": "[XX-Suggested by lookup — review before approving-XX]",
     "none": "[XX-None-XX]",
     "approve": "[XX-Approve-XX]",
     "cancel": "[XX-Cancel-XX]",

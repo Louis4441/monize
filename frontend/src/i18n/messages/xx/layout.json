@@ -99,6 +99,7 @@
       "deletedInvestmentReport": "[XX-Deleted investment report \"{name}\"-XX]",
       "createdPayee": "[XX-Created payee \"{name}\"-XX]",
       "updatedPayee": "[XX-Updated payee \"{name}\"-XX]",
+      "lookedUpPayeeContact": "[XX-Looked up contact details for payee \"{name}\"-XX]",
       "deletedPayee": "[XX-Deleted payee \"{name}\"-XX]",
       "createdReport": "[XX-Created report \"{name}\"-XX]",
       "updatedReport": "[XX-Updated report \"{name}\"-XX]",

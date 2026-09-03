@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@/test/render';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, act, cleanup } from '@/test/render';
 import { TransactionForm } from './TransactionForm';
 import { TransactionStatus } from '@/types/transaction';
 import { getLocalDateString } from '@/lib/utils';
@@ -8,6 +8,7 @@ import {
   TRANSACTION_SUBMIT_MODE_KEY,
 } from '@/hooks/useTransactionSubmitMode';
 import toast from 'react-hot-toast';
+import { usePreferencesStore } from '@/store/preferencesStore';
 
 // ---- Mock data ----
 
@@ -203,6 +204,12 @@ const mockGetAllAliases = vi.fn().mockResolvedValue([]);
 const mockReactivatePayee = vi.fn();
 const mockPayeesGetById = vi.fn();
 
+const mockLookupContactForPayee = vi.fn().mockResolvedValue({
+  reason: 'none',
+  suggestions: [],
+});
+const mockPayeeUpdate = vi.fn();
+
 vi.mock('@/lib/payees', () => ({
   payeesApi: {
     getAll: (...args: any[]) => mockPayeesGetAll(...args),
@@ -211,7 +218,19 @@ vi.mock('@/lib/payees', () => ({
     getAllAliases: (...args: any[]) => mockGetAllAliases(...args),
     reactivatePayee: (...args: any[]) => mockReactivatePayee(...args),
     getById: (...args: any[]) => mockPayeesGetById(...args),
+    lookupContactForPayee: (...args: any[]) => mockLookupContactForPayee(...args),
+    update: (...args: any[]) => mockPayeeUpdate(...args),
   },
+}));
+
+// Whether a payee created here gets its contact details looked up turns on two
+// facts the form cannot control: the opt-in preference and whether an AI
+// provider exists at all. Both are mocked so each test says which world it is
+// in; both default to off, which is what an untouched account has.
+let mockAiConfigured = false;
+
+vi.mock('@/hooks/useAiConfigured', () => ({
+  useAiConfigured: () => ({ configured: mockAiConfigured, resolved: true }),
 }));
 
 const mockCategoriesGetAll = vi.fn().mockResolvedValue(mockCategories);
@@ -1872,6 +1891,170 @@ describe('TransactionForm', () => {
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalled();
       });
+    });
+  });
+
+  // =========================================================================
+  // Contact lookup for a payee created here
+  // =========================================================================
+
+  describe('new payee contact lookup', () => {
+    const suggestion = {
+      label: null,
+      website: 'https://acme.example',
+      address: null,
+      email: null,
+      phone: '+1 555 010 2000',
+      source: 'ai-web-search' as const,
+      confidence: 'high' as const,
+      notes: null,
+      refined: [],
+    };
+
+    const created = {
+      id: 'new-payee-1',
+      userId: 'user-1',
+      name: 'New Item',
+      defaultCategoryId: null,
+      defaultCategory: null,
+      notes: null,
+      website: null,
+      address: null,
+      email: null,
+      phone: null,
+      hasLogo: false,
+      logoFetchedAt: null,
+      contactLookupAt: null,
+      contactLookupSource: null,
+      isActive: true,
+      createdAt: '2024-01-01T00:00:00Z',
+    };
+
+    beforeEach(() => {
+      mockPayeeCreate.mockResolvedValue(created);
+      mockLookupContactForPayee.mockReset();
+      mockLookupContactForPayee.mockResolvedValue({ reason: 'none', suggestions: [] });
+      mockPayeeUpdate.mockReset();
+      mockPayeeUpdate.mockResolvedValue({ ...created, website: suggestion.website });
+      mockAiConfigured = true;
+      usePreferencesStore.setState({
+        preferences: { payeeContactLookupEnabled: true } as any,
+      });
+    });
+
+    afterEach(() => {
+      // The tree is still mounted when a file's own after-hook runs, and a
+      // Zustand write re-renders it outside act -- so unmount first.
+      cleanup();
+      mockAiConfigured = false;
+      usePreferencesStore.setState({ preferences: null });
+    });
+
+    async function createPayee() {
+      render(<TransactionForm onSuccess={mockOnSuccess} onCancel={mockOnCancel} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('combobox-create-Payee')).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('combobox-create-Payee'));
+      });
+      // The create resolves, then the lookup it dispatched resolves after it:
+      // drain both so the assertions run against a settled tree.
+      await act(async () => {});
+    }
+
+    it('offers what the lookup found, and saves only after the user confirms', async () => {
+      mockLookupContactForPayee.mockResolvedValue({
+        reason: 'ok',
+        suggestions: [suggestion],
+      });
+
+      await createPayee();
+
+      await waitFor(() => {
+        expect(mockLookupContactForPayee).toHaveBeenCalledWith('new-payee-1');
+      });
+      // The lookup itself stores nothing: until the user confirms, the payee
+      // is still the name-only row that was created.
+      expect(mockPayeeUpdate).not.toHaveBeenCalled();
+
+      expect(await screen.findByText('Confirm contact details')).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Save 2 changes/ }));
+      });
+
+      await waitFor(() => {
+        expect(mockPayeeUpdate).toHaveBeenCalledWith('new-payee-1', {
+          website: 'https://acme.example',
+          phone: '+1 555 010 2000',
+        });
+      });
+    });
+
+    it('tells the server not to run its own lookup for that payee', async () => {
+      // Two lookups would be two paid calls, and the background one writes --
+      // storing values before the user has seen the dialogue offering them.
+      await createPayee();
+
+      await waitFor(() => {
+        expect(mockPayeeCreate).toHaveBeenCalledWith({
+          name: 'New Item',
+          deferContactLookup: true,
+        });
+      });
+    });
+
+    it('leaves the lookup to the server when no AI provider is configured', async () => {
+      mockAiConfigured = false;
+
+      await createPayee();
+
+      await waitFor(() => {
+        expect(mockPayeeCreate).toHaveBeenCalledWith({ name: 'New Item' });
+      });
+      expect(mockLookupContactForPayee).not.toHaveBeenCalled();
+    });
+
+    it('does not look up when the preference is off', async () => {
+      usePreferencesStore.setState({
+        preferences: { payeeContactLookupEnabled: false } as any,
+      });
+
+      await createPayee();
+
+      await waitFor(() => {
+        expect(mockPayeeCreate).toHaveBeenCalledWith({ name: 'New Item' });
+      });
+      expect(mockLookupContactForPayee).not.toHaveBeenCalled();
+    });
+
+    it('says nothing when the lookup finds nothing', async () => {
+      // The user asked for a payee, not for a lookup, so a lookup with nothing
+      // to offer stays out of the way: no dialogue and no message.
+      await createPayee();
+
+      await waitFor(() => {
+        expect(mockLookupContactForPayee).toHaveBeenCalled();
+      });
+      expect(screen.queryByText('Confirm contact details')).not.toBeInTheDocument();
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it('says nothing when the lookup could not run', async () => {
+      mockLookupContactForPayee.mockResolvedValue({
+        reason: 'failed',
+        suggestions: [],
+        detail: 'Your relay agent is offline',
+      });
+
+      await createPayee();
+
+      await waitFor(() => {
+        expect(mockLookupContactForPayee).toHaveBeenCalled();
+      });
+      expect(screen.queryByText('Confirm contact details')).not.toBeInTheDocument();
+      expect(toast.error).not.toHaveBeenCalled();
     });
   });
 

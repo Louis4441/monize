@@ -71,6 +71,36 @@ export interface AiCompletionResponse {
   provider: string;
 }
 
+/**
+ * Knobs for a provider's own server-side web search (Anthropic's `web_search`
+ * tool, OpenAI's Responses `web_search` tool). The provider runs the searches
+ * itself; no client-side tool loop is involved.
+ */
+export interface AiWebSearchOptions {
+  /**
+   * Upper bound on searches per completion. Anthropic enforces it as
+   * `max_uses`; OpenAI has no such cap, so there it is a prompt instruction.
+   */
+  maxUses: number;
+  allowedDomains?: string[];
+}
+
+/**
+ * A completion that may have consulted the web. `searched` is only true when
+ * the provider reports at least one search that returned results -- an error
+ * result, or a provider with no search at all, leaves it false so the caller
+ * can weight the answer accordingly.
+ */
+export interface AiWebSearchResponse extends AiCompletionResponse {
+  searched: boolean;
+  searchCount: number;
+  /**
+   * Set when the answer came through the MCP relay: the user's own agent may
+   * or may not have searched, and cannot say which.
+   */
+  viaRelay?: boolean;
+}
+
 export interface AiStreamChunk {
   content: string;
   done: boolean;
@@ -118,8 +148,24 @@ export interface AiProvider {
   readonly name: string;
   readonly supportsStreaming: boolean;
   readonly supportsToolUse: boolean;
+  /**
+   * Whether `completeWithWebSearch` runs a real server-side web search. A
+   * provider without one still serves such a request through `complete()`,
+   * from model knowledge; `AiService.completeWithWebSearch` makes that switch.
+   */
+  readonly supportsWebSearch: boolean;
 
   complete(request: AiCompletionRequest): Promise<AiCompletionResponse>;
+
+  /**
+   * A single tool-free completion with the provider's own web search enabled.
+   * Only providers with `supportsWebSearch` implement it. Like `complete()`,
+   * it maps messages through the simple (user/assistant-only) path.
+   */
+  completeWithWebSearch?(
+    request: AiCompletionRequest,
+    search: AiWebSearchOptions,
+  ): Promise<AiWebSearchResponse>;
 
   stream?(request: AiCompletionRequest): AsyncIterable<AiStreamChunk>;
 

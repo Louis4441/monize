@@ -17,6 +17,10 @@ import {
   DataSourceMock,
 } from "../test-helpers/scoped-db-testing";
 import { FaviconService } from "../common/favicon/favicon.service";
+import { PayeeContactLookupService } from "./lookup/payee-contact-lookup.service";
+import { ContactLookupSuggestions } from "./lookup/payee-contact-lookup.types";
+import { PayeeContactEnrichmentService } from "./lookup/payee-contact-enrichment.service";
+import { getActiveScopedManager, withScopedDb } from "../common/db/scoped-db";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -49,6 +53,8 @@ describe("PayeesService", () => {
     address: null,
     email: null,
     phone: null,
+    contactLookupAt: null,
+    contactLookupSource: null,
     defaultCategory: { id: "cat-1", name: "Food & Drink" } as any,
     isActive: true,
     createdAt: new Date("2025-01-01"),
@@ -68,6 +74,8 @@ describe("PayeesService", () => {
     address: null,
     email: null,
     phone: null,
+    contactLookupAt: null,
+    contactLookupSource: null,
     defaultCategory: null as any,
     isActive: true,
     createdAt: new Date("2025-01-02"),
@@ -78,9 +86,20 @@ describe("PayeesService", () => {
   // Typed against the real service so a signature change breaks the double
   // rather than leaving it describing a contract nothing has any more.
   let faviconService: jest.Mocked<Pick<FaviconService, "fetchFavicon">>;
+  let contactLookup: jest.Mocked<Pick<PayeeContactLookupService, "lookup">>;
+  let contactEnrichment: jest.Mocked<
+    Pick<PayeeContactEnrichmentService, "dispatchAfterCreate">
+  >;
 
   beforeEach(async () => {
     faviconService = { fetchFavicon: jest.fn().mockResolvedValue(null) };
+    contactLookup = {
+      lookup: jest
+        .fn()
+        .mockResolvedValue({ reason: "disabled", suggestion: null }),
+    };
+    contactEnrichment = { dispatchAfterCreate: jest.fn() };
+    (getActiveScopedManager as jest.Mock).mockReturnValue(undefined);
     queryBuilderMock = {
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
@@ -198,6 +217,8 @@ describe("PayeesService", () => {
           useValue: { record: jest.fn().mockResolvedValue(null) },
         },
         { provide: FaviconService, useValue: faviconService },
+        { provide: PayeeContactLookupService, useValue: contactLookup },
+        { provide: PayeeContactEnrichmentService, useValue: contactEnrichment },
       ],
     }).compile();
 
@@ -206,6 +227,296 @@ describe("PayeesService", () => {
 
   it("should be defined", () => {
     expect(service).toBeDefined();
+  });
+
+  // ─── contact lookup on create / preview ──────────────────────────────
+
+  describe("create: background contact lookup", () => {
+    const suggestion = {
+      website: "https://acme.example",
+      address: "1 Main St",
+      email: "hi@acme.example",
+      phone: "+1 555 010 2000",
+      label: null,
+      source: "ai-web-search" as const,
+      confidence: "high" as const,
+      notes: null,
+      refined: [],
+    };
+
+    beforeEach(() => {
+      payeesRepository.findOne.mockResolvedValue(null);
+    });
+
+    it("dispatches after the create's transaction resolved and history was recorded", async () => {
+      const order: string[] = [];
+      (withScopedDb as jest.Mock).mockImplementationOnce(
+        async (_ds: unknown, fn: (m: unknown) => Promise<unknown>) => {
+          order.push("tx-start");
+          const result = await fn(txManager);
+          order.push("tx-end");
+          return result;
+        },
+      );
+      payeesRepository.save.mockImplementation((data) => {
+        order.push("save");
+        return data;
+      });
+      contactEnrichment.dispatchAfterCreate.mockImplementation(() => {
+        order.push("dispatch");
+      });
+
+      await service.create(userId, { name: "Acme" });
+
+      expect(order).toEqual(["tx-start", "save", "tx-end", "dispatch"]);
+      expect(contactEnrichment.dispatchAfterCreate).toHaveBeenCalledWith(
+        userId,
+        "new-payee",
+        "Acme",
+        undefined,
+      );
+    });
+
+    it("carries a note into the background lookup as context", async () => {
+      await service.create(userId, {
+        name: "Acme",
+        notes: "the Dundas branch",
+      });
+
+      expect(contactEnrichment.dispatchAfterCreate).toHaveBeenCalledWith(
+        userId,
+        "new-payee",
+        "Acme",
+        { notes: "the Dundas branch" },
+      );
+    });
+
+    it("does not dispatch when the caller will offer the lookup itself", async () => {
+      // The transaction page's quick-create runs the lookup and shows the
+      // confirmation dialogue. A background write here would pay for a second
+      // lookup and store values before the user has seen them.
+      await service.create(
+        userId,
+        { name: "Acme" },
+        {
+          deferContactLookup: true,
+        },
+      );
+
+      expect(contactEnrichment.dispatchAfterCreate).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["website", { website: "acme.example" }],
+      ["address", { address: "1 Main St" }],
+      ["email", { email: "hi@acme.example" }],
+      ["phone", { phone: "+1 555 010 2000" }],
+    ])("does not dispatch when %s was supplied", async (_field, extra) => {
+      await service.create(userId, { name: "Acme", ...extra });
+
+      expect(contactEnrichment.dispatchAfterCreate).not.toHaveBeenCalled();
+    });
+
+    it("does not dispatch when the preview already looked up, and stores that stamp", async () => {
+      const attemptedAt = new Date("2026-09-02T10:00:00Z");
+
+      await service.create(
+        userId,
+        { name: "Acme" },
+        { contactLookup: { source: "ai-web-search", attemptedAt } },
+      );
+
+      expect(contactEnrichment.dispatchAfterCreate).not.toHaveBeenCalled();
+      expect(payeesRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contactLookupAt: attemptedAt,
+          contactLookupSource: "ai-web-search",
+        }),
+      );
+    });
+
+    it("stores a found-nothing stamp with a null source", async () => {
+      const attemptedAt = new Date("2026-09-02T10:00:00Z");
+
+      await service.create(
+        userId,
+        { name: "Acme" },
+        { contactLookup: { source: null, attemptedAt } },
+      );
+
+      expect(payeesRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contactLookupAt: attemptedAt,
+          contactLookupSource: null,
+        }),
+      );
+    });
+
+    it("does not dispatch inside an ambient transaction, where the row is not yet visible", async () => {
+      (getActiveScopedManager as jest.Mock).mockReturnValue(txManager);
+
+      await service.create(userId, { name: "Acme" });
+
+      expect(contactEnrichment.dispatchAfterCreate).not.toHaveBeenCalled();
+    });
+
+    it("leaves the stamp columns alone on a plain create", async () => {
+      await service.create(userId, { name: "Acme" });
+
+      const created = payeesRepository.create.mock.calls[0][0];
+      expect(created).not.toHaveProperty("contactLookupAt");
+      expect(created).not.toHaveProperty("contactLookupSource");
+    });
+
+    describe("previewCreate", () => {
+      it("does not look up unless asked", async () => {
+        await service.previewCreate(userId, { name: "Acme" });
+
+        expect(contactLookup.lookup).not.toHaveBeenCalled();
+      });
+
+      it("does not look up when the row carries any contact detail", async () => {
+        await service.previewCreate(
+          userId,
+          { name: "Acme", email: "hi@acme.example" },
+          { lookupContact: true },
+        );
+
+        expect(contactLookup.lookup).not.toHaveBeenCalled();
+      });
+
+      it("merges a found suggestion and returns the stamp the commit will store", async () => {
+        contactLookup.lookup.mockResolvedValue({
+          reason: "ok",
+          suggestions: [suggestion],
+        });
+
+        const preview = await service.previewCreate(
+          userId,
+          { name: "Acme" },
+          { lookupContact: true },
+        );
+
+        expect(contactLookup.lookup).toHaveBeenCalledWith(userId, {
+          name: "Acme",
+        });
+        expect(preview).toMatchObject({
+          name: "Acme",
+          website: "https://acme.example",
+          address: "1 Main St",
+          email: "hi@acme.example",
+          phone: "+1 555 010 2000",
+          contactLookup: {
+            source: "ai-web-search",
+            attemptedAt: expect.any(Date),
+          },
+        });
+      });
+
+      it("returns a null-source stamp when the lookup answered with nothing", async () => {
+        contactLookup.lookup.mockResolvedValue({
+          reason: "none",
+          suggestions: [],
+        });
+
+        const preview = await service.previewCreate(
+          userId,
+          { name: "Acme" },
+          { lookupContact: true },
+        );
+
+        expect(preview.contactLookup).toEqual({
+          source: null,
+          attemptedAt: expect.any(Date),
+        });
+        expect(preview.website).toBeUndefined();
+      });
+
+      it.each(["disabled", "no_provider", "failed"] as const)(
+        "returns no stamp for %s, so the commit may still look up in the background",
+        async (reason) => {
+          contactLookup.lookup.mockResolvedValue({ reason, suggestions: [] });
+
+          const preview = await service.previewCreate(
+            userId,
+            { name: "Acme" },
+            { lookupContact: true },
+          );
+
+          expect(preview).not.toHaveProperty("contactLookup");
+        },
+      );
+
+      it("previewCreatePayee passes the option through", async () => {
+        contactLookup.lookup.mockResolvedValue({
+          reason: "ok",
+          suggestions: [suggestion],
+        });
+
+        const preview = await service.previewCreatePayee(
+          userId,
+          { name: "Acme" },
+          { lookupContact: true },
+        );
+
+        expect(preview.contactLookup?.source).toBe("ai-web-search");
+      });
+    });
+  });
+
+  // ─── lookupContactForPayee ───────────────────────────────────────────
+
+  describe("lookupContactForPayee", () => {
+    it("looks the stored payee up with its own details as context, and writes nothing", async () => {
+      payeesRepository.findOne.mockResolvedValue({
+        ...mockPayee,
+        name: "Acme",
+        address: "Toronto",
+        notes: "the Dundas branch",
+      });
+      const outcome = {
+        reason: "ok" as const,
+        suggestions: [
+          {
+            label: null,
+            website: "https://acme.example",
+            address: null,
+            email: null,
+            phone: null,
+            source: "ai-web-search" as const,
+            confidence: "high" as const,
+            notes: null,
+            refined: [],
+          },
+        ] as ContactLookupSuggestions,
+      };
+      contactLookup.lookup.mockResolvedValue(outcome);
+
+      await expect(
+        service.lookupContactForPayee(userId, "payee-1"),
+      ).resolves.toBe(outcome);
+      expect(contactLookup.lookup).toHaveBeenCalledWith(
+        userId,
+        {
+          name: "Acme",
+          known: { address: "Toronto", notes: "the Dundas branch" },
+        },
+        { ignorePreference: true },
+      );
+      // The detail screen's button proposes; the user's confirmation is an
+      // ordinary update, so nothing here touches the row.
+      expect(payeesRepository.save).not.toHaveBeenCalled();
+      expect(txManager.query).not.toHaveBeenCalled();
+    });
+
+    it("throws NotFound for a payee the caller does not own", async () => {
+      payeesRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.lookupContactForPayee(userId, "payee-1"),
+      ).rejects.toThrow(NotFoundException);
+      expect(contactLookup.lookup).not.toHaveBeenCalled();
+    });
   });
 
   // ─── create ──────────────────────────────────────────────────────────

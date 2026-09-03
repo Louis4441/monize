@@ -285,6 +285,14 @@ export class AiActionBuilderService {
       address: preview.address,
       email: preview.email,
       phone: preview.phone,
+      ...(preview.contactLookup
+        ? {
+            contactLookup: {
+              source: preview.contactLookup.source,
+              attemptedAt: preview.contactLookup.attemptedAt.toISOString(),
+            },
+          }
+        : {}),
     };
     return {
       actionId,
@@ -298,6 +306,9 @@ export class AiActionBuilderService {
         website: preview.website,
         address: preview.address,
         email: preview.email,
+        ...(preview.contactLookup?.source
+          ? { contactLookupSource: preview.contactLookup.source }
+          : {}),
         phone: preview.phone,
       },
     };

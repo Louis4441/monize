@@ -91,6 +91,9 @@ export class OllamaProvider implements AiProvider {
   readonly name: string = "ollama";
   readonly supportsStreaming = true;
   readonly supportsToolUse = true;
+  // A local model has no search of its own; a web-search request is served
+  // from model knowledge by AiService.completeWithWebSearch.
+  readonly supportsWebSearch = false;
 
   private readonly logger = new Logger(OllamaProvider.name);
   protected readonly baseUrl: string;

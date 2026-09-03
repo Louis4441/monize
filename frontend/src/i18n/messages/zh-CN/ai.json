@@ -87,6 +87,8 @@
     "address": "地址",
     "email": "电子邮件",
     "phone": "电话",
+    "contactLookup": "联系信息",
+    "contactLookupSuggested": "来自查找的建议 — 请在批准前审核",
     "none": "无",
     "approve": "批准",
     "cancel": "取消",

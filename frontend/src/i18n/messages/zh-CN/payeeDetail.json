@@ -130,5 +130,22 @@
     "needsMoreHistory": "至少需要 {years} 年的历史才能把季节性规律与偶然区分开。",
     "empty": "暂无支出可按月分解",
     "monthTooltip": "{month}：{years, plural, one {# 年} other {# 年}}平均 {amount}"
+  },
+  "contactLookup": {
+    "button": "查找联系信息",
+    "inProgress": "正在查找...",
+    "nothingNew": "未找到新的联系信息。",
+    "noProvider": "请在 AI 设置中配置 AI 提供商以查找联系信息。",
+    "failed": "查找未能完成，请稍后重试。",
+    "dialogTitle": "确认联系信息",
+    "dialogSubtitle": "在您确认之前，不会为 {name} 保存任何内容。",
+    "pickMatch": "该名称匹配到 {count, plural, other {# 家商家}}。请选择您付款的那一家：",
+    "unlabelledMatch": "未命名的匹配项",
+    "willAdd": "添加",
+    "willReplace": "替换",
+    "cancel": "取消",
+    "confirm": "{count, plural, other {保存 # 项更改}}",
+    "applied": "{count, plural, other {已保存 # 项联系信息}}",
+    "applyFailed": "无法保存联系信息"
   }
 }

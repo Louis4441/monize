@@ -130,5 +130,22 @@
     "needsMoreHistory": "São necessários pelo menos {years} anos de histórico para distinguir um padrão sazonal do acaso.",
     "empty": "Ainda não há gastos para dividir por mês",
     "monthTooltip": "{month}: {amount} em média em {years, plural, one {# ano} other {# anos}}"
+  },
+  "contactLookup": {
+    "button": "Buscar dados de contato",
+    "inProgress": "Buscando...",
+    "nothingNew": "Nenhum dado de contato novo foi encontrado.",
+    "noProvider": "Configure um provedor de IA nas Configurações de IA para buscar dados de contato.",
+    "failed": "Não foi possível concluir a busca. Tente novamente mais tarde.",
+    "dialogTitle": "Confirmar os dados de contato",
+    "dialogSubtitle": "Nada é salvo para {name} até você confirmar.",
+    "pickMatch": "Esse nome corresponde a {count, plural, one {# empresa} other {# empresas}}. Escolha aquela para quem você paga:",
+    "unlabelledMatch": "Correspondência sem nome",
+    "willAdd": "Adicionar",
+    "willReplace": "Substituir",
+    "cancel": "Cancelar",
+    "confirm": "{count, plural, one {Salvar # alteração} other {Salvar # alterações}}",
+    "applied": "{count, plural, one {# dado de contato salvo} other {# dados de contato salvos}}",
+    "applyFailed": "Não foi possível salvar os dados de contato"
   }
 }

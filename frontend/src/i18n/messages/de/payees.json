@@ -91,7 +91,17 @@
     "applyCategoryNone": "Vorhandene Transaktionen nicht ändern",
     "applyCategoryUncategorized": "Nur Transaktionen ohne Kategorie ({count})",
     "applyCategoryAll": "Alle Transaktionen ({count})",
-    "applyCategoryHelp": "Überweisungen und aufgeteilte Transaktionen werden nie geändert."
+    "applyCategoryHelp": "Überweisungen und aufgeteilte Transaktionen werden nie geändert.",
+    "lookup": {
+      "button": "Angaben nachschlagen",
+      "searching": "Kontaktangaben werden gesucht...",
+      "suggested": "Vorschlag aus der Suche:",
+      "replaced": "Von der Suche ersetzt:",
+      "clear": "Änderungen der Suche rückgängig machen",
+      "nothingFound": "Für diesen Namen wurden keine öffentlichen Kontaktangaben gefunden.",
+      "noProvider": "Richten Sie in den <link>KI-Einstellungen</link> einen KI-Anbieter ein, um Kontaktangaben nachzuschlagen.",
+      "failed": "Die Suche konnte nicht abgeschlossen werden. Versuchen Sie es später erneut."
+    }
   },
   "merge": {
     "title": "Zahlungsempfänger zusammenführen",

@@ -250,6 +250,32 @@ the provider is called and the response parsed before anything is saved, so a
 failed call leaves no partial rows, and a total provider failure throws rather
 than fabricating a result.
 
+### Payee contact enrichment
+
+`backend/src/payees/lookup/` looks a new payee's website, address, email and
+phone up through the user's AI provider (opt-in) and writes the answer to the
+row. The provider call runs outside any transaction, on the tail of the
+request that created the payee (`PayeeContactEnrichmentService.dispatchAfterCreate`,
+dispatched by `PayeesService.create` only once its own `withScopedDb` has
+resolved and no ambient transaction exists). The effect is one conditional
+statement, `ENRICHMENT_UPDATE_SQL`: every contact column is `COALESCE(column,
+$n)` so nothing already stored is touched (INV-PAYEE-001), and the automatic
+path adds `WHERE contact_lookup_at IS NULL`, which is the idempotency key --
+a second replica, a retried request or a re-dispatch affects zero rows
+(EXT-001 by predicate rather than by unique index). `contact_lookup_at` stamps
+the *attempt* (found something, or found nothing); a failure -- provider
+offline, no provider, feature off, or an answer that could not be read --
+stamps nothing, so a later attempt can run (EXT-003). The favicon fetch that follows a looked-up website is keyed on
+that website (`UPDATE ... WHERE id AND user_id AND website = $resolved`), so
+a concurrent edit to the address cannot end up under a stale icon.
+
+What is process-local: the in-flight map and the admission queue
+(`LookupQueue`, two concurrent lookups, fifty waiting) bound what one replica
+does; two replicas can both pay for one lookup, and the second UPDATE then
+matches no row. The AI/MCP confirmation flow avoids the question by looking
+up in the *preview* and carrying the stamp down the signed descriptor to the
+commit, so the card and the row agree and nothing looks up twice.
+
 ## 7. There is no shared lifecycle, and one workflow shows what it would look like
 
 No generic `pending -> externally_created -> verified -> available` state machine
@@ -302,6 +328,7 @@ added rather than as it stands.
 | Budget alerts | Durable state written before the send, but the dedup read and insert are not atomic and no unique constraint backs them | EXT-001 |
 | Emergency-access reminder | `lastReminderSentAt` written after the send, and it is the gate | EXT-001 |
 | AI insight generation | Process-local `Set` as the reentrancy guard; cooldown is a check-then-act; inserts carry no idempotency key | EXT-001 |
+| Payee contact enrichment | In-flight guard and admission queue are process-local; two replicas can both pay for one lookup (the second UPDATE affects zero rows, so the data is right and only the cost is duplicated) | EXT-001 |
 
 Two rows are absent from this table on purpose, and both are settled: per-user
 backup sharding with admin-gated folder endpoints, and the FX/price natural-key

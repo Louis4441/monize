@@ -202,6 +202,12 @@ export class UserPreference {
   @Column({ name: "lock_reconciled_transactions", default: false })
   lockReconciledTransactions: boolean;
 
+  // Opt-in: look up a new payee's website, address, email and phone through
+  // the user's configured AI provider. Off by default because every lookup is
+  // a call the user pays for, and the answer is written into their data.
+  @Column({ name: "payee_contact_lookup_enabled", default: false })
+  payeeContactLookupEnabled: boolean;
+
   @Column({ length: 10, default: "en" })
   language: string;
 

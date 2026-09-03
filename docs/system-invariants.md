@@ -124,6 +124,7 @@ implied.
 | INV-ALERT-001 | A system alert row lands at most once per (recipient, dedupe key), and only the insert winner emails | enforced |
 | INV-RLS-001 | Enforced mode refuses to run on a role that can bypass RLS | enforced |
 | INV-CACHE-001 | A money-moving write invalidates every derived cache | enforced |
+| INV-PAYEE-001 | A contact lookup never overwrites a value the user entered, and the automatic one runs at most once per payee | enforced |
 | INV-RELEASE-001 | The tested, imaged and tagged revisions are one revision | partial |
 
 ## Imports
@@ -1921,6 +1922,107 @@ Retry semantics     Deletes are idempotent on a missing key; a failed create's
                     bytes are swept.
 Crash semantics     A transient orphan on rollback is durably recoverable by the
                     sweeper, not silent.
+Status              enforced
+```
+
+### INV-PAYEE-001 -- a contact lookup never overwrites the user's value
+
+```text
+Statement           A looked-up website, address, email or phone is written only
+                    into a column that is NULL at the moment of the write; a
+                    value the user entered, before or during the lookup, is
+                    never replaced. The automatic (background) lookup runs at
+                    most once per payee across replicas and retries.
+Source of truth     The payees row: the four contact columns, contact_lookup_at
+                    (the attempt) and contact_lookup_source (which lookup wrote
+                    at least one field).
+Enforcement         One statement, ENRICHMENT_UPDATE_SQL in
+                    payee-contact-enrichment.service.ts: every contact column is
+                    COALESCE(column, $n); contact_lookup_source moves only when
+                    the statement itself set a field (the CASE reads the
+                    pre-SET column values); the automatic path adds WHERE
+                    contact_lookup_at IS NULL. The read that precedes it (whose
+                    only job is to say which fields THIS write set) takes the
+                    row's write lock, FOR UPDATE, and holds it to the commit,
+                    so the two statements are one decision rather than a
+                    check-then-act a concurrent user edit can land inside. The provider call runs outside any
+                    transaction and PayeesService.create dispatches it only after
+                    its own withScopedDb resolved with no ambient manager
+                    (getActiveScopedManager() === undefined). The AI/MCP preview
+                    looks up before the card and hands its stamp to the commit,
+                    which stores it instead of looking up again. A client that
+                    will show the answer for confirmation says so on the create
+                    (CreatePayeeDto.deferContactLookup, read by
+                    PayeesController as a CreatePayeeOptions field and never
+                    stored on the row), so the background lookup does not pay
+                    for a second call nor write values the user is still being
+                    asked about: the transaction page's payee quick-create runs
+                    POST /payees/:id/lookup-contact itself and opens the same
+                    confirmation dialogue. The form path persists nothing until
+                    the user saves.
+                    A lookup given the payee's own stored details may answer with
+                    a FULLER value for a field that already has one (the branch
+                    address behind a stored "Toronto"), and may answer with more
+                    than one candidate where the name means more than one
+                    organisation or branch. Neither reaches the row by itself.
+                    POST /payees/:id/lookup-contact WRITES NOTHING -- it returns
+                    the candidates (PayeesService.lookupContactForPayee), the
+                    detail screen shows them in a confirmation dialogue naming
+                    each field as an add or a replace beside the value it would
+                    replace, and the user's confirmation goes through
+                    PATCH /payees/:id as their own edit. That is the only path by
+                    which a looked-up value replaces a stored one, and it is a
+                    user edit rather than a lookup write. A suggested value equal
+                    to what the user already holds is dropped by
+                    sanitizeContactSuggestion rather than counted; a fuller one is
+                    named in PayeeContactSuggestion.refined, which the payee form
+                    uses to replace-and-undo before Save.
+Concurrency scope   per payee
+Retry semantics     A re-dispatch, a second replica or a retried request matches
+                    zero rows on the automatic path; the user-initiated re-run
+                    omits the contact_lookup_at predicate and still only fills
+                    gaps. A failed attempt stamps nothing, so it may be retried.
+Crash semantics     A crash before the UPDATE leaves the row untouched and
+                    unstamped (a later attempt runs); after it, the row is
+                    complete. The favicon that follows a looked-up website is a
+                    separate best-effort write keyed on that website.
+Failure response    The coordinator never throws: disabled / no_provider /
+                    failed / none are returned and shown distinctly; a failure is
+                    never presented as "nothing found". `none` is an answer --
+                    the source looked and had nothing, which for the AI adapter
+                    means a parsed `{"matches": []}` -- and it is the reason
+                    that STAMPS contact_lookup_at. An answer that could not be
+                    read is not that: an empty turn (a web search paused past
+                    its continuation limit returns content ""), an output cut
+                    off at PAYEE_LOOKUP_MAX_TOKENS, or a relay agent replying in
+                    prose is `failed`, which stamps nothing. Collapsing the two
+                    retires the automatic lookup for that payee for good.
+Required tests      payee-contact-enrichment.service.spec.ts (COALESCE and
+                    predicate shape, stamp-on-answer only, favicon keyed on the
+                    website), payees.service.spec.ts (dispatch after the
+                    transaction, never inside one, never with a supplied field
+                    or a preview stamp, never when the caller defers it, notes
+                    carried in as context, and the detail-screen lookup writing
+                    nothing), payees.controller.spec.ts (deferContactLookup
+                    travels as an option, never as a payee field),
+                    contact-suggestion.sanitize.spec.ts (a refinement is named,
+                    an echo is dropped, candidates are capped and must be
+                    distinguishable), lookup-context.spec.ts (what leaves the
+                    row for the prompt), frontend PayeeForm.test.tsx (a replaced
+                    field is named separately and the undo restores what the user
+                    typed) and PayeeKeyInfoCard.test.tsx (nothing is written
+                    until the dialogue is confirmed, a cancel writes nothing, and
+                    the picked candidate is the one saved),
+                    TransactionForm.test.tsx (a payee created there defers the
+                    background lookup, runs its own and saves nothing until the
+                    dialogue is confirmed), raw-sql-columns.spec.ts (column names
+                    against schema.sql),
+                    ai-payee-contact-lookup.provider.spec.ts (an unreadable
+                    answer fails rather than reporting nothing found, and a
+                    parsed empty answer still reports none). Owed: a
+                    two-connection integration race proving the FOR UPDATE read
+                    against a concurrent user edit, per
+                    docs/verification-contract.md.
 Status              enforced
 ```
 

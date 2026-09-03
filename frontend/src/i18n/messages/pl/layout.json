@@ -99,6 +99,7 @@
       "deletedInvestmentReport": "Usunięto raport inwestycyjny \"{name}\"",
       "createdPayee": "Utworzono odbiorcę \"{name}\"",
       "updatedPayee": "Zaktualizowano odbiorcę \"{name}\"",
+      "lookedUpPayeeContact": "Wyszukano dane kontaktowe odbiorcy „{name}”",
       "deletedPayee": "Usunięto odbiorcę \"{name}\"",
       "createdReport": "Utworzono raport \"{name}\"",
       "updatedReport": "Zaktualizowano raport \"{name}\"",

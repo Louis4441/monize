@@ -104,18 +104,30 @@ export class PayeeToolPrepService {
     };
   }
 
+  /**
+   * `lookupContact` asks the preview to fill contact details the row did not
+   * supply through the user's contact lookup (when they have enabled it).
+   * Only the single-item paths pass it: a batch of up to 25 rows would be 25
+   * model calls inside one chat turn, so batch rows are enriched in the
+   * background after they commit instead.
+   */
   async prepareCreatePayeeSingle(
     userId: string,
     row: ManageCreatePayeeRow,
+    options: { lookupContact?: boolean } = {},
   ): Promise<CreatePayeePreview> {
-    return this.payeesService.previewCreatePayee(userId, {
-      name: row.name,
-      categoryName: row.categoryName,
-      website: row.website,
-      address: row.address,
-      email: row.email,
-      phone: row.phone,
-    });
+    return this.payeesService.previewCreatePayee(
+      userId,
+      {
+        name: row.name,
+        categoryName: row.categoryName,
+        website: row.website,
+        address: row.address,
+        email: row.email,
+        phone: row.phone,
+      },
+      options,
+    );
   }
 
   async prepareUpdatePayeeSingle(

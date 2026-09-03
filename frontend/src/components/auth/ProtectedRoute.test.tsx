@@ -165,6 +165,7 @@ describe('ProtectedRoute', () => {
     aiBubbleEnabled: false,
     showWhatsNew: true,
     lockReconciledTransactions: false,
+    payeeContactLookupEnabled: false,
     language: 'en',
     defaultMapProvider: 'device',
         createdAt: '2026-01-01T00:00:00Z',

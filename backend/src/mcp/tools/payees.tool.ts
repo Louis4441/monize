@@ -3,6 +3,7 @@ import { describeSkippedRows } from "../../common/bulk-create.types";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { PayeesService } from "../../payees/payees.service";
+import { contactLookupOptions } from "../../ai/actions/ai-actions.service";
 import {
   PayeeToolPrepService,
   ManageCreatePayeeRow,
@@ -124,7 +125,7 @@ export class McpPayeesTools {
         description:
           "Create, edit, or delete the user's payees. Accepts NAMES -- the payee and its default category are resolved internally, so you do NOT need to call list_payees/list_categories first. operation = 'create' | 'update' | 'delete' with an items array (1-25 rows). " +
           "create: { name, categoryName?, website?, address?, email?, phone? } -- categoryName optionally sets the payee's default category ('Parent: Child' for a subcategory); website accepts a bare domain ('acme.com') and is stored as an absolute https URL; address, email and phone are the payee's contact details. " +
-          "update: { name, newName?, categoryName?, website?, address?, email?, phone? } -- name identifies the existing payee; provide newName to rename, categoryName to set the default category, website to set the web address, and/or address, email and phone for its contact details (pass an empty string to clear any of them). At least one change is required. Setting a website also resolves that site's icon for the payee; to find payees missing a field, call list_payees and look for a null or missing one. " +
+          "update: { name, newName?, categoryName?, website?, address?, email?, phone? } -- name identifies the existing payee; provide newName to rename, categoryName to set the default category, website to set the web address, and/or address, email and phone for its contact details (pass an empty string to clear any of them). At least one change is required. Setting a website also resolves that site's icon for the payee; to find payees missing a field, call list_payees and look for a null or missing one. When the user has enabled automatic contact lookup in AI Settings, a single new payee created without any contact details is looked up before the card is shown, so the card may carry suggested website/address/email/phone; batch creates are looked up in the background after approval instead. " +
           "delete: { name } -- removes the payee (its transactions keep their stored payee name). " +
           "approvalMode = 'bulk' (default; one confirmation for the whole batch) or 'individual' (one confirmation per item); ignored for a single item. Set dryRun=true to preview every item without saving. The user is asked to confirm before anything is saved (web chat card via relay, or an MCP confirmation dialog).",
         inputSchema: {
@@ -337,6 +338,7 @@ export class McpPayeesTools {
       const preview = await this.prepService.prepareCreatePayeeSingle(
         userId,
         this.toCreateRow(items[0]),
+        { lookupContact: true },
       );
       const budget = this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
@@ -353,14 +355,18 @@ export class McpPayeesTools {
         return toolError(
           "Cancelled: the confirmation was declined, so no payee was created.",
         );
-      const payee = await this.payeesService.create(userId, {
-        name: preview.name,
-        defaultCategoryId: preview.defaultCategoryId ?? undefined,
-        website: preview.website,
-        address: preview.address,
-        email: preview.email,
-        phone: preview.phone,
-      });
+      const payee = await this.payeesService.create(
+        userId,
+        {
+          name: preview.name,
+          defaultCategoryId: preview.defaultCategoryId ?? undefined,
+          website: preview.website,
+          address: preview.address,
+          email: preview.email,
+          phone: preview.phone,
+        },
+        preview.contactLookup ? { contactLookup: preview.contactLookup } : {},
+      );
       this.writeLimiter.record(userId, "create_payee");
       return toolResult({ id: payee.id, name: payee.name, count: 1 });
     }
@@ -404,14 +410,18 @@ export class McpPayeesTools {
       );
     const ids: string[] = [];
     for (const preview of prep.okPreviews) {
-      const payee = await this.payeesService.create(userId, {
-        name: preview.name,
-        defaultCategoryId: preview.defaultCategoryId ?? undefined,
-        website: preview.website,
-        address: preview.address,
-        email: preview.email,
-        phone: preview.phone,
-      });
+      const payee = await this.payeesService.create(
+        userId,
+        {
+          name: preview.name,
+          defaultCategoryId: preview.defaultCategoryId ?? undefined,
+          website: preview.website,
+          address: preview.address,
+          email: preview.email,
+          phone: preview.phone,
+        },
+        preview.contactLookup ? { contactLookup: preview.contactLookup } : {},
+      );
       ids.push(payee.id);
       this.writeLimiter.record(userId, "create_payee");
     }
@@ -639,14 +649,18 @@ export class McpPayeesTools {
     const d = card.descriptor;
     switch (d.type) {
       case "create_payee": {
-        const payee = await this.payeesService.create(userId, {
-          name: d.name,
-          defaultCategoryId: d.defaultCategoryId ?? undefined,
-          website: d.website,
-          address: d.address,
-          email: d.email,
-          phone: d.phone,
-        });
+        const payee = await this.payeesService.create(
+          userId,
+          {
+            name: d.name,
+            defaultCategoryId: d.defaultCategoryId ?? undefined,
+            website: d.website,
+            address: d.address,
+            email: d.email,
+            phone: d.phone,
+          },
+          contactLookupOptions(d),
+        );
         this.writeLimiter.record(userId, "create_payee");
         return payee.id;
       }

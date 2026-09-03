@@ -77,6 +77,11 @@ const WITH_CONTEXT_ALLOWLIST = [
   "src/import/mny/mny-import.service.ts",
   "src/import/mny/mny-staging.service.ts",
   "src/mcp/mcp-http.controller.ts",
+  // Background payee contact enrichment: dispatched after the create's
+  // transaction committed, on the request's tail, so there is no ambient
+  // identity to inherit -- the user's own context is re-seeded for the one
+  // conditional UPDATE it makes.
+  "src/payees/lookup/payee-contact-enrichment.service.ts",
   "src/mcp/tools/transactions.tool.ts",
   // Joint accounts (N1): refreshing a stale joint account's current-month
   // snapshot runs recalculateAccount under withUserContext(ownerUserId) so

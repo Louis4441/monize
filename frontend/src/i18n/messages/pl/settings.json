@@ -764,6 +764,14 @@
         "step3": "Odpowiedzi są przesyłane strumieniowo z powrotem do czatu. Kropka stanu pokazuje, czy agent jest połączony.",
         "note": "Nic się nie uruchamia, dopóki agent nie jest połączony i nie nasłuchuje. Czat wyświetla instrukcje połączenia."
       }
+    },
+    "payeeLookup": {
+      "title": "Automatyczne wyszukiwanie danych kontaktowych odbiorcy",
+      "subtitle": "Automatycznie wyszukuje stronę internetową, adres, e-mail i numer telefonu nowego odbiorcy za pomocą skonfigurowanego dostawcy AI. Wysyłana jest nazwa odbiorcy wraz z zapisanymi już notatkami, stroną internetową, adresem, e-mailem i numerem telefonu, aby wyszukiwanie rozpoznało właściwą firmę we właściwej lokalizacji.",
+      "toggleLabel": "Włącz automatyczne wyszukiwanie danych kontaktowych",
+      "enabled": "Automatyczne wyszukiwanie danych kontaktowych włączone",
+      "disabled": "Automatyczne wyszukiwanie danych kontaktowych wyłączone",
+      "saveFailed": "Nie udało się zaktualizować ustawienia wyszukiwania danych kontaktowych"
     }
   },
   "sharedAccessPage": {

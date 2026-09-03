@@ -3,15 +3,21 @@ import { PayeesController } from "./payees.controller";
 import { PayeesService } from "./payees.service";
 import { PayeeDetailService } from "./payee-detail.service";
 import { PayeeAutoMergeService } from "./payee-auto-merge.service";
+import { PayeeContactLookupService } from "./lookup/payee-contact-lookup.service";
+import { PayeeContactEnrichmentService } from "./lookup/payee-contact-enrichment.service";
 
 describe("PayeesController", () => {
   let controller: PayeesController;
   let mockPayeesService: Record<string, jest.Mock>;
   let mockPayeeDetailService: Record<string, jest.Mock>;
   let mockAutoMergeService: Record<string, jest.Mock>;
+  let mockContactLookupService: Record<string, jest.Mock>;
+  let mockContactEnrichmentService: Record<string, jest.Mock>;
   const mockReq = { user: { id: "user-1" } };
 
   beforeEach(async () => {
+    mockContactLookupService = { lookup: jest.fn() };
+    mockContactEnrichmentService = { dispatchAfterCreate: jest.fn() };
     mockAutoMergeService = {
       previewAutoMerge: jest.fn(),
       applyAutoMerge: jest.fn(),
@@ -43,6 +49,7 @@ describe("PayeesController", () => {
       remove: jest.fn(),
       getLogo: jest.fn(),
       refreshLogo: jest.fn(),
+      lookupContactForPayee: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -60,6 +67,14 @@ describe("PayeesController", () => {
           provide: PayeeAutoMergeService,
           useValue: mockAutoMergeService,
         },
+        {
+          provide: PayeeContactLookupService,
+          useValue: mockContactLookupService,
+        },
+        {
+          provide: PayeeContactEnrichmentService,
+          useValue: mockContactEnrichmentService,
+        },
       ],
     }).compile();
 
@@ -75,7 +90,26 @@ describe("PayeesController", () => {
       const result = await controller.create(mockReq, dto as any);
 
       expect(result).toEqual(expected);
-      expect(mockPayeesService.create).toHaveBeenCalledWith("user-1", dto);
+      expect(mockPayeesService.create).toHaveBeenCalledWith("user-1", dto, {
+        deferContactLookup: undefined,
+      });
+    });
+
+    it("passes deferContactLookup as an option, never as a payee field", async () => {
+      // It says what the caller will do, not what the payee is: reaching the
+      // service's DTO it would be spread onto the entity insert.
+      mockPayeesService.create.mockResolvedValue({ id: "payee-1" });
+
+      await controller.create(mockReq, {
+        name: "Grocery Store",
+        deferContactLookup: true,
+      } as any);
+
+      expect(mockPayeesService.create).toHaveBeenCalledWith(
+        "user-1",
+        { name: "Grocery Store" },
+        { deferContactLookup: true },
+      );
     });
   });
 
@@ -725,6 +759,66 @@ describe("PayeesController", () => {
         "user-1",
         "payee-1",
       );
+    });
+  });
+
+  describe("lookupContact()", () => {
+    it("looks the name up without persisting, ignoring the opt-in preference", async () => {
+      const outcome = { reason: "none", suggestion: null };
+      mockContactLookupService.lookup.mockResolvedValue(outcome);
+
+      const result = await controller.lookupContact(mockReq, { name: "Acme" });
+
+      expect(result).toBe(outcome);
+      expect(mockContactLookupService.lookup).toHaveBeenCalledWith(
+        "user-1",
+        { name: "Acme", known: undefined },
+        { ignorePreference: true },
+      );
+    });
+
+    it("passes the form's own values through as context, and stores none of them", async () => {
+      mockContactLookupService.lookup.mockResolvedValue({
+        reason: "none",
+        suggestion: null,
+      });
+
+      await controller.lookupContact(mockReq, {
+        name: "Acme",
+        address: "Toronto",
+        notes: "the Dundas branch",
+      });
+
+      expect(mockContactLookupService.lookup).toHaveBeenCalledWith(
+        "user-1",
+        {
+          name: "Acme",
+          known: { address: "Toronto", notes: "the Dundas branch" },
+        },
+        { ignorePreference: true },
+      );
+    });
+  });
+
+  describe("lookupContactForPayee()", () => {
+    it("returns the candidates for the payee and writes nothing", async () => {
+      const outcome = {
+        reason: "ok",
+        suggestions: [{ label: null, website: "https://acme.example" }],
+      };
+      mockPayeesService.lookupContactForPayee.mockResolvedValue(outcome);
+
+      await expect(
+        controller.lookupContactForPayee(mockReq, "payee-1"),
+      ).resolves.toBe(outcome);
+      expect(mockPayeesService.lookupContactForPayee).toHaveBeenCalledWith(
+        "user-1",
+        "payee-1",
+      );
+      // The write is the user's own confirmed edit, through PATCH /payees/:id.
+      expect(
+        mockContactEnrichmentService.dispatchAfterCreate,
+      ).not.toHaveBeenCalled();
     });
   });
 });

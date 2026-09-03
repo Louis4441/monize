@@ -99,6 +99,7 @@
       "deletedInvestmentReport": "已删除投资报表\"{name}\"",
       "createdPayee": "已创建收款人\"{name}\"",
       "updatedPayee": "已更新收款人\"{name}\"",
+      "lookedUpPayeeContact": "已查找收款人“{name}”的联系信息",
       "deletedPayee": "已删除收款人\"{name}\"",
       "createdReport": "已创建报表\"{name}\"",
       "updatedReport": "已更新报表\"{name}\"",

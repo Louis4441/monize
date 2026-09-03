@@ -130,5 +130,22 @@
     "needsMoreHistory": "Servono almeno {years} anni di cronologia per distinguere uno schema stagionale dal caso.",
     "empty": "Nessuna spesa da suddividere per mese",
     "monthTooltip": "{month}: {amount} in media su {years, plural, one {# anno} other {# anni}}"
+  },
+  "contactLookup": {
+    "button": "Cerca recapiti",
+    "inProgress": "Ricerca in corso...",
+    "nothingNew": "Nessun nuovo recapito trovato.",
+    "noProvider": "Configura un provider IA nelle Impostazioni IA per cercare i recapiti.",
+    "failed": "Non è stato possibile completare la ricerca. Riprova più tardi.",
+    "dialogTitle": "Conferma i dati di contatto",
+    "dialogSubtitle": "Nulla viene salvato per {name} finché non confermi.",
+    "pickMatch": "Quel nome corrisponde a {count, plural, one {# attività} other {# attività}}. Scegli quella a cui paghi:",
+    "unlabelledMatch": "Corrispondenza senza nome",
+    "willAdd": "Aggiungi",
+    "willReplace": "Sostituisci",
+    "cancel": "Annulla",
+    "confirm": "{count, plural, one {Salva # modifica} other {Salva # modifiche}}",
+    "applied": "{count, plural, one {# dato di contatto salvato} other {# dati di contatto salvati}}",
+    "applyFailed": "Impossibile salvare i dati di contatto"
   }
 }

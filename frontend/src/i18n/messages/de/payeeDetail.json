@@ -130,5 +130,22 @@
     "needsMoreHistory": "Es sind mindestens {years} Jahre Historie nötig, um ein saisonales Muster von Zufall zu unterscheiden.",
     "empty": "Noch keine Ausgaben für eine Monatsaufteilung",
     "monthTooltip": "{month}: durchschnittlich {amount} über {years, plural, one {# Jahr} other {# Jahre}}"
+  },
+  "contactLookup": {
+    "button": "Kontaktangaben nachschlagen",
+    "inProgress": "Wird gesucht...",
+    "nothingNew": "Es wurden keine neuen Kontaktangaben gefunden.",
+    "noProvider": "Richten Sie in den KI-Einstellungen einen KI-Anbieter ein, um Kontaktangaben nachzuschlagen.",
+    "failed": "Die Suche konnte nicht abgeschlossen werden. Versuchen Sie es später erneut.",
+    "dialogTitle": "Kontaktangaben bestätigen",
+    "dialogSubtitle": "Für {name} wird nichts gespeichert, bevor Sie bestätigen.",
+    "pickMatch": "Dieser Name passt zu {count, plural, one {# Unternehmen} other {# Unternehmen}}. Wählen Sie das aus, an das Sie zahlen:",
+    "unlabelledMatch": "Treffer ohne Bezeichnung",
+    "willAdd": "Hinzufügen",
+    "willReplace": "Ersetzen",
+    "cancel": "Abbrechen",
+    "confirm": "{count, plural, one {# Änderung speichern} other {# Änderungen speichern}}",
+    "applied": "{count, plural, one {# Kontaktangabe gespeichert} other {# Kontaktangaben gespeichert}}",
+    "applyFailed": "Die Kontaktangaben konnten nicht gespeichert werden"
   }
 }

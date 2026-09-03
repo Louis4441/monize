@@ -15,6 +15,7 @@
  * assistant proposed.
  */
 
+import { ContactLookupSource } from "../../payees/lookup/payee-contact-lookup.types";
 import { InvestmentAction } from "../../securities/entities/investment-transaction.entity";
 
 export type AiActionType =
@@ -220,6 +221,20 @@ export interface CreatePayeeDescriptor extends BaseDescriptor {
   address?: string | null;
   email?: string | null;
   phone?: string | null;
+  /**
+   * Present when the preview already ran a contact lookup for this payee.
+   * The commit stores it as the row's provenance instead of looking up
+   * again, so the card and the stored row agree. `source` is null when the
+   * lookup answered but found nothing.
+   */
+  contactLookup?: PayeeContactLookupStamp;
+}
+
+/** Serialisable copy of the provenance a contact lookup leaves on a payee. */
+export interface PayeeContactLookupStamp {
+  source: ContactLookupSource | null;
+  /** ISO-8601 -- the descriptor is signed JSON. */
+  attemptedAt: string;
 }
 
 /**
@@ -695,6 +710,11 @@ export interface AiActionPreview {
   address?: string | null;
   email?: string | null;
   phone?: string | null;
+  /**
+   * Set when the contact fields above were looked up rather than supplied
+   * (create_payee). The card labels them as suggestions.
+   */
+  contactLookupSource?: ContactLookupSource | null;
   /**
    * True when an update/delete targets a reconciled transaction. The
    * confirmation card surfaces a warning so the user knows approving will

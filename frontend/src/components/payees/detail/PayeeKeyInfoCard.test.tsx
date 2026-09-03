@@ -1,8 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
+import toast from 'react-hot-toast';
 import { render } from '@/test/render';
 import { PayeeKeyInfoCard } from './PayeeKeyInfoCard';
+import { payeesApi } from '@/lib/payees';
 import type { PayeeDetail } from '@/types/payee';
+
+vi.mock('@/lib/payees', () => ({
+  payeesApi: { lookupContactForPayee: vi.fn(), update: vi.fn() },
+}));
+
+// Whether an AI provider exists decides whether the lookup is offered at all;
+// the hook is mocked so each test states which world it is in.
+let mockAiConfigured = true;
+vi.mock('@/hooks/useAiConfigured', () => ({
+  useAiConfigured: () => ({ configured: mockAiConfigured, resolved: true }),
+}));
 
 const mapProvider = { current: undefined as string | undefined };
 
@@ -26,6 +39,8 @@ function detailFixture(overrides: Partial<PayeeDetail> = {}): PayeeDetail {
       website: null,
       hasLogo: false,
       logoFetchedAt: null,
+      contactLookupAt: null,
+      contactLookupSource: null,
       address: null,
       email: null,
       phone: null,
@@ -116,6 +131,8 @@ describe('PayeeKeyInfoCard', () => {
           website: null,
           hasLogo: false,
           logoFetchedAt: null,
+          contactLookupAt: null,
+          contactLookupSource: null,
           address: null,
           email: null,
           phone: null,
@@ -307,5 +324,203 @@ describe('PayeeKeyInfoCard contact details', () => {
     expect(
       screen.queryByRole('link', { name: 'call the shop' }),
     ).not.toBeInTheDocument();
+  });
+
+  describe('contact lookup', () => {
+    const lookup = vi.mocked(payeesApi.lookupContactForPayee);
+
+    beforeEach(() => {
+      lookup.mockReset();
+      vi.mocked(payeesApi.update).mockReset();
+      // The toast doubles are module-level, so a call from an earlier case
+      // would otherwise be read as this one's.
+      vi.mocked(toast).mockClear();
+      vi.mocked(toast.success).mockClear();
+      vi.mocked(toast.error).mockClear();
+      mockAiConfigured = true;
+    });
+
+    it('offers no lookup button when no AI provider is configured', () => {
+      // Nothing could answer, so the card does not offer a button whose only
+      // outcome would be telling the user to configure a provider.
+      mockAiConfigured = false;
+      renderCard();
+
+      expect(
+        screen.queryByRole('button', { name: 'Look up contact details' }),
+      ).not.toBeInTheDocument();
+    });
+
+    const candidate = (overrides: Record<string, unknown> = {}) => ({
+      label: null,
+      website: null,
+      address: null,
+      email: null,
+      phone: null,
+      source: 'ai-web-search' as const,
+      confidence: 'high' as const,
+      notes: null,
+      refined: [],
+      ...overrides,
+    });
+
+    it('shows no provenance row: the Key Information list is the payee, not the lookup', () => {
+      renderCard(
+        detailFixture({
+          payee: {
+            ...detailFixture().payee,
+            phone: '+1 555 010 2000',
+            contactLookupAt: '2026-09-02T10:00:00.000Z',
+            contactLookupSource: 'ai-web-search',
+          },
+        }),
+      );
+      expect(screen.queryByText('Contact Details')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Looked up automatically on/)).not.toBeInTheDocument();
+      expect(screen.getByText('+1 555 010 2000')).toBeInTheDocument();
+    });
+
+    it('confirms before saving: the lookup itself writes nothing', async () => {
+      lookup.mockResolvedValue({
+        reason: 'ok',
+        suggestions: [candidate({ phone: '+1 416 555 0100' })],
+      });
+      const onContactLookedUp = vi.fn();
+      render(
+        <PayeeKeyInfoCard
+          detail={detailFixture()}
+          categoryLabelMap={categoryLabelMap}
+          onSelectDate={vi.fn()}
+          onSelectAccount={vi.fn()}
+          onContactLookedUp={onContactLookedUp}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Look up contact details' }));
+
+      expect(await screen.findByText('Confirm contact details')).toBeInTheDocument();
+      expect(screen.getByText('Add')).toBeInTheDocument();
+      // Nothing has been written or reloaded while the dialogue is open.
+      expect(payeesApi.update).not.toHaveBeenCalled();
+      expect(onContactLookedUp).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Save 1 change' }));
+      await waitFor(() =>
+        expect(payeesApi.update).toHaveBeenCalledWith('payee-1', {
+          phone: '+1 416 555 0100',
+        }),
+      );
+      await waitFor(() => expect(onContactLookedUp).toHaveBeenCalled());
+    });
+
+    it('says a value would replace a stored one, and saves only the rows left ticked', async () => {
+      const stored = { ...detailFixture().payee, address: 'Toronto' };
+      lookup.mockResolvedValue({
+        reason: 'ok',
+        suggestions: [
+          candidate({
+            address: '483 Bay St\nToronto, Ontario M5G 2C9\nCanada',
+            phone: '+1 416 555 0100',
+          }),
+        ],
+      });
+      renderCard(detailFixture({ payee: stored }));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Look up contact details' }));
+      expect(await screen.findByText('Replace')).toBeInTheDocument();
+      // The value being replaced is shown beside the new one, which is what
+      // makes confirming it the user's own edit rather than the lookup's.
+      expect(screen.getAllByText('Toronto').length).toBeGreaterThan(0);
+
+      fireEvent.click(screen.getByLabelText(/Address/));
+      fireEvent.click(screen.getByRole('button', { name: 'Save 1 change' }));
+
+      await waitFor(() =>
+        expect(payeesApi.update).toHaveBeenCalledWith('payee-1', {
+          phone: '+1 416 555 0100',
+        }),
+      );
+    });
+
+    it('offers every match when the name means more than one business, and saves the picked one', async () => {
+      lookup.mockResolvedValue({
+        reason: 'ok',
+        suggestions: [
+          candidate({ label: 'Hydro One, Toronto', phone: '+1 416 555 0100' }),
+          candidate({ label: 'Hydro One, Barrie', phone: '+1 705 555 0100' }),
+        ],
+      });
+      renderCard();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Look up contact details' }));
+      expect(
+        await screen.findByText('That name matches 2 businesses. Choose the one you pay:'),
+      ).toBeInTheDocument();
+
+      fireEvent.click(screen.getByLabelText(/Hydro One, Barrie/));
+      fireEvent.click(screen.getByRole('button', { name: 'Save 1 change' }));
+
+      await waitFor(() =>
+        expect(payeesApi.update).toHaveBeenCalledWith('payee-1', {
+          phone: '+1 705 555 0100',
+        }),
+      );
+    });
+
+    it('draws no picker for a single match', async () => {
+      lookup.mockResolvedValue({
+        reason: 'ok',
+        suggestions: [candidate({ phone: '+1 416 555 0100' })],
+      });
+      renderCard();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Look up contact details' }));
+      await screen.findByText('Confirm contact details');
+      expect(screen.queryByText(/Choose the one you pay/)).not.toBeInTheDocument();
+    });
+
+    it('writes nothing when the user cancels', async () => {
+      lookup.mockResolvedValue({
+        reason: 'ok',
+        suggestions: [candidate({ phone: '+1 416 555 0100' })],
+      });
+      renderCard();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Look up contact details' }));
+      await screen.findByText('Confirm contact details');
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      await waitFor(() =>
+        expect(screen.queryByText('Confirm contact details')).not.toBeInTheDocument(),
+      );
+      expect(payeesApi.update).not.toHaveBeenCalled();
+    });
+
+    it('says when nothing was found, and opens no dialogue', async () => {
+      lookup.mockResolvedValue({ reason: 'none', suggestions: [] });
+      renderCard();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Look up contact details' }));
+
+      await waitFor(() =>
+        expect(toast).toHaveBeenCalledWith('No new contact details were found.'),
+      );
+      expect(screen.queryByText('Confirm contact details')).not.toBeInTheDocument();
+    });
+
+    it('shows a failure with its own detail, never as nothing found', async () => {
+      lookup.mockResolvedValue({
+        reason: 'failed',
+        detail: 'Your MCP relay agent is not connected.',
+        suggestions: [],
+      });
+      renderCard();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Look up contact details' }));
+
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith('Your MCP relay agent is not connected.'),
+      );
+    });
   });
 });

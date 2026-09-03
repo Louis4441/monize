@@ -10,16 +10,33 @@ import {
   AiToolStreamChunk,
   AiMessage,
   AiContentBlock,
+  AiWebSearchOptions,
+  AiWebSearchResponse,
   ModelVerificationResult,
 } from "./ai-provider.interface";
 import { contentToPlainText, isContentBlocks } from "./content-blocks.util";
 import { longRunningFetch } from "./long-running-fetch";
 import { toolsField } from "./tools-field.util";
+import {
+  anthropicWebSearchTool,
+  AnthropicWebSearchVariant,
+  isUnsupportedWebSearchVariantError,
+  otherAnthropicWebSearchVariant,
+  preferredAnthropicWebSearchVariant,
+  serverToolsField,
+} from "./web-search-tool.util";
+
+/**
+ * How many times a `pause_turn` (the server-side search loop yielding control
+ * before it is done) is resumed before the turn is treated as unanswered.
+ */
+const MAX_WEB_SEARCH_CONTINUATIONS = 1;
 
 export class AnthropicProvider implements AiProvider {
   readonly name = "anthropic";
   readonly supportsStreaming = true;
   readonly supportsToolUse = true;
+  readonly supportsWebSearch = true;
 
   private readonly logger = new Logger(AnthropicProvider.name);
   private readonly client: Anthropic;
@@ -186,6 +203,91 @@ export class AnthropicProvider implements AiProvider {
       },
       model: response.model,
       provider: this.name,
+    };
+  }
+
+  /**
+   * One tool-free completion with Anthropic's server-side web search enabled.
+   * The search runs on Anthropic's side: results arrive as
+   * `web_search_tool_result` blocks in the same response, and `usage`
+   * reports how many searches ran. Two things are handled here rather than
+   * left to the caller:
+   *
+   * - The tool type depends on the model, and the model is user-configured.
+   *   The preferred variant is guessed from the id; if the API rejects it,
+   *   the request is retried once with the other variant.
+   * - `stop_reason: "pause_turn"` means the server paused a long search loop.
+   *   The turn is resumed by sending the response content back as the
+   *   assistant turn, at most `MAX_WEB_SEARCH_CONTINUATIONS` times.
+   *
+   * `searched` is true only when at least one search *returned results*: an
+   * error result block carries an object (`{ error_code }`) instead of the
+   * result array, and a request that never searched has no such block.
+   */
+  async completeWithWebSearch(
+    request: AiCompletionRequest,
+    search: AiWebSearchOptions,
+  ): Promise<AiWebSearchResponse> {
+    const messages = this.toSimpleMessages(request.messages);
+    let variant: AnthropicWebSearchVariant = preferredAnthropicWebSearchVariant(
+      this.modelId,
+    );
+
+    const send = (turns: Anthropic.MessageParam[]) =>
+      this.client.messages.create({
+        model: this.modelId,
+        max_tokens: request.maxTokens || 1024,
+        system: this.toCachedSystem(request.systemPrompt),
+        messages: turns,
+        ...serverToolsField(anthropicWebSearchTool(variant, search)),
+        ...(request.temperature !== undefined && {
+          temperature: request.temperature,
+        }),
+      });
+
+    let response: Anthropic.Message;
+    try {
+      response = await send(messages);
+    } catch (error) {
+      if (!isUnsupportedWebSearchVariantError(error)) {
+        throw error;
+      }
+      variant = otherAnthropicWebSearchVariant(variant);
+      this.logger.log(
+        `web search tool variant rejected for model=${this.modelId}; retrying with ${variant}`,
+      );
+      response = await send(messages);
+    }
+
+    let searchCount = response.usage.server_tool_use?.web_search_requests ?? 0;
+    let searched = hasWebSearchResults(response.content);
+    let inputTokens = response.usage.input_tokens;
+    let outputTokens = response.usage.output_tokens;
+    let textContent = textOf(response.content);
+    let continuations = 0;
+    let turns = messages;
+
+    while (
+      response.stop_reason === "pause_turn" &&
+      continuations < MAX_WEB_SEARCH_CONTINUATIONS
+    ) {
+      continuations += 1;
+      turns = [...turns, { role: "assistant", content: response.content }];
+      response = await send(turns);
+      searchCount += response.usage.server_tool_use?.web_search_requests ?? 0;
+      searched = searched || hasWebSearchResults(response.content);
+      inputTokens += response.usage.input_tokens;
+      outputTokens += response.usage.output_tokens;
+      textContent = textOf(response.content);
+    }
+
+    return {
+      content: textContent,
+      usage: { inputTokens, outputTokens },
+      model: response.model,
+      provider: this.name,
+      searched: searched && searchCount > 0,
+      searchCount,
     };
   }
 
@@ -443,4 +545,22 @@ export class AnthropicProvider implements AiProvider {
       clearTimeout(timeout);
     }
   }
+}
+
+function textOf(content: Anthropic.ContentBlock[]): string {
+  return content
+    .filter((block) => block.type === "text")
+    .map((block) => ("text" in block ? block.text : ""))
+    .join("");
+}
+
+/**
+ * A search that returned results carries an array; a failed search carries
+ * an error object. Only the array form counts as having searched.
+ */
+function hasWebSearchResults(content: Anthropic.ContentBlock[]): boolean {
+  return content.some(
+    (block) =>
+      block.type === "web_search_tool_result" && Array.isArray(block.content),
+  );
 }

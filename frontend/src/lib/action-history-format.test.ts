@@ -83,6 +83,6 @@ describe('renderActionDescription', () => {
 
   it('covers every description key the backend can emit', () => {
     expect(KNOWN_DESCRIPTION_KEYS.has('createdTransfer')).toBe(true);
-    expect(KNOWN_DESCRIPTION_KEYS.size).toBe(39);
+    expect(KNOWN_DESCRIPTION_KEYS.size).toBe(40);
   });
 });

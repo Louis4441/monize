@@ -17,7 +17,7 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-3 text-sm">
       <span className="text-gray-500 dark:text-gray-400">{label}</span>
-      <span className="text-gray-900 dark:text-gray-100 text-right break-words">
+      <span className="text-gray-900 dark:text-gray-100 text-right break-words whitespace-pre-line">
         {value}
       </span>
     </div>
@@ -321,6 +321,14 @@ export function TransactionConfirmationCard({
       rows.push({
         label: t('confirmAction.phone'),
         value: preview.phone || none,
+      });
+    }
+    // The contact details above came from a lookup, not from the user: say so,
+    // because approving stores them.
+    if (preview.contactLookupSource) {
+      rows.push({
+        label: t('confirmAction.contactLookup'),
+        value: t('confirmAction.contactLookupSuggested'),
       });
     }
   }

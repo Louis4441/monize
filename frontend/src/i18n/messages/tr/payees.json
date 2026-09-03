@@ -91,7 +91,17 @@
     "applyCategoryNone": "Mevcut işlemleri değiştirme",
     "applyCategoryUncategorized": "Yalnızca kategorisi olmayan işlemler ({count})",
     "applyCategoryAll": "Tüm işlemler ({count})",
-    "applyCategoryHelp": "Transferler ve bölünmüş işlemler hiçbir zaman değiştirilmez."
+    "applyCategoryHelp": "Transferler ve bölünmüş işlemler hiçbir zaman değiştirilmez.",
+    "lookup": {
+      "button": "Bilgileri ara",
+      "searching": "İletişim bilgileri aranıyor...",
+      "suggested": "Aramanın önerdiği:",
+      "replaced": "Arama tarafından değiştirildi:",
+      "clear": "Arama değişikliklerini geri al",
+      "nothingFound": "Bu ad için herkese açık iletişim bilgisi bulunamadı.",
+      "noProvider": "İletişim bilgilerini aramak için <link>Yapay Zeka Ayarları</link>'nda bir yapay zeka sağlayıcısı yapılandırın.",
+      "failed": "Arama tamamlanamadı. Daha sonra tekrar deneyin."
+    }
   },
   "merge": {
     "title": "Alacaklıyı Birleştir",

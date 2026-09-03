@@ -87,6 +87,8 @@
     "address": "Adres",
     "email": "E-mail",
     "phone": "Telefoon",
+    "contactLookup": "Contactgegevens",
+    "contactLookupSuggested": "Voorgesteld door de zoekopdracht — controleer voordat u goedkeurt",
     "none": "Geen",
     "approve": "Goedkeuren",
     "cancel": "Annuleren",

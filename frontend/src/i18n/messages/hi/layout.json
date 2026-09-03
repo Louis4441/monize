@@ -99,6 +99,7 @@
       "deletedInvestmentReport": "निवेश रिपोर्ट \"{name}\" हटाई गई",
       "createdPayee": "भुगतानकर्ता \"{name}\" बनाया गया",
       "updatedPayee": "भुगतानकर्ता \"{name}\" अपडेट हुआ",
+      "lookedUpPayeeContact": "प्राप्तकर्ता \"{name}\" के संपर्क विवरण खोजे गए",
       "deletedPayee": "भुगतानकर्ता \"{name}\" हटाया गया",
       "createdReport": "रिपोर्ट \"{name}\" बनाई गई",
       "updatedReport": "रिपोर्ट \"{name}\" अपडेट हुई",
