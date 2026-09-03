@@ -1,6 +1,9 @@
 import { BadRequestException } from "@nestjs/common";
 import { McpTransactionsTools } from "./transactions.tool";
 import { McpWriteLimiter } from "../mcp-write-limiter";
+import { CLIENT_CAPABILITIES_META_KEY } from "@modelcontextprotocol/server";
+import { installConfirmSupport } from "../mcp-confirm";
+import { McpRequestStateCodec } from "../mcp-request-state";
 import { mcpTestCtx, McpTestContext } from "../testing/mcp-test-context";
 
 describe("McpTransactionsTools", () => {
@@ -1035,6 +1038,163 @@ describe("McpTransactionsTools", () => {
       expect(transactionsService.create).toHaveBeenCalledTimes(2);
       const parsed = result.structuredContent as any;
       expect(parsed.ids).toEqual(["t1", "t2"]);
+    });
+
+    // On 2026-07-28 the tool answers with the question and the client calls it
+    // again with the answer. The write must happen on the second round and
+    // never on the first, and the second round must be about the same rows the
+    // user was shown.
+    describe("a 2026-07-28 write (multi round-trip)", () => {
+      const CAPS_KEY = CLIENT_CAPABILITIES_META_KEY;
+      const codec = new McpRequestStateCodec({
+        get: () => "unit-test-secret",
+      } as any);
+
+      function modernCtx(options: {
+        requestState?: unknown;
+        inputResponses?: Record<string, unknown>;
+      }) {
+        return mcpTestCtx(
+          { userId: "u1", scopes: "read,write" },
+          {
+            sessionId: undefined,
+            envelope: { [CAPS_KEY]: { elicitation: { form: {} } } },
+            requestState: options.requestState,
+            inputResponses: options.inputResponses,
+          },
+        );
+      }
+
+      const createOne = {
+        operation: "create",
+        items: [{ accountName: "Checking", amount: -50, date: "2025-01-15" }],
+      };
+
+      beforeEach(() => {
+        installConfirmSupport(server as any, codec);
+        relayService.emitPendingAction.mockReturnValue(false);
+        prepService.prepareCreate.mockResolvedValue(okStd());
+      });
+
+      it("asks and writes nothing on the first round", async () => {
+        const result = await handlers["manage_transactions"](
+          createOne,
+          modernCtx({}),
+        );
+
+        expect(result.resultType).toBe("input_required");
+        expect(result.requestState).toEqual(expect.any(String));
+        expect(transactionsService.create).not.toHaveBeenCalled();
+        // Nothing was elicited from the server side: there is no such request
+        // on this era.
+        expect(elicitInput).not.toHaveBeenCalled();
+      });
+
+      it("writes on the round the user accepted", async () => {
+        transactionsService.create.mockResolvedValue({
+          id: "t1",
+          transactionDate: "2025-01-15",
+        });
+        const asked = await handlers["manage_transactions"](
+          createOne,
+          modernCtx({}),
+        );
+        const answered = modernCtx({
+          requestState: await codec.verify(asked.requestState, {
+            mcpReq: { method: "tools/call" },
+            http: { authInfo: { clientId: "pat:t1" } },
+          } as any),
+          inputResponses: { confirm: { action: "accept", content: {} } },
+        });
+
+        const result = await handlers["manage_transactions"](
+          createOne,
+          answered,
+        );
+
+        expect(transactionsService.create).toHaveBeenCalledTimes(1);
+        expect((result.structuredContent as any).id).toBe("t1");
+      });
+
+      it("writes nothing when the user declines", async () => {
+        const asked = await handlers["manage_transactions"](
+          createOne,
+          modernCtx({}),
+        );
+        const answered = modernCtx({
+          requestState: await codec.verify(asked.requestState, {
+            mcpReq: { method: "tools/call" },
+            http: { authInfo: { clientId: "pat:t1" } },
+          } as any),
+          inputResponses: { confirm: { action: "decline" } },
+        });
+
+        const result = await handlers["manage_transactions"](
+          createOne,
+          answered,
+        );
+
+        expect(result.isError).toBe(true);
+        expect(transactionsService.create).not.toHaveBeenCalled();
+      });
+
+      // The seal proves the state is ours; it cannot prove the retry is about
+      // the same rows. A model that changed the amount between rounds would
+      // otherwise commit under a confirmation given for something else.
+      it("refuses a retry that asks about a different change", async () => {
+        const asked = await handlers["manage_transactions"](
+          createOne,
+          modernCtx({}),
+        );
+        const answered = modernCtx({
+          requestState: await codec.verify(asked.requestState, {
+            mcpReq: { method: "tools/call" },
+            http: { authInfo: { clientId: "pat:t1" } },
+          } as any),
+          inputResponses: { confirm: { action: "accept", content: {} } },
+        });
+        prepService.prepareCreate.mockResolvedValue(
+          okStd([{ ...stdPreview, amount: -999 }]),
+        );
+
+        const result = await handlers["manage_transactions"](
+          { ...createOne, items: [{ ...createOne.items[0], amount: -999 }] },
+          answered,
+        );
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("no longer matches");
+        expect(transactionsService.create).not.toHaveBeenCalled();
+      });
+
+      // A relay turn that started between the rounds must not swallow an
+      // answer the user already gave in their own client.
+      it("does not hand a confirmed retry to the web chat", async () => {
+        const asked = await handlers["manage_transactions"](
+          createOne,
+          modernCtx({}),
+        );
+        // Only the retry round is under test: the asking round legitimately
+        // offered the card to the web chat, and nobody took it.
+        relayService.emitPendingAction.mockClear();
+        relayService.emitPendingAction.mockReturnValue(true);
+        transactionsService.create.mockResolvedValue({
+          id: "t1",
+          transactionDate: "2025-01-15",
+        });
+        const answered = modernCtx({
+          requestState: await codec.verify(asked.requestState, {
+            mcpReq: { method: "tools/call" },
+            http: { authInfo: { clientId: "pat:t1" } },
+          } as any),
+          inputResponses: { confirm: { action: "accept", content: {} } },
+        });
+
+        await handlers["manage_transactions"](createOne, answered);
+
+        expect(relayService.emitPendingAction).not.toHaveBeenCalled();
+        expect(transactionsService.create).toHaveBeenCalledTimes(1);
+      });
     });
 
     it("declines a bulk create through confirmWrite", async () => {

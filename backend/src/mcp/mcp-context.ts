@@ -1,5 +1,6 @@
 import { sanitizeToolResultStrings } from "../common/sanitization.util";
 import type { AuthInfo, ServerContext } from "@modelcontextprotocol/server";
+import { ConfirmMismatchError } from "./mcp-confirm";
 
 export interface McpUserContext {
   userId: string;
@@ -146,6 +147,12 @@ export function toolError(message: string) {
  * all other errors return a generic message to avoid leaking internals.
  */
 export function safeToolError(err: unknown) {
+  // A confirmation that no longer matches the change is not an internal
+  // failure: it is a refusal the caller can act on, and the model needs to be
+  // told to ask again rather than to retry the same call.
+  if (err instanceof ConfirmMismatchError) {
+    return toolError(err.message);
+  }
   if (
     err &&
     typeof err === "object" &&

@@ -2,7 +2,10 @@ import { Injectable } from "@nestjs/common";
 import { describeSkippedRows } from "../../common/bulk-create.types";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/server";
-import type { ServerContext } from "@modelcontextprotocol/server";
+import type {
+  InputRequiredResult,
+  ServerContext,
+} from "@modelcontextprotocol/server";
 import { TransactionsService } from "../../transactions/transactions.service";
 import { PayeesService } from "../../payees/payees.service";
 import { AccountsService } from "../../accounts/accounts.service";
@@ -43,7 +46,13 @@ import {
   toolError,
   safeToolError,
 } from "../mcp-context";
-import { confirmWrite } from "../mcp-confirm";
+import {
+  cardKey,
+  confirmWrite,
+  confirmWriteMany,
+  isAsk,
+  type ConfirmItem,
+} from "../mcp-confirm";
 import { McpWriteLimiter } from "../mcp-write-limiter";
 import {
   getDefaultDateRange,
@@ -901,11 +910,23 @@ export class McpTransactionsTools {
     userId: string,
     pendingAction: PendingAiAction,
     confirmMessage: string,
-  ): Promise<"relay" | "accepted" | "declined"> {
-    if (emitRelayCard(this.relayService, userId, pendingAction)) {
+  ): Promise<"relay" | "accepted" | "declined" | { ask: InputRequiredResult }> {
+    // Only the round that ASKS may hand the confirmation to the web chat. On a
+    // retry the human has already answered in their own client, and a relay
+    // turn that began in between would swallow that answer.
+    if (
+      !ctx.mcpReq.requestState() &&
+      emitRelayCard(this.relayService, userId, pendingAction)
+    ) {
       return "relay";
     }
-    const confirmation = await confirmWrite(server, ctx, confirmMessage);
+    const confirmation = await confirmWrite(
+      server,
+      ctx,
+      confirmMessage,
+      pendingAction.descriptor,
+    );
+    if (isAsk(confirmation)) return confirmation;
     return confirmation === "declined" ? "declined" : "accepted";
   }
 
@@ -1088,6 +1109,7 @@ export class McpTransactionsTools {
       action,
       `Create this split transaction?\nAccount: ${preview.accountName}\nAmount: ${preview.amount} ${preview.currencyCode}\nDate: ${preview.transactionDate}\nSplits: ${(splits ?? []).map((s) => `${s.categoryName} ${s.amount}`).join(", ")}${this.attachmentConfirmNote(attachmentRefs)}`,
     );
+    if (isAsk(outcome)) return outcome.ask;
     if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
     if (outcome === "declined") {
       this.releaseAttachmentRefs(userId, attachmentRefs);
@@ -1193,6 +1215,7 @@ export class McpTransactionsTools {
           action,
           `Create this transaction?\nAccount: ${preview.accountName}\nAmount: ${preview.amount} ${preview.currencyCode}\nDate: ${preview.transactionDate}${this.attachmentConfirmNote(attachmentRefs)}`,
         );
+        if (isAsk(outcome)) return outcome.ask;
         if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
         if (outcome === "declined") {
           this.releaseAttachmentRefs(userId, attachmentRefs);
@@ -1241,6 +1264,7 @@ export class McpTransactionsTools {
         action,
         `Create this transfer?\nFrom: ${preview.fromAccountName}\nTo: ${preview.toAccountName}\nAmount: ${preview.amount} ${preview.fromCurrencyCode}\nDate: ${preview.transactionDate}`,
       );
+      if (isAsk(outcome)) return outcome.ask;
       if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
       if (outcome === "declined")
         return toolError(
@@ -1302,7 +1326,10 @@ export class McpTransactionsTools {
       );
     }
     // Relay: emit each card to the web chat.
-    if (emitRelayCard(this.relayService, userId, cards[0])) {
+    if (
+      !ctx.mcpReq.requestState() &&
+      emitRelayCard(this.relayService, userId, cards[0])
+    ) {
       for (let i = 1; i < cards.length; i++) {
         emitRelayCard(this.relayService, userId, cards[i]);
       }
@@ -1313,7 +1340,9 @@ export class McpTransactionsTools {
       server,
       ctx,
       `Create ${okCount} transaction(s)?${skipped.length ? ` (${skipped.length} skipped)` : ""}`,
+      cards.map((card) => card.descriptor),
     );
+    if (isAsk(confirmation)) return confirmation.ask;
     if (confirmation === "declined") {
       return toolError(
         "Cancelled: the confirmation was declined, so nothing was created.",
@@ -1393,6 +1422,7 @@ export class McpTransactionsTools {
           action,
           `Apply this transfer edit?\nFrom: ${preview.fromAccountName}\nTo: ${preview.toAccountName}\nAmount: ${preview.amount} ${preview.fromCurrencyCode}\nDate: ${preview.transactionDate}${preview.categoryName ? `\nCategory: ${preview.categoryName}` : ""}`,
         );
+        if (isAsk(outcome)) return outcome.ask;
         if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
         if (outcome === "declined")
           return toolError(
@@ -1445,6 +1475,7 @@ export class McpTransactionsTools {
         action,
         confirmMessage,
       );
+      if (isAsk(outcome)) return outcome.ask;
       if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
       if (outcome === "declined") {
         this.releaseAttachmentRefs(userId, attachmentRefs);
@@ -1539,14 +1570,19 @@ export class McpTransactionsTools {
       bulk.okRows,
       bulk.previewRows,
     );
-    if (emitRelayCard(this.relayService, userId, action)) {
+    if (
+      !ctx.mcpReq.requestState() &&
+      emitRelayCard(this.relayService, userId, action)
+    ) {
       return toolResult(RELAY_PREVIEW_SHOWN);
     }
     const confirmation = await confirmWrite(
       server,
       ctx,
       `Apply ${bulk.okRows.length} transaction edit(s)?${bulk.skipped.length ? ` (${bulk.skipped.length} skipped)` : ""}`,
+      action.descriptor,
     );
+    if (isAsk(confirmation)) return confirmation.ask;
     if (confirmation === "declined")
       return toolError(
         "Cancelled: the confirmation was declined, so nothing was changed.",
@@ -1597,6 +1633,7 @@ export class McpTransactionsTools {
         action,
         `Delete this transaction?\nAccount: ${preview.accountName}\nAmount: ${preview.amount} ${preview.currencyCode}\nDate: ${preview.transactionDate}${preview.isReconciled ? RECONCILED_CONFIRM_NOTE : ""}`,
       );
+      if (isAsk(outcome)) return outcome.ask;
       if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
       if (outcome === "declined")
         return toolError(
@@ -1648,14 +1685,19 @@ export class McpTransactionsTools {
       bulk.okRows,
       bulk.previewRows,
     );
-    if (emitRelayCard(this.relayService, userId, action)) {
+    if (
+      !ctx.mcpReq.requestState() &&
+      emitRelayCard(this.relayService, userId, action)
+    ) {
       return toolResult(RELAY_PREVIEW_SHOWN);
     }
     const confirmation = await confirmWrite(
       server,
       ctx,
       `Delete ${bulk.okRows.length} transaction(s)?${bulk.skipped.length ? ` (${bulk.skipped.length} skipped)` : ""}`,
+      action.descriptor,
     );
+    if (isAsk(confirmation)) return confirmation.ask;
     if (confirmation === "declined")
       return toolError(
         "Cancelled: the confirmation was declined, so nothing was deleted.",
@@ -1680,25 +1722,41 @@ export class McpTransactionsTools {
     cards: PendingAiAction[],
     skipped: { index: number; reason: string }[],
   ) {
-    // Relay path: emit each card; the browser confirms+commits each.
-    if (emitRelayCard(this.relayService, userId, cards[0])) {
+    // Relay path: emit each card; the browser confirms+commits each. Only the
+    // round that asks may do this -- see emitOrConfirm.
+    if (
+      !ctx.mcpReq.requestState() &&
+      emitRelayCard(this.relayService, userId, cards[0])
+    ) {
       for (let i = 1; i < cards.length; i++) {
         emitRelayCard(this.relayService, userId, cards[i]);
       }
       return toolResult(RELAY_PREVIEW_SHOWN);
     }
+    // Every card is asked in ONE round. A round per card would be 25 rounds on
+    // a full batch, and a multi-round-trip flow is two.
+    const answers = await confirmWriteMany(
+      server,
+      ctx,
+      this.confirmItems(cards),
+    );
+    if (!(answers instanceof Map)) return answers.ask;
     const ids: string[] = [];
-    for (const card of cards) {
-      const confirmation = await confirmWrite(
-        server,
-        ctx,
-        this.confirmLineFor(card),
-      );
-      if (confirmation === "declined") continue;
+    for (const [index, card] of cards.entries()) {
+      if (answers.get(cardKey(index)) === "declined") continue;
       const id = await this.commitCard(userId, card);
       if (id) ids.push(id);
     }
     return toolResult({ ids, count: ids.length, skipped });
+  }
+
+  /** One confirmation item per card, keyed by position within this round. */
+  private confirmItems(cards: PendingAiAction[]): ConfirmItem[] {
+    return cards.map((card, index) => ({
+      key: cardKey(index),
+      message: this.confirmLineFor(card),
+      action: card.descriptor,
+    }));
   }
 
   private confirmLineFor(card: PendingAiAction): string {

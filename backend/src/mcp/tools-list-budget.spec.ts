@@ -305,6 +305,7 @@ describe("tools/list payload budget", () => {
       noopProvider,
       noopProvider,
       noopProvider,
+      noopProvider,
     );
     const server = service.createServer();
     const instructions = (server.server as any)._instructions as string;

@@ -2,7 +2,10 @@ import { Injectable } from "@nestjs/common";
 import { describeSkippedRows } from "../../common/bulk-create.types";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/server";
-import type { ServerContext } from "@modelcontextprotocol/server";
+import type {
+  InputRequiredResult,
+  ServerContext,
+} from "@modelcontextprotocol/server";
 import { PayeesService } from "../../payees/payees.service";
 import { contactLookupOptions } from "../../ai/actions/ai-actions.service";
 import {
@@ -22,7 +25,13 @@ import {
   toolError,
   safeToolError,
 } from "../mcp-context";
-import { confirmWrite } from "../mcp-confirm";
+import {
+  cardKey,
+  confirmWrite,
+  confirmWriteMany,
+  isAsk,
+  type ConfirmItem,
+} from "../mcp-confirm";
 import { McpWriteLimiter } from "../mcp-write-limiter";
 import { getPayeesOutput, managePayeesOutput } from "../tool-output-schemas";
 import { READ_ONLY, WRITE } from "../mcp-annotations";
@@ -323,11 +332,23 @@ export class McpPayeesTools {
     userId: string,
     pendingAction: PendingAiAction,
     confirmMessage: string,
-  ): Promise<"relay" | "accepted" | "declined"> {
-    if (emitRelayCard(this.relayService, userId, pendingAction)) {
+  ): Promise<"relay" | "accepted" | "declined" | { ask: InputRequiredResult }> {
+    // Only the round that ASKS may hand the confirmation to the web chat. On a
+    // retry the human has already answered in their own client, and a relay
+    // turn that began in between would swallow that answer.
+    if (
+      !ctx.mcpReq.requestState() &&
+      emitRelayCard(this.relayService, userId, pendingAction)
+    ) {
       return "relay";
     }
-    const confirmation = await confirmWrite(server, ctx, confirmMessage);
+    const confirmation = await confirmWrite(
+      server,
+      ctx,
+      confirmMessage,
+      pendingAction.descriptor,
+    );
+    if (isAsk(confirmation)) return confirmation;
     return confirmation === "declined" ? "declined" : "accepted";
   }
 
@@ -354,6 +375,7 @@ export class McpPayeesTools {
         action,
         `Create this payee?\nName: ${preview.name}${preview.defaultCategoryName ? `\nDefault category: ${preview.defaultCategoryName}` : ""}${preview.website ? `\nWebsite: ${preview.website}` : ""}${contactCardLines(preview)}`,
       );
+      if (isAsk(outcome)) return outcome.ask;
       if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
       if (outcome === "declined")
         return toolError(
@@ -400,14 +422,19 @@ export class McpPayeesTools {
       prep.okRows,
       prep.previewRows,
     );
-    if (emitRelayCard(this.relayService, userId, action)) {
+    if (
+      !ctx.mcpReq.requestState() &&
+      emitRelayCard(this.relayService, userId, action)
+    ) {
       return toolResult(RELAY_PREVIEW_SHOWN);
     }
     const confirmation = await confirmWrite(
       server,
       ctx,
       `Create ${prep.okPreviews.length} payee(s)?${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}`,
+      action.descriptor,
     );
+    if (isAsk(confirmation)) return confirmation.ask;
     if (confirmation === "declined")
       return toolError(
         "Cancelled: the confirmation was declined, so nothing was created.",
@@ -454,6 +481,7 @@ export class McpPayeesTools {
         action,
         `Apply this payee edit?\nName: ${preview.name}\nDefault category: ${preview.defaultCategoryName ?? "(none)"}${preview.website !== undefined ? `\nWebsite: ${preview.website ?? "(cleared)"}` : ""}${contactCardLines(preview)}`,
       );
+      if (isAsk(outcome)) return outcome.ask;
       if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
       if (outcome === "declined")
         return toolError(
@@ -496,14 +524,19 @@ export class McpPayeesTools {
       prep.okRows,
       prep.previewRows,
     );
-    if (emitRelayCard(this.relayService, userId, action)) {
+    if (
+      !ctx.mcpReq.requestState() &&
+      emitRelayCard(this.relayService, userId, action)
+    ) {
       return toolResult(RELAY_PREVIEW_SHOWN);
     }
     const confirmation = await confirmWrite(
       server,
       ctx,
       `Apply ${prep.okPreviews.length} payee edit(s)?${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}`,
+      action.descriptor,
     );
+    if (isAsk(confirmation)) return confirmation.ask;
     if (confirmation === "declined")
       return toolError(
         "Cancelled: the confirmation was declined, so nothing was changed.",
@@ -546,6 +579,7 @@ export class McpPayeesTools {
         action,
         `Delete this payee?\nName: ${preview.name}`,
       );
+      if (isAsk(outcome)) return outcome.ask;
       if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
       if (outcome === "declined")
         return toolError(
@@ -581,14 +615,19 @@ export class McpPayeesTools {
       prep.okRows,
       prep.previewRows,
     );
-    if (emitRelayCard(this.relayService, userId, action)) {
+    if (
+      !ctx.mcpReq.requestState() &&
+      emitRelayCard(this.relayService, userId, action)
+    ) {
       return toolResult(RELAY_PREVIEW_SHOWN);
     }
     const confirmation = await confirmWrite(
       server,
       ctx,
       `Delete ${prep.okPreviews.length} payee(s)?${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}`,
+      action.descriptor,
     );
+    if (isAsk(confirmation)) return confirmation.ask;
     if (confirmation === "declined")
       return toolError(
         "Cancelled: the confirmation was declined, so nothing was deleted.",
@@ -613,24 +652,41 @@ export class McpPayeesTools {
     cards: PendingAiAction[],
     skipped: { index: number; reason: string }[],
   ) {
-    if (emitRelayCard(this.relayService, userId, cards[0])) {
+    // Only the round that asks may hand the cards to the web chat; on a retry
+    // the human has already answered in their own client.
+    if (
+      !ctx.mcpReq.requestState() &&
+      emitRelayCard(this.relayService, userId, cards[0])
+    ) {
       for (let i = 1; i < cards.length; i++) {
         emitRelayCard(this.relayService, userId, cards[i]);
       }
       return toolResult(RELAY_PREVIEW_SHOWN);
     }
+    // Every card is asked in ONE round: a round per card would be 25 rounds on
+    // a full batch, and a multi-round-trip flow is two.
+    const answers = await confirmWriteMany(
+      server,
+      ctx,
+      this.confirmItems(cards),
+    );
+    if (!(answers instanceof Map)) return answers.ask;
     const ids: string[] = [];
-    for (const card of cards) {
-      const confirmation = await confirmWrite(
-        server,
-        ctx,
-        this.confirmLineFor(card),
-      );
-      if (confirmation === "declined") continue;
+    for (const [index, card] of cards.entries()) {
+      if (answers.get(cardKey(index)) === "declined") continue;
       const id = await this.commitCard(userId, card);
       if (id) ids.push(id);
     }
     return toolResult({ ids, count: ids.length, skipped });
+  }
+
+  /** One confirmation item per card, keyed by position within this round. */
+  private confirmItems(cards: PendingAiAction[]): ConfirmItem[] {
+    return cards.map((card, index) => ({
+      key: cardKey(index),
+      message: this.confirmLineFor(card),
+      action: card.descriptor,
+    }));
   }
 
   private confirmLineFor(card: PendingAiAction): string {

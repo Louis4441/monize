@@ -1,11 +1,20 @@
 import { ClientCapabilitiesSchema } from "@modelcontextprotocol/core/internal";
 import {
+  CLIENT_CAPABILITIES_META_KEY,
   ProtocolError,
   ProtocolErrorCode,
   SdkError,
   SdkErrorCode,
 } from "@modelcontextprotocol/server";
-import { confirmWrite } from "./mcp-confirm";
+import {
+  ConfirmMismatchError,
+  confirmWrite,
+  confirmWriteMany,
+  confirmationFingerprint,
+  installConfirmSupport,
+  isAsk,
+} from "./mcp-confirm";
+import { McpRequestStateCodec } from "./mcp-request-state";
 import { mcpTestCtx, McpTestContext } from "./testing/mcp-test-context";
 
 /**
@@ -227,6 +236,213 @@ describe("mcp-confirm", () => {
       const { timeout } = elicit.mock.calls[0][1];
       expect(timeout).toBeGreaterThan(20_000);
       expect(timeout).toBeLessThan(60_000);
+    });
+  });
+
+  // On 2026-07-28 there is no server-side wait: the tool returns the question
+  // and the client calls it again with the answer. Everything the second round
+  // needs travels in the sealed state and comes back, so the server holds
+  // nothing in between -- which is what makes the endpoint stateless.
+  describe("confirmWriteMany on a 2026-07-28 request", () => {
+    const CAPS_KEY = CLIENT_CAPABILITIES_META_KEY;
+    const items = [
+      { key: "card-0", message: "Delete rent?", action: { id: "t1" } },
+      { key: "card-1", message: "Delete gym?", action: { id: "t2" } },
+    ];
+    let codec: McpRequestStateCodec;
+    let server: any;
+
+    function modernCtx(options: {
+      capabilities?: unknown;
+      requestState?: unknown;
+      inputResponses?: Record<string, unknown>;
+    }) {
+      return mcpTestCtx(
+        { userId: "u1", scopes: "write" },
+        {
+          sessionId: undefined,
+          envelope: {
+            [CAPS_KEY]: options.capabilities ?? { elicitation: { form: {} } },
+          },
+          requestState: options.requestState,
+          inputResponses: options.inputResponses,
+        },
+      );
+    }
+
+    /** What the client echoes for an answered dialog. */
+    const answered = (action: "accept" | "decline" | "cancel") => ({
+      action,
+      content: action === "accept" ? {} : undefined,
+    });
+
+    beforeEach(() => {
+      codec = new McpRequestStateCodec({
+        get: () => "unit-test-secret",
+      } as any);
+      server = fakeServer({ capabilities: undefined });
+      installConfirmSupport(server, codec);
+    });
+
+    it("asks once for every item, sealing what it asked", async () => {
+      const ctx = modernCtx({});
+      const outcome = await confirmWriteMany(server, ctx, items);
+      if (!isAsk(outcome)) throw new Error("expected a question");
+
+      expect(Object.keys(outcome.ask.inputRequests ?? {})).toEqual([
+        "card-0",
+        "card-1",
+      ]);
+      // The seal verifies under the same request, and carries the fingerprint
+      // of exactly these items rather than any row data.
+      const state = await codec.verify(
+        outcome.ask.requestState as string,
+        ctx as never,
+      );
+      expect(state).toEqual({
+        v: 1,
+        keys: ["card-0", "card-1"],
+        fingerprint: confirmationFingerprint(items),
+      });
+      expect(JSON.stringify(state)).not.toContain("t1");
+    });
+
+    it("reads each answer on the round that writes", async () => {
+      const state = {
+        v: 1 as const,
+        keys: ["card-0", "card-1"],
+        fingerprint: confirmationFingerprint(items),
+      };
+      const outcome = await confirmWriteMany(
+        server,
+        modernCtx({
+          requestState: state,
+          inputResponses: {
+            "card-0": answered("accept"),
+            "card-1": answered("decline"),
+          },
+        }),
+        items,
+      );
+      if (isAsk(outcome)) throw new Error("expected answers");
+      expect(outcome.get("card-0")).toBe("accepted");
+      expect(outcome.get("card-1")).toBe("declined");
+    });
+
+    it.each([
+      ["a cancelled dialog", { "card-0": answered("cancel") }],
+      ["an answer that never came", {}],
+      ["a response of another shape", { "card-0": { roots: [] } }],
+    ])("refuses the write on %s", async (_label, inputResponses) => {
+      const state = {
+        v: 1 as const,
+        keys: ["card-0"],
+        fingerprint: confirmationFingerprint([items[0]]),
+      };
+      const outcome = await confirmWriteMany(
+        server,
+        modernCtx({ requestState: state, inputResponses }),
+        [items[0]],
+      );
+      if (isAsk(outcome)) throw new Error("expected answers");
+      expect(outcome.get("card-0")).toBe("declined");
+    });
+
+    // The seam proves the state is ours and unexpired. What it cannot know is
+    // whether the retry is about the SAME change: a name that now resolves to
+    // another row, or an amount the model altered between rounds, would
+    // otherwise commit under a confirmation the user gave for something else.
+    it("refuses a retry that re-derived a different change", async () => {
+      const state = {
+        v: 1 as const,
+        keys: ["card-0", "card-1"],
+        fingerprint: confirmationFingerprint(items),
+      };
+      const moved = [items[0], { ...items[1], action: { id: "t9" } }];
+      await expect(
+        confirmWriteMany(
+          server,
+          modernCtx({
+            requestState: state,
+            inputResponses: {
+              "card-0": answered("accept"),
+              "card-1": answered("accept"),
+            },
+          }),
+          moved,
+        ),
+      ).rejects.toBeInstanceOf(ConfirmMismatchError);
+    });
+
+    it("refuses a retry about a different set of items", async () => {
+      const state = {
+        v: 1 as const,
+        keys: ["card-0", "card-1"],
+        fingerprint: confirmationFingerprint(items),
+      };
+      await expect(
+        confirmWriteMany(server, modernCtx({ requestState: state }), [
+          items[0],
+        ]),
+      ).rejects.toBeInstanceOf(ConfirmMismatchError);
+    });
+
+    // A client that declared no elicitation cannot be sent one: the SDK answers
+    // -32021 and the whole tool call fails, where today it falls through to the
+    // client's own approval prompt -- the only consent step such a client has.
+    it("does not ask a client that declared no elicitation", async () => {
+      const outcome = await confirmWriteMany(
+        server,
+        modernCtx({ capabilities: {} }),
+        items,
+      );
+      if (isAsk(outcome)) throw new Error("expected no question");
+      expect([...outcome.values()]).toEqual(["unsupported", "unsupported"]);
+    });
+
+    // A state nobody can seal is attacker-controlled input on the way back.
+    it("refuses rather than asking when no codec is installed", async () => {
+      const outcome = await confirmWriteMany(
+        fakeServer({ capabilities: undefined }),
+        modernCtx({}),
+        items,
+      );
+      if (isAsk(outcome)) throw new Error("expected no question");
+      expect([...outcome.values()]).toEqual(["declined", "declined"]);
+    });
+
+    describe("the seal", () => {
+      it("is refused when another credential presents it", async () => {
+        const asked = modernCtx({});
+        const outcome = await confirmWriteMany(server, asked, items);
+        if (!isAsk(outcome)) throw new Error("expected a question");
+
+        const otherCaller = mcpTestCtx(
+          { userId: "u1", scopes: "write", credentialId: "pat:other" },
+          { sessionId: undefined, envelope: {} },
+        );
+        await expect(
+          codec.verify(
+            outcome.ask.requestState as string,
+            otherCaller as never,
+          ),
+        ).rejects.toThrow();
+      });
+
+      it("is refused when replayed against another tool", async () => {
+        const asked = modernCtx({});
+        const outcome = await confirmWriteMany(server, asked, items);
+        if (!isAsk(outcome)) throw new Error("expected a question");
+
+        const otherMethod = modernCtx({});
+        (otherMethod.mcpReq as { method: string }).method = "prompts/get";
+        await expect(
+          codec.verify(
+            outcome.ask.requestState as string,
+            otherMethod as never,
+          ),
+        ).rejects.toThrow();
+      });
     });
   });
 });

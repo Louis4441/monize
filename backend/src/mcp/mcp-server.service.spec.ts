@@ -25,6 +25,7 @@ import { McpBudgetCheckPrompt } from "./prompts/budget-check.prompt";
 import { McpTransactionLookupPrompt } from "./prompts/transaction-lookup.prompt";
 import { McpSpendingAnalysisPrompt } from "./prompts/spending-analysis.prompt";
 import { AiRelayService } from "../ai/relay/ai-relay.service";
+import { McpRequestStateCodec } from "./mcp-request-state";
 
 describe("McpServerService", () => {
   let service: McpServerService;
@@ -52,6 +53,12 @@ describe("McpServerService", () => {
         {
           provide: AiRelayService,
           useValue: { reportToolActivity: jest.fn() },
+        },
+        {
+          provide: McpRequestStateCodec,
+          useValue: new McpRequestStateCodec({
+            get: () => "test-secret",
+          } as any),
         },
         { provide: McpAccountListResource, useValue: mockResourceProvider },
         { provide: McpCategoryTreeResource, useValue: mockResourceProvider },

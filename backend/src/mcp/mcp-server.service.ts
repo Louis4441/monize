@@ -2,6 +2,8 @@ import { Injectable } from "@nestjs/common";
 import { McpServer } from "@modelcontextprotocol/server";
 import { AiRelayService } from "../ai/relay/ai-relay.service";
 import { installRelayToolActivity } from "./mcp-relay-tool-activity";
+import { installConfirmSupport } from "./mcp-confirm";
+import { McpRequestStateCodec } from "./mcp-request-state";
 import { McpAccountsTools } from "./tools/accounts.tool";
 import { McpTransactionsTools } from "./tools/transactions.tool";
 import { McpCategoriesTools } from "./tools/categories.tool";
@@ -49,6 +51,7 @@ export class McpServerService {
     private readonly budgetsTools: McpBudgetsTools,
     private readonly relayTools: McpRelayTools,
     private readonly relayService: AiRelayService,
+    private readonly requestStateCodec: McpRequestStateCodec,
     private readonly accountListResource: McpAccountListResource,
     private readonly categoryTreeResource: McpCategoryTreeResource,
     private readonly recentTransactionsResource: McpRecentTransactionsResource,
@@ -126,12 +129,28 @@ export class McpServerService {
           "server/discover": { ttlMs: LIST_TTL_MS, cacheScope: "private" },
           "resources/read": { ttlMs: 0, cacheScope: "private" },
         },
+        // A write is confirmed in two rounds on 2026-07-28: the tool returns
+        // the question and the client calls it again with the answer. Two is
+        // the whole flow, so a third round is a client looping.
+        inputRequired: {
+          maxRounds: 2,
+          // The SDK's shim would answer an `input_required` on a 2025-era
+          // connection with real server-initiated requests -- but our 2025 path
+          // has its own fallback for a client that cannot show a dialog
+          // (mcp-elicitation-support.ts), which a shim cannot reproduce. That
+          // path asks directly instead; see `confirmWriteMany`.
+          legacyShim: false,
+        },
+        // Verified BEFORE any handler runs, so a tampered, expired or replayed
+        // confirmation is refused by the seam rather than read by a tool.
+        requestState: { verify: this.requestStateCodec.verify },
       },
     );
 
     // Stream the agent's tool calls to the web chat as live progress when this
     // session is serving a relayed prompt. Must run before the tools register.
     installRelayToolActivity(server, this.relayService);
+    installConfirmSupport(server, this.requestStateCodec);
 
     this.accountsTools.register(server);
     this.transactionsTools.register(server);
