@@ -1,13 +1,4 @@
-import { McpAccountsTools } from "./tools/accounts.tool";
-import { McpTransactionsTools } from "./tools/transactions.tool";
-import { McpCategoriesTools } from "./tools/categories.tool";
-import { McpPayeesTools } from "./tools/payees.tool";
-import { McpReportsTools } from "./tools/reports.tool";
-import { McpInvestmentsTools } from "./tools/investments.tool";
-import { McpScheduledTools } from "./tools/scheduled.tool";
-import { McpCalculateTools } from "./tools/calculate.tool";
-import { McpBudgetsTools } from "./tools/budgets.tool";
-import { McpRelayTools } from "./tools/relay.tool";
+import { collectToolConfigs } from "./testing/collect-tool-configs";
 
 // Tools that mutate state; everything else must be read-only.
 const WRITE_TOOLS = new Set([
@@ -29,66 +20,6 @@ const DESTRUCTIVE_TOOLS = new Set([
 ]);
 
 const EXPECTED_TOOL_COUNT = 20;
-
-interface ToolProvider {
-  register: (server: unknown, resolve?: unknown) => void;
-}
-
-function collectToolConfigs(): Array<{ name: string; config: any }> {
-  // Providers only read their service deps inside handlers, never during
-  // register(), so empty mocks are sufficient to capture the tool configs.
-  const providers: ToolProvider[] = [
-    new McpAccountsTools({} as any) as unknown as ToolProvider,
-    new McpTransactionsTools(
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-    ) as unknown as ToolProvider,
-    new McpCategoriesTools({} as any) as unknown as ToolProvider,
-    new McpPayeesTools(
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-    ) as unknown as ToolProvider,
-    new McpReportsTools({} as any, {} as any) as unknown as ToolProvider,
-    new McpInvestmentsTools(
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-    ) as unknown as ToolProvider,
-    new McpScheduledTools({} as any) as unknown as ToolProvider,
-    new McpCalculateTools() as unknown as ToolProvider,
-    new McpBudgetsTools({} as any) as unknown as ToolProvider,
-    new McpRelayTools({} as any) as unknown as ToolProvider,
-  ];
-
-  const configs: Array<{ name: string; config: any }> = [];
-  const fakeServer = {
-    registerTool: (name: string, config: any) => {
-      configs.push({ name, config });
-    },
-  };
-  const resolve = () => undefined;
-  for (const provider of providers) {
-    provider.register(fakeServer, resolve);
-  }
-  return configs;
-}
 
 describe("MCP tool spec compliance", () => {
   const configs = collectToolConfigs();
