@@ -172,6 +172,28 @@ export function findRlsMigrations(includeEnable = false): string[] {
  * Used as a post-condition -- what was declared has to exist in `pg_policies`
  * once the files have been applied.
  */
+/**
+ * Table renames a migration performs, as `old -> new`.
+ *
+ * A name in an older file's policy list can be renamed by a later migration
+ * (`budget_alerts` became `notifications` in 179), and the policy then lives
+ * under the new name -- the renaming migration re-creates it. The post-condition
+ * below resolves through this map so it demands the policy where it actually
+ * is, while a declared table that is absent AND never renamed still fails: that
+ * is the typo the check exists to catch.
+ *
+ * `ALTER TABLE`, deliberately not `ALTER ... RENAME TO` -- migration 179 renames
+ * five indexes in the same file, and an index carries no policy.
+ */
+export function renamedTables(rawSql: string): Array<[string, string]> {
+  const sql = stripSqlComments(rawSql);
+  return [
+    ...sql.matchAll(
+      /ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(\w+)\s+RENAME\s+TO\s+(\w+)/gi,
+    ),
+  ].map((m) => [m[1], m[2]] as [string, string]);
+}
+
 export function declaredPolicyTables(rawSql: string): string[] {
   // Comments stripped for the same reason as in the selector: these files
   // discuss policies in prose, and a sentence naming one would become a
@@ -285,6 +307,7 @@ export async function applyRlsPolicies(
   //    what ships.
   const migrations = findRlsMigrations(includeEnable);
   const declared = new Set<string>();
+  const renamedTo = new Map<string, string>();
 
   for (const file of migrations) {
     const sql = fs.readFileSync(file, "utf8");
@@ -298,6 +321,9 @@ export async function applyRlsPolicies(
     }
     for (const table of declaredPolicyTables(sql)) {
       declared.add(table);
+    }
+    for (const [from, to] of renamedTables(sql)) {
+      renamedTo.set(from, to);
     }
   }
 
@@ -318,7 +344,21 @@ export async function applyRlsPolicies(
       )
     ).map((r: { tablename: string }) => r.tablename),
   );
-  const missing = [...declared].filter((t) => !policied.has(t)).sort();
+  // A declared name is resolved through the rename chain first: the policy for a
+  // renamed table exists under its current name. Bounded by the map's size so a
+  // pathological `a -> b -> a` in the files cannot spin here.
+  const currentName = (table: string): string => {
+    let name = table;
+    for (let hops = 0; hops <= renamedTo.size; hops += 1) {
+      const next = renamedTo.get(name);
+      if (next === undefined || next === name) return name;
+      name = next;
+    }
+    return name;
+  };
+  const missing = [...declared]
+    .filter((t) => !policied.has(currentName(t)))
+    .sort();
   if (missing.length > 0) {
     throw new Error(
       `RLS migrations declare policies for tables that have none after apply: ${missing.join(", ")}.`,
