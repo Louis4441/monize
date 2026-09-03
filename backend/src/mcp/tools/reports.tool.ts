@@ -13,6 +13,8 @@ import {
 import {
   getDefaultDateRange,
   getDefaultPreviousMonth,
+  numberArg,
+  booleanArg,
 } from "../../common/tool-schemas";
 import { generateReportOutput } from "../tool-output-schemas";
 import { READ_ONLY } from "../mcp-annotations";
@@ -31,7 +33,11 @@ export class McpReportsTools {
         title: "Generate report",
         annotations: READ_ONLY,
         description:
-          "Run a built-in financial report. Prefer this over list_transactions for spending/income breakdown, anomaly, and month-comparison questions because it returns a ready aggregated result. Types: 'spending_by_category' (expense totals grouped by category), 'spending_by_payee' (expense totals grouped by payee), 'income_vs_expenses' (period income, expenses, and net), 'monthly_trend' (spending per month over the range -- use this for trend questions instead of fetching transactions month by month), 'income_by_source' (income grouped by source), 'spending_anomalies' (transactions that are statistically large for their category vs recent history -- use for 'any unusual spending?'; may return an empty list for sparse data, in which case report that nothing was unusual rather than implying a problem), 'month_comparison' (one month vs the previous month: income vs expenses, category spending changes, net worth, and investment performance -- use for 'how am I doing this month?'), and 'net_worth_history' (monthly assets, liabilities, and net worth over time -- use for net-worth trend questions about overall financial health). Parameters apply per type: the five aggregation types use startDate/endDate (default last 30 days); 'net_worth_history' uses startDate/endDate (default last 12 months); 'spending_anomalies' uses months; 'month_comparison' uses month. For an arbitrary pair of date ranges use compare_periods instead.",
+          "Run a built-in financial report, which returns a ready aggregate. " +
+          "Prefer it over list_transactions for any breakdown, anomaly or " +
+          "month-comparison question. The `type` field says what each report " +
+          "answers and which of the date parameters it reads. For an arbitrary " +
+          "pair of ranges use compare_periods instead.",
         inputSchema: {
           type: z
             .enum([
@@ -45,36 +51,27 @@ export class McpReportsTools {
               "net_worth_history",
             ])
             .describe(
-              "Which report to run. MUST be exactly one of the listed values.",
+              "Which report to run, exactly one of the listed values. The five totals reports (by category, by payee, income vs expenses, monthly trend, income by source) read startDate/endDate, default the last 30 days. net_worth_history reads them too, defaulting to 12 months. spending_anomalies reads months and finds transactions statistically large for their category -- an empty list means nothing was unusual, not a problem. month_comparison reads month and covers income, category changes, net worth and investments.",
             ),
           startDate: z
             .string()
             .max(10)
             .optional()
-            .describe(
-              "Start date (YYYY-MM-DD) for the five aggregation types (default 30 days ago) and net_worth_history (default 12 months ago).",
-            ),
+            .describe("Start date. See `type` for the per-report default."),
           endDate: z
             .string()
             .max(10)
             .optional()
-            .describe(
-              "End date (YYYY-MM-DD) for the five aggregation types and net_worth_history. Defaults to today.",
-            ),
-          months: z
-            .number()
-            .min(1)
-            .max(24)
+            .describe("End date. Defaults to today."),
+          months: numberArg(z.number().min(1).max(24))
             .optional()
-            .describe(
-              "spending_anomalies only: months of recent history to analyze (default 3).",
-            ),
+            .describe("spending_anomalies: months of history. Default 3."),
           month: z
             .string()
             .max(7)
             .optional()
             .describe(
-              "month_comparison only: month in YYYY-MM format (e.g. 2026-01). Defaults to the previous complete month.",
+              "month_comparison: YYYY-MM. Defaults to the previous complete month.",
             ),
         },
         outputSchema: generateReportOutput,

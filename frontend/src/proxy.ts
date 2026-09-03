@@ -105,13 +105,28 @@ function nextWithCsp(request: NextRequest): NextResponse {
 // "Accept: text/event-stream" on GET, and follow-up requests carry an
 // Mcp-Session-Id / MCP-Protocol-Version header — none of which a browser
 // navigation ever sends, so this cannot intercept normal page loads.
+//
+// The bearer check is why an unauthenticated probe gets a truthful answer. An
+// MCP request carrying only "Authorization: Bearer <bad token>" matched none of
+// the other signals, so it fell through to the app shell and was answered with a
+// redirect to /login and then a 200 — which a security scan reads as the server
+// accepting an invalid token, while the MCP endpoint itself had been refusing it
+// with a 401 all along. A request holding a bearer token is addressed to the
+// API, and the API's own refusal is what must reach it. This app authenticates
+// with cookies and never sends an Authorization header, so no page load matches.
+// Mcp-Method / Mcp-Name are the routing headers the 2026-07-28 revision requires
+// on every Streamable HTTP POST.
 function isRootMcpRequest(request: NextRequest, pathname: string): boolean {
   if (pathname !== '/') return false;
   const accept = request.headers.get('accept') ?? '';
+  const authorization = request.headers.get('authorization') ?? '';
   return (
     accept.includes('text/event-stream') ||
+    authorization.toLowerCase().startsWith('bearer ') ||
     request.headers.has('mcp-session-id') ||
-    request.headers.has('mcp-protocol-version')
+    request.headers.has('mcp-protocol-version') ||
+    request.headers.has('mcp-method') ||
+    request.headers.has('mcp-name')
   );
 }
 

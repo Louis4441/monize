@@ -364,6 +364,11 @@ background write with no request locale to inherit, so it resolves the
 recipient's stored `user_preferences.language` exactly as an email does. Reuse
 those two; a second locale resolver is how the answers drift.
 
+## A case-sensitive `LIKE` is not a search
+
+Postgres evaluates `LIKE` case-sensitively, so `Like('%amazon%')` matched nothing while `Like('%Amazon%')` matched -- and the tool built on it looked as though it only accepted exact names (its own description had promised a "case-insensitive substring match" for as long as it had been wrong). Where a filter is offered to a person or a model, match case-insensitively: `ILike`, or a comparison the code performs itself. `PayeesService.getLlmPayees` is the worked example, and its spec asserts that a lowercase query and an uppercase one return the same rows.
+
+**And a filtered list says how much it left out.** `getLlmPayees` returns `totalCount` (what matched) beside `payees` (what came back) and a `truncated` flag, because a capped list presented as the whole one is the same defect as a subtotal presented as a total.
 ## Rejection happens before the write
 
 A check capable of refusing a command belongs inside the transaction that performs it, and under the same lock where concurrency is in play. A service that mutates, commits, and returns a success-shaped value for a caller to reject afterwards has already done the thing the `409` says it did not do.

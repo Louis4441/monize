@@ -82,7 +82,7 @@ describe("McpScheduledTools", () => {
         kind: undefined,
         accountIds: undefined,
       });
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.itemCount).toBe(1);
       expect(parsed.items[0].kind).toBe("bill");
     });

@@ -667,10 +667,10 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
-        query: {
+        search: {
           type: "string",
           description:
-            "Ticker symbol (e.g. 'AAPL') or company/security name (e.g. 'Apple') to search for. Required.",
+            "Ticker symbol (e.g. 'AAPL') or company/security name (e.g. 'Apple') to look up. Required.",
         },
         exchange: {
           type: "string",
@@ -685,7 +685,7 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
             "Optional quote provider to query: 'yahoo', 'msn', or 'auto' (the user's configured default, the recommended choice). Omit for 'auto'.",
         },
       },
-      required: ["query"],
+      required: ["search"],
     },
   },
   {
@@ -919,6 +919,47 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
           type: "string",
           description:
             "Optional case-insensitive substring match on the payee name. Omit to return all payees.",
+        },
+        status: {
+          type: "string",
+          enum: ["active", "inactive", "all"],
+          description: "Which payees to consider. Defaults to 'all'.",
+        },
+        sortBy: {
+          type: "string",
+          enum: ["name", "lastUsed", "transactionCount"],
+          description:
+            "'name' (A-Z, default), 'lastUsed' (most recent first, never-used last), or 'transactionCount' (busiest first).",
+        },
+        limit: {
+          type: "number",
+          description:
+            "Return only the first N rows after sorting. The result reports totalCount and truncated, so say when a list is only part of the matches.",
+        },
+        hasWebsite: {
+          type: "boolean",
+          description:
+            "True keeps only payees with a website, false only those without, omitted asks nothing.",
+        },
+        hasLogo: {
+          type: "boolean",
+          description: "As hasWebsite, for a resolved brand icon.",
+        },
+        hasAddress: {
+          type: "boolean",
+          description: "As hasWebsite, for a postal address.",
+        },
+        hasEmail: {
+          type: "boolean",
+          description: "As hasWebsite, for an email address.",
+        },
+        hasPhone: {
+          type: "boolean",
+          description: "As hasWebsite, for a phone number.",
+        },
+        hasDefaultCategory: {
+          type: "boolean",
+          description: "As hasWebsite, for a default category.",
         },
       },
     },

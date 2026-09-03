@@ -72,7 +72,7 @@ describe("McpBudgetsTools", () => {
         "CURRENT",
         undefined,
       );
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.totalBudgeted).toBe(1000);
     });
 

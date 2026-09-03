@@ -15,6 +15,8 @@ import {
   reportProgressOutput,
 } from "../tool-output-schemas";
 import { READ_ONLY } from "../mcp-annotations";
+import { RELAY_TURN_GUIDANCE } from "../relay-guidance";
+import { uuidString } from "./schema-fragments";
 
 /**
  * Reverse-relay control tools. These do not touch the financial dataset -- they
@@ -39,7 +41,15 @@ export class McpRelayTools {
         title: "Wait for the next chat prompt",
         annotations: READ_ONLY,
         description:
-          "Long-poll for the next prompt a user typed in the Monize web chat. Returns { hasPrompt: false } if none arrives within the poll window -- in that case call this tool again immediately to keep listening. EXCEPTION: if the result is { hasPrompt: false, stop: true }, the user has been inactive for a while -- STOP your polling loop and exit cleanly; do NOT call get_next_prompt again. The web chat tells the user you disconnected for inactivity, and they reconnect you (re-run your loop) when they want to continue. When hasPrompt is true, handle the request using the other Monize tools, calling report_progress with short status updates as you work (before a lookup, or when sending a confirmation card), then call post_response with promptId and your final answer. ALWAYS finish a claimed prompt and call post_response, even for a long task: never abandon it partway. Send your FIRST report_progress immediately after claiming a prompt, and keep sending one at least every minute or two while you read, plan, or compose a large request -- the web chat shows the user a 'went quiet' message if it hears nothing from you for a few minutes, and a steady progress signal prevents that. 'history' is the prior conversation, oldest first. If 'attachments' is present, the user uploaded files with the prompt: read each attachment's 'uri' (a monize-attachment:// resource) to view the file before answering. Text files are also inlined into the prompt text, so you only need to read image and PDF attachments.",
+          "Long-poll for the next prompt typed in the Monize web chat. " +
+          "{ hasPrompt: false }: call again immediately to keep listening. " +
+          "{ hasPrompt: false, stop: true }: the user has gone inactive -- stop " +
+          "the polling loop and exit cleanly; they will reconnect you. " +
+          "{ hasPrompt: true }: the result carries the prompt, `history` " +
+          "(oldest first), any `attachments` (read each `uri` to view an image " +
+          "or PDF; text files are already inlined into the prompt) and " +
+          "`guidance` -- follow it, and always finish the claimed prompt with " +
+          "post_response.",
         inputSchema: {},
         outputSchema: getNextPromptOutput,
       },
@@ -70,6 +80,9 @@ export class McpRelayTools {
             promptId: claimed.promptId,
             prompt: claimed.prompt,
             history: claimed.history,
+            // Travels with the claimed prompt rather than in the server
+            // instructions, so only a relay turn pays for it.
+            guidance: RELAY_TURN_GUIDANCE,
             ...(claimed.attachments
               ? { attachments: claimed.attachments }
               : {}),
@@ -86,16 +99,13 @@ export class McpRelayTools {
         title: "Send a chat answer",
         annotations: READ_ONLY,
         description:
-          "Deliver your answer for a prompt obtained from get_next_prompt back to the Monize web chat. Pass the promptId you received and the full answer text. Always post your final answer, even if the task ran long: { delivered: true } is returned even when the user's live request already timed out -- the answer is buffered and shown as soon as the web chat reconnects, so it is never wasted. { delivered: false } is rare and means the promptId is unknown or was already answered; only then move on without retrying.",
+          "Deliver the final answer for a prompt from get_next_prompt. Always " +
+          "post it, however long the task ran: a buffered answer is shown when " +
+          "the chat reconnects, so it is never wasted. delivered:false means " +
+          "the promptId is unknown or already answered -- only then move on.",
         inputSchema: {
-          promptId: z
-            .string()
-            .uuid()
-            .describe("The promptId from get_next_prompt"),
-          text: z
-            .string()
-            .max(50000)
-            .describe("The answer to show the user in the chat"),
+          promptId: uuidString().describe("The promptId from get_next_prompt."),
+          text: z.string().max(50000).describe("The answer to show the user."),
         },
         outputSchema: postResponseOutput,
       },
@@ -124,16 +134,16 @@ export class McpRelayTools {
         title: "Stream a progress update",
         annotations: READ_ONLY,
         description:
-          "Stream a short, human-readable progress update to the Monize web chat while you work on a prompt from get_next_prompt. Shown live to the user as the assistant's running narration (e.g. 'Looking up the sporting goods category...' or 'Dry run looks good, sending the confirmation card.'). Call it whenever you start a lookup or make a decision, before the relevant tool call, and at least every minute or two during long reading/planning so the chat does not think you went quiet. Pass the promptId you are handling and one concise sentence. This does not answer the prompt -- still call post_response with the final answer when done. { delivered: false } means the web chat is not attached to your live narration right now (it may have stopped waiting after a silent gap). This is NOT a signal to abandon the prompt: keep working and still send your confirmation cards and your final post_response -- those ARE buffered and shown to the user when the chat reconnects, even though live progress lines are not. You may stop sending further progress lines once you see delivered:false, but you must still complete the task and post_response.",
+          "Stream one short sentence of live narration to the web chat while " +
+          'you work on a claimed prompt ("Looking up the groceries ' +
+          'category..."). Send one before each lookup or decision, and at ' +
+          "least every minute or two while reading or composing. It does not " +
+          "answer the prompt: finish with post_response. delivered:false means " +
+          "only that live narration is not attached right now -- keep working; " +
+          "cards and your final answer are still buffered and shown.",
         inputSchema: {
-          promptId: z
-            .string()
-            .uuid()
-            .describe("The promptId from get_next_prompt"),
-          text: z
-            .string()
-            .max(2000)
-            .describe("A short status update to show the user"),
+          promptId: uuidString().describe("The promptId from get_next_prompt."),
+          text: z.string().max(2000).describe("One short status sentence."),
         },
         outputSchema: reportProgressOutput,
       },

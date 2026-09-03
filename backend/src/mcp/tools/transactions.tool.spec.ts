@@ -224,7 +224,7 @@ describe("McpTransactionsTools", () => {
         }),
       );
       expect(transactionsService.getLlmTransactionRows).not.toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.totalIncome).toBe(1000);
       expect(parsed.transactions).toBeUndefined();
     });
@@ -279,7 +279,7 @@ describe("McpTransactionsTools", () => {
           limit: 10,
         }),
       );
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.transactions).toHaveLength(1);
       expect(parsed.total).toBe(1);
       expect(parsed.hasMore).toBe(true);
@@ -417,7 +417,7 @@ describe("McpTransactionsTools", () => {
         "u1",
         expect.objectContaining({ transfersOnly: true }),
       );
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.transfers).toBeDefined();
     });
 
@@ -535,7 +535,7 @@ describe("McpTransactionsTools", () => {
       );
 
       expect(transactionsService.create).not.toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.dryRun).toBe(true);
       expect(parsed.previews).toHaveLength(1);
     });
@@ -563,7 +563,7 @@ describe("McpTransactionsTools", () => {
       );
 
       expect(transactionsService.create).toHaveBeenCalledTimes(1);
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.id).toBe("t1");
       expect(parsed.count).toBe(1);
     });
@@ -629,7 +629,7 @@ describe("McpTransactionsTools", () => {
           expect.objectContaining({ payeeName: "Shared rent" }),
         ]),
       );
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.id).toBe("tf1");
     });
 
@@ -722,7 +722,7 @@ describe("McpTransactionsTools", () => {
       expect(actionBuilder.buildCreateTransactions).toHaveBeenCalledTimes(1);
       expect(relayService.emitPendingAction).toHaveBeenCalledTimes(1);
       expect(transactionsService.create).not.toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.status).toBeDefined();
     });
 
@@ -785,7 +785,7 @@ describe("McpTransactionsTools", () => {
       );
 
       expect(transactionsService.update).toHaveBeenCalledTimes(1);
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.id).toBe("t1");
     });
 
@@ -893,7 +893,7 @@ describe("McpTransactionsTools", () => {
       );
 
       expect(transactionsService.removeAny).toHaveBeenCalledWith("u1", "t1");
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.deleted).toBe(true);
     });
 
@@ -1039,7 +1039,7 @@ describe("McpTransactionsTools", () => {
         { sessionId: "s1" },
       );
       expect(transactionsService.create).toHaveBeenCalledTimes(2);
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.ids).toEqual(["t1", "t2"]);
     });
 
@@ -1102,7 +1102,7 @@ describe("McpTransactionsTools", () => {
         { sessionId: "s1" },
       );
       expect(transactionsService.createTransfer).toHaveBeenCalledTimes(1);
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.ids).toEqual(["t1", "tf1"]);
     });
 
@@ -1161,7 +1161,7 @@ describe("McpTransactionsTools", () => {
         { sessionId: "s1" },
       );
       expect(transactionsService.create).toHaveBeenCalledTimes(1);
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.ids).toEqual(["t1"]);
     });
 
@@ -1181,7 +1181,7 @@ describe("McpTransactionsTools", () => {
         { sessionId: "s1" },
       );
       expect(transactionsService.update).not.toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.dryRun).toBe(true);
     });
 
@@ -1201,7 +1201,7 @@ describe("McpTransactionsTools", () => {
         { sessionId: "s1" },
       );
       expect(transactionsService.removeAny).not.toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.dryRun).toBe(true);
     });
 
@@ -1268,7 +1268,7 @@ describe("McpTransactionsTools", () => {
         { sessionId: "s1" },
       );
       expect(transactionsService.update).toHaveBeenCalledTimes(1);
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.ids).toEqual(["t1"]);
     });
 
@@ -1377,7 +1377,7 @@ describe("McpTransactionsTools", () => {
         { sessionId: "s1" },
       );
       expect(transactionsService.update).toHaveBeenCalledTimes(2);
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.count).toBe(2);
     });
 
@@ -1456,7 +1456,7 @@ describe("McpTransactionsTools", () => {
         { sessionId: "s1" },
       );
       expect(transactionsService.removeAny).toHaveBeenCalledTimes(2);
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.ids).toEqual(["t1", "t2"]);
     });
 
@@ -1505,7 +1505,7 @@ describe("McpTransactionsTools", () => {
         { sessionId: "s1" },
       );
       expect(transactionsService.removeAny).toHaveBeenCalledTimes(2);
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.count).toBe(2);
     });
 
@@ -1568,7 +1568,7 @@ describe("McpTransactionsTools", () => {
         { sessionId: "s1" },
       );
       expect(transactionsService.createTransfer).toHaveBeenCalledTimes(2);
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.ids).toEqual(["tf1", "tf1"]);
     });
 
@@ -1634,7 +1634,7 @@ describe("McpTransactionsTools", () => {
         "t1",
         expect.objectContaining({ categoryId: "cat-1" }),
       );
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.count).toBe(2);
     });
 
@@ -1666,7 +1666,7 @@ describe("McpTransactionsTools", () => {
         },
         { sessionId: "s1" },
       );
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.skipped).toHaveLength(1);
     });
 
@@ -1719,7 +1719,7 @@ describe("McpTransactionsTools", () => {
         }),
         { createPayeeIfMissing: true },
       );
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.id).toBe("t-split");
       expect(parsed.count).toBe(1);
     });
@@ -1803,7 +1803,7 @@ describe("McpTransactionsTools", () => {
         { createPayeeIfMissing: true },
       );
       expect(transactionsService.updateSplits).not.toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.id).toBe("t1");
     });
 
@@ -1901,7 +1901,7 @@ describe("McpTransactionsTools", () => {
         },
         { sessionId: "s1" },
       );
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.dryRun).toBe(true);
       expect(parsed.previews[0].splits).toHaveLength(2);
       expect(transactionsService.update).not.toHaveBeenCalled();
@@ -1932,7 +1932,7 @@ describe("McpTransactionsTools", () => {
         },
         { sessionId: "s1" },
       );
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.dryRun).toBe(true);
       expect(parsed.previews[0].splits).toHaveLength(2);
       expect(transactionsService.create).not.toHaveBeenCalled();
@@ -2169,7 +2169,7 @@ describe("McpTransactionsTools", () => {
         UUID_USER,
         ["fresh-1"],
       );
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.id).toBe("t1");
       expect(parsed.attachments).toEqual([
         { id: "att-1", filename: "receipt.png" },
@@ -2189,7 +2189,7 @@ describe("McpTransactionsTools", () => {
       );
       expect(relayAttachmentStore.get).toHaveBeenCalledWith(UUID_USER, "ref-9");
       expect(attachmentsService.create).toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.attachments).toHaveLength(1);
     });
 
@@ -2223,7 +2223,7 @@ describe("McpTransactionsTools", () => {
       expect(attachmentsService.create).not.toHaveBeenCalled();
       // The parked bytes stay for the browser confirm.
       expect(relayAttachmentStore.releaseForPrompt).not.toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.status).toBe("preview_shown");
     });
 
@@ -2266,7 +2266,7 @@ describe("McpTransactionsTools", () => {
         TXID,
         expect.objectContaining({ originalname: "receipt.png" }),
       );
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.attachments).toHaveLength(1);
     });
 

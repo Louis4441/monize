@@ -23,20 +23,21 @@ export class McpCategoriesTools {
         title: "List categories",
         annotations: READ_ONLY,
         description:
-          "List the user's categories with their hierarchy (parent names) and transaction counts. Optionally filter by type or search by name. Returns the same shape as the AI Assistant's list_categories tool.",
+          "The user's categories with their hierarchy and transaction counts. " +
+          'Pass a row\'s `qualifiedName` ("Parent: Child") back to any other ' +
+          "tool -- a bare child name shared by two parents is rejected, not " +
+          "guessed.",
         inputSchema: {
           type: z
             .enum(["expense", "income", "all"])
             .optional()
-            .describe(
-              "Filter by category type. Defaults to 'all' when omitted.",
-            ),
+            .describe("Defaults to 'all'."),
           search: z
             .string()
             .max(100)
             .optional()
             .describe(
-              "Optional case-insensitive substring match on category name. Matched subcategories' parents are included so hierarchy stays visible.",
+              "Case-insensitive substring of the name. A match's parents come too, so the hierarchy stays readable.",
             ),
         },
         outputSchema: getCategoriesOutput,

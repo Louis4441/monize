@@ -87,6 +87,71 @@ describe('proxy MCP-at-root routing', () => {
     expect(response.headers.get('location')).toBeNull();
   });
 
+  it('proxies POST / carrying a bearer token, so the API answers an invalid one', async () => {
+    // A security scan aimed at the bare origin sent exactly this: a bearer token
+    // and nothing else. It used to match no MCP signal, fall through to the app
+    // shell, and be answered 307 -> 200, which reads as "the server accepted an
+    // invalid token". The backend has always refused it with a 401; the proxy
+    // just has to let that refusal through.
+    fetchMock.mockResolvedValueOnce(
+      new Response('{"error":{"message":"Unauthorized"}}', {
+        status: 401,
+        headers: { 'www-authenticate': 'Bearer realm="monize"' },
+      }),
+    );
+    const request = makeRequest('/', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer not-a-real-token',
+        accept: 'application/json',
+        'content-type': 'application/json',
+      },
+    });
+    const response = await proxy(request);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:3001/api/v1/mcp');
+    expect(response.status).toBe(401);
+    expect(response.headers.get('location')).toBeNull();
+  });
+
+  it('matches the bearer scheme case-insensitively', async () => {
+    const request = makeRequest('/', {
+      method: 'POST',
+      headers: { authorization: 'bearer pat_lowercase_scheme' },
+    });
+    await proxy(request);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:3001/api/v1/mcp');
+  });
+
+  it('proxies POST / with the 2026-07-28 Mcp-Method header', async () => {
+    const request = makeRequest('/', {
+      method: 'POST',
+      headers: { 'mcp-method': 'tools/list', 'mcp-name': 'list_accounts' },
+    });
+    await proxy(request);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:3001/api/v1/mcp');
+  });
+
+  it('still redirects a cookie-authenticated browser navigation to /', async () => {
+    // The app authenticates with cookies and never sends Authorization, so
+    // widening the predicate cannot reach an ordinary page load.
+    const request = makeRequest('/', {
+      headers: {
+        accept: 'text/html,application/xhtml+xml',
+        cookie: 'access_token=abc',
+      },
+    });
+    const response = await proxy(request);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(response.status).toBe(307);
+  });
+
   it('still proxies explicit /api/v1/mcp requests unchanged', async () => {
     const request = makeRequest('/api/v1/mcp', {
       method: 'POST',

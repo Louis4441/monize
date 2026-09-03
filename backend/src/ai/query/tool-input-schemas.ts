@@ -3,6 +3,8 @@ import {
   directionSchema,
   isoDateSchema,
   positiveIntSchema,
+  numberArg,
+  booleanArg,
 } from "../../common/tool-schemas";
 import { MAX_BULK_ACTION_ROWS } from "../actions/ai-action.types";
 import { MAX_ATTACHMENTS as MAX_CHAT_ATTACHMENTS } from "./dto/ai-query.dto";
@@ -29,14 +31,18 @@ export const listTransactionsSchema = z.object({
   accountNames: z.array(z.string().max(100)).max(50).optional(),
   categoryNames: z.array(z.string().max(100)).max(100).optional(),
   payeeNames: z.array(z.string().max(100)).max(100).optional(),
-  minAmount: z.number().min(-999999999999).max(999999999999).optional(),
-  maxAmount: z.number().min(-999999999999).max(999999999999).optional(),
+  minAmount: numberArg(
+    z.number().min(-999999999999).max(999999999999),
+  ).optional(),
+  maxAmount: numberArg(
+    z.number().min(-999999999999).max(999999999999),
+  ).optional(),
   direction: directionSchema.optional(),
   groupBy: z
     .enum(["category", "payee", "year", "month", "week", "none"])
     .optional(),
-  transfersOnly: z.boolean().optional(),
-  includeTransactions: z.boolean().optional(),
+  transfersOnly: booleanArg().optional(),
+  includeTransactions: booleanArg().optional(),
   limit: positiveIntSchema(1, 100).optional(),
   sortBy: z.enum(["date", "amount", "payee"]).optional(),
   sortDirection: z.enum(["asc", "desc"]).optional(),
@@ -83,7 +89,7 @@ export const comparePeriodsSchema = z.object({
 export const getPortfolioSummarySchema = z.object({
   accountNames: z.array(z.string().max(100)).optional(),
   // Opt-in country / asset-class look-through (an extra holdings + FX pass).
-  includeLookThrough: z.boolean().optional(),
+  includeLookThrough: booleanArg().optional(),
 });
 
 export const INVESTMENT_ACTIONS = [
@@ -135,6 +141,15 @@ export const getBudgetStatusSchema = z.object({
 
 export const listPayeesSchema = z.object({
   search: z.string().max(200).optional(),
+  status: z.enum(["active", "inactive", "all"]).optional(),
+  sortBy: z.enum(["name", "lastUsed", "transactionCount"]).optional(),
+  limit: numberArg(z.number().int().min(1).max(500)).optional(),
+  hasWebsite: booleanArg().optional(),
+  hasLogo: booleanArg().optional(),
+  hasAddress: booleanArg().optional(),
+  hasEmail: booleanArg().optional(),
+  hasPhone: booleanArg().optional(),
+  hasDefaultCategory: booleanArg().optional(),
 });
 
 /** Report month in YYYY-MM form, used by the month_comparison report type. */
@@ -182,7 +197,7 @@ export const getUpcomingBillsSchema = z.object({
 
 export const calculateSchema = z.object({
   operation: z.enum(["percentage", "difference", "ratio", "sum", "average"]),
-  values: z.array(z.number()).min(1).max(100),
+  values: z.array(numberArg()).min(1).max(100),
   label: z.string().max(200).optional(),
 });
 
@@ -199,7 +214,7 @@ export const renderChartSchema = z.object({
     .array(
       z.object({
         label: z.string().min(1).max(80),
-        value: z.number().finite().nonnegative(),
+        value: numberArg(z.number().finite().nonnegative()),
       }),
     )
     .min(1)
@@ -228,7 +243,7 @@ export const createTransactionSchema = z.object({
   payeeName: z.string().max(100).optional(),
   categoryName: z.string().max(100).optional(),
   description: z.string().max(500).optional(),
-  createPayeeIfMissing: z.boolean().optional(),
+  createPayeeIfMissing: booleanArg().optional(),
 });
 
 export const categorizeTransactionSchema = z.object({
@@ -260,7 +275,7 @@ export const managePayeesSchema = z.object({
 });
 
 export const lookupSecuritiesSchema = z.object({
-  query: z.string().min(1).max(100),
+  search: z.string().min(1).max(100),
   exchange: z.enum(SECURITY_EXCHANGES).optional(),
   provider: z.enum(["yahoo", "msn", "auto"]).optional(),
 });
@@ -275,7 +290,7 @@ export const manageSecuritiesSchema = z.object({
         symbol: z.string().min(1).max(100).optional(),
         exchange: z.enum(SECURITY_EXCHANGES).optional(),
         securityType: z.enum(SECURITY_TYPES).optional(),
-        isFavourite: z.boolean().optional(),
+        isFavourite: booleanArg().optional(),
         // ISO 4217 alphabetic code; the confirm-time DTO re-validates it as a
         // known currency, so the schema only enforces the 3-letter shape here.
         currencyCode: z
@@ -288,7 +303,7 @@ export const manageSecuritiesSchema = z.object({
           .array(
             z.object({
               name: z.string().min(1).max(100),
-              weight: z.number().min(0).max(100),
+              weight: numberArg(z.number().min(0).max(100)),
             }),
           )
           .max(60)
@@ -299,7 +314,7 @@ export const manageSecuritiesSchema = z.object({
           .array(
             z.object({
               name: z.string().min(1).max(100),
-              weight: z.number().min(0).max(100),
+              weight: numberArg(z.number().min(0).max(100)),
             }),
           )
           .max(60)
@@ -317,7 +332,9 @@ export const manageSecuritiesSchema = z.object({
  * CreateInvestmentTransactionDto (and the preview rounds to column scale), so
  * the schema only needs to reject negatives and absurd magnitudes.
  */
-const nonNegativeAmountSchema = z.number().finite().min(0).max(999999999999);
+const nonNegativeAmountSchema = numberArg(
+  z.number().finite().min(0).max(999999999999),
+);
 
 /**
  * Bulk variants: an array of the singular row schema, capped at
@@ -434,7 +451,7 @@ export const updateTransactionSchema = z
     payeeName: z.string().max(100).optional(),
     categoryName: z.string().max(100).optional(),
     description: z.string().max(500).optional(),
-    createPayeeIfMissing: z.boolean().optional(),
+    createPayeeIfMissing: booleanArg().optional(),
   })
   .refine(
     (v) =>
@@ -490,8 +507,10 @@ const manageTransactionItemSchema = z
     payeeName: z.string().max(100).optional(),
     categoryName: z.string().max(100).optional(),
     description: z.string().max(500).optional(),
-    createPayeeIfMissing: z.boolean().optional(),
-    exchangeRate: z.number().finite().min(0).max(1_000_000).optional(),
+    createPayeeIfMissing: booleanArg().optional(),
+    exchangeRate: numberArg(
+      z.number().finite().min(0).max(1_000_000),
+    ).optional(),
     toAmount: amountSchema.optional(),
     // split transactions (category splits only)
     splits: z
@@ -501,7 +520,12 @@ const manageTransactionItemSchema = z
     // Chat attachments to save on the transaction: each entry names a file on
     // the CURRENT message by filename (string) or 1-based position (number).
     attachments: z
-      .array(z.union([z.string().min(1).max(255), z.number().int().min(1)]))
+      .array(
+        z.union([
+          z.string().min(1).max(255),
+          numberArg(z.number().int().min(1)),
+        ]),
+      )
       .min(1)
       .max(MAX_CHAT_ATTACHMENTS)
       .optional(),

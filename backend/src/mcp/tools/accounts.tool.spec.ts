@@ -105,7 +105,7 @@ describe("McpAccountsTools", () => {
         accountTypes: ["CHEQUING", "SAVINGS"],
       });
       expect(result.isError).toBeUndefined();
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.netWorth).toBe(1000);
       expect(parsed.accounts[0].id).toBe("a1");
       // Loan schedule fields flow through for debt accounts

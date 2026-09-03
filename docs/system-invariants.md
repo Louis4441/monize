@@ -116,6 +116,7 @@ implied.
 | INV-ACTIVITY-001 | Activity is attributed to whoever acted, not to whoever was acted for | enforced |
 | INV-PROFILE-001 | A user-profile response is an allowlist | enforced |
 | INV-MCP-001 | An MCP session is bound to the credential that opened it | enforced |
+| INV-MCP-002 | An MCP request is answered by the MCP transport, never by the app shell | enforced |
 | INV-CURRENCY-001 | A shared currency is deleted only by its creator, on a global count | enforced |
 | INV-ATTACHMENT-001 | Available metadata resolves to committed bytes | enforced |
 | INV-BACKUP-001 | A backup file is complete, verified and owner-namespaced | enforced |
@@ -1879,6 +1880,34 @@ Concurrency scope   per session, per credential
 Failure response    403 on a mismatched credential.
 Required tests      Present: mcp-http.controller.spec.ts covers the 403
                     credential-mismatch and session/user-mismatch cases.
+Status              enforced
+```
+
+### INV-MCP-002 -- an MCP request is answered by the MCP transport
+
+```text
+Statement           A request addressed to the MCP server is answered by the MCP
+                    transport or refused by it. The Next.js application shell
+                    never answers one, so an unauthenticated probe receives the
+                    transport's own 401 rather than a page.
+Source of truth     frontend/src/proxy.ts isRootMcpRequest
+Enforcement         The proxy forwards a request to "/" to /api/v1/mcp when it
+                    carries an event-stream Accept, an Authorization: Bearer
+                    header, Mcp-Session-Id, MCP-Protocol-Version, Mcp-Method or
+                    Mcp-Name. Before the bearer clause a probe carrying only a
+                    bad token matched nothing, fell through to the app, and was
+                    answered 307 -> 200 -- indistinguishable from a server
+                    accepting an invalid token. mcp-http.controller.ts
+                    validatePat refuses every malformed or unknown bearer with a
+                    401 plus the RFC 9728 WWW-Authenticate header.
+Failure response    401 from the MCP endpoint, naming resource_metadata.
+Required tests      Present: proxy.test.ts covers the bearer probe (asserting the
+                    401 reaches the caller), the case-insensitive scheme, the
+                    Mcp-Method header, and that a cookie-authenticated browser
+                    navigation still redirects to /login. Both bearer cases were
+                    confirmed to fail without the clause.
+                    mcp-http.controller.spec.ts covers nine malformed and unknown
+                    Authorization shapes across POST, GET and DELETE.
 Status              enforced
 ```
 

@@ -231,12 +231,28 @@ export async function confirmWrite(
   }
 }
 
+/**
+ * The one success path for a tool.
+ *
+ * It returns `structuredContent` and NOTHING ELSE. Every tool here declares an
+ * `outputSchema`, so `structuredContent` is what the SDK validates and what a
+ * client reads; the spec's backwards-compatibility advice to ALSO emit the
+ * serialized JSON as a text block meant every result travelled twice, once
+ * pretty-printed, and a model paid for both halves of every answer. A portfolio
+ * summary or a page of transactions is far larger than the tool definition that
+ * asked for it, so this is the bigger half of the per-request cost.
+ *
+ * The cost of dropping it is a client too old to read `structuredContent`, which
+ * would see an empty result rather than a degraded one. Restoring the block is a
+ * one-line change here if such a client turns up.
+ *
+ * Errors keep their text block: `toolError` carries no structured content, and
+ * an error bypasses output validation entirely.
+ */
 export function toolResult(data: unknown) {
   const sanitized = normalizeNonFiniteNumbers(sanitizeToolResultStrings(data));
   return {
-    content: [
-      { type: "text" as const, text: JSON.stringify(sanitized, null, 2) },
-    ],
+    content: [] as { type: "text"; text: string }[],
     structuredContent: toStructuredContent(sanitized),
   };
 }

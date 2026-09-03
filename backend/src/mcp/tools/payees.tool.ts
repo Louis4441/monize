@@ -28,6 +28,13 @@ import {
 import { McpWriteLimiter } from "../mcp-write-limiter";
 import { getPayeesOutput, managePayeesOutput } from "../tool-output-schemas";
 import { READ_ONLY, WRITE } from "../mcp-annotations";
+import {
+  manageOperation,
+  approvalMode,
+  dryRun,
+  itemsArray,
+} from "./schema-fragments";
+import { numberArg, booleanArg } from "../../common/tool-schemas";
 
 type ManagePayeeOperation = "create" | "update" | "delete";
 type ApprovalMode = "bulk" | "individual";
@@ -84,13 +91,45 @@ export class McpPayeesTools {
         title: "List payees",
         annotations: READ_ONLY,
         description:
-          "List payees, optionally filtered by search query. Each payee carries its default category, website and contact details (address, email, phone; null when unset), so this is how to find payees missing one before filling them in with manage_payees.",
+          "The user's payees with their default category, contact details and " +
+          "usage. `search` is a case-insensitive substring of the name. The " +
+          "has* filters are three-valued: true keeps only the payees carrying " +
+          "that detail, false only those missing it, omitted asks nothing -- so " +
+          "hasEmail:false is how to find the payees still needing one. " +
+          "`totalCount` is how many matched and `truncated` says whether " +
+          "`payees` is only the first `limit` of them; never describe a " +
+          "truncated list as all of the user's payees.",
         inputSchema: {
           search: z
             .string()
             .max(200)
             .optional()
-            .describe("Search query to filter payees"),
+            .describe("Case-insensitive substring of the payee name."),
+          status: z
+            .enum(["active", "inactive", "all"])
+            .optional()
+            .describe("Defaults to 'all'."),
+          sortBy: z
+            .enum(["name", "lastUsed", "transactionCount"])
+            .optional()
+            .describe(
+              "name (A-Z, default), lastUsed (most recent first, never-used last), or transactionCount (busiest first).",
+            ),
+          limit: numberArg(z.number().int().min(1).max(500))
+            .optional()
+            .describe("Return only the first N rows after sorting."),
+          hasWebsite: booleanArg().optional().describe("Filter on a website."),
+          hasLogo: booleanArg()
+            .optional()
+            .describe("Filter on a resolved brand icon."),
+          hasAddress: booleanArg().optional().describe("Filter on an address."),
+          hasEmail: booleanArg().optional().describe("Filter on an email."),
+          hasPhone: booleanArg()
+            .optional()
+            .describe("Filter on a phone number."),
+          hasDefaultCategory: booleanArg()
+            .optional()
+            .describe("Filter on a default category."),
         },
         outputSchema: getPayeesOutput,
       },
@@ -101,16 +140,9 @@ export class McpPayeesTools {
         if (check.error) return check.result;
 
         try {
-          if (args.search) {
-            const payees = await this.payeesService.search(
-              ctx.userId,
-              args.search,
-              50,
-            );
-            return toolResult(payees);
-          }
-          const payees = await this.payeesService.findAll(ctx.userId);
-          return toolResult(payees);
+          return toolResult(
+            await this.payeesService.getLlmPayees(ctx.userId, args),
+          );
         } catch (err: unknown) {
           return safeToolError(err);
         }
@@ -123,82 +155,60 @@ export class McpPayeesTools {
         title: "Manage payees",
         annotations: WRITE,
         description:
-          "Create, edit, or delete the user's payees. Accepts NAMES -- the payee and its default category are resolved internally, so you do NOT need to call list_payees/list_categories first. operation = 'create' | 'update' | 'delete' with an items array (1-25 rows). " +
-          "create: { name, categoryName?, website?, address?, email?, phone? } -- categoryName optionally sets the payee's default category ('Parent: Child' for a subcategory); website accepts a bare domain ('acme.com') and is stored as an absolute https URL; address, email and phone are the payee's contact details. " +
-          "update: { name, newName?, categoryName?, website?, address?, email?, phone? } -- name identifies the existing payee; provide newName to rename, categoryName to set the default category, website to set the web address, and/or address, email and phone for its contact details (pass an empty string to clear any of them). At least one change is required. Setting a website also resolves that site's icon for the payee; to find payees missing a field, call list_payees and look for a null or missing one. When the user has enabled automatic contact lookup in AI Settings, a single new payee created without any contact details is looked up before the card is shown, so the card may carry suggested website/address/email/phone; batch creates are looked up in the background after approval instead. " +
-          "delete: { name } -- removes the payee (its transactions keep their stored payee name). " +
-          "approvalMode = 'bulk' (default; one confirmation for the whole batch) or 'individual' (one confirmation per item); ignored for a single item. Set dryRun=true to preview every item without saving. The user is asked to confirm before anything is saved (web chat card via relay, or an MCP confirmation dialog).",
+          "Create, rename, edit or delete payees. An update identifies the " +
+          "payee by `name` and needs at least one change; an empty string " +
+          "clears a contact field. Setting a website also resolves that site's " +
+          "icon. Deleting a payee leaves its transactions with their stored " +
+          "payee name. Where the user has enabled automatic contact lookup, a " +
+          "single new payee created with no contact details is looked up " +
+          "before the confirmation card is shown, so the card may carry " +
+          "suggestions; a batch is looked up in the background after approval.",
         inputSchema: {
-          operation: z
-            .enum(["create", "update", "delete"])
-            .describe("The operation to perform on every item."),
-          items: z
-            .array(
-              z.object({
-                name: z
-                  .string()
-                  .max(100)
-                  .describe(
-                    "create: the new payee name. update/delete: the existing payee's current name.",
-                  ),
-                newName: z
-                  .string()
-                  .max(100)
-                  .optional()
-                  .describe("update: the payee's new name."),
-                categoryName: z
-                  .string()
-                  .max(100)
-                  .optional()
-                  .describe(
-                    'create/update: default category name ("Parent: Child" for a subcategory). update: empty string clears it.',
-                  ),
-                website: z
-                  .string()
-                  .max(2048)
-                  .optional()
-                  .describe(
-                    'create/update: the payee\'s web address. A bare domain ("acme.com") is stored as "https://acme.com". update: empty string clears it.',
-                  ),
-                address: z
-                  .string()
-                  .max(500)
-                  .optional()
-                  .describe(
-                    "create/update: the payee's postal address as free text. update: empty string clears it.",
-                  ),
-                email: z
-                  .string()
-                  .max(255)
-                  .optional()
-                  .describe(
-                    "create/update: the payee's contact email address. update: empty string clears it.",
-                  ),
-                phone: z
-                  .string()
-                  .max(50)
-                  .optional()
-                  .describe(
-                    "create/update: the payee's contact phone number, in whatever format the user gives. update: empty string clears it.",
-                  ),
-              }),
-            )
-            .min(1)
-            .max(MAX_BULK_ACTION_ROWS)
-            .describe("The rows to act on (1-25)."),
-          approvalMode: z
-            .enum(["bulk", "individual"])
-            .optional()
-            .describe(
-              "How multi-item batches are approved: 'bulk' (default) one card for all; 'individual' one card per item. Ignored for a single item.",
-            ),
-          dryRun: z
-            .boolean()
-            .optional()
-            .default(false)
-            .describe(
-              "If true, validate and return a per-item preview without saving anything.",
-            ),
+          operation: manageOperation(),
+          items: itemsArray(
+            z.object({
+              name: z
+                .string()
+                .max(100)
+                .describe(
+                  "create: the new name. update/delete: the payee's current name.",
+                ),
+              newName: z
+                .string()
+                .max(100)
+                .optional()
+                .describe("update: rename to this."),
+              categoryName: z
+                .string()
+                .max(100)
+                .optional()
+                .describe("The payee's default category."),
+              website: z
+                .string()
+                .max(2048)
+                .optional()
+                .describe("Web address. A bare domain is stored as https."),
+              address: z
+                .string()
+                .max(500)
+                .optional()
+                .describe("Postal address, free text."),
+              email: z
+                .string()
+                .max(255)
+                .optional()
+                .describe("Contact email address."),
+              phone: z
+                .string()
+                .max(50)
+                .optional()
+                .describe(
+                  "Contact phone number, in whatever format the user gives.",
+                ),
+            }),
+          ),
+          approvalMode: approvalMode(),
+          dryRun: dryRun(),
         },
         outputSchema: managePayeesOutput,
       },

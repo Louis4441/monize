@@ -50,6 +50,14 @@ import {
   manageInvestmentTransactionsOutput,
 } from "../tool-output-schemas";
 import { READ_ONLY, WRITE } from "../mcp-annotations";
+import {
+  uuidString,
+  manageOperation,
+  approvalMode,
+  dryRun,
+  itemsArray,
+} from "./schema-fragments";
+import { numberArg, booleanArg } from "../../common/tool-schemas";
 
 type ManageInvOperation = "create" | "update" | "delete";
 type ManageSecOperation = "create" | "update" | "delete";
@@ -106,21 +114,22 @@ export class McpInvestmentsTools {
         title: "Portfolio summary",
         annotations: READ_ONLY,
         description:
-          "Get investment portfolio overview with holdings, gains/losses, and allocation. Returns the same compact, LLM-friendly shape as the AI Assistant's tool. Accepts account NAMES (resolved internally), so you do NOT need to call list_accounts first. " +
-          "Set includeLookThrough=true for exposure questions ('how much am I in the US?', 'what's my equity vs fixed income split?'): it adds lookThrough.byCountry and lookThrough.byAssetClass, each a list of { name, value, percentage } plus an unclassified 'Other' value. Funds are split by the breakdown the user maintains on the security; individual stocks are placed by listing exchange (country) and security type (asset class).",
+          "Portfolio overview: holdings, cost basis, gains and allocation, " +
+          "plus a per-account breakdown in holdingsByAccount -- so use it for " +
+          "single-account holdings questions too. Check valuationComplete " +
+          "before quoting any total: false means a price or an exchange rate " +
+          "was unavailable, and the figure is a subtotal, not a total. " +
+          "includeLookThrough adds country and asset-class exposure.",
         inputSchema: {
           accountNames: z
             .array(z.string().max(100))
             .max(50)
             .optional()
-            .describe(
-              "Optional investment account names to filter to (resolved internally). Omit to cover all investment accounts.",
-            ),
-          includeLookThrough: z
-            .boolean()
+            .describe("Investment account names. Omit for all of them."),
+          includeLookThrough: booleanArg()
             .optional()
             .describe(
-              "Set true to also return the country and asset-class look-through breakdowns. Default false; costs an extra pass over the holdings.",
+              "Adds country and asset-class exposure. Costs an extra pass.",
             ),
         },
         outputSchema: getPortfolioSummaryOutput,
@@ -156,43 +165,32 @@ export class McpInvestmentsTools {
         title: "List investment transactions",
         annotations: READ_ONLY,
         description:
-          "Query brokerage investment-account transactions (buys, sells, dividends, interest, capital gains, splits, transfers, reinvestments, share adjustments). Filter by account, security symbol, action, and date; optionally group by account, date, security, or action. Returns the same compact, LLM-friendly shape as the AI Assistant's tool. Accepts account NAMES (resolved internally), so you do NOT need to call list_accounts first.",
+          "Brokerage transactions -- trades, income, splits, transfers and " +
+          "share adjustments -- filtered by account, symbol, action and date, " +
+          "with optional grouping. A VOID row is listed but excluded from " +
+          "every total.",
         inputSchema: {
-          startDate: z
-            .string()
-            .max(10)
-            .optional()
-            .describe("Optional start date (YYYY-MM-DD)"),
-          endDate: z
-            .string()
-            .max(10)
-            .optional()
-            .describe("Optional end date (YYYY-MM-DD)"),
+          startDate: z.string().max(10).optional().describe("Start date."),
+          endDate: z.string().max(10).optional().describe("End date."),
           accountNames: z
             .array(z.string().max(100))
             .max(50)
             .optional()
-            .describe(
-              "Optional investment account names (resolved internally).",
-            ),
+            .describe("Investment account names."),
           symbols: z
             .array(z.string().min(1).max(20))
             .max(50)
             .optional()
-            .describe("Optional security ticker symbols (case insensitive)."),
+            .describe("Ticker symbols, case-insensitive."),
           actions: z
             .array(z.nativeEnum(InvestmentAction))
             .max(17)
             .optional()
-            .describe(
-              "Optional transaction types (BUY, SELL, DIVIDEND, INTEREST, CAPITAL_GAIN, SPLIT, TRANSFER_IN, TRANSFER_OUT, REINVEST, ADD_SHARES, REMOVE_SHARES, REINVEST_INTEREST, REINVEST_CAPITAL_GAIN_SHORT, REINVEST_CAPITAL_GAIN_LONG, CAPITAL_GAIN_SHORT, CAPITAL_GAIN_LONG, REDEEM).",
-            ),
+            .describe("Narrow to these actions."),
           groupBy: z
             .enum(["account", "date", "security", "action"])
             .optional()
-            .describe(
-              "Grouping: by account name, transaction date, security symbol, or action type. Defaults to 'security' when omitted.",
-            ),
+            .describe("Defaults to 'security'."),
         },
         outputSchema: listInvestmentTransactionsOutput,
       },
@@ -236,16 +234,19 @@ export class McpInvestmentsTools {
         title: "Capital gains",
         annotations: READ_ONLY,
         description:
-          "Per-period capital gains (realized + unrealized) for the user's investment accounts. Replays transaction history and snapshots positions against historical close prices, so the output includes mark-to-market movement on currently-held positions in addition to realized SELL gains. Requires startDate and endDate. Returns the same compact, LLM-friendly shape as the AI Assistant's tool. Accepts account NAMES (resolved internally), so you do NOT need to call list_accounts first.",
+          "Realized and unrealized capital gains per period. It replays the " +
+          "transaction history and marks positions to historical closes, so " +
+          "the result covers movement on holdings the user still owns as well " +
+          "as gains realized by a sale.",
         inputSchema: {
           startDate: z
             .string()
             .regex(/^\d{4}-\d{2}-\d{2}$/)
-            .describe("Start date of the window (YYYY-MM-DD)"),
+            .describe("Start of the window."),
           endDate: z
             .string()
             .regex(/^\d{4}-\d{2}-\d{2}$/)
-            .describe("End date of the window (YYYY-MM-DD)"),
+            .describe("End of the window."),
           accountNames: z
             .array(z.string().max(100))
             .max(50)
@@ -261,9 +262,7 @@ export class McpInvestmentsTools {
           groupBy: z
             .enum(["month", "security", "account"])
             .optional()
-            .describe(
-              "Bucket the breakdown by month, security, or account. Defaults to 'month' when omitted.",
-            ),
+            .describe("Defaults to 'month'."),
         },
         outputSchema: getCapitalGainsOutput,
       },
@@ -306,27 +305,24 @@ export class McpInvestmentsTools {
         title: "Look up securities",
         annotations: READ_ONLY,
         description:
-          "Look up a ticker symbol or company name against the user's configured price provider (Yahoo/MSN) and return the matching securities WITHOUT adding anything. Read-only: use it to resolve an ambiguous reference or confirm the exact symbol/exchange before adding it with manage_securities. Each candidate is flagged with alreadyAdded=true when a security with that symbol is already in the user's list. Shares the lookup logic with the AI Assistant's lookup_securities tool.",
+          "Look up a ticker or company name with the user's price provider " +
+          "and return the matches WITHOUT adding anything. Use it to resolve " +
+          "an ambiguous reference before manage_securities; a candidate " +
+          "already in the user's list is flagged alreadyAdded.",
         inputSchema: {
-          query: z
+          search: z
             .string()
             .min(1)
             .max(100)
-            .describe(
-              "Ticker symbol (e.g. 'AAPL') or company/security name to search for.",
-            ),
+            .describe("Ticker symbol or company name to look up."),
           exchange: z
             .enum(SECURITY_EXCHANGES)
             .optional()
-            .describe(
-              "Optional exchange to narrow the search. Omit to search across exchanges.",
-            ),
+            .describe("Narrows the search. Omit to search everywhere."),
           provider: z
             .enum(["yahoo", "msn", "auto"])
             .optional()
-            .describe(
-              "Optional quote provider: 'yahoo', 'msn', or 'auto' (the user's default). Omit for 'auto'.",
-            ),
+            .describe("Defaults to the user's configured provider."),
         },
         outputSchema: lookupSecuritiesOutput,
       },
@@ -340,7 +336,7 @@ export class McpInvestmentsTools {
           const result = await this.securitiesService.lookupSecuritiesForLlm(
             ctx.userId,
             {
-              query: args.query,
+              query: args.search,
               exchange: args.exchange,
               provider: args.provider,
             },
@@ -358,121 +354,87 @@ export class McpInvestmentsTools {
         title: "Manage securities",
         annotations: WRITE,
         description:
-          "Create, edit, or delete the user's securities (stocks, ETFs, funds). operation = 'create' | 'update' | 'delete' with an items array (1-25 rows). " +
-          "create: { query, exchange?, securityType?, isFavourite?, currencyCode? } -- the security is looked up and validated by ticker/name against the user's configured price provider, which fills the official symbol/name/exchange/type/currency (do not invent them); exchange/securityType MUST come from the enumerated lists; exchange disambiguates a symbol traded on several exchanges. " +
-          "update: { symbol, securityType?, exchange?, isFavourite?, currencyCode?, countryWeightings?, assetWeightings? } -- symbol identifies an existing security (ticker or name); provide the classification/display fields to change. countryWeightings sets a manual country allocation for an ETF/fund as { name, weight } with weight a PERCENTAGE (0-100); entries need not add to 100 (the rest is 'Other'). assetWeightings does the same for asset classes, with free-text names (e.g. 'Equity', 'Fixed Income', 'Cash') -- reuse the spelling already used on the user's other securities where one fits. " +
-          "delete: { symbol } -- removes the security (fails if it still has holdings or investment transactions). " +
-          "approvalMode = 'bulk' (default; one card for the whole batch) or 'individual' (one card per item); ignored for a single item. Set dryRun=true to preview every item without saving. The user is asked to confirm before anything is saved (web chat card via relay, or an MCP confirmation dialog).",
+          "Create, edit or delete securities. A create is validated against " +
+          "the user's price provider, which supplies the official symbol, " +
+          "name, exchange, type and currency -- do not invent them; pass " +
+          "`exchange` only to disambiguate a symbol trading in more than one " +
+          "place. An update identifies the security by symbol or name. " +
+          "A delete fails while the security still has holdings or " +
+          "transactions.",
         inputSchema: {
-          operation: z
-            .enum(["create", "update", "delete"])
-            .describe("The operation to perform on every item."),
-          items: z
-            .array(
-              z.object({
-                query: z
-                  .string()
-                  .min(1)
-                  .max(100)
-                  .optional()
-                  .describe(
-                    "create: ticker symbol or security name to look up and validate.",
-                  ),
-                symbol: z
-                  .string()
-                  .min(1)
-                  .max(100)
-                  .optional()
-                  .describe(
-                    "update/delete: the existing security's ticker symbol (or name).",
-                  ),
-                exchange: z
-                  .enum(SECURITY_EXCHANGES)
-                  .optional()
-                  .describe(
-                    "create: exchange to disambiguate the lookup. update: new exchange. Must be one of the enumerated values.",
-                  ),
-                securityType: z
-                  .enum(SECURITY_TYPES)
-                  .optional()
-                  .describe(
-                    "create/update: security type. Must be one of the enumerated values.",
-                  ),
-                isFavourite: z
-                  .boolean()
-                  .optional()
-                  .describe(
-                    "create/update: pin the security to the dashboard Favourite Securities widget.",
-                  ),
-                currencyCode: z
-                  .string()
-                  .regex(/^[A-Za-z]{3}$/)
-                  .optional()
-                  .describe(
-                    "create/update: ISO 4217 currency code (e.g. 'USD').",
-                  ),
-                countryWeightings: z
-                  .array(
-                    z.object({
-                      name: z
-                        .string()
-                        .min(1)
-                        .max(100)
-                        .describe(
-                          "Country name; prefer a canonical name (e.g. 'United States').",
-                        ),
-                      weight: z
-                        .number()
-                        .min(0)
-                        .max(100)
-                        .describe("Percentage 0-100."),
-                    }),
-                  )
-                  .max(60)
-                  .optional()
-                  .describe(
-                    "update only: manual country (geographic) allocation for an ETF/fund. Weights are PERCENTAGES (0-100) and need not sum to 100 (the rest is 'Other').",
-                  ),
-                assetWeightings: z
-                  .array(
-                    z.object({
-                      name: z
-                        .string()
-                        .min(1)
-                        .max(100)
-                        .describe(
-                          "Asset class name, free text (e.g. 'Equity', 'Fixed Income', 'Cash').",
-                        ),
-                      weight: z
-                        .number()
-                        .min(0)
-                        .max(100)
-                        .describe("Percentage 0-100."),
-                    }),
-                  )
-                  .max(60)
-                  .optional()
-                  .describe(
-                    "update only: manual asset-class allocation for an ETF/fund. Free-text names (no canonical list); weights are PERCENTAGES (0-100) and need not sum to 100 (the rest is 'Other').",
-                  ),
-              }),
-            )
-            .min(1)
-            .max(MAX_BULK_ACTION_ROWS)
-            .describe("The rows to act on (1-25)."),
-          approvalMode: z
-            .enum(["bulk", "individual"])
-            .optional()
-            .describe(
-              "How multi-item batches are approved: 'bulk' (default) one card for all; 'individual' one card per item. Ignored for a single item.",
-            ),
-          dryRun: z
-            .boolean()
-            .optional()
-            .default(false)
-            .describe(
-              "If true, validate and return a per-item preview without saving anything.",
-            ),
+          operation: manageOperation(),
+          items: itemsArray(
+            z.object({
+              query: z
+                .string()
+                .min(1)
+                .max(100)
+                .optional()
+                .describe("create: ticker or name to look up and validate."),
+              symbol: z
+                .string()
+                .min(1)
+                .max(100)
+                .optional()
+                .describe("update/delete: the security's ticker or name."),
+              exchange: z
+                .enum(SECURITY_EXCHANGES)
+                .optional()
+                .describe(
+                  "create: disambiguates the lookup. update: the new exchange.",
+                ),
+              securityType: z
+                .enum(SECURITY_TYPES)
+                .optional()
+                .describe("The security type."),
+              isFavourite: booleanArg()
+                .optional()
+                .describe("Pin it to the dashboard's favourites widget."),
+              currencyCode: z
+                .string()
+                .regex(/^[A-Za-z]{3}$/)
+                .optional()
+                .describe("ISO 4217 currency code."),
+              countryWeightings: z
+                .array(
+                  z.object({
+                    name: z
+                      .string()
+                      .min(1)
+                      .max(100)
+                      .describe("Country name, canonical where possible."),
+                    weight: numberArg(z.number().min(0).max(100)).describe(
+                      "Percentage 0-100.",
+                    ),
+                  }),
+                )
+                .max(60)
+                .optional()
+                .describe(
+                  "update: manual country allocation for a fund. Weights are percentages and need not reach 100; the rest is 'Other'.",
+                ),
+              assetWeightings: z
+                .array(
+                  z.object({
+                    name: z
+                      .string()
+                      .min(1)
+                      .max(100)
+                      .describe("Asset class name, free text."),
+                    weight: numberArg(z.number().min(0).max(100)).describe(
+                      "Percentage 0-100.",
+                    ),
+                  }),
+                )
+                .max(60)
+                .optional()
+                .describe(
+                  "update: manual asset-class allocation for a fund, same weighting rule. Names are free text -- reuse the spelling on the user's other securities.",
+                ),
+            }),
+          ),
+          approvalMode: approvalMode(),
+          dryRun: dryRun(),
         },
         outputSchema: manageSecuritiesOutput,
       },
@@ -527,110 +489,77 @@ export class McpInvestmentsTools {
         title: "Manage investment transactions",
         annotations: WRITE,
         description:
-          "Create, update, or delete the user's brokerage/investment-account transactions (BUY, SELL, DIVIDEND, INTEREST, CAPITAL_GAIN, SPLIT, TRANSFER_IN, TRANSFER_OUT, REINVEST, ADD_SHARES, REMOVE_SHARES, REINVEST_INTEREST, REINVEST_CAPITAL_GAIN_SHORT, REINVEST_CAPITAL_GAIN_LONG, CAPITAL_GAIN_SHORT, CAPITAL_GAIN_LONG, REDEEM). Accepts NAMES for account, funding account, and security -- they are resolved internally, so you do NOT need to call get_accounts/lookup_securities first. operation = 'create' | 'update' | 'delete' with an items array (1-25 rows). " +
-          "create: { accountName, action, date, security?, quantity?, price?, commission?, fundingAccountName?, description? } -- security is required for BUY, SELL, REDEEM, SPLIT, REINVEST (and the REINVEST_*/CAPITAL_GAIN_* refinements), ADD_SHARES, REMOVE_SHARES (matched by ticker or name). Buys debit and sells/dividends/interest/capital gains credit the brokerage's linked cash account automatically -- do not also create a separate cash transaction; fundingAccountName overrides which cash account is used. " +
-          "update: { transactionId, action?, date?, security?, quantity?, price?, commission?, description? } -- provide only the fields to change (>=1); omitted fields keep their current value; the total and cash impact are recomputed. " +
-          "delete: { transactionId } -- deleting one leg of a security transfer removes the paired leg too and reverses any linked cash impact. " +
-          "approvalMode controls the confirmation: by default 6 or more items show one confirmation for the whole batch and 1-5 items show one confirmation per item; pass 'individual' to force one confirmation per item at any count; ignored for a single item. The user is asked to confirm before anything is saved (web chat card via relay, or an MCP confirmation dialog).",
+          "Create, update or delete brokerage transactions. Account, funding " +
+          "account and security resolve by name. A buy debits, and a sale, " +
+          "dividend, interest or capital gain credits, the brokerage's linked " +
+          "cash account automatically -- never record that cash movement " +
+          "yourself; fundingAccountName overrides which account settles. " +
+          "An update changes only the fields you send and recomputes the " +
+          "total and the cash impact. Deleting one leg of a security transfer " +
+          "removes its pair and reverses the linked cash movement.",
         inputSchema: {
-          operation: z
-            .enum(["create", "update", "delete"])
-            .describe("The operation to perform on every item."),
-          items: z
-            .array(
-              z.object({
-                accountName: z
-                  .string()
-                  .max(100)
-                  .optional()
-                  .describe(
-                    "create: investment/brokerage account name. The base pair name (e.g. 'RRSP') resolves to its brokerage account ('RRSP - Brokerage'); the exact name also works.",
-                  ),
-                fundingAccountName: z
-                  .string()
-                  .max(100)
-                  .optional()
-                  .describe(
-                    "create: optional cash account that funds a buy or receives a sell's proceeds. Omit to use the brokerage's own linked cash account.",
-                  ),
-                security: z
-                  .string()
-                  .min(1)
-                  .max(100)
-                  .optional()
-                  .describe(
-                    "create/update: security ticker symbol or name. Required (create) for BUY, SELL, REDEEM, SPLIT, REINVEST (and the REINVEST_*/CAPITAL_GAIN_* refinements), ADD_SHARES, REMOVE_SHARES. Matched to one of the user's securities.",
-                  ),
-                action: z
-                  .nativeEnum(InvestmentAction)
-                  .optional()
-                  .describe(
-                    "create: transaction type. update: new type (omit to keep).",
-                  ),
-                date: z
-                  .string()
-                  .max(10)
-                  .optional()
-                  .describe("Transaction date (YYYY-MM-DD)."),
-                quantity: z
-                  .number()
-                  .min(0)
-                  .max(999999999999)
-                  .optional()
-                  .describe(
-                    "Number of shares (8 dp). For SPLIT, the split ratio (>0).",
-                  ),
-                price: z
-                  .number()
-                  .min(0)
-                  .max(999999999999)
-                  .optional()
-                  .describe(
-                    "Price per share (6 dp). For DIVIDEND/INTEREST/CAPITAL_GAIN with no quantity, the total cash amount.",
-                  ),
-                commission: z
-                  .number()
-                  .min(0)
-                  .max(999999999999)
-                  .optional()
-                  .describe("Commission or fee (4 dp). Defaults to 0."),
-                accruedInterest: z
-                  .number()
-                  .min(0)
-                  .max(999999999999)
-                  .optional()
-                  .describe(
-                    "REDEEM only: accrued interest paid out with the redemption (4 dp). Recorded as a linked INTEREST transaction and included in the single cash movement, so do not record it separately. Defaults to 0.",
-                  ),
-                exchangeRate: z
-                  .number()
-                  .min(0)
-                  .max(999999999999)
-                  .optional()
-                  .describe(
-                    "create/update: FX rate converting the security's currency into the funding cash account's currency (e.g. for a EUR security funded from a PLN account, the EUR->PLN rate such as 4.2514). Supply this when the broker's settlement data gives the rate or the converted cash total, so the cash posting is exact. Omit for same-currency transactions, or to use the rate for the transaction date.",
-                  ),
-                description: z
-                  .string()
-                  .max(500)
-                  .optional()
-                  .describe("Optional description or memo."),
-                transactionId: z
-                  .string()
-                  .uuid()
-                  .optional()
-                  .describe("update/delete: investment transaction ID."),
-              }),
-            )
-            .min(1)
-            .max(MAX_BULK_ACTION_ROWS)
-            .describe("The rows to act on (1-25)."),
-          approvalMode: z
-            .enum(["bulk", "individual"])
-            .optional()
-            .describe(
-              "How multi-item batches are approved: by default 6 or more items show one card for the whole batch and 1-5 items show one card per item; 'individual' forces one card per item at any count. Ignored for a single item.",
-            ),
+          operation: manageOperation(),
+          items: itemsArray(
+            z.object({
+              accountName: z
+                .string()
+                .max(100)
+                .optional()
+                .describe(
+                  "create: the brokerage account. A base pair name ('RRSP') resolves to its brokerage side.",
+                ),
+              fundingAccountName: z
+                .string()
+                .max(100)
+                .optional()
+                .describe(
+                  "create: the cash account that funds or receives. Omit for the brokerage's linked one.",
+                ),
+              security: z
+                .string()
+                .min(1)
+                .max(100)
+                .optional()
+                .describe(
+                  "The security, by ticker or name. Required to create anything that moves shares.",
+                ),
+              action: z
+                .nativeEnum(InvestmentAction)
+                .optional()
+                .describe("The transaction type."),
+              date: z.string().max(10).optional().describe("Transaction date."),
+              quantity: numberArg(z.number().min(0).max(999999999999))
+                .optional()
+                .describe("Number of shares, or the ratio for a SPLIT."),
+              price: numberArg(z.number().min(0).max(999999999999))
+                .optional()
+                .describe(
+                  "Price per share, or the total cash for an income row with no quantity.",
+                ),
+              commission: numberArg(z.number().min(0).max(999999999999))
+                .optional()
+                .describe("Commission or fee. Defaults to 0."),
+              accruedInterest: numberArg(z.number().min(0).max(999999999999))
+                .optional()
+                .describe(
+                  "REDEEM: accrued interest paid out with it. Booked as a linked INTEREST row inside the same cash movement, so never record it separately.",
+                ),
+              exchangeRate: numberArg(z.number().min(0).max(999999999999))
+                .optional()
+                .describe(
+                  "Rate from the security's currency into the settlement account's. Supply the broker's own rate to make the cash posting exact; omit for same-currency, or to use the date's rate.",
+                ),
+              description: z
+                .string()
+                .max(500)
+                .optional()
+                .describe("Description or memo."),
+              transactionId: uuidString()
+                .optional()
+                .describe("update/delete: the row's id."),
+            }),
+          ),
+          approvalMode: approvalMode(),
         },
         outputSchema: manageInvestmentTransactionsOutput,
       },

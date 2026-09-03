@@ -592,6 +592,203 @@ describe("PayeesService", () => {
     });
   });
 
+  // ─── getLlmPayees ────────────────────────────────────────────────────
+
+  describe("getLlmPayees", () => {
+    /** Four payees whose fields differ in exactly what the filters test. */
+    const roster = [
+      {
+        ...mockPayee,
+        id: "p-amazon",
+        name: "Amazon",
+        website: "https://amazon.com",
+        hasLogo: true,
+        address: "1 Main St",
+        email: null,
+        phone: null,
+        isActive: true,
+        defaultCategoryId: "cat-1",
+      },
+      {
+        ...mockPayee,
+        id: "p-zellers",
+        name: "Zellers",
+        website: null,
+        hasLogo: false,
+        address: null,
+        email: "hi@zellers.test",
+        phone: "555",
+        isActive: true,
+        defaultCategoryId: null,
+      },
+      {
+        ...mockPayee,
+        id: "p-corner",
+        name: "corner shop",
+        website: null,
+        hasLogo: false,
+        address: null,
+        email: null,
+        phone: null,
+        isActive: true,
+        defaultCategoryId: null,
+      },
+      {
+        ...mockPayee,
+        id: "p-old",
+        name: "Old Amazonian Books",
+        website: null,
+        hasLogo: false,
+        address: null,
+        email: null,
+        phone: null,
+        isActive: true,
+        defaultCategoryId: null,
+      },
+    ];
+
+    const stats: Record<string, { count: number; lastUsed: string | null }> = {
+      "p-amazon": { count: 12, lastUsed: "2026-08-01" },
+      "p-zellers": { count: 3, lastUsed: "2026-01-05" },
+      "p-corner": { count: 40, lastUsed: null },
+      "p-old": { count: 1, lastUsed: "2026-09-01" },
+    };
+
+    beforeEach(() => {
+      payeesRepository.find.mockResolvedValue(roster);
+      payeesRepository.createQueryBuilder.mockReturnValue({
+        ...queryBuilderMock,
+        getRawMany: jest.fn().mockResolvedValue(
+          roster.map((p) => ({
+            id: p.id,
+            count: String(stats[p.id].count),
+            last_used_date: stats[p.id].lastUsed,
+          })),
+        ),
+      });
+    });
+
+    const names = (result: { payees: { name: string }[] }) =>
+      result.payees.map((p) => p.name);
+
+    it("matches a name substring without regard to case", async () => {
+      // The defect: `search` used SQL LIKE, which Postgres evaluates
+      // case-sensitively, so a lowercase query matched nothing and the tool
+      // looked as though it accepted only exact names.
+      const lower = await service.getLlmPayees(userId, { search: "amazon" });
+      const upper = await service.getLlmPayees(userId, { search: "AMAZON" });
+
+      expect(names(lower)).toEqual(["Amazon", "Old Amazonian Books"]);
+      expect(names(upper)).toEqual(names(lower));
+    });
+
+    it("matches inside the name, not only at its start", async () => {
+      const result = await service.getLlmPayees(userId, { search: "shop" });
+      expect(names(result)).toEqual(["corner shop"]);
+    });
+
+    it("sorts by name case-insensitively by default", async () => {
+      const result = await service.getLlmPayees(userId);
+      expect(names(result)).toEqual([
+        "Amazon",
+        "corner shop",
+        "Old Amazonian Books",
+        "Zellers",
+      ]);
+    });
+
+    it("sorts by transaction count, busiest first", async () => {
+      const result = await service.getLlmPayees(userId, {
+        sortBy: "transactionCount",
+      });
+      expect(names(result)).toEqual([
+        "corner shop",
+        "Amazon",
+        "Zellers",
+        "Old Amazonian Books",
+      ]);
+    });
+
+    it("sorts by last used, most recent first, and puts a never-used payee last", async () => {
+      // Never used is unknown, not oldest: a null date must not sort as if it
+      // were the beginning of time.
+      const result = await service.getLlmPayees(userId, { sortBy: "lastUsed" });
+      expect(names(result)).toEqual([
+        "Old Amazonian Books",
+        "Amazon",
+        "Zellers",
+        "corner shop",
+      ]);
+    });
+
+    it("keeps only payees carrying a detail, or only those missing it", async () => {
+      const withEmail = await service.getLlmPayees(userId, { hasEmail: true });
+      const withoutEmail = await service.getLlmPayees(userId, {
+        hasEmail: false,
+      });
+
+      expect(names(withEmail)).toEqual(["Zellers"]);
+      expect(names(withoutEmail)).toEqual([
+        "Amazon",
+        "corner shop",
+        "Old Amazonian Books",
+      ]);
+    });
+
+    it("filters on every detail a payee can carry", async () => {
+      expect(
+        names(await service.getLlmPayees(userId, { hasWebsite: true })),
+      ).toEqual(["Amazon"]);
+      expect(
+        names(await service.getLlmPayees(userId, { hasLogo: true })),
+      ).toEqual(["Amazon"]);
+      expect(
+        names(await service.getLlmPayees(userId, { hasAddress: true })),
+      ).toEqual(["Amazon"]);
+      expect(
+        names(await service.getLlmPayees(userId, { hasPhone: true })),
+      ).toEqual(["Zellers"]);
+      expect(
+        names(await service.getLlmPayees(userId, { hasDefaultCategory: true })),
+      ).toEqual(["Amazon"]);
+    });
+
+    it("combines filters with the search", async () => {
+      const result = await service.getLlmPayees(userId, {
+        search: "amazon",
+        hasWebsite: false,
+      });
+      expect(names(result)).toEqual(["Old Amazonian Books"]);
+    });
+
+    it("reports a truncated list as a page of the matches, not as all of them", async () => {
+      const result = await service.getLlmPayees(userId, { limit: 2 });
+
+      expect(result.payees).toHaveLength(2);
+      expect(result.totalCount).toBe(4);
+      expect(result.truncated).toBe(true);
+    });
+
+    it("counts what matched, not what the user owns", async () => {
+      const result = await service.getLlmPayees(userId, {
+        search: "amazon",
+        limit: 5,
+      });
+
+      expect(result.totalCount).toBe(2);
+      expect(result.truncated).toBe(false);
+    });
+
+    it("asks findAll for the status it was given", async () => {
+      await service.getLlmPayees(userId, { status: "inactive" });
+      expect(payeesRepository.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ isActive: false }),
+        }),
+      );
+    });
+  });
+
   // ─── findAll ─────────────────────────────────────────────────────────
 
   describe("findAll", () => {

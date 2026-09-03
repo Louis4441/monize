@@ -3,26 +3,22 @@ import { z } from "zod";
 /**
  * Output schemas for every MCP tool.
  *
- * Each export is a Zod raw shape (the same form accepted by `inputSchema` in
- * `registerTool`). When a tool declares an `outputSchema`, the MCP SDK requires
- * the tool to return `structuredContent` and validates it against the schema,
- * so these shapes describe the structured payload produced by `toolResult`.
+ * Each export is a LOOSE `z.object` (a schema instance, which `registerTool`
+ * accepts alongside a raw shape). The distinction is not about what reaches the
+ * caller: the server validates `structuredContent` with `safeParseAsync` and
+ * then sends the handler's ORIGINAL object, so no field is ever stripped on the
+ * way out. It is about the JSON Schema the CLIENT validates against with ajv --
+ * a raw shape is wrapped in a strip-mode object, which serializes as
+ * `additionalProperties: false` and makes the client reject the very fields the
+ * tools return. `.loose()` emits `additionalProperties: {}`.
  *
- * Schemas are intentionally tolerant: Zod strips undeclared keys by default, so
- * extra/relation/timestamp fields on entity payloads never fail validation, and
- * we only model the fields the tools meaningfully expose. Tools that return a
- * bare array have their payload wrapped under `items` by `toStructuredContent`.
+ * That is also why these schemas are deliberately shallow. Every byte here is
+ * serialized into `tools/list` and carried on every request, so a schema
+ * declares what a model must be able to REASON about -- totals, completeness
+ * flags, the currency a total is in, and ids it has to copy back -- and leaves
+ * row-level columns to the payload itself, which arrives in full either way.
  */
 
-// Monetary and other decimal values arrive as JS numbers at runtime (the
-// entity `numericTransformer` converts PostgreSQL decimals). Decimals may be
-// null-equivalent: a divide-by-zero percentage produces NaN at runtime, which
-// `toolResult` normalizes to null (NaN's JSON form) so it both passes
-// structured-output validation and serializes. `num` must therefore accept
-// null. It must NOT use `z.nan()`: the SDK serializes each tool's outputSchema
-// to JSON Schema for `tools/list`, and `z.nan()` is unrepresentable there
-// ("NaN cannot be represented in JSON Schema"), which fails the whole
-// tools/list response and leaves every client showing zero tools.
 const num = z.number().nullable();
 const numNull = num;
 
@@ -35,6 +31,10 @@ const numNull = num;
 // side validates with Zod, which strips unknown keys -- the strictness only
 // bites on the client.)
 const looseObject = (shape: z.ZodRawShape) => z.object(shape).loose();
+/** A tool's whole output: loose, so a result branch need not be enumerated. */
+const toolOutput = (shape: z.ZodRawShape) => z.object(shape).loose();
+/** A row the model reads but never has to reason about field by field. */
+const rows = () => z.array(looseObject({}));
 const str = z.string();
 const strNull = z.string().nullable();
 const bool = z.boolean();
@@ -49,57 +49,28 @@ const bool = z.boolean();
  * rollup summary (assets, liabilities, net worth, account count). Tolerant so
  * extra entity fields and the optional/nullable columns all validate.
  */
-export const listAccountsOutput = {
-  accounts: z.array(
-    looseObject({
-      id: str,
-      name: str,
-      type: str,
-      subType: strNull.optional(),
-      balance: num,
-      currentBalance: numNull.optional(),
-      creditLimit: numNull.optional(),
-      interestRate: numNull.optional(),
-      currency: str,
-      isClosed: bool,
-      excludeFromNetWorth: bool.optional(),
-      institutionName: strNull.optional(),
-      accountNumber: strNull.optional(),
-      // Loan/mortgage schedule fields; null on non-debt accounts.
-      paymentAmount: numNull.optional(),
-      paymentFrequency: strNull.optional(),
-      paymentStartDate: strNull.optional(),
-      amortizationMonths: numNull.optional(),
-      originalPrincipal: numNull.optional(),
-    }),
-  ),
+export const listAccountsOutput = toolOutput({
+  accounts: rows(),
   totalAssets: num,
   totalLiabilities: num,
   netWorth: num,
   totalAccounts: num,
-  accountCount: num.optional(),
-};
+});
 
 // ---------------------------------------------------------------------------
 // transactions.tool.ts
 // ---------------------------------------------------------------------------
 
-export const comparePeriodsOutput = {
+export const comparePeriodsOutput = toolOutput({
   period1: looseObject({ start: str, end: str, total: num }),
   period2: looseObject({ start: str, end: str, total: num }),
   totalChange: num,
   totalChangePercent: num,
-  comparison: z.array(
-    looseObject({
-      label: str,
-      period1Amount: num,
-      period2Amount: num,
-      change: num,
-      changePercent: num,
-    }),
-  ),
-};
+  comparison: rows(),
+});
 
+// A row a write refused, with the reason the user has to be told: a refusal
+// the caller cannot act on is a refusal that ends the task.
 const bulkSkippedRow = looseObject({ index: num, reason: str });
 
 /**
@@ -110,45 +81,26 @@ const bulkSkippedRow = looseObject({ index: num, reason: str });
  * so this superset envelope validates each tool's payloads; `entityFields`
  * supplies the per-tool single-entity columns.
  */
-const manageToolOutput = (entityFields: z.ZodRawShape) => ({
-  // Dry-run / preview branch.
-  dryRun: bool.optional(),
-  operation: str.optional(),
-  preview: z.object({}).loose().optional(),
-  previews: z.array(looseObject({})).optional(),
-  message: str.optional(),
-  // Single created/updated/deleted entity (tool-specific) + common delete flag.
-  ...entityFields,
-  deleted: bool.optional(),
-  // Bulk / individual branches.
-  created: z.array(looseObject({})).optional(),
-  results: z.array(looseObject({})).optional(),
-  ids: z.array(str).optional(),
-  count: num.optional(),
-  skipped: z.array(bulkSkippedRow).optional(),
-  // Relay branch: a confirmation card was shown in the web chat instead.
-  status: str.optional(),
-});
-
-export const createTransactionsOutput = {
-  // Dry-run / preview branch: resolved rows + the rows that could not resolve.
-  dryRun: bool.optional(),
-  preview: z
-    .object({
-      rows: z.array(looseObject({})).optional(),
-      skipped: z.array(bulkSkippedRow).optional(),
-    })
-    .loose()
-    .optional(),
-  message: str.optional(),
-  // Created branch: ids of the rows created best-effort plus any skipped.
-  created: z.array(looseObject({})).optional(),
-  ids: z.array(str).optional(),
-  count: num.optional(),
-  skipped: z.array(bulkSkippedRow).optional(),
-  // Relay branch: a confirmation card was shown in the web chat instead.
-  status: str.optional(),
-};
+const manageToolOutput = (entityFields: z.ZodRawShape) =>
+  toolOutput({
+    // Dry-run / preview branch.
+    dryRun: bool.optional(),
+    operation: str.optional(),
+    preview: z.object({}).loose().optional(),
+    previews: z.array(looseObject({})).optional(),
+    message: str.optional(),
+    // Single created/updated/deleted entity (tool-specific) + common delete flag.
+    ...entityFields,
+    deleted: bool.optional(),
+    // Bulk / individual branches.
+    created: z.array(looseObject({})).optional(),
+    results: z.array(looseObject({})).optional(),
+    ids: z.array(str).optional(),
+    count: num.optional(),
+    skipped: z.array(bulkSkippedRow).optional(),
+    // Relay branch: a confirmation card was shown in the web chat instead.
+    status: str.optional(),
+  });
 
 /**
  * Unified `list_transactions` tool output. Replaces search_transactions /
@@ -157,32 +109,20 @@ export const createTransactionsOutput = {
  * plus an optional raw transaction list that is only included when explicitly
  * requested. Tolerant so every branch validates.
  */
-export const listTransactionsOutput = {
+export const listTransactionsOutput = toolOutput({
   totalIncome: num.optional(),
   totalExpenses: num.optional(),
   netCashFlow: num.optional(),
   transactionCount: num.optional(),
-  byCurrency: z
-    .record(
-      z.string(),
-      looseObject({
-        totalIncome: num,
-        totalExpenses: num,
-        netCashFlow: num,
-        transactionCount: num,
-      }),
-    )
-    .optional(),
+  byCurrency: z.record(z.string(), looseObject({})).optional(),
   groupedBy: strNull.optional(),
   breakdown: z.unknown().optional(),
-  // get_transfers rollup branch (transfersOnly).
-  transfers: z.object({}).loose().optional(),
-  // Raw transaction list branch (includeTransactions).
-  transactions: z.array(looseObject({})).optional(),
+  transfers: looseObject({}).optional(),
+  transactions: rows().optional(),
   total: num.optional(),
   hasMore: bool.optional(),
   truncatedTransactionList: bool.optional(),
-};
+});
 
 /**
  * Tolerant output for the unified `manage_transactions` tool. See
@@ -204,54 +144,24 @@ export const manageTransactionsOutput = manageToolOutput({
 // categories.tool.ts
 // ---------------------------------------------------------------------------
 
-export const getCategoriesOutput = {
-  categories: z.array(
-    looseObject({
-      id: str,
-      name: str,
-      parentName: strNull,
-      // The name to pass back to any other tool: "Business: Cell Phone".
-      // `name` alone is ambiguous whenever two parents share a child name.
-      qualifiedName: str,
-      isIncome: bool,
-      transactionCount: num,
-    }),
-  ),
+export const getCategoriesOutput = toolOutput({
+  // `qualifiedName` is the string every other tool accepts back, so the model
+  // has to know it exists; the rest of a category row is read, not reasoned on.
+  categories: z.array(looseObject({ id: str, qualifiedName: str })),
   totalCount: num,
-};
+});
 
 // ---------------------------------------------------------------------------
 // payees.tool.ts
 // ---------------------------------------------------------------------------
 
-export const getPayeesOutput = {
-  items: z.array(
-    looseObject({
-      id: str,
-      name: str,
-      defaultCategoryId: strNull.optional(),
-      // notes is a nullable column -- a payee without notes serializes as null,
-      // which must pass output validation (was rejected by a non-null string).
-      notes: strNull.optional(),
-      // Declared so a model can answer "which payees have no website?" from
-      // the schema rather than guessing that the field exists. Nullable, like
-      // notes -- a payee without one serializes as null.
-      website: strNull.optional(),
-      // Contact details, same nullable contract as website above: absent from
-      // the payee means null, not a missing key.
-      address: strNull.optional(),
-      email: strNull.optional(),
-      phone: strNull.optional(),
-      /** Whether a brand icon has been resolved from that website. */
-      hasLogo: bool.optional(),
-      isActive: bool.optional(),
-      transactionCount: num.optional(),
-      lastUsedDate: strNull.optional(),
-      aliasCount: num.optional(),
-      uncategorizedCount: num.optional(),
-    }),
-  ),
-};
+export const getPayeesOutput = toolOutput({
+  payees: z.array(looseObject({ id: str, name: str })),
+  // How many matched the filters, against how many came back: a capped list
+  // described as the whole one is a subtotal wearing a total's name.
+  totalCount: num,
+  truncated: bool,
+});
 
 /**
  * Tolerant output for the unified `manage_payees` tool. See `manageToolOutput`
@@ -275,58 +185,19 @@ export const managePayeesOutput = manageToolOutput({
  * statistics/anomalies/counts; 'net_worth_history' returns a bare array of
  * monthly snapshots, wrapped under `items` by `toolResult`.
  */
-export const generateReportOutput = {
-  // Date-range aggregation types.
+export const generateReportOutput = toolOutput({
+  // Eight report types with different payloads. Loose, so each branch's own
+  // fields travel without eight shapes being spelled out here.
   data: z.array(z.unknown()).optional(),
   totals: z.unknown().optional(),
   totalSpending: num.optional(),
   totalIncome: num.optional(),
-  // net_worth_history type: bare array wrapped under `items`.
-  items: z
-    .array(
-      looseObject({
-        month: str,
-        assets: num,
-        liabilities: num,
-        netWorth: num,
-      }),
-    )
-    .optional(),
-  // month_comparison type.
-  currentMonth: str.optional(),
-  previousMonth: str.optional(),
-  currentMonthLabel: str.optional(),
-  previousMonthLabel: str.optional(),
+  items: rows().optional(),
   currency: str.optional(),
-  incomeExpenses: z.record(z.string(), z.unknown()).optional(),
-  notes: z.record(z.string(), z.unknown()).optional(),
-  expenses: z.record(z.string(), z.unknown()).optional(),
-  topCategories: z.record(z.string(), z.unknown()).optional(),
-  netWorth: z.record(z.string(), z.unknown()).optional(),
-  investments: z.record(z.string(), z.unknown()).optional(),
-  // spending_anomalies type.
   statistics: looseObject({ mean: num, stdDev: num }).optional(),
-  anomalies: z
-    .array(
-      looseObject({
-        type: str,
-        severity: str,
-        title: str,
-        description: str,
-        amount: num.optional(),
-        transactionId: str.optional(),
-        transactionDate: str.optional(),
-        payeeName: strNull.optional(),
-        categoryId: strNull.optional(),
-        categoryName: strNull.optional(),
-        currentPeriodAmount: num.optional(),
-        previousPeriodAmount: num.optional(),
-        percentChange: num.optional(),
-      }),
-    )
-    .optional(),
+  anomalies: rows().optional(),
   counts: looseObject({ high: num, medium: num, low: num }).optional(),
-};
+});
 
 // ---------------------------------------------------------------------------
 // investments.tool.ts
@@ -339,12 +210,10 @@ const lookThroughBreakdown = looseObject({
   unclassifiedPercentage: num,
 });
 
-export const getPortfolioSummaryOutput = {
+export const getPortfolioSummaryOutput = toolOutput({
   holdingCount: num,
-  // The declared shape is the contract the model sees, and the SDK parses
-  // structuredContent against it -- an undeclared field is dropped. Leaving these
-  // out would have stripped the completeness signal back off at the MCP boundary
-  // the moment it was added to `LlmPortfolioSummary` (recheck RR2-007).
+  // The completeness flags are the contract, not decoration: a model must be
+  // able to tell a total from a subtotal, so they stay declared (RR2-007).
   fxComplete: bool,
   missingRatePairs: z.array(str),
   pricesComplete: bool,
@@ -358,110 +227,38 @@ export const getPortfolioSummaryOutput = {
   totalGainLossPercent: numNull,
   timeWeightedReturn: numNull,
   cagr: numNull,
-  holdings: z.array(
-    looseObject({
-      securityId: str,
-      symbol: str,
-      name: str,
-      securityType: str,
-      currency: str,
-      quantity: num,
-      averageCost: numNull,
-      costBasis: num,
-      marketValue: numNull,
-      gainLoss: numNull,
-      gainLossPercent: numNull,
-    }),
-  ),
+  // securityId is the id an entity link must quote, so it is named here.
+  holdings: z.array(looseObject({ securityId: str })),
   holdingsByAccount: z.array(
     looseObject({
       accountName: str,
       currency: str,
-      cashBalance: num,
-      totalCostBasis: num,
-      totalMarketValue: num,
-      totalGainLoss: num,
-      // This account's own completeness, which is a different question from the
-      // top-level flags: these totals are in the account's currency, those are in
-      // the user's default (recheck RR3-005).
+      // This account's own completeness: its totals are in ITS currency, the
+      // top-level ones in the user's, so a global flag cannot speak for them.
       fxComplete: bool,
       missingRatePairs: z.array(str),
       pricesComplete: bool,
       valuationComplete: bool,
-      totalGainLossPercent: num,
-      holdings: z.array(
-        looseObject({
-          securityId: str,
-          symbol: str,
-          name: str,
-          securityType: str,
-          currency: str,
-          quantity: num,
-          averageCost: numNull,
-          costBasis: num,
-          marketValue: numNull,
-          gainLoss: numNull,
-          gainLossPercent: numNull,
-        }),
-      ),
+      holdings: z.array(looseObject({ securityId: str })),
     }),
   ),
-  allocation: z.array(
-    looseObject({
-      name: str,
-      symbol: strNull,
-      type: str,
-      value: num,
-      percentage: num,
-    }),
-  ),
-  // Only present when the caller passes includeLookThrough.
-  lookThrough: looseObject({
-    totalPortfolioValue: num,
-    byCountry: lookThroughBreakdown,
-    byAssetClass: lookThroughBreakdown,
-  }).optional(),
-};
+  allocation: rows(),
+  lookThrough: looseObject({}).optional(),
+});
 
-export const listInvestmentTransactionsOutput = {
+export const listInvestmentTransactionsOutput = toolOutput({
   transactionCount: num,
   totalAmount: num,
   totalCommission: num,
   totalQuantity: num,
   actionCounts: z.record(z.string(), num),
   groupedBy: strNull,
-  groups: z
-    .array(
-      looseObject({
-        key: str,
-        transactionCount: num,
-        totalQuantity: num,
-        totalAmount: num,
-        totalCommission: num,
-      }),
-    )
-    .nullable(),
-  transactions: z.array(
-    looseObject({
-      transactionDate: str,
-      action: str,
-      accountName: strNull,
-      symbol: strNull,
-      securityName: strNull,
-      quantity: numNull,
-      price: numNull,
-      commission: num,
-      totalAmount: num,
-      currency: strNull,
-      description: strNull,
-      // A VOID row is listed but excluded from every total and group sum.
-      status: str,
-    }),
-  ),
+  groups: rows().nullable(),
+  transactions: rows(),
   truncatedTransactionList: bool,
-};
+});
 
-export const getCapitalGainsOutput = {
+export const getCapitalGainsOutput = toolOutput({
   startDate: str,
   endDate: str,
   totals: looseObject({
@@ -470,39 +267,17 @@ export const getCapitalGainsOutput = {
     totalCapitalGain: num,
   }),
   groupedBy: str,
-  entries: z.array(
-    looseObject({
-      month: strNull,
-      accountName: strNull,
-      symbol: strNull,
-      securityName: strNull,
-      currency: strNull,
-      startValue: num,
-      endValue: num,
-      realizedGain: num,
-      unrealizedGain: num,
-      totalCapitalGain: num,
-    }),
-  ),
+  entries: rows(),
   entryCount: num,
   truncatedEntryList: bool,
-};
+});
 
-export const lookupSecuritiesOutput = {
+export const lookupSecuritiesOutput = toolOutput({
   query: str,
   count: num,
-  candidates: z.array(
-    looseObject({
-      symbol: str,
-      name: str,
-      exchange: strNull,
-      securityType: strNull,
-      currencyCode: strNull,
-      provider: strNull,
-      alreadyAdded: bool,
-    }),
-  ),
-};
+  // alreadyAdded decides whether to offer adding it, so the model reasons on it.
+  candidates: z.array(looseObject({ symbol: str, alreadyAdded: bool })),
+});
 
 /**
  * Tolerant output for the unified `manage_securities` tool. See
@@ -559,45 +334,51 @@ const scheduledItem = looseObject({
   description: strNull,
 });
 
-export const getUpcomingBillsOutput = {
+export const getUpcomingBillsOutput = toolOutput({
   daysWindow: num,
   itemCount: num,
   overdueCount: num,
-  // Null when any item in the bucket has an unknown current amount, or when one
-  // of them is in a currency with no rate into `totalsCurrency`; the partial sum
-  // then travels in the `known*Subtotal` field beside it (issue #1247).
+  // Null when anything in the bucket is unknown or unconvertible; the partial
+  // sum then travels in the `known*Subtotal` beside it (issue #1247).
   totalUpcomingBills: numNull,
   totalUpcomingDeposits: numNull,
-  // The currency BOTH totals are in. Each item carries its own `currency`, which
-  // need not be this one -- so a total is only readable alongside this field.
+  // The currency BOTH totals are in. Items keep their own, so a total is only
+  // readable alongside this field.
   totalsCurrency: str,
   knownUpcomingBillsSubtotal: num.optional(),
   knownUpcomingDepositsSubtotal: num.optional(),
   amountsComplete: bool,
   unknownAmountItems: z.array(str).optional(),
-  // `"CAD->USD"` per pair that could not be converted, so a withheld total says
-  // why. An unresolvable item amount has no pair and is named above instead.
   missingRatePairs: z.array(str).optional(),
-  items: z.array(scheduledItem),
-};
+  // Per occurrence: its id (for an entity link), which way it posts, and
+  // whether its amount is known at all.
+  items: z.array(
+    looseObject({
+      id: str,
+      kind: str,
+      amount: numNull,
+      amountComplete: bool,
+      currency: str,
+    }),
+  ),
+});
 
 // ---------------------------------------------------------------------------
 // calculate.tool.ts
 // ---------------------------------------------------------------------------
 
-export const calculateOutput = {
+export const calculateOutput = toolOutput({
   result: num,
   formattedResult: str,
   operation: str,
   label: str.optional(),
-};
+});
 
 // ---------------------------------------------------------------------------
 // budgets.tool.ts
 // ---------------------------------------------------------------------------
 
-export const getBudgetStatusOutput = {
-  // Success branch (all optional so the not-found error branch validates too).
+export const getBudgetStatusOutput = toolOutput({
   budgetName: str.optional(),
   strategy: str.optional(),
   period: looseObject({ start: str, end: str }).optional(),
@@ -606,79 +387,49 @@ export const getBudgetStatusOutput = {
   totalIncome: num.optional(),
   remaining: num.optional(),
   percentUsed: num.optional(),
-  overBudgetCategories: z
-    .array(
-      looseObject({
-        category: str,
-        budgeted: num,
-        spent: num,
-        percentUsed: num,
-      }),
-    )
-    .optional(),
-  nearLimitCategories: z
-    .array(
-      looseObject({
-        category: str,
-        budgeted: num,
-        spent: num,
-        remaining: num,
-        percentUsed: num,
-      }),
-    )
-    .optional(),
+  overBudgetCategories: rows().optional(),
+  nearLimitCategories: rows().optional(),
   categoryCount: num.optional(),
-  velocity: z
-    .object({
-      dailyBurnRate: num,
-      // Null when an upcoming bill's current amount is unknown (issue #1247);
-      // `upcomingBillsComplete` says so explicitly.
-      safeDailySpend: num,
-      upcomingBillsComplete: bool,
-      projectedTotal: num,
-      projectedVariance: num,
-      daysRemaining: num,
-      paceStatus: str,
-    })
-    .optional(),
+  velocity: looseObject({
+    dailyBurnRate: num,
+    // Null when an upcoming bill's amount is unknown (issue #1247);
+    // upcomingBillsComplete says so rather than leaving a bare null.
+    safeDailySpend: num,
+    upcomingBillsComplete: bool,
+    projectedTotal: num,
+    projectedVariance: num,
+    daysRemaining: num,
+    paceStatus: str,
+  }).optional(),
   healthScore: looseObject({ score: num, label: str }).optional(),
-  // Not-found error branch.
+  // Not-found branch.
   error: str.optional(),
   availableBudgets: z.array(str).optional(),
-};
+});
 
 // ---------------------------------------------------------------------------
 // relay.tool.ts
 // ---------------------------------------------------------------------------
 
-export const getNextPromptOutput = {
+export const getNextPromptOutput = toolOutput({
   hasPrompt: bool,
-  // True when the user has been inactive long enough that the agent should stop
-  // its polling loop and exit (only set alongside hasPrompt:false).
+  // True when the user has gone inactive long enough that the agent should stop
+  // polling and exit (only set alongside hasPrompt:false).
   stop: bool.optional(),
-  // Present only when hasPrompt is true.
   promptId: str.optional(),
   prompt: str.optional(),
-  history: z.array(looseObject({ role: str, content: str })).optional(),
-  // Present only when the user uploaded files with the prompt. Each ref points
-  // at a `monize-attachment://<id>` resource the agent reads to view the file.
-  attachments: z
-    .array(
-      looseObject({
-        id: str,
-        filename: str,
-        mediaType: str,
-        kind: str,
-        uri: str,
-      }),
-    )
-    .optional(),
-};
+  // How to run a relay turn. Returned only with a claimed prompt, so a client
+  // that never relays does not carry it in every request's tool list.
+  guidance: str.optional(),
+  history: rows().optional(),
+  // Each ref points at a `monize-attachment://<id>` resource the agent reads.
+  attachments: z.array(looseObject({ id: str, uri: str })).optional(),
+});
 
-export const postResponseOutput = {
+export const postResponseOutput = toolOutput({
   delivered: bool,
-};
+});
 
-export const reportProgressOutput = {
+export const reportProgressOutput = toolOutput({
   delivered: bool,
-};
+});

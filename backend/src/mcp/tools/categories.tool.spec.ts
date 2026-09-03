@@ -56,7 +56,7 @@ describe("McpCategoriesTools", () => {
         type: undefined,
         search: undefined,
       });
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.totalCount).toBe(1);
       expect(parsed.categories[0].name).toBe("Food");
     });

@@ -1,0 +1,88 @@
+import { McpAccountsTools } from "../tools/accounts.tool";
+import { McpTransactionsTools } from "../tools/transactions.tool";
+import { McpCategoriesTools } from "../tools/categories.tool";
+import { McpPayeesTools } from "../tools/payees.tool";
+import { McpReportsTools } from "../tools/reports.tool";
+import { McpInvestmentsTools } from "../tools/investments.tool";
+import { McpScheduledTools } from "../tools/scheduled.tool";
+import { McpCalculateTools } from "../tools/calculate.tool";
+import { McpBudgetsTools } from "../tools/budgets.tool";
+import { McpRelayTools } from "../tools/relay.tool";
+
+/**
+ * Test helper: capture every tool's `registerTool` config without booting Nest.
+ *
+ * Shared by `mcp-annotations.spec.ts` (spec-compliance checks) and
+ * `tools-list-budget.spec.ts` (payload size). It lives here rather than in a
+ * spec because a spec must not be imported by another spec.
+ *
+ * The providers only read their service dependencies inside handlers, never
+ * during `register()`, so empty mocks are sufficient to capture the configs.
+ * The registration ORDER is meaningful: it is the order the SDK lists tools in,
+ * which the 2026-07-28 revision asks to be deterministic.
+ */
+
+export interface CapturedToolConfig {
+  name: string;
+  // The SDK's registerTool config: title, description, annotations and the two
+  // Zod schemas. Deliberately loose -- callers assert on individual fields.
+  config: any;
+}
+
+interface ToolProvider {
+  register: (server: unknown, resolve?: unknown) => void;
+}
+
+export function collectToolConfigs(): CapturedToolConfig[] {
+  const providers: ToolProvider[] = [
+    new McpAccountsTools({} as any) as unknown as ToolProvider,
+    new McpTransactionsTools(
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    ) as unknown as ToolProvider,
+    new McpCategoriesTools({} as any) as unknown as ToolProvider,
+    new McpPayeesTools(
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    ) as unknown as ToolProvider,
+    new McpReportsTools({} as any, {} as any) as unknown as ToolProvider,
+    new McpInvestmentsTools(
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    ) as unknown as ToolProvider,
+    new McpScheduledTools({} as any) as unknown as ToolProvider,
+    new McpCalculateTools() as unknown as ToolProvider,
+    new McpBudgetsTools({} as any) as unknown as ToolProvider,
+    new McpRelayTools({} as any) as unknown as ToolProvider,
+  ];
+
+  const configs: CapturedToolConfig[] = [];
+  const fakeServer = {
+    registerTool: (name: string, config: any) => {
+      configs.push({ name, config });
+    },
+  };
+  const resolve = () => undefined;
+  for (const provider of providers) {
+    provider.register(fakeServer, resolve);
+  }
+  return configs;
+}

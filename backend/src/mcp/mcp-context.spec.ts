@@ -141,29 +141,31 @@ describe("mcp-context", () => {
   });
 
   describe("toolResult", () => {
-    it("should return a success response with JSON data", () => {
+    it("returns the payload once, as structured content", () => {
+      // Not twice. Every tool declares an outputSchema, so structuredContent is
+      // what the SDK validates and what a client reads; the pretty-printed text
+      // block beside it made a model pay for the same answer a second time.
       const data = { accounts: [{ id: "a1", name: "Checking" }] };
       const result = toolResult(data);
       expect((result as any).isError).toBeUndefined();
-      expect(result.content).toHaveLength(1);
-      expect(result.content[0].type).toBe("text");
-      expect(JSON.parse(result.content[0].text)).toEqual(data);
+      expect(result.content).toEqual([]);
+      expect(result.structuredContent as any).toEqual(data);
     });
 
-    it("should pretty-print JSON with 2-space indentation", () => {
-      const result = toolResult({ key: "value" });
-      expect(result.content[0].text).toBe('{\n  "key": "value"\n}');
+    it("keeps the text block for errors, which carry no structured content", () => {
+      const result = toolError("Unknown account");
+      expect(result.content[0].text).toBe("Error: Unknown account");
+      expect((result as any).structuredContent).toBeUndefined();
+      expect(result.isError).toBe(true);
     });
 
-    it("should handle arrays", () => {
-      const result = toolResult([1, 2, 3]);
-      expect(JSON.parse(result.content[0].text)).toEqual([1, 2, 3]);
-    });
-
-    it("should handle null and primitive values", () => {
-      expect(JSON.parse(toolResult(null).content[0].text)).toBeNull();
-      expect(JSON.parse(toolResult(42).content[0].text)).toBe(42);
-      expect(JSON.parse(toolResult("hello").content[0].text)).toBe("hello");
+    it("handles arrays and primitives through structured content alone", () => {
+      expect(toolResult([1, 2, 3]).structuredContent).toEqual({
+        items: [1, 2, 3],
+      });
+      expect(toolResult(null).structuredContent).toEqual({ value: null });
+      expect(toolResult(42).structuredContent).toEqual({ value: 42 });
+      expect(toolResult("hello").structuredContent).toEqual({ value: "hello" });
     });
 
     describe("structuredContent", () => {
