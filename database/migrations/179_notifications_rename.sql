@@ -49,6 +49,36 @@ ALTER INDEX IF EXISTS idx_budget_alerts_fingerprint
 ALTER INDEX IF EXISTS idx_budget_alerts_dedupe
     RENAME TO idx_notifications_dedupe;
 
+-- A rename delivers nothing where the old name never existed: `ALTER INDEX IF
+-- EXISTS` no-ops silently, and this file would then leave the table without the
+-- indexes it claims to carry -- including `idx_notifications_dedupe`, which is
+-- the arbiter `NotificationService.create`'s `ON CONFLICT DO NOTHING` names, so
+-- a table missing it accepts the duplicate rows the write door promises to
+-- refuse. So the renames are followed by the definitions, `IF NOT EXISTS`:
+-- identical to `database/schema.sql`, a no-op on a deployed database (170 and
+-- 140 created them under the old names, which the renames above just moved) and
+-- a no-op on the replay over `schema.sql`. It does work exactly where the old
+-- names were never there -- an entity-synchronized database, which is what the
+-- integration harness builds. Creating a UNIQUE index cannot fail on duplicates
+-- there either: the only database reaching these statements is one that has no
+-- rows yet, since any database with history got the index from 140/170 first.
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread
+    ON notifications(user_id, is_read) WHERE is_read = false;
+CREATE INDEX IF NOT EXISTS idx_notifications_budget_period
+    ON notifications(budget_id, period_start);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_fingerprint
+    ON notifications(
+        budget_id,
+        period_start,
+        alert_type,
+        COALESCE(budget_category_id, '00000000-0000-0000-0000-000000000000'::uuid),
+        severity
+    );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_dedupe
+    ON notifications(user_id, dedupe_key)
+    WHERE dedupe_key IS NOT NULL;
+
 -- The policy names the table it is on, so it is re-created rather than renamed;
 -- the ENABLE is idempotent and repeated here because this migration is numbered
 -- after 123_rls_enable.sql, which never runs again on a deployed database.

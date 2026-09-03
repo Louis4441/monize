@@ -1,5 +1,3 @@
-import { readFileSync } from "fs";
-import * as path from "path";
 import { DataSource } from "typeorm";
 
 import { SystemAlertService } from "@/system-alerts/system-alert.service";
@@ -15,6 +13,7 @@ import {
   cleanTables,
   createTestUserDirect,
 } from "../helpers/integration-setup";
+import { applyRlsPolicies } from "../helpers/rls-setup";
 
 /**
  * INV-ALERT-001's SQL-resident halves, against a real PostgreSQL.
@@ -32,8 +31,15 @@ import {
  *    real ones against one database can.
  *
  * `synchronize` builds the schema from entities and creates no partial
- * indexes, so the suite applies migration 170 itself -- which doubles as
- * proof that the shipped migration and the service's conflict target agree.
+ * indexes, so the suite brings the database up to the real shape through
+ * `applyRlsPolicies`, which applies the shipped migrations -- 179 among them,
+ * since it references the RLS helpers -- and that is what creates
+ * `idx_notifications_dedupe` here. Still the shipped SQL rather than a fixture,
+ * so the migration and the service's conflict target cannot drift apart
+ * silently. It used to read migration 170 directly, which stopped working the
+ * day the table was renamed: 170 is guarded on the old name and correctly skips
+ * a database where the table is already `notifications`, so nothing created the
+ * index and every property here failed.
  *
  * Broken on purpose, both directions (CLAUDE.md 8.1): a conflict target that
  * no longer matches the index fails every test here (PostgreSQL refuses the
@@ -102,17 +108,10 @@ describe("system alert dedupe against a real database", () => {
   beforeAll(async () => {
     dataSource = new DataSource(INTEGRATION_TYPEORM_OPTIONS as never);
     await dataSource.initialize();
-    // The partial unique index the service's ON CONFLICT names. Applied from
-    // the shipped migration file so the two cannot drift apart silently.
-    await dataSource.query(
-      readFileSync(
-        path.join(
-          __dirname,
-          "../../../database/migrations/170_budget_alert_dedupe_key.sql",
-        ),
-        "utf-8",
-      ),
-    );
+    // The partial unique index the service's ON CONFLICT names, from the
+    // shipped migrations (see the note above). The owner still bypasses the
+    // policies this also creates, so the queries below read every row.
+    await applyRlsPolicies(dataSource);
   });
 
   afterAll(async () => {
