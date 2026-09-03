@@ -1127,13 +1127,16 @@ a follow-on surface or producer, with its spec obligation named.
 Three of the decisions above are follow-on features that the repository's own
 rule keeps behind a short approved spec (invariants, state-transition truth
 table, missing-data policy, numeric examples, test matrix), committed before the
-implementation it guides:
+implementation it guides. Each now has a proposed spec awaiting maintainer
+approval; no code lands until the open decisions in each are confirmed:
 
 1. **Balance-threshold notifications** (`balances`) -- financial.
+   `balance-threshold-notifications.md`.
 2. **Portfolio-movement notifications** (`investments`) -- financial, optional.
+   `portfolio-movement-notifications.md`.
 3. **Transaction-deletion cascade** -- not itself a calculation, but it changes
    what a delete reverses, so it is specified with the producers whose rows it
-   removes rather than bolted on.
+   removes rather than bolted on. `notification-transaction-cascade.md`.
 
 The core invariant #1291 already fixes for all three producers: a producer fires
 on a threshold **crossing** (79% -> 81% fires the 80% warning; 81% -> 82% -> 83%
