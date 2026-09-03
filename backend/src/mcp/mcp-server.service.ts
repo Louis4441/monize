@@ -28,6 +28,13 @@ import { McpSpendingAnalysisPrompt } from "./prompts/spending-analysis.prompt";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const backendPkg = require("../../package.json") as { version: string };
 
+/**
+ * How long a client may cache a listing (`tools/list` and its siblings) on the
+ * 2026-07-28 revision. The set of tools, prompts and resources is fixed by the
+ * running image, so the honest lifetime is "until this deployment changes".
+ */
+const LIST_TTL_MS = 60 * 60 * 1000;
+
 @Injectable()
 export class McpServerService {
   constructor(
@@ -94,11 +101,30 @@ export class McpServerService {
           "## Web-chat relay",
           "- When get_next_prompt hands you a prompt, its `guidance` field says how to report progress, batch work and finish the turn. Follow it.",
         ].join("\n"),
+        // `logging` is gone: the 2026-07-28 revision removed `logging/setLevel`
+        // and deprecated the logging feature itself (SEP-2577), and nothing
+        // here ever sent a log notification to a client.
         capabilities: {
-          logging: {},
           tools: {},
           resources: {},
           prompts: {},
+        },
+        // What a client may cache, and for how long, on the 2026-07-28 wire.
+        // The listings change only when this image does, so they are worth an
+        // hour; `private` because a bearer scopes the response and the
+        // instructions carry today's date. A resource read is live financial
+        // data and is never cached (a resource may still set its own window
+        // with `cacheHint`, and the name-resolving ones do).
+        cacheHints: {
+          "tools/list": { ttlMs: LIST_TTL_MS, cacheScope: "private" },
+          "prompts/list": { ttlMs: LIST_TTL_MS, cacheScope: "private" },
+          "resources/list": { ttlMs: LIST_TTL_MS, cacheScope: "private" },
+          "resources/templates/list": {
+            ttlMs: LIST_TTL_MS,
+            cacheScope: "private",
+          },
+          "server/discover": { ttlMs: LIST_TTL_MS, cacheScope: "private" },
+          "resources/read": { ttlMs: 0, cacheScope: "private" },
         },
       },
     );

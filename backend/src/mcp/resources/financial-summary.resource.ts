@@ -17,6 +17,8 @@ export class McpFinancialSummaryResource {
       "financial-summary",
       "monize://financial-summary",
       {
+        // Live data: a cached answer here is a stale figure, not a stale name.
+        cacheHint: { ttlMs: 0, cacheScope: "private" },
         title: "Financial summary",
         description:
           "High-level financial snapshot: income, expenses, net worth",

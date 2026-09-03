@@ -12,6 +12,8 @@ export class McpAccountListResource {
       "accounts",
       "monize://accounts",
       {
+        // Reference data a model reads to resolve a name to an id.
+        cacheHint: { ttlMs: 60_000, cacheScope: "private" },
         title: "Accounts",
         description: "Current account list with types and balances",
       },

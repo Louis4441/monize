@@ -12,6 +12,8 @@ export class McpCategoryTreeResource {
       "categories",
       "monize://categories",
       {
+        // Reference data a model reads to resolve a name to an id.
+        cacheHint: { ttlMs: 60_000, cacheScope: "private" },
         title: "Category tree",
         description: "Full category hierarchy",
       },

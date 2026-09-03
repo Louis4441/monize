@@ -29,6 +29,8 @@ export class McpRelayAttachmentResource {
       // per-prompt, so they must not appear in resources/list.
       new ResourceTemplate("monize-attachment://{id}", { list: undefined }),
       {
+        // Live data: a cached answer here is a stale figure, not a stale name.
+        cacheHint: { ttlMs: 0, cacheScope: "private" },
         title: "Chat attachment",
         description:
           "A file the user uploaded with their current chat prompt. Read the monize-attachment:// URI from get_next_prompt's attachments to view an image or PDF.",

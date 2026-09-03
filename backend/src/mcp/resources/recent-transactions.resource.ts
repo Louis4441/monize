@@ -17,6 +17,8 @@ export class McpRecentTransactionsResource {
       "recent-transactions",
       "monize://recent-transactions",
       {
+        // Live data: a cached answer here is a stale figure, not a stale name.
+        cacheHint: { ttlMs: 0, cacheScope: "private" },
         title: "Recent transactions",
         description: "Last 30 days of transactions (summarized)",
       },
