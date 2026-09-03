@@ -47,6 +47,8 @@ import { McpWriteLimiter } from "../mcp-write-limiter";
 import {
   getDefaultDateRange,
   resolveComparePeriods,
+  numberArg,
+  booleanArg,
 } from "../../common/tool-schemas";
 import {
   didYouMean,
@@ -169,16 +171,10 @@ export class McpTransactionsTools {
             .max(100)
             .optional()
             .describe("Payee names."),
-          minAmount: z
-            .number()
-            .min(-999999999999)
-            .max(999999999999)
+          minAmount: numberArg(z.number().min(-999999999999).max(999999999999))
             .optional()
             .describe("Minimum signed amount."),
-          maxAmount: z
-            .number()
-            .min(-999999999999)
-            .max(999999999999)
+          maxAmount: numberArg(z.number().min(-999999999999).max(999999999999))
             .optional()
             .describe("Maximum signed amount."),
           direction: z
@@ -191,22 +187,16 @@ export class McpTransactionsTools {
             .describe(
               "Default 'none', which returns totals with no breakdown.",
             ),
-          transfersOnly: z
-            .boolean()
+          transfersOnly: booleanArg()
             .optional()
             .describe("Also compute the per-account transfer rollup."),
-          includeTransactions: z
-            .boolean()
+          includeTransactions: booleanArg()
             .optional()
             .default(false)
             .describe(
               "Add the raw rows. Costs many tokens; the summary usually suffices. A foreign-currency row carries read-only originalAmount, originalCurrencyCode and exchangeRate beside the account-currency amount.",
             ),
-          limit: z
-            .number()
-            .int()
-            .min(1)
-            .max(100)
+          limit: numberArg(z.number().int().min(1).max(100))
             .optional()
             .default(50)
             .describe("Max raw rows, up to 100."),
@@ -409,10 +399,7 @@ export class McpTransactionsTools {
               transactionId: uuidString()
                 .optional()
                 .describe("update/delete: the row's id."),
-              amount: z
-                .number()
-                .min(-999999999999)
-                .max(999999999999)
+              amount: numberArg(z.number().min(-999999999999).max(999999999999))
                 .optional()
                 .describe(
                   "Signed amount, or the positive amount moved by a transfer.",
@@ -437,22 +424,17 @@ export class McpTransactionsTools {
                 .max(500)
                 .optional()
                 .describe("Description or memo."),
-              createPayeeIfMissing: z
-                .boolean()
+              createPayeeIfMissing: booleanArg()
                 .optional()
                 .describe(
                   "An unmatched payee name creates a payee (default) or stays free text.",
                 ),
-              exchangeRate: z
-                .number()
-                .min(0)
-                .max(1_000_000)
+              exchangeRate: numberArg(z.number().min(0).max(1_000_000))
                 .optional()
                 .describe("create: rate for a cross-currency transfer."),
-              toAmount: z
-                .number()
-                .min(-999999999999)
-                .max(999999999999)
+              toAmount: numberArg(
+                z.number().min(-999999999999).max(999999999999),
+              )
                 .optional()
                 .describe(
                   "create: explicit destination amount, overriding exchangeRate.",
@@ -465,11 +447,9 @@ export class McpTransactionsTools {
                       .min(1)
                       .max(100)
                       .describe("Category for this line."),
-                    amount: z
-                      .number()
-                      .min(-999999999999)
-                      .max(999999999999)
-                      .describe("Signed amount for this line."),
+                    amount: numberArg(
+                      z.number().min(-999999999999).max(999999999999),
+                    ).describe("Signed amount for this line."),
                     memo: z
                       .string()
                       .max(500)

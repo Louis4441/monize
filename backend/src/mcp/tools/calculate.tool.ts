@@ -5,6 +5,7 @@ import { toolResult, toolError } from "../mcp-context";
 import { executeCalculation } from "../../ai/query/calculate-tool";
 import { calculateOutput } from "../tool-output-schemas";
 import { READ_ONLY } from "../mcp-annotations";
+import { numberArg, booleanArg } from "../../common/tool-schemas";
 
 @Injectable()
 export class McpCalculateTools {
@@ -24,7 +25,7 @@ export class McpCalculateTools {
               "percentage: (values[0]/values[1])*100. difference: values[0]-values[1]. ratio: values[0]/values[1]. sum and average take every value.",
             ),
           values: z
-            .array(z.number())
+            .array(numberArg())
             .min(1)
             .max(100)
             .describe("Numbers to calculate with"),

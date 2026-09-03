@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { numberArg, booleanArg } from "../../common/tool-schemas";
 
 /**
  * Input-schema pieces shared by the MCP tools.
@@ -52,8 +53,7 @@ export const approvalMode = () =>
 
 /** Preview without saving. */
 export const dryRun = () =>
-  z
-    .boolean()
+  booleanArg()
     .optional()
     .default(false)
     .describe("Validate and preview every item without saving.");

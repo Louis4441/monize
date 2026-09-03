@@ -115,6 +115,14 @@ A fact lives in exactly one place:
 
 `tools-list-budget.spec.ts` serializes the real `tools/list` through the SDK and fails above a per-tool cap, a total cap and an instructions cap, printing the whole table on failure. The caps are a **ratchet**: lower one when a tool shrinks; raising one is a reviewed decision, not the fix for a red build. It also pins the listed order (2026-07-28 asks for a deterministic one) and scans for restated enum lists and banned phrases.
 
+## A model writes JSON by hand, so a numeric argument arrives as a string
+
+`limit: "10"` is what an LLM emits often enough that refusing it is a defect: the SDK validated `list_payees` against a bare `z.number()` and answered `-32602 expected number, received string` to a request that was perfectly clear. Every numeric tool input goes through `numberArg(...)` and every boolean through `booleanArg()` (`common/tool-schemas.ts`), on the MCP surface and the AI Assistant's alike.
+
+Neither is `z.coerce.*`, and both reasons matter. `z.coerce.number()` is `Number(value)`, so it reads `""`, `"   "`, `null` and `[]` as **0** -- an unknown arriving as a measured zero, which on `minAmount` filters at zero and on an `amount` would post a transaction for nothing. `z.coerce.boolean()` is `Boolean(value)`, so it reads `"false"` as TRUE -- the one input a caller most needs it to get right, since `hasEmail: "false"` is how you ask which payees are *missing* one. Both helpers convert only what is unambiguous and leave everything else to be refused.
+
+Bounds go inside (`numberArg(z.number().int().min(1).max(500))`), because they belong to the number. Both serialize to exactly the JSON Schema the bare form would, so the tolerance costs no `tools/list` bytes -- a union would have emitted an `anyOf` per field. `schema-fragments.guard.spec.ts` fails on a bare `z.number()` or `z.boolean()` in any tool file.
+
 ## Output schema conventions (`tool-output-schemas.ts`)
 
 Each export is a **loose `z.object`** built with `toolOutput(...)` -- a schema instance, which `registerTool` accepts alongside a raw shape.

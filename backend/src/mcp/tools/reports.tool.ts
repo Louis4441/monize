@@ -13,6 +13,8 @@ import {
 import {
   getDefaultDateRange,
   getDefaultPreviousMonth,
+  numberArg,
+  booleanArg,
 } from "../../common/tool-schemas";
 import { generateReportOutput } from "../tool-output-schemas";
 import { READ_ONLY } from "../mcp-annotations";
@@ -61,10 +63,7 @@ export class McpReportsTools {
             .max(10)
             .optional()
             .describe("End date. Defaults to today."),
-          months: z
-            .number()
-            .min(1)
-            .max(24)
+          months: numberArg(z.number().min(1).max(24))
             .optional()
             .describe("spending_anomalies: months of history. Default 3."),
           month: z

@@ -71,6 +71,32 @@ describe("shared MCP input-schema fragments", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("takes every number and boolean through the coercing helpers", () => {
+    // A model writes `limit: "10"` often enough that a bare z.number() is a
+    // defect, not strictness: the SDK answered -32602 "expected number,
+    // received string" for a request that was perfectly clear. numberArg and
+    // booleanArg accept the string form, still refuse junk, and serialize to
+    // the same JSON Schema, so the tolerance is free.
+    const offenders: string[] = [];
+    for (const { file, source } of sources) {
+      // `numberArg(z.number()...)` is the correct form -- the bounds belong to
+      // the number and the wrapper is what accepts the string form -- and the
+      // formatter often splits that call across two lines. So blank the pair
+      // across the whole source before scanning, keeping newlines so the
+      // offender report still points at the right line.
+      const scanned = stripComments(source).replace(
+        /numberArg\(\s*z\.number\(\)/g,
+        (match) => match.replace(/[^\n]/g, " "),
+      );
+      scanned.split("\n").forEach((line, index) => {
+        if (/\bz\.(number|boolean)\(\)/.test(line)) {
+          offenders.push(`${file}:${index + 1}`);
+        }
+      });
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it("keeps the UUID pattern free of regex flags", () => {
     // Zod serializes `regex.source`, which never carries flags: a flagged
     // pattern would validate one way on the server and another on the client.

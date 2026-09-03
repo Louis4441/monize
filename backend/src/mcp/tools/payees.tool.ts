@@ -34,6 +34,7 @@ import {
   dryRun,
   itemsArray,
 } from "./schema-fragments";
+import { numberArg, booleanArg } from "../../common/tool-schemas";
 
 type ManagePayeeOperation = "create" | "update" | "delete";
 type ApprovalMode = "bulk" | "individual";
@@ -114,26 +115,19 @@ export class McpPayeesTools {
             .describe(
               "name (A-Z, default), lastUsed (most recent first, never-used last), or transactionCount (busiest first).",
             ),
-          limit: z
-            .number()
-            .int()
-            .min(1)
-            .max(500)
+          limit: numberArg(z.number().int().min(1).max(500))
             .optional()
             .describe("Return only the first N rows after sorting."),
-          hasWebsite: z.boolean().optional().describe("Filter on a website."),
-          hasLogo: z
-            .boolean()
+          hasWebsite: booleanArg().optional().describe("Filter on a website."),
+          hasLogo: booleanArg()
             .optional()
             .describe("Filter on a resolved brand icon."),
-          hasAddress: z.boolean().optional().describe("Filter on an address."),
-          hasEmail: z.boolean().optional().describe("Filter on an email."),
-          hasPhone: z
-            .boolean()
+          hasAddress: booleanArg().optional().describe("Filter on an address."),
+          hasEmail: booleanArg().optional().describe("Filter on an email."),
+          hasPhone: booleanArg()
             .optional()
             .describe("Filter on a phone number."),
-          hasDefaultCategory: z
-            .boolean()
+          hasDefaultCategory: booleanArg()
             .optional()
             .describe("Filter on a default category."),
         },

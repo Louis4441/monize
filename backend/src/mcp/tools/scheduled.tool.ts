@@ -12,6 +12,7 @@ import {
 import { getUpcomingBillsOutput } from "../tool-output-schemas";
 import { READ_ONLY } from "../mcp-annotations";
 import { uuidString } from "./schema-fragments";
+import { numberArg, booleanArg } from "../../common/tool-schemas";
 
 const SCHEDULED_KIND_VALUES = [
   "bill",
@@ -50,10 +51,7 @@ export class McpScheduledTools {
           "`known*Subtotal` -- quote that only as a subtotal, and use " +
           "`unknownAmountItems` and `missingRatePairs` to say why it is partial.",
         inputSchema: {
-          days: z
-            .number()
-            .min(1)
-            .max(365)
+          days: numberArg(z.number().min(1).max(365))
             .optional()
             .default(30)
             .describe("Days to look ahead. Default 30."),

@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { McpPayeesTools } from "./payees.tool";
 import { McpWriteLimiter } from "../mcp-write-limiter";
 import { UserContextResolver } from "../mcp-context";
@@ -15,6 +16,7 @@ describe("McpPayeesTools", () => {
   let actionBuilder: Record<string, jest.Mock>;
   let resolve: jest.MockedFunction<UserContextResolver>;
   const handlers: Record<string, (...args: any[]) => any> = {};
+  const toolConfigs: Record<string, any> = {};
 
   beforeEach(() => {
     payeesService = {
@@ -87,8 +89,9 @@ describe("McpPayeesTools", () => {
 
     elicitInput = jest.fn().mockResolvedValue({ action: "accept" });
     server = {
-      registerTool: jest.fn((name, _opts, handler) => {
+      registerTool: jest.fn((name, opts, handler) => {
         handlers[name] = handler;
+        toolConfigs[name] = opts;
       }),
       // Default to no elicitation capability so writes proceed (matches a client
       // that can't show a dialog); the decline test overrides these.
@@ -148,6 +151,30 @@ describe("McpPayeesTools", () => {
       await handlers["list_payees"](args, { sessionId: "s1" });
 
       expect(payeesService.getLlmPayees).toHaveBeenCalledWith("u1", args);
+    });
+
+    it("accepts a limit written as a string, as a model sends it", async () => {
+      // The reported defect: the SDK refused `limit: "10"` with -32602
+      // "expected number, received string". Validation runs on the declared
+      // input schema, so this asserts against that schema rather than the
+      // handler, which never saw the call.
+      const schema = z.object(toolConfigs["list_payees"].inputSchema);
+
+      expect(schema.parse({ limit: "10" }).limit).toBe(10);
+      expect(schema.parse({ limit: 10 }).limit).toBe(10);
+      expect(schema.parse({ hasEmail: "false" }).hasEmail).toBe(false);
+      expect(schema.parse({ hasEmail: "true" }).hasEmail).toBe(true);
+    });
+
+    it("still refuses a limit that is not a number", async () => {
+      const schema = z.object(toolConfigs["list_payees"].inputSchema);
+
+      // "" and null must not arrive as 0: an unknown is not a measured zero.
+      for (const junk of ["", "  ", "abc", null, [], true]) {
+        expect(schema.safeParse({ limit: junk }).success).toBe(false);
+      }
+      expect(schema.safeParse({ limit: "501" }).success).toBe(false);
+      expect(schema.safeParse({ hasEmail: "yes" }).success).toBe(false);
     });
 
     it("returns error when no user context", async () => {

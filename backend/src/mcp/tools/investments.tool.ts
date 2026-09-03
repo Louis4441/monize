@@ -57,6 +57,7 @@ import {
   dryRun,
   itemsArray,
 } from "./schema-fragments";
+import { numberArg, booleanArg } from "../../common/tool-schemas";
 
 type ManageInvOperation = "create" | "update" | "delete";
 type ManageSecOperation = "create" | "update" | "delete";
@@ -125,8 +126,7 @@ export class McpInvestmentsTools {
             .max(50)
             .optional()
             .describe("Investment account names. Omit for all of them."),
-          includeLookThrough: z
-            .boolean()
+          includeLookThrough: booleanArg()
             .optional()
             .describe(
               "Adds country and asset-class exposure. Costs an extra pass.",
@@ -387,8 +387,7 @@ export class McpInvestmentsTools {
                 .enum(SECURITY_TYPES)
                 .optional()
                 .describe("The security type."),
-              isFavourite: z
-                .boolean()
+              isFavourite: booleanArg()
                 .optional()
                 .describe("Pin it to the dashboard's favourites widget."),
               currencyCode: z
@@ -404,11 +403,9 @@ export class McpInvestmentsTools {
                       .min(1)
                       .max(100)
                       .describe("Country name, canonical where possible."),
-                    weight: z
-                      .number()
-                      .min(0)
-                      .max(100)
-                      .describe("Percentage 0-100."),
+                    weight: numberArg(z.number().min(0).max(100)).describe(
+                      "Percentage 0-100.",
+                    ),
                   }),
                 )
                 .max(60)
@@ -424,11 +421,9 @@ export class McpInvestmentsTools {
                       .min(1)
                       .max(100)
                       .describe("Asset class name, free text."),
-                    weight: z
-                      .number()
-                      .min(0)
-                      .max(100)
-                      .describe("Percentage 0-100."),
+                    weight: numberArg(z.number().min(0).max(100)).describe(
+                      "Percentage 0-100.",
+                    ),
                   }),
                 )
                 .max(60)
@@ -533,38 +528,23 @@ export class McpInvestmentsTools {
                 .optional()
                 .describe("The transaction type."),
               date: z.string().max(10).optional().describe("Transaction date."),
-              quantity: z
-                .number()
-                .min(0)
-                .max(999999999999)
+              quantity: numberArg(z.number().min(0).max(999999999999))
                 .optional()
                 .describe("Number of shares, or the ratio for a SPLIT."),
-              price: z
-                .number()
-                .min(0)
-                .max(999999999999)
+              price: numberArg(z.number().min(0).max(999999999999))
                 .optional()
                 .describe(
                   "Price per share, or the total cash for an income row with no quantity.",
                 ),
-              commission: z
-                .number()
-                .min(0)
-                .max(999999999999)
+              commission: numberArg(z.number().min(0).max(999999999999))
                 .optional()
                 .describe("Commission or fee. Defaults to 0."),
-              accruedInterest: z
-                .number()
-                .min(0)
-                .max(999999999999)
+              accruedInterest: numberArg(z.number().min(0).max(999999999999))
                 .optional()
                 .describe(
                   "REDEEM: accrued interest paid out with it. Booked as a linked INTEREST row inside the same cash movement, so never record it separately.",
                 ),
-              exchangeRate: z
-                .number()
-                .min(0)
-                .max(999999999999)
+              exchangeRate: numberArg(z.number().min(0).max(999999999999))
                 .optional()
                 .describe(
                   "Rate from the security's currency into the settlement account's. Supply the broker's own rate to make the cash posting exact; omit for same-currency, or to use the date's rate.",
