@@ -110,6 +110,14 @@
   },
   "preferences": {
     "heading": "Einstellungen",
+    "groups": {
+      "languageRegion": "Sprache & Region",
+      "appearance": "Darstellung",
+      "datesNumbers": "Datum & Zahlen",
+      "investments": "Investitionen",
+      "transactions": "Buchungen",
+      "application": "Anwendung"
+    },
     "themeLabel": "Design",
     "defaultCurrencyLabel": "Standardwährung",
     "preferredExchangesLabel": "Bevorzugte Börsen (für Wertpapiersuchen)",
@@ -131,6 +139,10 @@
     "lockReconciledLabel": "Abgeglichene Buchungen sperren",
     "lockReconciledTooltip": "Solange dies deaktiviert ist, warnt Monize vor einer Änderung, die das Datum oder den Betrag einer abgeglichenen Buchung verschieben würde, und lässt sie dann zu. Solange es aktiviert ist, können abgeglichene Buchungen überhaupt nicht bearbeitet, gelöscht oder wieder geöffnet werden. Deaktivieren Sie es erneut, um eine Korrektur vorzunehmen.",
     "timeFormatLabel": "Zeitformat",
+    "timeFormatOptions": {
+      "h24": "24-Stunden (14:30)",
+      "h12": "12-Stunden (2:30 PM)"
+    },
     "recentTransactionsLabel": "Zuletzt verwendete Buchungen in der Schnellausfüllung",
     "recentTransactionsHelp": "Anzahl der Einträge im Verlaufs-Popover neben dem Zahlungsempfänger-Feld in Buchungsformularen.",
     "mapProviderLabel": "Kartenanbieter für Adressen",

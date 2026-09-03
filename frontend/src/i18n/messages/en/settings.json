@@ -110,6 +110,14 @@
   },
   "preferences": {
     "heading": "Preferences",
+    "groups": {
+      "languageRegion": "Language & Region",
+      "appearance": "Appearance",
+      "datesNumbers": "Dates & Numbers",
+      "investments": "Investments",
+      "transactions": "Transactions",
+      "application": "Application"
+    },
     "themeLabel": "Theme",
     "defaultCurrencyLabel": "Default Currency",
     "preferredExchangesLabel": "Preferred Exchanges (for security lookups)",
@@ -131,6 +139,10 @@
     "lockReconciledLabel": "Lock reconciled transactions",
     "lockReconciledTooltip": "While this is off, Monize warns you before an edit that would change a reconciled transaction's date or amount and then lets it through. While it is on, reconciled transactions cannot be edited, deleted or unreconciled at all. Turn it off again to make a correction.",
     "timeFormatLabel": "Time Format",
+    "timeFormatOptions": {
+      "h24": "24-hour (14:30)",
+      "h12": "12-hour (2:30 PM)"
+    },
     "recentTransactionsLabel": "Recent transactions in quick-fill",
     "recentTransactionsHelp": "Number of entries shown in the history button popover next to the Payee field on transaction forms.",
     "mapProviderLabel": "Map provider for addresses",

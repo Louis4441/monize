@@ -110,6 +110,14 @@
   },
   "preferences": {
     "heading": "設定",
+    "groups": {
+      "languageRegion": "言語と地域",
+      "appearance": "外観",
+      "datesNumbers": "日付と数値",
+      "investments": "投資",
+      "transactions": "取引",
+      "application": "アプリケーション"
+    },
     "themeLabel": "テーマ",
     "defaultCurrencyLabel": "デフォルト通貨",
     "preferredExchangesLabel": "優先取引所（証券検索用）",
@@ -131,6 +139,10 @@
     "lockReconciledLabel": "照合済み取引をロックする",
     "lockReconciledTooltip": "オフの間は、照合済み取引の日付や金額が変わる編集の前に Monize が警告し、そのうえで変更を許可します。オンの間は、照合済み取引を編集も削除も照合解除もできません。修正するには再びオフにしてください。",
     "timeFormatLabel": "時刻形式",
+    "timeFormatOptions": {
+      "h24": "24時間表示 (14:30)",
+      "h12": "12時間表示 (午後2:30)"
+    },
     "recentTransactionsLabel": "クイック入力の最近の取引数",
     "recentTransactionsHelp": "取引フォームの支払先フィールド横にある履歴ボタンのポップオーバーに表示されるエントリ数。",
     "mapProviderLabel": "住所の地図プロバイダー",

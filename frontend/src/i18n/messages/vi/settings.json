@@ -110,6 +110,14 @@
   },
   "preferences": {
     "heading": "Sở thích",
+    "groups": {
+      "languageRegion": "Ngôn ngữ & Khu vực",
+      "appearance": "Giao diện",
+      "datesNumbers": "Ngày & Số",
+      "investments": "Đầu tư",
+      "transactions": "Giao dịch",
+      "application": "Ứng dụng"
+    },
     "themeLabel": "Giao diện",
     "defaultCurrencyLabel": "Tiền tệ mặc định",
     "preferredExchangesLabel": "Sàn giao dịch ưa thích (để tra cứu giấy chứng khoán)",
@@ -131,6 +139,10 @@
     "lockReconciledLabel": "Khóa giao dịch đã đối soát",
     "lockReconciledTooltip": "Khi tùy chọn này tắt, Monize cảnh báo trước khi có chỉnh sửa làm thay đổi ngày hoặc số tiền của một giao dịch đã đối soát, rồi vẫn cho phép. Khi bật, giao dịch đã đối soát hoàn toàn không thể chỉnh sửa, xóa hay hủy đối soát. Hãy tắt lại để thực hiện chỉnh sửa.",
     "timeFormatLabel": "Định dạng giờ",
+    "timeFormatOptions": {
+      "h24": "24 giờ (14:30)",
+      "h12": "12 giờ (2:30 PM)"
+    },
     "recentTransactionsLabel": "Giao tác gần đây trong điền nhanh",
     "recentTransactionsHelp": "Số mục được hiển thị trong cửa sổ bật lên lịch sử bên cạnh trường Người nhận trên biểu mẫu giao tác.",
     "mapProviderLabel": "Nhà cung cấp bản đồ cho địa chỉ",

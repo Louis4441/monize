@@ -669,4 +669,175 @@ describe('PreferencesSection', () => {
       expect(screen.queryByTestId('msn-not-configured-error')).not.toBeInTheDocument();
     });
   });
+
+  /**
+   * The section is one card of sixteen controls, and the ONLY thing holding
+   * their order and their grouping is the JSX. Every other test in this file
+   * asserts by accessible label, so all thirty-six stayed green through the
+   * reorder that introduced these -- which is the finding, not the pass.
+   * These read the rendered order back out of the DOM.
+   */
+  describe('control order and grouping', () => {
+    // Group headings interleaved with the labels of the controls under them,
+    // in the order the card must render. Time Format is deliberately absent:
+    // it is gated on Show Create Date and has its own case below.
+    const EXPECTED_ORDER = [
+      'Language & Region',
+      'Language',
+      'Default Currency',
+      'Appearance',
+      'Theme',
+      'Colour theme',
+      'Dates & Numbers',
+      'Date Format',
+      'Number Format',
+      'Timezone',
+      'Week starts on',
+      'Show Create Date in transaction forms',
+      'Investments',
+      'Default Stock Quote Provider',
+      'Preferred Exchanges (for security lookups)',
+      'Transactions',
+      'Recent transactions in quick-fill',
+      'Lock reconciled transactions',
+      'Application',
+      'Map provider for addresses',
+      "Show What's New after an upgrade",
+    ];
+
+    const KNOWN_TEXTS = new Set([...EXPECTED_ORDER, 'Time Format']);
+
+    /**
+     * The labels and group headings the card renders, in document order.
+     * Walks every element and takes the first one whose own text is exactly a
+     * known label -- the controls use three different label elements (`label`
+     * for Select/Combobox, a `span` for the colour-theme radiogroup, `h3` for
+     * the group headings), so matching on text is what keeps this independent
+     * of which element each one happens to use.
+     */
+    function readRenderedOrder(container: HTMLElement): string[] {
+      const seen = new Set<string>();
+      const order: string[] = [];
+      for (const el of Array.from(container.querySelectorAll<HTMLElement>('*'))) {
+        const text = el.textContent?.trim() ?? '';
+        if (KNOWN_TEXTS.has(text) && !seen.has(text)) {
+          seen.add(text);
+          order.push(text);
+        }
+      }
+      return order;
+    }
+
+    it('renders every control under its own group heading, in order', async () => {
+      const { container } = render(
+        <PreferencesSection
+          preferences={mockPreferences}
+          onPreferencesUpdated={mockOnPreferencesUpdated}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Map provider for addresses')).toBeInTheDocument();
+      });
+
+      expect(readRenderedOrder(container)).toEqual(EXPECTED_ORDER);
+    });
+
+    it('renders the six group headings as headings, in order', async () => {
+      const { container } = render(
+        <PreferencesSection
+          preferences={mockPreferences}
+          onPreferencesUpdated={mockOnPreferencesUpdated}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Application')).toBeInTheDocument();
+      });
+
+      const headings = Array.from(container.querySelectorAll('h3')).map((h) =>
+        h.textContent?.trim(),
+      );
+      expect(headings).toEqual([
+        'Language & Region',
+        'Appearance',
+        'Dates & Numbers',
+        'Investments',
+        'Transactions',
+        'Application',
+      ]);
+    });
+
+    it('separates the groups with a rule, except the first', async () => {
+      const { container } = render(
+        <PreferencesSection
+          preferences={mockPreferences}
+          onPreferencesUpdated={mockOnPreferencesUpdated}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Application')).toBeInTheDocument();
+      });
+
+      // The wrapper of each group is its heading's parent. The first group
+      // opens the card, where a rule would read as a second heading under
+      // "Preferences"; every group after it is separated by one.
+      const wrappers = Array.from(container.querySelectorAll('h3')).map((h) => h.parentElement!);
+      expect(wrappers).toHaveLength(6);
+      expect(wrappers[0].className).not.toMatch(/border-t/);
+      for (const wrapper of wrappers.slice(1)) {
+        expect(wrapper.className).toMatch(/border-t/);
+        // A rule invisible in dark mode is not a rule.
+        expect(wrapper.className).toMatch(/dark:border-/);
+      }
+    });
+
+    it('hides Time Format until Show Create Date is on, then shows it directly beneath', async () => {
+      const { container } = render(
+        <PreferencesSection
+          preferences={mockPreferences}
+          onPreferencesUpdated={mockOnPreferencesUpdated}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Show Create Date in transaction forms'),
+        ).toBeInTheDocument();
+      });
+      expect(screen.queryByText('Time Format')).not.toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('switch', { name: 'Show Create Date in transaction forms' }),
+        );
+      });
+
+      const order = readRenderedOrder(container);
+      const toggleIndex = order.indexOf('Show Create Date in transaction forms');
+      expect(order[toggleIndex + 1]).toBe('Time Format');
+      // Still inside Dates & Numbers -- the next heading after it is Investments.
+      expect(order[toggleIndex + 2]).toBe('Investments');
+    });
+
+    it('localizes the Time Format options rather than hardcoding English', async () => {
+      render(
+        <PreferencesSection
+          preferences={{ ...mockPreferences, showCreatedAt: true }}
+          onPreferencesUpdated={mockOnPreferencesUpdated}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Time Format')).toBeInTheDocument();
+      });
+
+      const select = screen.getByLabelText('Time Format') as HTMLSelectElement;
+      expect(Array.from(select.options).map((o) => o.text)).toEqual([
+        '24-hour (14:30)',
+        '12-hour (2:30 PM)',
+      ]);
+    });
+  });
 });

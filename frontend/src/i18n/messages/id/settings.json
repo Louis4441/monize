@@ -110,6 +110,14 @@
   },
   "preferences": {
     "heading": "Preferensi",
+    "groups": {
+      "languageRegion": "Bahasa & Wilayah",
+      "appearance": "Tampilan",
+      "datesNumbers": "Tanggal & Angka",
+      "investments": "Investasi",
+      "transactions": "Transaksi",
+      "application": "Aplikasi"
+    },
     "themeLabel": "Tema",
     "defaultCurrencyLabel": "Mata Uang Bawaan",
     "preferredExchangesLabel": "Bursa Pilihan (untuk pencarian keamanan dokumen)",
@@ -131,6 +139,10 @@
     "lockReconciledLabel": "Kunci transaksi yang direkonsiliasi",
     "lockReconciledTooltip": "Saat ini nonaktif, Monize memperingatkan Anda sebelum perubahan yang akan menggeser tanggal atau jumlah transaksi yang direkonsiliasi, lalu mengizinkannya. Saat aktif, transaksi yang direkonsiliasi sama sekali tidak dapat diedit, dihapus, atau dibatalkan rekonsiliasinya. Nonaktifkan lagi untuk melakukan koreksi.",
     "timeFormatLabel": "Format Waktu",
+    "timeFormatOptions": {
+      "h24": "24 jam (14:30)",
+      "h12": "12 jam (2:30 PM)"
+    },
     "recentTransactionsLabel": "Transaksi terbaru dalam isi-cepat",
     "recentTransactionsHelp": "Jumlah entri yang ditampilkan di popover tombol riwayat di samping kolom Penerima pada formulir transaksi.",
     "mapProviderLabel": "Penyedia peta untuk alamat",

@@ -110,6 +110,14 @@
   },
   "preferences": {
     "heading": "Preferencje",
+    "groups": {
+      "languageRegion": "Język i region",
+      "appearance": "Wygląd",
+      "datesNumbers": "Daty i liczby",
+      "investments": "Inwestycje",
+      "transactions": "Transakcje",
+      "application": "Aplikacja"
+    },
     "themeLabel": "Motyw",
     "defaultCurrencyLabel": "Domyślna waluta",
     "preferredExchangesLabel": "Preferowane giełdy (do wyszukiwania papierów)",
@@ -131,6 +139,10 @@
     "lockReconciledLabel": "Zablokuj uzgodnione transakcje",
     "lockReconciledTooltip": "Gdy ta opcja jest wyłączona, Monize ostrzega przed edycją, która zmieniłaby datę lub kwotę uzgodnionej transakcji, a potem ją dopuszcza. Gdy jest włączona, uzgodnionych transakcji nie można w ogóle edytować, usuwać ani cofać ich uzgodnienia. Wyłącz ją ponownie, aby wprowadzić poprawkę.",
     "timeFormatLabel": "Format czasu",
+    "timeFormatOptions": {
+      "h24": "24-godzinny (14:30)",
+      "h12": "12-godzinny (2:30 PM)"
+    },
     "recentTransactionsLabel": "Ostatnie transakcje w szybkim uzupełnianiu",
     "recentTransactionsHelp": "Liczba wpisów wyświetlanych w okienku przycisku historii obok pola Odbiorca w formularzach transakcji.",
     "mapProviderLabel": "Dostawca map dla adresów",
