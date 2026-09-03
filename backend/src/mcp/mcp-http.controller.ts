@@ -11,14 +11,15 @@ import { ApiTags, ApiExcludeController } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import { Request, Response } from "express";
 import { randomUUID } from "crypto";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { McpServer } from "@modelcontextprotocol/server";
+import type { AuthInfo } from "@modelcontextprotocol/server";
+import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 import { SkipCsrf } from "../common/decorators/skip-csrf.decorator";
 import { SetMetadata } from "@nestjs/common";
 import { SKIP_PASSWORD_CHECK_KEY } from "../auth/guards/must-change-password.guard";
 import { McpServerService } from "./mcp-server.service";
 import { PatService } from "../auth/pat.service";
-import { McpUserContext } from "./mcp-context";
+import { McpUserContext, toAuthInfo } from "./mcp-context";
 import { OAuthProviderService } from "../oauth/oauth-provider.service";
 import { ConfigService } from "@nestjs/config";
 import { withUserContext } from "../common/db/with-context";
@@ -31,12 +32,15 @@ const SkipPasswordCheck = () => SetMetadata(SKIP_PASSWORD_CHECK_KEY, true);
  * **undefined** userId. Every tool handler therefore reaches the domain services
  * with no ambient identity, and `withScopedDb` refuses to run without one. Each
  * `transport.handleRequest` is wrapped in `withUserContext(authResult.userId)`
- * so the session's authenticated user is the ambient identity for the whole
+ * so the request's authenticated user is the ambient identity for the whole
  * JSON-RPC exchange, including the tool handlers it dispatches.
  *
  * This is the MCP counterpart of what the interceptor does for cookie/JWT
  * routes; the id comes from `validatePat` (PAT or OAuth access token), never
- * from tool arguments. Individual tools may still re-seed the same id locally
+ * from tool arguments. The same validated credential is attached to the
+ * request as the SDK's `AuthInfo`, which is how a tool handler learns who is
+ * calling (`resolveUserContext`) -- identity is a property of the request, not
+ * of a session. Individual tools may still re-seed the same id locally
  * (see `transactions.tool.ts`) -- a nested seed of the same user is a no-op.
  */
 @ApiExcludeController()
@@ -49,7 +53,7 @@ export class McpHttpController implements OnModuleDestroy {
   private static readonly MAX_SESSIONS_PER_USER = 10;
   private static readonly CLEANUP_INTERVAL_MS = 300_000; // 5 minutes
 
-  private transports = new Map<string, StreamableHTTPServerTransport>();
+  private transports = new Map<string, NodeStreamableHTTPServerTransport>();
   private servers = new Map<string, McpServer>();
   private sessionUsers = new Map<string, McpUserContext>();
   private sessionCreatedAt = new Map<string, number>();
@@ -94,8 +98,8 @@ export class McpHttpController implements OnModuleDestroy {
 
   private getUserSessionCount(userId: string): number {
     let count = 0;
-    for (const ctx of this.sessionUsers.values()) {
-      if (ctx.userId === userId) count++;
+    for (const bound of this.sessionUsers.values()) {
+      if (bound.userId === userId) count++;
     }
     return count;
   }
@@ -156,14 +160,51 @@ export class McpHttpController implements OnModuleDestroy {
     return true;
   }
 
-  @Post()
-  @Throttle({ default: { ttl: 60000, limit: 30 } })
-  async handlePost(@Req() req: Request, @Res() res: Response) {
+  /**
+   * Validate the request's bearer token and attach the identity the SDK gives
+   * every handler as `ctx.http.authInfo`.
+   *
+   * This is where INV-MCP-001 becomes a property of the REQUEST: the credential
+   * presented on this request decides the user and the scopes, on both protocol
+   * eras, and no tool reads identity from a session. A session (2025-era only)
+   * is additionally bound to the credential that opened it, below.
+   *
+   * Returns null when the request has been answered and must not proceed.
+   */
+  private async authorize(
+    req: Request,
+    res: Response,
+  ): Promise<McpUserContext | null> {
     const authResult = await this.validatePat(req);
     if (!authResult) {
       this.sendUnauthorized(res);
-      return;
+      return null;
     }
+    const authInfo = toAuthInfo(authResult, this.bearerToken(req));
+    if (!authInfo) {
+      // An OAuth grant with no id cannot be bound to a session or to a
+      // confirmation, and an unbindable credential must not be served.
+      res.status(403).json({
+        jsonrpc: "2.0",
+        error: { code: -32003, message: "Credential cannot be identified" },
+        id: null,
+      });
+      return null;
+    }
+    (req as Request & { auth?: AuthInfo }).auth = authInfo;
+    return authResult;
+  }
+
+  private bearerToken(req: Request): string {
+    const auth = req.headers.authorization ?? "";
+    return auth.startsWith("Bearer ") ? auth.substring(7) : "";
+  }
+
+  @Post()
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
+  async handlePost(@Req() req: Request, @Res() res: Response) {
+    const authResult = await this.authorize(req, res);
+    if (!authResult) return;
 
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
@@ -211,7 +252,7 @@ export class McpHttpController implements OnModuleDestroy {
       return;
     }
 
-    const transport = new StreamableHTTPServerTransport({
+    const transport = new NodeStreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
     });
 
@@ -222,11 +263,7 @@ export class McpHttpController implements OnModuleDestroy {
       }
     };
 
-    const resolve = (sessionId?: string) => {
-      if (!sessionId) return undefined;
-      return this.sessionUsers.get(sessionId);
-    };
-    const server = this.mcpServerService.createServer(resolve);
+    const server = this.mcpServerService.createServer();
     await server.connect(transport);
     await withUserContext(authResult.userId, () =>
       transport.handleRequest(req, res, req.body),
@@ -247,11 +284,8 @@ export class McpHttpController implements OnModuleDestroy {
   @Get()
   @Throttle({ default: { ttl: 60000, limit: 30 } })
   async handleGet(@Req() req: Request, @Res() res: Response) {
-    const authResult = await this.validatePat(req);
-    if (!authResult) {
-      this.sendUnauthorized(res);
-      return;
-    }
+    const authResult = await this.authorize(req, res);
+    if (!authResult) return;
 
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
     if (!sessionId) {
@@ -295,11 +329,8 @@ export class McpHttpController implements OnModuleDestroy {
   @Delete()
   @Throttle({ default: { ttl: 60000, limit: 30 } })
   async handleDelete(@Req() req: Request, @Res() res: Response) {
-    const authResult = await this.validatePat(req);
-    if (!authResult) {
-      this.sendUnauthorized(res);
-      return;
-    }
+    const authResult = await this.authorize(req, res);
+    if (!authResult) return;
 
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
     if (!sessionId) {

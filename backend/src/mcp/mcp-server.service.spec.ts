@@ -80,16 +80,14 @@ describe("McpServerService", () => {
   });
 
   it("should create a new McpServer instance", () => {
-    const resolver = jest.fn();
-    const server = service.createServer(resolver);
+    const server = service.createServer();
     expect(server).toBeDefined();
   });
 
   it("advertises the backend package.json version (auto-updates with releases)", () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { version } = require("../../package.json") as { version: string };
-    const resolver = jest.fn();
-    const server = service.createServer(resolver);
+    const server = service.createServer();
     const serverInfo = (server.server as any)._serverInfo as {
       name: string;
       version: string;
@@ -100,27 +98,23 @@ describe("McpServerService", () => {
   });
 
   it("should register all tools", () => {
-    const resolver = jest.fn();
-    service.createServer(resolver);
+    service.createServer();
     expect(mockToolProvider.register).toHaveBeenCalledTimes(10);
   });
 
   it("should register all resources", () => {
-    const resolver = jest.fn();
-    service.createServer(resolver);
+    service.createServer();
     expect(mockResourceProvider.register).toHaveBeenCalledTimes(5);
   });
 
   it("should register all prompts", () => {
-    const resolver = jest.fn();
-    service.createServer(resolver);
+    service.createServer();
     expect(mockPromptProvider.register).toHaveBeenCalledTimes(4);
   });
 
   it("should create independent server instances", () => {
-    const resolver = jest.fn();
-    const server1 = service.createServer(resolver);
-    const server2 = service.createServer(resolver);
+    const server1 = service.createServer();
+    const server2 = service.createServer();
     expect(server1).not.toBe(server2);
   });
 });

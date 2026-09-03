@@ -1,7 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { describeSkippedRows } from "../../common/bulk-create.types";
 import { z } from "zod";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
+import type { ServerContext } from "@modelcontextprotocol/server";
 import { PortfolioService } from "../../securities/portfolio.service";
 import { SecuritiesService } from "../../securities/securities.service";
 import {
@@ -32,13 +33,13 @@ import {
 } from "../../ai/actions/ai-action.types";
 import { RELAY_PREVIEW_SHOWN, emitRelayCard } from "../mcp-relay-confirm";
 import {
-  UserContextResolver,
+  resolveUserContext,
   requireScope,
   toolResult,
   toolError,
   safeToolError,
-  confirmWrite,
 } from "../mcp-context";
+import { confirmWrite } from "../mcp-confirm";
 import { McpWriteLimiter } from "../mcp-write-limiter";
 import {
   getPortfolioSummaryOutput,
@@ -106,7 +107,7 @@ export class McpInvestmentsTools {
     private readonly writeLimiter: McpWriteLimiter,
   ) {}
 
-  register(server: McpServer, resolve: UserContextResolver) {
+  register(server: McpServer) {
     server.registerTool(
       "get_portfolio_summary",
       {
@@ -119,7 +120,7 @@ export class McpInvestmentsTools {
           "before quoting any total: false means a price or an exchange rate " +
           "was unavailable, and the figure is a subtotal, not a total. " +
           "includeLookThrough adds country and asset-class exposure.",
-        inputSchema: {
+        inputSchema: z.object({
           accountNames: z
             .array(z.string().max(100))
             .max(50)
@@ -130,24 +131,24 @@ export class McpInvestmentsTools {
             .describe(
               "Adds country and asset-class exposure. Costs an extra pass.",
             ),
-        },
+        }),
         outputSchema: getPortfolioSummaryOutput,
       },
-      async (args, extra) => {
-        const ctx = resolve(extra.sessionId);
-        if (!ctx) return toolError("No user context");
-        const check = requireScope(ctx.scopes, "read");
+      async (args, ctx) => {
+        const user = resolveUserContext(ctx);
+        if (!user) return toolError("No user context");
+        const check = requireScope(user.scopes, "read");
         if (check.error) return check.result;
 
         try {
           const accountFilter = await this.accountsService.resolveAccountFilter(
-            ctx.userId,
+            user.userId,
             args.accountNames,
           );
           if (accountFilter.error) return toolError(accountFilter.error);
           const accountIds = accountFilter.accountIds;
           const summary = await this.portfolioService.getLlmSummary(
-            ctx.userId,
+            user.userId,
             accountIds,
             { includeLookThrough: args.includeLookThrough === true },
           );
@@ -168,7 +169,7 @@ export class McpInvestmentsTools {
           "share adjustments -- filtered by account, symbol, action and date, " +
           "with optional grouping. A VOID row is listed but excluded from " +
           "every total.",
-        inputSchema: {
+        inputSchema: z.object({
           startDate: z.string().max(10).optional().describe("Start date."),
           endDate: z.string().max(10).optional().describe("End date."),
           accountNames: z
@@ -190,25 +191,25 @@ export class McpInvestmentsTools {
             .enum(["account", "date", "security", "action"])
             .optional()
             .describe("Defaults to 'security'."),
-        },
+        }),
         outputSchema: listInvestmentTransactionsOutput,
       },
-      async (args, extra) => {
-        const ctx = resolve(extra.sessionId);
-        if (!ctx) return toolError("No user context");
-        const check = requireScope(ctx.scopes, "read");
+      async (args, ctx) => {
+        const user = resolveUserContext(ctx);
+        if (!user) return toolError("No user context");
+        const check = requireScope(user.scopes, "read");
         if (check.error) return check.result;
 
         try {
           const accountFilter = await this.accountsService.resolveAccountFilter(
-            ctx.userId,
+            user.userId,
             args.accountNames,
           );
           if (accountFilter.error) return toolError(accountFilter.error);
           const accountIds = accountFilter.accountIds;
           const result =
             await this.investmentTransactionsService.getLlmInvestmentTransactions(
-              ctx.userId,
+              user.userId,
               {
                 startDate: args.startDate,
                 endDate: args.endDate,
@@ -237,7 +238,7 @@ export class McpInvestmentsTools {
           "transaction history and marks positions to historical closes, so " +
           "the result covers movement on holdings the user still owns as well " +
           "as gains realized by a sale.",
-        inputSchema: {
+        inputSchema: z.object({
           startDate: z
             .string()
             .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -262,25 +263,25 @@ export class McpInvestmentsTools {
             .enum(["month", "security", "account"])
             .optional()
             .describe("Defaults to 'month'."),
-        },
+        }),
         outputSchema: getCapitalGainsOutput,
       },
-      async (args, extra) => {
-        const ctx = resolve(extra.sessionId);
-        if (!ctx) return toolError("No user context");
-        const check = requireScope(ctx.scopes, "read");
+      async (args, ctx) => {
+        const user = resolveUserContext(ctx);
+        if (!user) return toolError("No user context");
+        const check = requireScope(user.scopes, "read");
         if (check.error) return check.result;
 
         try {
           const accountFilter = await this.accountsService.resolveAccountFilter(
-            ctx.userId,
+            user.userId,
             args.accountNames,
           );
           if (accountFilter.error) return toolError(accountFilter.error);
           const accountIds = accountFilter.accountIds;
           const result =
             await this.investmentTransactionsService.getLlmCapitalGains(
-              ctx.userId,
+              user.userId,
               {
                 startDate: args.startDate,
                 endDate: args.endDate,
@@ -308,7 +309,7 @@ export class McpInvestmentsTools {
           "and return the matches WITHOUT adding anything. Use it to resolve " +
           "an ambiguous reference before manage_securities; a candidate " +
           "already in the user's list is flagged alreadyAdded.",
-        inputSchema: {
+        inputSchema: z.object({
           search: z
             .string()
             .min(1)
@@ -322,18 +323,18 @@ export class McpInvestmentsTools {
             .enum(["yahoo", "msn", "auto"])
             .optional()
             .describe("Defaults to the user's configured provider."),
-        },
+        }),
         outputSchema: lookupSecuritiesOutput,
       },
-      async (args, extra) => {
-        const ctx = resolve(extra.sessionId);
-        if (!ctx) return toolError("No user context");
-        const check = requireScope(ctx.scopes, "read");
+      async (args, ctx) => {
+        const user = resolveUserContext(ctx);
+        if (!user) return toolError("No user context");
+        const check = requireScope(user.scopes, "read");
         if (check.error) return check.result;
 
         try {
           const result = await this.securitiesService.lookupSecuritiesForLlm(
-            ctx.userId,
+            user.userId,
             {
               query: args.search,
               exchange: args.exchange,
@@ -360,7 +361,7 @@ export class McpInvestmentsTools {
           "place. An update identifies the security by symbol or name. " +
           "A delete fails while the security still has holdings or " +
           "transactions.",
-        inputSchema: {
+        inputSchema: z.object({
           operation: manageOperation(),
           items: itemsArray(
             z.object({
@@ -434,13 +435,13 @@ export class McpInvestmentsTools {
           ),
           approvalMode: approvalMode(),
           dryRun: dryRun(),
-        },
+        }),
         outputSchema: manageSecuritiesOutput,
       },
-      async (args, extra) => {
-        const ctx = resolve(extra.sessionId);
-        if (!ctx) return toolError("No user context");
-        const check = requireScope(ctx.scopes, "write");
+      async (args, ctx) => {
+        const user = resolveUserContext(ctx);
+        if (!user) return toolError("No user context");
+        const check = requireScope(user.scopes, "write");
         if (check.error) return check.result;
 
         const operation = args.operation as ManageSecOperation;
@@ -449,32 +450,32 @@ export class McpInvestmentsTools {
 
         try {
           if (args.dryRun) {
-            return this.manageSecDryRun(ctx.userId, operation, items);
+            return this.manageSecDryRun(user.userId, operation, items);
           }
           if (operation === "create") {
             return await this.manageSecCreate(
               server,
-              ctx.userId,
+              ctx,
+              user.userId,
               items,
               approvalMode,
-              extra.requestId,
             );
           }
           if (operation === "update") {
             return await this.manageSecUpdate(
               server,
-              ctx.userId,
+              ctx,
+              user.userId,
               items,
               approvalMode,
-              extra.requestId,
             );
           }
           return await this.manageSecDelete(
             server,
-            ctx.userId,
+            ctx,
+            user.userId,
             items,
             approvalMode,
-            extra.requestId,
           );
         } catch (err: unknown) {
           return safeToolError(err);
@@ -496,7 +497,7 @@ export class McpInvestmentsTools {
           "An update changes only the fields you send and recomputes the " +
           "total and the cash impact. Deleting one leg of a security transfer " +
           "removes its pair and reverses the linked cash movement.",
-        inputSchema: {
+        inputSchema: z.object({
           operation: manageOperation(),
           items: itemsArray(
             z.object({
@@ -559,13 +560,13 @@ export class McpInvestmentsTools {
             }),
           ),
           approvalMode: approvalMode(),
-        },
+        }),
         outputSchema: manageInvestmentTransactionsOutput,
       },
-      async (args, extra) => {
-        const ctx = resolve(extra.sessionId);
-        if (!ctx) return toolError("No user context");
-        const check = requireScope(ctx.scopes, "write");
+      async (args, ctx) => {
+        const user = resolveUserContext(ctx);
+        if (!user) return toolError("No user context");
+        const check = requireScope(user.scopes, "write");
         if (check.error) return check.result;
 
         const operation = args.operation as ManageInvOperation;
@@ -579,27 +580,27 @@ export class McpInvestmentsTools {
           if (operation === "create") {
             return await this.manageInvCreate(
               server,
-              ctx.userId,
+              ctx,
+              user.userId,
               items,
               approvalMode,
-              extra.requestId,
             );
           }
           if (operation === "update") {
             return await this.manageInvUpdate(
               server,
-              ctx.userId,
+              ctx,
+              user.userId,
               items,
               approvalMode,
-              extra.requestId,
             );
           }
           return await this.manageInvDelete(
             server,
-            ctx.userId,
+            ctx,
+            user.userId,
             items,
             approvalMode,
-            extra.requestId,
           );
         } catch (err: unknown) {
           return safeToolError(err);
@@ -645,10 +646,10 @@ export class McpInvestmentsTools {
 
   private async manageInvCreate(
     server: McpServer,
+    ctx: ServerContext,
     userId: string,
     items: ManageInvItem[],
     approvalMode: ApprovalMode,
-    requestId: unknown,
   ) {
     const single = items.length === 1;
 
@@ -669,8 +670,8 @@ export class McpInvestmentsTools {
       }
       const confirmation = await confirmWrite(
         server,
+        ctx,
         this.createConfirmLines(preview).join("\n"),
-        requestId as never,
       );
       if (confirmation === "declined") {
         return toolError(
@@ -710,13 +711,7 @@ export class McpInvestmentsTools {
       const cards = bulk.okPreviews.map((p) =>
         this.actionBuilder.buildCreateInvestmentTransaction(userId, p),
       );
-      return this.runInvIndividual(
-        server,
-        userId,
-        cards,
-        requestId,
-        bulk.skipped,
-      );
+      return this.runInvIndividual(server, ctx, userId, cards, bulk.skipped);
     }
 
     // bulk mode: one card carrying every row.
@@ -730,8 +725,8 @@ export class McpInvestmentsTools {
     }
     const confirmation = await confirmWrite(
       server,
+      ctx,
       `Create ${bulk.okPreviews.length} investment transaction(s)?${bulk.skipped.length ? ` (${bulk.skipped.length} skipped)` : ""}`,
-      requestId as never,
     );
     if (confirmation === "declined") {
       return toolError(
@@ -769,10 +764,10 @@ export class McpInvestmentsTools {
 
   private async manageInvUpdate(
     server: McpServer,
+    ctx: ServerContext,
     userId: string,
     items: ManageInvItem[],
     approvalMode: ApprovalMode,
-    requestId: unknown,
   ) {
     const single = items.length === 1;
 
@@ -794,11 +789,11 @@ export class McpInvestmentsTools {
       }
       const confirmation = await confirmWrite(
         server,
+        ctx,
         [
           "Apply this investment transaction edit?",
           ...this.editLines(preview),
         ].join("\n"),
-        requestId as never,
       );
       if (confirmation === "declined") {
         return toolError(
@@ -851,7 +846,7 @@ export class McpInvestmentsTools {
         );
       const budget = this.writeLimiter.reserve(userId, cards.length);
       if (budget) return budget;
-      return this.runInvIndividual(server, userId, cards, requestId, skipped);
+      return this.runInvIndividual(server, ctx, userId, cards, skipped);
     }
 
     const bulk =
@@ -875,8 +870,8 @@ export class McpInvestmentsTools {
     }
     const confirmation = await confirmWrite(
       server,
+      ctx,
       `Apply ${bulk.okRows.length} investment transaction edit(s)?${bulk.skipped.length ? ` (${bulk.skipped.length} skipped)` : ""}`,
-      requestId as never,
     );
     if (confirmation === "declined")
       return toolError(
@@ -907,10 +902,10 @@ export class McpInvestmentsTools {
 
   private async manageInvDelete(
     server: McpServer,
+    ctx: ServerContext,
     userId: string,
     items: ManageInvItem[],
     approvalMode: ApprovalMode,
-    requestId: unknown,
   ) {
     const single = items.length === 1;
 
@@ -931,13 +926,13 @@ export class McpInvestmentsTools {
       }
       const confirmation = await confirmWrite(
         server,
+        ctx,
         [
           "Delete this investment transaction?",
           `Account: ${preview.accountName}`,
           `Type: ${preview.action}`,
           `Date: ${preview.transactionDate}`,
         ].join("\n"),
-        requestId as never,
       );
       if (confirmation === "declined") {
         return toolError(
@@ -978,7 +973,7 @@ export class McpInvestmentsTools {
         );
       const budget = this.writeLimiter.reserve(userId, cards.length);
       if (budget) return budget;
-      return this.runInvIndividual(server, userId, cards, requestId, skipped);
+      return this.runInvIndividual(server, ctx, userId, cards, skipped);
     }
 
     const bulk =
@@ -1002,8 +997,8 @@ export class McpInvestmentsTools {
     }
     const confirmation = await confirmWrite(
       server,
+      ctx,
       `Delete ${bulk.okRows.length} investment transaction(s)?${bulk.skipped.length ? ` (${bulk.skipped.length} skipped)` : ""}`,
-      requestId as never,
     );
     if (confirmation === "declined")
       return toolError(
@@ -1027,9 +1022,9 @@ export class McpInvestmentsTools {
    */
   private async runInvIndividual(
     server: McpServer,
+    ctx: ServerContext,
     userId: string,
     cards: PendingAiAction[],
-    requestId: unknown,
     skipped: { index: number; reason: string }[],
   ) {
     if (emitRelayCard(this.relayService, userId, cards[0])) {
@@ -1042,8 +1037,8 @@ export class McpInvestmentsTools {
     for (const card of cards) {
       const confirmation = await confirmWrite(
         server,
+        ctx,
         this.confirmLineFor(card),
-        requestId as never,
       );
       if (confirmation === "declined") continue;
       const id = await this.commitCard(userId, card);
@@ -1245,28 +1240,24 @@ export class McpInvestmentsTools {
 
   private async emitOrConfirmSec(
     server: McpServer,
+    ctx: ServerContext,
     userId: string,
     pendingAction: PendingAiAction,
     confirmMessage: string,
-    requestId: unknown,
   ): Promise<"relay" | "accepted" | "declined"> {
     if (emitRelayCard(this.relayService, userId, pendingAction)) {
       return "relay";
     }
-    const confirmation = await confirmWrite(
-      server,
-      confirmMessage,
-      requestId as never,
-    );
+    const confirmation = await confirmWrite(server, ctx, confirmMessage);
     return confirmation === "declined" ? "declined" : "accepted";
   }
 
   private async manageSecCreate(
     server: McpServer,
+    ctx: ServerContext,
     userId: string,
     items: ManageSecItem[],
     approvalMode: ApprovalMode,
-    requestId: unknown,
   ) {
     if (items.length === 1) {
       const preview =
@@ -1279,10 +1270,10 @@ export class McpInvestmentsTools {
       const action = this.actionBuilder.buildCreateSecurity(userId, preview);
       const outcome = await this.emitOrConfirmSec(
         server,
+        ctx,
         userId,
         action,
         `Create this security?\nSymbol: ${preview.symbol}\nName: ${preview.name}\nCurrency: ${preview.currencyCode}`,
-        requestId,
       );
       if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
       if (outcome === "declined")
@@ -1314,13 +1305,7 @@ export class McpInvestmentsTools {
       const cards = prep.okPreviews.map((p) =>
         this.actionBuilder.buildCreateSecurity(userId, p),
       );
-      return this.runSecIndividual(
-        server,
-        userId,
-        cards,
-        requestId,
-        prep.skipped,
-      );
+      return this.runSecIndividual(server, ctx, userId, cards, prep.skipped);
     }
 
     const action = this.actionBuilder.buildBatchActions(
@@ -1334,8 +1319,8 @@ export class McpInvestmentsTools {
     }
     const confirmation = await confirmWrite(
       server,
+      ctx,
       `Create ${prep.okPreviews.length} security/securities?${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}`,
-      requestId as never,
     );
     if (confirmation === "declined")
       return toolError(
@@ -1351,10 +1336,10 @@ export class McpInvestmentsTools {
 
   private async manageSecUpdate(
     server: McpServer,
+    ctx: ServerContext,
     userId: string,
     items: ManageSecItem[],
     approvalMode: ApprovalMode,
-    requestId: unknown,
   ) {
     if (items.length === 1) {
       const preview =
@@ -1367,10 +1352,10 @@ export class McpInvestmentsTools {
       const action = this.actionBuilder.buildUpdateSecurity(userId, preview);
       const outcome = await this.emitOrConfirmSec(
         server,
+        ctx,
         userId,
         action,
         `Apply this security edit?\nSymbol: ${preview.symbol}\nType: ${preview.securityType ?? "(none)"}\nExchange: ${preview.exchange ?? "(none)"}\nCurrency: ${preview.currencyCode}`,
-        requestId,
       );
       if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
       if (outcome === "declined")
@@ -1402,13 +1387,7 @@ export class McpInvestmentsTools {
       const cards = prep.okPreviews.map((p) =>
         this.actionBuilder.buildUpdateSecurity(userId, p),
       );
-      return this.runSecIndividual(
-        server,
-        userId,
-        cards,
-        requestId,
-        prep.skipped,
-      );
+      return this.runSecIndividual(server, ctx, userId, cards, prep.skipped);
     }
 
     const action = this.actionBuilder.buildBatchActions(
@@ -1422,8 +1401,8 @@ export class McpInvestmentsTools {
     }
     const confirmation = await confirmWrite(
       server,
+      ctx,
       `Apply ${prep.okPreviews.length} security edit(s)?${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}`,
-      requestId as never,
     );
     if (confirmation === "declined")
       return toolError(
@@ -1439,10 +1418,10 @@ export class McpInvestmentsTools {
 
   private async manageSecDelete(
     server: McpServer,
+    ctx: ServerContext,
     userId: string,
     items: ManageSecItem[],
     approvalMode: ApprovalMode,
-    requestId: unknown,
   ) {
     if (items.length === 1) {
       const preview =
@@ -1455,10 +1434,10 @@ export class McpInvestmentsTools {
       const action = this.actionBuilder.buildDeleteSecurity(userId, preview);
       const outcome = await this.emitOrConfirmSec(
         server,
+        ctx,
         userId,
         action,
         `Delete this security?\nSymbol: ${preview.symbol}\nName: ${preview.name}`,
-        requestId,
       );
       if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
       if (outcome === "declined")
@@ -1486,13 +1465,7 @@ export class McpInvestmentsTools {
       const cards = prep.okPreviews.map((p) =>
         this.actionBuilder.buildDeleteSecurity(userId, p),
       );
-      return this.runSecIndividual(
-        server,
-        userId,
-        cards,
-        requestId,
-        prep.skipped,
-      );
+      return this.runSecIndividual(server, ctx, userId, cards, prep.skipped);
     }
 
     const action = this.actionBuilder.buildBatchActions(
@@ -1506,8 +1479,8 @@ export class McpInvestmentsTools {
     }
     const confirmation = await confirmWrite(
       server,
+      ctx,
       `Delete ${prep.okPreviews.length} security/securities?${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}`,
-      requestId as never,
     );
     if (confirmation === "declined")
       return toolError(
@@ -1583,9 +1556,9 @@ export class McpInvestmentsTools {
    */
   private async runSecIndividual(
     server: McpServer,
+    ctx: ServerContext,
     userId: string,
     cards: PendingAiAction[],
-    requestId: unknown,
     skipped: { index: number; reason: string }[],
   ) {
     if (emitRelayCard(this.relayService, userId, cards[0])) {
@@ -1598,8 +1571,8 @@ export class McpInvestmentsTools {
     for (const card of cards) {
       const confirmation = await confirmWrite(
         server,
+        ctx,
         this.secConfirmLineFor(card),
-        requestId as never,
       );
       if (confirmation === "declined") continue;
       const id = await this.commitSecCard(userId, card);

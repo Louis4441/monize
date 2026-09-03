@@ -1,6 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { UserContextResolver } from "./mcp-context";
+import { McpServer } from "@modelcontextprotocol/server";
 import { AiRelayService } from "../ai/relay/ai-relay.service";
 import { installRelayToolActivity } from "./mcp-relay-tool-activity";
 import { McpAccountsTools } from "./tools/accounts.tool";
@@ -54,10 +53,11 @@ export class McpServerService {
     private readonly spendingAnalysisPrompt: McpSpendingAnalysisPrompt,
   ) {}
 
-  createServer(resolve: UserContextResolver): McpServer {
+  createServer(): McpServer {
     // Surface today's date so the model can resolve relative ranges ("this
-    // month", "last 30 days") into YYYY-MM-DD without an extra round trip. The
-    // server is built per session, so this reflects the connection date.
+    // month", "last 30 days") into YYYY-MM-DD without an extra round trip. A
+    // server is built per 2025-era session and per 2026-07-28 request, so this
+    // is never staler than the connection.
     const today = new Date().toISOString().substring(0, 10);
     const server = new McpServer(
       { name: "monize", version: backendPkg.version },
@@ -99,24 +99,24 @@ export class McpServerService {
 
     // Stream the agent's tool calls to the web chat as live progress when this
     // session is serving a relayed prompt. Must run before the tools register.
-    installRelayToolActivity(server, resolve, this.relayService);
+    installRelayToolActivity(server, this.relayService);
 
-    this.accountsTools.register(server, resolve);
-    this.transactionsTools.register(server, resolve);
-    this.categoriesTools.register(server, resolve);
-    this.payeesTools.register(server, resolve);
-    this.reportsTools.register(server, resolve);
-    this.investmentsTools.register(server, resolve);
-    this.scheduledTools.register(server, resolve);
+    this.accountsTools.register(server);
+    this.transactionsTools.register(server);
+    this.categoriesTools.register(server);
+    this.payeesTools.register(server);
+    this.reportsTools.register(server);
+    this.investmentsTools.register(server);
+    this.scheduledTools.register(server);
     this.calculateTools.register(server);
-    this.budgetsTools.register(server, resolve);
-    this.relayTools.register(server, resolve);
+    this.budgetsTools.register(server);
+    this.relayTools.register(server);
 
-    this.accountListResource.register(server, resolve);
-    this.categoryTreeResource.register(server, resolve);
-    this.recentTransactionsResource.register(server, resolve);
-    this.financialSummaryResource.register(server, resolve);
-    this.relayAttachmentResource.register(server, resolve);
+    this.accountListResource.register(server);
+    this.categoryTreeResource.register(server);
+    this.recentTransactionsResource.register(server);
+    this.financialSummaryResource.register(server);
+    this.relayAttachmentResource.register(server);
 
     this.financialReviewPrompt.register(server);
     this.budgetCheckPrompt.register(server);

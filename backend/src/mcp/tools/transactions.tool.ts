@@ -1,7 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { describeSkippedRows } from "../../common/bulk-create.types";
 import { z } from "zod";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
+import type { ServerContext } from "@modelcontextprotocol/server";
 import { TransactionsService } from "../../transactions/transactions.service";
 import { PayeesService } from "../../payees/payees.service";
 import { AccountsService } from "../../accounts/accounts.service";
@@ -36,13 +37,13 @@ import { sniffAttachmentMime } from "../../attachments/attachment-mime.util";
 import { withUserContext } from "../../common/db/with-context";
 import { RELAY_PREVIEW_SHOWN, emitRelayCard } from "../mcp-relay-confirm";
 import {
-  UserContextResolver,
+  resolveUserContext,
   requireScope,
   toolResult,
   toolError,
   safeToolError,
-  confirmWrite,
 } from "../mcp-context";
+import { confirmWrite } from "../mcp-confirm";
 import { McpWriteLimiter } from "../mcp-write-limiter";
 import {
   getDefaultDateRange,
@@ -128,7 +129,7 @@ export class McpTransactionsTools {
     private readonly relayAttachmentStore: RelayAttachmentStore,
   ) {}
 
-  register(server: McpServer, resolve: UserContextResolver) {
+  register(server: McpServer) {
     server.registerTool(
       "list_transactions",
       {
@@ -142,7 +143,7 @@ export class McpTransactionsTools {
           "user wants the individual rows, which costs many tokens. Transfers " +
           "between the user's own accounts are excluded from the income and " +
           "expense totals -- use transfersOnly to see them.",
-        inputSchema: {
+        inputSchema: z.object({
           searchText: z
             .string()
             .max(200)
@@ -210,13 +211,13 @@ export class McpTransactionsTools {
             .optional()
             .default("desc")
             .describe("Default 'desc', newest first."),
-        },
+        }),
         outputSchema: listTransactionsOutput,
       },
-      async (args, extra) => {
-        const ctx = resolve(extra.sessionId);
-        if (!ctx) return toolError("No user context");
-        const check = requireScope(ctx.scopes, "read");
+      async (args, ctx) => {
+        const user = resolveUserContext(ctx);
+        if (!user) return toolError("No user context");
+        const check = requireScope(user.scopes, "read");
         if (check.error) return check.result;
 
         try {
@@ -224,7 +225,7 @@ export class McpTransactionsTools {
           const startDate = args.startDate ?? defaults.startDate;
           const endDate = args.endDate ?? defaults.endDate;
 
-          const resolved = await this.resolveListFilters(ctx.userId, {
+          const resolved = await this.resolveListFilters(user.userId, {
             accountNames: args.accountNames,
             categoryNames: args.categoryNames,
             payeeNames: args.payeeNames,
@@ -232,7 +233,7 @@ export class McpTransactionsTools {
           if (resolved.error) return toolError(resolved.error);
 
           const data = await this.analyticsService.getLlmListTransactions(
-            ctx.userId,
+            user.userId,
             {
               startDate,
               endDate,
@@ -253,7 +254,7 @@ export class McpTransactionsTools {
           }
 
           const rows = await this.transactionsService.getLlmTransactionRows(
-            ctx.userId,
+            user.userId,
             {
               accountId: resolved.accountIds?.[0],
               categoryId: resolved.categoryIds?.[0],
@@ -291,7 +292,7 @@ export class McpTransactionsTools {
           "Compare spending or income across two periods, with the absolute and " +
           "percentage change per group. Omitting any of the four dates " +
           "defaults to last full month against this month to date.",
-        inputSchema: {
+        inputSchema: z.object({
           period1Start: z
             .string()
             .max(10)
@@ -320,13 +321,13 @@ export class McpTransactionsTools {
             .enum(["expenses", "income", "both"])
             .optional()
             .describe("Default 'expenses'."),
-        },
+        }),
         outputSchema: comparePeriodsOutput,
       },
-      async (args, extra) => {
-        const ctx = resolve(extra.sessionId);
-        if (!ctx) return toolError("No user context");
-        const check = requireScope(ctx.scopes, "read");
+      async (args, ctx) => {
+        const user = resolveUserContext(ctx);
+        if (!user) return toolError("No user context");
+        const check = requireScope(user.scopes, "read");
         if (check.error) return check.result;
 
         try {
@@ -337,7 +338,7 @@ export class McpTransactionsTools {
             period2End: args.period2End,
           });
           const data = await this.analyticsService.getLlmPeriodComparison(
-            ctx.userId,
+            user.userId,
             {
               period1Start: periods.period1Start,
               period1End: periods.period1End,
@@ -375,7 +376,7 @@ export class McpTransactionsTools {
           "be sent in one call, each carrying its own complete array. " +
           "Deleting a row removes its linked transfer legs and split children " +
           "too.",
-        inputSchema: {
+        inputSchema: z.object({
           operation: manageOperation(),
           items: itemsArray(
             z.object({
@@ -496,13 +497,13 @@ export class McpTransactionsTools {
           ),
           approvalMode: approvalMode(),
           dryRun: dryRun(),
-        },
+        }),
         outputSchema: manageTransactionsOutput,
       },
-      async (args, extra) => {
-        const ctx = resolve(extra.sessionId);
-        if (!ctx) return toolError("No user context");
-        const check = requireScope(ctx.scopes, "write");
+      async (args, ctx) => {
+        const user = resolveUserContext(ctx);
+        if (!user) return toolError("No user context");
+        const check = requireScope(user.scopes, "write");
         if (check.error) return check.result;
 
         const operation = args.operation as ManageOperation;
@@ -536,7 +537,7 @@ export class McpTransactionsTools {
               );
             }
             const resolved = this.resolveMcpAttachments(
-              ctx.userId,
+              user.userId,
               items[0].attachments as ManageAttachmentInput[],
             );
             if ("error" in resolved) return toolError(resolved.error);
@@ -544,34 +545,34 @@ export class McpTransactionsTools {
           }
 
           if (args.dryRun) {
-            return this.manageDryRun(ctx.userId, operation, items);
+            return this.manageDryRun(user.userId, operation, items);
           }
           if (operation === "create") {
             return await this.manageCreate(
               server,
-              ctx.userId,
+              ctx,
+              user.userId,
               items,
               approvalMode,
-              extra.requestId,
               attachmentDtos,
             );
           }
           if (operation === "update") {
             return await this.manageUpdate(
               server,
-              ctx.userId,
+              ctx,
+              user.userId,
               items,
               approvalMode,
-              extra.requestId,
               attachmentDtos,
             );
           }
           return await this.manageDelete(
             server,
-            ctx.userId,
+            ctx,
+            user.userId,
             items,
             approvalMode,
-            extra.requestId,
           );
         } catch (err: unknown) {
           return safeToolError(err);
@@ -896,19 +897,15 @@ export class McpTransactionsTools {
    */
   private async emitOrConfirm(
     server: McpServer,
+    ctx: ServerContext,
     userId: string,
     pendingAction: PendingAiAction,
     confirmMessage: string,
-    requestId: unknown,
   ): Promise<"relay" | "accepted" | "declined"> {
     if (emitRelayCard(this.relayService, userId, pendingAction)) {
       return "relay";
     }
-    const confirmation = await confirmWrite(
-      server,
-      confirmMessage,
-      requestId as never,
-    );
+    const confirmation = await confirmWrite(server, ctx, confirmMessage);
     return confirmation === "declined" ? "declined" : "accepted";
   }
 
@@ -1063,9 +1060,9 @@ export class McpTransactionsTools {
   /** Create one category-split transaction (single rich item). */
   private async manageCreateSplit(
     server: McpServer,
+    ctx: ServerContext,
     userId: string,
     item: ManageItem,
-    requestId: unknown,
     attachmentDtos?: AttachmentDto[],
   ) {
     const budget = this.writeLimiter.reserve(userId, 1);
@@ -1086,10 +1083,10 @@ export class McpTransactionsTools {
     );
     const outcome = await this.emitOrConfirm(
       server,
+      ctx,
       userId,
       action,
       `Create this split transaction?\nAccount: ${preview.accountName}\nAmount: ${preview.amount} ${preview.currencyCode}\nDate: ${preview.transactionDate}\nSplits: ${(splits ?? []).map((s) => `${s.categoryName} ${s.amount}`).join(", ")}${this.attachmentConfirmNote(attachmentRefs)}`,
-      requestId,
     );
     if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
     if (outcome === "declined") {
@@ -1132,10 +1129,10 @@ export class McpTransactionsTools {
 
   private async manageCreate(
     server: McpServer,
+    ctx: ServerContext,
     userId: string,
     items: ManageItem[],
     approvalMode: ApprovalMode,
-    requestId: unknown,
     attachmentDtos?: AttachmentDto[],
   ) {
     const single = items.length === 1;
@@ -1145,9 +1142,9 @@ export class McpTransactionsTools {
     if (single && items[0].splits) {
       return this.manageCreateSplit(
         server,
+        ctx,
         userId,
         items[0],
-        requestId,
         attachmentDtos,
       );
     }
@@ -1191,10 +1188,10 @@ export class McpTransactionsTools {
         );
         const outcome = await this.emitOrConfirm(
           server,
+          ctx,
           userId,
           action,
           `Create this transaction?\nAccount: ${preview.accountName}\nAmount: ${preview.amount} ${preview.currencyCode}\nDate: ${preview.transactionDate}${this.attachmentConfirmNote(attachmentRefs)}`,
-          requestId,
         );
         if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
         if (outcome === "declined") {
@@ -1239,10 +1236,10 @@ export class McpTransactionsTools {
       const action = this.actionBuilder.buildCreateTransfer(userId, preview);
       const outcome = await this.emitOrConfirm(
         server,
+        ctx,
         userId,
         action,
         `Create this transfer?\nFrom: ${preview.fromAccountName}\nTo: ${preview.toAccountName}\nAmount: ${preview.amount} ${preview.fromCurrencyCode}\nDate: ${preview.transactionDate}`,
-        requestId,
       );
       if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
       if (outcome === "declined")
@@ -1277,7 +1274,7 @@ export class McpTransactionsTools {
           this.actionBuilder.buildCreateTransfer(userId, p),
         ),
       ];
-      return this.runIndividual(server, userId, cards, requestId, [
+      return this.runIndividual(server, ctx, userId, cards, [
         ...std.skipped,
         ...xfer.skipped,
       ]);
@@ -1314,8 +1311,8 @@ export class McpTransactionsTools {
     const skipped = [...std.skipped, ...xfer.skipped];
     const confirmation = await confirmWrite(
       server,
+      ctx,
       `Create ${okCount} transaction(s)?${skipped.length ? ` (${skipped.length} skipped)` : ""}`,
-      requestId as never,
     );
     if (confirmation === "declined") {
       return toolError(
@@ -1366,10 +1363,10 @@ export class McpTransactionsTools {
 
   private async manageUpdate(
     server: McpServer,
+    ctx: ServerContext,
     userId: string,
     items: ManageItem[],
     approvalMode: ApprovalMode,
-    requestId: unknown,
     attachmentDtos?: AttachmentDto[],
   ) {
     const single = items.length === 1;
@@ -1391,10 +1388,10 @@ export class McpTransactionsTools {
         const action = this.actionBuilder.buildUpdateTransfer(userId, preview);
         const outcome = await this.emitOrConfirm(
           server,
+          ctx,
           userId,
           action,
           `Apply this transfer edit?\nFrom: ${preview.fromAccountName}\nTo: ${preview.toAccountName}\nAmount: ${preview.amount} ${preview.fromCurrencyCode}\nDate: ${preview.transactionDate}${preview.categoryName ? `\nCategory: ${preview.categoryName}` : ""}`,
-          requestId,
         );
         if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
         if (outcome === "declined")
@@ -1443,10 +1440,10 @@ export class McpTransactionsTools {
         : `Apply this transaction edit?\nAccount: ${preview.accountName}\nAmount: ${preview.amount} ${preview.currencyCode}\nDate: ${preview.transactionDate}${attachmentNote}${reconciledNote}`;
       const outcome = await this.emitOrConfirm(
         server,
+        ctx,
         userId,
         action,
         confirmMessage,
-        requestId,
       );
       if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
       if (outcome === "declined") {
@@ -1522,7 +1519,7 @@ export class McpTransactionsTools {
         );
       const budget = this.writeLimiter.reserve(userId, cards.length);
       if (budget) return budget;
-      return this.runIndividual(server, userId, cards, requestId, skipped);
+      return this.runIndividual(server, ctx, userId, cards, skipped);
     }
 
     // bulk mode
@@ -1547,8 +1544,8 @@ export class McpTransactionsTools {
     }
     const confirmation = await confirmWrite(
       server,
+      ctx,
       `Apply ${bulk.okRows.length} transaction edit(s)?${bulk.skipped.length ? ` (${bulk.skipped.length} skipped)` : ""}`,
-      requestId as never,
     );
     if (confirmation === "declined")
       return toolError(
@@ -1578,10 +1575,10 @@ export class McpTransactionsTools {
 
   private async manageDelete(
     server: McpServer,
+    ctx: ServerContext,
     userId: string,
     items: ManageItem[],
     approvalMode: ApprovalMode,
-    requestId: unknown,
   ) {
     const single = items.length === 1;
 
@@ -1595,10 +1592,10 @@ export class McpTransactionsTools {
       const action = this.actionBuilder.buildDeleteTransaction(userId, preview);
       const outcome = await this.emitOrConfirm(
         server,
+        ctx,
         userId,
         action,
         `Delete this transaction?\nAccount: ${preview.accountName}\nAmount: ${preview.amount} ${preview.currencyCode}\nDate: ${preview.transactionDate}${preview.isReconciled ? RECONCILED_CONFIRM_NOTE : ""}`,
-        requestId,
       );
       if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
       if (outcome === "declined")
@@ -1632,7 +1629,7 @@ export class McpTransactionsTools {
         );
       const budget = this.writeLimiter.reserve(userId, cards.length);
       if (budget) return budget;
-      return this.runIndividual(server, userId, cards, requestId, skipped);
+      return this.runIndividual(server, ctx, userId, cards, skipped);
     }
 
     const bulk = await this.prepService.prepareDeleteBulk(
@@ -1656,8 +1653,8 @@ export class McpTransactionsTools {
     }
     const confirmation = await confirmWrite(
       server,
+      ctx,
       `Delete ${bulk.okRows.length} transaction(s)?${bulk.skipped.length ? ` (${bulk.skipped.length} skipped)` : ""}`,
-      requestId as never,
     );
     if (confirmation === "declined")
       return toolError(
@@ -1678,9 +1675,9 @@ export class McpTransactionsTools {
    */
   private async runIndividual(
     server: McpServer,
+    ctx: ServerContext,
     userId: string,
     cards: PendingAiAction[],
-    requestId: unknown,
     skipped: { index: number; reason: string }[],
   ) {
     // Relay path: emit each card; the browser confirms+commits each.
@@ -1694,8 +1691,8 @@ export class McpTransactionsTools {
     for (const card of cards) {
       const confirmation = await confirmWrite(
         server,
+        ctx,
         this.confirmLineFor(card),
-        requestId as never,
       );
       if (confirmation === "declined") continue;
       const id = await this.commitCard(userId, card);
