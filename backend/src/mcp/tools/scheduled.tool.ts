@@ -12,7 +12,7 @@ import {
 import { getUpcomingBillsOutput } from "../tool-output-schemas";
 import { READ_ONLY } from "../mcp-annotations";
 import { uuidString } from "./schema-fragments";
-import { numberArg, booleanArg } from "../../common/tool-schemas";
+import { numberArg } from "../../common/tool-schemas";
 
 const SCHEDULED_KIND_VALUES = [
   "bill",

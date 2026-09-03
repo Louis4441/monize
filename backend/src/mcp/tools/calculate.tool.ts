@@ -5,7 +5,7 @@ import { toolResult, toolError } from "../mcp-context";
 import { executeCalculation } from "../../ai/query/calculate-tool";
 import { calculateOutput } from "../tool-output-schemas";
 import { READ_ONLY } from "../mcp-annotations";
-import { numberArg, booleanArg } from "../../common/tool-schemas";
+import { numberArg } from "../../common/tool-schemas";
 
 @Injectable()
 export class McpCalculateTools {

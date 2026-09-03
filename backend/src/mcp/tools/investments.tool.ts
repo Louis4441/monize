@@ -28,7 +28,6 @@ import { AiActionBuilderService } from "../../ai/actions/ai-action-builder.servi
 import {
   ApprovalMode,
   PendingAiAction,
-  MAX_BULK_ACTION_ROWS,
   resolveApprovalMode,
 } from "../../ai/actions/ai-action.types";
 import { RELAY_PREVIEW_SHOWN, emitRelayCard } from "../mcp-relay-confirm";
