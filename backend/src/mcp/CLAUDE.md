@@ -90,9 +90,11 @@ The same user can have two MCP sessions at once -- the agent running the web-cha
 
 ## `toolResult` and structured content
 
-`toolResult(data)` (in `mcp-context.ts`) is the only success path. It sanitizes every string in the payload (`sanitizeToolResultStrings`), emits a text `content` block with the pretty-printed JSON (the raw data shape, which the AI Assistant relies on -- do not change it), and emits `structuredContent`: objects pass through; **bare arrays are wrapped under `items`**; primitives under `value`.
+`toolResult(data)` is the only success path. It sanitizes every string in the payload (`sanitizeToolResultStrings`), normalizes non-finite numbers to `null`, and returns **`structuredContent` alone**: objects pass through; bare arrays are wrapped under `items`; primitives under `value`.
 
-Because every tool declares `outputSchema`, the SDK **requires** `structuredContent` and validates it on each call (errors via `toolError`/`safeToolError` set `isError` and bypass validation). So a tool's output schema must accept what `toolResult` produces for that tool.
+**It deliberately does not also emit the payload as a text block.** The spec suggests a serialized-JSON `content` entry for clients too old to read `structuredContent`, and this server did that -- pretty-printed, so every answer travelled twice and a model paid for both halves. A page of transactions or a portfolio summary dwarfs the tool definition that asked for it, so the duplicate was the larger half of the per-request cost. The trade is explicit: a client that cannot read `structuredContent` now sees an empty result rather than a degraded one, and restoring the block is a one-line change in `mcp-context.ts`. Errors keep their text (`toolError` carries no structured content and bypasses output validation).
+
+A tool's own spec therefore asserts on `result.structuredContent`, not on parsed `content[0].text`.
 
 ## A tool definition is paid for on every request
 

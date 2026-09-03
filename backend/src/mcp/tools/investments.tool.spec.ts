@@ -190,7 +190,7 @@ describe("McpInvestmentsTools", () => {
         undefined,
         { includeLookThrough: false },
       );
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.totalPortfolioValue).toBe(10000);
       expect(parsed.totalGainLoss).toBe(500);
     });
@@ -255,7 +255,7 @@ describe("McpInvestmentsTools", () => {
         undefined,
         { includeLookThrough: true },
       );
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.lookThrough.byCountry.items[0].name).toBe("United States");
       expect(parsed.lookThrough.byAssetClass.items[0].name).toBe("Equity");
       expect(parsed.lookThrough.byAssetClass.unclassifiedValue).toBe(400);
@@ -350,7 +350,7 @@ describe("McpInvestmentsTools", () => {
         actions: ["BUY"],
         groupBy: "security",
       });
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.transactionCount).toBe(2);
       expect(parsed.groupedBy).toBe("security");
       expect(parsed.groups[0].key).toBe("AAPL");
@@ -466,7 +466,7 @@ describe("McpInvestmentsTools", () => {
         symbols: ["AAA"],
         groupBy: "security",
       });
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.totals.totalCapitalGain).toBe(150);
       expect(parsed.entries[0].symbol).toBe("AAA");
     });
@@ -614,7 +614,7 @@ describe("McpInvestmentsTools", () => {
       );
 
       expect(securitiesService.create).not.toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.dryRun).toBe(true);
       expect(parsed.operation).toBe("create");
     });
@@ -630,7 +630,7 @@ describe("McpInvestmentsTools", () => {
         "u1",
         expect.objectContaining({ symbol: "AAPL", name: "Apple Inc." }),
       );
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.id).toBe("sec-1");
     });
 
@@ -645,7 +645,7 @@ describe("McpInvestmentsTools", () => {
         "sec-1",
         expect.objectContaining({ isFavourite: true }),
       );
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.count).toBe(1);
     });
 
@@ -715,7 +715,7 @@ describe("McpInvestmentsTools", () => {
         { sessionId: "s1" },
       );
       expect(securitiesService.remove).toHaveBeenCalledWith("u1", "sec-1");
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.deleted).toBe(true);
     });
 
@@ -744,7 +744,7 @@ describe("McpInvestmentsTools", () => {
 
       expect(relayService.emitPendingAction).toHaveBeenCalled();
       expect(securitiesService.create).not.toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.status).toBe("preview_shown");
     });
 
@@ -773,7 +773,7 @@ describe("McpInvestmentsTools", () => {
         expect.any(Array),
       );
       expect(securitiesService.create).toHaveBeenCalledTimes(2);
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.count).toBe(2);
     });
 
@@ -836,7 +836,7 @@ describe("McpInvestmentsTools", () => {
       );
 
       expect(securitiesService.update).toHaveBeenCalledTimes(2);
-      expect(JSON.parse(result.content[0].text).count).toBe(2);
+      expect((result.structuredContent as any).count).toBe(2);
     });
 
     it("bulk-deletes multiple securities via confirmation", async () => {
@@ -864,7 +864,7 @@ describe("McpInvestmentsTools", () => {
       );
 
       expect(securitiesService.remove).toHaveBeenCalledTimes(2);
-      expect(JSON.parse(result.content[0].text).count).toBe(2);
+      expect((result.structuredContent as any).count).toBe(2);
     });
 
     it("individual mode commits one security card per item (non-relay)", async () => {
@@ -890,7 +890,7 @@ describe("McpInvestmentsTools", () => {
       );
 
       expect(securitiesService.create).toHaveBeenCalledTimes(2);
-      expect(JSON.parse(result.content[0].text).count).toBe(2);
+      expect((result.structuredContent as any).count).toBe(2);
     });
 
     it("individual mode updates each security (non-relay commit)", async () => {
@@ -995,8 +995,8 @@ describe("McpInvestmentsTools", () => {
       );
       expect(securitiesService.update).not.toHaveBeenCalled();
       expect(securitiesService.remove).not.toHaveBeenCalled();
-      expect(JSON.parse(upd.content[0].text).status).toBe("preview_shown");
-      expect(JSON.parse(del.content[0].text).status).toBe("preview_shown");
+      expect((upd.structuredContent as any).status).toBe("preview_shown");
+      expect((del.structuredContent as any).status).toBe("preview_shown");
     });
 
     it("bulk update/delete go through the relay when relayed", async () => {
@@ -1047,8 +1047,8 @@ describe("McpInvestmentsTools", () => {
       );
       expect(securitiesService.update).not.toHaveBeenCalled();
       expect(securitiesService.remove).not.toHaveBeenCalled();
-      expect(JSON.parse(upd.content[0].text).status).toBe("preview_shown");
-      expect(JSON.parse(del.content[0].text).status).toBe("preview_shown");
+      expect((upd.structuredContent as any).status).toBe("preview_shown");
+      expect((del.structuredContent as any).status).toBe("preview_shown");
     });
 
     it("dry-run previews update and delete without writing", async () => {
@@ -1083,8 +1083,8 @@ describe("McpInvestmentsTools", () => {
 
       expect(securitiesService.update).not.toHaveBeenCalled();
       expect(securitiesService.remove).not.toHaveBeenCalled();
-      expect(JSON.parse(upd.content[0].text).operation).toBe("update");
-      expect(JSON.parse(del.content[0].text).operation).toBe("delete");
+      expect((upd.structuredContent as any).operation).toBe("update");
+      expect((del.structuredContent as any).operation).toBe("delete");
     });
   });
   describe("manage_investment_transactions", () => {
@@ -1169,7 +1169,7 @@ describe("McpInvestmentsTools", () => {
         }),
       );
       expect(investmentTransactionsService.create).toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.id).toBe("inv-1");
       expect(parsed.count).toBe(1);
     });
@@ -1228,7 +1228,7 @@ describe("McpInvestmentsTools", () => {
 
       expect(relayService.emitPendingAction).toHaveBeenCalled();
       expect(investmentTransactionsService.create).not.toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.status).toBe("preview_shown");
     });
 
@@ -1326,7 +1326,7 @@ describe("McpInvestmentsTools", () => {
         { sessionId: "s1", requestId: "c1" },
       );
 
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.ids).toEqual(["i1"]);
       expect(parsed.count).toBe(1);
       // original skip (index 1) plus createBulk skip mapped via okIndex[1] = 2.
@@ -1397,7 +1397,7 @@ describe("McpInvestmentsTools", () => {
 
       // One card per ok row, all emitted to the web chat.
       expect(relayService.emitPendingAction).toHaveBeenCalledTimes(2);
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.status).toBe("preview_shown");
     });
 
@@ -1424,7 +1424,7 @@ describe("McpInvestmentsTools", () => {
         expect.objectContaining({ action: "SELL", quantity: 5 }),
       );
       expect(investmentTransactionsService.update).toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.id).toBe("it1");
     });
 
@@ -1473,7 +1473,7 @@ describe("McpInvestmentsTools", () => {
         actionBuilderRef.buildBatchUpdateInvestmentTransactions,
       ).toHaveBeenCalled();
       expect(investmentTransactionsService.update).toHaveBeenCalledTimes(1);
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.count).toBe(1);
       expect(parsed.skipped).toEqual([{ index: 1, reason: "not found" }]);
     });
@@ -1506,7 +1506,7 @@ describe("McpInvestmentsTools", () => {
         "u1",
         "it1",
       );
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.id).toBe("it1");
       expect(parsed.deleted).toBe(true);
     });
@@ -1536,7 +1536,7 @@ describe("McpInvestmentsTools", () => {
         actionBuilderRef.buildBatchDeleteInvestmentTransactions,
       ).toHaveBeenCalled();
       expect(investmentTransactionsService.remove).toHaveBeenCalledTimes(2);
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.count).toBe(2);
     });
 

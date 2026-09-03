@@ -35,7 +35,7 @@ describe("McpCalculateTools", () => {
     });
 
     expect(result.content).toBeDefined();
-    const data = JSON.parse(result.content[0].text);
+    const data = result.structuredContent as any;
     expect(data.result).toBe(6);
     expect(data.formattedResult).toBe("6%");
   });
@@ -49,7 +49,7 @@ describe("McpCalculateTools", () => {
       values: [0.1, 0.2],
     });
 
-    const data = JSON.parse(result.content[0].text);
+    const data = result.structuredContent as any;
     expect(data.result).toBe(0.3);
   });
 

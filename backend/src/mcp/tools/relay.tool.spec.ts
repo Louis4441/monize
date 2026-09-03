@@ -19,7 +19,7 @@ function register(relay: Partial<AiRelayService>, scopes = "read") {
   return handlers;
 }
 
-const parse = (result: any) => JSON.parse(result.content[0].text);
+const parse = (result: any) => result.structuredContent as any;
 
 describe("McpRelayTools", () => {
   describe("get_next_prompt", () => {

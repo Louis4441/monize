@@ -188,7 +188,7 @@ describe("McpReportsTools", () => {
           "u1",
           "2026-01",
         );
-        const parsed = JSON.parse(result.content[0].text);
+        const parsed = result.structuredContent as any;
         expect(parsed.currentMonth).toBe("2026-01");
       });
 
@@ -283,7 +283,9 @@ describe("McpReportsTools", () => {
           undefined,
           undefined,
         );
-        const parsed = JSON.parse(result.content[0].text);
+        // A bare array is wrapped under `items`: structured content must be an
+        // object, and this report type is the one that returns a plain list.
+        const parsed = (result.structuredContent as any).items;
         expect(parsed).toHaveLength(2);
       });
 
