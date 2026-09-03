@@ -191,15 +191,40 @@ describe("AiPayeeContactLookupProvider", () => {
     ]);
   });
 
-  it("returns no candidates for a non-JSON answer", async () => {
+  it("returns no candidates when the answer parsed and held nothing", async () => {
     aiService.completeWithWebSearch.mockResolvedValue(
-      answer({ content: "I could not find anything." }),
+      answer({ content: '{"matches": []}' }),
     );
 
     await expect(provider.lookup(userId, { name: "Acme" })).resolves.toEqual(
       [],
     );
   });
+
+  it.each([
+    ["an empty turn", ""],
+    ["prose with no JSON in it", "I could not find anything."],
+    [
+      "an answer cut off mid-object",
+      '{"matches": [{"label": "Acme, Toronto", "website": "https://acme.exa',
+    ],
+  ])(
+    "fails rather than reporting nothing found for %s",
+    async (_case, content) => {
+      // A source that could not answer must not arrive as `none`: that is the
+      // reason that stamps contact_lookup_at (retiring the automatic lookup for
+      // the payee for good) and the one every surface renders as "nothing
+      // found". An unfinished web-search turn returns content "" -- see
+      // anthropic.provider.spec.ts, "stops after one continuation".
+      aiService.completeWithWebSearch.mockResolvedValue(answer({ content }));
+
+      const error = await provider
+        .lookup(userId, { name: "Acme" })
+        .catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ContactLookupUnavailableError);
+      expect(error).toMatchObject({ reason: "failed" });
+    },
+  );
 
   it("throws no_provider before calling the model when no provider is configured", async () => {
     aiService.getActiveConfigs.mockResolvedValue([]);

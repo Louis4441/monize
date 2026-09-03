@@ -1941,7 +1941,11 @@ Enforcement         One statement, ENRICHMENT_UPDATE_SQL in
                     COALESCE(column, $n); contact_lookup_source moves only when
                     the statement itself set a field (the CASE reads the
                     pre-SET column values); the automatic path adds WHERE
-                    contact_lookup_at IS NULL. The provider call runs outside any
+                    contact_lookup_at IS NULL. The read that precedes it (whose
+                    only job is to say which fields THIS write set) takes the
+                    row's write lock, FOR UPDATE, and holds it to the commit,
+                    so the two statements are one decision rather than a
+                    check-then-act a concurrent user edit can land inside. The provider call runs outside any
                     transaction and PayeesService.create dispatches it only after
                     its own withScopedDb resolved with no ambient manager
                     (getActiveScopedManager() === undefined). The AI/MCP preview
@@ -1984,7 +1988,15 @@ Crash semantics     A crash before the UPDATE leaves the row untouched and
                     separate best-effort write keyed on that website.
 Failure response    The coordinator never throws: disabled / no_provider /
                     failed / none are returned and shown distinctly; a failure is
-                    never presented as "nothing found".
+                    never presented as "nothing found". `none` is an answer --
+                    the source looked and had nothing, which for the AI adapter
+                    means a parsed `{"matches": []}` -- and it is the reason
+                    that STAMPS contact_lookup_at. An answer that could not be
+                    read is not that: an empty turn (a web search paused past
+                    its continuation limit returns content ""), an output cut
+                    off at PAYEE_LOOKUP_MAX_TOKENS, or a relay agent replying in
+                    prose is `failed`, which stamps nothing. Collapsing the two
+                    retires the automatic lookup for that payee for good.
 Required tests      payee-contact-enrichment.service.spec.ts (COALESCE and
                     predicate shape, stamp-on-answer only, favicon keyed on the
                     website), payees.service.spec.ts (dispatch after the
@@ -2003,8 +2015,14 @@ Required tests      payee-contact-enrichment.service.spec.ts (COALESCE and
                     the picked candidate is the one saved),
                     TransactionForm.test.tsx (a payee created there defers the
                     background lookup, runs its own and saves nothing until the
-                    dialogue is confirmed), raw-sql-columns.spec.ts (column names against schema.sql). Owed: a two-connection race with a
-                    concurrent user edit, per docs/verification-contract.md.
+                    dialogue is confirmed), raw-sql-columns.spec.ts (column names
+                    against schema.sql),
+                    ai-payee-contact-lookup.provider.spec.ts (an unreadable
+                    answer fails rather than reporting nothing found, and a
+                    parsed empty answer still reports none). Owed: a
+                    two-connection integration race proving the FOR UPDATE read
+                    against a concurrent user edit, per
+                    docs/verification-contract.md.
 Status              enforced
 ```
 

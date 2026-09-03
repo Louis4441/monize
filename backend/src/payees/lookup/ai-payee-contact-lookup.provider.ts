@@ -86,7 +86,17 @@ export class AiPayeeContactLookupProvider implements PayeeContactLookupProvider 
     }
 
     const parsed = parseContactJson(response.content);
-    if (!parsed) return [];
+    // An answer we cannot read is not an answer. "The source looked and found
+    // nothing" is `{"matches": []}`, which parses; an empty or truncated turn
+    // is a failure, and the two must not arrive at the caller as one reason:
+    // `none` is what stamps contact_lookup_at, which retires the automatic
+    // lookup for that payee for good, and it is what the surfaces render as
+    // "nothing found". A web search that pauses past its continuation limit
+    // returns content "" (anthropic.provider.spec.ts pins that), and an answer
+    // cut off at PAYEE_LOOKUP_MAX_TOKENS ends mid-object.
+    if (!parsed) {
+      throw new ContactLookupUnavailableError("failed");
+    }
 
     const source: ContactLookupSource = response.searched
       ? "ai-web-search"

@@ -264,8 +264,8 @@ path adds `WHERE contact_lookup_at IS NULL`, which is the idempotency key --
 a second replica, a retried request or a re-dispatch affects zero rows
 (EXT-001 by predicate rather than by unique index). `contact_lookup_at` stamps
 the *attempt* (found something, or found nothing); a failure -- provider
-offline, no provider, feature off -- stamps nothing, so a later attempt can
-run (EXT-003). The favicon fetch that follows a looked-up website is keyed on
+offline, no provider, feature off, or an answer that could not be read --
+stamps nothing, so a later attempt can run (EXT-003). The favicon fetch that follows a looked-up website is keyed on
 that website (`UPDATE ... WHERE id AND user_id AND website = $resolved`), so
 a concurrent edit to the address cannot end up under a stale icon.
 
