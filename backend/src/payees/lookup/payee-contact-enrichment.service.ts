@@ -195,6 +195,13 @@ export class PayeeContactEnrichmentService {
    * Read-then-UPDATE inside one transaction. The read is only so the caller
    * can say which fields *this* write set; the UPDATE's COALESCE is what
    * guarantees nothing already there is touched.
+   *
+   * The read takes the row's write lock (`FOR UPDATE`) and holds it to the
+   * commit, so `before` is what the UPDATE will actually see. Without it the
+   * two statements are a check-then-act: a user editing the payee while the
+   * lookup was in flight can commit between them, and `filled` -- computed
+   * from before/after -- then credits the lookup with a value the user typed,
+   * recording it in their history and fetching a favicon for it.
    */
   private async write(
     m: EntityManager,
@@ -216,6 +223,7 @@ export class PayeeContactEnrichmentService {
         email: true,
         phone: true,
       },
+      lock: { mode: "pessimistic_write" },
     });
     if (!before) return null;
 

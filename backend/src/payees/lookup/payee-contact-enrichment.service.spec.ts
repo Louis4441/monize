@@ -142,6 +142,19 @@ describe("PayeeContactEnrichmentService", () => {
       });
     });
 
+    it("holds the row's write lock across the read and the UPDATE", async () => {
+      // The two statements are otherwise a check-then-act: a user editing the
+      // payee while the lookup was in flight commits between them, and
+      // `filled` -- computed from before/after -- credits the lookup with the
+      // value they typed, recording it in their history and fetching a favicon
+      // for it.
+      await service.enrichAfterCreate(userId, payeeId, "Acme");
+
+      expect(payeeRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({ lock: { mode: "pessimistic_write" } }),
+      );
+    });
+
     it("reports as filled only the fields that were empty before and set after", async () => {
       payeeRepo.findOne.mockResolvedValue({
         ...emptyRow,
