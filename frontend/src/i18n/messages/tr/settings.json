@@ -110,6 +110,14 @@
   },
   "preferences": {
     "heading": "Tercihler",
+    "groups": {
+      "languageRegion": "Dil ve Bölge",
+      "appearance": "Görünüm",
+      "datesNumbers": "Tarih ve Sayılar",
+      "investments": "Yatırımlar",
+      "transactions": "İşlemler",
+      "application": "Uygulama"
+    },
     "themeLabel": "Tema",
     "defaultCurrencyLabel": "Varsayılan Para Birimi",
     "preferredExchangesLabel": "Tercih Edilen Borsalar (menkul kıymet aramaları için)",
@@ -131,6 +139,10 @@
     "lockReconciledLabel": "Mutabık kılınan işlemleri kilitle",
     "lockReconciledTooltip": "Bu kapalıyken Monize, mutabık kılınmış bir işlemin tarihini veya tutarını değiştirecek bir düzenlemeden önce sizi uyarır ve ardından izin verir. Açıkken mutabık kılınmış işlemler hiç düzenlenemez, silinemez ve mutabakatları geri alınamaz. Bir düzeltme yapmak için tekrar kapatın.",
     "timeFormatLabel": "Saat Biçimi",
+    "timeFormatOptions": {
+      "h24": "24 saat (14:30)",
+      "h12": "12 saat (2:30 PM)"
+    },
     "recentTransactionsLabel": "Hızlı doldurma için son işlemler",
     "recentTransactionsHelp": "İşlem formlarında Alacaklı alanı yanındaki geçmiş düğmesi açılır penceresinde gösterilen kayıt sayısı.",
     "mapProviderLabel": "Adresler için harita sağlayıcısı",

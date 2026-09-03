@@ -110,6 +110,14 @@
   },
   "preferences": {
     "heading": "Voorkeuren",
+    "groups": {
+      "languageRegion": "Taal & regio",
+      "appearance": "Weergave",
+      "datesNumbers": "Datums & getallen",
+      "investments": "Beleggingen",
+      "transactions": "Transacties",
+      "application": "Applicatie"
+    },
     "themeLabel": "Thema",
     "defaultCurrencyLabel": "Standaardvaluta",
     "preferredExchangesLabel": "Voorkeursbeurzen (voor effectopzoekingen)",
@@ -131,6 +139,10 @@
     "lockReconciledLabel": "Afgestemde transacties vergrendelen",
     "lockReconciledTooltip": "Zolang dit uit staat, waarschuwt Monize vóór een bewerking die de datum of het bedrag van een afgestemde transactie zou verschuiven, en staat die daarna toe. Zolang het aan staat, kunnen afgestemde transacties helemaal niet worden bewerkt, verwijderd of ongedaan gemaakt. Zet het weer uit om een correctie te maken.",
     "timeFormatLabel": "Tijdnotatie",
+    "timeFormatOptions": {
+      "h24": "24-uurs (14:30)",
+      "h12": "12-uurs (2:30 PM)"
+    },
     "recentTransactionsLabel": "Recente transacties in snel invullen",
     "recentTransactionsHelp": "Aantal vermeldingen dat wordt weergegeven in de popover van de geschiedenis-knop naast het veld Begunstigde op transactieformulieren.",
     "mapProviderLabel": "Kaartaanbieder voor adressen",

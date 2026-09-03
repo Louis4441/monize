@@ -110,6 +110,14 @@
   },
   "preferences": {
     "heading": "환경설정",
+    "groups": {
+      "languageRegion": "언어 및 지역",
+      "appearance": "화면",
+      "datesNumbers": "날짜 및 숫자",
+      "investments": "투자",
+      "transactions": "거래",
+      "application": "애플리케이션"
+    },
     "themeLabel": "테마",
     "defaultCurrencyLabel": "기본 통화",
     "preferredExchangesLabel": "선호 거래소 (유가증권 조회용)",
@@ -131,6 +139,10 @@
     "lockReconciledLabel": "조정된 거래 잠금",
     "lockReconciledTooltip": "꺼져 있는 동안에는 조정된 거래의 날짜나 금액이 바뀌는 편집 전에 Monize가 경고한 뒤 진행을 허용합니다. 켜져 있는 동안에는 조정된 거래를 편집, 삭제, 조정 해제할 수 없습니다. 수정하려면 다시 꺼 주세요.",
     "timeFormatLabel": "시간 형식",
+    "timeFormatOptions": {
+      "h24": "24시간 (14:30)",
+      "h12": "12시간 (오후 2:30)"
+    },
     "recentTransactionsLabel": "빠른 채우기의 최근 거래 수",
     "recentTransactionsHelp": "거래 양식의 수취인 필드 옆 기록 버튼 팝오버에 표시되는 항목 수입니다.",
     "mapProviderLabel": "주소에 사용할 지도 제공자",

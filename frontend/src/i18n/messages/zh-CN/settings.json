@@ -110,6 +110,14 @@
   },
   "preferences": {
     "heading": "偏好设置",
+    "groups": {
+      "languageRegion": "语言与地区",
+      "appearance": "外观",
+      "datesNumbers": "日期与数字",
+      "investments": "投资",
+      "transactions": "交易",
+      "application": "应用"
+    },
     "themeLabel": "主题",
     "defaultCurrencyLabel": "默认货币",
     "preferredExchangesLabel": "首选交易所（用于证券查询）",
@@ -131,6 +139,10 @@
     "lockReconciledLabel": "锁定已对账交易",
     "lockReconciledTooltip": "关闭时，如果某项修改会改变已对账交易的日期或金额，Monize 会先提醒你，然后仍允许修改。开启时，已对账交易完全不能编辑、删除或取消对账。要更正请再次关闭。",
     "timeFormatLabel": "时间格式",
+    "timeFormatOptions": {
+      "h24": "24 小时制 (14:30)",
+      "h12": "12 小时制 (下午 2:30)"
+    },
     "recentTransactionsLabel": "快速填充中的近期交易数量",
     "recentTransactionsHelp": "交易表单中收款人字段旁历史按钮弹出框中显示的条目数量。",
     "mapProviderLabel": "地址使用的地图服务",

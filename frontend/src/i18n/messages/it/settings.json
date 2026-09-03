@@ -110,6 +110,14 @@
   },
   "preferences": {
     "heading": "Preferenze",
+    "groups": {
+      "languageRegion": "Lingua e regione",
+      "appearance": "Aspetto",
+      "datesNumbers": "Date e numeri",
+      "investments": "Investimenti",
+      "transactions": "Transazioni",
+      "application": "Applicazione"
+    },
     "themeLabel": "Tema",
     "defaultCurrencyLabel": "Valuta predefinita",
     "preferredExchangesLabel": "Borse preferite (per ricerche sui titoli)",
@@ -131,6 +139,10 @@
     "lockReconciledLabel": "Blocca le transazioni riconciliate",
     "lockReconciledTooltip": "Quando è disattivato, Monize avvisa prima di una modifica che sposterebbe la data o l'importo di una transazione riconciliata e poi la consente. Quando è attivo, le transazioni riconciliate non possono essere modificate, eliminate né riaperte. Disattivalo di nuovo per fare una correzione.",
     "timeFormatLabel": "Formato ora",
+    "timeFormatOptions": {
+      "h24": "24 ore (14:30)",
+      "h12": "12 ore (2:30 PM)"
+    },
     "recentTransactionsLabel": "Transazioni recenti nel riempimento rapido",
     "recentTransactionsHelp": "Numero di voci mostrate nel popover della cronologia accanto al campo Beneficiario nei moduli transazione.",
     "mapProviderLabel": "Provider di mappe per gli indirizzi",

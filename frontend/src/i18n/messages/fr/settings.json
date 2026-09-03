@@ -110,6 +110,14 @@
   },
   "preferences": {
     "heading": "Préférences",
+    "groups": {
+      "languageRegion": "Langue et région",
+      "appearance": "Apparence",
+      "datesNumbers": "Dates et nombres",
+      "investments": "Investissements",
+      "transactions": "Transactions",
+      "application": "Application"
+    },
     "themeLabel": "Thème",
     "defaultCurrencyLabel": "Devise par défaut",
     "preferredExchangesLabel": "Bourses préférées (pour la recherche de titres)",
@@ -131,6 +139,10 @@
     "lockReconciledLabel": "Verrouiller les transactions rapprochées",
     "lockReconciledTooltip": "Lorsque cette option est désactivée, Monize vous avertit avant une modification qui changerait la date ou le montant d'une transaction rapprochée, puis l'autorise. Lorsqu'elle est activée, les transactions rapprochées ne peuvent plus être modifiées, supprimées, ni voir leur rapprochement annulé. Désactivez-la à nouveau pour effectuer une correction.",
     "timeFormatLabel": "Format d'heure",
+    "timeFormatOptions": {
+      "h24": "24 heures (14:30)",
+      "h12": "12 heures (2:30 PM)"
+    },
     "recentTransactionsLabel": "Transactions récentes dans la saisie rapide",
     "recentTransactionsHelp": "Nombre d'entrées affichées dans le popover de l'historique à côté du champ Bénéficiaire dans les formulaires de transaction.",
     "mapProviderLabel": "Fournisseur de cartes pour les adresses",
