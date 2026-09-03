@@ -118,8 +118,9 @@ export interface PayeeContactSuggestion {
    * What tells this candidate apart from the others -- "Starbucks, 483 Bay
    * St, Toronto". Only present where the lookup found more than one
    * organisation or branch the name could mean; the picker has nothing else
-   * to show, so the server never offers an unlabelled candidate beside
-   * another.
+   * to show, so the server drops an unlabelled *alternate* rather than
+   * offering it. The best match may still arrive unlabelled -- it is the one
+   * the form applies without a picker -- so the dialogue names it.
    */
   label: string | null;
   website: string | null;

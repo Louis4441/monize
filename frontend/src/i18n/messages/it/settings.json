@@ -767,7 +767,7 @@
     },
     "payeeLookup": {
       "title": "Ricerca automatica dei recapiti del beneficiario",
-      "subtitle": "Cerca automaticamente sito web, indirizzo, email e numero di telefono di un nuovo beneficiario tramite il provider IA configurato.",
+      "subtitle": "Cerca automaticamente sito web, indirizzo, email e numero di telefono di un nuovo beneficiario tramite il provider IA configurato. Vengono inviati il nome del beneficiario e le eventuali note, sito web, indirizzo, email e telefono che ha già, in modo che la ricerca distingua l'azienda e la sede corrette.",
       "toggleLabel": "Abilita la ricerca automatica dei recapiti",
       "enabled": "Ricerca automatica dei recapiti abilitata",
       "disabled": "Ricerca automatica dei recapiti disabilitata",

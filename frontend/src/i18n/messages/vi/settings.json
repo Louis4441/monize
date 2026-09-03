@@ -767,7 +767,7 @@
     },
     "payeeLookup": {
       "title": "Tự động tra cứu thông tin liên hệ của người nhận",
-      "subtitle": "Tự động tra cứu trang web, địa chỉ, email và số điện thoại của người nhận mới thông qua nhà cung cấp AI bạn đã cấu hình.",
+      "subtitle": "Tự động tra cứu trang web, địa chỉ, email và số điện thoại của người nhận mới thông qua nhà cung cấp AI bạn đã cấu hình. Tên người nhận được gửi đi, cùng với mọi ghi chú, trang web, địa chỉ, email và số điện thoại đã có, để việc tra cứu phân biệt đúng doanh nghiệp và đúng địa điểm.",
       "toggleLabel": "Bật tự động tra cứu thông tin liên hệ",
       "enabled": "Đã bật tự động tra cứu thông tin liên hệ",
       "disabled": "Đã tắt tự động tra cứu thông tin liên hệ",

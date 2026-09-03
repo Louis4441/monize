@@ -767,7 +767,7 @@
     },
     "payeeLookup": {
       "title": "Búsqueda automática de datos de contacto del beneficiario",
-      "subtitle": "Busca automáticamente el sitio web, la dirección, el correo electrónico y el número de teléfono de un nuevo beneficiario a través de tu proveedor de IA configurado.",
+      "subtitle": "Busca automáticamente el sitio web, la dirección, el correo electrónico y el número de teléfono de un nuevo beneficiario a través de tu proveedor de IA configurado. Se envía el nombre del beneficiario, junto con las notas, el sitio web, la dirección, el correo electrónico y el teléfono que ya tenga, para que la búsqueda distinga la empresa y la ubicación correctas.",
       "toggleLabel": "Activar la búsqueda automática de datos de contacto",
       "enabled": "Búsqueda automática de datos de contacto activada",
       "disabled": "Búsqueda automática de datos de contacto desactivada",

@@ -767,7 +767,7 @@
     },
     "payeeLookup": {
       "title": "Recherche automatique des coordonnées du bénéficiaire",
-      "subtitle": "Recherche automatiquement le site web, l'adresse, l'e-mail et le numéro de téléphone d'un nouveau bénéficiaire via votre fournisseur d'IA configuré.",
+      "subtitle": "Recherche automatiquement le site web, l'adresse, l'e-mail et le numéro de téléphone d'un nouveau bénéficiaire via votre fournisseur d'IA configuré. Le nom du bénéficiaire est envoyé, ainsi que les notes, le site web, l'adresse, l'e-mail et le téléphone dont il dispose déjà, afin que la recherche distingue la bonne entreprise et le bon lieu.",
       "toggleLabel": "Activer la recherche automatique des coordonnées",
       "enabled": "Recherche automatique des coordonnées activée",
       "disabled": "Recherche automatique des coordonnées désactivée",

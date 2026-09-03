@@ -767,7 +767,7 @@
     },
     "payeeLookup": {
       "title": "Pesquisa automática dos contactos do beneficiário",
-      "subtitle": "Procura automaticamente o site, a morada, o e-mail e o número de telefone de um novo beneficiário através do seu fornecedor de IA configurado.",
+      "subtitle": "Procura automaticamente o site, a morada, o e-mail e o número de telefone de um novo beneficiário através do seu fornecedor de IA configurado. É enviado o nome do beneficiário, juntamente com quaisquer notas, site, morada, e-mail e telefone que já tenha, para que a pesquisa distinga a empresa e o local corretos.",
       "toggleLabel": "Ativar a pesquisa automática de contactos",
       "enabled": "Pesquisa automática de contactos ativada",
       "disabled": "Pesquisa automática de contactos desativada",

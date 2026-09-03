@@ -58,6 +58,11 @@ describe('PayeeContactLookupToggle', () => {
       /website, address, email and phone number/,
     );
     expect(subtitle).toHaveTextContent(/configured AI provider/);
+    // A switch that ships the payee's stored notes to a third-party model has
+    // to say so: this is the only surface where the user consents, and the
+    // lookup sends more than the name (buildLookupContext on the server).
+    expect(subtitle).toHaveTextContent(/is sent/);
+    expect(subtitle).toHaveTextContent(/notes/);
   });
 
   it('enables the lookup optimistically and shows the success toast', async () => {

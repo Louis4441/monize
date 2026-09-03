@@ -767,7 +767,7 @@
     },
     "payeeLookup": {
       "title": "Alacaklı iletişim bilgilerini otomatik arama",
-      "subtitle": "Yeni bir alacaklının web sitesini, adresini, e-posta adresini ve telefon numarasını yapılandırdığınız yapay zeka sağlayıcısı üzerinden otomatik olarak arar.",
+      "subtitle": "Yeni bir alacaklının web sitesini, adresini, e-posta adresini ve telefon numarasını yapılandırdığınız yapay zeka sağlayıcısı üzerinden otomatik olarak arar. Alacaklının adı, halihazırda kayıtlı notlar, web sitesi, adres, e-posta ve telefon bilgileriyle birlikte gönderilir; böylece arama doğru işletmeyi ve doğru konumu ayırt edebilir.",
       "toggleLabel": "İletişim bilgilerini otomatik aramayı etkinleştir",
       "enabled": "İletişim bilgilerini otomatik arama etkinleştirildi",
       "disabled": "İletişim bilgilerini otomatik arama devre dışı bırakıldı",

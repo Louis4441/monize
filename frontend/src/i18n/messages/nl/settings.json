@@ -767,7 +767,7 @@
     },
     "payeeLookup": {
       "title": "Contactgegevens van begunstigde automatisch opzoeken",
-      "subtitle": "Zoekt automatisch de website, het adres, het e-mailadres en het telefoonnummer van een nieuwe begunstigde op via je geconfigureerde AI-provider.",
+      "subtitle": "Zoekt automatisch de website, het adres, het e-mailadres en het telefoonnummer van een nieuwe begunstigde op via je geconfigureerde AI-provider. De naam van de begunstigde wordt verzonden, samen met eventuele notities, website, adres, e-mailadres en telefoonnummer die al zijn opgeslagen, zodat de zoekopdracht het juiste bedrijf op de juiste locatie herkent.",
       "toggleLabel": "Automatisch opzoeken van contactgegevens inschakelen",
       "enabled": "Automatisch opzoeken van contactgegevens ingeschakeld",
       "disabled": "Automatisch opzoeken van contactgegevens uitgeschakeld",
