@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { numberArg, booleanArg } from "../../common/tool-schemas";
+import { booleanArg } from "../../common/tool-schemas";
 
 /**
  * Input-schema pieces shared by the MCP tools.

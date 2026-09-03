@@ -203,13 +203,6 @@ export const generateReportOutput = toolOutput({
 // investments.tool.ts
 // ---------------------------------------------------------------------------
 
-/** One dimension of the portfolio look-through (countries or asset classes). */
-const lookThroughBreakdown = looseObject({
-  items: z.array(looseObject({ name: str, value: num, percentage: num })),
-  unclassifiedValue: num,
-  unclassifiedPercentage: num,
-});
-
 export const getPortfolioSummaryOutput = toolOutput({
   holdingCount: num,
   // The completeness flags are the contract, not decoration: a model must be
@@ -312,27 +305,6 @@ export const manageInvestmentTransactionsOutput = manageToolOutput({
 // ---------------------------------------------------------------------------
 // scheduled.tool.ts
 // ---------------------------------------------------------------------------
-
-const scheduledItem = looseObject({
-  id: str,
-  name: str,
-  accountId: str,
-  accountName: str,
-  payeeName: strNull,
-  categoryName: strNull,
-  // The effective amount this occurrence would post today, null when its current
-  // settlement rate is unknown -- never the stale persisted amount (issue #1247).
-  amount: numNull,
-  amountComplete: bool,
-  currency: str,
-  frequency: str,
-  nextDueDate: str,
-  daysUntilDue: num,
-  isActive: bool,
-  autoPost: bool,
-  kind: str,
-  description: strNull,
-});
 
 export const getUpcomingBillsOutput = toolOutput({
   daysWindow: num,

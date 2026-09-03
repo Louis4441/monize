@@ -14,7 +14,6 @@ import {
   getDefaultDateRange,
   getDefaultPreviousMonth,
   numberArg,
-  booleanArg,
 } from "../../common/tool-schemas";
 import { generateReportOutput } from "../tool-output-schemas";
 import { READ_ONLY } from "../mcp-annotations";

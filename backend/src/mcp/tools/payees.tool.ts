@@ -12,10 +12,7 @@ import {
 } from "../../payees/payee-tool-prep.service";
 import { AiRelayService } from "../../ai/relay/ai-relay.service";
 import { AiActionBuilderService } from "../../ai/actions/ai-action-builder.service";
-import {
-  PendingAiAction,
-  MAX_BULK_ACTION_ROWS,
-} from "../../ai/actions/ai-action.types";
+import { PendingAiAction } from "../../ai/actions/ai-action.types";
 import { RELAY_PREVIEW_SHOWN, emitRelayCard } from "../mcp-relay-confirm";
 import {
   UserContextResolver,
