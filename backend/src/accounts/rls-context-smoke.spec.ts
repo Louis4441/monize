@@ -7,6 +7,8 @@ import { MortgageReminderService } from "./mortgage-reminder.service";
 import { Account, AccountType } from "./entities/account.entity";
 import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
+import { NotificationPreference } from "../notification-center/entities/notification-preference.entity";
+import { NotificationPreferenceService } from "../notification-center/notification-preference.service";
 import { EmailService } from "../notifications/email.service";
 import { ScheduledTransactionsService } from "../scheduled-transactions/scheduled-transactions.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
@@ -124,16 +126,26 @@ describe("accounts module RLS context smoke (real withScopedDb)", () => {
         .fn()
         .mockResolvedValue({ notificationEmail: true, language: "en" }),
     };
+    // The email gate now runs through NotificationPreferenceService.resolveEmail,
+    // whose own withScopedDb reads NotificationPreference beside UserPreference
+    // -- both must resolve under the per-user context this test proves.
+    const notificationPreferencesRepo = {
+      findOne: jest.fn().mockResolvedValue(null),
+    };
     const { dataSource } = createScopedDbMocks([
       [Account, accountsRepo],
       [User, usersRepo],
       [UserPreference, preferencesRepo],
+      [NotificationPreference, notificationPreferencesRepo],
     ]);
     const sendMail = jest.fn().mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MortgageReminderService,
+        // The real service, so its nested withScopedDb read is exercised under
+        // the ambient user context (not mocked away).
+        NotificationPreferenceService,
         jobClaimProvider(jobClaims),
         { provide: DataSource, useValue: dataSource },
         {
@@ -166,6 +178,8 @@ describe("accounts module RLS context smoke (real withScopedDb)", () => {
 
     expect(accountsRepo.find).toHaveBeenCalled();
     expect(preferencesRepo.findOne).toHaveBeenCalled();
+    // The resolver's nested withScopedDb read ran under the same user context.
+    expect(notificationPreferencesRepo.findOne).toHaveBeenCalled();
     expect(usersRepo.findOne).toHaveBeenCalled();
     expect(sendMail).toHaveBeenCalledTimes(1);
   });

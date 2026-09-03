@@ -234,5 +234,28 @@ describe("restore plan", () => {
       // that has one lets a crafted backup keep a foreign user_id.
       expect(wrong).toEqual([]);
     });
+
+    it("pre-clears every user-scoped table before re-inserting it", () => {
+      // The restore inserts with ON CONFLICT DO NOTHING, so a table not cleared
+      // first keeps the destination account's existing rows and silently drops
+      // the backup's -- restore-over-existing stops reproducing the artifact.
+      // Every scopeToUser table therefore needs a `DELETE FROM <t> WHERE
+      // user_id` in the destructive pre-clear (child tables cleared through a
+      // parent are scopeToUser:false and excluded). notification_preferences
+      // shipped without one (audit / code-review Finding).
+      const restoreSource = readFileSync(
+        join(__dirname, "backup-restore-database.service.ts"),
+        "utf8",
+      );
+      const cleared = new Set(
+        [...restoreSource.matchAll(/DELETE FROM (\w+) WHERE user_id/g)].map(
+          (m) => m[1],
+        ),
+      );
+      const missing = RESTORE_PLAN.filter(
+        (step) => step.scopeToUser && !cleared.has(step.table),
+      ).map((step) => step.table);
+      expect(missing).toEqual([]);
+    });
   });
 });

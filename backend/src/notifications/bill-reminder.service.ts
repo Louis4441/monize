@@ -10,6 +10,8 @@ import { todayYMD } from "../common/date-utils";
 import { reminderWindowThrough } from "../scheduled-transactions/reminder-window";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { User } from "../users/entities/user.entity";
+import { NotificationCategory } from "../notification-center/entities/notification.entity";
+import { NotificationPreferenceService } from "../notification-center/notification-preference.service";
 import { EmailService } from "./email.service";
 import { billReminderTemplate } from "./email-templates";
 import { emailTranslator } from "../i18n/email-translator";
@@ -52,6 +54,7 @@ export class BillReminderService {
     // or a private copy of the override rules (issue #1247).
     @Inject(forwardRef(() => ScheduledOccurrenceService))
     private readonly occurrences: ScheduledOccurrenceService,
+    private readonly notificationPreferences: NotificationPreferenceService,
   ) {}
 
   /**
@@ -243,17 +246,24 @@ export class BillReminderService {
     }
 
     try {
-      // Check if user has email notifications enabled.
-      // RLS (task C2): per-user reads run under the user's own context.
-      const prefs = await withScopedDb(this.dataSource, (manager) =>
-        manager.getRepository(UserPreference).findOne({
-          where: { userId },
-        }),
+      // A bill reminder is the PAYMENTS category. Email is gated by the
+      // per-category matrix and the global email master switch together, and
+      // the resolver reads both. RLS (task C2): this per-user body already runs
+      // under the user's own context, and the resolver's nested withScopedDb
+      // joins it.
+      const emailEnabled = await this.notificationPreferences.resolveEmail(
+        userId,
+        NotificationCategory.PAYMENTS,
       );
-      if (prefs && !prefs.notificationEmail) {
+      if (!emailEnabled) {
         await this.releaseClaim(userId, claimKey, leaseToken);
         return false;
       }
+
+      // The user's stored locale for the reminder copy, composed off-request.
+      const prefs = await withScopedDb(this.dataSource, (manager) =>
+        manager.getRepository(UserPreference).findOne({ where: { userId } }),
+      );
 
       const user = await withScopedDb(this.dataSource, (manager) =>
         manager.getRepository(User).findOne({ where: { id: userId } }),

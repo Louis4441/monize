@@ -10,8 +10,26 @@
 -- INSERT ... ON CONFLICT DO NOTHING RETURNING id the cross-replica arbiter for
 -- both the row and its email (only the insert winner sends). Budget-generated
 -- alerts keep dedupe_key NULL and stay governed by the fingerprint index.
-ALTER TABLE budget_alerts ADD COLUMN IF NOT EXISTS dedupe_key VARCHAR(120);
+-- Guarded on the table's existence because migration 179 renames budget_alerts
+-- to `notifications` and carries the column and the index across with it. A
+-- database that has not reached 179 still calls the table budget_alerts and runs
+-- this exactly as it always did; one that has -- a fresh install built from
+-- schema.sql, and the replay CI runs on top of it -- already has both. PL/pgSQL
+-- plans a statement only when it is reached, which is what makes the guard work:
+-- naming a missing table outside a DO block is a parse error, not a skipped
+-- branch.
+DO $migration_170_dedupe$
+BEGIN
+    IF to_regclass('public.budget_alerts') IS NULL THEN
+        RAISE NOTICE
+            'budget_alerts has been renamed to notifications (migration 179), which carries dedupe_key and its index; skipping';
+        RETURN;
+    END IF;
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_budget_alerts_dedupe
-    ON budget_alerts(user_id, dedupe_key)
-    WHERE dedupe_key IS NOT NULL;
+    ALTER TABLE budget_alerts ADD COLUMN IF NOT EXISTS dedupe_key VARCHAR(120);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_budget_alerts_dedupe
+        ON budget_alerts(user_id, dedupe_key)
+        WHERE dedupe_key IS NOT NULL;
+END
+$migration_170_dedupe$;

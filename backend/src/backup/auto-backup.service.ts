@@ -42,9 +42,9 @@ import { withSystemContext, withUserContext } from "../common/db/with-context";
 import { UserMaintenanceService } from "../common/jobs/user-maintenance.service";
 import { SystemAlertService } from "../system-alerts/system-alert.service";
 import {
-  AlertSeverity,
-  AlertType,
-} from "../budgets/entities/budget-alert.entity";
+  NotificationSeverity,
+  NotificationType,
+} from "../notification-center/entities/notification.entity";
 import {
   UpdateAutoBackupSettingsDto,
   AutoBackupFrequency,
@@ -832,8 +832,8 @@ export class AutoBackupService {
     const { message, ...data } = detail;
     const email = await this.userEmailQuietly(userId);
     await this.systemAlerts.raiseAdminAlert({
-      type: AlertType.BACKUP_PARTIAL,
-      severity: AlertSeverity.WARNING,
+      type: NotificationType.BACKUP_PARTIAL,
+      severity: NotificationSeverity.WARNING,
       title: "Automatic backup incomplete",
       message: `Automatic backup for ${email ?? `user ${userId}`}: ${message}`,
       data: {
@@ -861,8 +861,8 @@ export class AutoBackupService {
     const error = String((cause as Error)?.message ?? cause).slice(0, 300);
     const email = await this.userEmailQuietly(userId);
     await this.systemAlerts.raiseAdminAlert({
-      type: AlertType.BACKUP_FAILED,
-      severity: AlertSeverity.CRITICAL,
+      type: NotificationType.BACKUP_FAILED,
+      severity: NotificationSeverity.CRITICAL,
       title: "Automatic backup failed",
       message:
         `The automatic backup for ${email ?? `user ${userId}`} failed: ` +

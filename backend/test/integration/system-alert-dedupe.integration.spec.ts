@@ -1,19 +1,19 @@
-import { readFileSync } from "fs";
-import * as path from "path";
 import { DataSource } from "typeorm";
 
 import { SystemAlertService } from "@/system-alerts/system-alert.service";
 import { JobClaimService } from "@/common/jobs/job-claim.service";
+import { NotificationService } from "@/notification-center/notification.service";
 import {
-  AlertSeverity,
-  AlertType,
-} from "@/budgets/entities/budget-alert.entity";
+  NotificationSeverity,
+  NotificationType,
+} from "@/notification-center/entities/notification.entity";
 
 import {
   INTEGRATION_TYPEORM_OPTIONS,
   cleanTables,
   createTestUserDirect,
 } from "../helpers/integration-setup";
+import { applyRlsPolicies } from "../helpers/rls-setup";
 
 /**
  * INV-ALERT-001's SQL-resident halves, against a real PostgreSQL.
@@ -31,8 +31,15 @@ import {
  *    real ones against one database can.
  *
  * `synchronize` builds the schema from entities and creates no partial
- * indexes, so the suite applies migration 170 itself -- which doubles as
- * proof that the shipped migration and the service's conflict target agree.
+ * indexes, so the suite brings the database up to the real shape through
+ * `applyRlsPolicies`, which applies the shipped migrations -- 179 among them,
+ * since it references the RLS helpers -- and that is what creates
+ * `idx_notifications_dedupe` here. Still the shipped SQL rather than a fixture,
+ * so the migration and the service's conflict target cannot drift apart
+ * silently. It used to read migration 170 directly, which stopped working the
+ * day the table was renamed: 170 is guarded on the old name and correctly skips
+ * a database where the table is already `notifications`, so nothing created the
+ * index and every property here failed.
  *
  * Broken on purpose, both directions (CLAUDE.md 8.1): a conflict target that
  * no longer matches the index fails every test here (PostgreSQL refuses the
@@ -48,8 +55,9 @@ describe("system alert dedupe against a real database", () => {
 
   const emailsSent: Array<{ to: string; subject: string }> = [];
 
-  const alertService = (): SystemAlertService =>
-    new SystemAlertService(
+  const alertService = (): SystemAlertService => {
+    const writeDoor = new NotificationService(dataSource);
+    return new SystemAlertService(
       dataSource,
       {
         getStatus: () => ({ configured: true }),
@@ -65,11 +73,24 @@ describe("system alert dedupe against a real database", () => {
       // real table, and a mock that always wins would make the collapse
       // assertion below vacuous.
       new JobClaimService(dataSource),
+      // The real write door on the real connection: what this file proves is
+      // that PostgreSQL's own planner refuses the second insert, which is a
+      // property of the statement the door issues.
+      writeDoor,
+      // The admin fan-out goes through the dispatch seam. Forward `notify` to the
+      // same real write door so the guarded insert still lands on the real
+      // connection (the ON CONFLICT arbitration this file proves), without pulling
+      // the push / notification-email fan-out into a dedupe test.
+      {
+        notify: (userId: string, alert: unknown) =>
+          writeDoor.create(userId, alert as never),
+      } as never,
     );
+  };
 
   const input = (dedupeKey: string) => ({
-    type: AlertType.BACKUP_FAILED,
-    severity: AlertSeverity.CRITICAL,
+    type: NotificationType.BACKUP_FAILED,
+    severity: NotificationSeverity.CRITICAL,
     title: "Automatic backup failed",
     message: "The automatic backup for u failed: disk full",
     data: { system: true, affectedUserId: "u" },
@@ -81,23 +102,16 @@ describe("system alert dedupe against a real database", () => {
   > =>
     dataSource.query(
       `SELECT user_id, dedupe_key, is_email_sent
-         FROM budget_alerts ORDER BY user_id`,
+         FROM notifications ORDER BY user_id`,
     );
 
   beforeAll(async () => {
     dataSource = new DataSource(INTEGRATION_TYPEORM_OPTIONS as never);
     await dataSource.initialize();
-    // The partial unique index the service's ON CONFLICT names. Applied from
-    // the shipped migration file so the two cannot drift apart silently.
-    await dataSource.query(
-      readFileSync(
-        path.join(
-          __dirname,
-          "../../../database/migrations/170_budget_alert_dedupe_key.sql",
-        ),
-        "utf-8",
-      ),
-    );
+    // The partial unique index the service's ON CONFLICT names, from the
+    // shipped migrations (see the note above). The owner still bypasses the
+    // policies this also creates, so the queries below read every row.
+    await applyRlsPolicies(dataSource);
   });
 
   afterAll(async () => {
@@ -106,7 +120,7 @@ describe("system alert dedupe against a real database", () => {
 
   beforeEach(async () => {
     emailsSent.length = 0;
-    await cleanTables(dataSource, ["budget_alerts", "job_claims", "users"]);
+    await cleanTables(dataSource, ["notifications", "job_claims", "users"]);
   });
 
   it("concurrent same-key raises land one row per admin, and each admin is emailed once", async () => {
@@ -176,8 +190,8 @@ describe("system alert dedupe against a real database", () => {
     });
 
     const perUser = {
-      type: AlertType.SCHEDULED_POST_FAILED,
-      severity: AlertSeverity.WARNING,
+      type: NotificationType.SCHEDULED_POST_FAILED,
+      severity: NotificationSeverity.WARNING,
       title: "Rent could not be posted",
       message: "It failed",
       data: { system: true },

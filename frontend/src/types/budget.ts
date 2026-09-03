@@ -2,46 +2,6 @@ export type BudgetType = 'MONTHLY' | 'ANNUAL' | 'PAY_PERIOD';
 export type BudgetStrategy = 'FIXED' | 'ROLLOVER' | 'ZERO_BASED' | 'FIFTY_THIRTY_TWENTY';
 export type RolloverType = 'NONE' | 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
 export type CategoryGroup = 'NEED' | 'WANT' | 'SAVING';
-export type AlertType =
-  | 'PACE_WARNING'
-  | 'THRESHOLD_WARNING'
-  | 'THRESHOLD_CRITICAL'
-  | 'OVER_BUDGET'
-  | 'FLEX_GROUP_WARNING'
-  | 'SEASONAL_SPIKE'
-  | 'PROJECTED_OVERSPEND'
-  | 'INCOME_SHORTFALL'
-  | 'POSITIVE_MILESTONE'
-  | 'BILL_DUE'
-  // System-level alerts (budgetId null). Admin-facing except
-  // SCHEDULED_POST_FAILED, which goes to the affected user. Kept in sync with
-  // the backend AlertType enum by hand.
-  | 'BACKUP_FAILED'
-  | 'BACKUP_PARTIAL'
-  | 'ENCRYPTION_KEY_MISSING'
-  | 'PROVIDER_OUTAGE'
-  | 'PROVIDER_RECOVERED'
-  | 'SMTP_FAILURE'
-  | 'SCHEDULED_POST_FAILED';
-export type AlertSeverity = 'info' | 'warning' | 'critical' | 'success';
-
-/**
- * The system half of the AlertType partition -- the backend's
- * SYSTEM_ALERT_TYPES (budget-alert.entity.ts) mirrored by hand and held equal
- * by `system-alert-types.contract.test.ts`. Financial is everything NOT in
- * this set, so the classification is one list on each side, never two.
- */
-export const SYSTEM_ALERT_TYPES: readonly AlertType[] = [
-  'BACKUP_FAILED',
-  'BACKUP_PARTIAL',
-  'ENCRYPTION_KEY_MISSING',
-  'PROVIDER_OUTAGE',
-  'PROVIDER_RECOVERED',
-  'SMTP_FAILURE',
-  'SCHEDULED_POST_FAILED',
-];
-
-export type AlertCategory = 'system' | 'financial';
 export type PeriodStatus = 'OPEN' | 'CLOSED' | 'PROJECTED';
 export type BudgetProfile = 'COMFORTABLE' | 'ON_TRACK' | 'AGGRESSIVE';
 
@@ -106,25 +66,6 @@ export interface BudgetCategory {
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface BudgetAlert {
-  id: string;
-  userId: string;
-  // Null for bill reminders and every system alert.
-  budgetId: string | null;
-  budgetCategoryId: string | null;
-  alertType: AlertType;
-  severity: AlertSeverity;
-  title: string;
-  message: string;
-  data: Record<string, unknown>;
-  isRead: boolean;
-  isEmailSent: boolean;
-  periodStart: string;
-  createdAt: string;
-  // Cross-replica fingerprint on system alerts; null on budget alerts.
-  dedupeKey?: string | null;
 }
 
 export interface BudgetPeriod {

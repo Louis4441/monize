@@ -67,6 +67,16 @@ const WITH_CONTEXT_ALLOWLIST = [
   // grantee's session cannot see the owner's users row under enforcement;
   // only the display label leaves the method).
   "src/delegation/joint-accounts.service.ts",
+  // The nightly purge of notifications the reader is done with: a cross-user
+  // sweep from a cron entry point, with no request to inherit an identity
+  // from. Every other method here runs under the caller's own context.
+  "src/notification-center/notification.service.ts",
+  // The reminder firing cron: the dismissed-source sweep and the atomic claim
+  // are cross-user (withSystemContext), and each due row's re-emit runs under
+  // its own user's context (withUserContext). Moved here from
+  // notification-center with the cron; the reminder CRUD it left behind has no
+  // context wrapper of its own.
+  "src/notifications/notification-reminder-cron.service.ts",
   // Joint register writes: authorization-decision row load plus the
   // owner-scoped mutation window, both fully decided by jointAccessFor
   // before the bypass opens (joint-accounts spec W1).
@@ -103,6 +113,16 @@ const WITH_CONTEXT_ALLOWLIST = [
   // transaction on purpose, because an outage is not part of whatever request
   // discovered it.
   "src/provider-health/provider-health.service.ts",
+  // Two genuinely cross-user pieces of work, and only those: generating the
+  // deployment's one VAPID key pair on the bootstrap hook (no request behind
+  // it), and counting the devices that key pair serves across every account.
+  // Reading the row itself runs under the caller's own identity -- the table is
+  // RLS-exempt, so a bypass there would widen the fence for nothing.
+  "src/push/push-config.service.ts",
+  // Daily sweep of long-retired push devices: a cross-user cron with no request
+  // behind it, and every row it can reach belongs to somebody who can no longer
+  // receive on it.
+  "src/push/push-subscription.service.ts",
   "src/scheduled-transactions/scheduled-transactions.service.ts",
   "src/securities/holdings.service.ts",
   // The market-index refresh is a deployment-wide cron with no request behind

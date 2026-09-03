@@ -17,7 +17,7 @@ by construction, any report that SMTP itself was broken.
 ## What now happens
 
 System-level issues are raised as rows in the existing alerts interface --
-the `budget_alerts` table behind the bell dropdown -- by
+the `notifications` table behind the bell dropdown -- by
 `backend/src/system-alerts/system-alert.service.ts`, and the admin-facing
 ones also email the administrators. `SystemAlertMonitorService` beside it
 owns the two conditions nothing else watches -- the encryption key and SMTP
@@ -26,7 +26,7 @@ health -- on one 15-minute sweep.
 ### Audience
 
 An issue only an administrator can act on goes **only to administrators**:
-one row per active admin (RLS keys `budget_alerts` on `user_id`, so a
+one row per active admin (RLS keys `notifications` on `user_id`, so a
 deployment-wide fact is materialized per recipient, each independently
 readable and dismissible). The recipient predicate is written once, in
 `queryAdminRecipients` (`backend/src/users/admin-recipients.util.ts`):
@@ -69,8 +69,9 @@ made the HTTP request wait on a per-administrator SMTP fan-out.
 **A title is bounded at the door.** Producers interpolate names they do not
 control, and `title` is `VARCHAR(255)`: an over-long one makes PostgreSQL raise
 22001, which the never-throws contract swallows, so the alert silently never
-exists. `SystemAlertService` truncates once, centrally, rather than trusting
-each producer.
+exists. `NotificationService` truncates once, at the write door, rather than
+trusting each producer -- and because every producer goes through that door, the
+bound holds for a budget alert and a bill reminder too.
 
 ### The two claims and their mechanisms
 
@@ -78,14 +79,20 @@ Every replica runs every cron, so both effects need a cross-replica arbiter
 (INV-ALERT-001 in `docs/system-invariants.md`):
 
 - **The row** is claimed by the partial unique index
-  `idx_budget_alerts_dedupe` on `(user_id, dedupe_key) WHERE dedupe_key IS
+  `idx_notifications_dedupe` on `(user_id, dedupe_key) WHERE dedupe_key IS
   NOT NULL` (migration 170), written as `INSERT ... ON CONFLICT DO NOTHING
-  RETURNING id`. The fingerprint index from migration 140 cannot arbitrate
-  these rows: it keys on `budget_id`, which is NULL for every system alert,
-  and NULL never equals NULL in a unique index.
+  RETURNING id`. The clause deliberately names no conflict target: it covers
+  every unique index on the table at once, which is what lets one write door
+  serve both kinds of producer. The fingerprint index from migration 140 cannot
+  arbitrate a system alert -- it keys on `budget_id`, which is NULL for every
+  one of them, and NULL never equals NULL in a unique index -- and the dedupe
+  index cannot arbitrate a budget alert, which leaves `dedupe_key` NULL. A
+  producer does not know which index applies to it, and with a bare clause it
+  does not have to.
 - **The email** goes only to recipients whose row the INSERT actually
-  returned -- the insert-winner shape `BudgetAlertService` uses, with the
-  same at-most-once trade as `ProviderOutageAlertService`
+  returned -- `NotificationService.create` answers `null` for the loser, which
+  is the whole arbitration -- with the same at-most-once trade as
+  `ProviderOutageAlertService`
   (`docs/external-side-effects.md`): a process killed between the insert
   committing and SMTP accepting loses that email; the in-app row survives,
   and a duplicated admin alert is the failure mode being designed against.
@@ -110,14 +117,14 @@ A system alert is written by a cron with no request locale, so the row
 stores **English** `title`/`message` as the fallback and the facts in
 `data` (with `system: true`); the bell dropdown composes localized copy
 client-side from `data`, exactly as `BILL_DUE` does
-(`frontend/src/components/budgets/BudgetAlertList.tsx`). The admin email
+(`frontend/src/components/notifications/NotificationList.tsx`). The admin email
 renders per-recipient framing through `emailTranslator` around the stored
 English title/message (`systemAlertTemplate`).
 
 ### Lifecycle and re-alerting
 
 System alert rows live the ordinary alert lifecycle: unread, read, soft
-dismiss, and the 30-day purge in `BudgetAlertService.purgeOldAlerts`. They are
+dismiss, and the 30-day purge in `NotificationService.purgeOld`. They are
 **not** budget news, so the weekly budget digest filters them out
 (`dedupe_key IS NULL`): a system alert raised on the first of a month carries
 that day as its `period_start`, which is also the month's budget period start,

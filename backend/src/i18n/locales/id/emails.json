@@ -193,5 +193,11 @@
     "greeting": "Hai {{ name }},",
     "intro": "Sebuah masalah pada instalasi Monize Anda memerlukan perhatian administrator.",
     "footer": "Peringatan ini juga ditampilkan pada lonceng notifikasi aplikasi. Peringatan hanya dibuat paling banyak satu kali per kejadian, berapa pun jumlah replika server yang mendeteksinya."
+  },
+  "notificationImmediate": {
+    "subject": "Anda memiliki notifikasi Monize baru",
+    "eyebrow": "Notifikasi Monize",
+    "button": "Buka di Monize",
+    "footer": "Anda menerima ini karena email langsung aktif untuk jenis notifikasi ini. Ubah di Pengaturan, Notifikasi."
   }
 }

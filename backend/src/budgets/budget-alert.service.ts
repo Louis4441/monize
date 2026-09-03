@@ -1,8 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
-import { LessThan, IsNull, DataSource } from "typeorm";
+import { DataSource, In } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
-import { returnedRows } from "../common/db/query-result";
 import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
 import { emailTranslator } from "../i18n/email-translator";
@@ -11,16 +10,21 @@ import { getMonthEndYMD } from "../common/date-utils";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
 import { Budget } from "./entities/budget.entity";
 import {
-  BudgetAlert,
-  AlertType,
-  AlertSeverity,
-} from "./entities/budget-alert.entity";
+  Notification,
+  NotificationType,
+  NotificationSeverity,
+  NotificationCategory,
+  typesForCategory,
+} from "../notification-center/entities/notification.entity";
+import { NotificationService } from "../notification-center/notification.service";
+import { NotificationPreferenceService } from "../notification-center/notification-preference.service";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
 import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
 import { EmailService } from "../notifications/email.service";
+import { NotificationDispatchService } from "../notifications/notification-dispatch.service";
 import {
   budgetAlertImmediateTemplate,
   budgetWeeklyDigestTemplate,
@@ -63,11 +67,29 @@ interface CategoryActual {
 interface AlertCandidate {
   budgetId: string;
   budgetCategoryId: string | null;
-  alertType: AlertType;
-  severity: AlertSeverity;
+  type: NotificationType;
+  severity: NotificationSeverity;
   title: string;
   message: string;
   data: Record<string, unknown>;
+}
+
+/**
+ * What the weekly budget digest is about: the budget types and the bill
+ * reminders, and nothing else that happens to share the table and a
+ * `period_start`. A reminder's re-emitted nag of one of these is dropped after
+ * the read (`isReminderReEmit`): it is the user's own repeat of a row already in
+ * the digest, not news.
+ */
+export const DIGEST_TYPES: readonly NotificationType[] = [
+  ...typesForCategory(NotificationCategory.BUDGETS),
+  NotificationType.BILL_DUE,
+];
+
+function isReminderReEmit(row: Notification): boolean {
+  const value = (row.data as Record<string, unknown> | null | undefined)
+    ?.reminderId;
+  return typeof value === "string" && value.length > 0;
 }
 
 @Injectable()
@@ -79,6 +101,17 @@ export class BudgetAlertService {
     private emailService: EmailService,
     private configService: ConfigService,
     private readonly i18n: I18nService,
+    // Every notification this service produces goes through the one write door.
+    // `markEmailSent` is called directly; new alerts are written through the
+    // dispatch below so they also fan out to push and immediate email.
+    private notifications: NotificationService,
+    // Email for budget alerts is gated by the BUDGETS channel matrix.
+    private readonly notificationPreferences: NotificationPreferenceService,
+    // The Phase 5 fan-out seam: writing a budget alert through `notify` adds the
+    // notification-mode push and immediate email (matrix- and throttle-gated) on
+    // top of the in-app row, without changing the batched critical email below,
+    // which is report-mode and stays as it is.
+    private readonly dispatch: NotificationDispatchService,
   ) {}
 
   @Cron("0 7 * * *")
@@ -309,7 +342,7 @@ export class BudgetAlertService {
 
     // De-duplicate against existing alerts for same period
     const existingAlerts = await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(BudgetAlert).find({
+      m.getRepository(Notification).find({
         where: {
           budgetId: budget.id,
           periodStart,
@@ -332,38 +365,23 @@ export class BudgetAlertService {
     // (audit P4-015). The unique fingerprint from migration 140 arbitrates
     // instead, and `ON CONFLICT DO NOTHING RETURNING` reports the outcome
     // honestly: the loser gets no row and therefore sends nothing.
-    const savedAlerts: BudgetAlert[] = [];
+    const savedAlerts: Notification[] = [];
     for (const candidate of newCandidates) {
-      const inserted = await withScopedDb(this.dataSource, (m) =>
-        m.query(
-          `INSERT INTO budget_alerts
-             (user_id, budget_id, budget_category_id, alert_type, severity,
-              title, message, data, period_start)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
-           ON CONFLICT (budget_id, period_start, alert_type,
-                        COALESCE(budget_category_id, '00000000-0000-0000-0000-000000000000'::uuid),
-                        severity)
-             DO NOTHING
-           RETURNING id`,
-          [
-            budget.userId,
-            candidate.budgetId,
-            candidate.budgetCategoryId,
-            candidate.alertType,
-            candidate.severity,
-            candidate.title,
-            candidate.message,
-            JSON.stringify(candidate.data ?? {}),
-            periodStart,
-          ],
-        ),
-      );
-      const rows = returnedRows<{ id: string }>(inserted);
-      if (rows.length === 0) continue;
-
-      const saved = await withScopedDb(this.dataSource, (m) =>
-        m.getRepository(BudgetAlert).findOne({ where: { id: rows[0].id } }),
-      );
+      // `null` from the door means the fingerprint index refused the row --
+      // another replica holds this alert -- so this processor sends nothing for
+      // it. That is the whole arbitration; there is no second check.
+      const saved = await this.dispatch.notify(budget.userId, {
+        type: candidate.type,
+        severity: candidate.severity,
+        title: candidate.title,
+        message: candidate.message,
+        data: candidate.data,
+        budgetId: candidate.budgetId,
+        budgetCategoryId: candidate.budgetCategoryId,
+        // Where the bell sends the reader: the budget the alert is about.
+        target: `/budgets/${candidate.budgetId}`,
+        periodStart,
+      });
       if (saved) savedAlerts.push(saved);
     }
 
@@ -375,10 +393,10 @@ export class BudgetAlertService {
     let emailsSent = 0;
     const criticalAlerts = savedAlerts.filter(
       (a) =>
-        a.severity === AlertSeverity.CRITICAL &&
-        (a.alertType === AlertType.THRESHOLD_CRITICAL ||
-          a.alertType === AlertType.OVER_BUDGET ||
-          a.alertType === AlertType.INCOME_SHORTFALL),
+        a.severity === NotificationSeverity.CRITICAL &&
+        (a.type === NotificationType.THRESHOLD_CRITICAL ||
+          a.type === NotificationType.OVER_BUDGET ||
+          a.type === NotificationType.INCOME_SHORTFALL),
     );
 
     if (criticalAlerts.length > 0) {
@@ -389,10 +407,10 @@ export class BudgetAlertService {
       if (sent) {
         emailsSent = 1;
         for (const alert of criticalAlerts) {
-          alert.isEmailSent = true;
-          await withScopedDb(this.dataSource, (m) =>
-            m.getRepository(BudgetAlert).save(alert),
-          );
+          // The flag is set through the door, on that row alone. Mutating the
+          // loaded entity as well would read as if the local copy mattered --
+          // it is never saved, and a full-row save is what this replaced.
+          await this.notifications.markEmailSent(alert.userId, alert.id);
         }
       }
     }
@@ -407,8 +425,8 @@ export class BudgetAlertService {
       alerts.push({
         budgetId: "",
         budgetCategoryId: cat.budgetCategoryId,
-        alertType: AlertType.OVER_BUDGET,
-        severity: AlertSeverity.CRITICAL,
+        type: NotificationType.OVER_BUDGET,
+        severity: NotificationSeverity.CRITICAL,
         title: `${cat.categoryName} is over budget`,
         message: `You have spent ${formatCurrency(cat.spent, cat.currencyCode)} of your ${formatCurrency(cat.budgeted, cat.currencyCode)} budget for ${cat.categoryName} (${cat.percentUsed.toFixed(1)}%).`,
         data: {
@@ -422,8 +440,8 @@ export class BudgetAlertService {
       alerts.push({
         budgetId: "",
         budgetCategoryId: cat.budgetCategoryId,
-        alertType: AlertType.THRESHOLD_CRITICAL,
-        severity: AlertSeverity.WARNING,
+        type: NotificationType.THRESHOLD_CRITICAL,
+        severity: NotificationSeverity.WARNING,
         title: `${cat.categoryName} approaching limit`,
         message: `You have used ${cat.percentUsed.toFixed(1)}% of your ${cat.categoryName} budget (${formatCurrency(cat.spent, cat.currencyCode)} of ${formatCurrency(cat.budgeted, cat.currencyCode)}).`,
         data: {
@@ -438,8 +456,8 @@ export class BudgetAlertService {
       alerts.push({
         budgetId: "",
         budgetCategoryId: cat.budgetCategoryId,
-        alertType: AlertType.THRESHOLD_WARNING,
-        severity: AlertSeverity.WARNING,
+        type: NotificationType.THRESHOLD_WARNING,
+        severity: NotificationSeverity.WARNING,
         title: `${cat.categoryName} reaching budget limit`,
         message: `You have used ${cat.percentUsed.toFixed(1)}% of your ${cat.categoryName} budget (${formatCurrency(cat.spent, cat.currencyCode)} of ${formatCurrency(cat.budgeted, cat.currencyCode)}).`,
         data: {
@@ -468,8 +486,8 @@ export class BudgetAlertService {
       return {
         budgetId: "",
         budgetCategoryId: cat.budgetCategoryId,
-        alertType: AlertType.PROJECTED_OVERSPEND,
-        severity: AlertSeverity.WARNING,
+        type: NotificationType.PROJECTED_OVERSPEND,
+        severity: NotificationSeverity.WARNING,
         title: `${cat.categoryName} projected to overspend`,
         message: `At your current pace, ${cat.categoryName} is projected to reach ${formatCurrency(projectedTotal, cat.currencyCode)} by the end of the period (budget: ${formatCurrency(cat.budgeted, cat.currencyCode)}).`,
         data: {
@@ -513,8 +531,8 @@ export class BudgetAlertService {
         alerts.push({
           budgetId: "",
           budgetCategoryId: null,
-          alertType: AlertType.FLEX_GROUP_WARNING,
-          severity: AlertSeverity.WARNING,
+          type: NotificationType.FLEX_GROUP_WARNING,
+          severity: NotificationSeverity.WARNING,
           title: `Flex group "${groupName}" at ${groupPercent.toFixed(0)}%`,
           message: `The "${groupName}" flex group has used ${formatCurrency(group.totalSpent, group.currencyCode)} of its combined ${formatCurrency(group.totalBudgeted, group.currencyCode)} budget (${groupPercent.toFixed(1)}%).`,
           data: {
@@ -545,8 +563,8 @@ export class BudgetAlertService {
       return {
         budgetId: "",
         budgetCategoryId: null,
-        alertType: AlertType.INCOME_SHORTFALL,
-        severity: AlertSeverity.CRITICAL,
+        type: NotificationType.INCOME_SHORTFALL,
+        severity: NotificationSeverity.CRITICAL,
         title: "Income below expected",
         message: `Your actual income (${formatCurrency(totalActualIncome, incomeActuals[0]?.currencyCode || "USD")}) is below ${Math.round(incomeRatio * 100)}% of expected income (${formatCurrency(expectedSoFar, incomeActuals[0]?.currencyCode || "USD")}) at this point in the period.`,
         data: {
@@ -580,8 +598,8 @@ export class BudgetAlertService {
         {
           budgetId: "",
           budgetCategoryId: null,
-          alertType: AlertType.POSITIVE_MILESTONE,
-          severity: AlertSeverity.SUCCESS,
+          type: NotificationType.POSITIVE_MILESTONE,
+          severity: NotificationSeverity.SUCCESS,
           title: "Budget on track",
           message: `You are ${Math.round(periodProgress * 100)}% through the period and have only used ${overallPercent.toFixed(1)}% of your total budget. Keep it up!`,
           data: {
@@ -600,7 +618,7 @@ export class BudgetAlertService {
 
   deduplicateAlerts(
     candidates: AlertCandidate[],
-    existing: BudgetAlert[],
+    existing: Notification[],
   ): AlertCandidate[] {
     // M25: Allow severity escalation (e.g., WARNING -> CRITICAL)
     const severityRank: Record<string, number> = {
@@ -613,7 +631,7 @@ export class BudgetAlertService {
     return candidates.filter((candidate) => {
       const match = existing.find(
         (e) =>
-          e.alertType === candidate.alertType &&
+          e.type === candidate.type &&
           e.budgetCategoryId === candidate.budgetCategoryId,
       );
       if (!match) return true;
@@ -627,17 +645,26 @@ export class BudgetAlertService {
 
   private async sendImmediateAlertEmail(
     userId: string,
-    alerts: BudgetAlert[],
+    alerts: Notification[],
   ): Promise<boolean> {
     if (!this.emailService.getStatus().configured) return false;
 
     try {
+      // A budget alert is the BUDGETS category; email is gated by that channel
+      // matrix and the global email master switch together (the resolver reads
+      // both). Runs under the user's own withUserContext.
+      const emailEnabled = await this.notificationPreferences.resolveEmail(
+        userId,
+        NotificationCategory.BUDGETS,
+      );
+      if (!emailEnabled) return false;
+
+      // The user's stored locale for the alert copy, composed off-request.
       const prefs = await withScopedDb(this.dataSource, (m) =>
         m.getRepository(UserPreference).findOne({
           where: { userId },
         }),
       );
-      if (prefs && !prefs.notificationEmail) return false;
 
       const user = await withScopedDb(this.dataSource, (m) =>
         m.getRepository(User).findOne({
@@ -701,7 +728,12 @@ export class BudgetAlertService {
         where: { userId },
       }),
     );
-    if (prefs && !prefs.notificationEmail) return false;
+    const emailEnabled = await this.notificationPreferences.resolveEmail(
+      userId,
+      NotificationCategory.BUDGETS,
+    );
+    if (!emailEnabled) return false;
+    // The digest has its own toggle beyond the channel matrix.
     if (prefs && prefs.budgetDigestEnabled === false) return false;
 
     const user = await withScopedDb(this.dataSource, (m) =>
@@ -714,29 +746,33 @@ export class BudgetAlertService {
     const { periodStart } = this.getCurrentPeriodDates();
 
     const allRecentAlerts = await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(BudgetAlert).find({
+      m.getRepository(Notification).find({
         where: {
           userId,
           periodStart,
-          // System alerts share this table but are not budget news, and
-          // `dedupe_key` is exactly what tells the two apart (only a system
-          // alert carries one). Without this an alert raised on the FIRST of
-          // a month -- whose `period_start` is stamped with that day, which is
-          // also the month's budget period start -- was rendered inside the
-          // budget digest for the rest of the month, and could produce a
-          // digest for a user who had no budget news at all.
-          dedupeKey: IsNull(),
+          // Budget news, selected POSITIVELY: the budget types plus BILL_DUE.
+          // Two exclusions came before this and both leaked. `dedupe_key IS
+          // NULL` assumed only a system alert carries a key, and stopped
+          // holding the day BILL_DUE rows gained an occurrence key -- every
+          // bill-due row silently left the digest. `type NOT IN the system
+          // set` let SCHEDULED_POST_FAILED (a PAYMENTS type, deliberately not
+          // system) raised on the FIRST of a month -- whose `period_start` is
+          // that day, also the budget period start -- render inside the budget
+          // digest for the rest of the month. Naming what belongs cannot leak
+          // a type nobody thought of.
+          type: In(DIGEST_TYPES),
         },
         order: { createdAt: "DESC" },
         take: 20,
       }),
     );
 
-    if (allRecentAlerts.length === 0) return false;
+    const budgetNews = allRecentAlerts.filter((a) => !isReminderReEmit(a));
+    if (budgetNews.length === 0) return false;
 
     // Filter out BILL_DUE alerts for bills already paid ahead of time
-    const billAlerts = allRecentAlerts.filter(
-      (a) => a.alertType === AlertType.BILL_DUE,
+    const billAlerts = budgetNews.filter(
+      (a) => a.type === NotificationType.BILL_DUE,
     );
     const paidBillIds = new Set<string>();
     if (billAlerts.length > 0) {
@@ -778,8 +814,8 @@ export class BudgetAlertService {
       }
     }
 
-    const recentAlerts = allRecentAlerts.filter((a) => {
-      if (a.alertType !== AlertType.BILL_DUE) return true;
+    const recentAlerts = budgetNews.filter((a) => {
+      if (a.type !== NotificationType.BILL_DUE) return true;
       const billId = (a.data as Record<string, unknown>)?.billId as string;
       return !paidBillIds.has(billId);
     });
@@ -854,8 +890,8 @@ export class BudgetAlertService {
         alerts.push({
           budgetId: "",
           budgetCategoryId: profile.budgetCategoryId,
-          alertType: AlertType.SEASONAL_SPIKE,
-          severity: AlertSeverity.INFO,
+          type: NotificationType.SEASONAL_SPIKE,
+          severity: NotificationSeverity.INFO,
           title: `Seasonal spike expected for ${profile.categoryName}`,
           message: `Last ${monthName} you spent ${profile.typicalIncrease.toFixed(1)}x your usual on ${profile.categoryName}. Consider adjusting your budget.`,
           data: {
@@ -1078,45 +1114,5 @@ export class BudgetAlertService {
         flexGroup: bc.flexGroup,
       };
     });
-  }
-
-  @Cron("0 3 * * *")
-  async purgeOldAlerts(): Promise<void> {
-    this.logger.log("Purging old alerts...");
-    try {
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 30);
-
-      // RLS (task C2): cross-user bulk purge -- runs under a system context.
-      const { dismissed, read } = await withSystemContext(async () => {
-        const result = await withScopedDb(this.dataSource, (m) =>
-          m.getRepository(BudgetAlert).delete({
-            dismissedAt: LessThan(cutoff),
-          }),
-        );
-        const readResult = await withScopedDb(this.dataSource, (m) =>
-          m.getRepository(BudgetAlert).delete({
-            isRead: true,
-            dismissedAt: IsNull(),
-            createdAt: LessThan(cutoff),
-          }),
-        );
-        return {
-          dismissed: result.affected || 0,
-          read: readResult.affected || 0,
-        };
-      });
-
-      if (dismissed + read > 0) {
-        this.logger.log(
-          `Purged ${dismissed} dismissed and ${read} old read alerts`,
-        );
-      }
-    } catch (error) {
-      this.logger.error(
-        "Failed to purge old alerts",
-        error instanceof Error ? error.stack : error,
-      );
-    }
   }
 }

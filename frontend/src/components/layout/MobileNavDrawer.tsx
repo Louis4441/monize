@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { isNavSectionActive } from '@/lib/nav-section';
-import { NAV_ICONS } from '@/lib/nav-links';
+import { ADMIN_LINKS, NAV_ICONS } from '@/lib/nav-links';
 import { useTranslations } from 'next-intl';
 import { Modal } from '@/components/ui/Modal';
 
@@ -153,9 +153,11 @@ export function MobileNavDrawer({
             <>
               <div className="border-t border-gray-200 dark:border-gray-700 mt-2" />
               <div className={SECTION_HEADER_CLASS}>{t('admin')}</div>
-              {renderLink(
-                { href: '/admin/users', label: t('userManagement') },
-                pathname.startsWith('/admin'),
+              {ADMIN_LINKS.map((link) =>
+                renderLink(
+                  { href: link.href, label: t(link.labelKey) },
+                  isNavSectionActive(pathname, link.href),
+                ),
               )}
             </>
           )}

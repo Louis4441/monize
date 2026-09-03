@@ -1177,7 +1177,7 @@ describe("a panel card is the shared Card surface", () => {
     "/src/components/ai/ResultChart.tsx",
     "/src/components/bills/CashFlowForecastChart.tsx",
     "/src/components/budgets/Budget503020Summary.tsx",
-    "/src/components/budgets/BudgetAlertList.tsx",
+    "/src/components/notifications/NotificationList.tsx",
     "/src/components/budgets/BudgetCategoryList.tsx",
     "/src/components/budgets/BudgetCategoryTrend.tsx",
     "/src/components/budgets/BudgetFlexGroupCard.tsx",
@@ -1328,6 +1328,57 @@ describe("a panel card is the shared Card surface", () => {
     const card = sources[CARD];
     expect(card, `${CARD} not found -- update CARD in this test`).toBeTruthy();
     expect(card.split("\n").some(CARD_FINGERPRINT)).toBe(true);
+  });
+});
+
+describe("a toggle is ToggleSwitch", () => {
+  /**
+   * `components/ui/ToggleSwitch.tsx` is the project's one on/off control, and a
+   * hand-rolled one is not merely duplicated markup: the admin push panel's came
+   * out 44px wide against the shared 36, with its own focus-ring offset colour,
+   * so one switch in Settings was visibly a different control from every other.
+   *
+   * The scan keys on `role="switch"` on an element that is not the shared
+   * component -- the attribute a hand-rolled toggle cannot omit without losing
+   * the accessibility the shared one provides.
+   *
+   * The baseline is **shrink-only**: each entry predates this rule. Converting a
+   * file to `ToggleSwitch` means deleting its line here; new code takes the
+   * shared component from the start.
+   */
+  const TOGGLE = "/src/components/ui/ToggleSwitch.tsx";
+  const HAND_ROLLED = /role=["']switch["']/;
+
+  const BASELINE: ReadonlyArray<string> = [
+    "/src/components/reports/DividendIncomeReport.tsx",
+    "/src/components/settings/NotificationsSection.tsx",
+  ];
+
+  function filesWithHandRolledToggle(): string[] {
+    return productionSources()
+      .filter(([path]) => path !== TOGGLE)
+      .filter(([, source]) => HAND_ROLLED.test(source))
+      .map(([path]) => path)
+      .sort();
+  }
+
+  it("has no hand-rolled switch outside the recorded baseline", () => {
+    const allowed = new Set(BASELINE);
+    const offenders = filesWithHandRolledToggle().filter(
+      (path) => !allowed.has(path),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps the baseline shrink-only", () => {
+    const offending = new Set(filesWithHandRolledToggle());
+    expect(BASELINE.filter((file) => !offending.has(file))).toEqual([]);
+  });
+
+  it("still finds the shared component, so the rule cannot pass by accident", () => {
+    const toggle = sources[TOGGLE];
+    expect(toggle, `${TOGGLE} not found -- update TOGGLE in this test`).toBeTruthy();
+    expect(HAND_ROLLED.test(toggle)).toBe(true);
   });
 });
 
@@ -1797,8 +1848,8 @@ describe("row hover comes from the shared pair, not a hand-picked grey", () => {
     "/src/components/ai/AiChatBubble.tsx",
     "/src/components/ai/AssistantTable.tsx",
     "/src/components/ai/ResultChart.tsx",
-    "/src/components/budgets/BudgetAlertBadge.tsx",
-    "/src/components/budgets/BudgetAlertList.tsx",
+    "/src/components/notifications/NotificationBell.tsx",
+    "/src/components/notifications/NotificationList.tsx",
     "/src/components/budgets/BudgetCategoryList.tsx",
     "/src/components/budgets/BudgetCategoryRow.tsx",
     "/src/components/budgets/BudgetWizardCategories.tsx",

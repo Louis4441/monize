@@ -926,6 +926,30 @@ Known and unresolved; none of these is a bug report waiting to be filed:
   key, which does not belong inside the transaction holding every one of the
   user's rows — and does not belong on a list endpoint at all, which is why
   `getConfigs` still reports only whether the column is populated.
+- **A renamed table needs an alias, and this is the mechanism.** A backup keys
+  its tables by SQL table name, so renaming a table renames a key that every
+  artifact written before the rename does not carry. Nothing about that failure
+  is loud: `insertRows` is handed `undefined` for the new key, restores zero rows
+  and reports zero — silent data loss inside an operation whose whole promise is
+  that nothing is lost. The version cannot carry the fix, since it is compared
+  for strict equality (above) and bumping it would reject every existing artifact
+  rather than read one. `LEGACY_TABLE_KEYS` in `backend/src/backup/backup-format.ts`
+  maps each current name to the names older artifacts used, and
+  `renameLegacyTableKeys` moves the key once, on the parsed document, before
+  anything walks it — id remapping, attachment staging, currency pre-creation and
+  the insert loop all address tables by name, and a rule applied at one of them
+  is a rule that holds for one of them. An artifact carrying both names keeps the
+  current one: it was written by an instance that already knew it — and because
+  that decision *discards* the legacy rows, it is reported rather than made
+  quietly: `renameLegacyTableKeys` returns `{ renamed, discarded }` and the
+  restore logs a warning naming the table and the row count, since rows in the
+  artifact that do not come back are exactly what a restore may not be silent
+  about. So far the map holds one entry, `notifications` ← `budget_alerts`
+  (migration 179).
+  `backup-format.spec.ts` covers the moves and
+  `backend/src/common/db/migration-table-renames.spec.ts` reads the renames out
+  of the migrations themselves, so the next rename is checked without being
+  registered.
 - **Delegation is reset.** `account_delegates`, `account_delegate_grants` and
   `delegate_account_favourites` are excluded by design, and cascade away when
   accounts are deleted. A restore therefore removes existing grants and

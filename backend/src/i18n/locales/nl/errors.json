@@ -214,7 +214,6 @@
     "categoryNotFound": "Categorie met ID {{ id }} niet gevonden",
     "categoryAlreadyInBudget": "Deze categorie staat al in het budget",
     "budgetCategoryNotFound": "Budgetcategorie met ID {{ id }} niet gevonden",
-    "alertNotFound": "Melding met ID {{ id }} niet gevonden",
     "periodNotFound": "Budgetperiode met ID {{ id }} niet gevonden",
     "noOpenPeriod": "Geen open periode om te sluiten",
     "categoryIdsNotOwned": "Categorie-ID's niet gevonden of niet eigendom van gebruiker: {{ ids }}"
@@ -338,8 +337,23 @@
     "invalidGranularity": "granularity moet 'daily' of 'monthly' zijn"
   },
   "notifications": {
+    "notFound": "Notificatie met ID {{ id }} niet gevonden",
     "smtpNotConfigured": "SMTP is niet geconfigureerd. Stel SMTP-omgevingsvariabelen in.",
-    "noEmailOnFile": "Geen e-mailadres bekend voor deze gebruiker."
+    "noEmailOnFile": "Geen e-mailadres bekend voor deze gebruiker.",
+    "categoryNotConfigurable": "Categorie {{ category }} is hier niet configureerbaar",
+    "emptyPreferenceUpdate": "Ten minste één voorkeursveld is vereist",
+    "tooManyReminders": "U kunt maximaal {{ max }} actieve herinneringen hebben. Stop er een voordat u een nieuwe toevoegt.",
+    "reminderOnReminder": "Een herinnering kan niet op de melding van een herinnering worden gezet. Zet deze op de oorspronkelijke melding."
+  },
+  "push": {
+    "channelUnavailable": "Pushmeldingen zijn niet beschikbaar op deze Monize-instantie.",
+    "endpointClaimed": "Deze browser is al geregistreerd bij een ander Monize-account. Meld je in deze browser af bij dat account en probeer het opnieuw.",
+    "deviceNotFound": "Pushapparaat niet gevonden.",
+    "noDevices": "Er is geen pushapparaat geregistreerd voor dit account. Schakel pushmeldingen eerst in deze browser in.",
+    "rotationUnavailable": "ENCRYPTION_KEY is niet ingesteld, dus de nieuwe privésleutel kon niet versleuteld worden opgeslagen. Stel de variabele in en start opnieuw voordat je vervangt.",
+    "channelNotConfigured": "Deze instantie heeft nog geen pushsleutelpaar, dus het browserpush-kanaal kan niet worden in- of uitgeschakeld.",
+    "keyRotated": "Deze instantie heeft haar pushsleutel gewijzigd terwijl je op deze pagina was. Herlaad en schakel push opnieuw in.",
+    "tooManyDevices": "Dit account heeft al het maximale aantal pushapparaten. Verwijder er een voordat je een nieuw apparaat toevoegt."
   },
   "institutions": {
     "nameConflict": "Er bestaat al een instelling met de naam \"{{ name }}\"",

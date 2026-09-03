@@ -19,6 +19,7 @@
   "tools": "도구",
   "admin": "관리자",
   "userManagement": "사용자 관리",
+  "notificationSettings": "알림 설정",
   "settings": "설정",
   "logout": "로그아웃",
   "toggleMenu": "메뉴 전환",

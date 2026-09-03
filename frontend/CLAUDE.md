@@ -338,7 +338,7 @@ Mobile Chrome sizes the viewport that `position: fixed` elements attach to from 
 
 ### A header panel is `fixed` inside a transformed ancestor -- give it a height, never a bottom anchor
 
-The sliding `AppHeader` always carries a `transform` (`useHideOnScroll`), which makes the header -- not the viewport -- the containing block for every `position: fixed` descendant. A panel mounted in the header (the alerts dropdown, `ActionHistoryPanel`) that anchors with `bottom-0`/`inset-0` is therefore capped at the header's own ~56px box: the full-screen alerts panel only *looked* full while alert rows overflowed it, and collapsed when empty. Size such a panel with an explicit height (`h-dvh` for the mobile full-screen treatment) and edge offsets that grow past the containing block; `BudgetAlertList.test.tsx` pins the class shape.
+The sliding `AppHeader` always carries a `transform` (`useHideOnScroll`), which makes the header -- not the viewport -- the containing block for every `position: fixed` descendant. A panel mounted in the header (the notifications dropdown, `ActionHistoryPanel`) that anchors with `bottom-0`/`inset-0` is therefore capped at the header's own ~56px box: the full-screen notifications panel only *looked* full while rows overflowed it, and collapsed when empty. Size such a panel with an explicit height (`h-dvh` for the mobile full-screen treatment) and edge offsets that grow past the containing block; `NotificationList.test.tsx` pins the class shape.
 
 ### A control that needs an AI provider is not offered without one -- `useAiConfigured()`
 
@@ -347,6 +347,73 @@ A provider is the prerequisite for the payee contact lookup and the assistant al
 **A preference outlives the provider that justified it.** `aiBubbleEnabled` stays true after the last provider is deleted, so the floating chat bubble gates on the provider as well as on the opt-in; without that it sits on every page and opens a chat that can only fail. Any future preference guarding provider-backed work inherits the same pair.
 
 The hook answers `configured: false` until the status settles **and** for a status read that failed -- deliberately, because "we could not ask" is not "there is a provider", and it is also what keeps a control from flashing in and vanishing. Read the cached `aiApi.getStatus` through the hook rather than fetching status again: one request serves every mounted surface, and a provider added or removed in Settings drops that cache.
+
+### A push subscription belongs to an account; `localStorage` belongs to an origin
+
+`monize.push.registeredEndpoint` records the endpoint this browser registered
+**and whose registration it was** (`rememberRegisteredEndpoint(userId,
+fingerprint)`), because two people share one browser profile: with the owner
+missing, the second account signing in saw a subscription it had no server row
+for, read it as a revocation and unsubscribed the browser -- taking push away
+from the first account, whose device list still showed the row as active.
+`classifyPushRegistration` therefore takes the marker *and* the reader's id, and
+answers `foreign` for a marker somebody else wrote -- **whichever endpoint it
+names**: read as a rotation, a foreign marker naming a different endpoint had the
+panel register a device for a reader who never asked for notifications, passing
+the permission gate only because the other account had granted it. The panel acts
+on nothing there, because neither repair (release, or re-register) is the reader's
+to make, and sign-out leaves such a subscription alone for the same reason. A
+value in the pre-owner format, or one with no reader identity, reads as "no
+information" -- which errs toward doing nothing.
+
+**Replacing this browser's endpoint means retiring the row for the one it
+replaced** (`retireServerRowFor`). Nothing else ever would: a row is retired by a
+delivery's own 404, and nothing delivers to an endpoint that no longer exists --
+so each rotation, and each Enable on a browser that does not expose
+`options.applicationServerKey`, left a permanent undeliverable "device" in the
+user's list holding one of their `MAX_LIVE_DEVICES_PER_USER` slots. That cleanup
+is also what makes the conservative reading of an unknown key affordable: an
+unreadable key is treated as a mismatch, because a silently undeliverable
+subscription is worse than a fresh endpoint.
+
+Whatever `getPushSupport` reads is the same shape of problem in time rather than
+identity: `Notification.permission` and "is this the installed iOS app" are
+states the user changes *elsewhere* and then comes back, so the panel re-reads
+them when the page becomes visible. Read once on mount, it kept telling the user
+the browser had refused after they had allowed it, with the Enable button hidden.
+
+### The notification permission is asked for once, from a click
+
+`Notification.requestPermission()` appears in exactly one file -- `lib/push.ts`,
+reached through `enablePushOnThisDevice` -- and
+`lib/push-permission-request.guard.test.ts` fails on a second call site. The rule
+is not politeness, it is what works: **there is no way to grant this permission at
+install time** (no manifest field, no API), and a request without a user gesture
+is refused rather than shown -- Firefox has required one since 72, Chrome quiets
+the prompt for origins with a poor grant rate, and iOS shows it only inside an
+installed web app. A permission an origin loses this way cannot be asked for
+again, which is why the news-site pattern (ask on page load) is the one shape this
+must never take.
+
+So "install with notifications" is really **ask at the right moment, with a
+button**, and `pushPromptState` (`lib/push.ts`) decides that moment.
+`PushEnableBanner` renders its three answers app-wide, and two of them carry no
+button because nothing a button could do would help: an iPhone in a Safari tab
+needs the Home Screen app first, and a browser already refusing can only be
+undone in its own settings -- **iOS Settings, then Notifications, then Monize**
+for an installed app, not any site settings. Those two states are exactly what
+the product had nothing to say about, and the reported experience was a user
+deleting the PWA to find out.
+
+Two mechanics that keep it honest. `handleEnable` is **not** an `async` function
+in either surface: iOS spends the click's transient activation on the first
+suspension, so the request has to be the first thing the handler does -- written
+`async () => { setBusy(true); await enable() }` it asks for a permission the user
+is then told they did not grant, with no prompt ever shown. And the dismissal is
+remembered per account **and** per kind (`monize.push.promptDismissed`): the
+account for the reason the registered-endpoint marker carries one, and the kind
+because waving away the offer says nothing about wanting to know, later, that the
+browser has started blocking Monize.
 
 ### A password field declares what may be autofilled into it
 

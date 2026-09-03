@@ -214,7 +214,6 @@
     "categoryNotFound": "Kategorie mit ID {{ id }} nicht gefunden",
     "categoryAlreadyInBudget": "Diese Kategorie ist bereits im Budget enthalten",
     "budgetCategoryNotFound": "Budgetkategorie mit ID {{ id }} nicht gefunden",
-    "alertNotFound": "Alarm mit ID {{ id }} nicht gefunden",
     "periodNotFound": "Budgetzeitraum mit ID {{ id }} nicht gefunden",
     "noOpenPeriod": "Kein offener Zeitraum zum Schließen",
     "categoryIdsNotOwned": "Kategorie-IDs nicht gefunden oder nicht im Besitz des Benutzers: {{ ids }}"
@@ -338,8 +337,23 @@
     "invalidGranularity": "granularity muss 'daily' oder 'monthly' sein"
   },
   "notifications": {
+    "notFound": "Benachrichtigung mit ID {{ id }} nicht gefunden",
     "smtpNotConfigured": "SMTP ist nicht konfiguriert. Setzen Sie SMTP-Umgebungsvariablen.",
-    "noEmailOnFile": "Keine E-Mail-Adresse für diesen Benutzer hinterlegt."
+    "noEmailOnFile": "Keine E-Mail-Adresse für diesen Benutzer hinterlegt.",
+    "categoryNotConfigurable": "Kategorie {{ category }} ist hier nicht konfigurierbar",
+    "emptyPreferenceUpdate": "Mindestens ein Einstellungsfeld ist erforderlich",
+    "tooManyReminders": "Sie können höchstens {{ max }} aktive Erinnerungen haben. Stoppen Sie eine, bevor Sie eine weitere hinzufügen.",
+    "reminderOnReminder": "Eine Erinnerung kann nicht auf der Benachrichtigung einer Erinnerung gesetzt werden. Setzen Sie sie stattdessen auf die ursprüngliche Benachrichtigung."
+  },
+  "push": {
+    "channelUnavailable": "Push-Benachrichtigungen sind auf dieser Monize-Instanz nicht verfügbar.",
+    "endpointClaimed": "Dieser Browser ist bereits bei einem anderen Monize-Konto registriert. Melden Sie sich in diesem Browser von jenem Konto ab und versuchen Sie es erneut.",
+    "deviceNotFound": "Push-Gerät nicht gefunden.",
+    "noDevices": "Für dieses Konto ist kein Push-Gerät registriert. Aktivieren Sie Push-Benachrichtigungen zuerst in diesem Browser.",
+    "rotationUnavailable": "ENCRYPTION_KEY ist nicht gesetzt, daher konnte kein neuer privater Schlüssel verschlüsselt gespeichert werden. Setzen Sie die Variable und starten Sie neu, bevor Sie erneuern.",
+    "channelNotConfigured": "Diese Instanz hat noch kein Push-Schlüsselpaar, daher lässt sich der Browser-Push-Kanal nicht ein- oder ausschalten.",
+    "keyRotated": "Diese Instanz hat ihren Push-Schlüssel geändert, während diese Seite geöffnet war. Laden Sie neu und aktivieren Sie Push erneut.",
+    "tooManyDevices": "Dieses Konto hat bereits die maximale Anzahl an Push-Geräten. Entfernen Sie eines, bevor Sie ein weiteres hinzufügen."
   },
   "institutions": {
     "nameConflict": "Institut mit dem Namen \"{{ name }}\" existiert bereits",

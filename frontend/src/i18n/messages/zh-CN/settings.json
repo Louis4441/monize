@@ -234,6 +234,115 @@
       "digestUpdateFailed": "更新预算摘要偏好失败",
       "digestDayFailed": "更新摘要日期失败",
       "testEmailFailed": "发送测试邮件失败"
+    },
+    "push": {
+      "heading": "浏览器推送",
+      "diagnostics": {
+        "summary": "通知诊断",
+        "intro": "此浏览器和设备向 Monize 报告的关于通知的信息。使用测试按钮让 Monize 创建一条通知，你可以在设备上查找，然后点击复制以发送完整报告。",
+        "refresh": "刷新",
+        "copy": "复制报告",
+        "copied": "已将诊断复制到剪贴板",
+        "localTest": "显示测试通知",
+        "localTestRunning": "检查中…",
+        "localTestBody": "如果你能看到这条消息，说明此设备上的通知正常工作。",
+        "localTestCreated": "Monize 已创建通知且没有报错，但这里无法确认系统是否显示了它。如果你在设备上没有看到，说明系统正在隐藏它；请在设备设置中开启 Monize 的通知。",
+        "localTestError": "无法在此设备上运行测试（{detail}）。"
+      },
+      "description": "注册此设备，Monize 即可在应用关闭时也送达通知。目前通过这条通道送达的只有测试通知，其余仍然出现在铃铛里。",
+      "androidNotify": "在 Android 上，仅授予权限还不够：系统仍可能隐藏通知。长按主屏幕上的 Monize 图标，点按“应用信息”，然后“通知”，并确保已开启。",
+      "permissionHint": "开启后，浏览器会请求显示通知的权限。在你允许之前不会发送任何内容。",
+      "enableButton": "在此设备上启用",
+      "enablingButton": "正在启用...",
+      "sendTestButton": "发送测试通知",
+      "sendingTestButton": "正在发送...",
+      "removeButton": "移除",
+      "thisDevice": "此设备",
+      "unifiedpushBadge": "UnifiedPush",
+      "unnamedDevice": "未命名设备",
+      "lastSeen": "最后活动 {when}",
+      "noLiveDevices": "尚未注册任何设备。请在此设备上启用推送后再发送测试。",
+      "notConfigured": "此 Monize 实例不提供浏览器推送。管理员可以在 Admin 区域启用。",
+      "disabledByAdmin": "管理员已为此 Monize 实例关闭浏览器推送。",
+      "keyUnreadable": "Monize 无法读取此实例的推送密钥对，因此无法投递任何通知。管理员可在 Admin 区域轮换密钥对以恢复。",
+      "serverKeyMissing": "此 Monize 实例缺少打开推送密钥对所需的加密密钥，因此无法投递任何内容。需要管理员在部署中设置该密钥并重启。",
+      "statusUnavailable": "Monize 无法确认浏览器推送是否可用。请重新加载页面后重试。",
+      "devicesUnavailable": "Monize 无法加载你已注册的设备。本页其他功能仍可使用；请重新加载后重试。",
+      "unsupported": {
+        "unsupported": "此浏览器无法接收推送通知。",
+        "denied": "此浏览器已阻止 Monize 的通知。请在浏览器的网站设置中允许通知，然后重新加载本页。",
+        "ios-browser": "在 iPhone 和 iPad 上，只有将 Monize 添加到主屏幕后推送通知才会生效。请使用“分享”，然后选择“添加到主屏幕”，并从那里打开 Monize。"
+      },
+      "disabledReason": {
+        "GONE": "已无法送达。请在该浏览器中重新启用推送。",
+        "KEY_ROTATED": "此实例轮换推送密钥对时已停用。请在该浏览器中重新启用推送。",
+        "FAILING": "多次投递失败后已停用。请在该浏览器中重新启用推送。"
+      },
+      "toasts": {
+        "enabled": "已在此设备上启用推送通知",
+        "enableFailed": "无法启用推送通知",
+        "permissionDenied": "此浏览器正在阻止 Monize 的通知。请在网站设置中允许后重试。",
+        "permissionDeniedIos": "Monize 的通知已被阻止。请打开 iOS“设置”，然后“通知”，再选择 Monize 以允许。",
+        "permissionDismissed": "未启用通知。浏览器询问时请选择“允许”。",
+        "permissionNoPrompt": "通知未开启，也没有出现任何请求。请打开 iOS“设置”，然后“通知”，再选择 Monize 并允许。如果列表中没有 Monize，请从主屏幕移除后重新添加（“分享”，然后“添加到主屏幕”），再试一次。",
+        "removed": "已移除设备",
+        "removeFailed": "无法移除设备",
+        "testSent": "{count, plural, other {测试通知已发送至 # 台设备}}",
+        "testPartial": "测试通知送达 {attempted} 台设备中的 {delivered} 台",
+        "testFailed": "无法投递测试通知",
+        "pushServiceRefused": "浏览器的推送服务拒绝了注册。请稍后重试；如果持续失败，请检查浏览器的推送设置。",
+        "pushServiceRefusedBrave": "Brave 默认屏蔽推送服务。在 Brave 中打开“设置”，然后“隐私和安全”，开启“使用 Google 服务进行推送消息传递”，重启浏览器后重试。"
+      },
+      "testResults": {
+        "heading": "上次测试（按设备）",
+        "status": {
+          "sent": "已送达推送服务",
+          "expired": "订阅已过期；请在该设备上重新启用推送",
+          "transient": "未送达（临时错误）；请重试",
+          "unconfigured": "此实例目前无法为推送消息签名"
+        }
+      }
+    },
+    "preferences": {
+      "heading": "如何通知我",
+      "description": "铃铛始终显示所有通知。选择 Monize 还通过邮件或推送发送哪些类型，以及频率。",
+      "categoryHeader": "通知",
+      "channels": {
+        "inApp": "应用内",
+        "emailReport": "邮件（报告）",
+        "emailNotification": "邮件（提醒）",
+        "push": "推送",
+        "unifiedpush": "UnifiedPush"
+      },
+      "categories": {
+        "PAYMENTS": "账单与计划",
+        "BUDGETS": "预算",
+        "SYSTEM": "系统警报"
+      },
+      "inAppAlways": "始终显示在铃铛中",
+      "channelNotApplicable": "不适用于此通知类型",
+      "emailToggleLabel": "{category} 的报告邮件",
+      "saveFailed": "无法保存该设置",
+      "throttle": {
+        "label": "间隔",
+        "ariaLabel": "{category} 的冷却时间",
+        "hint": "如果同组通知已在此时间窗内发送，则跳过提醒或推送。",
+        "options": {
+          "0": "关闭",
+          "5": "5 分钟",
+          "15": "15 分钟",
+          "30": "30 分钟",
+          "60": "1 小时",
+          "360": "6 小时",
+          "1440": "24 小时"
+        }
+      },
+      "emailNotificationToggleLabel": "{category} 的提醒邮件",
+      "pushToggleLabel": "{category} 的推送",
+      "unifiedpushToggleLabel": "{category} 的 UnifiedPush",
+      "emailUnavailable": "在上方开启邮件通知，即可通过邮件发送。",
+      "pushUnavailable": "请先在此设备上启用推送（见下方）。",
+      "unifiedpushUnavailable": "从你的分发器应用注册一个 UnifiedPush 端点以使用此通道。"
     }
   },
   "help": {

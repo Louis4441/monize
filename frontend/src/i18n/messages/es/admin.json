@@ -104,5 +104,70 @@
       "tempPasswordDescCreated": "Se generó una contraseña temporal para {name}. Compártela con ellos para que inicien sesión.",
       "tempPasswordDescUpgraded": "Un usuario compartido existente fue promovido a cuenta completa. Comparte esta contraseña temporal con {name}."
     }
+  },
+  "notificationsPage": {
+    "title": "Notificaciones",
+    "subtitle": "Canales de entrega que ofrece esta instancia de Monize y la identidad push que hay detrás.",
+    "loading": "Cargando ajustes de notificaciones...",
+    "loadUnavailable": "Monize no pudo leer los ajustes de notificaciones del servidor. Recarga la página para volver a intentarlo.",
+    "channelsHeading": "Canales de entrega",
+    "identityHeading": "Identidad de Web Push",
+    "perAccountNote": "Los dispositivos, las notificaciones de prueba y las preferencias pertenecen a cada cuenta y se gestionan en Ajustes. Un administrador configura la instancia y nunca envía notificaciones a otra persona ni las ve.",
+    "channelState": {
+      "on": "Activo",
+      "off": "Inactivo",
+      "unconfigured": "No disponible",
+      "unknown": "Desconocido"
+    },
+    "channels": {
+      "inApp": {
+        "name": "Notificaciones en la app",
+        "description": "La campana de la cabecera. Siempre disponible y no se puede desactivar: es donde vive una notificación aunque fallen todos los demás canales."
+      },
+      "webPush": {
+        "name": "Push del navegador",
+        "description": "Notificaciones entregadas al teléfono o al escritorio incluso con Monize cerrado. No necesita cuenta de Firebase, Google Play ni Apple Developer.",
+        "toggleLabel": "Activar el push del navegador en esta instancia",
+        "missingKeys": "Esta instancia no tiene par de claves push. Define ENCRYPTION_KEY y reinicia: Monize generará el par en el siguiente arranque.",
+        "keyUnreadable": "Esta instancia no puede descifrar su par de claves push almacenado, así que no se entrega nada. Rota el par de claves más abajo para recuperarlo.",
+        "serverKeyMissing": "Esta instancia no tiene ENCRYPTION_KEY, por lo que no puede abrir el par de claves push que guardó. Configure ENCRYPTION_KEY en el despliegue y reinicie: rotar no sirve mientras falte la clave."
+      },
+      "email": {
+        "name": "Correo electrónico",
+        "description": "Recordatorios de facturas, resúmenes de presupuesto y alertas del sistema enviados a la dirección de cada cuenta.",
+        "missingSmtp": "No hay ningún servidor de correo configurado. Define las variables de entorno SMTP para activar el correo.",
+        "statusUnavailable": "Monize no pudo leer el estado del servidor de correo."
+      },
+      "ntfy": {
+        "name": "ntfy y UnifiedPush",
+        "description": "Las mismas notificaciones push cifradas, entregadas a un distribuidor UnifiedPush autoalojado (ntfy, NextPush) en lugar de la infraestructura de Google o Apple. Comparte el par de claves push y el interruptor de esta instancia; cada persona registra su endpoint desde su aplicación UnifiedPush y activa el canal en Ajustes.",
+        "followsWebPush": "No disponible mientras el push del navegador esté desactivado o su par de claves no pueda usarse — este canal se entrega con el mismo par de claves."
+      }
+    },
+    "identity": {
+      "fingerprintLabel": "Huella de la clave",
+      "generatedLabel": "Generada",
+      "devicesLabel": "Dispositivos registrados",
+      "deviceCounts": "{live} activos, {disabled} retirados",
+      "rotateDescription": "Rotar reemplaza el par de claves de esta instancia. Todos los dispositivos registrados dejan de ser accesibles y tendrán que volver a activar el push, así que rota solo si la clave pudo quedar expuesta.",
+      "rotateButton": "Rotar par de claves",
+      "rotatingButton": "Rotando...",
+      "missingEncryptionKey": "Esta instancia no tiene par de claves push porque ENCRYPTION_KEY no está definida y la clave privada tendría que guardarse sin cifrar. Defínela y reinicia: Monize generará el par por sí mismo.",
+      "keyUnreadable": "Esta instancia tiene un par de claves push que ya no puede descifrar, así que no se entrega nada. Ocurre cuando ENCRYPTION_KEY cambia con la base de datos en marcha, o cuando se restaura una copia en otra instancia. Rota el par de claves para recuperarlo; todos los dispositivos volverán a registrarse.",
+      "serverKeyMissing": "Esta instancia no tiene ENCRYPTION_KEY configurada, por lo que no puede abrir el par de claves push que guardó. Rotar no servirá mientras falte la clave: configure ENCRYPTION_KEY en el despliegue y reinicie, y las notificaciones push volverán a funcionar con los dispositivos existentes."
+    },
+    "dialogs": {
+      "rotateTitle": "¿Rotar el par de claves push?",
+      "rotateMessage": "{count, plural, =0 {Aún no hay ningún dispositivo registrado, así que no se pierde nada.} one {Un dispositivo registrado dejará de recibir notificaciones hasta que alguien vuelva a activar el push en ese navegador.} other {# dispositivos registrados dejarán de recibir notificaciones hasta que se vuelva a activar el push en cada navegador.}}",
+      "rotateConfirm": "Rotar"
+    },
+    "toasts": {
+      "loadFailed": "No se pudieron cargar los ajustes de notificaciones",
+      "pushEnabled": "Push del navegador activado en esta instancia",
+      "pushDisabled": "Push del navegador desactivado en esta instancia",
+      "pushToggleFailed": "No se pudo cambiar el ajuste de push del navegador",
+      "rotated": "{count, plural, =0 {Par de claves rotado} one {Par de claves rotado; 1 dispositivo debe registrarse de nuevo} other {Par de claves rotado; # dispositivos deben registrarse de nuevo}}",
+      "rotateFailed": "No se pudo rotar el par de claves"
+    }
   }
 }

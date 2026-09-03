@@ -142,51 +142,60 @@ export const useAuthStore = create<AuthState>()(
           // nav visibility) would otherwise see actingAsUserId=null for one
           // render and flash the wrong page before the contexts request
           // settles.
-          Promise.all([
-            import('@/lib/auth'),
-            import('@/lib/delegation'),
-          ]).then(([{ authApi }, { delegationApi }]) => {
-            Promise.all([
-              authApi.getProfile(),
-              // Contexts is best-effort: a normal user with no delegations
-              // still gets a successful empty payload. Treat any failure
-              // here as "no delegation context" rather than blocking login
-              // restoration.
-              delegationApi.getContexts().catch(() => null),
-            ]).then(([user, contexts]) => {
-              state.setUser(user as User);
-              if (contexts) {
-                state.setDelegation(
-                  contexts.actingAsUserId,
-                  contexts.contexts,
-                  contexts.capabilities,
-                  contexts.sections,
-                );
-              }
-              state.setHasHydrated(true);
-            }).catch((error: unknown) => {
-              const status = error instanceof AxiosError ? error.response?.status : undefined;
-              if (status === 502 || (error instanceof AxiosError && !error.response)) {
-                // Backend unreachable -- keep isAuthenticated from localStorage so the app
-                // shell renders with the BackendDownBanner visible. This is safe because:
-                // (a) all API calls fail with 502 during downtime (no data access)
-                // (b) window.location.reload() on recovery forces full re-auth via getProfile()
-                // (c) if JWT/refresh token expired, the 401 interceptor triggers logout
-                import('@/store/connectionStore').then(({ useConnectionStore }) => {
-                  useConnectionStore.getState().setBackendDown();
+          Promise.all([import('@/lib/auth'), import('@/lib/delegation')]).then(
+            ([{ authApi }, { delegationApi }]) => {
+              Promise.all([
+                authApi.getProfile(),
+                // Contexts is best-effort: a normal user with no delegations
+                // still gets a successful empty payload. Treat any failure
+                // here as "no delegation context" rather than blocking login
+                // restoration.
+                delegationApi.getContexts().catch(() => null),
+              ])
+                .then(([user, contexts]) => {
+                  state.setUser(user as User);
+                  if (contexts) {
+                    state.setDelegation(
+                      contexts.actingAsUserId,
+                      contexts.contexts,
+                      contexts.capabilities,
+                      contexts.sections,
+                    );
+                  }
+                  state.setHasHydrated(true);
+                })
+                .catch((error: unknown) => {
+                  const status =
+                    error instanceof AxiosError
+                      ? error.response?.status
+                      : undefined;
+                  if (
+                    status === 502 ||
+                    (error instanceof AxiosError && !error.response)
+                  ) {
+                    // Backend unreachable -- keep isAuthenticated from localStorage so the app
+                    // shell renders with the BackendDownBanner visible. This is safe because:
+                    // (a) all API calls fail with 502 during downtime (no data access)
+                    // (b) window.location.reload() on recovery forces full re-auth via getProfile()
+                    // (c) if JWT/refresh token expired, the 401 interceptor triggers logout
+                    import('@/store/connectionStore').then(
+                      ({ useConnectionStore }) => {
+                        useConnectionStore.getState().setBackendDown();
+                      },
+                    );
+                    state.setHasHydrated(true);
+                  } else {
+                    // Genuine auth failure (401, etc.) — log out
+                    state.logout();
+                    state.setHasHydrated(true);
+                  }
                 });
-                state.setHasHydrated(true);
-              } else {
-                // Genuine auth failure (401, etc.) — log out
-                state.logout();
-                state.setHasHydrated(true);
-              }
-            });
-          });
+            },
+          );
         } else {
           state?.setHasHydrated(true);
         }
       },
-    }
-  )
+    },
+  ),
 );

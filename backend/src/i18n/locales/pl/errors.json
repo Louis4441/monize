@@ -214,7 +214,6 @@
     "categoryNotFound": "Nie znaleziono kategorii o ID {{ id }}",
     "categoryAlreadyInBudget": "Ta kategoria już jest w budżecie",
     "budgetCategoryNotFound": "Nie znaleziono kategorii budżetu o ID {{ id }}",
-    "alertNotFound": "Nie znaleziono alertu o ID {{ id }}",
     "periodNotFound": "Nie znaleziono okresu budżetu o ID {{ id }}",
     "noOpenPeriod": "Brak otwartego okresu do zamknięcia",
     "categoryIdsNotOwned": "Identyfikatory kategorii nie zostały znalezione lub nie należą do użytkownika: {{ ids }}"
@@ -338,8 +337,23 @@
     "invalidGranularity": "granularity musi być 'daily' lub 'monthly'"
   },
   "notifications": {
+    "notFound": "Nie znaleziono powiadomienia o ID {{ id }}",
     "smtpNotConfigured": "SMTP nie jest skonfigurowany. Ustaw zmienne środowiskowe SMTP.",
-    "noEmailOnFile": "Brak zapisanego adresu e-mail dla tego użytkownika."
+    "noEmailOnFile": "Brak zapisanego adresu e-mail dla tego użytkownika.",
+    "categoryNotConfigurable": "Kategoria {{ category }} nie jest tutaj konfigurowalna",
+    "emptyPreferenceUpdate": "Wymagane jest co najmniej jedno pole preferencji",
+    "tooManyReminders": "Możesz mieć maksymalnie {{ max }} aktywnych przypomnień. Zatrzymaj jedno przed dodaniem kolejnego.",
+    "reminderOnReminder": "Nie można ustawić przypomnienia na powiadomieniu wygenerowanym przez przypomnienie. Ustaw je na pierwotnym powiadomieniu."
+  },
+  "push": {
+    "channelUnavailable": "Powiadomienia push nie są dostępne w tej instancji Monize.",
+    "endpointClaimed": "Ta przeglądarka jest już zarejestrowana na innym koncie Monize. Wyloguj się z tamtego konta w tej przeglądarce i spróbuj ponownie.",
+    "deviceNotFound": "Nie znaleziono urządzenia push.",
+    "noDevices": "Do tego konta nie przypisano żadnego urządzenia push. Najpierw włącz powiadomienia push w tej przeglądarce.",
+    "rotationUnavailable": "Nie ustawiono ENCRYPTION_KEY, więc nowego klucza prywatnego nie dało się zapisać zaszyfrowanego. Ustaw ją i uruchom ponownie przed wymianą.",
+    "channelNotConfigured": "Ta instancja nie ma jeszcze pary kluczy push, więc kanału push w przeglądarce nie da się włączyć ani wyłączyć.",
+    "keyRotated": "Ta instancja zmieniła klucz push, gdy ta strona była otwarta. Odśwież stronę i włącz push ponownie.",
+    "tooManyDevices": "To konto ma już maksymalną liczbę urządzeń push. Usuń jedno, zanim dodasz kolejne."
   },
   "institutions": {
     "nameConflict": "Instytucja o nazwie \"{{ name }}\" już istnieje",

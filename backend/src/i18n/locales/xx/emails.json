@@ -193,5 +193,11 @@
     "greeting": "[XX-Hi {{ name }},-XX]",
     "intro": "[XX-An issue on your Monize deployment needs an administrator's attention.-XX]",
     "footer": "[XX-This alert is also shown in the app's notification bell. It is raised at most once per occurrence, however many server replicas noticed it.-XX]"
+  },
+  "notificationImmediate": {
+    "subject": "[XX-You have a new Monize notification-XX]",
+    "eyebrow": "[XX-Monize notification-XX]",
+    "button": "[XX-Open in Monize-XX]",
+    "footer": "[XX-You are receiving this because immediate email is on for this notification type. Change it in Settings, Notifications.-XX]"
   }
 }

@@ -44,7 +44,7 @@ apiClient.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 // Endpoints where a 401 is a business response (wrong credentials, wrong
@@ -127,6 +127,16 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config as InternalAxiosRequestConfig & {
       _csrfRetried?: boolean;
       _authRetried?: boolean;
+      /**
+       * Opt this request out of the 401 recovery below.
+       *
+       * For best-effort work that deliberately outlives the session it belongs
+       * to -- the push cleanup a sign-out starts and does not wait for. Left in,
+       * its 401 lands after the session is already gone and drives a refresh
+       * attempt and a hard `window.location.replace('/login')`, racing the
+       * sign-out's own navigation and discarding its toast.
+       */
+      _skipAuthRedirect?: boolean;
     };
 
     // Handle 502 (backend unavailable) or network errors (no response at all).
@@ -177,6 +187,7 @@ apiClient.interceptors.response.use(
     if (
       error.response?.status === 401 &&
       !originalRequest?._authRetried &&
+      !originalRequest?._skipAuthRedirect &&
       !isLoggingOut &&
       !isUnauthEndpoint(originalRequest?.url)
     ) {
@@ -219,7 +230,10 @@ apiClient.interceptors.response.use(
         // Ignore
       }
 
-      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+      if (
+        typeof window !== 'undefined' &&
+        !window.location.pathname.includes('/login')
+      ) {
         // Use replace() rather than assigning href so the post-401 page does
         // not stay in history. On PWAs (especially iOS standalone), an
         // assigned href can be deferred during BFCache restore and leave the
@@ -231,7 +245,7 @@ apiClient.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export default apiClient;

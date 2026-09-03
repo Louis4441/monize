@@ -64,9 +64,9 @@ vi.mock('@/store/authStore', () => ({
   },
 }));
 
-// Mock BudgetAlertBadge to avoid async act() warnings (tested in its own file)
-vi.mock('@/components/budgets/BudgetAlertBadge', () => ({
-  BudgetAlertBadge: () => <div data-testid="budget-alert-badge" />,
+// Mock NotificationBell to avoid async act() warnings (tested in its own file)
+vi.mock('@/components/notifications/NotificationBell', () => ({
+  NotificationBell: () => <div data-testid="budget-alert-badge" />,
 }));
 
 describe('AppHeader', () => {

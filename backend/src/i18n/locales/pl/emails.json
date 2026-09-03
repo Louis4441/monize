@@ -193,5 +193,11 @@
     "greeting": "Cześć {{ name }},",
     "intro": "Problem w Twojej instalacji Monize wymaga uwagi administratora.",
     "footer": "Ten alert jest też widoczny w dzwonku powiadomień aplikacji. Jest tworzony najwyżej raz na zdarzenie, niezależnie od liczby replik serwera, które je zauważyły."
+  },
+  "notificationImmediate": {
+    "subject": "Masz nowe powiadomienie Monize",
+    "eyebrow": "Powiadomienie Monize",
+    "button": "Otwórz w Monize",
+    "footer": "Otrzymujesz tę wiadomość, ponieważ dla tego typu powiadomień włączono natychmiastowy e-mail. Zmień to w Ustawieniach, Powiadomienia."
   }
 }

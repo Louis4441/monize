@@ -234,6 +234,115 @@
       "digestUpdateFailed": "Einstellung für Budget-Zusammenfassung konnte nicht aktualisiert werden",
       "digestDayFailed": "Budget-Zusammenfassungstag konnte nicht aktualisiert werden",
       "testEmailFailed": "Test-E-Mail konnte nicht gesendet werden"
+    },
+    "push": {
+      "heading": "Browser-Push",
+      "diagnostics": {
+        "summary": "Benachrichtigungsdiagnose",
+        "intro": "Was dieser Browser und dieses Gerät Monize über Benachrichtigungen melden. Nutze die Testschaltfläche, damit Monize eine Benachrichtigung erstellt, nach der du auf deinem Gerät suchen kannst, und dann Kopieren, um den vollständigen Bericht zu senden.",
+        "refresh": "Aktualisieren",
+        "copy": "Bericht kopieren",
+        "copied": "Diagnose in die Zwischenablage kopiert",
+        "localTest": "Testbenachrichtigung anzeigen",
+        "localTestRunning": "Wird geprüft…",
+        "localTestBody": "Wenn du das siehst, funktionieren Benachrichtigungen auf diesem Gerät.",
+        "localTestCreated": "Monize hat eine Benachrichtigung ohne Fehler erstellt, aber hier kann nichts bestätigen, dass das System sie tatsächlich angezeigt hat. Wenn du sie auf deinem Gerät nicht gesehen hast, blendet das System sie aus; aktiviere die Benachrichtigungen für Monize in den Geräteeinstellungen.",
+        "localTestError": "Der Test konnte auf diesem Gerät nicht ausgeführt werden ({detail})."
+      },
+      "description": "Dieses Gerät registrieren, damit Monize es auch bei geschlossener App erreichen kann. Bisher wird auf diesem Weg nur die Testbenachrichtigung zugestellt; alles andere landet weiterhin in der Glocke.",
+      "androidNotify": "Unter Android reicht eine erteilte Berechtigung nicht: Das System kann Benachrichtigungen trotzdem ausblenden. Halte das Monize-Symbol auf deinem Startbildschirm gedrückt, tippe auf App-Info, dann auf Benachrichtigungen, und stelle sicher, dass sie aktiviert sind.",
+      "permissionHint": "Wenn Sie dies aktivieren, fragt Ihr Browser um Erlaubnis, Benachrichtigungen anzuzeigen. Vorher wird nichts gesendet.",
+      "enableButton": "Auf diesem Gerät aktivieren",
+      "enablingButton": "Wird aktiviert ...",
+      "sendTestButton": "Testbenachrichtigung senden",
+      "sendingTestButton": "Wird gesendet ...",
+      "removeButton": "Entfernen",
+      "thisDevice": "Dieses Gerät",
+      "unifiedpushBadge": "UnifiedPush",
+      "unnamedDevice": "Unbenanntes Gerät",
+      "lastSeen": "Zuletzt aktiv {when}",
+      "noLiveDevices": "Noch kein Gerät registriert. Aktivieren Sie Push auf diesem Gerät, um einen Test zu senden.",
+      "notConfigured": "Browser-Push ist auf dieser Monize-Instanz nicht verfügbar. Eine Administratorin oder ein Administrator kann es im Admin-Bereich aktivieren.",
+      "disabledByAdmin": "Die Administration hat Browser-Push für diese Monize-Instanz deaktiviert.",
+      "keyUnreadable": "Monize kann das Push-Schlüsselpaar dieser Instanz nicht lesen, daher wird nichts zugestellt. Die Administration kann es im Admin-Bereich durch Erneuern des Schlüsselpaars wiederherstellen.",
+      "serverKeyMissing": "Dieser Monize-Instanz fehlt der Schlüssel, mit dem sie ihr Push-Schlüsselpaar öffnet, daher kann nichts zugestellt werden. Ein Administrator muss ihn im Deployment setzen und neu starten.",
+      "statusUnavailable": "Monize konnte nicht prüfen, ob Browser-Push verfügbar ist. Laden Sie die Seite neu, um es erneut zu versuchen.",
+      "devicesUnavailable": "Monize konnte Ihre registrierten Geräte nicht laden. Alles andere auf dieser Seite funktioniert weiterhin; laden Sie neu, um es erneut zu versuchen.",
+      "unsupported": {
+        "unsupported": "Dieser Browser kann keine Push-Benachrichtigungen empfangen.",
+        "denied": "Benachrichtigungen sind für Monize in diesem Browser blockiert. Erlauben Sie sie in den Website-Einstellungen des Browsers und laden Sie diese Seite neu.",
+        "ios-browser": "Auf iPhone und iPad funktionieren Push-Benachrichtigungen erst, wenn Monize zum Home-Bildschirm hinzugefügt wurde. Nutzen Sie „Teilen“, dann „Zum Home-Bildschirm“, und öffnen Sie Monize von dort."
+      },
+      "disabledReason": {
+        "GONE": "Nicht mehr erreichbar. Aktivieren Sie Push in jenem Browser erneut.",
+        "KEY_ROTATED": "Stillgelegt, als diese Instanz ihr Push-Schlüsselpaar erneuert hat. Aktivieren Sie Push in jenem Browser erneut.",
+        "FAILING": "Stillgelegt nach wiederholt fehlgeschlagener Zustellung. Aktivieren Sie Push in jenem Browser erneut."
+      },
+      "toasts": {
+        "enabled": "Push-Benachrichtigungen auf diesem Gerät aktiviert",
+        "enableFailed": "Push-Benachrichtigungen konnten nicht aktiviert werden",
+        "permissionDenied": "Dieser Browser blockiert Benachrichtigungen für Monize. Erlauben Sie sie in den Website-Einstellungen und versuchen Sie es erneut.",
+        "permissionDeniedIos": "Benachrichtigungen sind für Monize blockiert. Öffnen Sie die iOS-Einstellungen, dann Mitteilungen, dann Monize, um sie zu erlauben.",
+        "permissionDismissed": "Benachrichtigungen wurden nicht aktiviert. Wählen Sie „Zulassen“, wenn der Browser fragt.",
+        "permissionNoPrompt": "Benachrichtigungen wurden nicht aktiviert, und es erschien keine Abfrage. Öffnen Sie die iOS-Einstellungen, dann Mitteilungen, dann Monize, und erlauben Sie sie dort. Falls Monize nicht aufgeführt ist, entfernen Sie es vom Home-Bildschirm, fügen Sie es erneut hinzu (Teilen, dann Zum Home-Bildschirm) und versuchen Sie es noch einmal.",
+        "removed": "Gerät entfernt",
+        "removeFailed": "Gerät konnte nicht entfernt werden",
+        "testSent": "{count, plural, one {Testbenachrichtigung an 1 Gerät gesendet} other {Testbenachrichtigung an # Geräte gesendet}}",
+        "testPartial": "Testbenachrichtigung erreichte {delivered} von {attempted} Geräten",
+        "testFailed": "Testbenachrichtigung konnte nicht zugestellt werden",
+        "pushServiceRefused": "Der Push-Dienst des Browsers hat die Registrierung abgelehnt. Versuchen Sie es gleich noch einmal; schlägt es weiterhin fehl, prüfen Sie die Push-Einstellungen des Browsers.",
+        "pushServiceRefusedBrave": "Brave blockiert den Push-Dienst standardmäßig. Öffnen Sie in Brave die Einstellungen, dann Datenschutz und Sicherheit, aktivieren Sie „Google-Dienste für Push-Benachrichtigungen verwenden“, starten Sie den Browser neu und versuchen Sie es erneut."
+      },
+      "testResults": {
+        "heading": "Letzter Test, pro Gerät",
+        "status": {
+          "sent": "an den Push-Dienst zugestellt",
+          "expired": "Abonnement abgelaufen; Push auf diesem Gerät erneut aktivieren",
+          "transient": "nicht zugestellt (vorübergehender Fehler); erneut versuchen",
+          "unconfigured": "diese Instanz kann Push-Nachrichten derzeit nicht signieren"
+        }
+      }
+    },
+    "preferences": {
+      "heading": "Wie ich benachrichtigt werde",
+      "description": "Die Glocke zeigt immer jede Benachrichtigung. Wählen Sie, welche Arten Monize zusätzlich per E-Mail oder Push sendet und wie oft.",
+      "categoryHeader": "Benachrichtigung",
+      "channels": {
+        "inApp": "In der App",
+        "emailReport": "E-Mail (Bericht)",
+        "emailNotification": "E-Mail (Warnung)",
+        "push": "Push",
+        "unifiedpush": "UnifiedPush"
+      },
+      "categories": {
+        "PAYMENTS": "Rechnungen und Geplantes",
+        "BUDGETS": "Budgets",
+        "SYSTEM": "Systemwarnungen"
+      },
+      "inAppAlways": "Immer in der Glocke sichtbar",
+      "channelNotApplicable": "Für diese Benachrichtigungsart nicht zutreffend",
+      "emailToggleLabel": "Bericht-E-Mail für {category}",
+      "saveFailed": "Diese Einstellung konnte nicht gespeichert werden",
+      "throttle": {
+        "label": "Sperrzeit",
+        "ariaLabel": "Abklingzeit für {category}",
+        "hint": "Eine Warnung oder Push überspringen, wenn innerhalb dieses Zeitfensters bereits eine aus derselben Gruppe kam.",
+        "options": {
+          "0": "Aus",
+          "5": "5 Minuten",
+          "15": "15 Minuten",
+          "30": "30 Minuten",
+          "60": "1 Stunde",
+          "360": "6 Stunden",
+          "1440": "24 Stunden"
+        }
+      },
+      "emailNotificationToggleLabel": "Warn-E-Mail für {category}",
+      "pushToggleLabel": "Push für {category}",
+      "unifiedpushToggleLabel": "UnifiedPush für {category}",
+      "emailUnavailable": "Aktivieren Sie oben die E-Mail-Benachrichtigungen, um diese per E-Mail zu senden.",
+      "pushUnavailable": "Aktivieren Sie zuerst Push auf diesem Gerät (siehe unten).",
+      "unifiedpushUnavailable": "Registriere einen UnifiedPush-Endpunkt in deiner Distributor-App, um diesen Kanal zu nutzen."
     }
   },
   "help": {

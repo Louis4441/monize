@@ -1,0 +1,88 @@
+{
+  "title": "Benachrichtigungen",
+  "unread": "{count} ungelesen",
+  "markAllRead": "Alle als gelesen markieren",
+  "loading": "Benachrichtigungen werden geladen...",
+  "empty": "Keine Benachrichtigungen",
+  "undo": "Rückgängig",
+  "buttonTitle": "Benachrichtigungen",
+  "buttonAriaLabel": "Benachrichtigungen",
+  "dismissAriaLabel": "Benachrichtigung verwerfen",
+  "closeAriaLabel": "Benachrichtigungen schließen",
+  "emptyFiltered": "Keine Benachrichtigung entspricht dem aktuellen Filter",
+  "deleteAll": "Alle löschen",
+  "deleteAllConfirmTitle": "Benachrichtigungen löschen",
+  "deleteAllConfirmMessageAll": "Alle Benachrichtigungen löschen? Das kann nicht rückgängig gemacht werden.",
+  "deleteAllConfirmMessageFiltered": "Jede Benachrichtigung löschen, die dem aktuellen Filter entspricht, auch nicht angezeigte? Das kann nicht rückgängig gemacht werden.",
+  "deleted": "{count, plural, one {# Benachrichtigung gelöscht} other {# Benachrichtigungen gelöscht}}",
+  "deleteFailed": "Die Benachrichtigungen konnten nicht gelöscht werden",
+  "filter": {
+    "financial": "Finanziell",
+    "system": "System"
+  },
+  "severity": {
+    "critical": "Kritisch",
+    "warning": "Warnung",
+    "success": "Gute Nachricht",
+    "info": "Info"
+  },
+  "reminder": {
+    "remindAriaLabel": "Mich daran erinnern",
+    "stopAriaLabel": "Diese Erinnerung stoppen",
+    "stopped": "Erinnerung gestoppt",
+    "stopFailed": "Die Erinnerung konnte nicht gestoppt werden",
+    "created": "Erinnerung eingestellt",
+    "createFailed": "Die Erinnerung konnte nicht eingestellt werden",
+    "dialogTitle": "Erinnere mich",
+    "dialogDescription": "Erhalte diese Benachrichtigung später erneut, bis du reagierst.",
+    "modeLabel": "Wie oft",
+    "modeRepeat": "Wiederholen, bis ich stoppe",
+    "modeOnce": "Nur noch einmal",
+    "intervalLabelRepeat": "Erinnere mich alle",
+    "intervalLabelOnce": "Erinnere mich nach",
+    "durationMinutes": "{minutes, plural, one {# Minute} other {# Minuten}}",
+    "durationHours": "{hours, plural, one {# Stunde} other {# Stunden}}",
+    "cancel": "Abbrechen",
+    "confirm": "Erinnerung einstellen"
+  },
+  "billDue": {
+    "titleOverdue": "{payee} überfällig",
+    "titleToday": "{payee} heute fällig",
+    "titleTomorrow": "{payee} morgen fällig",
+    "titleInDays": "{payee} fällig in {days} Tagen",
+    "amountDue": "{amount} fällig am {date}",
+    "amountUnavailable": "Betrag nicht verfügbar (kein aktueller Wechselkurs), fällig am {date}"
+  },
+  "system": {
+    "backupFailed": {
+      "title": "Automatisches Backup fehlgeschlagen",
+      "message": "Das automatische Backup für {user} ist fehlgeschlagen: {error}"
+    },
+    "backupPartial": {
+      "title": "Automatisches Backup unvollständig",
+      "messageAttachments": "Das Backup für {user} wurde geschrieben, aber {missing} von {expected} Anhängen konnten nicht aufgenommen werden und {inconsistent} stimmten nicht mit ihren Metadaten überein. Vollständige Backups wurden bewahrt.",
+      "messagePromotion": "Das tägliche Backup für {user} war erfolgreich, aber die wöchentliche oder monatliche Kopie konnte nicht geschrieben werden: {error}",
+      "messageRetention": "Das Backup für {user} war erfolgreich, aber alte Backup-Dateien konnten nicht aufgeräumt werden: {error}"
+    },
+    "encryptionKeyMissing": {
+      "title": "Verschlüsselungsschlüssel nicht konfiguriert",
+      "message": "ENCRYPTION_KEY ist nicht gesetzt, daher werden Backups unverschlüsselt geschrieben und Geheimnisse können nicht gespeichert werden. Eine zukünftige Version wird ohne den Schlüssel nicht mehr starten."
+    },
+    "smtpFailure": {
+      "title": "E-Mail-Zustellung schlägt fehl",
+      "message": "Monize konnte keine E-Mail senden: {error}. Benachrichtigungen und Erinnerungen werden nicht zugestellt."
+    },
+    "providerOutage": {
+      "title": "{provider} antwortet nicht",
+      "message": "Marktdaten von {provider} sind nicht verfügbar. Kurse und Indexdaten sind möglicherweise veraltet, bis der Anbieter wieder antwortet."
+    },
+    "providerRecovered": {
+      "title": "{provider} antwortet wieder",
+      "message": "Der Ausfall ist vorbei und Marktdaten von {provider} werden wieder aktualisiert."
+    },
+    "scheduledPostFailed": {
+      "title": "{name} konnte nicht gebucht werden",
+      "message": "Ihre geplante Transaktion, fällig am {date}, wurde nicht automatisch gebucht: {error}. Sie können sie unter Rechnungen & Einzahlungen manuell buchen."
+    }
+  }
+}

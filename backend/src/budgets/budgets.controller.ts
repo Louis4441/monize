@@ -9,7 +9,6 @@ import {
   UseGuards,
   Request,
   Query,
-  ParseBoolPipe,
   ParseUUIDPipe,
 } from "@nestjs/common";
 import {
@@ -35,7 +34,6 @@ import { GenerateBudgetDto } from "./dto/generate-budget.dto";
 import { ApplyGeneratedBudgetDto } from "./dto/apply-generated-budget.dto";
 import { BudgetReportQueryDto } from "./dto/budget-report-query.dto";
 import { CategoryBudgetStatusDto } from "./dto/category-budget-status.dto";
-import { DismissAlertsQueryDto } from "./dto/dismiss-alerts-query.dto";
 import {
   AllowDelegate,
   DelegateRequiresSection,
@@ -137,75 +135,6 @@ export class BudgetsController {
   @ApiResponse({ status: 401, description: "Unauthorized" })
   applyGenerated(@Request() req, @Body() dto: ApplyGeneratedBudgetDto) {
     return this.budgetGeneratorService.apply(req.user.id, dto);
-  }
-
-  @Get("alerts")
-  @AllowDelegate()
-  @ApiOperation({ summary: "Get budget alerts" })
-  @ApiQuery({
-    name: "unreadOnly",
-    required: false,
-    type: Boolean,
-    description: "Only return unread alerts",
-  })
-  @ApiResponse({ status: 200, description: "Alerts retrieved" })
-  @ApiResponse({ status: 401, description: "Unauthorized" })
-  getAlerts(
-    @Request() req,
-    @Query("unreadOnly", new ParseBoolPipe({ optional: true }))
-    unreadOnly?: boolean,
-  ) {
-    return this.budgetsService.getAlerts(req.user.id, unreadOnly || false);
-  }
-
-  @Patch("alerts/:id/read")
-  @ApiOperation({ summary: "Mark an alert as read" })
-  @ApiParam({ name: "id", description: "Alert UUID" })
-  @ApiResponse({ status: 200, description: "Alert marked as read" })
-  @ApiResponse({ status: 401, description: "Unauthorized" })
-  @ApiResponse({ status: 404, description: "Alert not found" })
-  markAlertRead(@Request() req, @Param("id", ParseUUIDPipe) id: string) {
-    return this.budgetsService.markAlertRead(req.user.id, id);
-  }
-
-  @Patch("alerts/read-all")
-  @ApiOperation({ summary: "Mark all alerts as read" })
-  @ApiResponse({ status: 200, description: "All alerts marked as read" })
-  @ApiResponse({ status: 401, description: "Unauthorized" })
-  markAllAlertsRead(@Request() req) {
-    return this.budgetsService.markAllAlertsRead(req.user.id);
-  }
-
-  @Delete("alerts/:id")
-  @ApiOperation({ summary: "Delete an alert" })
-  @ApiParam({ name: "id", description: "Alert UUID" })
-  @ApiResponse({ status: 200, description: "Alert deleted" })
-  @ApiResponse({ status: 401, description: "Unauthorized" })
-  @ApiResponse({ status: 404, description: "Alert not found" })
-  deleteAlert(@Request() req, @Param("id", ParseUUIDPipe) id: string) {
-    return this.budgetsService.deleteAlert(req.user.id, id);
-  }
-
-  @Delete("alerts")
-  @ApiOperation({
-    summary: "Dismiss all alerts matching the given filter",
-  })
-  @ApiQuery({
-    name: "severity",
-    required: false,
-    enum: ["info", "warning", "critical", "success"],
-    description: "Only dismiss alerts of this severity",
-  })
-  @ApiQuery({
-    name: "category",
-    required: false,
-    enum: ["system", "financial"],
-    description: "Only dismiss system or financial alerts",
-  })
-  @ApiResponse({ status: 200, description: "Matching alerts dismissed" })
-  @ApiResponse({ status: 401, description: "Unauthorized" })
-  dismissAlerts(@Request() req, @Query() query: DismissAlertsQueryDto) {
-    return this.budgetsService.dismissAlerts(req.user.id, query);
   }
 
   @Get(":id")

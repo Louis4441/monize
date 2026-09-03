@@ -234,6 +234,115 @@
       "digestUpdateFailed": "Gagal memperbarui preferensi ringkasan anggaran",
       "digestDayFailed": "Gagal memperbarui hari ringkasan",
       "testEmailFailed": "Gagal mengirim surel uji"
+    },
+    "push": {
+      "heading": "Push peramban",
+      "diagnostics": {
+        "summary": "Diagnostik notifikasi",
+        "intro": "Apa yang dilaporkan browser dan perangkat ini ke Monize tentang notifikasi. Gunakan tombol uji agar Monize membuat notifikasi yang bisa Anda cari di perangkat, lalu Salin untuk mengirim laporan lengkap.",
+        "refresh": "Segarkan",
+        "copy": "Salin laporan",
+        "copied": "Diagnostik disalin ke papan klip",
+        "localTest": "Tampilkan notifikasi uji",
+        "localTestRunning": "Memeriksa…",
+        "localTestBody": "Jika Anda melihat ini, notifikasi berfungsi di perangkat ini.",
+        "localTestCreated": "Monize membuat notifikasi tanpa kesalahan, tetapi tidak ada yang bisa memastikan sistem menampilkannya. Jika Anda tidak melihatnya di perangkat, sistem menyembunyikannya; aktifkan notifikasi Monize di pengaturan perangkat.",
+        "localTestError": "Tidak dapat menjalankan uji di perangkat ini ({detail})."
+      },
+      "description": "Daftarkan perangkat ini agar Monize dapat menghubunginya bahkan saat aplikasi ditutup. Untuk saat ini hanya notifikasi uji yang dikirim lewat jalur ini; sisanya tetap masuk ke bel.",
+      "androidNotify": "Di Android, izin yang diberikan saja tidak cukup: sistem masih dapat menyembunyikan notifikasi. Tekan dan tahan ikon Monize di layar utama, ketuk Info aplikasi, lalu Notifikasi, dan pastikan semuanya aktif.",
+      "permissionHint": "Saat Anda mengaktifkannya, peramban akan meminta izin untuk menampilkan notifikasi. Tidak ada yang dikirim sebelum Anda mengizinkan.",
+      "enableButton": "Aktifkan di perangkat ini",
+      "enablingButton": "Mengaktifkan...",
+      "sendTestButton": "Kirim notifikasi uji coba",
+      "sendingTestButton": "Mengirim...",
+      "removeButton": "Hapus",
+      "thisDevice": "Perangkat ini",
+      "unifiedpushBadge": "UnifiedPush",
+      "unnamedDevice": "Perangkat tanpa nama",
+      "lastSeen": "Terakhir aktif {when}",
+      "noLiveDevices": "Belum ada perangkat terdaftar. Aktifkan push di perangkat ini untuk mengirim uji coba.",
+      "notConfigured": "Push peramban tidak tersedia di instans Monize ini. Administrator dapat mengaktifkannya di area Admin.",
+      "disabledByAdmin": "Administrator telah mematikan push peramban untuk instans Monize ini.",
+      "keyUnreadable": "Monize tidak dapat membaca pasangan kunci push instans ini, sehingga tidak ada yang terkirim. Administrator dapat memulihkannya dengan merotasi pasangan kunci di area Admin.",
+      "serverKeyMissing": "Instance Monize ini tidak memiliki kunci enkripsi yang dibutuhkan untuk membuka pasangan kunci push-nya, sehingga tidak ada yang dapat dikirim. Administrator harus menyetelnya di deployment dan memulai ulang.",
+      "statusUnavailable": "Monize tidak dapat memeriksa apakah push peramban tersedia. Muat ulang halaman untuk mencoba lagi.",
+      "devicesUnavailable": "Monize tidak dapat memuat perangkat terdaftar Anda. Semua hal lain di halaman ini tetap berfungsi; muat ulang untuk mencoba lagi.",
+      "unsupported": {
+        "unsupported": "Peramban ini tidak dapat menerima notifikasi push.",
+        "denied": "Notifikasi diblokir untuk Monize di peramban ini. Izinkan di pengaturan situs peramban, lalu muat ulang halaman ini.",
+        "ios-browser": "Di iPhone dan iPad, notifikasi push hanya berfungsi setelah Monize dipasang ke Layar Utama. Gunakan Bagikan, lalu Tambahkan ke Layar Utama, dan buka Monize dari sana."
+      },
+      "disabledReason": {
+        "GONE": "Tidak dapat dijangkau lagi. Aktifkan kembali push di peramban tersebut.",
+        "KEY_ROTATED": "Dinonaktifkan saat instans ini merotasi pasangan kunci push. Aktifkan kembali push di peramban tersebut.",
+        "FAILING": "Dinonaktifkan setelah kegagalan pengiriman berulang. Aktifkan kembali push di peramban tersebut."
+      },
+      "toasts": {
+        "enabled": "Notifikasi push diaktifkan di perangkat ini",
+        "enableFailed": "Tidak dapat mengaktifkan notifikasi push",
+        "permissionDenied": "Peramban ini memblokir notifikasi Monize. Izinkan di pengaturan situs lalu coba lagi.",
+        "permissionDeniedIos": "Notifikasi diblokir untuk Monize. Buka Pengaturan iOS, lalu Notifikasi, lalu Monize, untuk mengizinkannya.",
+        "permissionDismissed": "Notifikasi tidak diaktifkan. Pilih Izinkan saat peramban bertanya.",
+        "permissionNoPrompt": "Notifikasi tidak diaktifkan dan tidak ada permintaan yang muncul. Buka Pengaturan iOS, lalu Notifikasi, lalu Monize, dan izinkan di sana. Jika Monize tidak ada dalam daftar, hapus dari Layar Utama, tambahkan kembali (Bagikan, lalu Tambah ke Layar Utama) lalu coba sekali lagi.",
+        "removed": "Perangkat dihapus",
+        "removeFailed": "Tidak dapat menghapus perangkat",
+        "testSent": "{count, plural, other {Notifikasi uji coba dikirim ke # perangkat}}",
+        "testPartial": "Notifikasi uji coba menjangkau {delivered} dari {attempted} perangkat",
+        "testFailed": "Tidak dapat mengirim notifikasi uji coba",
+        "pushServiceRefused": "Layanan push browser menolak pendaftaran. Coba lagi sebentar; jika terus gagal, periksa pengaturan push browser.",
+        "pushServiceRefusedBrave": "Brave memblokir layanan push secara bawaan. Di Brave, buka Setelan, lalu Privasi dan keamanan, aktifkan \"Gunakan layanan Google untuk pesan push\", mulai ulang browser, lalu coba lagi."
+      },
+      "testResults": {
+        "heading": "Pengujian terakhir, per perangkat",
+        "status": {
+          "sent": "terkirim ke layanan push",
+          "expired": "langganan kedaluwarsa; aktifkan push di perangkat itu lagi",
+          "transient": "tidak terkirim (kesalahan sementara); coba lagi",
+          "unconfigured": "instans ini tidak dapat menandatangani pesan push saat ini"
+        }
+      }
+    },
+    "preferences": {
+      "heading": "Cara memberi tahu saya",
+      "description": "Bel selalu menampilkan setiap notifikasi. Pilih jenis mana yang juga dikirim Monize melalui email atau push, dan seberapa sering.",
+      "categoryHeader": "Notifikasi",
+      "channels": {
+        "inApp": "Dalam aplikasi",
+        "emailReport": "Email (laporan)",
+        "emailNotification": "Email (peringatan)",
+        "push": "Push",
+        "unifiedpush": "UnifiedPush"
+      },
+      "categories": {
+        "PAYMENTS": "Tagihan dan terjadwal",
+        "BUDGETS": "Anggaran",
+        "SYSTEM": "Peringatan sistem"
+      },
+      "inAppAlways": "Selalu tampil di lonceng",
+      "channelNotApplicable": "Tidak berlaku untuk jenis notifikasi ini",
+      "emailToggleLabel": "Email laporan untuk {category}",
+      "saveFailed": "Tidak dapat menyimpan setelan itu",
+      "throttle": {
+        "label": "Jeda",
+        "ariaLabel": "Jeda untuk {category}",
+        "hint": "Lewati peringatan atau push jika satu dari grup yang sama sudah dikirim dalam jendela ini.",
+        "options": {
+          "0": "Nonaktif",
+          "5": "5 menit",
+          "15": "15 menit",
+          "30": "30 menit",
+          "60": "1 jam",
+          "360": "6 jam",
+          "1440": "24 jam"
+        }
+      },
+      "emailNotificationToggleLabel": "Email peringatan untuk {category}",
+      "pushToggleLabel": "Push untuk {category}",
+      "unifiedpushToggleLabel": "UnifiedPush untuk {category}",
+      "emailUnavailable": "Aktifkan notifikasi email di atas untuk mengirimnya melalui email.",
+      "pushUnavailable": "Aktifkan push di perangkat ini terlebih dahulu (lihat di bawah).",
+      "unifiedpushUnavailable": "Daftarkan endpoint UnifiedPush dari aplikasi distributor Anda untuk menggunakan saluran ini."
     }
   },
   "help": {

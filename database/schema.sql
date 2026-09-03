@@ -1646,8 +1646,22 @@ CREATE TABLE budget_period_categories (
 CREATE INDEX idx_bpc_period ON budget_period_categories(budget_period_id);
 CREATE INDEX idx_bpc_category ON budget_period_categories(category_id);
 
--- Budget Alerts - persistent alert records
-CREATE TABLE budget_alerts (
+-- Every durable notification, whatever produced it (migration 179, renamed from
+-- budget_alerts). The table stopped being about budgets some time ago:
+-- BACKUP_FAILED, SMTP_FAILURE, PROVIDER_OUTAGE and SCHEDULED_POST_FAILED live
+-- here with budget_id NULL, and this is what the bell in the header reads. One
+-- durable row, one read model, one creation door (NotificationService).
+--
+-- `severity` is the priority axis discussion #1291 asked for -- it has carried
+-- that meaning since the first budget alert -- so there is no second column for
+-- it. Localization is the stored English fallback plus the facts in `data`,
+-- rendered in the reader's language by the client (or, for copy composed on the
+-- server, through emailTranslator); there are no message-key columns for a
+-- second mechanism to drift against. There is no `category` column either: what
+-- a notification is *about* is a pure function of alert_type, so it is derived
+-- by `notificationCategoryOf` rather than stored beside the value it is derived
+-- from. Migration 179 has the full reasoning for all four.
+CREATE TABLE notifications (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     budget_id UUID REFERENCES budgets(id) ON DELETE CASCADE,
@@ -1657,6 +1671,10 @@ CREATE TABLE budget_alerts (
     title VARCHAR(255) NOT NULL,
     message TEXT NOT NULL,
     data JSONB DEFAULT '{}',
+    -- The in-app path this points at, e.g. '/budgets/<id>'. Always a same-origin
+    -- path, never a URL: the service worker resolves it against the app's own
+    -- origin and discards anything that leaves it.
+    target VARCHAR(255),
     is_read BOOLEAN DEFAULT false,
     is_email_sent BOOLEAN DEFAULT false,
     period_start DATE NOT NULL,
@@ -1665,9 +1683,9 @@ CREATE TABLE budget_alerts (
     dedupe_key VARCHAR(120)
 );
 
-CREATE INDEX idx_budget_alerts_user ON budget_alerts(user_id);
-CREATE INDEX idx_budget_alerts_user_unread ON budget_alerts(user_id, is_read) WHERE is_read = false;
-CREATE INDEX idx_budget_alerts_budget_period ON budget_alerts(budget_id, period_start);
+CREATE INDEX idx_notifications_user ON notifications(user_id);
+CREATE INDEX idx_notifications_user_unread ON notifications(user_id, is_read) WHERE is_read = false;
+CREATE INDEX idx_notifications_budget_period ON notifications(budget_id, period_start);
 
 -- The app's own de-duplication rule as a database key (migration 140).
 -- deduplicateAlerts() drops a candidate matching an existing (alert_type,
@@ -1678,8 +1696,8 @@ CREATE INDEX idx_budget_alerts_budget_period ON budget_alerts(budget_id, period_
 --
 -- Duplicates predating the key are collapsed by the migration's preflight before
 -- it is created, keeping whichever row the user acted on.
-CREATE UNIQUE INDEX idx_budget_alerts_fingerprint
-    ON budget_alerts(
+CREATE UNIQUE INDEX idx_notifications_fingerprint
+    ON notifications(
         budget_id,
         period_start,
         alert_type,
@@ -1694,9 +1712,82 @@ CREATE UNIQUE INDEX idx_budget_alerts_fingerprint
 -- index makes INSERT ... ON CONFLICT DO NOTHING RETURNING id the cross-replica
 -- arbiter for both the row and its admin email (only the insert winner sends).
 -- Budget-generated alerts keep dedupe_key NULL.
-CREATE UNIQUE INDEX idx_budget_alerts_dedupe
-    ON budget_alerts(user_id, dedupe_key)
+CREATE UNIQUE INDEX idx_notifications_dedupe
+    ON notifications(user_id, dedupe_key)
     WHERE dedupe_key IS NOT NULL;
+
+-- Per-category notification channel preferences (migration 180,
+-- docs/specs/notification-preferences.md). One row per (user, category); an
+-- absent row means the default matrix. Phase 1 carries only the live channel,
+-- email; push, unifiedpush and the throttle window land with the dispatch that
+-- reads them. `category` is a derived NotificationCategory value (PAYMENTS,
+-- BUDGETS, SYSTEM today), never a raw alert_type.
+CREATE TABLE notification_preferences (
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    category VARCHAR(20) NOT NULL,
+    -- Report-mode email (batch/digest); live and unthrottled (migration 180).
+    email BOOLEAN NOT NULL DEFAULT true,
+    -- Notification-mode email (immediate, one per event); stored now, delivered
+    -- with the push dispatch in Phase 5 (migration 181).
+    email_notification BOOLEAN NOT NULL DEFAULT false,
+    -- Per-category cooldown for the notification-mode fan-out; 0 disables.
+    -- Stored now, enforced in Phase 5 (migration 181).
+    throttle_minutes INTEGER NOT NULL DEFAULT 0,
+    -- Per-category web push, the other notification-mode fan-out; read by the
+    -- Phase 5 dispatch (migration 183). DEFAULT FALSE: a matrix cell cannot turn
+    -- a device on, so push stays off until a device is enabled and the category
+    -- toggled.
+    push BOOLEAN NOT NULL DEFAULT false,
+    -- Per-category UnifiedPush/ntfy channel (migration 184); the same encrypted
+    -- Web Push wire as `push`, delivered to a distributor endpoint. DEFAULT
+    -- FALSE for the push reason: off until a UnifiedPush subscription exists.
+    unifiedpush BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, category)
+);
+
+CREATE TRIGGER update_notification_preferences_updated_at BEFORE UPDATE ON notification_preferences FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Repeating / one-time notification reminders (migration 182,
+-- docs/specs/notification-preferences.md Section 13). One row per active reminder
+-- a user asked for; it carries the template a fire re-emits, so a fire never
+-- reloads the (possibly dismissed) source notification. Each fire re-emits
+-- through NotificationService.create with a per-fire dedupe key (a fresh in-app
+-- row every interval). source_notification_id is ON DELETE SET NULL so a deleted
+-- source stops the nag rather than deleting the reminder mid-fire.
+CREATE TABLE notification_reminders (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    source_notification_id UUID REFERENCES notifications(id) ON DELETE SET NULL,
+    alert_type VARCHAR(30) NOT NULL,
+    severity VARCHAR(20) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    data JSONB DEFAULT '{}',
+    target VARCHAR(255),
+    dedupe_base VARCHAR(80),
+    repeat_mode VARCHAR(10) NOT NULL,
+    interval_minutes INTEGER NOT NULL,
+    next_fire_at TIMESTAMP NOT NULL,
+    last_fired_at TIMESTAMP,
+    fire_count INTEGER NOT NULL DEFAULT 0,
+    stopped_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_notification_reminders_due
+    ON notification_reminders (next_fire_at) WHERE stopped_at IS NULL;
+CREATE INDEX idx_notification_reminders_source
+    ON notification_reminders (source_notification_id)
+    WHERE source_notification_id IS NOT NULL;
+-- At most one active reminder per (user, source).
+CREATE UNIQUE INDEX idx_notification_reminders_active_source
+    ON notification_reminders (user_id, source_notification_id)
+    WHERE stopped_at IS NULL AND source_notification_id IS NOT NULL;
+
+CREATE TRIGGER update_notification_reminders_updated_at BEFORE UPDATE ON notification_reminders FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Triggers for budget tables updated_at
 CREATE TRIGGER update_budgets_updated_at BEFORE UPDATE ON budgets FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -2181,6 +2272,89 @@ CREATE TABLE gem_strategy_signals (
 CREATE UNIQUE INDEX idx_gem_strategy_signals_period ON gem_strategy_signals(strategy_id, evaluated_on, algorithm_version);
 CREATE INDEX idx_gem_strategy_signals_user ON gem_strategy_signals(user_id);
 
+-- ---------------------------------------------------------------------------
+-- Web Push transport (migration 178).
+--
+-- push_instance_config is the deployment's push identity: one VAPID key pair
+-- per Monize instance, generated on first start so a self-hosted administrator
+-- registers nothing with Google, Apple or Firebase. The private half is
+-- AES-256-GCM ciphertext under ENCRYPTION_KEY; an instance without that
+-- variable stores no key at all rather than a plaintext secret. Deployment-wide
+-- state with no owner column, so the table is RLS-exempt for the same reason
+-- provider_health is -- see the marker block at the foot of the RLS section.
+--
+-- Neither table is exported by a backup (INTENTIONALLY_EXCLUDED_TABLES in
+-- backend/src/backup/export-table-queries.ts): a subscription names a browser
+-- on one machine talking to one origin under one VAPID key, and restoring a
+-- production backup onto a test instance must not hand that instance the right
+-- to push to real phones.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE push_instance_config (
+    -- Singleton. The key admits exactly one value, so a second insert is a
+    -- conflict rather than a second push identity for one deployment.
+    id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
+    vapid_public_key VARCHAR(200) NOT NULL,
+    vapid_private_key_enc TEXT NOT NULL,
+    vapid_generated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- Instance kill-switch. Off hides the whole push surface from every
+    -- account's settings and makes the sender a no-op; it does not delete
+    -- subscriptions, so turning it back on restores the devices as they were.
+    web_push_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE push_subscriptions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    endpoint TEXT NOT NULL,
+    -- SHA-256 hex of the endpoint. The endpoint itself is unbounded text and a
+    -- btree index has a row-size limit, so the hash is what gets indexed.
+    endpoint_hash VARCHAR(64) NOT NULL,
+    p256dh VARCHAR(255) NOT NULL,
+    auth VARCHAR(255) NOT NULL,
+    -- Which wire this subscription is delivered on (migration 184). 'webpush' is
+    -- a browser vendor's push service; 'unifiedpush' is a distributor endpoint
+    -- (ntfy/NextPush), the same encrypted Web Push protocol either way. The
+    -- per-user channel toggles gate the two independently.
+    transport VARCHAR(20) NOT NULL DEFAULT 'webpush'
+        CONSTRAINT push_subscriptions_transport_check
+        CHECK (transport IN ('webpush', 'unifiedpush')),
+    device_name VARCHAR(100),
+    user_agent VARCHAR(255),
+    -- The instance identity this subscription was minted under. A rotation
+    -- makes every older subscription undeliverable -- the push service checks
+    -- the VAPID signature against the key the subscription was created with --
+    -- so the column is what lets the sender skip a stale row even if the
+    -- rotation that should have disabled it was interrupted.
+    vapid_public_key VARCHAR(200) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_success_at TIMESTAMP,
+    failure_count INTEGER NOT NULL DEFAULT 0,
+    disabled_at TIMESTAMP,
+    disabled_reason VARCHAR(40)
+);
+
+-- Globally unique, not unique per user, and that is the security property.
+--
+-- A push subscription belongs to a browser profile and an origin, NOT to a
+-- Monize session: two people sharing one browser get the same endpoint and the
+-- same encryption keys from pushManager.subscribe(). Scoped per user, both rows
+-- would survive and a notification addressed to the first account would be
+-- decrypted and displayed on the device the second account is now using.
+--
+-- One row per endpoint, and the second subscriber is REFUSED rather than
+-- allowed to take the row over: an endpoint is a string the caller supplied,
+-- and no ownership check covers it, so a takeover would be a cross-tenant
+-- delete on an unverified identifier -- and a silent one. The client answers
+-- the refusal by unsubscribing and subscribing again, which mints a fresh
+-- endpoint nobody holds, and logging out releases the endpoint the same way.
+CREATE UNIQUE INDEX idx_push_subscriptions_endpoint ON push_subscriptions(endpoint_hash);
+
+-- Every send starts with "which of this user's devices are still live".
+CREATE INDEX idx_push_subscriptions_user_live ON push_subscriptions(user_id) WHERE disabled_at IS NULL;
+
 -- ===========================================================================
 -- Row-Level Security policies
 --
@@ -2212,7 +2386,6 @@ DECLARE
         'ai_provider_configs',
         'ai_usage_logs',
         'auto_backup_settings',
-        'budget_alerts',
         'budgets',
         'custom_reports',
         'gem_strategies',
@@ -2229,7 +2402,11 @@ DECLARE
         'loan_rate_changes',
         'loan_scenarios',
         'monte_carlo_scenarios',
+        'notification_preferences',
+        'notification_reminders',
+        'notifications',
         'payee_aliases',
+        'push_subscriptions',
         'scheduled_transactions',
         'securities',
         'transaction_attachments',
@@ -2782,20 +2959,24 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- rls-exempt: market_index_sync
 -- rls-exempt: oauth_payloads
 -- rls-exempt: provider_health
+-- rls-exempt: push_instance_config
 -- rls-exempt: schema_migrations
 -- ---------------------------------------------------------------------------
 
 -- Verification helper (run manually; not part of the migration's effect):
 --   SELECT tablename, policyname FROM pg_policies
 --    WHERE schemaname = 'public' ORDER BY tablename;
--- Expected: 58 policies -- 26 direct + 4 real-user-keyed (112),
+-- Expected: 61 policies -- 26 direct + 4 real-user-keyed (112),
 --           15 indirect (113), 5 special (114),
 --           2 direct for the .mny import's staging + job tables (117),
 --           1 direct for security_documents (118),
 --           4 direct for the GEM strategy tables (124, 125),
 --           2 direct for job_claims and attachment_blob_tombstones,
---           1 indirect for scheduled_transaction_postings (133), and
---           1 direct for the OIDC step-up claim ledger (155).
+--           1 indirect for scheduled_transaction_postings (133),
+--           1 direct for the OIDC step-up claim ledger (155),
+--           1 direct for push_subscriptions (178),
+--           1 direct for notification_preferences (180), and
+--           1 direct for notification_reminders (182).
 
 -- ---------------------------------------------------------------------------
 -- Enable row-level security (migration 123).

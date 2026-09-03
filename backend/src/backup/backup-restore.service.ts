@@ -36,6 +36,7 @@ import {
   BackupPasswordRequiredError,
   backupTables,
   parseArtifactCompleteness,
+  renameLegacyTableKeys,
   RestoreBackupInput,
   RestoreResult,
 } from "./backup-format";
@@ -141,8 +142,28 @@ export class BackupRestoreService {
         // Everything below holds a slot, so nothing below is cancellable: the
         // signal above bounds the wait for the slot and is not consulted again.
         const gzippedPayload = await this.maybeDecrypt(input, user);
-        const rawData = await this.decompressAndParse(gzippedPayload);
-        this.validateBackupFormat(rawData);
+        const parsed = await this.decompressAndParse(gzippedPayload);
+        this.validateBackupFormat(parsed);
+
+        // An artifact older than a table rename addresses that table by its old
+        // name. Move it onto the current one here, before anything walks the
+        // document, so every later phase sees one shape -- as a new document,
+        // never by rewriting the parsed one in place.
+        const legacyNames = renameLegacyTableKeys(parsed);
+        const rawData = legacyNames.data;
+        if (legacyNames.renamed.length > 0) {
+          this.logger.log(
+            `Backup for user ${userId} uses legacy table names: ${legacyNames.renamed.join(", ")}`,
+          );
+        }
+        for (const dropped of legacyNames.discarded) {
+          // Warned, not logged: rows in the artifact are not being restored.
+          this.logger.warn(
+            `Backup for user ${userId} carries both ${dropped.table} and ` +
+              `${dropped.supersededBy}; keeping ${dropped.supersededBy} and ` +
+              `discarding ${dropped.rows} row(s) under the legacy name.`,
+          );
+        }
 
         await this.verifyAuthentication(user, input);
 

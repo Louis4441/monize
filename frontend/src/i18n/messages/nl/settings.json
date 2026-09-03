@@ -234,6 +234,115 @@
       "digestUpdateFailed": "Bijwerken van voorkeur voor budgetoverzicht mislukt",
       "digestDayFailed": "Bijwerken van dag van budgetoverzicht mislukt",
       "testEmailFailed": "Verzenden van teste-mail mislukt"
+    },
+    "push": {
+      "heading": "Browserpush",
+      "diagnostics": {
+        "summary": "Meldingsdiagnose",
+        "intro": "Wat deze browser en dit apparaat aan Monize melden over meldingen. Gebruik de testknop om Monize een melding te laten maken die je op je apparaat kunt zoeken, en daarna Kopiëren om het volledige rapport te sturen.",
+        "refresh": "Vernieuwen",
+        "copy": "Rapport kopiëren",
+        "copied": "Diagnose naar klembord gekopieerd",
+        "localTest": "Testmelding tonen",
+        "localTestRunning": "Controleren…",
+        "localTestBody": "Als je dit ziet, werken meldingen op dit apparaat.",
+        "localTestCreated": "Monize heeft een melding zonder fout aangemaakt, maar niets hier kan bevestigen dat het systeem deze heeft getoond. Als je hem niet op je apparaat zag, verbergt het systeem hem; schakel meldingen voor Monize in bij de apparaatinstellingen.",
+        "localTestError": "Kan de test niet uitvoeren op dit apparaat ({detail})."
+      },
+      "description": "Registreer dit apparaat zodat Monize het ook kan bereiken als de app gesloten is. Voorlopig wordt alleen de testmelding zo bezorgd; al het andere komt nog steeds in de bel.",
+      "androidNotify": "Op Android is een verleende toestemming niet genoeg: het systeem kan meldingen alsnog verbergen. Houd het Monize-pictogram op je startscherm ingedrukt, tik op App-info, dan Meldingen, en zorg dat ze aan staan.",
+      "permissionHint": "Als je dit aanzet, vraagt je browser toestemming om meldingen te tonen. Er wordt niets verzonden voordat je die geeft.",
+      "enableButton": "Inschakelen op dit apparaat",
+      "enablingButton": "Inschakelen...",
+      "sendTestButton": "Testmelding versturen",
+      "sendingTestButton": "Versturen...",
+      "removeButton": "Verwijderen",
+      "thisDevice": "Dit apparaat",
+      "unifiedpushBadge": "UnifiedPush",
+      "unnamedDevice": "Naamloos apparaat",
+      "lastSeen": "Laatst actief {when}",
+      "noLiveDevices": "Nog geen apparaat geregistreerd. Schakel push in op dit apparaat om een test te versturen.",
+      "notConfigured": "Browserpush is niet beschikbaar op deze Monize-instantie. Een beheerder kan het inschakelen in het Admin-gedeelte.",
+      "disabledByAdmin": "Een beheerder heeft browserpush uitgeschakeld voor deze Monize-instantie.",
+      "keyUnreadable": "Monize kan het pushsleutelpaar van deze instantie niet lezen, dus er wordt niets bezorgd. Een beheerder kan dit herstellen door het sleutelpaar in het Admin-gedeelte te vervangen.",
+      "serverKeyMissing": "Deze Monize-instantie mist de encryptiesleutel die nodig is om het push-sleutelpaar te openen, dus er kan niets bezorgd worden. Een beheerder moet die in de deployment instellen en opnieuw opstarten.",
+      "statusUnavailable": "Monize kon niet controleren of browserpush beschikbaar is. Herlaad de pagina om het opnieuw te proberen.",
+      "devicesUnavailable": "Monize kon je geregistreerde apparaten niet laden. De rest van deze pagina werkt gewoon; herlaad om het opnieuw te proberen.",
+      "unsupported": {
+        "unsupported": "Deze browser kan geen pushmeldingen ontvangen.",
+        "denied": "Meldingen zijn geblokkeerd voor Monize in deze browser. Sta ze toe in de site-instellingen en herlaad deze pagina.",
+        "ios-browser": "Op iPhone en iPad werken pushmeldingen pas als Monize op het beginscherm is geïnstalleerd. Gebruik Deel en daarna Zet op beginscherm, en open Monize van daaruit."
+      },
+      "disabledReason": {
+        "GONE": "Niet meer bereikbaar. Schakel push opnieuw in in die browser.",
+        "KEY_ROTATED": "Stopgezet toen deze instantie haar pushsleutelpaar verving. Schakel push opnieuw in in die browser.",
+        "FAILING": "Stopgezet na herhaalde afleverfouten. Schakel push opnieuw in in die browser."
+      },
+      "toasts": {
+        "enabled": "Pushmeldingen ingeschakeld op dit apparaat",
+        "enableFailed": "Pushmeldingen konden niet worden ingeschakeld",
+        "permissionDenied": "Deze browser blokkeert meldingen van Monize. Sta ze toe in de site-instellingen en probeer het opnieuw.",
+        "permissionDeniedIos": "Meldingen zijn geblokkeerd voor Monize. Open iOS-instellingen, dan Meldingen, dan Monize, om ze toe te staan.",
+        "permissionDismissed": "Meldingen zijn niet ingeschakeld. Kies Toestaan wanneer de browser het vraagt.",
+        "permissionNoPrompt": "Meldingen zijn niet aangezet en er verscheen geen verzoek. Open iOS-instellingen, dan Meldingen, dan Monize, en sta ze daar toe. Staat Monize er niet bij, verwijder het dan van het beginscherm, voeg het opnieuw toe (Deel, dan Zet op beginscherm) en probeer het nog eens.",
+        "removed": "Apparaat verwijderd",
+        "removeFailed": "Apparaat kon niet worden verwijderd",
+        "testSent": "{count, plural, one {Testmelding verstuurd naar 1 apparaat} other {Testmelding verstuurd naar # apparaten}}",
+        "testPartial": "De testmelding bereikte {delivered} van {attempted} apparaten",
+        "testFailed": "De testmelding kon niet worden afgeleverd",
+        "pushServiceRefused": "De pushdienst van de browser heeft de registratie geweigerd. Probeer het zo opnieuw; blijft het mislukken, controleer dan de pushinstellingen van de browser.",
+        "pushServiceRefusedBrave": "Brave blokkeert de pushdienst standaard. Open in Brave Instellingen, dan Privacy en beveiliging, zet \"Google-services gebruiken voor pushberichten\" aan, herstart de browser en probeer het opnieuw."
+      },
+      "testResults": {
+        "heading": "Laatste test, per apparaat",
+        "status": {
+          "sent": "afgeleverd bij de pushdienst",
+          "expired": "abonnement verlopen; schakel push op dat apparaat opnieuw in",
+          "transient": "niet afgeleverd (tijdelijke fout); probeer het opnieuw",
+          "unconfigured": "deze instantie kan pushberichten nu niet ondertekenen"
+        }
+      }
+    },
+    "preferences": {
+      "heading": "Hoe ik meldingen ontvang",
+      "description": "De bel toont altijd elke melding. Kies welke soorten Monize ook per e-mail of push verstuurt, en hoe vaak.",
+      "categoryHeader": "Melding",
+      "channels": {
+        "inApp": "In de app",
+        "emailReport": "E-mail (rapport)",
+        "emailNotification": "E-mail (waarschuwing)",
+        "push": "Push",
+        "unifiedpush": "UnifiedPush"
+      },
+      "categories": {
+        "PAYMENTS": "Rekeningen en gepland",
+        "BUDGETS": "Budgetten",
+        "SYSTEM": "Systeemwaarschuwingen"
+      },
+      "inAppAlways": "Altijd zichtbaar in de bel",
+      "channelNotApplicable": "Niet van toepassing op dit type melding",
+      "emailToggleLabel": "Rapport-e-mail voor {category}",
+      "saveFailed": "Kon die instelling niet opslaan",
+      "throttle": {
+        "label": "Wachttijd",
+        "ariaLabel": "Wachttijd voor {category}",
+        "hint": "Sla een waarschuwing of push over als er binnen dit venster al een uit dezelfde groep is verstuurd.",
+        "options": {
+          "0": "Uit",
+          "5": "5 minuten",
+          "15": "15 minuten",
+          "30": "30 minuten",
+          "60": "1 uur",
+          "360": "6 uur",
+          "1440": "24 uur"
+        }
+      },
+      "emailNotificationToggleLabel": "Waarschuwings-e-mail voor {category}",
+      "pushToggleLabel": "Push voor {category}",
+      "unifiedpushToggleLabel": "UnifiedPush voor {category}",
+      "emailUnavailable": "Schakel hierboven e-mailmeldingen in om deze per e-mail te versturen.",
+      "pushUnavailable": "Schakel push eerst in op dit apparaat (zie hieronder).",
+      "unifiedpushUnavailable": "Registreer een UnifiedPush-endpoint vanuit je distributor-app om dit kanaal te gebruiken."
     }
   },
   "help": {

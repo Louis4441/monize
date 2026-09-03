@@ -274,7 +274,7 @@ function fixtureTables(): Record<string, Record<string, unknown>[]> {
     budget_categories: [],
     budget_periods: [],
     budget_period_categories: [],
-    budget_alerts: [],
+    notifications: [],
     custom_reports: [],
     investment_reports: [],
     import_column_mappings: [],

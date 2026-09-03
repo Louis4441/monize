@@ -234,6 +234,115 @@
       "digestUpdateFailed": "Falha ao atualizar a preferência do resumo de orçamento",
       "digestDayFailed": "Falha ao atualizar o dia do resumo",
       "testEmailFailed": "Falha ao enviar o e-mail de teste"
+    },
+    "push": {
+      "heading": "Push do navegador",
+      "diagnostics": {
+        "summary": "Diagnóstico de notificações",
+        "intro": "O que este navegador e dispositivo comunicam ao Monize sobre notificações. Use o botão de teste para o Monize criar uma notificação que pode procurar no dispositivo e depois Copiar para enviar o relatório completo.",
+        "refresh": "Atualizar",
+        "copy": "Copiar relatório",
+        "copied": "Diagnóstico copiado para a área de transferência",
+        "localTest": "Mostrar uma notificação de teste",
+        "localTestRunning": "A verificar…",
+        "localTestBody": "Se consegue ver isto, as notificações funcionam neste dispositivo.",
+        "localTestCreated": "O Monize criou uma notificação sem erro, mas nada aqui pode confirmar que o sistema a mostrou. Se não a viu no dispositivo, o sistema está a ocultá-la; ative as notificações do Monize nas definições do dispositivo.",
+        "localTestError": "Não foi possível executar o teste neste dispositivo ({detail})."
+      },
+      "description": "Registe este dispositivo para que o Monize o possa alcançar mesmo com a aplicação fechada. Por agora só a notificação de teste é entregue por esta via; tudo o resto continua a chegar à campainha.",
+      "androidNotify": "No Android, uma permissão concedida não basta: o sistema ainda pode ocultar as notificações. Mantenha premido o ícone do Monize no ecrã inicial, toque em Informações da aplicação, depois em Notificações, e confirme que estão ativadas.",
+      "permissionHint": "Quando ativar isto, o seu navegador pede permissão para mostrar notificações. Nada é enviado antes de permitir.",
+      "enableButton": "Ativar neste dispositivo",
+      "enablingButton": "A ativar...",
+      "sendTestButton": "Enviar notificação de teste",
+      "sendingTestButton": "A enviar...",
+      "removeButton": "Remover",
+      "thisDevice": "Este dispositivo",
+      "unifiedpushBadge": "UnifiedPush",
+      "unnamedDevice": "Dispositivo sem nome",
+      "lastSeen": "Última atividade {when}",
+      "noLiveDevices": "Ainda não há dispositivos registados. Ative o push neste dispositivo para enviar um teste.",
+      "notConfigured": "O push do navegador não está disponível nesta instância do Monize. Um administrador pode ativá-lo na área Admin.",
+      "disabledByAdmin": "Um administrador desativou o push do navegador nesta instância do Monize.",
+      "keyUnreadable": "O Monize não consegue ler o par de chaves push desta instância, por isso nada é entregue. Um administrador pode recuperá-lo rodando o par de chaves na área Admin.",
+      "serverKeyMissing": "A esta instância do Monize falta a chave de cifra necessária para abrir o seu par de chaves push, por isso nada pode ser entregue. Um administrador tem de a definir no deployment e reiniciar.",
+      "statusUnavailable": "O Monize não conseguiu verificar se o push do navegador está disponível. Recarregue a página para tentar novamente.",
+      "devicesUnavailable": "O Monize não conseguiu carregar os seus dispositivos registados. O resto desta página continua a funcionar; recarregue para tentar novamente.",
+      "unsupported": {
+        "unsupported": "Este navegador não consegue receber notificações push.",
+        "denied": "As notificações estão bloqueadas para o Monize neste navegador. Permita-as nas definições do site e recarregue esta página.",
+        "ios-browser": "No iPhone e no iPad, as notificações push só funcionam depois de instalar o Monize no ecrã principal. Use Partilhar, depois Adicionar ao ecrã principal, e abra o Monize a partir daí."
+      },
+      "disabledReason": {
+        "GONE": "Já não está acessível. Ative novamente o push nesse navegador.",
+        "KEY_ROTATED": "Desativado quando esta instância rodou o par de chaves push. Ative novamente o push nesse navegador.",
+        "FAILING": "Desativado após falhas de entrega repetidas. Ative novamente o push nesse navegador."
+      },
+      "toasts": {
+        "enabled": "Notificações push ativadas neste dispositivo",
+        "enableFailed": "Não foi possível ativar as notificações push",
+        "permissionDenied": "Este navegador está a bloquear as notificações do Monize. Permita-as nas definições do site e tente novamente.",
+        "permissionDeniedIos": "As notificações estão bloqueadas para o Monize. Abra os Ajustes do iOS, depois Notificações, depois Monize, para as permitir.",
+        "permissionDismissed": "As notificações não foram ativadas. Escolha Permitir quando o navegador perguntar.",
+        "permissionNoPrompt": "As notificações não foram ativadas e não apareceu nenhum pedido. Abra os Ajustes do iOS, depois Notificações, depois Monize, e permita-as aí. Se o Monize não estiver na lista, remova-o do ecrã principal, adicione-o novamente (Partilhar, depois Adicionar ao ecrã principal) e tente outra vez.",
+        "removed": "Dispositivo removido",
+        "removeFailed": "Não foi possível remover o dispositivo",
+        "testSent": "{count, plural, one {Notificação de teste enviada para 1 dispositivo} other {Notificação de teste enviada para # dispositivos}}",
+        "testPartial": "A notificação de teste chegou a {delivered} de {attempted} dispositivos",
+        "testFailed": "Não foi possível entregar a notificação de teste",
+        "pushServiceRefused": "O serviço push do navegador recusou o registo. Tente novamente daqui a pouco; se continuar a falhar, verifique as definições push do navegador.",
+        "pushServiceRefusedBrave": "O Brave bloqueia o serviço push por predefinição. No Brave, abra Definições, depois Privacidade e segurança, ative «Usar serviços Google para mensagens push», reinicie o navegador e tente novamente."
+      },
+      "testResults": {
+        "heading": "Último teste, por dispositivo",
+        "status": {
+          "sent": "entregue ao serviço push",
+          "expired": "subscrição expirada; ative o push nesse dispositivo novamente",
+          "transient": "não entregue (erro temporário); tente novamente",
+          "unconfigured": "esta instância não consegue assinar mensagens push neste momento"
+        }
+      }
+    },
+    "preferences": {
+      "heading": "Como notificar-me",
+      "description": "O sino mostra sempre todas as notificações. Escolha quais tipos o Monize também envia por e-mail ou push, e com que frequência.",
+      "categoryHeader": "Notificação",
+      "channels": {
+        "inApp": "Na aplicação",
+        "emailReport": "Email (relatório)",
+        "emailNotification": "E-mail (alerta)",
+        "push": "Push",
+        "unifiedpush": "UnifiedPush"
+      },
+      "categories": {
+        "PAYMENTS": "Contas e agendados",
+        "BUDGETS": "Orçamentos",
+        "SYSTEM": "Alertas do sistema"
+      },
+      "inAppAlways": "Sempre visível no sino",
+      "channelNotApplicable": "Não aplicável a este tipo de notificação",
+      "emailToggleLabel": "Email (relatório) para {category}",
+      "saveFailed": "Não foi possível guardar essa definição",
+      "throttle": {
+        "label": "Intervalo",
+        "ariaLabel": "Intervalo para {category}",
+        "hint": "Ignora um alerta ou push se um do mesmo grupo já foi enviado dentro deste intervalo.",
+        "options": {
+          "0": "Desativado",
+          "5": "5 minutos",
+          "15": "15 minutos",
+          "30": "30 minutos",
+          "60": "1 hora",
+          "360": "6 horas",
+          "1440": "24 horas"
+        }
+      },
+      "emailNotificationToggleLabel": "E-mail de alerta para {category}",
+      "pushToggleLabel": "Push para {category}",
+      "unifiedpushToggleLabel": "UnifiedPush para {category}",
+      "emailUnavailable": "Ative acima as notificações por e-mail para enviá-las por e-mail.",
+      "pushUnavailable": "Ative primeiro o push neste dispositivo (ver abaixo).",
+      "unifiedpushUnavailable": "Registe um endpoint UnifiedPush a partir da sua aplicação distribuidora para usar este canal."
     }
   },
   "help": {
