@@ -22,29 +22,29 @@ import { McpServerService } from "./mcp-server.service";
 // measured size. A cap is a ratchet: lower it when a tool shrinks, and raise one
 // only as a reviewed decision.
 const TOOL_BYTE_BUDGET: Record<string, number> = {
-  list_accounts: 4192,
-  list_transactions: 4832,
-  compare_periods: 2600,
-  manage_transactions: 9671,
-  list_categories: 1477,
-  list_payees: 1604,
-  manage_payees: 4753,
-  generate_report: 5271,
-  get_portfolio_summary: 6639,
-  list_investment_transactions: 4226,
-  list_capital_gains: 3123,
-  lookup_securities: 2185,
-  manage_securities: 5759,
-  manage_investment_transactions: 6686,
-  list_upcoming_bills: 4556,
-  calculate: 1365,
-  get_budget_status: 3255,
-  get_next_prompt: 2557,
-  post_response: 1411,
-  report_progress: 2045,
+  list_accounts: 2300,
+  list_transactions: 4050,
+  compare_periods: 2150,
+  manage_transactions: 6700,
+  list_categories: 1350,
+  list_payees: 1000,
+  manage_payees: 3450,
+  generate_report: 3150,
+  get_portfolio_summary: 3500,
+  list_investment_transactions: 2750,
+  list_capital_gains: 2300,
+  lookup_securities: 1750,
+  manage_securities: 4750,
+  manage_investment_transactions: 5050,
+  list_upcoming_bills: 3400,
+  calculate: 1400,
+  get_budget_status: 2900,
+  get_next_prompt: 1600,
+  post_response: 1200,
+  report_progress: 1400,
 };
 
-const TOTAL_BYTE_BUDGET = 78_300;
+const TOTAL_BYTE_BUDGET = 54_000;
 const INSTRUCTIONS_BYTE_BUDGET = 2_600;
 
 /**

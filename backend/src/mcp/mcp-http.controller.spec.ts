@@ -52,6 +52,61 @@ describe("McpHttpController", () => {
     expect(controller).toBeDefined();
   });
 
+  // A security scan reported the server answering 200 to an invalid token. The
+  // cause was the frontend proxy, which did not recognise a bearer-only request
+  // to the bare origin as MCP traffic and let the app shell answer it
+  // (frontend/src/proxy.ts). This endpoint has always refused these, on every
+  // verb -- so that claim is checked here rather than left as a comment.
+  describe("malformed and unknown Authorization headers", () => {
+    const cases: Array<[string, Record<string, string>]> = [
+      ["no Authorization header", {}],
+      ["a bare scheme", { authorization: "Bearer" }],
+      ["an empty token", { authorization: "Bearer " }],
+      ["a whitespace token", { authorization: "Bearer    " }],
+      ["the wrong scheme", { authorization: "Basic dXNlcjpwYXNz" }],
+      ["a lowercase scheme", { authorization: "bearer pat_whatever" }],
+      ["an unknown PAT", { authorization: "Bearer pat_does_not_exist" }],
+      ["an unknown OAuth token", { authorization: "Bearer eyJhbGciOiJIUzI1" }],
+      ["a token that is only punctuation", { authorization: "Bearer ...." }],
+    ];
+
+    const verbs: Array<["handlePost" | "handleGet" | "handleDelete", string]> =
+      [
+        ["handlePost", "POST"],
+        ["handleGet", "GET"],
+        ["handleDelete", "DELETE"],
+      ];
+
+    describe.each(verbs)("%s", (method, verb) => {
+      it.each(cases)(`refuses ${verb} with %s`, async (_label, headers) => {
+        patService.validateToken.mockRejectedValue(new Error("Invalid"));
+        oauthProviderService.validateAccessToken.mockResolvedValue(null);
+
+        const req = { headers, body: {} } as any;
+        const res = {
+          status: jest.fn().mockReturnThis(),
+          json: jest.fn(),
+          setHeader: jest.fn(),
+        } as any;
+
+        await controller[method](req, res);
+
+        expect(res.status).toHaveBeenCalledWith(401);
+        expect(res.json).toHaveBeenCalledWith(
+          expect.objectContaining({
+            error: expect.objectContaining({ message: "Unauthorized" }),
+          }),
+        );
+        // RFC 9728: the refusal names where to get a token, so a client can
+        // start the OAuth flow rather than guessing.
+        expect(res.setHeader).toHaveBeenCalledWith(
+          "WWW-Authenticate",
+          expect.stringContaining("resource_metadata="),
+        );
+      });
+    });
+  });
+
   describe("handlePost", () => {
     it("should reject requests without PAT", async () => {
       const req = {
