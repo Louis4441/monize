@@ -1053,3 +1053,97 @@ there with their enforcement status).
   equal (`notification-preferences.contract.test.ts`), now over four channels.
 - The matrix's `unifiedpush` column gates on `>= 1` live UnifiedPush
   subscription, the same shape as the push column's device gating.
+
+---
+
+## 16. Maintainer decisions resolving #1291 open questions (2026-09)
+
+Section 12 recorded autonomous defaults with the caveat that a human confirms
+them before shipping to users. The maintainer has now answered the #1291 "Open
+questions" directly, so each item below is a **confirmed decision, not an AI
+default**. Where an answer expands scope beyond PR #1304 it is marked **NEW** --
+a follow-on surface or producer, with its spec obligation named.
+
+### 16.1 Product
+
+- **MVP notification types** -- every type the app supports today, plus others as
+  they make sense. PR #1304 ships the three live categories (`PAYMENTS`,
+  `BUDGETS`, `SYSTEM`); further types arrive each with its producer (Section 3).
+- **Successful auto-backups** -- no notification; failures only. Done
+  (`BACKUP_FAILED` is the only backup type).
+- **Security notifications mandatory?** -- no, opt-in. Confirms D6.
+- **History expiry** -- automatic. Done (`purgeOld`).
+- **User-configurable balance thresholds** -- yes. **NEW**: a `balances` producer
+  with per-account user thresholds. Financial, so it starts from its own spec
+  (Section 16.4).
+- **Investment / portfolio-movement alerts** -- maintainer's choice, "could be
+  useful". **NEW / optional**: an `investments`/portfolio producer. Financial,
+  its own spec (Section 16.4).
+- **Default push-content detail** -- no preference. Keep the privacy-first
+  category copy already shipped (Section 14 and "Privacy of the wire"): the wire
+  carries the category's generic copy, never an amount or a payee.
+
+### 16.2 UX
+
+- **Opening a notification marks it read** -- yes. (Verify the bell marks-on-open;
+  `markRead` exists.)
+- **"Mark all as read"** -- yes. Done (`PATCH /notifications/read-all`).
+- **Bell shows all unread**, not only important -- yes. Done.
+- **Push / notification configuration on a DEDICATED Notifications page**, not in
+  general Settings -- **NEW**: today the device and diagnostics panels
+  (`PushDevicesPanel`, `PushDiagnostics`) sit under `/settings`; they move to a
+  dedicated notifications surface.
+- **Per-device push disable while enabled elsewhere** -- yes. **NEW (small)**:
+  today `DELETE /push/subscriptions/:id` removes a subscription entirely; add a
+  disable toggle so a device is silenced without having to re-subscribe.
+
+### 16.3 Architecture
+
+- **VAPID keys persisted in the database** -- yes. Done (`push_instance_config`,
+  private half encrypted under `ENCRYPTION_KEY`).
+- **VAPID rotation** -- a sensible default: admin-triggered rotation that disables
+  stale subscriptions. Done (`rotateKeyPair`).
+- **Notification history in backup/restore** -- yes. Done.
+- **Push subscriptions in portable backups** -- included, not excluded. Done
+  (`export-table-queries.ts`). Caveat: `push_instance_config` carries the
+  encrypted VAPID private key, an instance secret rather than user data; its
+  backup lifecycle rides `ENCRYPTION_KEY` and is noted here so a future review
+  revisits it deliberately.
+- **Restored / cloned-environment push safety** -- don't bother; a developer edge
+  case. Confirms the Section 1 non-goal.
+- **Durable scheduler** -- implementer's choice. Done (a per-minute cron claiming
+  due rows through `FOR UPDATE SKIP LOCKED`, Section 13.2).
+- **Transaction -> event integrity** -- if the transaction that drives an event is
+  deleted, the event goes too. **NEW**: a notification or reminder whose subject
+  is a specific transaction is removed when that transaction is deleted. Needs a
+  bounded design (Section 16.4): which producers tie a row to a transaction id,
+  and delete-vs-null per row.
+- **Async localization** -- the recipient's chosen language. Done for the push
+  body and the email frame; the immediate-email body is producer-composed English
+  today (PR #1304 open item 2, spec Section 14).
+
+### 16.4 What still needs a spec before code
+
+Three of the decisions above are follow-on features that the repository's own
+rule keeps behind a short approved spec (invariants, state-transition truth
+table, missing-data policy, numeric examples, test matrix), committed before the
+implementation it guides:
+
+1. **Balance-threshold notifications** (`balances`) -- financial.
+2. **Portfolio-movement notifications** (`investments`) -- financial, optional.
+3. **Transaction-deletion cascade** -- not itself a calculation, but it changes
+   what a delete reverses, so it is specified with the producers whose rows it
+   removes rather than bolted on.
+
+The core invariant #1291 already fixes for all three producers: a producer fires
+on a threshold **crossing** (79% -> 81% fires the 80% warning; 81% -> 82% -> 83%
+does not), never on mere observation of the current state. The as-is budget
+producer is the pattern to follow.
+
+### 16.5 Notes carried into the design
+
+- Scheduled-transaction reminders use each bill/deposit's own
+  `reminder_days_before`. Done (`reminderWindowThrough(todayStr,
+  bill.reminderDaysBefore)`).
+- The bell's filter by **severity** and by **type** (financial vs system) is
+  preserved and must not regress (`NotificationBell`, `NotificationList`).
