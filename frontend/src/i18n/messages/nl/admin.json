@@ -104,5 +104,70 @@
       "tempPasswordDescCreated": "Er is een tijdelijk wachtwoord gegenereerd voor {name}. Deel dit met hen om in te loggen.",
       "tempPasswordDescUpgraded": "Een bestaande gedeelde gebruiker is omgezet naar een volledig account. Deel dit tijdelijke wachtwoord met {name}."
     }
+  },
+  "notificationsPage": {
+    "title": "Meldingen",
+    "subtitle": "Bezorgkanalen die deze Monize-instantie biedt, en de push-identiteit erachter.",
+    "loading": "Meldingsinstellingen laden...",
+    "loadUnavailable": "Monize kon de meldingsinstellingen niet van de server lezen. Herlaad de pagina om het opnieuw te proberen.",
+    "channelsHeading": "Bezorgkanalen",
+    "identityHeading": "Web Push-identiteit",
+    "perAccountNote": "Apparaten, testmeldingen en meldingsvoorkeuren horen bij elk account en worden beheerd in Instellingen. Een beheerder configureert de instantie en verstuurt of ziet nooit de meldingen van iemand anders.",
+    "channelState": {
+      "on": "Aan",
+      "off": "Uit",
+      "unconfigured": "Niet beschikbaar",
+      "unknown": "Onbekend"
+    },
+    "channels": {
+      "inApp": {
+        "name": "Meldingen in de app",
+        "description": "De bel in de kopregel. Altijd beschikbaar en niet uit te schakelen: hier blijft een melding staan, ook als elk ander kanaal faalt."
+      },
+      "webPush": {
+        "name": "Browserpush",
+        "description": "Meldingen op telefoon of desktop, ook als Monize gesloten is. Vereist geen Firebase, Google Play- of Apple Developer-account.",
+        "toggleLabel": "Browserpush inschakelen voor deze instantie",
+        "missingKeys": "Deze instantie heeft geen pushsleutelpaar. Stel ENCRYPTION_KEY in en start opnieuw: Monize genereert het paar bij de volgende start zelf.",
+        "keyUnreadable": "Deze instantie kan haar opgeslagen pushsleutelpaar niet ontsleutelen, dus er wordt niets bezorgd. Vervang het sleutelpaar hieronder om te herstellen.",
+        "serverKeyMissing": "Deze instantie heeft geen ENCRYPTION_KEY en kan het opgeslagen push-sleutelpaar dus niet openen. Stel ENCRYPTION_KEY in de deployment in en start opnieuw op — roteren helpt niet zolang de sleutel ontbreekt."
+      },
+      "email": {
+        "name": "E-mail",
+        "description": "Factuurherinneringen, budgetsamenvattingen en systeemwaarschuwingen naar het e-mailadres van elk account.",
+        "missingSmtp": "Er is geen mailserver geconfigureerd. Stel de SMTP-omgevingsvariabelen in om e-mail in te schakelen.",
+        "statusUnavailable": "Monize kon de status van de mailserver niet lezen."
+      },
+      "ntfy": {
+        "name": "ntfy en UnifiedPush",
+        "description": "Dezelfde versleutelde push, bezorgd via een zelf gehoste UnifiedPush-distributor (ntfy, NextPush) in plaats van de infrastructuur van Google of Apple. Het kanaal deelt het push-sleutelpaar en de schakelaar van deze instantie; iedereen registreert het eigen endpoint vanuit de UnifiedPush-app en zet het kanaal aan in Instellingen.",
+        "followsWebPush": "Niet beschikbaar zolang browserpush uit staat of het sleutelpaar niet gebruikt kan worden — dit kanaal wordt met hetzelfde sleutelpaar bezorgd."
+      }
+    },
+    "identity": {
+      "fingerprintLabel": "Sleutelvingerafdruk",
+      "generatedLabel": "Gegenereerd",
+      "devicesLabel": "Geregistreerde apparaten",
+      "deviceCounts": "{live} actief, {disabled} stopgezet",
+      "rotateDescription": "Vervangen wisselt het sleutelpaar van deze instantie. Elk geregistreerd apparaat is daarna onbereikbaar en moet push opnieuw inschakelen; vervang dus alleen als de sleutel mogelijk is gelekt.",
+      "rotateButton": "Sleutelpaar vervangen",
+      "rotatingButton": "Vervangen...",
+      "missingEncryptionKey": "Deze instantie heeft geen pushsleutelpaar, omdat ENCRYPTION_KEY niet is ingesteld en de privésleutel onversleuteld opgeslagen zou moeten worden. Stel de variabele in en start opnieuw: Monize genereert het paar zelf.",
+      "keyUnreadable": "Deze instantie heeft een pushsleutelpaar dat ze niet meer kan ontsleutelen, dus er wordt niets bezorgd. Dat gebeurt als ENCRYPTION_KEY verandert bij een draaiende database, of als een back-up op een andere instantie wordt teruggezet. Vervang het sleutelpaar om te herstellen; elk apparaat registreert zich opnieuw.",
+      "serverKeyMissing": "Voor deze instantie is geen ENCRYPTION_KEY ingesteld, waardoor het opgeslagen push-sleutelpaar niet geopend kan worden. Roteren helpt niet zolang de sleutel ontbreekt: stel ENCRYPTION_KEY in de deployment in en start opnieuw op, dan werkt push weer met de bestaande apparaten."
+    },
+    "dialogs": {
+      "rotateTitle": "Pushsleutelpaar vervangen?",
+      "rotateMessage": "{count, plural, =0 {Er is nog geen apparaat geregistreerd, dus er gaat niets verloren.} one {Eén geregistreerd apparaat ontvangt geen meldingen meer totdat push in die browser opnieuw wordt ingeschakeld.} other {# geregistreerde apparaten ontvangen geen meldingen meer totdat push in elke browser opnieuw wordt ingeschakeld.}}",
+      "rotateConfirm": "Vervangen"
+    },
+    "toasts": {
+      "loadFailed": "Kon de meldingsinstellingen niet laden",
+      "pushEnabled": "Browserpush ingeschakeld voor deze instantie",
+      "pushDisabled": "Browserpush uitgeschakeld voor deze instantie",
+      "pushToggleFailed": "Kon de browserpush-instelling niet wijzigen",
+      "rotated": "{count, plural, =0 {Sleutelpaar vervangen} one {Sleutelpaar vervangen; 1 apparaat moet zich opnieuw registreren} other {Sleutelpaar vervangen; # apparaten moeten zich opnieuw registreren}}",
+      "rotateFailed": "Kon het sleutelpaar niet vervangen"
+    }
   }
 }

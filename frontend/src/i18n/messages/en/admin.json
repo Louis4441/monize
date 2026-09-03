@@ -104,5 +104,70 @@
       "tempPasswordDescCreated": "A temporary password was generated for {name}. Share it with them to sign in.",
       "tempPasswordDescUpgraded": "An existing shared user was upgraded to a full account. Share this temporary password with {name}."
     }
+  },
+  "notificationsPage": {
+    "title": "Notifications",
+    "subtitle": "Delivery channels this Monize instance offers, and the push identity behind them.",
+    "loading": "Loading notification settings...",
+    "loadUnavailable": "Monize could not read the notification settings from the server. Reload the page to try again.",
+    "channelsHeading": "Delivery channels",
+    "identityHeading": "Web Push identity",
+    "perAccountNote": "Devices, test notifications and per-notification preferences belong to each account and are managed in Settings. An administrator configures the instance and never sends to, or sees, another person’s notifications.",
+    "channelState": {
+      "on": "On",
+      "off": "Off",
+      "unconfigured": "Unavailable",
+      "unknown": "Unknown"
+    },
+    "channels": {
+      "inApp": {
+        "name": "In-app notifications",
+        "description": "The bell in the header. Always available and cannot be switched off: it is where a notification lives even when every other channel fails."
+      },
+      "webPush": {
+        "name": "Browser push",
+        "description": "Notifications delivered to a phone or desktop even when Monize is closed. Needs no Firebase, Google Play or Apple Developer account.",
+        "toggleLabel": "Enable browser push for this instance",
+        "missingKeys": "This instance has no push key pair. Set ENCRYPTION_KEY and restart: Monize generates the pair itself on the next start.",
+        "keyUnreadable": "This instance cannot decrypt its stored push key pair, so nothing can be delivered. Rotate the key pair below to recover.",
+        "serverKeyMissing": "This instance has no ENCRYPTION_KEY, so it cannot open the push key pair it stored. Set ENCRYPTION_KEY in the deployment and restart — rotating cannot help while the key is missing."
+      },
+      "email": {
+        "name": "Email",
+        "description": "Bill reminders, budget digests and system alerts sent to each account’s email address.",
+        "missingSmtp": "No mail server is configured. Set the SMTP environment variables to enable email.",
+        "statusUnavailable": "Monize could not read the mail server status."
+      },
+      "ntfy": {
+        "name": "ntfy and UnifiedPush",
+        "description": "The same encrypted push, delivered to a self-hosted UnifiedPush distributor (ntfy, NextPush) instead of Google or Apple infrastructure. It shares this instance’s push key pair and switch; each person registers their endpoint from their UnifiedPush app and turns the channel on in Settings.",
+        "followsWebPush": "Unavailable while browser push is off or its key pair cannot be used — this channel is delivered with the same key pair."
+      }
+    },
+    "identity": {
+      "fingerprintLabel": "Key fingerprint",
+      "generatedLabel": "Generated",
+      "devicesLabel": "Registered devices",
+      "deviceCounts": "{live} active, {disabled} retired",
+      "rotateDescription": "Rotating replaces this instance’s key pair. Every registered device stops being reachable and has to turn push on again, so rotate only if the key may have been exposed.",
+      "rotateButton": "Rotate key pair",
+      "rotatingButton": "Rotating...",
+      "missingEncryptionKey": "This instance has no push key pair, because ENCRYPTION_KEY is not set and the private key would have to be stored unencrypted. Set it and restart: Monize generates the pair itself.",
+      "keyUnreadable": "This instance holds a push key pair it can no longer decrypt, so nothing can be delivered. It happens when ENCRYPTION_KEY changes under a live database, or when a backup is restored onto a different instance. Rotate the key pair to recover; every device will register again.",
+      "serverKeyMissing": "This instance has no ENCRYPTION_KEY set, so it cannot open the push key pair it stored. Rotating will not help while the key is missing: set ENCRYPTION_KEY in the deployment and restart, and push works again with the existing devices."
+    },
+    "dialogs": {
+      "rotateTitle": "Rotate the push key pair?",
+      "rotateMessage": "{count, plural, =0 {No device is registered yet, so nothing is lost.} one {One registered device will stop receiving notifications until someone turns push back on in that browser.} other {# registered devices will stop receiving notifications until someone turns push back on in each browser.}}",
+      "rotateConfirm": "Rotate"
+    },
+    "toasts": {
+      "loadFailed": "Could not load notification settings",
+      "pushEnabled": "Browser push enabled for this instance",
+      "pushDisabled": "Browser push disabled for this instance",
+      "pushToggleFailed": "Could not change the browser push setting",
+      "rotated": "{count, plural, =0 {Key pair rotated} one {Key pair rotated; 1 device must register again} other {Key pair rotated; # devices must register again}}",
+      "rotateFailed": "Could not rotate the key pair"
+    }
   }
 }

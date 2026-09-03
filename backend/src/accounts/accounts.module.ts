@@ -27,6 +27,7 @@ import { NotificationsModule } from "../notifications/notifications.module";
 import { DelegationModule } from "../delegation/delegation.module";
 import { LoanRateChangesModule } from "../loan-rate-changes/loan-rate-changes.module";
 import { CurrenciesModule } from "../currencies/currencies.module";
+import { NotificationCenterModule } from "../notification-center/notification-center.module";
 
 @Module({
   imports: [
@@ -54,6 +55,10 @@ import { CurrenciesModule } from "../currencies/currencies.module";
     forwardRef(() => DelegationModule),
     forwardRef(() => LoanRateChangesModule),
     forwardRef(() => CurrenciesModule),
+    // For NotificationPreferenceService: the mortgage renewal reminder gates
+    // its email on the PAYMENTS channel matrix. No forwardRef --
+    // NotificationCenterModule depends on nothing but the connection.
+    NotificationCenterModule,
   ],
   providers: [
     AccountsService,

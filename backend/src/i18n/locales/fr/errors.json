@@ -214,7 +214,6 @@
     "categoryNotFound": "Catégorie avec l'ID {{ id }} introuvable",
     "categoryAlreadyInBudget": "Cette catégorie est déjà dans le budget",
     "budgetCategoryNotFound": "Catégorie de budget avec l'ID {{ id }} introuvable",
-    "alertNotFound": "Alerte avec l'ID {{ id }} introuvable",
     "periodNotFound": "Période de budget avec l'ID {{ id }} introuvable",
     "noOpenPeriod": "Aucune période ouverte à clôturer",
     "categoryIdsNotOwned": "IDs de catégorie introuvables ou n'appartenant pas à l'utilisateur : {{ ids }}"
@@ -338,8 +337,23 @@
     "invalidGranularity": "granularity doit être 'daily' ou 'monthly'"
   },
   "notifications": {
+    "notFound": "Notification avec l'ID {{ id }} introuvable",
     "smtpNotConfigured": "SMTP n'est pas configuré. Définissez les variables d'environnement SMTP.",
-    "noEmailOnFile": "Aucune adresse e-mail enregistrée pour cet utilisateur."
+    "noEmailOnFile": "Aucune adresse e-mail enregistrée pour cet utilisateur.",
+    "categoryNotConfigurable": "La catégorie {{ category }} n'est pas configurable ici",
+    "emptyPreferenceUpdate": "Au moins un champ de préférence est requis",
+    "tooManyReminders": "Vous pouvez avoir au maximum {{ max }} rappels actifs. Arrêtez-en un avant d'en ajouter un autre.",
+    "reminderOnReminder": "Un rappel ne peut pas être défini sur la notification d'un rappel. Définissez-le sur la notification d'origine."
+  },
+  "push": {
+    "channelUnavailable": "Les notifications push ne sont pas disponibles sur cette instance Monize.",
+    "endpointClaimed": "Ce navigateur est déjà associé à un autre compte Monize. Déconnectez-vous de ce compte dans ce navigateur puis réessayez.",
+    "deviceNotFound": "Appareil push introuvable.",
+    "noDevices": "Aucun appareil push n'est enregistré pour ce compte. Activez d'abord les notifications push dans ce navigateur.",
+    "rotationUnavailable": "ENCRYPTION_KEY n'est pas définie : la nouvelle clé privée n'a pas pu être stockée chiffrée. Définissez-la et redémarrez avant d'effectuer une rotation.",
+    "channelNotConfigured": "Cette instance n'a pas encore de paire de clés push : le canal de push du navigateur ne peut être ni activé ni désactivé.",
+    "keyRotated": "Cette instance a changé sa clé push pendant que vous étiez sur cette page. Rechargez puis réactivez le push.",
+    "tooManyDevices": "Ce compte a déjà atteint le nombre maximal d'appareils push. Supprimez-en un avant d'en ajouter un autre."
   },
   "institutions": {
     "nameConflict": "Un établissement avec le nom « {{ name }} » existe déjà",

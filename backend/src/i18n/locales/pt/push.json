@@ -1,0 +1,23 @@
+{
+  "test": {
+    "title": "Notificação de teste do Monize",
+    "body": "As notificações push funcionam neste dispositivo."
+  },
+  "notification": {
+    "payments": {
+      "title": "Lembrete de pagamento",
+      "body": "Uma fatura ou um pagamento agendado precisa da sua atenção. Abra o Monize para ver os detalhes."
+    },
+    "budgets": {
+      "title": "Alerta de orçamento",
+      "body": "Um dos seus orçamentos precisa da sua atenção. Abra o Monize para ver os detalhes."
+    },
+    "system": {
+      "title": "Aviso do sistema",
+      "body": "O Monize tem um aviso do sistema para si. Abra a aplicação para ver os detalhes."
+    }
+  },
+  "actions": {
+    "stopReminder": "Parar lembretes"
+  }
+}

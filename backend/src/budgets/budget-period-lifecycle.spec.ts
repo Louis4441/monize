@@ -4,6 +4,7 @@ import { ConfigService } from "@nestjs/config";
 import { DataSource } from "typeorm";
 import { BudgetPeriodService } from "./budget-period.service";
 import { BudgetPeriodCronService } from "./budget-period-cron.service";
+import { NotificationPreferenceService } from "../notification-center/notification-preference.service";
 import { BudgetReportsService } from "./budget-reports.service";
 import { BudgetsService } from "./budgets.service";
 import { Budget, BudgetType, BudgetStrategy } from "./entities/budget.entity";
@@ -287,6 +288,11 @@ describe("Budget Period Lifecycle Integration", () => {
             translate: (key: string, opts?: { defaultValue?: string }) =>
               opts?.defaultValue ?? key,
           },
+        },
+        {
+          // The monthly summary email is gated by the BUDGETS channel matrix.
+          provide: NotificationPreferenceService,
+          useValue: { resolveEmail: jest.fn().mockResolvedValue(true) },
         },
       ],
     }).compile();

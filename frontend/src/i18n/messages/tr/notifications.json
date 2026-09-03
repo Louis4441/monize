@@ -1,0 +1,88 @@
+{
+  "title": "Bildirimler",
+  "unread": "{count} okunmamış",
+  "markAllRead": "Tümünü okundu işaretle",
+  "loading": "Bildirimler yükleniyor...",
+  "empty": "Bildirim yok",
+  "undo": "Geri Al",
+  "buttonTitle": "Bildirimler",
+  "buttonAriaLabel": "Bildirimler",
+  "dismissAriaLabel": "Bildirimi kapat",
+  "closeAriaLabel": "Bildirimleri kapat",
+  "emptyFiltered": "Geçerli filtreyle eşleşen bildirim yok",
+  "deleteAll": "Tümünü sil",
+  "deleteAllConfirmTitle": "Bildirimleri sil",
+  "deleteAllConfirmMessageAll": "Tüm bildirimler silinsin mi? Bu işlem geri alınamaz.",
+  "deleteAllConfirmMessageFiltered": "Gösterilmeyenler dahil, geçerli filtreyle eşleşen tüm bildirimler silinsin mi? Bu işlem geri alınamaz.",
+  "deleted": "{count, plural, other {# bildirim silindi}}",
+  "deleteFailed": "Bildirimler silinemedi",
+  "filter": {
+    "financial": "Finansal",
+    "system": "Sistem"
+  },
+  "severity": {
+    "critical": "Kritik",
+    "warning": "Uyarı",
+    "success": "İyi Haber",
+    "info": "Bilgi"
+  },
+  "reminder": {
+    "remindAriaLabel": "Bunu bana hatırlat",
+    "stopAriaLabel": "Bu hatırlatıcıyı durdur",
+    "stopped": "Hatırlatıcı durduruldu",
+    "stopFailed": "Hatırlatıcı durdurulamadı",
+    "created": "Hatırlatıcı ayarlandı",
+    "createFailed": "Hatırlatıcı ayarlanamadı",
+    "dialogTitle": "Bana hatırlat",
+    "dialogDescription": "Harekete geçene kadar bu bildirimi daha sonra tekrar al.",
+    "modeLabel": "Ne sıklıkla",
+    "modeRepeat": "Ben durdurana kadar tekrarla",
+    "modeOnce": "Sadece bir kez daha",
+    "intervalLabelRepeat": "Bana hatırlat, her",
+    "intervalLabelOnce": "Şu süre sonra hatırlat",
+    "durationMinutes": "{minutes, plural, one {# dakika} other {# dakika}}",
+    "durationHours": "{hours, plural, one {# saat} other {# saat}}",
+    "cancel": "İptal",
+    "confirm": "Hatırlatıcı ayarla"
+  },
+  "billDue": {
+    "titleOverdue": "{payee} gecikmiş",
+    "titleToday": "{payee} bugün ödenecek",
+    "titleTomorrow": "{payee} yarın ödenecek",
+    "titleInDays": "{payee} {days} gün içinde ödenecek",
+    "amountDue": "{date} tarihinde {amount} ödenecek",
+    "amountUnavailable": "Tutar kullanılamıyor (güncel döviz kuru yok), {date} tarihinde ödenecek"
+  },
+  "system": {
+    "backupFailed": {
+      "title": "Otomatik yedekleme başarısız oldu",
+      "message": "{user} için otomatik yedekleme başarısız oldu: {error}"
+    },
+    "backupPartial": {
+      "title": "Otomatik yedekleme eksik",
+      "messageAttachments": "{user} için yedek yazıldı, ancak {expected} ekten {missing} tanesi dahil edilemedi ve {inconsistent} tanesi meta verileriyle eşleşmedi. Tam yedekler korundu.",
+      "messagePromotion": "{user} için günlük yedekleme başarılı oldu, ancak haftalık veya aylık kopyası yazılamadı: {error}",
+      "messageRetention": "{user} için yedekleme başarılı oldu, ancak eski yedek dosyaları temizlenemedi: {error}"
+    },
+    "encryptionKeyMissing": {
+      "title": "Şifreleme anahtarı yapılandırılmamış",
+      "message": "ENCRYPTION_KEY ayarlanmadığından yedekler şifrelenmeden yazılıyor ve gizli bilgiler saklanamıyor. Gelecek bir sürüm bu anahtar olmadan başlamayacak."
+    },
+    "smtpFailure": {
+      "title": "E-posta gönderimi başarısız oluyor",
+      "message": "Monize e-posta gönderemedi: {error}. Bildirimler ve hatırlatıcılar iletilemiyor."
+    },
+    "providerOutage": {
+      "title": "{provider} yanıt vermiyor",
+      "message": "{provider} kaynaklı piyasa verilerine ulaşılamıyor. Sağlayıcı yeniden yanıt verene kadar fiyatlar ve endeks verileri güncel olmayabilir."
+    },
+    "providerRecovered": {
+      "title": "{provider} yeniden yanıt veriyor",
+      "message": "Kesinti sona erdi ve {provider} kaynaklı piyasa verileri yeniden güncelleniyor."
+    },
+    "scheduledPostFailed": {
+      "title": "{name} kaydedilemedi",
+      "message": "Vadesi {date} olan planlı işleminiz otomatik olarak kaydedilmedi: {error}. Faturalar ve Mevduatlar bölümünden elle kaydedebilirsiniz."
+    }
+  }
+}

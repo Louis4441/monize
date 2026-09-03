@@ -270,6 +270,100 @@ Seven rules, each with a test in `payee-contact-enrichment.service.spec.ts`, `co
 - **A lookup never fails a create, and it runs after the commit.** `PayeesService.create` dispatches the background enrichment only when the row carries no contact detail, the preview did not already look up, and `getActiveScopedManager()` is undefined -- "the callback resolved" only means "committed" when nobody upstream opened a transaction we joined, and a dispatch inside one would look for a row nobody else can see. The dispatch runs under `withUserContext` on the request's tail and logs its failure.
 - **The preview looks up so the card and the commit agree.** A single AI/MCP `create_payee` preview with no contact details runs the lookup (`previewCreate(..., { lookupContact: true })`) and hands its stamp down the descriptor to `create(..., { contactLookup })`, which stores that provenance instead of looking up again. Batch rows are enriched after they commit instead -- 25 model calls inside one chat turn is the wrong latency budget -- and both tool descriptions say so.
 
+## A business feature asks for a notification; it never imports a transport
+
+`WebPushSender` (`src/push/web-push-sender.service.ts`) is the only file in
+`src/` that imports `web-push` or calls `sendNotification`, and
+`push-secret.guard.spec.ts` fails on a second one. Budgets, bills, backups and
+imports call the notification layer and let it decide the wire -- which is how
+UnifiedPush arrived (`docs/specs/notification-preferences.md` section 15) without
+any of them changing: a UnifiedPush subscription is a Web Push subscription
+whose endpoint is a distributor, tagged `transport = 'unifiedpush'` and gated by
+its own matrix channel, delivered by the same sender (discussion #1291,
+"delivery isolation"). The VAPID private key follows from the
+same boundary: it is read only by `PushConfigService`, handed only to the sender,
+and no response shape in `src/push/` declares a private field. See INV-PUSH-001
+through INV-PUSH-005.
+
+Two consequences that are easy to get backwards. **A push endpoint is a URL the
+server will make an outbound request to**, so it is validated with
+`IsPushEndpoint`, which reuses the AI provider's safety check and adds an https
+floor -- never a bare `@IsUrl()`. That check resolves the host, and
+`dns.resolve4`/`resolve6` carry no timeout of their own, so the lookup is bounded
+INSIDE the check itself (`resolveBothFamilies` in
+`src/ai/validators/safe-url.validator.ts`) and every caller is covered without
+asking: the AI provider `baseUrl` validators and the startup check reach it
+through plain `validateUrlIsSafe`, and a resolver that never answers would hold
+whichever request asked -- a save, or a subscribe an authenticated caller may
+issue twenty times a minute. A timeout answers **false**, and specifically not
+"resolved to nothing": an empty answer is allowed (a name that resolves nowhere
+fails on its own), so a stall borrowing that answer would be an open door.
+`validateUrlIsSafeWithin` bounds the *whole* check and exists for the push
+sender, whose documented request worst case (`PUSH_TEST_WORST_CASE_MS`) has to
+name a budget it owns.
+
+And **a subscription belongs to a browser profile, not to a session**: the
+unique index is on `endpoint_hash` alone, so one endpoint has one owner -- and
+the second account subscribing in the same browser is *refused*, never allowed
+to take the row over. An endpoint is a string the caller supplied; deleting
+somebody else's row on the strength of it is a cross-tenant write no ownership
+check covers. The client answers the 409 by
+unsubscribing and subscribing again for a fresh endpoint, and logout releases
+the endpoint the same way (`releaseLocalPushSubscription`).
+
+## The notifications table has one writer
+
+`NotificationService.create` (`src/notification-center/notification.service.ts`)
+is the only place a notification row is written, and
+`notification-write-door.spec.ts` fails on a second one. A producer decides
+*what* to say; the row's shape is not its decision. There were three writers
+with three opinions -- a raw `INSERT` for budget alerts with its own conflict
+target and no title bound, an entity `save` for bill reminders with no conflict
+handling at all, and a second raw `INSERT` for system alerts with its own
+truncation helpers -- so every rule the row must obey held on one path and not
+the others.
+
+Two consequences worth knowing before you add a producer. The insert is
+`ON CONFLICT DO NOTHING` with **no conflict target**, which covers both unique
+indexes at once (the fingerprint for a budget notification, the dedupe key for a
+system one) -- a producer does not know which applies to it, and does not have
+to; `null` back means somebody else holds this notification, so it is not yours
+to email about, and that is the normal case rather than an error. And **reads
+are deliberately not centralized**: a producer's own de-duplication query is
+about its candidates, not about the reader's list.
+
+`category` is derived (`notificationCategoryOf`), never stored -- see migration
+179's header for why, and `notification-category.spec.ts` asserts the column's
+absence against `schema.sql`.
+
+**What a push notification COLLAPSES onto is the producer's decision, and the
+type is not the subject.** The browser replaces a shown notification whose `tag`
+matches, so `PushPayload.collapseKey` is a required field: `null` means "this
+type is one subject" (a test send, "email delivery is failing"), and a value
+names the subject. Deliberately not derived from `target` -- the bill producer
+sends every reminder to `/bills`, because there is no per-bill page, so a tag
+built from the route collapsed exactly the case it had to separate: two bills due
+on the same day, one of them shown and the other silently replaced. It carries an
+id, never a name or an amount: the payload is encrypted to the device, but a
+collapse key is metadata. The dispatch derives it in this order: a producer's
+`NotifyOptions.collapseKey` (the admin fan-out passes its `emailDedupeKey`, so
+sixty rows about one full disk are one notification on the phone), then the
+reminder id of a re-emitted nag (`rem:<id>` -- its per-fire dedupe key differs
+every fire), then the row's dedupe key, then its id.
+
+The HTTP surface lives in its own module (`notification-api.module.ts`) because
+it is the one part that needs a producer: bill reminders are materialized when
+the list is read. Put that edge on `NotificationCenterModule` and every producer
+of a notification lands on a require cycle with budgets.
+
+## Copy composed outside a request is rendered in the recipient's locale
+
+`emailTranslator(i18n, lang)` with `resolveUserEmailLocale` is not email-only
+despite the names: a Web Push body is composed on the server, in a cron or a
+background write with no request locale to inherit, so it resolves the
+recipient's stored `user_preferences.language` exactly as an email does. Reuse
+those two; a second locale resolver is how the answers drift.
+
 ## Rejection happens before the write
 
 A check capable of refusing a command belongs inside the transaction that performs it, and under the same lock where concurrency is in play. A service that mutates, commits, and returns a success-shaped value for a caller to reject afterwards has already done the thing the `409` says it did not do.
@@ -392,7 +486,7 @@ Changing what a service computes and seeing every test pass means the change is 
 
 ## Internationalization (i18n)
 
-Server-rendered strings (exception messages, email copy) are localized via `nestjs-i18n`. Wrap exception messages in `tr(key, fallback, args)` (`src/i18n/translate.ts`), which resolves against the request locale and returns the English `fallback` outside an HTTP context. Render emails with `emailTranslator(i18n, recipientLang)` (`src/i18n/email-translator.ts`) so copy matches the recipient's stored locale. Catalogs live in `src/i18n/locales/{locale}/*.json`; the authoritative locale list is `SUPPORTED_LOCALE_CODES` in `src/i18n/config.ts` (root `CLAUDE.md` enumerates them) -- keep in sync with the frontend's. The `en-*` entries are lean regional variants (`LOCALE_BASES`), falling back to `en` per key. Adding or changing a string means updating every locale (`src/i18n/locales.parity.spec.ts` fails otherwise), then `npm run i18n:pseudo`. Full flow: `src/i18n/README.md`.
+Server-rendered strings (exception messages, email copy) are localized via `nestjs-i18n`. Wrap exception messages in `tr(key, fallback, args)` (`src/i18n/translate.ts`), which resolves against the request locale and returns the English `fallback` outside an HTTP context. Render anything addressed to a person and composed outside a request -- emails, and a Web Push body -- with `emailTranslator(i18n, recipientLang)` (`src/i18n/email-translator.ts`) so copy matches the recipient's stored locale. Catalogs live in `src/i18n/locales/{locale}/*.json`; the authoritative locale list is `SUPPORTED_LOCALE_CODES` in `src/i18n/config.ts` (root `CLAUDE.md` enumerates them) -- keep in sync with the frontend's. The `en-*` entries are lean regional variants (`LOCALE_BASES`), falling back to `en` per key. Adding or changing a string means updating every locale (`src/i18n/locales.parity.spec.ts` fails otherwise), then `npm run i18n:pseudo`. Full flow: `src/i18n/README.md`.
 
 ## Every line in the log has the same shape
 

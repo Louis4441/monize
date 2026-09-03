@@ -1,0 +1,23 @@
+{
+  "test": {
+    "title": "Monize-testmelding",
+    "body": "Pushmeldingen werken op dit apparaat."
+  },
+  "notification": {
+    "payments": {
+      "title": "Betalingsherinnering",
+      "body": "Een rekening of geplande betaling vraagt uw aandacht. Open Monize voor de details."
+    },
+    "budgets": {
+      "title": "Budgetwaarschuwing",
+      "body": "Een van uw budgetten vraagt uw aandacht. Open Monize voor de details."
+    },
+    "system": {
+      "title": "Systeemmelding",
+      "body": "Monize heeft een systeemmelding voor u. Open de app voor de details."
+    }
+  },
+  "actions": {
+    "stopReminder": "Herinneringen stoppen"
+  }
+}

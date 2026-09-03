@@ -177,7 +177,7 @@ export interface BackupData {
   budget_categories: Record<string, unknown>[];
   budget_periods: Record<string, unknown>[];
   budget_period_categories: Record<string, unknown>[];
-  budget_alerts: Record<string, unknown>[];
+  notifications: Record<string, unknown>[];
   custom_reports: Record<string, unknown>[];
   investment_reports: Record<string, unknown>[];
   import_column_mappings: Record<string, unknown>[];
@@ -202,4 +202,81 @@ export type BackupTables = Record<
 /** `data` viewed as plain table -> rows, without an `as unknown as` at each site. */
 export function backupTables(data: BackupData): BackupTables {
   return data as unknown as BackupTables;
+}
+
+/**
+ * Tables that used to be exported under a different name, as
+ * `currentName -> the names older artifacts wrote it under`.
+ *
+ * A backup keys its tables by SQL table name, so renaming a table renames the
+ * key every artifact written before the rename does *not* carry. Nothing about
+ * that is loud: `insertRows` is handed `undefined` for the new key, restores
+ * zero rows, and reports zero -- a silent data loss inside an operation whose
+ * whole promise is that nothing is lost. The version cannot carry the fix
+ * either: `validateBackupFormat` compares it for equality, so bumping it would
+ * reject every existing artifact instead of reading one.
+ *
+ * `budget_alerts` became `notifications` in migration 179.
+ */
+export const LEGACY_TABLE_KEYS: Readonly<Record<string, readonly string[]>> = {
+  notifications: ["budget_alerts"],
+};
+
+/**
+ * Move any legacy table key onto the name the rest of the restore uses, in
+ * place, and report which ones moved.
+ *
+ * Called once, on the parsed artifact, before anything else looks at it -- id
+ * remapping, attachment staging, currency pre-creation and the insert loop all
+ * walk the document by table name, and a rule applied at only one of them is a
+ * rule that holds for one of them. An artifact carrying both names keeps the
+ * current one: it was written by an instance that already knew the new name.
+ *
+ * That decision DISCARDS the legacy rows, so it is reported rather than made
+ * silently -- an artifact holding 40 `budget_alerts` beside an empty
+ * `notifications` restored as a success with nothing said about the 40. A count
+ * of rows that did not come back never belongs only in a comment; the caller
+ * logs it, for the same reason `skippedAttachments` is its own field.
+ */
+export interface LegacyTableRename {
+  /** `legacy -> current`, for the log line. */
+  readonly renamed: string[];
+  /** Legacy tables whose rows were dropped because the current name won. */
+  readonly discarded: { table: string; supersededBy: string; rows: number }[];
+}
+
+export function renameLegacyTableKeys(
+  data: BackupData,
+): LegacyTableRename & { data: BackupData } {
+  const renamed: string[] = [];
+  const discarded: LegacyTableRename["discarded"] = [];
+  // Built as a new object, never by deleting keys on the caller's document
+  // ("immutability always"): the caller keeps the parsed artifact it was handed
+  // and continues with the returned one, so nothing changes shape under it.
+  let tables: BackupTables = { ...backupTables(data) };
+  for (const [current, legacyNames] of Object.entries(LEGACY_TABLE_KEYS)) {
+    for (const legacy of legacyNames) {
+      if (!(legacy in tables)) continue;
+      const { [legacy]: rows, ...withoutLegacy } = tables;
+      tables = withoutLegacy;
+      // Only a row array is moved. A malformed artifact carrying a scalar or an
+      // object under the legacy key would otherwise arrive under the current
+      // one, turning an absent table (which every later phase handles) into a
+      // present malformed one.
+      if (!Array.isArray(rows)) continue;
+      if (tables[current] !== undefined) {
+        if (rows.length > 0) {
+          discarded.push({
+            table: legacy,
+            supersededBy: current,
+            rows: rows.length,
+          });
+        }
+        continue;
+      }
+      tables = { ...tables, [current]: rows };
+      renamed.push(`${legacy} -> ${current}`);
+    }
+  }
+  return { data: tables as unknown as BackupData, renamed, discarded };
 }

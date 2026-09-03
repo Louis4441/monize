@@ -234,6 +234,115 @@
       "digestUpdateFailed": "Không thể cập nhật tùy chọn tóm tắt ngân sách",
       "digestDayFailed": "Không thể cập nhật ngày tóm tắt",
       "testEmailFailed": "Không thể gửi email thử nghiệm"
+    },
+    "push": {
+      "heading": "Đẩy từ trình duyệt",
+      "diagnostics": {
+        "summary": "Chẩn đoán thông báo",
+        "intro": "Những gì trình duyệt và thiết bị này báo cáo cho Monize về thông báo. Dùng nút kiểm tra để Monize tạo một thông báo mà bạn có thể tìm trên thiết bị, rồi Sao chép để gửi báo cáo đầy đủ.",
+        "refresh": "Làm mới",
+        "copy": "Sao chép báo cáo",
+        "copied": "Đã sao chép chẩn đoán vào bảng nhớ tạm",
+        "localTest": "Hiển thị thông báo thử",
+        "localTestRunning": "Đang kiểm tra…",
+        "localTestBody": "Nếu bạn thấy điều này, thông báo đang hoạt động trên thiết bị này.",
+        "localTestCreated": "Monize đã tạo một thông báo mà không có lỗi, nhưng không có gì ở đây xác nhận hệ thống đã hiển thị nó. Nếu bạn không thấy nó trên thiết bị, hệ thống đang ẩn nó; hãy bật thông báo của Monize trong cài đặt thiết bị.",
+        "localTestError": "Không thể chạy kiểm tra trên thiết bị này ({detail})."
+      },
+      "description": "Đăng ký thiết bị này để Monize có thể gửi tới nó ngay cả khi ứng dụng đã đóng. Hiện chỉ có thông báo thử nghiệm được gửi theo đường này; mọi thứ khác vẫn đến ở chuông.",
+      "androidNotify": "Trên Android, chỉ cấp quyền là chưa đủ: hệ thống vẫn có thể ẩn thông báo. Nhấn giữ biểu tượng Monize trên màn hình chính, chạm Thông tin ứng dụng, rồi Thông báo, và đảm bảo chúng đang bật.",
+      "permissionHint": "Khi bạn bật, trình duyệt sẽ xin quyền hiển thị thông báo. Không có gì được gửi trước khi bạn cho phép.",
+      "enableButton": "Bật trên thiết bị này",
+      "enablingButton": "Đang bật...",
+      "sendTestButton": "Gửi thông báo thử nghiệm",
+      "sendingTestButton": "Đang gửi...",
+      "removeButton": "Xóa",
+      "thisDevice": "Thiết bị này",
+      "unifiedpushBadge": "UnifiedPush",
+      "unnamedDevice": "Thiết bị chưa đặt tên",
+      "lastSeen": "Hoạt động lần cuối {when}",
+      "noLiveDevices": "Chưa có thiết bị nào được đăng ký. Hãy bật đẩy trên thiết bị này để gửi thử nghiệm.",
+      "notConfigured": "Đẩy từ trình duyệt không khả dụng trên phiên bản Monize này. Quản trị viên có thể bật trong khu vực Admin.",
+      "disabledByAdmin": "Quản trị viên đã tắt đẩy từ trình duyệt cho phiên bản Monize này.",
+      "keyUnreadable": "Monize không đọc được cặp khóa đẩy của phiên bản này nên không có gì được gửi đi. Quản trị viên có thể khôi phục bằng cách xoay cặp khóa trong khu vực Admin.",
+      "serverKeyMissing": "Phiên bản Monize này thiếu khóa mã hóa cần để mở cặp khóa push, nên không thể gửi được gì. Quản trị viên phải đặt khóa đó trong bản triển khai và khởi động lại.",
+      "statusUnavailable": "Monize không kiểm tra được đẩy từ trình duyệt có khả dụng hay không. Hãy tải lại trang để thử lại.",
+      "devicesUnavailable": "Monize không tải được các thiết bị đã đăng ký của bạn. Mọi thứ khác trên trang này vẫn hoạt động; hãy tải lại để thử lại.",
+      "unsupported": {
+        "unsupported": "Trình duyệt này không thể nhận thông báo đẩy.",
+        "denied": "Thông báo cho Monize đang bị chặn trong trình duyệt này. Hãy cho phép trong cài đặt trang web rồi tải lại trang.",
+        "ios-browser": "Trên iPhone và iPad, thông báo đẩy chỉ hoạt động sau khi cài Monize vào Màn hình chính. Chọn Chia sẻ, rồi Thêm vào Màn hình chính, và mở Monize từ đó."
+      },
+      "disabledReason": {
+        "GONE": "Không còn tiếp cận được. Hãy bật lại đẩy trong trình duyệt đó.",
+        "KEY_ROTATED": "Đã ngừng khi phiên bản này xoay cặp khóa đẩy. Hãy bật lại đẩy trong trình duyệt đó.",
+        "FAILING": "Đã ngừng sau nhiều lần gửi thất bại. Hãy bật lại đẩy trong trình duyệt đó."
+      },
+      "toasts": {
+        "enabled": "Đã bật thông báo đẩy trên thiết bị này",
+        "enableFailed": "Không thể bật thông báo đẩy",
+        "permissionDenied": "Trình duyệt này đang chặn thông báo của Monize. Hãy cho phép trong cài đặt trang web rồi thử lại.",
+        "permissionDeniedIos": "Thông báo đang bị chặn với Monize. Mở Cài đặt iOS, rồi Thông báo, rồi Monize để cho phép.",
+        "permissionDismissed": "Thông báo chưa được bật. Hãy chọn Cho phép khi trình duyệt hỏi.",
+        "permissionNoPrompt": "Thông báo chưa được bật và không có hộp thoại nào xuất hiện. Mở Cài đặt iOS, rồi Thông báo, rồi Monize, và cho phép ở đó. Nếu không thấy Monize trong danh sách, hãy xóa khỏi Màn hình chính, thêm lại (Chia sẻ, rồi Thêm vào Màn hình chính) và thử lần nữa.",
+        "removed": "Đã xóa thiết bị",
+        "removeFailed": "Không thể xóa thiết bị",
+        "testSent": "{count, plural, other {Đã gửi thông báo thử nghiệm tới # thiết bị}}",
+        "testPartial": "Thông báo thử nghiệm đã tới {delivered} trên {attempted} thiết bị",
+        "testFailed": "Không thể gửi thông báo thử nghiệm",
+        "pushServiceRefused": "Dịch vụ push của trình duyệt đã từ chối đăng ký. Hãy thử lại sau ít phút; nếu vẫn lỗi, kiểm tra cài đặt push của trình duyệt.",
+        "pushServiceRefusedBrave": "Brave chặn dịch vụ push theo mặc định. Trong Brave, mở Cài đặt, rồi Quyền riêng tư và bảo mật, bật \"Sử dụng dịch vụ của Google cho tin nhắn push\", khởi động lại trình duyệt và thử lại."
+      },
+      "testResults": {
+        "heading": "Lần thử gần nhất, theo thiết bị",
+        "status": {
+          "sent": "đã gửi tới dịch vụ push",
+          "expired": "đăng ký đã hết hạn; bật lại push trên thiết bị đó",
+          "transient": "chưa gửi được (lỗi tạm thời); thử lại",
+          "unconfigured": "phiên bản này hiện không thể ký tin nhắn push"
+        }
+      }
+    },
+    "preferences": {
+      "heading": "Cách thông báo cho tôi",
+      "description": "Chuông luôn hiển thị mọi thông báo. Chọn loại nào Monize cũng gửi qua email hoặc push, và tần suất.",
+      "categoryHeader": "Thông báo",
+      "channels": {
+        "inApp": "Trong ứng dụng",
+        "emailReport": "Email (báo cáo)",
+        "emailNotification": "Email (cảnh báo)",
+        "push": "Push",
+        "unifiedpush": "UnifiedPush"
+      },
+      "categories": {
+        "PAYMENTS": "Hóa đơn và đã lên lịch",
+        "BUDGETS": "Ngân sách",
+        "SYSTEM": "Cảnh báo hệ thống"
+      },
+      "inAppAlways": "Luôn hiển thị trong chuông",
+      "channelNotApplicable": "Không áp dụng cho loại thông báo này",
+      "emailToggleLabel": "Email báo cáo cho {category}",
+      "saveFailed": "Không thể lưu cài đặt đó",
+      "throttle": {
+        "label": "Giãn cách",
+        "ariaLabel": "Thời gian chờ cho {category}",
+        "hint": "Bỏ qua một cảnh báo hoặc push nếu một cái cùng nhóm đã gửi trong khoảng thời gian này.",
+        "options": {
+          "0": "Tắt",
+          "5": "5 phút",
+          "15": "15 phút",
+          "30": "30 phút",
+          "60": "1 giờ",
+          "360": "6 giờ",
+          "1440": "24 giờ"
+        }
+      },
+      "emailNotificationToggleLabel": "Email cảnh báo cho {category}",
+      "pushToggleLabel": "Push cho {category}",
+      "unifiedpushToggleLabel": "UnifiedPush cho {category}",
+      "emailUnavailable": "Bật thông báo qua email ở trên để gửi chúng qua email.",
+      "pushUnavailable": "Trước tiên hãy bật push trên thiết bị này (xem bên dưới).",
+      "unifiedpushUnavailable": "Đăng ký một endpoint UnifiedPush từ ứng dụng phân phối của bạn để sử dụng kênh này."
     }
   },
   "help": {

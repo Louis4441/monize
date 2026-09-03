@@ -234,6 +234,115 @@
       "digestUpdateFailed": "[XX-Failed to update budget digest preference-XX]",
       "digestDayFailed": "[XX-Failed to update digest day-XX]",
       "testEmailFailed": "[XX-Failed to send test email-XX]"
+    },
+    "push": {
+      "heading": "[XX-Browser push-XX]",
+      "diagnostics": {
+        "summary": "[XX-Notification diagnostics-XX]",
+        "intro": "[XX-What this browser and device report to Monize about notifications. Use the test button to have Monize create a notification you can look for on your device, then Copy to send the full report.-XX]",
+        "refresh": "[XX-Refresh-XX]",
+        "copy": "[XX-Copy report-XX]",
+        "copied": "[XX-Diagnostics copied to clipboard-XX]",
+        "localTest": "[XX-Show a test notification-XX]",
+        "localTestRunning": "[XX-Checking…-XX]",
+        "localTestBody": "[XX-If you can see this, notifications are working on this device.-XX]",
+        "localTestCreated": "[XX-Monize created a notification without an error, but nothing here can confirm the system actually showed it. If you did not see it on your device, the system is hiding it; enable notifications for Monize in your device settings.-XX]",
+        "localTestError": "[XX-Could not run the test on this device ({detail}).-XX]"
+      },
+      "description": "[XX-Register this device so Monize can reach it even when the app is closed. Only the test notification is delivered this way so far; everything else still arrives in the bell.-XX]",
+      "androidNotify": "[XX-On Android, a granted permission is not enough: the system can still hide notifications. Press and hold the Monize icon on your home screen, tap App info, then Notifications, and make sure they are turned on.-XX]",
+      "permissionHint": "[XX-When you turn this on, your browser asks for permission to show notifications. Nothing is sent until you allow it.-XX]",
+      "enableButton": "[XX-Enable on this device-XX]",
+      "enablingButton": "[XX-Enabling...-XX]",
+      "sendTestButton": "[XX-Send test notification-XX]",
+      "sendingTestButton": "[XX-Sending...-XX]",
+      "removeButton": "[XX-Remove-XX]",
+      "thisDevice": "[XX-This device-XX]",
+      "unifiedpushBadge": "[XX-UnifiedPush-XX]",
+      "unnamedDevice": "[XX-Unnamed device-XX]",
+      "lastSeen": "[XX-Last active {when}-XX]",
+      "noLiveDevices": "[XX-No device is registered yet. Enable push on this device to send a test.-XX]",
+      "notConfigured": "[XX-Browser push is not available on this Monize instance. An administrator can enable it in the Admin area.-XX]",
+      "disabledByAdmin": "[XX-An administrator has switched browser push off for this Monize instance.-XX]",
+      "keyUnreadable": "[XX-Monize cannot read this instance's push key pair, so nothing can be delivered. An administrator can recover it by rotating the key pair in the Admin area.-XX]",
+      "serverKeyMissing": "[XX-This Monize instance is missing the encryption key it needs to open its push key pair, so nothing can be delivered. An administrator has to set it in the deployment and restart.-XX]",
+      "statusUnavailable": "[XX-Monize could not check whether browser push is available. Reload the page to try again.-XX]",
+      "devicesUnavailable": "[XX-Monize could not load your registered devices. Everything else on this page still works; reload to try again.-XX]",
+      "unsupported": {
+        "unsupported": "[XX-This browser cannot receive push notifications.-XX]",
+        "denied": "[XX-Notifications are blocked for Monize in this browser. Allow them in the browser’s site settings, then reload this page.-XX]",
+        "ios-browser": "[XX-On iPhone and iPad, push notifications work only once Monize is installed to the Home Screen. Use Share, then Add to Home Screen, and open Monize from there.-XX]"
+      },
+      "disabledReason": {
+        "GONE": "[XX-No longer reachable. Enable push again in that browser.-XX]",
+        "KEY_ROTATED": "[XX-Retired when this instance rotated its push key pair. Enable push again in that browser.-XX]",
+        "FAILING": "[XX-Retired after repeated delivery failures. Enable push again in that browser.-XX]"
+      },
+      "toasts": {
+        "enabled": "[XX-Push notifications enabled on this device-XX]",
+        "enableFailed": "[XX-Could not enable push notifications-XX]",
+        "permissionDenied": "[XX-This browser is blocking notifications for Monize. Allow them in the browser’s site settings, then try again.-XX]",
+        "permissionDeniedIos": "[XX-Notifications are blocked for Monize. Open iOS Settings, then Notifications, then Monize to allow them.-XX]",
+        "permissionDismissed": "[XX-Notifications were not enabled. Choose Allow when the browser asks.-XX]",
+        "permissionNoPrompt": "[XX-Notifications were not enabled, and no prompt appeared. Open iOS Settings, then Notifications, then Monize, and allow them there. If Monize is not listed, remove it from the Home Screen, add it again (Share, then Add to Home Screen) and try once more.-XX]",
+        "removed": "[XX-Device removed-XX]",
+        "removeFailed": "[XX-Could not remove the device-XX]",
+        "testSent": "[XX-{count, plural, one {Test notification sent to 1 device} other {Test notification sent to # devices}}-XX]",
+        "testPartial": "[XX-Test notification reached {delivered} of {attempted} devices-XX]",
+        "testFailed": "[XX-Could not deliver the test notification-XX]",
+        "pushServiceRefused": "[XX-The browser's push service refused the registration. Try again in a moment; if it keeps failing, check the browser's push settings.-XX]",
+        "pushServiceRefusedBrave": "[XX-Brave blocks the push service by default. In Brave, open Settings, then Privacy and security, turn on \"Use Google services for push messaging\", restart the browser and try again.-XX]"
+      },
+      "testResults": {
+        "heading": "[XX-Last test, per device-XX]",
+        "status": {
+          "sent": "[XX-delivered to the push service-XX]",
+          "expired": "[XX-subscription expired; enable push on that device again-XX]",
+          "transient": "[XX-not delivered (temporary error); try again-XX]",
+          "unconfigured": "[XX-this instance cannot sign push messages right now-XX]"
+        }
+      }
+    },
+    "preferences": {
+      "heading": "[XX-How to notify me-XX]",
+      "description": "[XX-The bell always shows every notification. Choose which kinds Monize also sends by email or push, and how often.-XX]",
+      "categoryHeader": "[XX-Notification-XX]",
+      "channels": {
+        "inApp": "[XX-In-app-XX]",
+        "emailReport": "[XX-Email (report)-XX]",
+        "emailNotification": "[XX-Email (alert)-XX]",
+        "push": "[XX-Push-XX]",
+        "unifiedpush": "[XX-UnifiedPush-XX]"
+      },
+      "categories": {
+        "PAYMENTS": "[XX-Bills and scheduled-XX]",
+        "BUDGETS": "[XX-Budgets-XX]",
+        "SYSTEM": "[XX-System alerts-XX]"
+      },
+      "inAppAlways": "[XX-Always shown in the bell-XX]",
+      "channelNotApplicable": "[XX-Not applicable for this notification type-XX]",
+      "emailToggleLabel": "[XX-Report email for {category}-XX]",
+      "emailNotificationToggleLabel": "[XX-Alert email for {category}-XX]",
+      "pushToggleLabel": "[XX-Push for {category}-XX]",
+      "unifiedpushToggleLabel": "[XX-UnifiedPush for {category}-XX]",
+      "saveFailed": "[XX-Could not save that setting-XX]",
+      "emailUnavailable": "[XX-Turn on email notifications above to send these by email.-XX]",
+      "pushUnavailable": "[XX-Enable push on this device first (see below).-XX]",
+      "unifiedpushUnavailable": "[XX-Register a UnifiedPush endpoint from your distributor app to use this channel.-XX]",
+      "throttle": {
+        "label": "[XX-Cooldown-XX]",
+        "ariaLabel": "[XX-Cooldown for {category}-XX]",
+        "hint": "[XX-Skip an alert or push when one from the same group fired within this window.-XX]",
+        "options": {
+          "0": "[XX-Off-XX]",
+          "5": "[XX-5 minutes-XX]",
+          "15": "[XX-15 minutes-XX]",
+          "30": "[XX-30 minutes-XX]",
+          "60": "[XX-1 hour-XX]",
+          "360": "[XX-6 hours-XX]",
+          "1440": "[XX-24 hours-XX]"
+        }
+      }
     }
   },
   "help": {

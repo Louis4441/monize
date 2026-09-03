@@ -193,5 +193,11 @@
     "greeting": "您好，{{ name }}，",
     "intro": "您的 Monize 部署發生需要管理員處理的問題。",
     "footer": "此警示也會顯示在應用程式的通知鈴鐺中。無論有多少個伺服器副本發現該問題，每次事件最多只會產生一則警示。"
+  },
+  "notificationImmediate": {
+    "subject": "您有一則新的 Monize 通知",
+    "eyebrow": "Monize 通知",
+    "button": "在 Monize 中開啟",
+    "footer": "您收到此郵件是因為此通知類型已開啟即時郵件。可在設定、通知中變更。"
   }
 }

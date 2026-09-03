@@ -234,6 +234,115 @@
       "digestUpdateFailed": "Bütçe özeti tercihi güncellenemedi",
       "digestDayFailed": "Özet günü güncellenemedi",
       "testEmailFailed": "Test e-postası gönderilemedi"
+    },
+    "push": {
+      "heading": "Tarayıcı anlık bildirimi",
+      "diagnostics": {
+        "summary": "Bildirim tanılaması",
+        "intro": "Bu tarayıcının ve cihazın bildirimler hakkında Monize'a bildirdiği bilgiler. Monize'ın cihazınızda arayabileceğiniz bir bildirim oluşturması için test düğmesini, ardından tam raporu göndermek için Kopyala'yı kullanın.",
+        "refresh": "Yenile",
+        "copy": "Raporu kopyala",
+        "copied": "Tanılama panoya kopyalandı",
+        "localTest": "Test bildirimi göster",
+        "localTestRunning": "Kontrol ediliyor…",
+        "localTestBody": "Bunu görebiliyorsanız, bu cihazda bildirimler çalışıyor.",
+        "localTestCreated": "Monize bir bildirimi hatasız oluşturdu, ancak burada hiçbir şey sistemin onu gösterdiğini doğrulayamaz. Cihazınızda görmediyseniz sistem onu gizliyordur; cihaz ayarlarından Monize bildirimlerini açın.",
+        "localTestError": "Bu cihazda test çalıştırılamadı ({detail})."
+      },
+      "description": "Bu cihazı kaydedin, böylece uygulama kapalıyken de Monize ona ulaşabilir. Şimdilik bu yolla yalnızca test bildirimi teslim ediliyor; diğer her şey yine zil simgesine geliyor.",
+      "androidNotify": "Android'de izin vermeniz yetmez: sistem bildirimleri yine de gizleyebilir. Ana ekrandaki Monize simgesini basılı tutun, Uygulama bilgileri'ne, ardından Bildirimler'e dokunun ve açık olduklarından emin olun.",
+      "permissionHint": "Bunu açtığınızda tarayıcınız bildirim gösterme izni ister. İzin verilene kadar hiçbir şey gönderilmez.",
+      "enableButton": "Bu cihazda etkinleştir",
+      "enablingButton": "Etkinleştiriliyor...",
+      "sendTestButton": "Test bildirimi gönder",
+      "sendingTestButton": "Gönderiliyor...",
+      "removeButton": "Kaldır",
+      "thisDevice": "Bu cihaz",
+      "unifiedpushBadge": "UnifiedPush",
+      "unnamedDevice": "Adsız cihaz",
+      "lastSeen": "Son etkinlik {when}",
+      "noLiveDevices": "Henüz kayıtlı cihaz yok. Test göndermek için bu cihazda anlık bildirimleri açın.",
+      "notConfigured": "Bu Monize örneğinde tarayıcı anlık bildirimi kullanılamıyor. Bir yönetici Admin bölümünden etkinleştirebilir.",
+      "disabledByAdmin": "Bir yönetici bu Monize örneği için tarayıcı anlık bildirimini kapattı.",
+      "keyUnreadable": "Monize bu örneğin anlık bildirim anahtar çiftini okuyamıyor; bu yüzden hiçbir şey teslim edilmiyor. Bir yönetici Admin bölümünde anahtar çiftini değiştirerek kurtarabilir.",
+      "serverKeyMissing": "Bu Monize örneğinde push anahtar çiftini açmak için gereken şifreleme anahtarı yok, bu yüzden hiçbir şey iletilemiyor. Bir yöneticinin bunu dağıtımda ayarlayıp yeniden başlatması gerekiyor.",
+      "statusUnavailable": "Monize, tarayıcı anlık bildiriminin kullanılabilir olup olmadığını kontrol edemedi. Yeniden denemek için sayfayı yenileyin.",
+      "devicesUnavailable": "Monize kayıtlı cihazlarınızı yükleyemedi. Bu sayfadaki diğer her şey çalışıyor; yeniden denemek için sayfayı yenileyin.",
+      "unsupported": {
+        "unsupported": "Bu tarayıcı anlık bildirim alamaz.",
+        "denied": "Bu tarayıcıda Monize bildirimleri engellenmiş. Tarayıcının site ayarlarından izin verin ve bu sayfayı yenileyin.",
+        "ios-browser": "iPhone ve iPad'de anlık bildirimler yalnızca Monize Ana Ekrana eklendikten sonra çalışır. Paylaş, ardından Ana Ekrana Ekle'yi kullanın ve Monize'ı oradan açın."
+      },
+      "disabledReason": {
+        "GONE": "Artık erişilebilir değil. O tarayıcıda anlık bildirimleri yeniden açın.",
+        "KEY_ROTATED": "Bu örnek anlık bildirim anahtar çiftini değiştirdiğinde devre dışı bırakıldı. O tarayıcıda anlık bildirimleri yeniden açın.",
+        "FAILING": "Tekrarlanan teslim hatalarından sonra devre dışı bırakıldı. O tarayıcıda anlık bildirimleri yeniden açın."
+      },
+      "toasts": {
+        "enabled": "Bu cihazda anlık bildirimler etkinleştirildi",
+        "enableFailed": "Anlık bildirimler etkinleştirilemedi",
+        "permissionDenied": "Bu tarayıcı Monize bildirimlerini engelliyor. Site ayarlarından izin verip yeniden deneyin.",
+        "permissionDeniedIos": "Monize için bildirimler engellenmiş. İzin vermek için iOS Ayarlar'ı, sonra Bildirimler'i, sonra Monize'yi açın.",
+        "permissionDismissed": "Bildirimler etkinleştirilmedi. Tarayıcı sorduğunda İzin Ver'i seçin.",
+        "permissionNoPrompt": "Bildirimler açılmadı ve hiçbir istek görünmedi. iOS Ayarlar'ı açın, sonra Bildirimler, sonra Monize, ve orada izin verin. Monize listede yoksa ana ekrandan kaldırın, yeniden ekleyin (Paylaş, sonra Ana Ekrana Ekle) ve bir daha deneyin.",
+        "removed": "Cihaz kaldırıldı",
+        "removeFailed": "Cihaz kaldırılamadı",
+        "testSent": "{count, plural, one {Test bildirimi 1 cihaza gönderildi} other {Test bildirimi # cihaza gönderildi}}",
+        "testPartial": "Test bildirimi {attempted} cihazın {delivered} tanesine ulaştı",
+        "testFailed": "Test bildirimi teslim edilemedi",
+        "pushServiceRefused": "Tarayıcının push hizmeti kaydı reddetti. Biraz sonra yeniden deneyin; başarısız olmaya devam ederse tarayıcının push ayarlarını kontrol edin.",
+        "pushServiceRefusedBrave": "Brave, push hizmetini varsayılan olarak engeller. Brave'de Ayarlar, ardından Gizlilik ve güvenlik bölümünü açın, \"Push mesajları için Google hizmetlerini kullan\" seçeneğini açın, tarayıcıyı yeniden başlatın ve yeniden deneyin."
+      },
+      "testResults": {
+        "heading": "Son test, cihaz başına",
+        "status": {
+          "sent": "push hizmetine iletildi",
+          "expired": "abonelik süresi doldu; o cihazda push'u yeniden etkinleştirin",
+          "transient": "iletilmedi (geçici hata); yeniden deneyin",
+          "unconfigured": "bu örnek şu anda push mesajlarını imzalayamıyor"
+        }
+      }
+    },
+    "preferences": {
+      "heading": "Beni nasıl bilgilendirelim",
+      "description": "Zil her zaman tüm bildirimleri gösterir. Monize'ın hangi türleri ayrıca e-posta veya push ile ve ne sıklıkla göndereceğini seçin.",
+      "categoryHeader": "Bildirim",
+      "channels": {
+        "inApp": "Uygulamada",
+        "emailReport": "E-posta (rapor)",
+        "emailNotification": "E-posta (uyarı)",
+        "push": "Push",
+        "unifiedpush": "UnifiedPush"
+      },
+      "categories": {
+        "PAYMENTS": "Faturalar ve planlananlar",
+        "BUDGETS": "Bütçeler",
+        "SYSTEM": "Sistem uyarıları"
+      },
+      "inAppAlways": "Zilde her zaman görünür",
+      "channelNotApplicable": "Bu bildirim türü için geçerli değil",
+      "emailToggleLabel": "{category} için rapor e-postası",
+      "saveFailed": "Bu ayar kaydedilemedi",
+      "throttle": {
+        "label": "Bekleme",
+        "ariaLabel": "{category} için bekleme süresi",
+        "hint": "Aynı gruptan biri bu süre içinde gönderildiyse bir uyarı veya push'u atla.",
+        "options": {
+          "0": "Kapalı",
+          "5": "5 dakika",
+          "15": "15 dakika",
+          "30": "30 dakika",
+          "60": "1 saat",
+          "360": "6 saat",
+          "1440": "24 saat"
+        }
+      },
+      "emailNotificationToggleLabel": "{category} için uyarı e-postası",
+      "pushToggleLabel": "{category} için push",
+      "unifiedpushToggleLabel": "{category} için UnifiedPush",
+      "emailUnavailable": "Bunları e-postayla göndermek için yukarıdan e-posta bildirimlerini açın.",
+      "pushUnavailable": "Önce bu cihazda push'u etkinleştirin (aşağıya bakın).",
+      "unifiedpushUnavailable": "Bu kanalı kullanmak için dağıtıcı uygulamanızdan bir UnifiedPush uç noktası kaydedin."
     }
   },
   "help": {

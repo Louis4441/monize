@@ -109,9 +109,26 @@ export class BackupRestoreDatabaseService {
     await manager.query("DELETE FROM securities WHERE user_id = $1", [userId]);
 
     // Budget data
-    await manager.query("DELETE FROM budget_alerts WHERE user_id = $1", [
+    // Reminders before notifications is not required (source_notification_id is
+    // ON DELETE SET NULL), but both are cleared: the insert path is ON CONFLICT
+    // DO NOTHING, so without this pre-clear a restore over an existing account
+    // keeps the local reminder rows and drops the backup's.
+    await manager.query(
+      "DELETE FROM notification_reminders WHERE user_id = $1",
+      [userId],
+    );
+    await manager.query("DELETE FROM notifications WHERE user_id = $1", [
       userId,
     ]);
+    // Per-category channel preferences. The insert path is ON CONFLICT DO
+    // NOTHING keyed on (user_id, category), so without this pre-clear a restore
+    // over an existing account keeps the local preference rows and silently
+    // drops the backup's -- every other user-owned restore-plan table clears
+    // here for exactly that reason.
+    await manager.query(
+      "DELETE FROM notification_preferences WHERE user_id = $1",
+      [userId],
+    );
     await manager.query(
       `DELETE FROM budget_period_categories WHERE budget_period_id IN
        (SELECT bp.id FROM budget_periods bp

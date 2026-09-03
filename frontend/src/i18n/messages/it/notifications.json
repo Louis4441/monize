@@ -1,0 +1,88 @@
+{
+  "title": "Notifiche",
+  "unread": "{count} non letti",
+  "markAllRead": "Segna tutti come letti",
+  "loading": "Caricamento notifiche...",
+  "empty": "Nessuna notifica",
+  "undo": "Annulla",
+  "buttonTitle": "Notifiche",
+  "buttonAriaLabel": "Notifiche",
+  "dismissAriaLabel": "Ignora notifica",
+  "closeAriaLabel": "Chiudi notifiche",
+  "emptyFiltered": "Nessuna notifica corrisponde al filtro attuale",
+  "deleteAll": "Elimina tutti",
+  "deleteAllConfirmTitle": "Elimina notifiche",
+  "deleteAllConfirmMessageAll": "Eliminare tutte le notifiche? L'operazione non può essere annullata.",
+  "deleteAllConfirmMessageFiltered": "Eliminare ogni notifica che corrisponde al filtro attuale, comprese quelle non mostrate? L'operazione non può essere annullata.",
+  "deleted": "{count, plural, one {# notifica eliminata} other {# notifiche eliminate}}",
+  "deleteFailed": "Non è stato possibile eliminare le notifiche",
+  "filter": {
+    "financial": "Finanziari",
+    "system": "Sistema"
+  },
+  "severity": {
+    "critical": "Critico",
+    "warning": "Attenzione",
+    "success": "Buone notizie",
+    "info": "Info"
+  },
+  "reminder": {
+    "remindAriaLabel": "Ricordamelo",
+    "stopAriaLabel": "Interrompi questo promemoria",
+    "stopped": "Promemoria interrotto",
+    "stopFailed": "Impossibile interrompere il promemoria",
+    "created": "Promemoria impostato",
+    "createFailed": "Impossibile impostare il promemoria",
+    "dialogTitle": "Ricordamelo",
+    "dialogDescription": "Ricevi di nuovo questa notifica più tardi finché non intervieni.",
+    "modeLabel": "Con quale frequenza",
+    "modeRepeat": "Ripeti finché non lo interrompo",
+    "modeOnce": "Solo un'altra volta",
+    "intervalLabelRepeat": "Ricordamelo ogni",
+    "intervalLabelOnce": "Ricordamelo dopo",
+    "durationMinutes": "{minutes, plural, one {# minuto} other {# minuti}}",
+    "durationHours": "{hours, plural, one {# ora} other {# ore}}",
+    "cancel": "Annulla",
+    "confirm": "Imposta promemoria"
+  },
+  "billDue": {
+    "titleOverdue": "{payee} scaduto",
+    "titleToday": "{payee} in scadenza oggi",
+    "titleTomorrow": "{payee} in scadenza domani",
+    "titleInDays": "{payee} in scadenza tra {days} giorni",
+    "amountDue": "{amount} da pagare il {date}",
+    "amountUnavailable": "Importo non disponibile (nessun tasso di cambio attuale), in scadenza il {date}"
+  },
+  "system": {
+    "backupFailed": {
+      "title": "Backup automatico non riuscito",
+      "message": "Il backup automatico per {user} non è riuscito: {error}"
+    },
+    "backupPartial": {
+      "title": "Backup automatico incompleto",
+      "messageAttachments": "Il backup per {user} è stato scritto, ma {missing} allegati su {expected} non sono stati inclusi e {inconsistent} non corrispondevano ai loro metadati. I backup completi sono stati preservati.",
+      "messagePromotion": "Il backup giornaliero per {user} è riuscito, ma la copia settimanale o mensile non è stata scritta: {error}",
+      "messageRetention": "Il backup per {user} è riuscito, ma i vecchi file di backup non sono stati eliminati: {error}"
+    },
+    "encryptionKeyMissing": {
+      "title": "Chiave di cifratura non configurata",
+      "message": "ENCRYPTION_KEY non è impostata: i backup vengono scritti in chiaro e i segreti non possono essere salvati. Una versione futura non si avvierà senza di essa."
+    },
+    "smtpFailure": {
+      "title": "L'invio delle email non funziona",
+      "message": "Monize non è riuscito a inviare email: {error}. Notifiche e promemoria non vengono recapitati."
+    },
+    "providerOutage": {
+      "title": "{provider} non risponde",
+      "message": "I dati di mercato di {provider} non sono disponibili. Prezzi e dati degli indici potrebbero non essere aggiornati finché non risponderà di nuovo."
+    },
+    "providerRecovered": {
+      "title": "{provider} risponde di nuovo",
+      "message": "L'interruzione è terminata e i dati di mercato di {provider} vengono di nuovo aggiornati."
+    },
+    "scheduledPostFailed": {
+      "title": "{name} non è stata registrata",
+      "message": "La tua transazione pianificata in scadenza il {date} non è stata registrata automaticamente: {error}. Puoi registrarla manualmente da Fatture & Versamenti."
+    }
+  }
+}

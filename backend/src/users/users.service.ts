@@ -679,12 +679,37 @@ export class UsersService {
     ]);
     deleted.securities = result[1] ?? 0;
 
-    // Budget data
+    // Reminders first, while their source link still says whose nag each one
+    // is. A reminder is a TEMPLATE the cron re-emits, so one left behind would
+    // go on writing fresh notifications -- and pushing and emailing them --
+    // after the user asked for their data to be gone. The account survives
+    // this flow, so the users(id) CASCADE never fires, and deleting the
+    // notifications below would only SET NULL the link, not stop the nag.
+    // (`notification_preferences` is deliberately kept: it is a setting, like
+    // `user_preferences`, not data about the user's money.)
     result = await manager.query(
-      `DELETE FROM budget_alerts WHERE user_id = $1`,
+      `DELETE FROM notification_reminders WHERE user_id = $1`,
       [userId],
     );
-    deleted.budgetAlerts = result[1] ?? 0;
+    deleted.notificationReminders = result[1] ?? 0;
+
+    result = await manager.query(
+      `DELETE FROM notifications WHERE user_id = $1`,
+      [userId],
+    );
+    deleted.notifications = result[1] ?? 0;
+
+    // The devices this account registered for push. Left behind, "delete my
+    // data" kept the endpoint and both encryption keys for every device, they
+    // went on counting against the per-account device cap, and anything a
+    // producer sent still arrived on the user's phone -- after they had asked
+    // for their data to be gone. The account survives this flow, so nothing
+    // cascades: it has to be deleted here.
+    result = await manager.query(
+      `DELETE FROM push_subscriptions WHERE user_id = $1`,
+      [userId],
+    );
+    deleted.pushDevices = result[1] ?? 0;
 
     result = await manager.query(
       `DELETE FROM budget_period_categories WHERE budget_period_id IN

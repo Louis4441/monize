@@ -4,9 +4,9 @@ import {
   SystemAlertMonitorService,
 } from "./system-alert-monitor.service";
 import {
-  AlertSeverity,
-  AlertType,
-} from "../budgets/entities/budget-alert.entity";
+  NotificationSeverity,
+  NotificationType,
+} from "../notification-center/entities/notification.entity";
 import type { EmailFailureSnapshot } from "../notifications/email.service";
 
 describe("SystemAlertMonitorService", () => {
@@ -52,8 +52,8 @@ describe("SystemAlertMonitorService", () => {
       await service.checkEncryptionKey(new Date("2026-08-30T12:00:00Z"));
       expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: AlertType.ENCRYPTION_KEY_MISSING,
-          severity: AlertSeverity.WARNING,
+          type: NotificationType.ENCRYPTION_KEY_MISSING,
+          severity: NotificationSeverity.WARNING,
           dedupeKey: "ENCRYPTION_KEY_MISSING:2026-W35",
           data: { system: true },
         }),
@@ -89,7 +89,9 @@ describe("SystemAlertMonitorService", () => {
 
       await service.sweepSystemHealth(new Date("2026-08-30T12:00:00Z"));
       expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledWith(
-        expect.objectContaining({ type: AlertType.ENCRYPTION_KEY_MISSING }),
+        expect.objectContaining({
+          type: NotificationType.ENCRYPTION_KEY_MISSING,
+        }),
       );
     });
 
@@ -120,7 +122,7 @@ describe("SystemAlertMonitorService", () => {
       await service.sweepSystemHealth(now);
       expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledTimes(1);
       expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledWith(
-        expect.objectContaining({ type: AlertType.SMTP_FAILURE }),
+        expect.objectContaining({ type: NotificationType.SMTP_FAILURE }),
       );
     });
 
@@ -135,8 +137,8 @@ describe("SystemAlertMonitorService", () => {
       await service.sweepEmailHealth(now);
       expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: AlertType.SMTP_FAILURE,
-          severity: AlertSeverity.WARNING,
+          type: NotificationType.SMTP_FAILURE,
+          severity: NotificationSeverity.WARNING,
           dedupeKey: "SMTP_FAILURE:2026-08-30",
           email: false,
           data: expect.objectContaining({

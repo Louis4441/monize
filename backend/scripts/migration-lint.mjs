@@ -73,7 +73,19 @@ export function stripComments(sql) {
     }
     const tag = dollarTagAt(sql, i);
     if (tag) {
-      const end = sql.indexOf(tag, i + tag.length);
+      // A dollar-quoted body is plpgsql, so `--` inside it starts a comment
+      // there too -- and the rules run over the body's statements, reading that
+      // text as code. Left unstripped, an apostrophe in prose opens a string
+      // literal that swallows the statement separators after it, and a rule's
+      // own name written out in an explanation is matched as the statement it
+      // describes. Both have happened, in the same comment.
+      const bodyStart = i + tag.length;
+      const end = sql.indexOf(tag, bodyStart);
+      const bodyEnd = end === -1 ? sql.length : end;
+      const strippedBody = stripComments(sql.slice(bodyStart, bodyEnd));
+      for (let k = 0; k < strippedBody.length; k++) {
+        out[bodyStart + k] = strippedBody[k];
+      }
       i = end === -1 ? sql.length : end + tag.length;
       continue;
     }

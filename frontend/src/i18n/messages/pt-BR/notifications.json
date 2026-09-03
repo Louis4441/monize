@@ -1,0 +1,88 @@
+{
+  "title": "Notificações",
+  "unread": "{count} não lidos",
+  "markAllRead": "Marcar todos como lidos",
+  "loading": "Carregando notificações...",
+  "empty": "Sem notificações",
+  "undo": "Desfazer",
+  "buttonTitle": "Notificações",
+  "buttonAriaLabel": "Notificações",
+  "dismissAriaLabel": "Dispensar notificação",
+  "closeAriaLabel": "Fechar notificações",
+  "emptyFiltered": "Nenhuma notificação corresponde ao filtro atual",
+  "deleteAll": "Excluir todos",
+  "deleteAllConfirmTitle": "Excluir notificações",
+  "deleteAllConfirmMessageAll": "Excluir todas as notificações? Isso não pode ser desfeito.",
+  "deleteAllConfirmMessageFiltered": "Excluir todas as notificações que correspondem ao filtro atual, incluindo as não exibidas? Isso não pode ser desfeito.",
+  "deleted": "{count, plural, one {# notificação excluída} other {# notificações excluídas}}",
+  "deleteFailed": "Não foi possível excluir as notificações",
+  "filter": {
+    "financial": "Financeiros",
+    "system": "Sistema"
+  },
+  "severity": {
+    "critical": "Crítico",
+    "warning": "Aviso",
+    "success": "Boas Notícias",
+    "info": "Informação"
+  },
+  "reminder": {
+    "remindAriaLabel": "Lembrar-me disto",
+    "stopAriaLabel": "Parar este lembrete",
+    "stopped": "Lembrete interrompido",
+    "stopFailed": "Não foi possível interromper o lembrete",
+    "created": "Lembrete definido",
+    "createFailed": "Não foi possível definir o lembrete",
+    "dialogTitle": "Lembrar-me",
+    "dialogDescription": "Receba esta notificação novamente mais tarde até você agir.",
+    "modeLabel": "Com que frequência",
+    "modeRepeat": "Repetir até eu parar",
+    "modeOnce": "Apenas mais uma vez",
+    "intervalLabelRepeat": "Lembrar-me a cada",
+    "intervalLabelOnce": "Lembrar-me depois de",
+    "durationMinutes": "{minutes, plural, one {# minuto} other {# minutos}}",
+    "durationHours": "{hours, plural, one {# hora} other {# horas}}",
+    "cancel": "Cancelar",
+    "confirm": "Definir lembrete"
+  },
+  "billDue": {
+    "titleOverdue": "{payee} em atraso",
+    "titleToday": "{payee} vence hoje",
+    "titleTomorrow": "{payee} vence amanhã",
+    "titleInDays": "{payee} vence em {days} dias",
+    "amountDue": "{amount} a pagar em {date}",
+    "amountUnavailable": "Valor indisponível (sem taxa de câmbio atual), vence em {date}"
+  },
+  "system": {
+    "backupFailed": {
+      "title": "Falha no backup automático",
+      "message": "O backup automático de {user} falhou: {error}"
+    },
+    "backupPartial": {
+      "title": "Backup automático incompleto",
+      "messageAttachments": "O backup de {user} foi gravado, mas não foi possível incluir {missing} de {expected} anexos e {inconsistent} não correspondiam aos seus metadados. Os backups completos foram preservados.",
+      "messagePromotion": "O backup diário de {user} foi concluído, mas sua cópia semanal ou mensal não pôde ser gravada: {error}",
+      "messageRetention": "O backup de {user} foi concluído, mas os arquivos de backups antigos não puderam ser removidos: {error}"
+    },
+    "encryptionKeyMissing": {
+      "title": "Chave de criptografia não configurada",
+      "message": "A ENCRYPTION_KEY não está definida, então os backups são gravados sem criptografia e segredos não podem ser armazenados. Uma versão futura não iniciará sem ela."
+    },
+    "smtpFailure": {
+      "title": "O envio de email está falhando",
+      "message": "O Monize não conseguiu enviar email: {error}. Notificações e lembretes não estão sendo entregues."
+    },
+    "providerOutage": {
+      "title": "{provider} não está respondendo",
+      "message": "Os dados de mercado de {provider} estão indisponíveis. Preços e dados de índices podem ficar desatualizados até que ele volte a responder."
+    },
+    "providerRecovered": {
+      "title": "{provider} está respondendo novamente",
+      "message": "A interrupção terminou e os dados de mercado de {provider} estão sendo atualizados novamente."
+    },
+    "scheduledPostFailed": {
+      "title": "Não foi possível lançar {name}",
+      "message": "Sua transação agendada com vencimento em {date} não foi lançada automaticamente: {error}. Você pode lançá-la manualmente em Faturas e depósitos."
+    }
+  }
+}

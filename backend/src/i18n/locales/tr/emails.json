@@ -193,5 +193,11 @@
     "greeting": "Merhaba {{ name }},",
     "intro": "Monize kurulumunuzdaki bir sorun bir yöneticinin ilgisini gerektiriyor.",
     "footer": "Bu uyarı uygulamanın bildirim zilinde de gösterilir. Kaç sunucu kopyası fark etmiş olursa olsun, her olay için en fazla bir kez oluşturulur."
+  },
+  "notificationImmediate": {
+    "subject": "Yeni bir Monize bildiriminiz var",
+    "eyebrow": "Monize bildirimi",
+    "button": "Monize'de aç",
+    "footer": "Bu bildirim türü için anlık e-posta açık olduğundan bunu alıyorsunuz. Ayarlar, Bildirimler bölümünden değiştirin."
   }
 }

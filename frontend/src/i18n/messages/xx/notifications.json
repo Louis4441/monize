@@ -1,0 +1,88 @@
+{
+  "title": "[XX-Notifications-XX]",
+  "unread": "[XX-{count} unread-XX]",
+  "markAllRead": "[XX-Mark all read-XX]",
+  "loading": "[XX-Loading notifications...-XX]",
+  "empty": "[XX-No notifications-XX]",
+  "undo": "[XX-Undo-XX]",
+  "buttonTitle": "[XX-Notifications-XX]",
+  "buttonAriaLabel": "[XX-Notifications-XX]",
+  "dismissAriaLabel": "[XX-Dismiss notification-XX]",
+  "closeAriaLabel": "[XX-Close notifications-XX]",
+  "emptyFiltered": "[XX-No notifications match the current filter-XX]",
+  "deleteAll": "[XX-Delete all-XX]",
+  "deleteAllConfirmTitle": "[XX-Delete notifications-XX]",
+  "deleteAllConfirmMessageAll": "[XX-Delete all notifications? This cannot be undone.-XX]",
+  "deleteAllConfirmMessageFiltered": "[XX-Delete every notification matching the current filter, including any not shown? This cannot be undone.-XX]",
+  "deleted": "[XX-{count, plural, one {# notification deleted} other {# notifications deleted}}-XX]",
+  "deleteFailed": "[XX-The notifications could not be deleted-XX]",
+  "filter": {
+    "financial": "[XX-Financial-XX]",
+    "system": "[XX-System-XX]"
+  },
+  "severity": {
+    "critical": "[XX-Critical-XX]",
+    "warning": "[XX-Warning-XX]",
+    "success": "[XX-Good News-XX]",
+    "info": "[XX-Info-XX]"
+  },
+  "reminder": {
+    "remindAriaLabel": "[XX-Remind me about this-XX]",
+    "stopAriaLabel": "[XX-Stop this reminder-XX]",
+    "stopped": "[XX-Reminder stopped-XX]",
+    "stopFailed": "[XX-The reminder could not be stopped-XX]",
+    "created": "[XX-Reminder set-XX]",
+    "createFailed": "[XX-The reminder could not be set-XX]",
+    "dialogTitle": "[XX-Remind me-XX]",
+    "dialogDescription": "[XX-Get this notification again later until you act on it.-XX]",
+    "modeLabel": "[XX-How often-XX]",
+    "modeRepeat": "[XX-Repeat until I stop it-XX]",
+    "modeOnce": "[XX-Just once more-XX]",
+    "intervalLabelRepeat": "[XX-Remind me every-XX]",
+    "intervalLabelOnce": "[XX-Remind me after-XX]",
+    "durationMinutes": "[XX-{minutes, plural, one {# minute} other {# minutes}}-XX]",
+    "durationHours": "[XX-{hours, plural, one {# hour} other {# hours}}-XX]",
+    "cancel": "[XX-Cancel-XX]",
+    "confirm": "[XX-Set reminder-XX]"
+  },
+  "billDue": {
+    "titleOverdue": "[XX-{payee} overdue-XX]",
+    "titleToday": "[XX-{payee} due today-XX]",
+    "titleTomorrow": "[XX-{payee} due tomorrow-XX]",
+    "titleInDays": "[XX-{payee} due in {days} days-XX]",
+    "amountDue": "[XX-{amount} due on {date}-XX]",
+    "amountUnavailable": "[XX-Amount unavailable (no current exchange rate), due on {date}-XX]"
+  },
+  "system": {
+    "backupFailed": {
+      "title": "[XX-Automatic backup failed-XX]",
+      "message": "[XX-The automatic backup for {user} failed: {error}-XX]"
+    },
+    "backupPartial": {
+      "title": "[XX-Automatic backup incomplete-XX]",
+      "messageAttachments": "[XX-The backup for {user} was written, but {missing} of {expected} attachments could not be included and {inconsistent} did not match their metadata. Complete backups were preserved.-XX]",
+      "messagePromotion": "[XX-The daily backup for {user} succeeded, but its weekly or monthly copy could not be written: {error}-XX]",
+      "messageRetention": "[XX-The backup for {user} succeeded, but old backup files could not be cleaned up: {error}-XX]"
+    },
+    "encryptionKeyMissing": {
+      "title": "[XX-Encryption key not configured-XX]",
+      "message": "[XX-ENCRYPTION_KEY is not set, so backups are written unencrypted and secrets cannot be stored. A future release will refuse to start without it.-XX]"
+    },
+    "smtpFailure": {
+      "title": "[XX-Email delivery is failing-XX]",
+      "message": "[XX-Monize could not send email: {error}. Notifications and reminders are not being delivered.-XX]"
+    },
+    "providerOutage": {
+      "title": "[XX-{provider} is not responding-XX]",
+      "message": "[XX-Market data from {provider} is unavailable. Prices and index data may be out of date until it answers again.-XX]"
+    },
+    "providerRecovered": {
+      "title": "[XX-{provider} is answering again-XX]",
+      "message": "[XX-The outage is over and market data from {provider} is updating again.-XX]"
+    },
+    "scheduledPostFailed": {
+      "title": "[XX-{name} could not be posted-XX]",
+      "message": "[XX-Your scheduled transaction due {date} did not post automatically: {error}. You can post it manually from Bills.-XX]"
+    }
+  }
+}

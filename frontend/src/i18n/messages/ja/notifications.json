@@ -1,0 +1,88 @@
+{
+  "title": "通知",
+  "unread": "{count} 件未読",
+  "markAllRead": "すべて既読にする",
+  "loading": "通知を読み込んでいます...",
+  "empty": "通知はありません",
+  "undo": "元に戻す",
+  "buttonTitle": "通知",
+  "buttonAriaLabel": "通知",
+  "dismissAriaLabel": "通知を閉じる",
+  "closeAriaLabel": "通知一覧を閉じる",
+  "emptyFiltered": "現在のフィルターに一致する通知はありません",
+  "deleteAll": "すべて削除",
+  "deleteAllConfirmTitle": "通知を削除",
+  "deleteAllConfirmMessageAll": "すべての通知を削除しますか？この操作は取り消せません。",
+  "deleteAllConfirmMessageFiltered": "現在のフィルターに一致する通知を、表示されていないものも含めてすべて削除しますか？この操作は取り消せません。",
+  "deleted": "{count, plural, other {# 件の通知を削除しました}}",
+  "deleteFailed": "通知を削除できませんでした",
+  "filter": {
+    "financial": "財務",
+    "system": "システム"
+  },
+  "severity": {
+    "critical": "緊急",
+    "warning": "警告",
+    "success": "お知らせ",
+    "info": "情報"
+  },
+  "reminder": {
+    "remindAriaLabel": "これをリマインドする",
+    "stopAriaLabel": "このリマインダーを停止",
+    "stopped": "リマインダーを停止しました",
+    "stopFailed": "リマインダーを停止できませんでした",
+    "created": "リマインダーを設定しました",
+    "createFailed": "リマインダーを設定できませんでした",
+    "dialogTitle": "リマインド",
+    "dialogDescription": "対応するまで、後でこの通知を再度受け取ります。",
+    "modeLabel": "頻度",
+    "modeRepeat": "停止するまで繰り返す",
+    "modeOnce": "もう一度だけ",
+    "intervalLabelRepeat": "次の間隔でリマインド",
+    "intervalLabelOnce": "次の時間後にリマインド",
+    "durationMinutes": "{minutes, plural, other {# 分}}",
+    "durationHours": "{hours, plural, other {# 時間}}",
+    "cancel": "キャンセル",
+    "confirm": "リマインダーを設定"
+  },
+  "billDue": {
+    "titleOverdue": "{payee} は支払期日超過",
+    "titleToday": "{payee} は今日が支払期日",
+    "titleTomorrow": "{payee} は明日が支払期日",
+    "titleInDays": "{payee} は{days}日後が支払期日",
+    "amountDue": "{date} に {amount} の支払い",
+    "amountUnavailable": "金額が不明です (現在の為替レートがありません)。支払期日は {date}"
+  },
+  "system": {
+    "backupFailed": {
+      "title": "自動バックアップに失敗しました",
+      "message": "{user} の自動バックアップに失敗しました: {error}"
+    },
+    "backupPartial": {
+      "title": "自動バックアップが不完全です",
+      "messageAttachments": "{user} のバックアップは書き込まれましたが、{expected} 件中 {missing} 件の添付ファイルを含められず、{inconsistent} 件はメタデータと一致しませんでした。完全なバックアップは保持されています。",
+      "messagePromotion": "{user} の日次バックアップは成功しましたが、週次または月次のコピーを書き込めませんでした: {error}",
+      "messageRetention": "{user} のバックアップは成功しましたが、古いバックアップファイルを削除できませんでした: {error}"
+    },
+    "encryptionKeyMissing": {
+      "title": "暗号化キーが設定されていません",
+      "message": "ENCRYPTION_KEY が設定されていないため、バックアップは暗号化されずに書き込まれ、シークレットを保存できません。将来のリリースではこのキーがないと起動しなくなります。"
+    },
+    "smtpFailure": {
+      "title": "メール送信に失敗しています",
+      "message": "Monize はメールを送信できませんでした: {error}。通知やリマインダーが配信されていません。"
+    },
+    "providerOutage": {
+      "title": "{provider} が応答していません",
+      "message": "{provider} からの市場データを取得できません。再び応答するまで、価格や指数データが古い可能性があります。"
+    },
+    "providerRecovered": {
+      "title": "{provider} が再び応答しています",
+      "message": "障害は解消し、{provider} からの市場データは再び更新されています。"
+    },
+    "scheduledPostFailed": {
+      "title": "{name} を記帳できませんでした",
+      "message": "{date} が期日の定期取引を自動で記帳できませんでした: {error}。請求書・入金の画面から手動で記帳できます。"
+    }
+  }
+}

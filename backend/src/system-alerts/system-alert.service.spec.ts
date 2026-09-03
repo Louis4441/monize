@@ -5,9 +5,11 @@ import {
   SystemAlertInput,
 } from "./system-alert.service";
 import {
-  AlertSeverity,
-  AlertType,
-} from "../budgets/entities/budget-alert.entity";
+  Notification,
+  NotificationSeverity,
+  NotificationType,
+} from "../notification-center/entities/notification.entity";
+import { NotificationService } from "../notification-center/notification.service";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import {
   createScopedDbMocks,
@@ -37,8 +39,8 @@ function adminRow(overrides: Record<string, unknown> = {}) {
 
 function input(overrides: Partial<SystemAlertInput> = {}): SystemAlertInput {
   return {
-    type: AlertType.BACKUP_FAILED,
-    severity: AlertSeverity.CRITICAL,
+    type: NotificationType.BACKUP_FAILED,
+    severity: NotificationSeverity.CRITICAL,
     title: "Automatic backup failed",
     message: "The automatic backup for x failed: boom",
     data: { system: true },
@@ -52,6 +54,13 @@ describe("SystemAlertService", () => {
   let dataSource: DataSourceMock;
   let emailService: { getStatus: jest.Mock; sendMail: jest.Mock };
   let jobClaims: { claimOnce: jest.Mock };
+  /**
+   * The dispatch seam's `notify`, recorded AND forwarded to the real write door.
+   * Recording is what makes "the row travels through dispatch" a tested fact:
+   * a double that only forwarded was indistinguishable from the door itself, so
+   * reverting insertAlert to `notifications.create` left every test green.
+   */
+  let dispatchNotify: jest.Mock;
   let service: SystemAlertService;
 
   /**
@@ -71,7 +80,7 @@ describe("SystemAlertService", () => {
         if (data.adminQueryError) return Promise.reject(data.adminQueryError);
         return Promise.resolve(data.admins ?? [adminRow()]);
       }
-      if (text.includes("INSERT INTO budget_alerts")) {
+      if (text.includes("INSERT INTO notifications")) {
         // The pg driver returns bare rows for INSERT (never the
         // [rows, rowCount] tuple) -- see common/db/query-result.ts.
         return Promise.resolve(
@@ -83,15 +92,44 @@ describe("SystemAlertService", () => {
       }
       return Promise.resolve([]);
     });
-    manager.getRepository.mockReturnValue({
-      findOne: jest.fn().mockResolvedValue({ language: "en" }),
-    });
+    // Entity-aware because the write door reads the row it just inserted back
+    // as authoritative state: answering every findOne with a user preference
+    // would hand it a row with no id, which it correctly reads as "somebody
+    // else holds this notification".
+    manager.getRepository.mockImplementation((entity: unknown) =>
+      entity === Notification
+        ? {
+            findOne: jest.fn(({ where }: { where: { id: string } }) =>
+              Promise.resolve({ id: where.id }),
+            ),
+          }
+        : { findOne: jest.fn().mockResolvedValue({ language: "en" }) },
+    );
   }
 
   const insertStatements = () =>
     manager.query.mock.calls.filter(([sql]) =>
-      String(sql).includes("INSERT INTO budget_alerts"),
+      String(sql).includes("INSERT INTO notifications"),
     );
+
+  /**
+   * One insert's parameters keyed by the column the statement names, read out of
+   * the statement itself.
+   *
+   * By position these assertions pinned a parameter index, which is a fact about
+   * the writer's column order and not about the row: moving the INSERT behind
+   * one door renumbered every one of them, and an index that still exists points
+   * at the wrong value rather than failing.
+   */
+  const insertedRow = (index = 0): Record<string, unknown> => {
+    const [sql, params] = insertStatements()[index];
+    const columns = /INSERT INTO notifications\s*\(([^)]*)\)/.exec(String(sql));
+    if (!columns) throw new Error(`no column list in: ${String(sql)}`);
+    const names = columns[1].split(",").map((name) => name.trim());
+    return Object.fromEntries(
+      names.map((name, i) => [name, (params as unknown[])[i]]),
+    );
+  };
 
   const emailSentUpdates = () =>
     manager.query.mock.calls.filter(([sql]) =>
@@ -110,6 +148,18 @@ describe("SystemAlertService", () => {
       sendMail: jest.fn().mockResolvedValue(undefined),
     };
     jobClaims = { claimOnce: jest.fn().mockResolvedValue(true) };
+    // The real door, on the same mocked connection: what these tests are about is
+    // the SQL that lands and which recipient emails, and a double standing in for
+    // the writer would assert the call instead of the row.
+    const writeDoor = new NotificationService(dataSource as never);
+    // Both the admin fan-out (insertAlert) and the per-user path go through the
+    // dispatch seam. Forward `notify` to the real write door so the guarded
+    // insert still lands (and `created` still reflects the ON CONFLICT result)
+    // without pulling the push / email fan-out into these SQL-shape tests -- the
+    // fan-out has its own suite (`notification-dispatch.service.spec.ts`).
+    dispatchNotify = jest.fn((userId: string, input: unknown) =>
+      writeDoor.create(userId, input as never),
+    );
     service = new SystemAlertService(
       dataSource as never,
       emailService as never,
@@ -118,6 +168,8 @@ describe("SystemAlertService", () => {
           options?.defaultValue ?? _key,
       } as never,
       jobClaims as never,
+      writeDoor,
+      { notify: dispatchNotify } as never,
     );
   });
 
@@ -131,17 +183,47 @@ describe("SystemAlertService", () => {
       expect(result.created).toBe(2);
       const inserts = insertStatements();
       expect(inserts).toHaveLength(2);
-      for (const [sql, params] of inserts) {
-        expect(String(sql)).toContain(
-          "ON CONFLICT (user_id, dedupe_key) WHERE dedupe_key IS NOT NULL",
-        );
+      for (const [sql] of inserts) {
+        // One `ON CONFLICT DO NOTHING` covers every unique index on the table,
+        // so it arbitrates the dedupe key without naming it: the loser gets no
+        // row back and therefore sends nothing.
+        expect(String(sql)).toContain("ON CONFLICT DO NOTHING");
         expect(String(sql)).toContain("RETURNING id");
-        expect(params[7]).toBe("BACKUP_FAILED:user-1:2026-08-30");
       }
-      expect(inserts.map(([, params]) => params[0])).toEqual([
+      for (const i of [0, 1]) {
+        expect(insertedRow(i).dedupe_key).toBe(
+          "BACKUP_FAILED:user-1:2026-08-30",
+        );
+      }
+      expect([insertedRow(0).user_id, insertedRow(1).user_id]).toEqual([
         "admin-1",
         "admin-2",
       ]);
+    });
+
+    it("raises every admin's row THROUGH the dispatch seam, so SYSTEM push can reach them", async () => {
+      // The row shape is the door's; what this proves is the PATH. An admin who
+      // turned SYSTEM push on receives the alert on their device only because
+      // insertAlert asks dispatch, not the door -- and a double that merely
+      // forwarded could not tell the two apart.
+      route({
+        admins: [adminRow(), adminRow({ id: "admin-2", email: "b@e.f" })],
+      });
+      const alert = input();
+      await service.raiseAdminAlert(alert);
+
+      expect(dispatchNotify).toHaveBeenCalledTimes(2);
+      expect(dispatchNotify.mock.calls.map((call) => call[0])).toEqual([
+        "admin-1",
+        "admin-2",
+      ]);
+      expect(dispatchNotify.mock.calls[0][1]).toEqual(
+        expect.objectContaining({
+          type: alert.type,
+          severity: alert.severity,
+          dedupeKey: alert.dedupeKey,
+        }),
+      );
     });
 
     it("emails only the insert winners: a conflict loser's recipient gets nothing", async () => {
@@ -160,7 +242,9 @@ describe("SystemAlertService", () => {
         expect.any(String),
       );
       expect(emailSentUpdates()).toHaveLength(1);
-      expect(emailSentUpdates()[0][1]).toEqual(["row-1"]);
+      // The row AND its owner: the flag update carries a tenant predicate, so
+      // an id from one admin's fan-out cannot reach another's row.
+      expect(emailSentUpdates()[0][1]).toEqual(["row-1", "admin-1"]);
     });
 
     it("gives an admin with email disabled the row but no mail", async () => {
@@ -208,10 +292,10 @@ describe("SystemAlertService", () => {
   describe("email gating", () => {
     it("defaults to email for critical and warning, none for info and success", async () => {
       for (const [severity, expected] of [
-        [AlertSeverity.CRITICAL, 1],
-        [AlertSeverity.WARNING, 1],
-        [AlertSeverity.INFO, 0],
-        [AlertSeverity.SUCCESS, 0],
+        [NotificationSeverity.CRITICAL, 1],
+        [NotificationSeverity.WARNING, 1],
+        [NotificationSeverity.INFO, 0],
+        [NotificationSeverity.SUCCESS, 0],
       ] as const) {
         emailService.sendMail.mockClear();
         route({});
@@ -232,8 +316,8 @@ describe("SystemAlertService", () => {
       route({});
       await service.raiseAdminAlert(
         input({
-          type: AlertType.SMTP_FAILURE,
-          severity: AlertSeverity.CRITICAL,
+          type: NotificationType.SMTP_FAILURE,
+          severity: NotificationSeverity.CRITICAL,
           email: true,
           dedupeKey: "SMTP_FAILURE:2026-08-30",
         }),
@@ -254,8 +338,8 @@ describe("SystemAlertService", () => {
     it("writes one row for the affected user and sends no email", async () => {
       route({});
       const result = await service.raiseUserAlert("user-9", {
-        type: AlertType.SCHEDULED_POST_FAILED,
-        severity: AlertSeverity.WARNING,
+        type: NotificationType.SCHEDULED_POST_FAILED,
+        severity: NotificationSeverity.WARNING,
         title: "Rent could not be posted",
         message: "It failed",
         data: { system: true, scheduledId: "st-1" },
@@ -271,8 +355,8 @@ describe("SystemAlertService", () => {
     it("reports created: false for the dedupe loser", async () => {
       route({ insertResults: [[]] });
       const result = await service.raiseUserAlert("user-9", {
-        type: AlertType.SCHEDULED_POST_FAILED,
-        severity: AlertSeverity.WARNING,
+        type: NotificationType.SCHEDULED_POST_FAILED,
+        severity: NotificationSeverity.WARNING,
         title: "t",
         message: "m",
         data: {},
@@ -306,8 +390,8 @@ describe("SystemAlertService", () => {
       try {
         await expect(
           service.raiseUserAlert("user-9", {
-            type: AlertType.SCHEDULED_POST_FAILED,
-            severity: AlertSeverity.WARNING,
+            type: NotificationType.SCHEDULED_POST_FAILED,
+            severity: NotificationSeverity.WARNING,
             title: "t",
             message: "m",
             data: {},
@@ -321,11 +405,11 @@ describe("SystemAlertService", () => {
   });
 
   describe("bounds", () => {
-    it("every AlertType member fits the alert_type VARCHAR(30) column", () => {
+    it("every NotificationType member fits the alert_type VARCHAR(30) column", () => {
       // A longer member would not fail loudly: PostgreSQL raises 22001 at
       // insert time, which the never-throws contract would swallow, so the
       // alert would silently never exist. Guard the enum instead.
-      for (const member of Object.values(AlertType)) {
+      for (const member of Object.values(NotificationType)) {
         expect(member.length).toBeLessThanOrEqual(30);
       }
     });
@@ -339,9 +423,9 @@ describe("SystemAlertService", () => {
       const long = `${"N".repeat(400)} could not be posted`;
       await service.raiseAdminAlert(input({ title: long }));
 
-      const [, params] = insertStatements()[0];
-      expect(params[3]).toHaveLength(255);
-      expect(String(params[3]).endsWith("\u2026")).toBe(true);
+      const title = insertedRow().title;
+      expect(title).toHaveLength(255);
+      expect(String(title).endsWith("\u2026")).toBe(true);
     });
 
     it("leaves a title within the column alone", async () => {
@@ -349,7 +433,7 @@ describe("SystemAlertService", () => {
       await service.raiseAdminAlert(
         input({ title: "Automatic backup failed" }),
       );
-      expect(insertStatements()[0][1][3]).toBe("Automatic backup failed");
+      expect(insertedRow().title).toBe("Automatic backup failed");
     });
 
     it("truncates an oversized dedupe key deterministically rather than throwing", async () => {
@@ -364,8 +448,7 @@ describe("SystemAlertService", () => {
       } finally {
         error.mockRestore();
       }
-      const [, params] = insertStatements()[0];
-      expect(params[7]).toHaveLength(DEDUPE_KEY_MAX_LENGTH);
+      expect(insertedRow().dedupe_key).toHaveLength(DEDUPE_KEY_MAX_LENGTH);
     });
   });
 

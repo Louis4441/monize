@@ -53,6 +53,18 @@ const REFS: Record<string, RefRule[]> = {
       onMissing: "dropRow",
     },
   ],
+  // notification_reminders.source_notification_id is a real FK in schema.sql
+  // (ON DELETE SET NULL) that the entity models as a plain UUID column, so the
+  // entity-synced test DB has no constraint for the coverage guard to find; it
+  // is listed under SCHEMA_ONLY_FKS there. A reminder outlives its source by
+  // design (the sweep stops it), so a missing parent nulls the link.
+  notification_reminders: [
+    {
+      column: "source_notification_id",
+      refTable: "notifications",
+      onMissing: "null",
+    },
+  ],
   accounts: [
     { column: "linked_account_id", refTable: "accounts", onMissing: "null" },
     {
@@ -252,7 +264,7 @@ const REFS: Record<string, RefRule[]> = {
     },
     { column: "category_id", refTable: "categories", onMissing: "null" },
   ],
-  budget_alerts: [
+  notifications: [
     { column: "budget_id", refTable: "budgets", onMissing: "null" },
     {
       column: "budget_category_id",

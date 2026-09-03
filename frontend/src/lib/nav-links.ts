@@ -4,6 +4,7 @@ import {
   ArrowTrendingUpIcon,
   ArrowsRightLeftIcon,
   BanknotesIcon,
+  BellAlertIcon,
   BuildingLibraryIcon,
   BuildingOffice2Icon,
   CalendarDaysIcon,
@@ -56,6 +57,16 @@ export const TOOLS_LINKS: NavLinkDef[] = [
   { href: '/import', labelKey: 'import' },
 ];
 
+/**
+ * Administrator-only routes. A second entry is what turned the header's Admin
+ * button into a menu: with one page a button that navigates is right, with two
+ * it silently hides the other.
+ */
+export const ADMIN_LINKS: NavLinkDef[] = [
+  { href: '/admin/users', labelKey: 'userManagement' },
+  { href: '/admin/notifications', labelKey: 'notificationSettings' },
+];
+
 export const AI_LINKS: NavLinkDef[] = [
   { href: '/insights', labelKey: 'insights' },
   { href: '/ai', labelKey: 'aiAssistant' },
@@ -80,5 +91,6 @@ export const NAV_ICONS: Record<string, NavIcon> = {
   '/currencies': CurrencyDollarIcon,
   '/import': ArrowDownTrayIcon,
   '/admin/users': ShieldCheckIcon,
+  '/admin/notifications': BellAlertIcon,
   '/settings': Cog6ToothIcon,
 };

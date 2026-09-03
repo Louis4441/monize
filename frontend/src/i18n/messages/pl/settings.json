@@ -234,6 +234,115 @@
       "digestUpdateFailed": "Nie udało się zaktualizować preferencji podsumowania budżetu",
       "digestDayFailed": "Nie udało się zaktualizować dnia podsumowania",
       "testEmailFailed": "Nie udało się wysłać testowego e-maila"
+    },
+    "push": {
+      "heading": "Push w przeglądarce",
+      "diagnostics": {
+        "summary": "Diagnostyka powiadomień",
+        "intro": "Co ta przeglądarka i urządzenie zgłaszają Monize w sprawie powiadomień. Użyj przycisku testu, aby Monize utworzyło powiadomienie, którego możesz wypatrywać na urządzeniu, a następnie Kopiuj, aby przesłać pełny raport.",
+        "refresh": "Odśwież",
+        "copy": "Kopiuj raport",
+        "copied": "Skopiowano diagnostykę do schowka",
+        "localTest": "Pokaż testowe powiadomienie",
+        "localTestRunning": "Sprawdzanie…",
+        "localTestBody": "Jeśli to widzisz, powiadomienia działają na tym urządzeniu.",
+        "localTestCreated": "Monize utworzyło powiadomienie bez błędu, ale nic tutaj nie potwierdzi, że system faktycznie je wyświetlił. Jeśli nie widzisz go na urządzeniu, system je ukrywa; włącz powiadomienia dla Monize w ustawieniach urządzenia.",
+        "localTestError": "Nie udało się uruchomić testu na tym urządzeniu ({detail})."
+      },
+      "description": "Zarejestruj to urządzenie, aby Monize mogło je powiadomić nawet przy zamkniętej aplikacji. Na razie tą drogą dostarczane jest tylko powiadomienie testowe; wszystko inne nadal trafia do dzwonka.",
+      "androidNotify": "Na Androidzie sama zgoda nie wystarczy: system nadal może ukrywać powiadomienia. Przytrzymaj ikonę Monize na ekranie głównym, wybierz „O aplikacji”, potem „Powiadomienia” i upewnij się, że są włączone.",
+      "permissionHint": "Po włączeniu przeglądarka poprosi o zgodę na wyświetlanie powiadomień. Nic nie zostanie wysłane, dopóki jej nie udzielisz.",
+      "enableButton": "Włącz na tym urządzeniu",
+      "enablingButton": "Włączanie...",
+      "sendTestButton": "Wyślij powiadomienie testowe",
+      "sendingTestButton": "Wysyłanie...",
+      "removeButton": "Usuń",
+      "thisDevice": "To urządzenie",
+      "unifiedpushBadge": "UnifiedPush",
+      "unnamedDevice": "Urządzenie bez nazwy",
+      "lastSeen": "Ostatnia aktywność {when}",
+      "noLiveDevices": "Nie zarejestrowano jeszcze żadnego urządzenia. Włącz push na tym urządzeniu, aby wysłać test.",
+      "notConfigured": "Push w przeglądarce nie jest dostępny w tej instancji Monize. Administrator może go włączyć w sekcji Admin.",
+      "disabledByAdmin": "Administrator wyłączył push w przeglądarce dla tej instancji Monize.",
+      "keyUnreadable": "Monize nie potrafi odczytać pary kluczy push tej instancji, więc nic nie jest dostarczane. Administrator może to naprawić, wymieniając parę kluczy w sekcji Admin.",
+      "serverKeyMissing": "Tej instancji Monize brakuje klucza szyfrującego potrzebnego do otwarcia pary kluczy push, więc nic nie może zostać dostarczone. Administrator musi ustawić go we wdrożeniu i zrestartować aplikację.",
+      "statusUnavailable": "Monize nie mógł sprawdzić, czy push w przeglądarce jest dostępny. Odśwież stronę, aby spróbować ponownie.",
+      "devicesUnavailable": "Monize nie wczytał Twoich zarejestrowanych urządzeń. Reszta tej strony działa normalnie; odśwież, aby spróbować ponownie.",
+      "unsupported": {
+        "unsupported": "Ta przeglądarka nie może odbierać powiadomień push.",
+        "denied": "Powiadomienia dla Monize są zablokowane w tej przeglądarce. Zezwól na nie w ustawieniach witryny, a następnie odśwież tę stronę.",
+        "ios-browser": "Na iPhonie i iPadzie powiadomienia push działają dopiero po zainstalowaniu Monize na ekranie głównym. Użyj Udostępnij, potem Dodaj do ekranu głównego i otwórz Monize stamtąd."
+      },
+      "disabledReason": {
+        "GONE": "Nieosiągalne. Włącz push ponownie w tamtej przeglądarce.",
+        "KEY_ROTATED": "Wyłączone, gdy ta instancja wymieniła parę kluczy push. Włącz push ponownie w tamtej przeglądarce.",
+        "FAILING": "Wyłączone po powtarzających się błędach dostarczania. Włącz push ponownie w tamtej przeglądarce."
+      },
+      "toasts": {
+        "enabled": "Włączono powiadomienia push na tym urządzeniu",
+        "enableFailed": "Nie udało się włączyć powiadomień push",
+        "permissionDenied": "Ta przeglądarka blokuje powiadomienia Monize. Zezwól na nie w ustawieniach witryny i spróbuj ponownie.",
+        "permissionDeniedIos": "Powiadomienia dla Monize są zablokowane. Otwórz Ustawienia iOS, potem Powiadomienia, potem Monize, aby na nie zezwolić.",
+        "permissionDismissed": "Powiadomienia nie zostały włączone. Wybierz Zezwól, gdy przeglądarka zapyta.",
+        "permissionNoPrompt": "Powiadomienia nie zostały włączone i nie pojawiło się żadne pytanie. Otwórz Ustawienia iOS, potem Powiadomienia, potem Monize, i zezwól tam. Jeśli Monize nie ma na liście, usuń je z ekranu głównego, dodaj ponownie (Udostępnij, potem Dodaj do ekranu głównego) i spróbuj jeszcze raz.",
+        "removed": "Usunięto urządzenie",
+        "removeFailed": "Nie udało się usunąć urządzenia",
+        "testSent": "{count, plural, one {Wysłano powiadomienie testowe na 1 urządzenie} few {Wysłano powiadomienie testowe na # urządzenia} many {Wysłano powiadomienie testowe na # urządzeń} other {Wysłano powiadomienie testowe na # urządzenia}}",
+        "testPartial": "Powiadomienie testowe dotarło do {delivered} z {attempted} urządzeń",
+        "testFailed": "Nie udało się dostarczyć powiadomienia testowego",
+        "pushServiceRefused": "Usługa push przeglądarki odrzuciła rejestrację. Spróbuj ponownie za chwilę; jeśli błąd się powtarza, sprawdź ustawienia push w przeglądarce.",
+        "pushServiceRefusedBrave": "Brave domyślnie blokuje usługę push. W Brave otwórz Ustawienia, potem Prywatność i bezpieczeństwo, włącz „Używaj usług Google do obsługi wiadomości push”, zrestartuj przeglądarkę i spróbuj ponownie."
+      },
+      "testResults": {
+        "heading": "Ostatni test, na urządzenie",
+        "status": {
+          "sent": "dostarczono do usługi push",
+          "expired": "subskrypcja wygasła; włącz push na tym urządzeniu ponownie",
+          "transient": "nie dostarczono (błąd przejściowy); spróbuj ponownie",
+          "unconfigured": "ta instancja nie może teraz podpisywać wiadomości push"
+        }
+      }
+    },
+    "preferences": {
+      "heading": "Jak mnie powiadamiać",
+      "description": "Dzwonek zawsze pokazuje wszystkie powiadomienia. Wybierz, które rodzaje Monize wyśle również e-mailem lub push, i jak często.",
+      "categoryHeader": "Powiadomienie",
+      "channels": {
+        "inApp": "W aplikacji",
+        "emailReport": "E-mail (raport)",
+        "emailNotification": "E-mail (alert)",
+        "push": "Push",
+        "unifiedpush": "UnifiedPush"
+      },
+      "categories": {
+        "PAYMENTS": "Rachunki i zaplanowane",
+        "BUDGETS": "Budżety",
+        "SYSTEM": "Alerty systemowe"
+      },
+      "inAppAlways": "Zawsze widoczne w dzwonku",
+      "channelNotApplicable": "Nie dotyczy tego typu powiadomienia",
+      "emailToggleLabel": "E-mail (raport) dla: {category}",
+      "saveFailed": "Nie udało się zapisać tego ustawienia",
+      "throttle": {
+        "label": "Odstęp",
+        "ariaLabel": "Odstęp dla: {category}",
+        "hint": "Pomiń alert lub push, jeśli w tym oknie pojawił się już inny z tej samej grupy.",
+        "options": {
+          "0": "Wyłączone",
+          "5": "5 minut",
+          "15": "15 minut",
+          "30": "30 minut",
+          "60": "1 godzina",
+          "360": "6 godzin",
+          "1440": "24 godziny"
+        }
+      },
+      "emailNotificationToggleLabel": "E-mail alertowy dla: {category}",
+      "pushToggleLabel": "Push dla: {category}",
+      "unifiedpushToggleLabel": "UnifiedPush dla {category}",
+      "emailUnavailable": "Włącz powyżej powiadomienia e-mail, aby wysyłać je e-mailem.",
+      "pushUnavailable": "Najpierw włącz push na tym urządzeniu (patrz niżej).",
+      "unifiedpushUnavailable": "Zarejestruj punkt końcowy UnifiedPush w aplikacji dystrybutora, aby korzystać z tego kanału."
     }
   },
   "help": {

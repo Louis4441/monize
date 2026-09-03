@@ -147,7 +147,18 @@ export const RESTORE_PLAN: ReadonlyArray<RestoreStep> = [
     countKey: "budgetPeriodCategories",
     scopeToUser: false,
   },
-  { table: "budget_alerts", countKey: "budgetAlerts", scopeToUser: true },
+  { table: "notifications", countKey: "notifications", scopeToUser: true },
+  {
+    table: "notification_preferences",
+    countKey: "notificationPreferences",
+    scopeToUser: true,
+  },
+  {
+    // After notifications: source_notification_id references notifications(id).
+    table: "notification_reminders",
+    countKey: "notificationReminders",
+    scopeToUser: true,
+  },
   { table: "custom_reports", countKey: "customReports", scopeToUser: true },
   {
     table: "investment_reports",

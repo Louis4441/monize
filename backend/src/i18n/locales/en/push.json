@@ -1,0 +1,23 @@
+{
+  "test": {
+    "title": "Monize test notification",
+    "body": "Push notifications are working on this device."
+  },
+  "notification": {
+    "payments": {
+      "title": "Payment reminder",
+      "body": "A bill or scheduled payment needs your attention. Open Monize for the details."
+    },
+    "budgets": {
+      "title": "Budget alert",
+      "body": "One of your budgets needs your attention. Open Monize for the details."
+    },
+    "system": {
+      "title": "System notice",
+      "body": "Monize has a system notice for you. Open the app for the details."
+    }
+  },
+  "actions": {
+    "stopReminder": "Stop reminders"
+  }
+}

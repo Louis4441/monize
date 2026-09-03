@@ -1,0 +1,88 @@
+{
+  "title": "通知",
+  "unread": "{count} 則未讀",
+  "markAllRead": "全部標為已讀",
+  "loading": "正在載入通知...",
+  "empty": "沒有通知",
+  "undo": "復原",
+  "buttonTitle": "通知",
+  "buttonAriaLabel": "通知",
+  "dismissAriaLabel": "忽略通知",
+  "closeAriaLabel": "關閉通知",
+  "emptyFiltered": "沒有通知符合目前的篩選條件",
+  "deleteAll": "全部刪除",
+  "deleteAllConfirmTitle": "刪除通知",
+  "deleteAllConfirmMessageAll": "刪除所有通知？此操作無法復原。",
+  "deleteAllConfirmMessageFiltered": "刪除符合目前篩選條件的所有通知，包括未顯示的？此操作無法復原。",
+  "deleted": "{count, plural, other {已刪除 # 則通知}}",
+  "deleteFailed": "無法刪除通知",
+  "filter": {
+    "financial": "財務",
+    "system": "系統"
+  },
+  "severity": {
+    "critical": "緊急",
+    "warning": "警告",
+    "success": "好消息",
+    "info": "資訊"
+  },
+  "reminder": {
+    "remindAriaLabel": "提醒我此事",
+    "stopAriaLabel": "停止此提醒",
+    "stopped": "提醒已停止",
+    "stopFailed": "無法停止提醒",
+    "created": "提醒已設定",
+    "createFailed": "無法設定提醒",
+    "dialogTitle": "提醒我",
+    "dialogDescription": "稍後再次收到此通知，直到你處理為止。",
+    "modeLabel": "頻率",
+    "modeRepeat": "重複直到我停止",
+    "modeOnce": "只再一次",
+    "intervalLabelRepeat": "提醒我，每隔",
+    "intervalLabelOnce": "在此之後提醒我",
+    "durationMinutes": "{minutes, plural, other {# 分鐘}}",
+    "durationHours": "{hours, plural, other {# 小時}}",
+    "cancel": "取消",
+    "confirm": "設定提醒"
+  },
+  "billDue": {
+    "titleOverdue": "{payee} 已逾期",
+    "titleToday": "{payee} 今天到期",
+    "titleTomorrow": "{payee} 明天到期",
+    "titleInDays": "{payee} 將在 {days} 天後到期",
+    "amountDue": "{date} 應付 {amount}",
+    "amountUnavailable": "金額無法取得（無目前匯率），到期日 {date}"
+  },
+  "system": {
+    "backupFailed": {
+      "title": "自動備份失敗",
+      "message": "{user} 的自動備份失敗：{error}"
+    },
+    "backupPartial": {
+      "title": "自動備份不完整",
+      "messageAttachments": "{user} 的備份已寫入，但 {expected} 個附件中有 {missing} 個無法納入，另有 {inconsistent} 個與其中繼資料不符。完整備份已保留。",
+      "messagePromotion": "{user} 的每日備份成功，但其每週或每月副本無法寫入：{error}",
+      "messageRetention": "{user} 的備份成功，但舊的備份檔案無法清理：{error}"
+    },
+    "encryptionKeyMissing": {
+      "title": "尚未設定加密金鑰",
+      "message": "未設定 ENCRYPTION_KEY，備份將以未加密方式寫入，且無法儲存機密資訊。未來版本將在缺少該金鑰時拒絕啟動。"
+    },
+    "smtpFailure": {
+      "title": "郵件傳送失敗",
+      "message": "Monize 無法傳送郵件：{error}。通知與提醒未能送達。"
+    },
+    "providerOutage": {
+      "title": "{provider} 沒有回應",
+      "message": "無法取得 {provider} 的市場資料。在其恢復回應之前，價格與指數資料可能已過時。"
+    },
+    "providerRecovered": {
+      "title": "{provider} 已恢復回應",
+      "message": "故障已結束，{provider} 的市場資料正在重新更新。"
+    },
+    "scheduledPostFailed": {
+      "title": "無法登錄 {name}",
+      "message": "您到期日為 {date} 的定期交易未能自動登錄：{error}。您可以在「帳單與存款」中手動登錄。"
+    }
+  }
+}

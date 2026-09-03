@@ -4,6 +4,9 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
+import { PushDevicesPanel } from './PushDevicesPanel';
+import { PushDiagnostics } from './PushDiagnostics';
+import { NotificationPreferencesMatrix } from './NotificationPreferencesMatrix';
 import { userSettingsApi } from '@/lib/user-settings';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { UserPreferences } from '@/types/auth';
@@ -91,6 +94,9 @@ export function NotificationsSection({
     <div className="bg-white dark:bg-gray-800 shadow dark:shadow-gray-700/50 rounded-lg p-6 mb-6">
       <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{t('heading')}</h2>
 
+      {/* Email and browser push are separate channels, so the SMTP gate below
+          covers only the email half. Nesting push inside it hid the whole push
+          surface on every deployment that never configured a mail server. */}
       {!smtpConfigured ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">
           {t('smtpNotConfigured')}
@@ -191,6 +197,17 @@ export function NotificationsSection({
           </div>
         </div>
       )}
+
+      {/* The channel matrix spans email AND push, so it renders independent of
+          the email master switch: push preferences must be reachable when email
+          is off or unconfigured (delivery isolation). Its email columns gate on
+          `emailAvailable`; its push column gates on a live device. */}
+      <NotificationPreferencesMatrix
+        emailAvailable={smtpConfigured && notificationEmail}
+      />
+
+      <PushDevicesPanel />
+      <PushDiagnostics />
     </div>
   );
 }

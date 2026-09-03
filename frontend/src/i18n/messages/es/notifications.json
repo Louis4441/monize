@@ -1,0 +1,88 @@
+{
+  "title": "Notificaciones",
+  "unread": "{count} sin leer",
+  "markAllRead": "Marcar todas como leídas",
+  "loading": "Cargando notificaciones...",
+  "empty": "Sin notificaciones",
+  "undo": "Deshacer",
+  "buttonTitle": "Notificaciones",
+  "buttonAriaLabel": "Notificaciones",
+  "dismissAriaLabel": "Descartar notificación",
+  "closeAriaLabel": "Cerrar notificaciones",
+  "emptyFiltered": "Ninguna notificación coincide con el filtro actual",
+  "deleteAll": "Eliminar todas",
+  "deleteAllConfirmTitle": "Eliminar notificaciones",
+  "deleteAllConfirmMessageAll": "¿Eliminar todas las notificaciones? Esto no se puede deshacer.",
+  "deleteAllConfirmMessageFiltered": "¿Eliminar todas las notificaciones que coinciden con el filtro actual, incluidas las que no se muestran? Esto no se puede deshacer.",
+  "deleted": "{count, plural, one {# notificación eliminada} other {# notificaciones eliminadas}}",
+  "deleteFailed": "No se pudieron eliminar las notificaciones",
+  "filter": {
+    "financial": "Financieras",
+    "system": "Sistema"
+  },
+  "severity": {
+    "critical": "Crítico",
+    "warning": "Advertencia",
+    "success": "Buenas noticias",
+    "info": "Información"
+  },
+  "reminder": {
+    "remindAriaLabel": "Recordarme esto",
+    "stopAriaLabel": "Detener este recordatorio",
+    "stopped": "Recordatorio detenido",
+    "stopFailed": "No se pudo detener el recordatorio",
+    "created": "Recordatorio establecido",
+    "createFailed": "No se pudo establecer el recordatorio",
+    "dialogTitle": "Recordarme",
+    "dialogDescription": "Recibe esta notificación de nuevo más tarde hasta que actúes.",
+    "modeLabel": "Con qué frecuencia",
+    "modeRepeat": "Repetir hasta que lo detenga",
+    "modeOnce": "Solo una vez más",
+    "intervalLabelRepeat": "Recordarme cada",
+    "intervalLabelOnce": "Recordarme después de",
+    "durationMinutes": "{minutes, plural, one {# minuto} other {# minutos}}",
+    "durationHours": "{hours, plural, one {# hora} other {# horas}}",
+    "cancel": "Cancelar",
+    "confirm": "Establecer recordatorio"
+  },
+  "billDue": {
+    "titleOverdue": "{payee} vencido",
+    "titleToday": "{payee} vence hoy",
+    "titleTomorrow": "{payee} vence mañana",
+    "titleInDays": "{payee} vence en {days} días",
+    "amountDue": "{amount} a pagar el {date}",
+    "amountUnavailable": "Importe no disponible (no hay tipo de cambio actual), vence el {date}"
+  },
+  "system": {
+    "backupFailed": {
+      "title": "Error en la copia de seguridad automática",
+      "message": "La copia de seguridad automática de {user} falló: {error}"
+    },
+    "backupPartial": {
+      "title": "Copia de seguridad automática incompleta",
+      "messageAttachments": "La copia de seguridad de {user} se escribió, pero no se pudieron incluir {missing} de {expected} archivos adjuntos y {inconsistent} no coincidían con sus metadatos. Las copias completas se conservaron.",
+      "messagePromotion": "La copia diaria de {user} se completó, pero su copia semanal o mensual no se pudo escribir: {error}",
+      "messageRetention": "La copia de seguridad de {user} se completó, pero los archivos de copias antiguas no se pudieron eliminar: {error}"
+    },
+    "encryptionKeyMissing": {
+      "title": "Clave de cifrado sin configurar",
+      "message": "ENCRYPTION_KEY no está definida, por lo que las copias de seguridad se escriben sin cifrar y no se pueden guardar secretos. Una versión futura no arrancará sin ella."
+    },
+    "smtpFailure": {
+      "title": "El envío de correo está fallando",
+      "message": "Monize no pudo enviar correo: {error}. Las notificaciones y los recordatorios no se están entregando."
+    },
+    "providerOutage": {
+      "title": "{provider} no responde",
+      "message": "Los datos de mercado de {provider} no están disponibles. Los precios y los datos de índices pueden estar desactualizados hasta que vuelva a responder."
+    },
+    "providerRecovered": {
+      "title": "{provider} responde de nuevo",
+      "message": "La interrupción terminó y los datos de mercado de {provider} se están actualizando de nuevo."
+    },
+    "scheduledPostFailed": {
+      "title": "{name} no se pudo registrar",
+      "message": "Su transacción programada con vencimiento el {date} no se registró automáticamente: {error}. Puede registrarla manualmente desde Facturas y depósitos."
+    }
+  }
+}

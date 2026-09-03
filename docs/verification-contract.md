@@ -106,9 +106,24 @@ INV-LOAN-002's entry names the missing source scan while its row said `--`.
 | INV-CURRENCY-001 currency delete | supporting | **required** | required | required | -- | -- | -- | optional |
 | INV-ATTACHMENT-001 bytes present | supporting | -- | required | optional | -- | **required** | **required** | required |
 | INV-BACKUP-001 backup complete | supporting | -- | required | -- | optional | **required** | **required** | required |
+| INV-PUSH-001 subscription ownership | required | -- | **required** | required (not yet met) | -- | -- | -- | optional |
+| INV-PUSH-002 private key stays server-side | supporting | **required** | -- | -- | -- | -- | -- | -- |
+| INV-PUSH-006 channel offered only while usable | **required** | -- | optional | -- | -- | -- | -- | -- |
+| INV-PUSH-003 rotation retires subscriptions | **required** | -- | required | -- | -- | -- | -- | -- |
+| INV-PUSH-004 push failure is reported | **required** | -- | optional | -- | -- | required | required | -- |
+| INV-PUSH-005 subscription not portable | supporting | -- | **required** | -- | -- | -- | -- | -- |
+| INV-PUSH-007 one push sender | supporting | **required** | -- | -- | -- | -- | -- | -- |
+| INV-PUSH-008 transport gates its wire | **required** | -- | optional | -- | -- | -- | -- | optional |
+| INV-PUSH-009 unsupported channel forced off | **required** | **required** | -- | -- | -- | -- | -- | -- |
+| INV-PUSH-010 endpoint validated, transport list held equal | **required** | **required** | -- | -- | -- | -- | -- | -- |
 | INV-CRON-001 one effect per tick | supporting | -- | required | required | **required** | optional | -- | -- |
 | INV-PROVIDER-001 outage reported once | required | **required** | required | optional | required | -- | required | -- |
 | INV-ALERT-001 system alert raised once | required | -- | **required** | optional | required | -- | -- | -- |
+| INV-NOTIFY-001 one notification writer | supporting | **required** | -- | -- | -- | -- | -- | -- |
+| INV-DISPATCH-001 seam never writes | supporting | **required** | -- | -- | -- | -- | -- | -- |
+| INV-DISPATCH-002 in-app row always written | **required** | -- | optional | -- | -- | -- | -- | -- |
+| INV-DISPATCH-003 throttle gates fan-out only | **required** | -- | optional | required (not yet met) | optional | -- | -- | -- |
+| INV-DISPATCH-004 delivery failure never surfaces | **required** | -- | -- | -- | -- | required | -- | -- |
 | INV-RLS-001 role privilege | supporting | -- | **required** | -- | required | -- | -- | -- |
 | INV-CACHE-001 cache invalidation | required | **required** | -- | -- | -- | -- | -- | required |
 | INV-PAYEE-001 lookup never overwrites | **required** | supporting | optional | optional | -- | -- | -- | -- |

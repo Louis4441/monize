@@ -1,0 +1,88 @@
+{
+  "title": "Powiadomienia",
+  "unread": "{count} nieprzeczytanych",
+  "markAllRead": "Oznacz wszystkie jako przeczytane",
+  "loading": "Ładowanie powiadomień...",
+  "empty": "Brak powiadomień",
+  "undo": "Cofnij",
+  "buttonTitle": "Powiadomienia",
+  "buttonAriaLabel": "Powiadomienia",
+  "dismissAriaLabel": "Odrzuć powiadomienie",
+  "closeAriaLabel": "Zamknij powiadomienia",
+  "emptyFiltered": "Żadne powiadomienie nie pasuje do bieżącego filtra",
+  "deleteAll": "Usuń wszystkie",
+  "deleteAllConfirmTitle": "Usuń powiadomienia",
+  "deleteAllConfirmMessageAll": "Usunąć wszystkie powiadomienia? Tej operacji nie można cofnąć.",
+  "deleteAllConfirmMessageFiltered": "Usunąć wszystkie powiadomienia pasujące do bieżącego filtra, w tym niewyświetlone? Tej operacji nie można cofnąć.",
+  "deleted": "{count, plural, one {Usunięto # powiadomienie} few {Usunięto # powiadomienia} other {Usunięto # powiadomień}}",
+  "deleteFailed": "Nie udało się usunąć powiadomień",
+  "filter": {
+    "financial": "Finansowe",
+    "system": "Systemowe"
+  },
+  "severity": {
+    "critical": "Krytyczny",
+    "warning": "Ostrzeżenie",
+    "success": "Dobre wieści",
+    "info": "Informacja"
+  },
+  "reminder": {
+    "remindAriaLabel": "Przypomnij mi o tym",
+    "stopAriaLabel": "Zatrzymaj to przypomnienie",
+    "stopped": "Przypomnienie zatrzymane",
+    "stopFailed": "Nie udało się zatrzymać przypomnienia",
+    "created": "Przypomnienie ustawione",
+    "createFailed": "Nie udało się ustawić przypomnienia",
+    "dialogTitle": "Przypomnij mi",
+    "dialogDescription": "Otrzymaj to powiadomienie ponownie później, dopóki nie podejmiesz działania.",
+    "modeLabel": "Jak często",
+    "modeRepeat": "Powtarzaj, aż zatrzymam",
+    "modeOnce": "Tylko jeszcze raz",
+    "intervalLabelRepeat": "Przypominaj co",
+    "intervalLabelOnce": "Przypomnij za",
+    "durationMinutes": "{minutes, plural, one {# minuta} few {# minuty} many {# minut} other {# minuty}}",
+    "durationHours": "{hours, plural, one {# godzina} few {# godziny} many {# godzin} other {# godziny}}",
+    "cancel": "Anuluj",
+    "confirm": "Ustaw przypomnienie"
+  },
+  "billDue": {
+    "titleOverdue": "{payee} – termin minął",
+    "titleToday": "{payee} – termin dzisiaj",
+    "titleTomorrow": "{payee} – termin jutro",
+    "titleInDays": "{payee} – termin za {days} dni",
+    "amountDue": "{amount} do zapłaty {date}",
+    "amountUnavailable": "Kwota niedostępna (brak aktualnego kursu wymiany), termin {date}"
+  },
+  "system": {
+    "backupFailed": {
+      "title": "Automatyczna kopia zapasowa nie powiodła się",
+      "message": "Automatyczna kopia zapasowa dla {user} nie powiodła się: {error}"
+    },
+    "backupPartial": {
+      "title": "Automatyczna kopia zapasowa jest niekompletna",
+      "messageAttachments": "Kopia zapasowa dla {user} została zapisana, ale nie udało się dołączyć {missing} z {expected} załączników, a {inconsistent} nie zgadzało się ze swoimi metadanymi. Kompletne kopie zapasowe zostały zachowane.",
+      "messagePromotion": "Dzienna kopia zapasowa dla {user} powiodła się, ale nie udało się zapisać jej kopii tygodniowej lub miesięcznej: {error}",
+      "messageRetention": "Kopia zapasowa dla {user} powiodła się, ale nie udało się usunąć starych plików kopii zapasowych: {error}"
+    },
+    "encryptionKeyMissing": {
+      "title": "Klucz szyfrowania nie jest skonfigurowany",
+      "message": "ENCRYPTION_KEY nie jest ustawiony, więc kopie zapasowe są zapisywane bez szyfrowania, a sekrety nie mogą być przechowywane. Przyszła wersja nie uruchomi się bez niego."
+    },
+    "smtpFailure": {
+      "title": "Wysyłanie e-maili nie działa",
+      "message": "Monize nie mógł wysłać e-maila: {error}. Powiadomienia i przypomnienia nie są dostarczane."
+    },
+    "providerOutage": {
+      "title": "{provider} nie odpowiada",
+      "message": "Dane rynkowe z {provider} są niedostępne. Ceny i dane indeksów mogą być nieaktualne, dopóki dostawca znów nie odpowie."
+    },
+    "providerRecovered": {
+      "title": "{provider} znów odpowiada",
+      "message": "Awaria minęła i dane rynkowe z {provider} są znów aktualizowane."
+    },
+    "scheduledPostFailed": {
+      "title": "Nie udało się zaksięgować: {name}",
+      "message": "Twoja zaplanowana transakcja z terminem {date} nie została zaksięgowana automatycznie: {error}. Możesz zaksięgować ją ręcznie w sekcji Rachunki i wpłaty."
+    }
+  }
+}

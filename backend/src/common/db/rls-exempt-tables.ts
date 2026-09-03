@@ -32,6 +32,8 @@ export const RLS_EXEMPT_TABLES: Readonly<Record<string, string>> = {
     "OIDC provider artifacts keyed by opaque id/model/grant_id/uid, with no owner column to policy on.",
   provider_health:
     "Deployment-wide provider availability and alert bookkeeping; no owner column, one outage is every user's.",
+  push_instance_config:
+    "Singleton deployment push identity (one VAPID key pair per instance); no owner column, one identity is every user's.",
   schema_migrations:
     "Migration infrastructure, written only by db-migrate running as the owner.",
 };

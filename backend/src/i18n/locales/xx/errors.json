@@ -223,7 +223,6 @@
     "categoryNotFound": "[XX-Category with ID {{ id }} not found-XX]",
     "categoryAlreadyInBudget": "[XX-This category is already in the budget-XX]",
     "budgetCategoryNotFound": "[XX-Budget category with ID {{ id }} not found-XX]",
-    "alertNotFound": "[XX-Alert with ID {{ id }} not found-XX]",
     "periodNotFound": "[XX-Budget period with ID {{ id }} not found-XX]",
     "noOpenPeriod": "[XX-No open period to close-XX]",
     "categoryIdsNotOwned": "[XX-Category IDs not found or not owned by user: {{ ids }}-XX]"
@@ -347,8 +346,23 @@
     "invalidGranularity": "[XX-granularity must be 'daily' or 'monthly'-XX]"
   },
   "notifications": {
+    "notFound": "[XX-Notification with ID {{ id }} not found-XX]",
     "smtpNotConfigured": "[XX-SMTP is not configured. Set SMTP environment variables.-XX]",
-    "noEmailOnFile": "[XX-No email address on file for this user.-XX]"
+    "noEmailOnFile": "[XX-No email address on file for this user.-XX]",
+    "categoryNotConfigurable": "[XX-Category {{ category }} is not configurable here-XX]",
+    "emptyPreferenceUpdate": "[XX-At least one preference field is required-XX]",
+    "tooManyReminders": "[XX-You can have at most {{ max }} active reminders. Stop one before adding another.-XX]",
+    "reminderOnReminder": "[XX-A reminder cannot be set on a reminder's own notification. Set it on the original notification instead.-XX]"
+  },
+  "push": {
+    "channelUnavailable": "[XX-Push notifications are not available on this Monize instance.-XX]",
+    "endpointClaimed": "[XX-This browser is already registered to a different Monize account. Sign out of that account in this browser and try again.-XX]",
+    "deviceNotFound": "[XX-Push device not found.-XX]",
+    "noDevices": "[XX-No push devices are registered for this account. Enable push notifications in this browser first.-XX]",
+    "rotationUnavailable": "[XX-ENCRYPTION_KEY is not set, so a new private key could not be stored encrypted. Set it and restart before rotating.-XX]",
+    "channelNotConfigured": "[XX-This instance has no push key pair yet, so the browser push channel cannot be switched on or off.-XX]",
+    "keyRotated": "[XX-This instance changed its push key while you were on this page. Reload and enable push again.-XX]",
+    "tooManyDevices": "[XX-This account already has the maximum number of push devices. Remove one before adding another.-XX]"
   },
   "institutions": {
     "nameConflict": "[XX-Institution with name \"{{ name }}\" already exists-XX]",

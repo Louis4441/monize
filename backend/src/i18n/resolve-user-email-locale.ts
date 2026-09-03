@@ -4,9 +4,11 @@ import { isSupportedLocale } from "./config";
 import { currentRequestLocale } from "./request-locale";
 
 /**
- * Resolve the locale an email addressed to `userId` should be rendered in.
+ * Resolve the locale a message addressed to `userId` should be rendered in --
+ * an email, or a Web Push body, which is composed on the server for the same
+ * reason and therefore has the same question to answer.
  *
- * Email copy must match the recipient's own language, not the request locale of
+ * The copy must match the recipient's own language, not the request locale of
  * whoever triggered the send (an admin provisioning an account, a scheduler, or
  * an attacker tripping the failed-login lockout). Precedence:
  *

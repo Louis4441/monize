@@ -1,0 +1,23 @@
+{
+  "test": {
+    "title": "Notifikasi uji coba Monize",
+    "body": "Notifikasi push berfungsi di perangkat ini."
+  },
+  "notification": {
+    "payments": {
+      "title": "Pengingat pembayaran",
+      "body": "Sebuah tagihan atau pembayaran terjadwal memerlukan perhatian Anda. Buka Monize untuk detailnya."
+    },
+    "budgets": {
+      "title": "Peringatan anggaran",
+      "body": "Salah satu anggaran Anda memerlukan perhatian. Buka Monize untuk detailnya."
+    },
+    "system": {
+      "title": "Pemberitahuan sistem",
+      "body": "Monize memiliki pemberitahuan sistem untuk Anda. Buka aplikasi untuk detailnya."
+    }
+  },
+  "actions": {
+    "stopReminder": "Hentikan pengingat"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "test": {
+    "title": "Thông báo thử nghiệm Monize",
+    "body": "Thông báo đẩy đang hoạt động trên thiết bị này."
+  },
+  "notification": {
+    "payments": {
+      "title": "Nhắc nhở thanh toán",
+      "body": "Một hóa đơn hoặc khoản thanh toán đã lên lịch cần bạn chú ý. Mở Monize để xem chi tiết."
+    },
+    "budgets": {
+      "title": "Cảnh báo ngân sách",
+      "body": "Một trong các ngân sách của bạn cần được chú ý. Mở Monize để xem chi tiết."
+    },
+    "system": {
+      "title": "Thông báo hệ thống",
+      "body": "Monize có một thông báo hệ thống cho bạn. Mở ứng dụng để xem chi tiết."
+    }
+  },
+  "actions": {
+    "stopReminder": "Dừng nhắc nhở"
+  }
+}

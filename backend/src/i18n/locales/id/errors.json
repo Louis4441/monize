@@ -214,7 +214,6 @@
     "categoryNotFound": "Kategori dengan ID {{ id }} tidak ditemukan",
     "categoryAlreadyInBudget": "Kategori ini sudah ada dalam anggaran",
     "budgetCategoryNotFound": "Kategori anggaran dengan ID {{ id }} tidak ditemukan",
-    "alertNotFound": "Peringatan dengan ID {{ id }} tidak ditemukan",
     "periodNotFound": "Periode anggaran dengan ID {{ id }} tidak ditemukan",
     "noOpenPeriod": "Tidak ada periode yang terbuka untuk ditutup",
     "categoryIdsNotOwned": "ID kategori tidak ditemukan atau bukan milik pengguna: {{ ids }}"
@@ -338,8 +337,23 @@
     "invalidGranularity": "granularity harus 'daily' atau 'monthly'"
   },
   "notifications": {
+    "notFound": "Notifikasi dengan ID {{ id }} tidak ditemukan",
     "smtpNotConfigured": "SMTP belum dikonfigurasi. Atur variabel lingkungan SMTP.",
-    "noEmailOnFile": "Tidak ada alamat email yang tercatat untuk pengguna ini."
+    "noEmailOnFile": "Tidak ada alamat email yang tercatat untuk pengguna ini.",
+    "categoryNotConfigurable": "Kategori {{ category }} tidak dapat dikonfigurasi di sini",
+    "emptyPreferenceUpdate": "Setidaknya satu bidang preferensi diperlukan",
+    "tooManyReminders": "Anda dapat memiliki maksimal {{ max }} pengingat aktif. Hentikan satu sebelum menambahkan yang lain.",
+    "reminderOnReminder": "Pengingat tidak dapat dibuat pada notifikasi yang dihasilkan pengingat. Buatlah pada notifikasi aslinya."
+  },
+  "push": {
+    "channelUnavailable": "Notifikasi push tidak tersedia di instans Monize ini.",
+    "endpointClaimed": "Peramban ini sudah terdaftar pada akun Monize lain. Keluar dari akun tersebut di peramban ini lalu coba lagi.",
+    "deviceNotFound": "Perangkat push tidak ditemukan.",
+    "noDevices": "Belum ada perangkat push terdaftar untuk akun ini. Aktifkan notifikasi push di peramban ini terlebih dahulu.",
+    "rotationUnavailable": "ENCRYPTION_KEY belum disetel, sehingga kunci privat baru tidak dapat disimpan terenkripsi. Setel dan mulai ulang sebelum merotasi.",
+    "channelNotConfigured": "Instans ini belum memiliki pasangan kunci push, sehingga kanal push peramban tidak dapat dinyalakan atau dimatikan.",
+    "keyRotated": "Instans ini mengganti kunci push saat Anda berada di halaman ini. Muat ulang lalu aktifkan push lagi.",
+    "tooManyDevices": "Akun ini sudah mencapai jumlah maksimum perangkat push. Hapus satu sebelum menambah yang lain."
   },
   "institutions": {
     "nameConflict": "Institusi bernama \"{{ name }}\" sudah ada",

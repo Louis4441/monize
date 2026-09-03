@@ -175,15 +175,57 @@ Every caller is a cron, and each has a different amount of protection:
 | --- | --- |
 | `BillReminderService` | None. It recomputes the window from `nextDueDate`/`reminderDaysBefore` daily; there is no "already reminded for this due date" flag. Sending every day the bill is inside the window is intentional, but a crash-restart or a second replica sends the same reminder twice with nothing able to notice. |
 | `MortgageReminderService` | None -- same shape, no dedup state at all. |
-| `BudgetAlertService` | Partial. It creates the `BudgetAlert` row before sending and dedups candidates against existing rows by `(budgetId, alertType, budgetCategoryId, periodStart)`, so a sequential re-run does not re-notify. But the dedup read and the insert are not one atomic unit and no unique constraint backs them, so two replicas can both pass the check and both insert and send. `isEmailSent` is set after the send, so a crash in between leaves it `false` forever without causing a duplicate. |
+| `BudgetAlertService` | Full, by insert-winner, since migration 140. The in-memory dedup against existing rows by `(budgetId, type, budgetCategoryId, periodStart)` is a check-then-act and never was the arbiter; the unique fingerprint index is, through `NotificationService.create`, which answers `null` for the replica that loses the race so only the winner emails. `isEmailSent` is set after the send, so a crash in between leaves it `false` forever without causing a duplicate. |
 | Emergency-access grant | The one deliberate design. See section 5. |
-| `SystemAlertService` | Full, by insert-winner. Each admin's alert row is written `INSERT ... ON CONFLICT (user_id, dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING RETURNING id` against the partial unique index from migration 170, and the email goes only to rows the INSERT returned -- the shape `BudgetAlertService` is missing, with the same at-most-once trade as `ProviderOutageAlertService`: a crash between the commit and SMTP loses that email, and the in-app row survives as the durable notice (`docs/specs/system-alerts.md`, INV-ALERT-001). |
+| `SystemAlertService` | Full, by insert-winner. Each admin's alert row goes through `NotificationService.create`, whose `INSERT ... ON CONFLICT DO NOTHING RETURNING id` is arbitrated for these rows by the partial unique index from migration 170, and the email goes only to rows the INSERT returned -- with the same at-most-once trade as `ProviderOutageAlertService`: a crash between the commit and SMTP loses that email, and the in-app row survives as the durable notice (`docs/specs/system-alerts.md`, INV-ALERT-001). |
 | `ProviderOutageAlertService` | Full, and the opposite trade from the reminders. The notice is claimed with a single conditional `UPDATE ... WHERE state = 'down' AND outage_notified_at IS NULL AND outage_started_at <= now() - 15min AND (last_notified_at IS NULL OR last_notified_at <= now() - 6h) RETURNING ...`, so one replica sends per episode and a flapping provider cannot mail its way around the floor. The claim is taken *before* the send, which makes it **at most once**: a process killed in between loses that alert. Deliberate -- a duplicated monitoring email is the failure mode being designed against, the outage is still in the log and in `provider_health`, and a provider still down when the 6-hour floor elapses becomes notifiable again. |
 
-`BudgetAlertService` is a useful illustration of EXT-001: it accidentally has
-most of what the rule asks for -- durable state written before the effect -- and
-still fails, because the state is not *claimed* atomically. Durable-before-effect
-and atomically-claimed are two requirements, not one.
+`BudgetAlertService` is a useful illustration of EXT-001 both before and after
+its repair: it always had most of what the rule asks for -- durable state written
+before the effect -- and still sent duplicates, because the state was not
+*claimed* atomically. Durable-before-effect and atomically-claimed are two
+requirements, not one, and the unique index is what turned the first into the
+second.
+
+## 4a. Web Push
+
+`WebPushSender` is the only file in `src/` that imports `web-push`, and the one
+place a payload crosses an external push service. It is an external effect in
+the narrowest sense: once Mozilla, Google or Apple has accepted a message, no
+transaction can recall it.
+
+Three rules follow, and all three are the ordering rule rather than new
+mechanism:
+
+1. **The send happens after the commit, and never inside a transaction.**
+   `PushSubscriptionService.sendTest` loads its targets in one short
+   transaction, sends outside any, then records each outcome in its own short
+   transaction. A notification is about something that already happened; it must
+   not be able to roll that thing back.
+2. **The sender never throws.** Every failure is returned as an outcome
+   (`sent` / `unconfigured` / `expired` / `transient`), because the caller of a
+   future producer is a budget recalculation or a backup sweep, and a delivery
+   failure is not that operation's failure. This is the same trade as
+   `SystemAlertService`: the durable notice is the in-app row, and the push is
+   the best-effort copy.
+3. **A dead subscription stops being attempted.** 404 and 410 are the push
+   service saying the subscription is gone, and retire the device immediately
+   (`disabled_reason = GONE`). Everything else -- 401 and 403 included -- is
+   transient, deliberately: an authorization failure usually means this
+   instance's key or clock is wrong rather than that the device went away, and
+   retiring on it would empty every device list in the deployment over one bad
+   configuration. `MAX_CONSECUTIVE_FAILURES` bounds the retry either way
+   (`disabled_reason = FAILING`), so nothing is attempted forever.
+
+There is no outbox and no delivery ledger, which is the same gap email has: a
+crash between the send and the outcome write loses the bookkeeping for that one
+attempt, not the notification. `notification_deliveries` from discussion #1291
+is where that would be closed, and the open question recorded there is whether
+`job_claims` already does the job -- a third idempotency mechanism beside the
+two the codebase has would be a regression, not a feature.
+
+The subscription itself is instance-bound state, not portable user data: see
+`INTENTIONALLY_EXCLUDED_TABLES` and INV-PUSH-005.
 
 ## 5. Emergency access
 

@@ -214,7 +214,6 @@
     "categoryNotFound": "{{ id }} kimliğine sahip kategori bulunamadı",
     "categoryAlreadyInBudget": "Bu kategori zaten bütçede mevcut",
     "budgetCategoryNotFound": "{{ id }} kimliğine sahip bütçe kategorisi bulunamadı",
-    "alertNotFound": "{{ id }} kimliğine sahip uyarı bulunamadı",
     "periodNotFound": "{{ id }} kimliğine sahip bütçe dönemi bulunamadı",
     "noOpenPeriod": "Kapatılacak açık dönem yok",
     "categoryIdsNotOwned": "Kategori kimlikleri bulunamadı veya kullanıcıya ait değil: {{ ids }}"
@@ -338,8 +337,23 @@
     "invalidGranularity": "granularity 'daily' veya 'monthly' olmalıdır"
   },
   "notifications": {
+    "notFound": "{{ id }} kimliğine sahip bildirim bulunamadı",
     "smtpNotConfigured": "SMTP yapılandırılmamış. SMTP ortam değişkenlerini ayarlayın.",
-    "noEmailOnFile": "Bu kullanıcı için kayıtlı e-posta adresi yok."
+    "noEmailOnFile": "Bu kullanıcı için kayıtlı e-posta adresi yok.",
+    "categoryNotConfigurable": "{{ category }} kategorisi burada yapılandırılamaz",
+    "emptyPreferenceUpdate": "En az bir tercih alanı gereklidir",
+    "tooManyReminders": "En fazla {{ max }} etkin hatırlatıcınız olabilir. Yenisini eklemeden önce birini durdurun.",
+    "reminderOnReminder": "Bir hatırlatmanın kendi bildirimi üzerine hatırlatma kurulamaz. Bunun yerine özgün bildirim üzerine kurun."
+  },
+  "push": {
+    "channelUnavailable": "Bu Monize örneğinde anlık bildirimler kullanılamıyor.",
+    "endpointClaimed": "Bu tarayıcı zaten başka bir Monize hesabına kayıtlı. Bu tarayıcıda o hesaptan çıkış yapıp yeniden deneyin.",
+    "deviceNotFound": "Anlık bildirim cihazı bulunamadı.",
+    "noDevices": "Bu hesap için kayıtlı anlık bildirim cihazı yok. Önce bu tarayıcıda anlık bildirimleri açın.",
+    "rotationUnavailable": "ENCRYPTION_KEY ayarlanmadığı için yeni özel anahtar şifrelenmiş olarak saklanamadı. Değiştirmeden önce ayarlayıp yeniden başlatın.",
+    "channelNotConfigured": "Bu örneğin henüz anlık bildirim anahtar çifti yok; bu yüzden tarayıcı anlık bildirim kanalı açılıp kapatılamaz.",
+    "keyRotated": "Bu sayfadayken örnek anlık bildirim anahtarını değiştirdi. Sayfayı yenileyip anlık bildirimleri yeniden açın.",
+    "tooManyDevices": "Bu hesap zaten en fazla sayıda anlık bildirim cihazına sahip. Yeni bir tane eklemeden önce birini kaldırın."
   },
   "institutions": {
     "nameConflict": "\"{{ name }}\" adlı kurum zaten mevcut",

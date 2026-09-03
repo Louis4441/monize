@@ -214,7 +214,6 @@
     "categoryNotFound": "未找到 ID 为 {{ id }} 的分类",
     "categoryAlreadyInBudget": "此分类已在预算中",
     "budgetCategoryNotFound": "未找到 ID 为 {{ id }} 的预算分类",
-    "alertNotFound": "未找到 ID 为 {{ id }} 的提醒",
     "periodNotFound": "未找到 ID 为 {{ id }} 的预算周期",
     "noOpenPeriod": "没有可关闭的开放周期",
     "categoryIdsNotOwned": "未找到分类 ID 或不属于该用户：{{ ids }}"
@@ -338,8 +337,23 @@
     "invalidGranularity": "granularity 必须为 'daily' 或 'monthly'"
   },
   "notifications": {
+    "notFound": "未找到 ID 为 {{ id }} 的通知",
     "smtpNotConfigured": "SMTP 未配置。请设置 SMTP 环境变量。",
-    "noEmailOnFile": "此用户没有邮箱地址记录。"
+    "noEmailOnFile": "此用户没有邮箱地址记录。",
+    "categoryNotConfigurable": "类别 {{ category }} 无法在此配置",
+    "emptyPreferenceUpdate": "至少需要一个偏好设置字段",
+    "tooManyReminders": "您最多可以有 {{ max }} 个活动提醒。请先停止一个再添加。",
+    "reminderOnReminder": "无法在提醒自身生成的通知上设置提醒。请在原始通知上设置。"
+  },
+  "push": {
+    "channelUnavailable": "此 Monize 实例不提供推送通知。",
+    "endpointClaimed": "此浏览器已注册到另一个 Monize 账户。请在此浏览器中退出该账户后重试。",
+    "deviceNotFound": "未找到推送设备。",
+    "noDevices": "此账户尚未注册推送设备。请先在此浏览器中启用推送通知。",
+    "rotationUnavailable": "未设置 ENCRYPTION_KEY，因此无法加密存储新的私钥。请先设置并重启，然后再轮换。",
+    "channelNotConfigured": "此实例尚无推送密钥对，因此无法开启或关闭浏览器推送渠道。",
+    "keyRotated": "在你停留在本页期间，此实例更换了推送密钥。请重新加载页面并再次启用推送。",
+    "tooManyDevices": "此账户的推送设备数量已达上限。请先移除一台再添加。"
   },
   "institutions": {
     "nameConflict": "名为\"{{ name }}\"的机构已存在",

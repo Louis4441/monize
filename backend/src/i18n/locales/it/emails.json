@@ -193,5 +193,11 @@
     "greeting": "Ciao {{ name }},",
     "intro": "Un problema nella tua installazione di Monize richiede l'attenzione di un amministratore.",
     "footer": "Questo avviso è mostrato anche nella campanella delle notifiche dell'app. Viene generato al massimo una volta per evento, indipendentemente da quante repliche del server lo abbiano rilevato."
+  },
+  "notificationImmediate": {
+    "subject": "Hai una nuova notifica Monize",
+    "eyebrow": "Notifica Monize",
+    "button": "Apri in Monize",
+    "footer": "Ricevi questa email perché l'invio immediato è attivo per questo tipo di notifica. Modificalo in Impostazioni, Notifiche."
   }
 }

@@ -234,6 +234,115 @@
       "digestUpdateFailed": "Échec de la mise à jour de la préférence de récapitulatif de budget",
       "digestDayFailed": "Échec de la mise à jour du jour du récapitulatif",
       "testEmailFailed": "Échec de l'envoi de l'e-mail de test"
+    },
+    "push": {
+      "heading": "Push du navigateur",
+      "diagnostics": {
+        "summary": "Diagnostic des notifications",
+        "intro": "Ce que ce navigateur et cet appareil signalent à Monize au sujet des notifications. Utilisez le bouton de test pour que Monize crée une notification que vous pourrez rechercher sur votre appareil, puis Copier pour envoyer le rapport complet.",
+        "refresh": "Actualiser",
+        "copy": "Copier le rapport",
+        "copied": "Diagnostic copié dans le presse-papiers",
+        "localTest": "Afficher une notification de test",
+        "localTestRunning": "Vérification…",
+        "localTestBody": "Si vous voyez ceci, les notifications fonctionnent sur cet appareil.",
+        "localTestCreated": "Monize a créé une notification sans erreur, mais rien ici ne peut confirmer que le système l'a affichée. Si vous ne l'avez pas vue sur votre appareil, le système la masque ; activez les notifications de Monize dans les paramètres de l'appareil.",
+        "localTestError": "Impossible d'exécuter le test sur cet appareil ({detail})."
+      },
+      "description": "Enregistrez cet appareil pour que Monize puisse l'atteindre même quand l'application est fermée. Pour l'instant, seule la notification de test passe par ce canal ; tout le reste arrive toujours dans la cloche.",
+      "androidNotify": "Sur Android, une autorisation accordée ne suffit pas : le système peut quand même masquer les notifications. Appuyez longuement sur l'icône Monize de votre écran d'accueil, touchez Infos sur l'appli, puis Notifications, et assurez-vous qu'elles sont activées.",
+      "permissionHint": "Quand vous l'activez, votre navigateur demande l'autorisation d'afficher des notifications. Rien n'est envoyé avant votre accord.",
+      "enableButton": "Activer sur cet appareil",
+      "enablingButton": "Activation...",
+      "sendTestButton": "Envoyer une notification de test",
+      "sendingTestButton": "Envoi...",
+      "removeButton": "Supprimer",
+      "thisDevice": "Cet appareil",
+      "unifiedpushBadge": "UnifiedPush",
+      "unnamedDevice": "Appareil sans nom",
+      "lastSeen": "Dernière activité {when}",
+      "noLiveDevices": "Aucun appareil enregistré pour l'instant. Activez le push sur cet appareil pour envoyer un test.",
+      "notConfigured": "Le push du navigateur n'est pas disponible sur cette instance Monize. Un administrateur peut l'activer dans l'espace d'administration.",
+      "disabledByAdmin": "Un administrateur a désactivé le push du navigateur pour cette instance Monize.",
+      "keyUnreadable": "Monize ne peut pas lire la paire de clés push de cette instance : rien n'est distribué. Un administrateur peut rétablir le service en effectuant une rotation dans l'espace d'administration.",
+      "serverKeyMissing": "Cette instance Monize n'a pas la cle de chiffrement necessaire pour ouvrir sa paire de cles push, donc rien ne peut etre delivre. Un administrateur doit la definir dans le deploiement et redemarrer.",
+      "statusUnavailable": "Monize n'a pas pu vérifier si le push du navigateur est disponible. Rechargez la page pour réessayer.",
+      "devicesUnavailable": "Monize n'a pas pu charger vos appareils enregistrés. Le reste de cette page fonctionne toujours ; rechargez pour réessayer.",
+      "unsupported": {
+        "unsupported": "Ce navigateur ne peut pas recevoir de notifications push.",
+        "denied": "Les notifications sont bloquées pour Monize dans ce navigateur. Autorisez-les dans les paramètres du site, puis rechargez cette page.",
+        "ios-browser": "Sur iPhone et iPad, les notifications push ne fonctionnent qu'une fois Monize installé sur l'écran d'accueil. Utilisez Partager, puis Sur l'écran d'accueil, et ouvrez Monize depuis là."
+      },
+      "disabledReason": {
+        "GONE": "Plus joignable. Réactivez le push dans ce navigateur.",
+        "KEY_ROTATED": "Retiré lors de la rotation de la paire de clés push de cette instance. Réactivez le push dans ce navigateur.",
+        "FAILING": "Retiré après des échecs de distribution répétés. Réactivez le push dans ce navigateur."
+      },
+      "toasts": {
+        "enabled": "Notifications push activées sur cet appareil",
+        "enableFailed": "Impossible d'activer les notifications push",
+        "permissionDenied": "Ce navigateur bloque les notifications de Monize. Autorisez-les dans les paramètres du site puis réessayez.",
+        "permissionDeniedIos": "Les notifications sont bloquées pour Monize. Ouvrez Réglages iOS, puis Notifications, puis Monize, pour les autoriser.",
+        "permissionDismissed": "Les notifications n'ont pas été activées. Choisissez Autoriser lorsque le navigateur vous le demande.",
+        "permissionNoPrompt": "Les notifications n'ont pas été activées et aucune demande n'est apparue. Ouvrez Réglages iOS, puis Notifications, puis Monize, et autorisez-les là. Si Monize n'y figure pas, retirez-le de l'écran d'accueil, ajoutez-le à nouveau (Partager, puis Sur l'écran d'accueil) et réessayez.",
+        "removed": "Appareil supprimé",
+        "removeFailed": "Impossible de supprimer l'appareil",
+        "testSent": "{count, plural, one {Notification de test envoyée à 1 appareil} other {Notification de test envoyée à # appareils}}",
+        "testPartial": "La notification de test a atteint {delivered} appareils sur {attempted}",
+        "testFailed": "Impossible de distribuer la notification de test",
+        "pushServiceRefused": "Le service push du navigateur a refusé l'inscription. Réessayez dans un instant ; si l'échec persiste, vérifiez les paramètres push du navigateur.",
+        "pushServiceRefusedBrave": "Brave bloque le service push par défaut. Dans Brave, ouvrez Paramètres, puis Confidentialité et sécurité, activez « Utiliser les services Google pour la messagerie push », redémarrez le navigateur et réessayez."
+      },
+      "testResults": {
+        "heading": "Dernier test, par appareil",
+        "status": {
+          "sent": "remis au service push",
+          "expired": "abonnement expiré ; réactivez le push sur cet appareil",
+          "transient": "non remis (erreur temporaire) ; réessayez",
+          "unconfigured": "cette instance ne peut pas signer les messages push pour le moment"
+        }
+      }
+    },
+    "preferences": {
+      "heading": "Comment me notifier",
+      "description": "La cloche affiche toujours toutes les notifications. Choisissez lesquelles Monize envoie aussi par e-mail ou push, et à quelle fréquence.",
+      "categoryHeader": "Notification",
+      "channels": {
+        "inApp": "Dans l'appli",
+        "emailReport": "E-mail (rapport)",
+        "emailNotification": "E-mail (alerte)",
+        "push": "Push",
+        "unifiedpush": "UnifiedPush"
+      },
+      "categories": {
+        "PAYMENTS": "Factures et planifiés",
+        "BUDGETS": "Budgets",
+        "SYSTEM": "Alertes système"
+      },
+      "inAppAlways": "Toujours visible dans la cloche",
+      "channelNotApplicable": "Non applicable à ce type de notification",
+      "emailToggleLabel": "E-mail (rapport) pour {category}",
+      "saveFailed": "Impossible d'enregistrer ce réglage",
+      "throttle": {
+        "label": "Délai",
+        "ariaLabel": "Délai pour {category}",
+        "hint": "Ignorer une alerte ou un push si un autre du même groupe a été envoyé dans cet intervalle.",
+        "options": {
+          "0": "Désactivé",
+          "5": "5 minutes",
+          "15": "15 minutes",
+          "30": "30 minutes",
+          "60": "1 heure",
+          "360": "6 heures",
+          "1440": "24 heures"
+        }
+      },
+      "emailNotificationToggleLabel": "E-mail d'alerte pour {category}",
+      "pushToggleLabel": "Push pour {category}",
+      "unifiedpushToggleLabel": "UnifiedPush pour {category}",
+      "emailUnavailable": "Activez les notifications par e-mail ci-dessus pour les envoyer par e-mail.",
+      "pushUnavailable": "Activez d'abord le push sur cet appareil (voir ci-dessous).",
+      "unifiedpushUnavailable": "Enregistrez un point de terminaison UnifiedPush depuis votre application distributeur pour utiliser ce canal."
     }
   },
   "help": {

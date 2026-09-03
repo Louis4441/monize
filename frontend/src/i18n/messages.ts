@@ -16,6 +16,7 @@ const NAMESPACES = [
   "settings",
   "auth",
   "navigation",
+  "notifications",
   "accounts",
   "accountDetail",
   "accountDetail-creditCard",

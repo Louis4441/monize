@@ -1,0 +1,88 @@
+{
+  "title": "Notificações",
+  "unread": "{count} não lidos",
+  "markAllRead": "Marcar todos como lidos",
+  "loading": "A carregar notificações...",
+  "empty": "Sem notificações",
+  "undo": "Desfazer",
+  "buttonTitle": "Notificações",
+  "buttonAriaLabel": "Notificações",
+  "dismissAriaLabel": "Dispensar notificação",
+  "closeAriaLabel": "Fechar notificações",
+  "emptyFiltered": "Nenhuma notificação corresponde ao filtro atual",
+  "deleteAll": "Eliminar todos",
+  "deleteAllConfirmTitle": "Eliminar notificações",
+  "deleteAllConfirmMessageAll": "Eliminar todas as notificações? Esta ação não pode ser anulada.",
+  "deleteAllConfirmMessageFiltered": "Eliminar todas as notificações que correspondem ao filtro atual, incluindo as não mostradas? Esta ação não pode ser anulada.",
+  "deleted": "{count, plural, one {# notificação eliminada} other {# notificações eliminadas}}",
+  "deleteFailed": "Não foi possível eliminar as notificações",
+  "filter": {
+    "financial": "Financeiros",
+    "system": "Sistema"
+  },
+  "severity": {
+    "critical": "Crítico",
+    "warning": "Aviso",
+    "success": "Boas Notícias",
+    "info": "Informação"
+  },
+  "reminder": {
+    "remindAriaLabel": "Lembrar-me disto",
+    "stopAriaLabel": "Parar este lembrete",
+    "stopped": "Lembrete parado",
+    "stopFailed": "Não foi possível parar o lembrete",
+    "created": "Lembrete definido",
+    "createFailed": "Não foi possível definir o lembrete",
+    "dialogTitle": "Lembrar-me",
+    "dialogDescription": "Receba esta notificação novamente mais tarde até tomar uma ação.",
+    "modeLabel": "Com que frequência",
+    "modeRepeat": "Repetir até eu parar",
+    "modeOnce": "Apenas mais uma vez",
+    "intervalLabelRepeat": "Lembrar-me a cada",
+    "intervalLabelOnce": "Lembrar-me após",
+    "durationMinutes": "{minutes, plural, one {# minuto} other {# minutos}}",
+    "durationHours": "{hours, plural, one {# hora} other {# horas}}",
+    "cancel": "Cancelar",
+    "confirm": "Definir lembrete"
+  },
+  "billDue": {
+    "titleOverdue": "{payee} em atraso",
+    "titleToday": "{payee} vence hoje",
+    "titleTomorrow": "{payee} vence amanhã",
+    "titleInDays": "{payee} vence em {days} dias",
+    "amountDue": "{amount} a pagar em {date}",
+    "amountUnavailable": "Valor indisponível (sem taxa de câmbio atual), vence em {date}"
+  },
+  "system": {
+    "backupFailed": {
+      "title": "Falha na cópia de segurança automática",
+      "message": "A cópia de segurança automática de {user} falhou: {error}"
+    },
+    "backupPartial": {
+      "title": "Cópia de segurança automática incompleta",
+      "messageAttachments": "A cópia de segurança de {user} foi escrita, mas não foi possível incluir {missing} de {expected} anexos e {inconsistent} não correspondiam aos seus metadados. As cópias completas foram preservadas.",
+      "messagePromotion": "A cópia diária de {user} foi concluída, mas a sua cópia semanal ou mensal não pôde ser escrita: {error}",
+      "messageRetention": "A cópia de segurança de {user} foi concluída, mas os ficheiros de cópias antigas não puderam ser eliminados: {error}"
+    },
+    "encryptionKeyMissing": {
+      "title": "Chave de encriptação não configurada",
+      "message": "A ENCRYPTION_KEY não está definida, pelo que as cópias de segurança são escritas sem encriptação e não é possível guardar segredos. Uma versão futura não arrancará sem ela."
+    },
+    "smtpFailure": {
+      "title": "O envio de email está a falhar",
+      "message": "O Monize não conseguiu enviar email: {error}. As notificações e os lembretes não estão a ser entregues."
+    },
+    "providerOutage": {
+      "title": "{provider} não responde",
+      "message": "Os dados de mercado de {provider} estão indisponíveis. Os preços e os dados de índices podem estar desatualizados até que volte a responder."
+    },
+    "providerRecovered": {
+      "title": "{provider} está a responder novamente",
+      "message": "A interrupção terminou e os dados de mercado de {provider} estão novamente a ser atualizados."
+    },
+    "scheduledPostFailed": {
+      "title": "Não foi possível registar {name}",
+      "message": "A sua transação agendada com vencimento em {date} não foi registada automaticamente: {error}. Pode registá-la manualmente em Faturas e depósitos."
+    }
+  }
+}

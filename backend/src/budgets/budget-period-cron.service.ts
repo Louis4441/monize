@@ -15,6 +15,8 @@ import { BudgetReportsService } from "./budget-reports.service";
 import { EmailService } from "../notifications/email.service";
 import { budgetMonthlySummaryTemplate } from "../notifications/email-templates";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
+import { NotificationCategory } from "../notification-center/entities/notification.entity";
+import { NotificationPreferenceService } from "../notification-center/notification-preference.service";
 
 interface ClosedPeriodInfo {
   budget: Budget;
@@ -32,6 +34,9 @@ export class BudgetPeriodCronService {
     private emailService: EmailService,
     private configService: ConfigService,
     private readonly i18n: I18nService,
+    // The monthly summary is a BUDGETS email, gated by the same channel matrix
+    // as the weekly digest.
+    private readonly notificationPreferences: NotificationPreferenceService,
   ) {}
 
   @Cron("0 0 1 * *")
@@ -155,12 +160,22 @@ export class BudgetPeriodCronService {
     userId: string,
     periods: ClosedPeriodInfo[],
   ): Promise<boolean> {
+    // A budget monthly summary is the BUDGETS category; email is gated by that
+    // channel matrix and the global email master switch together (the resolver
+    // reads both), exactly as the weekly digest is. Runs under the user's own
+    // withUserContext, which the resolver's nested withScopedDb joins.
+    const emailEnabled = await this.notificationPreferences.resolveEmail(
+      userId,
+      NotificationCategory.BUDGETS,
+    );
+    if (!emailEnabled) return false;
+
+    // The user's stored locale and the digest's own toggle.
     const prefs = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(UserPreference).findOne({
         where: { userId },
       }),
     );
-    if (prefs && !prefs.notificationEmail) return false;
     if (prefs && prefs.budgetDigestEnabled === false) return false;
 
     const user = await withScopedDb(this.dataSource, (m) =>

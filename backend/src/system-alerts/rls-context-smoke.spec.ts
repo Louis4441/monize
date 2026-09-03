@@ -1,8 +1,9 @@
 import { SystemAlertService } from "./system-alert.service";
+import { NotificationService } from "../notification-center/notification.service";
 import {
-  AlertSeverity,
-  AlertType,
-} from "../budgets/entities/budget-alert.entity";
+  NotificationSeverity,
+  NotificationType,
+} from "../notification-center/entities/notification.entity";
 import { getRequestContext, RequestContext } from "../common/request-context";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
@@ -41,6 +42,13 @@ describe("System alerts RLS identity smoke (real withScopedDb)", () => {
     seen = [];
     const mocks = createScopedDbMocks();
     manager = mocks.manager;
+    // The door reads back the row it inserted; answer that read so the insert
+    // is reported as a win rather than as somebody else's row.
+    manager.getRepository.mockImplementation(() => ({
+      findOne: jest.fn(({ where }: { where: { id: string } }) =>
+        Promise.resolve({ id: where.id }),
+      ),
+    }));
     manager.query.mockImplementation(async (sql: string) => {
       const text = String(sql);
       if (text.includes("set_config")) return [];
@@ -55,12 +63,16 @@ describe("System alerts RLS identity smoke (real withScopedDb)", () => {
           },
         ];
       }
-      if (text.includes("INSERT INTO budget_alerts")) {
+      if (text.includes("INSERT INTO notifications")) {
         seen.push({ op: "insert", ctx: getRequestContext() });
         return [{ id: "row-1" }];
       }
       return [];
     });
+    // The real write door, on the same connection: the point of this file is
+    // which identity each statement runs under, and the door is where the
+    // INSERT now lives.
+    const writeDoor = new NotificationService(mocks.dataSource as never);
     service = new SystemAlertService(
       mocks.dataSource as never,
       // SMTP unconfigured: the email leg is covered by the unit spec, and
@@ -69,6 +81,15 @@ describe("System alerts RLS identity smoke (real withScopedDb)", () => {
       { translate: jest.fn() } as never,
       // No emailDedupeKey is passed below, so the claim is never consulted.
       { claimOnce: jest.fn().mockResolvedValue(true) } as never,
+      writeDoor,
+      // The per-user path fans out through dispatch, whose own identity reads
+      // have their own suite. Forward `notify` to the write door so this file
+      // stays about the ONE statement that writes and the identity it runs
+      // under -- the `withUserContext` around `notify` is what seeds it.
+      {
+        notify: (userId: string, input: unknown) =>
+          writeDoor.create(userId, input as never),
+      } as never,
     );
   });
 
@@ -90,8 +111,8 @@ describe("System alerts RLS identity smoke (real withScopedDb)", () => {
     // Deliberately no ambient context around the call -- the cron catch that
     // raises a backup alert has none, and the service must not depend on one.
     const result = await service.raiseAdminAlert({
-      type: AlertType.BACKUP_FAILED,
-      severity: AlertSeverity.CRITICAL,
+      type: NotificationType.BACKUP_FAILED,
+      severity: NotificationSeverity.CRITICAL,
       title: "t",
       message: "m",
       data: { system: true },
@@ -109,8 +130,8 @@ describe("System alerts RLS identity smoke (real withScopedDb)", () => {
 
   it("raiseUserAlert seeds the affected user's own identity, not a bypass", async () => {
     const result = await service.raiseUserAlert(USER_ID, {
-      type: AlertType.SCHEDULED_POST_FAILED,
-      severity: AlertSeverity.WARNING,
+      type: NotificationType.SCHEDULED_POST_FAILED,
+      severity: NotificationSeverity.WARNING,
       title: "t",
       message: "m",
       data: { system: true },

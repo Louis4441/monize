@@ -119,9 +119,24 @@ implied.
 | INV-CURRENCY-001 | A shared currency is deleted only by its creator, on a global count | enforced |
 | INV-ATTACHMENT-001 | Available metadata resolves to committed bytes | enforced |
 | INV-BACKUP-001 | A backup file is complete, verified and owner-namespaced | enforced |
+| INV-PUSH-001 | A push subscription belongs to the authenticated caller, and no request touches another account's device | enforced |
+| INV-PUSH-002 | The VAPID private key never leaves the server, and is never stored unencrypted | enforced |
+| INV-PUSH-006 | A push channel is offered only while its key pair can actually be used | enforced |
+| INV-PUSH-003 | A key rotation retires every subscription minted under the superseded pair | enforced |
+| INV-PUSH-004 | A push failure never rolls back what produced it, and a dead subscription stops being attempted | enforced |
+| INV-PUSH-005 | A push subscription is instance-bound state, never portable backup data | enforced |
+| INV-PUSH-007 | UnifiedPush is delivered by the one Web Push sender; no second transport importer exists | enforced |
+| INV-PUSH-008 | A subscription's transport gates its delivery: the `push` and `unifiedpush` channels reach only their own wire's devices | enforced |
+| INV-PUSH-009 | A channel a category does not expose is forced off at resolution, whatever the stored row says | enforced |
+| INV-PUSH-010 | A UnifiedPush endpoint is validated as a server-outbound URL, and its transport is bounded to one list held equal across DTO, schema and client | enforced |
 | INV-CRON-001 | One logical cron effect per schedule tick, across replicas | partial |
 | INV-PROVIDER-001 | An unreachable provider stops being called, and produces at most one alert pair per outage | enforced |
 | INV-ALERT-001 | A system alert row lands at most once per (recipient, dedupe key), and only the insert winner emails | enforced |
+| INV-NOTIFY-001 | Every notification a producer creates is written by NotificationService.create; the restore's dynamic-table insert is outside the scan | partial |
+| INV-DISPATCH-001 | The dispatch seam never writes a notification row itself; `create` stays the sole writer | enforced |
+| INV-DISPATCH-002 | The in-app row is written for every `notify`, whatever the matrix or the throttle says | enforced |
+| INV-DISPATCH-003 | The throttle gates only the notification-mode fan-out, never the in-app row or a report, and never an escalation | enforced |
+| INV-DISPATCH-004 | A failed push or email never rolls back, or surfaces through, the notification it is about | enforced |
 | INV-RLS-001 | Enforced mode refuses to run on a role that can bypass RLS | enforced |
 | INV-CACHE-001 | A money-moving write invalidates every derived cache | enforced |
 | INV-PAYEE-001 | A contact lookup never overwrites a value the user entered, and the automatic one runs at most once per payee | enforced |
@@ -1596,7 +1611,7 @@ Required tests      Occurrence identity and window: scheduled-occurrences.spec.t
                     Frontend: UpcomingBillsReport.test.tsx (per-occurrence
                     override in the list, the calendar, the CSV and the PDF, and
                     an unresolvable occurrence withholding the total),
-                    BudgetAlertList.test.tsx (localized bill-due copy, including
+                    NotificationList.test.tsx (localized bill-due copy, including
                     the unavailable-amount case), UpcomingBills.test.tsx and
                     BudgetUpcomingBills.test.tsx (moved next occurrence),
                     plus scheduled-utils, BudgetVelocityWidget,
@@ -2104,6 +2119,227 @@ Status              partial
 `docs/concurrency-and-idempotency.md` it must also record, per job, what prevents
 two replicas from producing the same effect.
 
+### INV-PUSH-001 -- a subscription belongs to its caller, and an endpoint to one account
+
+```text
+Statement           A push subscription is owned by the authenticated caller; a
+                    browser endpoint has exactly one owner; and no request
+                    writes to, or deletes, a row belonging to another account.
+Source of truth     push_subscriptions.user_id, arbitrated by
+                    idx_push_subscriptions_endpoint
+Enforcement         Ownership: CreatePushSubscriptionDto has no userId field at
+                    all and forbidNonWhitelisted rejects one, so the tenant can
+                    only be req.user.id; every list, delete and outcome write
+                    carries user_id in its own WHERE. Endpoint exclusivity: the
+                    unique index is on endpoint_hash ALONE, not
+                    (user_id, endpoint_hash) -- pushManager.subscribe() is scoped
+                    to a browser profile and an origin, so two accounts used in
+                    one browser receive the same endpoint AND the same encryption
+                    keys, and a per-user index would leave both rows live and let
+                    the first account's notification be decrypted and displayed on
+                    the device the second is now using.
+                    The second subscriber is REFUSED, not allowed to take the row
+                    over: ON CONFLICT (endpoint_hash) DO UPDATE ... WHERE
+                    user_id = EXCLUDED.user_id returns no row when the conflict
+                    belongs to somebody else, and that is a 409. The takeover this
+                    replaced deleted another tenant's row on the strength of a
+                    client-supplied string -- an unauthorized cross-tenant write,
+                    and a silent one: the first account lost push with no notice.
+                    An endpoint is not proof of ownership, so it buys no right.
+Concurrency scope   per endpoint, globally
+Retry semantics     Safe: a repeat subscribe from the same browser refreshes the
+                    one row rather than adding a device.
+Failure response    409, having written nothing. Not a dead end: the client
+                    unsubscribes and subscribes again for a fresh endpoint
+                    (enablePushOnThisDevice, exactly one retry), and logout
+                    releases the endpoint the same way
+                    (releaseLocalPushSubscription), so the ordinary
+                    shared-browser case never reaches the refusal.
+                    Both refusals on the subscribe path -- the channel being off,
+                    and a superseded applicationServerKey -- are decided from a
+                    read taken INSIDE the transaction that writes. Read outside
+                    it, an administrator's rotation committing in the window
+                    left a committed row whose 409 said nothing was written:
+                    disableStaleSubscriptions cannot retire a row that does not
+                    exist yet, so the device was listed live under a key nothing
+                    can be delivered under.
+                    The CLIENT's half of shared-browser safety is the registered-
+                    endpoint marker, which records the OWNER beside the endpoint:
+                    localStorage is per origin while a subscription's owner is an
+                    account, so an owner-less marker let the second account read
+                    the first's subscription as "revoked" and unsubscribe the
+                    browser -- revoking push for somebody not even signed in.
+                    classifyPushRegistration answers `foreign` there and acts on
+                    nothing.
+Required tests      push-subscription.service.spec.ts asserts no statement on
+                    this path names another user (no DELETE, no `user_id <>`,
+                    every statement bound to the caller), that a foreign conflict
+                    is a 409, and that both preconditions are read with a
+                    transaction already open (recorded, not asserted inside the
+                    mock: an expect that throws there arrives as the rejection
+                    the test was expecting). push.test.ts covers the client's
+                    single retry, the logout release, the marker's owner and the
+                    twelve-row classifier truth table including the foreign
+                    rows; PushDevicesPanel.test.tsx covers the panel acting on
+                    none of them. The database half needs no new
+                    spec: the catalog-driven
+                    rls-enforcement.integration.spec.ts enumerates the live
+                    schema, so push_subscriptions is bucketed as direct by its
+                    user_id column and its policy, its ENABLE and its cross-user
+                    INSERT rejection are all asserted automatically -- and the
+                    harness picks up migration 178 by content marker (it
+                    references app_current_user_id).
+Status              enforced
+```
+
+### INV-PUSH-002 -- the private key stays on the server
+
+```text
+Statement           The instance's VAPID private key is never returned by an API
+                    and never stored in plaintext.
+Source of truth     push_instance_config.vapid_private_key_enc
+Enforcement         Storage: PushConfigService.ensureKeyPair refuses to generate a
+                    pair at all when EncryptionService is unconfigured, so an
+                    instance without ENCRYPTION_KEY has no push rather than a
+                    plaintext secret; the operator already learns about the
+                    missing key from the weekly ENCRYPTION_KEY_MISSING alert.
+                    Exposure: no response shape in src/push/ declares a private
+                    field, and push-secret.guard.spec.ts scans the whole of src/
+                    for a second reader of the column, a second caller of
+                    getVapidIdentity, a second importer of web-push and a second
+                    caller of sendNotification. The public half is public by
+                    construction -- every subscribing browser is handed it.
+Concurrency scope   per instance
+Crash semantics     A pair this instance cannot decrypt (ENCRYPTION_KEY changed
+                    under a live database) yields a null identity and a named log
+                    line, not an AES-GCM failure behind a generic 500.
+Required tests      push-config.service.spec.ts, push-secret.guard.spec.ts.
+Status              enforced
+```
+
+### INV-PUSH-006 -- a channel is offered only while its key can be used
+
+```text
+Statement           Push reports itself available only while this server can
+                    actually sign with the stored key pair.
+Source of truth     Whether EncryptionService can decrypt
+                    push_instance_config.vapid_private_key_enc, resolved once
+                    per key pair by PushConfigService.resolveIdentity.
+Enforcement         resolveIdentity is the single answer: canUseKeyPair gates
+                    `enabled` on both the public and the admin shape, and
+                    getVapidIdentity returns what it resolved, so the three
+                    cannot disagree. It is memoised on the ciphertext -- key
+                    derivation is scryptSync, tens of milliseconds, and this
+                    answer is wanted on every config read, subscribe and send --
+                    which a rotation invalidates by construction. The failure
+                    is otherwise entirely silent: ENCRYPTION_KEY changes under a
+                    live database (or a backup lands on another instance), the
+                    column stays populated, every "is push configured?" check
+                    says yes, and only the send fails -- the same shape
+                    AiService names for a stored API key it cannot decrypt.
+                    `keyUnreadable` is its own field rather than folded into
+                    `configured` because the repairs differ: no key pair is
+                    fixed by setting ENCRYPTION_KEY and restarting, an unreadable
+                    one by rotating. Two causes, two repairs, one message each.
+                    Rotation itself refuses with a 400 when there is nowhere safe
+                    to store the new private half, rather than returning the
+                    unchanged config -- which reported a refusal as a success,
+                    indistinguishable from a genuine no-op rotation.
+Concurrency scope   per instance
+Failure response    The channel reads as unavailable everywhere, the admin page
+                    names the cause and keeps rotation offered, and the account
+                    surface stops offering an enable button that would produce a
+                    subscription nothing is ever delivered to.
+Required tests      push-config.service.spec.ts (both surfaces report the
+                    unreadable pair, it stays distinct from having none, and the
+                    rotation refusal throws); the admin page spec asserts the
+                    two messages do not collapse into one.
+Status              enforced
+```
+
+### INV-PUSH-003 -- a rotation retires what it supersedes
+
+```text
+Statement           After a key rotation, no subscription minted under the
+                    superseded pair is listed as reachable.
+Source of truth     push_subscriptions.vapid_public_key vs
+                    push_instance_config.vapid_public_key
+Enforcement         PushConfigService.rotateKeyPair writes the new pair and sets
+                    disabled_at/disabled_reason = KEY_ROTATED on every live
+                    subscription carrying a different key in ONE withScopedDb
+                    transaction: the push service validates the signature against
+                    the key the subscription was created with, so a new pair with
+                    live old subscriptions is an interface listing devices it
+                    cannot reach. WebPushSender re-checks the stored key before
+                    every send, so an interrupted rotation cannot produce an
+                    endless stream of 403s either.
+Concurrency scope   per instance
+Retry semantics     Re-running a rotation mints another pair and retires again;
+                    idempotent in effect, not in identity.
+Failure response    The count of retired devices is part of the response and of
+                    the confirmation dialog, not a log line.
+Required tests      push-config.service.spec.ts asserts both writes share one
+                    transaction (by transaction identity, not call count);
+                    web-push-sender.service.spec.ts asserts the pre-send check.
+Status              enforced
+```
+
+### INV-PUSH-004 -- a push failure is reported, never raised
+
+```text
+Statement           A delivery failure does not roll back the operation that
+                    produced the notification, and a subscription that cannot be
+                    delivered to stops being attempted.
+Source of truth     the PushSendOutcome returned by WebPushSender;
+                    push_subscriptions.failure_count / disabled_at
+Enforcement         WebPushSender never throws: every transport error is
+                    classified and returned. Sends happen outside any
+                    transaction, after the reads that selected the targets, and
+                    each outcome is written in its own short transaction --
+                    the ordering rule of docs/external-side-effects.md section
+                    4a. 404 and 410 retire the device immediately (GONE);
+                    everything else is transient and bounded by
+                    MAX_CONSECUTIVE_FAILURES (FAILING), because retiring on 401
+                    or 403 would empty every device list in the deployment over
+                    one bad key or clock.
+Concurrency scope   per subscription
+Retry semantics     A success resets failure_count; the bound is on consecutive
+                    failures, not on lifetime attempts.
+Crash semantics     A crash between the send and the outcome write loses that
+                    attempt's bookkeeping, not the notification. There is no
+                    delivery ledger yet -- see docs/external-side-effects.md.
+Required tests      web-push-sender.service.spec.ts (the full status table, and
+                    that a bare non-Error rejection still resolves);
+                    push-subscription.service.spec.ts (per-device outcomes are
+                    reported rather than thrown).
+Status              enforced
+```
+
+### INV-PUSH-005 -- a subscription is instance-bound, not portable
+
+```text
+Statement           A backup neither exports nor restores push subscriptions or
+                    the instance key pair.
+Source of truth     INTENTIONALLY_EXCLUDED_TABLES in
+                    backend/src/backup/export-table-queries.ts
+Enforcement         Both push tables are listed there, and neither appears in
+                    RESTORE_PLAN. The failure being designed against is concrete:
+                    a production backup restored into a test instance would hand
+                    that instance the endpoints and keys needed to push to real
+                    phones. Devices re-subscribe, which costs one click and is
+                    the only way the new instance obtains a subscription the push
+                    service will accept under its own VAPID key.
+                    push_subscriptions.vapid_public_key is the second line of
+                    defence: a row that did arrive by some other route carries a
+                    key this instance does not hold and is skipped by the sender.
+Concurrency scope   per instance
+Required tests      The backup integration spec's coverage check fails on a
+                    schema table that is in neither the export queries nor the
+                    exclusion set, so a future migration cannot quietly start
+                    exporting these.
+Status              enforced
+```
+
 ## Platform
 
 ### INV-PROVIDER-001 -- an unreachable provider stops being called, and is reported once
@@ -2178,17 +2414,18 @@ Statement           A system-level alert (BACKUP_FAILED, ENCRYPTION_KEY_MISSING,
                     however many replicas raise it, and its admin email is sent
                     only by whichever replica's INSERT actually created the row.
                     SMTP_FAILURE never emails at all.
-Source of truth     budget_alerts.dedupe_key under the partial unique index
-                    idx_budget_alerts_dedupe (user_id, dedupe_key) WHERE
+Source of truth     notifications.dedupe_key under the partial unique index
+                    idx_notifications_dedupe (user_id, dedupe_key) WHERE
                     dedupe_key IS NOT NULL (migration 170). The fingerprint
                     index from migration 140 cannot arbitrate these rows: it
                     keys on budget_id, NULL for every system alert, and NULL
                     never equals NULL in a unique index.
-Enforcement         SystemAlertService.insertAlert writes INSERT ... ON CONFLICT
-                    (user_id, dedupe_key) WHERE dedupe_key IS NOT NULL DO
-                    NOTHING RETURNING id; the email leg runs only for rows the
-                    INSERT returned (the insert-winner shape BudgetAlertService
-                    uses). shouldEmail refuses SMTP_FAILURE unconditionally.
+Enforcement         SystemAlertService.insertAlert asks
+                    NotificationService.create, whose INSERT ... ON CONFLICT DO
+                    NOTHING RETURNING id names no conflict target and so is
+                    arbitrated for these rows by the dedupe index; the email leg
+                    runs only where create returned a row. shouldEmail refuses
+                    SMTP_FAILURE unconditionally.
                     The provider pair additionally sits behind provider_health's
                     conditional-UPDATE claim, so its episode semantics are
                     unchanged.
@@ -2213,6 +2450,270 @@ Required tests      system-alerts/system-alert.service.spec.ts (fan-out,
                     same-key raises produce one row per admin; the partial-index
                     ON CONFLICT target is accepted by the real planner, which a
                     mocked query cannot prove).
+Status              enforced
+```
+
+### INV-NOTIFY-001 -- one writer owns the notifications table
+
+```text
+Statement           Every notification a PRODUCER creates is written by
+                    NotificationService.create, so the column bounds, the
+                    conflict handling and the period_start default are one rule
+                    rather than one rule per producer. The backup restore is the
+                    one exception, and it is not covered (see Status).
+Source of truth     src/notification-center/notification.service.ts
+Enforcement         notification-write-door.spec.ts scans every tracked
+                    non-spec file under backend/src for a raw INSERT/UPDATE/
+                    DELETE naming the table and for a repository write on the
+                    Notification entity, with comments blanked so the prose
+                    explaining the ban cannot trip it. Three files are
+                    allowlisted with reasons -- the door, delete-my-data, and
+                    the restore -- and the spec also fails if an allowlisted
+                    file stops writing, because a standing permission nobody
+                    uses is inherited by the next writer in that file.
+                    What the scan CANNOT see: backup-restore-database.service.ts
+                    inserts through a dynamic table name
+                    (`INSERT INTO "${table}"`, driven by RESTORE_PLAN, whose
+                    notifications entry this branch added), so a restored row
+                    never passes boundedTitle, boundedDedupeKey or
+                    boundedTarget. The one field where that has a consequence a
+                    reader can see is `target`, and it is re-validated at the
+                    consumer instead: safeNotificationTarget resolves it against
+                    this origin before any navigation, on the app side and again
+                    in the service worker. The column widths are the database's
+                    own (a longer value raises 22001 and fails the restore
+                    loudly, which is the honest failure for an artifact that
+                    does not fit).
+Concurrency scope   n/a -- a static property of the source
+Retry semantics     n/a
+Crash semantics     n/a
+Failure response    n/a
+Required tests      notification-write-door.spec.ts (the scan, plus a
+                    stripper test in both directions);
+                    notification.service.spec.ts (the bounds and the conflict
+                    answer the door enforces on every producer's behalf).
+Why it exists       There were three writers with three opinions: a raw INSERT
+                    for budget alerts with its own conflict target and no title
+                    bound, an entity save for bill reminders with no conflict
+                    handling at all, and a second raw INSERT for system alerts
+                    with its own truncation helpers. Every rule the row has to
+                    obey therefore held on one path and not the others -- an
+                    over-long scheduled-transaction name raised 22001 inside a
+                    never-throws catch, and the notification the user needed
+                    silently never existed.
+Status              partial -- every producer goes through the door and the scan
+                    proves it, but the restore's dynamic-table insert is outside
+                    what a source scan on the table name can reach. Closing it
+                    means the restore calling the door per row (which would
+                    rewrite ids and conflict handling the restore owns) or the
+                    scan understanding RESTORE_PLAN; neither is done, so this
+                    entry says so rather than claiming a coverage it does not
+                    have.
+```
+
+### INV-PUSH-007 -- UnifiedPush rides the one Web Push sender
+
+```text
+Statement           A UnifiedPush subscription is a Web Push subscription (an
+                    endpoint at a distributor plus the RFC 8291 keys, signed
+                    under this instance's VAPID pair), so it is delivered by
+                    WebPushSender and nothing else; no second transport importer
+                    exists in src/.
+Source of truth     src/push/web-push-sender.service.ts (the only importer of
+                    `web-push`); docs/specs/notification-preferences.md §15.
+Enforcement         push-secret.guard.spec.ts scans src/ for a second `web-push`
+                    importer or `sendNotification` caller and fails on one.
+Concurrency scope   n/a -- a static property of the source
+Failure response    n/a
+Required tests      push-secret.guard.spec.ts
+Why it exists       Delivery isolation (discussion #1291): a business feature asks
+                    for a notification and never imports a transport, so a new
+                    wire arrives without any producer changing -- and a second
+                    sender would be a second place the private key is handed to.
+Status              enforced
+```
+
+### INV-PUSH-008 -- a transport gates its own wire's devices
+
+```text
+Statement           The per-category `push` toggle reaches web-push devices only
+                    and `unifiedpush` reaches UnifiedPush devices only. A user
+                    with `push` on and `unifiedpush` off is never delivered to
+                    on a distributor endpoint, and the reverse.
+Source of truth     push_subscriptions.transport (migration 184), read by
+                    PushSubscriptionService.sendToUser's transport filter;
+                    NotificationDispatchService.fanOut builds the set from
+                    resolveNotificationDelivery.
+Enforcement         Two halves, each tested: the dispatch passes exactly the
+                    enabled set (notification-dispatch.service.spec.ts, the
+                    four-combination matrix) and the service applies it as
+                    `transport IN (...)` on the device query, with an empty set
+                    reaching no database at all
+                    (push-subscription.service.spec.ts). `sendTest` deliberately
+                    passes no filter: a test send asks whether ANY device works.
+Concurrency scope   per user, per notification
+Failure response    A device on a wire the user gated off is never queried, so
+                    there is nothing to fail.
+Required tests      notification-dispatch.service.spec.ts (the set);
+                    push-subscription.service.spec.ts (the filter, the empty set,
+                    the stored transport on subscribe).
+Why it exists       The two channels ride one encrypted wire and differ only by
+                    which devices they reach -- so the FILTER is the consent
+                    boundary. Without a service-layer test the first revision of
+                    §15 shipped with the filter undetected by any mutation.
+Status              enforced
+```
+
+### INV-PUSH-009 -- an unsupported channel is forced off at resolution
+
+```text
+Statement           A channel a matrix category does not expose
+                    (NOTIFICATION_CATEGORY_CHANNELS) resolves to OFF in
+                    resolveNotificationDelivery whatever the stored row holds,
+                    so a value written to an unsupported cell can never become a
+                    delivery nobody asked for.
+Source of truth     NOTIFICATION_CATEGORY_CHANNELS in
+                    notification-preference.service.ts, mirrored on the client
+                    and returned per row as `supportedChannels`.
+Enforcement         resolveNotificationDelivery ANDs every channel with its
+                    support flag; notification-preference.service.spec.ts proves
+                    SYSTEM's email stays off with the master switch on and a
+                    stored `true`; notification-preferences.contract.test.ts
+                    holds the client mirror equal, reading every channel the
+                    backend declares rather than a fixed list.
+Concurrency scope   n/a
+Failure response    n/a
+Required tests      notification-preference.service.spec.ts;
+                    notification-preferences.contract.test.ts.
+Why it exists       SYSTEM exposes push only -- its email is the admin fan-out's
+                    own severity-driven path -- and a cell that renders "not
+                    applicable" must also be one whose stored value is inert.
+Status              enforced
+```
+
+### INV-PUSH-010 -- a UnifiedPush endpoint is a server-outbound URL, bounded to one transport list
+
+```text
+Statement           A distributor endpoint is validated exactly as a browser
+                    endpoint is (IsPushEndpoint: https floor + SSRF resolve
+                    bounded inside the check), and `transport` is bounded to
+                    PUSH_TRANSPORTS -- one list held equal across the DTO, the
+                    CHECK constraint and the client union.
+Source of truth     src/push/dto/create-push-subscription.dto.ts (`@IsIn`);
+                    push_subscriptions_transport_check in database/schema.sql
+                    and migration 184; PUSH_TRANSPORTS in the entity and in
+                    frontend/src/lib/push.ts.
+Enforcement         The one controller line that registers a subscription passes
+                    the validated DTO; push-transport.contract.spec.ts holds the
+                    constant equal to the CHECK's literal set and the default,
+                    and push-transport.contract.test.ts (frontend) holds the
+                    client array equal to the entity's.
+Concurrency scope   n/a
+Failure response    A transport outside the list is refused by the DTO before
+                    any write; a drift between the copies fails the contract
+                    tests rather than surfacing as a 23514 the subscriber sees
+                    as a generic 500.
+Required tests      push-endpoint validator specs (unchanged);
+                    push-transport.contract.spec.ts;
+                    push-transport.contract.test.ts.
+Why it exists       An endpoint is a URL the server will POST to (CWE-918), and
+                    a list that means something is written once in the place
+                    that can check it.
+Status              enforced
+```
+
+### INV-DISPATCH-001 -- the dispatch seam never writes a row
+
+```text
+Statement           NotificationDispatchService.notify writes nothing itself; it
+                    calls NotificationService.create and fans out from what the
+                    door returned.
+Source of truth     src/notifications/notification-dispatch.service.ts
+Enforcement         notification-write-door.spec.ts (the scan admits no writer
+                    but the door); notification-dispatch.service.spec.ts asserts
+                    `create` is what is called with the producer's input.
+Concurrency scope   n/a
+Failure response    n/a
+Required tests      notification-write-door.spec.ts;
+                    notification-dispatch.service.spec.ts.
+Status              enforced
+```
+
+### INV-DISPATCH-002 -- the in-app row is always written
+
+```text
+Statement           Every `notify` writes the bell row regardless of the matrix
+                    or the throttle: a category with push and email both off
+                    still bells, and a throttled fan-out still leaves the row.
+Source of truth     notify: `create` runs before, and independently of, fanOut.
+Enforcement         notification-dispatch.service.spec.ts ("always writes the
+                    in-app row even with push and email both off").
+Concurrency scope   per notification
+Failure response    The row stands; only the fan-out is skipped.
+Required tests      notification-dispatch.service.spec.ts.
+Why it exists       The maintainer's ruling (spec §3/§4): the bell is the record;
+                    a first throttle draft dropped the row and was reverted.
+Status              enforced
+```
+
+### INV-DISPATCH-003 -- the throttle gates the fan-out only, and never an escalation
+
+```text
+Statement           A per-category cooldown suppresses only notification-mode
+                    push/email; never the in-app row, never a report email, and
+                    never a notification whose severity strictly exceeds every
+                    prior in the window.
+Source of truth     NotificationDispatchService.notify: when the throttle is
+                    active, pg_advisory_xact_lock(notif-fanout:<user>:<category>)
+                    is taken BEFORE the row is written, and priorInWindow decides
+                    on the same manager, in the same transaction.
+Enforcement         The lock is held across the write and the decision, so the
+                    later of two same-category deciders on different replicas
+                    blocks until the earlier row is committed and then sees it
+                    (D7). Taken after the commit -- the first version -- it
+                    serialised nothing: B could commit and decide before A's row
+                    was visible, and A then decided against B's later created_at.
+                    "Prior" is every other live same-category row in the
+                    window, excluded by id -- never by created_at ordering,
+                    which is the transaction's BEGIN time and can put the later
+                    lock-holder's row first. The decision precedes the caller's
+                    onWritten follow-up. A reminder's re-emit (data.reminderId)
+                    sits outside the cooldown on both sides: it takes no lock and
+                    no decision, and it is never a prior for anything else --
+                    the cooldown governs producers, not the user's own schedule.
+                    The EXISTS query carries severitiesAtOrAbove so an
+                    escalation never matches.
+                    notification-dispatch.service.spec.ts holds the lock -> write
+                    -> decide -> hook order, the id exclusion, the lock on both
+                    the push and the email path, the window-0 short-circuit, and
+                    the escalation set.
+Concurrency scope   per (user, category), across replicas
+Failure response    A suppressed fan-out is a skipped send; the row is already
+                    committed.
+Required tests      notification-dispatch.service.spec.ts.
+Status              enforced
+```
+
+### INV-DISPATCH-004 -- a delivery failure never reaches the producer
+
+```text
+Statement           A failed push or email neither rolls back nor surfaces
+                    through the notification it is about: `notify` resolves with
+                    the committed row and logs the failure, whether the caller
+                    awaited the fan-out or detached it.
+Source of truth     notify's `.catch` on the fan-out promise;
+                    PushSubscriptionService.sendToUser is non-throwing.
+Enforcement         notification-dispatch.service.spec.ts ("never lets a fan-out
+                    failure escape", and the detached-mode failure case).
+                    The row is committed by `create` before any fan-out runs, so
+                    there is nothing a rollback could reach.
+Concurrency scope   per notification
+Failure response    Logged once with the row id; the bell row stands.
+Required tests      notification-dispatch.service.spec.ts.
+Why it exists       A read-path producer (bill reminders on GET /notifications)
+                    detaches the fan-out so a stalled push endpoint cannot hold
+                    the reader; the guarantee has to hold on that path exactly
+                    as on the awaited one.
 Status              enforced
 ```
 
