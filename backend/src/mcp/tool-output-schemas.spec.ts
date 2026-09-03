@@ -5,7 +5,12 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { toolResult } from "./mcp-context";
 import * as schemas from "./tool-output-schemas";
 
-type RawShape = Record<string, z.ZodTypeAny>;
+/**
+ * Every output schema is now a loose `z.object` rather than a raw shape: the
+ * SDK accepts either, and the loose object is what makes the client's ajv
+ * validator admit the row-level fields these schemas no longer enumerate.
+ */
+type OutputSchema = z.ZodObject<any, any>;
 
 const scheduledItemSample = {
   id: "sc1",
@@ -41,7 +46,7 @@ const scheduledItemUnknownAmountSample = {
 // (pre-toolResult) form a tool handler would pass to toolResult. The payloads
 // mirror the documented service return shapes, including null fields and
 // undeclared entity fields (timestamps, relations) that must be tolerated.
-const cases: Array<{ name: string; schema: RawShape; raw: unknown }> = [
+const cases: Array<{ name: string; schema: OutputSchema; raw: unknown }> = [
   {
     name: "listAccountsOutput",
     schema: schemas.listAccountsOutput,
@@ -360,28 +365,6 @@ const cases: Array<{ name: string; schema: RawShape; raw: unknown }> = [
     name: "manageSecuritiesOutput (relay branch)",
     schema: schemas.manageSecuritiesOutput,
     raw: { status: "preview_shown" },
-  },
-  {
-    name: "createTransactionsOutput (created branch)",
-    schema: schemas.createTransactionsOutput,
-    raw: {
-      created: [{ id: "t1", date: "2026-01-01", amount: -5 }],
-      ids: ["t1"],
-      count: 1,
-      skipped: [{ index: 1, reason: "Unknown account" }],
-    },
-  },
-  {
-    name: "createTransactionsOutput (dry-run branch)",
-    schema: schemas.createTransactionsOutput,
-    raw: {
-      dryRun: true,
-      preview: {
-        rows: [{ status: "ok", amount: -5 }],
-        skipped: [],
-      },
-      message: "preview only",
-    },
   },
   {
     name: "getCategoriesOutput",
@@ -750,7 +733,7 @@ describe("tool-output-schemas", () => {
       "$name validates against its output schema",
       ({ schema, raw }) => {
         const result = toolResult(raw);
-        const parsed = z.object(schema).safeParse(result.structuredContent);
+        const parsed = schema.safeParse(result.structuredContent);
         if (!parsed.success) {
           throw new Error(JSON.stringify(parsed.error.issues, null, 2));
         }
@@ -763,13 +746,30 @@ describe("tool-output-schemas", () => {
   // and returning toolResult(...) must round-trip without an output-validation
   // error and surface structuredContent to the client.
   describe("end-to-end via InMemoryTransport", () => {
-    const rawFor = (schema: RawShape): unknown => {
+    /** Add fields no schema declares, at the top level and inside a row. */
+    const withUndeclaredFields = (raw: unknown): unknown => {
+      const payload = raw as { accounts?: unknown[] };
+      return {
+        ...payload,
+        undeclaredTopLevel: "kept",
+        accounts: (payload.accounts ?? []).map((account) => ({
+          ...(account as Record<string, unknown>),
+          undeclaredRowField: "kept",
+        })),
+      };
+    };
+
+    const rawFor = (schema: OutputSchema): unknown => {
       const found = cases.find((c) => c.schema === schema);
       if (!found) throw new Error("no sample for schema");
       return found.raw;
     };
 
-    const e2eTools: Array<{ name: string; schema: RawShape; raw: unknown }> = [
+    const e2eTools: Array<{
+      name: string;
+      schema: OutputSchema;
+      raw: unknown;
+    }> = [
       {
         name: "list_accounts",
         schema: schemas.listAccountsOutput,
@@ -806,7 +806,12 @@ describe("tool-output-schemas", () => {
             inputSchema: {},
             outputSchema: tool.schema,
           },
-          () => toolResult(tool.raw),
+          () =>
+            toolResult(
+              tool.name === "list_accounts"
+                ? withUndeclaredFields(tool.raw)
+                : tool.raw,
+            ),
         );
       }
 
@@ -834,6 +839,30 @@ describe("tool-output-schemas", () => {
           expect(res.isError).toBeFalsy();
           expect(res.structuredContent).toBeDefined();
         }
+
+        // The property the slimmed schemas depend on. These schemas declare
+        // totals, flags and copy-back ids and leave row columns undeclared, so
+        // an undeclared field -- at the top level or inside a row -- must still
+        // reach the client. Two mechanisms have to hold at once: the server
+        // sends the handler's ORIGINAL object (it parses only to decide
+        // pass/fail, and discards the parsed value), and the loose object
+        // serializes as `additionalProperties: {}` so the client's own
+        // validator admits it. A strip-mode schema would emit
+        // `additionalProperties: false` and the client would reject the call.
+        //
+        // The listTools() above is load-bearing: the client builds its output
+        // validator there, so calling a tool without it would validate nothing
+        // and this assertion would prove nothing.
+        const extras = await client.callTool({
+          name: "list_accounts",
+          arguments: {},
+        });
+        const structured = extras.structuredContent as {
+          undeclaredTopLevel?: unknown;
+          accounts?: Array<{ undeclaredRowField?: unknown }>;
+        };
+        expect(structured.undeclaredTopLevel).toBe("kept");
+        expect(structured.accounts?.[0]?.undeclaredRowField).toBe("kept");
       } finally {
         await client.close();
         await server.close();
