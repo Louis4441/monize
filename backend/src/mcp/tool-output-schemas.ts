@@ -653,6 +653,9 @@ export const getBudgetStatusOutput = {
 
 export const getNextPromptOutput = {
   hasPrompt: bool,
+  // How to run a relay turn. Returned only with a claimed prompt, so a client
+  // that never relays does not carry it in every request's tool list.
+  guidance: str.optional(),
   // True when the user has been inactive long enough that the agent should stop
   // its polling loop and exit (only set alongside hasPrompt:false).
   stop: bool.optional(),

@@ -25,56 +25,34 @@ export class McpAccountsTools {
         title: "List accounts",
         annotations: READ_ONLY,
         description:
-          "List the user's accounts with full details and an overall summary. " +
-          "Returns, for each account, its id, name, type, sub-type, balance " +
-          "(brokerage accounts show market value; every other account shows " +
-          "currentBalance + future transactions), raw currentBalance, credit " +
-          "limit, interest rate, currency, closed status, exclude-from-net-worth " +
-          "flag, institution name, and account number. Loan and mortgage " +
-          "accounts additionally include their payment amount, payment " +
-          "frequency, payment start date, amortization months, and original " +
-          "principal (null on other account types) so a loan's schedule can be " +
-          "reasoned about. Also returns a summary: " +
-          "total assets, total liabilities, net worth (all matching the dashboard " +
-          "Net Worth widget), and totalAccounts (the count AFTER filtering). " +
-          "Filter with accountTypes, status (open/closed/all, default open), " +
-          "accountNames (exact, case-insensitive), accountIds (UUIDs), or " +
-          "nameQuery (case-insensitive substring on the name). Use this for any " +
-          "question about which accounts the user has or how much money is in " +
-          "them. This single tool replaces the former get_accounts, " +
-          "get_account_balance, and get_account_balances tools.",
+          "The user's accounts and an assets / liabilities / net-worth summary " +
+          "matching the dashboard. Use it for any question about which accounts " +
+          "they have or how much money is in one. A brokerage account's " +
+          "`balance` is its market value; every other account's includes future " +
+          "transactions, with the through-today figure in `currentBalance`. " +
+          "Loan and mortgage rows carry their payment schedule. `totalAccounts` " +
+          "counts what is left AFTER filtering.",
         inputSchema: {
           accountNames: z
             .array(z.string().max(100))
             .max(100)
             .optional()
-            .describe(
-              "Optional: filter to specific account names (exact, case-insensitive). Omit to cover all accounts.",
-            ),
-          accountIds: z
-            .array(uuidString())
-            .optional()
-            .describe("Optional: filter to specific account IDs (UUIDs)."),
+            .describe("Exact account names, case-insensitive."),
+          accountIds: z.array(uuidString()).optional().describe("Account ids."),
           nameQuery: z
             .string()
             .max(100)
             .optional()
-            .describe(
-              "Optional: case-insensitive substring match on the account name.",
-            ),
+            .describe("Case-insensitive substring of the account name."),
           status: z
             .enum(["open", "closed", "all"])
             .optional()
-            .describe(
-              "Which accounts to include by status. Defaults to 'open'.",
-            ),
+            .describe("Defaults to 'open'."),
           accountTypes: z
             .array(z.nativeEnum(AccountType))
             .max(10)
             .optional()
-            .describe(
-              "Optional: filter to specific account types (CHEQUING, SAVINGS, CREDIT_CARD, LOAN, MORTGAGE, INVESTMENT, CASH, LINE_OF_CREDIT, ASSET, OTHER). Omit to include all types.",
-            ),
+            .describe("Omit to include every type."),
         },
         outputSchema: listAccountsOutput,
       },

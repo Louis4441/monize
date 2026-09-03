@@ -15,16 +15,13 @@ export class McpCalculateTools {
         title: "Calculate",
         annotations: READ_ONLY,
         description:
-          "Perform accurate server-side arithmetic on numbers from previous tool results. " +
-          "Use this instead of doing math yourself. Supports: percentage (part/whole*100), " +
-          "difference (a-b), ratio (a/b), sum, and average.",
+          "Server-side arithmetic on numbers from previous tool results. Use " +
+          "it instead of doing the maths yourself.",
         inputSchema: {
           operation: z
             .enum(["percentage", "difference", "ratio", "sum", "average"])
             .describe(
-              "The arithmetic operation. percentage: (values[0]/values[1])*100, " +
-                "difference: values[0]-values[1], ratio: values[0]/values[1], " +
-                "sum: add all values, average: arithmetic mean.",
+              "percentage: (values[0]/values[1])*100. difference: values[0]-values[1]. ratio: values[0]/values[1]. sum and average take every value.",
             ),
           values: z
             .array(z.number())

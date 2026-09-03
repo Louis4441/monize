@@ -45,7 +45,7 @@ const TOOL_BYTE_BUDGET: Record<string, number> = {
 };
 
 const TOTAL_BYTE_BUDGET = 78_300;
-const INSTRUCTIONS_BYTE_BUDGET = 8_800;
+const INSTRUCTIONS_BYTE_BUDGET = 2_600;
 
 /**
  * The order the SDK lists tools in, which follows the registration order in
@@ -216,6 +216,29 @@ function describesByProperty(schema: unknown): Map<string, string> {
   return found;
 }
 
+/**
+ * Does `text` copy out an enum's member LIST, rather than merely using words
+ * that happen to be members? A restated list runs member -> separator ->
+ * member; ordinary prose puts other words between them.
+ */
+function restatesList(text: string, members: string[]): boolean {
+  const escaped = members
+    .map((m) => m.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
+  const hits = [...text.matchAll(new RegExp(`\\b(${escaped})\\b`, "g"))];
+  let run: string[] = [];
+  let previousEnd = -1;
+  for (const hit of hits) {
+    const gap = previousEnd < 0 ? "" : text.slice(previousEnd, hit.index);
+    const isSeparator =
+      /^[\s,/|'"()\][-]*(?:or|and|then)?[\s,/|'"()\][-]*$/.test(gap);
+    run = previousEnd >= 0 && isSeparator ? [...run, hit[1]] : [hit[1]];
+    if (new Set(run).size >= 3) return true;
+    previousEnd = (hit.index ?? 0) + hit[0].length;
+  }
+  return false;
+}
+
 describe("tools/list payload budget", () => {
   let tools: ListedTool[];
   let bytesByTool: Map<string, number>;
@@ -293,5 +316,68 @@ describe("tools/list payload budget", () => {
 
   it("lists tools in a deterministic, pinned order", () => {
     expect(tools.map((t) => t.name)).toEqual(EXPECTED_TOOL_ORDER);
+  });
+  it("never restates an enum's members in prose", () => {
+    // A `z.enum` already ships its members in the JSON Schema, so listing them
+    // again in prose pays for the list twice. What counts as restating is the
+    // LIST, not the words: "create, edit or delete" is ordinary English about
+    // what the tool does, while "'bill', 'deposit', 'transfer'" is the enum
+    // copied out. So a run of three or more members separated by nothing but
+    // list punctuation is the offence, and the enum's OWN field may of course
+    // explain its members.
+    const offenders: string[] = [];
+    for (const tool of tools) {
+      const enums = enumsByProperty(tool.inputSchema);
+      if (enums.size === 0) continue;
+      const describes = describesByProperty(tool.inputSchema);
+      for (const [property, members] of enums) {
+        const restated = (text: string) => restatesList(text, members);
+        if (tool.description && restated(tool.description)) {
+          offenders.push(
+            `${tool.name}: description restates the '${property}' enum`,
+          );
+        }
+        for (const [otherProperty, text] of describes) {
+          if (otherProperty !== property && restated(text)) {
+            offenders.push(
+              `${tool.name}: '${otherProperty}' describe restates the '${property}' enum`,
+            );
+          }
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps codebase history and sibling-surface references out of descriptions", () => {
+    const offenders: string[] = [];
+    for (const tool of tools) {
+      for (const { phrase, why } of BANNED_DESCRIPTION_PHRASES) {
+        if (tool.description?.includes(phrase)) {
+          offenders.push(`${tool.name}: "${phrase}" (${why})`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps every field description short enough to scan", () => {
+    // An enum's own field is where its members are explained, so it is allowed
+    // more room than a field that only says how to fill itself.
+    const MAX_DESCRIBE_CHARS = 300;
+    const MAX_ENUM_DESCRIBE_CHARS = 600;
+    const offenders: string[] = [];
+    for (const tool of tools) {
+      const enums = enumsByProperty(tool.inputSchema);
+      for (const [property, text] of describesByProperty(tool.inputSchema)) {
+        const cap = enums.has(property)
+          ? MAX_ENUM_DESCRIBE_CHARS
+          : MAX_DESCRIBE_CHARS;
+        if (text.length > cap) {
+          offenders.push(`${tool.name}.${property}: ${text.length} > ${cap}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 });

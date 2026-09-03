@@ -90,13 +90,15 @@ export class McpPayeesTools {
         title: "List payees",
         annotations: READ_ONLY,
         description:
-          "List payees, optionally filtered by search query. Each payee carries its default category, website and contact details (address, email, phone; null when unset), so this is how to find payees missing one before filling them in with manage_payees.",
+          "The user's payees, each with its default category, website and contact " +
+          "details (null when unset) -- so this is how to find the payees " +
+          "missing one before filling them in with manage_payees.",
         inputSchema: {
           search: z
             .string()
             .max(200)
             .optional()
-            .describe("Search query to filter payees"),
+            .describe("Substring of the payee name."),
         },
         outputSchema: getPayeesOutput,
       },
@@ -129,11 +131,14 @@ export class McpPayeesTools {
         title: "Manage payees",
         annotations: WRITE,
         description:
-          "Create, edit, or delete the user's payees. Accepts NAMES -- the payee and its default category are resolved internally, so you do NOT need to call list_payees/list_categories first. operation = 'create' | 'update' | 'delete' with an items array (1-25 rows). " +
-          "create: { name, categoryName?, website?, address?, email?, phone? } -- categoryName optionally sets the payee's default category ('Parent: Child' for a subcategory); website accepts a bare domain ('acme.com') and is stored as an absolute https URL; address, email and phone are the payee's contact details. " +
-          "update: { name, newName?, categoryName?, website?, address?, email?, phone? } -- name identifies the existing payee; provide newName to rename, categoryName to set the default category, website to set the web address, and/or address, email and phone for its contact details (pass an empty string to clear any of them). At least one change is required. Setting a website also resolves that site's icon for the payee; to find payees missing a field, call list_payees and look for a null or missing one. When the user has enabled automatic contact lookup in AI Settings, a single new payee created without any contact details is looked up before the card is shown, so the card may carry suggested website/address/email/phone; batch creates are looked up in the background after approval instead. " +
-          "delete: { name } -- removes the payee (its transactions keep their stored payee name). " +
-          "approvalMode = 'bulk' (default; one confirmation for the whole batch) or 'individual' (one confirmation per item); ignored for a single item. Set dryRun=true to preview every item without saving. The user is asked to confirm before anything is saved (web chat card via relay, or an MCP confirmation dialog).",
+          "Create, rename, edit or delete payees. An update identifies the " +
+          "payee by `name` and needs at least one change; an empty string " +
+          "clears a contact field. Setting a website also resolves that site's " +
+          "icon. Deleting a payee leaves its transactions with their stored " +
+          "payee name. Where the user has enabled automatic contact lookup, a " +
+          "single new payee created with no contact details is looked up " +
+          "before the confirmation card is shown, so the card may carry " +
+          "suggestions; a batch is looked up in the background after approval.",
         inputSchema: {
           operation: manageOperation(),
           items: itemsArray(
@@ -142,47 +147,39 @@ export class McpPayeesTools {
                 .string()
                 .max(100)
                 .describe(
-                  "create: the new payee name. update/delete: the existing payee's current name.",
+                  "create: the new name. update/delete: the payee's current name.",
                 ),
               newName: z
                 .string()
                 .max(100)
                 .optional()
-                .describe("update: the payee's new name."),
+                .describe("update: rename to this."),
               categoryName: z
                 .string()
                 .max(100)
                 .optional()
-                .describe(
-                  'create/update: default category name ("Parent: Child" for a subcategory). update: empty string clears it.',
-                ),
+                .describe("The payee's default category."),
               website: z
                 .string()
                 .max(2048)
                 .optional()
-                .describe(
-                  'create/update: the payee\'s web address. A bare domain ("acme.com") is stored as "https://acme.com". update: empty string clears it.',
-                ),
+                .describe("Web address. A bare domain is stored as https."),
               address: z
                 .string()
                 .max(500)
                 .optional()
-                .describe(
-                  "create/update: the payee's postal address as free text. update: empty string clears it.",
-                ),
+                .describe("Postal address, free text."),
               email: z
                 .string()
                 .max(255)
                 .optional()
-                .describe(
-                  "create/update: the payee's contact email address. update: empty string clears it.",
-                ),
+                .describe("Contact email address."),
               phone: z
                 .string()
                 .max(50)
                 .optional()
                 .describe(
-                  "create/update: the payee's contact phone number, in whatever format the user gives. update: empty string clears it.",
+                  "Contact phone number, in whatever format the user gives.",
                 ),
             }),
           ),

@@ -133,74 +133,74 @@ export class McpTransactionsTools {
         title: "List transactions",
         annotations: READ_ONLY,
         description:
-          "List and aggregate the user's cash transactions. Accepts NAMES for accounts, categories, and payees -- they are resolved internally, so you do NOT need to call get_accounts/list_categories/list_payees first. Returns a rich summary by default: income/expense/net totals, per-currency totals, an optional grouped breakdown (groupBy: category/payee/year/month/week), and an optional per-account transfer rollup (transfersOnly). Set includeTransactions=true ONLY when the user wants the individual rows -- it adds the raw transaction list (which costs many tokens); otherwise the summary alone answers spending/income/total questions. Transfers between the user's own accounts are excluded from the income/expense totals (use transfersOnly to see them).",
+          "Totals and breakdowns over cash transactions: income, expenses, net, " +
+          "per-currency totals, an optional grouped breakdown and an optional " +
+          "per-account transfer rollup. The summary alone answers most " +
+          "spending and income questions; set includeTransactions only when the " +
+          "user wants the individual rows, which costs many tokens. Transfers " +
+          "between the user's own accounts are excluded from the income and " +
+          "expense totals -- use transfersOnly to see them.",
         inputSchema: {
           searchText: z
             .string()
             .max(200)
             .optional()
-            .describe("Search payee names or transaction descriptions"),
+            .describe("Substring of a payee name or description."),
           startDate: z
             .string()
             .max(10)
             .optional()
-            .describe("Start date (YYYY-MM-DD). Defaults to 30 days ago."),
-          endDate: z
-            .string()
-            .max(10)
-            .optional()
-            .describe("End date (YYYY-MM-DD). Defaults to today."),
+            .describe("Defaults to 30 days ago."),
+          endDate: z.string().max(10).optional().describe("Defaults to today."),
           accountNames: z
             .array(z.string().max(100))
             .max(50)
             .optional()
-            .describe("Optional account names to filter to"),
+            .describe("Account names."),
           categoryNames: z
             .array(z.string().max(100))
             .max(100)
             .optional()
             .describe(
-              'Optional category names to filter to, in the "Parent: Child" form the read tools return. A bare subcategory name shared by two parents is rejected rather than guessed, and the error lists the qualified names.',
+              "Category names. An ambiguous bare child name is rejected, and the error lists the qualified ones.",
             ),
           payeeNames: z
             .array(z.string().max(100))
             .max(100)
             .optional()
-            .describe("Optional payee names to filter to"),
+            .describe("Payee names."),
           minAmount: z
             .number()
             .min(-999999999999)
             .max(999999999999)
             .optional()
-            .describe("Minimum signed amount"),
+            .describe("Minimum signed amount."),
           maxAmount: z
             .number()
             .min(-999999999999)
             .max(999999999999)
             .optional()
-            .describe("Maximum signed amount"),
+            .describe("Maximum signed amount."),
           direction: z
             .enum(["expenses", "income", "both"])
             .optional()
-            .describe("Filter the grouped breakdown by direction"),
+            .describe("Narrows the grouped breakdown."),
           groupBy: z
             .enum(["category", "payee", "year", "month", "week", "none"])
             .optional()
             .describe(
-              "How to group the breakdown (default 'none' = totals only, no breakdown)",
+              "Default 'none', which returns totals with no breakdown.",
             ),
           transfersOnly: z
             .boolean()
             .optional()
-            .describe(
-              "When true, also compute the per-account transfer rollup (inbound/outbound/net)",
-            ),
+            .describe("Also compute the per-account transfer rollup."),
           includeTransactions: z
             .boolean()
             .optional()
             .default(false)
             .describe(
-              "When true, also include the raw transaction list (costs more tokens). Default false -- the summary alone usually suffices. Foreign-currency rows also carry read-only originalAmount, originalCurrencyCode, and exchangeRate metadata (amount stays in the account currency); informational only, creating foreign-currency transactions is not supported.",
+              "Add the raw rows. Costs many tokens; the summary usually suffices. A foreign-currency row carries read-only originalAmount, originalCurrencyCode and exchangeRate beside the account-currency amount.",
             ),
           limit: z
             .number()
@@ -209,23 +209,17 @@ export class McpTransactionsTools {
             .max(100)
             .optional()
             .default(50)
-            .describe(
-              "Max raw rows when includeTransactions is true (max 100)",
-            ),
+            .describe("Max raw rows, up to 100."),
           sortBy: z
             .enum(["date", "amount", "payee"])
             .optional()
             .default("date")
-            .describe(
-              "Which field to sort the raw rows by (when includeTransactions is true): 'date' (default), 'amount', or 'payee'",
-            ),
+            .describe("Sorts the raw rows. Default 'date'."),
           sortDirection: z
             .enum(["asc", "desc"])
             .optional()
             .default("desc")
-            .describe(
-              "Sort direction for the raw rows (when includeTransactions is true): 'desc' (newest first, default) or 'asc' (oldest first)",
-            ),
+            .describe("Default 'desc', newest first."),
         },
         outputSchema: listTransactionsOutput,
       },
@@ -304,42 +298,38 @@ export class McpTransactionsTools {
         title: "Compare periods",
         annotations: READ_ONLY,
         description:
-          "Compare spending or income between two time periods. Returns side-by-side comparison showing absolute and percentage changes per group. If any of the four period dates are omitted, defaults to the previous full month (period1) vs the current month-to-date (period2). Returns the same shape as the AI Assistant's compare_periods tool.",
+          "Compare spending or income across two periods, with the absolute and " +
+          "percentage change per group. Omitting any of the four dates " +
+          "defaults to last full month against this month to date.",
         inputSchema: {
           period1Start: z
             .string()
             .max(10)
             .optional()
-            .describe(
-              "First period start (YYYY-MM-DD). Defaults to the start of last month.",
-            ),
+            .describe("Defaults to the start of last month."),
           period1End: z
             .string()
             .max(10)
             .optional()
-            .describe(
-              "First period end (YYYY-MM-DD). Defaults to the last day of last month.",
-            ),
+            .describe("Defaults to the end of last month."),
           period2Start: z
             .string()
             .max(10)
             .optional()
-            .describe(
-              "Second period start (YYYY-MM-DD). Defaults to the start of the current month.",
-            ),
+            .describe("Defaults to the start of this month."),
           period2End: z
             .string()
             .max(10)
             .optional()
-            .describe("Second period end (YYYY-MM-DD). Defaults to today."),
+            .describe("Defaults to today."),
           groupBy: z
             .enum(["category", "payee"])
             .optional()
-            .describe("How to group comparison (default: category)"),
+            .describe("Default 'category'."),
           direction: z
             .enum(["expenses", "income", "both"])
             .optional()
-            .describe("Filter by direction (default: expenses)"),
+            .describe("Default 'expenses'."),
         },
         outputSchema: comparePeriodsOutput,
       },
@@ -380,14 +370,21 @@ export class McpTransactionsTools {
         title: "Manage transactions",
         annotations: WRITE,
         description:
-          "Create, update, or delete the user's cash transactions (including transfers between their own accounts). Accepts NAMES for account, category, and payee -- they are resolved internally, so you do NOT need to call get_accounts/list_categories first. operation = 'create' | 'update' | 'delete' with an items array (1-25 rows). " +
-          "create (standard): { accountName, amount, date, payeeName?, categoryName?, description?, createPayeeIfMissing? } (amount positive=income, negative=expense). " +
-          "create (transfer): { fromAccountName, toAccountName, amount, date, description?, payeeName?, categoryName?, createPayeeIfMissing?, exchangeRate?, toAmount? } -- an item is a transfer when toAccountName is present; payeeName is an optional custom label matched to an existing payee (or created if missing, like a normal transaction) and applied to both legs (omit to leave the payee blank; blank transfer payees display as 'Transfer to/from <account>' resolved from the current account name); categoryName is an optional spending category stored on both legs (surfaces the transfer in the monthly category breakdown without counting as income/expense). " +
-          "update: { transactionId, amount?, date?, payeeName?, categoryName?, description?, createPayeeIfMissing? } (>=1 field; a category-only change is transactionId + categoryName; transfers auto-detected; categoryName also applies to a transfer -- it is stored on both legs and surfaces the transfer in the monthly category breakdown without making it count as income/expense; payeeName sets the transfer's custom label, matched to an existing payee or created if missing). " +
-          "split transactions (create or update): add a 'splits' array of { categoryName, amount, memo? } (>= 2 lines, category splits only) instead of a single categoryName; split amounts must sum to the transaction amount. Updating an EXISTING split transaction: parent fields (date, payeeName, description) work without splits, but changing its categories or its amount requires resending the COMPLETE splits array (the tool errors with instructions otherwise). Read tools return one row per split line (same transaction id, distinct splitId), and always the COMPLETE set for each transaction even when you filtered by category -- so read the current lines first, then resend all of them with your change applied. Several split transactions CAN be sent in one call: each item carries its own complete splits array, and every row is previewed and applied with its own set. " +
-          "delete: { transactionId } (removes linked transfer legs / split children too). " +
-          "attachments (create or update): add an 'attachments' array to save files permanently on the transaction; each entry is EITHER { attachmentUri } referencing a monize-attachment:// chat file relayed from the Monize web chat, OR { fileData, fileName } with inline base64 bytes. Images and PDFs only, max 5 MB each. Single-item calls only; not valid on transfers, delete, or dryRun. An attachments-only update (transactionId + attachments) is a valid edit. " +
-          "approvalMode controls the confirmation: by default 6 or more items show one confirmation for the whole batch and 1-5 items show one confirmation per item; pass 'individual' to force one confirmation per item at any count; ignored for a single item. Set dryRun=true to preview every item without saving. The user is asked to confirm before anything is saved (web chat card via relay, or an MCP confirmation dialog).",
+          "Create, update or delete cash transactions, including transfers " +
+          "between the user's own accounts -- an item with toAccountName is a " +
+          "transfer. Names for account, category and payee resolve internally. " +
+          "A split transaction carries a `splits` array instead of a single " +
+          "categoryName, and its lines must sum to the transaction amount. " +
+          "Updating an EXISTING split transaction: parent fields (date, " +
+          "payeeName, description) work without splits, but changing its " +
+          "categories or its amount requires resending the COMPLETE splits " +
+          "array. Read tools return one row per split line (same transaction " +
+          "id, distinct splitId) and always the whole set even when you " +
+          "filtered by category, so read the current lines first and resend " +
+          "every one with your change applied. Several split transactions CAN " +
+          "be sent in one call, each carrying its own complete array. " +
+          "Deleting a row removes its linked transfer legs and split children " +
+          "too.",
         inputSchema: {
           operation: manageOperation(),
           items: itemsArray(
@@ -396,75 +393,69 @@ export class McpTransactionsTools {
                 .string()
                 .max(100)
                 .optional()
-                .describe("create (standard): account name."),
+                .describe("create: the account, for a non-transfer."),
               fromAccountName: z
                 .string()
                 .max(100)
                 .optional()
-                .describe("create (transfer): source account name."),
+                .describe("create: transfer source."),
               toAccountName: z
                 .string()
                 .max(100)
                 .optional()
                 .describe(
-                  "create (transfer): destination account name (presence makes the item a transfer).",
+                  "create: transfer destination. Its presence makes the item a transfer.",
                 ),
               transactionId: uuidString()
                 .optional()
-                .describe("update/delete: transaction ID."),
+                .describe("update/delete: the row's id."),
               amount: z
                 .number()
                 .min(-999999999999)
                 .max(999999999999)
                 .optional()
                 .describe(
-                  "Signed amount (standard create/update) or positive transfer amount.",
+                  "Signed amount, or the positive amount moved by a transfer.",
                 ),
-              date: z
-                .string()
-                .max(10)
-                .optional()
-                .describe("Transaction date (YYYY-MM-DD)."),
+              date: z.string().max(10).optional().describe("Transaction date."),
               payeeName: z
                 .string()
                 .max(100)
                 .optional()
                 .describe(
-                  "Optional payee name (standard create/update; or a custom transfer label for create/update transfer). Matched to an existing payee when one exists, otherwise handled per createPayeeIfMissing. Omit (transfer) to leave the payee blank; blank transfer payees display as 'Transfer to/from <account>' resolved from the current account name.",
+                  "Matched to an existing payee, else handled per createPayeeIfMissing. On a transfer it is a custom label; omitted, the transfer reads as 'Transfer to/from <account>'.",
                 ),
               categoryName: z
                 .string()
                 .max(100)
                 .optional()
                 .describe(
-                  'Optional category name (standard create/update, or transfer create/update -- on a transfer it is stored on both legs), qualified as "Parent: Child" -- a bare subcategory name shared by two parents is rejected, not guessed.',
+                  "The category. On a transfer it is stored on both legs and surfaces it in the category breakdown without counting as income or expense.",
                 ),
               description: z
                 .string()
                 .max(500)
                 .optional()
-                .describe("Optional description or memo."),
+                .describe("Description or memo."),
               createPayeeIfMissing: z
                 .boolean()
                 .optional()
                 .describe(
-                  "When the payee name matches no existing payee, create a new payee (default true) or keep as free text (false). Applies to standard and transfer create/update.",
+                  "An unmatched payee name creates a payee (default) or stays free text.",
                 ),
               exchangeRate: z
                 .number()
                 .min(0)
                 .max(1_000_000)
                 .optional()
-                .describe(
-                  "create (transfer): exchange rate for a cross-currency transfer.",
-                ),
+                .describe("create: rate for a cross-currency transfer."),
               toAmount: z
                 .number()
                 .min(-999999999999)
                 .max(999999999999)
                 .optional()
                 .describe(
-                  "create (transfer): explicit destination amount (overrides exchangeRate).",
+                  "create: explicit destination amount, overriding exchangeRate.",
                 ),
               splits: z
                 .array(
@@ -473,25 +464,23 @@ export class McpTransactionsTools {
                       .string()
                       .min(1)
                       .max(100)
-                      .describe(
-                        'Category for this split line, qualified as "Parent: Child" for a subcategory (required when the subcategory name is shared by more than one parent).',
-                      ),
+                      .describe("Category for this line."),
                     amount: z
                       .number()
                       .min(-999999999999)
                       .max(999999999999)
-                      .describe("Signed amount for this split line."),
+                      .describe("Signed amount for this line."),
                     memo: z
                       .string()
                       .max(500)
                       .optional()
-                      .describe("Optional memo for this split line."),
+                      .describe("Memo for this line."),
                   }),
                 )
                 .max(50)
                 .optional()
                 .describe(
-                  "Category splits (create/update). >= 2 lines instead of a single categoryName; amounts must sum to the transaction amount. On an EXISTING split transaction, a category or amount change requires resending the complete split set (parent fields work without it); read the current lines first. Several items may each carry their own splits array in one call.",
+                  "Two or more category lines instead of a single categoryName. See the tool description for editing an existing split.",
                 ),
               attachments: z
                 .array(
@@ -501,14 +490,14 @@ export class McpTransactionsTools {
                       .max(300)
                       .optional()
                       .describe(
-                        "monize-attachment://<id> URI (or bare id) of a chat file relayed from the Monize web chat. Mutually exclusive with fileData.",
+                        "A monize-attachment:// URI (or bare id) of a web-chat file. Exclusive with fileData.",
                       ),
                     fileData: z
                       .string()
                       .max(MAX_ATTACHMENT_BASE64_LENGTH)
                       .optional()
                       .describe(
-                        "Inline base64 file bytes (image or PDF, max 5 MB decoded). Requires fileName. Mutually exclusive with attachmentUri.",
+                        "Inline base64 bytes, max 5 MB decoded. Needs fileName. Exclusive with attachmentUri.",
                       ),
                     fileName: z
                       .string()
@@ -521,7 +510,7 @@ export class McpTransactionsTools {
                 .max(MAX_ATTACHMENTS)
                 .optional()
                 .describe(
-                  "create/update: files to save permanently on the transaction (images/PDF only). Single-item calls only; not valid on transfers, delete, or dryRun.",
+                  "Images or PDFs to save on the transaction. Single-item calls only; not valid on a transfer, a delete or a dryRun.",
                 ),
             }),
           ),

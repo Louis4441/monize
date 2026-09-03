@@ -19,7 +19,7 @@ describe("McpCalculateTools", () => {
     expect(mockServer.registerTool).toHaveBeenCalledWith(
       "calculate",
       expect.objectContaining({
-        description: expect.stringContaining("accurate server-side arithmetic"),
+        description: expect.stringContaining("Server-side arithmetic"),
       }),
       expect.any(Function),
     );
