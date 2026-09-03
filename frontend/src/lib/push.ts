@@ -330,6 +330,30 @@ export function requestNotificationPermission(): Promise<NotificationPermission>
 }
 
 /**
+ * Which refusal to report, as the key under `settings.notifications.push.toasts`.
+ * `denied` is a decision the user can undo in site settings -- except on an
+ * installed iOS web app, where the block lives in iOS Settings and no browser
+ * menu exists. `dismissed` normally means they closed the prompt -- except on
+ * that same installed app, where it is also what a prompt that never appeared
+ * looks like, and "choose Allow when the browser asks" sends them to look for a
+ * dialogue that is not coming. One rule, so the settings panel and the app-wide
+ * banner cannot disagree about the same error.
+ */
+export function pushPermissionMessageKey(
+  error: PushPermissionError,
+  installedIos: boolean = isInstalledIosWebApp(),
+):
+  | 'permissionDenied'
+  | 'permissionDeniedIos'
+  | 'permissionDismissed'
+  | 'permissionNoPrompt' {
+  if (error.reason === 'denied') {
+    return installedIos ? 'permissionDeniedIos' : 'permissionDenied';
+  }
+  return installedIos ? 'permissionNoPrompt' : 'permissionDismissed';
+}
+
+/**
  * The browser's push service refused to mint a subscription: permission was
  * granted, the service worker is active, and `pushManager.subscribe` still
  * rejected ("Registration failed - push service error"). On Brave that is the
@@ -1048,4 +1072,19 @@ export function defaultDeviceName(
             : null;
   if (!platform && !browser) return undefined;
   return [browser, platform].filter(Boolean).join(' on ');
+}
+
+/**
+ * The `setState` updater for a re-read `PushSupport`: keeps the previous object
+ * when the answer has not changed, so a tab switch is not a re-render.
+ */
+export function samePushSupportOr(
+  previous: PushSupport | null,
+  next: PushSupport,
+): PushSupport {
+  return previous !== null &&
+    previous.supported === next.supported &&
+    previous.reason === next.reason
+    ? previous
+    : next;
 }

@@ -27,7 +27,6 @@ import { PushTransport } from "../push/entities/push-subscription.entity";
 import { EmailService } from "./email.service";
 import { notificationImmediateTemplate } from "./email-templates";
 
-/** How `notify` treats the fan-out relative to its own promise. */
 /**
  * The per-category push copy, as English fallbacks; the catalogue key is
  * `push.notification.<category>` (lower-cased). One entry per category is
@@ -52,6 +51,14 @@ export const PUSH_CATEGORY_COPY: Readonly<
 };
 
 export interface NotifyOptions {
+  /**
+   * What the push COLLAPSES onto, when the producer knows better than the row:
+   * the admin fan-out raises one row per affected user per admin for a single
+   * cause (a full disk), and shares one email through `emailDedupeKey`; without
+   * the same key here the device stacks sixty pushes for that one cause. Defaults
+   * to the row's dedupe key or id. An id or a cause key, never a name or amount.
+   */
+  collapseKey?: string;
   /**
    * A same-transaction follow-up write, run right after the row is written and
    * before the transaction commits -- never when `create` returned `null`. The
@@ -86,6 +93,13 @@ export interface NotifyOptions {
  * `PushModule` (both leaves) and holds `EmailService`, so the seam needs no
  * `forwardRef` and no require cycle (`module-graph.spec.ts`, INV-MODULE).
  */
+/** The reminder a re-emitted row belongs to (`data.reminderId`, set by the reminder cron), else null. */
+function reminderIdOf(row: Notification): string | null {
+  const value = (row.data as Record<string, unknown> | null | undefined)
+    ?.reminderId;
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
 @Injectable()
 export class NotificationDispatchService {
   private readonly logger = new Logger(NotificationDispatchService.name);
@@ -146,7 +160,10 @@ export class NotificationDispatchService {
       }
       const row = await this.notifications.create(userId, input);
       if (!row) return null;
-      if (options.onWritten) await options.onWritten(manager, row);
+      // Decide BEFORE the caller's follow-up write: the reminder cron's hook
+      // dismisses the previous nag, and a dismissed row is not a prior -- so a
+      // hook that ran first would exempt every repeat from its own predecessor,
+      // and the spec's "subject to the matrix and throttle" would be false.
       const suppressed =
         throttled &&
         (await this.priorInWindow(
@@ -156,6 +173,7 @@ export class NotificationDispatchService {
           row,
           delivery.throttleMinutes,
         ));
+      if (options.onWritten) await options.onWritten(manager, row);
       return { row, suppressed };
     });
     if (!written) return null;
@@ -167,6 +185,7 @@ export class NotificationDispatchService {
       category,
       delivery,
       suppressed,
+      options.collapseKey,
     ).catch((error: unknown) => {
       // Never let a delivery failure escape: the bell row stands regardless.
       this.logger.error(
@@ -191,6 +210,7 @@ export class NotificationDispatchService {
       ReturnType<NotificationPreferenceService["resolveNotificationDelivery"]>
     >,
     suppressed: boolean,
+    collapseKey?: string,
   ): Promise<void> {
     if (
       !delivery.push &&
@@ -222,7 +242,7 @@ export class NotificationDispatchService {
     if (transports.length > 0) {
       await this.push.sendToUser(
         userId,
-        this.toPushPayload(row, category, recipient.lang),
+        this.toPushPayload(row, category, recipient.lang, collapseKey),
         transports,
       );
     }
@@ -266,6 +286,14 @@ export class NotificationDispatchService {
    * "no prior": the later decider blocks on the lock until the earlier row is
    * committed, then sees it and suppresses. Taken on every throttled path, push
    * included, because distinct rows do not collapse on the device.
+   *
+   * "Prior" is every OTHER live row in the window, excluded by id and not by
+   * `created_at < mine`: `created_at` is the transaction's BEGIN time, and the
+   * later lock-holder can have begun earlier (BEGIN is its own round trip before
+   * the lock statement), so ordering on it let both replicas send -- the first
+   * decider saw nothing, the second saw a row "younger" than its own and
+   * ignored it. The first decider never sees the second's row (not yet
+   * written), so exactly one of the two sends.
    */
   private async priorInWindow(
     manager: EntityManager,
@@ -285,14 +313,14 @@ export class NotificationDispatchService {
               AND alert_type = ANY($2)
               AND dismissed_at IS NULL
               AND created_at > $3
-              AND created_at < $4
+              AND id <> $4
               AND severity = ANY($5)
          ) AS suppress`,
         [
           userId,
           typesForCategory(category),
           windowStart,
-          row.createdAt,
+          row.id,
           severitiesAtOrAbove(row.severity),
         ],
       ),
@@ -317,19 +345,40 @@ export class NotificationDispatchService {
     row: Notification,
     category: NotificationCategory,
     lang: string,
+    collapseKey?: string,
   ): PushPayload {
     const t = emailTranslator(this.i18n, lang);
     const copy = PUSH_CATEGORY_COPY[category];
     const key = `push.notification.${category.toLowerCase()}`;
+    const reminderId = reminderIdOf(row);
     return {
       type: row.type,
       title: t(`${key}.title`, copy.title),
       body: t(`${key}.body`, copy.body),
       target: row.target ?? undefined,
-      // The subject this collapses onto: a system row's dedupe key, else the
-      // row's own id (unique, so two distinct alerts never hide one another).
-      // An id, never a name or amount -- a collapse key is metadata.
-      collapseKey: row.dedupeKey ?? row.id,
+      // The subject this collapses onto, in order: what the producer said (a
+      // cause shared by many rows), the REMINDER a re-emitted nag belongs to
+      // (its per-fire dedupe key differs every fire, and a phone left overnight
+      // must show one nag, not a hundred stacked), a system row's dedupe key,
+      // else the row's own id (unique, so two distinct alerts never hide one
+      // another). An id or a cause key, never a name or amount.
+      collapseKey:
+        collapseKey ??
+        (reminderId ? `rem:${reminderId}` : (row.dedupeKey ?? row.id)),
+      // A nag carries its reminder and the Stop action the worker renders for
+      // it (R4); the title is rendered here because the worker has no
+      // translator. Nothing else carries actions.
+      ...(reminderId
+        ? {
+            reminderId,
+            actions: [
+              {
+                action: "stop-reminder" as const,
+                title: t("push.actions.stopReminder", "Stop reminders"),
+              },
+            ],
+          }
+        : {}),
     };
   }
 

@@ -24,7 +24,8 @@ interface ShownNotification {
     icon: string;
     badge: string;
     tag: string;
-    data: { target: string };
+    data: { target: string; reminderId?: string };
+    actions?: { action: string; title: string }[];
   };
 }
 
@@ -171,6 +172,46 @@ describe('service worker push handling', () => {
       'Push notifications are working on this device.',
     );
     expect(sw.shown[0].options.data.target).toBe('/settings');
+  });
+
+  it('renders the Stop action and carries the reminder id for a re-emitted nag', async () => {
+    const sw = loadServiceWorker();
+
+    await sw.dispatchPush({
+      type: 'BILL_DUE',
+      title: 'Payment reminder',
+      body: 'b',
+      target: '/bills',
+      collapseKey: 'rem:rem-1',
+      reminderId: 'rem-1',
+      actions: [{ action: 'stop-reminder', title: 'Stop reminders' }],
+    });
+
+    expect(sw.shown[0].options.actions).toEqual([
+      { action: 'stop-reminder', title: 'Stop reminders' },
+    ]);
+    expect(sw.shown[0].options.data.reminderId).toBe('rem-1');
+  });
+
+  it('drops an action it does not handle and a reminder id that is not a short string', async () => {
+    const sw = loadServiceWorker();
+
+    await sw.dispatchPush({
+      type: 'BILL_DUE',
+      title: 'a',
+      body: 'b',
+      reminderId: { not: 'a string' },
+      actions: [
+        { action: 'open-vault', title: 'Open' },
+        { action: 'stop-reminder', title: '' },
+        'not an object',
+      ],
+    });
+
+    // A button whose id nothing branches on would be a button that does
+    // nothing, and a title-less button is unlabelled: neither is rendered.
+    expect(sw.shown[0].options.actions).toEqual([]);
+    expect(sw.shown[0].options.data.reminderId).toBeUndefined();
   });
 
   it('groups repeats of one subject onto a single notification', async () => {

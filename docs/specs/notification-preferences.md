@@ -603,7 +603,10 @@ stopped reminder is a no-op, not a 404-after-the-fact):
 
 1. **From the app** -- `POST /notifications/reminders/:id/stop` (JWT), and a Stop
    control on any bell row carrying `data.reminderId`.
-2. **From the push notification (Phase 5 carrier)** -- the SW `notificationclick`
+2. **From the push notification** -- a re-emitted nag's payload carries
+   `reminderId` and `actions: [{ action: "stop-reminder", title }]` (the title
+   rendered on the server in the recipient's locale, `push.actions.stopReminder`),
+   and the SW renders the action and keeps the id in `data`; the SW `notificationclick`
    handler, on `event.action === "stop-reminder"`, `fetch`es that same endpoint
    same-origin with the CSRF header (read from the Cookie Store where the browser
    offers it). The handler is written now (inert until a push carries the action)
@@ -786,7 +789,10 @@ skipped (Section 4). `throttle_minutes = 0` disables the window.
   is written**, in the transaction that writes it, and decides on that same
   connection -- a lock taken after the commit serialises nothing, because the
   other replica's row may commit between the write and the decision -- at the
-  cost of serialising that user's same-category writes. **Decision D7:
+  cost of serialising that user's same-category writes. The prior it looks for
+  is every other live row in the window, excluded by id: `created_at` is the
+  transaction's BEGIN time, so the later lock-holder's row can carry the earlier
+  stamp, and ordering on it let both replicas send. **Decision D7:
   advisory lock on the email path or accept rare duplicates** -- the maintainer
   picks; the default proposal is the lock, since a duplicate financial email is
   worse than a serialised send.

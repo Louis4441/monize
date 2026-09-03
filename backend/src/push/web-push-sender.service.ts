@@ -118,6 +118,16 @@ export interface PushTarget {
  * -- the body is composed from the recipient's own locale on the server and the
  * detail loads once the app is open (discussion #1291, "privacy by default").
  */
+/**
+ * A button on the notification. The id is a closed set the service worker
+ * recognises (`sw.js` drops anything else), the title is rendered on the server
+ * in the recipient's locale because the worker has no translator of its own.
+ */
+export interface PushAction {
+  action: "stop-reminder";
+  title: string;
+}
+
 export interface PushPayload {
   type: string;
   title: string;
@@ -145,6 +155,12 @@ export interface PushPayload {
    * id, not a name or an amount.
    */
   collapseKey: string | null;
+  /**
+   * The reminder a re-emitted nag belongs to. With it come the Stop action and
+   * the id the worker's `notificationclick` needs to silence it (R4).
+   */
+  reminderId?: string;
+  actions?: PushAction[];
 }
 
 /**

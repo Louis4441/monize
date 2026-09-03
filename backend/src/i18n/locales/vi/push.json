@@ -16,5 +16,8 @@
       "title": "Thông báo hệ thống",
       "body": "Monize có một thông báo hệ thống cho bạn. Mở ứng dụng để xem chi tiết."
     }
+  },
+  "actions": {
+    "stopReminder": "Dừng nhắc nhở"
   }
 }

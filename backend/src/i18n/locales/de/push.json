@@ -16,5 +16,8 @@
       "title": "Systemhinweis",
       "body": "Monize hat einen Systemhinweis für Sie. Öffnen Sie die App für die Details."
     }
+  },
+  "actions": {
+    "stopReminder": "Erinnerungen stoppen"
   }
 }

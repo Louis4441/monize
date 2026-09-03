@@ -345,7 +345,11 @@ sends every reminder to `/bills`, because there is no per-bill page, so a tag
 built from the route collapsed exactly the case it had to separate: two bills due
 on the same day, one of them shown and the other silently replaced. It carries an
 id, never a name or an amount: the payload is encrypted to the device, but a
-collapse key is metadata.
+collapse key is metadata. The dispatch derives it in this order: a producer's
+`NotifyOptions.collapseKey` (the admin fan-out passes its `emailDedupeKey`, so
+sixty rows about one full disk are one notification on the phone), then the
+reminder id of a re-emitted nag (`rem:<id>` -- its per-fire dedupe key differs
+every fire), then the row's dedupe key, then its id.
 
 The HTTP surface lives in its own module (`notification-api.module.ts`) because
 it is the one part that needs a producer: bill reminders are materialized when

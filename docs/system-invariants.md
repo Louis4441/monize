@@ -2673,11 +2673,18 @@ Enforcement         The lock is held across the write and the decision, so the
                     (D7). Taken after the commit -- the first version -- it
                     serialised nothing: B could commit and decide before A's row
                     was visible, and A then decided against B's later created_at.
+                    "Prior" is every other live same-category row in the
+                    window, excluded by id -- never by created_at ordering,
+                    which is the transaction's BEGIN time and can put the later
+                    lock-holder's row first. The decision precedes the caller's
+                    onWritten follow-up (the reminder cron dismisses the previous
+                    nag there), so a repeat is throttled by its own predecessor.
                     The EXISTS query carries severitiesAtOrAbove so an
                     escalation never matches.
                     notification-dispatch.service.spec.ts holds the lock -> write
-                    -> decide order, the lock on both the push and the email
-                    path, the window-0 short-circuit, and the escalation set.
+                    -> decide -> hook order, the id exclusion, the lock on both
+                    the push and the email path, the window-0 short-circuit, and
+                    the escalation set.
 Concurrency scope   per (user, category), across replicas
 Failure response    A suppressed fan-out is a skipped send; the row is already
                     committed.

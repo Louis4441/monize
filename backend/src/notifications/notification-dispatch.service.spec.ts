@@ -264,6 +264,118 @@ describe("NotificationDispatchService", () => {
     expect(sendToUser).toHaveBeenCalledTimes(1);
   });
 
+  it("runs the caller's onWritten follow-up AFTER the throttle decision, in the same transaction", async () => {
+    // The reminder cron dismisses the previous nag in the hook, and a dismissed
+    // row is not a prior -- so a hook that ran first would exempt every repeat
+    // from its own predecessor. The decision reads the live rows first.
+    resolveDelivery.mockResolvedValue({
+      emailNotification: false,
+      push: true,
+      unifiedpush: false,
+      throttleMinutes: 15,
+    });
+    const order: string[] = [];
+    query.mockImplementation(async (sql: string) => {
+      order.push(
+        String(sql).includes("pg_advisory_xact_lock") ? "lock" : "decide",
+      );
+      return [{ suppress: false }];
+    });
+    create.mockImplementation(async () => {
+      order.push("create");
+      return row();
+    });
+    const onWritten = jest.fn(async () => {
+      order.push("onWritten");
+    });
+    await service.notify("u1", {} as never, { onWritten });
+    expect(order).toEqual(["lock", "create", "decide", "onWritten"]);
+    expect(onWritten).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ id: "n1" }),
+    );
+  });
+
+  it("never runs onWritten when the write door refused the row", async () => {
+    create.mockResolvedValue(null);
+    const onWritten = jest.fn();
+    await expect(
+      service.notify("u1", {} as never, { onWritten }),
+    ).resolves.toBeNull();
+    expect(onWritten).not.toHaveBeenCalled();
+  });
+
+  it("excludes its own row by id, never by created_at ordering (D7 across replicas)", async () => {
+    // created_at is the transaction's BEGIN time, and the later lock-holder can
+    // have begun earlier, so `created_at < mine` let both replicas send.
+    resolveDelivery.mockResolvedValue({
+      emailNotification: false,
+      push: true,
+      unifiedpush: false,
+      throttleMinutes: 15,
+    });
+    await service.notify("u1", {} as never);
+    const existsCall = query.mock.calls.find((c) =>
+      String(c[0]).includes("SELECT EXISTS"),
+    );
+    expect(String(existsCall?.[0])).toContain("id <> $4");
+    expect(String(existsCall?.[0])).not.toContain("created_at <");
+    expect(existsCall?.[1]?.[3]).toBe("n1");
+  });
+
+  it("collapses a re-emitted nag onto its REMINDER and carries the Stop action (R4)", async () => {
+    resolveDelivery.mockResolvedValue({
+      emailNotification: false,
+      push: true,
+      unifiedpush: false,
+      throttleMinutes: 0,
+    });
+    create.mockResolvedValue(
+      row({
+        dedupeKey: "BILL_DUE:rem:rem-1:7",
+        data: { billId: "b1", reminderId: "rem-1" },
+      }),
+    );
+    await service.notify("u1", {} as never);
+    const payload = sendToUser.mock.calls[0][1];
+    // The per-fire dedupe key differs every fire; a phone left overnight must
+    // show one nag for this reminder, not a hundred stacked.
+    expect(payload.collapseKey).toBe("rem:rem-1");
+    expect(payload.reminderId).toBe("rem-1");
+    expect(payload.actions).toEqual([
+      { action: "stop-reminder", title: "Stop reminders" },
+    ]);
+  });
+
+  it("carries no actions and no reminder id on an ordinary notification", async () => {
+    resolveDelivery.mockResolvedValue({
+      emailNotification: false,
+      push: true,
+      unifiedpush: false,
+      throttleMinutes: 0,
+    });
+    await service.notify("u1", {} as never);
+    const payload = sendToUser.mock.calls[0][1];
+    expect(payload.reminderId).toBeUndefined();
+    expect(payload.actions).toBeUndefined();
+  });
+
+  it("lets the producer name the collapse key (the admin fan-out's cause key)", async () => {
+    resolveDelivery.mockResolvedValue({
+      emailNotification: false,
+      push: true,
+      unifiedpush: false,
+      throttleMinutes: 0,
+    });
+    create.mockResolvedValue(row({ dedupeKey: "BACKUP_FAILED:u7" }));
+    await service.notify("u1", {} as never, {
+      collapseKey: "BACKUP_FAILED:disk-full",
+    });
+    expect(sendToUser.mock.calls[0][1].collapseKey).toBe(
+      "BACKUP_FAILED:disk-full",
+    );
+  });
+
   it("uses the dedupe key as the collapse key when present", async () => {
     create.mockResolvedValue(row({ dedupeKey: "PROVIDER_OUTAGE:yahoo" }));
     resolveDelivery.mockResolvedValue({

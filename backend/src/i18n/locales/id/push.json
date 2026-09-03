@@ -16,5 +16,8 @@
       "title": "Pemberitahuan sistem",
       "body": "Monize memiliki pemberitahuan sistem untuk Anda. Buka aplikasi untuk detailnya."
     }
+  },
+  "actions": {
+    "stopReminder": "Hentikan pengingat"
   }
 }

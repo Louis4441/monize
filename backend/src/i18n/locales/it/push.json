@@ -16,5 +16,8 @@
       "title": "Avviso di sistema",
       "body": "Monize ha un avviso di sistema per te. Apri l'app per i dettagli."
     }
+  },
+  "actions": {
+    "stopReminder": "Interrompi i promemoria"
   }
 }

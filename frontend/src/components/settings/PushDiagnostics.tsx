@@ -17,6 +17,7 @@ import {
   isBraveBrowser,
 } from '@/lib/push';
 import { createLogger } from '@/lib/logger';
+import { useRereadOnVisible } from '@/hooks/useRereadOnVisible';
 import { getErrorMessage } from '@/lib/errors';
 
 const logger = createLogger('PushDiagnostics');
@@ -268,18 +269,7 @@ export function PushDiagnostics() {
 
   // The permission and the OS/display state are all changed ELSEWHERE and
   // returned to, so re-read on the way back rather than trusting the mount read.
-  useEffect(() => {
-    const reread = () => {
-      if (document.visibilityState !== 'visible') return;
-      refresh();
-    };
-    document.addEventListener('visibilitychange', reread);
-    window.addEventListener('focus', reread);
-    return () => {
-      document.removeEventListener('visibilitychange', reread);
-      window.removeEventListener('focus', reread);
-    };
-  }, [refresh]);
+  useRereadOnVisible(refresh);
 
   /**
    * Show a notification straight from the service worker, then ask the

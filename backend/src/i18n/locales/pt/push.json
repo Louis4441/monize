@@ -16,5 +16,8 @@
       "title": "Aviso do sistema",
       "body": "O Monize tem um aviso do sistema para si. Abra a aplicação para ver os detalhes."
     }
+  },
+  "actions": {
+    "stopReminder": "Parar lembretes"
   }
 }

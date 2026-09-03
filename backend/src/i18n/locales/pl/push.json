@@ -16,5 +16,8 @@
       "title": "Komunikat systemowy",
       "body": "Monize ma dla Ciebie komunikat systemowy. Otwórz aplikację, aby zobaczyć szczegóły."
     }
+  },
+  "actions": {
+    "stopReminder": "Zatrzymaj przypomnienia"
   }
 }

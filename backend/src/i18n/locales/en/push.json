@@ -16,5 +16,8 @@
       "title": "System notice",
       "body": "Monize has a system notice for you. Open the app for the details."
     }
+  },
+  "actions": {
+    "stopReminder": "Stop reminders"
   }
 }

@@ -16,5 +16,8 @@
       "title": "Avis système",
       "body": "Monize a un avis système pour vous. Ouvrez l'application pour les détails."
     }
+  },
+  "actions": {
+    "stopReminder": "Arrêter les rappels"
   }
 }

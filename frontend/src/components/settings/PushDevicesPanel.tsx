@@ -19,13 +19,16 @@ import {
   PushPermissionError,
   PushServiceError,
   defaultDeviceName,
+  pushPermissionMessageKey,
   type PushConfig,
   type PushDevice,
   type PushSupport,
   type PushTestDeviceResult,
+  samePushSupportOr,
 } from '@/lib/push';
 import { useAuthStore } from '@/store/authStore';
 import { createLogger } from '@/lib/logger';
+import { useRereadOnVisible } from '@/hooks/useRereadOnVisible';
 import { getErrorMessage } from '@/lib/errors';
 
 const logger = createLogger('PushDevices');
@@ -86,25 +89,12 @@ export function PushDevicesPanel() {
    * Only on becoming visible, and only when the answer actually differs, so a
    * tab switch is not a re-render.
    */
-  useEffect(() => {
-    const reread = () => {
-      if (document.visibilityState !== 'visible') return;
-      const next = getPushSupport();
-      setSupport((previous) =>
-        previous !== null &&
-        previous.supported === next.supported &&
-        previous.reason === next.reason
-          ? previous
-          : next,
-      );
-    };
-    document.addEventListener('visibilitychange', reread);
-    window.addEventListener('focus', reread);
-    return () => {
-      document.removeEventListener('visibilitychange', reread);
-      window.removeEventListener('focus', reread);
-    };
-  }, []);
+  useRereadOnVisible(
+    useCallback(
+      () => setSupport((previous) => samePushSupportOr(previous, getPushSupport())),
+      [],
+    ),
+  );
 
   // A browser can rotate its subscription on its own; the worker resubscribes
   // and says so, and this is the surface that holds the session and the CSRF
@@ -297,27 +287,9 @@ export function PushDevicesPanel() {
     })();
   };
 
-  /**
-   * Which refusal to report. `denied` is a decision the user can undo in site
-   * settings. `dismissed` normally means they closed the prompt -- except on an
-   * installed iOS web app, where it is also what a prompt that never appeared
-   * looks like, and telling that user to "choose Allow when the browser asks"
-   * sends them to look for a dialogue that is not coming.
-   */
-  const permissionMessage = (error: PushPermissionError): string => {
-    if (error.reason === 'denied') {
-      // On an installed iOS app the block is in iOS Settings, not in any
-      // browser's site settings -- and sending the reader to look for a menu
-      // their device does not have is how "there is no information anywhere
-      // about how to do it" happens.
-      return isInstalledIosWebApp()
-        ? t('toasts.permissionDeniedIos')
-        : t('toasts.permissionDenied');
-    }
-    return isInstalledIosWebApp()
-      ? t('toasts.permissionNoPrompt')
-      : t('toasts.permissionDismissed');
-  };
+  /** One rule for every surface that can hit this refusal (`pushPermissionMessageKey`). */
+  const permissionMessage = (error: PushPermissionError): string =>
+    t(`toasts.${pushPermissionMessageKey(error, isInstalledIosWebApp())}`);
 
   const handleRemove = async (device: PushDevice) => {
     setRemovingId(device.id);

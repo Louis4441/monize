@@ -73,10 +73,9 @@ const WITH_CONTEXT_ALLOWLIST = [
   "src/notification-center/notification.service.ts",
   // The reminder firing cron: the dismissed-source sweep and the atomic claim
   // are cross-user (withSystemContext), and each due row's re-emit runs under
-  // its own user's context (withUserContext). Every request-path method here
-  // runs under the caller's own context.
-  // The reminder cron: cross-user sweep + claim under system context, each
-  // re-emit under the owner (moved here from notification-center with the cron).
+  // its own user's context (withUserContext). Moved here from
+  // notification-center with the cron; the reminder CRUD it left behind has no
+  // context wrapper of its own.
   "src/notifications/notification-reminder-cron.service.ts",
   // Joint register writes: authorization-decision row load plus the
   // owner-scoped mutation window, both fully decided by jointAccessFor

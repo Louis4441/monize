@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
-import { IsNull, DataSource } from "typeorm";
+import { DataSource, In, Not } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
@@ -14,6 +14,7 @@ import {
   NotificationType,
   NotificationSeverity,
   NotificationCategory,
+  SYSTEM_NOTIFICATION_TYPES,
 } from "../notification-center/entities/notification.entity";
 import { NotificationService } from "../notification-center/notification.service";
 import { NotificationPreferenceService } from "../notification-center/notification-preference.service";
@@ -731,14 +732,16 @@ export class BudgetAlertService {
         where: {
           userId,
           periodStart,
-          // System alerts share this table but are not budget news, and
-          // `dedupe_key` is exactly what tells the two apart (only a system
-          // alert carries one). Without this an alert raised on the FIRST of
-          // a month -- whose `period_start` is stamped with that day, which is
-          // also the month's budget period start -- was rendered inside the
-          // budget digest for the rest of the month, and could produce a
-          // digest for a user who had no budget news at all.
-          dedupeKey: IsNull(),
+          // System alerts share this table but are not budget news. Excluded
+          // by TYPE: an earlier version keyed this on `dedupe_key IS NULL` on
+          // the premise that only a system alert carries one, and the premise
+          // stopped holding the day BILL_DUE rows gained an occurrence key --
+          // every bill-due row silently left the digest, with the paid-bill
+          // filter below running over an empty list. Without the exclusion an
+          // alert raised on the FIRST of a month -- whose `period_start` is
+          // stamped with that day, also the budget period start -- rendered
+          // inside the budget digest for the rest of the month.
+          type: Not(In([...SYSTEM_NOTIFICATION_TYPES])),
         },
         order: { createdAt: "DESC" },
         take: 20,

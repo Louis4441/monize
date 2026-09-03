@@ -16,5 +16,8 @@
       "title": "Systeemmelding",
       "body": "Monize heeft een systeemmelding voor u. Open de app voor de details."
     }
+  },
+  "actions": {
+    "stopReminder": "Herinneringen stoppen"
   }
 }

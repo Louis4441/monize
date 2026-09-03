@@ -16,5 +16,8 @@
       "title": "系统通知",
       "body": "Monize 有一条系统通知给您。打开应用查看详情。"
     }
+  },
+  "actions": {
+    "stopReminder": "停止提醒"
   }
 }

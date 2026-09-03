@@ -252,15 +252,25 @@ export class SystemAlertService {
     userId: string,
     input: Omit<SystemAlertInput, "email">,
   ): Promise<string | null> {
-    const row = await this.dispatch.notify(userId, {
-      type: input.type,
-      severity: input.severity,
-      title: input.title,
-      message: input.message,
-      data: input.data,
-      target: input.target,
-      dedupeKey: input.dedupeKey,
-    });
+    const row = await this.dispatch.notify(
+      userId,
+      {
+        type: input.type,
+        severity: input.severity,
+        title: input.title,
+        message: input.message,
+        data: input.data,
+        target: input.target,
+        dedupeKey: input.dedupeKey,
+      },
+      // One cause, one notification on the device: a full disk raises a row
+      // per affected user per admin, and shares one EMAIL through
+      // `emailDedupeKey`; the push collapses on the same key, or the admin's
+      // phone shows sixty stacked alerts about one broken volume.
+      input.emailDedupeKey === undefined
+        ? {}
+        : { collapseKey: input.emailDedupeKey },
+    );
     return row?.id ?? null;
   }
 

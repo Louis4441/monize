@@ -184,6 +184,31 @@ function pushText(value, fallback) {
     : fallback;
 }
 
+// The actions the worker knows how to handle. Anything else in the payload is
+// dropped: an action id is what `notificationclick` branches on, so an unknown
+// one would be a button that does nothing.
+var KNOWN_PUSH_ACTIONS = ['stop-reminder'];
+
+function pushActions(value) {
+  if (!Array.isArray(value)) return [];
+  var actions = [];
+  for (var i = 0; i < value.length && actions.length < 2; i += 1) {
+    var item = value[i];
+    if (!item || typeof item !== 'object') continue;
+    if (KNOWN_PUSH_ACTIONS.indexOf(item.action) === -1) continue;
+    var title = pushText(item.title, '');
+    if (title === '') continue;
+    actions.push({ action: item.action, title: title });
+  }
+  return actions;
+}
+
+function pushReminderId(value) {
+  return typeof value === 'string' && value.length > 0 && value.length <= 64
+    ? value
+    : undefined;
+}
+
 self.addEventListener('push', function (event) {
   var payload = readPushPayload(event);
   var target = safeNotificationPath(payload.target);
@@ -200,7 +225,11 @@ self.addEventListener('push', function (event) {
         // `collapseTag`: the subject is the payload's `collapseKey`, and a
         // payload without one is saying its type IS the subject.
         tag: collapseTag(payload),
-        data: { target: target },
+        // The reminder id rides along so the Stop action below can name what
+        // to stop; `actions` is the server's list, filtered to the ids this
+        // worker handles.
+        data: { target: target, reminderId: pushReminderId(payload.reminderId) },
+        actions: pushActions(payload.actions),
         // A test push exists to be looked at: keep it until dismissed rather
         // than letting a desktop banner auto-hide it in seconds. Real alerts
         // keep the platform's default so they do not pile up.
@@ -352,8 +381,9 @@ self.addEventListener('notificationclick', function (event) {
   var url = new URL(safeNotificationPath(data.target), self.location.origin)
     .href;
 
-  // A Stop action on a reminder push (Phase 5 populates `actions` and
-  // `data.reminderId`; this branch is inert until then). Silence the reminder
+  // A Stop action on a reminder push: the dispatch puts `actions` and
+  // `reminderId` on a re-emitted nag's payload, and the push handler above
+  // carries the id in `data`. Silence the reminder
   // without opening a window -- unless the stop did not take, in which case open
   // the app at the notification's target so the user can finish stopping it
   // there rather than being left with a nag that keeps firing.

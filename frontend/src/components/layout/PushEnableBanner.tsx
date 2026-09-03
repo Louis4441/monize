@@ -17,11 +17,14 @@ import {
   rememberPushPromptDismissal,
   PushPermissionError,
   PushServiceError,
+  pushPermissionMessageKey,
   type PushConfig,
   type PushPromptState,
   type PushSupport,
+  samePushSupportOr,
 } from '@/lib/push';
 import { createLogger } from '@/lib/logger';
+import { useRereadOnVisible } from '@/hooks/useRereadOnVisible';
 
 const logger = createLogger('PushEnableBanner');
 
@@ -130,25 +133,12 @@ export function PushEnableBanner() {
   // returned to: site settings, iOS Settings, "Add to Home Screen". Read once,
   // this banner would go on offering a button the browser has started refusing,
   // or keep telling an installed app to install itself.
-  useEffect(() => {
-    const reread = () => {
-      if (document.visibilityState !== 'visible') return;
-      const next = getPushSupport();
-      setSupport((previous) =>
-        previous !== null &&
-        previous.supported === next.supported &&
-        previous.reason === next.reason
-          ? previous
-          : next,
-      );
-    };
-    document.addEventListener('visibilitychange', reread);
-    window.addEventListener('focus', reread);
-    return () => {
-      document.removeEventListener('visibilitychange', reread);
-      window.removeEventListener('focus', reread);
-    };
-  }, []);
+  useRereadOnVisible(
+    useCallback(
+      () => setSupport((previous) => samePushSupportOr(previous, getPushSupport())),
+      [],
+    ),
+  );
 
   const state: PushPromptState = active
     ? pushPromptState({
@@ -187,13 +177,9 @@ export function PushEnableBanner() {
         setDismissed(true);
       } catch (error) {
         if (error instanceof PushPermissionError) {
-          toast.error(
-            error.reason === 'denied'
-              ? tPermission('permissionDenied')
-              : isInstalledIosWebApp()
-                ? tPermission('permissionNoPrompt')
-                : tPermission('permissionDismissed'),
-          );
+          // The same rule the settings panel applies, installed-iOS case
+          // included: two surfaces reporting one error must not disagree.
+          toast.error(tPermission(pushPermissionMessageKey(error, isInstalledIosWebApp())));
           // The browser now refuses, so the banner has a different thing to say.
           setSupport(getPushSupport());
         } else if (error instanceof PushServiceError) {

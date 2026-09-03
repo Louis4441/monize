@@ -1,4 +1,4 @@
-import { DataSource, IsNull } from "typeorm";
+import { DataSource, In, Not } from "typeorm";
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
@@ -16,6 +16,7 @@ import {
   Notification,
   NotificationType,
   NotificationSeverity,
+  SYSTEM_NOTIFICATION_TYPES,
 } from "../notification-center/entities/notification.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
@@ -1403,9 +1404,15 @@ describe("BudgetAlertService", () => {
       const digestQuery = alertsRepository.find.mock.calls
         .map(([options]) => options)
         .find((options) => options?.where?.periodStart !== undefined);
+      // By TYPE, not by `dedupeKey IS NULL`: BILL_DUE rows carry an occurrence
+      // dedupe key now, and a key-based exclusion silently dropped every one of
+      // them from the digest while the suite stayed green on mocked rows.
       expect(digestQuery.where).toEqual(
-        expect.objectContaining({ dedupeKey: IsNull() }),
+        expect.objectContaining({
+          type: Not(In([...SYSTEM_NOTIFICATION_TYPES])),
+        }),
       );
+      expect(digestQuery.where.dedupeKey).toBeUndefined();
     });
 
     it("sends no digest when the period's only alerts are system alerts", async () => {

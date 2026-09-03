@@ -16,5 +16,8 @@
       "title": "Aviso del sistema",
       "body": "Monize tiene un aviso del sistema para ti. Abre la aplicación para ver los detalles."
     }
+  },
+  "actions": {
+    "stopReminder": "Detener recordatorios"
   }
 }

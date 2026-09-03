@@ -16,5 +16,8 @@
       "title": "Sistem bildirimi",
       "body": "Monize'in sizin için bir sistem bildirimi var. Ayrıntılar için uygulamayı açın."
     }
+  },
+  "actions": {
+    "stopReminder": "Hatırlatmaları durdur"
   }
 }
