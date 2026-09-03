@@ -53,7 +53,13 @@ export class McpServerService {
     private readonly spendingAnalysisPrompt: McpSpendingAnalysisPrompt,
   ) {}
 
-  createServer(): McpServer {
+  /**
+   * One factory for both eras, so a 2026-07-28 client and a 2025-era client can
+   * never be served a different set of tools. The modern handler calls it per
+   * request and the sessionful path once per session.
+   */
+  createServer(opts: { era?: "legacy" | "modern" } = {}): McpServer {
+    void opts.era;
     // Surface today's date so the model can resolve relative ranges ("this
     // month", "last 30 days") into YYYY-MM-DD without an extra round trip. A
     // server is built per 2025-era session and per 2026-07-28 request, so this

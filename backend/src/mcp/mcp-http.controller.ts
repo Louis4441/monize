@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Delete,
+  Logger,
   Req,
   Res,
   OnModuleDestroy,
@@ -13,7 +14,15 @@ import { Request, Response } from "express";
 import { randomUUID } from "crypto";
 import { McpServer } from "@modelcontextprotocol/server";
 import type { AuthInfo } from "@modelcontextprotocol/server";
-import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
+import {
+  createMcpHandler,
+  isLegacyRequest,
+} from "@modelcontextprotocol/server";
+import {
+  NodeStreamableHTTPServerTransport,
+  toNodeHandler,
+  toWebRequest,
+} from "@modelcontextprotocol/node";
 import { SkipCsrf } from "../common/decorators/skip-csrf.decorator";
 import { SetMetadata } from "@nestjs/common";
 import { SKIP_PASSWORD_CHECK_KEY } from "../auth/guards/must-change-password.guard";
@@ -53,6 +62,27 @@ export class McpHttpController implements OnModuleDestroy {
   private static readonly MAX_SESSIONS_PER_USER = 10;
   private static readonly CLEANUP_INTERVAL_MS = 300_000; // 5 minutes
 
+  private readonly logger = new Logger(McpHttpController.name);
+
+  /**
+   * The 2026-07-28 leg. `legacy: "reject"` makes it modern-only: 2025-era
+   * traffic is routed to the sessionful path below instead of to the SDK's
+   * stateless fallback, which would answer an elicitation-shaped confirmation
+   * from an instance that holds nothing between rounds.
+   */
+  private readonly modern = createMcpHandler(
+    ({ era }) => this.mcpServerService.createServer({ era }),
+    {
+      legacy: "reject",
+      onerror: (error) =>
+        this.logger.warn(`MCP request failed: ${error.message}`),
+    },
+  );
+  private modernNode = toNodeHandler(this.modern, {
+    onerror: (error) =>
+      this.logger.warn(`MCP request could not be served: ${error.message}`),
+  });
+
   private transports = new Map<string, NodeStreamableHTTPServerTransport>();
   private servers = new Map<string, McpServer>();
   private sessionUsers = new Map<string, McpUserContext>();
@@ -73,6 +103,7 @@ export class McpHttpController implements OnModuleDestroy {
 
   onModuleDestroy() {
     clearInterval(this.cleanupTimer);
+    void this.modern.close();
     for (const transport of this.transports.values()) {
       transport.close().catch(() => {});
     }
@@ -195,16 +226,44 @@ export class McpHttpController implements OnModuleDestroy {
     return authResult;
   }
 
+  /**
+   * Which protocol era this request belongs to.
+   *
+   * The SDK's own predicate rather than a header check, because its ladder has
+   * rungs a header check cannot reproduce: a malformed envelope behind a
+   * present claim, a `MCP-Protocol-Version` header naming a modern revision
+   * with no envelope, and header/body mismatches are all answered BY THE MODERN
+   * PATH, with modern error codes. Anything it classifies as not-legacy that
+   * reached the sessionful transport instead would be answered in the wrong
+   * shape.
+   *
+   * `req.body` is the JSON Express already parsed, so the conversion reads
+   * nothing from the stream and the sessionful transport still gets its body.
+   */
+  private async isLegacy(req: Request): Promise<boolean> {
+    return isLegacyRequest(await toWebRequest(req, req.body), req.body);
+  }
+
   private bearerToken(req: Request): string {
     const auth = req.headers.authorization ?? "";
     return auth.startsWith("Bearer ") ? auth.substring(7) : "";
   }
 
+  // A 2026-07-28 client spends more requests for the same work than a 2025-era
+  // one: `server/discover` on connect, and a confirmed write is two `tools/call`
+  // POSTs rather than one call plus a server-initiated dialog.
   @Post()
-  @Throttle({ default: { ttl: 60000, limit: 30 } })
+  @Throttle({ default: { ttl: 60000, limit: 60 } })
   async handlePost(@Req() req: Request, @Res() res: Response) {
     const authResult = await this.authorize(req, res);
     if (!authResult) return;
+
+    if (!(await this.isLegacy(req))) {
+      await withUserContext(authResult.userId, () =>
+        this.modernNode(req, res, req.body),
+      );
+      return;
+    }
 
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
@@ -263,7 +322,7 @@ export class McpHttpController implements OnModuleDestroy {
       }
     };
 
-    const server = this.mcpServerService.createServer();
+    const server = this.mcpServerService.createServer({ era: "legacy" });
     await server.connect(transport);
     await withUserContext(authResult.userId, () =>
       transport.handleRequest(req, res, req.body),
@@ -289,11 +348,7 @@ export class McpHttpController implements OnModuleDestroy {
 
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
     if (!sessionId) {
-      res.status(400).json({
-        jsonrpc: "2.0",
-        error: { code: -32000, message: "Session ID required" },
-        id: null,
-      });
+      this.sendNoSessionStream(res);
       return;
     }
 
@@ -334,11 +389,7 @@ export class McpHttpController implements OnModuleDestroy {
 
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
     if (!sessionId) {
-      res.status(400).json({
-        jsonrpc: "2.0",
-        error: { code: -32000, message: "Session ID required" },
-        id: null,
-      });
+      this.sendNoSessionStream(res);
       return;
     }
 
@@ -370,6 +421,25 @@ export class McpHttpController implements OnModuleDestroy {
       transport.handleRequest(req, res),
     );
     this.destroySession(sessionId);
+  }
+
+  /**
+   * GET and DELETE are 2025-era session operations: the standalone stream and
+   * the session's own end. The 2026-07-28 revision has neither -- there is no
+   * session to address and no standalone stream to open -- so without a session
+   * id there is nothing here to answer, on either era.
+   */
+  private sendNoSessionStream(res: Response): void {
+    res.setHeader("Allow", "POST");
+    res.status(405).json({
+      jsonrpc: "2.0",
+      error: {
+        code: -32600,
+        message:
+          "Method not allowed: this endpoint answers POST. The 2026-07-28 revision has no session stream.",
+      },
+      id: null,
+    });
   }
 
   private destroySession(sessionId: string) {
