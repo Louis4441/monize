@@ -76,6 +76,7 @@ This is Next.js middleware (NOT the deprecated middleware pattern from this proj
 - **Auth redirects:** Unauthenticated requests to protected routes redirect to `/login`
 - **Security headers:** CSP with `strict-dynamic`, nonce-based script-src
 - **Public paths:** `/login`, `/register`, `/auth/callback`, `/forgot-password`, `/reset-password` (no auth required)
+- **MCP traffic at the bare origin:** a request to `/` carrying `Authorization: Bearer`, `Mcp-Method`, `Mcp-Name`, `Mcp-Session-Id`, `MCP-Protocol-Version` or an event-stream `Accept` is forwarded to the backend's MCP endpoint. **The app shell must never answer an MCP request**: a bearer-only probe used to fall through to it and be answered 307 to `/login` then 200, which a security scan reads as the server accepting an invalid token, while `/api/v1/mcp` had been refusing it with a 401 all along. None of those signals is something a page load sends -- this app authenticates with cookies and never sends an `Authorization` header.
 
 ## Component Patterns
 

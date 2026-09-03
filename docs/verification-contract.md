@@ -103,6 +103,7 @@ INV-LOAN-002's entry names the missing source scan while its row said `--`.
 | INV-ACTIVITY-001 activity attribution | supporting | -- | **required** | -- | -- | -- | -- | -- |
 | INV-PROFILE-001 allowlist | required | **required** | supporting | -- | -- | -- | -- | -- |
 | INV-MCP-001 credential binding | supporting | -- | required | -- | -- | -- | -- | -- |
+| INV-MCP-002 transport answers MCP | **required** | -- | -- | -- | -- | -- | -- | optional |
 | INV-CURRENCY-001 currency delete | supporting | **required** | required | required | -- | -- | -- | optional |
 | INV-ATTACHMENT-001 bytes present | supporting | -- | required | optional | -- | **required** | **required** | required |
 | INV-BACKUP-001 backup complete | supporting | -- | required | -- | optional | **required** | **required** | required |

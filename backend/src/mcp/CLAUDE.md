@@ -94,14 +94,41 @@ The same user can have two MCP sessions at once -- the agent running the web-cha
 
 Because every tool declares `outputSchema`, the SDK **requires** `structuredContent` and validates it on each call (errors via `toolError`/`safeToolError` set `isError` and bypass validation). So a tool's output schema must accept what `toolResult` produces for that tool.
 
+## A tool definition is paid for on every request
+
+Every byte of `tools/list` -- title, description, both schemas, annotations -- rides in the model's context on **every** request, and the server instructions ride beside it. This payload reached 78,207 bytes (~11,600 tokens) for 20 tools before anything measured it, because each defect fix appended a paragraph and the same fact was stated in the tool description, again in the field's `.describe()`, and again in the instructions.
+
+A fact lives in exactly one place:
+
+| Place | Carries |
+|---|---|
+| `description` | What the tool does, when to prefer it, and the one or two semantics a model gets wrong (a withheld total, an editing contract). |
+| A field's `.describe()` | How to fill *that* field, terse. An enum's own field is where its members are explained. |
+| Server `instructions` | Cross-tool conventions, once: signed amounts, name resolution, date formats, the approval rule shared by every `manage_*` tool. |
+
+- **Never restate an enum's members in prose.** The `z.enum` already ships them.
+- **Never describe another surface or the codebase's history.** "Returns the same shape as the AI Assistant's tool" and "replaces the former get_accounts" guide nobody holding this tool.
+- **Shared input shapes live in `tools/schema-fragments.ts`** (`uuidString`, `ymdDate`, `nameList`, `manageOperation`, `approvalMode`, `dryRun`, `itemsArray`). `z.string().uuid()` emits `format: "uuid"` *and* a 166-character pattern, per tool; the fragment is 75 characters. Its regex carries no flags on purpose -- zod serializes `regex.source`, so a flag would be enforced by the server's parse and silently absent from the client's schema. `schema-fragments.guard.spec.ts` fails on a second copy.
+- **Guidance for one kind of turn travels with that turn.** The relay's heartbeat and batching rules are returned as `guidance` on a claimed prompt (`relay-guidance.ts`), not carried by every client that never relays.
+
+`tools-list-budget.spec.ts` serializes the real `tools/list` through the SDK and fails above a per-tool cap, a total cap and an instructions cap, printing the whole table on failure. The caps are a **ratchet**: lower one when a tool shrinks; raising one is a reviewed decision, not the fix for a red build. It also pins the listed order (2026-07-28 asks for a deterministic one) and scans for restated enum lists and banned phrases.
+
 ## Output schema conventions (`tool-output-schemas.ts`)
 
-Each export is a **Zod raw shape** (same form as `inputSchema`), not a `z.object`. Schemas are deliberately **tolerant** -- they document shape without rejecting real runtime data:
+Each export is a **loose `z.object`** built with `toolOutput(...)` -- a schema instance, which `registerTool` accepts alongside a raw shape.
 
-- Build every object with the shared `looseObject(...)` helper, never bare `z.object(...)`. Tools return entity payloads carrying fields beyond the modeled subset, and the SDK serializes each schema to JSON Schema in output mode for `tools/list`, where a default (strip) object becomes `additionalProperties: false` and the *client* rejects the extra fields. `looseObject` emits `additionalProperties: {}`. Only model the fields you actually expose.
+**The declaration does not decide what reaches the caller.** The server validates `structuredContent` with `safeParseAsync` and then sends the handler's *original* object, so no field is ever stripped on the way out. What it decides is the JSON Schema the **client** validates against with ajv: a raw shape is wrapped in a strip-mode object, serialized as `additionalProperties: false`, and the client then rejects the very fields the tools return. Loose emits `additionalProperties: {}`.
+
+So declare what a model must **reason about**, and let the rest ride in the payload:
+
+- **Declare** totals, counts, completeness flags (`fxComplete`, `valuationComplete`, `amountsComplete`, and the per-account ones -- an account's totals are in *its* currency, so a global flag cannot speak for them), the currency a total is in (`totalsCurrency`), a `known*Subtotal`, a skipped row's `reason`, and any id the model must copy back (`securityId`, a scheduled item's `id`, an attachment's `uri`).
+- **Do not declare** row-level display columns. `rows()` is `z.array(looseObject({}))`.
+- Build every nested object with `looseObject(...)`, never a bare `z.object(...)`.
 - Money/decimals are numbers at runtime (entity `numericTransformer`). Use the shared `num` (`z.number().nullable()`). A divide-by-zero percentage is `NaN`, which `toolResult` normalizes to `null`. Do **not** use `z.nan()`: the SDK's JSON Schema serialization throws, failing the entire `tools/list` response and leaving every client showing zero tools.
-- Use `.nullable()` for documented-null fields and `.optional()` for fields that may be absent -- including alternate result branches (dry-run vs created, success vs not-found): make all branch fields optional.
-- Array-returning tools wrap under `items`: `{ items: z.array(itemSchema) }`, matching `toolResult`'s array wrapping.
+- Use `.nullable()` for documented-null fields and `.optional()` for fields that may be absent, including alternate result branches.
+- Array-returning tools wrap under `items`, matching `toolResult`'s array wrapping.
+
+`tool-output-schemas.spec.ts` asserts the property the shallowness depends on: an undeclared field, top-level and inside a row, still reaches the client. Its `listTools()` call is load-bearing -- the client builds its output validator there, so a `callTool` without it validates nothing and the assertion would prove nothing.
 
 ## Annotation presets (`mcp-annotations.ts`)
 
@@ -113,7 +140,9 @@ All tools operate on the user's own closed dataset, so `openWorldHint` is always
 | `CREATE` | adds a new record | `readOnlyHint:false, destructiveHint:false, idempotentHint:false` |
 | `UPDATE` | sets fields to given values | `readOnlyHint:false, destructiveHint:false, idempotentHint:true` |
 
-There is no destructive preset -- no tool deletes data. Add one only if a delete/overwrite tool is introduced.
+There is no destructive preset for a read tool. The four `manage_*` tools take `operation: "delete"` and are annotated `destructiveHint: true`.
+
+**A scanner flagging "delete" in those descriptions is reporting a real capability, not a defect.** Do not reword it away: a description that hides what the tool can do is worse than the finding. The mitigations are the annotation, the `write` scope, `McpWriteLimiter`'s daily cap, and a user confirmation before every write (a relay card, or an elicitation dialog). `lookup_securities` is the one rename that was worth making -- its text field is `search`, matching every other read tool, because `query` was flagged purely as a name and nothing there builds SQL.
 
 ## Scopes
 
