@@ -1,9 +1,9 @@
-import { DataSource, In, Not } from "typeorm";
+import { DataSource, In } from "typeorm";
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
-import { BudgetAlertService } from "./budget-alert.service";
+import { BudgetAlertService, DIGEST_TYPES } from "./budget-alert.service";
 import { NotificationService } from "../notification-center/notification.service";
 import { NotificationDispatchService } from "../notifications/notification-dispatch.service";
 import { NotificationPreferenceService } from "../notification-center/notification-preference.service";
@@ -16,7 +16,6 @@ import {
   Notification,
   NotificationType,
   NotificationSeverity,
-  SYSTEM_NOTIFICATION_TYPES,
 } from "../notification-center/entities/notification.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
@@ -1404,14 +1403,18 @@ describe("BudgetAlertService", () => {
       const digestQuery = alertsRepository.find.mock.calls
         .map(([options]) => options)
         .find((options) => options?.where?.periodStart !== undefined);
-      // By TYPE, not by `dedupeKey IS NULL`: BILL_DUE rows carry an occurrence
-      // dedupe key now, and a key-based exclusion silently dropped every one of
-      // them from the digest while the suite stayed green on mocked rows.
+      // Selected POSITIVELY -- the budget types plus BILL_DUE -- never by an
+      // exclusion. `dedupeKey IS NULL` dropped every BILL_DUE row once they
+      // carried an occurrence key; `NOT IN the system set` let a first-of-month
+      // SCHEDULED_POST_FAILED (PAYMENTS, not system) into the budget digest.
       expect(digestQuery.where).toEqual(
-        expect.objectContaining({
-          type: Not(In([...SYSTEM_NOTIFICATION_TYPES])),
-        }),
+        expect.objectContaining({ type: In(DIGEST_TYPES) }),
       );
+      expect(DIGEST_TYPES).toContain(NotificationType.BILL_DUE);
+      expect(DIGEST_TYPES).not.toContain(
+        NotificationType.SCHEDULED_POST_FAILED,
+      );
+      expect(DIGEST_TYPES).not.toContain(NotificationType.SMTP_FAILURE);
       expect(digestQuery.where.dedupeKey).toBeUndefined();
     });
 

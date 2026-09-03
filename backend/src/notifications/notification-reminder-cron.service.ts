@@ -31,6 +31,11 @@ export interface ClaimedReminderRow {
   fire_count: number;
 }
 
+/** Due rows one tick claims at most; the rest stay due and go next minute. */
+export const CLAIM_BATCH = 100;
+/** Re-emits in flight at once within a tick. */
+export const REEMIT_CONCURRENCY = 5;
+
 /**
  * Fires due reminders (spec section 13.2/13.3). Lives here, in the delivery
  * layer, and not beside the reminder CRUD in `NotificationCenterModule`: a
@@ -48,6 +53,8 @@ export interface ClaimedReminderRow {
 @Injectable()
 export class NotificationReminderCronService {
   private readonly logger = new Logger(NotificationReminderCronService.name);
+  /** Whether a tick is in flight on this replica (see `fireDue`). */
+  private running = false;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -76,6 +83,12 @@ export class NotificationReminderCronService {
    */
   @Cron("* * * * *")
   async fireDue(): Promise<void> {
+    // @nestjs/schedule has no overlap guard: a tick that outlives its minute
+    // (many due rows, a slow endpoint) would run beside the next one over the
+    // same pool. The claim already makes that safe -- no row fires twice -- so
+    // this guard is about not piling ticks up, not about correctness.
+    if (this.running) return;
+    this.running = true;
     try {
       // Stop any reminder whose cause is gone, before the claim so it cannot be
       // claimed this tick. Two shapes: the source was dismissed, or the source
@@ -105,18 +118,31 @@ export class NotificationReminderCronService {
       // Claim due rows atomically. next_fire_at is set to now + interval (not
       // previous + interval) so a cron that missed several ticks fires once and
       // reschedules, never a catch-up burst.
+      // Bounded: at most CLAIM_BATCH rows per tick (the rest are still due and
+      // go next minute), and `FOR UPDATE SKIP LOCKED` so a concurrent replica's
+      // tick takes different rows instead of queueing on the same ones. The
+      // CTE names its column `due_id` so the RETURNING list stays unqualified.
       const claimed = await withSystemContext(() =>
         withScopedDb(this.dataSource, async (manager) =>
           returnedRows<ClaimedReminderRow>(
             await manager.query(
-              `UPDATE notification_reminders
+              `WITH due AS (
+                 SELECT id AS due_id FROM notification_reminders
+                  WHERE stopped_at IS NULL AND next_fire_at <= CURRENT_TIMESTAMP
+                  ORDER BY next_fire_at
+                  LIMIT $1
+                  FOR UPDATE SKIP LOCKED
+               )
+               UPDATE notification_reminders
                   SET next_fire_at = CURRENT_TIMESTAMP
                                      + (interval_minutes * INTERVAL '1 minute'),
                       last_fired_at = CURRENT_TIMESTAMP,
                       fire_count = fire_count + 1
-                WHERE stopped_at IS NULL AND next_fire_at <= CURRENT_TIMESTAMP
+                 FROM due
+                WHERE notification_reminders.id = due.due_id
               RETURNING id, user_id, alert_type, severity, title, message,
                         data, target, dedupe_base, repeat_mode, fire_count`,
+              [CLAIM_BATCH],
             ),
           ),
         ),
@@ -124,18 +150,29 @@ export class NotificationReminderCronService {
 
       if (claimed.length === 0) return;
 
+      // Re-emits run a few at a time, each isolated: one user's failure must
+      // not skip the rest, and one stalled push endpoint (bounded per send by
+      // the sender's deadline) must not hold every other user's nag behind it.
       let fired = 0;
-      for (const claim of claimed) {
-        // Each re-emit is isolated: one user's failure must not skip the rest.
-        try {
-          await withUserContext(claim.user_id, () => this.reEmit(claim));
-          fired += 1;
-        } catch (error) {
+      for (let i = 0; i < claimed.length; i += REEMIT_CONCURRENCY) {
+        const batch = claimed.slice(i, i + REEMIT_CONCURRENCY);
+        const outcomes = await Promise.allSettled(
+          batch.map((claim) =>
+            withUserContext(claim.user_id, () => this.reEmit(claim)),
+          ),
+        );
+        outcomes.forEach((outcome, index) => {
+          if (outcome.status === "fulfilled") {
+            fired += 1;
+            return;
+          }
           this.logger.error(
-            `Failed to re-emit reminder ${claim.id}`,
-            error instanceof Error ? error.stack : error,
+            `Failed to re-emit reminder ${batch[index].id}`,
+            outcome.reason instanceof Error
+              ? outcome.reason.stack
+              : outcome.reason,
           );
-        }
+        });
       }
       if (fired > 0) {
         this.logger.log(`Re-emitted ${fired} due reminder(s)`);
@@ -145,6 +182,8 @@ export class NotificationReminderCronService {
         "Failed to fire due reminders",
         error instanceof Error ? error.stack : error,
       );
+    } finally {
+      this.running = false;
     }
   }
 

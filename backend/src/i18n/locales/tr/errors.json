@@ -342,7 +342,8 @@
     "noEmailOnFile": "Bu kullanıcı için kayıtlı e-posta adresi yok.",
     "categoryNotConfigurable": "{{ category }} kategorisi burada yapılandırılamaz",
     "emptyPreferenceUpdate": "En az bir tercih alanı gereklidir",
-    "tooManyReminders": "En fazla {{ max }} etkin hatırlatıcınız olabilir. Yenisini eklemeden önce birini durdurun."
+    "tooManyReminders": "En fazla {{ max }} etkin hatırlatıcınız olabilir. Yenisini eklemeden önce birini durdurun.",
+    "reminderOnReminder": "Bir hatırlatmanın kendi bildirimi üzerine hatırlatma kurulamaz. Bunun yerine özgün bildirim üzerine kurun."
   },
   "push": {
     "channelUnavailable": "Bu Monize örneğinde anlık bildirimler kullanılamıyor.",

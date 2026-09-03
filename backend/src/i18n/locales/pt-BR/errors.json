@@ -342,7 +342,8 @@
     "noEmailOnFile": "Não há endereço de e-mail registrado para este usuário.",
     "categoryNotConfigurable": "A categoria {{ category }} não é configurável aqui",
     "emptyPreferenceUpdate": "É necessário pelo menos um campo de preferência",
-    "tooManyReminders": "Você pode ter no máximo {{ max }} lembretes ativos. Pare um antes de adicionar outro."
+    "tooManyReminders": "Você pode ter no máximo {{ max }} lembretes ativos. Pare um antes de adicionar outro.",
+    "reminderOnReminder": "Não é possível definir um lembrete na notificação de um lembrete. Defina-o na notificação original."
   },
   "push": {
     "channelUnavailable": "As notificações push não estão disponíveis nesta instância do Monize.",

@@ -376,6 +376,41 @@ describe("NotificationDispatchService", () => {
     );
   });
 
+  it("keeps a reminder's re-emit OUTSIDE the cooldown: no lock, no decision, always delivered", async () => {
+    // A 15-minute reminder under a 30-minute cooldown would otherwise never
+    // push: its source or its own previous nag is always a prior in the window,
+    // which makes the interval a control that changes nothing.
+    resolveDelivery.mockResolvedValue({
+      emailNotification: false,
+      push: true,
+      unifiedpush: false,
+      throttleMinutes: 30,
+    });
+    create.mockResolvedValue(row({ data: { reminderId: "rem-1" } }));
+    await service.notify("u1", {
+      type: NotificationType.OVER_BUDGET,
+      data: { reminderId: "rem-1" },
+    } as never);
+    expect(query).not.toHaveBeenCalled();
+    expect(sendToUser).toHaveBeenCalledTimes(1);
+  });
+
+  it("never counts a reminder's nag as a prior for other interruptions", async () => {
+    resolveDelivery.mockResolvedValue({
+      emailNotification: false,
+      push: true,
+      unifiedpush: false,
+      throttleMinutes: 30,
+    });
+    await service.notify("u1", {} as never);
+    const existsCall = query.mock.calls.find((c) =>
+      String(c[0]).includes("SELECT EXISTS"),
+    );
+    expect(String(existsCall?.[0])).toContain(
+      "COALESCE(data->>'reminderId', '') = ''",
+    );
+  });
+
   it("uses the dedupe key as the collapse key when present", async () => {
     create.mockResolvedValue(row({ dedupeKey: "PROVIDER_OUTAGE:yahoo" }));
     resolveDelivery.mockResolvedValue({

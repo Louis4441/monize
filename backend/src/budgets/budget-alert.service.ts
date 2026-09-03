@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
-import { DataSource, In, Not } from "typeorm";
+import { DataSource, In } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
@@ -14,7 +14,7 @@ import {
   NotificationType,
   NotificationSeverity,
   NotificationCategory,
-  SYSTEM_NOTIFICATION_TYPES,
+  typesForCategory,
 } from "../notification-center/entities/notification.entity";
 import { NotificationService } from "../notification-center/notification.service";
 import { NotificationPreferenceService } from "../notification-center/notification-preference.service";
@@ -72,6 +72,24 @@ interface AlertCandidate {
   title: string;
   message: string;
   data: Record<string, unknown>;
+}
+
+/**
+ * What the weekly budget digest is about: the budget types and the bill
+ * reminders, and nothing else that happens to share the table and a
+ * `period_start`. A reminder's re-emitted nag of one of these is dropped after
+ * the read (`isReminderReEmit`): it is the user's own repeat of a row already in
+ * the digest, not news.
+ */
+export const DIGEST_TYPES: readonly NotificationType[] = [
+  ...typesForCategory(NotificationCategory.BUDGETS),
+  NotificationType.BILL_DUE,
+];
+
+function isReminderReEmit(row: Notification): boolean {
+  const value = (row.data as Record<string, unknown> | null | undefined)
+    ?.reminderId;
+  return typeof value === "string" && value.length > 0;
 }
 
 @Injectable()
@@ -732,26 +750,28 @@ export class BudgetAlertService {
         where: {
           userId,
           periodStart,
-          // System alerts share this table but are not budget news. Excluded
-          // by TYPE: an earlier version keyed this on `dedupe_key IS NULL` on
-          // the premise that only a system alert carries one, and the premise
-          // stopped holding the day BILL_DUE rows gained an occurrence key --
-          // every bill-due row silently left the digest, with the paid-bill
-          // filter below running over an empty list. Without the exclusion an
-          // alert raised on the FIRST of a month -- whose `period_start` is
-          // stamped with that day, also the budget period start -- rendered
-          // inside the budget digest for the rest of the month.
-          type: Not(In([...SYSTEM_NOTIFICATION_TYPES])),
+          // Budget news, selected POSITIVELY: the budget types plus BILL_DUE.
+          // Two exclusions came before this and both leaked. `dedupe_key IS
+          // NULL` assumed only a system alert carries a key, and stopped
+          // holding the day BILL_DUE rows gained an occurrence key -- every
+          // bill-due row silently left the digest. `type NOT IN the system
+          // set` let SCHEDULED_POST_FAILED (a PAYMENTS type, deliberately not
+          // system) raised on the FIRST of a month -- whose `period_start` is
+          // that day, also the budget period start -- render inside the budget
+          // digest for the rest of the month. Naming what belongs cannot leak
+          // a type nobody thought of.
+          type: In(DIGEST_TYPES),
         },
         order: { createdAt: "DESC" },
         take: 20,
       }),
     );
 
-    if (allRecentAlerts.length === 0) return false;
+    const budgetNews = allRecentAlerts.filter((a) => !isReminderReEmit(a));
+    if (budgetNews.length === 0) return false;
 
     // Filter out BILL_DUE alerts for bills already paid ahead of time
-    const billAlerts = allRecentAlerts.filter(
+    const billAlerts = budgetNews.filter(
       (a) => a.type === NotificationType.BILL_DUE,
     );
     const paidBillIds = new Set<string>();
@@ -794,7 +814,7 @@ export class BudgetAlertService {
       }
     }
 
-    const recentAlerts = allRecentAlerts.filter((a) => {
+    const recentAlerts = budgetNews.filter((a) => {
       if (a.type !== NotificationType.BILL_DUE) return true;
       const billId = (a.data as Record<string, unknown>)?.billId as string;
       return !paidBillIds.has(billId);

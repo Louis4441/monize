@@ -35,7 +35,12 @@ interface WindowClientStub {
   navigate?: ReturnType<typeof vi.fn>;
 }
 
-function loadServiceWorker(clients: WindowClientStub[] = []) {
+type FetchStub = (url: string, init?: RequestInit) => Promise<Response>;
+
+function loadServiceWorker(
+  clients: WindowClientStub[] = [],
+  fetchImpl: FetchStub = async () => new Response('', { status: 200 }),
+) {
   const listeners: Record<string, Listener[]> = {};
   const shown: ShownNotification[] = [];
   const openWindow = vi.fn(async (url: string) => ({ url }));
@@ -71,7 +76,7 @@ function loadServiceWorker(clients: WindowClientStub[] = []) {
       keys: async () => [],
       delete: async () => true,
     },
-    fetch: async () => new Response('', { status: 200 }),
+    fetch: fetchImpl,
     setTimeout: (fn: () => void, ms: number) => globalThis.setTimeout(fn, ms),
     clearTimeout: (id: ReturnType<typeof globalThis.setTimeout>) =>
       globalThis.clearTimeout(id),
@@ -122,10 +127,11 @@ function loadServiceWorker(clients: WindowClientStub[] = []) {
     await pending;
   };
 
-  const dispatchClick = async (data: unknown) => {
+  const dispatchClick = async (data: unknown, action = '') => {
     let pending: Promise<unknown> = Promise.resolve();
     const close = vi.fn();
     const event = {
+      action,
       notification: { data, close },
       waitUntil: (promise: Promise<unknown>) => {
         pending = promise;
@@ -593,5 +599,60 @@ describe('service worker subscription rotation', () => {
     await expect(
       sw.dispatchSubscriptionChange({ options: { applicationServerKey: KEY } }),
     ).resolves.toBeUndefined();
+  });
+});
+
+// The Stop action posts with the session cookie, which outlives the app by
+// fifteen minutes at most -- and a nag arrives precisely when the app has been
+// idle, so the common case is a 401. One same-origin refresh and one retry turn
+// that into a stop; a stop that still fails opens the app instead of leaving
+// the nag running with nothing to show for the tap.
+describe('the Stop action on a reminder push', () => {
+  const calls: { url: string; method?: string }[] = [];
+  const fetchScript = (statuses: number[]): FetchStub => {
+    calls.length = 0;
+    const queue = [...statuses];
+    return async (url, init) => {
+      calls.push({ url, method: init?.method });
+      return new Response('', { status: queue.shift() ?? 200 });
+    };
+  };
+
+  it('stops the reminder without opening a window when the session is live', async () => {
+    const sw = loadServiceWorker([], fetchScript([200]));
+    await sw.dispatchClick({ target: '/bills', reminderId: 'rem-1' }, 'stop-reminder');
+    expect(calls.map((c) => c.url)).toEqual([
+      '/api/v1/notifications/reminders/rem-1/stop',
+    ]);
+    expect(sw.openWindow).not.toHaveBeenCalled();
+  });
+
+  it('refreshes the session once and retries when the stop answers 401', async () => {
+    const sw = loadServiceWorker([], fetchScript([401, 200, 200]));
+    await sw.dispatchClick({ target: '/bills', reminderId: 'rem-1' }, 'stop-reminder');
+    expect(calls.map((c) => c.url)).toEqual([
+      '/api/v1/notifications/reminders/rem-1/stop',
+      '/api/v1/auth/refresh',
+      '/api/v1/notifications/reminders/rem-1/stop',
+    ]);
+    expect(calls[1].method).toBe('POST');
+    expect(sw.openWindow).not.toHaveBeenCalled();
+  });
+
+  it('opens the app at the target when the refresh fails too, rather than leaving the nag running', async () => {
+    const sw = loadServiceWorker([], fetchScript([401, 401]));
+    await sw.dispatchClick({ target: '/bills', reminderId: 'rem-1' }, 'stop-reminder');
+    expect(calls.map((c) => c.url)).toEqual([
+      '/api/v1/notifications/reminders/rem-1/stop',
+      '/api/v1/auth/refresh',
+    ]);
+    expect(sw.openWindow).toHaveBeenCalledWith(`${ORIGIN}/bills`);
+  });
+
+  it('does not retry a refusal that is not a session problem', async () => {
+    const sw = loadServiceWorker([], fetchScript([403]));
+    await sw.dispatchClick({ target: '/bills', reminderId: 'rem-1' }, 'stop-reminder');
+    expect(calls).toHaveLength(1);
+    expect(sw.openWindow).toHaveBeenCalledWith(`${ORIGIN}/bills`);
   });
 });

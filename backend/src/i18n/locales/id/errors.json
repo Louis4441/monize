@@ -342,7 +342,8 @@
     "noEmailOnFile": "Tidak ada alamat email yang tercatat untuk pengguna ini.",
     "categoryNotConfigurable": "Kategori {{ category }} tidak dapat dikonfigurasi di sini",
     "emptyPreferenceUpdate": "Setidaknya satu bidang preferensi diperlukan",
-    "tooManyReminders": "Anda dapat memiliki maksimal {{ max }} pengingat aktif. Hentikan satu sebelum menambahkan yang lain."
+    "tooManyReminders": "Anda dapat memiliki maksimal {{ max }} pengingat aktif. Hentikan satu sebelum menambahkan yang lain.",
+    "reminderOnReminder": "Pengingat tidak dapat dibuat pada notifikasi yang dihasilkan pengingat. Buatlah pada notifikasi aslinya."
   },
   "push": {
     "channelUnavailable": "Notifikasi push tidak tersedia di instans Monize ini.",

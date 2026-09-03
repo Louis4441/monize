@@ -342,7 +342,8 @@
     "noEmailOnFile": "此用户没有邮箱地址记录。",
     "categoryNotConfigurable": "类别 {{ category }} 无法在此配置",
     "emptyPreferenceUpdate": "至少需要一个偏好设置字段",
-    "tooManyReminders": "您最多可以有 {{ max }} 个活动提醒。请先停止一个再添加。"
+    "tooManyReminders": "您最多可以有 {{ max }} 个活动提醒。请先停止一个再添加。",
+    "reminderOnReminder": "无法在提醒自身生成的通知上设置提醒。请在原始通知上设置。"
   },
   "push": {
     "channelUnavailable": "此 Monize 实例不提供推送通知。",

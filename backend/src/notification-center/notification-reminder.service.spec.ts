@@ -165,6 +165,22 @@ describe("NotificationReminderService", () => {
       expect(reminderRepo.save).not.toHaveBeenCalled();
     });
 
+    it("refuses a reminder on a reminder's own nag (the parent's next fire would dismiss it)", async () => {
+      sourceRepo.findOne.mockResolvedValue({
+        ...source,
+        id: "nag-1",
+        data: { billId: "b1", reminderId: "rem-parent" },
+      });
+      await expect(
+        service.create("u1", {
+          sourceNotificationId: "nag-1",
+          repeatMode: ReminderRepeatMode.REPEAT,
+          intervalMinutes: 15,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(reminderRepo.save).not.toHaveBeenCalled();
+    });
+
     it("re-configures the one active reminder instead of adding a parallel nag, bypassing the cap", async () => {
       sourceRepo.findOne.mockResolvedValue(source);
       // An active reminder already exists for this source.

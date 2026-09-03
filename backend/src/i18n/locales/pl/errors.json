@@ -342,7 +342,8 @@
     "noEmailOnFile": "Brak zapisanego adresu e-mail dla tego użytkownika.",
     "categoryNotConfigurable": "Kategoria {{ category }} nie jest tutaj konfigurowalna",
     "emptyPreferenceUpdate": "Wymagane jest co najmniej jedno pole preferencji",
-    "tooManyReminders": "Możesz mieć maksymalnie {{ max }} aktywnych przypomnień. Zatrzymaj jedno przed dodaniem kolejnego."
+    "tooManyReminders": "Możesz mieć maksymalnie {{ max }} aktywnych przypomnień. Zatrzymaj jedno przed dodaniem kolejnego.",
+    "reminderOnReminder": "Nie można ustawić przypomnienia na powiadomieniu wygenerowanym przez przypomnienie. Ustaw je na pierwotnym powiadomieniu."
   },
   "push": {
     "channelUnavailable": "Powiadomienia push nie są dostępne w tej instancji Monize.",

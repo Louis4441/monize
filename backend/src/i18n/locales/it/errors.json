@@ -342,7 +342,8 @@
     "noEmailOnFile": "Nessun indirizzo email registrato per questo utente.",
     "categoryNotConfigurable": "La categoria {{ category }} non è configurabile qui",
     "emptyPreferenceUpdate": "È richiesto almeno un campo di preferenza",
-    "tooManyReminders": "Puoi avere al massimo {{ max }} promemoria attivi. Interrompine uno prima di aggiungerne un altro."
+    "tooManyReminders": "Puoi avere al massimo {{ max }} promemoria attivi. Interrompine uno prima di aggiungerne un altro.",
+    "reminderOnReminder": "Non è possibile impostare un promemoria sulla notifica di un promemoria. Impostalo sulla notifica originale."
   },
   "push": {
     "channelUnavailable": "Le notifiche push non sono disponibili su questa istanza di Monize.",

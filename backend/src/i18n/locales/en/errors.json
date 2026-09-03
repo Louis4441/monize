@@ -351,7 +351,8 @@
     "noEmailOnFile": "No email address on file for this user.",
     "categoryNotConfigurable": "Category {{ category }} is not configurable here",
     "emptyPreferenceUpdate": "At least one preference field is required",
-    "tooManyReminders": "You can have at most {{ max }} active reminders. Stop one before adding another."
+    "tooManyReminders": "You can have at most {{ max }} active reminders. Stop one before adding another.",
+    "reminderOnReminder": "A reminder cannot be set on a reminder's own notification. Set it on the original notification instead."
   },
   "push": {
     "channelUnavailable": "Push notifications are not available on this Monize instance.",

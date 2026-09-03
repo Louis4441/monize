@@ -327,17 +327,47 @@ function readCsrfTokenFromStore() {
 // network error, or a 403 where the CSRF cookie was unreadable (Firefox/Safari
 // expose no Cookie Store to the worker), resolves `false` so the caller can fall
 // back to opening the app rather than silently leaving the nag running.
+//
+// The session cookie the stop rides outlives the app by fifteen minutes at
+// most, and a nag arrives precisely when the app has been idle -- so the common
+// case is a 401. That is answered by one same-origin refresh (the refresh cookie
+// is same-origin, path '/', and the route skips CSRF) and a single retry; a stop
+// that still fails falls back to opening the app.
+function postStop(reminderId, headers) {
+  return fetch(
+    '/api/v1/notifications/reminders/' +
+      encodeURIComponent(reminderId) +
+      '/stop',
+    { method: 'POST', credentials: 'include', headers: headers }
+  );
+}
+
+function refreshSession() {
+  return fetch('/api/v1/auth/refresh', {
+    method: 'POST',
+    credentials: 'include',
+  })
+    .then(function (response) {
+      return !!response && response.ok;
+    })
+    .catch(function () {
+      return false;
+    });
+}
+
 function stopReminderFromAction(reminderId) {
   return readCsrfTokenFromStore()
     .then(function (token) {
       var headers = {};
       if (token) headers['X-CSRF-Token'] = token;
-      return fetch(
-        '/api/v1/notifications/reminders/' +
-          encodeURIComponent(reminderId) +
-          '/stop',
-        { method: 'POST', credentials: 'include', headers: headers }
-      );
+      return postStop(reminderId, headers).then(function (response) {
+        if (response && response.status === 401) {
+          return refreshSession().then(function (refreshed) {
+            return refreshed ? postStop(reminderId, headers) : response;
+          });
+        }
+        return response;
+      });
     })
     .then(function (response) {
       return !!response && response.ok;

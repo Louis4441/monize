@@ -106,6 +106,19 @@ export class NotificationReminderService {
           ),
         );
       }
+      if (isReminderReEmit(source)) {
+        // A nag is not a source. The parent reminder's next fire DISMISSES its
+        // previous nag (one live nag per reminder), so a child reminder pointed
+        // at one would be stopped by the orphan sweep a tick later with nothing
+        // telling the user. The UI hides the control on a nag row; this is the
+        // server saying the same thing to a caller that did not go through it.
+        throw new BadRequestException(
+          tr(
+            "errors.notifications.reminderOnReminder",
+            "A reminder cannot be set on a reminder's own notification. Set it on the original notification instead.",
+          ),
+        );
+      }
 
       // The unique-index race is recovered INSIDE this transaction, so the
       // losing INSERT must not abort it: PostgreSQL refuses every statement
@@ -263,6 +276,13 @@ export class NotificationReminderService {
       Math.max(REMINDER_MIN_INTERVAL_MINUTES, Math.round(minutes)),
     );
   }
+}
+
+/** Whether a row is a reminder's re-emitted nag (`data.reminderId`, set by the cron). */
+function isReminderReEmit(row: Notification): boolean {
+  const value = (row.data as Record<string, unknown> | null | undefined)
+    ?.reminderId;
+  return typeof value === "string" && value.length > 0;
 }
 
 /** The unique index that keeps one active reminder per (user, source). */

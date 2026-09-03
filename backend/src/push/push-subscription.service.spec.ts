@@ -404,7 +404,10 @@ describe("PushSubscriptionService", () => {
       const browser = manager.query.mock.calls.find(([sql]) =>
         String(sql).includes("INSERT INTO push_subscriptions"),
       )!;
-      expect(browser[1][8]).toBe("webpush");
+      // A silent client binds NULL and the SQL defaults a NEW row to webpush;
+      // on a refresh the same NULL keeps the row's existing wire instead.
+      expect(browser[1][8]).toBeNull();
+      expect(String(browser[0])).toContain("COALESCE($9, 'webpush')");
 
       manager.query.mockClear();
       await service.subscribe(
@@ -416,10 +419,11 @@ describe("PushSubscriptionService", () => {
         String(sql).includes("INSERT INTO push_subscriptions"),
       )!;
       expect(distributor[1][8]).toBe("unifiedpush");
-      // And the refresh arm carries it too, so a re-registration cannot silently
-      // move a device onto the other channel's gate.
+      // And the refresh arm keeps the stored wire when the client says nothing,
+      // so a UnifiedPush distributor re-posting rotated keys without the tag is
+      // not silently moved onto the webpush gate.
       expect(String(distributor[0])).toContain(
-        "transport = EXCLUDED.transport",
+        "transport = COALESCE(EXCLUDED.transport, push_subscriptions.transport)",
       );
     });
   });

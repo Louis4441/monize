@@ -536,7 +536,11 @@ data): `export-table-queries.ts`, `restore-plan.ts` after `notifications` (the
 
 `@Cron` every minute (the interval floor is 5, so a one-minute tick is cheap and
 precise). Every replica runs it, so the claim must be idempotent across replicas
-**without** an advisory lock -- a single conditional `UPDATE ... RETURNING` is
+**without** an advisory lock -- a single conditional `UPDATE ... RETURNING`
+(bounded to `CLAIM_BATCH` rows per tick through a `FOR UPDATE SKIP LOCKED` CTE,
+so a replica's tick takes rows another replica is not already holding, and the
+rest go next minute; re-emits run `REEMIT_CONCURRENCY` at a time behind an
+in-process overlap guard) is
 the mechanism (`docs/concurrency-and-idempotency.md`, "atomic delta / CAS"):
 
 ```sql
@@ -587,8 +591,15 @@ matrix and throttle, with:
   fingerprint index, so it cannot collide with the source's fingerprint.
 
 A repeat nag therefore interrupts by push and immediate email subject to the
-matrix and throttle, and the push carries `data.reminderId` for its Stop action
-(Section 13.4). The cron lives in `notifications/notification-reminder-cron.service.ts`,
+matrix, and the push carries `reminderId` plus the Stop action (Section 13.4).
+It sits **outside the category cooldown on both sides**: the cooldown governs
+producers' interruptions, and a reminder is the user's own schedule (an interval
+they chose, five minutes or more) -- held by the cooldown, a 15-minute reminder
+under a 30-minute cooldown would never push, its source or its own previous nag
+always a prior in the window, a control that changes nothing; counted as a
+prior, it would silence the category's other interruptions. So `notify` takes
+no lock and no decision for a row carrying `data.reminderId`, and
+`priorInWindow` ignores such rows. The cron lives in `notifications/notification-reminder-cron.service.ts`,
 beside the dispatch, because `NotificationCenterModule` is a leaf that cannot
 import the delivery side. Two same-transaction follow-ups ride `notify`'s
 `onWritten` hook: the previous nag of the same reminder is **dismissed** (one live
@@ -606,7 +617,12 @@ stopped reminder is a no-op, not a 404-after-the-fact):
 2. **From the push notification** -- a re-emitted nag's payload carries
    `reminderId` and `actions: [{ action: "stop-reminder", title }]` (the title
    rendered on the server in the recipient's locale, `push.actions.stopReminder`),
-   and the SW renders the action and keeps the id in `data`; the SW `notificationclick`
+   and the SW renders the action and keeps the id in `data`. The stop rides the
+   session cookie, which outlives the app by fifteen minutes at most, so a 401 is
+   answered by one same-origin `POST /auth/refresh` (the refresh cookie is
+   same-origin, path `/`) and a single retry; a stop that still fails opens the
+   app at the notification's target, where the bell carries the row's Stop
+   control -- there is no standalone reminders page. The SW `notificationclick`
    handler, on `event.action === "stop-reminder"`, `fetch`es that same endpoint
    same-origin with the CSRF header (read from the Cookie Store where the browser
    offers it). The handler is written now (inert until a push carries the action)
@@ -891,6 +907,12 @@ notification layer for a notification, never a transport. There is no second
 sender, no ntfy-native JSON publish, and no new outbound-request shape: the
 endpoint is still a URL the server POSTs an encrypted body to, validated with the
 same `IsPushEndpoint` (https floor + SSRF resolve), so no new CWE-918 surface.
+**Known limitation, by design for now:** that check refuses a distributor on a
+private network (`https://ntfy.home.lan`), at registration and again before every
+send, so a UnifiedPush subscription must name a publicly resolvable https
+distributor. A self-hoster whose distributor is LAN-only needs an operator
+allowlist consulted only for `transport = 'unifiedpush'` endpoints; that is
+future work, not something the web UI can promise today.
 
 **What it is not.** A browser PWA cannot *receive* at an arbitrary endpoint --
 `pushManager.subscribe()` is bound to the browser's own push service. So a

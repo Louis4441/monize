@@ -1,4 +1,8 @@
-import { NotificationReminderCronService } from "./notification-reminder-cron.service";
+import {
+  CLAIM_BATCH,
+  NotificationReminderCronService,
+  REEMIT_CONCURRENCY,
+} from "./notification-reminder-cron.service";
 import * as scopedDb from "../common/db/scoped-db";
 import * as withContext from "../common/db/with-context";
 
@@ -118,6 +122,56 @@ describe("NotificationReminderCronService", () => {
     expect(claimSql).not.toContain("stopped_at = CURRENT_TIMESTAMP");
     expect(claimSql).not.toContain("repeat_mode = $1");
     expect(claimSql).toContain("repeat_mode"); // returned, for reEmit's decision
+  });
+
+  it("bounds the claim and skips rows another replica holds", async () => {
+    await service.fireDue();
+    const [claimSql, params] = query.mock.calls[1];
+    expect(String(claimSql)).toContain("LIMIT $1");
+    expect(String(claimSql)).toContain("FOR UPDATE SKIP LOCKED");
+    expect(params).toEqual([CLAIM_BATCH]);
+  });
+
+  it("does not start a second tick while one is in flight", async () => {
+    let release!: () => void;
+    query.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve([[], 0]);
+        }),
+    );
+    const first = service.fireDue();
+    await Promise.resolve();
+    // The second call returns without touching the database.
+    await service.fireDue();
+    expect(query).toHaveBeenCalledTimes(1);
+    release();
+    await first;
+    // The first tick then ran its claim (call 2)...
+    expect(query).toHaveBeenCalledTimes(2);
+    // ...and once it is done, the next tick runs again: sweep + claim.
+    await service.fireDue();
+    expect(query).toHaveBeenCalledTimes(4);
+  });
+
+  it("re-emits a few at a time, every claim reached", async () => {
+    const claims = Array.from({ length: 12 }, (_, i) =>
+      claim({ id: `r${i}`, user_id: `u${i}` }),
+    );
+    query.mockResolvedValueOnce([[], 0]).mockResolvedValueOnce([claims, 12]);
+    let inFlight = 0;
+    let peak = 0;
+    notify.mockImplementation(async () => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((r) => setTimeout(r, 1));
+      inFlight -= 1;
+      return null;
+    });
+    await service.fireDue();
+    expect(notify).toHaveBeenCalledTimes(12);
+    expect(peak).toBeLessThanOrEqual(REEMIT_CONCURRENCY);
+    expect(peak).toBeGreaterThan(1);
   });
 
   it("supersedes the previous nag of the same reminder in the write transaction", async () => {

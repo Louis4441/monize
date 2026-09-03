@@ -95,7 +95,11 @@ export interface NotifyOptions {
  */
 /** The reminder a re-emitted row belongs to (`data.reminderId`, set by the reminder cron), else null. */
 function reminderIdOf(row: Notification): string | null {
-  const value = (row.data as Record<string, unknown> | null | undefined)
+  return reminderIdOfData(row.data);
+}
+
+function reminderIdOfData(data: unknown): string | null {
+  const value = (data as Record<string, unknown> | null | undefined)
     ?.reminderId;
   return typeof value === "string" && value.length > 0 ? value : null;
 }
@@ -142,7 +146,16 @@ export class NotificationDispatchService {
     );
     const interrupting =
       delivery.push || delivery.unifiedpush || delivery.emailNotification;
-    const throttled = interrupting && delivery.throttleMinutes > 0;
+    // The cooldown governs producers' interruptions. A reminder's re-emit is
+    // the user's own schedule (an interval they chose, five minutes or more), so
+    // it sits OUTSIDE the cooldown: neither held by it -- a 15-minute reminder
+    // under a 30-minute cooldown would otherwise never push, its source or its
+    // own previous nag always a prior in the window, a control that changes
+    // nothing -- nor counted as a prior for anything else (`priorInWindow`).
+    const throttled =
+      interrupting &&
+      delivery.throttleMinutes > 0 &&
+      reminderIdOfData(input.data) === null;
 
     // The row, the caller's follow-up write and the throttle decision share one
     // transaction, and when the throttle is active the (user, category) advisory
@@ -160,10 +173,8 @@ export class NotificationDispatchService {
       }
       const row = await this.notifications.create(userId, input);
       if (!row) return null;
-      // Decide BEFORE the caller's follow-up write: the reminder cron's hook
-      // dismisses the previous nag, and a dismissed row is not a prior -- so a
-      // hook that ran first would exempt every repeat from its own predecessor,
-      // and the spec's "subject to the matrix and throttle" would be false.
+      // Decide BEFORE the caller's follow-up write, so the decision reads the
+      // rows as they were when this one arrived, not as the hook leaves them.
       const suppressed =
         throttled &&
         (await this.priorInWindow(
@@ -294,6 +305,10 @@ export class NotificationDispatchService {
    * decider saw nothing, the second saw a row "younger" than its own and
    * ignored it. The first decider never sees the second's row (not yet
    * written), so exactly one of the two sends.
+   *
+   * A reminder's re-emitted nag (`data.reminderId`) is never a prior: the user
+   * asked for that cadence, and it must not silence the category's other
+   * interruptions any more than it is silenced by them (see `notify`).
    */
   private async priorInWindow(
     manager: EntityManager,
@@ -315,6 +330,7 @@ export class NotificationDispatchService {
               AND created_at > $3
               AND id <> $4
               AND severity = ANY($5)
+              AND COALESCE(data->>'reminderId', '') = ''
          ) AS suppress`,
         [
           userId,

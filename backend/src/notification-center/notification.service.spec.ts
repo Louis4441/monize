@@ -501,47 +501,64 @@ describe("NotificationService", () => {
   });
 
   describe("purgeOld", () => {
+    const purgeSql = () =>
+      manager.query.mock.calls
+        .map(([sql]) => String(sql))
+        .filter((sql) => sql.includes("DELETE FROM notifications"));
+
     it("drops dismissed rows past the retention window", async () => {
-      notifications.delete.mockResolvedValue({ affected: 5 });
+      manager.query.mockResolvedValue([[], 5]);
 
       await service.purgeOld();
 
-      expect(notifications.delete).toHaveBeenCalledWith(
-        expect.objectContaining({ dismissedAt: expect.anything() }),
-      );
+      const [dismissed] = purgeSql();
+      expect(dismissed).toContain("dismissed_at < $1");
+      expect(manager.query.mock.calls[0][1][0]).toBeInstanceOf(Date);
     });
 
     it("drops read rows the reader left alone, and only those", async () => {
-      notifications.delete
-        .mockResolvedValueOnce({ affected: 0 })
-        .mockResolvedValueOnce({ affected: 3 });
+      manager.query.mockResolvedValue([[], 0]);
 
       await service.purgeOld();
 
-      expect(notifications.delete).toHaveBeenCalledTimes(2);
+      const [, read] = purgeSql();
       // An unread row is the only record the user has that something happened,
       // so it is never purged however old it is.
-      expect(notifications.delete).toHaveBeenLastCalledWith(
-        expect.objectContaining({ isRead: true, dismissedAt: IsNull() }),
-      );
+      expect(read).toContain("is_read = true");
+      expect(read).toContain("dismissed_at IS NULL");
+      expect(read).toContain("created_at < $1");
+    });
+
+    it("spares a read row that an active reminder still nags about", async () => {
+      // The FK is ON DELETE SET NULL and the cron's sweep stops an orphaned
+      // reminder, so deleting the source on day 31 would silently end a
+      // schedule the user set up. A dismissed source needs no such guard: the
+      // dismissal already stopped its reminder.
+      manager.query.mockResolvedValue([[], 0]);
+
+      await service.purgeOld();
+
+      const [dismissed, read] = purgeSql();
+      expect(read).toContain("NOT EXISTS");
+      expect(read).toContain("notification_reminders");
+      expect(read).toContain("source_notification_id = n.id");
+      expect(read).toContain("stopped_at IS NULL");
+      expect(dismissed).not.toContain("NOT EXISTS");
     });
 
     it("keeps the cutoff at the documented retention window", async () => {
       const before = Date.now();
-      notifications.delete.mockResolvedValue({ affected: 0 });
+      manager.query.mockResolvedValue([[], 0]);
 
       await service.purgeOld();
 
-      const where = notifications.delete.mock.calls[0][0] as {
-        dismissedAt: { value: Date };
-      };
-      const cutoff = where.dismissedAt.value.getTime();
+      const cutoff = (manager.query.mock.calls[0][1][0] as Date).getTime();
       const expected = before - RETENTION_DAYS * 24 * 60 * 60 * 1000;
       expect(Math.abs(cutoff - expected)).toBeLessThan(60_000);
     });
 
     it("swallows a failure rather than ending the nightly run", async () => {
-      notifications.delete.mockRejectedValue(new Error("DB error"));
+      manager.query.mockRejectedValue(new Error("DB error"));
       jest
         .spyOn(service["logger"], "error")
         .mockImplementation(() => undefined);

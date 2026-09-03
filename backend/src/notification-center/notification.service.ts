@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
-import { DataSource, EntityManager, In, IsNull, LessThan, Not } from "typeorm";
+import { DataSource, EntityManager, In, IsNull, Not } from "typeorm";
 
 import { withScopedDb } from "../common/db/scoped-db";
 import { withSystemContext } from "../common/db/with-context";
@@ -330,20 +330,33 @@ export class NotificationService {
       // Cross-user bulk purge, so it runs under a system context (task C2).
       const { dismissed, read } = await withSystemContext(async () => {
         const dismissedResult = await withScopedDb(this.dataSource, (manager) =>
-          manager
-            .getRepository(Notification)
-            .delete({ dismissedAt: LessThan(cutoff) }),
+          manager.query(`DELETE FROM notifications WHERE dismissed_at < $1`, [
+            cutoff,
+          ]),
         );
+        // A read-but-not-dismissed row that an ACTIVE reminder nags about is
+        // kept: the FK is ON DELETE SET NULL and the reminder cron's sweep
+        // stops an orphaned reminder, so purging the source would silently end
+        // a schedule the user set up on day 31 with nothing telling them. A
+        // dismissed source is different -- dismissing it already stopped the
+        // reminder (the sweep), so the first DELETE needs no such guard.
         const readResult = await withScopedDb(this.dataSource, (manager) =>
-          manager.getRepository(Notification).delete({
-            isRead: true,
-            dismissedAt: IsNull(),
-            createdAt: LessThan(cutoff),
-          }),
+          manager.query(
+            `DELETE FROM notifications n
+              WHERE n.is_read = true
+                AND n.dismissed_at IS NULL
+                AND n.created_at < $1
+                AND NOT EXISTS (
+                  SELECT 1 FROM notification_reminders r
+                   WHERE r.source_notification_id = n.id
+                     AND r.stopped_at IS NULL
+                )`,
+            [cutoff],
+          ),
         );
         return {
-          dismissed: dismissedResult.affected || 0,
-          read: readResult.affected || 0,
+          dismissed: affectedRowCount(dismissedResult),
+          read: affectedRowCount(readResult),
         };
       });
 

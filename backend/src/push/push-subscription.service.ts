@@ -286,14 +286,15 @@ export class PushSubscriptionService {
         `INSERT INTO push_subscriptions
            (user_id, endpoint, endpoint_hash, p256dh, auth, device_name,
             user_agent, vapid_public_key, transport, created_at, last_seen_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, 'webpush'),
+                 CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
          ON CONFLICT (endpoint_hash) DO UPDATE
             SET p256dh = EXCLUDED.p256dh,
                 auth = EXCLUDED.auth,
                 device_name = COALESCE(EXCLUDED.device_name, push_subscriptions.device_name),
                 user_agent = EXCLUDED.user_agent,
                 vapid_public_key = EXCLUDED.vapid_public_key,
-                transport = EXCLUDED.transport,
+                transport = COALESCE(EXCLUDED.transport, push_subscriptions.transport),
                 last_seen_at = CURRENT_TIMESTAMP,
                 failure_count = 0,
                 disabled_at = NULL,
@@ -311,7 +312,11 @@ export class PushSubscriptionService {
             ? input.userAgent.slice(0, MAX_USER_AGENT_LENGTH)
             : null,
           input.vapidPublicKey,
-          input.dto.transport ?? "webpush",
+          // NULL when the client said nothing: a first registration defaults to
+          // the browser wire in SQL, and a REFRESH keeps the row's wire -- a
+          // UnifiedPush client re-posting rotated keys without the tag must not
+          // be moved onto the webpush gate, the way device_name is kept too.
+          input.dto.transport ?? null,
         ],
       );
       return returnedRows<{ id: string }>(inserted);

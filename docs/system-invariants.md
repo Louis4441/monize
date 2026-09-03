@@ -2677,8 +2677,10 @@ Enforcement         The lock is held across the write and the decision, so the
                     window, excluded by id -- never by created_at ordering,
                     which is the transaction's BEGIN time and can put the later
                     lock-holder's row first. The decision precedes the caller's
-                    onWritten follow-up (the reminder cron dismisses the previous
-                    nag there), so a repeat is throttled by its own predecessor.
+                    onWritten follow-up. A reminder's re-emit (data.reminderId)
+                    sits outside the cooldown on both sides: it takes no lock and
+                    no decision, and it is never a prior for anything else --
+                    the cooldown governs producers, not the user's own schedule.
                     The EXISTS query carries severitiesAtOrAbove so an
                     escalation never matches.
                     notification-dispatch.service.spec.ts holds the lock -> write
