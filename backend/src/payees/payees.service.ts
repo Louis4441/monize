@@ -32,6 +32,7 @@ import {
   countUncategorizedTransactionsByPayee,
 } from "./payee-backfill.util";
 import { stripHtml } from "../common/sanitization.util";
+import type { LlmPayeeList, LlmPayeeQuery } from "./llm-payee-query";
 import { getActiveScopedManager, withScopedDb } from "../common/db/scoped-db";
 import { normalizeWebsite } from "../common/normalize-website";
 import { FaviconService, FetchedLogo } from "../common/favicon/favicon.service";
@@ -702,6 +703,78 @@ export class PayeesService {
         uncategorizedCount: uncategorizedCountMap.get(payee.id) || 0,
       }));
     });
+  }
+
+  /**
+   * The payee list the AI Assistant and the MCP `list_payees` tool both read.
+   *
+   * Built on `findAll`, so the derived figures (transaction count, last used,
+   * alias and uncategorized counts) are computed in exactly one place; this adds
+   * the filtering, ordering and truncation a model needs to ask a narrow
+   * question instead of reading every payee.
+   *
+   * Two things it will not do. The search is a case-insensitive SUBSTRING match
+   * -- `search` used SQL `LIKE`, which Postgres evaluates case-sensitively, so
+   * "amazon" matched nothing while "Amazon" did, and the tool looked like it
+   * only accepted exact names. And a truncated list says so: `totalCount` is
+   * what matched, `payees.length` is what came back, and `truncated` is the
+   * difference, because a capped list presented as the whole one is the same
+   * defect as a subtotal presented as a total.
+   */
+  async getLlmPayees(
+    userId: string,
+    options: LlmPayeeQuery = {},
+  ): Promise<LlmPayeeList> {
+    const rows = await this.findAll(userId, options.status ?? "all");
+
+    const search = options.search?.trim().toLowerCase();
+    const wanted = (
+      required: boolean | undefined,
+      value: string | null | undefined,
+    ) => required === undefined || Boolean(value) === required;
+
+    const matched = rows.filter(
+      (payee) =>
+        (!search || payee.name.toLowerCase().includes(search)) &&
+        wanted(options.hasWebsite, payee.website) &&
+        wanted(options.hasAddress, payee.address) &&
+        wanted(options.hasEmail, payee.email) &&
+        wanted(options.hasPhone, payee.phone) &&
+        (options.hasLogo === undefined || payee.hasLogo === options.hasLogo) &&
+        (options.hasDefaultCategory === undefined ||
+          Boolean(payee.defaultCategoryId) === options.hasDefaultCategory),
+    );
+
+    const byName = (a: Payee, b: Payee) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    const sorted = [...matched].sort((a, b) => {
+      switch (options.sortBy) {
+        case "transactionCount":
+          // Busiest first; a tie is ordered by name so the page is stable.
+          return b.transactionCount - a.transactionCount || byName(a, b);
+        case "lastUsed":
+          // Most recent first. A payee never used has no date, and an unknown
+          // date sorts last rather than pretending to be the oldest.
+          if (a.lastUsedDate === b.lastUsedDate) return byName(a, b);
+          if (!a.lastUsedDate) return 1;
+          if (!b.lastUsedDate) return -1;
+          return b.lastUsedDate.localeCompare(a.lastUsedDate);
+        default:
+          return byName(a, b);
+      }
+    });
+
+    const limit = options.limit;
+    const payees =
+      limit !== undefined && limit < sorted.length
+        ? sorted.slice(0, limit)
+        : sorted;
+
+    return {
+      payees,
+      totalCount: matched.length,
+      truncated: payees.length < matched.length,
+    };
   }
 
   async findOne(userId: string, id: string): Promise<Payee> {

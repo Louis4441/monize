@@ -270,6 +270,12 @@ Seven rules, each with a test in `payee-contact-enrichment.service.spec.ts`, `co
 - **A lookup never fails a create, and it runs after the commit.** `PayeesService.create` dispatches the background enrichment only when the row carries no contact detail, the preview did not already look up, and `getActiveScopedManager()` is undefined -- "the callback resolved" only means "committed" when nobody upstream opened a transaction we joined, and a dispatch inside one would look for a row nobody else can see. The dispatch runs under `withUserContext` on the request's tail and logs its failure.
 - **The preview looks up so the card and the commit agree.** A single AI/MCP `create_payee` preview with no contact details runs the lookup (`previewCreate(..., { lookupContact: true })`) and hands its stamp down the descriptor to `create(..., { contactLookup })`, which stores that provenance instead of looking up again. Batch rows are enriched after they commit instead -- 25 model calls inside one chat turn is the wrong latency budget -- and both tool descriptions say so.
 
+## A case-sensitive `LIKE` is not a search
+
+Postgres evaluates `LIKE` case-sensitively, so `Like('%amazon%')` matched nothing while `Like('%Amazon%')` matched -- and the tool built on it looked as though it only accepted exact names (its own description had promised a "case-insensitive substring match" for as long as it had been wrong). Where a filter is offered to a person or a model, match case-insensitively: `ILike`, or a comparison the code performs itself. `PayeesService.getLlmPayees` is the worked example, and its spec asserts that a lowercase query and an uppercase one return the same rows.
+
+**And a filtered list says how much it left out.** `getLlmPayees` returns `totalCount` (what matched) beside `payees` (what came back) and a `truncated` flag, because a capped list presented as the whole one is the same defect as a subtotal presented as a total.
+
 ## Rejection happens before the write
 
 A check capable of refusing a command belongs inside the transaction that performs it, and under the same lock where concurrency is in play. A service that mutates, commits, and returns a success-shaped value for a caller to reject afterwards has already done the thing the `409` says it did not do.

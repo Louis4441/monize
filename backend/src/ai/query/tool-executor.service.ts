@@ -8,6 +8,7 @@ import {
 import { AccountsService } from "../../accounts/accounts.service";
 import { TransactionsService } from "../../transactions/transactions.service";
 import { PayeesService } from "../../payees/payees.service";
+import type { LlmPayeeQuery } from "../../payees/llm-payee-query";
 import {
   PayeeToolPrepService,
   ManageCreatePayeeRow,
@@ -2314,15 +2315,16 @@ export class ToolExecutorService {
     userId: string,
     input: Record<string, unknown>,
   ): Promise<ToolResult> {
-    const search = input.search as string | undefined;
-    const payees = search
-      ? await this.payeesService.search(userId, search, 50)
-      : await this.payeesService.findAll(userId);
+    const query = input as LlmPayeeQuery;
+    const result = await this.payeesService.getLlmPayees(userId, query);
+    const search = query.search;
 
     return {
-      data: payees,
-      summary: `${payees.length} payee${payees.length === 1 ? "" : "s"}${
-        search ? ` matching "${search}"` : ""
+      data: result,
+      summary: `${result.payees.length} payee${
+        result.payees.length === 1 ? "" : "s"
+      }${search ? ` matching "${search}"` : ""}${
+        result.truncated ? ` (of ${result.totalCount} matching)` : ""
       }.`,
       sources: [
         {

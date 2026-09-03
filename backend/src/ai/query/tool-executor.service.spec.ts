@@ -447,6 +447,14 @@ describe("ToolExecutorService", () => {
         { id: "payee-2", name: "Starbucks" },
       ]),
       search: jest.fn().mockResolvedValue([{ id: "payee-1", name: "Walmart" }]),
+      getLlmPayees: jest.fn().mockResolvedValue({
+        payees: [
+          { id: "payee-1", name: "Walmart" },
+          { id: "payee-2", name: "Starbucks" },
+        ],
+        totalCount: 2,
+        truncated: false,
+      }),
       previewCreate: jest.fn().mockResolvedValue({
         name: "Acme",
         defaultCategoryId: "cat-1",
@@ -1202,22 +1210,39 @@ describe("ToolExecutorService", () => {
       });
     });
 
-    it("list_payees returns all payees when no search is given", async () => {
+    it("list_payees reads the shared payee query", async () => {
       const result = await service.execute(userId, "list_payees", {});
 
-      expect(payees.findAll).toHaveBeenCalledWith(userId);
-      expect(payees.search).not.toHaveBeenCalled();
+      expect(payees.getLlmPayees).toHaveBeenCalledWith(userId, {});
       expect(result.sources[0].type).toBe("payees");
       expect(result.summary).toContain("2 payees");
     });
 
-    it("list_payees uses the search index when a query is given", async () => {
-      const result = await service.execute(userId, "list_payees", {
+    it("list_payees passes the search, sort, limit and presence filters down", async () => {
+      // Same method the MCP tool calls, so both surfaces answer alike.
+      const input = {
         search: "wal",
+        sortBy: "transactionCount",
+        limit: 5,
+        hasEmail: false,
+      };
+      const result = await service.execute(userId, "list_payees", input);
+
+      expect(payees.getLlmPayees).toHaveBeenCalledWith(userId, input);
+      expect(result.summary).toContain('matching "wal"');
+    });
+
+    it("list_payees says a truncated list is only part of the matches", async () => {
+      payees.getLlmPayees.mockResolvedValueOnce({
+        payees: [{ id: "p1", name: "Walmart" }],
+        totalCount: 9,
+        truncated: true,
       });
 
-      expect(payees.search).toHaveBeenCalledWith(userId, "wal", 50);
-      expect(result.summary).toContain('matching "wal"');
+      const result = await service.execute(userId, "list_payees", { limit: 1 });
+
+      expect(result.summary).toContain("1 payee");
+      expect(result.summary).toContain("of 9 matching");
     });
 
     it("generate_report delegates to the matching built-in report", async () => {

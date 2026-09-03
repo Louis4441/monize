@@ -20,6 +20,7 @@ describe("McpPayeesTools", () => {
     payeesService = {
       findAll: jest.fn(),
       search: jest.fn(),
+      getLlmPayees: jest.fn(),
       create: jest.fn().mockResolvedValue({ id: "p2", name: "New Payee" }),
       update: jest.fn().mockResolvedValue({ id: "p2", name: "New Payee" }),
       remove: jest.fn().mockResolvedValue(undefined),
@@ -106,22 +107,47 @@ describe("McpPayeesTools", () => {
   });
 
   describe("list_payees", () => {
-    it("should return all payees without search", async () => {
+    const list = {
+      payees: [{ id: "p1", name: "Amazon" }],
+      totalCount: 1,
+      truncated: false,
+    };
+
+    it("returns the list with its match count and truncation flag", async () => {
       resolve.mockReturnValue({ userId: "u1", scopes: "read" });
-      payeesService.findAll.mockResolvedValue([{ id: "p1", name: "Amazon" }]);
+      payeesService.getLlmPayees.mockResolvedValue(list);
 
       const result = await handlers["list_payees"]({}, { sessionId: "s1" });
-      expect(payeesService.findAll).toHaveBeenCalledWith("u1");
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed[0].name).toBe("Amazon");
+
+      expect(payeesService.getLlmPayees).toHaveBeenCalledWith("u1", {});
+      const parsed = result.structuredContent as any;
+      expect(parsed.payees[0].name).toBe("Amazon");
+      expect(parsed.totalCount).toBe(1);
+      expect(parsed.truncated).toBe(false);
     });
 
-    it("should search payees when query provided", async () => {
+    it("passes every filter, the sort and the limit through to the service", async () => {
+      // The tool is a thin adapter: the AI Assistant calls the same method, so
+      // a filter offered here and dropped on the way down would leave the two
+      // surfaces answering the same question differently.
       resolve.mockReturnValue({ userId: "u1", scopes: "read" });
-      payeesService.search.mockResolvedValue([{ id: "p1", name: "Amazon" }]);
+      payeesService.getLlmPayees.mockResolvedValue(list);
 
-      await handlers["list_payees"]({ search: "ama" }, { sessionId: "s1" });
-      expect(payeesService.search).toHaveBeenCalledWith("u1", "ama", 50);
+      const args = {
+        search: "ama",
+        status: "active" as const,
+        sortBy: "lastUsed" as const,
+        limit: 10,
+        hasWebsite: true,
+        hasLogo: false,
+        hasAddress: true,
+        hasEmail: false,
+        hasPhone: true,
+        hasDefaultCategory: false,
+      };
+      await handlers["list_payees"](args, { sessionId: "s1" });
+
+      expect(payeesService.getLlmPayees).toHaveBeenCalledWith("u1", args);
     });
 
     it("returns error when no user context", async () => {
@@ -152,7 +178,7 @@ describe("McpPayeesTools", () => {
         { name: "New Payee", defaultCategoryId: undefined },
         {},
       );
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.id).toBe("p2");
       expect(parsed.count).toBe(1);
     });
@@ -307,7 +333,7 @@ describe("McpPayeesTools", () => {
         name: "New Payee",
         defaultCategoryId: null,
       });
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.count).toBe(1);
     });
 
@@ -318,7 +344,7 @@ describe("McpPayeesTools", () => {
         { sessionId: "s1" },
       );
       expect(payeesService.remove).toHaveBeenCalledWith("u1", "p2");
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.deleted).toBe(true);
     });
 
@@ -351,7 +377,7 @@ describe("McpPayeesTools", () => {
 
       expect(relayService.emitPendingAction).toHaveBeenCalled();
       expect(payeesService.create).not.toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.status).toBe("preview_shown");
     });
 
@@ -371,7 +397,7 @@ describe("McpPayeesTools", () => {
       );
 
       expect(payeesService.create).not.toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.dryRun).toBe(true);
       expect(parsed.operation).toBe("create");
     });
@@ -407,7 +433,7 @@ describe("McpPayeesTools", () => {
         expect.any(Array),
       );
       expect(payeesService.create).toHaveBeenCalledTimes(2);
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.count).toBe(2);
     });
 
@@ -442,7 +468,7 @@ describe("McpPayeesTools", () => {
       );
 
       expect(payeesService.update).toHaveBeenCalledTimes(2);
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.count).toBe(2);
     });
 
@@ -468,7 +494,7 @@ describe("McpPayeesTools", () => {
       );
 
       expect(payeesService.remove).toHaveBeenCalledTimes(2);
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.count).toBe(2);
     });
 
@@ -492,7 +518,7 @@ describe("McpPayeesTools", () => {
         { sessionId: "s1" },
       );
 
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.count).toBe(1);
       expect(parsed.skipped).toHaveLength(1);
     });
@@ -527,7 +553,7 @@ describe("McpPayeesTools", () => {
 
       // Each card is confirmed and committed individually.
       expect(payeesService.create).toHaveBeenCalledTimes(2);
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.count).toBe(2);
     });
 
@@ -559,7 +585,7 @@ describe("McpPayeesTools", () => {
 
       expect(relayService.emitPendingAction).toHaveBeenCalledTimes(2);
       expect(payeesService.remove).not.toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
+      const parsed = result.structuredContent as any;
       expect(parsed.status).toBe("preview_shown");
     });
 
@@ -667,8 +693,8 @@ describe("McpPayeesTools", () => {
 
       expect(payeesService.update).not.toHaveBeenCalled();
       expect(payeesService.remove).not.toHaveBeenCalled();
-      expect(JSON.parse(upd.content[0].text).operation).toBe("update");
-      expect(JSON.parse(del.content[0].text).operation).toBe("delete");
+      expect((upd.structuredContent as any).operation).toBe("update");
+      expect((del.structuredContent as any).operation).toBe("delete");
     });
 
     it("single update/delete go through the relay when relayed", async () => {
@@ -686,8 +712,8 @@ describe("McpPayeesTools", () => {
 
       expect(payeesService.update).not.toHaveBeenCalled();
       expect(payeesService.remove).not.toHaveBeenCalled();
-      expect(JSON.parse(upd.content[0].text).status).toBe("preview_shown");
-      expect(JSON.parse(del.content[0].text).status).toBe("preview_shown");
+      expect((upd.structuredContent as any).status).toBe("preview_shown");
+      expect((del.structuredContent as any).status).toBe("preview_shown");
     });
 
     it("bulk update/delete go through the relay when relayed", async () => {
@@ -716,8 +742,8 @@ describe("McpPayeesTools", () => {
       );
       expect(payeesService.update).not.toHaveBeenCalled();
       expect(payeesService.remove).not.toHaveBeenCalled();
-      expect(JSON.parse(upd.content[0].text).status).toBe("preview_shown");
-      expect(JSON.parse(del.content[0].text).status).toBe("preview_shown");
+      expect((upd.structuredContent as any).status).toBe("preview_shown");
+      expect((del.structuredContent as any).status).toBe("preview_shown");
     });
 
     it("returns error when no user context", async () => {

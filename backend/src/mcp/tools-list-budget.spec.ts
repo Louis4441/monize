@@ -27,7 +27,7 @@ const TOOL_BYTE_BUDGET: Record<string, number> = {
   compare_periods: 2150,
   manage_transactions: 6700,
   list_categories: 1350,
-  list_payees: 1000,
+  list_payees: 2450,
   manage_payees: 3450,
   generate_report: 3150,
   get_portfolio_summary: 3500,
@@ -44,7 +44,7 @@ const TOOL_BYTE_BUDGET: Record<string, number> = {
   report_progress: 1400,
 };
 
-const TOTAL_BYTE_BUDGET = 54_000;
+const TOTAL_BYTE_BUDGET = 55_500;
 const INSTRUCTIONS_BYTE_BUDGET = 2_600;
 
 /**

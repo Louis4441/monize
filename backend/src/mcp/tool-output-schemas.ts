@@ -156,7 +156,11 @@ export const getCategoriesOutput = toolOutput({
 // ---------------------------------------------------------------------------
 
 export const getPayeesOutput = toolOutput({
-  items: z.array(looseObject({ id: str, name: str })),
+  payees: z.array(looseObject({ id: str, name: str })),
+  // How many matched the filters, against how many came back: a capped list
+  // described as the whole one is a subtotal wearing a total's name.
+  totalCount: num,
+  truncated: bool,
 });
 
 /**

@@ -386,32 +386,57 @@ const cases: Array<{ name: string; schema: OutputSchema; raw: unknown }> = [
   {
     name: "getPayeesOutput",
     schema: schemas.getPayeesOutput,
-    raw: [
-      {
-        id: "p1",
-        name: "Amazon",
-        defaultCategoryId: null,
-        // notes is a nullable column; a payee without notes serializes as null
-        // and must validate (this previously failed the whole tool response).
-        notes: null,
-        isActive: true,
-        transactionCount: 2,
-        lastUsedDate: null,
-        aliasCount: 0,
-        uncategorizedCount: 0,
-      },
-      {
-        id: "p2",
-        name: "Buon Gusto Restaurant",
-        defaultCategoryId: "c1",
-        notes: "Italian place downtown",
-        isActive: true,
-        transactionCount: 36,
-        lastUsedDate: "2026-05-22",
-        aliasCount: 0,
-        uncategorizedCount: 0,
-      },
-    ],
+    // The list is an object, not a bare array: a page of matches has to carry
+    // how many matched and whether it is only a page.
+    raw: {
+      payees: [
+        {
+          id: "p1",
+          name: "Amazon",
+          defaultCategoryId: null,
+          // notes is a nullable column; a payee without notes serializes as
+          // null and must validate (this once failed the whole tool response).
+          notes: null,
+          website: null,
+          address: null,
+          email: null,
+          phone: null,
+          hasLogo: false,
+          isActive: true,
+          transactionCount: 2,
+          lastUsedDate: null,
+          aliasCount: 0,
+          uncategorizedCount: 0,
+        },
+        {
+          id: "p2",
+          name: "Buon Gusto Restaurant",
+          defaultCategoryId: "c1",
+          notes: "Italian place downtown",
+          website: "https://buongusto.test",
+          address: "12 High St",
+          email: "book@buongusto.test",
+          phone: "555-0100",
+          hasLogo: true,
+          isActive: true,
+          transactionCount: 36,
+          lastUsedDate: "2026-05-22",
+          aliasCount: 0,
+          uncategorizedCount: 0,
+        },
+      ],
+      totalCount: 2,
+      truncated: false,
+    },
+  },
+  {
+    name: "getPayeesOutput (truncated page)",
+    schema: schemas.getPayeesOutput,
+    raw: {
+      payees: [{ id: "p1", name: "Amazon" }],
+      totalCount: 87,
+      truncated: true,
+    },
   },
   {
     name: "managePayeesOutput (single created branch)",

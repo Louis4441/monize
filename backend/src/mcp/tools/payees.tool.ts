@@ -90,15 +90,52 @@ export class McpPayeesTools {
         title: "List payees",
         annotations: READ_ONLY,
         description:
-          "The user's payees, each with its default category, website and contact " +
-          "details (null when unset) -- so this is how to find the payees " +
-          "missing one before filling them in with manage_payees.",
+          "The user's payees with their default category, contact details and " +
+          "usage. `search` is a case-insensitive substring of the name. The " +
+          "has* filters are three-valued: true keeps only the payees carrying " +
+          "that detail, false only those missing it, omitted asks nothing -- so " +
+          "hasEmail:false is how to find the payees still needing one. " +
+          "`totalCount` is how many matched and `truncated` says whether " +
+          "`payees` is only the first `limit` of them; never describe a " +
+          "truncated list as all of the user's payees.",
         inputSchema: {
           search: z
             .string()
             .max(200)
             .optional()
-            .describe("Substring of the payee name."),
+            .describe("Case-insensitive substring of the payee name."),
+          status: z
+            .enum(["active", "inactive", "all"])
+            .optional()
+            .describe("Defaults to 'all'."),
+          sortBy: z
+            .enum(["name", "lastUsed", "transactionCount"])
+            .optional()
+            .describe(
+              "name (A-Z, default), lastUsed (most recent first, never-used last), or transactionCount (busiest first).",
+            ),
+          limit: z
+            .number()
+            .int()
+            .min(1)
+            .max(500)
+            .optional()
+            .describe("Return only the first N rows after sorting."),
+          hasWebsite: z.boolean().optional().describe("Filter on a website."),
+          hasLogo: z
+            .boolean()
+            .optional()
+            .describe("Filter on a resolved brand icon."),
+          hasAddress: z.boolean().optional().describe("Filter on an address."),
+          hasEmail: z.boolean().optional().describe("Filter on an email."),
+          hasPhone: z
+            .boolean()
+            .optional()
+            .describe("Filter on a phone number."),
+          hasDefaultCategory: z
+            .boolean()
+            .optional()
+            .describe("Filter on a default category."),
         },
         outputSchema: getPayeesOutput,
       },
@@ -109,16 +146,9 @@ export class McpPayeesTools {
         if (check.error) return check.result;
 
         try {
-          if (args.search) {
-            const payees = await this.payeesService.search(
-              ctx.userId,
-              args.search,
-              50,
-            );
-            return toolResult(payees);
-          }
-          const payees = await this.payeesService.findAll(ctx.userId);
-          return toolResult(payees);
+          return toolResult(
+            await this.payeesService.getLlmPayees(ctx.userId, args),
+          );
         } catch (err: unknown) {
           return safeToolError(err);
         }

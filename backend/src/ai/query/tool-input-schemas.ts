@@ -135,6 +135,15 @@ export const getBudgetStatusSchema = z.object({
 
 export const listPayeesSchema = z.object({
   search: z.string().max(200).optional(),
+  status: z.enum(["active", "inactive", "all"]).optional(),
+  sortBy: z.enum(["name", "lastUsed", "transactionCount"]).optional(),
+  limit: z.number().int().min(1).max(500).optional(),
+  hasWebsite: z.boolean().optional(),
+  hasLogo: z.boolean().optional(),
+  hasAddress: z.boolean().optional(),
+  hasEmail: z.boolean().optional(),
+  hasPhone: z.boolean().optional(),
+  hasDefaultCategory: z.boolean().optional(),
 });
 
 /** Report month in YYYY-MM form, used by the month_comparison report type. */
