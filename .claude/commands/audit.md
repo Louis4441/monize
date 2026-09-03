@@ -38,7 +38,7 @@ Two companion documents exist and neither replaces this file:
 
 # Language
 
-Communicate with the user in Polish.
+Communicate with the user in English.
 
 This includes:
 
@@ -60,9 +60,6 @@ This includes:
 - regression-test proposals;
 - review summaries intended for the PR;
 - Markdown review artifacts.
-
-Do not switch the conversational part to English merely because the source code or deliverable is
-in English.
 
 ---
 
