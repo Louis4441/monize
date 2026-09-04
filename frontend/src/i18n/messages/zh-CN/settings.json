@@ -206,6 +206,17 @@
   },
   "notifications": {
     "heading": "通知",
+    "portfolioAlert": {
+      "title": "投资价值变动",
+      "description": "当我的投资账户变动超过阈值时，每天通知我一次；以市场变化和分红衡量（不含存入和取出）。",
+      "enableLabel": "启用投资变动提醒",
+      "thresholdLabel": "当每日变动至少达到以下值时通知",
+      "save": "保存",
+      "saved": "阈值已保存",
+      "saveError": "无法保存阈值",
+      "loadError": "无法加载投资提醒设置",
+      "retry": "重试"
+    },
     "smtpNotConfigured": "邮件通知不可用。管理员尚未配置 SMTP。",
     "emailNotificationsTitle": "邮件通知",
     "emailNotificationsDescription": "接收即将到期账单和预算提醒的邮件提醒",
@@ -324,7 +335,10 @@
       "categories": {
         "PAYMENTS": "账单与计划",
         "BUDGETS": "预算",
-        "SYSTEM": "系统警报"
+        "SYSTEM": "系统警报",
+        "BALANCES": "账户余额",
+        "INVESTMENTS": "投资价值",
+        "STRATEGIES": "策略信号"
       },
       "channelNotApplicable": "不适用于此通知类型",
       "emailToggleLabel": "{category} 的报告邮件",

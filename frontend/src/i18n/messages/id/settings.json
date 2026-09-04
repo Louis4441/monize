@@ -206,6 +206,17 @@
   },
   "notifications": {
     "heading": "Notifikasi",
+    "portfolioAlert": {
+      "title": "Pergerakan nilai investasi",
+      "description": "Beri tahu saya sekali sehari saat akun investasi saya bergerak melewati ambang batas, diukur dari perubahan pasar dan dividen (setoran dan penarikan dikecualikan).",
+      "enableLabel": "Aktifkan peringatan pergerakan investasi",
+      "thresholdLabel": "Beri tahu saat pergerakan harian minimal",
+      "save": "Simpan",
+      "saved": "Ambang batas disimpan",
+      "saveError": "Tidak dapat menyimpan ambang batas",
+      "loadError": "Tidak dapat memuat pengaturan peringatan investasi",
+      "retry": "Coba lagi"
+    },
     "smtpNotConfigured": "Notifikasi surel tidak tersedia. SMTP belum dikonfigurasi oleh administrator.",
     "emailNotificationsTitle": "Notifikasi Surel",
     "emailNotificationsDescription": "Terima pengingat surel untuk tagihan yang akan datang dan peringatan anggaran",
@@ -324,7 +335,10 @@
       "categories": {
         "PAYMENTS": "Tagihan dan terjadwal",
         "BUDGETS": "Anggaran",
-        "SYSTEM": "Peringatan sistem"
+        "SYSTEM": "Peringatan sistem",
+        "BALANCES": "Saldo akun",
+        "INVESTMENTS": "Nilai investasi",
+        "STRATEGIES": "Sinyal strategi"
       },
       "channelNotApplicable": "Tidak berlaku untuk jenis notifikasi ini",
       "emailToggleLabel": "Email laporan untuk {category}",

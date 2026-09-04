@@ -206,6 +206,17 @@
   },
   "notifications": {
     "heading": "Notifications",
+    "portfolioAlert": {
+      "title": "Variation de la valeur des placements",
+      "description": "Me prévenir une fois par jour lorsque mes comptes de placement varient au-delà d'un seuil, mesuré à partir des variations de marché et des dividendes (les dépôts et retraits sont exclus).",
+      "enableLabel": "Activer les alertes de variation des placements",
+      "thresholdLabel": "Me prévenir lorsque la variation quotidienne atteint au moins",
+      "save": "Enregistrer",
+      "saved": "Seuil enregistré",
+      "saveError": "Impossible d'enregistrer le seuil",
+      "loadError": "Impossible de charger le réglage des alertes de placement",
+      "retry": "Réessayer"
+    },
     "smtpNotConfigured": "Les notifications par e-mail ne sont pas disponibles. Le SMTP n'a pas été configuré par l'administrateur.",
     "emailNotificationsTitle": "Notifications par e-mail",
     "emailNotificationsDescription": "Recevez des rappels par e-mail pour les factures à venir et les alertes de budget",
@@ -324,7 +335,10 @@
       "categories": {
         "PAYMENTS": "Factures et planifiés",
         "BUDGETS": "Budgets",
-        "SYSTEM": "Alertes système"
+        "SYSTEM": "Alertes système",
+        "BALANCES": "Soldes des comptes",
+        "INVESTMENTS": "Valeur des placements",
+        "STRATEGIES": "Signaux de stratégie"
       },
       "channelNotApplicable": "Non applicable à ce type de notification",
       "emailToggleLabel": "E-mail (rapport) pour {category}",

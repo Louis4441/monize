@@ -206,6 +206,17 @@
   },
   "notifications": {
     "heading": "Meldingen",
+    "portfolioAlert": {
+      "title": "Waardeverandering van beleggingen",
+      "description": "Waarschuw mij eenmaal per dag wanneer mijn beleggingsrekeningen buiten een drempel bewegen, gemeten aan marktveranderingen en dividenden (stortingen en opnames worden uitgesloten).",
+      "enableLabel": "Waarschuwingen voor beleggingsbewegingen inschakelen",
+      "thresholdLabel": "Waarschuwen wanneer de dagelijkse beweging minstens is",
+      "save": "Opslaan",
+      "saved": "Drempel opgeslagen",
+      "saveError": "Kon de drempel niet opslaan",
+      "loadError": "Kon de instelling voor beleggingswaarschuwingen niet laden",
+      "retry": "Opnieuw proberen"
+    },
     "smtpNotConfigured": "E-mailmeldingen zijn niet beschikbaar. SMTP is niet geconfigureerd door de beheerder.",
     "emailNotificationsTitle": "E-mailmeldingen",
     "emailNotificationsDescription": "Ontvang e-mailherinneringen voor aankomende rekeningen en budgetwaarschuwingen",
@@ -324,7 +335,10 @@
       "categories": {
         "PAYMENTS": "Rekeningen en gepland",
         "BUDGETS": "Budgetten",
-        "SYSTEM": "Systeemwaarschuwingen"
+        "SYSTEM": "Systeemwaarschuwingen",
+        "BALANCES": "Rekeningsaldi",
+        "INVESTMENTS": "Beleggingswaarde",
+        "STRATEGIES": "Strategiesignalen"
       },
       "channelNotApplicable": "Niet van toepassing op dit type melding",
       "emailToggleLabel": "Rapport-e-mail voor {category}",
