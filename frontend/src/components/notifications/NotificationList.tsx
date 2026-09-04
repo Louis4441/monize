@@ -369,6 +369,61 @@ export function NotificationList({
     }
   };
 
+  /**
+   * A GEM recommendation-change row, composed in the reader's language from the
+   * `data` facts the producer wrote (`docs/specs/gem-signal-change-notifications.md`).
+   * Returns null for any other type, falling back to the stored English.
+   */
+  const gemSignalData = (
+    notification: Notification,
+  ): {
+    kind?: string;
+    strategyName?: string;
+    fromState?: string;
+    toState?: string;
+    toSymbol?: string | null;
+    toRole?: string | null;
+  } | null => {
+    if (notification.type !== 'GEM_SIGNAL_CHANGED') return null;
+    return (notification.data ?? {}) as {
+      kind?: string;
+      strategyName?: string;
+      fromState?: string;
+      toState?: string;
+      toSymbol?: string | null;
+      toRole?: string | null;
+    };
+  };
+
+  const stateLabel = (state: string | undefined): string =>
+    state === 'RISK_ON' ? t('gemSignal.riskOn') : t('gemSignal.riskOff');
+
+  const gemSignalTitle = (notification: Notification): string | null => {
+    const data = gemSignalData(notification);
+    if (!data) return null;
+    const strategy = data.strategyName ?? '';
+    return data.kind === 'risk'
+      ? t('gemSignal.riskTitle', { strategy, state: stateLabel(data.toState) })
+      : t('gemSignal.allocationTitle', { strategy });
+  };
+
+  const gemSignalMessage = (notification: Notification): string | null => {
+    const data = gemSignalData(notification);
+    if (!data) return null;
+    const strategy = data.strategyName ?? '';
+    if (data.kind === 'risk') {
+      return t('gemSignal.riskMessage', {
+        strategy,
+        fromState: stateLabel(data.fromState),
+        toState: stateLabel(data.toState),
+      });
+    }
+    return t('gemSignal.allocationMessage', {
+      strategy,
+      target: data.toSymbol ?? data.toRole ?? '',
+    });
+  };
+
   const unreadCount = notifications.filter((a) => !a.isRead && !dismissingIds.has(a.id)).length;
 
   const handleAlertClick = (notification: Notification) => {
@@ -603,10 +658,10 @@ export function NotificationList({
                               </span>
                             </div>
                             <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                              {billDueTitle(notification) ?? systemAlertTitle(notification) ?? notification.title}
+                              {billDueTitle(notification) ?? systemAlertTitle(notification) ?? gemSignalTitle(notification) ?? notification.title}
                             </p>
                             <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mt-0.5">
-                              {billDueMessage(notification) ?? systemAlertMessage(notification) ?? notification.message}
+                              {billDueMessage(notification) ?? systemAlertMessage(notification) ?? gemSignalMessage(notification) ?? notification.message}
                             </p>
                           </div>
                         </div>

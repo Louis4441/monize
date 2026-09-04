@@ -131,6 +131,11 @@ const WITH_CONTEXT_ALLOWLIST = [
   "src/securities/market-index.service.ts",
   "src/securities/securities.controller.ts",
   "src/securities/security-price.service.ts",
+  // GEM recommendation-change cron: a deployment-wide fan-out (system context
+  // to enumerate every strategy's owner) then a per-user body (withUserContext)
+  // that reuses the report materializer and dispatches a notification. No
+  // request behind it (docs/specs/gem-signal-change-notifications.md).
+  "src/strategies/gem-signal-change-alert.service.ts",
   // System alerts: every caller is a cron catch, a post-claim hook or a
   // bootstrap hook with no request behind it, so the service seeds its own
   // context -- system for the admin fan-out, user for a per-user alert
