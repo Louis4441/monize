@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildPayeeSchema } from './PayeeForm';
+import type { CountryCode } from 'libphonenumber-js/max';
 
 /**
  * The form's validation rules, tested against the schema itself.
@@ -11,8 +12,11 @@ import { buildPayeeSchema } from './PayeeForm';
  * teeth.
  */
 const t = (key: string) => key;
-const parse = (input: Record<string, unknown>) =>
-  buildPayeeSchema(t).safeParse({ name: 'Starbucks', ...input });
+/** The region a bare national number is read in; US unless a case says otherwise. */
+const parse = (
+  input: Record<string, unknown>,
+  phoneRegion: CountryCode | null = 'US',
+) => buildPayeeSchema(t, phoneRegion).safeParse({ name: 'Starbucks', ...input });
 
 describe('payee form schema', () => {
   it('accepts a well-formed email', () => {
@@ -54,15 +58,53 @@ describe('payee form schema', () => {
     expect(parse({ phone: '5'.repeat(51) }).success).toBe(false);
   });
 
-  it('accepts a phone number in any format the user writes', () => {
-    // No format rule on purpose: international numbers carry country codes,
-    // brackets, spaces and extensions.
-    for (const phone of ['+1 (206) 448-8762', '020 7946 0958', '555 ext. 12']) {
+  it('accepts a phone number in any shape the user writes it', () => {
+    // Brackets, spaces, dots, an extension and a country code are all ways of
+    // writing one number; the shape is the user's business, the number is not.
+    for (const phone of [
+      '+1 (206) 448-8762',
+      '206.448.8762',
+      '206 448 8762',
+      '+44 20 7946 0958 ext. 12',
+      '+442079460958;ext=12',
+    ]) {
       expect(parse({ phone }).success).toBe(true);
     }
   });
 
+  it('accepts a bare national number in the region the preferences imply', () => {
+    expect(parse({ phone: '020 7946 0958' }, 'GB').success).toBe(true);
+    // ...and the same digits are not a US number.
+    expect(parse({ phone: '020 7946 0958' }, 'US').success).toBe(false);
+  });
+
+  it('rejects a number that is not one, under the field', () => {
+    const result = parse({ phone: '12345' });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]).toMatchObject({
+      path: ['phone'],
+      message: 'validation.phoneInvalid',
+    });
+  });
+
+  it('asks for a country code when it cannot place the number', () => {
+    // A different message because it is a different repair: checking the digits
+    // would not help a user whose number is correct and merely unplaceable.
+    const result = parse({ phone: '020 7946 0958' }, null);
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]).toMatchObject({
+      path: ['phone'],
+      message: 'validation.phoneNeedsCountryCode',
+    });
+  });
+
+  it('accepts a blank phone, because that is how the field is cleared', () => {
+    expect(parse({ phone: '' }).success).toBe(true);
+  });
+
   it('still requires a name', () => {
-    expect(buildPayeeSchema(t).safeParse({ name: '' }).success).toBe(false);
+    expect(buildPayeeSchema(t, 'US').safeParse({ name: '' }).success).toBe(false);
   });
 });

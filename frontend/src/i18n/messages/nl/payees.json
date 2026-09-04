@@ -284,7 +284,9 @@
   "selectCategoryPlaceholder": "Selecteer categorie...",
   "validation": {
     "nameRequired": "Naam begunstigde is verplicht",
-    "emailInvalid": "Voer een geldig e-mailadres in"
+    "emailInvalid": "Voer een geldig e-mailadres in",
+    "phoneInvalid": "Voer een geldig telefoonnummer in",
+    "phoneNeedsCountryCode": "Voeg de landcode toe, bijvoorbeeld +1 206 448 8762"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "Standaardcategorieën toepassen?",

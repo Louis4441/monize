@@ -365,6 +365,8 @@
     "nameConflict": "Penerima bernama \"{{ name }}\" sudah ada",
     "nameRequired": "Nama penerima wajib diisi",
     "invalidEmail": "\"{{ email }}\" bukan alamat email yang valid",
+    "invalidPhone": "\"{{ phone }}\" bukan nomor telepon yang valid",
+    "phoneNeedsCountryCode": "Sertakan kode negara untuk \"{{ phone }}\", misalnya +1 206 448 8762",
     "notFound": "Penerima dengan ID {{ id }} tidak ditemukan",
     "logoNotFound": "Tidak ada logo yang tersedia untuk penerima pembayaran ini",
     "categoryIdsNotOwned": "ID kategori tidak ditemukan atau bukan milik pengguna: {{ ids }}",

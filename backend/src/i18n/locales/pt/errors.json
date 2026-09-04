@@ -365,6 +365,8 @@
     "nameConflict": "Já existe um beneficiário com o nome \"{{ name }}\"",
     "nameRequired": "O nome do beneficiário é obrigatório",
     "invalidEmail": "\"{{ email }}\" não é um endereço de e-mail válido",
+    "invalidPhone": "\"{{ phone }}\" não é um número de telefone válido",
+    "phoneNeedsCountryCode": "Inclua o indicativo do país para \"{{ phone }}\", por exemplo +1 206 448 8762",
     "notFound": "Beneficiário com ID {{ id }} não encontrado",
     "logoNotFound": "Nenhum logótipo disponível para este beneficiário",
     "categoryIdsNotOwned": "IDs de categoria não encontrados ou não pertencentes ao utilizador: {{ ids }}",

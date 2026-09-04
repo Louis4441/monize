@@ -326,6 +326,25 @@ Whether an unreconciled row is *overdue* is decided by `classifyStaleRow` (`lib/
 
 **A failed lookup is not a clean ledger.** `useStaleReconciliation` returns `undefined` on failure, and every consumer reads undefined as "no information" and marks nothing. An empty context instead would make an outage indistinguishable from an up-to-date ledger -- the same class of mistake as `accounts = []` on a failed request.
 
+### A phone number is shown through `formatPhoneForDisplay`, never raw
+
+`payee.phone` is stored as E.164 with an optional RFC 3966 extension suffix
+(`+12064488762`, `+442079460958;ext=12`). `formatPhoneForDisplay`
+(`lib/phone-number.ts`) is the only way it reaches a reader -- grouped, with the
+extension as ` x12` -- and it is **total**: rows written before normalization are
+not backfilled, so a value it cannot parse comes back unchanged rather than
+blanked (a stored "call the shop" is worth showing even though it cannot be
+dialled). `telHref` is the exception and takes the stored value on purpose: it
+needs the digits and the `;ext=` suffix, which it carries into the `tel:` link.
+
+The payee form validates with `normalizePhoneNumber` under the field, using the
+region from `phoneRegionFromPreferences` over the stored `numberFormat` and
+`language`. That is not belt-and-braces: both layers assert
+`backend/src/common/phone-number-cases.json`, so the field can neither block a
+number the API would store nor submit one it would refuse.
+`lib/phone-number.guard.test.ts` scans for a raw `{x.phone}` render and requires
+every known display surface to reference the formatter.
+
 ### A long list -- page it, or bound it and scroll with `scrollbar-slim`
 
 A full-page list uses `components/ui/Pagination.tsx`. A list inside a card caps its height and scrolls: `scrollbar-slim max-h-* overflow-y-auto pr-1`. The thing to avoid is the *default* scrollbar, not scrolling -- on Linux/Windows the native bar inside a small card reads as a rendering fault. `scrollbar-slim` (defined in `globals.css` alongside `scrollbar-hide`) keeps a thin themed thumb.

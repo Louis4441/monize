@@ -199,6 +199,39 @@ transactionDate: string;
 
 `@IsOptional()` waives validation for `undefined` and `null` only. A text input the user left alone arrives as `""` (react-hook-form sends it), so an `@IsUrl` / `@IsEmail` beside `@IsOptional()` still rejects it -- and because validation fails per *request*, one blank optional field breaks every save from that form. Add `@ValidateIf((_o, value) => value !== null && value !== "")` for a nullable column so a blank clears it. `src/common/optional-format-dto.spec.ts` sweeps every URL- and email-validated DTO property; a NOT NULL field belongs on its exemption list with a reason. This class of bug is invisible to unit tests (hand-built payloads); it surfaces in E2E or production.
 
+### A phone number is normalized by the service, not by a decorator
+
+`payees.phone` is stored in one form for every country -- E.164 with an
+optional RFC 3966 extension suffix (`+12064488762`, `+442079460958;ext=12`) --
+and rendered through `formatPhoneForDisplay`. Both live in
+`src/common/phone-number.util.ts`, over `libphonenumber-js/max`; `min` reduces
+`isValid()` to a length check, so the browser would accept numbers the server
+then had to accept too.
+
+The check is **not** a DTO decorator, because placing a number written without a
+country code needs the caller's region and class-validator cannot see it. The
+region comes from preferences the user has already set (`number_format`, then
+`language`), and `null` -- no region derivable -- makes a bare national number a
+*question* (`phoneNeedsCountryCode`) rather than a rejection: telling somebody
+their perfectly correct number is invalid sends them to check digits that are
+right. Three writers exist and all three go through
+`PayeesService.previewContactFields`: the preview an AI or MCP card is built
+from, the create, and the update. A preview that did not normalize would show
+one value on the card and store another.
+
+Two rules the tests hold. **A resent value is not an edit** -- the form sends
+every field on every save, and rows written before this existed are not
+backfilled, so validating a value merely *present* in the payload would make
+such a payee impossible to edit at all. Only a value that actually moved is
+normalized. And **the lookup normalizes before any caller sees a suggestion**
+(`PayeeContactLookupService.vetCandidate`), which is what makes the background
+enrichment `UPDATE` safe: it writes a model's answer straight into the column
+with no DTO anywhere in its path. `phone-normalization.guard.spec.ts` fails on a
+file that both writes a phone and reaches the database without going through a
+door, and `common/phone-number-cases.json` is the truth table this layer and the
+frontend both assert, so the two can never disagree about which numbers are
+accepted.
+
 ### A request-supplied array declares an upper bound
 
 Every `@IsArray()` DTO property carries `@ArrayMaxSize(n)` -- an unbounded array turns per-element work downstream into a denial-of-service lever (CodeQL `js/loop-bound-injection`, CWE-834). `src/common/array-bound-dto.spec.ts` sweeps validator metadata; its grandfather list may only shrink. Relatedly, never use a request value's `.length` as a loop bound inside a `withScopedDb` callback (CodeQL cannot track the outer guard through the closure): iterate `for (const [i, v] of xs.entries())`.

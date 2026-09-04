@@ -284,7 +284,9 @@
   "selectCategoryPlaceholder": "Chọn danh mục...",
   "validation": {
     "nameRequired": "Tên người nhận là bắt buộc",
-    "emailInvalid": "Nhập địa chỉ email hợp lệ"
+    "emailInvalid": "Nhập địa chỉ email hợp lệ",
+    "phoneInvalid": "Nhập số điện thoại hợp lệ",
+    "phoneNeedsCountryCode": "Hãy thêm mã quốc gia, ví dụ +1 206 448 8762"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "Áp dụng danh mục mặc định?",

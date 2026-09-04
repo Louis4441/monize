@@ -284,7 +284,9 @@
   "selectCategoryPlaceholder": "Wybierz kategorię...",
   "validation": {
     "nameRequired": "Nazwa odbiorcy jest wymagana",
-    "emailInvalid": "Wprowadź prawidłowy adres e-mail"
+    "emailInvalid": "Wprowadź prawidłowy adres e-mail",
+    "phoneInvalid": "Wprowadź prawidłowy numer telefonu",
+    "phoneNeedsCountryCode": "Dodaj numer kierunkowy kraju, na przykład +1 206 448 8762"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "Przypisać domyślne kategorie?",

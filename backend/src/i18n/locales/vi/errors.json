@@ -365,6 +365,8 @@
     "nameConflict": "Người nhận với tên \"{{ name }}\" đã tồn tại",
     "nameRequired": "Tên người nhận là bắt buộc",
     "invalidEmail": "\"{{ email }}\" không phải là địa chỉ email hợp lệ",
+    "invalidPhone": "\"{{ phone }}\" không phải là số điện thoại hợp lệ",
+    "phoneNeedsCountryCode": "Hãy thêm mã quốc gia cho \"{{ phone }}\", ví dụ +1 206 448 8762",
     "notFound": "Không tìm thấy người nhận với ID {{ id }}",
     "logoNotFound": "Không có biểu trưng cho người nhận thanh toán này",
     "categoryIdsNotOwned": "Không tìm thấy ID danh mục hoặc không thuộc sở hữu của người dùng: {{ ids }}",

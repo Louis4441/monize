@@ -35,6 +35,11 @@ import { stripHtml } from "../common/sanitization.util";
 import type { LlmPayeeList, LlmPayeeQuery } from "./llm-payee-query";
 import { getActiveScopedManager, withScopedDb } from "../common/db/scoped-db";
 import { normalizeWebsite } from "../common/normalize-website";
+import {
+  normalizePhoneOrThrow,
+  resolveUserPhoneRegion,
+} from "../common/phone-number.util";
+import type { CountryCode } from "libphonenumber-js/max";
 import { FaviconService, FetchedLogo } from "../common/favicon/favicon.service";
 import { brandLogoColumns } from "../common/favicon/brand-logo.columns";
 import { PayeeContactLookupService } from "./lookup/payee-contact-lookup.service";
@@ -173,18 +178,28 @@ function normalizeContactField(
 }
 
 /**
- * The contact fields as a preview would store them, with the email checked.
+ * The contact fields as they will be STORED: trimmed, blanks read as clears,
+ * the email checked and the phone normalized to E.164.
  *
- * The check belongs here because a preview has to compute what the commit will
- * do: `CreatePayeeDto` rejects a malformed email, so without this the user
- * would be shown a confirmation card, approve it, and only then get a
- * validation failure from a request they had already agreed to.
+ * Every writer goes through here -- the preview an AI or MCP card is built
+ * from, and the create and update that commit -- because a preview has to
+ * compute what the commit will do. Checking only at commit time would show the
+ * user a confirmation card, take their approval, and then fail the request
+ * they had already agreed to; normalizing only at commit time would show them
+ * "(206) 448-8762" on the card and store something else.
+ *
+ * `region` places a number written without a country code (see
+ * `phone-number.util.ts`). It is `null` where the caller could not resolve one,
+ * which makes a bare national number a refusal rather than a guess.
  */
-function previewContactFields(input: {
-  address?: string | null;
-  email?: string | null;
-  phone?: string | null;
-}): { address?: string | null; email?: string | null; phone?: string | null } {
+function previewContactFields(
+  input: {
+    address?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  },
+  region: CountryCode | null,
+): { address?: string | null; email?: string | null; phone?: string | null } {
   const email = normalizeContactField(input.email);
   if (email && !isEmail(email)) {
     throw new BadRequestException(
@@ -197,10 +212,11 @@ function previewContactFields(input: {
       ),
     );
   }
+  const phone = normalizeContactField(input.phone);
   return {
     address: normalizeContactField(input.address),
     email,
-    phone: normalizeContactField(input.phone),
+    phone: phone ? normalizePhoneOrThrow(phone, region) : phone,
   };
 }
 
@@ -215,6 +231,33 @@ export class PayeesService {
     private contactLookup: PayeeContactLookupService,
     private contactEnrichment: PayeeContactEnrichmentService,
   ) {}
+
+  /**
+   * The contact fields as they will be stored, resolving the caller's phone
+   * region only when there is a number that needs placing.
+   *
+   * The laziness is the point: a region is one more query, and the great
+   * majority of payees carry no phone at all. Every writer -- preview, create
+   * and update alike -- goes through here, so all of them place a number the
+   * same way.
+   */
+  private async storableContactFields(
+    userId: string,
+    input: {
+      address?: string | null;
+      email?: string | null;
+      phone?: string | null;
+    },
+  ): Promise<{
+    address?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  }> {
+    const region = normalizeContactField(input.phone)
+      ? await resolveUserPhoneRegion(this.dataSource, userId)
+      : null;
+    return previewContactFields(input, region);
+  }
 
   async create(
     userId: string,
@@ -233,10 +276,15 @@ export class PayeesService {
       : null;
 
     // The contact fields the form sends as "" mean "empty", not "a blank
-    // string" -- see normalizeContactField.
-    const address = normalizeContactField(createPayeeDto.address) ?? null;
-    const email = normalizeContactField(createPayeeDto.email) ?? null;
-    const phone = normalizeContactField(createPayeeDto.phone) ?? null;
+    // string" -- see normalizeContactField -- and a phone is stored in one
+    // canonical form whichever door wrote it. Through the same function the
+    // preview uses, so an AI or MCP card cannot show one value and the commit
+    // store another; it throws before the transaction below opens, so a
+    // refused number leaves nothing written.
+    const contact = await this.storableContactFields(userId, createPayeeDto);
+    const address = contact.address ?? null;
+    const email = contact.email ?? null;
+    const phone = contact.phone ?? null;
     const saved = await withScopedDb(this.dataSource, async (m) => {
       const repo = m.getRepository(Payee);
       // Check if payee with same name already exists for this user
@@ -351,7 +399,7 @@ export class PayeesService {
     options: PreviewCreateOptions = {},
   ): Promise<CreatePayeePreview> {
     const name = stripHtml(input.name)?.trim() || "";
-    let contact = previewContactFields(input);
+    let contact = await this.storableContactFields(userId, input);
     // Normalise here, not at commit time: a preview has to compute what the
     // commit will do, so the card shows "https://acme.com" for a typed
     // "acme.com" rather than a value the save would then change.
@@ -597,7 +645,7 @@ export class PayeesService {
       defaultCategoryId,
       defaultCategoryName,
       website,
-      ...previewContactFields(input),
+      ...(await this.storableContactFields(userId, input)),
     };
   }
 
@@ -1097,8 +1145,22 @@ export class PayeesService {
     }
     if (updatePayeeDto.email !== undefined)
       updateFields.email = normalizeContactField(updatePayeeDto.email) ?? null;
-    if (updatePayeeDto.phone !== undefined)
-      updateFields.phone = normalizeContactField(updatePayeeDto.phone) ?? null;
+    if (updatePayeeDto.phone !== undefined) {
+      const phone = normalizeContactField(updatePayeeDto.phone) ?? null;
+      // A resent value is not an edit. The form sends every field on every
+      // save, so keying the check off the field being PRESENT would re-run it
+      // over a value already on the row -- and a row written before phones
+      // were normalized holds one this build refuses, so renaming such a payee
+      // would fail on a number the user never touched. Only a value that
+      // actually moved is normalized; the stored one is left exactly as it is.
+      updateFields.phone =
+        phone !== null && phone !== payee.phone
+          ? normalizePhoneOrThrow(
+              phone,
+              await resolveUserPhoneRegion(this.dataSource, userId),
+            )
+          : phone;
+    }
     if (updatePayeeDto.address !== undefined)
       updateFields.address =
         normalizeContactField(updatePayeeDto.address) ?? null;

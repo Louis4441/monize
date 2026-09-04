@@ -284,7 +284,9 @@
   "selectCategoryPlaceholder": "カテゴリを選択...",
   "validation": {
     "nameRequired": "支払先名は必須です",
-    "emailInvalid": "有効なメールアドレスを入力してください"
+    "emailInvalid": "有効なメールアドレスを入力してください",
+    "phoneInvalid": "有効な電話番号を入力してください",
+    "phoneNeedsCountryCode": "国番号を追加してください (例: +1 206 448 8762)"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "デフォルトカテゴリを適用しますか？",

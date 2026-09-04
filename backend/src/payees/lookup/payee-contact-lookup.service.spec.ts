@@ -33,7 +33,9 @@ describe("PayeeContactLookupService", () => {
     website: "https://acme.example",
     address: "1 Main St",
     email: "hi@acme.example",
-    phone: "+1 555 010 2000",
+    // Already in the stored form, so the vetting tests below can compare a
+    // candidate verbatim; the normalization itself is exercised separately.
+    phone: "+12064488762",
     source: "ai-web-search",
     confidence: "high",
     notes: null,
@@ -49,6 +51,7 @@ describe("PayeeContactLookupService", () => {
         userId,
         payeeContactLookupEnabled: true,
         language: "en-CA",
+        numberFormat: "en-CA",
         defaultCurrency: "CAD",
       }),
     };
@@ -259,5 +262,73 @@ describe("PayeeContactLookupService", () => {
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toContain("fetch failed");
     warn.mockRestore();
+  });
+
+  describe("phone normalization", () => {
+    it("stores a suggested number in the canonical form", async () => {
+      // A model writes a number in whatever shape the page it read used, and
+      // the background enrichment writes the answer straight into the column
+      // without a DTO in the way -- so this is where it becomes storable.
+      provider.lookup.mockResolvedValue([
+        { ...suggestion, phone: "(206) 448-8762" },
+      ]);
+
+      const outcome = await service.lookup(userId, { name: "Acme" });
+
+      expect(outcome.suggestions[0]?.phone).toBe("+12064488762");
+    });
+
+    it("places a bare number in the region the user's preferences imply", async () => {
+      preferenceRepo.findOne.mockResolvedValue({
+        userId,
+        payeeContactLookupEnabled: true,
+        language: "en",
+        numberFormat: "en-GB",
+        defaultCurrency: "GBP",
+      });
+      provider.lookup.mockResolvedValue([
+        { ...suggestion, phone: "020 7946 0958" },
+      ]);
+
+      const outcome = await service.lookup(userId, { name: "Acme" });
+
+      expect(outcome.suggestions[0]?.phone).toBe("+442079460958");
+    });
+
+    it("drops a number it cannot place rather than offering one nobody can dial", async () => {
+      preferenceRepo.findOne.mockResolvedValue({
+        userId,
+        payeeContactLookupEnabled: true,
+        language: "en",
+        numberFormat: "browser",
+        defaultCurrency: "USD",
+      });
+      provider.lookup.mockResolvedValue([
+        { ...suggestion, phone: "020 7946 0958", refined: ["phone"] },
+      ]);
+
+      const outcome = await service.lookup(userId, { name: "Acme" });
+
+      expect(outcome.suggestions[0]?.phone).toBeNull();
+      // A refinement the user can never be offered is not one.
+      expect(outcome.suggestions[0]?.refined).toEqual([]);
+    });
+
+    it("drops a candidate whose phone was its only field", async () => {
+      provider.lookup.mockResolvedValue([
+        {
+          ...suggestion,
+          website: null,
+          address: null,
+          email: null,
+          phone: "not a number",
+        },
+      ]);
+
+      await expect(service.lookup(userId, { name: "Acme" })).resolves.toEqual({
+        reason: "none",
+        suggestions: [],
+      });
+    });
   });
 });

@@ -284,7 +284,9 @@
   "selectCategoryPlaceholder": "श्रेणी चुनें...",
   "validation": {
     "nameRequired": "भुगतानकर्ता का नाम आवश्यक है",
-    "emailInvalid": "मान्य ईमेल पता दर्ज करें"
+    "emailInvalid": "मान्य ईमेल पता दर्ज करें",
+    "phoneInvalid": "मान्य फ़ोन नंबर दर्ज करें",
+    "phoneNeedsCountryCode": "देश कोड जोड़ें, उदाहरण के लिए +1 206 448 8762"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "डिफ़ॉल्ट श्रेणियां लागू करें?",

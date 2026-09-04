@@ -30,13 +30,27 @@ import { useFormSubmitRef } from '@/hooks/useFormSubmitRef';
 import { useFormDirtyNotify } from '@/hooks/useFormDirtyNotify';
 import { FormActions } from '@/components/ui/FormActions';
 import { PayeeAliasManager } from './PayeeAliasManager';
+import {
+  formatPhoneForDisplay,
+  normalizePhoneNumber,
+  phoneRegionFromPreferences,
+} from '@/lib/phone-number';
+import type { CountryCode } from 'libphonenumber-js/max';
 
 /**
  * Exported so the validation rules can be tested directly: `PayeeForm.test.tsx`
  * mocks `zodResolver` away (so its submit handlers see real field values), which
  * makes every rule in here invisible from that suite.
  */
-export const buildPayeeSchema = (t: (key: string) => string) => z.object({
+export const buildPayeeSchema = (
+  t: (key: string) => string,
+  /**
+   * Where a number typed without a country code belongs. `null` means the
+   * user's preferences name no region, which makes a bare national number a
+   * question rather than a rejection -- see the phone rule below.
+   */
+  phoneRegion: CountryCode | null,
+) => z.object({
   name: z.string().min(1, t('validation.nameRequired')).max(255),
   defaultCategoryId: z.string().optional(),
   notes: z.string().optional(),
@@ -53,7 +67,28 @@ export const buildPayeeSchema = (t: (key: string) => string) => z.object({
     .refine((value) => !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), {
       message: t('validation.emailInvalid'),
     }),
-  phone: z.string().max(50).optional(),
+  // Checked here rather than left to the server so the error lands under the
+  // field, and checked by the SAME rules the server applies (both layers assert
+  // `backend/src/common/phone-number-cases.json`) so this can neither block a
+  // number the API would take nor pass one it would refuse. Refined rather than
+  // a stricter type for the reason the email above is: an emptied field submits
+  // "" and that is how a contact detail is cleared, so the blank has to pass.
+  phone: z
+    .string()
+    .max(50)
+    .optional()
+    .superRefine((value, ctx) => {
+      if (!value) return;
+      const result = normalizePhoneNumber(value, phoneRegion);
+      if (result.ok) return;
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          result.reason === 'needs-country-code'
+            ? t('validation.phoneNeedsCountryCode')
+            : t('validation.phoneInvalid'),
+      });
+    }),
 });
 
 type PayeeFormData = z.infer<ReturnType<typeof buildPayeeSchema>>;
@@ -92,6 +127,17 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
   const [applyMode, setApplyMode] = useState<ApplyCategoryToTransactions>('none');
   const pendingAliasesRef = useRef<string[]>([]);
 
+  // Where a number typed without a country code belongs. The same two
+  // preferences the server reads, so the field and the API agree about which
+  // numbers are placeable.
+  const numberFormat = usePreferencesStore((s) => s.preferences?.numberFormat);
+  const language = usePreferencesStore((s) => s.preferences?.language);
+  const phoneRegion = useMemo(
+    () => phoneRegionFromPreferences({ numberFormat, language }),
+    [numberFormat, language],
+  );
+  const schema = useMemo(() => buildPayeeSchema(t, phoneRegion), [t, phoneRegion]);
+
   const {
     register,
     handleSubmit,
@@ -100,7 +146,7 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
     watch,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<PayeeFormData>({
-    resolver: zodResolver(buildPayeeSchema(t)),
+    resolver: zodResolver(schema),
     defaultValues: payee
       ? {
           name: payee.name,
@@ -109,7 +155,10 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
           website: payee.website || '',
           address: payee.address || '',
           email: payee.email || '',
-          phone: payee.phone || '',
+          // Shown the way a person reads a number; the save re-normalizes it
+          // to the same stored value, so displaying it does not make the form
+          // dirty or rewrite the row.
+          phone: formatPhoneForDisplay(payee.phone),
         }
       : {
           defaultCategoryId: '',

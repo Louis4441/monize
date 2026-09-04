@@ -7,6 +7,7 @@ import type {
   ServerContext,
 } from "@modelcontextprotocol/server";
 import { PayeesService } from "../../payees/payees.service";
+import { formatPhoneForDisplay } from "../../common/phone-number.util";
 import { contactLookupOptions } from "../../ai/actions/ai-actions.service";
 import {
   PayeeToolPrepService,
@@ -74,7 +75,16 @@ function contactCardLines(preview: {
   for (const [label, value] of [
     ["Address", preview.address],
     ["Email", preview.email],
-    ["Phone", preview.phone],
+    // A phone is shown the way a person reads one, never the stored E.164:
+    // the human approving this card has to recognise the number.
+    [
+      "Phone",
+      preview.phone === undefined
+        ? undefined
+        : preview.phone === null
+          ? null
+          : formatPhoneForDisplay(preview.phone),
+    ],
   ] as const) {
     if (value !== undefined) rows.push(`\n${label}: ${value ?? "(cleared)"}`);
   }
@@ -210,7 +220,7 @@ export class McpPayeesTools {
                 .max(50)
                 .optional()
                 .describe(
-                  "Contact phone number, in whatever format the user gives.",
+                  "Contact phone number, any format with country code.",
                 ),
             }),
           ),

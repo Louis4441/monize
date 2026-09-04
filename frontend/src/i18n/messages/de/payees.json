@@ -284,7 +284,9 @@
   "selectCategoryPlaceholder": "Kategorie auswählen...",
   "validation": {
     "nameRequired": "Name des Zahlungsempfängers ist erforderlich",
-    "emailInvalid": "Geben Sie eine gültige E-Mail-Adresse ein"
+    "emailInvalid": "Geben Sie eine gültige E-Mail-Adresse ein",
+    "phoneInvalid": "Geben Sie eine gültige Telefonnummer ein",
+    "phoneNeedsCountryCode": "Ländervorwahl hinzufügen, zum Beispiel +1 206 448 8762"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "Standardkategorien zuweisen?",

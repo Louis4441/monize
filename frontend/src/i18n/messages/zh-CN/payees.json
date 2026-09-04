@@ -284,7 +284,9 @@
   "selectCategoryPlaceholder": "选择分类...",
   "validation": {
     "nameRequired": "收款人名称为必填项",
-    "emailInvalid": "请输入有效的电子邮件地址"
+    "emailInvalid": "请输入有效的电子邮件地址",
+    "phoneInvalid": "请输入有效的电话号码",
+    "phoneNeedsCountryCode": "请添加国家/地区代码，例如 +1 206 448 8762"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "应用默认分类？",

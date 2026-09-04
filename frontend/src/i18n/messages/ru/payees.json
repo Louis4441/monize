@@ -284,7 +284,9 @@
   "selectCategoryPlaceholder": "Выберите категорию...",
   "validation": {
     "nameRequired": "Имя получателя обязательно",
-    "emailInvalid": "Введите действительный адрес электронной почты"
+    "emailInvalid": "Введите действительный адрес электронной почты",
+    "phoneInvalid": "Введите действительный номер телефона",
+    "phoneNeedsCountryCode": "Добавьте код страны, например +1 206 448 8762"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "Применить категории по умолчанию?",

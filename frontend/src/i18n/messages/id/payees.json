@@ -284,7 +284,9 @@
   "selectCategoryPlaceholder": "Pilih kategori...",
   "validation": {
     "nameRequired": "Nama penerima wajib diisi",
-    "emailInvalid": "Masukkan alamat email yang valid"
+    "emailInvalid": "Masukkan alamat email yang valid",
+    "phoneInvalid": "Masukkan nomor telepon yang valid",
+    "phoneNeedsCountryCode": "Tambahkan kode negara, misalnya +1 206 448 8762"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "Terapkan kategori default?",

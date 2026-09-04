@@ -284,7 +284,9 @@
   "selectCategoryPlaceholder": "Kategori seçin...",
   "validation": {
     "nameRequired": "Alacaklı adı gereklidir",
-    "emailInvalid": "Geçerli bir e-posta adresi girin"
+    "emailInvalid": "Geçerli bir e-posta adresi girin",
+    "phoneInvalid": "Geçerli bir telefon numarası girin",
+    "phoneNeedsCountryCode": "Ülke kodunu ekleyin, örneğin +1 206 448 8762"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "Varsayılan kategoriler uygulansin mı?",

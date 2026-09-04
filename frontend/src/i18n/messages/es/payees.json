@@ -284,7 +284,9 @@
   "selectCategoryPlaceholder": "Seleccionar categoría...",
   "validation": {
     "nameRequired": "El nombre del beneficiario es obligatorio",
-    "emailInvalid": "Introduzca una dirección de correo electrónico válida"
+    "emailInvalid": "Introduzca una dirección de correo electrónico válida",
+    "phoneInvalid": "Introduzca un número de teléfono válido",
+    "phoneNeedsCountryCode": "Añada el código de país, por ejemplo +1 206 448 8762"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "¿Aplicar categorías predeterminadas?",

@@ -365,6 +365,8 @@
     "nameConflict": "\"{{ name }}\" adlı alacaklı zaten mevcut",
     "nameRequired": "Alacaklı adı gereklidir",
     "invalidEmail": "\"{{ email }}\" geçerli bir e-posta adresi değil",
+    "invalidPhone": "\"{{ phone }}\" geçerli bir telefon numarası değil",
+    "phoneNeedsCountryCode": "\"{{ phone }}\" için ülke kodunu ekleyin, örneğin +1 206 448 8762",
     "notFound": "{{ id }} kimliğine sahip alacaklı bulunamadı",
     "logoNotFound": "Bu alıcı için logo yok",
     "categoryIdsNotOwned": "Kategori kimlikleri bulunamadı veya kullanıcıya ait değil: {{ ids }}",
