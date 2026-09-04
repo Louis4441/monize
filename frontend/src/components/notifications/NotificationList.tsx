@@ -3,6 +3,7 @@
 import { useFormatter, useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { useDateFormat } from '@/hooks/useDateFormat';
 import type { NotificationFilters } from '@/lib/notification-filters';
 import { hasActiveNotificationFilters } from '@/lib/notification-filters';
 import { Badge } from '@/components/ui/Badge';
@@ -231,6 +232,15 @@ export function NotificationList({
   const format = useFormatter();
   const router = useRouter();
   const { formatCurrency } = useNumberFormat();
+  /**
+   * A due date rendered in the reader's own date-format preference
+   * (`DD.MM.YYYY`, `MM/DD/YYYY`, ...), never the stored `YYYY-MM-DD`. The row
+   * carries the date as a calendar string, so it goes through `formatDate` --
+   * the same helper every register and report uses -- rather than being
+   * interpolated raw, which showed a Polish reader `2026-09-15` in place of
+   * `15.09.2026`.
+   */
+  const { formatDate } = useDateFormat();
 
   /**
    * A bill-due notification's headline, in the reader's language. `null` for anything
@@ -257,11 +267,11 @@ export function NotificationList({
     const data = billDueData(notification);
     if (!data) return null;
     if (data.amount == null || data.amountComplete === false) {
-      return t('billDue.amountUnavailable', { date: data.dueDate! });
+      return t('billDue.amountUnavailable', { date: formatDate(data.dueDate!) });
     }
     return t('billDue.amountDue', {
       amount: formatCurrency(data.amount, data.currencyCode),
-      date: data.dueDate!,
+      date: formatDate(data.dueDate!),
     });
   };
 
@@ -360,7 +370,7 @@ export function NotificationList({
       case 'SCHEDULED_POST_FAILED':
         return data.dueDate
           ? t('system.scheduledPostFailed.message', {
-              date: data.dueDate,
+              date: formatDate(data.dueDate),
               error: data.error ?? '',
             })
           : null;
