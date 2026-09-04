@@ -39,6 +39,11 @@ const WITH_CONTEXT_ALLOWLIST = [
   "src/backup/backup-restore.service.ts",
   "src/budgets/budget-alert.service.ts",
   "src/budgets/budget-period-cron.service.ts",
+  // Daily portfolio-movement cron: a system-context fan-out over users with a
+  // threshold, then a per-user body (withUserContext) that prices the portfolio
+  // and dispatches. No request behind it
+  // (docs/specs/portfolio-movement-notifications.md).
+  "src/notification-center/portfolio-movement-alert.service.ts",
   "src/common/interceptors/request-context.interceptor.ts",
   // Cross-replica job coordination: claimOnce/claimLease write to a global
   // claims table that belongs to no single user, from cron entry points with no

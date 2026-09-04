@@ -61,6 +61,12 @@
     "riskOn": "[XX-risk-on-XX]",
     "riskOff": "[XX-risk-off-XX]"
   },
+  "portfolioMovement": {
+    "titleUp": "[XX-Investments up {percent}%-XX]",
+    "titleDown": "[XX-Investments down {percent}%-XX]",
+    "messageUp": "[XX-Your investments are up {percent}% today, excluding deposits and withdrawals. Open to review.-XX]",
+    "messageDown": "[XX-Your investments are down {percent}% today, excluding deposits and withdrawals. Open to review.-XX]"
+  },
   "system": {
     "backupFailed": {
       "title": "[XX-Automatic backup failed-XX]",

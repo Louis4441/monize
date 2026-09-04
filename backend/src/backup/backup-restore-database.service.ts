@@ -129,6 +129,13 @@ export class BackupRestoreDatabaseService {
       "DELETE FROM notification_preferences WHERE user_id = $1",
       [userId],
     );
+    // Portfolio-movement baseline + threshold: one row per user, restored by an
+    // insert path with the same over-existing-account hazard, so it clears here
+    // too.
+    await manager.query(
+      "DELETE FROM notification_portfolio_state WHERE user_id = $1",
+      [userId],
+    );
     await manager.query(
       `DELETE FROM budget_period_categories WHERE budget_period_id IN
        (SELECT bp.id FROM budget_periods bp

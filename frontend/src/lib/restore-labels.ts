@@ -33,6 +33,7 @@ export const RESTORE_LABELS: Record<string, string> = {
   budgetPeriodCategories: 'Budget Period Categories',
   notificationPreferences: 'Notification Preferences',
   notificationReminders: 'Notification Reminders',
+  notificationPortfolioState: 'Portfolio Movement Alerts',
   notifications: 'Notifications',
   customReports: 'Custom Reports',
   importColumnMappings: 'Import Column Mappings',

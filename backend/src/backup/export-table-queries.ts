@@ -365,6 +365,10 @@ export function buildExportTableQueries(
       sql: "SELECT * FROM notification_reminders WHERE user_id = $1",
     },
     {
+      key: "notification_portfolio_state",
+      sql: "SELECT * FROM notification_portfolio_state WHERE user_id = $1",
+    },
+    {
       key: "custom_reports",
       sql: "SELECT * FROM custom_reports WHERE user_id = $1",
     },

@@ -577,6 +577,15 @@ export const RULES: Record<string, TableRules> = {
     created_at: keep,
     updated_at: keep,
   },
+  notification_portfolio_state: {
+    user_id: keep,
+    move_alert_percent: keep, // the user's threshold, not identifying
+    baseline_value: scale, // a money figure -- scaled like every other amount
+    baseline_currency: keep, // an ISO currency code
+    baseline_captured_on: keep, // a date
+    created_at: keep,
+    updated_at: keep,
+  },
   custom_reports: {
     id: keep,
     user_id: keep,

@@ -424,6 +424,40 @@ export function NotificationList({
     });
   };
 
+  /**
+   * A daily portfolio-movement row, composed from the producer's `data`
+   * (`docs/specs/portfolio-movement-notifications.md`). The percent is already
+   * signed by direction; the copy names each direction so it reads naturally in
+   * every locale.
+   */
+  const portfolioMovementData = (
+    notification: Notification,
+  ): { direction?: string; changePercent?: number } | null => {
+    if (notification.type !== 'PORTFOLIO_MOVEMENT') return null;
+    return (notification.data ?? {}) as {
+      direction?: string;
+      changePercent?: number;
+    };
+  };
+
+  const portfolioMovementTitle = (notification: Notification): string | null => {
+    const data = portfolioMovementData(notification);
+    if (!data) return null;
+    const percent = Math.abs(data.changePercent ?? 0);
+    return data.direction === 'down'
+      ? t('portfolioMovement.titleDown', { percent })
+      : t('portfolioMovement.titleUp', { percent });
+  };
+
+  const portfolioMovementMessage = (notification: Notification): string | null => {
+    const data = portfolioMovementData(notification);
+    if (!data) return null;
+    const percent = Math.abs(data.changePercent ?? 0);
+    return data.direction === 'down'
+      ? t('portfolioMovement.messageDown', { percent })
+      : t('portfolioMovement.messageUp', { percent });
+  };
+
   const unreadCount = notifications.filter((a) => !a.isRead && !dismissingIds.has(a.id)).length;
 
   const handleAlertClick = (notification: Notification) => {
@@ -658,10 +692,10 @@ export function NotificationList({
                               </span>
                             </div>
                             <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                              {billDueTitle(notification) ?? systemAlertTitle(notification) ?? gemSignalTitle(notification) ?? notification.title}
+                              {billDueTitle(notification) ?? systemAlertTitle(notification) ?? gemSignalTitle(notification) ?? portfolioMovementTitle(notification) ?? notification.title}
                             </p>
                             <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mt-0.5">
-                              {billDueMessage(notification) ?? systemAlertMessage(notification) ?? gemSignalMessage(notification) ?? notification.message}
+                              {billDueMessage(notification) ?? systemAlertMessage(notification) ?? gemSignalMessage(notification) ?? portfolioMovementMessage(notification) ?? notification.message}
                             </p>
                           </div>
                         </div>

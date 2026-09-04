@@ -1789,6 +1789,24 @@ CREATE UNIQUE INDEX idx_notification_reminders_active_source
 
 CREATE TRIGGER update_notification_reminders_updated_at BEFORE UPDATE ON notification_reminders FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+-- Per-user state for the daily portfolio-movement notification (migration 185;
+-- docs/specs/portfolio-movement-notifications.md). The opt-in threshold plus the
+-- producer's own last-complete-value baseline. baseline_currency is a resolved
+-- reporting-currency snapshot, deliberately not a currencies(code) FK (derived,
+-- not user-entered; a currency deletion must not cascade a user's baseline).
+CREATE TABLE notification_portfolio_state (
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    move_alert_percent NUMERIC(9,4),
+    baseline_value NUMERIC(20,4),
+    baseline_currency VARCHAR(3),
+    baseline_captured_on DATE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id)
+);
+
+CREATE TRIGGER update_notification_portfolio_state_updated_at BEFORE UPDATE ON notification_portfolio_state FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- Triggers for budget tables updated_at
 CREATE TRIGGER update_budgets_updated_at BEFORE UPDATE ON budgets FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_budget_categories_updated_at BEFORE UPDATE ON budget_categories FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -2410,6 +2428,7 @@ DECLARE
         'loan_rate_changes',
         'loan_scenarios',
         'monte_carlo_scenarios',
+        'notification_portfolio_state',
         'notification_preferences',
         'notification_reminders',
         'notifications',
@@ -2974,7 +2993,7 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- Verification helper (run manually; not part of the migration's effect):
 --   SELECT tablename, policyname FROM pg_policies
 --    WHERE schemaname = 'public' ORDER BY tablename;
--- Expected: 61 policies -- 26 direct + 4 real-user-keyed (112),
+-- Expected: 62 policies -- 26 direct + 4 real-user-keyed (112),
 --           15 indirect (113), 5 special (114),
 --           2 direct for the .mny import's staging + job tables (117),
 --           1 direct for security_documents (118),
@@ -2983,8 +3002,9 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 --           1 indirect for scheduled_transaction_postings (133),
 --           1 direct for the OIDC step-up claim ledger (155),
 --           1 direct for push_subscriptions (178),
---           1 direct for notification_preferences (180), and
---           1 direct for notification_reminders (182).
+--           1 direct for notification_preferences (180),
+--           1 direct for notification_reminders (182), and
+--           1 direct for notification_portfolio_state (185).
 
 -- ---------------------------------------------------------------------------
 -- Enable row-level security (migration 123).

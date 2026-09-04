@@ -109,4 +109,23 @@ export const notificationPreferencesApi = {
     );
     return response.data;
   },
+
+  /** The daily portfolio-movement threshold in percent, or null when off. */
+  getPortfolioAlert: async (): Promise<{ movePercent: number | null }> => {
+    const response = await apiClient.get<{ movePercent: number | null }>(
+      '/notifications/preferences/portfolio-alert',
+    );
+    return response.data;
+  },
+
+  /** Set (number) or clear (null) the portfolio-movement threshold. */
+  setPortfolioAlert: async (
+    movePercent: number | null,
+  ): Promise<{ movePercent: number | null }> => {
+    const response = await apiClient.put<{ movePercent: number | null }>(
+      '/notifications/preferences/portfolio-alert',
+      { movePercent },
+    );
+    return response.data;
+  },
 };
