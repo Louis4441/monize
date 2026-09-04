@@ -155,8 +155,6 @@
       "openstreetmap": "OpenStreetMap",
       "waze": "Waze"
     },
-    "saveButton": "Simpan Preferensi",
-    "savingButton": "Menyimpan...",
     "toasts": {
       "saved": "Preferensi disimpan",
       "saveFailed": "Gagal menyimpan preferensi",
@@ -239,15 +237,10 @@
       "heading": "Push peramban",
       "diagnostics": {
         "summary": "Diagnostik notifikasi",
-        "intro": "Apa yang dilaporkan browser dan perangkat ini ke Monize tentang notifikasi. Gunakan tombol uji agar Monize membuat notifikasi yang bisa Anda cari di perangkat, lalu Salin untuk mengirim laporan lengkap.",
+        "intro": "Apa yang dilaporkan peramban dan perangkat ini ke Monize tentang notifikasi. Segarkan setelah mengubah pengaturan, lalu gunakan Salin untuk mengirim laporan lengkap.",
         "refresh": "Segarkan",
         "copy": "Salin laporan",
-        "copied": "Diagnostik disalin ke papan klip",
-        "localTest": "Tampilkan notifikasi uji",
-        "localTestRunning": "Memeriksa…",
-        "localTestBody": "Jika Anda melihat ini, notifikasi berfungsi di perangkat ini.",
-        "localTestCreated": "Monize membuat notifikasi tanpa kesalahan, tetapi tidak ada yang bisa memastikan sistem menampilkannya. Jika Anda tidak melihatnya di perangkat, sistem menyembunyikannya; aktifkan notifikasi Monize di pengaturan perangkat.",
-        "localTestError": "Tidak dapat menjalankan uji di perangkat ini ({detail})."
+        "copied": "Diagnostik disalin ke papan klip"
       },
       "description": "Daftarkan perangkat ini agar Monize dapat menghubunginya bahkan saat aplikasi ditutup. Untuk saat ini hanya notifikasi uji yang dikirim lewat jalur ini; sisanya tetap masuk ke bel.",
       "androidNotify": "Di Android, izin yang diberikan saja tidak cukup: sistem masih dapat menyembunyikan notifikasi. Tekan dan tahan ikon Monize di layar utama, ketuk Info aplikasi, lalu Notifikasi, dan pastikan semuanya aktif.",
@@ -260,7 +253,6 @@
       "thisDevice": "Perangkat ini",
       "unifiedpushBadge": "UnifiedPush",
       "unnamedDevice": "Perangkat tanpa nama",
-      "lastSeen": "Terakhir aktif {when}",
       "noLiveDevices": "Belum ada perangkat terdaftar. Aktifkan push di perangkat ini untuk mengirim uji coba.",
       "notConfigured": "Push peramban tidak tersedia di instans Monize ini. Administrator dapat mengaktifkannya di area Admin.",
       "disabledByAdmin": "Administrator telah mematikan push peramban untuk instans Monize ini.",
@@ -301,25 +293,39 @@
           "transient": "tidak terkirim (kesalahan sementara); coba lagi",
           "unconfigured": "instans ini tidak dapat menandatangani pesan push saat ini"
         }
+      },
+      "transport": {
+        "webpush": "Push web",
+        "unifiedpush": "UnifiedPush"
+      },
+      "facts": {
+        "endpoint": "Endpoint",
+        "transport": "Dikirim melalui",
+        "registeredIp": "Didaftarkan dari",
+        "registered": "Terdaftar",
+        "lastSeen": "Terakhir aktif",
+        "lastDelivery": "Pengiriman terakhir",
+        "noDelivery": "Belum ada yang dikirim",
+        "userAgent": "Peramban",
+        "unknownIp": "Tidak diketahui"
       }
     },
     "preferences": {
       "heading": "Cara memberi tahu saya",
-      "description": "Bel selalu menampilkan setiap notifikasi. Pilih jenis mana yang juga dikirim Monize melalui email atau push, dan seberapa sering.",
+      "description": "Pilih jenis mana yang dikirim Monize lewat email atau push, dan seberapa sering.",
       "categoryHeader": "Notifikasi",
       "channels": {
-        "inApp": "Dalam aplikasi",
         "emailReport": "Email (laporan)",
         "emailNotification": "Email (peringatan)",
         "push": "Push",
-        "unifiedpush": "UnifiedPush"
+        "unifiedpush": "UnifiedPush",
+        "unifiedpushHint": "Notifikasi dikirim melalui aplikasi distributor yang Anda jalankan sendiri, seperti ntfy, alih-alih layanan push vendor peramban. Daftarkan endpoint di aplikasi tersebut untuk memakai kanal ini."
       },
       "categories": {
         "PAYMENTS": "Tagihan dan terjadwal",
         "BUDGETS": "Anggaran",
         "SYSTEM": "Peringatan sistem"
       },
-      "inAppAlways": "Selalu tampil di lonceng",
       "channelNotApplicable": "Tidak berlaku untuk jenis notifikasi ini",
       "emailToggleLabel": "Email laporan untuk {category}",
       "saveFailed": "Tidak dapat menyimpan setelan itu",
@@ -341,8 +347,8 @@
       "pushToggleLabel": "Push untuk {category}",
       "unifiedpushToggleLabel": "UnifiedPush untuk {category}",
       "emailUnavailable": "Aktifkan notifikasi email di atas untuk mengirimnya melalui email.",
-      "pushUnavailable": "Aktifkan push di perangkat ini terlebih dahulu (lihat di bawah).",
-      "unifiedpushUnavailable": "Daftarkan endpoint UnifiedPush dari aplikasi distributor Anda untuk menggunakan saluran ini."
+      "pushUnavailable": "Tidak ada perangkat yang terdaftar untuk push, jadi kanal ini tidak dapat mengirim apa pun.",
+      "pushEnableHint": "Peramban ini belum terdaftar untuk notifikasi push."
     }
   },
   "help": {

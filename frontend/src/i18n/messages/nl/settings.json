@@ -155,8 +155,6 @@
       "openstreetmap": "OpenStreetMap",
       "waze": "Waze"
     },
-    "saveButton": "Voorkeuren opslaan",
-    "savingButton": "Opslaan...",
     "toasts": {
       "saved": "Voorkeuren opgeslagen",
       "saveFailed": "Opslaan van voorkeuren mislukt",
@@ -239,15 +237,10 @@
       "heading": "Browserpush",
       "diagnostics": {
         "summary": "Meldingsdiagnose",
-        "intro": "Wat deze browser en dit apparaat aan Monize melden over meldingen. Gebruik de testknop om Monize een melding te laten maken die je op je apparaat kunt zoeken, en daarna Kopiëren om het volledige rapport te sturen.",
+        "intro": "Wat deze browser en dit apparaat aan Monize melden over meldingen. Ververs na het wijzigen van een instelling en gebruik daarna Kopiëren om het volledige rapport te versturen.",
         "refresh": "Vernieuwen",
         "copy": "Rapport kopiëren",
-        "copied": "Diagnose naar klembord gekopieerd",
-        "localTest": "Testmelding tonen",
-        "localTestRunning": "Controleren…",
-        "localTestBody": "Als je dit ziet, werken meldingen op dit apparaat.",
-        "localTestCreated": "Monize heeft een melding zonder fout aangemaakt, maar niets hier kan bevestigen dat het systeem deze heeft getoond. Als je hem niet op je apparaat zag, verbergt het systeem hem; schakel meldingen voor Monize in bij de apparaatinstellingen.",
-        "localTestError": "Kan de test niet uitvoeren op dit apparaat ({detail})."
+        "copied": "Diagnose naar klembord gekopieerd"
       },
       "description": "Registreer dit apparaat zodat Monize het ook kan bereiken als de app gesloten is. Voorlopig wordt alleen de testmelding zo bezorgd; al het andere komt nog steeds in de bel.",
       "androidNotify": "Op Android is een verleende toestemming niet genoeg: het systeem kan meldingen alsnog verbergen. Houd het Monize-pictogram op je startscherm ingedrukt, tik op App-info, dan Meldingen, en zorg dat ze aan staan.",
@@ -260,7 +253,6 @@
       "thisDevice": "Dit apparaat",
       "unifiedpushBadge": "UnifiedPush",
       "unnamedDevice": "Naamloos apparaat",
-      "lastSeen": "Laatst actief {when}",
       "noLiveDevices": "Nog geen apparaat geregistreerd. Schakel push in op dit apparaat om een test te versturen.",
       "notConfigured": "Browserpush is niet beschikbaar op deze Monize-instantie. Een beheerder kan het inschakelen in het Admin-gedeelte.",
       "disabledByAdmin": "Een beheerder heeft browserpush uitgeschakeld voor deze Monize-instantie.",
@@ -301,25 +293,39 @@
           "transient": "niet afgeleverd (tijdelijke fout); probeer het opnieuw",
           "unconfigured": "deze instantie kan pushberichten nu niet ondertekenen"
         }
+      },
+      "transport": {
+        "webpush": "Webpush",
+        "unifiedpush": "UnifiedPush"
+      },
+      "facts": {
+        "endpoint": "Eindpunt",
+        "transport": "Bezorgd via",
+        "registeredIp": "Geregistreerd vanaf",
+        "registered": "Geregistreerd",
+        "lastSeen": "Laatst actief",
+        "lastDelivery": "Laatste bezorging",
+        "noDelivery": "Nog niets bezorgd",
+        "userAgent": "Browser",
+        "unknownIp": "Onbekend"
       }
     },
     "preferences": {
       "heading": "Hoe ik meldingen ontvang",
-      "description": "De bel toont altijd elke melding. Kies welke soorten Monize ook per e-mail of push verstuurt, en hoe vaak.",
+      "description": "Kies welke soorten Monize per e-mail of push verstuurt, en hoe vaak.",
       "categoryHeader": "Melding",
       "channels": {
-        "inApp": "In de app",
         "emailReport": "E-mail (rapport)",
         "emailNotification": "E-mail (waarschuwing)",
         "push": "Push",
-        "unifiedpush": "UnifiedPush"
+        "unifiedpush": "UnifiedPush",
+        "unifiedpushHint": "Meldingen worden bezorgd via een distributor-app die je zelf draait, zoals ntfy, in plaats van de pushdienst van de browserleverancier. Registreer een eindpunt in die app om dit kanaal te gebruiken."
       },
       "categories": {
         "PAYMENTS": "Rekeningen en gepland",
         "BUDGETS": "Budgetten",
         "SYSTEM": "Systeemwaarschuwingen"
       },
-      "inAppAlways": "Altijd zichtbaar in de bel",
       "channelNotApplicable": "Niet van toepassing op dit type melding",
       "emailToggleLabel": "Rapport-e-mail voor {category}",
       "saveFailed": "Kon die instelling niet opslaan",
@@ -341,8 +347,8 @@
       "pushToggleLabel": "Push voor {category}",
       "unifiedpushToggleLabel": "UnifiedPush voor {category}",
       "emailUnavailable": "Schakel hierboven e-mailmeldingen in om deze per e-mail te versturen.",
-      "pushUnavailable": "Schakel push eerst in op dit apparaat (zie hieronder).",
-      "unifiedpushUnavailable": "Registreer een UnifiedPush-endpoint vanuit je distributor-app om dit kanaal te gebruiken."
+      "pushUnavailable": "Er is geen apparaat geregistreerd voor push, dus dit kanaal kan niets bezorgen.",
+      "pushEnableHint": "Deze browser is niet geregistreerd voor pushmeldingen."
     }
   },
   "help": {

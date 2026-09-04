@@ -155,8 +155,6 @@
       "openstreetmap": "OpenStreetMap",
       "waze": "Waze"
     },
-    "saveButton": "Lưu sở thích",
-    "savingButton": "Đang lưu...",
     "toasts": {
       "saved": "Đã lưu sở thích",
       "saveFailed": "Không thể lưu sở thích",
@@ -239,15 +237,10 @@
       "heading": "Đẩy từ trình duyệt",
       "diagnostics": {
         "summary": "Chẩn đoán thông báo",
-        "intro": "Những gì trình duyệt và thiết bị này báo cáo cho Monize về thông báo. Dùng nút kiểm tra để Monize tạo một thông báo mà bạn có thể tìm trên thiết bị, rồi Sao chép để gửi báo cáo đầy đủ.",
+        "intro": "Những gì trình duyệt và thiết bị này báo cáo cho Monize về thông báo. Hãy làm mới sau khi thay đổi một cài đặt, rồi dùng Sao chép để gửi báo cáo đầy đủ.",
         "refresh": "Làm mới",
         "copy": "Sao chép báo cáo",
-        "copied": "Đã sao chép chẩn đoán vào bảng nhớ tạm",
-        "localTest": "Hiển thị thông báo thử",
-        "localTestRunning": "Đang kiểm tra…",
-        "localTestBody": "Nếu bạn thấy điều này, thông báo đang hoạt động trên thiết bị này.",
-        "localTestCreated": "Monize đã tạo một thông báo mà không có lỗi, nhưng không có gì ở đây xác nhận hệ thống đã hiển thị nó. Nếu bạn không thấy nó trên thiết bị, hệ thống đang ẩn nó; hãy bật thông báo của Monize trong cài đặt thiết bị.",
-        "localTestError": "Không thể chạy kiểm tra trên thiết bị này ({detail})."
+        "copied": "Đã sao chép chẩn đoán vào bảng nhớ tạm"
       },
       "description": "Đăng ký thiết bị này để Monize có thể gửi tới nó ngay cả khi ứng dụng đã đóng. Hiện chỉ có thông báo thử nghiệm được gửi theo đường này; mọi thứ khác vẫn đến ở chuông.",
       "androidNotify": "Trên Android, chỉ cấp quyền là chưa đủ: hệ thống vẫn có thể ẩn thông báo. Nhấn giữ biểu tượng Monize trên màn hình chính, chạm Thông tin ứng dụng, rồi Thông báo, và đảm bảo chúng đang bật.",
@@ -260,7 +253,6 @@
       "thisDevice": "Thiết bị này",
       "unifiedpushBadge": "UnifiedPush",
       "unnamedDevice": "Thiết bị chưa đặt tên",
-      "lastSeen": "Hoạt động lần cuối {when}",
       "noLiveDevices": "Chưa có thiết bị nào được đăng ký. Hãy bật đẩy trên thiết bị này để gửi thử nghiệm.",
       "notConfigured": "Đẩy từ trình duyệt không khả dụng trên phiên bản Monize này. Quản trị viên có thể bật trong khu vực Admin.",
       "disabledByAdmin": "Quản trị viên đã tắt đẩy từ trình duyệt cho phiên bản Monize này.",
@@ -301,25 +293,39 @@
           "transient": "chưa gửi được (lỗi tạm thời); thử lại",
           "unconfigured": "phiên bản này hiện không thể ký tin nhắn push"
         }
+      },
+      "transport": {
+        "webpush": "Web push",
+        "unifiedpush": "UnifiedPush"
+      },
+      "facts": {
+        "endpoint": "Điểm cuối",
+        "transport": "Gửi qua",
+        "registeredIp": "Đăng ký từ",
+        "registered": "Đã đăng ký",
+        "lastSeen": "Hoạt động gần nhất",
+        "lastDelivery": "Lần gửi gần nhất",
+        "noDelivery": "Chưa gửi gì",
+        "userAgent": "Trình duyệt",
+        "unknownIp": "Không rõ"
       }
     },
     "preferences": {
       "heading": "Cách thông báo cho tôi",
-      "description": "Chuông luôn hiển thị mọi thông báo. Chọn loại nào Monize cũng gửi qua email hoặc push, và tần suất.",
+      "description": "Chọn những loại mà Monize gửi qua email hoặc push, và tần suất gửi.",
       "categoryHeader": "Thông báo",
       "channels": {
-        "inApp": "Trong ứng dụng",
         "emailReport": "Email (báo cáo)",
         "emailNotification": "Email (cảnh báo)",
         "push": "Push",
-        "unifiedpush": "UnifiedPush"
+        "unifiedpush": "UnifiedPush",
+        "unifiedpushHint": "Thông báo được gửi qua ứng dụng phân phối do bạn tự chạy, chẳng hạn ntfy, thay vì dịch vụ push của hãng trình duyệt. Hãy đăng ký một điểm cuối trong ứng dụng đó để dùng kênh này."
       },
       "categories": {
         "PAYMENTS": "Hóa đơn và đã lên lịch",
         "BUDGETS": "Ngân sách",
         "SYSTEM": "Cảnh báo hệ thống"
       },
-      "inAppAlways": "Luôn hiển thị trong chuông",
       "channelNotApplicable": "Không áp dụng cho loại thông báo này",
       "emailToggleLabel": "Email báo cáo cho {category}",
       "saveFailed": "Không thể lưu cài đặt đó",
@@ -341,8 +347,8 @@
       "pushToggleLabel": "Push cho {category}",
       "unifiedpushToggleLabel": "UnifiedPush cho {category}",
       "emailUnavailable": "Bật thông báo qua email ở trên để gửi chúng qua email.",
-      "pushUnavailable": "Trước tiên hãy bật push trên thiết bị này (xem bên dưới).",
-      "unifiedpushUnavailable": "Đăng ký một endpoint UnifiedPush từ ứng dụng phân phối của bạn để sử dụng kênh này."
+      "pushUnavailable": "Chưa có thiết bị nào đăng ký nhận push, nên kênh này không thể gửi được gì.",
+      "pushEnableHint": "Trình duyệt này chưa đăng ký nhận thông báo push."
     }
   },
   "help": {

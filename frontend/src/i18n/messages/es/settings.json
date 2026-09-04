@@ -155,8 +155,6 @@
       "openstreetmap": "OpenStreetMap",
       "waze": "Waze"
     },
-    "saveButton": "Guardar preferencias",
-    "savingButton": "Guardando...",
     "toasts": {
       "saved": "Preferencias guardadas",
       "saveFailed": "Error al guardar las preferencias",
@@ -239,15 +237,10 @@
       "heading": "Push del navegador",
       "diagnostics": {
         "summary": "Diagnóstico de notificaciones",
-        "intro": "Lo que este navegador y dispositivo informan a Monize sobre las notificaciones. Usa el botón de prueba para que Monize cree una notificación que puedas buscar en tu dispositivo y luego Copiar para enviar el informe completo.",
+        "intro": "Lo que este navegador y dispositivo informan a Monize sobre las notificaciones. Actualiza después de cambiar un ajuste y luego usa Copiar para enviar el informe completo.",
         "refresh": "Actualizar",
         "copy": "Copiar informe",
-        "copied": "Diagnóstico copiado al portapapeles",
-        "localTest": "Mostrar una notificación de prueba",
-        "localTestRunning": "Comprobando…",
-        "localTestBody": "Si puedes ver esto, las notificaciones funcionan en este dispositivo.",
-        "localTestCreated": "Monize creó una notificación sin errores, pero aquí nada puede confirmar que el sistema la haya mostrado. Si no la viste en tu dispositivo, el sistema la está ocultando; activa las notificaciones de Monize en los ajustes del dispositivo.",
-        "localTestError": "No se pudo ejecutar la prueba en este dispositivo ({detail})."
+        "copied": "Diagnóstico copiado al portapapeles"
       },
       "description": "Registra este dispositivo para que Monize pueda avisarte incluso con la aplicación cerrada. Por ahora solo se entrega así la notificación de prueba; todo lo demás sigue llegando a la campana.",
       "androidNotify": "En Android, un permiso concedido no basta: el sistema todavía puede ocultar las notificaciones. Mantén pulsado el icono de Monize en tu pantalla de inicio, toca Información de la aplicación, luego Notificaciones, y asegúrate de que estén activadas.",
@@ -260,7 +253,6 @@
       "thisDevice": "Este dispositivo",
       "unifiedpushBadge": "UnifiedPush",
       "unnamedDevice": "Dispositivo sin nombre",
-      "lastSeen": "Última actividad {when}",
       "noLiveDevices": "Aún no hay ningún dispositivo registrado. Activa el push en este dispositivo para enviar una prueba.",
       "notConfigured": "El push del navegador no está disponible en esta instancia de Monize. Un administrador puede activarlo en el área de administración.",
       "disabledByAdmin": "Un administrador ha desactivado el push del navegador en esta instancia de Monize.",
@@ -301,25 +293,39 @@
           "transient": "no entregado (error temporal); inténtalo de nuevo",
           "unconfigured": "esta instancia no puede firmar mensajes push ahora"
         }
+      },
+      "transport": {
+        "webpush": "Push web",
+        "unifiedpush": "UnifiedPush"
+      },
+      "facts": {
+        "endpoint": "Endpoint",
+        "transport": "Se entrega por",
+        "registeredIp": "Registrado desde",
+        "registered": "Registrado",
+        "lastSeen": "Última actividad",
+        "lastDelivery": "Última entrega",
+        "noDelivery": "Aún no se ha entregado nada",
+        "userAgent": "Navegador",
+        "unknownIp": "Desconocida"
       }
     },
     "preferences": {
       "heading": "Cómo notificarme",
-      "description": "La campana siempre muestra todas las notificaciones. Elige cuáles envía Monize también por correo o push, y con qué frecuencia.",
+      "description": "Elige qué tipos envía Monize por correo o push, y con qué frecuencia.",
       "categoryHeader": "Notificación",
       "channels": {
-        "inApp": "En la app",
         "emailReport": "Correo (informe)",
         "emailNotification": "Correo (alerta)",
         "push": "Push",
-        "unifiedpush": "UnifiedPush"
+        "unifiedpush": "UnifiedPush",
+        "unifiedpushHint": "Las notificaciones se entregan a través de una aplicación distribuidora que tú mismo ejecutas, como ntfy, en lugar del servicio push del proveedor del navegador. Registra un endpoint en esa aplicación para usar este canal."
       },
       "categories": {
         "PAYMENTS": "Facturas y programados",
         "BUDGETS": "Presupuestos",
         "SYSTEM": "Alertas del sistema"
       },
-      "inAppAlways": "Siempre visible en la campana",
       "channelNotApplicable": "No aplicable a este tipo de notificación",
       "emailToggleLabel": "Correo (informe) para {category}",
       "saveFailed": "No se pudo guardar ese ajuste",
@@ -341,8 +347,8 @@
       "pushToggleLabel": "Push para {category}",
       "unifiedpushToggleLabel": "UnifiedPush para {category}",
       "emailUnavailable": "Activa arriba las notificaciones por correo para enviarlas por correo.",
-      "pushUnavailable": "Primero activa el push en este dispositivo (más abajo).",
-      "unifiedpushUnavailable": "Registra un endpoint de UnifiedPush desde tu aplicación distribuidora para usar este canal."
+      "pushUnavailable": "No hay ningún dispositivo registrado para push, así que este canal no puede entregar nada.",
+      "pushEnableHint": "Este navegador no está registrado para notificaciones push."
     }
   },
   "help": {

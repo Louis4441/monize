@@ -31,6 +31,23 @@ function productionSources(): [string, string][] {
   );
 }
 
+/**
+ * Blank out comment bodies, keeping the file's length and line breaks so
+ * reported line numbers still point at the source. Prose in this repo discusses
+ * the very patterns these scans ban -- `<button>`, `role="switch"` -- and a scan
+ * that reads its own explanation as a violation is worse than no scan, because
+ * the cheap way out of it is a weaker comment.
+ */
+function withoutComments(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, (match) => match.replace(/[^\n]/g, " "))
+    .replace(
+      /(^|[^:])\/\/[^\n]*/g,
+      (match, before: string) =>
+        before + " ".repeat(match.length - before.length),
+    );
+}
+
 describe("date entry goes through DateInput", () => {
   /** The one file allowed to hold a raw date input -- it *is* the wrapper. */
   const WRAPPER = "/src/components/ui/DateInput.tsx";
@@ -461,22 +478,6 @@ describe("nothing interactive is nested inside a button", () => {
    * nothing is how `InfoTooltip` got here in the first place.
    */
   const INTERACTIVE = /<(button|a|select|textarea|input|InfoTooltip)[\s/>]/g;
-
-  /**
-   * Blank out comment bodies, keeping the file's length and line breaks so
-   * reported line numbers still point at the source. Prose in this repo
-   * discusses `<button>` constantly, and a scan that reads its own
-   * explanation as a violation is worse than no scan.
-   */
-  function withoutComments(source: string): string {
-    return source
-      .replace(/\/\*[\s\S]*?\*\//g, (match) => match.replace(/[^\n]/g, " "))
-      .replace(
-        /(^|[^:])\/\/[^\n]*/g,
-        (match, before: string) =>
-          before + " ".repeat(match.length - before.length),
-      );
-  }
 
   /** [start, end) of every non-self-closing `<button>` element's children. */
   function buttonBodies(source: string): Array<[number, number]> {
@@ -1357,7 +1358,7 @@ describe("a toggle is ToggleSwitch", () => {
   function filesWithHandRolledToggle(): string[] {
     return productionSources()
       .filter(([path]) => path !== TOGGLE)
-      .filter(([, source]) => HAND_ROLLED.test(source))
+      .filter(([, source]) => HAND_ROLLED.test(withoutComments(source)))
       .map(([path]) => path)
       .sort();
   }
@@ -1368,6 +1369,22 @@ describe("a toggle is ToggleSwitch", () => {
       (path) => !allowed.has(path),
     );
     expect(offenders).toEqual([]);
+  });
+
+  // A scan that reads prose is a scan whose cheapest fix is a weaker comment,
+  // so it reads code only -- and that has to hold in BOTH directions, or the
+  // stripper silently blinds the rule it protects.
+  it("ignores the attribute in a comment and still catches it in markup", () => {
+    const explained = [
+      "/**",
+      ' * A second tree would double every role="switch" in the a11y tree.',
+      " */",
+      "export const x = 1;",
+    ].join("\n");
+    expect(HAND_ROLLED.test(withoutComments(explained))).toBe(false);
+    expect(
+      HAND_ROLLED.test(withoutComments('<button role="switch" />')),
+    ).toBe(true);
   });
 
   it("keeps the baseline shrink-only", () => {

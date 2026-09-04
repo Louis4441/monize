@@ -155,8 +155,6 @@
       "openstreetmap": "OpenStreetMap",
       "waze": "Waze"
     },
-    "saveButton": "Einstellungen speichern",
-    "savingButton": "Wird gespeichert...",
     "toasts": {
       "saved": "Einstellungen gespeichert",
       "saveFailed": "Einstellungen konnten nicht gespeichert werden",
@@ -239,15 +237,10 @@
       "heading": "Browser-Push",
       "diagnostics": {
         "summary": "Benachrichtigungsdiagnose",
-        "intro": "Was dieser Browser und dieses Gerät Monize über Benachrichtigungen melden. Nutze die Testschaltfläche, damit Monize eine Benachrichtigung erstellt, nach der du auf deinem Gerät suchen kannst, und dann Kopieren, um den vollständigen Bericht zu senden.",
+        "intro": "Was dieser Browser und dieses Gerät Monize über Benachrichtigungen melden. Aktualisiere nach einer Einstellungsänderung und nutze dann Kopieren, um den vollständigen Bericht zu senden.",
         "refresh": "Aktualisieren",
         "copy": "Bericht kopieren",
-        "copied": "Diagnose in die Zwischenablage kopiert",
-        "localTest": "Testbenachrichtigung anzeigen",
-        "localTestRunning": "Wird geprüft…",
-        "localTestBody": "Wenn du das siehst, funktionieren Benachrichtigungen auf diesem Gerät.",
-        "localTestCreated": "Monize hat eine Benachrichtigung ohne Fehler erstellt, aber hier kann nichts bestätigen, dass das System sie tatsächlich angezeigt hat. Wenn du sie auf deinem Gerät nicht gesehen hast, blendet das System sie aus; aktiviere die Benachrichtigungen für Monize in den Geräteeinstellungen.",
-        "localTestError": "Der Test konnte auf diesem Gerät nicht ausgeführt werden ({detail})."
+        "copied": "Diagnose in die Zwischenablage kopiert"
       },
       "description": "Dieses Gerät registrieren, damit Monize es auch bei geschlossener App erreichen kann. Bisher wird auf diesem Weg nur die Testbenachrichtigung zugestellt; alles andere landet weiterhin in der Glocke.",
       "androidNotify": "Unter Android reicht eine erteilte Berechtigung nicht: Das System kann Benachrichtigungen trotzdem ausblenden. Halte das Monize-Symbol auf deinem Startbildschirm gedrückt, tippe auf App-Info, dann auf Benachrichtigungen, und stelle sicher, dass sie aktiviert sind.",
@@ -260,7 +253,6 @@
       "thisDevice": "Dieses Gerät",
       "unifiedpushBadge": "UnifiedPush",
       "unnamedDevice": "Unbenanntes Gerät",
-      "lastSeen": "Zuletzt aktiv {when}",
       "noLiveDevices": "Noch kein Gerät registriert. Aktivieren Sie Push auf diesem Gerät, um einen Test zu senden.",
       "notConfigured": "Browser-Push ist auf dieser Monize-Instanz nicht verfügbar. Eine Administratorin oder ein Administrator kann es im Admin-Bereich aktivieren.",
       "disabledByAdmin": "Die Administration hat Browser-Push für diese Monize-Instanz deaktiviert.",
@@ -301,25 +293,39 @@
           "transient": "nicht zugestellt (vorübergehender Fehler); erneut versuchen",
           "unconfigured": "diese Instanz kann Push-Nachrichten derzeit nicht signieren"
         }
+      },
+      "transport": {
+        "webpush": "Web-Push",
+        "unifiedpush": "UnifiedPush"
+      },
+      "facts": {
+        "endpoint": "Endpunkt",
+        "transport": "Zugestellt über",
+        "registeredIp": "Registriert von",
+        "registered": "Registriert",
+        "lastSeen": "Zuletzt aktiv",
+        "lastDelivery": "Letzte Zustellung",
+        "noDelivery": "Noch nichts zugestellt",
+        "userAgent": "Browser",
+        "unknownIp": "Unbekannt"
       }
     },
     "preferences": {
       "heading": "Wie ich benachrichtigt werde",
-      "description": "Die Glocke zeigt immer jede Benachrichtigung. Wählen Sie, welche Arten Monize zusätzlich per E-Mail oder Push sendet und wie oft.",
+      "description": "Wähle, welche Arten Monize per E-Mail oder Push sendet und wie oft.",
       "categoryHeader": "Benachrichtigung",
       "channels": {
-        "inApp": "In der App",
         "emailReport": "E-Mail (Bericht)",
         "emailNotification": "E-Mail (Warnung)",
         "push": "Push",
-        "unifiedpush": "UnifiedPush"
+        "unifiedpush": "UnifiedPush",
+        "unifiedpushHint": "Benachrichtigungen werden über eine selbst betriebene Distributor-App wie ntfy zugestellt, statt über den Push-Dienst eines Browser-Anbieters. Registriere in dieser App einen Endpunkt, um diesen Kanal zu nutzen."
       },
       "categories": {
         "PAYMENTS": "Rechnungen und Geplantes",
         "BUDGETS": "Budgets",
         "SYSTEM": "Systemwarnungen"
       },
-      "inAppAlways": "Immer in der Glocke sichtbar",
       "channelNotApplicable": "Für diese Benachrichtigungsart nicht zutreffend",
       "emailToggleLabel": "Bericht-E-Mail für {category}",
       "saveFailed": "Diese Einstellung konnte nicht gespeichert werden",
@@ -341,8 +347,8 @@
       "pushToggleLabel": "Push für {category}",
       "unifiedpushToggleLabel": "UnifiedPush für {category}",
       "emailUnavailable": "Aktivieren Sie oben die E-Mail-Benachrichtigungen, um diese per E-Mail zu senden.",
-      "pushUnavailable": "Aktivieren Sie zuerst Push auf diesem Gerät (siehe unten).",
-      "unifiedpushUnavailable": "Registriere einen UnifiedPush-Endpunkt in deiner Distributor-App, um diesen Kanal zu nutzen."
+      "pushUnavailable": "Für Push ist kein Gerät registriert, daher kann dieser Kanal nichts zustellen.",
+      "pushEnableHint": "Dieser Browser ist nicht für Push-Benachrichtigungen registriert."
     }
   },
   "help": {

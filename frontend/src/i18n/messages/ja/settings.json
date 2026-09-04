@@ -155,8 +155,6 @@
       "openstreetmap": "OpenStreetMap",
       "waze": "Waze"
     },
-    "saveButton": "設定を保存",
-    "savingButton": "保存中...",
     "toasts": {
       "saved": "設定を保存しました",
       "saveFailed": "設定の保存に失敗しました",
@@ -239,15 +237,10 @@
       "heading": "ブラウザープッシュ",
       "diagnostics": {
         "summary": "通知診断",
-        "intro": "このブラウザーとデバイスが通知について Monize に報告する内容です。テストボタンを押すと Monize が通知を作成するので、デバイスで探してみてください。コピーで完全なレポートを送信できます。",
+        "intro": "このブラウザーとデバイスが通知について Monize に報告している内容です。設定を変更したら更新し、「レポートをコピー」で全文を送ってください。",
         "refresh": "更新",
         "copy": "レポートをコピー",
-        "copied": "診断をクリップボードにコピーしました",
-        "localTest": "テスト通知を表示",
-        "localTestRunning": "確認中…",
-        "localTestBody": "これが見えていれば、このデバイスで通知は正常に動作しています。",
-        "localTestCreated": "Monize はエラーなく通知を作成しましたが、システムが実際に表示したかどうかはここでは確認できません。デバイスで見えなかった場合、システムが非表示にしています。デバイスの設定で Monize の通知をオンにしてください。",
-        "localTestError": "このデバイスでテストを実行できませんでした（{detail}）。"
+        "copied": "診断をクリップボードにコピーしました"
       },
       "description": "この端末を登録すると、アプリを閉じていても Monize から通知を届けられます。今のところこの経路で届くのはテスト通知だけで、それ以外はこれまでどおりベルに届きます。",
       "androidNotify": "Android では、許可を与えただけでは不十分で、システムが通知を非表示にすることがあります。ホーム画面の Monize アイコンを長押しし、アプリ情報、通知の順にタップして、オンになっていることを確認してください。",
@@ -260,7 +253,6 @@
       "thisDevice": "この端末",
       "unifiedpushBadge": "UnifiedPush",
       "unnamedDevice": "名前のない端末",
-      "lastSeen": "最終アクティブ: {when}",
       "noLiveDevices": "まだ端末が登録されていません。テストを送信するには、この端末でプッシュを有効にしてください。",
       "notConfigured": "この Monize インスタンスではブラウザープッシュを利用できません。管理者が Admin エリアで有効にできます。",
       "disabledByAdmin": "管理者がこの Monize インスタンスのブラウザープッシュを無効にしています。",
@@ -301,25 +293,39 @@
           "transient": "未配信（一時的なエラー）。もう一度お試しください",
           "unconfigured": "このインスタンスは現在プッシュメッセージに署名できません"
         }
+      },
+      "transport": {
+        "webpush": "ウェブプッシュ",
+        "unifiedpush": "UnifiedPush"
+      },
+      "facts": {
+        "endpoint": "エンドポイント",
+        "transport": "配信経路",
+        "registeredIp": "登録元",
+        "registered": "登録日時",
+        "lastSeen": "最終アクティビティ",
+        "lastDelivery": "最終配信",
+        "noDelivery": "まだ配信されていません",
+        "userAgent": "ブラウザー",
+        "unknownIp": "不明"
       }
     },
     "preferences": {
       "heading": "通知方法",
-      "description": "ベルには常にすべての通知が表示されます。Monize がメールまたはプッシュでも送信する種類と、その頻度を選択します。",
+      "description": "Monize がメールまたはプッシュで送る種類と、その頻度を選びます。",
       "categoryHeader": "通知",
       "channels": {
-        "inApp": "アプリ内",
         "emailReport": "メール（レポート）",
         "emailNotification": "メール（アラート）",
         "push": "プッシュ",
-        "unifiedpush": "UnifiedPush"
+        "unifiedpush": "UnifiedPush",
+        "unifiedpushHint": "通知は、ブラウザーベンダーのプッシュサービスではなく、ntfy などご自身で運用するディストリビューターアプリ経由で配信されます。このチャネルを使うには、そのアプリでエンドポイントを登録してください。"
       },
       "categories": {
         "PAYMENTS": "請求と予定",
         "BUDGETS": "予算",
         "SYSTEM": "システムアラート"
       },
-      "inAppAlways": "ベルには常に表示されます",
       "channelNotApplicable": "この通知タイプには適用されません",
       "emailToggleLabel": "{category} のレポートメール",
       "saveFailed": "設定を保存できませんでした",
@@ -341,8 +347,8 @@
       "pushToggleLabel": "{category} のプッシュ",
       "unifiedpushToggleLabel": "{category} の UnifiedPush",
       "emailUnavailable": "これらをメールで送信するには、上のメール通知をオンにしてください。",
-      "pushUnavailable": "まずこのデバイスでプッシュを有効にしてください（下記参照）。",
-      "unifiedpushUnavailable": "このチャネルを使用するには、ディストリビューターアプリから UnifiedPush エンドポイントを登録してください。"
+      "pushUnavailable": "プッシュに登録されたデバイスがないため、このチャネルは配信できません。",
+      "pushEnableHint": "このブラウザーはプッシュ通知に登録されていません。"
     }
   },
   "help": {

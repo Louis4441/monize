@@ -155,8 +155,6 @@
       "openstreetmap": "OpenStreetMap",
       "waze": "Waze"
     },
-    "saveButton": "保存偏好设置",
-    "savingButton": "保存中...",
     "toasts": {
       "saved": "偏好设置已保存",
       "saveFailed": "保存偏好设置失败",
@@ -239,15 +237,10 @@
       "heading": "浏览器推送",
       "diagnostics": {
         "summary": "通知诊断",
-        "intro": "此浏览器和设备向 Monize 报告的关于通知的信息。使用测试按钮让 Monize 创建一条通知，你可以在设备上查找，然后点击复制以发送完整报告。",
+        "intro": "此浏览器和设备向 Monize 报告的通知相关信息。更改设置后请刷新，然后用“复制报告”发送完整报告。",
         "refresh": "刷新",
         "copy": "复制报告",
-        "copied": "已将诊断复制到剪贴板",
-        "localTest": "显示测试通知",
-        "localTestRunning": "检查中…",
-        "localTestBody": "如果你能看到这条消息，说明此设备上的通知正常工作。",
-        "localTestCreated": "Monize 已创建通知且没有报错，但这里无法确认系统是否显示了它。如果你在设备上没有看到，说明系统正在隐藏它；请在设备设置中开启 Monize 的通知。",
-        "localTestError": "无法在此设备上运行测试（{detail}）。"
+        "copied": "已将诊断复制到剪贴板"
       },
       "description": "注册此设备，Monize 即可在应用关闭时也送达通知。目前通过这条通道送达的只有测试通知，其余仍然出现在铃铛里。",
       "androidNotify": "在 Android 上，仅授予权限还不够：系统仍可能隐藏通知。长按主屏幕上的 Monize 图标，点按“应用信息”，然后“通知”，并确保已开启。",
@@ -260,7 +253,6 @@
       "thisDevice": "此设备",
       "unifiedpushBadge": "UnifiedPush",
       "unnamedDevice": "未命名设备",
-      "lastSeen": "最后活动 {when}",
       "noLiveDevices": "尚未注册任何设备。请在此设备上启用推送后再发送测试。",
       "notConfigured": "此 Monize 实例不提供浏览器推送。管理员可以在 Admin 区域启用。",
       "disabledByAdmin": "管理员已为此 Monize 实例关闭浏览器推送。",
@@ -301,25 +293,39 @@
           "transient": "未送达（临时错误）；请重试",
           "unconfigured": "此实例目前无法为推送消息签名"
         }
+      },
+      "transport": {
+        "webpush": "网页推送",
+        "unifiedpush": "UnifiedPush"
+      },
+      "facts": {
+        "endpoint": "端点",
+        "transport": "投递方式",
+        "registeredIp": "注册来源",
+        "registered": "注册时间",
+        "lastSeen": "最近活动",
+        "lastDelivery": "最近投递",
+        "noDelivery": "尚未投递过任何内容",
+        "userAgent": "浏览器",
+        "unknownIp": "未知"
       }
     },
     "preferences": {
       "heading": "如何通知我",
-      "description": "铃铛始终显示所有通知。选择 Monize 还通过邮件或推送发送哪些类型，以及频率。",
+      "description": "选择 Monize 通过邮件或推送发送哪些类型，以及发送频率。",
       "categoryHeader": "通知",
       "channels": {
-        "inApp": "应用内",
         "emailReport": "邮件（报告）",
         "emailNotification": "邮件（提醒）",
         "push": "推送",
-        "unifiedpush": "UnifiedPush"
+        "unifiedpush": "UnifiedPush",
+        "unifiedpushHint": "通知通过你自行运行的分发应用（例如 ntfy）投递，而不是浏览器厂商的推送服务。请在该应用中注册一个端点以使用此通道。"
       },
       "categories": {
         "PAYMENTS": "账单与计划",
         "BUDGETS": "预算",
         "SYSTEM": "系统警报"
       },
-      "inAppAlways": "始终显示在铃铛中",
       "channelNotApplicable": "不适用于此通知类型",
       "emailToggleLabel": "{category} 的报告邮件",
       "saveFailed": "无法保存该设置",
@@ -341,8 +347,8 @@
       "pushToggleLabel": "{category} 的推送",
       "unifiedpushToggleLabel": "{category} 的 UnifiedPush",
       "emailUnavailable": "在上方开启邮件通知，即可通过邮件发送。",
-      "pushUnavailable": "请先在此设备上启用推送（见下方）。",
-      "unifiedpushUnavailable": "从你的分发器应用注册一个 UnifiedPush 端点以使用此通道。"
+      "pushUnavailable": "没有设备注册推送，因此此通道无法投递。",
+      "pushEnableHint": "此浏览器尚未注册推送通知。"
     }
   },
   "help": {

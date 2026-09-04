@@ -2322,6 +2322,14 @@ CREATE TABLE push_subscriptions (
         CHECK (transport IN ('webpush', 'unifiedpush')),
     device_name VARCHAR(100),
     user_agent VARCHAR(255),
+    -- The address this subscription was registered from (migration 185), so the
+    -- device list can tell two browsers on one machine apart -- `device_name` is
+    -- derived from the User-Agent and is identical for both. Refreshed on each
+    -- re-registration, alongside last_seen_at, and NEVER at delivery time: a
+    -- push travels from this server to the push service, which reaches the
+    -- device over a connection this deployment does not see, so the address a
+    -- device is reachable at today is not knowable here.
+    registered_ip INET,
     -- The instance identity this subscription was minted under. A rotation
     -- makes every older subscription undeliverable -- the push service checks
     -- the VAPID signature against the key the subscription was created with --

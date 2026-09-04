@@ -155,8 +155,6 @@
       "openstreetmap": "OpenStreetMap",
       "waze": "Waze"
     },
-    "saveButton": "儲存偏好設定",
-    "savingButton": "儲存中...",
     "toasts": {
       "saved": "偏好設定已儲存",
       "saveFailed": "儲存偏好設定失敗",
@@ -239,15 +237,10 @@
       "heading": "瀏覽器推播",
       "diagnostics": {
         "summary": "通知診斷",
-        "intro": "此瀏覽器與裝置向 Monize 回報的通知相關資訊。使用測試按鈕讓 Monize 建立一則通知，你可以在裝置上尋找，然後按複製以傳送完整報告。",
+        "intro": "此瀏覽器與裝置向 Monize 回報的通知相關資訊。變更設定後請重新整理，再用「複製報告」傳送完整報告。",
         "refresh": "重新整理",
         "copy": "複製報告",
-        "copied": "已將診斷複製到剪貼簿",
-        "localTest": "顯示測試通知",
-        "localTestRunning": "檢查中…",
-        "localTestBody": "如果你能看到這則訊息，表示此裝置上的通知正常運作。",
-        "localTestCreated": "Monize 已建立通知且沒有錯誤，但這裡無法確認系統是否顯示了它。如果你在裝置上沒有看到，表示系統正在隱藏它；請在裝置設定中開啟 Monize 的通知。",
-        "localTestError": "無法在此裝置上執行測試（{detail}）。"
+        "copied": "已將診斷複製到剪貼簿"
       },
       "description": "註冊此裝置，Monize 就能在應用程式關閉時也送達通知。目前透過這條通道送達的只有測試通知，其餘仍會出現在鈴鐺裡。",
       "androidNotify": "在 Android 上，只授予權限還不夠：系統仍可能隱藏通知。長按主畫面上的 Monize 圖示，點按「應用程式資訊」，然後「通知」，並確認已開啟。",
@@ -260,7 +253,6 @@
       "thisDevice": "此裝置",
       "unifiedpushBadge": "UnifiedPush",
       "unnamedDevice": "未命名裝置",
-      "lastSeen": "最後活動 {when}",
       "noLiveDevices": "尚未註冊任何裝置。請先在此裝置啟用推播再傳送測試。",
       "notConfigured": "此 Monize 執行個體未提供瀏覽器推播。管理員可在 Admin 區域啟用。",
       "disabledByAdmin": "管理員已為此 Monize 執行個體關閉瀏覽器推播。",
@@ -301,25 +293,39 @@
           "transient": "未送達（暫時性錯誤）；請再試一次",
           "unconfigured": "此執行個體目前無法簽署推播訊息"
         }
+      },
+      "transport": {
+        "webpush": "網頁推播",
+        "unifiedpush": "UnifiedPush"
+      },
+      "facts": {
+        "endpoint": "端點",
+        "transport": "投遞方式",
+        "registeredIp": "註冊來源",
+        "registered": "註冊時間",
+        "lastSeen": "最近活動",
+        "lastDelivery": "最近投遞",
+        "noDelivery": "尚未投遞過任何內容",
+        "userAgent": "瀏覽器",
+        "unknownIp": "未知"
       }
     },
     "preferences": {
       "heading": "如何通知我",
-      "description": "鈴鐺一律顯示所有通知。選擇 Monize 還要透過電子郵件或推播傳送哪些類型，以及頻率。",
+      "description": "選擇 Monize 透過電子郵件或推播傳送哪些類型，以及傳送頻率。",
       "categoryHeader": "通知",
       "channels": {
-        "inApp": "應用程式內",
         "emailReport": "郵件（報告）",
         "emailNotification": "電子郵件（提醒）",
         "push": "推播",
-        "unifiedpush": "UnifiedPush"
+        "unifiedpush": "UnifiedPush",
+        "unifiedpushHint": "通知會透過你自行執行的分發應用程式（例如 ntfy）投遞，而非瀏覽器廠商的推播服務。請在該應用程式中註冊端點以使用此管道。"
       },
       "categories": {
         "PAYMENTS": "帳單與排程",
         "BUDGETS": "預算",
         "SYSTEM": "系統警示"
       },
-      "inAppAlways": "始終顯示在鈴鐺中",
       "channelNotApplicable": "不適用於此通知類型",
       "emailToggleLabel": "{category} 的報告郵件",
       "saveFailed": "無法儲存該設定",
@@ -341,8 +347,8 @@
       "pushToggleLabel": "{category} 的推播",
       "unifiedpushToggleLabel": "{category} 的 UnifiedPush",
       "emailUnavailable": "在上方開啟電子郵件通知，即可透過電子郵件傳送。",
-      "pushUnavailable": "請先在此裝置上啟用推播（見下方）。",
-      "unifiedpushUnavailable": "從你的分發器應用程式註冊一個 UnifiedPush 端點以使用此頻道。"
+      "pushUnavailable": "沒有裝置註冊推播，因此此管道無法投遞。",
+      "pushEnableHint": "此瀏覽器尚未註冊推播通知。"
     }
   },
   "help": {

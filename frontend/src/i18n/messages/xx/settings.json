@@ -155,8 +155,6 @@
       "openstreetmap": "[XX-OpenStreetMap-XX]",
       "waze": "[XX-Waze-XX]"
     },
-    "saveButton": "[XX-Save Preferences-XX]",
-    "savingButton": "[XX-Saving...-XX]",
     "toasts": {
       "saved": "[XX-Preferences saved-XX]",
       "saveFailed": "[XX-Failed to save preferences-XX]",
@@ -239,15 +237,10 @@
       "heading": "[XX-Browser push-XX]",
       "diagnostics": {
         "summary": "[XX-Notification diagnostics-XX]",
-        "intro": "[XX-What this browser and device report to Monize about notifications. Use the test button to have Monize create a notification you can look for on your device, then Copy to send the full report.-XX]",
+        "intro": "[XX-What this browser and device report to Monize about notifications. Refresh after changing a setting, then Copy to send the full report.-XX]",
         "refresh": "[XX-Refresh-XX]",
         "copy": "[XX-Copy report-XX]",
-        "copied": "[XX-Diagnostics copied to clipboard-XX]",
-        "localTest": "[XX-Show a test notification-XX]",
-        "localTestRunning": "[XX-Checking…-XX]",
-        "localTestBody": "[XX-If you can see this, notifications are working on this device.-XX]",
-        "localTestCreated": "[XX-Monize created a notification without an error, but nothing here can confirm the system actually showed it. If you did not see it on your device, the system is hiding it; enable notifications for Monize in your device settings.-XX]",
-        "localTestError": "[XX-Could not run the test on this device ({detail}).-XX]"
+        "copied": "[XX-Diagnostics copied to clipboard-XX]"
       },
       "description": "[XX-Register this device so Monize can reach it even when the app is closed. Only the test notification is delivered this way so far; everything else still arrives in the bell.-XX]",
       "androidNotify": "[XX-On Android, a granted permission is not enough: the system can still hide notifications. Press and hold the Monize icon on your home screen, tap App info, then Notifications, and make sure they are turned on.-XX]",
@@ -260,7 +253,6 @@
       "thisDevice": "[XX-This device-XX]",
       "unifiedpushBadge": "[XX-UnifiedPush-XX]",
       "unnamedDevice": "[XX-Unnamed device-XX]",
-      "lastSeen": "[XX-Last active {when}-XX]",
       "noLiveDevices": "[XX-No device is registered yet. Enable push on this device to send a test.-XX]",
       "notConfigured": "[XX-Browser push is not available on this Monize instance. An administrator can enable it in the Admin area.-XX]",
       "disabledByAdmin": "[XX-An administrator has switched browser push off for this Monize instance.-XX]",
@@ -301,25 +293,39 @@
           "transient": "[XX-not delivered (temporary error); try again-XX]",
           "unconfigured": "[XX-this instance cannot sign push messages right now-XX]"
         }
+      },
+      "transport": {
+        "webpush": "[XX-Web push-XX]",
+        "unifiedpush": "[XX-UnifiedPush-XX]"
+      },
+      "facts": {
+        "endpoint": "[XX-Endpoint-XX]",
+        "transport": "[XX-Delivered by-XX]",
+        "registeredIp": "[XX-Registered from-XX]",
+        "registered": "[XX-Registered-XX]",
+        "lastSeen": "[XX-Last active-XX]",
+        "lastDelivery": "[XX-Last delivery-XX]",
+        "noDelivery": "[XX-Nothing delivered yet-XX]",
+        "userAgent": "[XX-Browser-XX]",
+        "unknownIp": "[XX-Unknown-XX]"
       }
     },
     "preferences": {
       "heading": "[XX-How to notify me-XX]",
-      "description": "[XX-The bell always shows every notification. Choose which kinds Monize also sends by email or push, and how often.-XX]",
+      "description": "[XX-Choose which kinds Monize sends by email or push, and how often.-XX]",
       "categoryHeader": "[XX-Notification-XX]",
       "channels": {
-        "inApp": "[XX-In-app-XX]",
         "emailReport": "[XX-Email (report)-XX]",
         "emailNotification": "[XX-Email (alert)-XX]",
         "push": "[XX-Push-XX]",
-        "unifiedpush": "[XX-UnifiedPush-XX]"
+        "unifiedpush": "[XX-UnifiedPush-XX]",
+        "unifiedpushHint": "[XX-Notifications are delivered through a distributor app you run yourself, such as ntfy, instead of a browser vendor's push service. Register an endpoint in that app to use this channel.-XX]"
       },
       "categories": {
         "PAYMENTS": "[XX-Bills and scheduled-XX]",
         "BUDGETS": "[XX-Budgets-XX]",
         "SYSTEM": "[XX-System alerts-XX]"
       },
-      "inAppAlways": "[XX-Always shown in the bell-XX]",
       "channelNotApplicable": "[XX-Not applicable for this notification type-XX]",
       "emailToggleLabel": "[XX-Report email for {category}-XX]",
       "emailNotificationToggleLabel": "[XX-Alert email for {category}-XX]",
@@ -327,8 +333,7 @@
       "unifiedpushToggleLabel": "[XX-UnifiedPush for {category}-XX]",
       "saveFailed": "[XX-Could not save that setting-XX]",
       "emailUnavailable": "[XX-Turn on email notifications above to send these by email.-XX]",
-      "pushUnavailable": "[XX-Enable push on this device first (see below).-XX]",
-      "unifiedpushUnavailable": "[XX-Register a UnifiedPush endpoint from your distributor app to use this channel.-XX]",
+      "pushUnavailable": "[XX-No device is registered for push, so this channel cannot deliver.-XX]",
       "throttle": {
         "label": "[XX-Cooldown-XX]",
         "ariaLabel": "[XX-Cooldown for {category}-XX]",
@@ -342,7 +347,8 @@
           "360": "[XX-6 hours-XX]",
           "1440": "[XX-24 hours-XX]"
         }
-      }
+      },
+      "pushEnableHint": "[XX-This browser is not registered for push notifications.-XX]"
     }
   },
   "help": {

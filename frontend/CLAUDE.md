@@ -415,6 +415,38 @@ account for the reason the registered-endpoint marker carries one, and the kind
 because waving away the offer says nothing about wanting to know, later, that the
 browser has started blocking Monize.
 
+### A settings screen has one save contract, and it is save-on-change
+
+`PreferencesSection` had two: language, theme and colour theme persisted the
+moment they changed (each selector owns its own write, because each has work to
+do beyond it), and the other thirteen controls waited for a "Save Preferences"
+button -- with nothing on screen saying which a given control followed, so a
+change made and navigated away from was silently lost. Every field now writes as
+it changes, through `useSavedPreference` (`hooks/useSavedPreference.ts`) and the
+one `commitPreference` the section owns: optimistic local state, the PATCH, and
+on failure a revert to the value THAT change replaced plus an error toast --
+the same shape the notification toggles already used.
+
+Three properties the hook carries, each with a test:
+
+- **The patch is the one field that changed**, never a resend of everything the
+  screen holds. The bulk payload had the opposite failure mode: a field left out
+  of it was reset the next time anything else was saved.
+- **A control re-emitting the value it already holds writes nothing.** A request
+  per non-edit is a toast per non-edit.
+- **The revert closes over the value of its own change**, so two changes in
+  flight cannot restore each other's.
+
+Do not reintroduce a Save button beside auto-saving controls. Where a field
+genuinely needs one -- a multi-part form that is invalid mid-edit -- the whole
+screen takes that contract, not one control on it.
+
+**A removed control has consumers `npx vitest run` never loads.** The E2E suite
+lives in `e2e/`, outside `frontend/src`, so a green Vitest run says nothing about
+it: deleting the Save button left `e2e/tests/settings.spec.ts` clicking a button
+that no longer exists, and only CI found it. Deleting or renaming any control an
+E2E spec drives means grepping `e2e/` for its accessible name in the same commit.
+
 ### A password field declares what may be autofilled into it
 
 Every `<Input type="password">` carries an `autoComplete`: `current-password` when it really is this account's password, `new-password` when one is being set here, `off` when it is not a credential of this site at all. Omitting it is not neutral -- a password manager fills a bare box with the saved credential, and the form submits it as typed: the AI provider's API key field silently replaced the stored key ("Saved" on screen, provider dead, row shows `****` either way), and the backup export password is the same shape and worse. `ui-conventions.test.ts` fails on a password input with no `autoComplete`, and on a value outside those three.
