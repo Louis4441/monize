@@ -44,6 +44,10 @@ const WITH_CONTEXT_ALLOWLIST = [
   // and dispatches. No request behind it
   // (docs/specs/portfolio-movement-notifications.md).
   "src/notification-center/portfolio-movement-alert.service.ts",
+  // Event-driven balance-threshold evaluation: runs on the net-worth recalc's
+  // post-commit timer (no request), so it seeds its own withUserContext
+  // (docs/specs/balance-threshold-notifications.md).
+  "src/notification-center/balance-threshold-alert.service.ts",
   "src/common/interceptors/request-context.interceptor.ts",
   // Cross-replica job coordination: claimOnce/claimLease write to a global
   // claims table that belongs to no single user, from cron entry points with no

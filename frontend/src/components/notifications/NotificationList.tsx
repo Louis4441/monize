@@ -458,6 +458,67 @@ export function NotificationList({
       : t('portfolioMovement.messageUp', { percent });
   };
 
+  /**
+   * A balance-threshold crossing row, composed from the producer's `data`
+   * (`docs/specs/balance-threshold-notifications.md`). The amount is formatted
+   * in the account's own currency (the crossing's currency).
+   */
+  const balanceThresholdData = (
+    notification: Notification,
+  ): {
+    kind?: string;
+    accountName?: string;
+    balance?: number;
+    threshold?: number;
+    currencyCode?: string;
+  } | null => {
+    if (
+      notification.type !== 'BALANCE_BELOW_THRESHOLD' &&
+      notification.type !== 'BALANCE_ABOVE_THRESHOLD'
+    ) {
+      return null;
+    }
+    return (notification.data ?? {}) as {
+      kind?: string;
+      accountName?: string;
+      balance?: number;
+      threshold?: number;
+      currencyCode?: string;
+    };
+  };
+
+  const balanceThresholdTitle = (notification: Notification): string | null => {
+    const data = balanceThresholdData(notification);
+    if (!data) return null;
+    const account = data.accountName ?? '';
+    return notification.type === 'BALANCE_ABOVE_THRESHOLD'
+      ? t('balanceThreshold.titleHigh', { account })
+      : t('balanceThreshold.titleLow', { account });
+  };
+
+  const balanceThresholdMessage = (
+    notification: Notification,
+  ): string | null => {
+    const data = balanceThresholdData(notification);
+    if (!data) return null;
+    const account = data.accountName ?? '';
+    const money = (value: number | undefined): string =>
+      value == null
+        ? ''
+        : formatCurrency(value, data.currencyCode);
+    return notification.type === 'BALANCE_ABOVE_THRESHOLD'
+      ? t('balanceThreshold.messageHigh', {
+          account,
+          balance: money(data.balance),
+          threshold: money(data.threshold),
+        })
+      : t('balanceThreshold.messageLow', {
+          account,
+          balance: money(data.balance),
+          threshold: money(data.threshold),
+        });
+  };
+
   const unreadCount = notifications.filter((a) => !a.isRead && !dismissingIds.has(a.id)).length;
 
   const handleAlertClick = (notification: Notification) => {
@@ -692,10 +753,10 @@ export function NotificationList({
                               </span>
                             </div>
                             <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                              {billDueTitle(notification) ?? systemAlertTitle(notification) ?? gemSignalTitle(notification) ?? portfolioMovementTitle(notification) ?? notification.title}
+                              {billDueTitle(notification) ?? systemAlertTitle(notification) ?? gemSignalTitle(notification) ?? portfolioMovementTitle(notification) ?? balanceThresholdTitle(notification) ?? notification.title}
                             </p>
                             <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mt-0.5">
-                              {billDueMessage(notification) ?? systemAlertMessage(notification) ?? gemSignalMessage(notification) ?? portfolioMovementMessage(notification) ?? notification.message}
+                              {billDueMessage(notification) ?? systemAlertMessage(notification) ?? gemSignalMessage(notification) ?? portfolioMovementMessage(notification) ?? balanceThresholdMessage(notification) ?? notification.message}
                             </p>
                           </div>
                         </div>

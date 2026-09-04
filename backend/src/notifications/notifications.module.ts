@@ -13,6 +13,7 @@ import { PushModule } from "../push/push.module";
 import { SecuritiesModule } from "../securities/securities.module";
 import { CurrenciesModule } from "../currencies/currencies.module";
 import { PortfolioMovementAlertService } from "../notification-center/portfolio-movement-alert.service";
+import { BalanceThresholdAlertService } from "../notification-center/balance-threshold-alert.service";
 
 @Module({
   imports: [
@@ -53,8 +54,16 @@ import { PortfolioMovementAlertService } from "../notification-center/portfolio-
     // PortfolioService and the exchange-rate service, so it lives here where the
     // dispatch is, not in NotificationCenterModule (which stays connection-only).
     PortfolioMovementAlertService,
+    // Event-driven balance-threshold crossings (BALANCES category). Triggered
+    // from the post-commit balance-invalidation seam (NetWorthService), so it is
+    // exported for that module to call.
+    BalanceThresholdAlertService,
   ],
   controllers: [NotificationsController],
-  exports: [EmailService, NotificationDispatchService],
+  exports: [
+    EmailService,
+    NotificationDispatchService,
+    BalanceThresholdAlertService,
+  ],
 })
 export class NotificationsModule {}

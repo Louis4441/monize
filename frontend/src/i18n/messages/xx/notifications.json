@@ -67,6 +67,12 @@
     "messageUp": "[XX-Your investments are up {percent}% today, excluding deposits and withdrawals. Open to review.-XX]",
     "messageDown": "[XX-Your investments are down {percent}% today, excluding deposits and withdrawals. Open to review.-XX]"
   },
+  "balanceThreshold": {
+    "titleLow": "[XX-{account} is below your threshold-XX]",
+    "titleHigh": "[XX-{account} is above your threshold-XX]",
+    "messageLow": "[XX-{account} dropped to {balance}, below your {threshold} threshold.-XX]",
+    "messageHigh": "[XX-{account} rose to {balance}, above your {threshold} threshold.-XX]"
+  },
   "system": {
     "backupFailed": {
       "title": "[XX-Automatic backup failed-XX]",

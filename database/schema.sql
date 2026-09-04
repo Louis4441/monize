@@ -127,6 +127,13 @@ CREATE TABLE accounts (
     statement_settlement_day INTEGER, -- last day of billing cycle (credit cards only)
     is_closed BOOLEAN DEFAULT false,
     closed_date DATE,
+    -- Balance-threshold alerts (migration 186; docs/specs/balance-threshold-notifications.md).
+    -- Thresholds in the account's own currency (NULL = off); the *_armed latches
+    -- make the crossing rule hold across evaluations (a CAS, INV-BALANCE-002).
+    low_balance_threshold NUMERIC(20, 4),
+    high_balance_threshold NUMERIC(20, 4),
+    low_alert_armed BOOLEAN NOT NULL DEFAULT false,
+    high_alert_armed BOOLEAN NOT NULL DEFAULT false,
     is_favourite BOOLEAN DEFAULT false,
     favourite_sort_order INTEGER DEFAULT 0,
     exclude_from_net_worth BOOLEAN DEFAULT false,
