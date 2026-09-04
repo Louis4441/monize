@@ -127,7 +127,7 @@ CREATE TABLE accounts (
     statement_settlement_day INTEGER, -- last day of billing cycle (credit cards only)
     is_closed BOOLEAN DEFAULT false,
     closed_date DATE,
-    -- Balance-threshold alerts (migration 186; docs/specs/balance-threshold-notifications.md).
+    -- Balance-threshold alerts (migration 187; docs/specs/balance-threshold-notifications.md).
     -- Thresholds in the account's own currency (NULL = off); the *_armed latches
     -- make the crossing rule hold across evaluations (a CAS, INV-BALANCE-002).
     low_balance_threshold NUMERIC(20, 4),
@@ -1796,7 +1796,7 @@ CREATE UNIQUE INDEX idx_notification_reminders_active_source
 
 CREATE TRIGGER update_notification_reminders_updated_at BEFORE UPDATE ON notification_reminders FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Per-user state for the daily portfolio-movement notification (migration 185;
+-- Per-user state for the daily portfolio-movement notification (migration 186;
 -- docs/specs/portfolio-movement-notifications.md). The opt-in threshold plus the
 -- producer's own last-complete-value baseline. baseline_currency is a resolved
 -- reporting-currency snapshot, deliberately not a currencies(code) FK (derived,
