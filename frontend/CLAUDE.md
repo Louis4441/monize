@@ -441,6 +441,12 @@ Do not reintroduce a Save button beside auto-saving controls. Where a field
 genuinely needs one -- a multi-part form that is invalid mid-edit -- the whole
 screen takes that contract, not one control on it.
 
+**A removed control has consumers `npx vitest run` never loads.** The E2E suite
+lives in `e2e/`, outside `frontend/src`, so a green Vitest run says nothing about
+it: deleting the Save button left `e2e/tests/settings.spec.ts` clicking a button
+that no longer exists, and only CI found it. Deleting or renaming any control an
+E2E spec drives means grepping `e2e/` for its accessible name in the same commit.
+
 ### A password field declares what may be autofilled into it
 
 Every `<Input type="password">` carries an `autoComplete`: `current-password` when it really is this account's password, `new-password` when one is being set here, `off` when it is not a credential of this site at all. Omitting it is not neutral -- a password manager fills a bare box with the saved credential, and the form submits it as typed: the AI provider's API key field silently replaced the stored key ("Saved" on screen, provider dead, row shows `****` either way), and the backup export password is the same shape and worse. `ui-conventions.test.ts` fails on a password input with no `autoComplete`, and on a value outside those three.
