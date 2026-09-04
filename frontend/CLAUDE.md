@@ -326,6 +326,48 @@ Whether an unreconciled row is *overdue* is decided by `classifyStaleRow` (`lib/
 
 **A failed lookup is not a clean ledger.** `useStaleReconciliation` returns `undefined` on failure, and every consumer reads undefined as "no information" and marks nothing. An empty context instead would make an outage indistinguishable from an up-to-date ledger -- the same class of mistake as `accounts = []` on a failed request.
 
+### A phone number is shown through `formatPhoneForDisplay`, never raw
+
+`payee.phone` is stored as E.164 with an optional RFC 3966 extension suffix
+(`+12064488762`, `+442079460958;ext=12`). `formatPhoneForDisplay`
+(`lib/phone-number.ts`) is the only way it reaches a reader -- grouped, with the
+extension as ` x12` -- and it is **total**: rows written before normalization are
+not backfilled, so a value it cannot parse comes back unchanged rather than
+blanked (a stored "call the shop" is worth showing even though it cannot be
+dialled). `telHref` is the exception and takes the stored value on purpose: it
+needs the digits and the `;ext=` suffix, which it carries into the `tel:` link.
+
+The payee form validates with `normalizePhoneNumber` under the field, using the
+region from `phoneRegionFromPreferences` over the stored `numberFormat` and
+`language`. That is not belt-and-braces: both layers assert
+`backend/src/common/phone-number-cases.json`, so the field can neither block a
+number the API would store nor submit one it would refuse. The waiver is part of
+that agreement -- `buildPayeeSchema` takes the phone the payee already holds and
+passes an unchanged value, exactly as the server does, because rows written
+before normalization are not backfilled and a stricter field would make a payee
+holding free text impossible to edit at all.
+`lib/phone-number.guard.test.ts` scans for a raw `{x.phone}` render and requires
+every known display surface to reference the formatter.
+
+**An input is a display surface.** A value reaches a reader through `setValue`
+as surely as through JSX, and the lookup prefill wrote the suggestion's stored
+form into the Phone field -- so the same box formatted on load and showed
+`+442079460958;ext=12` when a lookup filled it. A loop that writes contact
+fields generically decides the phone's form at the write site
+(`field === 'phone' ? formatPhoneForDisplay(value) : value`), which the guard
+scans for; comparing the two forms is the same bug wearing a different hat, and
+reported an unchanged number as a replaced one.
+
+**Not knowing the region is a third state, and it is not a default.**
+`phoneRegion` is `undefined` while `usePreferencesStore` holds no row -- before
+the fetch lands, and after one that failed -- and the field checks nothing then,
+leaving the answer to the server, which reads the row. `null` is different: it
+is an *answer* (the preferences name no region), and it asks for a country code.
+Collapsing the two applies the `en-US` column default to a `de-DE` user and
+rejects a Berlin number the API stores happily. The shared truth table proves
+the two layers' *functions* agree; only the wiring can prove they were handed
+the same inputs, so read the whole `preferences` object, never fields off it.
+
 ### A long list -- page it, or bound it and scroll with `scrollbar-slim`
 
 A full-page list uses `components/ui/Pagination.tsx`. A list inside a card caps its height and scrolls: `scrollbar-slim max-h-* overflow-y-auto pr-1`. The thing to avoid is the *default* scrollbar, not scrolling -- on Linux/Windows the native bar inside a small card reads as a rendering fault. `scrollbar-slim` (defined in `globals.css` alongside `scrollbar-hide`) keeps a thin themed thumb.

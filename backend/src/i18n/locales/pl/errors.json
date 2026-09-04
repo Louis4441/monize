@@ -365,6 +365,8 @@
     "nameConflict": "Odbiorca o nazwie \"{{ name }}\" już istnieje",
     "nameRequired": "Nazwa odbiorcy jest wymagana",
     "invalidEmail": "\"{{ email }}\" nie jest prawidłowym adresem e-mail",
+    "invalidPhone": "\"{{ phone }}\" nie jest prawidłowym numerem telefonu",
+    "phoneNeedsCountryCode": "Podaj numer kierunkowy kraju dla \"{{ phone }}\", na przykład +1 206 448 8762",
     "notFound": "Nie znaleziono odbiorcy o ID {{ id }}",
     "logoNotFound": "Brak logo dla tego odbiorcy",
     "categoryIdsNotOwned": "Identyfikatory kategorii nie zostały znalezione lub nie należą do użytkownika: {{ ids }}",

@@ -365,6 +365,8 @@
     "nameConflict": "Zahlungsempfänger mit dem Namen \"{{ name }}\" existiert bereits",
     "nameRequired": "Name des Zahlungsempfängers ist erforderlich",
     "invalidEmail": "\"{{ email }}\" ist keine gültige E-Mail-Adresse",
+    "invalidPhone": "\"{{ phone }}\" ist keine gültige Telefonnummer",
+    "phoneNeedsCountryCode": "Geben Sie die Ländervorwahl für \"{{ phone }}\" an, zum Beispiel +1 206 448 8762",
     "notFound": "Zahlungsempfänger mit ID {{ id }} nicht gefunden",
     "logoNotFound": "Für diesen Zahlungsempfänger ist kein Logo verfügbar",
     "categoryIdsNotOwned": "Kategorie-IDs nicht gefunden oder nicht im Besitz des Benutzers: {{ ids }}",

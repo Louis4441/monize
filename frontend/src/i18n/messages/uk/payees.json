@@ -284,7 +284,9 @@
   "selectCategoryPlaceholder": "Оберіть категорію...",
   "validation": {
     "nameRequired": "Назва одержувача обов'язкова",
-    "emailInvalid": "Введіть дійсну адресу електронної пошти"
+    "emailInvalid": "Введіть дійсну адресу електронної пошти",
+    "phoneInvalid": "Введіть дійсний номер телефону",
+    "phoneNeedsCountryCode": "Додайте код країни, наприклад +1 206 448 8762"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "Застосувати категорії за замовчуванням?",

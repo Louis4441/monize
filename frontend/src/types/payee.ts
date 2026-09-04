@@ -30,6 +30,13 @@ export interface Payee {
   /** Free-text postal address. One field, not structured parts. */
   address: string | null;
   email: string | null;
+  /**
+   * E.164 with an optional RFC 3966 extension suffix (`+12064488762`,
+   * `+442079460958;ext=12`), normalized on write by every path that stores one.
+   * Render it through `formatPhoneForDisplay` (`@/lib/phone-number`), never
+   * raw: rows written before that rule are not backfilled, so this can still
+   * hold free text.
+   */
   phone: string | null;
   /**
    * When a contact lookup last got an answer for this payee (found something,
@@ -126,6 +133,13 @@ export interface PayeeContactSuggestion {
   website: string | null;
   address: string | null;
   email: string | null;
+  /**
+   * E.164 with an optional RFC 3966 extension suffix (`+12064488762`,
+   * `+442079460958;ext=12`), normalized on write by every path that stores one.
+   * Render it through `formatPhoneForDisplay` (`@/lib/phone-number`), never
+   * raw: rows written before that rule are not backfilled, so this can still
+   * hold free text.
+   */
   phone: string | null;
   source: ContactLookupSource;
   confidence: 'high' | 'medium' | 'low' | null;

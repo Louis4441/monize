@@ -365,6 +365,8 @@
     "nameConflict": "Esiste già un beneficiario con il nome \"{{ name }}\"",
     "nameRequired": "Il nome del beneficiario è obbligatorio",
     "invalidEmail": "\"{{ email }}\" non è un indirizzo e-mail valido",
+    "invalidPhone": "\"{{ phone }}\" non è un numero di telefono valido",
+    "phoneNeedsCountryCode": "Includi il prefisso internazionale per \"{{ phone }}\", ad esempio +1 206 448 8762",
     "notFound": "Beneficiario con ID {{ id }} non trovato",
     "logoNotFound": "Nessun logo disponibile per questo beneficiario",
     "categoryIdsNotOwned": "ID categoria non trovati o non di proprietà dell'utente: {{ ids }}",

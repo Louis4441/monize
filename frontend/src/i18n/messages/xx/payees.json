@@ -284,7 +284,9 @@
   "selectCategoryPlaceholder": "[XX-Select category...-XX]",
   "validation": {
     "nameRequired": "[XX-Payee name is required-XX]",
-    "emailInvalid": "[XX-Enter a valid email address-XX]"
+    "emailInvalid": "[XX-Enter a valid email address-XX]",
+    "phoneInvalid": "[XX-Enter a valid phone number-XX]",
+    "phoneNeedsCountryCode": "[XX-Add the country code, for example +1 206 448 8762-XX]"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "[XX-Apply default categories?-XX]",

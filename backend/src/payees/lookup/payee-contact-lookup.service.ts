@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { withScopedDb } from "../../common/db/scoped-db";
 import { validateUrlIsSafe } from "../../ai/validators/safe-url.validator";
+import { normalizePhoneNumber } from "../../common/phone-number.util";
 import { UserPreference } from "../../users/entities/user-preference.entity";
 import {
   ContactLookupOutcome,
@@ -39,7 +40,14 @@ interface LookupPreferences {
  * here the website is additionally resolved through `validateUrlIsSafe`,
  * which refuses private and loopback addresses (SSRF, since the favicon
  * fetcher will visit it) and, as a side effect, an invented hostname that
- * does not resolve.
+ * does not resolve, and the phone is normalized to the stored E.164 form.
+ *
+ * The phone belongs here rather than in the sanitizer because normalizing is
+ * not a pure reshape -- it can REFUSE, and a refusal here is the point. This is
+ * the single door for every lookup -- the detail page's button, the form's
+ * prefill, the AI/MCP create preview and the background enrichment -- so
+ * `ENRICHMENT_UPDATE_SQL`, which writes a suggestion straight into the column
+ * without passing a DTO, can never store a number in some other shape.
  */
 @Injectable()
 export class PayeeContactLookupService {
@@ -87,7 +95,7 @@ export class PayeeContactLookupService {
 
     const checked: PayeeContactSuggestion[] = [];
     for (const candidate of candidates) {
-      const vetted = await this.vetWebsite(candidate);
+      const vetted = await this.vetCandidate(candidate);
       if (vetted) checked.push(vetted);
     }
     const [best, ...rest] = checked;
@@ -99,23 +107,48 @@ export class PayeeContactLookupService {
   }
 
   /**
-   * Resolve the candidate's website through `validateUrlIsSafe` and drop it
-   * when it does not survive, along with any claim that it refined one the
-   * user holds. A candidate left with nothing at all is not a candidate.
+   * The per-field checks the pure sanitizer cannot make, because each of them
+   * can REFUSE: a website resolved through `validateUrlIsSafe` (which turns
+   * down private and loopback addresses and, as a side effect, an invented
+   * hostname), and a phone read as a number rather than a string.
+   *
+   * A field that does not survive is dropped to null, together with any claim
+   * that it refined a value the user holds -- a refinement the user can never
+   * be offered is not one. A candidate left with nothing at all is not a
+   * candidate.
    */
-  private async vetWebsite(
+  private async vetCandidate(
     suggestion: PayeeContactSuggestion,
   ): Promise<PayeeContactSuggestion | null> {
     const website =
       suggestion.website && (await validateUrlIsSafe(suggestion.website))
         ? suggestion.website
         : null;
+    // A model writes a number in whatever shape the page it read used, so this
+    // is where a suggestion becomes storable -- with NO region, deliberately.
+    //
+    // The reader's region says where THEY dial from; it is not evidence about
+    // a third party's number, and this path is the one that writes without
+    // anyone to ask (the background enrichment's UPDATE). Read in the reader's
+    // region, a Mexico City "55 1234 5678" is a perfectly valid +15512345678 in
+    // New Jersey -- a different number that dials, stored under a name the user
+    // trusts. So a suggestion has to carry its own country code, which is what
+    // the prompt asks the model for; one that does not is unplaceable and is
+    // dropped. An empty field the user can fill beats a confident wrong number.
+    const normalized = suggestion.phone
+      ? normalizePhoneNumber(suggestion.phone, null)
+      : null;
+    const phone = normalized?.ok ? normalized.stored : null;
+    const dropped = new Set<string>();
+    if (website === null) dropped.add("website");
+    if (phone === null) dropped.add("phone");
     const checked: PayeeContactSuggestion = {
       ...suggestion,
       website,
+      phone,
       refined:
-        website === null
-          ? suggestion.refined.filter((field) => field !== "website")
+        dropped.size > 0
+          ? suggestion.refined.filter((field) => !dropped.has(field))
           : suggestion.refined,
     };
     const hasAny =
@@ -130,6 +163,10 @@ export class PayeeContactLookupService {
    * The opt-in flag, plus the two facts about the user that disambiguate a
    * name ("Hydro One" vs "Hydro-Québec"): their language tag and default
    * currency. Both are already stored; nothing new is collected.
+   *
+   * Deliberately NOT the region their preferences imply: see `vetCandidate`.
+   * A suggested number is placed by its own country code or not at all, so
+   * there is nothing here for a region to decide.
    */
   private async readPreferences(userId: string): Promise<LookupPreferences> {
     const prefs = await withScopedDb(this.dataSource, (m) =>

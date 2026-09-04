@@ -374,6 +374,8 @@
     "nameConflict": "[XX-Payee with name \"{{ name }}\" already exists-XX]",
     "nameRequired": "[XX-Payee name is required-XX]",
     "invalidEmail": "[XX-\"{{ email }}\" is not a valid email address-XX]",
+    "invalidPhone": "[XX-\"{{ phone }}\" is not a valid phone number-XX]",
+    "phoneNeedsCountryCode": "[XX-Include the country code for \"{{ phone }}\", for example +1 206 448 8762-XX]",
     "notFound": "[XX-Payee with ID {{ id }} not found-XX]",
     "logoNotFound": "[XX-No logo available for this payee-XX]",
     "categoryIdsNotOwned": "[XX-Category IDs not found or not owned by user: {{ ids }}-XX]",

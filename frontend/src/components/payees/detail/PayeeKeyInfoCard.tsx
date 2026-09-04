@@ -7,6 +7,7 @@ import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { externalUrlLabel, toSafeExternalUrl } from '@/lib/external-url';
 import { mailtoHref, mapsUrl, telHref } from '@/lib/contact-links';
+import { formatPhoneForDisplay } from '@/lib/phone-number';
 import { useMapProvider } from '@/hooks/useMapProvider';
 import { useAiConfigured } from '@/hooks/useAiConfigured';
 import { usePayeeContactLookup } from '@/hooks/usePayeeContactLookup';
@@ -63,6 +64,9 @@ export function PayeeKeyInfoCard({
     ? mapsUrl({ address: payee.address, provider: mapProvider })
     : null;
   const phoneLink = telHref(payee.phone);
+  // Stored as E.164; shown the way a person reads a number. A legacy value that
+  // predates normalization comes back unchanged rather than blanked.
+  const phoneDisplay = formatPhoneForDisplay(payee.phone);
   const emailLink = mailtoHref(payee.email);
 
   const rows: KeyValueRow[] = [
@@ -182,10 +186,10 @@ export function PayeeKeyInfoCard({
             href={phoneLink}
             className="text-blue-600 hover:underline dark:text-blue-400"
           >
-            {payee.phone}
+            {phoneDisplay}
           </a>
         ) : (
-          payee.phone
+          phoneDisplay
         )
       ) : null,
     },

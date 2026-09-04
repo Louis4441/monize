@@ -227,8 +227,13 @@ CREATE TABLE payees (
     logo_fetched_at TIMESTAMP,
     -- Contact information. address is free text (one field, not structured
     -- parts) because formats are locale-specific and its only consumer is a
-    -- maps link that takes a single query string. phone is stored as written --
-    -- country codes, spaces, brackets and extensions all survive.
+    -- maps link that takes a single query string. phone is stored in ONE form
+    -- whichever surface wrote it -- E.164 with an optional RFC 3966 extension
+    -- suffix (+12064488762, +442079460958;ext=12) -- so two records of the same
+    -- number compare equal and a tel: link dials the same digits either way.
+    -- Rows written before that rule are deliberately not backfilled: they hold
+    -- whatever was typed until the payee is next saved, so a reader must format
+    -- through formatPhoneForDisplay rather than assume the shape.
     address TEXT,
     email VARCHAR(255),
     phone VARCHAR(50),

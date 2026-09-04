@@ -284,7 +284,9 @@
   "selectCategoryPlaceholder": "카테고리 선택...",
   "validation": {
     "nameRequired": "수취인 이름이 필요합니다",
-    "emailInvalid": "유효한 이메일 주소를 입력하세요"
+    "emailInvalid": "유효한 이메일 주소를 입력하세요",
+    "phoneInvalid": "유효한 전화번호를 입력하세요",
+    "phoneNeedsCountryCode": "국가 번호를 추가하세요. 예: +1 206 448 8762"
   },
   "defaultCategoryBackfill": {
     "allConfirmTitle": "기본 카테고리를 적용하시겠습니까?",

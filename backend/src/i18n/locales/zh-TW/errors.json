@@ -365,6 +365,8 @@
     "nameConflict": "已有名為「{{ name }}」的收款人",
     "nameRequired": "收款人名稱為必填項目",
     "invalidEmail": "\"{{ email }}\" 不是有效的電子郵件地址",
+    "invalidPhone": "\"{{ phone }}\" 不是有效的電話號碼",
+    "phoneNeedsCountryCode": "請為 \"{{ phone }}\" 加上國碼，例如 +1 206 448 8762",
     "notFound": "找不到 ID 為 {{ id }} 的收款人",
     "logoNotFound": "此收款人沒有可用的標誌",
     "categoryIdsNotOwned": "找不到類別 ID 或類別不屬於使用者：{{ ids }}",
