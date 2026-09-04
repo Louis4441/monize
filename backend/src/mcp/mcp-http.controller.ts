@@ -71,7 +71,7 @@ export class McpHttpController implements OnModuleDestroy {
    * from an instance that holds nothing between rounds.
    */
   private readonly modern = createMcpHandler(
-    ({ era }) => this.mcpServerService.createServer({ era }),
+    () => this.mcpServerService.createServer(),
     {
       legacy: "reject",
       onerror: (error) =>
@@ -322,7 +322,7 @@ export class McpHttpController implements OnModuleDestroy {
       }
     };
 
-    const server = this.mcpServerService.createServer({ era: "legacy" });
+    const server = this.mcpServerService.createServer();
     await server.connect(transport);
     await withUserContext(authResult.userId, () =>
       transport.handleRequest(req, res, req.body),

@@ -204,9 +204,9 @@ describe("McpHttpController", () => {
       await controller.handlePost(req, mockNodeRes());
 
       expect(modernNode).not.toHaveBeenCalled();
-      expect(mcpServerService.createServer).toHaveBeenCalledWith({
-        era: "legacy",
-      });
+      // The factory takes no era -- the sessionful leg is identified by the
+      // fact that it built a server of its own rather than by an argument.
+      expect(mcpServerService.createServer).toHaveBeenCalledWith();
     });
 
     it("routes a 2025-era request carrying a session id to that session", async () => {

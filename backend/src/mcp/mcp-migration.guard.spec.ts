@@ -131,6 +131,17 @@ describe("a write confirmation is asked in one place", () => {
     expect(offenders).toEqual([]);
   });
 
+  // The action a card is fingerprinted under is `confirmItemsForCards`'
+  // decision, in one place. Three tools had their own copy of the mapping, and
+  // a fourth would be the one that passes something the round that writes
+  // cannot re-derive.
+  it("no tool builds its own confirmation card mapping", () => {
+    const offenders = toolFiles.filter((path) =>
+      /key:\s*cardKey\(/.test(read(path)),
+    );
+    expect(offenders).toEqual([]);
+  });
+
   // A tool reading the answers itself would skip the fingerprint check, which
   // is what proves the retry is about the change the user approved.
   it("no tool reads inputResponses directly", () => {
@@ -155,5 +166,15 @@ describe("the confirmation seal", () => {
       (match) => match[1],
     );
     expect(fields.sort()).toEqual(["fingerprint", "keys", "v"]);
+  });
+
+  // The fingerprint is recomputed on a LATER tool call, so it may only cover
+  // fields the change itself determines. `roundStableAction` is where the
+  // per-build ones are dropped; hashing `item.action` raw is the defect it
+  // exists to prevent, and it is one edit away at all times.
+  it("fingerprints the round-stable projection, not the raw action", () => {
+    const confirm = read("mcp/mcp-confirm.ts");
+    expect(confirm).toContain("action: roundStableAction(item.action)");
+    expect(confirm).not.toMatch(/^\s*action: item\.action,$/m);
   });
 });

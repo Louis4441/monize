@@ -44,10 +44,10 @@ import {
 } from "../mcp-context";
 import {
   cardKey,
+  confirmItemsForCards,
   confirmWrite,
   confirmWriteMany,
   isAsk,
-  type ConfirmItem,
 } from "../mcp-confirm";
 import { McpWriteLimiter } from "../mcp-write-limiter";
 import {
@@ -1080,7 +1080,7 @@ export class McpInvestmentsTools {
     const answers = await confirmWriteMany(
       server,
       ctx,
-      this.confirmItems(cards),
+      confirmItemsForCards(cards, (card) => this.confirmLineFor(card)),
     );
     if (!(answers instanceof Map)) return answers.ask;
     const ids: string[] = [];
@@ -1145,15 +1145,6 @@ export class McpInvestmentsTools {
       default:
         return null;
     }
-  }
-
-  /** One confirmation item per card, keyed by position within this round. */
-  private confirmItems(cards: PendingAiAction[]): ConfirmItem[] {
-    return cards.map((card, index) => ({
-      key: cardKey(index),
-      message: this.confirmLineFor(card),
-      action: card.descriptor,
-    }));
   }
 
   private confirmLineFor(card: PendingAiAction): string {
@@ -1656,11 +1647,7 @@ export class McpInvestmentsTools {
     const answers = await confirmWriteMany(
       server,
       ctx,
-      cards.map((card, index) => ({
-        key: cardKey(index),
-        message: this.secConfirmLineFor(card),
-        action: card.descriptor,
-      })),
+      confirmItemsForCards(cards, (card) => this.secConfirmLineFor(card)),
     );
     if (!(answers instanceof Map)) return answers.ask;
     const ids: string[] = [];

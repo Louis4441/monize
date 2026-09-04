@@ -136,10 +136,9 @@ describe("McpServerService", () => {
   // factory, because the values are its decision.
   describe("cacheable results", () => {
     async function listToolsRaw() {
-      const handler = createMcpHandler(
-        ({ era }) => service.createServer({ era }),
-        { legacy: "reject" },
-      );
+      const handler = createMcpHandler(() => service.createServer(), {
+        legacy: "reject",
+      });
       try {
         const response = await handler.fetch(
           new Request("http://mcp.test/mcp", {

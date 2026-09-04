@@ -67,9 +67,12 @@ export class McpServerService {
    * One factory for both eras, so a 2026-07-28 client and a 2025-era client can
    * never be served a different set of tools. The modern handler calls it per
    * request and the sessionful path once per session.
+   *
+   * It takes no era on purpose: a factory that cannot see which revision asked
+   * cannot answer them differently, which is a stronger guarantee than a
+   * parameter every branch is trusted to ignore.
    */
-  createServer(opts: { era?: "legacy" | "modern" } = {}): McpServer {
-    void opts.era;
+  createServer(): McpServer {
     // Surface today's date so the model can resolve relative ranges ("this
     // month", "last 30 days") into YYYY-MM-DD without an extra round trip. A
     // server is built per 2025-era session and per 2026-07-28 request, so this

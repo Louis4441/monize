@@ -1935,7 +1935,13 @@ Status              enforced
 Statement           A confirmation a user gave authorizes exactly the change
                     they were shown, asked of exactly the credential that was
                     asked. It cannot be replayed by another caller, against
-                    another tool, or re-aimed at a different change.
+                    another tool, or re-aimed at a different change. It is
+                    deliberately NOT single-use: the same seal and answer, from
+                    the same credential against the same tool inside the TTL,
+                    commits again -- the answer is client-asserted on this
+                    revision, so a client able to replay one could equally have
+                    fabricated it, and the seal bounds who and what rather than
+                    how many times.
 Source of truth     backend/src/mcp/mcp-request-state.ts,
                     backend/src/mcp/mcp-confirm.ts
 Enforcement         On the 2026-07-28 revision the confirmation spans two calls
@@ -1948,17 +1954,34 @@ Enforcement         On the 2026-07-28 revision the confirmation spans two calls
                     writes recomputes it from what it re-derived and throws
                     ConfirmMismatchError on any difference, so a retry that
                     resolved a name to another row or altered an amount writes
-                    nothing. The payload is signed, not encrypted, so it holds
-                    the fingerprint and nothing else.
+                    nothing. What is fingerprinted is the change and not the
+                    round it was built in: roundStableAction (mcp-confirm.ts)
+                    drops the fields the builder mints per build -- actionId and
+                    expiresAt, named once by AI_ACTION_ENVELOPE_FIELDS beside
+                    the descriptor and typed so the compiler refuses a new one
+                    off the list, plus an attachment's parking slot, whose file
+                    stays identified by sha256/filename/contentType/byteSize.
+                    Hashing the descriptor raw makes every fingerprint unique
+                    and refuses every confirmed write. The payload is signed,
+                    not encrypted, so it holds the fingerprint and nothing else.
 Concurrency scope   per confirmation flow
 Failure response    -32602 from the seam for a bad seal; a tool error naming the
                     mismatch, with no write, for a re-aimed retry.
 Required tests      Present: mcp-confirm.spec.ts covers the ask/answer matrix, a
                     fingerprint mismatch, a key-set mismatch, and a seal
-                    replayed under another credential or another method.
-                    transactions.tool.spec.ts drives both rounds of a real write.
+                    replayed under another credential or another method, and
+                    drives the REAL AiActionBuilderService twice to assert the
+                    fingerprint holds across rounds while still separating two
+                    different changes (a double that returns one frozen object
+                    agrees with itself whatever is hashed, which is how the
+                    unstable fingerprint shipped green).
+                    transactions.tool.spec.ts drives both rounds of a real write
+                    through a builder double that mints a fresh envelope per
+                    call, as the real one does.
                     mcp-migration.guard.spec.ts asserts the sealed payload
-                    carries nothing but the fingerprint.
+                    carries nothing but the fingerprint, that the fingerprint is
+                    taken over the round-stable projection, and that no tool
+                    maps its own confirmation cards.
 Status              enforced
 ```
 

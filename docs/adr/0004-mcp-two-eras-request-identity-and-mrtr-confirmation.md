@@ -50,6 +50,14 @@ makes that safe is a signed `requestState`: bound to the credential and the
 method, carrying a fingerprint of what the user was shown, and re-checked on
 the round that writes.
 
+**The fingerprint covers the change, not the round.** The two rounds are two
+tool calls, so each rebuilds its descriptor with a fresh `actionId`,
+`expiresAt` and attachment parking slot. Those are projected out
+(`roundStableAction`) and everything that says what is being approved is
+hashed. The alternative -- having each caller hand over a pre-trimmed action --
+was rejected: it is a rule every one of thirty call sites has to remember, and
+forgetting it fails closed but totally, refusing every confirmed write.
+
 **Client ID Metadata Documents are deferred**; RFC 9207 `iss` is in scope and
 already satisfied by the provider.
 
@@ -71,6 +79,17 @@ have the direct client's confirmations offered to the browser. The mitigation
 is a sentence in the connect instructions telling them to mint the agent its
 own token. This is the one place the upgrade makes something worse, and it is
 recorded here rather than left for someone to discover.
+
+**A confirmation is bounded by who and what, not by how many times.** The seal
+carries no nonce and the server holds no record of a spent one, so the same
+seal and the same answer, re-sent by the same credential against the same tool
+within the ten-minute TTL, commits again. This is deliberate rather than
+overlooked: the answer is client-asserted on this revision -- as it already is
+on the 2025-era one, where a client can return `accept` without showing anyone
+a dialog -- so a client able to replay a confirmation could equally have
+fabricated the first one. Single-use would put the server-side record back that
+the stateless core exists to remove, and would buy nothing against the only
+attacker it could face.
 
 The sessionful path is now the only part of the server with an end date. When
 no client negotiates a 2025-era revision, `legacy: "reject"` on the whole

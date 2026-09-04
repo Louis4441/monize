@@ -48,10 +48,10 @@ import {
 } from "../mcp-context";
 import {
   cardKey,
+  confirmItemsForCards,
   confirmWrite,
   confirmWriteMany,
   isAsk,
-  type ConfirmItem,
 } from "../mcp-confirm";
 import { McpWriteLimiter } from "../mcp-write-limiter";
 import {
@@ -1109,7 +1109,14 @@ export class McpTransactionsTools {
       action,
       `Create this split transaction?\nAccount: ${preview.accountName}\nAmount: ${preview.amount} ${preview.currencyCode}\nDate: ${preview.transactionDate}\nSplits: ${(splits ?? []).map((s) => `${s.categoryName} ${s.amount}`).join(", ")}${this.attachmentConfirmNote(attachmentRefs)}`,
     );
-    if (isAsk(outcome)) return outcome.ask;
+    if (isAsk(outcome)) {
+      // The refs park the file bytes for the round that commits, and this
+      // round does not: it returns the question. Round two re-derives its own,
+      // so holding these would leave a duplicate copy of every uploaded file
+      // in the store until its TTL.
+      this.releaseAttachmentRefs(userId, attachmentRefs);
+      return outcome.ask;
+    }
     if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
     if (outcome === "declined") {
       this.releaseAttachmentRefs(userId, attachmentRefs);
@@ -1215,7 +1222,11 @@ export class McpTransactionsTools {
           action,
           `Create this transaction?\nAccount: ${preview.accountName}\nAmount: ${preview.amount} ${preview.currencyCode}\nDate: ${preview.transactionDate}${this.attachmentConfirmNote(attachmentRefs)}`,
         );
-        if (isAsk(outcome)) return outcome.ask;
+        if (isAsk(outcome)) {
+          // See manageCreateSplit: the asking round parks nothing it keeps.
+          this.releaseAttachmentRefs(userId, attachmentRefs);
+          return outcome.ask;
+        }
         if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
         if (outcome === "declined") {
           this.releaseAttachmentRefs(userId, attachmentRefs);
@@ -1475,7 +1486,11 @@ export class McpTransactionsTools {
         action,
         confirmMessage,
       );
-      if (isAsk(outcome)) return outcome.ask;
+      if (isAsk(outcome)) {
+        // See manageCreateSplit: the asking round parks nothing it keeps.
+        this.releaseAttachmentRefs(userId, attachmentRefs);
+        return outcome.ask;
+      }
       if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
       if (outcome === "declined") {
         this.releaseAttachmentRefs(userId, attachmentRefs);
@@ -1738,7 +1753,7 @@ export class McpTransactionsTools {
     const answers = await confirmWriteMany(
       server,
       ctx,
-      this.confirmItems(cards),
+      confirmItemsForCards(cards, (card) => this.confirmLineFor(card)),
     );
     if (!(answers instanceof Map)) return answers.ask;
     const ids: string[] = [];
@@ -1748,15 +1763,6 @@ export class McpTransactionsTools {
       if (id) ids.push(id);
     }
     return toolResult({ ids, count: ids.length, skipped });
-  }
-
-  /** One confirmation item per card, keyed by position within this round. */
-  private confirmItems(cards: PendingAiAction[]): ConfirmItem[] {
-    return cards.map((card, index) => ({
-      key: cardKey(index),
-      message: this.confirmLineFor(card),
-      action: card.descriptor,
-    }));
   }
 
   private confirmLineFor(card: PendingAiAction): string {

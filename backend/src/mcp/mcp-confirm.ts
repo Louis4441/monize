@@ -9,6 +9,7 @@ import {
   type ServerContext,
 } from "@modelcontextprotocol/server";
 import { canonicalize } from "../ai/actions/ai-action-signing.service";
+import { AI_ACTION_ENVELOPE_FIELDS } from "../ai/actions/ai-action.types";
 import {
   clientAnsweredForItself,
   elicitationBehaviour,
@@ -51,9 +52,11 @@ export interface ConfirmItem {
   message: string;
   /**
    * The action this approval is for, canonicalized into the sealed state so
-   * the round that writes can prove it is writing what was approved. Anything
-   * that varies between rounds (an action id, an expiry, a signature) must be
-   * left out by the caller.
+   * the round that writes can prove it is writing what was approved.
+   *
+   * Pass the signed action descriptor as it is: the fields that vary between
+   * rounds are stripped centrally by `roundStableAction`, because a caller
+   * that had to remember to strip them is a caller that will forget.
    */
   action: unknown;
 }
@@ -116,11 +119,58 @@ export function installConfirmSupport(
 }
 
 /**
+ * Fields an action carries that are minted per BUILD rather than describing the
+ * change, so two derivations of the same change disagree on them.
+ *
+ * The two rounds of a 2026-07-28 confirmation are two separate tool calls, and
+ * each one rebuilds its descriptor: `actionId` is a fresh UUID, `expiresAt` a
+ * fresh clock reading, `attachmentRefId` a fresh parking slot for bytes that
+ * are otherwise identified by `sha256`, `filename`, `contentType` and
+ * `byteSize` -- all of which stay in the fingerprint. Hashing any of them would
+ * make every retry a mismatch and refuse every confirmed write.
+ *
+ * The envelope half is not restated here: it comes from the descriptor's own
+ * declaration (`AI_ACTION_ENVELOPE_FIELDS`), whose type makes the compiler
+ * refuse a new per-build field that is not on the list.
+ */
+const ROUND_VOLATILE_ACTION_FIELDS: ReadonlySet<string> = new Set<string>([
+  ...AI_ACTION_ENVELOPE_FIELDS,
+  // Derived from the descriptor, so it varies with it.
+  "signature",
+  // The parking slot, not the file: sha256/filename/contentType/byteSize stay.
+  "attachmentRefId",
+]);
+
+/**
+ * The part of an action that says WHAT is being approved, with the per-build
+ * fields removed at every depth (a batch descriptor nests rows, and a row can
+ * nest attachments).
+ *
+ * Exported for the guard that drives the real action builder twice and asserts
+ * the projection is identical; nothing else should need it.
+ */
+export function roundStableAction(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(roundStableAction);
+  }
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  const stable: Record<string, unknown> = {};
+  for (const [key, nested] of Object.entries(value)) {
+    if (ROUND_VOLATILE_ACTION_FIELDS.has(key)) continue;
+    stable[key] = roundStableAction(nested);
+  }
+  return stable;
+}
+
+/**
  * Hash of the exact set of actions a user is being asked to approve.
  *
  * The keys and messages are in it as well as the actions: a retry that asks the
  * same rows under different wording, or in a different order, is not the
- * confirmation that was given.
+ * confirmation that was given. The actions go in through `roundStableAction`,
+ * so what is hashed is the change and not the round it was built in.
  */
 export function confirmationFingerprint(items: ConfirmItem[]): string {
   return createHash("sha256")
@@ -129,11 +179,29 @@ export function confirmationFingerprint(items: ConfirmItem[]): string {
         items.map((item) => ({
           key: item.key,
           message: item.message,
-          action: item.action,
+          action: roundStableAction(item.action),
         })),
       ),
     )
     .digest("hex");
+}
+
+/**
+ * One confirmation item per approval card, keyed by position within the round.
+ *
+ * Every write tool asks the same question of a list of `PendingAiAction`s, and
+ * three copies of this mapping is three places for the action passed to the
+ * fingerprint to drift from the descriptor that is actually committed.
+ */
+export function confirmItemsForCards<T extends { descriptor: unknown }>(
+  cards: readonly T[],
+  lineFor: (card: T) => string,
+): ConfirmItem[] {
+  return cards.map((card, index) => ({
+    key: cardKey(index),
+    message: lineFor(card),
+    action: card.descriptor,
+  }));
 }
 
 /** Whether this request is a 2026-07-28 one (it carries the `_meta` envelope). */

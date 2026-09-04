@@ -13,7 +13,11 @@ import {
   confirmationFingerprint,
   installConfirmSupport,
   isAsk,
+  roundStableAction,
 } from "./mcp-confirm";
+import { AiActionBuilderService } from "../ai/actions/ai-action-builder.service";
+import { AiActionSigningService } from "../ai/actions/ai-action-signing.service";
+import type { CreateTransactionPreview } from "../transactions/transactions.service";
 import { McpRequestStateCodec } from "./mcp-request-state";
 import { mcpTestCtx, McpTestContext } from "./testing/mcp-test-context";
 
@@ -443,6 +447,151 @@ describe("mcp-confirm", () => {
           ),
         ).rejects.toThrow();
       });
+    });
+  });
+});
+
+/**
+ * The fingerprint has to survive being computed twice, because that is the
+ * whole of a multi round-trip confirmation: round one asks, round two rebuilds
+ * the same change from the same arguments and must recognise it.
+ *
+ * These drive the REAL action builder rather than a double. A double that
+ * returns one frozen object agrees with itself no matter what the fingerprint
+ * hashes, which is how a descriptor carrying a per-build `actionId` and
+ * `expiresAt` shipped: every confirmed write on 2026-07-28 was refused with
+ * "the confirmation no longer matches the change", and every test was green.
+ */
+describe("the fingerprint of a real action, across two rounds", () => {
+  const builder = new AiActionBuilderService(
+    new AiActionSigningService({
+      get: () => "unit-test-secret",
+    } as never),
+  );
+
+  const preview: CreateTransactionPreview = {
+    accountId: "acc-1",
+    accountName: "Checking",
+    amount: -50,
+    transactionDate: "2025-01-15",
+    payeeId: null,
+    payeeName: "Store",
+    payeeMatched: false,
+    payeeWillBeCreated: true,
+    categoryId: "cat-1",
+    categoryName: "Groceries",
+    description: null,
+    currencyCode: "CAD",
+  };
+
+  /** What a tool passes to `confirmWrite`, built fresh as each round does. */
+  const round = (action: unknown) => [
+    { key: "confirm", message: "Create this transaction?", action },
+  ];
+
+  it("agrees with itself when the same change is re-derived", () => {
+    const first = builder.buildCreateTransaction("u1", preview);
+    const second = builder.buildCreateTransaction("u1", preview);
+
+    // The premise: the two descriptors are NOT equal, so this is a real test.
+    expect(second.descriptor).not.toEqual(first.descriptor);
+    expect(confirmationFingerprint(round(second.descriptor))).toBe(
+      confirmationFingerprint(round(first.descriptor)),
+    );
+  });
+
+  it("agrees when the change carries attachments parked in a new slot", () => {
+    const attachment = {
+      filename: "receipt.png",
+      contentType: "image/png",
+      byteSize: 1024,
+      sha256: "a".repeat(64),
+    };
+    const first = builder.buildCreateTransaction("u1", preview, undefined, [
+      { attachmentRefId: "ref-round-one", ...attachment },
+    ]);
+    const second = builder.buildCreateTransaction("u1", preview, undefined, [
+      { attachmentRefId: "ref-round-two", ...attachment },
+    ]);
+
+    expect(confirmationFingerprint(round(second.descriptor))).toBe(
+      confirmationFingerprint(round(first.descriptor)),
+    );
+  });
+
+  // The projection removes the round, not the change: everything that says
+  // WHAT is being approved has to survive it, or the fingerprint stops
+  // catching a retry that altered the change.
+  it("still separates two different changes", () => {
+    const first = builder.buildCreateTransaction("u1", preview);
+    const other = builder.buildCreateTransaction("u1", {
+      ...preview,
+      amount: -999,
+    });
+
+    expect(confirmationFingerprint(round(other.descriptor))).not.toBe(
+      confirmationFingerprint(round(first.descriptor)),
+    );
+  });
+
+  it("still separates the same change against another account", () => {
+    const first = builder.buildCreateTransaction("u1", preview);
+    const other = builder.buildCreateTransaction("u1", {
+      ...preview,
+      accountId: "acc-2",
+      accountName: "Savings",
+    });
+
+    expect(confirmationFingerprint(round(other.descriptor))).not.toBe(
+      confirmationFingerprint(round(first.descriptor)),
+    );
+  });
+
+  it("still separates a different file behind the same parking slot", () => {
+    const slot = "ref-1";
+    const first = builder.buildCreateTransaction("u1", preview, undefined, [
+      {
+        attachmentRefId: slot,
+        filename: "receipt.png",
+        contentType: "image/png",
+        byteSize: 1024,
+        sha256: "a".repeat(64),
+      },
+    ]);
+    const other = builder.buildCreateTransaction("u1", preview, undefined, [
+      {
+        attachmentRefId: slot,
+        filename: "receipt.png",
+        contentType: "image/png",
+        byteSize: 1024,
+        sha256: "b".repeat(64),
+      },
+    ]);
+
+    expect(confirmationFingerprint(round(other.descriptor))).not.toBe(
+      confirmationFingerprint(round(first.descriptor)),
+    );
+  });
+
+  // A batch descriptor nests its rows, and a row can nest attachments, so the
+  // projection has to reach every depth rather than the top level only.
+  it("removes the per-build fields at every depth", () => {
+    expect(
+      roundStableAction({
+        type: "batch_actions",
+        actionId: "a1",
+        expiresAt: 1,
+        rows: [
+          {
+            actionId: "a2",
+            amount: -50,
+            attachments: [{ attachmentRefId: "r1", sha256: "abc" }],
+          },
+        ],
+      }),
+    ).toEqual({
+      type: "batch_actions",
+      rows: [{ amount: -50, attachments: [{ sha256: "abc" }] }],
     });
   });
 });

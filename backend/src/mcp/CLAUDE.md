@@ -10,7 +10,7 @@ Monize exposes its financial data over the **Model Context Protocol** so MCP cli
 - **The legacy path stays selected on purpose.** The SDK's stateless legacy fallback would serve a 2025-era client from an instance that holds nothing between rounds, and our 2025 confirmation is a server-initiated elicitation that waits.
 - **GET and DELETE are 2025-era session operations.** Without a session id they answer `405` with `Allow: POST`: the new revision has no standalone stream and no session to end.
 - **Auth** (`validatePat`): `Authorization: Bearer <token>`. `pat_*` tokens go through `PatService`; everything else is treated as an OAuth 2.1 access token (`OAuthProviderService`). A 401 returns `WWW-Authenticate` with `resource_metadata` (RFC 9728) pointing at `/.well-known/oauth-protected-resource`. A credential that cannot be identified (an OAuth grant with no id) is refused with 403 rather than served.
-- **Server factory** (`mcp-server.service.ts`): `createServer({ era })` builds a fresh `McpServer`, sets `instructions`, capabilities, cache hints and the confirmation options, and registers every tool/resource/prompt. The modern handler calls it per request, the sessionful path once per session. The server `version` is read from `backend/package.json` -- never hardcode it.
+- **Server factory** (`mcp-server.service.ts`): `createServer()` builds a fresh `McpServer`, sets `instructions`, capabilities, cache hints and the confirmation options, and registers every tool/resource/prompt. The modern handler calls it per request, the sessionful path once per session. It deliberately takes no era: a factory that cannot see which revision asked cannot answer them differently. The server `version` is read from `backend/package.json` -- never hardcode it.
 
 ## Identity is a property of the request, not of a session
 
@@ -26,7 +26,8 @@ mcp/
   mcp-server.service.ts      # createServer(): wires everything onto an McpServer
   mcp-context.ts             # request identity (toAuthInfo/resolveUserContext/callerKey),
                              # requireScope, toolResult/toolError, sanitization
-  mcp-confirm.ts             # the write confirmation, in both revisions' shapes
+  mcp-confirm.ts             # the write confirmation, in both revisions' shapes,
+                             # and the round-stable projection it fingerprints
   mcp-request-state.ts       # the seal a multi round-trip confirmation carries
   mcp-annotations.ts         # shared tool annotation presets (READ_ONLY/CREATE/UPDATE)
   mcp-write-limiter.ts       # per-user daily write cap for mutating tools
@@ -38,7 +39,7 @@ mcp/
   mcp.module.ts              # NestJS providers/imports
 ```
 
-Each tool/resource/prompt is an `@Injectable()` class with a `register(server, resolve)` method, listed in both `mcp.module.ts` (providers) and `mcp-server.service.ts` (wired into `createServer`).
+Each tool/resource/prompt is an `@Injectable()` class with a `register(server)` method, listed in both `mcp.module.ts` (providers) and `mcp-server.service.ts` (wired into `createServer`).
 
 ## Adding a tool (required format)
 
@@ -79,7 +80,7 @@ Checklist for a new tool:
 2. Add the tool to its domain `tools/*.tool.ts` with the five config fields above.
 3. Add its output schema to `tool-output-schemas.ts` (conventions below) and import it.
 4. Pick the right annotation preset (below).
-5. If it mutates data, derive scope `"write"`, enforce the daily write limit via `McpWriteLimiter` (see `transactions.tool.ts`), and sanitize user strings with `stripHtml(...)` before persisting. Gate the write behind a user confirmation with `confirmWrite(server, ctx, message, action)`, passing the action descriptor so the confirmation is fingerprinted. **Handle all four outcomes**: return `outcome.ask` unchanged when `isAsk(outcome)` (the question, on 2026-07-28 -- write nothing), persist on `"accepted"`/`"unsupported"`, and return a `toolError` without writing on `"declined"`. `"unsupported"` means no dialog reached a human -- the client still gates every tool call with its own approval prompt, so proceeding is not a consent bypass.
+5. If it mutates data, derive scope `"write"`, enforce the daily write limit via `McpWriteLimiter` (see `transactions.tool.ts`), and sanitize user strings with `stripHtml(...)` before persisting. Gate the write behind a user confirmation with `confirmWrite(server, ctx, message, action)`, passing the signed action descriptor as it is -- `confirmationFingerprint` strips the per-build fields itself (see below), so a caller neither may nor need pre-trim it. **Handle all four outcomes**: return `outcome.ask` unchanged when `isAsk(outcome)` (the question, on 2026-07-28 -- write nothing), persist on `"accepted"`/`"unsupported"`, and return a `toolError` without writing on `"declined"`. `"unsupported"` means no dialog reached a human -- the client still gates every tool call with its own approval prompt, so proceeding is not a consent bypass.
    - **Relay first.** When the call is serving a prompt the user typed in the Monize web chat (reverse relay), confirm there instead: build the signed `PendingAiAction` with `AiActionBuilderService` (shared with the AI Assistant tool executor) and emit it. If the card is shown in the browser (committed via `/ai/actions/confirm` on approval), return `RELAY_PREVIEW_SHOWN` and do NOT write or `confirmWrite`; otherwise fall through to `confirmWrite`. Offer the card only when `ctx.mcpReq.requestState()` is absent -- a retry round already carries the user's answer.
 6. Update `mcp-server.service.ts` count and `mcp.module.ts` if it's a new provider class.
 7. Add/extend tests (below). `mcp-annotations.spec.ts` enforces that every tool has title + input/output schema + annotations with the right read/write hints -- bump `EXPECTED_TOOL_COUNT` and `WRITE_TOOLS`/`IDEMPOTENT_WRITES`.
@@ -92,9 +93,12 @@ Every write is confirmed by a human before it is saved, and how that question is
 
 Three properties make that round trip safe, and all three live in the seal (`mcp-request-state.ts`, verified by the SDK seam before any handler runs):
 
-- **It is bound to the credential and the method.** A confirmation cannot be replayed by another caller or against another tool.
+- **It is bound to the credential and the method.** A confirmation cannot be replayed by another caller or against another tool. It is not single-use: the same seal and the same answer, re-sent by the same credential against the same tool inside the TTL, commits again. A client able to do that could equally have fabricated the `accept` in the first place -- the answer is client-asserted on this revision, exactly as it is on the 2025-era one -- so the seal bounds who and what, never how many times.
 - **It carries a fingerprint of what the user was shown**, recomputed on the round that writes. A retry that re-derived different rows -- a name that now resolves elsewhere, an amount the model altered -- is refused with a message telling the model to ask again. The seam can prove the state is ours and unexpired; only the fingerprint can prove it is about *this* change.
+- **What is fingerprinted is the change, not the round it was built in.** Round two is a separate tool call, so it rebuilds its descriptor: `actionId` is a fresh UUID, `expiresAt` a fresh clock reading, and an attachment's `attachmentRefId` a fresh parking slot. `roundStableAction` drops exactly those at every depth (the envelope half from `AI_ACTION_ENVELOPE_FIELDS`, so the descriptor's own declaration is the list and the compiler refuses a new per-build field that is not on it); everything that says *what* is being approved -- amounts, ids, dates, an attachment's `sha256` -- stays in. Hashing the descriptor raw is not a smaller version of this: it makes every fingerprint unique, so every confirmed write on 2026-07-28 is refused with "the confirmation no longer matches the change". `mcp-migration.guard.spec.ts` fails on the raw form, and `mcp-confirm.spec.ts` drives the **real** action builder twice -- a builder double that returns one frozen object agrees with itself no matter what is hashed, which is how the defect shipped green.
 - **It is signed, not encrypted.** The client can read the payload, so it holds a fingerprint and nothing else: no row ids, no amounts, no names.
+
+Every card's item comes from `confirmItemsForCards`, so what a card is fingerprinted under is one decision rather than one per tool.
 
 Two consequences to keep: **individual approval mode asks for every card in ONE round** (a round per card would be 25 rounds on a full batch, and the flow allows two), and **a relay card is offered only on the round that asks** -- on a retry the human has already answered in their own client, and a web-chat turn that began in between would swallow that answer.
 
@@ -211,8 +215,8 @@ Tools/resources/prompts unit tests mock `registerTool`/`registerResource`/`regis
 - `tool-output-schemas.spec.ts` -- each output schema accepts a representative `toolResult` payload (incl. NaN, null, and alternate branches), and an end-to-end round-trip through the real SDK via `InMemoryTransport`.
 - `mcp-server.service.spec.ts` -- registration counts, the advertised version tracking `package.json`, the cache fields on a real listing, and the absence of the `logging` capability.
 - `mcp-eras.spec.ts` -- **both revisions, in process, against the real SDK**: a client pinned to 2026-07-28 over `handler.fetch` and a 2025-era client over `InMemoryTransport` reach the same tools and resolve the same caller, and a write is confirmed in two rounds (accepted, declined, and never answered). A mocked transport cannot show any of that.
-- `mcp-confirm.spec.ts` -- the confirmation matrix in both shapes, including a seal replayed under another credential or another tool.
-- `mcp-migration.guard.spec.ts` -- the mechanical rules: no 1.x import, no session-shaped identity read, no tool building its own `inputRequired` or reading `inputResponses`, and every tool that confirms a write handling the unanswered round.
+- `mcp-confirm.spec.ts` -- the confirmation matrix in both shapes, a seal replayed under another credential or another tool, and the fingerprint of a **real** built action holding across two rounds while still separating two different changes.
+- `mcp-migration.guard.spec.ts` -- the mechanical rules: no 1.x import, no session-shaped identity read, no tool building its own `inputRequired`, reading `inputResponses` or mapping its own confirmation cards, every tool that confirms a write handling the unanswered round, and the fingerprint taken over the round-stable projection.
 
 ## Spec compliance notes
 

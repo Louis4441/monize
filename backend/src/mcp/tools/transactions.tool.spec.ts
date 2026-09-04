@@ -6,6 +6,42 @@ import { installConfirmSupport } from "../mcp-confirm";
 import { McpRequestStateCodec } from "../mcp-request-state";
 import { mcpTestCtx, McpTestContext } from "../testing/mcp-test-context";
 
+/**
+ * A builder double that mints a FRESH envelope per call, exactly as the real
+ * `AiActionBuilderService` does.
+ *
+ * The previous double returned one frozen object with no `descriptor` at all,
+ * so the two rounds of a 2026-07-28 confirmation fingerprinted `undefined`
+ * twice and agreed by construction -- which is precisely the bug that shipped:
+ * in production every round rebuilt its descriptor with a new `actionId` and
+ * `expiresAt`, the fingerprints never matched, and every confirmed write was
+ * refused. A double that cannot vary cannot show that.
+ */
+function buildActionBuilderMock(): Record<string, jest.Mock> {
+  let minted = 0;
+  const build = (type: string) =>
+    jest.fn(() => ({
+      type,
+      preview: {},
+      descriptor: {
+        type,
+        userId: "u1",
+        actionId: `action-${++minted}`,
+        expiresAt: 1_700_000_000_000 + minted,
+      },
+    }));
+  return {
+    buildCreateTransaction: build("create_transaction"),
+    buildCreateTransactions: build("create_transactions"),
+    buildCategorizeTransaction: jest.fn().mockReturnValue({}),
+    buildUpdateTransaction: build("update_transaction"),
+    buildDeleteTransaction: build("delete_transaction"),
+    buildCreateTransfer: build("create_transfer"),
+    buildUpdateTransfer: build("update_transfer"),
+    buildBatchActions: build("batch_actions"),
+  };
+}
+
 describe("McpTransactionsTools", () => {
   let tool: McpTransactionsTools;
   let transactionsService: Record<string, jest.Mock>;
@@ -77,30 +113,7 @@ describe("McpTransactionsTools", () => {
     // Default: not serving a relayed prompt, so the tool uses its normal
     // (direct MCP-client) confirmation path and the existing assertions hold.
     relayService = { emitPendingAction: jest.fn().mockReturnValue(false) };
-    actionBuilder = {
-      buildCreateTransaction: jest
-        .fn()
-        .mockReturnValue({ type: "create_transaction", preview: {} }),
-      buildCreateTransactions: jest
-        .fn()
-        .mockReturnValue({ type: "create_transactions", preview: {} }),
-      buildCategorizeTransaction: jest.fn().mockReturnValue({}),
-      buildUpdateTransaction: jest
-        .fn()
-        .mockReturnValue({ type: "update_transaction", preview: {} }),
-      buildDeleteTransaction: jest
-        .fn()
-        .mockReturnValue({ type: "delete_transaction", preview: {} }),
-      buildCreateTransfer: jest
-        .fn()
-        .mockReturnValue({ type: "create_transfer", preview: {} }),
-      buildUpdateTransfer: jest
-        .fn()
-        .mockReturnValue({ type: "update_transfer", preview: {} }),
-      buildBatchActions: jest
-        .fn()
-        .mockReturnValue({ type: "batch_actions", preview: {} }),
-    };
+    actionBuilder = buildActionBuilderMock();
     prepService = {
       prepareCreate: jest.fn(),
       prepareCreateTransfer: jest.fn().mockResolvedValue({
@@ -2362,6 +2375,38 @@ describe("McpTransactionsTools", () => {
       expect(result.isError).toBe(true);
       expect(transactionsService.create).not.toHaveBeenCalled();
       expect(attachmentsService.create).not.toHaveBeenCalled();
+      expect(relayAttachmentStore.releaseForPrompt).toHaveBeenCalledWith(
+        UUID_USER,
+        ["fresh-1"],
+      );
+    });
+
+    // The asking round of a 2026-07-28 write parks the bytes to build its
+    // preview and then returns the question. Round two re-derives its own refs,
+    // so anything held here is a duplicate copy of every uploaded file sitting
+    // in the store until its TTL, counting against the per-user cap.
+    it("releases parked refs on the round that only asks", async () => {
+      const asking = mcpTestCtx(
+        { userId: UUID_USER, scopes: "write" },
+        {
+          sessionId: undefined,
+          envelope: {
+            [CLIENT_CAPABILITIES_META_KEY]: { elicitation: { form: {} } },
+          },
+        },
+      );
+      installConfirmSupport(
+        server as any,
+        new McpRequestStateCodec({ get: () => "unit-test-secret" } as any),
+      );
+
+      const result = await handlers["manage_transactions"](
+        createArgs([{ fileData: PNG_B64, fileName: "receipt.png" }]),
+        asking,
+      );
+
+      expect(result.resultType).toBe("input_required");
+      expect(transactionsService.create).not.toHaveBeenCalled();
       expect(relayAttachmentStore.releaseForPrompt).toHaveBeenCalledWith(
         UUID_USER,
         ["fresh-1"],
