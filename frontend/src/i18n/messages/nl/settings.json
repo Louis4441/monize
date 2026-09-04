@@ -303,16 +303,18 @@
       "facts": {
         "endpoint": "Eindpunt",
         "transport": "Bezorgd via",
+        "registeredIp": "Geregistreerd vanaf",
         "registered": "Geregistreerd",
         "lastSeen": "Laatst actief",
         "lastDelivery": "Laatste bezorging",
         "noDelivery": "Nog niets bezorgd",
-        "userAgent": "Browser"
+        "userAgent": "Browser",
+        "unknownIp": "Onbekend"
       }
     },
     "preferences": {
       "heading": "Hoe ik meldingen ontvang",
-      "description": "De bel toont altijd elke melding. Kies welke soorten Monize ook per e-mail of push verstuurt, en hoe vaak.",
+      "description": "Kies welke soorten Monize per e-mail of push verstuurt, en hoe vaak.",
       "categoryHeader": "Melding",
       "channels": {
         "emailReport": "E-mail (rapport)",

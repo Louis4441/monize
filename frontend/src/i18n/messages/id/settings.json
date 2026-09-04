@@ -303,16 +303,18 @@
       "facts": {
         "endpoint": "Endpoint",
         "transport": "Dikirim melalui",
+        "registeredIp": "Didaftarkan dari",
         "registered": "Terdaftar",
         "lastSeen": "Terakhir aktif",
         "lastDelivery": "Pengiriman terakhir",
         "noDelivery": "Belum ada yang dikirim",
-        "userAgent": "Peramban"
+        "userAgent": "Peramban",
+        "unknownIp": "Tidak diketahui"
       }
     },
     "preferences": {
       "heading": "Cara memberi tahu saya",
-      "description": "Bel selalu menampilkan setiap notifikasi. Pilih jenis mana yang juga dikirim Monize melalui email atau push, dan seberapa sering.",
+      "description": "Pilih jenis mana yang dikirim Monize lewat email atau push, dan seberapa sering.",
       "categoryHeader": "Notifikasi",
       "channels": {
         "emailReport": "Email (laporan)",

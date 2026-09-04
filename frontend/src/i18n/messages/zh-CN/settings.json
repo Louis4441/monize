@@ -303,16 +303,18 @@
       "facts": {
         "endpoint": "端点",
         "transport": "投递方式",
+        "registeredIp": "注册来源",
         "registered": "注册时间",
         "lastSeen": "最近活动",
         "lastDelivery": "最近投递",
         "noDelivery": "尚未投递过任何内容",
-        "userAgent": "浏览器"
+        "userAgent": "浏览器",
+        "unknownIp": "未知"
       }
     },
     "preferences": {
       "heading": "如何通知我",
-      "description": "铃铛始终显示所有通知。选择 Monize 还通过邮件或推送发送哪些类型，以及频率。",
+      "description": "选择 Monize 通过邮件或推送发送哪些类型，以及发送频率。",
       "categoryHeader": "通知",
       "channels": {
         "emailReport": "邮件（报告）",

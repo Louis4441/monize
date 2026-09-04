@@ -303,16 +303,18 @@
       "facts": {
         "endpoint": "Punkt końcowy",
         "transport": "Dostarczane przez",
+        "registeredIp": "Zarejestrowano z",
         "registered": "Zarejestrowano",
         "lastSeen": "Ostatnia aktywność",
         "lastDelivery": "Ostatnie dostarczenie",
         "noDelivery": "Nic jeszcze nie dostarczono",
-        "userAgent": "Przeglądarka"
+        "userAgent": "Przeglądarka",
+        "unknownIp": "Nieznany"
       }
     },
     "preferences": {
       "heading": "Jak mnie powiadamiać",
-      "description": "Dzwonek zawsze pokazuje wszystkie powiadomienia. Wybierz, które rodzaje Monize wyśle również e-mailem lub push, i jak często.",
+      "description": "Wybierz, które rodzaje Monize wysyła e-mailem lub przez push i jak często.",
       "categoryHeader": "Powiadomienie",
       "channels": {
         "emailReport": "E-mail (raport)",

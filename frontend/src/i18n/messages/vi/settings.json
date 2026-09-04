@@ -303,16 +303,18 @@
       "facts": {
         "endpoint": "Điểm cuối",
         "transport": "Gửi qua",
+        "registeredIp": "Đăng ký từ",
         "registered": "Đã đăng ký",
         "lastSeen": "Hoạt động gần nhất",
         "lastDelivery": "Lần gửi gần nhất",
         "noDelivery": "Chưa gửi gì",
-        "userAgent": "Trình duyệt"
+        "userAgent": "Trình duyệt",
+        "unknownIp": "Không rõ"
       }
     },
     "preferences": {
       "heading": "Cách thông báo cho tôi",
-      "description": "Chuông luôn hiển thị mọi thông báo. Chọn loại nào Monize cũng gửi qua email hoặc push, và tần suất.",
+      "description": "Chọn những loại mà Monize gửi qua email hoặc push, và tần suất gửi.",
       "categoryHeader": "Thông báo",
       "channels": {
         "emailReport": "Email (báo cáo)",

@@ -373,7 +373,15 @@ export function PushDevicesPanel() {
           {devices.map((device) => (
             <li
               key={device.id}
-              className="flex flex-wrap items-start justify-between gap-2 py-2"
+              // Deliberately NOT `flex-wrap`. The facts below the device name
+              // give the content block a wide min-content -- an endpoint digest,
+              // an agent string -- so on a wrapping row whichever device had the
+              // longest of them pushed Remove onto its own line, bottom left,
+              // while every other row kept it top right. The content column
+              // shrinks (`min-w-0`, with `truncate`/`break-all` inside it) and
+              // the action never does, which is how the token and trusted-device
+              // lists in this same page are laid out.
+              className="flex items-start justify-between gap-2 py-2"
             >
               <div className="min-w-0">
                 <p className="text-sm text-gray-900 dark:text-gray-100">
@@ -415,6 +423,13 @@ export function PushDevicesPanel() {
                   <DeviceFact label={t('facts.transport')}>
                     {t(`transport.${device.transport ?? 'webpush'}`)}
                   </DeviceFact>
+                  <DeviceFact label={t('facts.registeredIp')}>
+                    {/* Absent (an older backend) and null (the server could not
+                        determine one) are both unknown, and unknown is a state
+                        with words -- never a blank cell, and never an address
+                        nobody was at. */}
+                    {device.registeredIp ?? t('facts.unknownIp')}
+                  </DeviceFact>
                   <DeviceFact label={t('facts.registered')}>
                     {formatDateTime(device.createdAt)}
                   </DeviceFact>
@@ -442,10 +457,11 @@ export function PushDevicesPanel() {
                 </dl>
               </div>
               <Button
-                variant="ghost"
+                variant="danger"
                 size="sm"
                 disabled={removingId === device.id}
                 onClick={() => handleRemove(device)}
+                className="flex-shrink-0"
               >
                 {t('removeButton')}
               </Button>

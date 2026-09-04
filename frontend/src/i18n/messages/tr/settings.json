@@ -303,16 +303,18 @@
       "facts": {
         "endpoint": "Uç nokta",
         "transport": "Şununla iletilir",
+        "registeredIp": "Şuradan kaydedildi",
         "registered": "Kaydedildi",
         "lastSeen": "Son etkinlik",
         "lastDelivery": "Son teslimat",
         "noDelivery": "Henüz hiçbir şey iletilmedi",
-        "userAgent": "Tarayıcı"
+        "userAgent": "Tarayıcı",
+        "unknownIp": "Bilinmiyor"
       }
     },
     "preferences": {
       "heading": "Beni nasıl bilgilendirelim",
-      "description": "Zil her zaman tüm bildirimleri gösterir. Monize'ın hangi türleri ayrıca e-posta veya push ile ve ne sıklıkla göndereceğini seçin.",
+      "description": "Monize'ın e-posta veya push ile hangi türleri, ne sıklıkta göndereceğini seçin.",
       "categoryHeader": "Bildirim",
       "channels": {
         "emailReport": "E-posta (rapor)",

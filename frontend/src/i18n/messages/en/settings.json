@@ -303,16 +303,18 @@
       "facts": {
         "endpoint": "Endpoint",
         "transport": "Delivered by",
+        "registeredIp": "Registered from",
         "registered": "Registered",
         "lastSeen": "Last active",
         "lastDelivery": "Last delivery",
         "noDelivery": "Nothing delivered yet",
-        "userAgent": "Browser"
+        "userAgent": "Browser",
+        "unknownIp": "Unknown"
       }
     },
     "preferences": {
       "heading": "How to notify me",
-      "description": "The bell always shows every notification. Choose which kinds Monize also sends by email or push, and how often.",
+      "description": "Choose which kinds Monize sends by email or push, and how often.",
       "categoryHeader": "Notification",
       "channels": {
         "emailReport": "Email (report)",

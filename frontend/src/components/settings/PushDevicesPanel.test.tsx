@@ -77,6 +77,7 @@ function device(overrides: Partial<PushDevice> = {}): PushDevice {
     createdAt: '2026-08-01T10:00:00.000Z',
     lastSeenAt: '2026-08-02T10:00:00.000Z',
     lastSuccessAt: null,
+    registeredIp: '203.0.113.7',
     disabledAt: null,
     disabledReason: null,
     ...overrides,
@@ -181,6 +182,7 @@ describe('PushDevicesPanel', () => {
         createdAt: '2026-08-01T10:00:00.000Z',
         lastSeenAt: '2026-08-02T10:00:00.000Z',
         lastSuccessAt: '2026-08-02T11:00:00.000Z',
+        registeredIp: '203.0.113.7',
       }),
     ]);
     mockCurrentFingerprint.mockResolvedValue(THIS_DEVICE);
@@ -197,13 +199,76 @@ describe('PushDevicesPanel', () => {
     expect(screen.getByText('Registered')).toBeInTheDocument();
     expect(screen.getByText('Last active')).toBeInTheDocument();
     expect(screen.getByText('Last delivery')).toBeInTheDocument();
+    expect(screen.getByText('Registered from')).toBeInTheDocument();
+    expect(screen.getByText('203.0.113.7')).toBeInTheDocument();
     expect(
       screen.getByText('Mozilla/5.0 (X11; Linux x86_64) Chrome/140'),
     ).toBeInTheDocument();
   });
 
+  // Absent (a backend that predates the column) and null (a request whose
+  // address the server could not determine) are the same fact -- unknown -- and
+  // unknown is a state with words, never a blank cell and never an invented
+  // address.
+  it.each([
+    // `undefined` is the shape a backend predating the column sends; `null` is
+    // this backend saying it could not determine one.
+    ['the field is absent', undefined],
+    ['the server stored none', null],
+  ])('says the address is unknown when %s', async (_name, registeredIp) => {
+    mockListDevices.mockResolvedValue([device({ registeredIp })]);
+    mockCurrentFingerprint.mockResolvedValue(THIS_DEVICE);
+
+    render(<PushDevicesPanel />);
+
+    await screen.findByText('Registered from');
+    expect(screen.getByText('Unknown')).toBeInTheDocument();
+  });
+
   // A device nothing has ever reached is exactly the one a reader is hunting
   // for, so "never" is a state with words, not a blank cell.
+  // The regression: the row wrapped. The facts under the device name give the
+  // content block a wide min-content, so on a `flex-wrap` row whichever device
+  // had the longest endpoint digest or agent string pushed Remove onto its own
+  // line -- bottom left on that one row, top right on every other, which reads
+  // as a rendering fault rather than a layout.
+  it('keeps Remove on the row, whatever the device name and facts are', async () => {
+    mockListDevices.mockResolvedValue([
+      device({
+        deviceName:
+          'A browser with a very long derived name on a very long platform',
+        userAgent:
+          'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
+      }),
+      device({ id: 'd-2', endpointFingerprint: OTHER_DEVICE, deviceName: 'B' }),
+    ]);
+    mockCurrentFingerprint.mockResolvedValue(THIS_DEVICE);
+
+    render(<PushDevicesPanel />);
+
+    await screen.findByText('B');
+    const rows = screen.getAllByRole('listitem');
+    for (const row of rows) {
+      expect(row.className).not.toMatch(/\bflex-wrap\b/);
+    }
+    // And the action itself never yields the width the content column does.
+    for (const button of screen.getAllByRole('button', { name: 'Remove' })) {
+      expect(button.className).toMatch(/\bflex-shrink-0\b/);
+    }
+  });
+
+  // Removing a registration is destructive, so it wears the design system's one
+  // red button rather than a hand-rolled red of its own.
+  it('draws Remove as the danger button', async () => {
+    mockListDevices.mockResolvedValue([device()]);
+    mockCurrentFingerprint.mockResolvedValue(THIS_DEVICE);
+
+    render(<PushDevicesPanel />);
+
+    const remove = await screen.findByRole('button', { name: 'Remove' });
+    expect(remove.className).toMatch(/\bbg-red-600\b/);
+  });
+
   it('says so when an endpoint has never been delivered to', async () => {
     mockListDevices.mockResolvedValue([device({ lastSuccessAt: null })]);
     mockCurrentFingerprint.mockResolvedValue(THIS_DEVICE);

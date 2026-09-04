@@ -303,16 +303,18 @@
       "facts": {
         "endpoint": "एंडपॉइंट",
         "transport": "इसके ज़रिए भेजा गया",
+        "registeredIp": "यहाँ से पंजीकृत",
         "registered": "पंजीकृत",
         "lastSeen": "पिछली सक्रियता",
         "lastDelivery": "पिछली डिलीवरी",
         "noDelivery": "अभी तक कुछ नहीं भेजा गया",
-        "userAgent": "ब्राउज़र"
+        "userAgent": "ब्राउज़र",
+        "unknownIp": "अज्ञात"
       }
     },
     "preferences": {
       "heading": "मुझे कैसे सूचित करें",
-      "description": "घंटी हमेशा हर सूचना दिखाती है। चुनें कि Monize कौन-सी सूचनाएँ ई-मेल या पुश से भी भेजे, और कितनी बार।",
+      "description": "चुनें कि Monize किस प्रकार की सूचनाएँ ईमेल या पुश से भेजे, और कितनी बार।",
       "categoryHeader": "सूचना",
       "channels": {
         "emailReport": "ईमेल (रिपोर्ट)",

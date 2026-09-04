@@ -303,16 +303,18 @@
       "facts": {
         "endpoint": "Endpunkt",
         "transport": "Zugestellt über",
+        "registeredIp": "Registriert von",
         "registered": "Registriert",
         "lastSeen": "Zuletzt aktiv",
         "lastDelivery": "Letzte Zustellung",
         "noDelivery": "Noch nichts zugestellt",
-        "userAgent": "Browser"
+        "userAgent": "Browser",
+        "unknownIp": "Unbekannt"
       }
     },
     "preferences": {
       "heading": "Wie ich benachrichtigt werde",
-      "description": "Die Glocke zeigt immer jede Benachrichtigung. Wählen Sie, welche Arten Monize zusätzlich per E-Mail oder Push sendet und wie oft.",
+      "description": "Wähle, welche Arten Monize per E-Mail oder Push sendet und wie oft.",
       "categoryHeader": "Benachrichtigung",
       "channels": {
         "emailReport": "E-Mail (Bericht)",

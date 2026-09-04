@@ -849,6 +849,39 @@ exactly the state the old copy had no words for. It renders nothing -- hint
 included -- when it could not help: the instance does not offer push, the browser
 cannot receive it, or the endpoint is already registered.
 
+### 14.5.1 Telling one registered endpoint from another
+
+`device_name` is derived from the User-Agent (`defaultDeviceName`), so two
+browsers on one machine are listed under identical words -- and a reader
+deciding whether to REVOKE a registration has to be able to identify it first.
+The device list therefore shows, per row: the endpoint digest (the row's own
+identity; the endpoint itself is a delivery credential and never leaves the
+server), the wire, the address it was registered from, when it was registered,
+when it was last active, when it was last actually delivered to, and the agent
+string.
+
+`push_subscriptions.registered_ip INET` (migration 185) holds that address. Two
+properties are load-bearing:
+
+- **It is REGISTERED, not current.** A push travels from this server to the push
+  SERVICE, which reaches the device over a connection this deployment never
+  sees, so where a device is reachable today is not knowable here. The column is
+  written from the subscribe request and refreshed on each re-registration, at
+  the same moment `last_seen_at` moves -- the refresh arm OVERWRITES rather than
+  `COALESCE`s, because an older address under a moved `last_seen_at` would make
+  the pair a lie.
+- **Unknown is a state.** Null for a row predating the column and for a request
+  whose address the server could not determine; the client renders "Unknown"
+  rather than a blank cell or an invented address.
+
+The address is read by `clientIpOf` (`backend/src/common/client-ip.util.ts`),
+which is the deployment's one reading of a client address -- shared with the 2FA
+trusted-device path, so one machine cannot be stored under two spellings (a
+dual-stack listener reports every IPv4 client as `::ffff:<v4>`). It is the
+reader's own address, shown only to them, on an RLS-policied user-owned table;
+`push_subscriptions` stays in `EXCLUDED_FROM_EXPORT`, so it does not travel in a
+backup.
+
 ### 14.6 Chart-in-push (R5) -- feasibility and the security envelope
 
 Per Section 7: Android-Chrome-only progressive enhancement, default off, ships

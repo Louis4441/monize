@@ -303,16 +303,18 @@
       "facts": {
         "endpoint": "エンドポイント",
         "transport": "配信経路",
+        "registeredIp": "登録元",
         "registered": "登録日時",
         "lastSeen": "最終アクティビティ",
         "lastDelivery": "最終配信",
         "noDelivery": "まだ配信されていません",
-        "userAgent": "ブラウザー"
+        "userAgent": "ブラウザー",
+        "unknownIp": "不明"
       }
     },
     "preferences": {
       "heading": "通知方法",
-      "description": "ベルには常にすべての通知が表示されます。Monize がメールまたはプッシュでも送信する種類と、その頻度を選択します。",
+      "description": "Monize がメールまたはプッシュで送る種類と、その頻度を選びます。",
       "categoryHeader": "通知",
       "channels": {
         "emailReport": "メール（レポート）",

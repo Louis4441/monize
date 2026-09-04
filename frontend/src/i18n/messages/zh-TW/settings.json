@@ -303,16 +303,18 @@
       "facts": {
         "endpoint": "端點",
         "transport": "投遞方式",
+        "registeredIp": "註冊來源",
         "registered": "註冊時間",
         "lastSeen": "最近活動",
         "lastDelivery": "最近投遞",
         "noDelivery": "尚未投遞過任何內容",
-        "userAgent": "瀏覽器"
+        "userAgent": "瀏覽器",
+        "unknownIp": "未知"
       }
     },
     "preferences": {
       "heading": "如何通知我",
-      "description": "鈴鐺一律顯示所有通知。選擇 Monize 還要透過電子郵件或推播傳送哪些類型，以及頻率。",
+      "description": "選擇 Monize 透過電子郵件或推播傳送哪些類型，以及傳送頻率。",
       "categoryHeader": "通知",
       "channels": {
         "emailReport": "郵件（報告）",

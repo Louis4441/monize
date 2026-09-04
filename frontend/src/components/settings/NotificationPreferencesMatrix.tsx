@@ -36,7 +36,7 @@ interface NotificationPreferencesMatrixProps {
  *
  * In-app is deliberately NOT a column: the bell shows every notification and
  * there is nothing to choose, so a column of permanent ticks spent a sixth of a
- * phone's width saying so. The sentence above the grid says it instead.
+ * phone's width saying so.
  *
  * It renders independent of the email master switch on purpose: push is a
  * separate channel (delivery isolation, discussion #1291), so nesting the whole
@@ -170,7 +170,7 @@ export function NotificationPreferencesMatrix({
     live.some((device) => device.endpointFingerprint === thisDevice);
 
   return (
-    <div className="border-t border-gray-200 pt-4 dark:border-gray-700">
+    <div className="border-t border-gray-200 pt-4 pb-4 dark:border-gray-700">
       <h3 className="mb-1 text-sm font-medium text-gray-900 dark:text-gray-100">
         {t('heading')}
       </h3>

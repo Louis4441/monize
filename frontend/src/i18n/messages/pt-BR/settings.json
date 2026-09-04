@@ -303,16 +303,18 @@
       "facts": {
         "endpoint": "Endpoint",
         "transport": "Entregue por",
+        "registeredIp": "Registrado a partir de",
         "registered": "Registrado",
         "lastSeen": "Última atividade",
         "lastDelivery": "Última entrega",
         "noDelivery": "Nada entregue ainda",
-        "userAgent": "Navegador"
+        "userAgent": "Navegador",
+        "unknownIp": "Desconhecido"
       }
     },
     "preferences": {
       "heading": "Como me notificar",
-      "description": "O sino sempre mostra todas as notificações. Escolha quais tipos o Monize também envia por e-mail ou push, e com que frequência.",
+      "description": "Escolha quais tipos o Monize envia por e-mail ou push, e com que frequência.",
       "categoryHeader": "Notificação",
       "channels": {
         "emailReport": "Email (relatório)",

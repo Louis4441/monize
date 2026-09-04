@@ -303,16 +303,18 @@
       "facts": {
         "endpoint": "Кінцева точка",
         "transport": "Доставляється через",
+        "registeredIp": "Зареєстровано з",
         "registered": "Зареєстровано",
         "lastSeen": "Остання активність",
         "lastDelivery": "Остання доставка",
         "noDelivery": "Ще нічого не доставлено",
-        "userAgent": "Браузер"
+        "userAgent": "Браузер",
+        "unknownIp": "Невідомо"
       }
     },
     "preferences": {
       "heading": "Як мене сповіщати",
-      "description": "Дзвіночок завжди показує всі сповіщення. Виберіть, які типи Monize також надсилає електронною поштою чи push і як часто.",
+      "description": "Виберіть, які види Monize надсилає електронною поштою або через push і як часто.",
       "categoryHeader": "Сповіщення",
       "channels": {
         "emailReport": "Ел. пошта (звіт)",
