@@ -70,20 +70,30 @@ export class BalanceThresholdAlertService {
     userId: string,
     accountId: string,
   ): Promise<void> {
-    await withScopedDb(this.dataSource, async (manager) => {
+    // Arm/re-arm the latches in one transaction and collect the crossings that
+    // fired; dispatch AFTER it commits. `dispatch.notify` writes the row in its
+    // own transaction and then awaits the push/email fan-out -- an external side
+    // effect -- and its own contract says to call it OUTSIDE any transaction
+    // whose failure it would report. Called from inside this `withScopedDb`, its
+    // nested transaction would join this one, so the fan-out would run before
+    // the commit AND while the CAS `UPDATE accounts` row lock is held across the
+    // push HTTP; a rollback after a fire would then leave a delivered push with
+    // no committed row and re-fire the crossing. The latch is the idempotency
+    // mechanism (INV-BALANCE-002), so it commits first as the durable claim.
+    const fired = await withScopedDb(this.dataSource, async (manager) => {
+      const crossings: Array<{ row: FiredBalanceRow; kind: "low" | "high" }> =
+        [];
       const low = await this.claimLow(manager, userId, accountId);
-      if (low) {
-        await this.fire(userId, accountId, low, "low");
-      } else {
-        await this.rearmLow(manager, userId, accountId);
-      }
+      if (low) crossings.push({ row: low, kind: "low" });
+      else await this.rearmLow(manager, userId, accountId);
       const high = await this.claimHigh(manager, userId, accountId);
-      if (high) {
-        await this.fire(userId, accountId, high, "high");
-      } else {
-        await this.rearmHigh(manager, userId, accountId);
-      }
+      if (high) crossings.push({ row: high, kind: "high" });
+      else await this.rearmHigh(manager, userId, accountId);
+      return crossings;
     });
+    for (const { row, kind } of fired) {
+      await this.fire(userId, accountId, row, kind);
+    }
   }
 
   /** Arm-and-claim the low latch iff the balance is below the low threshold. */

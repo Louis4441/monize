@@ -5,6 +5,10 @@ import { DataSource } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
 import { returnedRows } from "../common/db/query-result";
+import {
+  investmentLinkedSplitExclusion,
+  investmentLinkedTransactionExclusion,
+} from "../common/investment-filter.util";
 import { todayYMD } from "../common/date-utils";
 import { preferredCurrency } from "../common/default-currency.util";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
@@ -215,11 +219,31 @@ export class PortfolioMovementAlertService {
    *
    * Included: ordinary deposits/withdrawals and transfers whose counterparty is
    * NOT an investment account. Excluded (internal): investment-linked cash legs
-   * (BUY/SELL/DIVIDEND -- identified by an `investment_transactions` row on the
-   * transaction OR on any of its split children), transfers whose counterparty
-   * is also an investment account, and VOID or future-dated rows. Grouped by
-   * account currency and converted through the shared rate service; a currency
-   * with no rate makes the flow incomplete (the movement is then withheld).
+   * (BUY/SELL/DIVIDEND), transfers whose counterparty is also an investment
+   * account, and VOID or future-dated rows. The investment-leg exclusion is the
+   * shared predicate from `investment-filter.util.ts`
+   * (`investmentLinkedTransactionExclusion` for a top-level row,
+   * `investmentLinkedSplitExclusion` for an embedded split line) rather than a
+   * hand-rolled one -- INV-PORTMOVE-006 requires it, and a hand-rolled copy had
+   * joined `investment_transactions.transaction_split_id` (a `transaction_splits`
+   * FK) against `transactions.id`, a table mismatch that made the split
+   * exclusion a silent no-op. Grouped by account currency and converted through
+   * the shared rate service; a currency with no rate makes the flow incomplete
+   * (the movement is then withheld).
+   *
+   * TWO KNOWN COARSE CASES (INV-PORTMOVE, tracked in the spec's open items),
+   * both narrowing rather than corrupting the common path:
+   *  - A split parent that mixes an embedded investment line with an ordinary
+   *    external cash line is excluded WHOLE (it sums `t.amount`, so it cannot
+   *    keep one line and drop another). The line-granular form -- summing only
+   *    the ordinary external children, `reportableTransactionAmount`'s dialect --
+   *    is a spec-guided follow-up, because the flow's transfer policy (a transfer
+   *    OUT of the set counts) differs from that helper's (it drops all transfers).
+   *  - A BUY/SELL funded from an account OUTSIDE the investment set (an explicit
+   *    `fundingAccountId` on an ordinary account) moves value into the set with
+   *    no cash leg in the set, so this flow cannot see it and the purchase reads
+   *    as a market move. The spec treats BUY/SELL as internal; widening that is a
+   *    maintainer decision, not a coded defect.
    *
    * NOTE: verified by unit tests only at the fold layer; the SQL classification
    * needs the integration environment (a real database with the investment
@@ -243,14 +267,11 @@ export class PortfolioMovementAlertService {
               AND t.transaction_date > $2
               AND t.transaction_date <= $3
               AND t.status IS DISTINCT FROM 'VOID'
+              AND ${investmentLinkedTransactionExclusion("t")}
               AND NOT EXISTS (
-                SELECT 1 FROM investment_transactions it
-                 WHERE it.transaction_id = t.id
-              )
-              AND NOT EXISTS (
-                SELECT 1 FROM transactions s
-                 JOIN investment_transactions its ON its.transaction_split_id = s.id
-                 WHERE s.parent_transaction_id = t.id
+                SELECT 1 FROM transaction_splits s
+                 WHERE s.transaction_id = t.id
+                   AND NOT (${investmentLinkedSplitExclusion("s")})
               )
               AND NOT (
                 t.is_transfer = true

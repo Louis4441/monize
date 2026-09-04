@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
@@ -30,42 +30,34 @@ export function PortfolioAlertControl() {
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const load = () => {
+  // One loader for both the mount effect and the retry button, so the two
+  // cannot drift; `isCancelled` lets the mount effect drop a response that
+  // arrives after unmount (and a retry that resolves after navigating away).
+  const load = useCallback((isCancelled: () => boolean = () => false) => {
     setLoadFailed(false);
     notificationPreferencesApi
       .getPortfolioAlert()
       .then(({ movePercent }) => {
+        if (isCancelled()) return;
         setEnabled(movePercent != null);
         if (movePercent != null) setPercent(movePercent);
         setLoaded(true);
       })
       .catch((error) => {
+        if (isCancelled()) return;
         log.error('Could not load portfolio alert setting', error);
         setLoadFailed(true);
         setLoaded(true);
       });
-  };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-    notificationPreferencesApi
-      .getPortfolioAlert()
-      .then(({ movePercent }) => {
-        if (cancelled) return;
-        setEnabled(movePercent != null);
-        if (movePercent != null) setPercent(movePercent);
-        setLoaded(true);
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        log.error('Could not load portfolio alert setting', error);
-        setLoadFailed(true);
-        setLoaded(true);
-      });
+    load(() => cancelled);
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [load]);
 
   const save = async (nextPercent: number | null) => {
     setBusy(true);
@@ -95,7 +87,7 @@ export function PortfolioAlertControl() {
     return (
       <div className="text-sm text-gray-600 dark:text-gray-300">
         <p>{t('loadError')}</p>
-        <Button variant="secondary" size="sm" onClick={load} className="mt-2">
+        <Button variant="secondary" size="sm" onClick={() => load()} className="mt-2">
           {t('retry')}
         </Button>
       </div>

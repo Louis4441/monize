@@ -35,9 +35,7 @@ describe("BalanceThresholdAlertService", () => {
       }
       if (/SET high_alert_armed = true/.test(sql)) {
         return Promise.resolve(
-          highFires
-            ? [{ ...firedLowRow, threshold: "9000.0000" }]
-            : [],
+          highFires ? [{ ...firedLowRow, threshold: "9000.0000" }] : [],
         );
       }
       return Promise.resolve([]); // re-arm updates return nothing
@@ -109,6 +107,42 @@ describe("BalanceThresholdAlertService", () => {
     const { service, dispatch } = makeService(true, true);
     await service.evaluateAccounts("user-1", []);
     expect(dispatch.notify).not.toHaveBeenCalled();
+  });
+
+  // `dispatch.notify` writes the row in its own transaction and then awaits the
+  // push/email fan-out. Called inside the CAS `withScopedDb`, that fan-out would
+  // run before the latch commits and while the `accounts` row lock is held
+  // across the push HTTP -- so the crossing is collected in the transaction and
+  // dispatched only after it has resolved. Moving `notify` back inside the
+  // callback re-orders these and fails the test.
+  it("dispatches only after the CAS transaction has resolved", async () => {
+    const order: string[] = [];
+    const { manager, dataSource } = createScopedDbMocks([]);
+    manager.query.mockImplementation((sql: string) =>
+      Promise.resolve(
+        /SET low_alert_armed = true/.test(sql) ? [firedLowRow] : [],
+      ),
+    );
+    const inner = dataSource.transaction.getMockImplementation()!;
+    dataSource.transaction.mockImplementation(async (...args: unknown[]) => {
+      const result = await (inner as (...a: unknown[]) => unknown)(...args);
+      order.push("tx-resolved");
+      return result;
+    });
+    const dispatch = {
+      notify: jest.fn().mockImplementation(() => {
+        order.push("notify");
+        return Promise.resolve({ id: "n-1" });
+      }),
+    } as unknown as NotificationDispatchService;
+    const service = new BalanceThresholdAlertService(
+      dataSource as unknown as DataSource,
+      dispatch,
+    );
+
+    await service.evaluateAccounts("user-1", ["acc-1"]);
+
+    expect(order).toEqual(["tx-resolved", "notify"]);
   });
 });
 

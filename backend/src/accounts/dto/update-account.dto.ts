@@ -129,6 +129,8 @@ export class UpdateAccountDto {
   @IsOptional()
   @ValidateIf((_o, value) => value !== null)
   @IsNumber({ maxDecimalPlaces: 4 })
+  @Min(-999999999999)
+  @Max(999999999999)
   lowBalanceThreshold?: number | null;
 
   @ApiPropertyOptional({
@@ -140,6 +142,8 @@ export class UpdateAccountDto {
   @IsOptional()
   @ValidateIf((_o, value) => value !== null)
   @IsNumber({ maxDecimalPlaces: 4 })
+  @Min(-999999999999)
+  @Max(999999999999)
   highBalanceThreshold?: number | null;
 
   @ApiPropertyOptional({

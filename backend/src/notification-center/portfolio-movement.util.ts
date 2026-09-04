@@ -8,6 +8,7 @@
  * completeness/withhold policy (INV-PORTMOVE-001..006) are unit-testable in
  * isolation. The producer supplies the inputs and applies the result.
  */
+import { roundMoney } from "../common/round.util";
 
 /** A percentage is a ratio, not money -- never round it with `roundMoney` (4dp). */
 export const PORTFOLIO_MOVE_PERCENT_DECIMALS = 2;
@@ -78,6 +79,9 @@ export function decideMovement(input: MovementInputs): MovementDecision {
     return { fire: null, rebaselineTo: input.mvToday };
   }
 
+  // The threshold compares at full precision, but the STORED movement is the
+  // difference of three decimal(20,4) values, and the difference of two 4dp
+  // decimals is not a 4dp decimal -- round the delta before it is persisted.
   const movement = input.mvToday - input.baseline.value - input.flow.value;
   const rawPercent = (movement / input.baseline.value) * 100;
   const fires = Math.abs(rawPercent) >= input.movePercent;
@@ -86,7 +90,7 @@ export function decideMovement(input: MovementInputs): MovementDecision {
       ? {
           changePercent: roundPercent(rawPercent),
           direction: rawPercent >= 0 ? "up" : "down",
-          movementValue: movement,
+          movementValue: roundMoney(movement),
         }
       : null,
     rebaselineTo: input.mvToday,

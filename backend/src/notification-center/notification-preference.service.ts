@@ -375,8 +375,13 @@ export class NotificationPreferenceService {
           [userId],
         ),
       );
+      // A stored value at or below zero is "off" (the cron enumerates
+      // `move_alert_percent > 0`), so the GET reports it as off too rather than
+      // as an enabled 0% threshold the producer never acts on.
       const value = rows[0]?.move_alert_percent;
-      return value == null ? null : Number(value);
+      if (value == null) return null;
+      const num = Number(value);
+      return num > 0 ? num : null;
     });
   }
 
