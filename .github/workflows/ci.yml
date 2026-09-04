@@ -193,12 +193,26 @@ jobs:
       - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
           node-version: 24
+      # The gate's own logic, before it is trusted to gate anything. It is the
+      # part that decides whether a red X means "you shipped a vulnerability"
+      # or "npmjs is down", and it costs ~100ms.
+      - name: Verify the audit gate
+        run: node --test scripts/npm-audit-gate.test.mjs
       # Blocking gate: what we actually ship. A high-severity advisory in a
       # runtime dependency fails the build.
+      #
+      # Not a bare `npm audit`: that exits 1 both for an advisory and for an
+      # advisories endpoint it could not reach, so an npmjs outage was
+      # indistinguishable from a vulnerability (twice on PR #1308, while
+      # `npm ci` in this same job resolved every package). The gate reads
+      # `--json`, retries ONLY a no-answer, and still fails if the endpoint
+      # never answers -- "we could not verify" is not "verified clean" -- but
+      # now says which of the two happened. See scripts/lib/npm-audit-gate.mjs.
       - name: Audit production dependencies (blocking)
         run: |
-          cd backend && npm ci && npm audit --audit-level=high --omit=dev
-          cd ../frontend && npm ci && npm audit --audit-level=high --omit=dev
+          (cd backend && npm ci)
+          (cd frontend && npm ci)
+          node scripts/npm-audit-gate.mjs
       # Visibility only: build tooling (eslint, jest, the Nest CLI) never
       # reaches a user, and its advisories are routinely unfixable for weeks --
       # the current one, brace-expansion GHSA-mh99-v99m-4gvg, has no patched
