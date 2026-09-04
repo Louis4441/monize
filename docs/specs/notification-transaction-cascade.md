@@ -60,8 +60,10 @@ producer whose subject *is* the transaction sets it.
 - **INV-NOTIFY-TXN-003 (cascade delete is not a write-door write).** The cascade
   removes rows; it does not create them. INV-NOTIFY-001 governs the *shape* of a
   created row (bounds, conflict, one writer); a DB-level `ON DELETE CASCADE` is a
-  sanctioned delete path, listed beside delete-my-data and `purgeOld` in the
-  invariant register, and does not open a second writer.
+  sanctioned delete path -- the same class as delete-my-data and `purgeOld`, which
+  are delete paths outside the write-door scan rather than named entries in
+  INV-NOTIFY-001's allowlist (that allowlist names only the door, delete-my-data and
+  the restore's dynamic insert) -- and it does not open a second writer.
 - **INV-NOTIFY-TXN-004 (reminders follow their source, not the transaction).** A
   reminder is linked to a notification (`source_notification_id ON DELETE SET
   NULL`), never directly to a transaction. When a transaction cascade-deletes a
@@ -106,10 +108,17 @@ link is set only through the one door, never by a producer reaching around it.
 
 A producer whose subject is a ledger transaction:
 
-- sets `target: `/transactions/${txId}`` and `sourceTransactionId: txId`;
-- these two must agree -- `notification-target.contract.test.ts` is extended so
-  that a notification carrying `sourceTransactionId` has a `target` that resolves
-  to that transaction, and vice versa (a source-scan/contract, so a producer
+- sets `sourceTransactionId: txId` and a `target` that resolves to a **real route**.
+  There is no per-transaction App Router page today (`/transactions` is a list, not
+  `/transactions/:id`), so such a producer either targets `/transactions` (with the
+  row filtered client-side) or ships the `/transactions/:id` route as part of its own
+  scope. The earlier draft's literal `` `/transactions/${txId}` `` would fail
+  `notification-target.contract.test.ts`, which asserts every producer target
+  resolves; this is corrected here.
+- when the producer does target a per-transaction route, that `target` and
+  `sourceTransactionId` must agree -- `notification-target.contract.test.ts` is
+  extended so that a notification carrying `sourceTransactionId` has a `target` that
+  resolves to that transaction, and vice versa (a source-scan/contract, so a producer
   cannot set one without the other).
 
 No such producer ships in this spec; the contract is stated so the first one

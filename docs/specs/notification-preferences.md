@@ -1059,18 +1059,22 @@ there with their enforcement status).
 ## 16. Maintainer decisions resolving #1291 open questions (2026-09)
 
 Section 12 recorded autonomous defaults with the caveat that a human confirms
-them before shipping to users. The maintainer has now answered the #1291 "Open
-questions" directly, so each item below is a **confirmed decision, not an AI
-default**. Where an answer expands scope beyond PR #1304 it is marked **NEW** --
-a follow-on surface or producer, with its spec obligation named.
+them before shipping to users. The maintainer answered the #1291 "Open questions"
+directly in **discussion kenlasko/monize#1291, comment dated 2026-09-01**; each
+item below cites that answer, so it is a **confirmed decision, not an AI default**.
+Where an answer expands scope beyond PR #1304 it is marked **NEW** -- a follow-on
+surface or producer, with its spec obligation named. (Per the org rule that AI
+output is auxiliary, the source of each answer is named so the next reader can
+verify it against the discussion rather than trusting this summary.)
 
 ### 16.1 Product
 
 - **MVP notification types** -- every type the app supports today, plus others as
   they make sense. PR #1304 ships the three live categories (`PAYMENTS`,
   `BUDGETS`, `SYSTEM`); further types arrive each with its producer (Section 3).
-- **Successful auto-backups** -- no notification; failures only. Done
-  (`BACKUP_FAILED` is the only backup type).
+- **Successful auto-backups** -- no notification; failures only. Done: the only
+  backup notification types are `BACKUP_FAILED` and `BACKUP_PARTIAL`, and neither
+  announces a success.
 - **Security notifications mandatory?** -- no, opt-in. Confirms D6.
 - **History expiry** -- automatic. Done (`purgeOld`).
 - **User-configurable balance thresholds** -- yes. **NEW**: a `balances` producer
@@ -1104,11 +1108,16 @@ a follow-on surface or producer, with its spec obligation named.
 - **VAPID rotation** -- a sensible default: admin-triggered rotation that disables
   stale subscriptions. Done (`rotateKeyPair`).
 - **Notification history in backup/restore** -- yes. Done.
-- **Push subscriptions in portable backups** -- included, not excluded. Done
-  (`export-table-queries.ts`). Caveat: `push_instance_config` carries the
-  encrypted VAPID private key, an instance secret rather than user data; its
-  backup lifecycle rides `ENCRYPTION_KEY` and is noted here so a future review
-  revisits it deliberately.
+- **Push subscriptions in portable backups** -- **excluded, and deliberately so.**
+  `push_subscriptions` and `push_instance_config` are both in
+  `INTENTIONALLY_EXCLUDED_TABLES` (`export-table-queries.ts`), and INV-PUSH-005 is
+  `enforced` on exactly that exclusion: a subscription is instance-bound (a restored
+  one is either undeliverable or lets a test instance push to a real device), and
+  `push_instance_config` carries the encrypted VAPID private key, an instance secret
+  rather than user data. This is the maintainer's "restored/cloned-environment push
+  safety -- don't bother" answer, applied. Including them would require superseding
+  INV-PUSH-005 (an ADR), which is not done and not proposed. The earlier draft of
+  this bullet said "included -- Done"; that was wrong and is corrected here.
 - **Restored / cloned-environment push safety** -- don't bother; a developer edge
   case. Confirms the Section 1 non-goal.
 - **Durable scheduler** -- implementer's choice. Done (a per-minute cron claiming
@@ -1124,24 +1133,35 @@ a follow-on surface or producer, with its spec obligation named.
 
 ### 16.4 What still needs a spec before code
 
-Three of the decisions above are follow-on features that the repository's own
-rule keeps behind a short approved spec (invariants, state-transition truth
-table, missing-data policy, numeric examples, test matrix), committed before the
-implementation it guides. Each now has a proposed spec awaiting maintainer
-approval; no code lands until the open decisions in each are confirmed:
+These follow-on features are the ones the branch author has now asked to build,
+and each is kept behind a short approved spec (invariants, state-transition truth
+table, missing-data policy, numeric examples, test matrix) per the repository rule,
+committed before the implementation it guides. Each has a proposed spec awaiting
+maintainer approval; no code lands until the open decisions in each are confirmed.
+The measure and product decisions in each were confirmed with the requester
+(recorded in each spec's Decisions section):
 
-1. **Balance-threshold notifications** (`balances`) -- financial.
+1. **Balance-threshold notifications** (`balances`) -- financial, **event-driven**
+   (evaluated from the post-commit balance-invalidation seam, not a daily cron).
    `balance-threshold-notifications.md`.
-2. **Portfolio-movement notifications** (`investments`) -- financial, optional.
+2. **Portfolio-movement notifications** (`investments`) -- financial. Daily, above a
+   user threshold, measuring the **market change net of external cash flows** (a
+   deposit does not fire; a dividend is return, not a loss).
    `portfolio-movement-notifications.md`.
-3. **Transaction-deletion cascade** -- not itself a calculation, but it changes
-   what a delete reverses, so it is specified with the producers whose rows it
-   removes rather than bolted on. `notification-transaction-cascade.md`.
+3. **GEM recommendation-change notifications** (`strategies`) -- a change of GEM
+   recommendation between periods, with `RISK_ON <-> RISK_OFF` as its own louder
+   event. `gem-signal-change-notifications.md`.
+4. **Transaction-deletion cascade** -- not itself a calculation, but it changes what
+   a delete reverses, so it is specified with the producers whose rows it removes
+   rather than bolted on. `notification-transaction-cascade.md`. (Not in the current
+   build batch; listed here as the fourth follow-on.)
 
-The core invariant #1291 already fixes for all three producers: a producer fires
-on a threshold **crossing** (79% -> 81% fires the 80% warning; 81% -> 82% -> 83%
-does not), never on mere observation of the current state. The as-is budget
-producer is the pattern to follow.
+The core rule #1291 fixes for every producer: fire on a **crossing** (79% -> 81%
+fires the 80% warning; 81% -> 82% -> 83% does not), never on mere observation of the
+current state. The budget producer approximates this within a period via a
+fingerprint dedupe; the balance producer uses an explicit armed latch, and GEM a
+period-over-period comparison -- each spec names its own mechanism rather than
+claiming the budget producer's applies unchanged.
 
 ### 16.5 Notes carried into the design
 
