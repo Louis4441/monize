@@ -33,7 +33,6 @@ const logger = createLogger('Settings');
 const SETTINGS_SECTION_IDS = [
   { id: 'profile', navKey: 'profile', demoVisible: false },
   { id: 'preferences', navKey: 'preferences', demoVisible: true },
-  { id: 'tours', navKey: 'tours', href: '/settings/tours', demoVisible: true },
   { id: 'notifications', navKey: 'notifications', demoVisible: true },
   { id: 'security', navKey: 'security', demoVisible: false },
   { id: 'shared-access', navKey: 'sharedAccess', href: '/settings/shared-access', demoVisible: false },
@@ -46,6 +45,7 @@ const SETTINGS_SECTION_IDS = [
   // deployment defaults by the backend and never sees the section.
   { id: 'auto-backup', navKey: 'autoBackup', demoVisible: false, adminOnly: true },
   { id: 'help', navKey: 'help', demoVisible: false },
+  { id: 'tours', navKey: 'tours', href: '/settings/tours', demoVisible: true },
   { id: 'about', navKey: 'about', demoVisible: true },
   { id: 'danger-zone', navKey: 'dangerZone', variant: 'danger' as const, demoVisible: false },
 ] as const;
@@ -304,20 +304,6 @@ function OwnerSettingsView() {
               </div>
             )}
 
-            <div id="tours" className="scroll-mt-32 lg:scroll-mt-22">
-              <Link
-                href="/settings/tours"
-                className="block bg-white dark:bg-gray-800 shadow dark:shadow-gray-700/50 rounded-lg p-6 mb-6 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              >
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
-                  {t('toursCard.title')}
-                </h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {t('toursCard.description')}
-                </p>
-              </Link>
-            </div>
-
             {preferences && (
               <div id="notifications" className="scroll-mt-32 lg:scroll-mt-22">
                 <NotificationsSection
@@ -408,6 +394,20 @@ function OwnerSettingsView() {
 
             <div id="help" className="scroll-mt-32 lg:scroll-mt-22">
               <HelpSection />
+            </div>
+
+            <div id="tours" className="scroll-mt-32 lg:scroll-mt-22">
+              <Link
+                href="/settings/tours"
+                className="block bg-white dark:bg-gray-800 shadow dark:shadow-gray-700/50 rounded-lg p-6 mb-6 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                  {t('toursCard.title')}
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {t('toursCard.description')}
+                </p>
+              </Link>
             </div>
 
             <div id="about" className="scroll-mt-32 lg:scroll-mt-22">
