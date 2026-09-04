@@ -11,7 +11,7 @@ import type { NotificationCategory } from '@/types/notification';
  * is a severity-driven admin fan-out, not a user toggle).
  */
 export const NOTIFICATION_PREFERENCE_CATEGORIES: readonly NotificationCategory[] =
-  ['PAYMENTS', 'BUDGETS', 'SYSTEM'];
+  ['PAYMENTS', 'BUDGETS', 'SYSTEM', 'BALANCES', 'INVESTMENTS', 'STRATEGIES'];
 
 /**
  * Which channels a matrix category exposes as a live control -- the client
@@ -44,6 +44,9 @@ export const NOTIFICATION_CATEGORY_CHANNELS: Record<
   PAYMENTS: { email: true, emailNotification: true, push: true, unifiedpush: true },
   BUDGETS: { email: true, emailNotification: true, push: true, unifiedpush: true },
   SYSTEM: { email: false, emailNotification: false, push: true, unifiedpush: true },
+  BALANCES: { email: true, emailNotification: true, push: true, unifiedpush: true },
+  INVESTMENTS: { email: true, emailNotification: true, push: true, unifiedpush: true },
+  STRATEGIES: { email: true, emailNotification: true, push: true, unifiedpush: true },
 };
 
 /**

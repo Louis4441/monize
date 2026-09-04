@@ -324,7 +324,10 @@
       "categories": {
         "PAYMENTS": "Bills and scheduled",
         "BUDGETS": "Budgets",
-        "SYSTEM": "System alerts"
+        "SYSTEM": "System alerts",
+        "BALANCES": "Account balances",
+        "INVESTMENTS": "Investment value",
+        "STRATEGIES": "Strategy signals"
       },
       "channelNotApplicable": "Not applicable for this notification type",
       "emailToggleLabel": "Report email for {category}",

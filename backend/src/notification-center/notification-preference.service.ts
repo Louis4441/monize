@@ -27,6 +27,9 @@ export const NOTIFICATION_PREFERENCE_CATEGORIES: readonly NotificationCategory[]
     NotificationCategory.PAYMENTS,
     NotificationCategory.BUDGETS,
     NotificationCategory.SYSTEM,
+    NotificationCategory.BALANCES,
+    NotificationCategory.INVESTMENTS,
+    NotificationCategory.STRATEGIES,
   ];
 
 /**
@@ -91,6 +94,29 @@ export const NOTIFICATION_CATEGORY_CHANNELS: Record<
   [NotificationCategory.SYSTEM]: {
     email: false,
     emailNotification: false,
+    push: true,
+    unifiedpush: true,
+  },
+  // Balance crossings, portfolio movement and GEM signal changes are all
+  // user-facing financial news (like a bill), so every channel is a live
+  // control. There is no report-mode digest for any of them yet, but the column
+  // is a real control (an immediate email report could batch them later), so it
+  // stays on rather than "not applicable".
+  [NotificationCategory.BALANCES]: {
+    email: true,
+    emailNotification: true,
+    push: true,
+    unifiedpush: true,
+  },
+  [NotificationCategory.INVESTMENTS]: {
+    email: true,
+    emailNotification: true,
+    push: true,
+    unifiedpush: true,
+  },
+  [NotificationCategory.STRATEGIES]: {
+    email: true,
+    emailNotification: true,
     push: true,
     unifiedpush: true,
   },
