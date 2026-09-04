@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
@@ -13,11 +13,20 @@ import { createLogger } from '@/lib/logger';
 const log = createLogger('PortfolioAlertControl');
 
 const DEFAULT_PERCENT = 5;
+/** How long after the last keystroke a threshold edit auto-saves. */
+const SAVE_DEBOUNCE_MS = 700;
 
 /**
  * The opt-in daily portfolio-movement threshold
  * (`docs/specs/portfolio-movement-notifications.md`). Off by default; enabling
  * stores a percentage, disabling clears it (and the producer's baseline).
+ *
+ * Saves on change like the rest of the settings surface (the manual "Save"
+ * button was removed with #1310's move to auto-save): the toggle persists
+ * immediately, a threshold edit persists once typing settles, and a failed save
+ * reverts the control to the value the server last accepted and shows an error.
+ * The portfolio threshold lives on its own endpoint (not `user_preferences`), so
+ * it cannot use `useSavedPreference`, but it follows the same contract.
  *
  * A failed load is not "off": it disables the control and offers a retry, so an
  * outage is never rendered as the feature being unavailable.
@@ -29,16 +38,20 @@ export function PortfolioAlertControl() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
+  // The value the server last accepted, so a failed auto-save can revert to it
+  // and an unchanged value never re-saves. `null` means the alert is off.
+  const lastSavedRef = useRef<number | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // One loader for both the mount effect and the retry button, so the two
-  // cannot drift; `isCancelled` lets the mount effect drop a response that
-  // arrives after unmount (and a retry that resolves after navigating away).
+  // cannot drift; `isCancelled` drops a response that arrives after unmount.
   const load = useCallback((isCancelled: () => boolean = () => false) => {
     setLoadFailed(false);
     notificationPreferencesApi
       .getPortfolioAlert()
       .then(({ movePercent }) => {
         if (isCancelled()) return;
+        lastSavedRef.current = movePercent;
         setEnabled(movePercent != null);
         if (movePercent != null) setPercent(movePercent);
         setLoaded(true);
@@ -56,29 +69,50 @@ export function PortfolioAlertControl() {
     load(() => cancelled);
     return () => {
       cancelled = true;
+      if (saveTimer.current) clearTimeout(saveTimer.current);
     };
   }, [load]);
 
-  const save = async (nextPercent: number | null) => {
-    setBusy(true);
-    try {
-      await notificationPreferencesApi.setPortfolioAlert(nextPercent);
-      toast.success(t('saved'));
-    } catch (error) {
-      log.error('Could not save portfolio alert setting', error);
-      toast.error(getErrorMessage(error, t('saveError')));
-      throw error;
-    } finally {
-      setBusy(false);
-    }
+  // Persist a value. Success is silent (this is auto-save); failure surfaces an
+  // error and rethrows so the caller can revert the control it changed.
+  const persist = useCallback(
+    async (next: number | null) => {
+      setBusy(true);
+      try {
+        await notificationPreferencesApi.setPortfolioAlert(next);
+        lastSavedRef.current = next;
+      } catch (error) {
+        log.error('Could not save portfolio alert setting', error);
+        toast.error(getErrorMessage(error, t('saveError')));
+        throw error;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [t],
+  );
+
+  const handleToggle = (nextEnabled: boolean) => {
+    setEnabled(nextEnabled);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    // Enabling stores the current percent; disabling clears it.
+    const target = nextEnabled ? (percent ?? DEFAULT_PERCENT) : null;
+    void persist(target).catch(() => setEnabled(!nextEnabled)); // revert on failure
   };
 
-  const handleToggle = (next: boolean) => {
-    setEnabled(next);
-    // Enabling stores the current percent; disabling clears it.
-    void save(next ? (percent ?? DEFAULT_PERCENT) : null).catch(() => {
-      setEnabled(!next); // revert on failure
-    });
+  const handlePercentChange = (value: number | undefined) => {
+    setPercent(value);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    // An empty or non-positive field is not a value to save; the toggle owns the
+    // off state. Only auto-save a real change once typing settles.
+    if (!enabled || value == null || value <= 0) return;
+    if (value === lastSavedRef.current) return;
+    saveTimer.current = setTimeout(() => {
+      void persist(value).catch(() => {
+        // Revert to what the server last accepted (NumericInput re-syncs on it).
+        setPercent(lastSavedRef.current ?? DEFAULT_PERCENT);
+      });
+    }, SAVE_DEBOUNCE_MS);
   };
 
   if (!loaded) return null;
@@ -113,31 +147,19 @@ export function PortfolioAlertControl() {
         />
       </div>
       {enabled && (
-        <div className="mt-3 flex items-end gap-2">
-          <div>
-            <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">
-              {t('thresholdLabel')}
-            </label>
-            <NumericInput
-              value={percent}
-              onChange={setPercent}
-              suffix="%"
-              decimalPlaces={2}
-              min={0.1}
-              max={100}
-              className="w-32"
-            />
-          </div>
-          <Button
-            variant="primary"
-            size="sm"
-            disabled={busy || percent == null}
-            onClick={() => {
-              if (percent != null) void save(percent).catch(() => {});
-            }}
-          >
-            {t('save')}
-          </Button>
+        <div className="mt-3">
+          <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">
+            {t('thresholdLabel')}
+          </label>
+          <NumericInput
+            value={percent}
+            onChange={handlePercentChange}
+            suffix="%"
+            decimalPlaces={2}
+            min={0.1}
+            max={100}
+            className="w-32"
+          />
         </div>
       )}
     </div>
