@@ -115,8 +115,10 @@ implied.
 | INV-AUTH-004 | A logout reports only what it achieved | enforced |
 | INV-ACTIVITY-001 | Activity is attributed to whoever acted, not to whoever was acted for | enforced |
 | INV-PROFILE-001 | A user-profile response is an allowlist | enforced |
-| INV-MCP-001 | An MCP session is bound to the credential that opened it | enforced |
+| INV-MCP-001 | Identity comes from the credential on the request | enforced |
 | INV-MCP-002 | An MCP request is answered by the MCP transport, never by the app shell | enforced |
+| INV-MCP-003 | A write confirmation is bound to one credential and one change | enforced |
+| INV-MCP-004 | A write happens only on the round a human answered | enforced |
 | INV-CURRENCY-001 | A shared currency is deleted only by its creator, on a global count | enforced |
 | INV-ATTACHMENT-001 | Available metadata resolves to committed bytes | enforced |
 | INV-BACKUP-001 | A backup file is complete, verified and owner-namespaced | enforced |
@@ -1863,23 +1865,39 @@ A removal list would be wrong structurally: the default for a new column is
 file, and the route is delegate-accessible so the leak would cross users. The
 allowlist inverts that default.
 
-### INV-MCP-001 -- a session is bound to its credential
+### INV-MCP-001 -- identity comes from the credential on the request
 
 ```text
-Statement           An MCP session is bound to the specific credential that
-                    opened it, and the presented token's current scopes are
-                    re-read on every request.
-Enforcement         The session is bound to the credential id and scopes are
-                    re-read per request. mcp-http.controller.ts
-                    authorizeExistingSession refuses with 403 unless
-                    sessionUser.credentialId === authResult.credentialId (not just
-                    userId), and re-binds scopes: authResult.scopes on every
-                    request. validatePat runs per request, so a revoked token 401s
-                    immediately rather than at TTL.
-Concurrency scope   per session, per credential
-Failure response    403 on a mismatched credential.
-Required tests      Present: mcp-http.controller.spec.ts covers the 403
-                    credential-mismatch and session/user-mismatch cases.
+Statement           An MCP request is served as the user of the credential
+                    presented ON THAT REQUEST, with that credential's current
+                    scopes. No tool reads identity from a session, from tool
+                    arguments, or from anywhere else. A 2025-era session is
+                    additionally bound to the credential that opened it.
+Source of truth     backend/src/mcp/mcp-context.ts resolveUserContext
+Enforcement         mcp-http.controller.ts authorize() runs validatePat per
+                    request and attaches the result as the SDK AuthInfo; a
+                    handler reads it through resolveUserContext(ctx), which
+                    validates the shape rather than trusting it. A credential
+                    that cannot be identified (an OAuth grant with no id) is
+                    refused 403 rather than served, because it can be bound to
+                    nothing. On the 2025-era path authorizeExistingSession also
+                    refuses with 403 unless the session's credentialId matches
+                    the presented one (not just the userId), which is what stops
+                    a read-only token inheriting a write session's scopes. A
+                    revoked token 401s immediately rather than at session TTL.
+                    The 2026-07-28 revision has no session at all, so the
+                    per-request rule is the whole rule there.
+Concurrency scope   per request; additionally per session on the 2025-era path
+Failure response    401 for an unknown credential; 403 for one that cannot be
+                    identified or does not match its session.
+Required tests      Present: mcp-context.spec.ts covers the AuthInfo round trip,
+                    the unbindable credential, and a malformed authInfo refusing
+                    rather than resolving a partial user. mcp-http.controller.spec.ts
+                    covers the 403 credential-mismatch and session/user-mismatch
+                    cases, and asserts a 2026-07-28 request is served with its
+                    own authInfo and touches no session. mcp-eras.spec.ts drives
+                    both revisions against the real SDK and asserts the tool
+                    resolves the caller from the request.
 Status              enforced
 ```
 
@@ -1908,6 +1926,90 @@ Required tests      Present: proxy.test.ts covers the bearer probe (asserting th
                     confirmed to fail without the clause.
                     mcp-http.controller.spec.ts covers nine malformed and unknown
                     Authorization shapes across POST, GET and DELETE.
+Status              enforced
+```
+
+### INV-MCP-003 -- a write confirmation is bound to one credential and one change
+
+```text
+Statement           A confirmation a user gave authorizes exactly the change
+                    they were shown, asked of exactly the credential that was
+                    asked. It cannot be replayed by another caller, against
+                    another tool, or re-aimed at a different change. It is
+                    deliberately NOT single-use: the same seal and answer, from
+                    the same credential against the same tool inside the TTL,
+                    commits again -- the answer is client-asserted on this
+                    revision, so a client able to replay one could equally have
+                    fabricated it, and the seal bounds who and what rather than
+                    how many times.
+Source of truth     backend/src/mcp/mcp-request-state.ts,
+                    backend/src/mcp/mcp-confirm.ts
+Enforcement         On the 2026-07-28 revision the confirmation spans two calls
+                    and the server holds nothing between them, so what carries
+                    it is a signed requestState (HMAC-SHA256, ten-minute TTL)
+                    bound to the request's credential and method. The SDK seam
+                    verifies it BEFORE any handler runs and refuses a bad,
+                    expired or foreign one with -32602. The seal also carries a
+                    fingerprint of the items the user was shown; the round that
+                    writes recomputes it from what it re-derived and throws
+                    ConfirmMismatchError on any difference, so a retry that
+                    resolved a name to another row or altered an amount writes
+                    nothing. What is fingerprinted is the change and not the
+                    round it was built in: roundStableAction (mcp-confirm.ts)
+                    drops the fields the builder mints per build -- actionId and
+                    expiresAt, named once by AI_ACTION_ENVELOPE_FIELDS beside
+                    the descriptor and typed so the compiler refuses a new one
+                    off the list, plus an attachment's parking slot, whose file
+                    stays identified by sha256/filename/contentType/byteSize.
+                    Hashing the descriptor raw makes every fingerprint unique
+                    and refuses every confirmed write. The payload is signed,
+                    not encrypted, so it holds the fingerprint and nothing else.
+Concurrency scope   per confirmation flow
+Failure response    -32602 from the seam for a bad seal; a tool error naming the
+                    mismatch, with no write, for a re-aimed retry.
+Required tests      Present: mcp-confirm.spec.ts covers the ask/answer matrix, a
+                    fingerprint mismatch, a key-set mismatch, and a seal
+                    replayed under another credential or another method, and
+                    drives the REAL AiActionBuilderService twice to assert the
+                    fingerprint holds across rounds while still separating two
+                    different changes (a double that returns one frozen object
+                    agrees with itself whatever is hashed, which is how the
+                    unstable fingerprint shipped green).
+                    transactions.tool.spec.ts drives both rounds of a real write
+                    through a builder double that mints a fresh envelope per
+                    call, as the real one does.
+                    mcp-migration.guard.spec.ts asserts the sealed payload
+                    carries nothing but the fingerprint, that the fingerprint is
+                    taken over the round-stable projection, and that no tool
+                    maps its own confirmation cards.
+Status              enforced
+```
+
+### INV-MCP-004 -- a write happens only on the round a human answered
+
+```text
+Statement           A write reaches the database only after a user's answer is
+                    read. An unanswered, declined or cancelled confirmation
+                    writes nothing, on either protocol revision.
+Source of truth     backend/src/mcp/mcp-confirm.ts
+Enforcement         On 2026-07-28 the first round RETURNS the question
+                    (resultType input_required) and writes nothing; only the
+                    round carrying inputResponses can write, and anything that
+                    is not an accepted elicitation -- declined, cancelled,
+                    missing, dropped, or a response of another kind -- is read
+                    as "declined". A client that fulfils nothing never calls
+                    back, so nothing is written. On a 2025-era connection the
+                    server waits for the dialog and refuses on any answer that
+                    is not an accept, except where the client demonstrably
+                    cannot show one ("unsupported"), where the client's own
+                    per-tool approval prompt is the consent step.
+Concurrency scope   per tool call
+Failure response    A tool error naming the refusal; no write.
+Required tests      Present: mcp-confirm.spec.ts covers every non-accept answer.
+                    mcp-eras.spec.ts drives a real 2026-07-28 client that
+                    accepts, declines, and never answers, asserting the write
+                    happened only in the first case. The write-tool specs cover
+                    the same on both rounds.
 Status              enforced
 ```
 
