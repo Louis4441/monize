@@ -206,6 +206,17 @@
   },
   "notifications": {
     "heading": "Benachrichtigungen",
+    "portfolioAlert": {
+      "title": "Wertänderung der Anlagen",
+      "description": "Einmal täglich benachrichtigen, wenn sich meine Anlagekonten über einen Schwellenwert hinaus bewegen, gemessen an Marktveränderungen und Dividenden (Ein- und Auszahlungen ausgenommen).",
+      "enableLabel": "Benachrichtigungen zu Anlagebewegungen aktivieren",
+      "thresholdLabel": "Benachrichtigen, wenn die Tagesbewegung mindestens beträgt",
+      "save": "Speichern",
+      "saved": "Schwellenwert gespeichert",
+      "saveError": "Schwellenwert konnte nicht gespeichert werden",
+      "loadError": "Einstellung für Anlagewarnungen konnte nicht geladen werden",
+      "retry": "Erneut versuchen"
+    },
     "smtpNotConfigured": "E-Mail-Benachrichtigungen sind nicht verfügbar. SMTP wurde vom Administrator nicht konfiguriert.",
     "emailNotificationsTitle": "E-Mail-Benachrichtigungen",
     "emailNotificationsDescription": "E-Mail-Erinnerungen für bevorstehende Rechnungen und Budget-Warnungen empfangen",
@@ -324,7 +335,10 @@
       "categories": {
         "PAYMENTS": "Rechnungen und Geplantes",
         "BUDGETS": "Budgets",
-        "SYSTEM": "Systemwarnungen"
+        "SYSTEM": "Systemwarnungen",
+        "BALANCES": "Kontostände",
+        "INVESTMENTS": "Anlagewert",
+        "STRATEGIES": "Strategiesignale"
       },
       "channelNotApplicable": "Für diese Benachrichtigungsart nicht zutreffend",
       "emailToggleLabel": "Bericht-E-Mail für {category}",

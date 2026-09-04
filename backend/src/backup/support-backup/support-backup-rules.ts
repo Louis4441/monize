@@ -176,6 +176,10 @@ export const RULES: Record<string, TableRules> = {
     statement_settlement_day: keep,
     is_closed: keep,
     closed_date: keep,
+    low_balance_threshold: scale, // a money figure, scaled like every amount
+    high_balance_threshold: scale,
+    low_alert_armed: keep, // the crossing latch, a boolean
+    high_alert_armed: keep,
     is_favourite: keep,
     favourite_sort_order: keep,
     exclude_from_net_worth: keep,
@@ -574,6 +578,15 @@ export const RULES: Record<string, TableRules> = {
     last_fired_at: keep,
     fire_count: keep,
     stopped_at: keep,
+    created_at: keep,
+    updated_at: keep,
+  },
+  notification_portfolio_state: {
+    user_id: keep,
+    move_alert_percent: keep, // the user's threshold, not identifying
+    baseline_value: scale, // a money figure -- scaled like every other amount
+    baseline_currency: keep, // an ISO currency code
+    baseline_captured_on: keep, // a date
     created_at: keep,
     updated_at: keep,
   },

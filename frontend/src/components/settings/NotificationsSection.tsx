@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { PushDevicesPanel } from './PushDevicesPanel';
 import { PushDiagnostics } from './PushDiagnostics';
 import { NotificationPreferencesMatrix } from './NotificationPreferencesMatrix';
+import { PortfolioAlertControl } from './PortfolioAlertControl';
 import { userSettingsApi } from '@/lib/user-settings';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { UserPreferences } from '@/types/auth';
@@ -208,6 +209,8 @@ export function NotificationsSection({
       <NotificationPreferencesMatrix
         emailAvailable={smtpConfigured && notificationEmail}
       />
+
+      <PortfolioAlertControl />
 
       <PushDevicesPanel />
       <PushDiagnostics />

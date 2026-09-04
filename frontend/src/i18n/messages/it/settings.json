@@ -206,6 +206,17 @@
   },
   "notifications": {
     "heading": "Notifiche",
+    "portfolioAlert": {
+      "title": "Variazione del valore degli investimenti",
+      "description": "Avvisami una volta al giorno quando i miei conti di investimento si muovono oltre una soglia, misurata dalle variazioni di mercato e dai dividendi (versamenti e prelievi esclusi).",
+      "enableLabel": "Attiva gli avvisi di variazione degli investimenti",
+      "thresholdLabel": "Avvisa quando la variazione giornaliera è almeno",
+      "save": "Salva",
+      "saved": "Soglia salvata",
+      "saveError": "Impossibile salvare la soglia",
+      "loadError": "Impossibile caricare l'impostazione degli avvisi sugli investimenti",
+      "retry": "Riprova"
+    },
     "smtpNotConfigured": "Le notifiche email non sono disponibili. SMTP non è stato configurato dall'amministratore.",
     "emailNotificationsTitle": "Notifiche email",
     "emailNotificationsDescription": "Ricevi promemoria email per fatture in scadenza e avvisi del budget",
@@ -324,7 +335,10 @@
       "categories": {
         "PAYMENTS": "Bollette e programmati",
         "BUDGETS": "Budget",
-        "SYSTEM": "Avvisi di sistema"
+        "SYSTEM": "Avvisi di sistema",
+        "BALANCES": "Saldi dei conti",
+        "INVESTMENTS": "Valore degli investimenti",
+        "STRATEGIES": "Segnali di strategia"
       },
       "channelNotApplicable": "Non applicabile a questo tipo di notifica",
       "emailToggleLabel": "Email (report) per {category}",

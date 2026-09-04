@@ -159,6 +159,13 @@ export const RESTORE_PLAN: ReadonlyArray<RestoreStep> = [
     countKey: "notificationReminders",
     scopeToUser: true,
   },
+  {
+    // Only references users(id); one row per user (the portfolio-movement
+    // baseline + threshold).
+    table: "notification_portfolio_state",
+    countKey: "notificationPortfolioState",
+    scopeToUser: true,
+  },
   { table: "custom_reports", countKey: "customReports", scopeToUser: true },
   {
     table: "investment_reports",

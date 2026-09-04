@@ -206,6 +206,17 @@
   },
   "notifications": {
     "heading": "Thông báo",
+    "portfolioAlert": {
+      "title": "Biến động giá trị đầu tư",
+      "description": "Thông báo cho tôi mỗi ngày một lần khi các tài khoản đầu tư của tôi biến động vượt ngưỡng, được đo từ thay đổi thị trường và cổ tức (không tính nạp và rút tiền).",
+      "enableLabel": "Bật cảnh báo biến động đầu tư",
+      "thresholdLabel": "Thông báo khi mức biến động hằng ngày ít nhất là",
+      "save": "Lưu",
+      "saved": "Đã lưu ngưỡng",
+      "saveError": "Không thể lưu ngưỡng",
+      "loadError": "Không thể tải cài đặt cảnh báo đầu tư",
+      "retry": "Thử lại"
+    },
     "smtpNotConfigured": "Thông báo email không có sẵn. SMTP chưa được quản trị viên cấu hình.",
     "emailNotificationsTitle": "Thông báo email",
     "emailNotificationsDescription": "Nhận nhắc nhở email cho các hóa đơn sắp đến và cảnh báo ngân sách",
@@ -324,7 +335,10 @@
       "categories": {
         "PAYMENTS": "Hóa đơn và đã lên lịch",
         "BUDGETS": "Ngân sách",
-        "SYSTEM": "Cảnh báo hệ thống"
+        "SYSTEM": "Cảnh báo hệ thống",
+        "BALANCES": "Số dư tài khoản",
+        "INVESTMENTS": "Giá trị đầu tư",
+        "STRATEGIES": "Tín hiệu chiến lược"
       },
       "channelNotApplicable": "Không áp dụng cho loại thông báo này",
       "emailToggleLabel": "Email báo cáo cho {category}",

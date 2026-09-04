@@ -206,6 +206,17 @@
   },
   "notifications": {
     "heading": "通知",
+    "portfolioAlert": {
+      "title": "投資價值變動",
+      "description": "當我的投資帳戶變動超過閾值時，每天通知我一次；以市場變化與股利衡量（不含存入與提出）。",
+      "enableLabel": "啟用投資變動提醒",
+      "thresholdLabel": "當每日變動至少達到以下值時通知",
+      "save": "儲存",
+      "saved": "閾值已儲存",
+      "saveError": "無法儲存閾值",
+      "loadError": "無法載入投資提醒設定",
+      "retry": "重試"
+    },
     "smtpNotConfigured": "電子郵件通知不可用。管理員尚未設定 SMTP。",
     "emailNotificationsTitle": "電子郵件通知",
     "emailNotificationsDescription": "接收即將到期帳單和預算警示的電子郵件提醒",
@@ -324,7 +335,10 @@
       "categories": {
         "PAYMENTS": "帳單與排程",
         "BUDGETS": "預算",
-        "SYSTEM": "系統警示"
+        "SYSTEM": "系統警示",
+        "BALANCES": "帳戶餘額",
+        "INVESTMENTS": "投資價值",
+        "STRATEGIES": "策略訊號"
       },
       "channelNotApplicable": "不適用於此通知類型",
       "emailToggleLabel": "{category} 的報告郵件",

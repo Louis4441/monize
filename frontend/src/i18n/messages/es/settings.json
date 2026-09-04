@@ -206,6 +206,17 @@
   },
   "notifications": {
     "heading": "Notificaciones",
+    "portfolioAlert": {
+      "title": "Movimiento del valor de inversiones",
+      "description": "Avísame una vez al día cuando mis cuentas de inversión se muevan más allá de un umbral, medido por cambios de mercado y dividendos (los depósitos y retiros se excluyen).",
+      "enableLabel": "Activar alertas de movimiento de inversiones",
+      "thresholdLabel": "Avisar cuando el movimiento diario sea al menos",
+      "save": "Guardar",
+      "saved": "Umbral guardado",
+      "saveError": "No se pudo guardar el umbral",
+      "loadError": "No se pudo cargar la configuración de alertas de inversión",
+      "retry": "Reintentar"
+    },
     "smtpNotConfigured": "Las notificaciones por correo electrónico no están disponibles. El administrador no ha configurado SMTP.",
     "emailNotificationsTitle": "Notificaciones por correo electrónico",
     "emailNotificationsDescription": "Recibe recordatorios por correo para facturas próximas y alertas de presupuesto",
@@ -324,7 +335,10 @@
       "categories": {
         "PAYMENTS": "Facturas y programados",
         "BUDGETS": "Presupuestos",
-        "SYSTEM": "Alertas del sistema"
+        "SYSTEM": "Alertas del sistema",
+        "BALANCES": "Saldos de cuentas",
+        "INVESTMENTS": "Valor de inversiones",
+        "STRATEGIES": "Señales de estrategia"
       },
       "channelNotApplicable": "No aplicable a este tipo de notificación",
       "emailToggleLabel": "Correo (informe) para {category}",

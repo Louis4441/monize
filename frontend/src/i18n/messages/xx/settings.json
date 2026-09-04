@@ -206,6 +206,17 @@
   },
   "notifications": {
     "heading": "[XX-Notifications-XX]",
+    "portfolioAlert": {
+      "title": "[XX-Investment value movement-XX]",
+      "description": "[XX-Notify me once a day when my investment accounts move beyond a threshold, measured from market changes and dividends (deposits and withdrawals are excluded).-XX]",
+      "enableLabel": "[XX-Enable investment movement alerts-XX]",
+      "thresholdLabel": "[XX-Notify when the daily move is at least-XX]",
+      "save": "[XX-Save-XX]",
+      "saved": "[XX-Threshold saved-XX]",
+      "saveError": "[XX-Could not save the threshold-XX]",
+      "loadError": "[XX-Could not load the investment alert setting-XX]",
+      "retry": "[XX-Retry-XX]"
+    },
     "smtpNotConfigured": "[XX-Email notifications are not available. SMTP has not been configured by the administrator.-XX]",
     "emailNotificationsTitle": "[XX-Email Notifications-XX]",
     "emailNotificationsDescription": "[XX-Receive email reminders for upcoming bills and budget alerts-XX]",
@@ -324,7 +335,10 @@
       "categories": {
         "PAYMENTS": "[XX-Bills and scheduled-XX]",
         "BUDGETS": "[XX-Budgets-XX]",
-        "SYSTEM": "[XX-System alerts-XX]"
+        "SYSTEM": "[XX-System alerts-XX]",
+        "BALANCES": "[XX-Account balances-XX]",
+        "INVESTMENTS": "[XX-Investment value-XX]",
+        "STRATEGIES": "[XX-Strategy signals-XX]"
       },
       "channelNotApplicable": "[XX-Not applicable for this notification type-XX]",
       "emailToggleLabel": "[XX-Report email for {category}-XX]",
