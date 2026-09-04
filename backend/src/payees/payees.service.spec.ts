@@ -3297,6 +3297,25 @@ describe("PayeesService", () => {
         );
       });
 
+      it("does not refuse an update preview over a legacy number it resends", async () => {
+        // A preview computes what the commit will do, and `update` waives a
+        // value that did not move -- so a card must not fail on one either.
+        payeesRepository.findOne.mockResolvedValue({
+          ...mockPayee,
+          phone: "call the shop",
+        });
+
+        const preview = await service.previewUpdatePayee(userId, {
+          name: "Starbucks",
+          address: "1 Main St",
+          phone: "call the shop",
+        });
+
+        expect(preview).toEqual(
+          expect.objectContaining({ phone: "call the shop" }),
+        );
+      });
+
       it("reads an emptied contact field as a clear, not as absent", async () => {
         payeesRepository.findOne.mockResolvedValue(null);
 

@@ -248,12 +248,26 @@ export class PayeesService {
       email?: string | null;
       phone?: string | null;
     },
+    /**
+     * The phone the row already holds, where there is one. A value equal to it
+     * did not move, so it is passed through untouched -- the same rule `update`
+     * applies, and a preview that did not share it would refuse an edit the
+     * commit would accept.
+     */
+    currentPhone?: string | null,
   ): Promise<{
     address?: string | null;
     email?: string | null;
     phone?: string | null;
   }> {
-    const region = normalizeContactField(input.phone)
+    const phone = normalizeContactField(input.phone);
+    if (phone && currentPhone && phone === currentPhone) {
+      return {
+        ...previewContactFields({ ...input, phone: null }, null),
+        phone,
+      };
+    }
+    const region = phone
       ? await resolveUserPhoneRegion(this.dataSource, userId)
       : null;
     return previewContactFields(input, region);
@@ -645,7 +659,7 @@ export class PayeesService {
       defaultCategoryId,
       defaultCategoryName,
       website,
-      ...(await this.storableContactFields(userId, input)),
+      ...(await this.storableContactFields(userId, input, payee.phone)),
     };
   }
 

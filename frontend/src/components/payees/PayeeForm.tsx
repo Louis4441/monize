@@ -50,6 +50,11 @@ export const buildPayeeSchema = (
    * question rather than a rejection -- see the phone rule below.
    */
   phoneRegion: CountryCode | null,
+  /**
+   * The phone this payee already holds, as the field shows it. A value equal to
+   * it is not an edit, and is waived below.
+   */
+  currentPhone?: string,
 ) => z.object({
   name: z.string().min(1, t('validation.nameRequired')).max(255),
   defaultCategoryId: z.string().optional(),
@@ -79,6 +84,12 @@ export const buildPayeeSchema = (
     .optional()
     .superRefine((value, ctx) => {
       if (!value) return;
+      // A resent value is not an edit -- the same rule the server applies, and
+      // it has to be applied here too or the two disagree in the direction that
+      // costs the user the most: rows written before normalization are not
+      // backfilled, so a payee holding "call the shop" would be impossible to
+      // rename from this form while the API would take the change happily.
+      if (currentPhone !== undefined && value === currentPhone) return;
       const result = normalizePhoneNumber(value, phoneRegion);
       if (result.ok) return;
       ctx.addIssue({
@@ -136,7 +147,12 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
     () => phoneRegionFromPreferences({ numberFormat, language }),
     [numberFormat, language],
   );
-  const schema = useMemo(() => buildPayeeSchema(t, phoneRegion), [t, phoneRegion]);
+  // What the field starts with, so an untouched phone is waived above.
+  const currentPhoneDisplay = formatPhoneForDisplay(payee?.phone);
+  const schema = useMemo(
+    () => buildPayeeSchema(t, phoneRegion, currentPhoneDisplay),
+    [t, phoneRegion, currentPhoneDisplay],
+  );
 
   const {
     register,

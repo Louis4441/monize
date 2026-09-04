@@ -107,4 +107,33 @@ describe('payee form schema', () => {
   it('still requires a name', () => {
     expect(buildPayeeSchema(t, 'US').safeParse({ name: '' }).success).toBe(false);
   });
+
+  it('accepts a legacy number the payee already holds, so the row stays editable', () => {
+    // Rows written before normalization are not backfilled, and the server
+    // waives a value that did not move. Were this field stricter, a payee
+    // holding free text could not be edited at all from here -- the browser
+    // refusing a change the API would take.
+    const result = buildPayeeSchema(t, 'US', 'call the shop').safeParse({
+      name: 'Corner Shop',
+      phone: 'call the shop',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('still refuses a bad value that replaces the legacy one', () => {
+    const result = buildPayeeSchema(t, 'US', 'call the shop').safeParse({
+      name: 'Corner Shop',
+      phone: '12345',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('waives nothing when the payee has no stored phone', () => {
+    // A new payee has no value to resend, so every number is checked.
+    expect(buildPayeeSchema(t, 'US').safeParse({ name: 'A', phone: '12345' }).success).toBe(
+      false,
+    );
+  });
 });

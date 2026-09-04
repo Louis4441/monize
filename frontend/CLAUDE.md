@@ -341,7 +341,11 @@ The payee form validates with `normalizePhoneNumber` under the field, using the
 region from `phoneRegionFromPreferences` over the stored `numberFormat` and
 `language`. That is not belt-and-braces: both layers assert
 `backend/src/common/phone-number-cases.json`, so the field can neither block a
-number the API would store nor submit one it would refuse.
+number the API would store nor submit one it would refuse. The waiver is part of
+that agreement -- `buildPayeeSchema` takes the phone the payee already holds and
+passes an unchanged value, exactly as the server does, because rows written
+before normalization are not backfilled and a stricter field would make a payee
+holding free text impossible to edit at all.
 `lib/phone-number.guard.test.ts` scans for a raw `{x.phone}` render and requires
 every known display surface to reference the formatter.
 
