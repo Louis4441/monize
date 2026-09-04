@@ -36,6 +36,7 @@ import type { LlmPayeeList, LlmPayeeQuery } from "./llm-payee-query";
 import { getActiveScopedManager, withScopedDb } from "../common/db/scoped-db";
 import { normalizeWebsite } from "../common/normalize-website";
 import {
+  formatPhoneForDisplay,
   normalizePhoneOrThrow,
   resolveUserPhoneRegion,
 } from "../common/phone-number.util";
@@ -833,7 +834,16 @@ export class PayeesService {
         : sorted;
 
     return {
-      payees,
+      // A model quotes these rows back to the reader, so the phone travels in
+      // the form a person reads -- the same decision the AI executor's
+      // `contactSummary` and the MCP contact card make about a preview. Stored
+      // E.164 is how the column compares two numbers, not an answer to "what is
+      // their number?", and a surface that hands it over unformatted is how one
+      // number ends up printed two ways in one product.
+      payees: payees.map((payee) => ({
+        ...payee,
+        phone: payee.phone ? formatPhoneForDisplay(payee.phone) : payee.phone,
+      })),
       totalCount: matched.length,
       truncated: payees.length < matched.length,
     };

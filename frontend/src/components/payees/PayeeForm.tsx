@@ -45,11 +45,16 @@ import type { CountryCode } from 'libphonenumber-js/max';
 export const buildPayeeSchema = (
   t: (key: string) => string,
   /**
-   * Where a number typed without a country code belongs. `null` means the
-   * user's preferences name no region, which makes a bare national number a
-   * question rather than a rejection -- see the phone rule below.
+   * Where a number typed without a country code belongs.
+   *
+   * Three states, not two. `null` is an ANSWER -- the user's preferences name
+   * no region -- which makes a bare national number a question rather than a
+   * rejection, see the phone rule below. `undefined` is "we do not know yet",
+   * because the preferences this is derived from have not loaded, and there
+   * the field must not check at all: substituting a default would have this
+   * form reject a Berlin number the API stores happily.
    */
-  phoneRegion: CountryCode | null,
+  phoneRegion: CountryCode | null | undefined,
   /**
    * The phone this payee already holds, as the field shows it. A value equal to
    * it is not an edit, and is waived below.
@@ -90,6 +95,10 @@ export const buildPayeeSchema = (
       // backfilled, so a payee holding "call the shop" would be impossible to
       // rename from this form while the API would take the change happily.
       if (currentPhone !== undefined && value === currentPhone) return;
+      // The region is not known yet, so neither is the answer. The server
+      // reads the stored preferences and will say; guessing here is how this
+      // field would come to block a number the API accepts.
+      if (phoneRegion === undefined) return;
       const result = normalizePhoneNumber(value, phoneRegion);
       if (result.ok) return;
       ctx.addIssue({
@@ -141,11 +150,16 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
   // Where a number typed without a country code belongs. The same two
   // preferences the server reads, so the field and the API agree about which
   // numbers are placeable.
-  const numberFormat = usePreferencesStore((s) => s.preferences?.numberFormat);
-  const language = usePreferencesStore((s) => s.preferences?.language);
+  //
+  // The whole ROW, not two fields off it: `preferences` is null before the
+  // fetch lands and stays null when it fails, and reading the fields
+  // individually cannot tell that apart from a row that names no region. The
+  // shared truth table proves the two layers' FUNCTIONS agree; it cannot prove
+  // they were handed the same inputs, and this is where they would not be.
+  const preferences = usePreferencesStore((s) => s.preferences);
   const phoneRegion = useMemo(
-    () => phoneRegionFromPreferences({ numberFormat, language }),
-    [numberFormat, language],
+    () => (preferences ? phoneRegionFromPreferences(preferences) : undefined),
+    [preferences],
   );
   // What the field starts with, so an untouched phone is waived above.
   const currentPhoneDisplay = formatPhoneForDisplay(payee?.phone);
@@ -277,12 +291,20 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
         for (const field of CONTACT_LOOKUP_FIELDS) {
           const value = suggestion[field];
           if (!value) continue;
+          // A suggestion arrives in the STORED form, and this field shows the
+          // read form -- the same thing `defaultValues` does above, so a phone
+          // does not read one way when the payee loads and another when a
+          // lookup fills it (`+442079460958;ext=12` is not a thing to put in
+          // front of anyone). Comparing the two forms directly is the same bug
+          // wearing a different hat: it reports a number that did not change as
+          // a replaced value.
+          const shown = field === 'phone' ? formatPhoneForDisplay(value) : value;
           const current = getValues(field) ?? '';
           if (!current) {
-            setValue(field, value, { shouldDirty: true });
+            setValue(field, shown, { shouldDirty: true });
             filled.add(field);
-          } else if (refined.has(field) && current !== value) {
-            setValue(field, value, { shouldDirty: true });
+          } else if (refined.has(field) && current !== shown) {
+            setValue(field, shown, { shouldDirty: true });
             // A second lookup replaces the first one's answer, so the value to
             // restore is still the one the user typed. An edit in between
             // clears the entry (the watcher below), and `current` is then

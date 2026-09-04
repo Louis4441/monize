@@ -767,6 +767,40 @@ describe("PayeesService", () => {
       ).toEqual(["Amazon"]);
     });
 
+    it("hands the model a phone in the form a person reads", async () => {
+      // A model quotes these rows back to the reader, so the same number must
+      // not read "+12064488762" in the assistant and "+1 206 448 8762" on the
+      // payee page. The stored form is how the column compares two numbers; it
+      // is not an answer to "what is their number?".
+      payeesRepository.find.mockResolvedValue([
+        { ...roster[0], phone: "+12064488762" },
+      ]);
+
+      const result = await service.getLlmPayees(userId);
+
+      expect(result.payees[0].phone).toBe("+1 206 448 8762");
+    });
+
+    it("passes a legacy value through rather than blanking it", async () => {
+      // Rows written before normalization are not backfilled, and a stored
+      // "call the shop" is worth quoting even though nobody can dial it.
+      payeesRepository.find.mockResolvedValue([
+        { ...roster[0], phone: "call the shop" },
+      ]);
+
+      const result = await service.getLlmPayees(userId);
+
+      expect(result.payees[0].phone).toBe("call the shop");
+    });
+
+    it("leaves a payee with no phone holding null, not an empty string", async () => {
+      // Absent is not blank: `hasPhone: false` and every consumer downstream
+      // read this as "there is no number", and "" is a number-shaped nothing.
+      const result = await service.getLlmPayees(userId);
+
+      expect(result.payees.find((p) => p.name === "Amazon")?.phone).toBeNull();
+    });
+
     it("combines filters with the search", async () => {
       const result = await service.getLlmPayees(userId, {
         search: "amazon",

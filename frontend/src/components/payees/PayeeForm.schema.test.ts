@@ -15,7 +15,7 @@ const t = (key: string) => key;
 /** The region a bare national number is read in; US unless a case says otherwise. */
 const parse = (
   input: Record<string, unknown>,
-  phoneRegion: CountryCode | null = 'US',
+  phoneRegion: CountryCode | null | undefined = 'US',
 ) => buildPayeeSchema(t, phoneRegion).safeParse({ name: 'Starbucks', ...input });
 
 describe('payee form schema', () => {
@@ -128,6 +128,24 @@ describe('payee form schema', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+
+  it('checks nothing while the region is still unknown', () => {
+    // `undefined` is not `null`: null is an ANSWER (the preferences name no
+    // region, so a bare number is unplaceable), undefined is "the preferences
+    // have not loaded". Defaulting the second to US would have this form reject
+    // a Berlin number the API stores -- the browser refusing what the API takes,
+    // which is the one thing the shared truth table cannot catch, because it
+    // tests the functions and not the inputs they are handed.
+    // Called directly: `parse(input, undefined)` would take the helper's own
+    // default and never reach the schema with an unknown region.
+    const unknown = (phone: string) =>
+      buildPayeeSchema(t, undefined).safeParse({ name: 'Starbucks', phone });
+    expect(unknown('030 12345678').success).toBe(true);
+    expect(unknown('nonsense').success).toBe(true);
+    // ...and once they load, the rule applies again, both ways.
+    expect(parse({ phone: '030 12345678' }, 'DE').success).toBe(true);
+    expect(parse({ phone: '030 12345678' }, 'US').success).toBe(false);
   });
 
   it('waives nothing when the payee has no stored phone', () => {

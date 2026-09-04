@@ -51,7 +51,6 @@ describe("PayeeContactLookupService", () => {
         userId,
         payeeContactLookupEnabled: true,
         language: "en-CA",
-        numberFormat: "en-CA",
         defaultCurrency: "CAD",
       }),
     };
@@ -268,9 +267,11 @@ describe("PayeeContactLookupService", () => {
     it("stores a suggested number in the canonical form", async () => {
       // A model writes a number in whatever shape the page it read used, and
       // the background enrichment writes the answer straight into the column
-      // without a DTO in the way -- so this is where it becomes storable.
+      // without a DTO in the way -- so this is where it becomes storable. The
+      // country code has to be the model's own (see below); the SHAPE around it
+      // is still whatever the page used.
       provider.lookup.mockResolvedValue([
-        { ...suggestion, phone: "(206) 448-8762" },
+        { ...suggestion, phone: "+1 (206) 448-8762" },
       ]);
 
       const outcome = await service.lookup(userId, { name: "Acme" });
@@ -278,7 +279,45 @@ describe("PayeeContactLookupService", () => {
       expect(outcome.suggestions[0]?.phone).toBe("+12064488762");
     });
 
-    it("places a bare number in the region the user's preferences imply", async () => {
+    it("keeps a suggestion that carries its own country code", async () => {
+      provider.lookup.mockResolvedValue([
+        { ...suggestion, phone: "+52 55 1234 5678" },
+      ]);
+
+      const outcome = await service.lookup(userId, { name: "Acme" });
+
+      expect(outcome.suggestions[0]?.phone).toBe("+525512345678");
+    });
+
+    it("does not file a suggested number in the reader's own region", async () => {
+      // The reader dials from the US; the payee is in Mexico City. Read as US,
+      // "55 1234 5678" is a valid +15512345678 in New Jersey -- a DIFFERENT
+      // number that dials, written into the column by the background
+      // enrichment with nobody in the loop. The reader's region says where
+      // they dial from, not where a third party's office is.
+      preferenceRepo.findOne.mockResolvedValue({
+        userId,
+        payeeContactLookupEnabled: true,
+        language: "en",
+        numberFormat: "en-US",
+        defaultCurrency: "USD",
+      });
+      provider.lookup.mockResolvedValue([
+        { ...suggestion, phone: "55 1234 5678", refined: ["phone"] },
+      ]);
+
+      const outcome = await service.lookup(userId, { name: "Acme" });
+
+      expect(outcome.suggestions[0]?.phone).toBeNull();
+      // A refinement the user can never be offered is not one.
+      expect(outcome.suggestions[0]?.refined).toEqual([]);
+    });
+
+    it("drops a bare number even where the region would have placed it", async () => {
+      // The GB reader and a GB number agree here -- and that coincidence is
+      // exactly what must not be relied on, because nothing in the suggestion
+      // says which country it came from. Same rule, whether or not the guess
+      // would have been right.
       preferenceRepo.findOne.mockResolvedValue({
         userId,
         payeeContactLookupEnabled: true,
@@ -292,26 +331,20 @@ describe("PayeeContactLookupService", () => {
 
       const outcome = await service.lookup(userId, { name: "Acme" });
 
-      expect(outcome.suggestions[0]?.phone).toBe("+442079460958");
+      expect(outcome.suggestions[0]?.phone).toBeNull();
     });
 
-    it("drops a number it cannot place rather than offering one nobody can dial", async () => {
-      preferenceRepo.findOne.mockResolvedValue({
-        userId,
-        payeeContactLookupEnabled: true,
-        language: "en",
-        numberFormat: "browser",
-        defaultCurrency: "USD",
-      });
+    it("does not read the region preference at all", async () => {
+      // The teeth on the rule above: a region that is never read cannot be
+      // reintroduced by accident.
       provider.lookup.mockResolvedValue([
-        { ...suggestion, phone: "020 7946 0958", refined: ["phone"] },
+        { ...suggestion, phone: "+52 55 1234 5678" },
       ]);
 
-      const outcome = await service.lookup(userId, { name: "Acme" });
+      await service.lookup(userId, { name: "Acme" });
 
-      expect(outcome.suggestions[0]?.phone).toBeNull();
-      // A refinement the user can never be offered is not one.
-      expect(outcome.suggestions[0]?.refined).toEqual([]);
+      const select = preferenceRepo.findOne.mock.calls[0]?.[0]?.select ?? {};
+      expect(select).not.toHaveProperty("numberFormat");
     });
 
     it("drops a candidate whose phone was its only field", async () => {

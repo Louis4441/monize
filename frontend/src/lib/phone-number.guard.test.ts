@@ -47,6 +47,37 @@ function stripComments(source: string): string {
 const RAW_JSX_RENDER = /\{\s*\w+(?:\?)?\.phone\s*(?:\}|\?\?|\|\|)/;
 
 /**
+ * A phone value put into a form control. An input is a surface a person reads
+ * exactly as much as a rendered span, and rendering is not the only way a value
+ * reaches one: the payee form's lookup prefill wrote the Phone input through
+ * `setValue`, so the scan above saw nothing while the field showed
+ * `+442079460958;ext=12` -- a machine-only suffix in a box labelled Phone --
+ * and the same input formatted the stored value on load, three lines away.
+ *
+ * Named `'phone'` outright is the easy half.
+ */
+const RAW_FORM_WRITE =
+  // The lookahead spans the whitespace rather than sitting after it: `\s*` can
+  // give back what it matched, and a lookahead placed after it always finds a
+  // position where the formatter does not start.
+  /\bsetValue\(\s*(?:'phone'|"phone"|`phone`)\s*,(?!\s*formatPhoneForDisplay)/;
+
+/**
+ * The hard half, and the shape the defect actually had: a loop over the contact
+ * fields writing each one by its variable, where nothing on the line says
+ * "phone" at all. A file that writes contact fields into a form generically has
+ * to decide the phone's form at the write site -- so if it writes
+ * `setValue(field, ...)`, it must also carry the per-field mapping.
+ *
+ * Two questions rather than one wider pattern: banning `setValue(field, ...)`
+ * outright would fail every generic form in the codebase, and exempting them by
+ * name is how the one that matters keeps its exemption.
+ */
+const LOOPS_FIELDS_INTO_FORM = /\bsetValue\(\s*field\s*,/;
+const MAPS_PHONE_AT_THE_WRITE_SITE =
+  /field === 'phone'\s*\?\s*formatPhoneForDisplay\(/;
+
+/**
  * The files allowed to handle a raw phone value, each with the reason.
  *
  * `phone-number.ts` is where the formatting lives. `contact-links.ts` builds the
@@ -75,6 +106,54 @@ describe('a phone number is displayed through one formatter', () => {
       .map(([path]) => path);
     // Wrap the value in `formatPhoneForDisplay` from `@/lib/phone-number`.
     expect(offenders).toEqual([]);
+  });
+
+  it('is never written straight into a form control', () => {
+    const offenders = productionSources()
+      .filter(([, source]) => RAW_FORM_WRITE.test(source))
+      .map(([path]) => path);
+    // Wrap the value in `formatPhoneForDisplay` from `@/lib/phone-number`.
+    expect(offenders).toEqual([]);
+  });
+
+  it('decides the phone\'s form where a loop writes fields generically', () => {
+    const offenders = productionSources()
+      .filter(([, source]) => LOOPS_FIELDS_INTO_FORM.test(source))
+      .filter(([, source]) => !MAPS_PHONE_AT_THE_WRITE_SITE.test(source))
+      .map(([path]) => path);
+    // A loop that writes contact fields into a form must format the phone at
+    // the write site: `field === 'phone' ? formatPhoneForDisplay(value) : value`.
+    expect(offenders).toEqual([]);
+  });
+
+  it('finds the loop, so the rule above is not vacuous', () => {
+    // The one file this is about. Were the shape to change, the scan would
+    // pass over an empty list and stop guarding anything.
+    const looping = productionSources()
+      .filter(([, source]) => LOOPS_FIELDS_INTO_FORM.test(source))
+      .map(([path]) => path);
+    expect(looping).toContain('/src/components/payees/PayeeForm.tsx');
+  });
+
+  it('catches a raw form write, and reads a formatted one as fine', () => {
+    // The counter-test, both ways: a scan that cannot fail is not a guard, and
+    // one that cannot pass gets weakened until it is.
+    expect(RAW_FORM_WRITE.test("setValue('phone', value)")).toBe(true);
+    expect(RAW_FORM_WRITE.test('setValue("phone", suggestion.phone, opts)')).toBe(true);
+    expect(
+      RAW_FORM_WRITE.test("setValue('phone', formatPhoneForDisplay(value))"),
+    ).toBe(false);
+    expect(RAW_FORM_WRITE.test("setValue('email', value)")).toBe(false);
+
+    // ...and the loop form, which is the one that got through: the original
+    // mistake names no field on the line at all.
+    const original = "setValue(field, value, { shouldDirty: true });";
+    expect(LOOPS_FIELDS_INTO_FORM.test(original)).toBe(true);
+    expect(MAPS_PHONE_AT_THE_WRITE_SITE.test(original)).toBe(false);
+    const fixed =
+      "const shown = field === 'phone' ? formatPhoneForDisplay(value) : value;\n" +
+      'setValue(field, shown, { shouldDirty: true });';
+    expect(MAPS_PHONE_AT_THE_WRITE_SITE.test(fixed)).toBe(true);
   });
 
   it('is formatted at every surface that shows one', () => {

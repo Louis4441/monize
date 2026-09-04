@@ -232,6 +232,25 @@ door, and `common/phone-number-cases.json` is the truth table this layer and the
 frontend both assert, so the two can never disagree about which numbers are
 accepted.
 
+**A region is a fact about the reader, not evidence about a third party.**
+`number_format` says where *this user* dials from, which is exactly what places
+a number *they* typed -- and is unrelated to where a payee's office is. So the
+contact lookup normalizes a model's suggestion with **no** region
+(`vetCandidate` passes `null`) and drops one that carries no country code, which
+is what the prompt asks the model for. Read in the reader's region, a Mexico
+City `55 1234 5678` is a valid `+15512345678` in New Jersey -- a different
+number that dials, written into the column by the background enrichment with
+nobody in the loop, under a name the user trusts. An empty field they can fill
+beats a confident wrong number. The rule splits by *who supplied the value*, not
+by which function normalizes it: user-typed gets the region, model-supplied does
+not.
+
+**A stored form is not an answer.** `getLlmPayees` renders `phone` through
+`formatPhoneForDisplay` before the row reaches a model, the same decision the AI
+executor's `contactSummary` and the MCP contact card make about a preview -- a
+model quotes these rows back to the reader, and bare E.164 in the assistant
+beside grouped digits on the payee page is one number printed two ways.
+
 ### A request-supplied array declares an upper bound
 
 Every `@IsArray()` DTO property carries `@ArrayMaxSize(n)` -- an unbounded array turns per-element work downstream into a denial-of-service lever (CodeQL `js/loop-bound-injection`, CWE-834). `src/common/array-bound-dto.spec.ts` sweeps validator metadata; its grandfather list may only shrink. Relatedly, never use a request value's `.length` as a loop bound inside a `withScopedDb` callback (CodeQL cannot track the outer guard through the closure): iterate `for (const [i, v] of xs.entries())`.
