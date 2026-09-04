@@ -14,16 +14,39 @@ vi.mock('@/lib/notification-preferences', async (importOriginal) => ({
 }));
 
 const listDevices = vi.fn();
+const getConfig = vi.fn();
+const currentFingerprint = vi.fn();
 vi.mock('@/lib/push', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/push')>()),
-  pushApi: { listDevices: (...a: unknown[]) => listDevices(...a) },
+  pushApi: {
+    listDevices: (...a: unknown[]) => listDevices(...a),
+    getConfig: (...a: unknown[]) => getConfig(...a),
+  },
+  // The matrix asks which endpoint THIS browser holds, so it can tell "the
+  // account has a live device" from "the machine in front of you has one".
+  currentDeviceFingerprint: (...a: unknown[]) => currentFingerprint(...a),
+  getPushSupport: () => ({ supported: true }),
 }));
 
 // A live web-push device (absent transport reads as webpush); a disabled one;
 // and a live UnifiedPush device for the unifiedpush-column test.
-const liveDevice = { id: 'd1', disabledAt: null };
-const disabledDevice = { id: 'd2', disabledAt: '2026-09-01T00:00:00Z' };
-const liveUnifiedDevice = { id: 'd3', disabledAt: null, transport: 'unifiedpush' };
+const THIS_ENDPOINT = 'aaaa1111';
+const liveDevice = {
+  id: 'd1',
+  disabledAt: null,
+  endpointFingerprint: THIS_ENDPOINT,
+};
+const disabledDevice = {
+  id: 'd2',
+  disabledAt: '2026-09-01T00:00:00Z',
+  endpointFingerprint: THIS_ENDPOINT,
+};
+const liveUnifiedDevice = {
+  id: 'd3',
+  disabledAt: null,
+  transport: 'unifiedpush',
+  endpointFingerprint: 'cccc3333',
+};
 
 describe('NotificationPreferencesMatrix', () => {
   const allChannels = { email: true, emailNotification: true, push: true, unifiedpush: true };
@@ -41,6 +64,15 @@ describe('NotificationPreferencesMatrix', () => {
     // One live web-push device by default, so the push column is a real control;
     // no UnifiedPush device, so that column self-gates disabled.
     listDevices.mockReset().mockResolvedValue([liveDevice, disabledDevice]);
+    // This browser holds the endpoint that live row names, so by default it is
+    // already registered and the enable action has nothing to offer.
+    currentFingerprint.mockReset().mockResolvedValue(THIS_ENDPOINT);
+    getConfig.mockReset().mockResolvedValue({
+      enabled: true,
+      publicKey: 'BPublicKey',
+      configured: true,
+      keyUnreadable: false,
+    });
   });
   afterEach(() => cleanup());
 
@@ -56,6 +88,11 @@ describe('NotificationPreferencesMatrix', () => {
     expect(screen.getByText('Bills and scheduled')).toBeInTheDocument();
     expect(screen.getByText('Budgets')).toBeInTheDocument();
     expect(screen.getByText('System alerts')).toBeInTheDocument();
+    // In-app is not a column: the bell shows everything and there is nothing to
+    // choose, so the sentence above the grid says it instead of a column of
+    // permanent ticks spending a sixth of a phone's width.
+    expect(screen.queryByText('In-app')).toBeNull();
+    expect(screen.queryByText('Always shown in the bell')).toBeNull();
     // report + alert + push + unifiedpush for the two full rows (8), push +
     // unifiedpush only for SYSTEM (2) = 10.
     expect(screen.getAllByRole('switch')).toHaveLength(10);
@@ -94,16 +131,34 @@ describe('NotificationPreferencesMatrix', () => {
     );
   });
 
-  it('disables the UnifiedPush column and explains why when no UnifiedPush device is live', async () => {
+  it('disables the UnifiedPush column when no UnifiedPush device is live', async () => {
     await renderMatrix();
-    // No UnifiedPush device by default -> the column is disabled with a hint.
+    // No UnifiedPush device by default -> the column is disabled.
     const switches = screen.getAllByRole('switch');
     expect(switches[3]).toBeDisabled(); // PAYMENTS unifiedpush
+  });
+
+  // The two column explanations moved out of the footnote list and onto the
+  // columns they explain: a tooltip beside the heading from `md` up, the same
+  // sentence inside each of that column's cells below it (where `InfoTooltip`
+  // renders nothing at all, having no touch trigger).
+  it('explains UnifiedPush and the cooldown on the columns themselves', async () => {
+    await renderMatrix();
+    const unifiedpush =
+      'UnifiedPush delivers through a distributor app you run yourself, such as ntfy, instead of a browser vendor\'s push service. Register an endpoint in that app to use this channel.';
+    const cooldown =
+      'Skip an alert or push when one from the same group fired within this window.';
+    // The heading's tooltip carries it as its accessible name...
     expect(
-      screen.getByText(
-        'Register a UnifiedPush endpoint from your distributor app to use this channel.',
-      ),
+      screen.getByRole('button', { name: unifiedpush }),
     ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: cooldown })).toBeInTheDocument();
+    // ...and each appears exactly once as rendered text: the footnote a phone
+    // gets instead, ONCE, not once per row -- the repetition is what a phone has
+    // least room for. The portal variant draws its body only while hovered or
+    // focused, so the accessible name above is the whole of the desktop half.
+    expect(screen.getAllByText(unifiedpush)).toHaveLength(1);
+    expect(screen.getAllByText(cooldown)).toHaveLength(1);
   });
 
   it('gates the email columns on email availability', async () => {
@@ -126,8 +181,60 @@ describe('NotificationPreferencesMatrix', () => {
     const switches = screen.getAllByRole('switch');
     expect(switches[2]).toBeDisabled(); // PAYMENTS push
     expect(
-      screen.getByText('Enable push on this device first (see below).'),
+      screen.getByText(
+        'No device is registered for push, so this channel cannot deliver.',
+      ),
     ).toBeInTheDocument();
+  });
+
+  // The regression this section was missing: the matrix could say the push
+  // column needed a device and offer nothing but a pointer to another panel.
+  // The channel is registered per ENDPOINT, so the action belongs here.
+  it('offers to register this browser when the account has no live device', async () => {
+    listDevices.mockResolvedValue([disabledDevice]);
+    await renderMatrix();
+    expect(
+      screen.getByText('This browser is not registered for push notifications.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Enable on this device' }),
+    ).toBeInTheDocument();
+  });
+
+  // A working channel elsewhere is not a working channel here: the offer keys
+  // off THIS endpoint, never off the account having some live device.
+  it('still offers to register this browser when another device is live', async () => {
+    listDevices.mockResolvedValue([liveUnifiedDevice]);
+    currentFingerprint.mockResolvedValue('bbbb2222');
+    await renderMatrix();
+    expect(
+      screen.getByRole('button', { name: 'Enable on this device' }),
+    ).toBeInTheDocument();
+  });
+
+  it('offers nothing once this browser is registered', async () => {
+    await renderMatrix();
+    expect(screen.queryByRole('button', { name: 'Enable on this device' })).toBeNull();
+    expect(
+      screen.queryByText('This browser is not registered for push notifications.'),
+    ).toBeNull();
+  });
+
+  // A button that can only fail is worse than no button -- and the sentence
+  // beside it must not be left standing on its own either.
+  it('offers nothing when this browser cannot receive push at all', async () => {
+    getConfig.mockResolvedValue({
+      enabled: false,
+      publicKey: null,
+      configured: false,
+      keyUnreadable: false,
+    });
+    listDevices.mockResolvedValue([disabledDevice]);
+    await renderMatrix();
+    expect(screen.queryByRole('button', { name: 'Enable on this device' })).toBeNull();
+    expect(
+      screen.queryByText('This browser is not registered for push notifications.'),
+    ).toBeNull();
   });
 
   it('persists each channel toggle for its category', async () => {

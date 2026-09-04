@@ -164,8 +164,53 @@ describe('PushDevicesPanel', () => {
 
     await screen.findByText('ntfy on Android');
     // Exactly one badge: the distributor device wears it, the browser row (an
-    // absent transport reads as web push) does not.
-    expect(screen.getAllByText('UnifiedPush')).toHaveLength(1);
+    // absent transport reads as web push) does not. Queried by test id rather
+    // than by its text, because every row now also NAMES its wire in the facts
+    // beneath it -- a text query counts both and reads as two badges.
+    expect(screen.getAllByTestId('push-transport-badge')).toHaveLength(1);
+    // And the wire is spelled out per row, distributor and browser alike --
+    // twice for the distributor, which wears the badge as well as the fact.
+    expect(screen.getAllByText('UnifiedPush')).toHaveLength(2);
+    expect(screen.getByText('Web push')).toBeInTheDocument();
+  });
+
+  it('identifies each endpoint beyond its derived device name', async () => {
+    mockListDevices.mockResolvedValue([
+      device({
+        userAgent: 'Mozilla/5.0 (X11; Linux x86_64) Chrome/140',
+        createdAt: '2026-08-01T10:00:00.000Z',
+        lastSeenAt: '2026-08-02T10:00:00.000Z',
+        lastSuccessAt: '2026-08-02T11:00:00.000Z',
+      }),
+    ]);
+    mockCurrentFingerprint.mockResolvedValue(THIS_DEVICE);
+
+    render(<PushDevicesPanel />);
+
+    // `deviceName` is derived from the user agent, so two browsers on one
+    // machine share it word for word. What tells the rows apart -- and what a
+    // reader needs before revoking one -- is the endpoint digest, the wire, the
+    // dates and the agent string.
+    await screen.findByText('Endpoint');
+    expect(screen.getByText(THIS_DEVICE)).toBeInTheDocument();
+    expect(screen.getByText('Delivered by')).toBeInTheDocument();
+    expect(screen.getByText('Registered')).toBeInTheDocument();
+    expect(screen.getByText('Last active')).toBeInTheDocument();
+    expect(screen.getByText('Last delivery')).toBeInTheDocument();
+    expect(
+      screen.getByText('Mozilla/5.0 (X11; Linux x86_64) Chrome/140'),
+    ).toBeInTheDocument();
+  });
+
+  // A device nothing has ever reached is exactly the one a reader is hunting
+  // for, so "never" is a state with words, not a blank cell.
+  it('says so when an endpoint has never been delivered to', async () => {
+    mockListDevices.mockResolvedValue([device({ lastSuccessAt: null })]);
+    mockCurrentFingerprint.mockResolvedValue(THIS_DEVICE);
+
+    render(<PushDevicesPanel />);
+
+    expect(await screen.findByText('Nothing delivered yet')).toBeInTheDocument();
   });
 
   // The regression: a retired row is not a registration. After a rotation the
