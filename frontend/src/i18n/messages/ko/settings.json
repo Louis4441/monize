@@ -155,8 +155,6 @@
       "openstreetmap": "OpenStreetMap",
       "waze": "Waze"
     },
-    "saveButton": "환경설정 저장",
-    "savingButton": "저장 중...",
     "toasts": {
       "saved": "환경설정이 저장되었습니다",
       "saveFailed": "환경설정 저장에 실패했습니다",
@@ -321,7 +319,7 @@
         "emailNotification": "이메일(알림)",
         "push": "푸시",
         "unifiedpush": "UnifiedPush",
-        "unifiedpushHint": "UnifiedPush는 브라우저 공급업체의 푸시 서비스 대신 ntfy처럼 직접 운영하는 배포자 앱을 통해 전달합니다. 이 채널을 사용하려면 그 앱에서 엔드포인트를 등록하세요."
+        "unifiedpushHint": "알림은 브라우저 공급업체의 푸시 서비스 대신 ntfy처럼 직접 운영하는 배포자 앱을 통해 전달됩니다. 이 채널을 사용하려면 그 앱에서 엔드포인트를 등록하세요."
       },
       "categories": {
         "PAYMENTS": "청구서 및 예약",

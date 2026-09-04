@@ -155,8 +155,6 @@
       "openstreetmap": "OpenStreetMap",
       "waze": "Waze"
     },
-    "saveButton": "Simpan Preferensi",
-    "savingButton": "Menyimpan...",
     "toasts": {
       "saved": "Preferensi disimpan",
       "saveFailed": "Gagal menyimpan preferensi",
@@ -321,7 +319,7 @@
         "emailNotification": "Email (peringatan)",
         "push": "Push",
         "unifiedpush": "UnifiedPush",
-        "unifiedpushHint": "UnifiedPush mengirim melalui aplikasi distributor yang Anda jalankan sendiri, seperti ntfy, alih-alih layanan push vendor peramban. Daftarkan endpoint di aplikasi tersebut untuk memakai kanal ini."
+        "unifiedpushHint": "Notifikasi dikirim melalui aplikasi distributor yang Anda jalankan sendiri, seperti ntfy, alih-alih layanan push vendor peramban. Daftarkan endpoint di aplikasi tersebut untuk memakai kanal ini."
       },
       "categories": {
         "PAYMENTS": "Tagihan dan terjadwal",

@@ -155,8 +155,6 @@
       "openstreetmap": "OpenStreetMap",
       "waze": "Waze"
     },
-    "saveButton": "Save Preferences",
-    "savingButton": "Saving...",
     "toasts": {
       "saved": "Preferences saved",
       "saveFailed": "Failed to save preferences",
@@ -321,7 +319,7 @@
         "emailNotification": "Email (alert)",
         "push": "Push",
         "unifiedpush": "UnifiedPush",
-        "unifiedpushHint": "UnifiedPush delivers through a distributor app you run yourself, such as ntfy, instead of a browser vendor's push service. Register an endpoint in that app to use this channel."
+        "unifiedpushHint": "Notifications are delivered through a distributor app you run yourself, such as ntfy, instead of a browser vendor's push service. Register an endpoint in that app to use this channel."
       },
       "categories": {
         "PAYMENTS": "Bills and scheduled",

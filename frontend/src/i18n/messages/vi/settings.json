@@ -155,8 +155,6 @@
       "openstreetmap": "OpenStreetMap",
       "waze": "Waze"
     },
-    "saveButton": "Lưu sở thích",
-    "savingButton": "Đang lưu...",
     "toasts": {
       "saved": "Đã lưu sở thích",
       "saveFailed": "Không thể lưu sở thích",
@@ -321,7 +319,7 @@
         "emailNotification": "Email (cảnh báo)",
         "push": "Push",
         "unifiedpush": "UnifiedPush",
-        "unifiedpushHint": "UnifiedPush gửi qua ứng dụng phân phối do bạn tự chạy, chẳng hạn ntfy, thay vì dịch vụ push của hãng trình duyệt. Hãy đăng ký một điểm cuối trong ứng dụng đó để dùng kênh này."
+        "unifiedpushHint": "Thông báo được gửi qua ứng dụng phân phối do bạn tự chạy, chẳng hạn ntfy, thay vì dịch vụ push của hãng trình duyệt. Hãy đăng ký một điểm cuối trong ứng dụng đó để dùng kênh này."
       },
       "categories": {
         "PAYMENTS": "Hóa đơn và đã lên lịch",

@@ -26,8 +26,6 @@ interface EnableThisEndpointButtonProps {
    * is not there.
    */
   hint?: string;
-  /** Run after a successful registration, so the caller can reload its list. */
-  onEnabled?: () => void | Promise<void>;
 }
 
 /**
@@ -47,7 +45,6 @@ interface EnableThisEndpointButtonProps {
 export function EnableThisEndpointButton({
   registeredHere,
   hint,
-  onEnabled,
 }: EnableThisEndpointButtonProps) {
   const t = useTranslations('settings.notifications.push');
   const [config, setConfig] = useState<PushConfig | null>(null);
@@ -81,7 +78,7 @@ export function EnableThisEndpointButton({
     }, [config]),
   );
 
-  const { isEnabling, enable } = usePushEnable(config?.publicKey, onEnabled);
+  const { isEnabling, enable } = usePushEnable(config?.publicKey);
 
   if (!config?.enabled || !config.publicKey) return null;
   if (support === null || !support.supported) return null;

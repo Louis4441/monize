@@ -155,8 +155,6 @@
       "openstreetmap": "OpenStreetMap",
       "waze": "Waze"
     },
-    "saveButton": "儲存偏好設定",
-    "savingButton": "儲存中...",
     "toasts": {
       "saved": "偏好設定已儲存",
       "saveFailed": "儲存偏好設定失敗",
@@ -321,7 +319,7 @@
         "emailNotification": "電子郵件（提醒）",
         "push": "推播",
         "unifiedpush": "UnifiedPush",
-        "unifiedpushHint": "UnifiedPush 透過你自行執行的分發應用程式（例如 ntfy）投遞，而非瀏覽器廠商的推播服務。請在該應用程式中註冊端點以使用此管道。"
+        "unifiedpushHint": "通知會透過你自行執行的分發應用程式（例如 ntfy）投遞，而非瀏覽器廠商的推播服務。請在該應用程式中註冊端點以使用此管道。"
       },
       "categories": {
         "PAYMENTS": "帳單與排程",

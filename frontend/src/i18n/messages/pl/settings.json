@@ -155,8 +155,6 @@
       "openstreetmap": "OpenStreetMap",
       "waze": "Waze"
     },
-    "saveButton": "Zapisz preferencje",
-    "savingButton": "Zapisywanie...",
     "toasts": {
       "saved": "Zapisano preferencje",
       "saveFailed": "Nie udało się zapisać preferencji",
@@ -321,7 +319,7 @@
         "emailNotification": "E-mail (alert)",
         "push": "Push",
         "unifiedpush": "UnifiedPush",
-        "unifiedpushHint": "UnifiedPush dostarcza powiadomienia przez aplikację dystrybutora, którą prowadzisz samodzielnie (na przykład ntfy), zamiast przez usługę push dostawcy przeglądarki. Zarejestruj punkt końcowy w tej aplikacji, aby korzystać z tego kanału."
+        "unifiedpushHint": "Powiadomienia są dostarczane przez aplikację dystrybutora, którą prowadzisz samodzielnie (na przykład ntfy), zamiast przez usługę push dostawcy przeglądarki. Zarejestruj punkt końcowy w tej aplikacji, aby korzystać z tego kanału."
       },
       "categories": {
         "PAYMENTS": "Rachunki i zaplanowane",

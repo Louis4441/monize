@@ -4,6 +4,7 @@ import { PushDevicesPanel } from './PushDevicesPanel';
 import toast from 'react-hot-toast';
 import { PushPermissionError, type PushDevice } from '@/lib/push';
 import { useAuthStore } from '@/store/authStore';
+import { notifyPushDevicesChanged } from '@/lib/pushDevicesSignal';
 
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({
@@ -255,6 +256,26 @@ describe('PushDevicesPanel', () => {
     for (const button of screen.getAllByRole('button', { name: 'Remove' })) {
       expect(button.className).toMatch(/\bflex-shrink-0\b/);
     }
+  });
+
+  // The regression: enabling push from the preference matrix wrote a row this
+  // list never reloaded, so the panel below went on offering to enable a device
+  // that was already registered. The two surfaces hold separate copies of the
+  // list; the write announces itself to both.
+  it('reloads its list when a registration changes anywhere on the page', async () => {
+    mockListDevices.mockResolvedValue([]);
+    mockCurrentFingerprint.mockResolvedValue(null);
+
+    render(<PushDevicesPanel />);
+    await waitFor(() => expect(mockListDevices).toHaveBeenCalledTimes(1));
+
+    mockListDevices.mockResolvedValue([device()]);
+    mockCurrentFingerprint.mockResolvedValue(THIS_DEVICE);
+    await act(async () => {
+      notifyPushDevicesChanged();
+    });
+
+    expect(await screen.findByText('Chrome on Linux')).toBeInTheDocument();
   });
 
   // Removing a registration is destructive, so it wears the design system's one

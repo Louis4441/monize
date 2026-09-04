@@ -16,6 +16,7 @@ import {
 import { currentDeviceFingerprint, pushApi, type PushDevice } from '@/lib/push';
 import type { NotificationCategory } from '@/types/notification';
 import { createLogger } from '@/lib/logger';
+import { subscribePushDevices } from '@/lib/pushDevicesSignal';
 
 const logger = createLogger('NotificationPreferencesMatrix');
 
@@ -109,6 +110,18 @@ export function NotificationPreferencesMatrix({
       logger.debug('Could not load push devices', error),
     );
   }, [refreshDevices]);
+
+  // A device registered or removed by the panel below moves what these columns
+  // may offer, and this component's copy of the list is its own.
+  useEffect(
+    () =>
+      subscribePushDevices(() => {
+        void refreshDevices().catch((error) =>
+          logger.debug('Could not reload push devices', error),
+        );
+      }),
+    [refreshDevices],
+  );
 
   // Optimistic: reflect the choice immediately, revert the whole row if the
   // save fails. One helper for every channel and the cooldown alike.
@@ -303,7 +316,18 @@ export function NotificationPreferencesMatrix({
                   aria-label={t('throttle.ariaLabel', {
                     category: categoryLabel,
                   })}
-                  className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50 md:text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                  // `min-w-0` and a phone-only cap, together. A `<select>`
+                  // sizes itself to its WIDEST OPTION and its automatic minimum
+                  // size is that width, so as a flex item it takes what it wants
+                  // and every bit of shrinking falls on the label beside it --
+                  // which, being `min-w-0`, collapses to nothing and lets
+                  // "Cooldown" overflow underneath the control. Capped and
+                  // shrinkable, the two share the row; the selected option
+                  // ellipsizes in a locale whose labels are long, which is the
+                  // right thing to give up. Neither applies from `md` up, where
+                  // the column header carries the label and the cell is its own
+                  // grid track.
+                  className="min-w-0 max-w-[9.5rem] rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50 md:max-w-none md:text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                 >
                   {THROTTLE_OPTION_MINUTES.map((minutes) => (
                     <option key={minutes} value={minutes}>
@@ -345,7 +369,6 @@ export function NotificationPreferencesMatrix({
         <EnableThisEndpointButton
           registeredHere={registeredHere}
           hint={t('pushEnableHint')}
-          onEnabled={refreshDevices}
         />
       </div>
     </div>
@@ -394,7 +417,7 @@ function MatrixCell({
 }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1 md:justify-center md:border-t md:border-gray-100 md:py-2 md:dark:border-gray-800">
-      <span className="min-w-0 text-sm text-gray-600 md:hidden dark:text-gray-400">
+      <span className="min-w-0 flex-1 text-sm text-gray-600 md:hidden dark:text-gray-400">
         {label}
       </span>
       {children}

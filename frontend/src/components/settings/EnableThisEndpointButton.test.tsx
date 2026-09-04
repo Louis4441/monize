@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act, cleanup } from '@/test/render';
 import toast from 'react-hot-toast';
 import { EnableThisEndpointButton } from './EnableThisEndpointButton';
+import { subscribePushDevices } from '@/lib/pushDevicesSignal';
 
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({
@@ -33,11 +34,7 @@ vi.mock('@/lib/push', async (importOriginal) => ({
   },
 }));
 
-async function renderButton(props: {
-  registeredHere: boolean;
-  hint?: string;
-  onEnabled?: () => void | Promise<void>;
-}) {
+async function renderButton(props: { registeredHere: boolean; hint?: string }) {
   await act(async () => {
     render(<EnableThisEndpointButton {...props} />);
   });
@@ -67,9 +64,10 @@ describe('EnableThisEndpointButton', () => {
     ).toBeInTheDocument();
   });
 
-  it('registers this browser and tells the caller to reload', async () => {
-    const onEnabled = vi.fn();
-    await renderButton({ registeredHere: false, onEnabled });
+  it('registers this browser and announces it to every list on the page', async () => {
+    const reload = vi.fn();
+    const stop = subscribePushDevices(reload);
+    await renderButton({ registeredHere: false });
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Enable on this device' }));
@@ -79,10 +77,30 @@ describe('EnableThisEndpointButton', () => {
     // The public key the instance published -- a subscription minted under any
     // other one is rejected by the push service.
     expect(mockEnable.mock.calls[0][0]).toBe('PUB');
-    await waitFor(() => expect(onEnabled).toHaveBeenCalledTimes(1));
+    // Announced rather than handed to one caller: the devices panel below reads
+    // the same rows and would otherwise go on offering to enable a device that
+    // was just registered.
+    await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
     expect(toast.success).toHaveBeenCalledWith(
       'Push notifications enabled on this device',
     );
+    stop();
+  });
+
+  it('announces nothing when the registration failed', async () => {
+    const { PushPermissionError } = await import('@/lib/push');
+    mockEnable.mockRejectedValue(new PushPermissionError('denied'));
+    const reload = vi.fn();
+    const stop = subscribePushDevices(reload);
+    await renderButton({ registeredHere: false });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Enable on this device' }));
+    });
+    await act(async () => {}); // drain the rejection handler
+
+    expect(reload).not.toHaveBeenCalled();
+    stop();
   });
 
   it('maps a refused permission to its own repair, not a generic failure', async () => {

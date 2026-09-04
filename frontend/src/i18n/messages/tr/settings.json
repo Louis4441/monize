@@ -155,8 +155,6 @@
       "openstreetmap": "OpenStreetMap",
       "waze": "Waze"
     },
-    "saveButton": "Tercihleri Kaydet",
-    "savingButton": "Kaydediliyor...",
     "toasts": {
       "saved": "Tercihler kaydedildi",
       "saveFailed": "Tercihler kaydedilemedi",
@@ -321,7 +319,7 @@
         "emailNotification": "E-posta (uyarı)",
         "push": "Push",
         "unifiedpush": "UnifiedPush",
-        "unifiedpushHint": "UnifiedPush, tarayıcı sağlayıcısının push hizmeti yerine ntfy gibi kendi çalıştırdığınız bir dağıtıcı uygulama üzerinden iletir. Bu kanalı kullanmak için o uygulamada bir uç nokta kaydedin."
+        "unifiedpushHint": "Bildirimler, tarayıcı sağlayıcısının push hizmeti yerine ntfy gibi kendi çalıştırdığınız bir dağıtıcı uygulama üzerinden iletilir. Bu kanalı kullanmak için o uygulamada bir uç nokta kaydedin."
       },
       "categories": {
         "PAYMENTS": "Faturalar ve planlananlar",

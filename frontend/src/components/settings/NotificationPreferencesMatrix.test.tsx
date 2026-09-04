@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { render } from '@/test/render';
 import { NotificationPreferencesMatrix } from './NotificationPreferencesMatrix';
+import { notifyPushDevicesChanged } from '@/lib/pushDevicesSignal';
 
 const list = vi.fn();
 const update = vi.fn();
@@ -144,8 +145,13 @@ describe('NotificationPreferencesMatrix', () => {
   // renders nothing at all, having no touch trigger).
   it('explains UnifiedPush and the cooldown on the columns themselves', async () => {
     await renderMatrix();
+    // Deliberately does NOT open with "UnifiedPush": on a phone the bold column
+    // name is printed immediately before it, and a sentence repeating its own
+    // subject read "UnifiedPush UnifiedPush delivers through...". It still has
+    // to stand alone as the column tooltip, where the heading supplies the
+    // subject instead.
     const unifiedpush =
-      'UnifiedPush delivers through a distributor app you run yourself, such as ntfy, instead of a browser vendor\'s push service. Register an endpoint in that app to use this channel.';
+      'Notifications are delivered through a distributor app you run yourself, such as ntfy, instead of a browser vendor\'s push service. Register an endpoint in that app to use this channel.';
     const cooldown =
       'Skip an alert or push when one from the same group fired within this window.';
     // The heading's tooltip carries it as its accessible name...
@@ -159,6 +165,22 @@ describe('NotificationPreferencesMatrix', () => {
     // focused, so the accessible name above is the whole of the desktop half.
     expect(screen.getAllByText(unifiedpush)).toHaveLength(1);
     expect(screen.getAllByText(cooldown)).toHaveLength(1);
+  });
+
+  // The regression: the cooldown `<select>` sizes itself to its WIDEST OPTION
+  // and its automatic minimum size is that width, so as a flex item it took
+  // what it wanted and every bit of shrinking fell on the label beside it --
+  // which, being `min-w-0`, collapsed and let "Cooldown" run underneath the
+  // control. Capped and shrinkable, the two share the row.
+  it('caps the cooldown control on a phone so its label keeps its space', async () => {
+    await renderMatrix();
+    for (const select of screen.getAllByRole('combobox')) {
+      expect(select.className).toMatch(/\bmax-w-\[[\d.]+rem\]/);
+      expect(select.className).toMatch(/\bmin-w-0\b/);
+      // ...and neither applies from `md` up, where the column header carries
+      // the label and the cell is its own grid track.
+      expect(select.className).toMatch(/\bmd:max-w-none\b/);
+    }
   });
 
   it('gates the email columns on email availability', async () => {
@@ -210,6 +232,23 @@ describe('NotificationPreferencesMatrix', () => {
     expect(
       screen.getByRole('button', { name: 'Enable on this device' }),
     ).toBeInTheDocument();
+  });
+
+  // The other direction of the same seam: removing the last device from the
+  // panel below has to re-gate these columns, which were left offering toggles
+  // for a channel that could no longer deliver.
+  it('re-gates its columns when a registration changes anywhere on the page', async () => {
+    await renderMatrix();
+    expect(screen.getAllByRole('switch')[2]).not.toBeDisabled(); // PAYMENTS push
+
+    listDevices.mockResolvedValue([disabledDevice]);
+    await act(async () => {
+      notifyPushDevicesChanged();
+    });
+
+    await waitFor(() =>
+      expect(screen.getAllByRole('switch')[2]).toBeDisabled(),
+    );
   });
 
   it('offers nothing once this browser is registered', async () => {

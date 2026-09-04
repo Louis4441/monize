@@ -155,8 +155,6 @@
       "openstreetmap": "OpenStreetMap",
       "waze": "Waze"
     },
-    "saveButton": "Voorkeuren opslaan",
-    "savingButton": "Opslaan...",
     "toasts": {
       "saved": "Voorkeuren opgeslagen",
       "saveFailed": "Opslaan van voorkeuren mislukt",
@@ -321,7 +319,7 @@
         "emailNotification": "E-mail (waarschuwing)",
         "push": "Push",
         "unifiedpush": "UnifiedPush",
-        "unifiedpushHint": "UnifiedPush bezorgt via een distributor-app die je zelf draait, zoals ntfy, in plaats van de pushdienst van de browserleverancier. Registreer een eindpunt in die app om dit kanaal te gebruiken."
+        "unifiedpushHint": "Meldingen worden bezorgd via een distributor-app die je zelf draait, zoals ntfy, in plaats van de pushdienst van de browserleverancier. Registreer een eindpunt in die app om dit kanaal te gebruiken."
       },
       "categories": {
         "PAYMENTS": "Rekeningen en gepland",

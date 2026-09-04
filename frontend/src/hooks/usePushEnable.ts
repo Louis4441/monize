@@ -12,6 +12,7 @@ import {
   PushServiceError,
 } from '@/lib/push';
 import { getErrorMessage } from '@/lib/errors';
+import { notifyPushDevicesChanged } from '@/lib/pushDevicesSignal';
 
 /**
  * Registering THIS browser's endpoint for push, as one action every surface
@@ -31,12 +32,14 @@ import { getErrorMessage } from '@/lib/errors';
  *     permission, Brave's push-service switch, anything else), and one rule maps
  *     each to its message (`pushPermissionMessageKey`).
  *
- * `onEnabled` runs after a successful registration, so a caller can reload
- * whatever it renders from the device list.
+ * A successful registration announces itself through `notifyPushDevicesChanged`
+ * rather than through a per-caller callback. Both surfaces that offer this
+ * button also LIST devices, and every listing surface already subscribes, so a
+ * callback would reload the caller a second time and still leave the other one
+ * stale -- one mechanism, reaching everybody.
  */
 export function usePushEnable(
   publicKey: string | null | undefined,
-  onEnabled?: () => void | Promise<void>,
 ): { isEnabling: boolean; enable: () => void } {
   const t = useTranslations('settings.notifications.push');
   const [isEnabling, setIsEnabling] = useState(false);
@@ -48,7 +51,11 @@ export function usePushEnable(
     void (async () => {
       try {
         await enabling;
-        await onEnabled?.();
+        // Every surface reading the device list, not only the one that owns
+        // this button: the panel and the matrix hold separate copies, so
+        // refreshing only the caller left the other offering to enable a
+        // device that had just been registered.
+        notifyPushDevicesChanged();
         toast.success(t('toasts.enabled'));
       } catch (error) {
         if (error instanceof PushPermissionError) {
@@ -70,7 +77,7 @@ export function usePushEnable(
         setIsEnabling(false);
       }
     })();
-  }, [publicKey, onEnabled, t]);
+  }, [publicKey, t]);
 
   return { isEnabling, enable };
 }

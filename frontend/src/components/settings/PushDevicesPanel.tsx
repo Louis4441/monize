@@ -27,6 +27,10 @@ import { createLogger } from '@/lib/logger';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { usePushEnable } from '@/hooks/usePushEnable';
 import { useRereadOnVisible } from '@/hooks/useRereadOnVisible';
+import {
+  notifyPushDevicesChanged,
+  subscribePushDevices,
+} from '@/lib/pushDevicesSignal';
 import { getErrorMessage } from '@/lib/errors';
 
 const logger = createLogger('PushDevices');
@@ -76,15 +80,22 @@ export function PushDevicesPanel() {
   // Registering this browser's endpoint. Shared with the action offered from
   // the preference matrix, so the transient-activation rule and the three
   // refusal messages are written once (`usePushEnable`).
-  const { isEnabling, enable: handleEnable } = usePushEnable(
-    config?.publicKey,
-    refreshDevices,
-  );
+  const { isEnabling, enable: handleEnable } = usePushEnable(config?.publicKey);
 
   // Timestamps are instants, so they are rendered in the timezone and time
   // format the reader chose in Preferences -- not the browser's, which is what
   // a bare `toLocaleString()` reaches for.
   const { formatDateTime } = useDateFormat();
+
+  // A registration made anywhere on this page is a registration this list has
+  // to show. The matrix's own "Enable on this device" writes the same rows.
+  useEffect(
+    () =>
+      subscribePushDevices(() => {
+        void refreshDevices().catch(() => setDevicesFailed(true));
+      }),
+    [refreshDevices],
+  );
 
   /**
    * Re-read what this browser supports whenever the user comes back to the page.
@@ -270,6 +281,10 @@ export function PushDevicesPanel() {
         await pushApi.removeDevice(device.id);
       }
       await refreshDevices();
+      // The matrix gates its push columns on there being a live device, so the
+      // last removal has to reach it: left stale, it kept offering toggles for
+      // a channel that could no longer deliver.
+      notifyPushDevicesChanged();
       toast.success(t('toasts.removed'));
     } catch (error) {
       toast.error(getErrorMessage(error, t('toasts.removeFailed')));
