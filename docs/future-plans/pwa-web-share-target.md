@@ -383,12 +383,15 @@ preserved as that plan requires.
 
 ---
 
-## 9. Open questions for the maintainer
+## 9. Maintainer decisions
 
-1. Stash lifetime: one hour is proposed. A shorter value protects a shared
-   device; a longer one tolerates a slow OIDC login. Say if either matters more.
-2. Whether the review screen should offer Import for a single CSV that could
-   equally be an investment CSV (the wizard already disambiguates on its
-   mapping step, so the proposal is to let it).
-3. Whether desktop Chromium's installed-app share target is worth a line in the
-   README, or whether the feature should be documented as Android only.
+Resolved on the plan's review, so the implementation does not reopen them:
+
+1. **Stash lifetime is one hour.** The value in Section 3.2 stands.
+2. **A lone CSV is offered to Import.** The review screen does not ask whether
+   a CSV is a bank statement or an investment export; the wizard's mapping step
+   already makes that distinction and keeps making it.
+3. **Documented as Android only.** The README and the settings copy describe
+   the share sheet as an Android feature. Desktop Chromium's installed-app share
+   target works through the same code and stays undocumented rather than
+   promised.
