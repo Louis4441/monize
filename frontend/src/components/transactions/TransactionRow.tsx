@@ -50,6 +50,28 @@ function describeInvestmentSplit(split: TransactionSplit, uncategorizedLabel: st
   return symbol ? `${action}: ${symbol}` : action;
 }
 
+/**
+ * The paperclip and count a row with attachments shows. One rendering for
+ * the tier table's Attachments column and the phone card, so the two cannot
+ * drift; the caller decides whether a row has anything to show (the tier cell
+ * prints a dash for none, the card prints nothing at all).
+ */
+function AttachmentBadge({ count }: { count: number }) {
+  const t = useTranslations('transactions');
+  return (
+    <span
+      data-testid="attachment-badge"
+      className="inline-flex items-center gap-1 text-gray-600 dark:text-gray-300"
+      title={t('list.attachmentsCount', { count })}
+    >
+      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+      </svg>
+      {count}
+    </span>
+  );
+}
+
 function CopyDropdown({ density, onDuplicate, onScheduleRecurring }: {
   density: DensityLevel;
   onDuplicate?: () => void;
@@ -302,9 +324,10 @@ export const TransactionRow = memo(function TransactionRow({
   // different set of facts -- every value below is the same value the tier
   // branch renders, from the same helper. Edit/Copy/Delete are deliberately
   // absent: on a phone those live in the long-press action sheet the same
-  // handlers below open. Description, Ref #, attachments and the three FX
-  // columns are left out to keep the card to two lines -- three when the row
-  // carries tags, which take a line of their own under the category.
+  // handlers below open. Description, Ref # and the three FX columns are left
+  // out to keep the card to two lines -- three when the row carries tags,
+  // which take a line of their own under the category. Attachments keep
+  // their place left of the category, but only on a row that has some.
   if (wrapped) {
     return (
       <tr
@@ -418,6 +441,13 @@ export const TransactionRow = memo(function TransactionRow({
                   {transaction.account?.name || '-'}
                 </span>
               )}
+              {/* Attachments sit left of the category, as the tier table's
+                  column does. A row with none renders nothing here -- not the
+                  tier cell's dash, and no empty element either -- so the
+                  category stays flush to the card's left edge. */}
+              {transaction.attachmentCount && transaction.attachmentCount > 0 ? (
+                <AttachmentBadge count={transaction.attachmentCount} />
+              ) : null}
               {transaction.linkedInvestmentTransactionId ? (
                 // No `title` here, unlike the tier cell: a hover tooltip is
                 // unreachable on a phone, and the pill's own label already
@@ -880,12 +910,7 @@ export const TransactionRow = memo(function TransactionRow({
       </td>
       <td className={`${cellPadding} whitespace-nowrap text-center text-sm ${registerColumnClass('attachments')}`}>
         {transaction.attachmentCount && transaction.attachmentCount > 0 ? (
-          <span className="inline-flex items-center gap-1 text-gray-600 dark:text-gray-300" title={t('list.attachmentsCount', { count: transaction.attachmentCount })}>
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-            </svg>
-            {transaction.attachmentCount}
-          </span>
+          <AttachmentBadge count={transaction.attachmentCount} />
         ) : (
           <span className="text-gray-400 dark:text-gray-500">-</span>
         )}
