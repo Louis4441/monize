@@ -1924,3 +1924,77 @@ describe('useImportWizard - .mny wipe confirmation', () => {
     expect(mockMnyStart).not.toHaveBeenCalled();
   });
 });
+
+describe('useImportWizard - handleFiles (Web Share Target hand-off)', () => {
+  // The OS hands over `File` objects with no input element behind them, so the
+  // wizard's entry point takes files rather than a change event. Everything
+  // after this point is identical to a file the user picked.
+  it('drives the wizard from a bare File array', async () => {
+    mockGetAllAccounts.mockResolvedValue([baseAccount()]);
+    mockParseQif.mockResolvedValue(baseParsedQif());
+
+    const { result } = renderHook(() => useImportWizard());
+    await waitFor(() => expect(result.current.accounts).toHaveLength(1));
+
+    await act(async () => {
+      await result.current.handleFiles([makeFile('shared.qif', 'data')]);
+    });
+
+    expect(mockParseQif).toHaveBeenCalled();
+    expect(result.current.step).toBe('selectAccount');
+    expect(result.current.importFiles).toHaveLength(1);
+    expect(result.current.importFiles[0].fileName).toBe('shared.qif');
+  });
+
+  it('detects a shared CSV by extension, as the picker path does', async () => {
+    mockGetAllAccounts.mockResolvedValue([baseAccount()]);
+    mockParseCsvHeaders.mockResolvedValue({ headers: ['Date', 'Amount'], sampleRows: [] });
+    mockAutoMatchCsvColumns.mockReturnValue({});
+    mockLooksLikeInvestmentCsv.mockReturnValue(false);
+
+    const { result } = renderHook(() => useImportWizard());
+    await waitFor(() => expect(result.current.accounts).toHaveLength(1));
+
+    await act(async () => {
+      await result.current.handleFiles([makeFile('january.csv', 'Date,Amount')]);
+    });
+
+    expect(result.current.step).toBe('csvColumnMapping');
+    expect(result.current.fileType).toBe('csv');
+  });
+
+  it('is a no-op for an empty hand-off', async () => {
+    mockGetAllAccounts.mockResolvedValue([baseAccount()]);
+
+    const { result } = renderHook(() => useImportWizard());
+    await waitFor(() => expect(result.current.accounts).toHaveLength(1));
+
+    await act(async () => {
+      await result.current.handleFiles([]);
+    });
+
+    expect(mockParseQif).not.toHaveBeenCalled();
+    expect(result.current.step).toBe('upload');
+  });
+
+  // The change handler is now a thin adapter, so both doors must behave the
+  // same: a defect fixed in one would otherwise survive in the other.
+  it('is what the file input\'s change handler delegates to', async () => {
+    mockGetAllAccounts.mockResolvedValue([baseAccount()]);
+    mockParseQif.mockResolvedValue(baseParsedQif());
+
+    const { result } = renderHook(() => useImportWizard());
+    await waitFor(() => expect(result.current.accounts).toHaveLength(1));
+
+    await act(async () => {
+      await result.current.handleFileSelect(fileEvent([makeFile('picked.qif', 'data')]));
+    });
+    const viaInput = result.current.importFiles.map((f) => f.fileName);
+
+    await act(async () => {
+      await result.current.handleFiles([makeFile('picked.qif', 'data')]);
+    });
+
+    expect(result.current.importFiles.map((f) => f.fileName)).toEqual(viaInput);
+  });
+});

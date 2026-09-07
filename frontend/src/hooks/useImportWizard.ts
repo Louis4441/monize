@@ -148,6 +148,21 @@ export function useImportWizard() {
   const [csvColumnMapping, setCsvColumnMapping] = useState<CsvColumnMappingConfig>(DEFAULT_CSV_COLUMN_MAPPING);
   const [csvTransferRules, setCsvTransferRules] = useState<CsvTransferRule[]>([]);
   const [savedColumnMappings, setSavedColumnMappings] = useState<SavedColumnMapping[]>([]);
+  /**
+   * True once accounts, categories, securities and currencies are all in.
+   *
+   * The wizard matches a file's categories against the user's categories, its
+   * symbols against their securities and its filename against their accounts,
+   * so those lists are a PREREQUISITE for `handleFiles`, not merely data that
+   * arrives eventually: run against empty lists, every match fails, and a
+   * failed category match is an offer to CREATE a category the user already
+   * has. A human picking a file cannot realistically get ahead of this load;
+   * the Web Share Target's automatic hand-off can and does, so it waits on it.
+   *
+   * Stays false if the load failed: the shared files are then left in the stash
+   * for a retry rather than handed to a wizard that knows nothing.
+   */
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isBulkImport = importFiles.length > 1;
@@ -228,6 +243,7 @@ export function useImportWizard() {
         setSecurities(securitiesData);
         setCurrencies(currenciesData);
         setSavedColumnMappings(columnMappingsData);
+        setDataLoaded(true);
 
         if (preselectedAccountId) {
           const accountExists = accountsData.some((a) => a.id === preselectedAccountId);
@@ -359,15 +375,21 @@ export function useImportWizard() {
     runBulkLookup();
   }, [step, initialLookupDone, securityMappings, preferredExchanges, defaultCurrency]);
 
-  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  /**
+   * Take a set of files and drive the wizard from them.
+   *
+   * Split out from the change handler so the Web Share Target's review screen
+   * can hand over files the OS provided: they arrive as `File` objects with no
+   * input element behind them, and everything from here on is identical to a
+   * file the user picked.
+   */
+  const handleFiles = useCallback(async (fileArray: File[]) => {
+    if (fileArray.length === 0) return;
 
     setIsLoading(true);
     setInitialLookupDone(false);
 
     try {
-      const fileArray = Array.from(files);
 
       // Detect file types and enforce same type
       const detectedTypes = fileArray.map((f) => detectFileType(f.name));
@@ -540,6 +562,16 @@ export function useImportWizard() {
       setIsLoading(false);
     }
   }, [accounts, categories, securities, defaultCurrency, preselectedAccountId, t, uploadMny]);
+
+  /** The file input's change event, reduced to the files it carries. */
+  const handleFileSelect = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+      await handleFiles(Array.from(files));
+    },
+    [handleFiles],
+  );
 
   // CSV column mapping handlers
   const handleCsvColumnMappingChange = useCallback((mapping: CsvColumnMappingConfig) => {
@@ -1211,7 +1243,7 @@ export function useImportWizard() {
     accounts, categories, securities,
     categoryMappings, setCategoryMappings, accountMappings, securityMappings,
     handleAccountMappingChange, handleSecurityMappingChange, handleSecurityLookup,
-    isLoading, importResult, bulkImportResult, handleImport, handleFileSelect, handleImportMore,
+    isLoading, dataLoaded, importResult, bulkImportResult, handleImport, handleFileSelect, handleFiles, handleImportMore,
     lookupLoadingIndex, bulkLookupInProgress,
     lookupPickerQuery, lookupPickerCandidates, handleLookupPickerPick, handleLookupPickerCancel,
     showCreateAccount, setShowCreateAccount, creatingForFileIndex, setCreatingForFileIndex,

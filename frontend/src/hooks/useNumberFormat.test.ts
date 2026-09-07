@@ -439,3 +439,49 @@ describe('formatPercentTrimmed', () => {
     expect(en.formatPercentTrimmed(33.333333)).toBe('33.3333%');
   });
 });
+
+describe('formatBytes across locales', () => {
+  afterEach(() => {
+    vi.mocked(usePreferencesStore).mockImplementation((selector: any) =>
+      selector({ preferences: { numberFormat: 'en-US', defaultCurrency: 'USD' } }),
+    );
+  });
+
+  const withLocale = (numberFormat: string) => {
+    vi.mocked(usePreferencesStore).mockImplementation((selector: any) =>
+      selector({ preferences: { numberFormat, defaultCurrency: 'USD' } }),
+    );
+    return renderHook(() => useNumberFormat()).result;
+  };
+
+  it('scales to the unit the size reads best in', () => {
+    const result = withLocale('en-US');
+    expect(result.current.formatBytes(512)).toBe('512 byte');
+    expect(result.current.formatBytes(1536)).toBe('1.5 kB');
+    expect(result.current.formatBytes(5 * 1024 * 1024)).toBe('5.0 MB');
+    expect(result.current.formatBytes(2 * 1024 ** 3)).toBe('2.0 GB');
+  });
+
+  // The point of the whole change: a file size is a number a person reads, so
+  // the decimal mark follows their preference. `toFixed` wrote a `.` for
+  // everyone, so a Polish reader saw "1.4 MB" beside their own "1 234,56 zł".
+  it('writes the decimal mark the reader uses', () => {
+    expect(withLocale('pl-PL').current.formatBytes(1536)).toBe('1,5 kB');
+    expect(withLocale('de-DE').current.formatBytes(1536)).toBe('1,5 kB');
+  });
+
+  // Intl localizes the unit as well, which is why this does not need the unit
+  // abbreviations translated into twenty-two catalogs.
+  it('localizes the unit abbreviation, not only the number', () => {
+    // French separates the value from the unit with a NARROW NO-BREAK SPACE
+    // (U+202F), not an ordinary one. Asserted as the real character rather than
+    // normalised away: a test that compared against a plain space would be
+    // asserting an output Intl does not produce.
+    expect(withLocale('fr-FR').current.formatBytes(1536)).toBe('1,5\u202Fko');
+    expect(withLocale('ru-RU').current.formatBytes(1536)).toBe('1,5 кБ');
+  });
+
+  it('renders a zero size as a measured zero, not as unknown', () => {
+    expect(withLocale('en-US').current.formatBytes(0)).toBe('0 byte');
+  });
+});

@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { roundToDecimals, adaptiveFractionDigits } from '@/lib/format';
+import { scaleBytes } from '@/lib/bytes';
 import { preferredCurrency } from '@/lib/default-currency';
 import { getNumberSeparators } from '@/lib/number-parse';
 
@@ -223,6 +224,29 @@ export function useNumberFormat() {
     [numberFormat, language]
   );
 
+  /**
+   * A file size, in the reader's locale.
+   *
+   * `Intl`'s `style: 'unit'` localizes the abbreviation as well as the number,
+   * so a French reader gets `1,4 ko` and a Russian one `1,4 кБ` without this
+   * repo translating unit names into twenty-two catalogs. The scaling is
+   * `scaleBytes`; this is only the rendering.
+   */
+  const formatBytes = useCallback(
+    (bytes: number): string => {
+      const { value, unit, decimals } = scaleBytes(bytes);
+      const locale = getEffectiveLocale(numberFormat, language);
+      return getNumberFormat(locale, {
+        style: 'unit',
+        unit,
+        unitDisplay: 'short',
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      }).format(value);
+    },
+    [numberFormat, language]
+  );
+
   const formatPercent = useCallback(
     (value: number, decimals: number = 2): string => {
       const locale = getEffectiveLocale(numberFormat, language);
@@ -404,5 +428,5 @@ export function useNumberFormat() {
     [numberFormat, defaultCurrency, language]
   );
 
-  return { formatCurrency, formatCurrencyPrecise, formatCurrencyCompact, formatCurrencyAxis, formatCurrencyFlag, formatCurrencyLabel, formatNumber, formatPercent, formatPercentTrimmed, formatSignedPercent, formatQuantity, formatShareQuantity, formatPrice, defaultCurrency, numberFormat, numberLocale, numberSeparators };
+  return { formatCurrency, formatCurrencyPrecise, formatCurrencyCompact, formatCurrencyAxis, formatCurrencyFlag, formatCurrencyLabel, formatNumber, formatBytes, formatPercent, formatPercentTrimmed, formatSignedPercent, formatQuantity, formatShareQuantity, formatPrice, defaultCurrency, numberFormat, numberLocale, numberSeparators };
 }

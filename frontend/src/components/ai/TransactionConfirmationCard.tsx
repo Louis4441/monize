@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
-import { formatBytes } from '@/components/transactions/AttachmentsSection';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import type { PendingAction } from '@/types/ai';
 import { formatPhoneForDisplay } from '@/lib/phone-number';
@@ -31,7 +30,7 @@ export function TransactionConfirmationCard({
   onCancel,
 }: TransactionConfirmationCardProps) {
   const t = useTranslations('ai');
-  const { formatCurrency, formatCurrencyPrecise, formatQuantity } =
+  const { formatCurrency, formatCurrencyPrecise, formatQuantity, formatBytes } =
     useNumberFormat();
   const { preview, type, status } = action;
 

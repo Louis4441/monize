@@ -243,3 +243,133 @@ describe('proxy security headers', () => {
     expect(response.headers.get('X-Frame-Options')).toBe('DENY');
   });
 });
+
+describe('proxy web share target fallback', () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    fetchMock.mockReset();
+  });
+
+  /** A share POST as the OS sends it, with a body the proxy must not touch. */
+  function makeShareRequest(): NextRequest {
+    const body = new FormData();
+    body.append('files', new File(['receipt bytes'], 'receipt.png', { type: 'image/png' }));
+    return new NextRequest(`${BASE}/share-target`, { method: 'POST', body });
+  }
+
+  // The worker normally answers this POST and the network never sees it. When
+  // it does reach us, the one thing that must not happen is the bytes going
+  // anywhere: not to the backend, not even read into this process.
+  it('answers a missed share with a 303 to the review page', async () => {
+    const response = await proxy(makeShareRequest());
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get('location')).toBe(`${BASE}/share?missed=1`);
+  });
+
+  it('never reads the shared body, and never forwards it to the backend', async () => {
+    const request = makeShareRequest();
+
+    await proxy(request);
+
+    expect(request.bodyUsed).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // Without this branch the POST falls through to the unauthenticated redirect,
+  // which is a 307 -- and a 307 replays the multipart POST against /login.
+  it('answers before the auth check, so a signed-out share is not replayed', async () => {
+    const response = await proxy(makeShareRequest());
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get('location')).not.toContain('/login');
+  });
+
+  it('applies the standard security headers to that redirect', async () => {
+    delete process.env.DISABLE_HTTPS_HEADERS;
+    const response = await proxy(makeShareRequest());
+
+    expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(response.headers.get('X-Frame-Options')).toBe('DENY');
+  });
+
+  it('leaves a GET of the action path on the ordinary protected path', async () => {
+    const response = await proxy(makeRequest('/share-target'));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(`${BASE}/login`);
+  });
+
+  it('sends a signed-out share review to login carrying the way back', async () => {
+    const response = await proxy(makeRequest('/share?id=abc-123'));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      `${BASE}/login?returnTo=%2Fshare%3Fid%3Dabc-123`,
+    );
+  });
+
+  it('leaves every other protected route redirecting to a bare /login', async () => {
+    const response = await proxy(makeRequest('/dashboard'));
+
+    expect(response.headers.get('location')).toBe(`${BASE}/login`);
+  });
+});
+
+/**
+ * The behavioural test above proves this request's body is not read. This scan
+ * holds the structural reason it cannot be: the share branch returns before the
+ * proxy reaches any code that consumes a body. Someone moving that branch below
+ * the API block would keep the behaviour only by accident.
+ */
+describe('proxy.ts share branch placement', () => {
+  const proxySource = import.meta.glob('/src/proxy.ts', {
+    query: '?raw',
+    eager: true,
+    import: 'default',
+  }) as Record<string, string>;
+
+  /**
+   * Blank comments, keeping line numbering, so the scan reads CODE. The comment
+   * above the share branch necessarily says "without touching the body", and a
+   * scan that its own explanation could satisfy would prove nothing.
+   */
+  function withoutComments(source: string): string {
+    return source
+      .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, ' '))
+      .replace(/\/\/[^\n]*/g, (line) => ' '.repeat(line.length));
+  }
+
+  const BODY_READ = /request\.(arrayBuffer|formData|text|json|blob)\s*\(|request\.body\b/;
+
+  it('resolved the module, and the stripper works in both directions', () => {
+    expect(Object.keys(proxySource)).toEqual(['/src/proxy.ts']);
+
+    const stripped = withoutComments(
+      ['// request.arrayBuffer()', '/* request.body */', 'await request.arrayBuffer();'].join('\n'),
+    );
+    const lines = stripped.split('\n');
+    expect(BODY_READ.test(lines[0])).toBe(false);
+    expect(BODY_READ.test(lines[1])).toBe(false);
+    expect(BODY_READ.test(lines[2])).toBe(true);
+    expect(lines).toHaveLength(3);
+  });
+
+  it('returns the share redirect before any code that consumes a body', () => {
+    const code = withoutComments(proxySource['/src/proxy.ts']);
+
+    const shareBranch = code.indexOf('SHARE_TARGET_PATH');
+    const firstBodyRead = code.search(BODY_READ);
+
+    expect(shareBranch).toBeGreaterThan(-1);
+    expect(firstBodyRead).toBeGreaterThan(-1);
+    expect(shareBranch).toBeLessThan(firstBodyRead);
+  });
+});
