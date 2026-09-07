@@ -2320,6 +2320,13 @@ CREATE INDEX idx_gem_strategy_signals_user ON gem_strategy_signals(user_id);
 -- to push to real phones.
 -- ---------------------------------------------------------------------------
 
+CREATE TABLE push_chart_artifacts (
+    id VARCHAR(64) PRIMARY KEY CHECK (id ~ '^[a-f0-9]{64}$'),
+    expires_at TIMESTAMPTZ NOT NULL,
+    png BYTEA NOT NULL CHECK (octet_length(png) <= 65536)
+);
+CREATE INDEX idx_push_chart_artifacts_expiry ON push_chart_artifacts(expires_at);
+
 CREATE TABLE push_instance_config (
     -- Singleton. The key admits exactly one value, so a second insert is a
     -- conflict rather than a second push identity for one deployment.
@@ -2998,6 +3005,7 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- rls-exempt: market_index_sync
 -- rls-exempt: oauth_payloads
 -- rls-exempt: provider_health
+-- rls-exempt: push_chart_artifacts
 -- rls-exempt: push_instance_config
 -- rls-exempt: schema_migrations
 -- ---------------------------------------------------------------------------

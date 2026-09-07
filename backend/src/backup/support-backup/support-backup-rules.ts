@@ -44,6 +44,7 @@ export const ALWAYS_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
   "ai_provider_configs",
   "transaction_attachments",
   "attachment_blobs",
+  "push_chart_artifacts",
 ]);
 
 export const RULES: Record<string, TableRules> = {

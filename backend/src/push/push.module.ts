@@ -1,3 +1,5 @@
+import { PushChartArtifactService } from "./push-chart-artifact.service";
+import { PushChartController } from "./push-chart.controller";
 import { Module } from "@nestjs/common";
 import { EncryptionModule } from "../common/encryption/encryption.module";
 import { PushConfigService } from "./push-config.service";
@@ -18,8 +20,17 @@ import { AdminNotificationsController } from "./admin-notifications.controller";
  */
 @Module({
   imports: [EncryptionModule],
-  providers: [PushConfigService, PushSubscriptionService, WebPushSender],
-  controllers: [PushController, AdminNotificationsController],
+  providers: [
+    PushChartArtifactService,
+    PushConfigService,
+    PushSubscriptionService,
+    WebPushSender,
+  ],
+  controllers: [
+    PushChartController,
+    PushController,
+    AdminNotificationsController,
+  ],
   // PushSubscriptionService is exported for the Phase 5 dispatch's `sendToUser`
   // fan-out (a business feature asks the notification layer to deliver something
   // and never imports a transport; the dispatch is that layer).
