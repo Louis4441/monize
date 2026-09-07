@@ -7,7 +7,10 @@ import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { getErrorMessage } from '@/lib/errors';
 import { attachmentsApi, attachmentDownloadUrl } from '@/lib/attachments';
+import { DocumentScanDialog, type ScanOutcome } from './DocumentScanDialog';
+import { ScanDocumentControl } from './ScanDocumentControl';
 import {
+  StagedAttachment,
   Attachment,
   ACCEPTED_ATTACHMENT_TYPES,
   MAX_ATTACHMENT_BYTES,
@@ -22,7 +25,10 @@ import {
  */
 type AttachmentsSectionProps =
   | { transactionId: string }
-  | { stagedFiles: File[]; onStagedFilesChange: (files: File[]) => void };
+  | {
+      stagedFiles: StagedAttachment[];
+      onStagedFilesChange: (files: StagedAttachment[]) => void;
+    };
 
 /** Human-readable byte size (e.g. 1.4 MB). */
 export function formatBytes(bytes: number): string {
@@ -117,6 +123,8 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
   );
   const [deleteTarget, setDeleteTarget] = useState<Attachment | null>(null);
   const [deleting, setDeleting] = useState(false);
+  /** The photo currently in the scan dialog, or null when it is closed. */
+  const [scanning, setScanning] = useState<File | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -137,10 +145,13 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
       toast.error(error);
       return;
     }
+    await upload(file);
+  };
 
+  const upload = async (file: File, original?: File) => {
     setUploading(true);
     try {
-      await attachmentsApi.upload(transactionId, file);
+      await attachmentsApi.upload(transactionId, file, original);
       toast.success(t('uploaded'));
       await load();
     } catch (err) {
@@ -148,6 +159,42 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
     } finally {
       setUploading(false);
     }
+  };
+
+  /**
+   * A photo picked for scanning is checked against the cap, and against
+   * nothing else about the file.
+   *
+   * Neither its size nor its type says whether the scan can be attached: what
+   * gets attached is the dialog's output, a JPEG capped at `OUTPUT_MAX_EDGE`,
+   * so a HEIC is scannable and so is a 14 MB photo from a recent phone. The
+   * size rule applied here refused exactly the captures this feature exists
+   * for, and it made the dialog's own "the original is too large to keep"
+   * path unreachable outside its unit test.
+   */
+  const handleScanSelected = (file: File) => {
+    if (attachments.length >= MAX_ATTACHMENTS_PER_TRANSACTION) {
+      toast.error(t('tooMany', { max: MAX_ATTACHMENTS_PER_TRANSACTION }));
+      return;
+    }
+    setScanning(file);
+  };
+
+  const openScanPicker = useRef<(() => void) | null>(null);
+  const rememberScanPicker = useCallback((open: () => void) => {
+    openScanPicker.current = open;
+  }, []);
+
+  // Retake is not Cancel: it closes the review and asks for another photo.
+  // Wired to the same close, the two buttons did exactly the same thing.
+  const handleScanRetake = useCallback(() => {
+    setScanning(null);
+    openScanPicker.current?.();
+  }, []);
+
+  const handleScanAccepted = async (outcome: ScanOutcome) => {
+    setScanning(null);
+    await upload(outcome.file, outcome.original);
   };
 
   const handleDelete = async () => {
@@ -173,11 +220,18 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
         <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           {t('title')}
         </span>
-        <UploadControl
-          onFileSelected={handleFileSelected}
-          loading={uploading}
-          disabled={uploading || atLimit}
-        />
+        <div className="flex items-center gap-2">
+          <ScanDocumentControl
+            onFileSelected={handleScanSelected}
+            onReady={rememberScanPicker}
+            disabled={uploading || atLimit}
+          />
+          <UploadControl
+            onFileSelected={handleFileSelected}
+            loading={uploading}
+            disabled={uploading || atLimit}
+          />
+        </div>
       </div>
 
       {attachments.length === 0 ? (
@@ -227,6 +281,22 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
                   <span className="text-xs text-gray-500 dark:text-gray-400">
                     {formatBytes(attachment.byteSize)}
                   </span>
+                  {/* A scan pair is one attachment: the photo it came from is
+                      reached from this row rather than listed as a second one. */}
+                  {attachment.originalAttachmentId && (
+                    <>
+                      {' '}
+                      <a
+                        href={attachmentDownloadUrl(
+                          attachment.originalAttachmentId,
+                        )}
+                        download
+                        className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+                      >
+                        {t('scan.viewOriginalFile')}
+                      </a>
+                    </>
+                  )}
                 </div>
                 <Button
                   type="button"
@@ -243,6 +313,16 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
           })}
         </ul>
       )}
+
+      <DocumentScanDialog
+        isOpen={scanning !== null}
+        file={scanning}
+        onCancel={() => setScanning(null)}
+        // Retake closes the dialog and leaves the control ready: the input is
+        // cleared after every pick, so choosing the same photo again works.
+        onRetake={handleScanRetake}
+        onAccept={handleScanAccepted}
+      />
 
       <ConfirmDialog
         isOpen={deleteTarget !== null}
@@ -267,17 +347,18 @@ function StagedAttachments({
   files,
   onChange,
 }: {
-  files: File[];
-  onChange: (files: File[]) => void;
+  files: StagedAttachment[];
+  onChange: (files: StagedAttachment[]) => void;
 }) {
   const t = useTranslations('attachments');
+  const [scanning, setScanning] = useState<File | null>(null);
 
   // Object URLs for image previews, recreated whenever the file list changes
   // and revoked on cleanup so blobs are not leaked. Guarded for environments
   // (jsdom) where createObjectURL is unavailable.
   const previews = useMemo(
     () =>
-      files.map((file) =>
+      files.map(({ file }) =>
         file.type.startsWith('image/') &&
         typeof URL.createObjectURL === 'function'
           ? URL.createObjectURL(file)
@@ -302,7 +383,35 @@ function StagedAttachments({
       toast.error(error);
       return;
     }
-    onChange([...files, file]);
+    onChange([...files, { file }]);
+  };
+
+  /** Same admission as the saved list: the cap, and nothing about the photo. */
+  const handleScanSelected = (file: File) => {
+    if (files.length >= MAX_ATTACHMENTS_PER_TRANSACTION) {
+      toast.error(t('tooMany', { max: MAX_ATTACHMENTS_PER_TRANSACTION }));
+      return;
+    }
+    setScanning(file);
+  };
+
+  const openScanPicker = useRef<(() => void) | null>(null);
+  const rememberScanPicker = useCallback((open: () => void) => {
+    openScanPicker.current = open;
+  }, []);
+
+  // Retake is not Cancel: it closes the review and asks for another photo.
+  // Wired to the same close, the two buttons did exactly the same thing.
+  const handleScanRetake = useCallback(() => {
+    setScanning(null);
+    openScanPicker.current?.();
+  }, []);
+
+  const handleScanAccepted = (outcome: ScanOutcome) => {
+    setScanning(null);
+    // The pair is staged as one entry, so it counts once against the cap and
+    // is uploaded in one request when the transaction is created.
+    onChange([...files, { file: outcome.file, original: outcome.original }]);
   };
 
   const removeAt = (index: number) => {
@@ -317,7 +426,17 @@ function StagedAttachments({
         <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           {t('title')}
         </span>
-        <UploadControl onFileSelected={handleFileSelected} disabled={atLimit} />
+        <div className="flex items-center gap-2">
+          <ScanDocumentControl
+            onFileSelected={handleScanSelected}
+            onReady={rememberScanPicker}
+            disabled={atLimit}
+          />
+          <UploadControl
+            onFileSelected={handleFileSelected}
+            disabled={atLimit}
+          />
+        </div>
       </div>
 
       {files.length === 0 ? (
@@ -325,7 +444,7 @@ function StagedAttachments({
       ) : (
         <>
           <ul className="space-y-2">
-            {files.map((file, index) => {
+            {files.map(({ file, original }, index) => {
               const preview = previews[index];
               return (
                 <li
@@ -353,6 +472,7 @@ function StagedAttachments({
                     </span>
                     <span className="text-xs text-gray-500 dark:text-gray-400">
                       {formatBytes(file.size)}
+                      {original ? ` · ${t('scan.originalKept')}` : ''}
                     </span>
                   </div>
                   <Button
@@ -373,6 +493,14 @@ function StagedAttachments({
           </p>
         </>
       )}
+
+      <DocumentScanDialog
+        isOpen={scanning !== null}
+        file={scanning}
+        onCancel={() => setScanning(null)}
+        onRetake={handleScanRetake}
+        onAccept={handleScanAccepted}
+      />
     </div>
   );
 }

@@ -229,6 +229,57 @@ describe('every password field says what may be autofilled into it', () => {
   });
 });
 
+describe("a platform capability is not decided by the window's width", () => {
+  /**
+   * `useIsMobile` is a 639px media query, so a narrow desktop window answers
+   * yes to it. That is fine for choosing a LAYOUT -- the register's card rows
+   * show the same figures either way -- and wrong for anything that changes
+   * what a control can do, which is what `isTouchDevice` (`lib/touch-device.ts`)
+   * is for.
+   *
+   * `capture` is the case that made this a scan: on a browser that honours it
+   * the OS file picker is replaced by the camera, so keyed off the viewport it
+   * took "choose an existing photo" away from anyone with a narrow window and
+   * handed it back when they widened it.
+   */
+  function filesUsing(pattern: RegExp): string[] {
+    return productionSources()
+      .filter(([, source]) => pattern.test(withoutComments(source)))
+      .map(([path]) => path);
+  }
+
+  it("keeps the camera handoff off the viewport hook", () => {
+    const offenders = productionSources()
+      .filter(([, source]) => {
+        const code = withoutComments(source);
+        return /\bcapture\s*[:=]/.test(code) && /useIsMobile/.test(code);
+      })
+      .map(([path]) => path);
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("asks the pointer through one helper", () => {
+    // A third hand-rolled copy is how the two existing ones came to be worth
+    // extracting; the media query belongs in `lib/touch-device.ts` alone.
+    const offenders = filesUsing(/pointer:\s*coarse/).filter(
+      (path) => path !== "/src/lib/touch-device.ts",
+    );
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("catches the pattern it bans", () => {
+    const bad = 'const m = useIsMobile();\n<input capture="environment" />';
+    expect(/\bcapture\s*[:=]/.test(withoutComments(bad))).toBe(true);
+    expect(/useIsMobile/.test(withoutComments(bad))).toBe(true);
+    // ...and reads its own explanation as prose, not as a violation.
+    expect(
+      /pointer:\s*coarse/.test(withoutComments("// never (pointer: coarse)")),
+    ).toBe(false);
+  });
+});
+
 describe("a scrollbar you need is not hidden", () => {
   /**
    * `scrollbar-hide` is for a horizontal strip of chips, where the content being
@@ -405,12 +456,23 @@ describe("a tab bar is the shared Tabs component", () => {
   const TABLIST = /role=["']tablist["']/;
 
   it("declares role=tablist in exactly one place", () => {
+    // Comments stripped, like the other scans whose banned pattern has to be
+    // NAMED to explain itself: a call site that deliberately uses two buttons
+    // instead says so, and quoting the role it avoided is not a violation.
     const offenders = productionSources()
       .filter(([path]) => path !== SHARED)
-      .filter(([, source]) => TABLIST.test(source))
+      .filter(([, source]) => TABLIST.test(withoutComments(source)))
       .map(([path]) => path);
 
     expect(offenders).toEqual([]);
+  });
+
+  it("reads a tablist in code but not one named in a comment", () => {
+    // Both directions, so the stripping cannot quietly disarm the rule.
+    expect(TABLIST.test(withoutComments('<div role="tablist">'))).toBe(true);
+    expect(
+      TABLIST.test(withoutComments('// never hand-roll role="tablist"')),
+    ).toBe(false);
   });
 
   it("still finds the shared tablist, so the rule cannot pass by accident", () => {
