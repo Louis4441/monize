@@ -262,7 +262,8 @@ that drops it, a user who opens the app from the launcher instead):
 - The proxy's unauthenticated redirect carries `returnTo` for this path. Today
   it redirects to a bare `/login`; the change is scoped to `/share` so no other
   page's behaviour moves in this plan.
-- `ShareInboxNotice`, mounted in the app shell beside `OfflineFallbackSync`,
+- `ShareInboxNotice`, mounted in the shell's banner stack beside
+  `PushEnableBanner` (section 10),
   calls `purgeExpiredSharedBundles()` then `listSharedBundles()` on mount and
   shows a dismissible banner ("2 files were shared with Monize -- review them")
   linking to `/share?id=`. A stash the user never reaches is still purged by
@@ -329,7 +330,8 @@ Changed:
 - `frontend/src/components/transactions/TransactionForm.tsx` --
   `initialStagedFiles`.
 - `frontend/src/store/authStore.ts` -- `clearShareInbox()` on logout.
-- `frontend/src/app/layout.tsx` -- mounts `ShareInboxNotice`.
+- `frontend/src/components/layout/SwipeShell.tsx` -- mounts `ShareInboxNotice`
+  in the shell's banner stack (see section 10).
 - `docs/system-invariants.md`, `docs/external-side-effects.md` (the stash is a
   client-side store; a short entry says it is not the server's and what bounds
   it), `frontend/CLAUDE.md` (a paragraph naming `lib/share-inbox.ts` as the one
@@ -440,3 +442,11 @@ should say where it was wrong.
    before the first suspension, so a defensive `catch` there put a `setState` on
    the synchronous path. The inbox module is documented and tested never to
    reject, so the catch was the thing to remove.
+7. **The notice is a banner, so it lives in the banner stack.** The plan said
+   "beside `OfflineFallbackSync`" in the root layout, which is where the
+   invisible providers live -- and above `AppHeader`, which is `sticky top-0`.
+   `SwipeShell` already renders a stack of six banners after the header
+   (delegation, HTTP warning, backend down, demo mode, update available, push
+   enable), and the closest analogue of this one is the last of those. It goes
+   there. The shell's auth-route branch deliberately does not render it, which
+   costs nothing: the notice is for a signed-in reader.
