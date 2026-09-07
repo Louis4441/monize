@@ -304,7 +304,7 @@ by one state value:
 |---|---|---|
 | `loadingEngine` | Spinner, "Preparing the scanner" | Cancel |
 | `analysing` | Spinner over the original | Cancel |
-| `review` | Preview with an Original / Enhanced toggle (two shared `Button`s, not a tablist), the corner handles over the original, quality warnings, Rotate | Use enhanced, Keep original only, Retake, Cancel |
+| `review` | Preview with an Original / Enhanced toggle (two shared `Button`s, not a tablist), the corner handles over the original, quality warnings, and Rotate on the enhanced view only -- the original is stored untouched (I2), so nothing beside it offers to edit it | Use enhanced, Keep original only, Retake, Cancel |
 | `failed` | The error (engine failed to load, unsupported image) | Keep original only, Retake, Cancel |
 
 "Keep original only" hands the untouched `File` to the same path a plain

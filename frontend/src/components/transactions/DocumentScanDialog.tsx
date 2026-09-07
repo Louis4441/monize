@@ -285,14 +285,19 @@ export function DocumentScanDialog({
               >
                 {t('scan.viewOriginal')}
               </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={handleRotate}
-              >
-                {t('scan.rotate')}
-              </Button>
+              {/* Only the scan turns. The original is stored byte-for-byte
+                  as the device produced it (`I2`), so a Rotate button beside
+                  it would promise something this dialog will not do. */}
+              {mode === 'enhanced' && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleRotate}
+                >
+                  {t('scan.rotate')}
+                </Button>
+              )}
             </div>
 
             <div className="flex justify-center">

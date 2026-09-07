@@ -357,6 +357,51 @@ describe('DocumentScanDialog', () => {
   });
 
   describe('rotating', () => {
+    // The original is stored byte-for-byte as the device produced it (`I2`),
+    // so only the scan turns. Offering Rotate beside the photo would promise
+    // an edit this dialog does not make.
+    it('is offered for the scan and not for the photo', async () => {
+      // Landscape, so a turn the round trip must not lose is visible in the size.
+      worker.result = scanResult({
+        enhanced: {
+          width: 40,
+          height: 20,
+          data: new Uint8ClampedArray(40 * 20 * 4),
+        },
+      });
+      await open();
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: 'Use enhanced' }),
+        ).toBeEnabled(),
+      );
+      const preview = () =>
+        screen.getByRole('img', { name: 'Enhanced scan preview' })
+          .parentElement as HTMLElement;
+      const landscape = preview().style.width;
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Rotate' }));
+      });
+      const turned = preview().style.width;
+      expect(turned).not.toBe(landscape);
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Original' }));
+      });
+      expect(
+        screen.queryByRole('button', { name: 'Rotate' }),
+      ).not.toBeInTheDocument();
+
+      // ...and it comes back with the scan, still holding the turn: hiding the
+      // control must not quietly discard what it did.
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Enhanced' }));
+      });
+      expect(screen.getByRole('button', { name: 'Rotate' })).toBeInTheDocument();
+      expect(preview().style.width).toBe(turned);
+    });
+
     // Rotation used to re-run the scan: ~7.7s per press on a 12MP photo, and
     // four presses queued half a minute to arrive back where you started.
     it('sends nothing to the worker', async () => {
