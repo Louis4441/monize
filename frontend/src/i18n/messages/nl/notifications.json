@@ -111,5 +111,9 @@
       "title": "{name} kon niet worden geboekt",
       "message": "Je geplande transactie met vervaldatum {date} is niet automatisch geboekt: {error}. Je kunt deze handmatig boeken via Facturen & stortingen."
     }
+  },
+  "priceMovement": {
+    "title": "Melding bij koerswijziging: {symbol} ({percent}%)",
+    "message": "{symbol}: {percent}% ten opzichte van de vorige beschikbare sessie."
   }
 }

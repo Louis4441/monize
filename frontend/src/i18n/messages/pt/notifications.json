@@ -111,5 +111,9 @@
       "title": "Não foi possível registar {name}",
       "message": "A sua transação agendada com vencimento em {date} não foi registada automaticamente: {error}. Pode registá-la manualmente em Faturas e depósitos."
     }
+  },
+  "priceMovement": {
+    "title": "Alerta de variação do preço: {symbol} ({percent}%)",
+    "message": "{symbol}: {percent}% face à sessão anterior disponível."
   }
 }

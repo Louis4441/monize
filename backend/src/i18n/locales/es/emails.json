@@ -285,6 +285,10 @@
       "milestoneMessage": "Ha transcurrido el {{ progress }}% del período y solo has utilizado el {{ percent }}% de tu presupuesto total. ¡Sigue así!",
       "seasonalTitle": "Se espera un aumento estacional en {{ category }}",
       "seasonalMessage": "El pasado mes de {{ month }} gastaste {{ increase }} veces lo habitual en {{ category }}. Considera ajustar tu presupuesto."
+    },
+    "priceMovement": {
+      "title": "Alerta de cambio de precio: {{ symbol }} ({{ percent }}%)",
+      "message": "{{ symbol }}: {{ percent }}% respecto a la sesión anterior disponible."
     }
   }
 }

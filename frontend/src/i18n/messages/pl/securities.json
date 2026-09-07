@@ -341,5 +341,10 @@
     "dateRequired": "Data jest wymagana",
     "priceRequired": "Cena jest wymagana",
     "priceNonNegative": "Cena musi być liczbą nieujemną"
+  },
+  "priceAlert": {
+    "label": "Alert zmiany ceny (%)",
+    "help": "Puste pole wyłącza alert. Powiadomienie o wzroście lub spadku względem poprzedniej dostępnej sesji, najwyżej raz dziennie (UTC) na instrument.",
+    "range": "Wpisz wartość procentową od 0,1 do 1000."
   }
 }

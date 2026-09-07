@@ -111,5 +111,9 @@
       "title": "无法登记 {name}",
       "message": "您到期日为 {date} 的定期交易未能自动登记：{error}。您可以在“账单与存款”中手动登记。"
     }
+  },
+  "priceMovement": {
+    "title": "价格变动提醒: {symbol} ({percent}%)",
+    "message": "{symbol}：相对于上一个有数据的交易日变动 {percent}%。"
   }
 }

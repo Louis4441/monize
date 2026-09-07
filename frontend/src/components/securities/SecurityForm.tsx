@@ -66,6 +66,7 @@ const buildSecuritySchema = (t: (key: string) => string) => z.object({
   irWebsite: z.string().max(2048).optional(),
   quoteProvider: z.enum(['', 'yahoo', 'msn']).optional(),
   msnInstrumentId: z.string().max(50).optional(),
+  priceAlertPercent: z.string().optional().refine((v) => !v?.trim() || (Number.isFinite(Number(v)) && Number(v) >= 0.1 && Number(v) <= 1000), t('priceAlert.range')),
   isFavourite: z.boolean().optional(),
 });
 
@@ -231,6 +232,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       quoteProvider: security?.quoteProvider || '',
       msnInstrumentId: security?.msnInstrumentId || '',
       isFavourite: security?.isFavourite || false,
+      priceAlertPercent: security?.priceAlertPercent == null ? '' : String(security.priceAlertPercent),
     },
   });
 
@@ -380,6 +382,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
         quoteProvider: '',
         msnInstrumentId: '',
         isFavourite: false,
+        priceAlertPercent: '',
       });
       setSelectedTagIds([]);
       setCountryRows([]);
@@ -464,6 +467,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       irWebsite: data.irWebsite?.trim() ?? '',
       msnInstrumentId: data.msnInstrumentId?.trim() || undefined,
       isFavourite: data.isFavourite ?? false,
+      priceAlertPercent: data.priceAlertPercent?.trim() ? Number(data.priceAlertPercent) : null,
       // Only ETFs/funds carry the manual breakdowns; send [] to clear them.
       ...(isFund
         ? {
@@ -616,6 +620,16 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
           </p>
         )}
       </div>
+
+      <Input
+        label={t('priceAlert.label')}
+        type="number" min="0.1" max="1000" step="any"
+        {...register('priceAlertPercent')}
+        error={errors.priceAlertPercent?.message}
+        aria-describedby="price-alert-help"
+      />
+
+      <p id="price-alert-help" className="text-sm text-gray-500 dark:text-gray-400">{t('priceAlert.help')}</p>
 
       {watch('quoteProvider') === 'msn' && (
         <Input

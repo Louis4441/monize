@@ -341,5 +341,10 @@
     "dateRequired": "[XX-Date is required-XX]",
     "priceRequired": "[XX-Price is required-XX]",
     "priceNonNegative": "[XX-Price must be a non-negative number-XX]"
+  },
+  "priceAlert": {
+    "label": "[XX-Price change alert (%)-XX]",
+    "help": "[XX-Leave blank to disable. Alerts on a rise or fall since the previous available session, at most once per instrument per UTC day.-XX]",
+    "range": "[XX-Enter a percentage from 0.1 to 1000.-XX]"
   }
 }

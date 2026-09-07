@@ -938,7 +938,7 @@ says so.
 ### 14.6 Chart-in-push (R5) -- feasibility and the security envelope
 
 Per Section 7: Android-Chrome-only progressive enhancement, default off, ships
-last. A `prices` notification (a future producer) may set
+last. A security-price notification may set
 `payload.image = '/api/v1/push/chart/<token>.png'`, where `<token>` is a
 **single-use, short-TTL, HMAC-signed** reference to a pre-rendered PNG the
 backend holds -- no user input in the path (CWE-22: the token is validated and
@@ -948,8 +948,11 @@ when it expands the notification), which is why the token is unguessable and
 expires. The SW passes `image` straight to `showNotification`. Where `image` is
 unsupported the notification is text-only and the deep link opens the full chart
 on `/securities/<id>`: **the number and the link are the contract; the chart is a
-nicety.** No `prices` producer exists yet, so this lands with the first
-price-alert producer, behind a per-group toggle defaulting off.
+nicety.** The `SECURITY_PRICE_MOVEMENT` producer now exists (see
+`security-price-alerts.md`), with owner-configured per-security percentage
+thresholds and Investments channel gating. Image rendering and the endpoint
+remain unimplemented; their next step still requires a chart opt-in defaulting
+off. The price-alert threshold itself does not authorize image delivery.
 
 ### 14.7 Invariants and the test obligations
 

@@ -111,5 +111,9 @@
       "title": "{name} kaydedilemedi",
       "message": "Vadesi {date} olan planlı işleminiz otomatik olarak kaydedilmedi: {error}. Faturalar ve Mevduatlar bölümünden elle kaydedebilirsiniz."
     }
+  },
+  "priceMovement": {
+    "title": "Fiyat değişimi uyarısı: {symbol} ({percent}%)",
+    "message": "{symbol}: önceki mevcut seansa göre %{percent}."
   }
 }

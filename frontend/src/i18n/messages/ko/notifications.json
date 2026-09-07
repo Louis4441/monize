@@ -111,5 +111,9 @@
       "title": "{name}을(를) 기록하지 못했습니다",
       "message": "{date}이 만기인 예약 거래가 자동으로 기록되지 않았습니다: {error}. 청구서 및 입금 화면에서 수동으로 기록할 수 있습니다."
     }
+  },
+  "priceMovement": {
+    "title": "가격 변동 알림: {symbol} ({percent}%)",
+    "message": "{symbol}: 이전 데이터가 있는 거래일 대비 {percent}%."
   }
 }

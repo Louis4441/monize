@@ -111,5 +111,9 @@
       "title": "{name} を記帳できませんでした",
       "message": "{date} が期日の定期取引を自動で記帳できませんでした: {error}。請求書・入金の画面から手動で記帳できます。"
     }
+  },
+  "priceMovement": {
+    "title": "価格変動アラート: {symbol} ({percent}%)",
+    "message": "{symbol}：直前の利用可能な取引日比 {percent}%。"
   }
 }

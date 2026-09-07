@@ -285,6 +285,10 @@
       "milestoneMessage": "अवधि का {{ progress }}% बीत चुका है और आपने कुल बजट का केवल {{ percent }}% उपयोग किया है। ऐसे ही जारी रखें!",
       "seasonalTitle": "{{ category }} में मौसमी वृद्धि की संभावना है",
       "seasonalMessage": "पिछले {{ month }} में आपने {{ category }} पर सामान्य से {{ increase }} गुना खर्च किया था। अपना बजट समायोजित करने पर विचार करें।"
+    },
+    "priceMovement": {
+      "title": "कीमत में बदलाव का अलर्ट: {{ symbol }} ({{ percent }}%)",
+      "message": "{{ symbol }}: पिछले उपलब्ध कारोबारी सत्र की तुलना में {{ percent }}%।"
     }
   }
 }

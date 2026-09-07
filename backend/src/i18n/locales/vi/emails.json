@@ -285,6 +285,10 @@
       "milestoneMessage": "Đã qua {{ progress }}% kỳ và bạn mới sử dụng {{ percent }}% tổng ngân sách. Hãy tiếp tục phát huy!",
       "seasonalTitle": "Dự kiến chi tiêu cho {{ category }} tăng theo mùa",
       "seasonalMessage": "Vào {{ month }} lần trước, bạn đã chi cho {{ category }} gấp {{ increase }} lần bình thường. Hãy cân nhắc điều chỉnh ngân sách."
+    },
+    "priceMovement": {
+      "title": "Cảnh báo biến động giá: {{ symbol }} ({{ percent }}%)",
+      "message": "{{ symbol }}: {{ percent }}% so với phiên có dữ liệu trước đó."
     }
   }
 }

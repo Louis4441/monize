@@ -111,5 +111,9 @@
       "title": "{name} could not be posted",
       "message": "Your scheduled transaction due {date} did not post automatically: {error}. You can post it manually from Bills."
     }
+  },
+  "priceMovement": {
+    "title": "Price change alert: {symbol} ({percent}%)",
+    "message": "{symbol}: {percent}% compared with the previous available session."
   }
 }

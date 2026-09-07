@@ -285,6 +285,10 @@
       "milestoneMessage": "{{ progress }}% periode telah berlalu dan Anda baru menggunakan {{ percent }}% dari total anggaran. Pertahankan!",
       "seasonalTitle": "Lonjakan musiman diperkirakan untuk {{ category }}",
       "seasonalMessage": "Pada bulan {{ month }} yang lalu, pengeluaran Anda untuk {{ category }} adalah {{ increase }} kali dari biasanya. Pertimbangkan untuk menyesuaikan anggaran."
+    },
+    "priceMovement": {
+      "title": "Peringatan perubahan harga: {{ symbol }} ({{ percent }}%)",
+      "message": "{{ symbol }}: {{ percent }}% dibandingkan sesi sebelumnya yang tersedia."
     }
   }
 }

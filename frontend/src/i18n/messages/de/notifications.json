@@ -111,5 +111,9 @@
       "title": "{name} konnte nicht gebucht werden",
       "message": "Ihre geplante Transaktion, fällig am {date}, wurde nicht automatisch gebucht: {error}. Sie können sie unter Rechnungen & Einzahlungen manuell buchen."
     }
+  },
+  "priceMovement": {
+    "title": "Alarm bei Kursänderung: {symbol} ({percent}%)",
+    "message": "{symbol}: {percent}% gegenüber der letzten verfügbaren Sitzung."
   }
 }

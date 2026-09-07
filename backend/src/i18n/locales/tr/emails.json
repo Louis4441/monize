@@ -285,6 +285,10 @@
       "milestoneMessage": "Dönemin %{{ progress }} kadarı geçti ve toplam bütçenizin yalnızca %{{ percent }} kadarını kullandınız. Böyle devam edin!",
       "seasonalTitle": "{{ category }} için mevsimsel artış bekleniyor",
       "seasonalMessage": "Geçen {{ month }} ayında {{ category }} için normalin {{ increase }} katı harcama yaptınız. Bütçenizi ayarlamayı düşünün."
+    },
+    "priceMovement": {
+      "title": "Fiyat değişimi uyarısı: {{ symbol }} ({{ percent }}%)",
+      "message": "{{ symbol }}: önceki mevcut seansa göre %{{ percent }}."
     }
   }
 }

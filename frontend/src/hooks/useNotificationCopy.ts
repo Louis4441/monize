@@ -72,7 +72,7 @@ function daysUntil(dueDate: string): number {
 
 export function useNotificationCopy() {
   const t = useTranslations('notifications');
-  const { formatCurrency } = useNumberFormat();
+  const { formatCurrency, formatNumber } = useNumberFormat();
   const { formatDate } = useDateFormat();
   /**
    * A bill-due notification's headline, in the reader's language. `null` for anything
@@ -355,8 +355,16 @@ export function useNotificationCopy() {
         });
   };
 
+  const priceCopy = (notification: Notification, part: 'title' | 'message'): string | null => {
+    const data = notification.data;
+    if (notification.type !== 'SECURITY_PRICE_MOVEMENT' || typeof data?.symbol !== 'string' ||
+        typeof data.changePercent !== 'number' || !Number.isFinite(data.changePercent)) return null;
+    return t(`priceMovement.${part}`, { symbol: data.symbol, percent: formatNumber(data.changePercent, 2) });
+  };
+
   return (notification: Notification) => ({
     title:
+      priceCopy(notification, 'title') ??
       billDueTitle(notification) ??
       systemAlertTitle(notification) ??
       gemSignalTitle(notification) ??
@@ -364,6 +372,7 @@ export function useNotificationCopy() {
       balanceThresholdTitle(notification) ??
       notification.title,
     message:
+      priceCopy(notification, 'message') ??
       billDueMessage(notification) ??
       systemAlertMessage(notification) ??
       gemSignalMessage(notification) ??

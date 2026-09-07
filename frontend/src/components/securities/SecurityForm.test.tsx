@@ -132,6 +132,17 @@ describe('SecurityForm', () => {
     });
   });
 
+  it.each(['5', ''])('saves or clears a security price threshold (%s)', async (value) => {
+    render(<SecurityForm security={createSecurity({ priceAlertPercent: 10 })} onSubmit={onSubmit} onCancel={onCancel} />);
+    const input = await screen.findByLabelText('Price change alert (%)');
+    expect(input).toHaveValue(10);
+    fireEvent.change(input, { target: { value } });
+    fireEvent.click(screen.getByText('Update Security'));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      priceAlertPercent: value ? 5 : null,
+    })));
+  });
+
   it('calls onCancel when cancel is clicked', async () => {
     render(<SecurityForm onSubmit={onSubmit} onCancel={onCancel} />);
     fireEvent.click(screen.getByText('Cancel'));

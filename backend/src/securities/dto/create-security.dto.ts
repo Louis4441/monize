@@ -40,6 +40,13 @@ export class AllocationWeightDto {
 }
 
 export class CreateSecurityDto {
+  @ApiProperty({ required: false, nullable: true, minimum: 0.1, maximum: 1000 })
+  @IsOptional()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(0.1)
+  @Max(1000)
+  priceAlertPercent?: number | null;
+
   @ApiProperty({ example: "AAPL", description: "Stock symbol or ticker" })
   @IsString()
   @MaxLength(20)

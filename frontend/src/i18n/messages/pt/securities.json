@@ -341,5 +341,10 @@
     "dateRequired": "A data é obrigatória",
     "priceRequired": "O preço é obrigatório",
     "priceNonNegative": "O preço deve ser um número não negativo"
+  },
+  "priceAlert": {
+    "label": "Alerta de variação do preço (%)",
+    "help": "Deixe vazio para desativar. Avisa de subidas ou descidas face à sessão anterior disponível, no máximo uma vez por instrumento e dia UTC.",
+    "range": "Introduza uma percentagem entre 0,1 e 1000."
   }
 }

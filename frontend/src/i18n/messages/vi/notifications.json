@@ -111,5 +111,9 @@
       "title": "Không thể ghi nhận {name}",
       "message": "Giao dịch định kỳ của bạn đến hạn {date} đã không được ghi nhận tự động: {error}. Bạn có thể ghi nhận thủ công trong mục Hóa đơn & Tiền gửi."
     }
+  },
+  "priceMovement": {
+    "title": "Cảnh báo biến động giá: {symbol} ({percent}%)",
+    "message": "{symbol}: {percent}% so với phiên có dữ liệu trước đó."
   }
 }

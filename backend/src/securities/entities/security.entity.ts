@@ -85,6 +85,18 @@ export class Security {
   skipPriceUpdates: boolean;
 
   @ApiProperty({
+    nullable: true,
+    description:
+      "Daily quoted-price movement threshold (%); null disables alerts",
+  })
+  @Column({
+    type: "double precision",
+    name: "price_alert_percent",
+    nullable: true,
+  })
+  priceAlertPercent: number | null;
+
+  @ApiProperty({
     example: "Technology",
     description: "Stock sector from Yahoo Finance",
   })

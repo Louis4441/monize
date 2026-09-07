@@ -111,5 +111,9 @@
       "title": "無法登錄 {name}",
       "message": "您到期日為 {date} 的定期交易未能自動登錄：{error}。您可以在「帳單與存款」中手動登錄。"
     }
+  },
+  "priceMovement": {
+    "title": "價格變動提醒: {symbol} ({percent}%)",
+    "message": "{symbol}：相對於上一個有資料的交易日變動 {percent}%。"
   }
 }

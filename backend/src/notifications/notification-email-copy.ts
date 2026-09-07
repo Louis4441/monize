@@ -121,6 +121,14 @@ export function composeLocalizedNotificationCopy(
         },
       );
     }
+    case NotificationType.SECURITY_PRICE_MOVEMENT: {
+      if (!strings(data, "symbol") || !numbers(data, "changePercent"))
+        return null;
+      return pair("priceMovement.title", "priceMovement.message", {
+        symbol: data.symbol,
+        percent: number(data.changePercent, 2),
+      });
+    }
     case NotificationType.PORTFOLIO_MOVEMENT: {
       if (
         !numbers(data, "changePercent") ||

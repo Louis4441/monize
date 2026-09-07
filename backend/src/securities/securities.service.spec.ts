@@ -750,6 +750,12 @@ describe("SecuritiesService", () => {
       expect(saved.quoteProvider).toBeNull();
     });
 
+    it.each([5, null])("persists or clears the price alert threshold %s", async (threshold) => {
+      securitiesRepository.findOne.mockResolvedValue({ ...mockSecurity, priceAlertPercent: 10 });
+      await service.update("user-1", "sec-1", { priceAlertPercent: threshold });
+      expect(queryRunnerManager.save.mock.calls[0][1].priceAlertPercent).toBe(threshold);
+    });
+
     it("persists isFavourite updates", async () => {
       securitiesRepository.findOne.mockResolvedValue({ ...mockSecurity });
 

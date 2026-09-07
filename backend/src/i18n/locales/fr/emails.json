@@ -285,6 +285,10 @@
       "milestoneMessage": "{{ progress }} % de la période s'est écoulée et vous n'avez utilisé que {{ percent }} % de votre budget total. Continuez ainsi !",
       "seasonalTitle": "Hausse saisonnière prévue pour {{ category }}",
       "seasonalMessage": "En {{ month }} dernier, vous avez dépensé {{ increase }} fois plus que d'habitude pour {{ category }}. Pensez à ajuster votre budget."
+    },
+    "priceMovement": {
+      "title": "Alerte de variation du cours: {{ symbol }} ({{ percent }}%)",
+      "message": "{{ symbol }} : {{ percent }}% par rapport à la séance précédente disponible."
     }
   }
 }

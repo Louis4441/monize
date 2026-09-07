@@ -111,5 +111,9 @@
       "title": "{name} n'a pas pu être enregistrée",
       "message": "Votre transaction planifiée arrivant à échéance le {date} n'a pas été enregistrée automatiquement : {error}. Vous pouvez l'enregistrer manuellement depuis Factures et dépôts."
     }
+  },
+  "priceMovement": {
+    "title": "Alerte de variation du cours: {symbol} ({percent}%)",
+    "message": "{symbol} : {percent}% par rapport à la séance précédente disponible."
   }
 }

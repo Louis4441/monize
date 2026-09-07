@@ -111,5 +111,9 @@
       "title": "Nie udało się zaksięgować: {name}",
       "message": "Twoja zaplanowana transakcja z terminem {date} nie została zaksięgowana automatycznie: {error}. Możesz zaksięgować ją ręcznie w sekcji Rachunki i wpłaty."
     }
+  },
+  "priceMovement": {
+    "title": "Alert zmiany ceny: {symbol} ({percent}%)",
+    "message": "{symbol}: zmiana o {percent}% względem poprzedniej dostępnej sesji."
   }
 }

@@ -285,6 +285,10 @@
       "milestoneMessage": "You are {{ progress }}% through the period and have only used {{ percent }}% of your total budget. Keep it up!",
       "seasonalTitle": "Seasonal spike expected for {{ category }}",
       "seasonalMessage": "Last {{ month }} you spent {{ increase }}x your usual on {{ category }}. Consider adjusting your budget."
+    },
+    "priceMovement": {
+      "title": "Price change alert: {{ symbol }} ({{ percent }}%)",
+      "message": "{{ symbol }}: {{ percent }}% compared with the previous available session."
     }
   }
 }

@@ -341,5 +341,10 @@
     "dateRequired": "日期为必填项",
     "priceRequired": "价格为必填项",
     "priceNonNegative": "价格必须为非负数"
+  },
+  "priceAlert": {
+    "label": "价格变动提醒 (%)",
+    "help": "留空以关闭。相对于上一个有数据的交易日，价格上涨或下跌时提醒，每个证券每个 UTC 日最多一次。",
+    "range": "请输入 0.1 至 1000 之间的百分比。"
   }
 }

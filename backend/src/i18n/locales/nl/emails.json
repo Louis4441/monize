@@ -285,6 +285,10 @@
       "milestoneMessage": "{{ progress }}% van de periode is verstreken en je hebt pas {{ percent }}% van je totale budget gebruikt. Ga zo door!",
       "seasonalTitle": "Seizoenspiek verwacht voor {{ category }}",
       "seasonalMessage": "Afgelopen {{ month }} gaf je {{ increase }} keer zoveel als gebruikelijk uit aan {{ category }}. Overweeg je budget aan te passen."
+    },
+    "priceMovement": {
+      "title": "Melding bij koerswijziging: {{ symbol }} ({{ percent }}%)",
+      "message": "{{ symbol }}: {{ percent }}% ten opzichte van de vorige beschikbare sessie."
     }
   }
 }

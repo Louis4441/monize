@@ -341,5 +341,10 @@
     "dateRequired": "Tanggal wajib diisi",
     "priceRequired": "Harga wajib diisi",
     "priceNonNegative": "Harga harus berupa angka non-negatif"
+  },
+  "priceAlert": {
+    "label": "Peringatan perubahan harga (%)",
+    "help": "Kosongkan untuk menonaktifkan. Memberi tahu kenaikan atau penurunan dari sesi sebelumnya yang tersedia, maksimal sekali per instrumen per hari UTC.",
+    "range": "Masukkan persentase antara 0,1 dan 1000."
   }
 }

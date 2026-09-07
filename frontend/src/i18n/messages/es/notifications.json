@@ -111,5 +111,9 @@
       "title": "{name} no se pudo registrar",
       "message": "Su transacción programada con vencimiento el {date} no se registró automáticamente: {error}. Puede registrarla manualmente desde Facturas y depósitos."
     }
+  },
+  "priceMovement": {
+    "title": "Alerta de cambio de precio: {symbol} ({percent}%)",
+    "message": "{symbol}: {percent}% respecto a la sesión anterior disponible."
   }
 }

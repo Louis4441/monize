@@ -285,6 +285,10 @@
       "milestoneMessage": "기간의 {{ progress }}%가 지났고 전체 예산의 {{ percent }}%만 사용했습니다. 계속 유지하세요!",
       "seasonalTitle": "{{ category }}의 계절적 지출 증가가 예상됩니다",
       "seasonalMessage": "지난 {{ month }}에 {{ category }}에 평소의 {{ increase }}배를 지출했습니다. 예산 조정을 고려해 보세요."
+    },
+    "priceMovement": {
+      "title": "가격 변동 알림: {{ symbol }} ({{ percent }}%)",
+      "message": "{{ symbol }}: 이전 데이터가 있는 거래일 대비 {{ percent }}%."
     }
   }
 }

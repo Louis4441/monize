@@ -285,6 +285,10 @@
       "milestoneMessage": "本期已過去{{ progress }}%，而您僅使用了總預算的{{ percent }}%。繼續保持！",
       "seasonalTitle": "預計{{ category }}將出現季節性支出高峰",
       "seasonalMessage": "上一個{{ month }}，您在{{ category }}上的支出是平時的{{ increase }}倍。請考慮調整預算。"
+    },
+    "priceMovement": {
+      "title": "價格變動提醒: {{ symbol }} ({{ percent }}%)",
+      "message": "{{ symbol }}：相對於上一個有資料的交易日變動 {{ percent }}%。"
     }
   }
 }

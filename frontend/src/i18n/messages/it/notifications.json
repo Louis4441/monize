@@ -111,5 +111,9 @@
       "title": "{name} non è stata registrata",
       "message": "La tua transazione pianificata in scadenza il {date} non è stata registrata automaticamente: {error}. Puoi registrarla manualmente da Fatture & Versamenti."
     }
+  },
+  "priceMovement": {
+    "title": "Avviso variazione prezzo: {symbol} ({percent}%)",
+    "message": "{symbol}: {percent}% rispetto alla precedente seduta disponibile."
   }
 }

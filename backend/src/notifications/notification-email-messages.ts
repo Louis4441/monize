@@ -1,5 +1,8 @@
 /** English fallbacks for notification email copy; kept in parity with the catalog by tests. */
 export const NOTIFICATION_EMAIL_MESSAGES = {
+  "priceMovement.title": "Price change alert: {{ symbol }} ({{ percent }}%)",
+  "priceMovement.message":
+    "{{ symbol }}: {{ percent }}% compared with the previous available session.",
   "billDue.titleOverdue": "{{ payee }} overdue",
   "billDue.titleToday": "{{ payee }} due today",
   "billDue.titleTomorrow": "{{ payee }} due tomorrow",

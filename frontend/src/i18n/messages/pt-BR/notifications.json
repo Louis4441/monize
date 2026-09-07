@@ -111,5 +111,9 @@
       "title": "Não foi possível lançar {name}",
       "message": "Sua transação agendada com vencimento em {date} não foi lançada automaticamente: {error}. Você pode lançá-la manualmente em Faturas e depósitos."
     }
+  },
+  "priceMovement": {
+    "title": "Alerta de variação do preço: {symbol} ({percent}%)",
+    "message": "{symbol}: {percent}% em relação à sessão anterior disponível."
   }
 }

@@ -341,5 +341,10 @@
     "dateRequired": "La date est requise",
     "priceRequired": "Le cours est requis",
     "priceNonNegative": "Le cours doit être un nombre non négatif"
+  },
+  "priceAlert": {
+    "label": "Alerte de variation du cours (%)",
+    "help": "Laisser vide pour désactiver. Signale une hausse ou une baisse depuis la séance précédente disponible, au plus une fois par titre et par jour UTC.",
+    "range": "Saisir un pourcentage entre 0,1 et 1000."
   }
 }

@@ -107,6 +107,17 @@ describe('NotificationList', () => {
     expect(mockPush).toHaveBeenCalledWith('/budgets/budget-1');
   });
 
+  it('renders structured security price facts and navigates to the instrument', () => {
+    render(<NotificationList {...defaultProps} notifications={[makeNotification({
+      type: 'SECURITY_PRICE_MOVEMENT', title: 'stored English', message: 'stored English',
+      target: '/securities/sec-1', data: { symbol: 'AAPL', changePercent: -5.25 },
+    })]} />);
+    expect(screen.getByText('Price change alert: AAPL (-5.25%)')).toBeInTheDocument();
+    expect(screen.getByText('AAPL: -5.25% compared with the previous available session.')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('notification-item-notification-1'));
+    expect(mockPush).toHaveBeenCalledWith('/securities/sec-1');
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     // A due date on a notification row is a calendar string; the UI must render

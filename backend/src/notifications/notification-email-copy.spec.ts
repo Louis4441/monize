@@ -104,6 +104,7 @@ const examples = {
     threshold: 1000,
     currencyCode: "BHD",
   },
+  SECURITY_PRICE_MOVEMENT: { symbol: "AAPL", changePercent: -5.25 },
   PORTFOLIO_MOVEMENT: {
     direction: "down",
     changePercent: -3.25,

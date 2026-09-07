@@ -50,6 +50,7 @@ export enum NotificationType {
   // cash flows (INVESTMENTS category). One per day per user via a dedupe_key
   // carrying the date. See `docs/specs/portfolio-movement-notifications.md`.
   PORTFOLIO_MOVEMENT = "PORTFOLIO_MOVEMENT",
+  SECURITY_PRICE_MOVEMENT = "SECURITY_PRICE_MOVEMENT",
   // A GEM strategy's recommendation changed between periods (STRATEGIES
   // category). `data.kind` is "risk" (RISK_ON<->RISK_OFF) or "allocation".
   // See `docs/specs/gem-signal-change-notifications.md`.
@@ -123,6 +124,7 @@ export const BALANCE_NOTIFICATION_TYPES: readonly NotificationType[] = [
 ];
 export const INVESTMENT_NOTIFICATION_TYPES: readonly NotificationType[] = [
   NotificationType.PORTFOLIO_MOVEMENT,
+  NotificationType.SECURITY_PRICE_MOVEMENT,
 ];
 export const STRATEGY_NOTIFICATION_TYPES: readonly NotificationType[] = [
   NotificationType.GEM_SIGNAL_CHANGED,
