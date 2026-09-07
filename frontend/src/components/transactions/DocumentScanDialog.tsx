@@ -35,7 +35,6 @@ import {
   type QuarterTurns,
 } from '@/lib/document-scanner/rotate-image';
 import { MAX_ATTACHMENT_BYTES } from '@/types/attachment';
-import { formatBytes } from './AttachmentsSection';
 import { DocumentCornerHandles } from './DocumentCornerHandles';
 
 /**
@@ -118,7 +117,7 @@ export function DocumentScanDialog({
   createWorker,
 }: DocumentScanDialogProps) {
   const t = useTranslations('attachments');
-  const { formatNumber } = useNumberFormat();
+  const { formatNumber, formatBytes } = useNumberFormat();
   const scanner = useDocumentScanner(createWorker);
   const { scan, refine, reset } = scanner;
 

@@ -92,7 +92,10 @@ describe('TransactionConfirmationCard', () => {
       />,
     );
     expect(screen.getByText('Attachments')).toBeInTheDocument();
-    expect(screen.getByText('receipt.png (2.0 KB)')).toBeInTheDocument();
+    // `kB` rather than `KB`: sizes go through `useNumberFormat().formatBytes`
+    // now, so the unit abbreviation is CLDR's for the reader's locale, and
+    // English's is the SI-style lowercase prefix. MB and GB are unchanged.
+    expect(screen.getByText('receipt.png (2.0 kB)')).toBeInTheDocument();
     expect(screen.getByText('invoice.pdf (1.0 MB)')).toBeInTheDocument();
   });
 

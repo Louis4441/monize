@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { getErrorMessage } from '@/lib/errors';
 import { attachmentsApi, attachmentDownloadUrl } from '@/lib/attachments';
 import { DocumentScanDialog, type ScanOutcome } from './DocumentScanDialog';
@@ -30,18 +31,6 @@ type AttachmentsSectionProps =
       onStagedFilesChange: (files: StagedAttachment[]) => void;
     };
 
-/** Human-readable byte size (e.g. 1.4 MB). */
-export function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ['KB', 'MB', 'GB'];
-  let value = bytes / 1024;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  return `${value.toFixed(1)} ${units[unit]}`;
-}
 
 /**
  * Validate a freshly selected file against the shared limits. Returns a
@@ -54,6 +43,9 @@ function validateSelection(
   file: File,
   currentCount: number,
   t: (key: string, values?: Record<string, string | number>) => string,
+  // A pure function cannot call the hook, so the component hands its formatter
+  // down -- the `NumberFormatters` pattern, for one formatter.
+  formatBytes: (bytes: number) => string,
 ): string | null {
   if (currentCount >= MAX_ATTACHMENTS_PER_TRANSACTION) {
     return t('tooMany', { max: MAX_ATTACHMENTS_PER_TRANSACTION });
@@ -116,6 +108,7 @@ function UploadControl({
  */
 function SavedAttachments({ transactionId }: { transactionId: string }) {
   const t = useTranslations('attachments');
+  const { formatBytes } = useNumberFormat();
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [erroredImages, setErroredImages] = useState<Record<string, boolean>>(
@@ -140,7 +133,7 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
   }, [load]);
 
   const handleFileSelected = async (file: File) => {
-    const error = validateSelection(file, attachments.length, t);
+    const error = validateSelection(file, attachments.length, t, formatBytes);
     if (error) {
       toast.error(error);
       return;
@@ -351,6 +344,7 @@ function StagedAttachments({
   onChange: (files: StagedAttachment[]) => void;
 }) {
   const t = useTranslations('attachments');
+  const { formatBytes } = useNumberFormat();
   const [scanning, setScanning] = useState<File | null>(null);
 
   // Object URLs for image previews, recreated whenever the file list changes
@@ -378,7 +372,7 @@ function StagedAttachments({
   );
 
   const handleFileSelected = (file: File) => {
-    const error = validateSelection(file, files.length, t);
+    const error = validateSelection(file, files.length, t, formatBytes);
     if (error) {
       toast.error(error);
       return;

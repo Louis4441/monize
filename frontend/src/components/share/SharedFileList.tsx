@@ -9,7 +9,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Badge } from '@/components/ui/Badge';
 import { TABLE_BODY_CLASS } from '@/components/ui/Table';
-import { formatBytes } from '@/components/transactions/AttachmentsSection';
+import { useNumberFormat } from '@/hooks/useNumberFormat';
 import {
   SHARE_MAX_FILES,
   SHARE_MAX_FILE_BYTES,
@@ -27,6 +27,7 @@ import type { SharedBundleItem } from '@/lib/share-inbox';
  */
 export function SharedFileList({ items }: { items: SharedBundleItem[] }) {
   const t = useTranslations('share');
+  const { formatBytes } = useNumberFormat();
 
   // The reasons name the limit that refused the file, so the numbers come from
   // the limits themselves rather than being written into the copy.

@@ -32,6 +32,8 @@
  * hook, and is tested in `src/hooks/useNumberFormat.test.ts` and in the
  * component locale cases (`SecurityList.test.tsx`).
  */
+
+import { scaleBytes } from '@/lib/bytes';
 export function numberFormatMockDefaults() {
   // Grouped through Intl, not `toFixed`: the real hook groups, so a default that
   // did not would quietly make "5,000 runs" render as "5000 runs" in any test
@@ -52,6 +54,18 @@ export function numberFormatMockDefaults() {
     formatCurrencyFlag: (value: number) => money(value, 2),
     formatCurrencyLabel: (value: number) => money(value, 2),
     formatNumber: (value: number, digits = 2) => plain(value, digits),
+    // Through the same Intl unit style the real hook uses, so a default is not
+    // quietly a different renderer from the one production runs.
+    formatBytes: (value: number) => {
+      const { value: scaled, unit, decimals } = scaleBytes(value);
+      return new Intl.NumberFormat('en-US', {
+        style: 'unit',
+        unit,
+        unitDisplay: 'short',
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      }).format(scaled);
+    },
     formatPercent: (value: number, digits = 2) => `${plain(value, digits)}%`,
     formatPercentTrimmed: (value: number) =>
       `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 }).format(value)}%`,
