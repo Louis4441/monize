@@ -26,6 +26,24 @@
     "viewOriginal": "[XX-Original-XX]",
     "viewOriginalFile": "[XX-View original-XX]",
     "rotate": "[XX-Rotate-XX]",
+    "styleLabel": "[XX-Finish-XX]",
+    "styles": {
+      "colour": "[XX-Colour-XX]",
+      "grayscale": "[XX-Greyscale-XX]",
+      "blackAndWhite": "[XX-Black and white-XX]",
+      "none": "[XX-No enhancement-XX]"
+    },
+    "styleHints": {
+      "colour": "[XX-Evens out the lighting, lifts the contrast and sharpens the text.-XX]",
+      "grayscale": "[XX-The same clean-up without the colour. Smaller, and free of the tint paper picks up under artificial light.-XX]",
+      "blackAndWhite": "[XX-Ink and paper only. Best for printed text; it will flatten photos and logos.-XX]",
+      "none": "[XX-Straightened and cropped, otherwise exactly as photographed. Use this when the clean-up spoils the subject.-XX]"
+    },
+    "adjustments": {
+      "brightness": "[XX-Brightness ({value})-XX]",
+      "contrast": "[XX-Contrast ({value})-XX]"
+    },
+    "resetAdjustments": "[XX-Reset brightness and contrast-XX]",
     "adjustHint": "[XX-Switch to Original to drag the corners if the edges are wrong.-XX]",
     "updating": "[XX-Updating the preview…-XX]",
     "noDocumentFound": "[XX-No document edges were found, so the whole photo was used. Switch to Original and drag the corners to set them yourself.-XX]",

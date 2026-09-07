@@ -26,6 +26,24 @@
     "viewOriginal": "Originale",
     "viewOriginalFile": "Vedi originale",
     "rotate": "Ruota",
+    "styleLabel": "Resa",
+    "styles": {
+      "colour": "A colori",
+      "grayscale": "Scala di grigi",
+      "blackAndWhite": "Bianco e nero",
+      "none": "Nessun miglioramento"
+    },
+    "styleHints": {
+      "colour": "Uniforma l’illuminazione, aumenta il contrasto e rende più nitido il testo.",
+      "grayscale": "La stessa pulizia senza il colore. Più leggera e priva della dominante che la carta assume con la luce artificiale.",
+      "blackAndWhite": "Solo inchiostro e carta. Ideale per il testo stampato; appiattirà foto e loghi.",
+      "none": "Raddrizzata e ritagliata, per il resto esattamente come fotografata. Da usare quando il miglioramento rovina il soggetto."
+    },
+    "adjustments": {
+      "brightness": "Luminosità ({value})",
+      "contrast": "Contrasto ({value})"
+    },
+    "resetAdjustments": "Reimposta luminosità e contrasto",
     "adjustHint": "Passa a «Originale» per trascinare gli angoli se i bordi non sono corretti.",
     "updating": "Aggiornamento dell’anteprima…",
     "noDocumentFound": "Non sono stati trovati i bordi del documento, quindi è stata usata l’intera foto. Passa a «Originale» e sistema tu gli angoli.",

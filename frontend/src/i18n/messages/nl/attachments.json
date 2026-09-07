@@ -26,6 +26,24 @@
     "viewOriginal": "Origineel",
     "viewOriginalFile": "Origineel bekijken",
     "rotate": "Draaien",
+    "styleLabel": "Afwerking",
+    "styles": {
+      "colour": "Kleur",
+      "grayscale": "Grijstinten",
+      "blackAndWhite": "Zwart-wit",
+      "none": "Geen verbetering"
+    },
+    "styleHints": {
+      "colour": "Egaliseert de belichting, verhoogt het contrast en verscherpt de tekst.",
+      "grayscale": "Dezelfde opschoning zonder kleur. Kleiner en zonder de zweem die papier bij kunstlicht krijgt.",
+      "blackAndWhite": "Alleen inkt en papier. Het beste voor gedrukte tekst; foto’s en logo’s worden er vlak van.",
+      "none": "Rechtgezet en bijgesneden, verder precies zoals gefotografeerd. Gebruik dit wanneer de verbetering het onderwerp bederft."
+    },
+    "adjustments": {
+      "brightness": "Helderheid ({value})",
+      "contrast": "Contrast ({value})"
+    },
+    "resetAdjustments": "Helderheid en contrast herstellen",
     "adjustHint": "Ga naar ‘Origineel’ om de hoeken te verslepen als de randen niet kloppen.",
     "updating": "Voorbeeld wordt bijgewerkt…",
     "noDocumentFound": "Er zijn geen documentranden gevonden, dus de hele foto is gebruikt. Ga naar ‘Origineel’ en sleep de hoeken zelf.",

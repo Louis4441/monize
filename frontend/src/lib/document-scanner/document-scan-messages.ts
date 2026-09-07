@@ -1,7 +1,7 @@
 import { loadEngine } from './opencv-engine';
 import {
+  applyStyle,
   detectDocument,
-  enhance,
   limitSize,
   warpToQuad,
 } from './document-scan-pipeline';
@@ -27,29 +27,42 @@ export async function handleScanMessage(
   try {
     const cv = await loadEngine();
 
-    if (request.kind === 'scan') {
-      const { quad, found } = detectDocument(cv, request.image);
-      const warped = warpToQuad(cv, request.image, quad);
-      const enhanced = limitSize(cv, enhance(cv, warped));
-      const result: ScanResult = {
-        documentFound: found,
-        quad,
-        enhanced,
-        warnings: assessCapture(cv, request.image, quad, found, enhanced),
+    // A restyle is told nothing about the photo or the corners: it is handed a
+    // warp that has already been made and asked to finish it differently. That
+    // is the whole point -- a style change costs one pass over the crop rather
+    // than warping several megapixels again.
+    if (request.kind === 'restyle') {
+      return {
+        kind: 'image',
+        requestId: request.requestId,
+        image: applyStyle(cv, request.image, request.style),
+        style: request.style,
       };
-      return { kind: 'result', requestId: request.requestId, result };
     }
 
     // A re-warp follows the user overruling the detection, so it does not
     // detect again -- and it reports `documentFound: true` because the corners
     // are now the user's own, not a guess that might have failed.
-    const warped = warpToQuad(cv, request.image, request.quad);
-    const enhanced = limitSize(cv, enhance(cv, warped));
+    const detected =
+      request.kind === 'scan'
+        ? detectDocument(cv, request.image)
+        : { quad: request.quad, found: true };
+
+    const warped = limitSize(cv, warpToQuad(cv, request.image, detected.quad));
+    const enhanced = applyStyle(cv, warped, request.style);
     const result: ScanResult = {
-      documentFound: true,
-      quad: request.quad,
+      documentFound: detected.found,
+      quad: detected.quad,
+      warped,
       enhanced,
-      warnings: assessCapture(cv, request.image, request.quad, true, enhanced),
+      style: request.style,
+      warnings: assessCapture(
+        cv,
+        request.image,
+        detected.quad,
+        detected.found,
+        enhanced,
+      ),
     };
     return { kind: 'result', requestId: request.requestId, result };
   } catch (error) {

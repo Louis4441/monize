@@ -2,6 +2,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { loadEngine, type OpenCv } from './opencv-engine';
 import {
+  applyStyle,
+  desaturate,
   detectDocument,
   enhance,
   limitSize,
@@ -14,7 +16,7 @@ import {
   blankFrame,
   syntheticDocument,
 } from './synthetic-document';
-import type { Quad, RawImage } from './document-scan.types';
+import { SCAN_STYLES, type Quad, type RawImage } from './document-scan.types';
 
 /**
  * The pipeline against the REAL OpenCV build, on pictures whose answer is known
@@ -47,6 +49,22 @@ function expectNearQuad(found: Quad, expected: Quad): void {
       CORNER_TOLERANCE,
     );
   }
+}
+
+/** A flat rectangle of one colour, for asking what a finish does to it. */
+function solidColour(
+  width: number,
+  height: number,
+  [r, g, b]: [number, number, number],
+): RawImage {
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = r;
+    data[i + 1] = g;
+    data[i + 2] = b;
+    data[i + 3] = 255;
+  }
+  return { width, height, data };
 }
 
 /** Mean intensity of a rectangular region, for comparing lighting. */
@@ -242,6 +260,111 @@ describe('enhance', () => {
     const first = enhance(cv, image);
     const second = enhance(cv, image);
     expect(Array.from(second.data)).toEqual(Array.from(first.data));
+  });
+});
+
+describe('applyStyle', () => {
+  /** A warped page with text on it, which is what a finish is applied to. */
+  const page = () => syntheticDocument({ width: 320, height: 260 });
+
+  it('leaves the crop untouched when no enhancement was asked for', () => {
+    const image = page();
+    // The same object, not merely equal pixels: this branch exists to do
+    // nothing, and copying fourteen megabytes to do nothing is worth avoiding.
+    expect(applyStyle(cv, image, 'none')).toBe(image);
+  });
+
+  it('is the enhancement itself in colour', () => {
+    const image = page();
+    expect(Array.from(applyStyle(cv, image, 'colour').data)).toEqual(
+      Array.from(enhance(cv, image).data),
+    );
+  });
+
+  it('keeps the size whatever the finish', () => {
+    const image = page();
+    for (const style of SCAN_STYLES) {
+      const result = applyStyle(cv, image, style);
+      expect([result.width, result.height]).toEqual([image.width, image.height]);
+    }
+  });
+
+  // Every finish is a pure function of its input (I3): the file that is stored
+  // is the preview that was approved, and a second run has to agree with it.
+  it('is deterministic for every finish', () => {
+    const image = page();
+    for (const style of SCAN_STYLES) {
+      expect(Array.from(applyStyle(cv, image, style).data)).toEqual(
+        Array.from(applyStyle(cv, image, style).data),
+      );
+    }
+  });
+
+  describe('greyscale', () => {
+    it('leaves no channel disagreeing with another', () => {
+      const result = applyStyle(cv, page(), 'grayscale');
+      for (let i = 0; i < result.data.length; i += 4) {
+        expect(result.data[i]).toBe(result.data[i + 1]);
+        expect(result.data[i + 1]).toBe(result.data[i + 2]);
+      }
+    });
+
+    // Luminance-weighted, not an average of the channels -- otherwise red ink
+    // comes out the same grey as the blue stamp beside it.
+    //
+    // Asked of `desaturate` rather than of the finish, deliberately: the finish
+    // enhances first, and illumination normalisation divides a flat colour by
+    // its own background, so any solid patch reaches the desaturation as white.
+    // Put through `applyStyle` this case would pass or fail on the enhancement
+    // and say nothing about the weighting.
+    it('separates two colours a channel average would collapse', () => {
+      const [greyRed] = desaturate(cv, solidColour(60, 40, [220, 30, 30])).data;
+      const [greyBlue] = desaturate(cv, solidColour(60, 40, [30, 30, 220])).data;
+
+      // An unweighted mean gives both exactly the same value.
+      expect((220 + 30 + 30) / 3).toBe((30 + 30 + 220) / 3);
+      expect(Math.abs(greyRed - greyBlue)).toBeGreaterThan(20);
+    });
+  });
+
+  describe('black and white', () => {
+    it('leaves only ink and paper', () => {
+      const result = applyStyle(cv, page(), 'blackAndWhite');
+      const values = new Set<number>();
+      for (let i = 0; i < result.data.length; i += 4) values.add(result.data[i]);
+      expect([...values].sort((a, b) => a - b)).toEqual([0, 255]);
+    });
+
+    // It reads the crop, not the enhanced image: the enhancement ends in an
+    // unsharp mask, whose halos a threshold turns into a broken outline.
+    it('does not build on the colour finish', () => {
+      const image = page();
+      expect(Array.from(applyStyle(cv, image, 'blackAndWhite').data)).not.toEqual(
+        Array.from(applyStyle(cv, enhance(cv, image), 'blackAndWhite').data),
+      );
+    });
+
+    // The threshold is local, so a page lit from one side comes out evenly --
+    // which is why it needs no illumination step of its own.
+    it('survives a shadow across the page', () => {
+      const shadowed = syntheticDocument({
+        quad: [
+          { x: 20, y: 20 },
+          { x: 700, y: 20 },
+          { x: 700, y: 700 },
+          { x: 20, y: 700 },
+        ],
+        text: false,
+        shadow: 0.55,
+      });
+      const result = applyStyle(cv, shadowed, 'blackAndWhite');
+
+      const gap = Math.abs(
+        meanIntensity(result, 40, 100, 200, 600) -
+          meanIntensity(result, 520, 100, 680, 600),
+      );
+      expect(gap).toBeLessThan(40);
+    });
   });
 });
 

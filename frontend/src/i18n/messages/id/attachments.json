@@ -26,6 +26,24 @@
     "viewOriginal": "Asli",
     "viewOriginalFile": "Lihat asli",
     "rotate": "Putar",
+    "styleLabel": "Hasil akhir",
+    "styles": {
+      "colour": "Berwarna",
+      "grayscale": "Skala abu-abu",
+      "blackAndWhite": "Hitam putih",
+      "none": "Tanpa penyempurnaan"
+    },
+    "styleHints": {
+      "colour": "Meratakan pencahayaan, menaikkan kontras, dan mempertajam teks.",
+      "grayscale": "Pembersihan yang sama tanpa warna. Lebih kecil dan bebas dari rona yang muncul pada kertas di bawah cahaya buatan.",
+      "blackAndWhite": "Hanya tinta dan kertas. Terbaik untuk teks cetak; foto dan logo akan menjadi datar.",
+      "none": "Diluruskan dan dipangkas, selebihnya persis seperti difoto. Gunakan ini bila penyempurnaan merusak subjeknya."
+    },
+    "adjustments": {
+      "brightness": "Kecerahan ({value})",
+      "contrast": "Kontras ({value})"
+    },
+    "resetAdjustments": "Atur ulang kecerahan dan kontras",
     "adjustHint": "Beralih ke “Asli” untuk menggeser sudut jika tepinya salah.",
     "updating": "Memperbarui pratinjau…",
     "noDocumentFound": "Tepi dokumen tidak ditemukan, jadi seluruh foto digunakan. Beralih ke “Asli” dan tentukan sudutnya sendiri.",

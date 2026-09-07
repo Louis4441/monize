@@ -26,6 +26,24 @@
     "viewOriginal": "원본",
     "viewOriginalFile": "원본 보기",
     "rotate": "회전",
+    "styleLabel": "마무리",
+    "styles": {
+      "colour": "컬러",
+      "grayscale": "회색조",
+      "blackAndWhite": "흑백",
+      "none": "보정 없음"
+    },
+    "styleHints": {
+      "colour": "조명을 고르게 하고 대비를 높여 글자를 또렷하게 만듭니다.",
+      "grayscale": "색만 뺀 같은 보정입니다. 용량이 작고, 인공조명 아래 종이에 도는 색조도 없습니다.",
+      "blackAndWhite": "잉크와 종이만 남깁니다. 인쇄된 글자에 가장 좋지만 사진과 로고는 평평해집니다.",
+      "none": "기울기를 바로잡고 잘라내기만 하며 나머지는 촬영한 그대로입니다. 보정이 피사체를 해칠 때 사용하세요."
+    },
+    "adjustments": {
+      "brightness": "밝기 ({value})",
+      "contrast": "대비 ({value})"
+    },
+    "resetAdjustments": "밝기와 대비 초기화",
     "adjustHint": "가장자리가 잘못되었다면 “원본”으로 전환해 모서리를 끌어 조정하세요.",
     "updating": "미리보기를 업데이트하는 중…",
     "noDocumentFound": "문서 가장자리를 찾지 못해 사진 전체를 사용했습니다. “원본”으로 전환해 모서리를 직접 지정하세요.",

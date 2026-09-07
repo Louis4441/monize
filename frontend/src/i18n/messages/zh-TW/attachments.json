@@ -26,6 +26,24 @@
     "viewOriginal": "原圖",
     "viewOriginalFile": "檢視原圖",
     "rotate": "旋轉",
+    "styleLabel": "處理方式",
+    "styles": {
+      "colour": "彩色",
+      "grayscale": "灰階",
+      "blackAndWhite": "黑白",
+      "none": "不做強化"
+    },
+    "styleHints": {
+      "colour": "讓光線均勻、提高對比並銳化文字。",
+      "grayscale": "同樣的處理，但去掉顏色。檔案更小，也沒有紙張在人造光下泛出的色偏。",
+      "blackAndWhite": "只保留墨水與紙張。最適合印刷文字；照片與標誌會被壓平。",
+      "none": "僅擺正並裁切，其餘與拍攝時完全相同。當強化反而破壞畫面時使用。"
+    },
+    "adjustments": {
+      "brightness": "亮度（{value}）",
+      "contrast": "對比（{value}）"
+    },
+    "resetAdjustments": "重設亮度與對比",
     "adjustHint": "若邊緣不正確，請切換到「原圖」並拖曳四角。",
     "updating": "正在更新預覽…",
     "noDocumentFound": "找不到文件邊緣，因此使用了整張照片。請切換到「原圖」並自行拖曳四角。",

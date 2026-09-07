@@ -26,6 +26,24 @@
     "viewOriginal": "Orijinal",
     "viewOriginalFile": "Orijinali görüntüle",
     "rotate": "Döndür",
+    "styleLabel": "Son işlem",
+    "styles": {
+      "colour": "Renkli",
+      "grayscale": "Gri tonlama",
+      "blackAndWhite": "Siyah beyaz",
+      "none": "İyileştirme yok"
+    },
+    "styleHints": {
+      "colour": "Işığı eşitler, kontrastı yükseltir ve metni keskinleştirir.",
+      "grayscale": "Renksiz hâliyle aynı temizleme. Daha küçük ve kâğıdın yapay ışıkta aldığı renk tonundan arınmış.",
+      "blackAndWhite": "Yalnızca mürekkep ve kâğıt. Basılı metin için en iyisi; fotoğrafları ve logoları düzleştirir.",
+      "none": "Düzeltilmiş ve kırpılmış, gerisi tam olarak çekildiği gibi. İyileştirme konuyu bozduğunda bunu kullanın."
+    },
+    "adjustments": {
+      "brightness": "Parlaklık ({value})",
+      "contrast": "Kontrast ({value})"
+    },
+    "resetAdjustments": "Parlaklık ve kontrastı sıfırla",
     "adjustHint": "Kenarlar yanlışsa köşeleri sürüklemek için “Orijinal”e geçin.",
     "updating": "Önizleme güncelleniyor…",
     "noDocumentFound": "Belge kenarları bulunamadı, bu yüzden fotoğrafın tamamı kullanıldı. “Orijinal”e geçip köşeleri kendiniz yerleştirin.",

@@ -26,6 +26,24 @@
     "viewOriginal": "Oryginał",
     "viewOriginalFile": "Zobacz oryginał",
     "rotate": "Obróć",
+    "styleLabel": "Wykończenie",
+    "styles": {
+      "colour": "Kolor",
+      "grayscale": "Skala szarości",
+      "blackAndWhite": "Czarno-białe",
+      "none": "Bez poprawek"
+    },
+    "styleHints": {
+      "colour": "Wyrównuje oświetlenie, podnosi kontrast i wyostrza tekst.",
+      "grayscale": "To samo oczyszczenie bez koloru. Mniejsze i bez zabarwienia, jakie papier przyjmuje w sztucznym świetle.",
+      "blackAndWhite": "Tylko tusz i papier. Najlepsze do tekstu drukowanego; spłaszczy zdjęcia i logotypy.",
+      "none": "Wyprostowane i przycięte, poza tym dokładnie tak, jak sfotografowano. Użyj, gdy poprawki psują temat."
+    },
+    "adjustments": {
+      "brightness": "Jasność ({value})",
+      "contrast": "Kontrast ({value})"
+    },
+    "resetAdjustments": "Przywróć jasność i kontrast",
     "adjustHint": "Przełącz na „Oryginał”, aby przeciągnąć narożniki, jeśli krawędzie są nieprawidłowe.",
     "updating": "Aktualizowanie podglądu…",
     "noDocumentFound": "Nie znaleziono krawędzi dokumentu, więc użyto całego zdjęcia. Przełącz na „Oryginał” i ustaw narożniki samodzielnie.",

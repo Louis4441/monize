@@ -26,6 +26,24 @@
     "viewOriginal": "原图",
     "viewOriginalFile": "查看原图",
     "rotate": "旋转",
+    "styleLabel": "处理方式",
+    "styles": {
+      "colour": "彩色",
+      "grayscale": "灰度",
+      "blackAndWhite": "黑白",
+      "none": "不做增强"
+    },
+    "styleHints": {
+      "colour": "让光照均匀、提升对比度并锐化文字。",
+      "grayscale": "同样的处理，但去掉颜色。文件更小，也没有纸张在人造光下泛出的色偏。",
+      "blackAndWhite": "只保留墨水和纸张。最适合印刷文字；照片和标志会被压平。",
+      "none": "仅摆正并裁切，其余与拍摄时完全一致。当增强反而破坏画面时使用。"
+    },
+    "adjustments": {
+      "brightness": "亮度（{value}）",
+      "contrast": "对比度（{value}）"
+    },
+    "resetAdjustments": "重置亮度和对比度",
     "adjustHint": "如果边缘不正确，请切换到“原图”并拖动四角。",
     "updating": "正在更新预览…",
     "noDocumentFound": "未找到文档边缘，因此使用了整张照片。请切换到“原图”并自行拖动四角。",

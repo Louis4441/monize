@@ -2,6 +2,7 @@ import type {
   Quad,
   RawImage,
   ScanResult,
+  ScanStyle,
   ScannerRequest,
   ScannerResponse,
 } from './document-scan.types';
@@ -24,16 +25,45 @@ import type {
 /** How long a single scan may take before it is treated as hung. */
 export const SCAN_TIMEOUT_MS = 60_000;
 
+/** What a worker reply can carry: a whole scan, or finished pixels alone. */
+type ScannerPayload = ScanResult | RawImage;
+
 interface Pending {
-  resolve: (result: ScanResult) => void;
+  resolve: (payload: ScannerPayload) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
 }
 
 export interface ScannerClient {
-  scan(image: RawImage): Promise<ScanResult>;
-  rewarp(image: RawImage, quad: Quad): Promise<ScanResult>;
+  scan(image: RawImage, style: ScanStyle): Promise<ScanResult>;
+  rewarp(image: RawImage, quad: Quad, style: ScanStyle): Promise<ScanResult>;
+  /**
+   * Finish an already-warped document a different way. Takes a
+   * `ScanResult.warped` and answers with pixels, nothing else.
+   */
+  restyle(warped: RawImage, style: ScanStyle): Promise<RawImage>;
   dispose(): void;
+}
+
+/**
+ * Narrow a reply to the shape the request asked for.
+ *
+ * A cast would do the same thing and be wrong silently: the request kind and
+ * the reply kind are agreed between two files, and a worker answering the wrong
+ * one would otherwise reach the dialog as a preview built from undefined.
+ */
+function asScanResult(payload: ScannerPayload): ScanResult {
+  if (!('enhanced' in payload)) {
+    throw new Error('The document scanner answered with the wrong shape');
+  }
+  return payload;
+}
+
+function asImage(payload: ScannerPayload): RawImage {
+  if ('enhanced' in payload) {
+    throw new Error('The document scanner answered with the wrong shape');
+  }
+  return payload;
 }
 
 /** Build the worker. Replaceable so tests can supply a double. */
@@ -66,6 +96,7 @@ export function createScannerClient(
     const response = event.data;
     settle(response.requestId, (entry) => {
       if (response.kind === 'result') entry.resolve(response.result);
+      else if (response.kind === 'image') entry.resolve(response.image);
       else entry.reject(new Error(response.message));
     });
   };
@@ -80,13 +111,13 @@ export function createScannerClient(
 
   const send = (
     build: (requestId: number) => ScannerRequest,
-  ): Promise<ScanResult> => {
+  ): Promise<ScannerPayload> => {
     if (disposed) {
       return Promise.reject(new Error('The document scanner was closed'));
     }
     const requestId = nextId++;
     const request = build(requestId);
-    return new Promise<ScanResult>((resolve, reject) => {
+    return new Promise<ScannerPayload>((resolve, reject) => {
       const timer = setTimeout(() => {
         settle(requestId, (entry) =>
           entry.reject(new Error('The document scanner timed out')),
@@ -98,9 +129,25 @@ export function createScannerClient(
   };
 
   return {
-    scan: (image) => send((requestId) => ({ kind: 'scan', requestId, image })),
-    rewarp: (image, quad) =>
-      send((requestId) => ({ kind: 'rewarp', requestId, image, quad })),
+    scan: (image, style) =>
+      send((requestId) => ({ kind: 'scan', requestId, image, style })).then(
+        asScanResult,
+      ),
+    rewarp: (image, quad, style) =>
+      send((requestId) => ({
+        kind: 'rewarp',
+        requestId,
+        image,
+        quad,
+        style,
+      })).then(asScanResult),
+    restyle: (warped, style) =>
+      send((requestId) => ({
+        kind: 'restyle',
+        requestId,
+        image: warped,
+        style,
+      })).then(asImage),
     dispose: () => {
       if (disposed) return;
       disposed = true;

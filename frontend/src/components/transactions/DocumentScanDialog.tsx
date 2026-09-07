@@ -6,17 +6,29 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Modal } from '@/components/ui/Modal';
+import { Select } from '@/components/ui/Select';
 import { useDocumentScanner } from '@/hooks/useDocumentScanner';
+import { useNumberFormat } from '@/hooks/useNumberFormat';
 import {
   encodeScan,
   scanFilename,
   toCanvas,
 } from '@/lib/document-scanner/decode-image';
 import type { WorkerFactory } from '@/lib/document-scanner/document-scan-client';
-import type {
-  Quad,
-  QualityWarning,
-  RawImage,
+import {
+  ADJUSTMENT_RANGE,
+  NEUTRAL_ADJUSTMENTS,
+  adjustImage,
+  isNeutral,
+  type ImageAdjustments,
+} from '@/lib/document-scanner/adjust-image';
+import {
+  DEFAULT_SCAN_STYLE,
+  SCAN_STYLES,
+  type Quad,
+  type QualityWarning,
+  type RawImage,
+  type ScanStyle,
 } from '@/lib/document-scanner/document-scan.types';
 import {
   rotateImage,
@@ -61,6 +73,9 @@ export interface DocumentScanDialogProps {
 
 type PreviewMode = 'enhanced' | 'original';
 
+/** The two repairs offered, in the order they are drawn. */
+const ADJUSTMENT_FIELDS = ['brightness', 'contrast'] as const;
+
 /** Fit a photo into the preview box, keeping its aspect ratio. */
 function previewSize(image: RawImage): { width: number; height: number } {
   const longest = Math.max(image.width, image.height);
@@ -103,12 +118,16 @@ export function DocumentScanDialog({
   createWorker,
 }: DocumentScanDialogProps) {
   const t = useTranslations('attachments');
+  const { formatNumber } = useNumberFormat();
   const scanner = useDocumentScanner(createWorker);
-  const { scan, rewarp, reset } = scanner;
+  const { scan, refine, reset } = scanner;
 
   const [mode, setMode] = useState<PreviewMode>('enhanced');
   const [rotation, setRotation] = useState<QuarterTurns>(0);
   const [quad, setQuad] = useState<Quad | null>(null);
+  const [style, setStyle] = useState<ScanStyle>(DEFAULT_SCAN_STYLE);
+  const [adjustments, setAdjustments] =
+    useState<ImageAdjustments>(NEUTRAL_ADJUSTMENTS);
   const [busy, setBusy] = useState(false);
 
   // Scan whatever file the parent hands over, and forget the previous result
@@ -121,6 +140,8 @@ export function DocumentScanDialog({
     setMode('enhanced');
     setRotation(0);
     setQuad(null);
+    setStyle(DEFAULT_SCAN_STYLE);
+    setAdjustments(NEUTRAL_ADJUSTMENTS);
     void scan(file);
   }, [isOpen, file, scan, reset]);
 
@@ -135,17 +156,22 @@ export function DocumentScanDialog({
 
   const source = scanner.source;
   /**
-   * The enhanced image with the user's quarter turns applied.
+   * What the pipeline produced, with everything the user changed since.
    *
-   * A turn is a permutation of pixels the pipeline has already produced, so it
-   * happens here rather than by re-running the scan -- which took seconds per
-   * press and queued if pressed again. Memoized on the pair, so re-rendering
-   * for any other reason does not repeat it.
+   * Two stages, and neither of them is the pipeline: brightness and contrast
+   * are a lookup per pixel, a quarter turn is a permutation of them. Both work
+   * on pixels that are already computed, so they happen here rather than by
+   * re-running the scan -- which took seconds per press and queued if pressed
+   * again. Memoized separately so changing one does not redo the other.
    */
-  const enhanced = useMemo(() => {
+  const adjusted = useMemo(() => {
     const produced = scanner.result?.enhanced ?? null;
-    return produced ? rotateImage(produced, rotation) : null;
-  }, [scanner.result, rotation]);
+    return produced ? adjustImage(produced, adjustments) : null;
+  }, [scanner.result, adjustments]);
+  const enhanced = useMemo(
+    () => (adjusted ? rotateImage(adjusted, rotation) : null),
+    [adjusted, rotation],
+  );
   const shown = mode === 'enhanced' ? enhanced : source;
   const paint = useCanvasPainter(shown);
 
@@ -159,10 +185,32 @@ export function DocumentScanDialog({
   const handleCornerCommit = useCallback(
     (next: Quad) => {
       setQuad(next);
-      void rewarp(next);
+      void refine({ quad: next, style });
     },
-    [rewarp],
+    [refine, style],
   );
+
+  // A style change re-runs the finish over the crop that is already made; the
+  // corners travel with it so the hook can tell that is all it needs to do.
+  const handleStyleChange = useCallback(
+    (next: ScanStyle) => {
+      setStyle(next);
+      const corners = quad ?? scanner.result?.quad;
+      if (corners) void refine({ quad: corners, style: next });
+    },
+    [quad, refine, scanner.result],
+  );
+
+  const handleAdjustment = useCallback(
+    (field: keyof ImageAdjustments, value: number) => {
+      setAdjustments((current) => ({ ...current, [field]: value }));
+    },
+    [],
+  );
+
+  const handleResetAdjustments = useCallback(() => {
+    setAdjustments(NEUTRAL_ADJUSTMENTS);
+  }, []);
 
   // No scan, no worker, no round trip: the turn applies to pixels that already
   // exist, so the preview follows the click.
@@ -216,8 +264,9 @@ export function DocumentScanDialog({
         variant="primary"
         onClick={handleUseEnhanced}
         isLoading={busy}
-        // The preview is what gets stored (`I3`), so while a re-warp is in
-        // flight the button would hand back the image the user just changed.
+        // The preview is what gets stored (`I3`), so while a warp or a finish
+        // is in flight the button would hand back the image the user just
+        // changed away from.
         disabled={status !== 'ready' || !enhanced || scanner.recomputing}
       >
         {t('scan.useEnhanced')}
@@ -331,6 +380,62 @@ export function DocumentScanDialog({
                 )}
               </div>
             </div>
+
+            {/* The finish and the two repairs, on the scan alone: the photo is
+                stored exactly as the device produced it (`I2`), so nothing
+                here is offered beside it. */}
+            {mode === 'enhanced' && (
+              <div className="space-y-4 rounded-md border border-gray-200 p-3 dark:border-gray-700">
+                <Select
+                  label={t('scan.styleLabel')}
+                  value={style}
+                  onChange={(event) =>
+                    handleStyleChange(event.target.value as ScanStyle)
+                  }
+                  options={SCAN_STYLES.map((option) => ({
+                    value: option,
+                    label: t(`scan.styles.${option}`),
+                  }))}
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {t(`scan.styleHints.${style}`)}
+                </p>
+
+                {ADJUSTMENT_FIELDS.map((field) => (
+                  <div key={field}>
+                    <label
+                      htmlFor={`scan-${field}`}
+                      className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >
+                      {t(`scan.adjustments.${field}`, {
+                        value: formatNumber(adjustments[field], 0),
+                      })}
+                    </label>
+                    <input
+                      id={`scan-${field}`}
+                      type="range"
+                      min={-ADJUSTMENT_RANGE}
+                      max={ADJUSTMENT_RANGE}
+                      value={adjustments[field]}
+                      onChange={(event) =>
+                        handleAdjustment(field, Number(event.target.value))
+                      }
+                      className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-200 accent-blue-600 dark:bg-gray-600"
+                    />
+                  </div>
+                ))}
+
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleResetAdjustments}
+                  disabled={isNeutral(adjustments)}
+                >
+                  {t('scan.resetAdjustments')}
+                </Button>
+              </div>
+            )}
 
             {/* A re-warp keeps the previous preview on screen rather than
                 blanking it, so without this the picture simply looks like it

@@ -7,6 +7,7 @@ import type {
   Quad,
   RawImage,
   ScanResult,
+  ScanStyle,
   ScannerRequest,
   ScannerResponse,
 } from '@/lib/document-scanner/document-scan.types';
@@ -38,11 +39,20 @@ const quad: Quad = [
   { x: 0, y: 4 },
 ];
 
+/** The crop the scan produced, which a restyle is applied to. */
+const warped: RawImage = {
+  width: 2,
+  height: 2,
+  data: new Uint8ClampedArray(16),
+};
+
 function resultWith(warning: 'blurry' | 'lowResolution'): ScanResult {
   return {
     documentFound: true,
     quad,
+    warped,
     enhanced: { width: 1, height: 1, data: new Uint8ClampedArray(4) },
+    style: 'colour',
     warnings: [warning],
   };
 }
@@ -64,6 +74,17 @@ class ControllableWorker {
   reply(index: number, result: ScanResult): void {
     this.onmessage?.({
       data: { kind: 'result', requestId: this.sent[index].requestId, result },
+    } as MessageEvent<ScannerResponse>);
+  }
+
+  replyImage(index: number, image: RawImage, style: ScanStyle): void {
+    this.onmessage?.({
+      data: {
+        kind: 'image',
+        requestId: this.sent[index].requestId,
+        image,
+        style,
+      },
     } as MessageEvent<ScannerResponse>);
   }
 
@@ -173,10 +194,9 @@ describe('useDocumentScanner', () => {
     expect(result.current.error).toBe('the engine failed');
   });
 
-  describe('rewarp', () => {
-    it('re-warps the photo already on screen with the user’s corners', async () => {
-      const { result } = render();
-
+  describe('refine', () => {
+    /** Scan a photo and land its result, which every refine builds on. */
+    async function scanned(result: { current: ReturnType<typeof useDocumentScanner> }) {
       await act(async () => {
         void result.current.scan(file('receipt.jpg'));
       });
@@ -185,41 +205,135 @@ describe('useDocumentScanner', () => {
         worker.reply(0, resultWith('blurry'));
       });
       await waitFor(() => expect(result.current.status).toBe('ready'));
+    }
 
-      const moved: Quad = [
-        { x: 1, y: 1 },
-        { x: 3, y: 1 },
-        { x: 3, y: 3 },
-        { x: 1, y: 3 },
-      ];
+    const moved: Quad = [
+      { x: 1, y: 1 },
+      { x: 3, y: 1 },
+      { x: 3, y: 3 },
+      { x: 1, y: 3 },
+    ];
+
+    it('re-warps the photo already on screen with the user\u2019s corners', async () => {
+      const { result } = render();
+      await scanned(result);
+
       await act(async () => {
-        void result.current.rewarp(moved);
+        void result.current.refine({ quad: moved, style: 'colour' });
       });
       await waitFor(() => expect(worker.sent).toHaveLength(2));
 
       expect(worker.sent[1]).toMatchObject({
         kind: 'rewarp',
         quad: moved,
+        style: 'colour',
         // The same decoded photo, not a re-read of the file.
         image: decoded,
       });
     });
 
-    // A re-warp takes seconds on a large photo. Several quick adjustments used
-    // to queue, so the user waited for every intermediate result they had
-    // already replaced -- which is what "press it a few times and wait 30
-    // seconds" was.
-    it('runs the newest corners and drops the ones overtaken', async () => {
+    // The point of splitting the warp from the finish: changing the finish over
+    // corners that have not moved is one pass over a crop that already exists,
+    // not a second warp of several megapixels.
+    it('restyles the existing warp when only the finish changed', async () => {
       const { result } = render();
+      await scanned(result);
 
       await act(async () => {
-        void result.current.scan(file('receipt.jpg'));
+        void result.current.refine({ quad, style: 'blackAndWhite' });
       });
-      await waitFor(() => expect(worker.sent).toHaveLength(1));
+      await waitFor(() => expect(worker.sent).toHaveLength(2));
+
+      expect(worker.sent[1]).toMatchObject({
+        kind: 'restyle',
+        style: 'blackAndWhite',
+        // The warp the scan produced, not the photo.
+        image: warped,
+      });
+      expect(worker.sent[1]).not.toHaveProperty('quad');
+    });
+
+    // The decision is the hook\u2019s, not the caller\u2019s: whether the crop on hand is
+    // still the right one is a fact about what has landed, not about the click.
+    it('warps again when the corners moved, even for the same finish', async () => {
+      const { result } = render();
+      await scanned(result);
+
       await act(async () => {
-        worker.reply(0, resultWith('blurry'));
+        void result.current.refine({ quad: moved, style: 'colour' });
       });
-      await waitFor(() => expect(result.current.status).toBe('ready'));
+      await waitFor(() => expect(worker.sent).toHaveLength(2));
+      expect(worker.sent[1].kind).toBe('rewarp');
+    });
+
+    // A restyle answers with pixels alone, so the hook builds the result around
+    // them -- and the corners and warnings have to survive that, or the handles
+    // jump back to the detection the moment somebody picks greyscale.
+    it('keeps the corners and warnings a restyle was not told about', async () => {
+      const { result } = render();
+      await scanned(result);
+
+      await act(async () => {
+        void result.current.refine({ quad, style: 'grayscale' });
+      });
+      await waitFor(() => expect(worker.sent).toHaveLength(2));
+
+      const restyled: RawImage = {
+        width: 2,
+        height: 2,
+        data: new Uint8ClampedArray(16),
+      };
+      await act(async () => {
+        worker.replyImage(1, restyled, 'grayscale');
+      });
+      await waitFor(() => expect(result.current.recomputing).toBe(false));
+
+      expect(result.current.result?.enhanced).toBe(restyled);
+      expect(result.current.result?.style).toBe('grayscale');
+      expect(result.current.result?.quad).toEqual(quad);
+      expect(result.current.result?.warnings).toEqual(['blurry']);
+    });
+
+    // A restyle uses the crop the last warp produced, so a corner move that
+    // landed in between has to be the crop it works from.
+    it('restyles the newest warp, not the one the scan produced', async () => {
+      const { result } = render();
+      await scanned(result);
+
+      await act(async () => {
+        void result.current.refine({ quad: moved, style: 'colour' });
+      });
+      await waitFor(() => expect(worker.sent).toHaveLength(2));
+
+      const rewarped = resultWith('lowResolution');
+      const movedWarp: RawImage = {
+        width: 3,
+        height: 3,
+        data: new Uint8ClampedArray(36),
+      };
+      await act(async () => {
+        worker.reply(1, { ...rewarped, quad: moved, warped: movedWarp });
+      });
+      await waitFor(() => expect(result.current.recomputing).toBe(false));
+
+      await act(async () => {
+        void result.current.refine({ quad: moved, style: 'none' });
+      });
+      await waitFor(() => expect(worker.sent).toHaveLength(3));
+
+      expect(worker.sent[2]).toMatchObject({
+        kind: 'restyle',
+        image: movedWarp,
+      });
+    });
+
+    // Producing the document takes seconds on a large photo. Several quick
+    // adjustments used to queue, so the user waited for every intermediate
+    // result they had already replaced -- which is what "press it a few times
+    // and wait 30 seconds" was.
+    it('runs the newest recipe and drops the ones overtaken', async () => {
+      const { result } = render();
+      await scanned(result);
 
       const corners = (offset: number): Quad => [
         { x: offset, y: offset },
@@ -230,9 +344,9 @@ describe('useDocumentScanner', () => {
 
       // Three adjustments while the first is still running.
       await act(async () => {
-        void result.current.rewarp(corners(1));
-        void result.current.rewarp(corners(2));
-        void result.current.rewarp(corners(3));
+        void result.current.refine({ quad: corners(1), style: 'colour' });
+        void result.current.refine({ quad: corners(2), style: 'colour' });
+        void result.current.refine({ quad: corners(3), style: 'colour' });
       });
       await waitFor(() => expect(worker.sent).toHaveLength(2));
 
@@ -253,21 +367,13 @@ describe('useDocumentScanner', () => {
       await waitFor(() => expect(worker.sent).toHaveLength(3));
     });
 
-    it('reports that it is recomputing while a re-warp runs', async () => {
+    it('reports that it is recomputing while one runs', async () => {
       const { result } = render();
-
-      await act(async () => {
-        void result.current.scan(file('receipt.jpg'));
-      });
-      await waitFor(() => expect(worker.sent).toHaveLength(1));
-      await act(async () => {
-        worker.reply(0, resultWith('blurry'));
-      });
-      await waitFor(() => expect(result.current.status).toBe('ready'));
+      await scanned(result);
       expect(result.current.recomputing).toBe(false);
 
       await act(async () => {
-        void result.current.rewarp(quad);
+        void result.current.refine({ quad: moved, style: 'colour' });
       });
       await waitFor(() => expect(result.current.recomputing).toBe(true));
       // The previous result stays on screen: this is not a loading state.
@@ -284,18 +390,10 @@ describe('useDocumentScanner', () => {
     // a drain that never runs again.
     it('keeps accepting adjustments after one fails', async () => {
       const { result } = render();
+      await scanned(result);
 
       await act(async () => {
-        void result.current.scan(file('receipt.jpg'));
-      });
-      await waitFor(() => expect(worker.sent).toHaveLength(1));
-      await act(async () => {
-        worker.reply(0, resultWith('blurry'));
-      });
-      await waitFor(() => expect(result.current.status).toBe('ready'));
-
-      await act(async () => {
-        void result.current.rewarp(quad);
+        void result.current.refine({ quad: moved, style: 'colour' });
       });
       await waitFor(() => expect(worker.sent).toHaveLength(2));
       await act(async () => {
@@ -305,20 +403,20 @@ describe('useDocumentScanner', () => {
       expect(result.current.recomputing).toBe(false);
 
       await act(async () => {
-        void result.current.rewarp(quad);
+        void result.current.refine({ quad: moved, style: 'colour' });
       });
       await waitFor(() => expect(worker.sent).toHaveLength(3));
     });
 
-    it('does nothing when there is no photo to re-warp', async () => {
+    it('does nothing when there is no photo to work from', async () => {
       const { result } = render();
       await act(async () => {
-        await result.current.rewarp(quad);
+        await result.current.refine({ quad, style: 'colour' });
       });
       expect(worker.sent).toHaveLength(0);
     });
 
-    // A re-warp refines the photo on screen, so it must not outrank a scan of a
+    // A refine works on the photo on screen, so it must not outrank a scan of a
     // different photo that started after it.
     it('is discarded when a new photo has been chosen meanwhile', async () => {
       const { result } = render();
@@ -333,11 +431,11 @@ describe('useDocumentScanner', () => {
       await waitFor(() => expect(result.current.status).toBe('ready'));
 
       await act(async () => {
-        void result.current.rewarp(quad);
+        void result.current.refine({ quad: moved, style: 'colour' });
       });
       await waitFor(() => expect(worker.sent).toHaveLength(2));
 
-      // A new photo is picked before the re-warp comes back.
+      // A new photo is picked before the refine comes back.
       await act(async () => {
         void result.current.scan(file('second.jpg'));
       });
@@ -347,7 +445,7 @@ describe('useDocumentScanner', () => {
         worker.reply(1, resultWith('lowResolution'));
       });
 
-      // Still loading the new photo; the stale re-warp did not land.
+      // Still loading the new photo; the stale refine did not land.
       expect(result.current.status).toBe('loading');
     });
   });

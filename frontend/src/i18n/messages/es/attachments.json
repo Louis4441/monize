@@ -26,6 +26,24 @@
     "viewOriginal": "Original",
     "viewOriginalFile": "Ver original",
     "rotate": "Girar",
+    "styleLabel": "Acabado",
+    "styles": {
+      "colour": "Color",
+      "grayscale": "Escala de grises",
+      "blackAndWhite": "Blanco y negro",
+      "none": "Sin mejora"
+    },
+    "styleHints": {
+      "colour": "Uniforma la iluminación, realza el contraste y afina el texto.",
+      "grayscale": "La misma limpieza sin color. Más ligero y sin el tono que el papel toma con luz artificial.",
+      "blackAndWhite": "Solo tinta y papel. Ideal para texto impreso; aplanará fotos y logotipos.",
+      "none": "Enderezado y recortado, por lo demás tal como se fotografió. Úselo cuando la mejora estropee el original."
+    },
+    "adjustments": {
+      "brightness": "Brillo ({value})",
+      "contrast": "Contraste ({value})"
+    },
+    "resetAdjustments": "Restablecer brillo y contraste",
     "adjustHint": "Cambie a «Original» para arrastrar las esquinas si los bordes no son correctos.",
     "updating": "Actualizando la vista previa…",
     "noDocumentFound": "No se encontraron los bordes del documento, así que se usó la foto completa. Cambie a «Original» y arrastre las esquinas usted mismo.",

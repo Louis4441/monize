@@ -4,6 +4,7 @@ import { render, screen, waitFor, act, fireEvent } from '@/test/render';
 import { DocumentScanDialog } from './DocumentScanDialog';
 import type {
   Quad,
+  RawImage,
   ScanResult,
   ScannerRequest,
   ScannerResponse,
@@ -46,7 +47,9 @@ function scanResult(overrides: Partial<ScanResult> = {}): ScanResult {
   return {
     documentFound: true,
     quad,
+    warped: { width: 20, height: 20, data: new Uint8ClampedArray(20 * 20 * 4) },
     enhanced: { width: 20, height: 20, data: new Uint8ClampedArray(20 * 20 * 4) },
+    style: 'colour',
     warnings: [],
     ...overrides,
   };
@@ -58,6 +61,8 @@ class AutoWorker {
   onmessage: ((event: MessageEvent<ScannerResponse>) => void) | null = null;
   onerror: ((event: ErrorEvent) => void) | null = null;
   result: ScanResult = scanResult();
+  /** What a restyle comes back with, when a case cares. */
+  restyled: RawImage | null = null;
   failWith: string | null = null;
 
   postMessage(request: ScannerRequest): void {
@@ -70,11 +75,18 @@ class AutoWorker {
               requestId: request.requestId,
               message: this.failWith,
             }
-          : {
-              kind: 'result',
-              requestId: request.requestId,
-              result: this.result,
-            },
+          : request.kind === 'restyle'
+            ? {
+                kind: 'image',
+                requestId: request.requestId,
+                image: this.restyled ?? this.result.enhanced,
+                style: request.style,
+              }
+            : {
+                kind: 'result',
+                requestId: request.requestId,
+                result: this.result,
+              },
       } as MessageEvent<ScannerResponse>);
     });
   }
@@ -248,7 +260,9 @@ describe('DocumentScanDialog', () => {
       );
 
       // The enhanced view has no handles: its coordinates are not the photo's.
-      expect(screen.queryByRole('slider')).not.toBeInTheDocument();
+      // Asked by name rather than by role -- the brightness and contrast
+      // controls on this view are sliders too.
+      expect(screen.queryByLabelText('Top-left corner')).not.toBeInTheDocument();
 
       await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: 'Original' }));
@@ -485,6 +499,208 @@ describe('DocumentScanDialog', () => {
 
       const passed = vi.mocked(encodeScan).mock.calls.at(-1)?.[0];
       expect(passed).toMatchObject({ width: 20, height: 40 });
+    });
+  });
+
+  describe('the finish', () => {
+    async function ready() {
+      const handles = await open();
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: 'Use enhanced' }),
+        ).toBeEnabled(),
+      );
+      return handles;
+    }
+
+    it('offers every finish, on the scan alone', async () => {
+      await ready();
+
+      const select = screen.getByLabelText('Finish') as HTMLSelectElement;
+      expect(
+        Array.from(select.options).map((option) => option.value),
+      ).toEqual(['colour', 'grayscale', 'blackAndWhite', 'none']);
+      expect(select.value).toBe('colour');
+
+      // The photo is stored exactly as taken, so nothing here is offered
+      // beside it.
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Original' }));
+      });
+      expect(screen.queryByLabelText('Finish')).not.toBeInTheDocument();
+    });
+
+    // The whole reason the warp comes back from the worker: a finish change is
+    // one pass over a crop that already exists.
+    it('restyles the existing crop rather than warping again', async () => {
+      await ready();
+      const before = worker.sent.length;
+
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Finish'), {
+          target: { value: 'blackAndWhite' },
+        });
+      });
+      await waitFor(() => expect(worker.sent.length).toBe(before + 1));
+
+      expect(worker.sent[before]).toMatchObject({
+        kind: 'restyle',
+        style: 'blackAndWhite',
+      });
+      expect(worker.sent.some((request) => request.kind === 'rewarp')).toBe(
+        false,
+      );
+    });
+
+    it('shows what the chosen finish does', async () => {
+      await ready();
+      expect(
+        screen.getByText(/Evens out the lighting/),
+      ).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Finish'), {
+          target: { value: 'none' },
+        });
+      });
+      expect(screen.getByText(/exactly as photographed/)).toBeInTheDocument();
+    });
+
+    it('carries the chosen finish into a later corner move', async () => {
+      await ready();
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Finish'), {
+          target: { value: 'grayscale' },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Original' }));
+      });
+      await act(async () => {
+        fireEvent.keyDown(screen.getByLabelText('Top-left corner'), {
+          key: 'ArrowRight',
+        });
+      });
+
+      await waitFor(() =>
+        expect(
+          worker.sent.some((request) => request.kind === 'rewarp'),
+        ).toBe(true),
+      );
+      const rewarp = worker.sent.find((request) => request.kind === 'rewarp');
+      expect(rewarp).toMatchObject({ style: 'grayscale' });
+    });
+  });
+
+  describe('brightness and contrast', () => {
+    async function ready() {
+      // Landscape, so a change in the preview is visible in its size.
+      worker.result = scanResult({
+        enhanced: {
+          width: 40,
+          height: 20,
+          data: new Uint8ClampedArray(40 * 20 * 4),
+        },
+      });
+      await open();
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: 'Use enhanced' }),
+        ).toBeEnabled(),
+      );
+    }
+
+    it('offers both, starting from the image as produced', async () => {
+      await ready();
+
+      expect(screen.getByLabelText('Brightness (0)')).toBeInTheDocument();
+      expect(screen.getByLabelText('Contrast (0)')).toBeInTheDocument();
+      // Nothing to undo yet.
+      expect(
+        screen.getByRole('button', { name: 'Reset brightness and contrast' }),
+      ).toBeDisabled();
+    });
+
+    // A lookup per pixel over pixels that already exist, so it costs no worker
+    // round trip at all -- which is what lets the slider move the picture as it
+    // is dragged.
+    it('applies without asking the worker', async () => {
+      await ready();
+      const before = worker.sent.length;
+
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Brightness (0)'), {
+          target: { value: '40' },
+        });
+      });
+
+      expect(screen.getByLabelText('Brightness (40)')).toBeInTheDocument();
+      expect(worker.sent).toHaveLength(before);
+    });
+
+    it('undoes both at once, and only while there is something to undo', async () => {
+      await ready();
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Contrast (0)'), {
+          target: { value: '-25' },
+        });
+      });
+      const reset = screen.getByRole('button', {
+        name: 'Reset brightness and contrast',
+      });
+      expect(reset).toBeEnabled();
+
+      await act(async () => {
+        fireEvent.click(reset);
+      });
+
+      expect(screen.getByLabelText('Contrast (0)')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Reset brightness and contrast' }),
+      ).toBeDisabled();
+    });
+
+    // The preview is the file that gets stored (`I3`), so an adjustment that
+    // only changed the picture on screen would store the unadjusted one.
+    it('encodes the adjusted image, not the one the worker returned', async () => {
+      await ready();
+      const { encodeScan } = await import(
+        '@/lib/document-scanner/decode-image'
+      );
+      const encode = vi.mocked(encodeScan);
+      encode.mockClear();
+
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Brightness (0)'), {
+          target: { value: '100' },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Use enhanced' }));
+      });
+
+      const encoded = encode.mock.calls[0][0];
+      expect(Array.from(encoded.data.slice(0, 4))).not.toEqual(
+        Array.from(worker.result.enhanced.data.slice(0, 4)),
+      );
+    });
+
+    it('survives a finish change', async () => {
+      await ready();
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Brightness (0)'), {
+          target: { value: '30' },
+        });
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Finish'), {
+          target: { value: 'grayscale' },
+        });
+      });
+
+      await waitFor(() =>
+        expect(screen.getByLabelText('Brightness (30)')).toBeInTheDocument(),
+      );
     });
   });
 

@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { handleScanMessage } from './document-scan-messages';
 import { loadEngine } from './opencv-engine';
 import { DEFAULT_QUAD, syntheticDocument } from './synthetic-document';
-import type { Quad } from './document-scan.types';
+import type { Quad, ScanStyle } from './document-scan.types';
 
 /**
  * What the worker does with a message, tested without a worker.
@@ -22,6 +22,7 @@ describe('handleScanMessage', () => {
       kind: 'scan',
       requestId: 7,
       image: syntheticDocument(),
+      style: 'colour',
     });
 
     expect(response.kind).toBe('result');
@@ -47,6 +48,7 @@ describe('handleScanMessage', () => {
       requestId: 9,
       image: syntheticDocument(),
       quad: moved,
+      style: 'colour',
     });
 
     expect(response.kind).toBe('result');
@@ -66,6 +68,7 @@ describe('handleScanMessage', () => {
       requestId: 1,
       image,
       quad: DEFAULT_QUAD,
+      style: 'colour' as const,
     };
 
     expect(Object.keys(request)).not.toContain('rotation');
@@ -77,6 +80,97 @@ describe('handleScanMessage', () => {
     expect(response.result.enhanced.width).toBeGreaterThan(0);
   });
 
+  // The warp is what a later style change is applied to, so it has to come
+  // back -- otherwise switching to greyscale would have to warp the photo again.
+  it('answers a scan with the warp it finished, already size-limited', async () => {
+    const response = await handleScanMessage({
+      kind: 'scan',
+      requestId: 3,
+      image: syntheticDocument(),
+      style: 'colour',
+    });
+    if (response.kind !== 'result') throw new Error('expected a result');
+
+    expect(response.result.warped.width).toBe(response.result.enhanced.width);
+    expect(response.result.warped.height).toBe(response.result.enhanced.height);
+    expect(response.result.style).toBe('colour');
+    // Two different images, or the finish did nothing.
+    expect(Array.from(response.result.warped.data)).not.toEqual(
+      Array.from(response.result.enhanced.data),
+    );
+  });
+
+  describe('a restyle', () => {
+    /** The warp a style change would be applied to. */
+    async function warpOf(style: ScanStyle = 'colour') {
+      const response = await handleScanMessage({
+        kind: 'scan',
+        requestId: 1,
+        image: syntheticDocument(),
+        style,
+      });
+      if (response.kind !== 'result') throw new Error('expected a result');
+      return response.result;
+    }
+
+    it('answers with pixels alone, naming the style it applied', async () => {
+      const scanned = await warpOf();
+
+      const response = await handleScanMessage({
+        kind: 'restyle',
+        requestId: 11,
+        image: scanned.warped,
+        style: 'grayscale',
+      });
+
+      expect(response.kind).toBe('image');
+      if (response.kind !== 'image') return;
+      expect(response.requestId).toBe(11);
+      expect(response.style).toBe('grayscale');
+      expect(response.image.width).toBe(scanned.warped.width);
+    });
+
+    // A restyle is handed a warp and told nothing else, which is what makes it
+    // cheap. A reply shaped like a whole scan could only repeat that back.
+    it('reports no corners, because it was told none', async () => {
+      const scanned = await warpOf();
+      const response = await handleScanMessage({
+        kind: 'restyle',
+        requestId: 12,
+        image: scanned.warped,
+        style: 'none',
+      });
+
+      expect(response.kind).toBe('image');
+      expect(response).not.toHaveProperty('result');
+    });
+
+    // The same style through either door has to mean the same thing, or the
+    // picture changes when nothing about the document did.
+    it('agrees with a scan asked for that style outright', async () => {
+      const scanned = await warpOf('colour');
+      const direct = await handleScanMessage({
+        kind: 'scan',
+        requestId: 2,
+        image: syntheticDocument(),
+        style: 'blackAndWhite',
+      });
+      if (direct.kind !== 'result') throw new Error('expected a result');
+
+      const restyled = await handleScanMessage({
+        kind: 'restyle',
+        requestId: 13,
+        image: scanned.warped,
+        style: 'blackAndWhite',
+      });
+      if (restyled.kind !== 'image') throw new Error('expected an image');
+
+      expect(Array.from(restyled.image.data)).toEqual(
+        Array.from(direct.result.enhanced.data),
+      );
+    });
+  });
+
   // A rejected promise inside the worker never reaches the page, so a failure
   // has to come back as a message -- carrying the id, or the client cannot
   // match it to the request that is waiting.
@@ -86,6 +180,7 @@ describe('handleScanMessage', () => {
       requestId: 42,
       // Zero-sized: the pipeline cannot build a Mat from it.
       image: { width: 0, height: 0, data: new Uint8ClampedArray(0) },
+      style: 'colour',
     });
 
     expect(response.kind).toBe('error');

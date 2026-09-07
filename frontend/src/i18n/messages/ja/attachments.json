@@ -26,6 +26,24 @@
     "viewOriginal": "元の写真",
     "viewOriginalFile": "元の写真を表示",
     "rotate": "回転",
+    "styleLabel": "仕上がり",
+    "styles": {
+      "colour": "カラー",
+      "grayscale": "グレースケール",
+      "blackAndWhite": "白黒",
+      "none": "補正なし"
+    },
+    "styleHints": {
+      "colour": "明るさのむらをならし、コントラストを上げて文字を鮮明にします。",
+      "grayscale": "同じ補正から色を除いたものです。容量が小さく、人工照明で紙に乗る色かぶりもありません。",
+      "blackAndWhite": "インクと紙だけにします。印刷された文字に最適ですが、写真やロゴは平坦になります。",
+      "none": "傾きを直して切り抜くだけで、あとは撮影したままです。補正が被写体を損なうときに使ってください。"
+    },
+    "adjustments": {
+      "brightness": "明るさ ({value})",
+      "contrast": "コントラスト ({value})"
+    },
+    "resetAdjustments": "明るさとコントラストをリセット",
     "adjustHint": "枠がずれている場合は「元の写真」に切り替えて四隅をドラッグしてください。",
     "updating": "プレビューを更新しています…",
     "noDocumentFound": "書類の枠を検出できなかったため、写真全体を使用しました。「元の写真」に切り替えて四隅を指定してください。",

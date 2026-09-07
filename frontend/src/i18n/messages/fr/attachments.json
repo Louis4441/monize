@@ -26,6 +26,24 @@
     "viewOriginal": "Original",
     "viewOriginalFile": "Voir l’original",
     "rotate": "Pivoter",
+    "styleLabel": "Rendu",
+    "styles": {
+      "colour": "Couleur",
+      "grayscale": "Niveaux de gris",
+      "blackAndWhite": "Noir et blanc",
+      "none": "Aucune amélioration"
+    },
+    "styleHints": {
+      "colour": "Uniformise l’éclairage, renforce le contraste et affine le texte.",
+      "grayscale": "Le même nettoyage sans la couleur. Plus léger et sans la teinte que le papier prend en lumière artificielle.",
+      "blackAndWhite": "Encre et papier uniquement. Idéal pour le texte imprimé ; les photos et les logos seront aplatis.",
+      "none": "Redressé et recadré, sinon exactement tel que photographié. À utiliser quand l’amélioration abîme le sujet."
+    },
+    "adjustments": {
+      "brightness": "Luminosité ({value})",
+      "contrast": "Contraste ({value})"
+    },
+    "resetAdjustments": "Réinitialiser la luminosité et le contraste",
     "adjustHint": "Passez à « Original » pour déplacer les coins si les bords sont incorrects.",
     "updating": "Mise à jour de l’aperçu…",
     "noDocumentFound": "Aucun bord de document n’a été trouvé, la photo entière a donc été utilisée. Passez à « Original » et placez les coins vous-même.",

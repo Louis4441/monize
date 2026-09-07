@@ -56,7 +56,7 @@ Answers to the discussion's open questions, confirmed with the maintainer on
 |---|---|---|
 | I1 | **A scan pair is one attachment.** It lists as one row, counts as one against the per-transaction cap and the register's `attachmentCount`, commits together and is deleted together. | One `withScopedDb` writes both rows and both objects; `original_of_attachment_id` carries `ON DELETE CASCADE`; every "is this a visible attachment" read goes through one predicate (`primaryAttachmentWhere`, section "Backend"). Recorded as INV-ATTACHMENT-002. |
 | I2 | **The original is byte-for-byte what the device produced.** No re-encoding, no orientation rewrite, no metadata stripping. | The client uploads the `File` it was handed; the server sniffs and hashes it exactly as a plain upload. |
-| I3 | **The enhanced image is a pure function of (original bytes, corner coordinates, quarter turns).** Re-running the pipeline on the same inputs yields the same output, so the preview the user approved is the file that is stored. | Detection, warp and enhancement are deterministic OpenCV operations with fixed constants; rotation is a deterministic permutation applied to the finished pixels (`rotate-image.ts`), and the preview and the uploaded `Blob` are encoded from that same rotated buffer -- never a CSS transform over an unrotated file. |
+| I3 | **The enhanced image is a pure function of (original bytes, corner coordinates, finish, brightness, contrast, quarter turns).** Re-running the pipeline on the same inputs yields the same output, so the preview the user approved is the file that is stored. | Detection, warp and every finish are deterministic OpenCV operations with fixed constants; brightness/contrast is a fixed lookup table (`adjust-image.ts`) and rotation a permutation (`rotate-image.ts`), both over the finished pixels. The preview and the uploaded `Blob` are encoded from that one buffer -- never a CSS transform or filter over an unadjusted file. |
 | I4 | **INV-ATTACHMENT-001 holds for both objects.** A rollback after either object is written leaves bytes nobody references, never a row promising absent bytes. | Two upload intents are committed before the transaction opens; both are cleared inside it; the compensation path deletes every object that was written. |
 | I5 | **A quality check never discards information the user wanted.** Every warning offers "Use anyway". | Dialog state machine (section "Frontend"). |
 | I6 | **A scan result belongs to the request that produced it.** A stale worker reply (from a previous photo, or after Retake) is dropped. | Every worker message carries a request id; the hook adopts a reply only when its id matches the current request (`frontend/CLAUDE.md`, asynchronous data rule). |
@@ -205,7 +205,9 @@ New directory `frontend/src/lib/document-scanner/`:
 |---|---|
 | `document-scan.types.ts` | `ScanRequest`, `ScanResult`, `Quad` (four `{x, y}` in source-image pixels, TL/TR/BR/BL), `QualityWarning`, worker message envelopes with `requestId`. Plain data only, transferable. |
 | `opencv-engine.ts` | The one import of the OpenCV.js module, plus `loadEngine()` that resolves once `cv` is initialised. |
-| `document-scan-pipeline.ts` | Pure functions over `{ width, height, data: Uint8ClampedArray }`: `detectDocument`, `warpToQuad`, `enhance`. No DOM types, so Vitest runs them under Node with the real engine. |
+| `document-scan-pipeline.ts` | Pure functions over `{ width, height, data: Uint8ClampedArray }`: `detectDocument`, `warpToQuad`, `limitSize`, and `applyStyle` (with `enhance` and `desaturate` beneath it). No DOM types, so Vitest runs them under Node with the real engine. |
+| `rotate-image.ts` | Quarter turns as a pixel permutation, on the main thread. |
+| `adjust-image.ts` | Brightness and contrast as a 256-entry lookup, on the main thread. |
 | `document-scan-quality.ts` | `assessCapture(image, quad)` returning `QualityWarning[]`. |
 | `document-scan-messages.ts` | `handleScanMessage(msg)`: the worker's dispatcher, testable without a `Worker`. |
 | `document-scan.worker.ts` | A shim: `onmessage = (e) => postMessage(await handleScanMessage(e.data), transfer)`. Excluded from coverage; everything it calls is covered. |
@@ -213,13 +215,24 @@ New directory `frontend/src/lib/document-scanner/`:
 | `synthetic-document.ts` | Test fixture generator: a dark frame with a white, rotated, perspective-skewed quad at known corners, optionally blurred or dim. Used by unit tests and by the e2e spec's PNG fixture. |
 
 The hook `frontend/src/hooks/useDocumentScanner.ts` owns the client's
-lifecycle, exposes `scan(file)`, `rewarp(quad)` and the engine's loading
-state, and adopts a reply only when its `requestId` is the current one (I6). A
-re-warp requested while one is running does not queue: the newest quad replaces
-the pending one, so a drag across the photo costs one re-warp per settled
-position rather than one per pointer event. `recomputing` distinguishes
+lifecycle, exposes `scan(file)` and `refine({ quad, style })`, and adopts a
+reply only when its `requestId` is the current one (I6).
+
+`refine` takes the corners and the finish together rather than offering two
+calls, because the pair decides how much work a change costs: a finish change
+over corners that have not moved is answered by `restyle` -- one pass over the
+crop the last warp produced -- while moved corners need `rewarp`. The hook makes
+that choice from what has actually landed (`ScanResult.warped` and the quad it
+came from), never from which control the user touched, so a finish change
+following an unfinished drag cannot be applied to a stale crop.
+
+A refine requested while one is running does not queue: the newest recipe
+replaces the pending one, so a drag across the photo costs one round trip per
+settled position rather than one per pointer event. `recomputing` distinguishes
 "refining what is already on screen" from "nothing to show yet", so the preview
-stays visible while a drag is being applied.
+stays visible while a change is being applied, and Use enhanced is disabled
+while it is -- accepting mid-refine would store the image the corners were moved
+away from.
 
 Engine packaging: the OpenCV.js build is a pinned npm dependency
 (`@techstark/opencv-js`, Apache-2.0) imported only from `opencv-engine.ts`, so
@@ -270,12 +283,23 @@ warp and enhancement run on the full image with the corners scaled back up.
    permutation on the finished image instead (`rotate-image.ts`, ~180 ms for
    the same photo, synchronous, so nothing can queue). Automatic
    upright-orientation needs text recognition and is out of scope.
-3. **Lighting and shadow** (steps 5 and 6): per-channel background estimate by
+3. **Size limit**: the warp is reduced to `OUTPUT_MAX_EDGE` before anything is
+   applied to it. Enhancing twelve megapixels and then discarding four fifths of
+   them costs seconds for detail that never reaches the file, and every step
+   below works in a fixed pixel neighbourhood -- a 31 px illumination kernel, a
+   25 px threshold block -- so running them first would make the result depend
+   on the camera's resolution rather than the document's.
+4. **Finish** (steps 5 to 8), `applyStyle`, which is where the user's choice
+   enters. `colour` is the full enhancement: per-channel background estimate by
    a large-kernel morphological close, divided out (division normalisation),
-   then CLAHE (clip 2.0, 8x8 tiles) on the L channel in Lab.
-4. **Contrast, denoise, sharpen** (steps 7 and 8): bilateral filter (d 5) and
-   an unsharp mask (sigma 1.0, amount 0.6). Colour is kept; the
-   black-and-white variant is deferred.
+   then CLAHE (clip 2.0, 8x8 tiles) on the L channel in Lab, a bilateral filter
+   (d 5) and an unsharp mask (sigma 1.0, amount 0.6). `grayscale` is that,
+   desaturated by luminance. `blackAndWhite` is an adaptive Gaussian threshold
+   (block 25, C 10) taken from the WARP rather than from the enhancement -- the
+   unsharp mask haloes every glyph and a threshold turns those haloes into a
+   broken outline, and the threshold is locally adaptive so it corrects the
+   illumination itself. `none` is the warp untouched, for a subject the
+   enhancement fights: a photograph, a coloured logo, a chart.
 
 Every constant is named and lives in `document-scan-pipeline.ts`; the tests
 that calibrate them cite the synthetic fixture they were tuned on.
@@ -304,7 +328,7 @@ by one state value:
 |---|---|---|
 | `loadingEngine` | Spinner, "Preparing the scanner" | Cancel |
 | `analysing` | Spinner over the original | Cancel |
-| `review` | Preview with an Original / Enhanced toggle (two shared `Button`s, not a tablist), the corner handles over the original, quality warnings, and Rotate on the enhanced view only -- the original is stored untouched (I2), so nothing beside it offers to edit it | Use enhanced, Keep original only, Retake, Cancel |
+| `review` | Preview with an Original / Enhanced toggle (two shared `Button`s, not a tablist), the corner handles over the original, quality warnings, and -- on the enhanced view only, since the original is stored untouched (I2) -- Rotate, the finish `Select`, and brightness/contrast sliders with a Reset | Use enhanced, Keep original only, Retake, Cancel |
 | `failed` | The error (engine failed to load, unsupported image) | Keep original only, Retake, Cancel |
 
 "Keep original only" hands the untouched `File` to the same path a plain
@@ -318,6 +342,14 @@ coordinates with four handles using pointer events and `setPointerCapture`,
 `touch-action: none`, arrow-key nudging for keyboard users, and a convexity
 check that snaps an invalid drag back. Releasing a handle calls `rewarp`,
 which re-runs steps 2 to 4 without re-detecting.
+
+Brightness and contrast sit beside the finish but do not travel with it: the
+finish is the worker's (it re-runs an OpenCV chain over the crop), while these
+two are one lookup per pixel on the main thread -- measured at 24 ms on the
+largest output the pipeline can produce, which is what lets the sliders move the
+picture as they are dragged rather than on release. They are deliberately the
+only two offered; sharpening and denoise sliders invite making a scan worse in
+ways nobody can predict from the control, and the pipeline already applies both.
 
 What takes the press is not the drawn dot. The dot has to stay small -- a
 fingertip-sized one covers the very corner it is placing -- so each handle is a

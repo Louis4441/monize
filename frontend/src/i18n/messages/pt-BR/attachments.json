@@ -26,6 +26,24 @@
     "viewOriginal": "Original",
     "viewOriginalFile": "Ver original",
     "rotate": "Girar",
+    "styleLabel": "Acabamento",
+    "styles": {
+      "colour": "Cor",
+      "grayscale": "Tons de cinza",
+      "blackAndWhite": "Preto e branco",
+      "none": "Sem melhoria"
+    },
+    "styleHints": {
+      "colour": "Uniformiza a iluminação, aumenta o contraste e deixa o texto mais nítido.",
+      "grayscale": "A mesma limpeza sem a cor. Menor e livre do tom que o papel ganha sob luz artificial.",
+      "blackAndWhite": "Apenas tinta e papel. Ideal para texto impresso; vai achatar fotos e logotipos.",
+      "none": "Endireitado e recortado, no mais exatamente como foi fotografado. Use quando a melhoria estraga o assunto."
+    },
+    "adjustments": {
+      "brightness": "Brilho ({value})",
+      "contrast": "Contraste ({value})"
+    },
+    "resetAdjustments": "Redefinir brilho e contraste",
     "adjustHint": "Mude para “Original” para arrastar os cantos se as bordas estiverem erradas.",
     "updating": "Atualizando a pré-visualização…",
     "noDocumentFound": "Nenhuma borda do documento foi encontrada, então a foto inteira foi usada. Mude para “Original” e posicione os cantos você mesmo.",

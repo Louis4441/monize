@@ -8,10 +8,12 @@ import {
   type WorkerFactory,
 } from '@/lib/document-scanner/document-scan-client';
 import { decodeImageFile } from '@/lib/document-scanner/decode-image';
-import type {
-  Quad,
-  RawImage,
-  ScanResult,
+import {
+  DEFAULT_SCAN_STYLE,
+  type Quad,
+  type RawImage,
+  type ScanResult,
+  type ScanStyle,
 } from '@/lib/document-scanner/document-scan.types';
 
 /**
@@ -43,13 +45,35 @@ export interface DocumentScannerState {
   recomputing: boolean;
 }
 
+/**
+ * What the user has asked the scanner for: which corners, and which finish.
+ *
+ * One value rather than two calls, because the two decide TOGETHER how much
+ * work a change costs. A style change over unmoved corners needs only the
+ * finish re-run; a corner move needs the warp as well. A caller that asked for
+ * them separately would have to know that -- and would have to keep them
+ * ordered, since a restyle uses the crop the last warp produced.
+ */
+export interface ScanRecipe {
+  quad: Quad;
+  style: ScanStyle;
+}
+
 export interface UseDocumentScanner extends DocumentScannerState {
   /** Decode a picked file and scan it. */
   scan(file: File): Promise<void>;
-  /** Re-warp the current photo with corners the user moved. */
-  rewarp(quad: Quad): Promise<void>;
+  /** Produce the document again for corners or a finish the user changed. */
+  refine(recipe: ScanRecipe): Promise<void>;
   /** Forget the current photo and result, leaving the worker alive. */
   reset(): void;
+}
+
+/** Whether two quads name the same crop, so a re-warp would be wasted. */
+function sameQuad(a: Quad, b: Quad): boolean {
+  return a.every((corner, index) => {
+    const other = b[index];
+    return corner.x === other.x && corner.y === other.y;
+  });
 }
 
 export function useDocumentScanner(
@@ -66,16 +90,19 @@ export function useDocumentScanner(
   const mountedRef = useRef(true);
 
   /**
-   * The newest corners waiting to be re-warped, and whether one is running.
+   * The newest recipe waiting to be produced, and whether one is running.
    *
-   * A re-warp takes seconds on a large photo, so several quick adjustments
-   * would otherwise queue behind each other and the user would wait for every
-   * intermediate result they had already replaced. Only the newest is kept:
-   * the one in flight finishes, then the latest pending corners run, and
+   * Producing the document takes seconds on a large photo, so several quick
+   * adjustments would otherwise queue behind each other and the user would wait
+   * for every intermediate result they had already replaced. Only the newest is
+   * kept: the one in flight finishes, then the latest pending recipe runs, and
    * anything in between is dropped unrun.
    */
-  const pendingQuadRef = useRef<Quad | null>(null);
-  const rewarpRunningRef = useRef(false);
+  const pendingRecipeRef = useRef<ScanRecipe | null>(null);
+  const refineRunningRef = useRef(false);
+
+  /** The last result that landed, so a refine knows what it is refining. */
+  const resultRef = useRef<ScanResult | null>(null);
 
   const [state, setState] = useState<DocumentScannerState>({
     status: 'idle',
@@ -114,7 +141,8 @@ export function useDocumentScanner(
     async (file: File): Promise<void> => {
       const attempt = ++attemptRef.current;
       // A new photo abandons any adjustment queued for the previous one.
-      pendingQuadRef.current = null;
+      pendingRecipeRef.current = null;
+      resultRef.current = null;
       setState({
         status: 'loading',
         source: null,
@@ -126,7 +154,8 @@ export function useDocumentScanner(
         const image = await decodeImageFile(file);
         if (attempt !== attemptRef.current) return;
         sourceRef.current = image;
-        const result = await client().scan(image);
+        const result = await client().scan(image, DEFAULT_SCAN_STYLE);
+        if (attempt === attemptRef.current) resultRef.current = result;
         commit(attempt, {
           status: 'ready',
           source: image,
@@ -146,26 +175,46 @@ export function useDocumentScanner(
     [client, commit],
   );
 
-  const rewarp = useCallback(
-    async (quad: Quad): Promise<void> => {
+  const refine = useCallback(
+    async (recipe: ScanRecipe): Promise<void> => {
       const image = sourceRef.current;
       if (!image) return;
 
-      pendingQuadRef.current = quad;
+      pendingRecipeRef.current = recipe;
       // Someone is already draining the queue; it will pick this up.
-      if (rewarpRunningRef.current) return;
-      rewarpRunningRef.current = true;
+      if (refineRunningRef.current) return;
+      refineRunningRef.current = true;
 
       try {
-        while (pendingQuadRef.current) {
-          const next = pendingQuadRef.current;
-          pendingQuadRef.current = null;
-          // Deliberately NOT a new attempt: a re-warp refines the photo already
+        while (pendingRecipeRef.current) {
+          const next = pendingRecipeRef.current;
+          pendingRecipeRef.current = null;
+          // Deliberately NOT a new attempt: a refine works on the photo already
           // on screen, so a scan of a different photo landing meanwhile wins.
           const attempt = attemptRef.current;
           commit(attempt, { recomputing: true });
           try {
-            const result = await client().rewarp(image, next);
+            const previous = resultRef.current;
+            // Only the finish changed, over corners the current warp was made
+            // from: re-finishing that warp is the whole of the work. Decided
+            // here rather than by the caller, because "is this warp still the
+            // right one" is a fact about what has landed, not about the click.
+            const result =
+              previous && sameQuad(previous.quad, next.quad)
+                ? {
+                    // The warnings are carried over rather than recomputed, and
+                    // that is sound rather than convenient: all three are
+                    // measured on the photo, the corners or the output's size,
+                    // none of which a finish moves.
+                    ...previous,
+                    enhanced: await client().restyle(
+                      previous.warped,
+                      next.style,
+                    ),
+                    style: next.style,
+                  }
+                : await client().rewarp(image, next.quad, next.style);
+            if (attempt === attemptRef.current) resultRef.current = result;
             commit(attempt, { status: 'ready', result, error: null });
           } catch (error) {
             commit(attempt, {
@@ -180,7 +229,7 @@ export function useDocumentScanner(
       } finally {
         // Released on every path: leaving it set would strand every later
         // adjustment in the queue with nothing draining it.
-        rewarpRunningRef.current = false;
+        refineRunningRef.current = false;
         commit(attemptRef.current, { recomputing: false });
       }
     },
@@ -190,7 +239,8 @@ export function useDocumentScanner(
   const reset = useCallback((): void => {
     attemptRef.current++;
     sourceRef.current = null;
-    pendingQuadRef.current = null;
+    pendingRecipeRef.current = null;
+    resultRef.current = null;
     setState({
       status: 'idle',
       source: null,
@@ -200,5 +250,5 @@ export function useDocumentScanner(
     });
   }, []);
 
-  return { ...state, scan, rewarp, reset };
+  return { ...state, scan, refine, reset };
 }

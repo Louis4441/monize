@@ -11,7 +11,12 @@ import {
   quadArea,
   scaleQuad,
 } from './document-scan-geometry';
-import type { Point, Quad, RawImage } from './document-scan.types';
+import type {
+  Point,
+  Quad,
+  RawImage,
+  ScanStyle,
+} from './document-scan.types';
 
 /**
  * The image operations, in the order Discussion #1292 lays them out: find the
@@ -49,6 +54,19 @@ const DENOISE_SIGMA_SPACE = 50;
 /** Unsharp mask strength. */
 const SHARPEN_SIGMA = 1;
 const SHARPEN_AMOUNT = 0.6;
+
+/**
+ * Adaptive threshold for the black-and-white finish.
+ *
+ * The block is the neighbourhood each pixel's threshold is computed over, so it
+ * has to be comfortably larger than a glyph and smaller than the lighting
+ * gradient across the page -- which is what makes the threshold correct the
+ * illumination by itself, with no separate normalisation step. `C` is
+ * subtracted from that local mean: a positive value biases towards white, which
+ * keeps paper grain from surviving as speckle.
+ */
+const THRESHOLD_BLOCK = 25;
+const THRESHOLD_C = 10;
 
 /** Everything allocated inside one step, released even when a step throws. */
 class Scope {
@@ -371,11 +389,98 @@ export function enhance(cv: OpenCv, image: RawImage): RawImage {
 }
 
 /**
+ * Drop the colour, keeping the enhancement.
+ *
+ * A phone photographing paper under artificial light gives it a cast the eye
+ * ignores and a JPEG does not; a receipt has no colour worth the bytes anyway.
+ * The conversion is OpenCV's luminance-weighted one, not an average of the
+ * channels, so red ink does not come out the same grey as the paper.
+ */
+export function desaturate(cv: OpenCv, image: RawImage): RawImage {
+  return withScope((scope) => {
+    const source = scope.add(toMat(cv, image));
+    const gray = scope.add(new cv.Mat());
+    cv.cvtColor(source, gray, cv.COLOR_RGBA2GRAY);
+    const rgba = scope.add(new cv.Mat());
+    cv.cvtColor(gray, rgba, cv.COLOR_GRAY2RGBA);
+    return toRawImage(
+      rgba as unknown as { rows: number; cols: number; data: Uint8Array },
+    );
+  });
+}
+
+/**
+ * Reduce the page to ink and paper.
+ *
+ * Deliberately taken from the WARPED image rather than from the enhanced one:
+ * the enhancement ends in an unsharp mask, which puts a bright halo around
+ * every glyph, and a threshold turns those halos into a broken outline. The
+ * adaptive threshold does its own illumination correction -- each pixel is
+ * compared against the mean of its own neighbourhood -- so the normalisation
+ * step it would inherit is not merely unnecessary, it is applied twice.
+ */
+function threshold(cv: OpenCv, image: RawImage): RawImage {
+  return withScope((scope) => {
+    const source = scope.add(toMat(cv, image));
+    const gray = scope.add(new cv.Mat());
+    cv.cvtColor(source, gray, cv.COLOR_RGBA2GRAY);
+    const mono = scope.add(new cv.Mat());
+    cv.adaptiveThreshold(
+      gray,
+      mono,
+      255,
+      cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+      cv.THRESH_BINARY,
+      THRESHOLD_BLOCK,
+      THRESHOLD_C,
+    );
+    const rgba = scope.add(new cv.Mat());
+    cv.cvtColor(mono, rgba, cv.COLOR_GRAY2RGBA);
+    return toRawImage(
+      rgba as unknown as { rows: number; cols: number; data: Uint8Array },
+    );
+  });
+}
+
+/**
+ * Finish a warped document the way the user asked for.
+ *
+ * The one place a style becomes pixels, so a scan and a later restyle cannot
+ * disagree about what a style means -- the same rule as "a preview computes
+ * what the commit will do, through the same code", one level down.
+ */
+export function applyStyle(
+  cv: OpenCv,
+  warped: RawImage,
+  style: ScanStyle,
+): RawImage {
+  switch (style) {
+    case 'none':
+      // The crop, deskewed and otherwise untouched. Not a no-op by accident:
+      // it is the answer whenever the enhancement fights the subject.
+      return warped;
+    case 'grayscale':
+      return desaturate(cv, enhance(cv, warped));
+    case 'blackAndWhite':
+      return threshold(cv, warped);
+    case 'colour':
+      return enhance(cv, warped);
+  }
+}
+
+/**
  * Reduce an image so its longest edge fits the upload ceiling.
  *
  * A phone photo warped at full resolution can exceed the 10 MB attachment
  * limit as a JPEG, and a document does not become more readable above a couple
  * of thousand pixels on its long edge.
+ *
+ * Applied to the WARP, before any finish. Two reasons, and the second is the
+ * one that matters: enhancing 12 megapixels and then throwing four fifths of
+ * them away costs seconds for detail that never reaches the file, and the
+ * finish is a fixed-pixel neighbourhood everywhere -- a 31 px illumination
+ * kernel, a 25 px threshold block -- so running it before the resize would make
+ * the result depend on the camera's resolution rather than the document's.
  */
 export function limitSize(cv: OpenCv, image: RawImage): RawImage {
   const scale = fitScale(image.width, image.height, OUTPUT_MAX_EDGE);

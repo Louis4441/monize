@@ -62,6 +62,12 @@ function resultFor(label: string): ScanResult {
       height: 1,
       data: new Uint8ClampedArray([0, 0, 0, 0]),
     },
+    warped: {
+      width: 1,
+      height: 1,
+      data: new Uint8ClampedArray([9, 9, 9, 9]),
+    },
+    style: 'colour',
     // The label rides on a warning so two results are distinguishable.
     warnings: [label as 'blurry'],
   };
@@ -98,7 +104,7 @@ describe('createScannerClient', () => {
 
   it('sends a scan request and resolves with the result the worker returns', async () => {
     const scanner = client();
-    const pending = scanner.scan(image);
+    const pending = scanner.scan(image, 'colour');
 
     expect(worker.sent).toHaveLength(1);
     expect(worker.sent[0].kind).toBe('scan');
@@ -116,17 +122,79 @@ describe('createScannerClient', () => {
     const scanner = client();
     // Never answered: this case is about what was SENT. The rejection is
     // absorbed so a timeout after the test cannot surface as an unhandled one.
-    scanner.rewarp(image, quad).catch(() => undefined);
+    scanner.rewarp(image, quad, 'colour').catch(() => undefined);
 
     expect(worker.sent[0]).toMatchObject({ kind: 'rewarp', quad });
     // A rotation here would put a quarter turn back on the expensive path.
     expect(worker.sent[0]).not.toHaveProperty('rotation');
   });
 
+  describe('a restyle', () => {
+    it('sends the warp it was given, not the photo', async () => {
+      const scanner = client();
+      const warped: RawImage = {
+        width: 4,
+        height: 4,
+        data: new Uint8ClampedArray(64),
+      };
+      const pending = scanner.restyle(warped, 'blackAndWhite');
+
+      expect(worker.sent[0]).toMatchObject({
+        kind: 'restyle',
+        image: warped,
+        style: 'blackAndWhite',
+      });
+      // No corners: the crop is already made, which is the whole saving.
+      expect(worker.sent[0]).not.toHaveProperty('quad');
+
+      const image: RawImage = {
+        width: 4,
+        height: 4,
+        data: new Uint8ClampedArray(64),
+      };
+      worker.reply({
+        kind: 'image',
+        requestId: worker.sent[0].requestId,
+        image,
+        style: 'blackAndWhite',
+      });
+
+      await expect(pending).resolves.toBe(image);
+    });
+
+    // The two reply shapes are agreed between this file and the worker, and a
+    // cast would let a disagreement reach the dialog as a preview built from
+    // undefined.
+    it('rejects a reply of the wrong shape rather than passing it on', async () => {
+      const scanner = client();
+      const pending = scanner.restyle(image, 'grayscale');
+      worker.reply({
+        kind: 'result',
+        requestId: worker.sent[0].requestId,
+        result: resultFor('blurry'),
+      });
+
+      await expect(pending).rejects.toThrow(/wrong shape/);
+    });
+
+    it('rejects a scan answered with pixels alone', async () => {
+      const scanner = client();
+      const pending = scanner.scan(image, 'colour');
+      worker.reply({
+        kind: 'image',
+        requestId: worker.sent[0].requestId,
+        image,
+        style: 'colour',
+      });
+
+      await expect(pending).rejects.toThrow(/wrong shape/);
+    });
+  });
+
   it('gives every request its own id', () => {
     const scanner = client();
-    scanner.scan(image).catch(() => undefined);
-    scanner.scan(image).catch(() => undefined);
+    scanner.scan(image, 'colour').catch(() => undefined);
+    scanner.scan(image, 'colour').catch(() => undefined);
 
     expect(worker.sent[0].requestId).not.toBe(worker.sent[1].requestId);
   });
@@ -135,8 +203,8 @@ describe('createScannerClient', () => {
   // still running, and the first one's answer arrives second.
   it('answers each request with its own result, whatever the order', async () => {
     const scanner = client();
-    const first = scanner.scan(image);
-    const second = scanner.scan(image);
+    const first = scanner.scan(image, 'colour');
+    const second = scanner.scan(image, 'colour');
     const [firstId, secondId] = worker.sent.map((r) => r.requestId);
 
     worker.reply({
@@ -158,7 +226,7 @@ describe('createScannerClient', () => {
 
   it('ignores a reply for a request it has already settled', async () => {
     const scanner = client();
-    const pending = scanner.scan(image);
+    const pending = scanner.scan(image, 'colour');
     const { requestId } = worker.sent[0];
 
     worker.reply({ kind: 'result', requestId, result: resultFor('blurry') });
@@ -176,7 +244,7 @@ describe('createScannerClient', () => {
 
   it('rejects when the worker reports an error for that request', async () => {
     const scanner = client();
-    const pending = scanner.scan(image);
+    const pending = scanner.scan(image, 'colour');
     worker.reply({
       kind: 'error',
       requestId: worker.sent[0].requestId,
@@ -189,8 +257,8 @@ describe('createScannerClient', () => {
   // settled here or the dialog waits forever on a reply that cannot come.
   it('rejects everything outstanding when the worker itself fails', async () => {
     const scanner = client();
-    const first = scanner.scan(image);
-    const second = scanner.scan(image);
+    const first = scanner.scan(image, 'colour');
+    const second = scanner.scan(image, 'colour');
 
     worker.fail('worker died');
 
@@ -204,7 +272,7 @@ describe('createScannerClient', () => {
     // The expectation is attached BEFORE the clock moves: advancing first
     // rejects the promise while nothing is listening, which Node reports as an
     // unhandled rejection even though the test goes on to assert it.
-    const settled = expect(scanner.scan(image)).rejects.toThrow(/timed out/);
+    const settled = expect(scanner.scan(image, 'colour')).rejects.toThrow(/timed out/);
 
     await vi.advanceTimersByTimeAsync(SCAN_TIMEOUT_MS + 1);
 
@@ -214,7 +282,7 @@ describe('createScannerClient', () => {
   it('does not time out a request that was answered', async () => {
     vi.useFakeTimers();
     const scanner = client();
-    const pending = scanner.scan(image);
+    const pending = scanner.scan(image, 'colour');
     worker.reply({
       kind: 'result',
       requestId: worker.sent[0].requestId,
@@ -230,7 +298,7 @@ describe('createScannerClient', () => {
   describe('dispose', () => {
     it('terminates the worker and rejects what was outstanding', async () => {
       const scanner = client();
-      const pending = scanner.scan(image);
+      const pending = scanner.scan(image, 'colour');
 
       scanner.dispose();
 
@@ -241,7 +309,7 @@ describe('createScannerClient', () => {
     it('refuses further work once closed', async () => {
       const scanner = client();
       scanner.dispose();
-      await expect(scanner.scan(image)).rejects.toThrow(/closed/);
+      await expect(scanner.scan(image, 'colour')).rejects.toThrow(/closed/);
     });
 
     it('is safe to call twice', () => {
