@@ -185,6 +185,12 @@ function ShareContent() {
 
   const onTransactionCreated = useCallback(async () => {
     setShowForm(false);
+    // The form awaits its uploads before reporting success, so the bytes are on
+    // the server by the time the stash is dropped. It reports success even when
+    // an individual upload failed (it toasts and carries on), and dropping the
+    // bundle is still right there: the OS shared these files FROM somewhere, so
+    // the stash was never the only copy, and keeping a used share would have
+    // the notice go on offering it.
     if (bundle) await discardSharedBundle(bundle.index.id);
     setBundle(null);
     toast.success(t('attached'));
