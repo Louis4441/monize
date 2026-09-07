@@ -345,6 +345,7 @@
   "priceAlert": {
     "label": "Peringatan perubahan harga (%)",
     "help": "Kosongkan untuk menonaktifkan. Memberi tahu kenaikan atau penurunan dari sesi sebelumnya yang tersedia, maksimal sekali per instrumen per hari UTC.",
-    "range": "Masukkan persentase antara 0,1 dan 1000."
+    "range": "Masukkan persentase antara 0,1 dan 1000.",
+    "chartLabel": "Sertakan grafik dalam peringatan harga"
   }
 }

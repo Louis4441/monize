@@ -288,11 +288,12 @@ Findings (to be re-verified against the shipping browsers):
   chart/<token>.png'`, where `<token>` is a single-use, short-TTL, HMAC-signed
   reference to a pre-rendered chart the backend holds (no user input in the path;
   CWE-22 validated). The renderer produces a small sparkline of the security's
-  recent closes. The SW passes `image` straight through to `showNotification`.
-- Fallback: where `image` is unsupported the notification is text-only with the
-  price move in the body; the deep link (R6) opens the full chart on
-  `/securities/<id>`. **The chart is a nicety; the number and the link are the
-  contract.**
+  recent closes. The SW passes only the validated same-origin chart path to `showNotification`.
+- Fallback: where `image` is unsupported, the shipping implementation retains
+  generic localized Investments text for lock-screen privacy (Section 14.6).
+  The deep link (R6) opens the instrument on `/securities/<id>`. The original
+  proposal to put the price move in every push body is not enabled by this
+  image-only opt-in; numerical details remain in the bell and immediate email.
 
 This is the highest-risk, lowest-portability requirement; it ships last (Phase 5)
 and behind a per-group toggle, defaulting off until validated on real devices.
@@ -935,24 +936,46 @@ an address nobody was at, indistinguishable from a genuine loopback connection.
 A deployment fronted by nothing has no client address to record, and the column
 says so.
 
-### 14.6 Chart-in-push (R5) -- feasibility and the security envelope
+### 14.6 Chart-in-push (R5) -- delivery and security envelope
 
-Per Section 7: Android-Chrome-only progressive enhancement, default off, ships
-last. A security-price notification may set
-`payload.image = '/api/v1/push/chart/<token>.png'`, where `<token>` is a
-**single-use, short-TTL, HMAC-signed** reference to a pre-rendered PNG the
-backend holds -- no user input in the path (CWE-22: the token is validated and
-resolves server-side to a stored artifact, never a filesystem path built from
-input). The fetch is **unauthenticated** (the browser, not our page, fetches it
-when it expands the notification), which is why the token is unguessable and
-expires. The SW passes `image` straight to `showNotification`. Where `image` is
-unsupported the notification is text-only and the deep link opens the full chart
-on `/securities/<id>`: **the number and the link are the contract; the chart is a
-nicety.** The `SECURITY_PRICE_MOVEMENT` producer now exists (see
-`security-price-alerts.md`), with owner-configured per-security percentage
-thresholds and Investments channel gating. Image rendering and the endpoint
-remain unimplemented; their next step still requires a chart opt-in defaulting
-off. The price-alert threshold itself does not authorize image delivery.
+The `SECURITY_PRICE_MOVEMENT` producer (`security-price-alerts.md`) can now
+attach a PNG to Web Push. Each instrument is one collapse group and has a
+separate `priceChartEnabled` opt-in, default false. The price-alert threshold
+alone does not authorize images. The sender rechecks the owner, active status,
+threshold and chart opt-in before reading stored quotes. UnifiedPush remains
+text-only. Category delivery gates and throttling apply before rendering.
+
+The renderer uses at most 60 stored closes, with the alert's own price/date as
+the last point, and produces a 640 × 280 PNG without browser or native runtime
+dependencies. It makes no provider requests. A chart shows quoted prices, not
+portfolio holdings or returns; axes use numeric prices and ISO dates.
+
+Each target device receives a separate
+`payload.image = '/api/v1/push/chart/<token>.png'`. The opaque token contains a
+random 256-bit nonce, expiry and purpose-separated HMAC. The endpoint requires
+this bearer credential rather than a session: anyone holding it can view that
+one image once within five minutes. Signature, format and TTL are checked
+before database access; PostgreSQL `DELETE RETURNING` consumes it atomically
+across replicas. HEAD does not consume it. No token becomes a filesystem path.
+The response is non-cacheable; the service worker accepts only this exact
+same-origin path format, without query strings, fragments or external URLs.
+
+Storage is shared PostgreSQL infrastructure, excluded from backups, capped at
+1,000 images of at most 64 KiB each. An advisory transaction lock serializes
+quota decisions; expired rows are removed on issue and every five minutes.
+Invalid data, missing history, a full store or rendering/storage failure leaves
+the existing localized, generic Investments text and instrument deep link.
+Images are a progressive enhancement: browsers without image support and
+notifications received after the image expires remain text-only. Push retention
+is longer than image retention by design. The opt-in permits a price chart on
+the device's notification screen; text otherwise retains the existing privacy
+policy and does not disclose amounts.
+
+Unit tests cover rendering, owner/opt-in gating, per-device issuance, invalid
+payloads, token validation and safe worker image paths. A PostgreSQL integration
+test covers concurrent consumption and replay. It has not run in the local
+workspace (no PostgreSQL); native browser image rendering also remains a manual
+validation item, alongside the existing browser test environment limitation.
 
 ### 14.7 Invariants and the test obligations
 

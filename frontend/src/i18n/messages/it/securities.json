@@ -345,6 +345,7 @@
   "priceAlert": {
     "label": "Avviso variazione prezzo (%)",
     "help": "Lascia vuoto per disattivare. Segnala rialzi o ribassi rispetto alla precedente seduta disponibile, al massimo una volta per strumento al giorno UTC.",
-    "range": "Inserisci una percentuale tra 0,1 e 1000."
+    "range": "Inserisci una percentuale tra 0,1 e 1000.",
+    "chartLabel": "Includi un grafico negli avvisi sui prezzi"
   }
 }

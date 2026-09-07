@@ -16,12 +16,14 @@ import {
 import {
   Notification,
   NotificationCategory,
+  NotificationType,
   notificationCategoryOf,
   severitiesAtOrAbove,
   typesForCategory,
 } from "../notification-center/entities/notification.entity";
 import { NotificationPreferenceService } from "../notification-center/notification-preference.service";
 import { PushSubscriptionService } from "../push/push-subscription.service";
+import { priceChartRequest } from "../push/push-price-chart.service";
 import { PushPayload } from "../push/web-push-sender.service";
 import { PushTransport } from "../push/entities/push-subscription.entity";
 import { EmailService } from "./email.service";
@@ -268,6 +270,9 @@ export class NotificationDispatchService {
         userId,
         this.toPushPayload(row, category, recipient.lang, collapseKey),
         transports,
+        ...(row.type === NotificationType.SECURITY_PRICE_MOVEMENT
+          ? [priceChartRequest(row.data)]
+          : []),
       );
     }
     if (delivery.emailNotification) {

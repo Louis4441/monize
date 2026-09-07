@@ -585,6 +585,7 @@ CREATE TABLE securities (
     description TEXT, -- free-text notes, optionally pre-filled from the quote provider
     is_active BOOLEAN DEFAULT true,
     is_favourite BOOLEAN NOT NULL DEFAULT false, -- pinned to the dashboard Favourite Securities widget
+    price_chart_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     price_alert_percent DOUBLE PRECISION CHECK (price_alert_percent >= 0.1 AND price_alert_percent <= 1000),
     skip_price_updates BOOLEAN DEFAULT false, -- for auto-generated symbols that can't be looked up
     sector VARCHAR(100),             -- stock sector from Yahoo Finance (e.g. 'Technology')

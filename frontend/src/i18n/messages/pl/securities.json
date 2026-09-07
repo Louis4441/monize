@@ -345,6 +345,7 @@
   "priceAlert": {
     "label": "Alert zmiany ceny (%)",
     "help": "Puste pole wyłącza alert. Powiadomienie o wzroście lub spadku względem poprzedniej dostępnej sesji, najwyżej raz dziennie (UTC) na instrument.",
-    "range": "Wpisz wartość procentową od 0,1 do 1000."
+    "range": "Wpisz wartość procentową od 0,1 do 1000.",
+    "chartLabel": "Dołącz wykres do alertów cenowych"
   }
 }

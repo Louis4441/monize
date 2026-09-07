@@ -35,6 +35,10 @@ skips overlapping ticks; the database notification dedupe remains the
 cross-replica write authority. Each security's failure is isolated so the scan
 continues. Database rows are read per batch rather than all loaded at once.
 
-This delivers the real price-alert producer prerequisite for notification spec
-section 14.6. PNG rendering, per-group chart opt-in and the one-use image endpoint
-remain the next part of TODO 4; this change does not claim image delivery.
+Optional charts now follow notification spec section 14.6. Each security has
+`priceChartEnabled`, default false, editable alongside its alert threshold.
+Web Push devices receive distinct single-use image links valid for five minutes;
+UnifiedPush remains text-only. Image failure never prevents text delivery.
+Migration 191 persists the opt-in; migration 190 stores bounded ephemeral PNGs,
+which are excluded from all backups. Browser display and the real-PostgreSQL
+concurrency test still require their respective runtime validation environments.

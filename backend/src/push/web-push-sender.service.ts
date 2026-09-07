@@ -129,6 +129,8 @@ export interface PushAction {
 }
 
 export interface PushPayload {
+  /** Strict same-origin chart route; a separate one-use token per device. */
+  image?: string;
   type: string;
   title: string;
   body: string;

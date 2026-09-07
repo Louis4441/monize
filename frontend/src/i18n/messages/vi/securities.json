@@ -345,6 +345,7 @@
   "priceAlert": {
     "label": "Cảnh báo biến động giá (%)",
     "help": "Để trống để tắt. Thông báo tăng hoặc giảm so với phiên có dữ liệu trước đó, tối đa một lần mỗi mã trong một ngày UTC.",
-    "range": "Nhập tỷ lệ phần trăm từ 0,1 đến 1000."
+    "range": "Nhập tỷ lệ phần trăm từ 0,1 đến 1000.",
+    "chartLabel": "Thêm biểu đồ vào cảnh báo giá"
   }
 }

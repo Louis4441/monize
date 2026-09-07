@@ -96,6 +96,10 @@ export class Security {
   })
   priceAlertPercent: number | null;
 
+  @ApiProperty({ default: false })
+  @Column({ name: "price_chart_enabled", type: "boolean", default: false })
+  priceChartEnabled: boolean;
+
   @ApiProperty({
     example: "Technology",
     description: "Stock sector from Yahoo Finance",

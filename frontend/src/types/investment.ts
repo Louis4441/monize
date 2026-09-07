@@ -39,6 +39,7 @@ export interface Security {
   isActive: boolean;
   isFavourite: boolean;
   priceAlertPercent?: number | null;
+  priceChartEnabled?: boolean;
   skipPriceUpdates: boolean;
   sector: string | null;
   industry: string | null;
@@ -583,6 +584,7 @@ export interface CreateSecurityData {
   msnInstrumentId?: string;
   isFavourite?: boolean;
   priceAlertPercent?: number | null;
+  priceChartEnabled?: boolean;
   /** Manual ETF/fund country breakdown; weight is a decimal 0-1 (like sectorWeightings). */
   countryWeightings?: { name: string; weight: number }[];
   /** Manual ETF/fund asset-class breakdown (free-text names); weight is a decimal 0-1. */

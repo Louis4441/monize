@@ -66,6 +66,7 @@ const buildSecuritySchema = (t: (key: string) => string) => z.object({
   irWebsite: z.string().max(2048).optional(),
   quoteProvider: z.enum(['', 'yahoo', 'msn']).optional(),
   msnInstrumentId: z.string().max(50).optional(),
+  priceChartEnabled: z.boolean().optional(),
   priceAlertPercent: z.string().optional().refine((v) => !v?.trim() || (Number.isFinite(Number(v)) && Number(v) >= 0.1 && Number(v) <= 1000), t('priceAlert.range')),
   isFavourite: z.boolean().optional(),
 });
@@ -232,6 +233,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       quoteProvider: security?.quoteProvider || '',
       msnInstrumentId: security?.msnInstrumentId || '',
       isFavourite: security?.isFavourite || false,
+      priceChartEnabled: security?.priceChartEnabled ?? false,
       priceAlertPercent: security?.priceAlertPercent == null ? '' : String(security.priceAlertPercent),
     },
   });
@@ -382,6 +384,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
         quoteProvider: '',
         msnInstrumentId: '',
         isFavourite: false,
+        priceChartEnabled: false,
         priceAlertPercent: '',
       });
       setSelectedTagIds([]);
@@ -467,6 +470,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       irWebsite: data.irWebsite?.trim() ?? '',
       msnInstrumentId: data.msnInstrumentId?.trim() || undefined,
       isFavourite: data.isFavourite ?? false,
+      priceChartEnabled: data.priceChartEnabled ?? false,
       priceAlertPercent: data.priceAlertPercent?.trim() ? Number(data.priceAlertPercent) : null,
       // Only ETFs/funds carry the manual breakdowns; send [] to clear them.
       ...(isFund
@@ -630,6 +634,11 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       />
 
       <p id="price-alert-help" className="text-sm text-gray-500 dark:text-gray-400">{t('priceAlert.help')}</p>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" {...register('priceChartEnabled')} />
+        {t('priceAlert.chartLabel')}
+      </label>
 
       {watch('quoteProvider') === 'msn' && (
         <Input

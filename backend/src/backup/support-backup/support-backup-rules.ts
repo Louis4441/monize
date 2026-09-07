@@ -356,6 +356,7 @@ export const RULES: Record<string, TableRules> = {
     is_favourite: keep,
     skip_price_updates: keep,
     price_alert_percent: keep,
+    price_chart_enabled: keep,
     sector: keep,
     industry: keep,
     sector_weightings: keep, // public weightings

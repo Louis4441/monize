@@ -21,6 +21,7 @@ interface ShownNotification {
   title: string;
   options: {
     body: string;
+    image?: string;
     icon: string;
     badge: string;
     tag: string;
@@ -820,5 +821,21 @@ describe('worker Stop without Cookie Store', () => {
       'X-CSRF-Token': 'new-token',
     });
     expect(sw.openWindow).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('push chart image paths', () => {
+  const image = `/api/v1/push/chart/${'a'.repeat(64)}.1790000000000.${'b'.repeat(64)}.png`;
+  it('passes the bounded same-origin chart route to the notification', async () => {
+    const sw = loadServiceWorker();
+    await sw.dispatchPush({ title: 'Price', body: 'Price changed', image });
+    expect(sw.shown[0].options.image).toBe(image);
+  });
+  it.each([null, 42, '//evil.test/a.png', 'https://evil.test/a.png', '/api/v1/push/chart/../../secrets', image + '?q=1', image + '#a', image + '/extra', image.replace('.png', '%2epng')])('drops unsafe image %s without dropping text', async (image) => {
+    const sw = loadServiceWorker();
+    await sw.dispatchPush({ title: 'Price', body: 'Price changed', image });
+    expect(sw.shown[0].options.image).toBeUndefined();
+    expect(sw.shown[0].options.body).toBe('Price changed');
   });
 });

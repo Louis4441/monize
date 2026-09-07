@@ -1,4 +1,8 @@
 import {
+  PushPriceChartService,
+  PriceChartRequest,
+} from "./push-price-chart.service";
+import {
   BadRequestException,
   ConflictException,
   Injectable,
@@ -154,6 +158,7 @@ export class PushSubscriptionService {
     private readonly pushConfig: PushConfigService,
     private readonly sender: WebPushSender,
     private readonly i18n: I18nService,
+    private readonly charts: PushPriceChartService,
   ) {}
 
   /**
@@ -501,6 +506,7 @@ export class PushSubscriptionService {
     userId: string,
     payload: PushPayload,
     transports?: PushTransport[],
+    chartRequest?: PriceChartRequest,
   ): Promise<{ attempted: number; delivered: number }> {
     if (transports && transports.length === 0) {
       return { attempted: 0, delivered: 0 };
@@ -523,7 +529,11 @@ export class PushSubscriptionService {
     );
     if (targets.length === 0) return { attempted: 0, delivered: 0 };
 
-    const devices = await this.fanOut(userId, payload, targets, batch);
+    const chart =
+      chartRequest && targets.some((t) => t.transport === "webpush")
+        ? await this.charts.render(userId, chartRequest)
+        : null;
+    const devices = await this.fanOut(userId, payload, targets, batch, chart);
     return {
       attempted: targets.length,
       delivered: devices.filter((d) => d.status === "sent").length,
@@ -543,12 +553,17 @@ export class PushSubscriptionService {
     payload: PushPayload,
     targets: PushSubscription[],
     sender: PushBatch,
+    chart: Buffer | null = null,
   ): Promise<PushTestDeviceResult[]> {
     const devices: PushTestDeviceResult[] = [];
     for (let i = 0; i < targets.length; i += PUSH_TEST_CONCURRENCY) {
       const batch = targets.slice(i, i + PUSH_TEST_CONCURRENCY);
       const results = await Promise.all(
         batch.map(async (target) => {
+          const image =
+            chart && target.transport === "webpush"
+              ? await this.charts.issue(chart)
+              : null;
           const outcome = await sender.send(
             {
               endpoint: target.endpoint,
@@ -556,7 +571,7 @@ export class PushSubscriptionService {
               auth: target.auth,
               vapidPublicKey: target.vapidPublicKey,
             },
-            payload,
+            image ? { ...payload, image } : payload,
           );
           const disabledReason = await this.recordOutcome(
             userId,

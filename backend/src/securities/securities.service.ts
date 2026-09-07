@@ -637,6 +637,8 @@ export class SecuritiesService {
       security.irWebsite = updateSecurityDto.irWebsite ?? null;
     if (updateSecurityDto.isActive !== undefined)
       security.isActive = updateSecurityDto.isActive;
+    if (updateSecurityDto.priceChartEnabled !== undefined)
+      security.priceChartEnabled = updateSecurityDto.priceChartEnabled;
     if (updateSecurityDto.priceAlertPercent !== undefined)
       security.priceAlertPercent = updateSecurityDto.priceAlertPercent;
     if (updateSecurityDto.isFavourite !== undefined)

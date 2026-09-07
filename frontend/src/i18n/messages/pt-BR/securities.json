@@ -345,6 +345,7 @@
   "priceAlert": {
     "label": "Alerta de variação do preço (%)",
     "help": "Deixe vazio para desativar. Avisa sobre altas ou quedas em relação à sessão anterior disponível, no máximo uma vez por ativo e dia UTC.",
-    "range": "Insira uma porcentagem entre 0,1 e 1000."
+    "range": "Insira uma porcentagem entre 0,1 e 1000.",
+    "chartLabel": "Incluir um gráfico nos alertas de preços"
   }
 }

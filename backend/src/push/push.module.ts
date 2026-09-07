@@ -1,5 +1,6 @@
 import { PushChartArtifactService } from "./push-chart-artifact.service";
 import { PushChartController } from "./push-chart.controller";
+import { PushPriceChartService } from "./push-price-chart.service";
 import { Module } from "@nestjs/common";
 import { EncryptionModule } from "../common/encryption/encryption.module";
 import { PushConfigService } from "./push-config.service";
@@ -21,6 +22,7 @@ import { AdminNotificationsController } from "./admin-notifications.controller";
 @Module({
   imports: [EncryptionModule],
   providers: [
+    PushPriceChartService,
     PushChartArtifactService,
     PushConfigService,
     PushSubscriptionService,

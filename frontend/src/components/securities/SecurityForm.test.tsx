@@ -143,6 +143,15 @@ describe('SecurityForm', () => {
     })));
   });
 
+  it.each([false, true])('saves an explicit chart opt-in (initial %s)', async (enabled) => {
+    render(<SecurityForm security={createSecurity({ priceChartEnabled: enabled })} onSubmit={onSubmit} onCancel={onCancel} />);
+    const checkbox = await screen.findByLabelText('Include a chart in price alerts');
+    expect((checkbox as HTMLInputElement).checked).toBe(enabled);
+    fireEvent.click(checkbox);
+    fireEvent.click(screen.getByText('Update Security'));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({priceChartEnabled: !enabled})));
+  });
+
   it('calls onCancel when cancel is clicked', async () => {
     render(<SecurityForm onSubmit={onSubmit} onCancel={onCancel} />);
     fireEvent.click(screen.getByText('Cancel'));

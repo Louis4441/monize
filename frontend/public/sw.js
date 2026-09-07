@@ -203,6 +203,12 @@ function pushActions(value) {
   return actions;
 }
 
+// Only our opaque same-origin chart route may trigger an image download.
+function safeNotificationImage(value) {
+  return typeof value === 'string' && /^\/api\/v1\/push\/chart\/[a-f0-9]{64}\.[0-9]{13}\.[a-f0-9]{64}\.png$/.test(value)
+    ? value : undefined;
+}
+
 function pushReminderId(value) {
   return typeof value === 'string' && value.length > 0 && value.length <= 64
     ? value
@@ -218,6 +224,7 @@ self.addEventListener('push', function (event) {
       pushText(payload.title, PUSH_FALLBACK_TITLE),
       {
         body: pushText(payload.body, PUSH_FALLBACK_BODY),
+        image: safeNotificationImage(payload.image),
         icon: PUSH_ICON,
         badge: PUSH_BADGE,
         // Collapse repeats of ONE subject onto one notification rather than

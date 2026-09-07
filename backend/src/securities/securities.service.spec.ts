@@ -756,6 +756,12 @@ describe("SecuritiesService", () => {
       expect(queryRunnerManager.save.mock.calls[0][1].priceAlertPercent).toBe(threshold);
     });
 
+    it.each([true, false])("persists chart opt-in %s", async (enabled) => {
+      securitiesRepository.findOne.mockResolvedValue({ ...mockSecurity, priceChartEnabled: !enabled });
+      await service.update("user-1", "sec-1", { priceChartEnabled: enabled });
+      expect(queryRunnerManager.save.mock.calls[0][1].priceChartEnabled).toBe(enabled);
+    });
+
     it("persists isFavourite updates", async () => {
       securitiesRepository.findOne.mockResolvedValue({ ...mockSecurity });
 
