@@ -83,6 +83,7 @@ Monize is running in my [Kubernetes cluster](https://github.com/kenlasko/k8s).
 - Microsoft Money full-file import: read a `.mny` file directly -- accounts, transfers, splits, investments, price history, exchange rates and scheduled bills -- and reconcile every balance against the file afterwards ([guide](docs/import-ms-money.md))
 - Quicken full-file import: import all accounts, categories, and tags from a single QIF export
 - Data reset: wipe financial data and re-import without losing your user account or settings
+- Share into the app on Android: with Monize installed as a PWA, share a receipt photo, a PDF or a statement export (CSV, OFX, QFX, QIF) to it from another app and land on a review screen that offers to attach it to a new transaction or open the import wizard. Nothing is imported or attached until you choose it, and shared files are kept on the device for an hour
 
 ### Investment Features
 - Track stocks, bonds, ETFs, mutual funds, options, GICs and cryptocurrency

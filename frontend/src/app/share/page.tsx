@@ -310,13 +310,11 @@ function ShareContent() {
       <Modal
         isOpen={showForm}
         onClose={() => setShowForm(false)}
+        title={t('newTransactionTitle')}
         maxWidth="6xl"
         className="p-6 !max-w-[69rem]"
         pushHistory
       >
-        <h2 className="mb-4 text-2xl font-bold text-gray-900 dark:text-gray-100">
-          {t('newTransactionTitle')}
-        </h2>
         <TransactionForm
           initialStagedFiles={usable.files}
           onSuccess={onTransactionCreated}

@@ -543,6 +543,47 @@ states the user changes *elsewhere* and then comes back, so the panel re-reads
 them when the page becomes visible. Read once on mount, it kept telling the user
 the browser had refused after they had allowed it, with the Enable button hidden.
 
+### A shared file has one accept list and one reader -- `share-target.ts`, `share-inbox.ts`
+
+The Web Share Target puts Monize in the OS share sheet, and the two halves of it
+each live in exactly one file:
+
+- **`lib/share-target.ts` is the accept list, the limits and the
+  classification.** `SHARE_TARGET_ACCEPT` is *derived* from
+  `ACCEPTED_ATTACHMENT_TYPES` plus `SHARE_STATEMENT_EXTENSIONS`, so the share
+  sheet cannot offer a type the upload then refuses (nor hide one it would take);
+  the per-file and per-share caps come from `MAX_ATTACHMENT_BYTES` and
+  `MAX_ATTACHMENTS_PER_TRANSACTION` rather than being written again. `.mny` is
+  deliberately absent -- a Money file is a whole profile behind a password prompt
+  and a wipe confirmation.
+- **`lib/share-inbox.ts` is the only reader of the stash.** Nothing else names
+  `SHARE_CACHE_NAME` or builds a stash key; a second reader is how the key shape
+  and the worker's writer drift apart. Every function treats an unusable Cache
+  API as an *empty inbox* and resolves rather than rejecting, which is what lets
+  `ShareInboxNotice` call it on mount without a guard -- and why a `catch` around
+  it would put a `setState` on the synchronous path the
+  `react-hooks/set-state-in-effect` rule forbids.
+
+**Do not classify a shared file with the import wizard's `detectFileType`.** That
+function falls through to `qif` for every extension it does not recognise, which
+is right for a picker (the user chose the file) and wrong for a share sheet (the
+OS chose it, so anything outside the accept list must be refused with a reason
+rather than handed to the QIF parser). `classifySharedFile` is the share path's
+rule and answers `null` for exactly that case.
+
+**`public/sw.js` cannot import any of this**, so it repeats the paths, keys,
+limits and accept lists as literals and `src/test/sw-share-target.test.ts`
+asserts the two agree -- the mirroring discipline `sw-offline.test.ts` already
+applies to the boot palette. It also reads the worker's own
+`classifySharedFile` out of the sandbox and compares it, case by case, against
+the app's.
+
+**A refused file stays on the list.** The worker records the reason and discards
+the bytes, so the review screen can say which of the files the user picked was
+not used and why; an accepted file whose bytes were later evicted is reported as
+*unavailable*, never silently dropped from a list that would then look complete.
+Those are two different states and the copy for each says so.
+
 ### The notification permission is asked for once, from a click
 
 `Notification.requestPermission()` appears in exactly one file -- `lib/push.ts`,

@@ -8,6 +8,7 @@ import {
   TableCellsIcon,
 } from '@heroicons/react/24/outline';
 import { Badge } from '@/components/ui/Badge';
+import { TABLE_BODY_CLASS } from '@/components/ui/Table';
 import { formatBytes } from '@/components/transactions/AttachmentsSection';
 import {
   SHARE_MAX_FILES,
@@ -37,7 +38,10 @@ export function SharedFileList({ items }: { items: SharedBundleItem[] }) {
   };
 
   return (
-    <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+    // Not a table, but the row-divider rule is the same one and it lives in
+    // exactly one place; a second copy of the string is what Table.tsx exists
+    // to prevent.
+    <ul className={TABLE_BODY_CLASS}>
       {items.map((item, index) => {
         const { entry } = item;
         const unusable = item.file === null;

@@ -1,11 +1,15 @@
 # Web Share Target: sharing files into the installed Monize PWA
 
-Status: PROPOSED (spec-first, per root `CLAUDE.md`: a feature of any substance
-starts from a short approved spec committed before the implementation).
-Related: discussion #1292 (second part), INV-ATTACHMENT-001, INV-IMPORT-001..003.
+Status: IMPLEMENTED (Phase 1). Written spec-first, per root `CLAUDE.md`; this
+section records what shipped and where the build departed from the plan, so the
+document keeps describing the tree rather than the intention.
+Related: discussion #1292 (second part), INV-SHARE-001..004, INV-ATTACHMENT-001,
+INV-IMPORT-001..003.
 
-The first part of #1292 (document scanning and image enhancement) is a separate
-plan and is not covered here. This document is the plan for the second part:
+The first part of #1292 (document scanning and image enhancement) shipped
+separately and is described by `docs/future-plans/document-scanner.md`; it is not
+covered here beyond Phase 3 below. This document is the plan for the second
+part:
 making an installed Monize PWA appear in the operating system's Share sheet so a
 user can send a receipt photo, a PDF, or a bank statement export (CSV, OFX, QFX,
 QIF) straight to Monize, land on an explicit review screen, and then hand the
@@ -290,9 +294,9 @@ no extension, so `isStaticAsset` can never serve a stash entry to a fetch.
 | INV-SHARE-003 | The stash holds only files within the declared limits, and no bundle outlives its lifetime or the session. | Worker-side limit checks store a reason, not bytes; purge on `activate`, on each share, on app mount; `clearShareInbox()` in `logout`. |
 | INV-SHARE-004 | A share never produces an error page: on every path the user lands on a Monize page that explains what happened. | The worker's handler always resolves to a redirect (malformed body -> `/share?error=stash`); the proxy fallback redirects; the review screen has states for missed, unsupported, expired, empty. |
 
-These are added to `docs/system-invariants.md` with the plan, as `unenforced`
-until the implementation lands, in keeping with that document's rule that
-editing it does not close a gap.
+These are in `docs/system-invariants.md` as INV-SHARE-001..004, all four
+`enforced`, each naming the tests that hold it; `docs/verification-contract.md`
+carries their rows in the test-kind matrix.
 
 ---
 
@@ -377,9 +381,14 @@ picker), and Ask the assistant (hand the files to `ChatInterface` as
 5 MB / 20 MB caps -- the classification table gains a column and nothing else
 moves).
 
-**Phase 3, if the first part of #1292 ships:** the scan pipeline runs on the
-review screen before the New transaction destination, with the original
-preserved as that plan requires.
+**Phase 3 (separate plan; the first part of #1292 has since shipped):** the scan
+pipeline runs on the review screen before the New transaction destination, with
+the original preserved as that plan requires. This is now a real option rather
+than a conditional one -- `frontend/src/lib/document-scanner/` exists and the
+staged-attachment shape already carries a scan pair (`StagedAttachment`'s
+optional `original`), so the work is offering the scan on the review screen, not
+building a pipeline. Deliberately out of Phase 1: a shared file is staged as a
+plain file with no original, exactly as an unscanned upload is.
 
 ---
 
@@ -395,3 +404,39 @@ Resolved on the plan's review, so the implementation does not reopen them:
    the share sheet as an Android feature. Desktop Chromium's installed-app share
    target works through the same code and stays undocumented rather than
    promised.
+
+---
+
+## 10. What the build changed
+
+Recorded because the sections above are a design, and a design that shipped
+should say where it was wrong.
+
+1. **`initialStagedFiles` is `File[]`, staged as `StagedAttachment[]`.** The
+   document scanner landed between the plan and the build, so
+   `TransactionForm`'s staged state is now `{ file, original? }` per attachment.
+   The prop stays a plain `File[]` -- a shared file has no scan original -- and
+   the form maps it. The wrapper also withholds it on a "Create & New" restart,
+   for the same reason it withholds `duplicateFrom`: those files were uploaded
+   to the entry just created.
+2. **The stash reports three states per file, not two.** `readSharedBundle`
+   returns `items`, and an entry can be accepted, refused (with a reason) or
+   *accepted but missing* -- its bytes evicted under storage pressure. The plan
+   had only the first two, which would have quietly dropped an evicted file from
+   a list that then looked complete.
+3. **`SHARE_STATEMENT_EXTENSIONS` is the classifier, and the plan said so only
+   after review.** Worth restating because it is the trap: the import wizard's
+   `detectFileType` answers `qif` for anything it does not recognise.
+4. **`isShareInboxSupported` is exported.** The review screen needs to tell "no
+   Cache API in this browser" from "nothing in the stash", and they are different
+   screens.
+5. **The proxy's no-body claim is behavioural first.** The plan promised a source
+   scan; the build asserts `request.bodyUsed === false` and that `fetch` was
+   never called, which is the direct claim, and keeps the scan as the guard on
+   the branch's *position*.
+6. **`ShareInboxNotice` reads the stash from inside the effect.** Written as a
+   `useCallback` the effect invokes, it failed `react-hooks/set-state-in-effect`
+   -- correctly: a synchronous throw inside an async function runs its `catch`
+   before the first suspension, so a defensive `catch` there put a `setState` on
+   the synchronous path. The inbox module is documented and tested never to
+   reject, so the catch was the thing to remove.
