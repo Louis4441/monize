@@ -24,7 +24,6 @@
     "failed": "Belge taranamadı. Fotoğrafı yine de olduğu gibi ekleyebilirsiniz.",
     "viewEnhanced": "İyileştirilmiş",
     "viewOriginal": "Orijinal",
-    "viewOriginalFile": "Orijinali görüntüle",
     "rotate": "Döndür",
     "styleLabel": "Son işlem",
     "styles": {
@@ -67,5 +66,15 @@
       "bottomLeft": "Sol alt köşe"
     },
     "originalKept": "orijinal saklandı"
+  },
+  "preview": {
+    "loading": "Önizleme yükleniyor…",
+    "failed": "Önizleme yüklenemedi. Dosyayı yine de indirebilirsiniz.",
+    "unsupported": "Bu dosya türü önizlenemiyor. Yine de indirebilirsiniz.",
+    "fit": "Ekrana sığdır",
+    "actualSize": "Gerçek boyut",
+    "pageCount": "{count, plural, one {# sayfa} other {# sayfa}}",
+    "page": "Sayfa {page} / {total}",
+    "open": "{name} önizlemesi"
   }
 }

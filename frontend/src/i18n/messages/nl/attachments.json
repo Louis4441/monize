@@ -24,7 +24,6 @@
     "failed": "Het document kon niet worden gescand. U kunt de foto alsnog ongewijzigd bijvoegen.",
     "viewEnhanced": "Verbeterd",
     "viewOriginal": "Origineel",
-    "viewOriginalFile": "Origineel bekijken",
     "rotate": "Draaien",
     "styleLabel": "Afwerking",
     "styles": {
@@ -67,5 +66,15 @@
       "bottomLeft": "Hoek linksonder"
     },
     "originalKept": "origineel bewaard"
+  },
+  "preview": {
+    "loading": "Voorbeeld wordt geladen…",
+    "failed": "Het voorbeeld kon niet worden geladen. U kunt het bestand nog steeds downloaden.",
+    "unsupported": "Van dit bestandstype kan geen voorbeeld worden getoond. U kunt het nog steeds downloaden.",
+    "fit": "Passend op scherm",
+    "actualSize": "Ware grootte",
+    "pageCount": "{count, plural, one {# pagina} other {# pagina's}}",
+    "page": "Pagina {page} van {total}",
+    "open": "Voorbeeld van {name}"
   }
 }

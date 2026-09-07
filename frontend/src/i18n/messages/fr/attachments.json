@@ -24,7 +24,6 @@
     "failed": "Le document n’a pas pu être numérisé. Vous pouvez tout de même joindre la photo telle quelle.",
     "viewEnhanced": "Améliorée",
     "viewOriginal": "Original",
-    "viewOriginalFile": "Voir l’original",
     "rotate": "Pivoter",
     "styleLabel": "Rendu",
     "styles": {
@@ -67,5 +66,15 @@
       "bottomLeft": "Coin inférieur gauche"
     },
     "originalKept": "original conservé"
+  },
+  "preview": {
+    "loading": "Chargement de l'aperçu…",
+    "failed": "L'aperçu n'a pas pu être chargé. Vous pouvez tout de même télécharger le fichier.",
+    "unsupported": "Ce type de fichier ne peut pas être prévisualisé. Vous pouvez tout de même le télécharger.",
+    "fit": "Ajuster à l'écran",
+    "actualSize": "Taille réelle",
+    "pageCount": "{count, plural, one {# page} other {# pages}}",
+    "page": "Page {page} sur {total}",
+    "open": "Aperçu de {name}"
   }
 }

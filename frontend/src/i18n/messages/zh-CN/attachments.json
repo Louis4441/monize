@@ -24,7 +24,6 @@
     "failed": "无法扫描该文档。您仍可以按原样附加这张照片。",
     "viewEnhanced": "增强版",
     "viewOriginal": "原图",
-    "viewOriginalFile": "查看原图",
     "rotate": "旋转",
     "styleLabel": "处理方式",
     "styles": {
@@ -67,5 +66,15 @@
       "bottomLeft": "左下角"
     },
     "originalKept": "已保留原图"
+  },
+  "preview": {
+    "loading": "正在加载预览…",
+    "failed": "无法加载预览。您仍然可以下载该文件。",
+    "unsupported": "无法预览此类文件。您仍然可以下载它。",
+    "fit": "适应屏幕",
+    "actualSize": "实际大小",
+    "pageCount": "{count, plural, other {# 页}}",
+    "page": "第 {page} 页，共 {total} 页",
+    "open": "预览 {name}"
   }
 }

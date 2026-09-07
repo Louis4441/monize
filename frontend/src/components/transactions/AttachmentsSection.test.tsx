@@ -67,9 +67,43 @@ vi.mock('./DocumentScanDialog', () => ({
     ) : null,
 }));
 
-vi.mock('@/lib/attachments', () => ({
+/**
+ * The preview dialog is likewise a stub that reports what it was asked to
+ * show. Its own suite covers what it draws; here the question is which row
+ * opens it and with what.
+ */
+vi.mock('./AttachmentPreviewDialog', () => ({
+  AttachmentPreviewDialog: ({
+    isOpen,
+    target,
+    onClose,
+  }: {
+    isOpen: boolean;
+    target:
+      | { kind: 'saved'; attachment: Attachment }
+      | { kind: 'file'; file: File; original?: File }
+      | null;
+    onClose: () => void;
+  }) =>
+    isOpen && target ? (
+      <div data-testid="preview-dialog">
+        <span data-testid="preview-target">
+          {target.kind === 'saved'
+            ? `saved:${target.attachment.id}:${target.attachment.originalAttachmentId ?? 'none'}`
+            : `file:${target.file.name}:${target.original?.name ?? 'none'}`}
+        </span>
+        <button type="button" onClick={onClose}>
+          close-preview
+        </button>
+      </div>
+    ) : null,
+}));
+
+// Spread the real module: a bare factory would blank `fetchBytes` and every
+// other export for the whole tree under test.
+vi.mock('@/lib/attachments', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/attachments')>()),
   attachmentsApi: { list: vi.fn(), upload: vi.fn(), delete: vi.fn() },
-  attachmentDownloadUrl: (id: string) => `/api/v1/attachments/${id}/download`,
 }));
 
 const mockList = attachmentsApi.list as ReturnType<typeof vi.fn>;
@@ -112,14 +146,27 @@ describe('AttachmentsSection', () => {
     expect(screen.getByText('No attachments yet')).toBeInTheDocument();
   });
 
-  it('lists attachments with a working download link', async () => {
+  it('previews an attachment when its row is clicked, and downloads nothing', async () => {
     mockList.mockResolvedValue([makeAttachment()]);
     await renderSection();
-    const link = screen.getByRole('link', { name: 'receipt.png' });
-    expect(link).toHaveAttribute(
-      'href',
-      '/api/v1/attachments/a-1/download',
-    );
+
+    // The row is a button, not a download link: preview is the default action.
+    expect(screen.queryByRole('link', { name: 'receipt.png' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('preview-dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Preview receipt.png' }));
+    expect(screen.getByTestId('preview-target')).toHaveTextContent('saved:a-1:none');
+
+    fireEvent.click(screen.getByRole('button', { name: 'close-preview' }));
+    expect(screen.queryByTestId('preview-dialog')).not.toBeInTheDocument();
+  });
+
+  it('keeps Delete outside the preview trigger', async () => {
+    mockList.mockResolvedValue([makeAttachment()]);
+    await renderSection();
+    const trigger = screen.getByRole('button', { name: 'Preview receipt.png' });
+    const remove = screen.getByRole('button', { name: 'Delete' });
+    expect(trigger.contains(remove)).toBe(false);
   });
 
   it('reports failure to load', async () => {
@@ -327,7 +374,7 @@ describe('AttachmentsSection', () => {
       expect(screen.getByTestId('scan-dialog')).toBeInTheDocument();
     });
 
-    it('shows a link to the original on a scanned attachment', async () => {
+    it('hands the preview the original id of a scanned attachment', async () => {
       mockList.mockResolvedValue([
         makeAttachment({
           id: 'scan-1',
@@ -337,20 +384,15 @@ describe('AttachmentsSection', () => {
       ]);
       await renderSection();
 
-      const link = screen.getByRole('link', { name: 'View original' });
-      expect(link).toHaveAttribute(
-        'href',
-        '/api/v1/attachments/orig-1/download',
+      // One row for the pair; the original is reached inside the preview.
+      expect(screen.getAllByRole('listitem')).toHaveLength(1);
+      expect(screen.queryByText('View original')).not.toBeInTheDocument();
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Preview receipt-scan.jpg' }),
       );
-    });
-
-    it('shows no such link on an ordinary attachment', async () => {
-      mockList.mockResolvedValue([makeAttachment()]);
-      await renderSection();
-
-      expect(
-        screen.queryByRole('link', { name: 'View original' }),
-      ).not.toBeInTheDocument();
+      expect(screen.getByTestId('preview-target')).toHaveTextContent(
+        'saved:scan-1:orig-1',
+      );
     });
   });
 
@@ -417,6 +459,21 @@ describe('AttachmentsSection', () => {
       renderStaged([{ file: scan, original }]);
 
       expect(screen.getByText(/original kept/i)).toBeInTheDocument();
+    });
+
+    it('previews a staged file, with the photo it was scanned from', () => {
+      const scan = fileOfType('image/jpeg');
+      Object.defineProperty(scan, 'name', { value: 'receipt-scan.jpg' });
+      const original = fileOfType('image/jpeg');
+      Object.defineProperty(original, 'name', { value: 'receipt.jpg' });
+      renderStaged([{ file: scan, original }]);
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Preview receipt-scan.jpg' }),
+      );
+      expect(screen.getByTestId('preview-target')).toHaveTextContent(
+        'file:receipt-scan.jpg:receipt.jpg',
+      );
     });
 
     it('lists staged files with a remove control', () => {

@@ -24,7 +24,6 @@
     "failed": "[XX-The document could not be scanned. You can still attach the photo as it is.-XX]",
     "viewEnhanced": "[XX-Enhanced-XX]",
     "viewOriginal": "[XX-Original-XX]",
-    "viewOriginalFile": "[XX-View original-XX]",
     "rotate": "[XX-Rotate-XX]",
     "styleLabel": "[XX-Finish-XX]",
     "styles": {
@@ -67,5 +66,15 @@
       "bottomLeft": "[XX-Bottom-left corner-XX]"
     },
     "originalKept": "[XX-original kept-XX]"
+  },
+  "preview": {
+    "loading": "[XX-Loading preview…-XX]",
+    "failed": "[XX-The preview could not be loaded. You can still download the file.-XX]",
+    "unsupported": "[XX-This file type cannot be previewed. You can still download it.-XX]",
+    "fit": "[XX-Fit to screen-XX]",
+    "actualSize": "[XX-Actual size-XX]",
+    "pageCount": "[XX-{count, plural, one {# page} other {# pages}}-XX]",
+    "page": "[XX-Page {page} of {total}-XX]",
+    "open": "[XX-Preview {name}-XX]"
   }
 }

@@ -24,7 +24,6 @@
     "failed": "문서를 스캔하지 못했습니다. 사진은 그대로 첨부할 수 있습니다.",
     "viewEnhanced": "보정본",
     "viewOriginal": "원본",
-    "viewOriginalFile": "원본 보기",
     "rotate": "회전",
     "styleLabel": "마무리",
     "styles": {
@@ -67,5 +66,15 @@
       "bottomLeft": "왼쪽 아래 모서리"
     },
     "originalKept": "원본 보관됨"
+  },
+  "preview": {
+    "loading": "미리보기를 불러오는 중…",
+    "failed": "미리보기를 불러올 수 없습니다. 파일은 다운로드할 수 있습니다.",
+    "unsupported": "이 파일 형식은 미리 볼 수 없습니다. 다운로드는 가능합니다.",
+    "fit": "화면에 맞춤",
+    "actualSize": "실제 크기",
+    "pageCount": "{count, plural, other {#페이지}}",
+    "page": "{total}페이지 중 {page}페이지",
+    "open": "{name} 미리보기"
   }
 }
