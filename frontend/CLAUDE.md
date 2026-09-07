@@ -584,6 +584,28 @@ not used and why; an accepted file whose bytes were later evicted is reported as
 *unavailable*, never silently dropped from a list that would then look complete.
 Those are two different states and the copy for each says so.
 
+**An automatic hand-off makes reference data a prerequisite, not a late
+arrival.** `useSharedFilesHandoff` drives the import wizard from the shared files
+on mount, and the wizard matches the file's categories against the user's
+categories, its symbols against their securities and its filename against their
+accounts. A human picking a file cannot realistically get ahead of those five
+parallel requests; a hand-off that fires on mount loses that race every time --
+and a failed category match is not neutral, it is an offer to **create** a
+category the user already has. So the wizard exposes `dataLoaded` and the
+hand-off waits for it, claiming its one-shot ref only once it actually proceeds.
+A load that failed leaves `dataLoaded` false and the bundle in the stash, which
+is the honest outcome: the files are offered again rather than matched against
+nothing. `src/app/import/share-handoff.test.tsx` holds the ordering with deferred
+requests, and fails if the gate is removed.
+
+**The kind a shared file is comes off the entry the worker wrote, never
+recomputed from the `File`.** The review screen's destination and the glyph in
+its list both read `entry.kind`; deriving it a second time from the rebuilt
+`File` is how a row drawn as a statement comes to offer an attachment's
+destination. `null` there means the worker never classified it, so the file is
+not usable and the screen says exactly that rather than calling the share
+mixed.
+
 ### The notification permission is asked for once, from a click
 
 `Notification.requestPermission()` appears in exactly one file -- `lib/push.ts`,

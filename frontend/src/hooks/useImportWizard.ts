@@ -148,6 +148,21 @@ export function useImportWizard() {
   const [csvColumnMapping, setCsvColumnMapping] = useState<CsvColumnMappingConfig>(DEFAULT_CSV_COLUMN_MAPPING);
   const [csvTransferRules, setCsvTransferRules] = useState<CsvTransferRule[]>([]);
   const [savedColumnMappings, setSavedColumnMappings] = useState<SavedColumnMapping[]>([]);
+  /**
+   * True once accounts, categories, securities and currencies are all in.
+   *
+   * The wizard matches a file's categories against the user's categories, its
+   * symbols against their securities and its filename against their accounts,
+   * so those lists are a PREREQUISITE for `handleFiles`, not merely data that
+   * arrives eventually: run against empty lists, every match fails, and a
+   * failed category match is an offer to CREATE a category the user already
+   * has. A human picking a file cannot realistically get ahead of this load;
+   * the Web Share Target's automatic hand-off can and does, so it waits on it.
+   *
+   * Stays false if the load failed: the shared files are then left in the stash
+   * for a retry rather than handed to a wizard that knows nothing.
+   */
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isBulkImport = importFiles.length > 1;
@@ -228,6 +243,7 @@ export function useImportWizard() {
         setSecurities(securitiesData);
         setCurrencies(currenciesData);
         setSavedColumnMappings(columnMappingsData);
+        setDataLoaded(true);
 
         if (preselectedAccountId) {
           const accountExists = accountsData.some((a) => a.id === preselectedAccountId);
@@ -1227,7 +1243,7 @@ export function useImportWizard() {
     accounts, categories, securities,
     categoryMappings, setCategoryMappings, accountMappings, securityMappings,
     handleAccountMappingChange, handleSecurityMappingChange, handleSecurityLookup,
-    isLoading, importResult, bulkImportResult, handleImport, handleFileSelect, handleFiles, handleImportMore,
+    isLoading, dataLoaded, importResult, bulkImportResult, handleImport, handleFileSelect, handleFiles, handleImportMore,
     lookupLoadingIndex, bulkLookupInProgress,
     lookupPickerQuery, lookupPickerCandidates, handleLookupPickerPick, handleLookupPickerCancel,
     showCreateAccount, setShowCreateAccount, creatingForFileIndex, setCreatingForFileIndex,

@@ -318,11 +318,15 @@ self.addEventListener('activate', function (event) {
           .map(function (name) { return caches.delete(name); })
       );
     }).then(function () {
+      // Claim first: taking control of open pages is what the offline fallback
+      // and the share target both depend on, and it must not wait behind
+      // housekeeping. The purge still runs inside this waitUntil, so the worker
+      // stays alive for it.
+      return self.clients.claim();
+    }).then(function () {
       // Expiry is enforced by the worker, not only by the app: a bundle nobody
       // opened still ages out while no page of ours is running.
       return purgeShareStash();
-    }).then(function () {
-      return self.clients.claim();
     })
   );
 });

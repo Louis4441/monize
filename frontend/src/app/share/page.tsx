@@ -24,7 +24,7 @@ import {
   readSharedBundle,
   type SharedBundle,
 } from '@/lib/share-inbox';
-import { classifySharedFile, isShareBundleId } from '@/lib/share-target';
+import { isShareBundleId } from '@/lib/share-target';
 import { createLogger } from '@/lib/logger';
 
 const TransactionForm = dynamic(
@@ -128,18 +128,21 @@ function ShareContent() {
 
   /** The files that are actually usable, and what they can be used for. */
   const usable = useMemo(() => {
-    const files = bundle?.files ?? [];
-    const kinds = new Set(
-      files.map((file) => classifySharedFile(file)).filter(Boolean),
+    // The worker classified each file on arrival and recorded it on the entry,
+    // so this reads that decision rather than making it a second time: two
+    // classifiers on one screen is how the glyph beside a file comes to
+    // disagree with the destination offered for it.
+    const items = (bundle?.items ?? []).flatMap((item) =>
+      item.file && item.entry.kind
+        ? [{ file: item.file, kind: item.entry.kind }]
+        : [],
     );
+    const kinds = new Set(items.map((item) => item.kind));
     return {
-      files,
+      files: items.map((item) => item.file),
       // A share is offered a destination only when every usable file agrees on
       // one. Mixed shares are refused rather than half-imported.
-      kind:
-        kinds.size === 1
-          ? ([...kinds][0] as 'attachment' | 'statement')
-          : null,
+      kind: kinds.size === 1 ? [...kinds][0] : null,
     };
   }, [bundle]);
 

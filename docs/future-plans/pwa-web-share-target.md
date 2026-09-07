@@ -450,3 +450,15 @@ should say where it was wrong.
    enable), and the closest analogue of this one is the last of those. It goes
    there. The shell's auth-route branch deliberately does not render it, which
    costs nothing: the notice is for a signed-in reader.
+8. **The import hand-off waits for the wizard's reference data.** Found in review
+   and fixed: firing on mount, it beat the accounts, categories and securities
+   requests every time, so a shared QIF was matched against empty lists and every
+   category in it offered as one to create. `useImportWizard` exposes
+   `dataLoaded`; the hand-off gates on it.
+9. **The review screen reads the recorded classification.** It recomputed
+   `classifySharedFile` from the rebuilt `File` while the list beside it drew
+   `entry.kind` -- two classifiers on one screen. It now reads the entry, and an
+   unclassified stored file reports as unusable rather than as a mixed share.
+10. **`activate` claims clients before purging.** Taking control of open pages is
+    what the offline fallback and the share target both depend on, so it no
+    longer waits behind stash housekeeping.

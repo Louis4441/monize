@@ -42,12 +42,21 @@ const logger = createLogger('Import');
  * exactly as it does for a file the user picked, and the import still takes an
  * explicit press.
  */
-function useSharedFilesHandoff(handleFiles: (files: File[]) => Promise<void>) {
+function useSharedFilesHandoff(
+  handleFiles: (files: File[]) => Promise<void>,
+  ready: boolean,
+) {
   const searchParams = useSearchParams();
   const shareId = searchParams?.get('share') ?? null;
   const takenRef = useRef<string | null>(null);
 
   useEffect(() => {
+    // `ready` is the wizard's reference data being in. Without it the file
+    // would be matched against empty account, category and security lists, so
+    // every category in it would be offered as one to CREATE even where the
+    // user already has it. The ref is claimed only once we actually proceed,
+    // so a not-yet-ready render does not consume the one attempt.
+    if (!ready) return;
     if (!isShareBundleId(shareId ?? '') || takenRef.current === shareId) return;
     takenRef.current = shareId;
     const id = shareId as string;
@@ -62,7 +71,7 @@ function useSharedFilesHandoff(handleFiles: (files: File[]) => Promise<void>) {
     void take().catch((error) => {
       logger.error('Failed to take the shared files into the wizard:', error);
     });
-  }, [shareId, handleFiles]);
+  }, [shareId, handleFiles, ready]);
 }
 
 export default function ImportPage() {
@@ -82,7 +91,7 @@ function ImportContent() {
   // An OIDC account confirms the optional wipe by re-authenticating with its
   // provider rather than by typing a password.
   const user = useAuthStore((state) => state.user);
-  useSharedFilesHandoff(wizard.handleFiles);
+  useSharedFilesHandoff(wizard.handleFiles, wizard.dataLoaded);
 
   const renderStep = () => {
     switch (wizard.step) {

@@ -3,6 +3,7 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import { render } from '@/test/render';
 import SharePage from './page';
 import type { SharedBundle, SharedBundleItem } from '@/lib/share-inbox';
+import { classifySharedFile } from '@/lib/share-target';
 
 // The review screen is where the plan's second requirement lives: a share
 // always lands somewhere that explains itself, and nothing is imported or
@@ -56,6 +57,12 @@ vi.mock('@/components/transactions/TransactionForm', () => ({
   },
 }));
 
+/**
+ * One stored entry as the WORKER writes it: `kind` is the classification it
+ * recorded on arrival, not null. A fixture that left it null would be a shape
+ * the worker never produces (it refuses an unclassifiable file rather than
+ * storing one), and the screen reads that field.
+ */
 function item(
   name: string,
   type: string,
@@ -63,7 +70,13 @@ function item(
 ): SharedBundleItem {
   const hasFile = overrides.file !== null;
   return {
-    entry: { name, type, size: 10, kind: null, key: 'k' },
+    entry: {
+      name,
+      type,
+      size: 10,
+      kind: classifySharedFile({ name, type }),
+      key: 'k',
+    },
     file: hasFile ? new File(['x'], name, { type }) : null,
     missing: false,
     ...overrides,
@@ -129,6 +142,49 @@ describe('share review screen', () => {
 
     await waitFor(() => expect(transactionForm).toHaveBeenCalled());
     expect(transactionForm.mock.calls[0][0].initialStagedFiles).toHaveLength(2);
+  });
+
+  // One classifier, not two. The worker recorded what each file is when it
+  // arrived; the screen must not re-derive it from the File, or the glyph in the
+  // list and the destination on offer can disagree about the same file.
+  it('follows the kind the worker recorded, not a fresh guess from the file', async () => {
+    const recordedAsStatement = item('looks-like-a-receipt.png', 'image/png', {
+      entry: {
+        name: 'looks-like-a-receipt.png',
+        type: 'image/png',
+        size: 10,
+        kind: 'statement',
+        key: 'k',
+      },
+    });
+    mocks.readSharedBundle.mockResolvedValue(bundle([recordedAsStatement]));
+
+    await renderPage();
+
+    expect(
+      await screen.findByRole('button', { name: /import as a statement/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /attach to a new transaction/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  // A stored file the worker never classified is not usable, and saying "share
+  // receipts and statements separately" about it would be a wrong explanation.
+  it('reports an unclassified stored file as unusable, not as a mixed share', async () => {
+    const unclassified = item('mystery', '', {
+      entry: { name: 'mystery', type: '', size: 10, kind: null, key: 'k' },
+    });
+    mocks.readSharedBundle.mockResolvedValue(bundle([unclassified]));
+
+    await renderPage();
+
+    expect(
+      await screen.findByText(/could not use any of these files/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/receipts and statements need separate shares/i),
+    ).not.toBeInTheDocument();
   });
 
   it('offers the import wizard for a share of statements', async () => {

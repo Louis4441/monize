@@ -49,8 +49,13 @@ function loadServiceWorker(options: { now?: number } = {}) {
   const absolute = (key: string) =>
     new URL(typeof key === 'string' ? key : String(key), ORIGIN).toString();
 
-  const makeCache = (store: Map<string, Response>) => ({
-    keys: async () => [...store.keys()].map((url) => ({ url })),
+  const order: string[] = [];
+
+  const makeCache = (store: Map<string, Response>, name: string) => ({
+    keys: async () => {
+      order.push(`keys:${name}`);
+      return [...store.keys()].map((url) => ({ url }));
+    },
     match: async (key: string | { url: string }) => {
       const hit = store.get(absolute(typeof key === 'string' ? key : key.url));
       return hit ? hit.clone() : undefined;
@@ -69,7 +74,7 @@ function loadServiceWorker(options: { now?: number } = {}) {
         store = new Map();
         stores.set(name, store);
       }
-      return makeCache(store);
+      return makeCache(store, name);
     },
     keys: async () => [...stores.keys()],
     delete: async (name: string) => stores.delete(name),
@@ -84,7 +89,12 @@ function loadServiceWorker(options: { now?: number } = {}) {
       skipWaiting: vi.fn(),
       location: { origin: ORIGIN },
       registration: { showNotification: vi.fn() },
-      clients: { claim: vi.fn(), matchAll: async () => [] },
+      clients: {
+        claim: vi.fn(() => {
+          order.push('claim');
+        }),
+        matchAll: async () => [],
+      },
       crypto: { randomUUID: () => `bundle-${++uuidCounter}` },
     },
     caches,
@@ -164,6 +174,7 @@ function loadServiceWorker(options: { now?: number } = {}) {
     listeners,
     stores,
     caches,
+    order,
     constant,
     dispatchFetch,
     dispatchActivate,
@@ -477,6 +488,20 @@ describe('service worker share stash lifetime', () => {
     expect(await sw.caches.keys()).toContain(SHARE_CACHE_NAME);
     expect(await sw.caches.keys()).not.toContain('monize-static-v2');
     expect(sw.shareStore().size).toBeGreaterThan(0);
+  });
+
+  // Taking control of open pages is what the offline fallback and the share
+  // target both need; housekeeping must not stand in front of it.
+  it('claims clients before it purges, so control is not gated on housekeeping', async () => {
+    const sw = loadServiceWorker();
+
+    await sw.dispatchActivate();
+
+    const claimed = sw.order.indexOf('claim');
+    const purged = sw.order.indexOf(`keys:${SHARE_CACHE_NAME}`);
+    expect(claimed).toBeGreaterThan(-1);
+    expect(purged).toBeGreaterThan(-1);
+    expect(claimed).toBeLessThan(purged);
   });
 
   it('purges an expired bundle on activate and keeps a live one', async () => {
