@@ -1060,6 +1060,24 @@ transport badge, renames, removes, and exposes the channel toggle); it does not
 mint the keys, because the client that will decrypt owns them. Copy says so
 rather than offering a browser button that could never receive.
 
+### 15.1.1 ntfy reference receiver
+
+`backend/scripts/unifiedpush-client/` now provides a Node.js receiver with local
+recipient key storage, owner-authenticated registration, encrypted ntfy polling,
+checkpointed reconnects and subscription removal. It uses the existing
+`POST /push/subscriptions` with `transport: "unifiedpush"`; no authentication,
+SSRF or delivery gate is relaxed. Monize session credentials are sent only to
+Monize and are unnecessary while listening. Message copy is localized by the
+server; the receiver emits JSON and accepts only same-origin navigation targets.
+
+This closes the absence of any registering receiver in the tree for ntfy.
+It does not provide an Android package, a D-Bus connector, desktop banners,
+or browser registration to arbitrary distributors. Session handoff is manual
+and ntfy endpoints requiring separate HTTP credentials are unsupported. The
+README specifies installation, lifecycle and the deployment smoke test.
+The automated registration-to-decryption harness uses real Web Push encryption
+with mocked HTTP boundaries; live distributor verification remains outstanding.
+
 ### 15.2 Data model (migration 184)
 
 - `push_subscriptions.transport VARCHAR(20) NOT NULL DEFAULT 'webpush'`, with a
