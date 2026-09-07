@@ -111,11 +111,12 @@ test.describe('Web Share Target', () => {
     await importButton.click();
 
     // The wizard opens on its own mapping step: the files are handed over, the
-    // import itself is still ahead of the user.
+    // import itself is still ahead of the user. Named exactly, so this cannot
+    // pass on some other piece of copy that happens to say "column".
     await page.waitForURL(/\/import/, { timeout: 30000 });
-    await expect(page.getByText(/column/i).first()).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(
+      page.getByText('CSV Column Mapping', { exact: false }),
+    ).toBeVisible({ timeout: 30000 });
 
     // Still nothing imported: reaching the wizard is not importing.
     const after = await api.get<{ data: unknown[] }>(
