@@ -27,6 +27,11 @@ const REVIEWED: Record<string, string> = {
   "backup/restore-plan.ts":
     "defers the self-referential foreign key and repairs it in Phase 3 -- a " +
     "restore ordering concern, and it must name the column to defer it",
+  "backup/support-backup/support-backup-integrity.ts":
+    "declares what the support export's referential scrub does with the link " +
+    "when its target row was trimmed away -- a dangling-reference rule, not a " +
+    "read that decides which attachments a user sees, and the coverage guard " +
+    "in support-backup.integration.spec.ts requires every real FK to appear",
 };
 
 function sourceFiles(dir: string): string[] {
