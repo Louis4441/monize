@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures';
 import { createAccount, createTransaction } from '../helpers/factories';
 import { uniqueId } from '../helpers/api';
 import { syntheticDocumentPng } from '../helpers/document-fixture';
+import { minimalPdf } from '../helpers/pdf-fixture';
 
 /**
  * Attachments, including the document scanner.
@@ -45,10 +46,24 @@ test.describe('Transaction attachments', () => {
 
     const row = dialog.locator('li', { hasText: 'note.png' });
     await expect(row).toBeVisible({ timeout: 15000 });
-    // A plain upload is stored as it was given: no original beside it.
-    await expect(
-      dialog.getByRole('link', { name: 'View original' }),
-    ).toHaveCount(0);
+
+    // Clicking the row previews rather than downloads.
+    await row.getByRole('button', { name: 'Preview note.png' }).click();
+    const preview = page.getByRole('dialog', { name: 'note.png' });
+    await expect(preview).toBeVisible();
+    await expect(preview.getByRole('img', { name: 'note.png' })).toBeVisible({
+      timeout: 15000,
+    });
+    // A plain upload is stored as it was given: no original to switch to.
+    await expect(preview.getByRole('button', { name: 'Original' })).toHaveCount(0);
+    // Download is still offered, from the preview.
+    const downloadHref = await preview
+      .getByRole('link', { name: 'Download' })
+      .getAttribute('href');
+    expect(downloadHref).toBeTruthy();
+    expect((await page.request.get(downloadHref!)).status()).toBe(200);
+    await preview.getByRole('button', { name: 'Close' }).last().click();
+    await expect(preview).toHaveCount(0);
 
     await row.getByRole('button', { name: 'Delete' }).click();
     await page
@@ -94,17 +109,24 @@ test.describe('Transaction attachments', () => {
       0,
     );
 
-    // The photo is still reachable, and the two files are different.
-    const originalLink = scanRow.getByRole('link', { name: 'View original' });
-    await expect(originalLink).toBeVisible();
+    // The photo is still reachable: the preview switches between the two,
+    // and Download follows whichever is on screen.
+    await scanRow.getByRole('button', { name: 'Preview receipt-scan.jpg' }).click();
+    const preview = page.getByRole('dialog', { name: 'receipt-scan.jpg' });
+    await expect(preview).toBeVisible();
+    const download = preview.getByRole('link', { name: 'Download' });
+    const scanHref = await download.getAttribute('href');
 
-    const scanHref = await scanRow
-      .getByRole('link', { name: 'receipt-scan.jpg' })
-      .getAttribute('href');
-    const originalHref = await originalLink.getAttribute('href');
+    const original = preview.getByRole('button', { name: 'Original' });
+    await expect(original).toBeVisible();
+    await original.click();
+    await expect(original).toHaveAttribute('aria-pressed', 'true');
+    const originalHref = await download.getAttribute('href');
     expect(scanHref).toBeTruthy();
     expect(originalHref).toBeTruthy();
     expect(originalHref).not.toBe(scanHref);
+    await preview.getByRole('button', { name: 'Close' }).last().click();
+    await expect(preview).toHaveCount(0);
 
     const scanResponse = await page.request.get(scanHref!);
     const originalResponse = await page.request.get(originalHref!);
@@ -156,8 +178,49 @@ test.describe('Transaction attachments', () => {
     // The photo is stored under its own name, with nothing behind it.
     const row = dialog.locator('li', { hasText: 'receipt.png' });
     await expect(row).toBeVisible({ timeout: 30000 });
-    await expect(row.getByRole('link', { name: 'View original' })).toHaveCount(
-      0,
-    );
+    await row.getByRole('button', { name: 'Preview receipt.png' }).click();
+    const preview = page.getByRole('dialog', { name: 'receipt.png' });
+    await expect(preview).toBeVisible();
+    await expect(preview.getByRole('button', { name: 'Original' })).toHaveCount(0);
+  });
+
+  test('previews a PDF in the app', async ({ authedPage: page, api }) => {
+    const account = await createAccount(api);
+    const payeeName = `Attach Pdf ${uniqueId()}`;
+    await createTransaction(api, { accountId: account.id, payeeName });
+
+    await page.goto('/transactions');
+    const dialog = await openTransaction(page, payeeName);
+
+    await dialog.getByLabel('Add attachment').setInputFiles({
+      name: 'invoice.pdf',
+      mimeType: 'application/pdf',
+      buffer: minimalPdf(),
+    });
+
+    const row = dialog.locator('li', { hasText: 'invoice.pdf' });
+    await expect(row).toBeVisible({ timeout: 15000 });
+    await row.getByRole('button', { name: 'Preview invoice.pdf' }).click();
+    const preview = page.getByRole('dialog', { name: 'invoice.pdf' });
+    await expect(preview).toBeVisible();
+
+    // This is the only place the vendored worker, its module MIME type and
+    // the page's CSP are exercised: the unit suites mock the engine away. A
+    // drawn page is a canvas with a real size; a failed engine is an alert.
+    const firstPage = preview.getByRole('img', { name: 'Page 1 of 1' });
+    await expect(firstPage).toBeVisible({ timeout: 60000 });
+    await expect
+      .poll(async () => firstPage.evaluate((el) => (el as HTMLCanvasElement).height), {
+        timeout: 60000,
+      })
+      .toBeGreaterThan(0);
+    await expect(preview.getByRole('alert')).toHaveCount(0);
+
+    const downloadHref = await preview
+      .getByRole('link', { name: 'Download' })
+      .getAttribute('href');
+    const response = await page.request.get(downloadHref!);
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toContain('application/pdf');
   });
 });

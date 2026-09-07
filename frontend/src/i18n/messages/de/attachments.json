@@ -24,7 +24,6 @@
     "failed": "Das Dokument konnte nicht gescannt werden. Sie können das Foto trotzdem unverändert anhängen.",
     "viewEnhanced": "Aufbereitet",
     "viewOriginal": "Original",
-    "viewOriginalFile": "Original ansehen",
     "rotate": "Drehen",
     "styleLabel": "Finish",
     "styles": {
@@ -67,5 +66,15 @@
       "bottomLeft": "Ecke unten links"
     },
     "originalKept": "Original behalten"
+  },
+  "preview": {
+    "loading": "Vorschau wird geladen…",
+    "failed": "Die Vorschau konnte nicht geladen werden. Sie können die Datei trotzdem herunterladen.",
+    "unsupported": "Dieser Dateityp kann nicht als Vorschau angezeigt werden. Sie können ihn trotzdem herunterladen.",
+    "fit": "An Bildschirm anpassen",
+    "actualSize": "Originalgröße",
+    "pageCount": "{count, plural, one {# Seite} other {# Seiten}}",
+    "page": "Seite {page} von {total}",
+    "open": "Vorschau von {name}"
   }
 }

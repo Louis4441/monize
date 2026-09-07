@@ -8,6 +8,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { getErrorMessage } from '@/lib/errors';
 import { attachmentsApi, attachmentDownloadUrl } from '@/lib/attachments';
+import { AttachmentPreviewDialog, type PreviewTarget } from './AttachmentPreviewDialog';
 import { DocumentScanDialog, type ScanOutcome } from './DocumentScanDialog';
 import { ScanDocumentControl } from './ScanDocumentControl';
 import {
@@ -118,6 +119,14 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
   const [deleting, setDeleting] = useState(false);
   /** The photo currently in the scan dialog, or null when it is closed. */
   const [scanning, setScanning] = useState<File | null>(null);
+  /**
+   * The attachment open in the preview, or null when it is closed.
+   *
+   * The whole target is held here rather than composed in the JSX, so it keeps
+   * one identity for as long as it is on screen -- an object rebuilt on every
+   * render of this list is a different subject to anything downstream.
+   */
+  const [preview, setPreview] = useState<PreviewTarget | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -239,58 +248,49 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
                 key={attachment.id}
                 className="flex items-center gap-3 rounded-md border border-gray-200 dark:border-gray-700 p-2"
               >
-                {showThumb ? (
-                  // Served from our own backend; next/image adds no value and
-                  // cannot follow the onError fallback.
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={attachmentDownloadUrl(attachment.id)}
-                    alt={attachment.filename}
-                    loading="lazy"
-                    className="h-10 w-10 shrink-0 rounded object-cover"
-                    onError={() =>
-                      setErroredImages((prev) => ({
-                        ...prev,
-                        [attachment.id]: true,
-                      }))
-                    }
-                  />
-                ) : (
-                  <span
-                    aria-hidden="true"
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-lg"
-                  >
-                    {attachment.contentType === 'application/pdf' ? '📄' : '📎'}
-                  </span>
-                )}
-                <div className="min-w-0 flex-1">
-                  <a
-                    href={attachmentDownloadUrl(attachment.id)}
-                    download={attachment.filename}
-                    className="block truncate text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    {attachment.filename}
-                  </a>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {formatBytes(attachment.byteSize)}
-                  </span>
-                  {/* A scan pair is one attachment: the photo it came from is
-                      reached from this row rather than listed as a second one. */}
-                  {attachment.originalAttachmentId && (
-                    <>
-                      {' '}
-                      <a
-                        href={attachmentDownloadUrl(
-                          attachment.originalAttachmentId,
-                        )}
-                        download
-                        className="text-xs text-blue-600 hover:underline dark:text-blue-400"
-                      >
-                        {t('scan.viewOriginalFile')}
-                      </a>
-                    </>
+                {/* The row is the preview trigger: thumbnail, name and size
+                    in one button, with the filename as its accessible name.
+                    Delete stays a sibling -- a control inside a button is
+                    a control nobody can reach. */}
+                <button
+                  type="button"
+                  onClick={() => setPreview({ kind: 'saved', attachment })}
+                  aria-label={t('preview.open', { name: attachment.filename })}
+                  className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                >
+                  {showThumb ? (
+                    // Served from our own backend; next/image adds no value and
+                    // cannot follow the onError fallback.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={attachmentDownloadUrl(attachment.id)}
+                      alt=""
+                      loading="lazy"
+                      className="h-10 w-10 shrink-0 rounded object-cover"
+                      onError={() =>
+                        setErroredImages((prev) => ({
+                          ...prev,
+                          [attachment.id]: true,
+                        }))
+                      }
+                    />
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-lg"
+                    >
+                      {attachment.contentType === 'application/pdf' ? '📄' : '📎'}
+                    </span>
                   )}
-                </div>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                      {attachment.filename}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {formatBytes(attachment.byteSize)}
+                    </span>
+                  </span>
+                </button>
                 <Button
                   type="button"
                   variant="ghost"
@@ -315,6 +315,12 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
         // cleared after every pick, so choosing the same photo again works.
         onRetake={handleScanRetake}
         onAccept={handleScanAccepted}
+      />
+
+      <AttachmentPreviewDialog
+        isOpen={preview !== null}
+        target={preview}
+        onClose={() => setPreview(null)}
       />
 
       <ConfirmDialog
@@ -346,6 +352,8 @@ function StagedAttachments({
   const t = useTranslations('attachments');
   const { formatBytes } = useNumberFormat();
   const [scanning, setScanning] = useState<File | null>(null);
+  /** The staged entry open in the preview, or null when it is closed. */
+  const [preview, setPreview] = useState<PreviewTarget | null>(null);
 
   // Object URLs for image previews, recreated whenever the file list changes
   // and revoked on cleanup so blobs are not leaked. Guarded for environments
@@ -439,36 +447,45 @@ function StagedAttachments({
         <>
           <ul className="space-y-2">
             {files.map(({ file, original }, index) => {
-              const preview = previews[index];
+              const thumbnail = previews[index];
               return (
                 <li
                   key={`${file.name}-${index}`}
                   className="flex items-center gap-3 rounded-md border border-gray-200 dark:border-gray-700 p-2"
                 >
-                  {preview ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={preview}
-                      alt={file.name}
-                      className="h-10 w-10 shrink-0 rounded object-cover"
-                    />
-                  ) : (
-                    <span
-                      aria-hidden="true"
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-lg"
-                    >
-                      {file.type === 'application/pdf' ? '📄' : '📎'}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPreview({ kind: 'file', file, original })
+                    }
+                    aria-label={t('preview.open', { name: file.name })}
+                    className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  >
+                    {thumbnail ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={thumbnail}
+                        alt=""
+                        className="h-10 w-10 shrink-0 rounded object-cover"
+                      />
+                    ) : (
+                      <span
+                        aria-hidden="true"
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-lg"
+                      >
+                        {file.type === 'application/pdf' ? '📄' : '📎'}
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm text-gray-900 dark:text-gray-100">
+                        {file.name}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {formatBytes(file.size)}
+                        {original ? ` · ${t('scan.originalKept')}` : ''}
+                      </span>
                     </span>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <span className="block truncate text-sm text-gray-900 dark:text-gray-100">
-                      {file.name}
-                    </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {formatBytes(file.size)}
-                      {original ? ` · ${t('scan.originalKept')}` : ''}
-                    </span>
-                  </div>
+                  </button>
                   <Button
                     type="button"
                     variant="ghost"
@@ -494,6 +511,12 @@ function StagedAttachments({
         onCancel={() => setScanning(null)}
         onRetake={handleScanRetake}
         onAccept={handleScanAccepted}
+      />
+
+      <AttachmentPreviewDialog
+        isOpen={preview !== null}
+        target={preview}
+        onClose={() => setPreview(null)}
       />
     </div>
   );

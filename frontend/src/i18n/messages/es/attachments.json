@@ -24,7 +24,6 @@
     "failed": "No se pudo escanear el documento. Aun así puede adjuntar la foto tal cual.",
     "viewEnhanced": "Mejorada",
     "viewOriginal": "Original",
-    "viewOriginalFile": "Ver original",
     "rotate": "Girar",
     "styleLabel": "Acabado",
     "styles": {
@@ -67,5 +66,15 @@
       "bottomLeft": "Esquina inferior izquierda"
     },
     "originalKept": "original conservado"
+  },
+  "preview": {
+    "loading": "Cargando la vista previa…",
+    "failed": "No se pudo cargar la vista previa. Aún puedes descargar el archivo.",
+    "unsupported": "Este tipo de archivo no se puede previsualizar. Aún puedes descargarlo.",
+    "fit": "Ajustar a la pantalla",
+    "actualSize": "Tamaño real",
+    "pageCount": "{count, plural, one {# página} other {# páginas}}",
+    "page": "Página {page} de {total}",
+    "open": "Vista previa de {name}"
   }
 }

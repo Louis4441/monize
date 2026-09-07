@@ -24,7 +24,6 @@
     "failed": "Não foi possível digitalizar o documento. Pode mesmo assim anexar a fotografia tal como está.",
     "viewEnhanced": "Melhorada",
     "viewOriginal": "Original",
-    "viewOriginalFile": "Ver original",
     "rotate": "Rodar",
     "styleLabel": "Acabamento",
     "styles": {
@@ -67,5 +66,15 @@
       "bottomLeft": "Canto inferior esquerdo"
     },
     "originalKept": "original mantido"
+  },
+  "preview": {
+    "loading": "A carregar a pré-visualização…",
+    "failed": "Não foi possível carregar a pré-visualização. Ainda pode transferir o ficheiro.",
+    "unsupported": "Este tipo de ficheiro não pode ser pré-visualizado. Ainda pode transferi-lo.",
+    "fit": "Ajustar ao ecrã",
+    "actualSize": "Tamanho real",
+    "pageCount": "{count, plural, one {# página} other {# páginas}}",
+    "page": "Página {page} de {total}",
+    "open": "Pré-visualizar {name}"
   }
 }

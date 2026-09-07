@@ -24,7 +24,6 @@
     "failed": "Non è stato possibile scansionare il documento. Puoi comunque allegare la foto così com’è.",
     "viewEnhanced": "Migliorata",
     "viewOriginal": "Originale",
-    "viewOriginalFile": "Vedi originale",
     "rotate": "Ruota",
     "styleLabel": "Resa",
     "styles": {
@@ -67,5 +66,15 @@
       "bottomLeft": "Angolo in basso a sinistra"
     },
     "originalKept": "originale conservato"
+  },
+  "preview": {
+    "loading": "Caricamento dell'anteprima…",
+    "failed": "Impossibile caricare l'anteprima. Puoi comunque scaricare il file.",
+    "unsupported": "Questo tipo di file non può essere visualizzato in anteprima. Puoi comunque scaricarlo.",
+    "fit": "Adatta allo schermo",
+    "actualSize": "Dimensione reale",
+    "pageCount": "{count, plural, one {# pagina} other {# pagine}}",
+    "page": "Pagina {page} di {total}",
+    "open": "Anteprima di {name}"
   }
 }

@@ -24,7 +24,6 @@
     "failed": "書類をスキャンできませんでした。写真はそのまま添付できます。",
     "viewEnhanced": "補正後",
     "viewOriginal": "元の写真",
-    "viewOriginalFile": "元の写真を表示",
     "rotate": "回転",
     "styleLabel": "仕上がり",
     "styles": {
@@ -67,5 +66,15 @@
       "bottomLeft": "左下の角"
     },
     "originalKept": "元の写真を保持"
+  },
+  "preview": {
+    "loading": "プレビューを読み込んでいます…",
+    "failed": "プレビューを読み込めませんでした。ファイルはダウンロードできます。",
+    "unsupported": "この種類のファイルはプレビューできません。ダウンロードは可能です。",
+    "fit": "画面に合わせる",
+    "actualSize": "実際のサイズ",
+    "pageCount": "{count, plural, other {# ページ}}",
+    "page": "{total} ページ中 {page} ページ",
+    "open": "{name} をプレビュー"
   }
 }

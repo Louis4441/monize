@@ -24,7 +24,6 @@
     "failed": "無法掃描此文件。您仍可依原樣附加這張照片。",
     "viewEnhanced": "強化版",
     "viewOriginal": "原圖",
-    "viewOriginalFile": "檢視原圖",
     "rotate": "旋轉",
     "styleLabel": "處理方式",
     "styles": {
@@ -67,5 +66,15 @@
       "bottomLeft": "左下角"
     },
     "originalKept": "已保留原圖"
+  },
+  "preview": {
+    "loading": "正在載入預覽…",
+    "failed": "無法載入預覽。您仍然可以下載該檔案。",
+    "unsupported": "無法預覽此類型的檔案。您仍然可以下載它。",
+    "fit": "符合螢幕",
+    "actualSize": "實際大小",
+    "pageCount": "{count, plural, other {# 頁}}",
+    "page": "第 {page} 頁，共 {total} 頁",
+    "open": "預覽 {name}"
   }
 }

@@ -193,6 +193,56 @@ photo can reach the dialog, "Keep original only" would upload a file the server
 answers **413** to, so it is disabled there. A control offering an action the
 server will refuse is worse than an absent one.
 
+### An attachment is opened in `AttachmentPreviewDialog`, never downloaded from a row
+
+Clicking an attachment previews it; Download is a footer action of the preview.
+Four rules the viewer holds, each with a test:
+
+- **Bytes come through `attachmentsApi.fetchBytes`**, never a bare `<img src>`
+  or `fetch`: the axios client's 401-refresh interceptor is the only thing that
+  can renew an expired token, and an `<img>` whose request 401s simply fails to
+  load. The row's thumbnail still uses `attachmentDownloadUrl` directly, and
+  that is why the preview's request is answered from the HTTP cache it primed.
+  `useAttachmentBytes` keys the payload to its source, so switching Enhanced to
+  Original and back cannot paint the slower answer over the newer one, and a
+  failed read is `error`, never an empty result.
+- **pdf.js is reached from one module behind a dynamic import.**
+  `lib/attachment-preview/pdf-engine.ts` is the only file naming `pdfjs-dist`
+  or `/vendor/pdfjs/`, and `PdfPages` is the only place it is `import()`ed, so
+  no page pays for a PDF renderer until somebody previews a PDF (the module
+  also touches `DOMMatrix` at load, which a server render must never reach).
+  `lib/attachment-preview/attachment-preview.guard.test.ts` scans for both.
+- **The worker is vendored and version-pinned.** pdf.js constructs its own
+  Web Worker from `GlobalWorkerOptions.workerSrc`; the script must match the
+  bundled API exactly, so `frontend/scripts/copy-vendor.mjs` copies it out of the
+  installed package on `predev`/`prebuild`/`pretest` (beside the OpenCV build,
+  same script) and the engine appends `?v=<pdfjs.version>` so a stale copy in
+  the HTTP cache cannot answer for a newer API. `public/sw.js` deliberately
+  does not cache `.mjs`.
+- **A PDF page is drawn when the reader can see it.** A canvas costs its
+  pixels whether or not anyone is looking, and at the dialog's width a full
+  page clamps to `MAX_PAGE_PIXELS`, which is 16 MB: drawing all of a 20-page
+  statement up front asks for hundreds of megabytes and loses the tab on a
+  phone. `PdfPages` observes each page and releases the backing store of one
+  scrolled away, keeping the box it measured so nothing jumps. What bounds the
+  cost is what is on screen, never the length of the document.
+- **What the reader chose belongs to the attachment, not to the prop object.**
+  The dialog keys its Enhanced/Original and Fit/Actual state on the subject
+  being previewed (`previewSourceKey`), because a caller that composes `target`
+  in its JSX rebuilds it on every one of its own renders -- and keyed on
+  identity that threw the reader back to the enhanced image mid-read, and
+  re-fetched it. The saved list also holds the whole target in state, as the
+  staged list already did. Which controls the toolbar offers likewise comes
+  from the metadata, not from the bytes in flight, or they appear late and
+  shift the picture underneath.
+- **A phone gets the whole viewport through `Modal`'s `fullScreenOnPhone`**,
+  spelled with `max-sm:` variants so the base classes every other dialog
+  relies on are untouched. The layout is a CSS question, so it is not
+  `useIsMobile` (see the next section). A scan pair's Enhanced / Original
+  switch is the same two-button pattern `DocumentScanDialog` draws, and the
+  original's Download carries no filename because the list does not know it --
+  the server names it through Content-Disposition.
+
 ### A platform capability is not decided by the window's width -- `isTouchDevice`
 
 `useIsMobile` is a 639px media query; `isTouchDevice` (`lib/touch-device.ts`) is

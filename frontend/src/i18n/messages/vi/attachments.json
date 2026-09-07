@@ -24,7 +24,6 @@
     "failed": "Không thể quét tài liệu. Bạn vẫn có thể đính kèm ảnh như hiện tại.",
     "viewEnhanced": "Đã cải thiện",
     "viewOriginal": "Ảnh gốc",
-    "viewOriginalFile": "Xem ảnh gốc",
     "rotate": "Xoay",
     "styleLabel": "Kiểu hoàn thiện",
     "styles": {
@@ -67,5 +66,15 @@
       "bottomLeft": "Góc dưới bên trái"
     },
     "originalKept": "đã giữ ảnh gốc"
+  },
+  "preview": {
+    "loading": "Đang tải bản xem trước…",
+    "failed": "Không thể tải bản xem trước. Bạn vẫn có thể tải tệp xuống.",
+    "unsupported": "Không thể xem trước loại tệp này. Bạn vẫn có thể tải nó xuống.",
+    "fit": "Vừa màn hình",
+    "actualSize": "Kích thước thật",
+    "pageCount": "{count, plural, other {# trang}}",
+    "page": "Trang {page} / {total}",
+    "open": "Xem trước {name}"
   }
 }

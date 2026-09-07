@@ -24,7 +24,6 @@
     "failed": "Dokumen tidak dapat dipindai. Anda tetap dapat melampirkan fotonya apa adanya.",
     "viewEnhanced": "Ditingkatkan",
     "viewOriginal": "Asli",
-    "viewOriginalFile": "Lihat asli",
     "rotate": "Putar",
     "styleLabel": "Hasil akhir",
     "styles": {
@@ -67,5 +66,15 @@
       "bottomLeft": "Sudut kiri bawah"
     },
     "originalKept": "foto asli disimpan"
+  },
+  "preview": {
+    "loading": "Memuat pratinjau…",
+    "failed": "Pratinjau tidak dapat dimuat. Anda tetap dapat mengunduh berkasnya.",
+    "unsupported": "Jenis berkas ini tidak dapat dipratinjau. Anda tetap dapat mengunduhnya.",
+    "fit": "Sesuaikan dengan layar",
+    "actualSize": "Ukuran sebenarnya",
+    "pageCount": "{count, plural, other {# halaman}}",
+    "page": "Halaman {page} dari {total}",
+    "open": "Pratinjau {name}"
   }
 }

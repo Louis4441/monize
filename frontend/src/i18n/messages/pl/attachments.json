@@ -24,7 +24,6 @@
     "failed": "Nie udało się zeskanować dokumentu. Nadal możesz dołączyć zdjęcie w obecnej postaci.",
     "viewEnhanced": "Poprawione",
     "viewOriginal": "Oryginał",
-    "viewOriginalFile": "Zobacz oryginał",
     "rotate": "Obróć",
     "styleLabel": "Wykończenie",
     "styles": {
@@ -67,5 +66,15 @@
       "bottomLeft": "Lewy dolny narożnik"
     },
     "originalKept": "oryginał zachowany"
+  },
+  "preview": {
+    "loading": "Ładowanie podglądu…",
+    "failed": "Nie udało się wczytać podglądu. Nadal możesz pobrać plik.",
+    "unsupported": "Tego typu pliku nie można podejrzeć. Nadal możesz go pobrać.",
+    "fit": "Dopasuj do ekranu",
+    "actualSize": "Rzeczywisty rozmiar",
+    "pageCount": "{count, plural, one {# strona} few {# strony} many {# stron} other {# strony}}",
+    "page": "Strona {page} z {total}",
+    "open": "Podgląd {name}"
   }
 }

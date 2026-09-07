@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join, relative } from 'path';
 import { describe, expect, it } from 'vitest';
+import { blankComments } from '@/test/blank-comments';
 
 const SRC_ROOT = join(__dirname, '..', '..');
 
@@ -24,22 +25,6 @@ function sourceFiles(dir: string): string[] {
     out.push(full);
   }
   return out;
-}
-
-/**
- * Blank comments while preserving line breaks, so an offender still reports the
- * right line.
- *
- * This scan's subjects have to be named in prose -- the engine module explains
- * at length why it does not import the package -- so matching raw text would
- * fail on the explanation, and the cheap way out is to weaken the explanation.
- */
-export function blankComments(source: string): string {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, ' '))
-    .replace(/(^|[^:])\/\/[^\n]*/g, (match, prefix: string) =>
-      prefix.concat(' '.repeat(match.length - prefix.length)),
-    );
 }
 
 const files = sourceFiles(SRC_ROOT).map((file) => ({

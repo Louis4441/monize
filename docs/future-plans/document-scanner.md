@@ -42,7 +42,7 @@ Answers to the discussion's open questions, confirmed with the maintainer on
 | # | Question | Decision |
 |---|---|---|
 | 1 | Where does processing run? | **In the browser, in a Web Worker**, using a self-hosted OpenCV.js WebAssembly build loaded lazily the first time the scan dialog opens. No backend image dependency, no async job, identical behaviour for the database, local and S3 storage providers, and the photo never leaves the device unprocessed unless the user asks to keep it. |
-| 2 | Store the original, the enhanced image, or both? | **Both, as two linked `transaction_attachments` rows written in one request and one transaction.** The enhanced image is the attachment the user sees; the original is a hidden sibling reachable through "View original". |
+| 2 | Store the original, the enhanced image, or both? | **Both, as two linked `transaction_attachments` rows written in one request and one transaction.** The enhanced image is the attachment the user sees; the original is a hidden sibling reachable through the Original toggle in the attachment preview. |
 | 3 | Automatic detection or an explicit choice? | **An explicit "Scan document" button** beside "Upload". A plain upload is never modified. Auto-offering on every image upload is a possible follow-up behind a preference. |
 | 4 | Quality checks? | **Yes, as warnings, never as a block**: motion blur, document edges outside the frame, and low output resolution, each with a Retake action. |
 | 5 | Camera? | **Direct rear-camera capture on mobile** via `capture="environment"` on the scan control's file input; desktop gets the normal file picker. |
@@ -161,7 +161,7 @@ the restore plan. Without it the fourth site drifts, and a scan pair shows as
 "2" in the register while the list shows one.
 
 `getForDownload` is unchanged: it authorizes by `user_id` and the original has
-its own id, so "View original" is the existing download route.
+its own id, so the preview's Original view reads the existing download route.
 
 ### Delete
 
@@ -379,8 +379,9 @@ Staged mode: `stagedFiles: File[]` becomes `StagedAttachment[]`
 `TransactionForm.tsx`'s post-create loop passes both parts. The staged
 thumbnail shows the enhanced file.
 
-The saved list shows one row per pair with the enhanced thumbnail and, when
-`originalAttachmentId` is set, a "View original" link to
+The saved list shows one row per pair with the enhanced thumbnail; clicking
+the row opens `AttachmentPreviewDialog`, which offers an Enhanced / Original
+toggle when `originalAttachmentId` is set and fetches the original through
 `attachmentDownloadUrl(originalAttachmentId)`. Delete removes the pair (one
 confirm, as today).
 
@@ -421,10 +422,10 @@ English edit.
 | Backend integration | `backup-restore.integration.spec.ts` | A pair whose original sorts first survives export and restore. |
 | Frontend unit | `document-scan-pipeline.test.ts`, `document-scan-quality.test.ts` | Real engine under Node on synthetic fixtures: detected corners within tolerance of the planted ones, `documentFound: false` on a blank frame, a blurred fixture flags `blurry`, a sharp one does not, determinism (same input twice is byte-equal, I3). |
 | Frontend unit | `document-scan-client.test.ts`, `useDocumentScanner.test.ts` | Mocked `Worker`: request ids, a stale reply is dropped (I6), timeout, dispose terminates. |
-| Frontend unit | `DocumentScanDialog.test.tsx`, `DocumentCornerHandles.test.tsx`, `AttachmentsSection.test.tsx` | State transitions, every warning keeps "Use anyway", handle drag calls `rewarp`, staged pairs upload both parts, "View original" renders only when the id is present. |
+| Frontend unit | `DocumentScanDialog.test.tsx`, `DocumentCornerHandles.test.tsx`, `AttachmentsSection.test.tsx` | State transitions, every warning keeps "Use anyway", handle drag calls `rewarp`, staged pairs upload both parts, the preview offers Original only when the id is present. |
 | Frontend guard | `document-scan.guard.test.ts` | The engine module is imported only from `opencv-engine.ts`; `new Worker(` appears only in `document-scan-client.ts`. |
 | Frontend guard | `proxy.test.ts` | `'wasm-unsafe-eval'` is in `script-src`. |
-| E2E | `e2e/tests/attachments.spec.ts` | Chromium runs the real WASM: plain upload, scan a generated fixture PNG, accept, one row with "View original", download both, delete removes both. Follows `e2e/tests/import.spec.ts` for `setInputFiles`. |
+| E2E | `e2e/tests/attachments.spec.ts` | Chromium runs the real WASM: plain upload, scan a generated fixture PNG, accept, one row whose preview offers Original, download both, delete removes both. Follows `e2e/tests/import.spec.ts` for `setInputFiles`. |
 
 A green suite after any behaviour change in this list is a finding, per the
 root `CLAUDE.md`.
