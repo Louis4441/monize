@@ -159,7 +159,12 @@ describe('createScannerClient', () => {
         style: 'blackAndWhite',
       });
 
-      await expect(pending).resolves.toBe(image);
+      // The finish comes back from the worker rather than being assumed from
+      // the request: what the result claims to be is what was produced.
+      await expect(pending).resolves.toEqual({
+        image,
+        style: 'blackAndWhite',
+      });
     });
 
     // The two reply shapes are agreed between this file and the worker, and a

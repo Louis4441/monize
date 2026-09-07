@@ -80,7 +80,17 @@ export function useDocumentScanner(
   createWorker?: WorkerFactory,
 ): UseDocumentScanner {
   const clientRef = useRef<ScannerClient | null>(null);
-  const sourceRef = useRef<RawImage | null>(null);
+  /**
+   * The decoded photo, inseparable from the attempt that decoded it.
+   *
+   * One ref rather than two, because the pair is only meaningful together: the
+   * refine loop below runs across awaits, and reading the image and the attempt
+   * from separate refs let it take a photo from one attempt and stamp the
+   * result with another -- a warp of the discarded photo, presented as the
+   * current one (`I6`, and `frontend/CLAUDE.md`'s rule that asynchronous data
+   * belongs to the request that produced it).
+   */
+  const sourceRef = useRef<{ attempt: number; image: RawImage } | null>(null);
   /**
    * Which attempt is current. Incremented by every scan and every reset, so a
    * reply captured under an older value is known to be stale without needing
@@ -153,7 +163,7 @@ export function useDocumentScanner(
       try {
         const image = await decodeImageFile(file);
         if (attempt !== attemptRef.current) return;
-        sourceRef.current = image;
+        sourceRef.current = { attempt, image };
         const result = await client().scan(image, DEFAULT_SCAN_STYLE);
         if (attempt === attemptRef.current) resultRef.current = result;
         commit(attempt, {
@@ -177,8 +187,7 @@ export function useDocumentScanner(
 
   const refine = useCallback(
     async (recipe: ScanRecipe): Promise<void> => {
-      const image = sourceRef.current;
-      if (!image) return;
+      if (!sourceRef.current) return;
 
       pendingRecipeRef.current = recipe;
       // Someone is already draining the queue; it will pick this up.
@@ -189,9 +198,14 @@ export function useDocumentScanner(
         while (pendingRecipeRef.current) {
           const next = pendingRecipeRef.current;
           pendingRecipeRef.current = null;
+          // Read per iteration, not once at the top: this loop can be draining
+          // a recipe queued after a DIFFERENT photo was scanned, and the photo
+          // it works from must be the one the result will be stamped with.
+          const source = sourceRef.current;
+          if (!source) break;
           // Deliberately NOT a new attempt: a refine works on the photo already
           // on screen, so a scan of a different photo landing meanwhile wins.
-          const attempt = attemptRef.current;
+          const { attempt, image } = source;
           commit(attempt, { recomputing: true });
           try {
             const previous = resultRef.current;
@@ -201,18 +215,19 @@ export function useDocumentScanner(
             // right one" is a fact about what has landed, not about the click.
             const result =
               previous && sameQuad(previous.quad, next.quad)
-                ? {
-                    // The warnings are carried over rather than recomputed, and
-                    // that is sound rather than convenient: all three are
-                    // measured on the photo, the corners or the output's size,
-                    // none of which a finish moves.
-                    ...previous,
-                    enhanced: await client().restyle(
-                      previous.warped,
-                      next.style,
-                    ),
-                    style: next.style,
-                  }
+                ? await client()
+                    .restyle(previous.warped, next.style)
+                    .then((restyled) => ({
+                      // The warnings are carried over rather than recomputed,
+                      // and that is sound rather than convenient: all three are
+                      // measured on the photo, the corners or the output's
+                      // size, none of which a finish moves.
+                      ...previous,
+                      enhanced: restyled.image,
+                      // The worker's answer, not the request: what the result
+                      // says it is has to be what was actually produced.
+                      style: restyled.style,
+                    }))
                 : await client().rewarp(image, next.quad, next.style);
             if (attempt === attemptRef.current) resultRef.current = result;
             commit(attempt, { status: 'ready', result, error: null });

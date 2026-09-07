@@ -176,6 +176,36 @@ ask about the *platform* (`detectMapPlatform`, `pointer: coarse`), never
 `useIsMobile` -- that is a 639px viewport query, so a narrow desktop window would
 flip the behaviour mid-session.
 
+### A gate belongs to the thing it admits, not to the thing that produced it
+
+The scan control checked the picked photo against `MAX_ATTACHMENT_BYTES` before
+opening the scanner, copied from the plain upload where it is right -- there the
+file *is* the attachment. Here it is the scanner's INPUT: what gets attached is
+a JPEG capped at `OUTPUT_MAX_EDGE`, so the check refused exactly the captures
+the feature exists for (a 12MP phone photo is routinely over 10 MB and scans to
+well under it), and it made the dialog's own "the original is too large to keep"
+path unreachable outside its unit test -- two suites asserting opposite
+behaviours, both green. Before copying an admission check, ask which artefact
+the limit describes.
+
+The other half of that fix is the same rule pointing the other way: once such a
+photo can reach the dialog, "Keep original only" would upload a file the server
+answers **413** to, so it is disabled there. A control offering an action the
+server will refuse is worse than an absent one.
+
+### A platform capability is not decided by the window's width -- `isTouchDevice`
+
+`useIsMobile` is a 639px media query; `isTouchDevice` (`lib/touch-device.ts`) is
+`(pointer: coarse)`, and they answer different questions. The viewport hook is
+right for choosing a *layout* (the register's card rows show the same figures
+either way) and wrong for anything that changes what a control can do:
+`capture="environment"` on the scan input replaces the OS file picker with the
+camera on a browser that honours it, so keyed off the width it took "choose an
+existing photo" away from anyone with a narrow desktop window and handed it back
+when they widened it. The media query lives in that one helper -- `DateInput`
+held the only other copy -- and `ui-conventions.test.ts` fails a `capture` in a
+file that imports `useIsMobile`, and a second hand-rolled `pointer: coarse`.
+
 ### Date entry -- `DateInput`, never a raw `<input type="date">`
 
 `components/ui/DateInput.tsx` is the only place a raw date input is allowed; `ui-conventions.test.ts` fails the build if another appears. It carries lenient parsing of typed text, keyboard shortcuts, and `CalendarPopover`. Key behaviors:

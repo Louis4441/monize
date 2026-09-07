@@ -1,6 +1,9 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { handleScanMessage } from './document-scan-messages';
+import {
+  handleScanMessage,
+  transferablesFor,
+} from './document-scan-messages';
 import { loadEngine } from './opencv-engine';
 import { DEFAULT_QUAD, syntheticDocument } from './synthetic-document';
 import type { Quad, ScanStyle } from './document-scan.types';
@@ -168,6 +171,66 @@ describe('handleScanMessage', () => {
       expect(Array.from(restyled.image.data)).toEqual(
         Array.from(direct.result.enhanced.data),
       );
+    });
+  });
+
+  describe('what a reply hands over rather than copies', () => {
+    async function scanWith(style: ScanStyle) {
+      const response = await handleScanMessage({
+        kind: 'scan',
+        requestId: 1,
+        image: syntheticDocument(),
+        style,
+      });
+      if (response.kind !== 'result') throw new Error('expected a result');
+      return response;
+    }
+
+    it('transfers both images a scan produces', async () => {
+      const response = await scanWith('colour');
+      const buffers = transferablesFor(response);
+
+      expect(buffers).toHaveLength(2);
+      expect(buffers).toContain(response.result.enhanced.data.buffer);
+      // The crop travels too. Left out it is structured-cloned on every scan --
+      // several megabytes of copy for a buffer the worker is done with.
+      expect(buffers).toContain(response.result.warped.data.buffer);
+    });
+
+    // `applyStyle` returns its input unchanged for `none`, so the two images
+    // are one buffer -- and `postMessage` throws DataCloneError on a transfer
+    // list that names it twice, which would break that finish outright.
+    it('names an aliased buffer once', async () => {
+      const response = await scanWith('none');
+      expect(response.result.warped.data.buffer).toBe(
+        response.result.enhanced.data.buffer,
+      );
+
+      expect(transferablesFor(response)).toHaveLength(1);
+    });
+
+    it('transfers the image a restyle produces', async () => {
+      const scanned = await scanWith('colour');
+      const response = await handleScanMessage({
+        kind: 'restyle',
+        requestId: 2,
+        image: scanned.result.warped,
+        style: 'grayscale',
+      });
+      if (response.kind !== 'image') throw new Error('expected an image');
+
+      expect(transferablesFor(response)).toEqual([response.image.data.buffer]);
+    });
+
+    it('has nothing to transfer for a failure', async () => {
+      const response = await handleScanMessage({
+        kind: 'scan',
+        requestId: 3,
+        image: { width: 0, height: 0, data: new Uint8ClampedArray(0) },
+        style: 'colour',
+      });
+      expect(response.kind).toBe('error');
+      expect(transferablesFor(response)).toEqual([]);
     });
   });
 

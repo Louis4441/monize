@@ -25,8 +25,14 @@ import type {
 /** How long a single scan may take before it is treated as hung. */
 export const SCAN_TIMEOUT_MS = 60_000;
 
+/** A restyle's answer: the finished pixels, and what they were finished as. */
+export interface RestyledImage {
+  image: RawImage;
+  style: ScanStyle;
+}
+
 /** What a worker reply can carry: a whole scan, or finished pixels alone. */
-type ScannerPayload = ScanResult | RawImage;
+type ScannerPayload = ScanResult | RestyledImage;
 
 interface Pending {
   resolve: (payload: ScannerPayload) => void;
@@ -39,9 +45,11 @@ export interface ScannerClient {
   rewarp(image: RawImage, quad: Quad, style: ScanStyle): Promise<ScanResult>;
   /**
    * Finish an already-warped document a different way. Takes a
-   * `ScanResult.warped` and answers with pixels, nothing else.
+   * `ScanResult.warped` and answers with the pixels and the finish they were
+   * produced with -- the worker states what it made, rather than the caller
+   * assuming its request was honoured.
    */
-  restyle(warped: RawImage, style: ScanStyle): Promise<RawImage>;
+  restyle(warped: RawImage, style: ScanStyle): Promise<RestyledImage>;
   dispose(): void;
 }
 
@@ -59,7 +67,7 @@ function asScanResult(payload: ScannerPayload): ScanResult {
   return payload;
 }
 
-function asImage(payload: ScannerPayload): RawImage {
+function asRestyled(payload: ScannerPayload): RestyledImage {
   if ('enhanced' in payload) {
     throw new Error('The document scanner answered with the wrong shape');
   }
@@ -96,7 +104,8 @@ export function createScannerClient(
     const response = event.data;
     settle(response.requestId, (entry) => {
       if (response.kind === 'result') entry.resolve(response.result);
-      else if (response.kind === 'image') entry.resolve(response.image);
+      else if (response.kind === 'image')
+        entry.resolve({ image: response.image, style: response.style });
       else entry.reject(new Error(response.message));
     });
   };
@@ -147,7 +156,7 @@ export function createScannerClient(
         requestId,
         image: warped,
         style,
-      })).then(asImage),
+      })).then(asRestyled),
     dispose: () => {
       if (disposed) return;
       disposed = true;

@@ -20,10 +20,14 @@ vi.mock('./DocumentScanDialog', () => ({
     isOpen,
     file,
     onAccept,
+    onRetake,
+    onCancel,
   }: {
     isOpen: boolean;
     file: File | null;
     onAccept: (outcome: { file: File; original?: File }) => void;
+    onRetake: () => void;
+    onCancel: () => void;
   }) =>
     isOpen ? (
       <div data-testid="scan-dialog">
@@ -52,6 +56,12 @@ vi.mock('./DocumentScanDialog', () => ({
           }
         >
           accept-scan-only
+        </button>
+        <button type="button" onClick={onRetake}>
+          Retake
+        </button>
+        <button type="button" onClick={onCancel}>
+          Cancel scan
         </button>
       </div>
     ) : null,
@@ -253,9 +263,13 @@ describe('AttachmentsSection', () => {
       expect(mockUpload.mock.calls[0][2]).toBeUndefined();
     });
 
-    // Scanning a photo that cannot then be attached wastes the user's time on
-    // a result they will be refused, so the limits are checked first.
-    it('refuses a photo over the size limit before scanning it', async () => {
+    // What gets attached is the dialog's output, not the photo, so the photo's
+    // own size decides nothing. Rejecting it here refused exactly the captures
+    // the scanner exists for -- a 12MP phone photo is routinely over the
+    // attachment limit and scans to a JPEG well under it -- and it made the
+    // dialog's "the original is too large to keep" path unreachable outside
+    // its own unit test.
+    it('scans a photo larger than an attachment may be', async () => {
       await renderSection();
 
       await act(async () => {
@@ -264,8 +278,39 @@ describe('AttachmentsSection', () => {
         });
       });
 
+      expect(screen.getByTestId('scan-dialog')).toBeInTheDocument();
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    // Retake and Cancel both closed the dialog and nothing else, so the button
+    // the user presses to take another photo left them hunting for the Scan
+    // document button again.
+    it('reopens the picker on Retake, and does not on Cancel', async () => {
+      await renderSection();
+      const opened = vi.spyOn(HTMLInputElement.prototype, 'click');
+
+      await act(async () => {
+        fireEvent.change(scanInput(), { target: { files: [photo()] } });
+      });
+      opened.mockClear();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Retake' }));
+      });
       expect(screen.queryByTestId('scan-dialog')).not.toBeInTheDocument();
-      expect(toast.error).toHaveBeenCalled();
+      expect(opened).toHaveBeenCalled();
+
+      await act(async () => {
+        fireEvent.change(scanInput(), { target: { files: [photo()] } });
+      });
+      opened.mockClear();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel scan' }));
+      });
+      expect(screen.queryByTestId('scan-dialog')).not.toBeInTheDocument();
+      expect(opened).not.toHaveBeenCalled();
+      opened.mockRestore();
     });
 
     // The scanner re-encodes its output as a JPEG, so a format that could not

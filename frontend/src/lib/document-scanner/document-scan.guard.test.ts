@@ -110,7 +110,13 @@ describe('the scanner engine is reached from one place', () => {
       .split('\n')
       .filter((line) => line.trim().length > 0);
     expect(statements.length).toBeLessThan(25);
-    expect(worker!.code).not.toMatch(/\bif\s*\(|\bfor\s*\(|\bwhile\s*\(/);
+    // A ternary counts. The transfer list was chosen by one here, so which
+    // buffers were handed over rather than copied was decided in the one file
+    // no suite loads -- and it was wrong (the crop was copied on every scan)
+    // with nothing able to say so.
+    expect(worker!.code).not.toMatch(
+      /\bif\s*\(|\bfor\s*\(|\bwhile\s*\(|\?[^.]|&&|\|\|/,
+    );
   });
 
   describe('the scan itself', () => {

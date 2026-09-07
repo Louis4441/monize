@@ -255,7 +255,10 @@ export function DocumentScanDialog({
         type="button"
         variant="outline"
         onClick={handleKeepOriginal}
-        disabled={!file}
+        // An original over the attachment limit is one the server will refuse,
+        // so offering to keep it alone is offering a 413. The notice beside the
+        // preview says why; the scan itself is still acceptable.
+        disabled={!file || originalTooLarge}
       >
         {t('scan.keepOriginal')}
       </Button>

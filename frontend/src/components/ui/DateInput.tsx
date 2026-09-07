@@ -11,6 +11,7 @@ import {
   parseFlexibleDate,
 } from '@/lib/date-parse';
 import { useDateFormat } from '@/hooks/useDateFormat';
+import { isTouchDevice } from '@/lib/touch-device';
 
 interface DateInputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -229,9 +230,6 @@ function adjustIsoDate(iso: string, segmentType: DateSegmentType, delta: number)
   return getLocalDateString(new Date(y, m - 1, d + delta));
 }
 
-function isTouchDevice(): boolean {
-  return typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
-}
 
 const calendarIconSvg = (
   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

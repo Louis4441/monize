@@ -195,6 +195,11 @@ describe('DocumentScanDialog', () => {
     );
 
     expect(screen.getByText(/only the enhanced scan will be attached/i)).toBeInTheDocument();
+    // ...and keeping it ALONE is not offered, because the server would refuse
+    // it with a 413 the user would have to interpret themselves.
+    expect(
+      screen.getByRole('button', { name: 'Keep original only' }),
+    ).toBeDisabled();
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Use enhanced' }));

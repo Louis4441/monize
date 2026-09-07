@@ -32,6 +32,8 @@ vi.mock('@/lib/document-scanner/decode-image', () => ({
   decodeImageFile: vi.fn(async () => decoded),
 }));
 
+import { decodeImageFile } from '@/lib/document-scanner/decode-image';
+
 const quad: Quad = [
   { x: 0, y: 0 },
   { x: 4, y: 0 },
@@ -406,6 +408,59 @@ describe('useDocumentScanner', () => {
         void result.current.refine({ quad: moved, style: 'colour' });
       });
       await waitFor(() => expect(worker.sent).toHaveLength(3));
+    });
+
+    // The loop drains recipes queued while it was awaiting, and a retake in
+    // that window changes which photo those corners belong to. Working from a
+    // photo captured before the loop started produced a warp of the DISCARDED
+    // document, stamped with the current photo's attempt -- so the user could
+    // approve and store an image of a receipt they had already replaced (I6).
+    it('works from the photo current when each recipe runs, not the first', async () => {
+      const { result } = render();
+      await scanned(result);
+
+      // A refine on the first photo, left in flight.
+      await act(async () => {
+        void result.current.refine({ quad: moved, style: 'colour' });
+      });
+      await waitFor(() => expect(worker.sent).toHaveLength(2));
+
+      // A second photo is scanned and lands while that refine is still running.
+      const second: RawImage = {
+        width: 8,
+        height: 8,
+        data: new Uint8ClampedArray(8 * 8 * 4),
+      };
+      vi.mocked(decodeImageFile).mockResolvedValueOnce(second);
+      await act(async () => {
+        void result.current.scan(file('second.jpg'));
+      });
+      await waitFor(() => expect(worker.sent).toHaveLength(3));
+      await act(async () => {
+        worker.reply(2, resultWith('blurry'));
+      });
+      await waitFor(() => expect(result.current.status).toBe('ready'));
+
+      // Corners moved on the SECOND photo, queued behind the first refine.
+      const later: Quad = [
+        { x: 2, y: 2 },
+        { x: 6, y: 2 },
+        { x: 6, y: 6 },
+        { x: 2, y: 6 },
+      ];
+      await act(async () => {
+        void result.current.refine({ quad: later, style: 'colour' });
+      });
+
+      // The first refine finally answers, releasing the queue.
+      await act(async () => {
+        worker.reply(1, resultWith('lowResolution'));
+      });
+      await waitFor(() => expect(worker.sent).toHaveLength(4));
+
+      // The queued recipe runs against the photo on screen now.
+      expect(worker.sent[3]).toMatchObject({ kind: 'rewarp', quad: later });
+      expect((worker.sent[3] as { image: RawImage }).image).toBe(second);
     });
 
     it('does nothing when there is no photo to work from', async () => {

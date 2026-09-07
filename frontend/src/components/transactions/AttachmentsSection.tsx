@@ -162,23 +162,35 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
   };
 
   /**
-   * A photo picked for scanning is checked against the cap and the size limit
-   * before the scanner runs -- a scan the user cannot attach is wasted work,
-   * and worse, wasted attention. Its TYPE is not checked here: the dialog
-   * re-encodes what it produces as a JPEG, so a HEIC is scannable even though
-   * it could not be attached as it stands.
+   * A photo picked for scanning is checked against the cap, and against
+   * nothing else about the file.
+   *
+   * Neither its size nor its type says whether the scan can be attached: what
+   * gets attached is the dialog's output, a JPEG capped at `OUTPUT_MAX_EDGE`,
+   * so a HEIC is scannable and so is a 14 MB photo from a recent phone. The
+   * size rule applied here refused exactly the captures this feature exists
+   * for, and it made the dialog's own "the original is too large to keep"
+   * path unreachable outside its unit test.
    */
   const handleScanSelected = (file: File) => {
     if (attachments.length >= MAX_ATTACHMENTS_PER_TRANSACTION) {
       toast.error(t('tooMany', { max: MAX_ATTACHMENTS_PER_TRANSACTION }));
       return;
     }
-    if (file.size > MAX_ATTACHMENT_BYTES) {
-      toast.error(t('tooLarge', { max: formatBytes(MAX_ATTACHMENT_BYTES) }));
-      return;
-    }
     setScanning(file);
   };
+
+  const openScanPicker = useRef<(() => void) | null>(null);
+  const rememberScanPicker = useCallback((open: () => void) => {
+    openScanPicker.current = open;
+  }, []);
+
+  // Retake is not Cancel: it closes the review and asks for another photo.
+  // Wired to the same close, the two buttons did exactly the same thing.
+  const handleScanRetake = useCallback(() => {
+    setScanning(null);
+    openScanPicker.current?.();
+  }, []);
 
   const handleScanAccepted = async (outcome: ScanOutcome) => {
     setScanning(null);
@@ -211,6 +223,7 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
         <div className="flex items-center gap-2">
           <ScanDocumentControl
             onFileSelected={handleScanSelected}
+            onReady={rememberScanPicker}
             disabled={uploading || atLimit}
           />
           <UploadControl
@@ -307,7 +320,7 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
         onCancel={() => setScanning(null)}
         // Retake closes the dialog and leaves the control ready: the input is
         // cleared after every pick, so choosing the same photo again works.
-        onRetake={() => setScanning(null)}
+        onRetake={handleScanRetake}
         onAccept={handleScanAccepted}
       />
 
@@ -373,18 +386,26 @@ function StagedAttachments({
     onChange([...files, { file }]);
   };
 
-  /** Same admission as the saved list: the cap and the size, not the type. */
+  /** Same admission as the saved list: the cap, and nothing about the photo. */
   const handleScanSelected = (file: File) => {
     if (files.length >= MAX_ATTACHMENTS_PER_TRANSACTION) {
       toast.error(t('tooMany', { max: MAX_ATTACHMENTS_PER_TRANSACTION }));
       return;
     }
-    if (file.size > MAX_ATTACHMENT_BYTES) {
-      toast.error(t('tooLarge', { max: formatBytes(MAX_ATTACHMENT_BYTES) }));
-      return;
-    }
     setScanning(file);
   };
+
+  const openScanPicker = useRef<(() => void) | null>(null);
+  const rememberScanPicker = useCallback((open: () => void) => {
+    openScanPicker.current = open;
+  }, []);
+
+  // Retake is not Cancel: it closes the review and asks for another photo.
+  // Wired to the same close, the two buttons did exactly the same thing.
+  const handleScanRetake = useCallback(() => {
+    setScanning(null);
+    openScanPicker.current?.();
+  }, []);
 
   const handleScanAccepted = (outcome: ScanOutcome) => {
     setScanning(null);
@@ -408,6 +429,7 @@ function StagedAttachments({
         <div className="flex items-center gap-2">
           <ScanDocumentControl
             onFileSelected={handleScanSelected}
+            onReady={rememberScanPicker}
             disabled={atLimit}
           />
           <UploadControl
@@ -476,7 +498,7 @@ function StagedAttachments({
         isOpen={scanning !== null}
         file={scanning}
         onCancel={() => setScanning(null)}
-        onRetake={() => setScanning(null)}
+        onRetake={handleScanRetake}
         onAccept={handleScanAccepted}
       />
     </div>

@@ -13,6 +13,31 @@ import type {
 } from './document-scan.types';
 
 /**
+ * The buffers a reply may hand over rather than copy.
+ *
+ * Every image in a reply, and the deduplication is not tidiness: `applyStyle`
+ * returns its input unchanged for the `none` finish, so `warped` and `enhanced`
+ * are then the SAME buffer, and `postMessage` throws `DataCloneError` on a
+ * transfer list naming one twice -- which would break that finish outright.
+ *
+ * It lives here rather than in the worker entry point because that file is the
+ * one thing no test environment can run, so a decision made there is a decision
+ * nothing checks. Getting it wrong is silent either way: a buffer left out is
+ * copied instead of moved, which is only ever visible as a phone stalling.
+ */
+export function transferablesFor(response: ScannerResponse): ArrayBuffer[] {
+  const images =
+    response.kind === 'result'
+      ? [response.result.enhanced, response.result.warped]
+      : response.kind === 'image'
+        ? [response.image]
+        : [];
+  const buffers = new Set<ArrayBuffer>();
+  for (const image of images) buffers.add(image.data.buffer as ArrayBuffer);
+  return [...buffers];
+}
+
+/**
  * The worker's dispatcher, as an ordinary function.
  *
  * The worker file itself is three lines of `postMessage` plumbing that no test
