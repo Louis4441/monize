@@ -297,6 +297,16 @@ exists to expose, and the migration must not round it away. It normalizes the
 `-0` Intl produces for a residue that rounds to zero, and renders a nullish or
 NaN quantity as `0`.
 
+**A file size is a number too, and its unit is localized with it.** `formatBytes`
+off the hook renders through `Intl.NumberFormat`'s `style: 'unit'`, which
+localizes the unit abbreviation as well as the digits (`1,5 ko`, `1,5 кБ`) -- so no
+unit name is ever translated into a catalog. Picking the unit is pure and lives
+in `scaleBytes` (`lib/bytes.ts`); only the rendering needs a locale, which is why
+a pure validator takes the formatter as an argument (`validateSelection` in
+`AttachmentsSection`) rather than importing one. Never hand-roll a
+`(bytes / 1024).toFixed(1) + ' KB'` helper: four surfaces shared one, and it wrote
+a `.` decimal beside a reader's own `1 234,56 zł`.
+
 **The ISO code beside a foreign amount is not this rule.** `withCurrencyCode`
 appends it deliberately when a security's currency is not the reader's; localize
 the number *before* the suffix and leave the suffix alone.
@@ -563,6 +573,23 @@ each live in exactly one file:
   `ShareInboxNotice` call it on mount without a guard -- and why a `catch` around
   it would put a `setState` on the synchronous path the
   `react-hooks/set-state-in-effect` rule forbids.
+
+**A bundle belongs to the first authenticated reader that observes it, and the
+reader's id is a required argument.** The worker cannot decide whose share it is
+-- a share can arrive with nobody signed in, which is the whole point of the
+logged-out resume -- so `listSharedBundles(viewerUserId)` and
+`readSharedBundle(id, viewerUserId)` stamp `ownerUserId` on an unclaimed index
+and treat a bundle owned by anybody else as absent. **Listing claims too**: a
+share the sharer was merely notified about is already theirs, and it is exactly
+the one nothing else ever observed. Clearing the stash on `logout` is a sweep,
+not the access rule -- two people share a browser profile, and a session that
+simply expired never ran `logout`, which is the same reasoning as the
+push-registration marker's owner. The id is **required**, not optional, because
+an omitted argument is silently indistinguishable from "everyone's": a caller
+that has not resolved the reader yet reads nothing and shows its loading state
+(`src/app/share/page.tsx`, `ShareInboxNotice`, `useSharedFilesHandoff`), rather
+than claiming a share on behalf of whoever the app is still fetching.
+INV-SHARE-005.
 
 **Do not classify a shared file with the import wizard's `detectFileType`.** That
 function falls through to `qif` for every extension it does not recognise, which

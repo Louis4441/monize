@@ -34,10 +34,18 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => searchParams.value,
 }));
 
+// The reader is mutable because the hand-off is an OWNERSHIP-bearing read: a
+// bundle belongs to the first authenticated reader that observes it, so the
+// wizard must take nothing while the store is still resolving who that is.
+const VIEWER_ID = 'u1';
+const auth = vi.hoisted(() => ({
+  user: { id: 'u1', email: 'a@b.c', hasPassword: true } as { id: string } | null,
+}));
+
 vi.mock('@/store/authStore', () => ({
   useAuthStore: (selector?: (s: unknown) => unknown) => {
     const state = {
-      user: { id: 'u1', email: 'a@b.c', hasPassword: true },
+      user: auth.user,
       isAuthenticated: true,
       _hasHydrated: true,
     };
@@ -117,6 +125,7 @@ describe('import page share hand-off ordering', () => {
     searchParams.value = new URLSearchParams('share=bundle-1');
     mocks.getSecurities.mockResolvedValue([]);
     mocks.getCurrencies.mockResolvedValue([]);
+    auth.user = { id: VIEWER_ID };
     mocks.getColumnMappings.mockResolvedValue([]);
     mocks.discardSharedBundle.mockResolvedValue(undefined);
     mocks.parseQif.mockResolvedValue({
@@ -171,7 +180,33 @@ describe('import page share hand-off ordering', () => {
     // Only once the reference data is in does the hand-off run, and it then
     // parses against the real category list.
     await waitFor(() => expect(mocks.parseQif).toHaveBeenCalledTimes(1));
-    expect(mocks.readSharedBundle).toHaveBeenCalledWith('bundle-1');
+    expect(mocks.readSharedBundle).toHaveBeenCalledWith('bundle-1', VIEWER_ID);
+  });
+
+  // Reference data being in is not the only prerequisite: the read claims the
+  // bundle for whoever makes it, so an unnamed reader must take nothing -- and
+  // the bundle stays in the stash, offered again once the account is known.
+  it('takes nothing while the reader is unnamed, and keeps the bundle', async () => {
+    auth.user = null;
+    mocks.getAllCategories.mockResolvedValue([{ id: 'cat-1', name: 'Groceries', parentId: null }]);
+    mocks.getAllAccounts.mockResolvedValue([
+      {
+        id: 'acc-1',
+        name: 'Chequing',
+        accountType: 'CHEQUING',
+        currencyCode: 'USD',
+        isClosed: false,
+      },
+    ]);
+
+    await act(async () => {
+      render(<ImportPage />);
+    });
+
+    await waitFor(() => expect(mocks.getAllCategories).toHaveBeenCalled());
+    expect(mocks.readSharedBundle).not.toHaveBeenCalled();
+    expect(mocks.parseQif).not.toHaveBeenCalled();
+    expect(mocks.discardSharedBundle).not.toHaveBeenCalled();
   });
 
   it('takes the files exactly once, and only then discards the bundle', async () => {

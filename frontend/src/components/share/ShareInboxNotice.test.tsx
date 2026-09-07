@@ -3,6 +3,7 @@ import { act, cleanup, screen, waitFor } from '@testing-library/react';
 import { render } from '@/test/render';
 import { ShareInboxNotice } from './ShareInboxNotice';
 import { useAuthStore } from '@/store/authStore';
+import type { User } from '@/types/auth';
 
 // The banner is the durable way back to a share whose redirect did not survive
 // (an OIDC round trip that drops returnTo, or the user opening Monize from the
@@ -47,6 +48,15 @@ function bundleIndex(id: string, acceptedFiles: number, refusedFiles = 0) {
   return { id, createdAt: Date.now(), files };
 }
 
+/**
+ * A bundle belongs to the first authenticated reader that observes it, and this
+ * banner IS an observation -- so it needs a named reader, not merely an
+ * authenticated one.
+ */
+const VIEWER_ID = 'user-1';
+
+const reader = (id: string) => ({ id, email: 'reader@monize.test' }) as User;
+
 async function renderNotice() {
   await act(async () => {
     render(<ShareInboxNotice />);
@@ -59,7 +69,7 @@ describe('ShareInboxNotice', () => {
     mocks.purgeExpiredSharedBundles.mockResolvedValue(undefined);
     mocks.listSharedBundles.mockResolvedValue([]);
     act(() => {
-      useAuthStore.setState({ isAuthenticated: true });
+      useAuthStore.setState({ isAuthenticated: true, user: reader(VIEWER_ID) });
     });
   });
 
@@ -133,7 +143,7 @@ describe('ShareInboxNotice', () => {
 
   it('reads nothing while signed out', async () => {
     act(() => {
-      useAuthStore.setState({ isAuthenticated: false });
+      useAuthStore.setState({ isAuthenticated: false, user: null });
     });
     mocks.listSharedBundles.mockResolvedValue([bundleIndex('newest', 1)]);
 
@@ -141,6 +151,41 @@ describe('ShareInboxNotice', () => {
 
     expect(mocks.listSharedBundles).not.toHaveBeenCalled();
     expect(screen.queryByRole('link', { name: /review/i })).not.toBeInTheDocument();
+  });
+
+  // Listing a bundle CLAIMS it for the reader, so an unnamed one must not list:
+  // the notice is the surface that would otherwise stamp a share with whoever
+  // the app is still resolving. `isAuthenticated` rehydrates from localStorage
+  // before the profile request lands, so this state is the ordinary first paint
+  // after a reload, not a corner case.
+  it('reads nothing while the reader is still unnamed', async () => {
+    act(() => {
+      useAuthStore.setState({ isAuthenticated: true, user: null });
+    });
+    mocks.listSharedBundles.mockResolvedValue([bundleIndex('newest', 1)]);
+
+    await renderNotice();
+
+    expect(mocks.listSharedBundles).not.toHaveBeenCalled();
+    expect(screen.queryByRole('link', { name: /review/i })).not.toBeInTheDocument();
+
+    // Named, it reads on that account's behalf and offers the share.
+    await act(async () => {
+      useAuthStore.setState({ user: reader(VIEWER_ID) });
+    });
+
+    expect(await screen.findByRole('link', { name: /review/i })).toBeInTheDocument();
+    expect(mocks.listSharedBundles).toHaveBeenCalledWith(VIEWER_ID);
+  });
+
+  it('lists on behalf of the signed-in reader', async () => {
+    mocks.listSharedBundles.mockResolvedValue([bundleIndex('newest', 1)]);
+
+    await renderNotice();
+
+    await waitFor(() =>
+      expect(mocks.listSharedBundles).toHaveBeenCalledWith(VIEWER_ID),
+    );
   });
 
   it('can be dismissed', async () => {

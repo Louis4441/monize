@@ -28,6 +28,7 @@ export function ShareInboxNotice() {
   const t = useTranslations('share');
   const pathname = usePathname();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const viewerUserId = useAuthStore((state) => state.user?.id);
   const [pending, setPending] = useState<{ id: string; count: number } | null>(
     null,
   );
@@ -41,13 +42,19 @@ export function ShareInboxNotice() {
   // `useCallback` the effect calls: every state update then lands in a
   // callback after a suspension, which is what keeps this off the synchronous
   // effect path the set-state-in-effect rule forbids.
+  // The purge rides along inside this one gate deliberately. It is a lifetime
+  // sweep rather than an access check, so the reader's id is not what entitles
+  // it -- but hoisting it out of the gate would run it on `/share`, where an
+  // expired bundle is deliberately still readable so the screen can say
+  // "expired" instead of "nothing here". Waiting for the reader costs nothing:
+  // the worker sweeps on activate and on every share as well.
   useEffect(() => {
-    if (!isAuthenticated || pathname === SHARE_PAGE_PATH) return;
+    if (!isAuthenticated || !viewerUserId || pathname === SHARE_PAGE_PATH) return;
     let alive = true;
 
     void (async () => {
       await purgeExpiredSharedBundles();
-      const bundles = await listSharedBundles();
+      const bundles = await listSharedBundles(viewerUserId);
       if (!alive) return;
       const newest = bundles[0];
       // Only files that are actually usable are worth interrupting for: a
@@ -61,7 +68,7 @@ export function ShareInboxNotice() {
     return () => {
       alive = false;
     };
-  }, [isAuthenticated, pathname]);
+  }, [isAuthenticated, viewerUserId, pathname]);
 
   // Never over the review screen itself, which is already showing the share.
   if (!isAuthenticated || !pending || pathname === SHARE_PAGE_PATH) return null;

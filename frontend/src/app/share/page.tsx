@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { InboxArrowDownIcon } from '@heroicons/react/24/outline';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { useAuthStore } from '@/store/authStore';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/Button';
@@ -81,6 +82,11 @@ function ShareContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // Whose share this is. A bundle belongs to the first authenticated reader
+  // that sees it, so nothing is read before the reader is known -- an unknown
+  // viewer must not be shown, or be able to claim, anybody's share.
+  const viewerUserId = useAuthStore((state) => state.user?.id);
+
   const requestedId = searchParams?.get('id') ?? null;
   const missed = searchParams?.get('missed') === '1';
   const stashError = searchParams?.get('error') === 'stash';
@@ -96,6 +102,9 @@ function ShareContent() {
       setLoaded(true);
       return;
     }
+    // Still resolving who is reading: stay on the loading state rather than
+    // reporting an empty inbox we have not actually looked in.
+    if (!viewerUserId) return;
     let cancelled = false;
 
     const load = async () => {
@@ -104,10 +113,10 @@ function ShareContent() {
       // sent to, so show that rather than nothing.
       let id = requestedId;
       if (!isShareBundleId(id ?? '')) {
-        const bundles = await listSharedBundles();
+        const bundles = await listSharedBundles(viewerUserId);
         id = bundles[0]?.id ?? null;
       }
-      const found = id ? await readSharedBundle(id) : null;
+      const found = id ? await readSharedBundle(id, viewerUserId) : null;
       if (cancelled) return;
       setBundle(found);
       setLoaded(true);
@@ -124,7 +133,7 @@ function ShareContent() {
     return () => {
       cancelled = true;
     };
-  }, [requestedId, missed, stashError]);
+  }, [requestedId, missed, stashError, viewerUserId]);
 
   /** The files that are actually usable, and what they can be used for. */
   const usable = useMemo(() => {

@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react';
 import { render } from '@/test/render';
+import { useAuthStore } from '@/store/authStore';
 import SharePage from './page';
 import type { SharedBundle, SharedBundleItem } from '@/lib/share-inbox';
 import { classifySharedFile } from '@/lib/share-target';
+import type { User } from '@/types/auth';
 
 // The review screen is where the plan's second requirement lives: a share
 // always lands somewhere that explains itself, and nothing is imported or
@@ -99,6 +101,21 @@ function bundle(items: SharedBundleItem[], overrides: Partial<SharedBundle> = {}
   };
 }
 
+/**
+ * The reader every case is written for. A bundle belongs to the first
+ * authenticated reader that observes it, so the screen reads nothing at all
+ * until the auth store names one -- which makes the signed-in user a
+ * prerequisite of this page's fixtures, not decoration.
+ */
+const VIEWER_ID = 'user-1';
+
+function signIn(id: string | null) {
+  useAuthStore.setState({
+    user: id ? ({ id, email: 'reader@monize.test' } as User) : null,
+    isAuthenticated: id !== null,
+  });
+}
+
 async function renderPage() {
   await act(async () => {
     render(<SharePage />);
@@ -107,6 +124,7 @@ async function renderPage() {
 
 describe('share review screen', () => {
   beforeEach(() => {
+    signIn(VIEWER_ID);
     searchParams.value = new URLSearchParams('id=bundle-1');
     mocks.isShareInboxSupported.mockReturnValue(true);
     mocks.listSharedBundles.mockResolvedValue([]);
@@ -116,6 +134,8 @@ describe('share review screen', () => {
   });
 
   afterEach(() => {
+    cleanup();
+    signIn(null);
     vi.clearAllMocks();
   });
 
@@ -319,8 +339,35 @@ describe('share review screen', () => {
     await renderPage();
 
     await waitFor(() =>
-      expect(mocks.readSharedBundle).toHaveBeenCalledWith('newest'),
+      expect(mocks.readSharedBundle).toHaveBeenCalledWith('newest', VIEWER_ID),
     );
+    expect(mocks.listSharedBundles).toHaveBeenCalledWith(VIEWER_ID);
+  });
+
+  // A bundle belongs to the first authenticated reader that sees it, so an
+  // unknown reader must be shown nothing -- and must not be able to claim
+  // anybody's share by landing on this URL. Staying on the loading state is the
+  // honest report: we have not looked in the inbox yet.
+  it('reads nothing until the reader is known', async () => {
+    signIn(null);
+    mocks.readSharedBundle.mockResolvedValue(
+      bundle([item('receipt.jpg', 'image/jpeg')]),
+    );
+
+    await renderPage();
+
+    expect(mocks.readSharedBundle).not.toHaveBeenCalled();
+    expect(mocks.listSharedBundles).not.toHaveBeenCalled();
+    expect(screen.queryByText('receipt.jpg')).not.toBeInTheDocument();
+    expect(screen.queryByText(/nothing here to review/i)).not.toBeInTheDocument();
+
+    // ...and reads it the moment the store answers, without a remount.
+    await act(async () => {
+      signIn(VIEWER_ID);
+    });
+
+    expect(await screen.findByText('receipt.jpg')).toBeInTheDocument();
+    expect(mocks.readSharedBundle).toHaveBeenCalledWith('bundle-1', VIEWER_ID);
   });
 
   it('discards only after the confirmation is accepted', async () => {

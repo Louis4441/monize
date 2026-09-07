@@ -45,6 +45,8 @@ const logger = createLogger('Import');
 function useSharedFilesHandoff(
   handleFiles: (files: File[]) => Promise<void>,
   ready: boolean,
+  // A bundle belongs to one account; the wizard reads it as that reader.
+  viewerUserId: string | undefined,
 ) {
   const searchParams = useSearchParams();
   const shareId = searchParams?.get('share') ?? null;
@@ -56,13 +58,13 @@ function useSharedFilesHandoff(
     // every category in it would be offered as one to CREATE even where the
     // user already has it. The ref is claimed only once we actually proceed,
     // so a not-yet-ready render does not consume the one attempt.
-    if (!ready) return;
+    if (!ready || !viewerUserId) return;
     if (!isShareBundleId(shareId ?? '') || takenRef.current === shareId) return;
     takenRef.current = shareId;
     const id = shareId as string;
 
     const take = async () => {
-      const bundle = await readSharedBundle(id);
+      const bundle = await readSharedBundle(id, viewerUserId);
       if (!bundle || bundle.expired || bundle.files.length === 0) return;
       await handleFiles(bundle.files);
       await discardSharedBundle(id);
@@ -71,7 +73,7 @@ function useSharedFilesHandoff(
     void take().catch((error) => {
       logger.error('Failed to take the shared files into the wizard:', error);
     });
-  }, [shareId, handleFiles, ready]);
+  }, [shareId, handleFiles, ready, viewerUserId]);
 }
 
 export default function ImportPage() {
@@ -91,7 +93,7 @@ function ImportContent() {
   // An OIDC account confirms the optional wipe by re-authenticating with its
   // provider rather than by typing a password.
   const user = useAuthStore((state) => state.user);
-  useSharedFilesHandoff(wizard.handleFiles, wizard.dataLoaded);
+  useSharedFilesHandoff(wizard.handleFiles, wizard.dataLoaded, user?.id);
 
   const renderStep = () => {
     switch (wizard.step) {

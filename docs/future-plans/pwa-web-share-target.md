@@ -272,11 +272,17 @@ that drops it, a user who opens the app from the launcher instead):
 ### 4.4 Lifetime and privacy of the stash
 
 A bundle is deleted when consumed, when discarded, when the user logs out, and
-when it is older than the lifetime. The worker purges expired bundles on
-`activate` and on every new share, so the bound holds even if no page runs. The
-worker's `activate` handler currently deletes every cache but `CACHE_NAME`; the
-share cache must be added to its keep-list, or the first worker update after a
-share silently empties the inbox (Section 7 has the test).
+when it is older than the lifetime. Deletion on logout is a sweep rather than the
+access rule: two people share a browser profile, and a session that simply
+expired never ran `logout`. So a bundle is also **identity-tagged** -- the first
+authenticated reader that observes it stamps `ownerUserId` on the index, and from
+then on it is invisible to every other account (Section 10, item 11).
+
+The worker purges expired bundles on `activate` and on every new share, so the
+bound holds even if no page runs. The worker's `activate` handler currently
+deletes every cache but `CACHE_NAME`; the share cache must be added to its
+keep-list, or the first worker update after a share silently empties the inbox
+(Section 7 has the test).
 
 The stash never holds a file the worker rejected, and it never holds the
 multipart framing: each accepted file is one `Response` whose body is the file's
@@ -294,8 +300,9 @@ no extension, so `isStaticAsset` can never serve a stash entry to a fetch.
 | INV-SHARE-002 | Nothing is imported, attached or saved from a share without an explicit user action on a screen that shows what will happen. | The review screen has no auto-advance; the two destinations are the existing form save and the wizard's review step. E2E asserts that landing on `/share` creates no rows. |
 | INV-SHARE-003 | The stash holds only files within the declared limits, and no bundle outlives its lifetime or the session. | Worker-side limit checks store a reason, not bytes; purge on `activate`, on each share, on app mount; `clearShareInbox()` in `logout`. |
 | INV-SHARE-004 | A share never produces an error page: on every path the user lands on a Monize page that explains what happened. | The worker's handler always resolves to a redirect (malformed body -> `/share?error=stash`); the proxy fallback redirects; the review screen has states for missed, unsupported, expired, empty. |
+| INV-SHARE-005 | A stashed bundle belongs to one account; no other account signed in on the same browser can list it, read it or be notified about it. | `listSharedBundles` / `readSharedBundle` require a `viewerUserId`, stamp `ownerUserId` on an unclaimed index and treat another owner's bundle as absent; the three call sites read nothing until the auth store names a reader. |
 
-These are in `docs/system-invariants.md` as INV-SHARE-001..004, all four
+These are in `docs/system-invariants.md` as INV-SHARE-001..005, all five
 `enforced`, each naming the tests that hold it; `docs/verification-contract.md`
 carries their rows in the test-kind matrix.
 
@@ -462,3 +469,20 @@ should say where it was wrong.
 10. **`activate` claims clients before purging.** Taking control of open pages is
     what the offline fallback and the share target both depend on, so it no
     longer waits behind stash housekeeping.
+11. **The stash identity-tags its bundles rather than relying on logout alone.**
+    The plan gave Section 4.4 one privacy mechanism -- deletion, including on
+    logout -- and that is a sweep, not an access rule: two people share a browser
+    profile, and an expired session never runs `logout`, so one account's receipt
+    stayed on offer to whoever signed in next. Ownership is settled on the app
+    side because the worker cannot settle it (a share arrives with nobody signed
+    in, by design): the first authenticated reader stamps `ownerUserId`, and both
+    observing functions now require a `viewerUserId`. **Listing claims as well as
+    reading**, since the notification-only share is exactly the one nothing else
+    ever observed. INV-SHARE-005 records it.
+12. **Byte sizes are localized.** The four surfaces that print a file size shared
+    a hand-rolled `formatBytes` writing `2.0 KB` with a `.` decimal in every
+    locale. `scaleBytes` (`lib/bytes.ts`) picks the unit and
+    `useNumberFormat().formatBytes` renders it through `Intl.NumberFormat`'s
+    `style: 'unit'`, which localizes the number and the unit abbreviation
+    together. English output changes as a result (CLDR short forms: `2.0 kB`,
+    `512 byte`).

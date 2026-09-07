@@ -16,6 +16,17 @@ import {
  * names `SHARE_CACHE_NAME` or builds a stash key -- a second reader is how the
  * key shape and the worker's writer drift apart.
  *
+ * **A bundle belongs to the first authenticated reader that sees it.** The worker
+ * cannot know whose share it is -- a share can arrive with nobody signed in,
+ * which is the whole point of the logged-out resume -- so ownership is settled
+ * on the app side: the first authenticated observation stamps `ownerUserId` on
+ * the index, and from then on the bundle is invisible to every other account.
+ * Two people share a browser profile, and a session that simply expired never
+ * ran `logout`, so clearing on sign-out alone left one account's receipt on
+ * offer to the next (the same reasoning as the push-registration marker's
+ * owner). First-come-first-served is the only rule available here, and it closes
+ * the case that matters: a share the sharer was told about is already theirs.
+ *
  * Every function here feature-detects the Cache API and treats its absence as an
  * empty inbox rather than an error: a browser without it (or a private window
  * that refuses storage) simply has nothing shared, and the review screen says
@@ -61,7 +72,47 @@ function parseIndex(value: unknown): SharedBundleIndex | null {
   if (!Array.isArray(candidate.files)) return null;
   const files = candidate.files.filter(isShareEntry);
   if (files.length !== candidate.files.length) return null;
-  return { id: candidate.id, createdAt: candidate.createdAt, files };
+  // An owner that is not a string is no owner: an unreadable stamp must not be
+  // mistaken for somebody's claim, nor silently grant the bundle to everyone.
+  const ownerUserId =
+    typeof candidate.ownerUserId === 'string' && candidate.ownerUserId.length > 0
+      ? candidate.ownerUserId
+      : undefined;
+  return { id: candidate.id, createdAt: candidate.createdAt, files, ownerUserId };
+}
+
+/** True when this reader may see the bundle: theirs, or nobody's yet. */
+function isVisibleTo(index: SharedBundleIndex, viewerUserId: string): boolean {
+  return index.ownerUserId === undefined || index.ownerUserId === viewerUserId;
+}
+
+/**
+ * Stamp an unclaimed bundle with its reader, so no other account can see it.
+ *
+ * Rewrites only the index, never the bytes. A concurrent claim from another tab
+ * of the same account writes the same owner, and one from another account cannot
+ * happen: it would not have seen this bundle to claim it.
+ */
+async function claimIndex(
+  cache: Cache,
+  index: SharedBundleIndex,
+  viewerUserId: string,
+): Promise<SharedBundleIndex> {
+  if (index.ownerUserId !== undefined) return index;
+  const claimed: SharedBundleIndex = { ...index, ownerUserId: viewerUserId };
+  try {
+    await cache.put(
+      shareIndexKey(index.id),
+      new Response(JSON.stringify(claimed), {
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+  } catch {
+    // A stash that cannot be written is still readable by this reader; the next
+    // observation tries again. Returning the claimed shape keeps this call
+    // consistent with what it reports.
+  }
+  return claimed;
 }
 
 async function readIndex(
@@ -100,10 +151,11 @@ async function keysForBundle(cache: Cache, id: string): Promise<Request[]> {
  * read stays a read.
  */
 export async function listSharedBundles(
+  viewerUserId: string,
   now: number = Date.now(),
 ): Promise<SharedBundleIndex[]> {
   const cache = await openShareCache();
-  if (!cache) return [];
+  if (!cache || !viewerUserId) return [];
 
   let keys: readonly Request[];
   try {
@@ -117,10 +169,18 @@ export async function listSharedBundles(
     .filter((id): id is string => id !== null);
 
   const indexes = await Promise.all(ids.map((id) => readIndex(cache, id)));
-  return indexes
+  const live = indexes
     .filter((index): index is SharedBundleIndex => index !== null)
     .filter((index) => !isExpiredBundle(index, now))
-    .sort((a, b) => b.createdAt - a.createdAt);
+    .filter((index) => isVisibleTo(index, viewerUserId));
+
+  // Listing is an authenticated observation, so it claims: a share the sharer
+  // was merely NOTIFIED about is already theirs, which is the case that would
+  // otherwise still be readable by whoever signs in next.
+  const claimed = await Promise.all(
+    live.map((index) => claimIndex(cache, index, viewerUserId)),
+  );
+  return claimed.sort((a, b) => b.createdAt - a.createdAt);
 }
 
 /** One entry, paired with the bytes behind it when they are still there. */
@@ -185,14 +245,22 @@ async function readEntryFile(
  */
 export async function readSharedBundle(
   id: string,
+  viewerUserId: string,
   now: number = Date.now(),
 ): Promise<SharedBundle | null> {
-  if (!isShareBundleId(id)) return null;
+  if (!isShareBundleId(id) || !viewerUserId) return null;
   const cache = await openShareCache();
   if (!cache) return null;
 
-  const index = await readIndex(cache, id);
-  if (!index) return null;
+  const found = await readIndex(cache, id);
+  if (!found) return null;
+  // Another account's share is not this reader's to see, and reads as absent
+  // rather than as a refusal: the id came off a URL, and "whose is it" is not a
+  // question this screen should answer to whoever pasted one.
+  if (!isVisibleTo(found, viewerUserId)) return null;
+  const index = isExpiredBundle(found, now)
+    ? found
+    : await claimIndex(cache, found, viewerUserId);
 
   const items: SharedBundleItem[] = [];
   for (const entry of index.files) {

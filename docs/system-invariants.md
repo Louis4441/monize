@@ -127,6 +127,7 @@ implied.
 | INV-SHARE-002 | Nothing is imported, attached or saved from a share without an explicit action | enforced |
 | INV-SHARE-003 | The share stash holds only files within the declared limits, and outlives neither its lifetime nor the session | enforced |
 | INV-SHARE-004 | A share always lands on a Monize page that explains what happened | enforced |
+| INV-SHARE-005 | A stashed share belongs to one account, and no other account can see it | enforced |
 | INV-BACKUP-001 | A backup file is complete, verified and owner-namespaced | enforced |
 | INV-PUSH-001 | A push subscription belongs to the authenticated caller, and no request touches another account's device | enforced |
 | INV-PUSH-002 | The VAPID private key never leaves the server, and is never stored unencrypted | enforced |
@@ -2271,7 +2272,9 @@ Statement           The share stash holds only files within the declared limits
                     (10 MB per file, 10 files and 50 MB per share), no bundle
                     survives its one-hour lifetime, and none survives a logout.
                     A file refused by a limit has its reason recorded and its
-                    bytes discarded.
+                    bytes discarded. Logout is the sweep, not the access rule --
+                    INV-SHARE-005 is what keeps one account's share out of
+                    another's inbox when no logout ever runs.
 Enforcement         `public/sw.js` checks each file as it arrives and writes a
                     reason instead of bytes; the limits mirror
                     `src/lib/share-target.ts` (which derives the per-file and
@@ -2318,6 +2321,43 @@ Retry semantics     Every state names the way forward (share again, or add the
                     files from inside Monize).
 Crash semantics     A stash that cannot be read is reported as nothing to
                     review, never as a share with no files in it.
+Status              enforced
+```
+
+### INV-SHARE-005 -- a stashed share belongs to one account
+
+```text
+Statement           A bundle in the share stash belongs to the first
+                    authenticated reader that observes it, and from that moment
+                    no other account signed in on the same browser can list it,
+                    read its bytes or be notified about it. An unobserved bundle
+                    is unclaimed, which is claimable -- never everyone's.
+Enforcement         The service worker cannot decide this: a share can arrive
+                    with nobody signed in, which is the whole point of the
+                    logged-out resume. So ownership is settled on the app side.
+                    `src/lib/share-inbox.ts` is the one reader, and both of its
+                    observing functions -- `listSharedBundles` and
+                    `readSharedBundle` -- require a `viewerUserId`, stamp
+                    `ownerUserId` on an unclaimed index, and filter out a bundle
+                    owned by anybody else. Listing claims as well as reading,
+                    because a share the sharer was merely NOTIFIED about is
+                    already theirs. The three call sites take the id from
+                    `useAuthStore` and read nothing while it is undefined
+                    (`src/app/share/page.tsx`, `components/share/ShareInboxNotice.tsx`,
+                    `useSharedFilesHandoff` in `src/app/import/page.tsx`).
+                    `share-inbox.test.ts`'s `ownership` block covers the claim,
+                    the claim on listing, another account's bundle reading as
+                    absent, an unreadable stamp reading as unclaimed, and an
+                    unnamed reader seeing and claiming nothing.
+Concurrency scope   per bundle
+Retry semantics     A claim that cannot be written (storage refused) leaves the
+                    index unclaimed and the next observation retries; the reader
+                    that failed to write still sees its own bundle.
+Crash semantics     The stamp is a property of the stored index, so a process
+                    that dies after the claim leaves the bundle owned. A crash
+                    before it leaves the bundle unclaimed and therefore
+                    claimable, which is the pre-existing state rather than a new
+                    exposure.
 Status              enforced
 ```
 

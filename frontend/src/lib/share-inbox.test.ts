@@ -72,6 +72,11 @@ function createCacheStorage() {
 
 const NOW = 1_700_000_000_000;
 
+/** The reader every case below is written from the point of view of. */
+const VIEWER = 'user-1';
+/** Somebody else on the same browser profile. */
+const OTHER = 'user-2';
+
 type SeedFile = {
   name: string;
   type: string;
@@ -87,6 +92,8 @@ async function seedBundle(
   id: string,
   files: SeedFile[],
   createdAt = NOW,
+  /** Whose share it already is. Omitted means the worker's unclaimed shape. */
+  ownerUserId?: string,
 ) {
   const cache = await cacheStorage.storage.open(SHARE_CACHE_NAME);
   const entries = files.map((file, position) => {
@@ -106,6 +113,7 @@ async function seedBundle(
     id,
     createdAt,
     files: entries as SharedBundleIndex['files'],
+    ...(ownerUserId ? { ownerUserId } : {}),
   };
   await cache.put(shareIndexKey(id), new Response(JSON.stringify(index)));
 
@@ -141,7 +149,7 @@ describe('share inbox', () => {
       { name: 'receipt.png', type: 'image/png', body: 'PNGDATA' },
     ]);
 
-    const bundle = await readSharedBundle('bundle-1', NOW);
+    const bundle = await readSharedBundle('bundle-1', VIEWER, NOW);
 
     expect(bundle).not.toBeNull();
     expect(bundle!.files).toHaveLength(1);
@@ -157,7 +165,7 @@ describe('share inbox', () => {
       { name: 'huge.pdf', type: 'application/pdf', reason: 'tooLarge' },
     ]);
 
-    const bundle = await readSharedBundle('bundle-2', NOW);
+    const bundle = await readSharedBundle('bundle-2', VIEWER, NOW);
 
     expect(bundle!.items).toHaveLength(2);
     expect(bundle!.items[1].entry.reason).toBe('tooLarge');
@@ -174,7 +182,7 @@ describe('share inbox', () => {
       { name: 'gone.png', type: 'image/png', evicted: true },
     ]);
 
-    const bundle = await readSharedBundle('bundle-3', NOW);
+    const bundle = await readSharedBundle('bundle-3', VIEWER, NOW);
 
     expect(bundle!.items[0].missing).toBe(true);
     expect(bundle!.items[0].entry.reason).toBeUndefined();
@@ -182,15 +190,15 @@ describe('share inbox', () => {
   });
 
   it('reports an unknown or malformed bundle as absent', async () => {
-    expect(await readSharedBundle('nothing-here', NOW)).toBeNull();
-    expect(await readSharedBundle('../escape', NOW)).toBeNull();
+    expect(await readSharedBundle('nothing-here', VIEWER, NOW)).toBeNull();
+    expect(await readSharedBundle('../escape', VIEWER, NOW)).toBeNull();
 
     const cache = await cacheStorage.storage.open(SHARE_CACHE_NAME);
     await cache.put(shareIndexKey('bad'), new Response('not json'));
-    expect(await readSharedBundle('bad', NOW)).toBeNull();
+    expect(await readSharedBundle('bad', VIEWER, NOW)).toBeNull();
 
     await cache.put(shareIndexKey('shapeless'), new Response('{"id":"shapeless"}'));
-    expect(await readSharedBundle('shapeless', NOW)).toBeNull();
+    expect(await readSharedBundle('shapeless', VIEWER, NOW)).toBeNull();
   });
 
   it('flags an expired bundle rather than hiding it from a direct read', async () => {
@@ -201,7 +209,7 @@ describe('share inbox', () => {
       NOW - SHARE_STASH_TTL_MS,
     );
 
-    const bundle = await readSharedBundle('old', NOW);
+    const bundle = await readSharedBundle('old', VIEWER, NOW);
 
     expect(bundle).not.toBeNull();
     expect(bundle!.expired).toBe(true);
@@ -217,7 +225,7 @@ describe('share inbox', () => {
       NOW - SHARE_STASH_TTL_MS - 1,
     );
 
-    const listed = await listSharedBundles(NOW);
+    const listed = await listSharedBundles(VIEWER, NOW);
 
     expect(listed.map((index) => index.id)).toEqual(['newer', 'older']);
   });
@@ -256,6 +264,164 @@ describe('share inbox', () => {
     expect(keys.some((key) => key.includes('/orphan/'))).toBe(false);
   });
 
+  // The worker cannot know whose share it is -- a share can arrive with nobody
+  // signed in -- so ownership is settled by the first authenticated reader.
+  describe('ownership', () => {
+    async function ownerOf(id: string): Promise<string | undefined> {
+      const cache = await cacheStorage.storage.open(SHARE_CACHE_NAME);
+      const response = await cache.match(shareIndexKey(id));
+      const index = (await response!.json()) as SharedBundleIndex;
+      return index.ownerUserId;
+    }
+
+    it('stamps an unclaimed bundle with the reader that read it', async () => {
+      await seedBundle(cacheStorage, 'fresh', [
+        { name: 'a.png', type: 'image/png' },
+      ]);
+      expect(await ownerOf('fresh')).toBeUndefined();
+
+      const bundle = await readSharedBundle('fresh', VIEWER, NOW);
+
+      expect(bundle!.index.ownerUserId).toBe(VIEWER);
+      expect(await ownerOf('fresh')).toBe(VIEWER);
+    });
+
+    // The case sign-out alone never covered: the sharer was only NOTIFIED about
+    // the share, so nothing but the notice ever observed it.
+    it('claims on listing, not only on reading', async () => {
+      await seedBundle(cacheStorage, 'noticed', [
+        { name: 'a.png', type: 'image/png' },
+      ]);
+
+      const listed = await listSharedBundles(VIEWER, NOW);
+
+      expect(listed.map((index) => index.ownerUserId)).toEqual([VIEWER]);
+      expect(await ownerOf('noticed')).toBe(VIEWER);
+    });
+
+    it('keeps a claim across a second read, and does not re-stamp it', async () => {
+      await seedBundle(cacheStorage, 'mine', [
+        { name: 'a.png', type: 'image/png' },
+      ]);
+
+      await readSharedBundle('mine', VIEWER, NOW);
+      const again = await readSharedBundle('mine', VIEWER, NOW);
+
+      expect(again!.index.ownerUserId).toBe(VIEWER);
+      expect(again!.files).toHaveLength(1);
+      expect(await ownerOf('mine')).toBe(VIEWER);
+    });
+
+    // A share is one account's document. Reading as absent rather than refusing
+    // is deliberate: the id came off a URL, and "whose is it" is not a question
+    // this screen answers to whoever pasted one.
+    it("reads another account's bundle as absent, and never lists it", async () => {
+      await seedBundle(
+        cacheStorage,
+        'theirs',
+        [{ name: 'a.png', type: 'image/png' }],
+        NOW,
+        OTHER,
+      );
+
+      expect(await readSharedBundle('theirs', VIEWER, NOW)).toBeNull();
+      expect(await listSharedBundles(VIEWER, NOW)).toEqual([]);
+      // Untouched: it is still the other account's to open.
+      expect(await ownerOf('theirs')).toBe(OTHER);
+    });
+
+    it('leaves the owner alone for a reader that already owns it', async () => {
+      await seedBundle(
+        cacheStorage,
+        'held',
+        [{ name: 'a.png', type: 'image/png' }],
+        NOW,
+        VIEWER,
+      );
+
+      const bundle = await readSharedBundle('held', VIEWER, NOW);
+
+      expect(bundle!.index.ownerUserId).toBe(VIEWER);
+      expect(bundle!.files).toHaveLength(1);
+    });
+
+    // An unreadable stamp is not somebody's claim, and not everybody's either:
+    // it reads as unclaimed, which the next authenticated reader settles.
+    it('treats a non-string owner as unclaimed', async () => {
+      const cache = await cacheStorage.storage.open(SHARE_CACHE_NAME);
+      await cache.put(
+        shareIndexKey('odd'),
+        new Response(
+          JSON.stringify({
+            id: 'odd',
+            createdAt: NOW,
+            files: [],
+            ownerUserId: 42,
+          }),
+        ),
+      );
+
+      const bundle = await readSharedBundle('odd', VIEWER, NOW);
+
+      expect(bundle).not.toBeNull();
+      expect(await ownerOf('odd')).toBe(VIEWER);
+    });
+
+    // Claiming an expired bundle would rewrite an index the purge is about to
+    // delete, and there is nothing to protect: it can no longer be used.
+    it('does not claim an expired bundle', async () => {
+      await seedBundle(
+        cacheStorage,
+        'stale',
+        [{ name: 'a.png', type: 'image/png' }],
+        NOW - SHARE_STASH_TTL_MS - 1,
+      );
+
+      const bundle = await readSharedBundle('stale', VIEWER, NOW);
+
+      expect(bundle!.expired).toBe(true);
+      expect(await ownerOf('stale')).toBeUndefined();
+    });
+
+    // Nothing is shown to, or claimable by, a reader we cannot name -- the share
+    // page stays on its loading state until the auth store answers.
+    it('shows nothing to an unknown reader', async () => {
+      await seedBundle(cacheStorage, 'waiting', [
+        { name: 'a.png', type: 'image/png' },
+      ]);
+
+      expect(await listSharedBundles('', NOW)).toEqual([]);
+      expect(await readSharedBundle('waiting', '', NOW)).toBeNull();
+      expect(await ownerOf('waiting')).toBeUndefined();
+    });
+
+    // The purge is a lifetime sweep, not an access check: it runs from whichever
+    // account happens to be signed in, and must not delete another account's
+    // live share.
+    it('purges by lifetime alone, leaving another account\'s live share', async () => {
+      await seedBundle(
+        cacheStorage,
+        'theirs-live',
+        [{ name: 'a.png', type: 'image/png' }],
+        NOW,
+        OTHER,
+      );
+      await seedBundle(
+        cacheStorage,
+        'theirs-old',
+        [{ name: 'b.png', type: 'image/png' }],
+        NOW - SHARE_STASH_TTL_MS - 1,
+        OTHER,
+      );
+
+      await purgeExpiredSharedBundles(NOW);
+
+      const keys = [...cacheStorage.storeFor(SHARE_CACHE_NAME)!.keys()];
+      expect(keys.some((key) => key.includes('/theirs-live/'))).toBe(true);
+      expect(keys.some((key) => key.includes('/theirs-old/'))).toBe(false);
+    });
+  });
+
   it('drops the whole stash on clear', async () => {
     await seedBundle(cacheStorage, 'one', [{ name: 'a.png', type: 'image/png' }]);
 
@@ -276,8 +442,8 @@ describe('share inbox without the Cache API', () => {
     vi.stubGlobal('caches', undefined);
 
     expect(isShareInboxSupported()).toBe(false);
-    expect(await listSharedBundles(NOW)).toEqual([]);
-    expect(await readSharedBundle('anything', NOW)).toBeNull();
+    expect(await listSharedBundles(VIEWER, NOW)).toEqual([]);
+    expect(await readSharedBundle('anything', VIEWER, NOW)).toBeNull();
     await expect(discardSharedBundle('anything')).resolves.toBeUndefined();
     await expect(purgeExpiredSharedBundles(NOW)).resolves.toBeUndefined();
     await expect(clearShareInbox()).resolves.toBeUndefined();
@@ -293,8 +459,8 @@ describe('share inbox without the Cache API', () => {
       },
     });
 
-    expect(await listSharedBundles(NOW)).toEqual([]);
-    expect(await readSharedBundle('anything', NOW)).toBeNull();
+    expect(await listSharedBundles(VIEWER, NOW)).toEqual([]);
+    expect(await readSharedBundle('anything', VIEWER, NOW)).toBeNull();
     await expect(clearShareInbox()).resolves.toBeUndefined();
   });
 });

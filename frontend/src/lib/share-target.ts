@@ -202,6 +202,14 @@ export interface SharedBundleIndex {
   id: string;
   createdAt: number;
   files: SharedFileEntry[];
+  /**
+   * The account this bundle belongs to, stamped by the first authenticated
+   * reader that observed it (`claimIndex` in `lib/share-inbox.ts`).
+   *
+   * The worker cannot set it: a share can arrive with nobody signed in. Absent
+   * therefore means "not yet claimed", which is claimable -- never "everyone's".
+   */
+  ownerUserId?: string;
 }
 
 /**

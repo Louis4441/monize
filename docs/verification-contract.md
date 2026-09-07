@@ -114,6 +114,7 @@ INV-LOAN-002's entry names the missing source scan while its row said `--`.
 | INV-SHARE-002 reviewed, never applied | **required** | -- | -- | -- | -- | -- | -- | **required** |
 | INV-SHARE-003 stash bounded and cleared | **required** | **required** | -- | -- | -- | -- | -- | optional |
 | INV-SHARE-004 a share never dead-ends | **required** | -- | -- | -- | -- | -- | -- | supporting |
+| INV-SHARE-005 a share belongs to one account | **required** | -- | -- | -- | -- | -- | -- | -- |
 | INV-BACKUP-001 backup complete | supporting | -- | required | -- | optional | **required** | **required** | required |
 | INV-PUSH-001 subscription ownership | required | -- | **required** | required (not yet met) | -- | -- | -- | optional |
 | INV-PUSH-002 private key stays server-side | supporting | **required** | -- | -- | -- | -- | -- | -- |
