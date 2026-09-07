@@ -1208,3 +1208,36 @@ claiming the budget producer's applies unchanged.
   bill.reminderDaysBefore)`).
 - The bell's filter by **severity** and by **type** (financial vs system) is
   preserved and must not regress (`NotificationBell`, `NotificationList`).
+
+
+### Delegate access policy (TODO 10)
+
+Notification delivery and read state are personal to the owner. An acting
+delegate may read the existing notification feed only with the Budgets section
+grant. Reading as a delegate does not materialize new bill notifications.
+
+| Operation while acting as an owner | Policy |
+| --- | --- |
+| Read the notification feed | Budgets section grant required |
+| Mark read, mark all read, dismiss one or many | Owner only |
+| Read or change channel preferences and portfolio alert thresholds | Owner only |
+| Read push configuration, list/register/remove devices, send test push | Owner only |
+| List, create or stop reminders, including the push Stop request | Owner only |
+
+`@OwnerOnly()` makes this explicit on the four controllers; only the feed's
+list method overrides it with `@AllowDelegate()`. The global delegate guard
+continues to enforce the policy for direct API calls. Managing one's own
+notifications requires switching back to one's own account context. There is
+no notification-management delegation capability in this feature.
+
+The bell follows the same grant check and hides all write controls for an
+acting delegate. Opening a row navigates without marking the owner's row read.
+Context changes discard the previous feed and cancel pending dismiss timers.
+Settings already exposes only the actor's security controls in delegated mode;
+the reminders page already declines delegated access without fetching rows.
+
+`notification-delegate-policy.spec.ts` exercises the production guard with real
+route metadata and signed tokens for all four controllers. UI regressions cover
+read-only rows and the missing-grant case. Feed category visibility remains the
+existing Budgets-section policy; this decision does not add account/category
+filtering or grant delegates access to the owner's delivery destinations.

@@ -10,6 +10,9 @@ import { SetMetadata } from "@nestjs/common";
 export const ALLOW_DELEGATE_KEY = "allowDelegate";
 export const AllowDelegate = () => SetMetadata(ALLOW_DELEGATE_KEY, true);
 
+/** Explicit owner-only policy; a method may override a class's delegate access. */
+export const OwnerOnly = () => SetMetadata(ALLOW_DELEGATE_KEY, false);
+
 /**
  * Marks a route as account-scoped for delegates. The value is the request key
  * holding the account id; the guard additionally requires an active READ grant

@@ -59,7 +59,8 @@ interface NotificationListProps {
   onFiltersChange: (filters: NotificationFilters) => void;
   /** Asks the owner to confirm and dismiss everything matching `filters`. */
   onDeleteAll: () => void;
-  canManageReminders?: boolean;
+  /** Owner-only mutations, including read state and reminders. */
+  canManageNotifications?: boolean;
 }
 
 const SEVERITY_FILTER_OPTIONS: readonly NotificationSeverity[] = [
@@ -141,7 +142,7 @@ export function NotificationList({
   filters,
   onFiltersChange,
   onDeleteAll,
-  canManageReminders = true,
+  canManageNotifications = true,
 }: NotificationListProps) {
   const t = useTranslations('notifications');
   /**
@@ -159,7 +160,7 @@ export function NotificationList({
   const unreadCount = notifications.filter((a) => !a.isRead && !dismissingIds.has(a.id)).length;
 
   const handleAlertClick = (notification: Notification) => {
-    if (!notification.isRead) {
+    if (canManageNotifications && !notification.isRead) {
       onMarkRead(notification.id);
     }
     onClose();
@@ -199,7 +200,7 @@ export function NotificationList({
       className="fixed inset-x-0 top-0 h-dvh sm:absolute sm:inset-auto sm:right-0 sm:mt-1 sm:h-auto sm:w-[30rem] bg-white dark:bg-gray-800 sm:rounded-lg shadow-lg dark:shadow-gray-700/50 sm:border border-gray-200 dark:border-gray-700 z-50 sm:max-h-[28rem] flex flex-col"
       data-testid="notification-list"
     >
-      {canManageReminders && (
+      {canManageNotifications && (
         <Link href="/reminders" onClick={onClose}
           className="px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
           {t('reminder.pageTitle')}
@@ -216,7 +217,7 @@ export function NotificationList({
           )}
         </h3>
         <div className="flex items-center gap-3">
-          {unreadCount > 0 && (
+          {canManageNotifications && unreadCount > 0 && (
             <button
               onClick={onMarkAllRead}
               className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
@@ -225,7 +226,7 @@ export function NotificationList({
               {t('markAllRead')}
             </button>
           )}
-          {notifications.length > 0 && (
+          {canManageNotifications && notifications.length > 0 && (
             <button
               onClick={onDeleteAll}
               className="text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
@@ -406,22 +407,24 @@ export function NotificationList({
                       </button>
                       {/* Action controls, siblings of the click button (never
                           nested inside it): remind/stop, then dismiss. */}
-                      <div className="absolute top-2 right-2 flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
-                        <RemindMeButton notification={notification} />
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDismiss(notification.id);
-                          }}
-                          className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                          data-testid={`dismiss-notification-${notification.id}`}
-                          aria-label={t('dismissAriaLabel')}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                            <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-                          </svg>
-                        </button>
-                      </div>
+                      {canManageNotifications && (
+                        <div className="absolute top-2 right-2 flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
+                          <RemindMeButton notification={notification} />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDismiss(notification.id);
+                            }}
+                            className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                            data-testid={`dismiss-notification-${notification.id}`}
+                            aria-label={t('dismissAriaLabel')}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                              <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

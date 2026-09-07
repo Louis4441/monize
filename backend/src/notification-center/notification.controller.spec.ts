@@ -31,6 +31,14 @@ describe("NotificationController", () => {
   });
 
   describe("list", () => {
+    it("does not materialize notifications while a delegate reads the feed", async () => {
+      await controller.list({ user: { id: "owner-1", isActing: true } });
+      expect(budgets.ensureBillDueNotifications).not.toHaveBeenCalled();
+      expect(notifications.list).toHaveBeenCalledWith("owner-1", {
+        unreadOnly: false,
+      });
+    });
+
     it("materializes pending bill reminders before reading", async () => {
       await controller.list(req);
 

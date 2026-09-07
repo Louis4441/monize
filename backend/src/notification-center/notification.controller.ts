@@ -25,6 +25,7 @@ import { DismissNotificationsQueryDto } from "./dto/dismiss-notifications-query.
 import { BudgetsService } from "../budgets/budgets.service";
 import {
   AllowDelegate,
+  OwnerOnly,
   DelegateRequiresSection,
 } from "../delegation/decorators/delegate-access.decorator";
 
@@ -32,19 +33,17 @@ import {
  * The notification centre: what this account has been told, and what it has
  * done about it.
  *
- * These five endpoints lived on `BudgetsController` as `/budgets/alerts*` until
- * the table stopped being about budgets. The delegate rules come across
- * unchanged on purpose -- section `budgets`, the list readable, every write
- * closed -- because a move is not the moment to widen or narrow who may read
- * somebody else's notifications. Whether a delegate granted the budgets section
- * should see the owner's BACKUP_FAILED rows is a real question and a separate
- * one; it was already the answer here before this controller existed.
+ * Delegates with the Budgets section may read the existing notification feed.
+ * Read state, dismissal and delivery settings belong to the owner. The explicit
+ * class policy also protects future routes; only list opts into delegate access.
+ * See notification-preferences.md: Delegate access policy (TODO 10).
  */
 @ApiTags("Notifications")
 @Controller("notifications")
 @UseGuards(AuthGuard("jwt"))
 @ApiBearerAuth()
 @DelegateRequiresSection("budgets")
+@OwnerOnly()
 export class NotificationController {
   constructor(
     private readonly notifications: NotificationService,
@@ -71,12 +70,12 @@ export class NotificationController {
     @Query("unreadOnly", new ParseBoolPipe({ optional: true }))
     unreadOnly?: boolean,
   ) {
-    // Only the full list materializes pending bill reminders. `unreadOnly` has
+    // Only the owner's full list materializes pending bill reminders. `unreadOnly` has
     // no client today -- the bell reads the full list once and counts unread
     // rows itself -- so this branch exists for a caller that wants the count
     // without a write, and is kept honest by the controller spec rather than by
     // a comment claiming a caller it does not have.
-    if (!unreadOnly) {
+    if (!unreadOnly && !req.user.isActing) {
       await this.budgets.ensureBillDueNotifications(req.user.id);
     }
     return this.notifications.list(req.user.id, {

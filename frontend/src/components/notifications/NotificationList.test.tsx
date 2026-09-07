@@ -90,8 +90,21 @@ describe('NotificationList', () => {
   });
 
   it('hides reminder management when the caller is a delegate', () => {
-    render(<NotificationList {...defaultProps} canManageReminders={false} />);
+    render(<NotificationList {...defaultProps} canManageNotifications={false} />);
     expect(screen.queryByRole('link', { name: 'Active reminders' })).not.toBeInTheDocument();
+  });
+
+  it('lets a delegate open a row without changing read state or exposing write controls', () => {
+    render(<NotificationList {...defaultProps} canManageNotifications={false}
+      notifications={[makeNotification(), makeNotification({ id: 'nag', data: { reminderId: 'rem-1' } })]} />);
+    for (const id of ['mark-all-read', 'delete-all-notifications', 'dismiss-notification-notification-1',
+      'remind-me-notification-1', 'stop-reminder-nag']) {
+      expect(screen.queryByTestId(id)).not.toBeInTheDocument();
+    }
+    fireEvent.click(screen.getByTestId('notification-item-notification-1'));
+    expect(defaultProps.onMarkRead).not.toHaveBeenCalled();
+    expect(defaultProps.onClose).toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith('/budgets/budget-1');
   });
 
   beforeEach(() => {
