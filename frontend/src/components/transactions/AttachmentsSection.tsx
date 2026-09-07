@@ -119,8 +119,14 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
   const [deleting, setDeleting] = useState(false);
   /** The photo currently in the scan dialog, or null when it is closed. */
   const [scanning, setScanning] = useState<File | null>(null);
-  /** The attachment open in the preview, or null when it is closed. */
-  const [preview, setPreview] = useState<Attachment | null>(null);
+  /**
+   * The attachment open in the preview, or null when it is closed.
+   *
+   * The whole target is held here rather than composed in the JSX, so it keeps
+   * one identity for as long as it is on screen -- an object rebuilt on every
+   * render of this list is a different subject to anything downstream.
+   */
+  const [preview, setPreview] = useState<PreviewTarget | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -248,7 +254,7 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
                     a control nobody can reach. */}
                 <button
                   type="button"
-                  onClick={() => setPreview(attachment)}
+                  onClick={() => setPreview({ kind: 'saved', attachment })}
                   aria-label={t('preview.open', { name: attachment.filename })}
                   className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                 >
@@ -313,7 +319,7 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
 
       <AttachmentPreviewDialog
         isOpen={preview !== null}
-        target={preview ? { kind: 'saved', attachment: preview } : null}
+        target={preview}
         onClose={() => setPreview(null)}
       />
 

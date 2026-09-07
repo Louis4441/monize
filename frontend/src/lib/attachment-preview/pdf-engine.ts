@@ -10,8 +10,8 @@
  *
  * pdf.js renders in a Web Worker it constructs itself from
  * `GlobalWorkerOptions.workerSrc`. That script is copied out of the installed
- * package at build time (`scripts/copy-vendor.mjs`) so it is served from our
- * own origin under the page's CSP, and the URL carries the API's version as a
+ * package at build time (`frontend/scripts/copy-vendor.mjs`) so it is served from
+ * our own origin under the page's CSP, and the URL carries the API's version as a
  * query string: the worker must match the API exactly, and a stale copy in the
  * HTTP cache would otherwise answer for a newer API with "API version does not
  * match Worker version".
@@ -36,6 +36,17 @@ export interface PdfPageRender {
 
 export interface PdfHandle {
   numPages: number;
+  /**
+   * Height divided by width of the first page.
+   *
+   * A page that has not been drawn yet still has to occupy the height it will
+   * occupy once it is, or every page of the document is inside the viewport at
+   * once and "render what the reader can see" degrades to "render everything".
+   * One ratio for the whole document is an approximation -- a PDF may mix page
+   * sizes -- and it only sizes the placeholder: the real size is set from the
+   * page's own viewport the moment it is drawn.
+   */
+  aspectRatio: number;
   /**
    * Draw one page into `canvas` at `cssWidth` CSS pixels wide, sizing the
    * canvas itself for the device's pixel ratio.
@@ -77,9 +88,13 @@ export async function openPdf(bytes: ArrayBuffer): Promise<PdfHandle> {
     standardFontDataUrl: PDFJS_STANDARD_FONTS_URL,
   });
   const document = await loadingTask.promise;
+  const firstPage = await document.getPage(1);
+  const firstViewport = firstPage.getViewport({ scale: 1 });
 
   return {
     numPages: document.numPages,
+    aspectRatio:
+      firstViewport.width > 0 ? firstViewport.height / firstViewport.width : 1,
     renderPage(pageNumber, canvas, cssWidth, devicePixelRatio) {
       let cancelled = false;
       let task: RenderTask | null = null;

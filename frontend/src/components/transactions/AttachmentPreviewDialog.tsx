@@ -1,11 +1,15 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Modal } from '@/components/ui/Modal';
-import { useAttachmentBytes, type PreviewSource } from '@/hooks/useAttachmentBytes';
+import {
+  previewSourceKey,
+  useAttachmentBytes,
+  type PreviewSource,
+} from '@/hooks/useAttachmentBytes';
 import { attachmentDownloadUrl } from '@/lib/attachments';
 import { downloadBlob } from '@/lib/download';
 import type { Attachment } from '@/types/attachment';
@@ -32,6 +36,34 @@ function hasOriginal(target: PreviewTarget): boolean {
   return target.kind === 'saved'
     ? !!target.attachment.originalAttachmentId
     : target.original !== undefined;
+}
+
+/**
+ * What kind of file the preview is about to show, from the metadata the list
+ * already carries rather than from the bytes still in flight.
+ *
+ * Asking the loaded bytes instead means the zoom controls are absent until the
+ * fetch lands and then appear, shifting the picture the reader is looking at,
+ * once on open and again on every switch between the scan and its photo. A
+ * scan's original is an image by construction: the server refuses a pair whose
+ * halves are not both images.
+ */
+function expectedKind(
+  target: PreviewTarget,
+  variant: Variant,
+): 'image' | 'pdf' | 'other' {
+  const type =
+    target.kind === 'saved'
+      ? variant === 'original' && target.attachment.originalAttachmentId
+        ? 'image/'
+        : target.attachment.contentType
+      : (variant === 'original' && target.original
+          ? target.original
+          : target.file
+        ).type;
+  if (type.startsWith('image/')) return 'image';
+  if (type === 'application/pdf') return 'pdf';
+  return 'other';
 }
 
 function sourceFor(target: PreviewTarget, variant: Variant): PreviewSource {
@@ -72,22 +104,29 @@ export function AttachmentPreviewDialog({
   const t = useTranslations('attachments');
   const tCommon = useTranslations('common');
 
-  // Variant and zoom belong to one target; a new target starts over. Tracked
-  // by the previous-render pattern rather than reset in an effect.
+  // Variant and zoom belong to one attachment, and a different attachment
+  // starts over. Keyed on WHAT is being previewed, never on the identity of
+  // the prop object: a caller that builds `target` inline rebuilds it on every
+  // one of its own renders, and keying on the object would throw the reader
+  // back to the enhanced image, at Fit, in the middle of reading the original.
+  const subject = target === null ? null : previewSourceKey(sourceFor(target, 'enhanced'));
   const [viewState, setViewState] = useState<{
-    target: PreviewTarget | null;
+    subject: string | null;
     variant: Variant;
     fit: Fit;
-  }>({ target, variant: 'enhanced', fit: 'fit' });
-  if (viewState.target !== target) {
-    setViewState({ target, variant: 'enhanced', fit: 'fit' });
+  }>({ subject, variant: 'enhanced', fit: 'fit' });
+  if (viewState.subject !== subject) {
+    setViewState({ subject, variant: 'enhanced', fit: 'fit' });
   }
-  const variant = viewState.target === target ? viewState.variant : 'enhanced';
-  const fit = viewState.target === target ? viewState.fit : 'fit';
+  const variant = viewState.subject === subject ? viewState.variant : 'enhanced';
+  const fit = viewState.subject === subject ? viewState.fit : 'fit';
   const setVariant = (next: Variant) =>
-    setViewState((prev) => ({ ...prev, target, variant: next }));
+    setViewState((prev) => ({ ...prev, subject, variant: next }));
   const setFit = (next: Fit) =>
-    setViewState((prev) => ({ ...prev, target, fit: next }));
+    setViewState((prev) => ({ ...prev, subject, fit: next }));
+  // The element the PDF pages scroll inside, so a page is drawn when the
+  // reader reaches it rather than all of them at once.
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   const source = isOpen && target ? sourceFor(target, variant) : null;
   const bytes = useAttachmentBytes(source);
@@ -95,6 +134,9 @@ export function AttachmentPreviewDialog({
   const ready = bytes?.status === 'ready' ? bytes : null;
   const isImage = ready?.contentType.startsWith('image/') ?? false;
   const isPdf = ready?.contentType === 'application/pdf';
+  // Drawn from the metadata so the toolbar does not move while bytes load; the
+  // loaded type still decides what the body actually renders.
+  const showZoom = target !== null && (expectedKind(target, variant) === 'image' || isImage);
 
   // Object URLs for the image, made from the bytes on screen and revoked when
   // they change. Guarded for environments (jsdom) without createObjectURL.
@@ -169,7 +211,7 @@ export function AttachmentPreviewDialog({
         </>
       }
     >
-      {(hasOriginal(target) || isImage) && (
+      {(hasOriginal(target) || showZoom) && (
         <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 px-4 py-2 sm:px-6 dark:border-gray-700">
           {hasOriginal(target) && (
             <>
@@ -195,7 +237,7 @@ export function AttachmentPreviewDialog({
               </Button>
             </>
           )}
-          {isImage && (
+          {showZoom && (
             <div className="ml-auto flex items-center gap-2">
               <Button
                 type="button"
@@ -221,6 +263,7 @@ export function AttachmentPreviewDialog({
       )}
 
       <div
+        ref={bodyRef}
         className="min-h-0 flex-1 overflow-auto bg-gray-100 p-4 dark:bg-gray-900"
         aria-busy={bytes?.status === 'loading'}
       >
@@ -248,7 +291,9 @@ export function AttachmentPreviewDialog({
             }
           />
         )}
-        {ready && isPdf && <PdfPages bytes={ready.bytes} label={name} />}
+        {ready && isPdf && (
+          <PdfPages bytes={ready.bytes} scrollRootRef={bodyRef} />
+        )}
         {ready && !isImage && !isPdf && (
           <p className="text-center text-sm text-gray-600 dark:text-gray-300">
             {t('preview.unsupported')}

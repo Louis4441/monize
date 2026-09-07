@@ -214,11 +214,27 @@ Four rules the viewer holds, each with a test:
   `lib/attachment-preview/attachment-preview.guard.test.ts` scans for both.
 - **The worker is vendored and version-pinned.** pdf.js constructs its own
   Web Worker from `GlobalWorkerOptions.workerSrc`; the script must match the
-  bundled API exactly, so `scripts/copy-vendor.mjs` copies it out of the
+  bundled API exactly, so `frontend/scripts/copy-vendor.mjs` copies it out of the
   installed package on `predev`/`prebuild`/`pretest` (beside the OpenCV build,
   same script) and the engine appends `?v=<pdfjs.version>` so a stale copy in
   the HTTP cache cannot answer for a newer API. `public/sw.js` deliberately
   does not cache `.mjs`.
+- **A PDF page is drawn when the reader can see it.** A canvas costs its
+  pixels whether or not anyone is looking, and at the dialog's width a full
+  page clamps to `MAX_PAGE_PIXELS`, which is 16 MB: drawing all of a 20-page
+  statement up front asks for hundreds of megabytes and loses the tab on a
+  phone. `PdfPages` observes each page and releases the backing store of one
+  scrolled away, keeping the box it measured so nothing jumps. What bounds the
+  cost is what is on screen, never the length of the document.
+- **What the reader chose belongs to the attachment, not to the prop object.**
+  The dialog keys its Enhanced/Original and Fit/Actual state on the subject
+  being previewed (`previewSourceKey`), because a caller that composes `target`
+  in its JSX rebuilds it on every one of its own renders -- and keyed on
+  identity that threw the reader back to the enhanced image mid-read, and
+  re-fetched it. The saved list also holds the whole target in state, as the
+  staged list already did. Which controls the toolbar offers likewise comes
+  from the metadata, not from the bytes in flight, or they appear late and
+  shift the picture underneath.
 - **A phone gets the whole viewport through `Modal`'s `fullScreenOnPhone`**,
   spelled with `max-sm:` variants so the base classes every other dialog
   relies on are untouched. The layout is a CSS question, so it is not

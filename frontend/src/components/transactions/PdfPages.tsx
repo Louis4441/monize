@@ -1,12 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { createLogger } from '@/lib/logger';
-import type { PdfHandle } from '@/lib/attachment-preview/pdf-engine';
+import type { PdfHandle, PdfPageRender } from '@/lib/attachment-preview/pdf-engine';
 
 const logger = createLogger('PdfPages');
+
+/** How far outside the scroller a page is drawn before the reader reaches it. */
+const PRERENDER_MARGIN = '400px 0px';
 
 /**
  * Every page of a PDF, drawn top to bottom into one canvas each.
@@ -15,26 +18,46 @@ const logger = createLogger('PdfPages');
  * lazily inside an effect: the engine is a separate chunk plus a vendored
  * worker, fetched the first time somebody previews a PDF and never before.
  *
- * Pages are drawn at the width of the container, re-drawn when it resizes,
- * and sequentially rather than all at once so the first page appears while
- * the rest are still rasterising. The document is destroyed, and any render
- * in flight cancelled, on unmount or when the bytes change.
+ * **A page is drawn when the reader can see it, and released when they scroll
+ * away.** A canvas costs its pixels whether or not anyone is looking: at the
+ * dialog's width a full page clamps to `MAX_PAGE_PIXELS`, which is 16 MB of
+ * backing store, so drawing every page of a 20-page statement up front asks
+ * the browser for hundreds of megabytes and loses the tab on a phone. What
+ * bounds the cost is the number of pages on screen, not the length of the
+ * document. Releasing a page keeps its measured box, so nothing moves under
+ * the reader when it goes blank and is redrawn.
  */
-export function PdfPages({ bytes, label }: { bytes: ArrayBuffer; label: string }) {
+export function PdfPages({
+  bytes,
+  scrollRootRef,
+}: {
+  bytes: ArrayBuffer;
+  /**
+   * The element the pages scroll inside, so visibility is measured against it.
+   * Its absence is not fatal: the viewport is the fallback root, which is
+   * correct but cannot pre-draw the page just below the fold.
+   */
+  scrollRootRef?: RefObject<HTMLElement | null>;
+}) {
   const t = useTranslations('attachments');
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const handleRef = useRef<PdfHandle | null>(null);
+  /** Which width each drawn page was drawn at, so a resize redraws it. */
+  const drawnRef = useRef<Map<number, number>>(new Map());
   // Both are keyed to the bytes they describe, so a new document shows the
   // loading state on the render it arrives, without a reset in an effect.
   const [opened, setOpened] = useState<{
     bytes: ArrayBuffer;
     pageCount: number;
+    aspectRatio: number;
   } | null>(null);
   const [failure, setFailure] = useState<ArrayBuffer | null>(null);
   const [width, setWidth] = useState<number | null>(null);
+  const [visible, setVisible] = useState<number[]>([]);
 
-  const pageCount = opened?.bytes === bytes ? opened.pageCount : null;
+  const document = opened?.bytes === bytes ? opened : null;
+  const pageCount = document?.pageCount ?? null;
   const failed = failure === bytes;
 
   useEffect(() => {
@@ -48,7 +71,12 @@ export function PdfPages({ bytes, label }: { bytes: ArrayBuffer; label: string }
           return;
         }
         handleRef.current = handle;
-        setOpened({ bytes, pageCount: handle.numPages });
+        drawnRef.current = new Map();
+        setOpened({
+          bytes,
+          pageCount: handle.numPages,
+          aspectRatio: handle.aspectRatio,
+        });
       } catch (error) {
         if (cancelled) return;
         logger.error('Failed to open PDF:', error);
@@ -74,15 +102,73 @@ export function PdfPages({ bytes, label }: { bytes: ArrayBuffer; label: string }
     return () => observer.disconnect();
   }, []);
 
+  // Before anything is measured: give every undrawn page the height it will
+  // have. A run of zero-height canvases all intersect at once, and the very
+  // first visibility report would then name every page in the document --
+  // which is the eager render this component exists to avoid. Layout, not
+  // effect, so it lands before the observer's first callback.
+  useLayoutEffect(() => {
+    if (document === null || width === null) return;
+    const height = Math.round(width * document.aspectRatio);
+    for (let page = 1; page <= document.pageCount; page++) {
+      if (drawnRef.current.has(page)) continue;
+      const canvas = canvasRefs.current[page - 1];
+      if (!canvas) continue;
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+    }
+  }, [document, width]);
+
+  useEffect(() => {
+    if (pageCount === null) return;
+    const onScreen = new Set<number>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const page = Number((entry.target as HTMLElement).dataset.page);
+          if (!page) continue;
+          if (entry.isIntersecting) onScreen.add(page);
+          else onScreen.delete(page);
+        }
+        const next = Array.from(onScreen).sort((a, b) => a - b);
+        setVisible((prev) =>
+          prev.length === next.length && prev.every((p, i) => p === next[i])
+            ? prev
+            : next,
+        );
+      },
+      { root: scrollRootRef?.current ?? null, rootMargin: PRERENDER_MARGIN },
+    );
+    for (let page = 1; page <= pageCount; page++) {
+      const canvas = canvasRefs.current[page - 1];
+      if (canvas) observer.observe(canvas);
+    }
+    return () => observer.disconnect();
+  }, [pageCount, scrollRootRef]);
+
   useEffect(() => {
     const handle = handleRef.current;
     if (!handle || pageCount === null || width === null) return;
     let cancelled = false;
-    let current: ReturnType<PdfHandle['renderPage']> | null = null;
+    let current: PdfPageRender | null = null;
+
+    // Hand back the pixels of anything the reader has scrolled past. The
+    // element keeps the size it was drawn at, so releasing it moves nothing.
+    for (const page of Array.from(drawnRef.current.keys())) {
+      if (visible.includes(page)) continue;
+      const canvas = canvasRefs.current[page - 1];
+      if (canvas) {
+        canvas.width = 0;
+        canvas.height = 0;
+      }
+      drawnRef.current.delete(page);
+    }
+
     const ratio = typeof window === 'undefined' ? 1 : window.devicePixelRatio;
     (async () => {
-      for (let page = 1; page <= pageCount; page++) {
+      for (const page of visible) {
         if (cancelled) return;
+        if (drawnRef.current.get(page) === width) continue;
         const canvas = canvasRefs.current[page - 1];
         if (!canvas) continue;
         current = handle.renderPage(page, canvas, width, ratio);
@@ -94,13 +180,15 @@ export function PdfPages({ bytes, label }: { bytes: ArrayBuffer; label: string }
           setFailure(bytes);
           return;
         }
+        if (cancelled) return;
+        drawnRef.current.set(page, width);
       }
     })();
     return () => {
       cancelled = true;
       current?.cancel();
     };
-  }, [bytes, pageCount, width]);
+  }, [bytes, pageCount, width, visible]);
 
   return (
     <div ref={containerRef} className="w-full">
@@ -124,12 +212,12 @@ export function PdfPages({ bytes, label }: { bytes: ArrayBuffer; label: string }
               ref={(element) => {
                 canvasRefs.current[index] = element;
               }}
+              data-page={index + 1}
               role="img"
               aria-label={t('preview.page', {
                 page: index + 1,
                 total: pageCount,
               })}
-              title={label}
               className="mx-auto mb-3 block max-w-full bg-white shadow"
             />
           ))}

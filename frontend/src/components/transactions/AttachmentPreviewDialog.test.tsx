@@ -14,10 +14,8 @@ vi.mock('@/lib/download', () => ({ downloadBlob: vi.fn() }));
 
 /** The PDF renderer has its own suite; here it only has to be handed the bytes. */
 vi.mock('./PdfPages', () => ({
-  PdfPages: ({ bytes, label }: { bytes: ArrayBuffer; label: string }) => (
-    <div data-testid="pdf-pages">
-      {label}:{bytes.byteLength}
-    </div>
+  PdfPages: ({ bytes }: { bytes: ArrayBuffer }) => (
+    <div data-testid="pdf-pages">{bytes.byteLength}</div>
   ),
 }));
 
@@ -167,7 +165,7 @@ describe('AttachmentPreviewDialog', () => {
   it('hands a PDF to the page renderer', async () => {
     await open(saved({ id: 'pdf-1', filename: 'invoice.pdf', contentType: 'application/pdf' }));
     const pages = await screen.findByTestId('pdf-pages');
-    expect(pages).toHaveTextContent(`invoice.pdf:${bytesOf('pdf-1').byteLength}`);
+    expect(pages).toHaveTextContent(String(bytesOf('pdf-1').byteLength));
     expect(screen.queryByRole('button', { name: 'Fit to screen' })).not.toBeInTheDocument();
   });
 
@@ -221,5 +219,124 @@ describe('AttachmentPreviewDialog', () => {
     const closes = screen.getAllByRole('button', { name: 'Close' });
     fireEvent.click(closes[closes.length - 1]);
     expect(onClose).toHaveBeenCalled();
+  });
+
+  /**
+   * The caller may rebuild the target object on every one of its own renders
+   * -- the saved list does exactly that shape of thing -- and that must not be
+   * read as a different attachment. Keyed on the object, this test finds the
+   * reader thrown back to the enhanced image at Fit, mid-read.
+   */
+  it('keeps what the reader chose when an equivalent target arrives', async () => {
+    const attachment = makeAttachment({
+      id: 'scan-1',
+      filename: 'receipt-scan.jpg',
+      originalAttachmentId: 'orig-1',
+    });
+    const { rerender } = await open({ kind: 'saved', attachment });
+    await screen.findByRole('img', { name: 'receipt-scan.jpg' });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Original' }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Actual size' }));
+    });
+    fetchBytes.mockClear();
+
+    await act(async () => {
+      rerender(
+        <AttachmentPreviewDialog
+          isOpen
+          target={{ kind: 'saved', attachment }}
+          onClose={vi.fn()}
+        />,
+      );
+    });
+
+    expect(screen.getByRole('button', { name: 'Original' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Actual size' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    // And nothing was re-read: the subject never changed.
+    expect(fetchBytes).not.toHaveBeenCalled();
+  });
+
+  it('starts over when a different attachment is previewed', async () => {
+    const first = makeAttachment({ id: 'a-1', originalAttachmentId: 'orig-1' });
+    const { rerender } = await open({ kind: 'saved', attachment: first });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Original' }));
+    });
+
+    const second = makeAttachment({
+      id: 'a-2',
+      filename: 'other.png',
+      originalAttachmentId: 'orig-2',
+    });
+    await act(async () => {
+      rerender(
+        <AttachmentPreviewDialog
+          isOpen
+          target={{ kind: 'saved', attachment: second }}
+          onClose={vi.fn()}
+        />,
+      );
+    });
+
+    expect(screen.getByRole('button', { name: 'Enhanced' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  describe('the toolbar does not wait for the bytes', () => {
+    it('offers the zoom controls on an image while it is still loading', async () => {
+      fetchBytes.mockReturnValue(new Promise(() => {}));
+      await open(saved());
+      expect(screen.getByText('Loading preview…')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Fit to screen' }),
+      ).toBeInTheDocument();
+    });
+
+    it('offers none on a PDF', async () => {
+      fetchBytes.mockReturnValue(new Promise(() => {}));
+      await open(saved({ filename: 'invoice.pdf', contentType: 'application/pdf' }));
+      expect(
+        screen.queryByRole('button', { name: 'Fit to screen' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('keeps them while switching to a scan original', async () => {
+      let resolveOriginal: (value: unknown) => void = () => {};
+      fetchBytes.mockImplementation((id: string) =>
+        id === 'orig-1'
+          ? new Promise((resolve) => {
+              resolveOriginal = resolve;
+            })
+          : Promise.resolve({ bytes: bytesOf(id), contentType: 'image/png' }),
+      );
+      await open(
+        saved({ id: 'scan-1', filename: 'receipt-scan.jpg', originalAttachmentId: 'orig-1' }),
+      );
+      await screen.findByRole('img', { name: 'receipt-scan.jpg' });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Original' }));
+      });
+      // Mid-switch, with nothing loaded: the controls stay put.
+      expect(screen.getByText('Loading preview…')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Fit to screen' }),
+      ).toBeInTheDocument();
+      await act(async () => {
+        resolveOriginal({ bytes: bytesOf('orig'), contentType: 'image/jpeg' });
+      });
+    });
   });
 });
