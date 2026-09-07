@@ -8,6 +8,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { BootSplash } from '@/components/layout/BootSplash';
 import { BootSplashHider } from '@/components/providers/BootSplashHider';
 import { OfflineFallbackSync } from '@/components/providers/OfflineFallbackSync';
+import { ShareInboxNotice } from '@/components/share/ShareInboxNotice';
 import { PreferencesLoader } from '@/components/providers/PreferencesLoader';
 import { ServiceWorkerRegistrar } from '@/components/providers/ServiceWorkerRegistrar';
 import { PwaLifecycleHandler } from '@/components/providers/PwaLifecycleHandler';
@@ -158,6 +159,7 @@ export default async function RootLayout({
           <ThemeProvider>
             <BootSplashHider />
             <OfflineFallbackSync />
+            <ShareInboxNotice />
             <PreferencesLoader>
               <SwipeShell httpsHeadersActive={httpsHeadersActive}>
                 {children}

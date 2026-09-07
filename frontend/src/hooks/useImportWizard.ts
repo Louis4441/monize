@@ -359,15 +359,21 @@ export function useImportWizard() {
     runBulkLookup();
   }, [step, initialLookupDone, securityMappings, preferredExchanges, defaultCurrency]);
 
-  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  /**
+   * Take a set of files and drive the wizard from them.
+   *
+   * Split out from the change handler so the Web Share Target's review screen
+   * can hand over files the OS provided: they arrive as `File` objects with no
+   * input element behind them, and everything from here on is identical to a
+   * file the user picked.
+   */
+  const handleFiles = useCallback(async (fileArray: File[]) => {
+    if (fileArray.length === 0) return;
 
     setIsLoading(true);
     setInitialLookupDone(false);
 
     try {
-      const fileArray = Array.from(files);
 
       // Detect file types and enforce same type
       const detectedTypes = fileArray.map((f) => detectFileType(f.name));
@@ -540,6 +546,16 @@ export function useImportWizard() {
       setIsLoading(false);
     }
   }, [accounts, categories, securities, defaultCurrency, preselectedAccountId, t, uploadMny]);
+
+  /** The file input's change event, reduced to the files it carries. */
+  const handleFileSelect = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+      await handleFiles(Array.from(files));
+    },
+    [handleFiles],
+  );
 
   // CSV column mapping handlers
   const handleCsvColumnMappingChange = useCallback((mapping: CsvColumnMappingConfig) => {
@@ -1211,7 +1227,7 @@ export function useImportWizard() {
     accounts, categories, securities,
     categoryMappings, setCategoryMappings, accountMappings, securityMappings,
     handleAccountMappingChange, handleSecurityMappingChange, handleSecurityLookup,
-    isLoading, importResult, bulkImportResult, handleImport, handleFileSelect, handleImportMore,
+    isLoading, importResult, bulkImportResult, handleImport, handleFileSelect, handleFiles, handleImportMore,
     lookupLoadingIndex, bulkLookupInProgress,
     lookupPickerQuery, lookupPickerCandidates, handleLookupPickerPick, handleLookupPickerCancel,
     showCreateAccount, setShowCreateAccount, creatingForFileIndex, setCreatingForFileIndex,
