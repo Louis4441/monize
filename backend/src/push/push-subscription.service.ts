@@ -567,6 +567,7 @@ export class PushSubscriptionService {
           const outcome = await sender.send(
             {
               endpoint: target.endpoint,
+              transport: target.transport,
               p256dh: target.p256dh,
               auth: target.auth,
               vapidPublicKey: target.vapidPublicKey,

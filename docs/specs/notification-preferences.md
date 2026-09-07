@@ -1041,12 +1041,36 @@ notification layer for a notification, never a transport. There is no second
 sender, no ntfy-native JSON publish, and no new outbound-request shape: the
 endpoint is still a URL the server POSTs an encrypted body to, validated with the
 same `IsPushEndpoint` (https floor + SSRF resolve), so no new CWE-918 surface.
-**Known limitation, by design for now:** that check refuses a distributor on a
-private network (`https://ntfy.home.lan`), at registration and again before every
-send, so a UnifiedPush subscription must name a publicly resolvable https
-distributor. A self-hoster whose distributor is LAN-only needs an operator
-allowlist consulted only for `transport = 'unifiedpush'` endpoints; that is
-future work, not something the web UI can promise today.
+Private distributors are disabled by default. An operator can enable exact
+HTTPS DNS origins through `UNIFIEDPUSH_PRIVATE_ENDPOINTS`, a JSON mapping from
+origin to a pinned RFC1918 IPv4 or IPv6 ULA address. Example:
+`{"https://ntfy.home.lan:8443":"192.168.20.5"}`. Pass it to the backend environment
+and restart every replica; both Compose variants forward the variable.
+
+The exception applies only when `transport = 'unifiedpush'`, at registration
+and before each send. Hostname and port must match exactly; subdomains,
+wildcards, URL credentials, fragments, path-prefixed entries and IP-literal
+origins are not admitted. At most 32 entries and 16 KiB of configuration are
+accepted. Invalid configuration prevents backend startup. User preferences,
+subscription fields and administrator API requests cannot edit this setting.
+
+Each private delivery's HTTPS agent resolves only to the configured IP, with
+normal certificate verification and SNI for the original hostname. DNS changes
+cannot redirect that exception elsewhere. Loopback, link-local, metadata,
+multicast and public addresses cannot be pins. Use a dedicated distributor
+origin: the exception authorizes encrypted POSTs to paths on that origin, not
+an arbitrary host in a network range. Certificates must chain to a CA trusted
+by Node; no insecure TLS switch is introduced. The recipient client must also
+be able to reach and trust this server.
+
+Removing an entry and restarting the backend removes the private exception;
+existing subscriptions are rechecked before delivery. Public endpoints retain
+the existing bounded SSRF validation. Browser `webpush` subscriptions receive
+no private exception, even if their origin appears in the mapping. Tests cover
+configuration, exact matching, DTO transport, pinned lookup callback forms and
+sender refusal after removal; live LAN/TLS delivery remains a deployment smoke
+test.
+
 
 **What it is not.** A browser PWA cannot *receive* at an arbitrary endpoint --
 `pushManager.subscribe()` is bound to the browser's own push service. So a

@@ -1,3 +1,9 @@
+import {
+  privatePushEndpoint,
+  privatePushEndpoints,
+  pinnedPushLookup,
+  PrivatePushEndpoint,
+} from "./unifiedpush-private-endpoints";
 import { Injectable, Logger } from "@nestjs/common";
 import * as webpush from "web-push";
 import * as https from "node:https";
@@ -106,6 +112,7 @@ export function collectAgentSockets(agent: https.Agent): Socket[] {
  * must not be able to reach a field it has no business reading.
  */
 export interface PushTarget {
+  transport?: "webpush" | "unifiedpush";
   endpoint: string;
   p256dh: string;
   auth: string;
@@ -214,7 +221,9 @@ export type PushSendOutcome =
 export class WebPushSender {
   private readonly logger = new Logger(WebPushSender.name);
 
-  constructor(private readonly pushConfig: PushConfigService) {}
+  constructor(private readonly pushConfig: PushConfigService) {
+    privatePushEndpoints();
+  }
 
   /**
    * One fan-out, one identity read. `getVapidIdentity` is a database read (plus
@@ -260,7 +269,8 @@ export class WebPushSender {
     // and resolves to a private address now would turn each send into an
     // internal request. Reported as transient rather than as a distinct state:
     // the bounded retry retires it as FAILING, which is what actually happened.
-    if (!(await this.endpointStillSafe(target.endpoint))) {
+    const pin = privatePushEndpoint(target.endpoint, target.transport);
+    if (!pin && !(await this.endpointStillSafe(target.endpoint))) {
       this.logger.warn(
         "Refusing a push to an endpoint that could not be confirmed as a public host",
       );
@@ -271,7 +281,7 @@ export class WebPushSender {
     }
 
     try {
-      await this.deliverWithDeadline(target, payload, identity);
+      await this.deliverWithDeadline(target, payload, identity, pin);
       return { status: "sent" };
     } catch (error) {
       return this.classify(error);
@@ -303,8 +313,12 @@ export class WebPushSender {
     target: PushTarget,
     payload: PushPayload,
     identity: { publicKey: string; privateKey: string },
+    pin?: PrivatePushEndpoint,
   ): Promise<void> {
-    const agent = new https.Agent({ keepAlive: false });
+    const agent = new https.Agent({
+      keepAlive: false,
+      ...(pin ? { lookup: pinnedPushLookup(pin) } : {}),
+    });
     const sockets = collectAgentSockets(agent);
 
     let timer: ReturnType<typeof setTimeout> | undefined;

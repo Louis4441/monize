@@ -24,8 +24,10 @@ Replace both origins with your own. HTTPS is mandatory. Origin subpaths,
 embedded credentials, query strings and redirects are refused. The ntfy server
 must allow reading and publishing to a random capability topic without extra
 HTTP authentication; servers requiring an ntfy access token are not supported
-by this first client. Monize's existing SSRF checks still require a publicly
-resolvable distributor. Private-network allowlisting is separate TODO 6.
+by this first client. For a private distributor, the Monize operator must set
+`UNIFIEDPUSH_PRIVATE_ENDPOINTS` as described in notification spec Section 15.1.
+The receiving machine must resolve/reach the same distributor and trust its
+HTTPS certificate. The backend pins its own connection to the configured IP.
 
 For registration, sign into your Monize account normally, including MFA/SSO if
 configured. In your browser's developer tools, copy the current `auth_token`
