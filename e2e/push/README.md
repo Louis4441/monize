@@ -24,7 +24,10 @@ These tests therefore do not prove native OS clicks or worker lifetime extension
 
 Coverage: displayed copy; same-subject replacement versus distinct subjects;
 safe and hostile navigation targets; Stop with real session and CSRF cookies;
-one refresh/retry on 401; failed Stop navigation to the reminders page.
+one refresh/retry on 401 with a rotated CSRF cookie; failed Stop navigation to
+the reminders page; JSON CSRF acquisition when Cookie Store is deliberately
+removed from Chromium to exercise the portable worker path. This last case
+does not substitute for native Firefox/Safari action-delivery verification.
 
 The API is a controlled response server, not NestJS: authorization, RLS and
 server-side CSRF enforcement remain covered by backend tests. External push

@@ -18,7 +18,7 @@ type PushHarness = {
 export const test = base.extend<{ pushHarness: PushHarness }>({
   pushHarness: async ({ page, context }, use) => {
     const requests: RequestRecord[] = [];
-    const state = { stopStatuses: [201], refreshStatus: 200 };
+    const state = { stopStatuses: [201], refreshStatus: 200, csrfToken: 'browser-csrf' };
     const server = createServer((req, res) => {
       const path = req.url ?? '/';
       if (path.startsWith('/api/')) {
@@ -28,12 +28,24 @@ export const test = base.extend<{ pushHarness: PushHarness }>({
           cookie: req.headers.cookie ?? '',
           csrf: String(req.headers['x-csrf-token'] ?? ''),
         });
-        res.statusCode =
-          path === '/api/v1/auth/refresh'
-            ? state.refreshStatus
-            : (state.stopStatuses.shift() ?? 201);
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ stopped: true }));
+        if (path === '/api/v1/auth/csrf-refresh') {
+          res.setHeader('Cache-Control', 'no-store');
+          res.setHeader('Set-Cookie', `csrf_token=${state.csrfToken}; Path=/; SameSite=Lax`);
+          res.end(JSON.stringify({ csrfToken: state.csrfToken }));
+        } else {
+          res.statusCode =
+            path === '/api/v1/auth/refresh'
+              ? state.refreshStatus
+              : req.headers['x-csrf-token'] === state.csrfToken
+                ? (state.stopStatuses.shift() ?? 201)
+                : 403;
+          if (path === '/api/v1/auth/refresh' && res.statusCode === 200) {
+            state.csrfToken = 'browser-csrf-refreshed';
+            res.setHeader('Set-Cookie', `csrf_token=${state.csrfToken}; Path=/; SameSite=Lax`);
+          }
+          res.end(JSON.stringify({ stopped: true }));
+        }
       } else if (path === '/sw.js') {
         res.setHeader('Content-Type', 'application/javascript');
         res.setHeader('Cache-Control', 'no-store');

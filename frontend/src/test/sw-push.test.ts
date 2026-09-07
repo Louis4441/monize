@@ -40,6 +40,7 @@ type FetchStub = (url: string, init?: RequestInit) => Promise<Response>;
 function loadServiceWorker(
   clients: WindowClientStub[] = [],
   fetchImpl: FetchStub = async () => new Response('', { status: 200 }),
+  cookieStore?: { get: () => Promise<{ value: string } | null> },
 ) {
   const listeners: Record<string, Listener[]> = {};
   const shown: ShownNotification[] = [];
@@ -49,6 +50,7 @@ function loadServiceWorker(
 
   const context = vm.createContext({
     self: {
+      cookieStore,
       addEventListener: (type: string, fn: Listener) => {
         (listeners[type] ??= []).push(fn);
       },
@@ -608,6 +610,7 @@ describe('service worker subscription rotation', () => {
 // that into a stop; a stop that still fails opens the app instead of leaving
 // the nag running with nothing to show for the tap.
 describe('the Stop action on a reminder push', () => {
+  const store = { get: async () => ({ value: 'csrf-before-refresh' }) };
   const calls: { url: string; method?: string }[] = [];
   const fetchScript = (statuses: number[]): FetchStub => {
     calls.length = 0;
@@ -619,8 +622,11 @@ describe('the Stop action on a reminder push', () => {
   };
 
   it('stops the reminder without opening a window when the session is live', async () => {
-    const sw = loadServiceWorker([], fetchScript([200]));
-    await sw.dispatchClick({ target: '/bills', reminderId: 'rem-1' }, 'stop-reminder');
+    const sw = loadServiceWorker([], fetchScript([200]), store);
+    await sw.dispatchClick(
+      { target: '/bills', reminderId: 'rem-1' },
+      'stop-reminder',
+    );
     expect(calls.map((c) => c.url)).toEqual([
       '/api/v1/notifications/reminders/rem-1/stop',
     ]);
@@ -628,8 +634,11 @@ describe('the Stop action on a reminder push', () => {
   });
 
   it('refreshes the session once and retries when the stop answers 401', async () => {
-    const sw = loadServiceWorker([], fetchScript([401, 200, 200]));
-    await sw.dispatchClick({ target: '/bills', reminderId: 'rem-1' }, 'stop-reminder');
+    const sw = loadServiceWorker([], fetchScript([401, 200, 200]), store);
+    await sw.dispatchClick(
+      { target: '/bills', reminderId: 'rem-1' },
+      'stop-reminder',
+    );
     expect(calls.map((c) => c.url)).toEqual([
       '/api/v1/notifications/reminders/rem-1/stop',
       '/api/v1/auth/refresh',
@@ -640,8 +649,11 @@ describe('the Stop action on a reminder push', () => {
   });
 
   it('opens the app at the target when the refresh fails too, rather than leaving the nag running', async () => {
-    const sw = loadServiceWorker([], fetchScript([401, 401]));
-    await sw.dispatchClick({ target: '/bills', reminderId: 'rem-1' }, 'stop-reminder');
+    const sw = loadServiceWorker([], fetchScript([401, 401]), store);
+    await sw.dispatchClick(
+      { target: '/bills', reminderId: 'rem-1' },
+      'stop-reminder',
+    );
     expect(calls.map((c) => c.url)).toEqual([
       '/api/v1/notifications/reminders/rem-1/stop',
       '/api/v1/auth/refresh',
@@ -650,9 +662,163 @@ describe('the Stop action on a reminder push', () => {
   });
 
   it('does not retry a refusal that is not a session problem', async () => {
-    const sw = loadServiceWorker([], fetchScript([403]));
-    await sw.dispatchClick({ target: '/bills', reminderId: 'rem-1' }, 'stop-reminder');
+    const sw = loadServiceWorker([], fetchScript([403]), store);
+    await sw.dispatchClick(
+      { target: '/bills', reminderId: 'rem-1' },
+      'stop-reminder',
+    );
     expect(calls).toHaveLength(1);
     expect(sw.openWindow).toHaveBeenCalledWith(`${ORIGIN}/reminders`);
+  });
+});
+
+describe('worker Stop without Cookie Store', () => {
+  const tokenUrl = '/api/v1/auth/csrf-refresh';
+  const stopUrl = '/api/v1/notifications/reminders/rem-1/stop';
+  const refreshUrl = '/api/v1/auth/refresh';
+
+  it.each(['absent', 'throws', 'empty'])(
+    'obtains a token over authenticated JSON when Cookie Store is %s',
+    async (kind) => {
+      const fetcher = vi.fn<FetchStub>(async (url) =>
+        url === tokenUrl
+          ? Response.json({ csrfToken: 'server-token' })
+          : new Response('', { status: 201 }),
+      );
+      const store =
+        kind === 'absent'
+          ? undefined
+          : {
+              get: async () => {
+                if (kind === 'throws') throw new Error('unavailable');
+                return null;
+              },
+            };
+      const sw = loadServiceWorker([], fetcher, store);
+      await sw.dispatchClick({ reminderId: 'rem-1' }, 'stop-reminder');
+      expect(fetcher.mock.calls).toEqual([
+        [
+          tokenUrl,
+          {
+            method: 'GET',
+            credentials: 'include',
+            mode: 'same-origin',
+            cache: 'no-store',
+            redirect: 'error',
+          },
+        ],
+        [
+          stopUrl,
+          {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'X-CSRF-Token': 'server-token' },
+          },
+        ],
+      ]);
+      expect(sw.openWindow).not.toHaveBeenCalled();
+    },
+  );
+
+  it('refreshes once when token acquisition finds an expired session', async () => {
+    const fetcher = vi
+      .fn<FetchStub>()
+      .mockResolvedValueOnce(new Response('', { status: 401 }))
+      .mockResolvedValueOnce(new Response('', { status: 200 }))
+      .mockResolvedValueOnce(Response.json({ csrfToken: 'new-token' }))
+      .mockResolvedValueOnce(new Response('', { status: 201 }));
+    const sw = loadServiceWorker([], fetcher);
+    await sw.dispatchClick({ reminderId: 'rem-1' }, 'stop-reminder');
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
+      tokenUrl,
+      refreshUrl,
+      tokenUrl,
+      stopUrl,
+    ]);
+    expect(fetcher.mock.calls[3][1]?.headers).toEqual({
+      'X-CSRF-Token': 'new-token',
+    });
+    expect(sw.openWindow).not.toHaveBeenCalled();
+  });
+
+  it('reacquires the JSON token if the session expires between GET and Stop', async () => {
+    const fetcher = vi
+      .fn<FetchStub>()
+      .mockResolvedValueOnce(Response.json({ csrfToken: 'old-token' }))
+      .mockResolvedValueOnce(new Response('', { status: 401 }))
+      .mockResolvedValueOnce(new Response('', { status: 200 }))
+      .mockResolvedValueOnce(Response.json({ csrfToken: 'new-token' }))
+      .mockResolvedValueOnce(new Response('', { status: 201 }));
+    const sw = loadServiceWorker([], fetcher);
+    await sw.dispatchClick({ reminderId: 'rem-1' }, 'stop-reminder');
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
+      tokenUrl,
+      stopUrl,
+      refreshUrl,
+      tokenUrl,
+      stopUrl,
+    ]);
+    expect(fetcher.mock.calls[4][1]?.headers).toEqual({
+      'X-CSRF-Token': 'new-token',
+    });
+    expect(sw.openWindow).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {},
+    { csrfToken: '' },
+    { csrfToken: 42 },
+    { csrfToken: 'x'.repeat(513) },
+  ])('never posts Stop with a malformed token response %j', async (body) => {
+    const fetcher = vi.fn<FetchStub>(async () => Response.json(body));
+    const sw = loadServiceWorker([], fetcher);
+    await sw.dispatchClick({ reminderId: 'rem-1' }, 'stop-reminder');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(sw.openWindow).toHaveBeenCalledWith(`${ORIGIN}/reminders`);
+  });
+
+  it.each(['forbidden', 'network', 'invalid-json', 'expired-after-refresh'])(
+    'falls back without an unbounded retry on %s',
+    async (failure) => {
+      const fetcher = vi.fn<FetchStub>(async (url) => {
+        if (url === refreshUrl) return new Response('', { status: 200 });
+        if (failure === 'network') throw new Error('offline');
+        if (failure === 'invalid-json') return new Response('not json');
+        return new Response('', {
+          status: failure === 'forbidden' ? 403 : 401,
+        });
+      });
+      const sw = loadServiceWorker([], fetcher);
+      await sw.dispatchClick({ reminderId: 'rem-1' }, 'stop-reminder');
+      expect(fetcher.mock.calls.map(([url]) => url)).toEqual(
+        failure === 'expired-after-refresh'
+          ? [tokenUrl, refreshUrl, tokenUrl]
+          : [tokenUrl],
+      );
+      expect(sw.openWindow).toHaveBeenCalledWith(`${ORIGIN}/reminders`);
+    },
+  );
+
+  it('reads the rotated Cookie Store token after refreshing the session', async () => {
+    const get = vi
+      .fn()
+      .mockResolvedValueOnce({ value: 'old-token' })
+      .mockResolvedValueOnce({ value: 'new-token' });
+    const fetcher = vi
+      .fn<FetchStub>()
+      .mockResolvedValueOnce(new Response('', { status: 401 }))
+      .mockResolvedValueOnce(new Response('', { status: 200 }))
+      .mockResolvedValueOnce(new Response('', { status: 201 }));
+    const sw = loadServiceWorker([], fetcher, { get });
+    await sw.dispatchClick({ reminderId: 'rem-1' }, 'stop-reminder');
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
+      stopUrl,
+      refreshUrl,
+      stopUrl,
+    ]);
+    expect(fetcher.mock.calls[2][1]?.headers).toEqual({
+      'X-CSRF-Token': 'new-token',
+    });
+    expect(sw.openWindow).not.toHaveBeenCalled();
   });
 });

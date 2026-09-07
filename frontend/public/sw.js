@@ -299,12 +299,8 @@ self.addEventListener('pushsubscriptionchange', function (event) {
   );
 });
 
-// Read the CSRF double-submit cookie so the worker can authorize a state-changing
-// POST. The app injects this header from `document.cookie`; the worker has no
-// `document`, so it uses the Cookie Store API where the browser offers it
-// (Chromium). Where it does not, the token is null and the request is sent
-// without it -- the server then refuses, which for a best-effort Stop is an
-// acceptable no-op rather than a broken guarantee.
+// Cookie Store avoids a round trip where available. Other workers obtain the
+// token from the authenticated, non-cacheable same-origin JSON endpoint.
 function readCsrfTokenFromStore() {
   if (self.cookieStore && typeof self.cookieStore.get === 'function') {
     return self.cookieStore
@@ -319,20 +315,8 @@ function readCsrfTokenFromStore() {
   return Promise.resolve(null);
 }
 
-// Stop a repeating reminder from its push Stop action. Same-origin, credentialed
-// (the session cookie rides along), and idempotent server-side: a forged or
-// already-stopped id is a no-op scoped to the caller, never a cross-user write.
-//
-// Resolves to whether the stop actually took (a 2xx). It never rejects: a
-// network error, or a 403 where the CSRF cookie was unreadable (Firefox/Safari
-// expose no Cookie Store to the worker), resolves `false` so the caller can fall
-// back to opening the app rather than silently leaving the nag running.
-//
-// The session cookie the stop rides outlives the app by fifteen minutes at
-// most, and a nag arrives precisely when the app has been idle -- so the common
-// case is a 401. That is answered by one same-origin refresh (the refresh cookie
-// is same-origin, path '/', and the route skips CSRF) and a single retry; a stop
-// that still fails falls back to opening the app.
+// The Stop endpoint retains JWT authentication, ownership checks and the CSRF
+// double-submit guard. Failure still opens the reminders page.
 function postStop(reminderId, headers) {
   return fetch(
     '/api/v1/notifications/reminders/' +
@@ -355,19 +339,41 @@ function refreshSession() {
     });
 }
 
-function stopReminderFromAction(reminderId) {
-  return readCsrfTokenFromStore()
-    .then(function (token) {
-      var headers = {};
-      if (token) headers['X-CSRF-Token'] = token;
-      return postStop(reminderId, headers).then(function (response) {
-        if (response && response.status === 401) {
-          return refreshSession().then(function (refreshed) {
-            return refreshed ? postStop(reminderId, headers) : response;
-          });
+function postStopWithCsrf(reminderId) {
+  return readCsrfTokenFromStore().then(function (token) {
+    if (token) return postStop(reminderId, { 'X-CSRF-Token': token });
+    return fetch('/api/v1/auth/csrf-refresh', {
+      method: 'GET',
+      credentials: 'include',
+      mode: 'same-origin',
+      cache: 'no-store',
+      redirect: 'error',
+    }).then(function (response) {
+      // Propagate a 401 to the bounded session-refresh path below. Never send
+      // a state-changing request when token retrieval failed.
+      if (!response.ok) return response;
+      return response.json().then(function (data) {
+        if (!data || typeof data.csrfToken !== 'string' ||
+            data.csrfToken.length === 0 || data.csrfToken.length > 512) {
+          return { ok: false, status: 403 };
         }
-        return response;
+        return postStop(reminderId, { 'X-CSRF-Token': data.csrfToken });
       });
+    });
+  });
+}
+
+function stopReminderFromAction(reminderId) {
+  return postStopWithCsrf(reminderId)
+    .then(function (response) {
+      if (response && response.status === 401) {
+        return refreshSession().then(function (refreshed) {
+          // Refresh rotates CSRF cookies too: acquire the new token instead
+          // of retrying with the header from the expired session.
+          return refreshed ? postStopWithCsrf(reminderId) : response;
+        });
+      }
+      return response;
     })
     .then(function (response) {
       return !!response && response.ok;

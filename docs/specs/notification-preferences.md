@@ -656,15 +656,16 @@ stopped reminder is a no-op, not a 404-after-the-fact):
    active reminders page at `/reminders`, where each active reminder has a Stop
    control. The SW `notificationclick`
    handler, on `event.action === "stop-reminder"`, `fetch`es that same endpoint
-   same-origin with the CSRF header (read from the Cookie Store where the browser
-   offers it). The handler is written now (inert until a push carries the action)
-   so Phase 5 only has to populate `actions`. It checks the response: if the stop
-   did not take -- a network error, or a 403 where the worker could not read the
-   CSRF cookie (Firefox/Safari expose no Cookie Store to a worker) -- it opens the
-   active reminders page so the user can finish stopping it there,
-   rather than being left with a nag that keeps firing. The fuller door #2 UX (a
-   single retry, then a "could not stop -- open Monize" follow-up notification)
-   ships with the Phase 5 push dispatch that actually sends the action.
+   same-origin with the CSRF header. It reads Cookie Store where available;
+   otherwise it calls authenticated `GET /auth/csrf-refresh`, which returns the
+   same session-bound token in its cookie and a non-cacheable JSON response.
+   A token retrieval failure never sends an unprotected Stop request. A 401 at
+   token retrieval or Stop triggers at most one session refresh and retry,
+   acquiring a fresh CSRF token because refresh rotates the cookie. JWT,
+   ownership and double-submit CSRF checks on Stop remain required. Failure
+   opens `/reminders` so the user can finish stopping it there. This removes
+   the Cookie Store dependency for browsers that deliver the Stop action;
+   native action availability and delivery still require browser validation.
 3. **Source gone / condition cleared** -- the firing cron's sweep stops any
    reminder whose source was **dismissed** *or* **deleted**. The source FK is
    `ON DELETE SET NULL`, so a source that is read-but-never-dismissed and then

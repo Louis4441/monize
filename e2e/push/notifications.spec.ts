@@ -75,9 +75,10 @@ test('Stop refreshes an expired session once and retries', async ({ pushHarness:
   await expect
     .poll(() => h.requests.map((r) => r.path))
     .toEqual([stop, '/api/v1/auth/refresh', stop]);
-  expect(h.requests.filter((r) => r.path === stop).every((r) => r.csrf === 'browser-csrf')).toBe(
-    true,
-  );
+  expect(h.requests.filter((r) => r.path === stop).map((r) => r.csrf)).toEqual([
+    'browser-csrf',
+    'browser-csrf-refreshed',
+  ]);
 });
 
 for (const status of [401, 403]) {
@@ -89,5 +90,32 @@ for (const status of [401, 403]) {
     await h.click('stop-reminder');
     await expect(page).toHaveURL(h.origin + '/reminders');
     expect(h.requests.length).toBe(status === 401 ? 2 : 1);
+  });
+}
+
+for (const expired of [false, true]) {
+  test(`Stop obtains JSON CSRF without Cookie Store (expired session: ${expired})`, async ({
+    page,
+    pushHarness: h,
+  }) => {
+    // Exercise the portable path in Chromium. Native Firefox/Safari push and
+    // OS action delivery are still a separate manual browser check.
+    await h.worker.evaluate(() => {
+      Object.defineProperty(self, 'cookieStore', { value: undefined, configurable: true });
+    });
+    if (expired) h.stopStatuses = [401, 201];
+    await h.push(reminder);
+    await expect.poll(async () => (await shown(h.worker)).length).toBe(1);
+    await h.click('stop-reminder');
+    const token = '/api/v1/auth/csrf-refresh';
+    const stop = `/api/v1/notifications/reminders/${reminder.reminderId}/stop`;
+    expect(h.requests.map((r) => r.path)).toEqual(
+      expired ? [token, stop, '/api/v1/auth/refresh', token, stop] : [token, stop],
+    );
+    expect(h.requests.filter((r) => r.path === stop).map((r) => r.csrf)).toEqual(
+      expired ? ['browser-csrf', 'browser-csrf-refreshed'] : ['browser-csrf'],
+    );
+    await expect(page).toHaveURL(h.origin + '/initial');
+    await expect.poll(async () => (await shown(h.worker)).length).toBe(0);
   });
 }
