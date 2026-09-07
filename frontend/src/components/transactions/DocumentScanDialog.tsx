@@ -18,6 +18,10 @@ import type {
   QualityWarning,
   RawImage,
 } from '@/lib/document-scanner/document-scan.types';
+import {
+  rotateImage,
+  type QuarterTurns,
+} from '@/lib/document-scanner/rotate-image';
 import { MAX_ATTACHMENT_BYTES } from '@/types/attachment';
 import { formatBytes } from './AttachmentsSection';
 import { DocumentCornerHandles } from './DocumentCornerHandles';
@@ -103,7 +107,7 @@ export function DocumentScanDialog({
   const { scan, rewarp, reset } = scanner;
 
   const [mode, setMode] = useState<PreviewMode>('enhanced');
-  const [rotation, setRotation] = useState<0 | 1 | 2 | 3>(0);
+  const [rotation, setRotation] = useState<QuarterTurns>(0);
   const [quad, setQuad] = useState<Quad | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -130,7 +134,18 @@ export function DocumentScanDialog({
   }
 
   const source = scanner.source;
-  const enhanced = scanner.result?.enhanced ?? null;
+  /**
+   * The enhanced image with the user's quarter turns applied.
+   *
+   * A turn is a permutation of pixels the pipeline has already produced, so it
+   * happens here rather than by re-running the scan -- which took seconds per
+   * press and queued if pressed again. Memoized on the pair, so re-rendering
+   * for any other reason does not repeat it.
+   */
+  const enhanced = useMemo(() => {
+    const produced = scanner.result?.enhanced ?? null;
+    return produced ? rotateImage(produced, rotation) : null;
+  }, [scanner.result, rotation]);
   const shown = mode === 'enhanced' ? enhanced : source;
   const paint = useCanvasPainter(shown);
 
@@ -144,16 +159,16 @@ export function DocumentScanDialog({
   const handleCornerCommit = useCallback(
     (next: Quad) => {
       setQuad(next);
-      void rewarp(next, rotation);
+      void rewarp(next);
     },
-    [rewarp, rotation],
+    [rewarp],
   );
 
+  // No scan, no worker, no round trip: the turn applies to pixels that already
+  // exist, so the preview follows the click.
   const handleRotate = useCallback(() => {
-    const next = ((rotation + 1) % 4) as 0 | 1 | 2 | 3;
-    setRotation(next);
-    if (quad) void rewarp(quad, next);
-  }, [quad, rotation, rewarp]);
+    setRotation((current) => ((current + 1) % 4) as QuarterTurns);
+  }, []);
 
   const handleUseEnhanced = useCallback(async () => {
     if (!enhanced || !file) return;
@@ -201,7 +216,9 @@ export function DocumentScanDialog({
         variant="primary"
         onClick={handleUseEnhanced}
         isLoading={busy}
-        disabled={status !== 'ready' || !enhanced}
+        // The preview is what gets stored (`I3`), so while a re-warp is in
+        // flight the button would hand back the image the user just changed.
+        disabled={status !== 'ready' || !enhanced || scanner.recomputing}
       >
         {t('scan.useEnhanced')}
       </Button>
@@ -310,7 +327,19 @@ export function DocumentScanDialog({
               </div>
             </div>
 
-            {mode === 'enhanced' && (
+            {/* A re-warp keeps the previous preview on screen rather than
+                blanking it, so without this the picture simply looks like it
+                ignored the drag. */}
+            {scanner.recomputing && (
+              <p
+                className="text-center text-xs text-gray-500 dark:text-gray-400"
+                aria-live="polite"
+              >
+                {t('scan.updating')}
+              </p>
+            )}
+
+            {mode === 'enhanced' && !scanner.recomputing && (
               <p className="text-center text-xs text-gray-500 dark:text-gray-400">
                 {t('scan.adjustHint')}
               </p>

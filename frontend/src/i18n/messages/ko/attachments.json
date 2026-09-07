@@ -27,6 +27,7 @@
     "viewOriginalFile": "원본 보기",
     "rotate": "회전",
     "adjustHint": "가장자리가 잘못되었다면 “원본”으로 전환해 모서리를 끌어 조정하세요.",
+    "updating": "미리보기를 업데이트하는 중…",
     "noDocumentFound": "문서 가장자리를 찾지 못해 사진 전체를 사용했습니다. “원본”으로 전환해 모서리를 직접 지정하세요.",
     "previewEnhancedAlt": "보정된 스캔 미리보기",
     "previewOriginalAlt": "원본 사진 미리보기",

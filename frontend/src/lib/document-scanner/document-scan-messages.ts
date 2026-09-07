@@ -43,12 +43,7 @@ export async function handleScanMessage(
     // A re-warp follows the user overruling the detection, so it does not
     // detect again -- and it reports `documentFound: true` because the corners
     // are now the user's own, not a guess that might have failed.
-    const warped = warpToQuad(
-      cv,
-      request.image,
-      request.quad,
-      request.rotation,
-    );
+    const warped = warpToQuad(cv, request.image, request.quad);
     const enhanced = limitSize(cv, enhance(cv, warped));
     const result: ScanResult = {
       documentFound: true,

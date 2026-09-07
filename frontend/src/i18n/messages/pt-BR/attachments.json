@@ -27,6 +27,7 @@
     "viewOriginalFile": "Ver original",
     "rotate": "Girar",
     "adjustHint": "Mude para “Original” para arrastar os cantos se as bordas estiverem erradas.",
+    "updating": "Atualizando a pré-visualização…",
     "noDocumentFound": "Nenhuma borda do documento foi encontrada, então a foto inteira foi usada. Mude para “Original” e posicione os cantos você mesmo.",
     "previewEnhancedAlt": "Prévia da digitalização melhorada",
     "previewOriginalAlt": "Prévia da foto original",

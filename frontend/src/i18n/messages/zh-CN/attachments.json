@@ -27,6 +27,7 @@
     "viewOriginalFile": "查看原图",
     "rotate": "旋转",
     "adjustHint": "如果边缘不正确，请切换到“原图”并拖动四角。",
+    "updating": "正在更新预览…",
     "noDocumentFound": "未找到文档边缘，因此使用了整张照片。请切换到“原图”并自行拖动四角。",
     "previewEnhancedAlt": "增强扫描预览",
     "previewOriginalAlt": "原始照片预览",

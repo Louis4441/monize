@@ -32,11 +32,7 @@ interface Pending {
 
 export interface ScannerClient {
   scan(image: RawImage): Promise<ScanResult>;
-  rewarp(
-    image: RawImage,
-    quad: Quad,
-    rotation: 0 | 1 | 2 | 3,
-  ): Promise<ScanResult>;
+  rewarp(image: RawImage, quad: Quad): Promise<ScanResult>;
   dispose(): void;
 }
 
@@ -103,14 +99,8 @@ export function createScannerClient(
 
   return {
     scan: (image) => send((requestId) => ({ kind: 'scan', requestId, image })),
-    rewarp: (image, quad, rotation) =>
-      send((requestId) => ({
-        kind: 'rewarp',
-        requestId,
-        image,
-        quad,
-        rotation,
-      })),
+    rewarp: (image, quad) =>
+      send((requestId) => ({ kind: 'rewarp', requestId, image, quad })),
     dispose: () => {
       if (disposed) return;
       disposed = true;

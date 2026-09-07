@@ -231,19 +231,18 @@ export function detectDocument(
 }
 
 /**
- * Flatten the document to a rectangle, then turn it upright if asked.
+ * Flatten the document to a rectangle.
  *
  * The perspective transform corrects skew as well as tilt -- a rotated page maps
  * onto the output rectangle by the same matrix -- so there is no separate
- * deskew step. `rotation` is the user's own quarter turns, which no automatic
- * step can decide without reading the text.
+ * deskew step.
+ *
+ * The user's own quarter turns are NOT applied here. They depend on none of
+ * this work, and applying them here meant re-warping and re-enhancing the
+ * whole photo for each one; they are a permutation of the finished pixels
+ * instead (`rotate-image.ts`).
  */
-export function warpToQuad(
-  cv: OpenCv,
-  image: RawImage,
-  quad: Quad,
-  rotation: 0 | 1 | 2 | 3 = 0,
-): RawImage {
+export function warpToQuad(cv: OpenCv, image: RawImage, quad: Quad): RawImage {
   return withScope((scope) => {
     const source = scope.add(toMat(cv, image));
     const size = outputSize(quad);
@@ -280,21 +279,8 @@ export function warpToQuad(
       new cv.Scalar(255, 255, 255, 255),
     );
 
-    if (rotation === 0) {
-      return toRawImage(
-        warped as unknown as { rows: number; cols: number; data: Uint8Array },
-      );
-    }
-    const rotated = scope.add(new cv.Mat());
-    const code =
-      rotation === 1
-        ? cv.ROTATE_90_CLOCKWISE
-        : rotation === 2
-          ? cv.ROTATE_180
-          : cv.ROTATE_90_COUNTERCLOCKWISE;
-    cv.rotate(warped, rotated, code);
     return toRawImage(
-      rotated as unknown as { rows: number; cols: number; data: Uint8Array },
+      warped as unknown as { rows: number; cols: number; data: Uint8Array },
     );
   });
 }

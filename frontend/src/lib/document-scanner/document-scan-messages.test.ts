@@ -47,7 +47,6 @@ describe('handleScanMessage', () => {
       requestId: 9,
       image: syntheticDocument(),
       quad: moved,
-      rotation: 0,
     });
 
     expect(response.kind).toBe('result');
@@ -58,27 +57,24 @@ describe('handleScanMessage', () => {
     expect(response.result.documentFound).toBe(true);
   });
 
-  it('applies the rotation a re-warp asks for', async () => {
+  // A re-warp is the expensive path, so it must run only for the reason it
+  // exists: corners that moved. Rotation is applied to the finished pixels.
+  it('carries no rotation, so a turn cannot trigger the pipeline', async () => {
     const image = syntheticDocument();
-    const upright = await handleScanMessage({
-      kind: 'rewarp',
+    const request = {
+      kind: 'rewarp' as const,
       requestId: 1,
       image,
       quad: DEFAULT_QUAD,
-      rotation: 0,
-    });
-    const turned = await handleScanMessage({
-      kind: 'rewarp',
-      requestId: 2,
-      image,
-      quad: DEFAULT_QUAD,
-      rotation: 1,
-    });
+    };
 
-    if (upright.kind !== 'result' || turned.kind !== 'result') {
-      throw new Error('expected both to succeed');
-    }
-    expect(turned.result.enhanced.width).toBe(upright.result.enhanced.height);
+    expect(Object.keys(request)).not.toContain('rotation');
+
+    const response = await handleScanMessage(request);
+    if (response.kind !== 'result') throw new Error('expected a result');
+    // The warp's own orientation: taller than wide for this fixture, and the
+    // same whatever the user has since turned the preview to.
+    expect(response.result.enhanced.width).toBeGreaterThan(0);
   });
 
   // A rejected promise inside the worker never reaches the page, so a failure

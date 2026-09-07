@@ -56,7 +56,7 @@ Answers to the discussion's open questions, confirmed with the maintainer on
 |---|---|---|
 | I1 | **A scan pair is one attachment.** It lists as one row, counts as one against the per-transaction cap and the register's `attachmentCount`, commits together and is deleted together. | One `withScopedDb` writes both rows and both objects; `original_of_attachment_id` carries `ON DELETE CASCADE`; every "is this a visible attachment" read goes through one predicate (`primaryAttachmentWhere`, section "Backend"). Recorded as INV-ATTACHMENT-002. |
 | I2 | **The original is byte-for-byte what the device produced.** No re-encoding, no orientation rewrite, no metadata stripping. | The client uploads the `File` it was handed; the server sniffs and hashes it exactly as a plain upload. |
-| I3 | **The enhanced image is a pure function of (original bytes, corner coordinates, rotation).** Re-running the pipeline on the same inputs yields the same output, so the preview the user approved is the file that is stored. | Detection, warp and enhancement are deterministic OpenCV operations with fixed constants; the dialog uploads the exact `Blob` it displayed, never a re-render. |
+| I3 | **The enhanced image is a pure function of (original bytes, corner coordinates, quarter turns).** Re-running the pipeline on the same inputs yields the same output, so the preview the user approved is the file that is stored. | Detection, warp and enhancement are deterministic OpenCV operations with fixed constants; rotation is a deterministic permutation applied to the finished pixels (`rotate-image.ts`), and the preview and the uploaded `Blob` are encoded from that same rotated buffer -- never a CSS transform over an unrotated file. |
 | I4 | **INV-ATTACHMENT-001 holds for both objects.** A rollback after either object is written leaves bytes nobody references, never a row promising absent bytes. | Two upload intents are committed before the transaction opens; both are cleared inside it; the compensation path deletes every object that was written. |
 | I5 | **A quality check never discards information the user wanted.** Every warning offers "Use anyway". | Dialog state machine (section "Frontend"). |
 | I6 | **A scan result belongs to the request that produced it.** A stale worker reply (from a previous photo, or after Retake) is dropped. | Every worker message carries a request id; the hook adopts a reply only when its id matches the current request (`frontend/CLAUDE.md`, asynchronous data rule). |
@@ -213,9 +213,13 @@ New directory `frontend/src/lib/document-scanner/`:
 | `synthetic-document.ts` | Test fixture generator: a dark frame with a white, rotated, perspective-skewed quad at known corners, optionally blurred or dim. Used by unit tests and by the e2e spec's PNG fixture. |
 
 The hook `frontend/src/hooks/useDocumentScanner.ts` owns the client's
-lifecycle, exposes `scan(file)`, `rewarp(quad, rotation)` and the engine's
-loading state, and adopts a reply only when its `requestId` is the current one
-(I6).
+lifecycle, exposes `scan(file)`, `rewarp(quad)` and the engine's loading
+state, and adopts a reply only when its `requestId` is the current one (I6). A
+re-warp requested while one is running does not queue: the newest quad replaces
+the pending one, so a drag across the photo costs one re-warp per settled
+position rather than one per pointer event. `recomputing` distinguishes
+"refining what is already on screen" from "nothing to show yet", so the preview
+stays visible while a drag is being applied.
 
 Engine packaging: the OpenCV.js build is a pinned npm dependency
 (`@techstark/opencv-js`, Apache-2.0) imported only from `opencv-engine.ts`, so
@@ -259,7 +263,12 @@ warp and enhancement run on the full image with the corners scaled back up.
 2. **Perspective and crop** (steps 3 and 4): corners ordered TL/TR/BR/BL,
    output size from the longer of each opposite edge pair,
    `getPerspectiveTransform` and `warpPerspective`. Skew is corrected by the
-   warp; a Rotate button turns the result by 90 degrees. Automatic
+   warp. Rotation is deliberately **not** part of this pipeline: a quarter turn
+   does not change a single one of the decisions above, and re-running detect,
+   warp and enhance for one costs ~7.7 s on a 12 MP photo (~6.1 s of it the
+   enhancement), which queued behind every further press. It is a pixel
+   permutation on the finished image instead (`rotate-image.ts`, ~180 ms for
+   the same photo, synchronous, so nothing can queue). Automatic
    upright-orientation needs text recognition and is out of scope.
 3. **Lighting and shadow** (steps 5 and 6): per-channel background estimate by
    a large-kernel morphological close, divided out (division normalisation),
@@ -309,6 +318,14 @@ coordinates with four handles using pointer events and `setPointerCapture`,
 `touch-action: none`, arrow-key nudging for keyboard users, and a convexity
 check that snaps an invalid drag back. Releasing a handle calls `rewarp`,
 which re-runs steps 2 to 4 without re-detecting.
+
+What takes the press is not the drawn dot. The dot has to stay small -- a
+fingertip-sized one covers the very corner it is placing -- so each handle is a
+small visible circle with `pointer-events: none` over a transparent circle of
+`HANDLE_HIT_RADIUS` (a 44 px target). The overlay is also padded by that radius
+beyond the photo on all four sides, because a detected corner usually sits *on*
+the frame edge: clipped to the image, only the inward half of its target
+existed, which is what made the handles need a fine touch on a phone.
 
 ### Attachments section
 

@@ -193,23 +193,127 @@ describe('useDocumentScanner', () => {
         { x: 1, y: 3 },
       ];
       await act(async () => {
-        void result.current.rewarp(moved, 1);
+        void result.current.rewarp(moved);
       });
       await waitFor(() => expect(worker.sent).toHaveLength(2));
 
       expect(worker.sent[1]).toMatchObject({
         kind: 'rewarp',
         quad: moved,
-        rotation: 1,
         // The same decoded photo, not a re-read of the file.
         image: decoded,
       });
     });
 
+    // A re-warp takes seconds on a large photo. Several quick adjustments used
+    // to queue, so the user waited for every intermediate result they had
+    // already replaced -- which is what "press it a few times and wait 30
+    // seconds" was.
+    it('runs the newest corners and drops the ones overtaken', async () => {
+      const { result } = render();
+
+      await act(async () => {
+        void result.current.scan(file('receipt.jpg'));
+      });
+      await waitFor(() => expect(worker.sent).toHaveLength(1));
+      await act(async () => {
+        worker.reply(0, resultWith('blurry'));
+      });
+      await waitFor(() => expect(result.current.status).toBe('ready'));
+
+      const corners = (offset: number): Quad => [
+        { x: offset, y: offset },
+        { x: 4 - offset, y: offset },
+        { x: 4 - offset, y: 4 - offset },
+        { x: offset, y: 4 - offset },
+      ];
+
+      // Three adjustments while the first is still running.
+      await act(async () => {
+        void result.current.rewarp(corners(1));
+        void result.current.rewarp(corners(2));
+        void result.current.rewarp(corners(3));
+      });
+      await waitFor(() => expect(worker.sent).toHaveLength(2));
+
+      // Only the first has been sent so far; the middle one is already gone.
+      expect(worker.sent[1]).toMatchObject({ quad: corners(1) });
+
+      await act(async () => {
+        worker.reply(1, resultWith('lowResolution'));
+      });
+
+      // The newest corners run next -- not the one in between.
+      await waitFor(() => expect(worker.sent).toHaveLength(3));
+      expect(worker.sent[2]).toMatchObject({ quad: corners(3) });
+
+      await act(async () => {
+        worker.reply(2, resultWith('blurry'));
+      });
+      await waitFor(() => expect(worker.sent).toHaveLength(3));
+    });
+
+    it('reports that it is recomputing while a re-warp runs', async () => {
+      const { result } = render();
+
+      await act(async () => {
+        void result.current.scan(file('receipt.jpg'));
+      });
+      await waitFor(() => expect(worker.sent).toHaveLength(1));
+      await act(async () => {
+        worker.reply(0, resultWith('blurry'));
+      });
+      await waitFor(() => expect(result.current.status).toBe('ready'));
+      expect(result.current.recomputing).toBe(false);
+
+      await act(async () => {
+        void result.current.rewarp(quad);
+      });
+      await waitFor(() => expect(result.current.recomputing).toBe(true));
+      // The previous result stays on screen: this is not a loading state.
+      expect(result.current.status).toBe('ready');
+      expect(result.current.result).not.toBeNull();
+
+      await act(async () => {
+        worker.reply(1, resultWith('lowResolution'));
+      });
+      await waitFor(() => expect(result.current.recomputing).toBe(false));
+    });
+
+    // A failure must release the queue, or every later adjustment sits behind
+    // a drain that never runs again.
+    it('keeps accepting adjustments after one fails', async () => {
+      const { result } = render();
+
+      await act(async () => {
+        void result.current.scan(file('receipt.jpg'));
+      });
+      await waitFor(() => expect(worker.sent).toHaveLength(1));
+      await act(async () => {
+        worker.reply(0, resultWith('blurry'));
+      });
+      await waitFor(() => expect(result.current.status).toBe('ready'));
+
+      await act(async () => {
+        void result.current.rewarp(quad);
+      });
+      await waitFor(() => expect(worker.sent).toHaveLength(2));
+      await act(async () => {
+        worker.replyError(1, 'the engine failed');
+      });
+      await waitFor(() => expect(result.current.status).toBe('failed'));
+      expect(result.current.recomputing).toBe(false);
+
+      await act(async () => {
+        void result.current.rewarp(quad);
+      });
+      await waitFor(() => expect(worker.sent).toHaveLength(3));
+    });
+
     it('does nothing when there is no photo to re-warp', async () => {
       const { result } = render();
       await act(async () => {
-        await result.current.rewarp(quad, 0);
+        await result.current.rewarp(quad);
       });
       expect(worker.sent).toHaveLength(0);
     });
@@ -229,7 +333,7 @@ describe('useDocumentScanner', () => {
       await waitFor(() => expect(result.current.status).toBe('ready'));
 
       await act(async () => {
-        void result.current.rewarp(quad, 0);
+        void result.current.rewarp(quad);
       });
       await waitFor(() => expect(worker.sent).toHaveLength(2));
 

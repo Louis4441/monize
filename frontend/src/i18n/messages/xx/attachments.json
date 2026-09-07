@@ -27,6 +27,7 @@
     "viewOriginalFile": "[XX-View original-XX]",
     "rotate": "[XX-Rotate-XX]",
     "adjustHint": "[XX-Switch to Original to drag the corners if the edges are wrong.-XX]",
+    "updating": "[XX-Updating the preview…-XX]",
     "noDocumentFound": "[XX-No document edges were found, so the whole photo was used. Switch to Original and drag the corners to set them yourself.-XX]",
     "previewEnhancedAlt": "[XX-Enhanced scan preview-XX]",
     "previewOriginalAlt": "[XX-Original photo preview-XX]",

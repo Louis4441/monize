@@ -276,21 +276,170 @@ describe('DocumentScanDialog', () => {
         expect(worker.sent.some((r) => r.kind === 'rewarp')).toBe(true),
       );
     });
+
+    // A re-warp deliberately leaves the previous preview up rather than
+    // blanking the dialog, so with nothing said the picture just looks like it
+    // ignored the drag -- and accepting it would store the image the corners
+    // were moved away from.
+    describe('while the re-warp is still running', () => {
+      /** Answers the scan, then holds the re-warp open. */
+      function holdRewarp() {
+        const answer = worker.postMessage.bind(worker);
+        worker.postMessage = (request: ScannerRequest) => {
+          if (request.kind === 'rewarp') {
+            worker.sent.push(request);
+            return;
+          }
+          answer(request);
+        };
+      }
+
+      async function dragACorner() {
+        await open();
+        await waitFor(() =>
+          expect(
+            screen.getByRole('button', { name: 'Use enhanced' }),
+          ).toBeEnabled(),
+        );
+        holdRewarp();
+        await act(async () => {
+          fireEvent.click(screen.getByRole('button', { name: 'Original' }));
+        });
+        await act(async () => {
+          fireEvent.keyDown(screen.getByLabelText('Top-left corner'), {
+            key: 'ArrowRight',
+          });
+        });
+      }
+
+      it('says the preview is being updated', async () => {
+        await dragACorner();
+
+        await waitFor(() =>
+          expect(screen.getByText('Updating the preview…')).toBeInTheDocument(),
+        );
+      });
+
+      it('will not hand back the preview it is about to replace', async () => {
+        await dragACorner();
+
+        await waitFor(() =>
+          expect(
+            screen.getByRole('button', { name: 'Use enhanced' }),
+          ).toBeDisabled(),
+        );
+      });
+
+      it('offers it again once the re-warp lands', async () => {
+        await open();
+        await waitFor(() =>
+          expect(
+            screen.getByRole('button', { name: 'Use enhanced' }),
+          ).toBeEnabled(),
+        );
+        await act(async () => {
+          fireEvent.click(screen.getByRole('button', { name: 'Original' }));
+        });
+        await act(async () => {
+          fireEvent.keyDown(screen.getByLabelText('Top-left corner'), {
+            key: 'ArrowRight',
+          });
+        });
+
+        await waitFor(() =>
+          expect(
+            screen.getByRole('button', { name: 'Use enhanced' }),
+          ).toBeEnabled(),
+        );
+        expect(screen.queryByText('Updating the preview…')).not.toBeInTheDocument();
+      });
+    });
   });
 
-  it('re-warps with the new rotation when the image is turned', async () => {
-    await open();
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Use enhanced' })).toBeEnabled(),
-    );
+  describe('rotating', () => {
+    // Rotation used to re-run the scan: ~7.7s per press on a 12MP photo, and
+    // four presses queued half a minute to arrive back where you started.
+    it('sends nothing to the worker', async () => {
+      await open();
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: 'Use enhanced' }),
+        ).toBeEnabled(),
+      );
+      const before = worker.sent.length;
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Rotate' }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Rotate' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Rotate' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Rotate' }));
+      });
+
+      expect(worker.sent).toHaveLength(before);
+      expect(worker.sent.some((r) => r.kind === 'rewarp')).toBe(false);
     });
 
-    await waitFor(() => {
-      const rewarp = worker.sent.find((r) => r.kind === 'rewarp');
-      expect(rewarp).toMatchObject({ rotation: 1 });
+    it('turns the preview, swapping its dimensions', async () => {
+      // A landscape result, so a quarter turn is visible in the size.
+      worker.result = scanResult({
+        enhanced: {
+          width: 40,
+          height: 20,
+          data: new Uint8ClampedArray(40 * 20 * 4),
+        },
+      });
+      await open();
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: 'Use enhanced' }),
+        ).toBeEnabled(),
+      );
+
+      const canvas = () =>
+        screen.getByRole('img', { name: 'Enhanced scan preview' })
+          .parentElement as HTMLElement;
+      const landscape = canvas().style.width;
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Rotate' }));
+      });
+
+      expect(canvas().style.width).not.toBe(landscape);
+      // Two more turns and it is landscape again, three back to portrait.
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Rotate' }));
+      });
+      expect(canvas().style.width).toBe(landscape);
+    });
+
+    // The upload takes the pixels the preview showed, so a turn has to reach
+    // the encoder rather than being a display trick.
+    it('encodes the turned image, not the untouched one', async () => {
+      const { encodeScan } = await import(
+        '@/lib/document-scanner/decode-image'
+      );
+      worker.result = scanResult({
+        enhanced: {
+          width: 40,
+          height: 20,
+          data: new Uint8ClampedArray(40 * 20 * 4),
+        },
+      });
+      await open();
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: 'Use enhanced' }),
+        ).toBeEnabled(),
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Rotate' }));
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Use enhanced' }));
+      });
+
+      const passed = vi.mocked(encodeScan).mock.calls.at(-1)?.[0];
+      expect(passed).toMatchObject({ width: 20, height: 40 });
     });
   });
 

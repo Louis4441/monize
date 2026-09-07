@@ -55,14 +55,16 @@ export interface ScanRequest {
 /**
  * Ask the worker to redo the warp and enhancement for corners the user moved.
  * Detection is not repeated: the user has just overruled it.
+ *
+ * Deliberately carries no rotation. A quarter turn changes none of this work,
+ * and routing it through here made every press of Rotate re-run the whole
+ * enhancement -- seconds of it (`rotate-image.ts`).
  */
 export interface RewarpRequest {
   kind: 'rewarp';
   requestId: number;
   image: RawImage;
   quad: Quad;
-  /** Quarter turns clockwise to apply after the warp. */
-  rotation: 0 | 1 | 2 | 3;
 }
 
 export type ScannerRequest = ScanRequest | RewarpRequest;

@@ -187,13 +187,15 @@ describe('warpToQuad', () => {
     ).toBeGreaterThan(180);
   });
 
-  it('rotates by quarter turns when asked', () => {
+  // Rotation deliberately is not a warp concern any more: it costs seconds
+  // here and milliseconds on the finished pixels (`rotate-image.test.ts`).
+  it('produces the same result however many times it is asked', () => {
     const image = syntheticDocument();
-    const upright = warpToQuad(cv, image, DEFAULT_QUAD, 0);
-    const turned = warpToQuad(cv, image, DEFAULT_QUAD, 1);
+    const first = warpToQuad(cv, image, DEFAULT_QUAD);
+    const second = warpToQuad(cv, image, DEFAULT_QUAD);
 
-    expect(turned.width).toBe(upright.height);
-    expect(turned.height).toBe(upright.width);
+    expect(second.width).toBe(first.width);
+    expect(Array.from(second.data)).toEqual(Array.from(first.data));
   });
 });
 

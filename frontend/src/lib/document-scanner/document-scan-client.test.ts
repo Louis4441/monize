@@ -112,17 +112,15 @@ describe('createScannerClient', () => {
     await expect(pending).resolves.toMatchObject({ documentFound: true });
   });
 
-  it('sends the corners and rotation on a re-warp', async () => {
+  it('sends the corners on a re-warp, and nothing else', async () => {
     const scanner = client();
     // Never answered: this case is about what was SENT. The rejection is
     // absorbed so a timeout after the test cannot surface as an unhandled one.
-    scanner.rewarp(image, quad, 2).catch(() => undefined);
+    scanner.rewarp(image, quad).catch(() => undefined);
 
-    expect(worker.sent[0]).toMatchObject({
-      kind: 'rewarp',
-      quad,
-      rotation: 2,
-    });
+    expect(worker.sent[0]).toMatchObject({ kind: 'rewarp', quad });
+    // A rotation here would put a quarter turn back on the expensive path.
+    expect(worker.sent[0]).not.toHaveProperty('rotation');
   });
 
   it('gives every request its own id', () => {

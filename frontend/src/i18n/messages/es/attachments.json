@@ -27,6 +27,7 @@
     "viewOriginalFile": "Ver original",
     "rotate": "Girar",
     "adjustHint": "Cambie a «Original» para arrastrar las esquinas si los bordes no son correctos.",
+    "updating": "Actualizando la vista previa…",
     "noDocumentFound": "No se encontraron los bordes del documento, así que se usó la foto completa. Cambie a «Original» y arrastre las esquinas usted mismo.",
     "previewEnhancedAlt": "Vista previa del escaneo mejorado",
     "previewOriginalAlt": "Vista previa de la foto original",

@@ -27,6 +27,7 @@
     "viewOriginalFile": "Vedi originale",
     "rotate": "Ruota",
     "adjustHint": "Passa a «Originale» per trascinare gli angoli se i bordi non sono corretti.",
+    "updating": "Aggiornamento dell’anteprima…",
     "noDocumentFound": "Non sono stati trovati i bordi del documento, quindi è stata usata l’intera foto. Passa a «Originale» e sistema tu gli angoli.",
     "previewEnhancedAlt": "Anteprima della scansione migliorata",
     "previewOriginalAlt": "Anteprima della foto originale",

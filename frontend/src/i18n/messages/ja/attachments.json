@@ -27,6 +27,7 @@
     "viewOriginalFile": "元の写真を表示",
     "rotate": "回転",
     "adjustHint": "枠がずれている場合は「元の写真」に切り替えて四隅をドラッグしてください。",
+    "updating": "プレビューを更新しています…",
     "noDocumentFound": "書類の枠を検出できなかったため、写真全体を使用しました。「元の写真」に切り替えて四隅を指定してください。",
     "previewEnhancedAlt": "補正後のスキャンのプレビュー",
     "previewOriginalAlt": "元の写真のプレビュー",

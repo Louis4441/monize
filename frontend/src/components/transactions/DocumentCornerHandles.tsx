@@ -29,6 +29,31 @@ const NUDGE_STEP = 4;
 /** The same nudge with Shift held, for crossing a large image quickly. */
 const NUDGE_STEP_LARGE = 24;
 
+/** Radius of the drawn handle, in display pixels. */
+const HANDLE_RADIUS = 11;
+
+/** The same handle while it is being dragged, so it stays visible under a thumb. */
+const HANDLE_RADIUS_DRAGGING = 14;
+
+/**
+ * Radius of the invisible circle that actually takes the pointer.
+ *
+ * 22 gives a 44px target, the size a fingertip can be relied on to hit. The
+ * drawn handle stays small: making the visible dot finger-sized would cover
+ * the very corner the user is trying to place.
+ */
+const HANDLE_HIT_RADIUS = 22;
+
+/**
+ * How far the overlay extends beyond the photo, in display pixels.
+ *
+ * A detected corner usually sits ON the edge of the frame, and an overlay
+ * clipped to the photo cuts its target in half -- the reason the corners were
+ * hard to grab on a phone was that only the inward half of each one existed.
+ * Extending by the hit radius keeps every target whole.
+ */
+const OVERLAY_PADDING = HANDLE_HIT_RADIUS;
+
 export interface DocumentCornerHandlesProps {
   /** The corners being edited, in source-image pixels. */
   quad: Quad;
@@ -103,12 +128,19 @@ export function DocumentCornerHandles({
       // Guard a zero-sized box: a dialog that has not laid out yet would divide
       // by zero and send every corner to NaN.
       if (rect.width === 0 || rect.height === 0) return null;
-      return {
-        x: ((event.clientX - rect.left) / rect.width) * imageWidth,
-        y: ((event.clientY - rect.top) / rect.height) * imageHeight,
-      };
+      // The box is the photo plus `OVERLAY_PADDING` on every side, so the
+      // padding comes off before the fraction means anything about the image.
+      const displayX =
+        ((event.clientX - rect.left) / rect.width) *
+          (displayWidth + OVERLAY_PADDING * 2) -
+        OVERLAY_PADDING;
+      const displayY =
+        ((event.clientY - rect.top) / rect.height) *
+          (displayHeight + OVERLAY_PADDING * 2) -
+        OVERLAY_PADDING;
+      return { x: displayX / scaleX, y: displayY / scaleY };
     },
-    [imageWidth, imageHeight],
+    [displayWidth, displayHeight, scaleX, scaleY],
   );
 
   const handlePointerDown =
@@ -175,11 +207,22 @@ export function DocumentCornerHandles({
   return (
     <svg
       ref={svgRef}
-      className="absolute inset-0 h-full w-full"
-      viewBox={`0 0 ${displayWidth} ${displayHeight}`}
-      // Without this a drag on a touch screen scrolls the dialog instead of
-      // moving the corner.
-      style={{ touchAction: 'none' }}
+      // Extends past the photo so a handle sitting on the frame edge is whole.
+      // The SVG itself has no fill, so it intercepts nothing outside the
+      // circles it draws.
+      className="absolute"
+      style={{
+        top: -OVERLAY_PADDING,
+        left: -OVERLAY_PADDING,
+        width: displayWidth + OVERLAY_PADDING * 2,
+        height: displayHeight + OVERLAY_PADDING * 2,
+        // Without this a drag on a touch screen scrolls the dialog instead of
+        // moving the corner.
+        touchAction: 'none',
+      }}
+      viewBox={`${-OVERLAY_PADDING} ${-OVERLAY_PADDING} ${
+        displayWidth + OVERLAY_PADDING * 2
+      } ${displayHeight + OVERLAY_PADDING * 2}`}
       role="group"
       aria-label={t('scan.corners.label')}
     >
@@ -191,32 +234,48 @@ export function DocumentCornerHandles({
       {quad.map((corner, index) => {
         const point = toDisplay(corner);
         return (
-          <circle
-            key={CORNER_LABEL_KEYS[index]}
-            cx={point.x}
-            cy={point.y}
-            r={dragging === index ? 14 : 11}
-            className={
-              disabled
-                ? 'fill-gray-400 stroke-white'
-                : 'cursor-grab fill-blue-600 stroke-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400'
-            }
-            strokeWidth={2}
-            role="slider"
-            tabIndex={disabled ? -1 : 0}
-            aria-label={t(CORNER_LABEL_KEYS[index])}
-            // The corner's position is two numbers, and a slider reports one.
-            // The x is reported and the label names the corner, which is what
-            // makes the arrow keys discoverable at all.
-            aria-valuemin={0}
-            aria-valuemax={imageWidth}
-            aria-valuenow={Math.round(corner.x)}
-            onPointerDown={handlePointerDown(index)}
-            onPointerMove={handlePointerMove(index)}
-            onPointerUp={endDrag(index)}
-            onPointerCancel={endDrag(index)}
-            onKeyDown={handleKeyDown(index)}
-          />
+          <g key={CORNER_LABEL_KEYS[index]}>
+            {/* Drawn small so it does not hide the corner being placed... */}
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r={dragging === index ? HANDLE_RADIUS_DRAGGING : HANDLE_RADIUS}
+              className={
+                disabled
+                  ? 'fill-gray-400 stroke-white'
+                  : 'fill-blue-600 stroke-white'
+              }
+              strokeWidth={2}
+              // The transparent circle over it is what takes the pointer.
+              style={{ pointerEvents: 'none' }}
+            />
+            {/* ...and grabbed large, so a fingertip can hit it. */}
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r={HANDLE_HIT_RADIUS}
+              fill="transparent"
+              className={
+                disabled
+                  ? undefined
+                  : 'cursor-grab focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400'
+              }
+              role="slider"
+              tabIndex={disabled ? -1 : 0}
+              aria-label={t(CORNER_LABEL_KEYS[index])}
+              // The corner's position is two numbers, and a slider reports one.
+              // The x is reported and the label names the corner, which is what
+              // makes the arrow keys discoverable at all.
+              aria-valuemin={0}
+              aria-valuemax={imageWidth}
+              aria-valuenow={Math.round(corner.x)}
+              onPointerDown={handlePointerDown(index)}
+              onPointerMove={handlePointerMove(index)}
+              onPointerUp={endDrag(index)}
+              onPointerCancel={endDrag(index)}
+              onKeyDown={handleKeyDown(index)}
+            />
+          </g>
         );
       })}
     </svg>

@@ -27,6 +27,7 @@
     "viewOriginalFile": "檢視原圖",
     "rotate": "旋轉",
     "adjustHint": "若邊緣不正確，請切換到「原圖」並拖曳四角。",
+    "updating": "正在更新預覽…",
     "noDocumentFound": "找不到文件邊緣，因此使用了整張照片。請切換到「原圖」並自行拖曳四角。",
     "previewEnhancedAlt": "強化掃描預覽",
     "previewOriginalAlt": "原始照片預覽",

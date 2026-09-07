@@ -27,6 +27,7 @@
     "viewOriginalFile": "Voir l’original",
     "rotate": "Pivoter",
     "adjustHint": "Passez à « Original » pour déplacer les coins si les bords sont incorrects.",
+    "updating": "Mise à jour de l’aperçu…",
     "noDocumentFound": "Aucun bord de document n’a été trouvé, la photo entière a donc été utilisée. Passez à « Original » et placez les coins vous-même.",
     "previewEnhancedAlt": "Aperçu du scan amélioré",
     "previewOriginalAlt": "Aperçu de la photo d’origine",

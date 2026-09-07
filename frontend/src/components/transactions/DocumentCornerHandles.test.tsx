@@ -25,7 +25,7 @@ const QUAD: Quad = [
 function renderHandles(overrides: Partial<Parameters<typeof DocumentCornerHandles>[0]> = {}) {
   const onChange = vi.fn();
   const onCommit = vi.fn();
-  render(
+  const view = render(
     <DocumentCornerHandles
       quad={QUAD}
       imageWidth={400}
@@ -37,7 +37,7 @@ function renderHandles(overrides: Partial<Parameters<typeof DocumentCornerHandle
       {...overrides}
     />,
   );
-  return { onChange, onCommit };
+  return { onChange, onCommit, container: view.container };
 }
 
 /** The four handles, in the fixed top-left/top-right/bottom-right/bottom-left order. */
@@ -63,6 +63,58 @@ describe('DocumentCornerHandles', () => {
     const topLeft = screen.getByLabelText('Top-left corner');
     expect(topLeft.getAttribute('cx')).toBe('50');
     expect(topLeft.getAttribute('cy')).toBe('50');
+  });
+
+  describe('reaching a handle with a fingertip', () => {
+    // The drawn dot has to stay small -- a finger-sized dot covers the very
+    // corner being placed -- so what takes the pointer is a separate,
+    // transparent circle big enough to hit.
+    it('gives each handle a target a fingertip can land on', () => {
+      renderHandles();
+
+      for (const handle of handles()) {
+        const radius = Number(handle.getAttribute('r'));
+        // 44px across is the size a touch target is expected to be.
+        expect(radius * 2).toBeGreaterThanOrEqual(44);
+        expect(handle.getAttribute('fill')).toBe('transparent');
+      }
+    });
+
+    it('draws the handle itself small, and lets the target take presses', () => {
+      const { container } = renderHandles();
+      const drawn = Array.from(container.querySelectorAll('circle')).filter(
+        (circle) => circle.getAttribute('fill') !== 'transparent',
+      );
+
+      expect(drawn).toHaveLength(4);
+      for (const circle of drawn) {
+        expect(Number(circle.getAttribute('r'))).toBeLessThan(22);
+        // Otherwise the small dot would swallow presses meant for the target.
+        expect((circle as SVGElement).style.pointerEvents).toBe('none');
+      }
+    });
+
+    // A detected corner usually sits ON the frame edge. Clipped to the photo,
+    // only the inward half of its target exists -- which is what made them
+    // hard to grab on a phone.
+    it('extends the overlay past the photo so an edge handle is whole', () => {
+      const { container } = renderHandles();
+      const svg = container.querySelector('svg') as SVGSVGElement;
+
+      const [minX, minY, boxWidth, boxHeight] = (
+        svg.getAttribute('viewBox') as string
+      )
+        .split(' ')
+        .map(Number);
+
+      expect(minX).toBeLessThan(0);
+      expect(minY).toBeLessThan(0);
+      // The padding is added on both sides, so the box grows by twice it.
+      expect(boxWidth).toBe(200 + -minX * 2);
+      expect(boxHeight).toBe(200 + -minY * 2);
+      // And it is at least as wide as the hit target's reach.
+      expect(-minX).toBeGreaterThanOrEqual(22);
+    });
   });
 
   it('reports the corner position in source pixels', () => {

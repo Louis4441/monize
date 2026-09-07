@@ -27,6 +27,7 @@
     "viewOriginalFile": "Original ansehen",
     "rotate": "Drehen",
     "adjustHint": "Wechseln Sie zu „Original“, um die Ecken zu ziehen, falls die Kanten falsch sind.",
+    "updating": "Vorschau wird aktualisiert …",
     "noDocumentFound": "Es wurden keine Dokumentkanten gefunden, daher wurde das ganze Foto verwendet. Wechseln Sie zu „Original“ und ziehen Sie die Ecken selbst.",
     "previewEnhancedAlt": "Vorschau des aufbereiteten Scans",
     "previewOriginalAlt": "Vorschau des Originalfotos",
