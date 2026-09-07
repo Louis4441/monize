@@ -164,6 +164,12 @@ test.describe('Web Share Target', () => {
     );
     expect(before.data).toHaveLength(0);
 
+    // A share names no account, so the form opens without one: picking it is
+    // part of the review, which is the point. Filled the same way
+    // transactions.spec.ts fills this form.
+    await dialog.getByLabel(/^account$/i).selectOption({ value: account.id });
+    await dialog.getByLabel(/amount/i).first().fill('24.99');
+
     await dialog
       .getByRole('button', { name: /create transaction/i })
       .click();
@@ -256,6 +262,11 @@ test.describe('Web Share Target', () => {
     await page.getByRole('button', { name: /^discard$/i }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('button', { name: /^discard$/i }).click();
+
+    // The screen leaves for Transactions once the bundle is gone; waiting for
+    // that is what makes the re-read below a read of the finished state rather
+    // than a race with the delete.
+    await page.waitForURL(/\/transactions/, { timeout: 30000 });
 
     // Coming back to the same id finds nothing rather than the same files.
     await page.goto(shareUrl);
