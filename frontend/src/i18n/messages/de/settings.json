@@ -246,6 +246,9 @@
     },
     "push": {
       "heading": "Browser-Push",
+      "collapsedDevices": "{count, plural, =0 {Keine Geräte registriert} one {# Gerät registriert} other {# Geräte registriert}}",
+      "collapsedDevicesWithRetired": "{count, plural, =0 {Keine Geräte registriert} one {# Gerät registriert} other {# Geräte registriert}}, {retired, plural, one {# stillgelegt} other {# stillgelegt}}",
+      "collapsedDevicesUnavailable": "Geräteliste nicht verfügbar",
       "diagnostics": {
         "summary": "Benachrichtigungsdiagnose",
         "intro": "Was dieser Browser und dieses Gerät Monize über Benachrichtigungen melden. Aktualisiere nach einer Einstellungsänderung und nutze dann Kopieren, um den vollständigen Bericht zu senden.",

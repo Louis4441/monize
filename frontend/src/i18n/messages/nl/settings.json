@@ -246,6 +246,9 @@
     },
     "push": {
       "heading": "Browserpush",
+      "collapsedDevices": "{count, plural, =0 {Geen apparaten geregistreerd} one {# apparaat geregistreerd} other {# apparaten geregistreerd}}",
+      "collapsedDevicesWithRetired": "{count, plural, =0 {Geen apparaten geregistreerd} one {# apparaat geregistreerd} other {# apparaten geregistreerd}}, {retired, plural, one {# ingetrokken} other {# ingetrokken}}",
+      "collapsedDevicesUnavailable": "Apparatenlijst niet beschikbaar",
       "diagnostics": {
         "summary": "Meldingsdiagnose",
         "intro": "Wat deze browser en dit apparaat aan Monize melden over meldingen. Ververs na het wijzigen van een instelling en gebruik daarna Kopiëren om het volledige rapport te versturen.",

@@ -246,6 +246,9 @@
     },
     "push": {
       "heading": "瀏覽器推播",
+      "collapsedDevices": "{count, plural, =0 {未註冊任何裝置} other {已註冊 # 台裝置}}",
+      "collapsedDevicesWithRetired": "{count, plural, =0 {未註冊任何裝置} other {已註冊 # 台裝置}}，{retired, plural, other {# 台已停用}}",
+      "collapsedDevicesUnavailable": "裝置清單無法使用",
       "diagnostics": {
         "summary": "通知診斷",
         "intro": "此瀏覽器與裝置向 Monize 回報的通知相關資訊。變更設定後請重新整理，再用「複製報告」傳送完整報告。",

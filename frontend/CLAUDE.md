@@ -732,6 +732,12 @@ account for the reason the registered-endpoint marker carries one, and the kind
 because waving away the offer says nothing about wanting to know, later, that the
 browser has started blocking Monize.
 
+### A `<details>` disclosure is controlled, because jsdom half-implements it
+
+`<details>`/`<summary>` is the disclosure this codebase uses (`PushDiagnostics`, and the foldable Browser push block beside it): native keyboard operation, and the expanded state announced without an `aria-expanded` of our own. But React does not manage `open` the way it manages an input's `value` -- it writes the attribute and stops -- so a component that renders anything off "is this open" must hold that in state, pass `open={state}`, and move it itself. **`onToggle` cannot be the only mover**: jsdom flips `open` on a summary click and fires no `toggle` event at all, so the behaviour is untestable through it and a browser that misses the event leaves the summary describing the wrong state. Handle the summary's `onClick`, `preventDefault()` to cancel the element's own activation behaviour, and toggle state there (Enter and Space on a focused summary dispatch a click, so the keyboard comes with it); keep `onToggle` wired for the toggles no click produces, such as Chrome expanding a `<details>` to reveal a find-in-page match.
+
+**What a collapsed summary stands in for is not the same text the open block shows.** It replaces the block, so it answers the question the block would have -- Browser push collapses to how many devices can be *delivered to*, retired rows named separately rather than summed in, and "Device list unavailable" where the read failed, never the `0` an empty `devices` array would give (the failed-lookup rule, one more time). And a block whose whole content is one sentence explaining why a feature is unavailable does not get a disclosure: hiding the reason behind a click is worse than not folding.
+
 ### A settings screen has one save contract, and it is save-on-change
 
 `PreferencesSection` had two: language, theme and colour theme persisted the

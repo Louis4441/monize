@@ -246,6 +246,9 @@
     },
     "push": {
       "heading": "Push peramban",
+      "collapsedDevices": "{count, plural, =0 {Belum ada perangkat terdaftar} other {# perangkat terdaftar}}",
+      "collapsedDevicesWithRetired": "{count, plural, =0 {Belum ada perangkat terdaftar} other {# perangkat terdaftar}}, {retired, plural, other {# dipensiunkan}}",
+      "collapsedDevicesUnavailable": "Daftar perangkat tidak tersedia",
       "diagnostics": {
         "summary": "Diagnostik notifikasi",
         "intro": "Apa yang dilaporkan peramban dan perangkat ini ke Monize tentang notifikasi. Segarkan setelah mengubah pengaturan, lalu gunakan Salin untuk mengirim laporan lengkap.",

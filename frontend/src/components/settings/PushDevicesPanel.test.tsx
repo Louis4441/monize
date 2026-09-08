@@ -130,6 +130,121 @@ describe('PushDevicesPanel', () => {
     ).toBeInTheDocument();
   });
 
+  describe('folding the block away', () => {
+    // The panel is the tallest thing in Settings -> Notifications, and most of
+    // its height is only interesting while you are registering a device.
+    async function collapse() {
+      const summary = await screen.findByTestId('push-block-summary');
+      fireEvent.click(summary);
+      return summary;
+    }
+
+    it('starts open, with nothing standing in for the block', async () => {
+      mockListDevices.mockResolvedValue([device()]);
+      render(<PushDevicesPanel />);
+
+      expect(
+        await screen.findByRole('button', { name: /send test notification/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('push-block-collapsed-summary'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('hides the block and counts the devices instead', async () => {
+      mockListDevices.mockResolvedValue([
+        device(),
+        device({ id: 'd-2', endpointFingerprint: OTHER_DEVICE }),
+      ]);
+      render(<PushDevicesPanel />);
+      await screen.findByRole('button', { name: /send test notification/i });
+
+      await act(async () => {
+        await collapse();
+      });
+
+      expect(
+        screen.getByTestId('push-block-collapsed-summary'),
+      ).toHaveTextContent('2 devices registered');
+      // The heading is what is left to click on, so it stays.
+      expect(screen.getByText('Browser push')).toBeInTheDocument();
+    });
+
+    it('says zero when the list really is empty', async () => {
+      render(<PushDevicesPanel />);
+      await screen.findByRole('button', { name: /send test notification/i });
+
+      await act(async () => {
+        await collapse();
+      });
+
+      expect(
+        screen.getByTestId('push-block-collapsed-summary'),
+      ).toHaveTextContent('No devices registered');
+    });
+
+    it('counts what can be delivered to, and names the rest as retired', async () => {
+      // A retired row is still listed and still removable, so a bare count of
+      // the rows would disagree with the list underneath -- and a count that
+      // included them would claim delivery to endpoints that answer nothing.
+      mockListDevices.mockResolvedValue([
+        device(),
+        device({
+          id: 'd-2',
+          endpointFingerprint: OTHER_DEVICE,
+          disabledAt: '2026-08-03T10:00:00.000Z',
+          disabledReason: 'KEY_ROTATED',
+        }),
+      ]);
+      render(<PushDevicesPanel />);
+      await screen.findByRole('button', { name: /send test notification/i });
+
+      await act(async () => {
+        await collapse();
+      });
+
+      expect(
+        screen.getByTestId('push-block-collapsed-summary'),
+      ).toHaveTextContent('1 device registered, 1 retired');
+    });
+
+    it('does not report a list that would not load as an empty one', async () => {
+      // `devices` is empty because the read failed, not because the user has
+      // registered nothing: "No devices registered" would send them to enable
+      // push on a browser that may already be on the list.
+      mockListDevices.mockRejectedValue(new Error('offline'));
+      render(<PushDevicesPanel />);
+      await screen.findByText(/could not load your registered devices/i);
+
+      await act(async () => {
+        await collapse();
+      });
+
+      const summary = screen.getByTestId('push-block-collapsed-summary');
+      expect(summary).toHaveTextContent('Device list unavailable');
+      expect(summary).not.toHaveTextContent(/No devices registered/);
+    });
+
+    it('leaves a one-sentence block unfoldable', async () => {
+      // The three unavailable branches are a single sentence saying why. A
+      // disclosure hiding the reason behind a click is worse than none.
+      mockGetConfig.mockResolvedValue({
+        enabled: false,
+        publicKey: null,
+        configured: true,
+        keyUnreadable: false,
+      });
+      render(<PushDevicesPanel />);
+
+      expect(
+        await screen.findByText(/administrator has switched browser push off/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('push-block-summary'),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   it('marks the row that is this browser', async () => {
     mockListDevices.mockResolvedValue([
       device(),
