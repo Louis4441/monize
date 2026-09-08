@@ -5,6 +5,10 @@ import toast from 'react-hot-toast';
 import { PushPermissionError, type PushDevice } from '@/lib/push';
 import { useAuthStore } from '@/store/authStore';
 import { notifyPushDevicesChanged } from '@/lib/pushDevicesSignal';
+import {
+  SETTINGS_SECTION_DEFAULT_COLLAPSED,
+  useSettingsSectionStore,
+} from '@/store/settingsSectionStore';
 
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({
@@ -88,6 +92,13 @@ function device(overrides: Partial<PushDevice> = {}): PushDevice {
 describe('PushDevicesPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The fold outlives a remount by design, so it outlives a test too:
+    // `setup.ts` clears localStorage between tests but cannot reach the store
+    // that already read it. Nothing is mounted here (RTL's cleanup ran in the
+    // previous afterEach), so this write needs no act().
+    useSettingsSectionStore.setState({
+      collapsed: { ...SETTINGS_SECTION_DEFAULT_COLLAPSED },
+    });
     mockGetConfig.mockResolvedValue({
       enabled: true,
       publicKey: 'PUB',
@@ -128,6 +139,158 @@ describe('PushDevicesPanel', () => {
     expect(
       screen.getByText(/No device is registered yet/i),
     ).toBeInTheDocument();
+  });
+
+  describe('folding the block away', () => {
+    // The panel is the tallest thing in Settings -> Notifications, and most of
+    // its height is only interesting while you are registering a device.
+    async function collapse() {
+      const summary = await screen.findByTestId('push-block-summary');
+      fireEvent.click(summary);
+      return summary;
+    }
+
+    /**
+     * Whether the block is folded, read off the element that does the folding.
+     *
+     * jsdom applies no user-agent stylesheet to `<details>`, so its children
+     * stay in the document whatever `open` says -- asserting the Enable button
+     * has gone would pass in a browser and fail here for a reason that has
+     * nothing to do with this component. `open` is the mechanism, so `open` is
+     * what is asserted, alongside the summary that stands in for the content.
+     */
+    function isFolded() {
+      const details = screen
+        .getByTestId('push-block-summary')
+        .closest('details');
+      return details !== null && !details.open;
+    }
+
+    it('starts open, with nothing standing in for the block', async () => {
+      mockListDevices.mockResolvedValue([device()]);
+      render(<PushDevicesPanel />);
+
+      expect(
+        await screen.findByRole('button', { name: /send test notification/i }),
+      ).toBeInTheDocument();
+      expect(isFolded()).toBe(false);
+      expect(
+        screen.queryByTestId('push-block-collapsed-summary'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('hides the block and counts the devices instead', async () => {
+      mockListDevices.mockResolvedValue([
+        device(),
+        device({ id: 'd-2', endpointFingerprint: OTHER_DEVICE }),
+      ]);
+      render(<PushDevicesPanel />);
+      await screen.findByRole('button', { name: /send test notification/i });
+
+      await act(async () => {
+        await collapse();
+      });
+
+      expect(isFolded()).toBe(true);
+      expect(
+        screen.getByTestId('push-block-collapsed-summary'),
+      ).toHaveTextContent('2 devices registered');
+      // The heading is what is left to click on, so it stays.
+      expect(screen.getByText('Browser push')).toBeInTheDocument();
+    });
+
+    it('says zero when the list really is empty', async () => {
+      render(<PushDevicesPanel />);
+      await screen.findByRole('button', { name: /send test notification/i });
+
+      await act(async () => {
+        await collapse();
+      });
+
+      expect(
+        screen.getByTestId('push-block-collapsed-summary'),
+      ).toHaveTextContent('No devices registered');
+    });
+
+    it('counts what can be delivered to, and names the rest as retired', async () => {
+      // A retired row is still listed and still removable, so a bare count of
+      // the rows would disagree with the list underneath -- and a count that
+      // included them would claim delivery to endpoints that answer nothing.
+      mockListDevices.mockResolvedValue([
+        device(),
+        device({
+          id: 'd-2',
+          endpointFingerprint: OTHER_DEVICE,
+          disabledAt: '2026-08-03T10:00:00.000Z',
+          disabledReason: 'KEY_ROTATED',
+        }),
+      ]);
+      render(<PushDevicesPanel />);
+      await screen.findByRole('button', { name: /send test notification/i });
+
+      await act(async () => {
+        await collapse();
+      });
+
+      expect(
+        screen.getByTestId('push-block-collapsed-summary'),
+      ).toHaveTextContent('1 device registered, 1 retired');
+    });
+
+    it('does not report a list that would not load as an empty one', async () => {
+      // `devices` is empty because the read failed, not because the user has
+      // registered nothing: "No devices registered" would send them to enable
+      // push on a browser that may already be on the list.
+      mockListDevices.mockRejectedValue(new Error('offline'));
+      render(<PushDevicesPanel />);
+      await screen.findByText(/could not load your registered devices/i);
+
+      await act(async () => {
+        await collapse();
+      });
+
+      const summary = screen.getByTestId('push-block-collapsed-summary');
+      expect(summary).toHaveTextContent('Device list unavailable');
+      expect(summary).not.toHaveTextContent(/No devices registered/);
+    });
+
+    it('stays folded across a remount', async () => {
+      // The whole point of storing it: a fold that reopened on the next visit
+      // to Settings would be a fold nobody could make stick.
+      mockListDevices.mockResolvedValue([device()]);
+      const { unmount } = render(<PushDevicesPanel />);
+      await screen.findByRole('button', { name: /send test notification/i });
+      await act(async () => {
+        await collapse();
+      });
+      unmount();
+
+      render(<PushDevicesPanel />);
+
+      expect(
+        await screen.findByTestId('push-block-collapsed-summary'),
+      ).toHaveTextContent('1 device registered');
+      expect(isFolded()).toBe(true);
+    });
+
+    it('leaves a one-sentence block unfoldable', async () => {
+      // The three unavailable branches are a single sentence saying why. A
+      // disclosure hiding the reason behind a click is worse than none.
+      mockGetConfig.mockResolvedValue({
+        enabled: false,
+        publicKey: null,
+        configured: true,
+        keyUnreadable: false,
+      });
+      render(<PushDevicesPanel />);
+
+      expect(
+        await screen.findByText(/administrator has switched browser push off/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('push-block-summary'),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it('marks the row that is this browser', async () => {

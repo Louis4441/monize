@@ -313,6 +313,49 @@
           }
         }
       }
+    },
+    "v1_16_0": {
+      "notifications": {
+        "title": "[XX-Notifications-XX]",
+        "steps": {
+          "welcome": {
+            "title": "[XX-Monize can tell you things now-XX]",
+            "body": "[XX-A bill falling due, a budget going over, a balance crossing a line you set, a backup that failed. This walkthrough covers where those arrive, and how you choose which ones reach you by email or on your phone.-XX]"
+          },
+          "bell": {
+            "title": "[XX-The bell is the record-XX]",
+            "body": "[XX-Every notification Monize raises is written here, whatever else you switch on or off. Email and push are copies sent onward; this list is the original, and the number on the bell counts what you have not read yet.-XX]"
+          },
+          "panel": {
+            "title": "[XX-What a notification carries-XX]",
+            "body": "[XX-Each one says what happened and links to the page that shows it — the bill, the budget, the account. **Mark all read** clears the count without removing anything. A notification you want to be reminded about has a **Remind me** action: once more after a delay, or repeating until you stop it, and you can stop it from the notification itself when it reaches your phone.-XX]"
+          },
+          "filters": {
+            "title": "[XX-Narrow the list, then act on it-XX]",
+            "body": "[XX-The top row filters by severity and the bottom row separates **Financial** from **System** — backups, mail delivery and other things only an administrator can act on. **Delete all** follows whatever filter is showing and reaches every match, not only the ones on screen, so you can clear a run of resolved system alerts and leave the rest.-XX]"
+          },
+          "settings": {
+            "title": "[XX-Where delivery is decided-XX]",
+            "body": "[XX-**Settings → Notifications** holds the rest of this tour. The top of the card is the email switch and the weekly budget digest; below it is the grid that decides everything else, then your push devices.-XX]"
+          },
+          "matrix": {
+            "title": "[XX-One row per kind, one column per channel-XX]",
+            "body": "[XX-Choose per notification type whether it goes out as a **report email**, an **alert email**, a **push**, or through **UnifiedPush** to a distributor you run yourself. There is no column for the bell because the bell always gets the row. **Cooldown** is the last column: skip the email and the push when something from the same group already went out inside that window — the bell entry is still written. Every switch saves the moment you flip it.-XX]"
+          },
+          "push": {
+            "title": "[XX-Your devices-XX]",
+            "body": "[XX-Register a browser here and Monize can reach it while the app is closed. It signs its own messages, so there is no Google or Apple account in the middle. Each device can be tested and removed on its own, and a device that stops being reachable says why. On an iPhone this works once Monize is added to the Home Screen; if your administrator has not switched push on for this instance, this block says so instead.-XX]"
+          },
+          "portfolio": {
+            "title": "[XX-Investment movement-XX]",
+            "body": "[XX-Once a day, when your investment accounts move by more than the amount you set here. It measures market movement and dividends — money you pay in or take out is not a move.-XX]"
+          },
+          "finish": {
+            "title": "[XX-One more place to look-XX]",
+            "body": "[XX-Balance alerts live on the account itself: edit any account and set **Notify below** or **Notify above**. They fire when the balance *crosses* the line, so you are told once rather than after every payment that keeps it there. You can retake this tour anytime from Settings.-XX]"
+          }
+        }
+      }
     }
   }
 }

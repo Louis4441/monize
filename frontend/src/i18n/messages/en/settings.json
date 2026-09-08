@@ -246,6 +246,9 @@
     },
     "push": {
       "heading": "Browser push",
+      "collapsedDevices": "{count, plural, =0 {No devices registered} one {# device registered} other {# devices registered}}",
+      "collapsedDevicesWithRetired": "{count, plural, =0 {No devices registered} one {# device registered} other {# devices registered}}, {retired, plural, one {# retired} other {# retired}}",
+      "collapsedDevicesUnavailable": "Device list unavailable",
       "diagnostics": {
         "summary": "Notification diagnostics",
         "intro": "What this browser and device report to Monize about notifications. Refresh after changing a setting, then Copy to send the full report.",

@@ -313,6 +313,49 @@
           }
         }
       }
+    },
+    "v1_16_0": {
+      "notifications": {
+        "title": "Meldingen",
+        "steps": {
+          "welcome": {
+            "title": "Monize kan het je nu laten weten",
+            "body": "Een rekening die vervalt, een budget dat eroverheen gaat, een saldo dat een grens passeert die jij hebt gezet, een mislukte back-up. Deze rondleiding laat zien waar dat binnenkomt en hoe je kiest wat je per e-mail of op je telefoon bereikt."
+          },
+          "bell": {
+            "title": "De bel is het origineel",
+            "body": "Elke melding die Monize maakt, wordt hier vastgelegd — wat je verder ook aan of uit zet. E-mail en push zijn kopieën die daarna verstuurd worden; deze lijst is het origineel, en het getal op de bel telt wat je nog niet gelezen hebt."
+          },
+          "panel": {
+            "title": "Wat een melding meebrengt",
+            "body": "Elke melding zegt wat er gebeurd is en verwijst naar de pagina die het laat zien: de rekening, het budget, de rekening-courant. **Alles markeren als gelezen** zet de teller terug zonder iets te verwijderen. Wil je eraan herinnerd worden, dan heeft elke melding **Herinner mij**: nog één keer na een tijdje, of herhaald tot je het stopt — en stoppen kan ook vanuit de melding zelf op je telefoon."
+          },
+          "filters": {
+            "title": "Eerst de lijst beperken, dan handelen",
+            "body": "De bovenste rij filtert op ernst, de onderste scheidt **Financieel** van **Systeem** — back-ups, mailbezorging en al het andere waar alleen een beheerder iets aan kan doen. **Alles verwijderen** volgt het ingestelde filter en bereikt elke treffer, niet alleen wat op het scherm staat, zodat je een reeks afgehandelde systeemmeldingen kunt opruimen en de rest laat staan."
+          },
+          "settings": {
+            "title": "Waar bezorging wordt bepaald",
+            "body": "**Instellingen → Meldingen** draagt de rest van deze rondleiding. Bovenaan de kaart staan de e-mailschakelaar en het wekelijkse budgetoverzicht; daaronder het raster dat al het andere bepaalt, en dan je pushapparaten."
+          },
+          "matrix": {
+            "title": "Eén rij per soort, één kolom per kanaal",
+            "body": "Kies per soort melding of die uitgaat als **E-mail (rapport)**, **E-mail (waarschuwing)**, **Push** of via **UnifiedPush** naar een distributeur die je zelf draait. Er is geen kolom voor de bel, omdat de bel de rij altijd krijgt. **Wachttijd** is de laatste kolom: sla e-mail en push over als er binnen dat venster al iets uit dezelfde groep is verstuurd — het item in de bel wordt hoe dan ook geschreven. Elke schakelaar slaat meteen op."
+          },
+          "push": {
+            "title": "Je apparaten",
+            "body": "Registreer hier een browser en Monize kan die bereiken terwijl de app dicht is. Monize ondertekent zijn eigen berichten, dus er zit geen Google- of Apple-account tussen. Elk apparaat is apart te testen en te verwijderen, en een apparaat dat niet meer bereikbaar is, zegt waarom. Op een iPhone werkt dit zodra Monize op het beginscherm staat; heeft je beheerder push niet aangezet voor deze installatie, dan staat dat hier in plaats daarvan."
+          },
+          "portfolio": {
+            "title": "Beweging van beleggingen",
+            "body": "Eén keer per dag, wanneer je beleggingsrekeningen meer bewegen dan het bedrag dat je hier instelt. Het meet marktbeweging en dividend: geld dat je inlegt of opneemt is geen beweging."
+          },
+          "finish": {
+            "title": "Nog één plek om te kijken",
+            "body": "Saldowaarschuwingen staan bij de rekening zelf: bewerk een rekening en zet **Waarschuwen onder** of **Waarschuwen boven**. Ze gaan af wanneer het saldo de grens *passeert*, dus je hoort het één keer in plaats van na elke betaling die het daar houdt. Je kunt deze rondleiding altijd opnieuw doen vanuit Instellingen."
+          }
+        }
+      }
     }
   }
 }

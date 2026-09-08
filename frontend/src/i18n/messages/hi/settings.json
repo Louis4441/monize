@@ -246,6 +246,9 @@
     },
     "push": {
       "heading": "ब्राउज़र पुश",
+      "collapsedDevices": "{count, plural, =0 {कोई डिवाइस पंजीकृत नहीं} one {# डिवाइस पंजीकृत} other {# डिवाइस पंजीकृत}}",
+      "collapsedDevicesWithRetired": "{count, plural, =0 {कोई डिवाइस पंजीकृत नहीं} one {# डिवाइस पंजीकृत} other {# डिवाइस पंजीकृत}}, {retired, plural, one {# निष्क्रिय} other {# निष्क्रिय}}",
+      "collapsedDevicesUnavailable": "डिवाइस सूची उपलब्ध नहीं",
       "diagnostics": {
         "summary": "सूचना डायग्नोस्टिक्स",
         "intro": "यह ब्राउज़र और डिवाइस सूचनाओं के बारे में Monize को क्या बताते हैं। कोई सेटिंग बदलने के बाद रीफ़्रेश करें, फिर पूरी रिपोर्ट भेजने के लिए कॉपी करें।",

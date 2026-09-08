@@ -16,6 +16,7 @@ import { Tag } from '@/types/tag';
 import { TransactionStatus } from '@/types/transaction';
 import { TimePeriod, TIME_PERIOD_OPTIONS, resolveTimePeriod } from '@/lib/time-periods';
 import { collectTagKeys } from '@/lib/tag-key-value';
+import { orderAccountsForPicker } from '@/lib/account-utils';
 import { TagKeyOp } from '@/hooks/useTransactionFilters';
 
 
@@ -188,17 +189,21 @@ export function TransactionFilterPanel({
     .map((code) => ({ value: code, label: code }));
   const hasCurrencyFilter = CURRENCY_FILTER_OPTIONS.length > 0;
 
+  // Same order the account switcher beside this filter uses -- these two
+  // controls sit on one page over one set of accounts, so the chips and the
+  // caret's Favourites section cannot be arranged differently. `.sort()` also
+  // reorders in place, and `filteredAccounts` is a memo other consumers read.
+  const { favourites: favouriteAccounts } = orderAccountsForPicker(filteredAccounts);
+
   return (
     <>
       {/* Quick Account Select - Favourites */}
-      {filteredAccounts.filter(a => a.isFavourite).length > 0 && (
+      {favouriteAccounts.length > 0 && (
         <div className="flex items-center gap-2 mb-4 overflow-x-auto scrollbar-hide">
           <span className="text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap flex-shrink-0">
             {t('filter.favourites')}
           </span>
-          {filteredAccounts
-            .filter(a => a.isFavourite)
-            .sort((a, b) => a.favouriteSortOrder - b.favouriteSortOrder)
+          {favouriteAccounts
             .map(account => {
               const isSelected = filterAccountIds.includes(account.id);
               return (

@@ -32,6 +32,8 @@ import {
   subscribePushDevices,
 } from '@/lib/pushDevicesSignal';
 import { getErrorMessage } from '@/lib/errors';
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
+import { useSettingsSectionCollapsed } from '@/store/settingsSectionStore';
 
 const logger = createLogger('PushDevices');
 
@@ -363,8 +365,22 @@ export function PushDevicesPanel() {
       ? (support.reason ?? 'unsupported')
       : undefined;
 
+  // What the block says about itself while it is folded away. A failed device
+  // read is its own answer, never a count: `devices` is empty (or stale) then,
+  // and "No devices registered" over a list that would not load tells the user
+  // to enable push on a browser that may already be registered.
+  const retiredCount = devices.length - liveDevices.length;
+  const collapsedSummary = devicesFailed
+    ? t('collapsedDevicesUnavailable')
+    : retiredCount > 0
+      ? t('collapsedDevicesWithRetired', {
+          count: liveDevices.length,
+          retired: retiredCount,
+        })
+      : t('collapsedDevices', { count: liveDevices.length });
+
   return (
-    <PushBlock heading={t('heading')}>
+    <PushBlock heading={t('heading')} collapsedSummary={collapsedSummary}>
       <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
         {unsupportedReason
           ? t(`unsupported.${unsupportedReason}`)
@@ -557,19 +573,103 @@ function DeviceFact({
   );
 }
 
+/**
+ * The bordered block every branch of this panel renders into.
+ *
+ * `collapsedSummary` makes it foldable, and only the configured branch passes
+ * one: the other three are a single sentence saying why push is unavailable,
+ * and a disclosure that hides the reason behind a click is worse than no
+ * disclosure. The `<details>`/`<summary>` pair is the same shape
+ * `PushDiagnostics` uses twenty lines below -- native keyboard operation, and
+ * the expanded/collapsed state announced without an `aria-expanded` of our own.
+ *
+ * `open` is a controlled prop rather than a one-shot attribute, and the summary
+ * click is handled here rather than left to the element. React does not manage
+ * `open` for us, so setting it once and letting the element toggle itself
+ * leaves the state this component renders from disagreeing with the DOM the
+ * moment the user folds the block -- and the count is rendered off exactly that
+ * state. `onToggle` alone is not enough to close that gap either: it is the
+ * only signal a native toggle gives, and jsdom flips `open` without ever firing
+ * it, so the behaviour would be untestable here and a missed event in any
+ * browser would leave the count describing the wrong state. It stays wired
+ * anyway for the toggles no click produces -- Chrome expands a `<details>` to
+ * show a find-in-page match.
+ *
+ * The fold is remembered per browser (`settingsSectionStore`), not per account:
+ * whether this panel is worth its height is a fact about the screen in front of
+ * the reader, the same reasoning row density and the register's date view are
+ * stored on. It defaults to open, so a reader who has never folded it sees
+ * exactly what they saw before -- and a stored value that is not a boolean
+ * falls back to that default rather than hiding push behind a corrupted entry.
+ */
 function PushBlock({
   heading,
+  collapsedSummary,
   children,
 }: {
   heading: string;
+  /**
+   * Rendered beside the heading while the block is folded, and omitted while it
+   * is open -- the expanded block already lists the devices this counts, so
+   * showing it in both states says the same thing twice. Absent means the block
+   * does not fold at all.
+   */
+  collapsedSummary?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const { collapsed, setCollapsed } = useSettingsSectionCollapsed('push');
+  const open = !collapsed;
+
   return (
-    <div className="border-t border-gray-200 pt-4 dark:border-gray-700">
-      <h3 className="mb-3 text-sm font-medium text-gray-900 dark:text-gray-100">
-        {heading}
-      </h3>
-      {children}
+    // The tour anchor lives here rather than on any one of the four branches
+    // above, so a step pointing at "browser push" still lands on a deployment
+    // where an administrator has not enabled it -- the block that says so is
+    // exactly what such a reader needs to see.
+    <div
+      {...tourAnchor(TOUR_ANCHORS.notificationPushDevices)}
+      className="border-t border-gray-200 pt-4 dark:border-gray-700"
+    >
+      {collapsedSummary === undefined ? (
+        <>
+          <h3 className="mb-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+            {heading}
+          </h3>
+          {children}
+        </>
+      ) : (
+        <details
+          open={open}
+          onToggle={(event) => setCollapsed(!event.currentTarget.open)}
+        >
+          <summary
+            className="cursor-pointer"
+            data-testid="push-block-summary"
+            onClick={(event) => {
+              // Cancels the element's own activation behaviour, so `open` moves
+              // only through this state. Enter and Space on a focused summary
+              // dispatch a click too, so the keyboard path comes with it.
+              event.preventDefault();
+              setCollapsed(open);
+            }}
+          >
+            {/* `inline` keeps the heading on the disclosure marker's own line;
+                the h3 stays so the block holds its place in the page's heading
+                outline whichever branch rendered it. */}
+            <h3 className="inline text-sm font-medium text-gray-900 dark:text-gray-100">
+              {heading}
+            </h3>
+            {!open && (
+              <span
+                className="ml-2 text-sm text-gray-500 dark:text-gray-400"
+                data-testid="push-block-collapsed-summary"
+              >
+                {collapsedSummary}
+              </span>
+            )}
+          </summary>
+          <div className="mt-3">{children}</div>
+        </details>
+      )}
     </div>
   );
 }

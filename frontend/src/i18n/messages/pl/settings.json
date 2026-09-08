@@ -246,6 +246,9 @@
     },
     "push": {
       "heading": "Push w przeglądarce",
+      "collapsedDevices": "{count, plural, =0 {Brak zarejestrowanych urządzeń} one {# zarejestrowane urządzenie} few {# zarejestrowane urządzenia} many {# zarejestrowanych urządzeń} other {# zarejestrowanego urządzenia}}",
+      "collapsedDevicesWithRetired": "{count, plural, =0 {Brak zarejestrowanych urządzeń} one {# zarejestrowane urządzenie} few {# zarejestrowane urządzenia} many {# zarejestrowanych urządzeń} other {# zarejestrowanego urządzenia}}, {retired, plural, one {# wycofane} few {# wycofane} many {# wycofanych} other {# wycofanego}}",
+      "collapsedDevicesUnavailable": "Lista urządzeń niedostępna",
       "diagnostics": {
         "summary": "Diagnostyka powiadomień",
         "intro": "Co ta przeglądarka i to urządzenie zgłaszają Monize na temat powiadomień. Odśwież po zmianie ustawienia, a następnie użyj Kopiuj, aby wysłać pełny raport.",

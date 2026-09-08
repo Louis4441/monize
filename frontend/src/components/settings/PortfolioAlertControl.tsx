@@ -9,6 +9,7 @@ import { NumericInput } from '@/components/ui/NumericInput';
 import { notificationPreferencesApi } from '@/lib/notification-preferences';
 import { getErrorMessage } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 
 const log = createLogger('PortfolioAlertControl');
 
@@ -129,7 +130,7 @@ export function PortfolioAlertControl() {
   }
 
   return (
-    <div>
+    <div {...tourAnchor(TOUR_ANCHORS.notificationPortfolioAlert)}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="font-medium text-gray-900 dark:text-gray-100">

@@ -313,6 +313,49 @@
           }
         }
       }
+    },
+    "v1_16_0": {
+      "notifications": {
+        "title": "Powiadomienia",
+        "steps": {
+          "welcome": {
+            "title": "Monize może teraz dawać znać",
+            "body": "Rachunek z terminem płatności, przekroczony budżet, saldo przechodzące przez ustawioną przez Ciebie granicę, nieudana kopia zapasowa. Ten przewodnik pokazuje, gdzie to trafia i jak decydujesz, co dotrze do Ciebie e-mailem albo na telefon."
+          },
+          "bell": {
+            "title": "Dzwonek jest zapisem",
+            "body": "Każde powiadomienie, które Monize tworzy, trafia tutaj — niezależnie od tego, co włączysz lub wyłączysz gdzie indziej. E-mail i push to kopie wysyłane dalej; ta lista jest oryginałem, a liczba przy dzwonku pokazuje, ilu jeszcze nie przeczytałeś."
+          },
+          "panel": {
+            "title": "Co niesie ze sobą powiadomienie",
+            "body": "Każde mówi, co się stało, i prowadzi do strony, która to pokazuje: rachunku, budżetu, konta. **Oznacz wszystkie jako przeczytane** zeruje licznik, niczego nie usuwając. Jeśli chcesz, aby Ci o czymś przypomniano, każde powiadomienie ma **Przypomnij mi**: jeszcze raz po chwili albo cyklicznie, dopóki tego nie zatrzymasz — a zatrzymać możesz je także z samego powiadomienia na telefonie."
+          },
+          "filters": {
+            "title": "Najpierw zawęź listę, potem działaj",
+            "body": "Górny rząd filtruje według wagi, dolny oddziela **Finansowe** od **Systemowych** — kopie zapasowe, dostarczanie poczty i wszystko, z czym poradzi sobie tylko administrator. **Usuń wszystkie** trzyma się ustawionego filtra i obejmuje wszystkie pasujące wpisy, nie tylko te na ekranie, więc możesz uprzątnąć serię rozwiązanych alertów systemowych i zostawić resztę."
+          },
+          "settings": {
+            "title": "Gdzie zapada decyzja o dostarczaniu",
+            "body": "**Ustawienia → Powiadomienia** zawierają resztę tego przewodnika. Na górze karty jest przełącznik e-maili i cotygodniowe podsumowanie budżetów; niżej siatka decydująca o całej reszcie, a potem Twoje urządzenia push."
+          },
+          "matrix": {
+            "title": "Jeden wiersz na rodzaj, jedna kolumna na kanał",
+            "body": "Dla każdego rodzaju powiadomienia wybierz, czy wychodzi jako **E-mail (raport)**, **E-mail (alert)**, **Push**, czy przez **UnifiedPush** do dystrybutora, który sam prowadzisz. Nie ma kolumny dla dzwonka, bo dzwonek zawsze dostaje wiersz. **Odstęp** to ostatnia kolumna: pomija e-mail i push, gdy coś z tej samej grupy wyszło już w tym oknie czasowym — wpis w dzwonku i tak powstaje. Każdy przełącznik zapisuje się od razu."
+          },
+          "push": {
+            "title": "Twoje urządzenia",
+            "body": "Zarejestruj tutaj przeglądarkę, a Monize dosięgnie jej także przy zamkniętej aplikacji. Sam podpisuje swoje wiadomości, więc po drodze nie ma żadnego konta Google ani Apple. Każde urządzenie da się osobno przetestować i usunąć, a urządzenie, które przestało być osiągalne, podaje powód. Na iPhonie działa to po dodaniu Monize do ekranu początkowego; jeśli administrator nie włączył push w tej instancji, znajdziesz tu informację o tym."
+          },
+          "portfolio": {
+            "title": "Zmiana wartości inwestycji",
+            "body": "Raz dziennie, gdy Twoje konta inwestycyjne zmienią się o więcej niż ustawiona tutaj kwota. Mierzone są ruchy rynku i dywidendy — wpłaty i wypłaty nie są zmianą."
+          },
+          "finish": {
+            "title": "Jeszcze jedno miejsce",
+            "body": "Progi salda są przy samym koncie: otwórz konto do edycji i ustaw **Powiadom poniżej** albo **Powiadom powyżej**. Uruchamiają się, gdy saldo *przekroczy* granicę, więc usłyszysz o tym raz, a nie po każdej kolejnej płatności. Ten przewodnik możesz powtórzyć w każdej chwili w Ustawieniach."
+          }
+        }
+      }
     }
   }
 }

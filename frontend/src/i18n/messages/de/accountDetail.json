@@ -5,6 +5,8 @@
     "edit": "Konto bearbeiten",
     "back": "Zurück zu den Konten",
     "switchAccount": "Zu einem anderen Konto wechseln",
+    "switchFavourites": "Favoriten",
+    "switchOtherAccounts": "Weitere Konten",
     "switchPlaceholder": "Konten filtern...",
     "switchNoMatches": "Keine Konten gefunden",
     "jointBadge": "Gemeinsam",

@@ -313,6 +313,49 @@
           }
         }
       }
+    },
+    "v1_16_0": {
+      "notifications": {
+        "title": "Notifications",
+        "steps": {
+          "welcome": {
+            "title": "Monize peut désormais vous prévenir",
+            "body": "Une facture qui arrive à échéance, un budget dépassé, un solde qui franchit un seuil que vous avez fixé, une sauvegarde en échec. Cette visite montre où tout cela arrive et comment vous choisissez ce qui vous atteint par e-mail ou sur votre téléphone."
+          },
+          "bell": {
+            "title": "La cloche fait foi",
+            "body": "Toute notification émise par Monize est écrite ici, quoi que vous activiez ou désactiviez par ailleurs. L’e-mail et le push sont des copies envoyées ensuite ; cette liste est l’original, et le nombre sur la cloche compte ce que vous n’avez pas encore lu."
+          },
+          "panel": {
+            "title": "Ce que porte une notification",
+            "body": "Chacune indique ce qui s’est passé et renvoie à la page qui le montre : la facture, le budget, le compte. **Tout marquer comme lu** remet le compteur à zéro sans rien supprimer. Pour être relancé, chaque notification propose **Me rappeler** : une fois encore après un délai, ou en boucle jusqu’à ce que vous l’arrêtiez — et vous pouvez l’arrêter depuis la notification elle-même sur votre téléphone."
+          },
+          "filters": {
+            "title": "Restreindre la liste, puis agir dessus",
+            "body": "La rangée du haut filtre par gravité, celle du bas sépare **Financières** et **Système** — sauvegardes, envoi du courrier et tout ce qu’un administrateur seul peut traiter. **Tout supprimer** suit le filtre affiché et atteint toutes les correspondances, pas seulement celles à l’écran : vous pouvez ainsi solder une série d’alertes système résolues et garder le reste."
+          },
+          "settings": {
+            "title": "Où se décide la distribution",
+            "body": "**Paramètres → Notifications** porte la suite de cette visite. En haut de la carte : l’interrupteur e-mail et le récapitulatif budgétaire hebdomadaire ; en dessous, la grille qui décide de tout le reste, puis vos appareils push."
+          },
+          "matrix": {
+            "title": "Une ligne par type, une colonne par canal",
+            "body": "Choisissez, pour chaque type de notification, s’il part en **E-mail (rapport)**, en **E-mail (alerte)**, en **Push** ou via **UnifiedPush** vers un distributeur que vous hébergez vous-même. Il n’y a pas de colonne pour la cloche, car la cloche reçoit toujours la ligne. **Délai** est la dernière colonne : l’e-mail et le push sont omis si quelque chose du même groupe est déjà parti dans cette fenêtre — l’entrée dans la cloche, elle, est toujours écrite. Chaque interrupteur enregistre immédiatement."
+          },
+          "push": {
+            "title": "Vos appareils",
+            "body": "Enregistrez un navigateur ici et Monize pourra l’atteindre même l’application fermée. Monize signe ses propres messages : aucun compte Google ni Apple au milieu. Chaque appareil se teste et se retire séparément, et un appareil devenu injoignable en dit la raison. Sur iPhone, cela fonctionne une fois Monize ajouté à l’écran d’accueil ; si votre administrateur n’a pas activé le push sur cette instance, ce bloc l’indique."
+          },
+          "portfolio": {
+            "title": "Mouvement des placements",
+            "body": "Une fois par jour, quand vos comptes de placement bougent de plus que le montant fixé ici. La mesure porte sur les mouvements de marché et les dividendes : l’argent que vous versez ou retirez n’est pas un mouvement."
+          },
+          "finish": {
+            "title": "Un dernier endroit à regarder",
+            "body": "Les alertes de solde vivent sur le compte lui-même : modifiez un compte et renseignez **Prévenir en dessous de** ou **Prévenir au-dessus de**. Elles se déclenchent quand le solde *franchit* le seuil, vous êtes donc prévenu une fois plutôt qu’après chaque paiement qui l’y maintient. Vous pouvez refaire cette visite à tout moment depuis les Paramètres."
+          }
+        }
+      }
     }
   }
 }

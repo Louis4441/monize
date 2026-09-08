@@ -246,6 +246,9 @@
     },
     "push": {
       "heading": "Push du navigateur",
+      "collapsedDevices": "{count, plural, =0 {Aucun appareil enregistré} one {# appareil enregistré} other {# appareils enregistrés}}",
+      "collapsedDevicesWithRetired": "{count, plural, =0 {Aucun appareil enregistré} one {# appareil enregistré} other {# appareils enregistrés}}, {retired, plural, one {# retiré} other {# retirés}}",
+      "collapsedDevicesUnavailable": "Liste des appareils indisponible",
       "diagnostics": {
         "summary": "Diagnostic des notifications",
         "intro": "Ce que ce navigateur et cet appareil signalent à Monize au sujet des notifications. Actualisez après avoir modifié un réglage, puis utilisez Copier pour envoyer le rapport complet.",

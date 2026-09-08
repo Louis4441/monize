@@ -246,6 +246,9 @@
     },
     "push": {
       "heading": "ブラウザープッシュ",
+      "collapsedDevices": "{count, plural, =0 {登録済みの端末なし} other {端末 # 台を登録済み}}",
+      "collapsedDevicesWithRetired": "{count, plural, =0 {登録済みの端末なし} other {端末 # 台を登録済み}}、{retired, plural, other {# 台は停止済み}}",
+      "collapsedDevicesUnavailable": "端末一覧を取得できません",
       "diagnostics": {
         "summary": "通知診断",
         "intro": "このブラウザーとデバイスが通知について Monize に報告している内容です。設定を変更したら更新し、「レポートをコピー」で全文を送ってください。",

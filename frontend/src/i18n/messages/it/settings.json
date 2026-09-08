@@ -246,6 +246,9 @@
     },
     "push": {
       "heading": "Push del browser",
+      "collapsedDevices": "{count, plural, =0 {Nessun dispositivo registrato} one {# dispositivo registrato} other {# dispositivi registrati}}",
+      "collapsedDevicesWithRetired": "{count, plural, =0 {Nessun dispositivo registrato} one {# dispositivo registrato} other {# dispositivi registrati}}, {retired, plural, one {# ritirato} other {# ritirati}}",
+      "collapsedDevicesUnavailable": "Elenco dei dispositivi non disponibile",
       "diagnostics": {
         "summary": "Diagnostica delle notifiche",
         "intro": "Ciò che questo browser e questo dispositivo segnalano a Monize sulle notifiche. Aggiorna dopo aver cambiato un'impostazione, poi usa Copia per inviare il rapporto completo.",

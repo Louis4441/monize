@@ -28,6 +28,8 @@ const PERSISTED_STORE_KEYS: Record<string, string> = {
     'authenticated only: the store is imported by the list components, none of which the login page renders. One of three row-density levels -- a fact about the screen, not the account, so it survives logout deliberately.',
   'monize-register-date-display':
     'authenticated only: imported by the transaction register, which the login page never renders. A single boolean (drop the year from register dates on phone widths) -- a fact about the screen, not the account, so it survives logout deliberately.',
+  'monize-settings-sections':
+    'authenticated only: imported by the Settings page, which no unauthenticated route renders. One boolean per named Settings section, saying whether the reader has folded it away -- a fact about the screen, not the account, so it survives logout deliberately. It names sections, never their contents.',
 };
 
 // What an unauthenticated visitor's browser holds, verbatim. These are the two

@@ -246,6 +246,9 @@
     },
     "push": {
       "heading": "Đẩy từ trình duyệt",
+      "collapsedDevices": "{count, plural, =0 {Chưa đăng ký thiết bị nào} other {Đã đăng ký # thiết bị}}",
+      "collapsedDevicesWithRetired": "{count, plural, =0 {Chưa đăng ký thiết bị nào} other {Đã đăng ký # thiết bị}}, {retired, plural, other {# đã ngừng}}",
+      "collapsedDevicesUnavailable": "Không tải được danh sách thiết bị",
       "diagnostics": {
         "summary": "Chẩn đoán thông báo",
         "intro": "Những gì trình duyệt và thiết bị này báo cáo cho Monize về thông báo. Hãy làm mới sau khi thay đổi một cài đặt, rồi dùng Sao chép để gửi báo cáo đầy đủ.",

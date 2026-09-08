@@ -313,6 +313,49 @@
           }
         }
       }
+    },
+    "v1_16_0": {
+      "notifications": {
+        "title": "Notifiche",
+        "steps": {
+          "welcome": {
+            "title": "Ora Monize può avvisarti",
+            "body": "Una bolletta in scadenza, un budget sforato, un saldo che supera una soglia che hai fissato, un backup fallito. Questo percorso mostra dove arriva tutto questo e come scegli che cosa ti raggiunge via email o sul telefono."
+          },
+          "bell": {
+            "title": "La campanella è il registro",
+            "body": "Ogni notifica che Monize genera viene scritta qui, qualunque cosa tu attivi o disattivi altrove. Email e push sono copie inviate in seguito; questa lista è l’originale, e il numero sulla campanella conta ciò che non hai ancora letto."
+          },
+          "panel": {
+            "title": "Che cosa porta una notifica",
+            "body": "Ognuna dice che cosa è successo e rimanda alla pagina che lo mostra: la bolletta, il budget, il conto. **Segna tutti come letti** azzera il contatore senza rimuovere nulla. Se vuoi essere richiamato, ogni notifica offre **Ricordamelo**: ancora una volta dopo un intervallo, oppure ripetuta finché non la fermi — e puoi fermarla dalla notifica stessa quando arriva sul telefono."
+          },
+          "filters": {
+            "title": "Restringi la lista, poi agisci",
+            "body": "La riga in alto filtra per gravità, quella in basso separa **Finanziari** da **Sistema**: backup, invio della posta e tutto ciò su cui può intervenire solo un amministratore. **Elimina tutti** segue il filtro attivo e raggiunge ogni corrispondenza, non solo quelle a schermo, così puoi archiviare una serie di avvisi di sistema già risolti e lasciare il resto."
+          },
+          "settings": {
+            "title": "Dove si decide la consegna",
+            "body": "**Impostazioni → Notifiche** contiene il resto di questo percorso. In cima alla scheda ci sono l’interruttore dell’email e il riepilogo settimanale dei budget; sotto, la griglia che decide tutto il resto, e poi i tuoi dispositivi push."
+          },
+          "matrix": {
+            "title": "Una riga per tipo, una colonna per canale",
+            "body": "Scegli, per ogni tipo di notifica, se esce come **Email (report)**, **Email (avviso)**, **Push** o tramite **UnifiedPush** verso un distributore che ospiti tu. Non c’è una colonna per la campanella, perché la campanella riceve sempre la riga. **Intervallo** è l’ultima colonna: salta email e push quando qualcosa dello stesso gruppo è già uscito dentro quella finestra — la voce nella campanella viene comunque scritta. Ogni interruttore salva nel momento in cui lo sposti."
+          },
+          "push": {
+            "title": "I tuoi dispositivi",
+            "body": "Registra qui un browser e Monize potrà raggiungerlo anche ad app chiusa. Firma da sé i propri messaggi, quindi non c’è nessun account Google o Apple di mezzo. Ogni dispositivo si prova e si rimuove per conto suo, e uno che smette di essere raggiungibile ne dice il motivo. Su iPhone funziona una volta aggiunto Monize alla schermata Home; se il tuo amministratore non ha attivato le push su questa istanza, qui lo trovi scritto."
+          },
+          "portfolio": {
+            "title": "Movimento degli investimenti",
+            "body": "Una volta al giorno, quando i tuoi conti di investimento si muovono più dell’importo che fissi qui. Misura i movimenti di mercato e i dividendi: il denaro che versi o preleivi non è un movimento."
+          },
+          "finish": {
+            "title": "Ancora un posto da guardare",
+            "body": "Gli avvisi sul saldo stanno sul conto stesso: modifica un conto e imposta **Avvisa sotto** o **Avvisa sopra**. Scattano quando il saldo *attraversa* la soglia, così te lo dicono una volta invece che dopo ogni pagamento che ce lo tiene. Puoi rifare questo percorso quando vuoi dalle Impostazioni."
+          }
+        }
+      }
     }
   }
 }

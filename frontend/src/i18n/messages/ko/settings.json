@@ -246,6 +246,9 @@
     },
     "push": {
       "heading": "브라우저 푸시",
+      "collapsedDevices": "{count, plural, =0 {등록된 기기 없음} other {기기 #대 등록됨}}",
+      "collapsedDevicesWithRetired": "{count, plural, =0 {등록된 기기 없음} other {기기 #대 등록됨}}, {retired, plural, other {#대 사용 중지}}",
+      "collapsedDevicesUnavailable": "기기 목록을 불러올 수 없음",
       "diagnostics": {
         "summary": "알림 진단",
         "intro": "이 브라우저와 기기가 알림에 대해 Monize에 보고하는 내용입니다. 설정을 바꾼 뒤 새로 고치고, 복사로 전체 보고서를 보내세요.",

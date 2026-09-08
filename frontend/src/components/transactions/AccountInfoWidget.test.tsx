@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, act, waitFor } from '@/test/render';
+import { render, screen, fireEvent, act, waitFor, within } from '@/test/render';
 import { AccountInfoWidget } from './AccountInfoWidget';
 import { Account } from '@/types/account';
 import type { Transaction } from '@/types/transaction';
@@ -631,6 +631,158 @@ describe('AccountInfoWidget', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Switch to another account' }));
       expect(screen.queryByRole('menuitem', { name: /Old Chequing/ })).not.toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: /Savings/ })).toBeInTheDocument();
+    });
+
+    it('lifts the starred accounts into their own section, above the rest', () => {
+      render(
+        <AccountInfoWidget
+          account={makeAccount()}
+          switchableAccounts={[
+            makeAccount(),
+            ...others,
+            makeAccount({
+              id: 'a-4',
+              name: 'Zephyr Savings',
+              accountType: 'SAVINGS',
+              isFavourite: true,
+              favouriteSortOrder: 1,
+            }),
+          ]}
+          onSwitchAccount={vi.fn()}
+          onEdit={vi.fn()}
+          onCollapse={vi.fn()}
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Switch to another account' }));
+
+      // Last alphabetically, first in the menu: the section decides, not the name.
+      const names = screen.getAllByRole('menuitem').map((item) => item.textContent);
+      expect(names).toEqual([
+        'Zephyr SavingsSavings',
+        'Old ChequingChequing',
+        'SavingsSavings',
+      ]);
+      expect(
+        within(screen.getByRole('group', { name: 'Favourites' }))
+          .getAllByRole('menuitem')
+          .map((item) => item.textContent),
+      ).toEqual(['Zephyr SavingsSavings']);
+      expect(
+        within(screen.getByRole('group', { name: 'Other accounts' }))
+          .getAllByRole('menuitem'),
+      ).toHaveLength(2);
+    });
+
+    it('orders the starred accounts the way the user arranged them', () => {
+      // `favouriteSortOrder`, not the name -- the same order the Accounts page
+      // and every account `<select>` put them in.
+      render(
+        <AccountInfoWidget
+          account={makeAccount()}
+          switchableAccounts={[
+            makeAccount(),
+            makeAccount({
+              id: 'a-4',
+              name: 'Alpha',
+              isFavourite: true,
+              favouriteSortOrder: 2,
+            }),
+            makeAccount({
+              id: 'a-5',
+              name: 'Beta',
+              isFavourite: true,
+              favouriteSortOrder: 1,
+            }),
+          ]}
+          onSwitchAccount={vi.fn()}
+          onEdit={vi.fn()}
+          onCollapse={vi.fn()}
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Switch to another account' }));
+
+      expect(
+        within(screen.getByRole('group', { name: 'Favourites' }))
+          .getAllByRole('menuitem')
+          .map((item) => item.textContent),
+      ).toEqual(['BetaChequing', 'AlphaChequing']);
+    });
+
+    it('leaves the menu unsectioned when nothing is starred', () => {
+      render(
+        <AccountInfoWidget
+          account={makeAccount()}
+          switchableAccounts={[makeAccount(), ...others]}
+          onSwitchAccount={vi.fn()}
+          onEdit={vi.fn()}
+          onCollapse={vi.fn()}
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Switch to another account' }));
+
+      expect(screen.queryAllByRole('group')).toHaveLength(0);
+    });
+
+    it('leaves the menu unsectioned when the only starred account is this one', () => {
+      // The switcher never offers the account already on screen, so a
+      // "Favourites" heading would have nothing under it -- and an "Other
+      // accounts" heading over the whole list says nothing.
+      render(
+        <AccountInfoWidget
+          account={makeAccount({ isFavourite: true, favouriteSortOrder: 1 })}
+          switchableAccounts={[
+            makeAccount({ isFavourite: true, favouriteSortOrder: 1 }),
+            ...others,
+          ]}
+          onSwitchAccount={vi.fn()}
+          onEdit={vi.fn()}
+          onCollapse={vi.fn()}
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Switch to another account' }));
+
+      expect(screen.queryAllByRole('group')).toHaveLength(0);
+      expect(screen.getAllByRole('menuitem')).toHaveLength(2);
+    });
+
+    it('finds a starred account by typing its name', () => {
+      // The filter only appears past `EntitySwitcher`'s threshold, which is
+      // also the only size at which the sections earn their keep.
+      const many = Array.from({ length: 10 }, (_, index) =>
+        makeAccount({ id: `filler-${index}`, name: `Filler ${index}` }),
+      );
+      render(
+        <AccountInfoWidget
+          account={makeAccount()}
+          switchableAccounts={[
+            makeAccount(),
+            ...many,
+            makeAccount({
+              id: 'a-4',
+              name: 'Zephyr Savings',
+              accountType: 'SAVINGS',
+              isFavourite: true,
+              favouriteSortOrder: 1,
+            }),
+          ]}
+          onSwitchAccount={vi.fn()}
+          onEdit={vi.fn()}
+          onCollapse={vi.fn()}
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Switch to another account' }));
+      fireEvent.change(screen.getByPlaceholderText('Filter accounts...'), {
+        target: { value: 'zephyr' },
+      });
+
+      // The section it sits in does not narrow what the filter can reach, and
+      // the now-empty "Other accounts" heading goes with its rows.
+      expect(
+        screen.getAllByRole('menuitem').map((item) => item.textContent),
+      ).toEqual(['Zephyr SavingsSavings']);
+      expect(
+        screen.queryByRole('group', { name: 'Other accounts' }),
+      ).not.toBeInTheDocument();
     });
 
     it('reports the chosen account id and closes the menu', () => {

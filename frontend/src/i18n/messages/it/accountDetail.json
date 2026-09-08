@@ -5,6 +5,8 @@
     "edit": "Modifica conto",
     "back": "Torna ai conti",
     "switchAccount": "Passa a un altro conto",
+    "switchFavourites": "Preferiti",
+    "switchOtherAccounts": "Altri conti",
     "switchPlaceholder": "Filtra conti...",
     "switchNoMatches": "Nessun conto corrisponde",
     "jointBadge": "Cointestato",
