@@ -18,6 +18,7 @@ import { TwoFactorVerify } from '@/components/auth/TwoFactorVerify';
 import { AuthShell } from '@/components/auth/AuthShell';
 import { IncompleteLogoutNotice } from '@/components/auth/IncompleteLogoutNotice';
 import { clearLogoutIncomplete } from '@/lib/logout-state';
+import { DEMO_USER_EMAIL, DEMO_USER_PASSWORD } from '@/lib/demo-credentials';
 import { User } from '@/types/auth';
 import { createLogger } from '@/lib/logger';
 import { buildEmailSchema } from '@/lib/zod-helpers';
@@ -91,8 +92,8 @@ export default function LoginPage() {
   useEffect(() => {
     if (authMethods.demo) {
       reset({
-        email: 'demo@monize.com',
-        password: 'Demo123!',
+        email: DEMO_USER_EMAIL,
+        password: DEMO_USER_PASSWORD,
       });
     }
   }, [authMethods.demo, reset]);

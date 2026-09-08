@@ -2563,3 +2563,39 @@ describe("a payee contact lookup surface asks whether a lookup can run", () => {
     );
   });
 });
+
+describe("a random value comes from the Web Crypto API", () => {
+  /**
+   * `Math.random()` is not a security primitive, and every use of it in the
+   * client so far has been an id: a list key, a removal handle, a temporary
+   * split row. Those want uniqueness, which `crypto.randomUUID()` gives with
+   * no argument about strength -- and Bearer flags the alternative as
+   * CWE-330, which cost an exception with a review date rather than a fix
+   * (issue #1323). `lib/ai-attachments.ts` is the pattern; `SplitEditor` was
+   * the last holdout.
+   */
+  const WEAK_RANDOM = /\bMath\.random\b/;
+
+  it("never calls Math.random in a production source", () => {
+    const offenders = productionSources()
+      .filter(([, source]) => WEAK_RANDOM.test(withoutComments(source)))
+      .map(([path]) => path);
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("still finds the sanctioned helper, so the rule cannot pass by accident", () => {
+    const users = productionSources().filter(([, source]) =>
+      /crypto\.randomUUID\(\)/.test(withoutComments(source)),
+    );
+    expect(users.length).toBeGreaterThan(0);
+  });
+
+  it("catches the pattern it bans", () => {
+    expect(
+      WEAK_RANDOM.test(withoutComments("id: `temp-${Date.now()}-${Math.random()}`")),
+    ).toBe(true);
+    // ...and reads its own explanation as prose, not as a violation.
+    expect(WEAK_RANDOM.test(withoutComments("// not Math.random"))).toBe(false);
+  });
+});

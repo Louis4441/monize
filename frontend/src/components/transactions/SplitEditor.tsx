@@ -341,7 +341,7 @@ export function SplitEditor({
 
   const addSplit = () => {
     const newSplit: SplitRow = {
-      id: `temp-${Date.now()}-${Math.random()}`,
+      id: `temp-${crypto.randomUUID()}`,
       splitType: 'category',
       categoryId: undefined,
       transferAccountId: undefined,

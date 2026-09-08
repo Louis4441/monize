@@ -1,5 +1,6 @@
 import { APIRequestContext, APIResponse, expect } from '@playwright/test';
 import { randomBytes, randomInt } from 'crypto';
+import { E2E_DEFAULT_PASSWORD } from './credentials';
 
 const API_PREFIX = '/api/v1';
 
@@ -53,7 +54,7 @@ export async function registerViaApi(
 ): Promise<TestUser> {
   const user: TestUser = {
     email: opts.email ?? `e2e-${uniqueId()}@test.example.com`,
-    password: opts.password ?? 'E2eTestPass123!',
+    password: opts.password ?? E2E_DEFAULT_PASSWORD,
     firstName: opts.firstName ?? 'E2E',
     lastName: opts.lastName ?? 'Tester',
   };

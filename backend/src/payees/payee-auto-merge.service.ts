@@ -970,9 +970,12 @@ function longestCommonTokenPrefix(tokenLists: string[][]): string[] {
   const minLen = Math.min(...tokenLists.map((tokens) => tokens.length));
   const prefix: string[] = [];
   for (let k = 0; k < minLen; k++) {
-    const token = tokenLists[0][k];
-    if (tokenLists.every((tokens) => tokens[k] === token)) {
-      prefix.push(token);
+    // `leading`, not `token`: these are payee-name words, and a local whose
+    // name ends in "token" reads to Bearer's CWE-208 rule as a credential
+    // compared in variable time.
+    const leading = tokenLists[0][k];
+    if (tokenLists.every((tokens) => tokens[k] === leading)) {
+      prefix.push(leading);
     } else {
       break;
     }
