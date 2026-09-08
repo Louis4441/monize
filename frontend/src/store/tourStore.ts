@@ -259,3 +259,15 @@ export function useTourOpensToolsMenu(): boolean {
     return !!active.steps[active.stepIndex]?.openToolsMenu;
   });
 }
+
+/**
+ * Whether the step showing right now wants the header's notification panel
+ * open, so it can describe the panel's contents instead of a closed bell.
+ */
+export function useTourOpensNotificationBell(): boolean {
+  return useTourStore((s) => {
+    const active = s.active;
+    if (!active || active.showSkippedOutro) return false;
+    return !!active.steps[active.stepIndex]?.openNotificationBell;
+  });
+}

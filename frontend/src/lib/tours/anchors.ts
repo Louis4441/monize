@@ -72,9 +72,22 @@ export const TOUR_ANCHORS = {
   gemSettingsRoles: 'gem-settings-roles',
   gemSettingsSave: 'gem-settings-save',
 
+  // Notifications (the header bell and the panel it opens)
+  notificationBell: 'notification-bell',
+  notificationPanel: 'notification-panel',
+  notificationPanelFilters: 'notification-panel-filters',
+
   // Settings
   settingsWhatsNewToggle: 'settings-whats-new-toggle',
   settingsAppVersion: 'settings-app-version',
+  // Settings -> Notifications. Each is on a container that renders in every
+  // state of its block -- the push panel's heading wrapper is shared by its
+  // "administrator has not enabled this" branch too -- so a step never points
+  // at something only a configured deployment mounts.
+  settingsNotifications: 'settings-notifications',
+  notificationChannelMatrix: 'notification-channel-matrix',
+  notificationPushDevices: 'notification-push-devices',
+  notificationPortfolioAlert: 'notification-portfolio-alert',
 } as const;
 
 export type TourAnchorId = (typeof TOUR_ANCHORS)[keyof typeof TOUR_ANCHORS];

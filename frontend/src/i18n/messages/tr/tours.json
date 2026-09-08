@@ -313,6 +313,49 @@
           }
         }
       }
+    },
+    "v1_16_0": {
+      "notifications": {
+        "title": "Bildirimler",
+        "steps": {
+          "welcome": {
+            "title": "Monize artık size haber verebiliyor",
+            "body": "Vadesi gelen bir fatura, aşılan bir bütçe, koyduğunuz bir sınırı geçen bir bakiye, başarısız bir yedekleme. Bu tur, bunların nereye düştüğünü ve hangilerinin size e-postayla ya da telefonunuzda ulaşacağını nasıl seçtiğinizi gösteriyor."
+          },
+          "bell": {
+            "title": "Zil kaydın kendisidir",
+            "body": "Monize’ın ürettiği her bildirim, başka neyi açıp kapatırsanız kapatın buraya yazılır. E-posta ve anlık bildirim, sonradan gönderilen kopyalardır; bu liste aslın kendisidir ve zilin üzerindeki sayı henüz okumadıklarınızı sayar."
+          },
+          "panel": {
+            "title": "Bir bildirim neyi taşır",
+            "body": "Her biri ne olduğunu söyler ve onu gösteren sayfaya bağlanır: faturaya, bütçeye, hesaba. **Tümünü okundu işaretle** hiçbir şeyi kaldırmadan sayacı sıfırlar. Hatırlatılmasını istediğiniz bir bildirimde **Bana hatırlat** vardır: bir süre sonra bir kez daha ya da siz durdurana kadar tekrar tekrar — ve telefonunuza ulaştığında bildirimin kendisinden de durdurabilirsiniz."
+          },
+          "filters": {
+            "title": "Önce listeyi daraltın, sonra üzerinde işlem yapın",
+            "body": "Üst sıra önem derecesine göre süzer, alt sıra **Finansal** ile **Sistem**’i ayırır — yedeklemeler, posta teslimi ve yalnızca bir yöneticinin çözebileceği diğer şeyler. **Tümünü sil** ekrandaki filtreyi izler ve yalnızca görünenleri değil eşleşen her kaydı kapsar; böylece çözülmüş sistem uyarılarının tamamını temizleyip gerisini bırakabilirsiniz."
+          },
+          "settings": {
+            "title": "Teslimatın karara bağlandığı yer",
+            "body": "**Ayarlar → Bildirimler** bu turun geri kalanını taşıyor. Kartın üstünde e-posta anahtarı ve haftalık bütçe özeti var; altında geri kalan her şeye karar veren ızgara, sonra da anlık bildirim cihazlarınız."
+          },
+          "matrix": {
+            "title": "Her tür için bir satır, her kanal için bir sütun",
+            "body": "Her bildirim türü için **E-posta (rapor)**, **E-posta (uyarı)**, **Push** ya da kendi işlettiğiniz bir dağıtıcıya giden **UnifiedPush** arasından seçin. Zil için sütun yok, çünkü satırı her zaman zil alır. Son sütun **Bekleme**: aynı gruptan bir şey o pencere içinde zaten çıktıysa e-posta ve anlık bildirim atlanır — zildeki kayıt yine de yazılır. Her anahtar, siz değiştirdiğiniz anda kaydedilir."
+          },
+          "push": {
+            "title": "Cihazlarınız",
+            "body": "Buradan bir tarayıcı kaydedin, Monize uygulama kapalıyken bile ona ulaşsın. Kendi iletilerini kendisi imzalar, yani araya giren bir Google ya da Apple hesabı yoktur. Her cihaz ayrı ayrı sınanabilir ve kaldırılabilir, ulaşılamaz hale gelen bir cihaz da nedenini söyler. iPhone’da bu, Monize Ana Ekran’a eklendikten sonra çalışır; yöneticiniz bu kurulumda anlık bildirimi açmadıysa burada bunu okursunuz."
+          },
+          "portfolio": {
+            "title": "Yatırım değeri hareketi",
+            "body": "Günde bir kez, yatırım hesaplarınız burada belirlediğiniz tutardan fazla hareket ettiğinde. Piyasa hareketini ve temettüleri ölçer: yatırdığınız ya da çektiğiniz para bir hareket değildir."
+          },
+          "finish": {
+            "title": "Bakılacak bir yer daha",
+            "body": "Bakiye uyarıları hesabın kendisinde durur: herhangi bir hesabı düzenleyip **Şunun altında bildir** ya da **Şunun üstünde bildir** değerini girin. Bakiye sınırı *geçtiğinde* tetiklenirler, böylece onu orada tutan her ödemeden sonra değil, bir kez haber alırsınız. Bu turu istediğiniz zaman Ayarlar’dan tekrarlayabilirsiniz."
+          }
+        }
+      }
     }
   }
 }

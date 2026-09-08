@@ -12,6 +12,7 @@ import { userSettingsApi } from '@/lib/user-settings';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { UserPreferences } from '@/types/auth';
 import { getErrorMessage } from '@/lib/errors';
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 
 interface NotificationsSectionProps {
   initialNotificationEmail: boolean;
@@ -92,7 +93,10 @@ export function NotificationsSection({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 shadow dark:shadow-gray-700/50 rounded-lg p-6 mb-6">
+    <div
+      {...tourAnchor(TOUR_ANCHORS.settingsNotifications)}
+      className="bg-white dark:bg-gray-800 shadow dark:shadow-gray-700/50 rounded-lg p-6 mb-6"
+    >
       <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{t('heading')}</h2>
 
       {/* Email and browser push are separate channels, so the SMTP gate below

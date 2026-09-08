@@ -150,6 +150,10 @@ The header's link arrays and the per-route Heroicon map are declared side by sid
 
 A step gated by `requires` is the omit effect's to remove: the engine neither navigates to it nor skips it as unreachable while its requirement is unmet or still resolving, or the two race and a deliberate omission is reported as a degraded tour.
 
+### A step inside a dropdown asks the engine to hold it open
+
+A menu or panel in the header closes on a click outside itself, and the tour card is outside it -- so a `click` advance on the trigger opens the dropdown and the reader's very next press closes it under the step describing its contents. The step declares the intent instead (`openToolsMenu` for the header's Tools menu, `openNotificationBell` for the notification panel) and the component ORs that flag over its own state, so the flag also wins over the click-outside close. Two consequences: the step pointing at the closed trigger must NOT carry the flag (the open panel covers the button it names), and every step anchored inside the panel must, or the panel vanishes mid-tour. `NotificationBell.test.tsx` holds all three cases -- opens without a click, survives a click on `document.body`, closes again once the tour steps past.
+
 ### A coach mark parks in the corner the step is not about
 
 An `unobtrusive` anchorless step parks its card in the bottom-**right** corner, which is exactly where every list puts its row actions (`RowActions` is `justify-end`, in a sticky-right cell). A step that asks the user to click one therefore had its own card intercepting that click -- CI caught the account-detail step's card over the **Details** button at a 720px-tall viewport, and the shipped 1.13 foreign-currency tour had the same collision. Such a step sets `placement: 'left'` (the only meaning `placement` has for a corner-parked card). The card is also draggable, but a tour whose first move is "get my card out of the way" is not one to ship: park it clear. `tours.spec.ts` clicks the real row action, so the collision fails the E2E rather than the user.

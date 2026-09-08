@@ -91,6 +91,15 @@ export interface TourStep {
    */
   openToolsMenu?: boolean;
   /**
+   * Open the header's notification panel while this step is showing, for the
+   * same reason `openToolsMenu` exists: the panel is a dropdown the engine
+   * cannot leave open by pointing at it. A `click` advance on the bell would
+   * open it, but the very next thing the user does -- reading a card that sits
+   * outside the panel -- is a click-outside, and the panel would close under
+   * the step describing its contents.
+   */
+  openNotificationBell?: boolean;
+  /**
    * Data this step needs to be worth showing. The engine omits the step (with
    * no "steps were skipped" outro -- the omission is deliberate) when the
    * requirement is not met, e.g. skipping the record-a-transaction walkthrough

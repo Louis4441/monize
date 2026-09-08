@@ -32,6 +32,7 @@ import {
   subscribePushDevices,
 } from '@/lib/pushDevicesSignal';
 import { getErrorMessage } from '@/lib/errors';
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 
 const logger = createLogger('PushDevices');
 
@@ -565,7 +566,14 @@ function PushBlock({
   children: React.ReactNode;
 }) {
   return (
-    <div className="border-t border-gray-200 pt-4 dark:border-gray-700">
+    // The tour anchor lives here rather than on any one of the four branches
+    // above, so a step pointing at "browser push" still lands on a deployment
+    // where an administrator has not enabled it -- the block that says so is
+    // exactly what such a reader needs to see.
+    <div
+      {...tourAnchor(TOUR_ANCHORS.notificationPushDevices)}
+      className="border-t border-gray-200 pt-4 dark:border-gray-700"
+    >
       <h3 className="mb-3 text-sm font-medium text-gray-900 dark:text-gray-100">
         {heading}
       </h3>
