@@ -632,10 +632,17 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
         arrows, changes value on the scroll wheel, and parses what was typed
         against the browser's locale rather than the user's chosen one.
 
-        The range stays on the Zod schema rather than on `min`/`max` here.
-        `NumericInput` clamps `min` WHILE TYPING, so a floor of 0.1 would rewrite
-        the "0" of "0.5" the moment it was pressed; the schema already refuses
-        the same range with a message the field renders.
+        Shaped after its sibling `PortfolioAlertControl`, which renders the
+        portfolio movement threshold: same `decimalPlaces`, same `min`/`max`.
+        `min` clamps the value handed back while typing, but not the field's
+        own text -- `handleChange` calls `setDisplayValue` before the clamp --
+        so typing "0.5" still works, and the transient value converges on the
+        next keystroke. The Zod schema keeps the range too, because it owns the
+        message the field renders.
+
+        The value is bridged as a canonical string (`String(value)`), never the
+        locale text the user sees: `onSubmit` does `Number(...)` on this field,
+        and "0,13" would arrive as NaN for a comma-decimal reader.
       */}
       <NumericInput
         label={t('priceAlert.label')}
@@ -652,6 +659,8 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
           )
         }
         decimalPlaces={2}
+        min={0.1}
+        max={1000}
         error={errors.priceAlertPercent?.message}
         aria-describedby="price-alert-help"
       />
