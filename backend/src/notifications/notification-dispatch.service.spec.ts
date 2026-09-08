@@ -132,6 +132,43 @@ describe("NotificationDispatchService", () => {
     },
   );
 
+  it("formats the email's figures by the recipient's numberFormat, not their language", async () => {
+    // The two preferences are independent (INV-DISPLAY-001): an English UI with
+    // Polish grouping is a supported choice. The test above proves only that
+    // `language` travels -- with the two AGREEING, dropping the number
+    // preference anywhere between the preferences read and the composer still
+    // renders Polish. Here they disagree, so this is the case that fails if
+    // `resolveUserEmailFormats` stops reporting `numberFormat`, or if
+    // `sendEmail` stops passing it on.
+    resolveDelivery.mockResolvedValue({
+      emailNotification: true,
+      push: false,
+      unifiedpush: false,
+      throttleMinutes: 0,
+    });
+    prefRepo.findOne.mockResolvedValue({
+      language: "en",
+      numberFormat: "pl-PL",
+    });
+    create.mockResolvedValue(
+      row({
+        type: NotificationType.BALANCE_BELOW_THRESHOLD,
+        data: {
+          accountName: "Current",
+          balance: -25,
+          threshold: 0,
+          currencyCode: "PLN",
+        },
+      }),
+    );
+    await service.notify("u1", {} as never);
+    const html = decode(sendMail.mock.calls[0][2]);
+    // English prose around a Polish figure is the point, not an accident.
+    expect(html).toContain("dropped to");
+    expect(html).toContain("-25,00");
+    expect(html).not.toContain("-25.00");
+  });
+
   it("passes validated price facts to chart delivery only for price alerts", async () => {
     const data = {
       securityId: "11111111-1111-4111-8111-111111111111",
