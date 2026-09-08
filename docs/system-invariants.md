@@ -1919,6 +1919,31 @@ Enforcement         Client: every figure goes through useNumberFormat(); a pure
                     templates, the budget-alert and bill-due message builders,
                     the portfolio-movement push body, the anomaly-report
                     descriptions and the monthly-comparison notes.
+                    notificationEmailCopy takes the pair through
+                    NotificationCopyOptions.numberFormat, so the immediate
+                    dispatch, the admin system alerts and the budget digests all
+                    compose their figures from it; resolveUserEmailFormats
+                    answers the language and the number format from the ONE
+                    preferences read resolveUserEmailLocale already made, since
+                    two readers of that row are two chances for the language
+                    precedence to be spelled differently. The DATE in that copy
+                    stays on the language: which language a month is spelled in
+                    is not the number preference.
+                    A producer that stores an English fallback a person can
+                    still be shown formats the figure inside it the same way --
+                    budgets.service.ts for BILL_DUE and
+                    security-price-alert.service.ts for the price movement,
+                    because notificationEmailCopy falls back WHOLE to that
+                    stored pair for a row it cannot rebuild and an email then
+                    renders it to the recipient.
+                    A message CATALOG is the exception and carries its own list
+                    in the guard: notification-email-messages.ts holds
+                    '{{ percent }}%' as translatable source whose figure arrives
+                    already formatted, and whose sign each locale places for
+                    itself -- exempt because there is nothing there to route
+                    through a locale, which is a different claim from "only a
+                    machine reads this", and checked by asserting the file still
+                    formats nothing.
                     backend/src/common/number-locale.guard.spec.ts holds the
                     classification of every caller of the en-US helpers (each
                     with the reason its output is not addressed to a person),
@@ -1952,7 +1977,21 @@ Required tests      Present: useNumberFormat.test.ts (share quantity at 8dp unde
                     disagrees with the host locale); number-locale.guard.spec.ts
                     (the resolver's truth table and pl-PL/en-US rendering);
                     email-templates.spec.ts "recipient number locale" (a Polish
-                    bill reminder). A component test must not build its
+                    bill reminder);
+                    resolve-user-email-locale.spec.ts (the number format
+                    surviving a language that falls back, and the 'browser'
+                    sentinel returned as stored rather than resolved);
+                    notification-email-copy.spec.ts (an explicit numberFormat
+                    beating the language, with the DATE staying on the language);
+                    notification-dispatch.service.spec.ts (the same pair
+                    DISAGREEING, end to end through sendEmail);
+                    security-price-alert.service.spec.ts (the stored English
+                    fallback's percentage, and the DTO refusing a precision the
+                    form cannot round-trip).
+                    A test whose two preferences AGREE cannot see this invariant
+                    at all: with language pl and no numberFormat, dropping the
+                    number preference anywhere in the chain still renders Polish.
+                    Make them disagree. And a component test must not build its
                     expectation with the same helper the component renders
                     through -- SecurityList.test.tsx did, which is why the defect
                     shipped green.
