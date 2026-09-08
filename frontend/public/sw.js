@@ -366,7 +366,14 @@ self.addEventListener('message', function (event) {
 // ---------------------------------------------------------------------------
 
 var PUSH_ICON = '/icons/icon-192x192.png';
-var PUSH_BADGE = '/icons/icon-maskable-192x192.png';
+// The badge is a MASK, not a picture: Chrome on Android keeps only the alpha
+// channel and tints what is left, so the alpha has to BE the glyph. Every other
+// icon this project ships fails that -- a maskable icon is opaque edge to edge
+// by definition of its purpose, which is why the toolbar drew a filled square.
+// `badge-monochrome.png` is white-on-transparent, built by
+// frontend/scripts/build-notification-badge.mjs and held to that shape by
+// src/test/notification-badge.test.ts.
+var PUSH_BADGE = '/icons/badge-monochrome.png';
 var PUSH_FALLBACK_TITLE = 'Monize';
 var PUSH_FALLBACK_BODY = 'You have a new notification in Monize.';
 

@@ -738,6 +738,24 @@ account for the reason the registered-endpoint marker carries one, and the kind
 because waving away the offer says nothing about wanting to know, later, that the
 browser has started blocking Monize.
 
+### A notification's `badge` is a mask, its `icon` is a picture
+
+Chrome on Android draws `showNotification`'s `badge` by keeping the image's
+**alpha channel**, discarding the colours and tinting the shape that is left into
+the status bar and the toolbar. So the alpha channel has to *be* the glyph, and
+an image that is opaque everywhere is a request to draw a filled square -- which
+is what shipped, because `PUSH_BADGE` pointed at `icon-maskable-192x192.png`, and
+a maskable icon is opaque edge to edge by definition of that purpose. The
+notification body's `icon` is the opposite -- a picture, drawn in colour -- which
+is why the drawer looked right while the toolbar showed a block.
+
+The badge is therefore its own asset: `public/icons/badge-monochrome.png`, white
+on transparent at 96x96 (24dp at the densest screen Chrome asks for), generated
+from the brand mark by `frontend/scripts/build-notification-badge.mjs`, and never
+taken from `buildManifest`'s icon list. `src/test/notification-badge.test.ts`
+fails on a fully opaque badge, on a badge borrowed from an app icon, and on a
+committed PNG that has stopped matching the logo it is generated from.
+
 ### A `<details>` disclosure is controlled, because jsdom half-implements it
 
 `<details>`/`<summary>` is the disclosure this codebase uses (`PushDiagnostics`, and the foldable Browser push block beside it): native keyboard operation, and the expanded state announced without an `aria-expanded` of our own. But React does not manage `open` the way it manages an input's `value` -- it writes the attribute and stops -- so a component that renders anything off "is this open" must hold that in state, pass `open={state}`, and move it itself. **`onToggle` cannot be the only mover**: jsdom flips `open` on a summary click and fires no `toggle` event at all, so the behaviour is untestable through it and a browser that misses the event leaves the summary describing the wrong state. Handle the summary's `onClick`, `preventDefault()` to cancel the element's own activation behaviour, and toggle state there (Enter and Space on a focused summary dispatch a click, so the keyboard comes with it); keep `onToggle` wired for the toggles no click produces, such as Chrome expanding a `<details>` to reveal a find-in-page match.
