@@ -81,34 +81,36 @@ function ScheduledCategoryMarker({
   categoryColor: string | null;
   bounded?: boolean;
 }) {
+  const t = useTranslations('scheduledTransactions');
   const cap = bounded ? ' max-w-full' : '';
   const bound = (n: ReactNode) => (bounded ? <span className="truncate">{n}</span> : n);
+  const investmentLabel = t('form.tabs.investment');
   return transaction.isInvestment ? (
     <span
       className={`inline-flex text-xs font-medium rounded-full ${badgePadding}${cap} bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200`}
       title={
         transaction.investmentSecurity
           ? `${transaction.investmentAction || ''} ${transaction.investmentSecurity.symbol || transaction.investmentSecurity.name}`.trim()
-          : transaction.investmentAction || 'Investment'
+          : transaction.investmentAction || investmentLabel
       }
     >
       {bound(transaction.investmentSecurity?.symbol
-        ? `${transaction.investmentAction || 'Investment'}: ${transaction.investmentSecurity.symbol}`
-        : transaction.investmentAction || 'Investment')}
+        ? `${transaction.investmentAction || investmentLabel}: ${transaction.investmentSecurity.symbol}`
+        : transaction.investmentAction || investmentLabel)}
     </span>
   ) : transaction.isTransfer ? (
     <span
       className={`inline-flex text-xs font-medium rounded-full ${badgePadding}${cap} bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200`}
       title={`Transfer to ${transaction.transferAccount?.name || 'account'}`}
     >
-      {bound('Transfer')}
+      {bound(t('form.tabs.transfer'))}
     </span>
   ) : transaction.isSplit ? (
     <span
       className={`inline-flex text-xs font-medium rounded-full ${badgePadding}${cap} bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200`}
       title={transaction.splits?.map(s => s.category?.name || 'Uncategorized').join(', ')}
     >
-      {bound(<>Split ({transaction.splits?.length || 0})</>)}
+      {bound(t('list.splitBadge', { count: transaction.splits?.length || 0 }))}
     </span>
   ) : transaction.category ? (
     <span
@@ -193,7 +195,7 @@ function ScheduledScheduleDetails({
             <span className="text-xs text-gray-400 dark:text-gray-500 line-through leading-tight">
               {formatDate(transaction.nextDueDate)}
             </span>
-            <span className="leading-tight" title="Date modified for this occurrence">
+            <span className="leading-tight" title={t('list.modifiedDateTitle')}>
               {formatDate(transaction.nextOverride.overrideDate)}
             </span>
           </span>

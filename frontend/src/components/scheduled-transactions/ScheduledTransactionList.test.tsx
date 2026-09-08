@@ -500,7 +500,10 @@ describe('ScheduledTransactionList', () => {
     render(<ScheduledTransactionList transactions={transactions} />);
     // Both dates should be shown
     expect(screen.getByText('2025-03-01')).toBeInTheDocument();
-    expect(screen.getByText('2025-03-05')).toBeInTheDocument();
+    expect(screen.getByText('2025-03-05')).toHaveAttribute(
+      'title',
+      'Date modified for this occurrence',
+    );
   });
 
   // --- Action buttons ---

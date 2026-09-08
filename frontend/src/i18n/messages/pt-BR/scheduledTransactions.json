@@ -22,6 +22,8 @@
     "modifiedBadge": "{count} modificadas",
     "modifiedTitle": "{count, plural, one {# ocorrência futura modificada} other {# ocorrências futuras modificadas}}",
     "modifiedAmountTitle": "Modificado para a próxima ocorrência",
+    "modifiedDateTitle": "Data alterada para esta ocorrência",
+    "splitBadge": "Dividida ({count})",
     "autoPostBadge": "Ativo",
     "autoPostTitle": "Lançado automaticamente na data de vencimento",
     "inactiveSuffix": " — Inativo",

@@ -22,6 +22,8 @@
     "modifiedBadge": "[XX-{count} modified-XX]",
     "modifiedTitle": "[XX-{count, plural, one {# upcoming occurrence modified} other {# upcoming occurrences modified}}-XX]",
     "modifiedAmountTitle": "[XX-Modified for next occurrence-XX]",
+    "modifiedDateTitle": "[XX-Date modified for this occurrence-XX]",
+    "splitBadge": "[XX-Split ({count})-XX]",
     "autoPostBadge": "[XX-On-XX]",
     "autoPostTitle": "[XX-Auto-posts when due-XX]",
     "inactiveSuffix": "[XX- — Inactive-XX]",

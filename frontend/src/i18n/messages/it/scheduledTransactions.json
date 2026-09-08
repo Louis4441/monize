@@ -22,6 +22,8 @@
     "modifiedBadge": "{count} modificate",
     "modifiedTitle": "{count, plural, one {# occorrenza futura modificata} other {# occorrenze future modificate}}",
     "modifiedAmountTitle": "Modificato per la prossima occorrenza",
+    "modifiedDateTitle": "Data modificata per questa occorrenza",
+    "splitBadge": "Suddivisione ({count})",
     "autoPostBadge": "Attivo",
     "autoPostTitle": "Registrazione automatica alla scadenza",
     "inactiveSuffix": " — Inattiva",

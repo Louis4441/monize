@@ -22,6 +22,8 @@
     "modifiedBadge": "{count} değiştirildi",
     "modifiedTitle": "{count, plural, one {# yaklaşan tekrar değiştirildi} other {# yaklaşan tekrar değiştirildi}}",
     "modifiedAmountTitle": "Bir sonraki tekrar için değiştirildi",
+    "modifiedDateTitle": "Bu gerçekleşme için tarih değiştirildi",
+    "splitBadge": "Bölünmüş ({count})",
     "autoPostBadge": "Açık",
     "autoPostTitle": "Vadesi geldiğinde otomatik kaydedilir",
     "inactiveSuffix": " — Pasif",

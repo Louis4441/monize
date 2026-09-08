@@ -22,6 +22,8 @@
     "modifiedBadge": "{count} geändert",
     "modifiedTitle": "{count, plural, one {# bevorstehende Ausführung geändert} other {# bevorstehende Ausführungen geändert}}",
     "modifiedAmountTitle": "Für nächste Ausführung geändert",
+    "modifiedDateTitle": "Datum für dieses Vorkommen geändert",
+    "splitBadge": "Buchungsteil ({count})",
     "autoPostBadge": "Ein",
     "autoPostTitle": "Wird automatisch bei Fälligkeit gebucht",
     "inactiveSuffix": " — Inaktiv",

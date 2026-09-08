@@ -22,6 +22,8 @@
     "modifiedBadge": "{count}개 수정됨",
     "modifiedTitle": "{count, plural, one {# 건의 예정 발생이 수정됨} other {# 건의 예정 발생이 수정됨}}",
     "modifiedAmountTitle": "다음 발생에 대해 수정됨",
+    "modifiedDateTitle": "이 일정의 날짜가 변경됨",
+    "splitBadge": "분할 ({count})",
     "autoPostBadge": "켜짐",
     "autoPostTitle": "만기 시 자동 게시",
     "inactiveSuffix": " — 비활성",

@@ -22,6 +22,8 @@
     "modifiedBadge": "已修改 {count} 次",
     "modifiedTitle": "{count, plural, one {# 个即将到来的发生已修改} other {# 个即将到来的发生已修改}}",
     "modifiedAmountTitle": "下次发生时已修改",
+    "modifiedDateTitle": "已修改此次执行的日期",
+    "splitBadge": "拆分（{count}）",
     "autoPostBadge": "开启",
     "autoPostTitle": "到期自动过账",
     "inactiveSuffix": " — 非活跃",
