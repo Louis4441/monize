@@ -1364,6 +1364,45 @@ describe('TransactionsPage', () => {
       expect(widgetColumn?.className).toContain('opacity-100');
     });
 
+    it('switches to another account from the caret, keeping the Show Accounts toggle', async () => {
+      mockGetAllAccounts.mockResolvedValue(mockAccounts);
+      mockGetDailyBalances.mockResolvedValue([]);
+
+      render(<TransactionsPage />);
+      await waitFor(() => {
+        expect(screen.getByTestId('filter-panel')).toBeInTheDocument();
+      });
+
+      // Show Closed accounts only, then narrow to the closed one. The status
+      // toggle is the filter the caret must respect: switching goes through the
+      // same command as the Accounts filter, so it survives the switch.
+      fireEvent.click(screen.getByTestId('set-account-status-active'));
+      fireEvent.click(screen.getByTestId('set-account-filter'));
+      await waitFor(() => {
+        expect(screen.getByText('Current Balance')).toBeInTheDocument();
+      });
+      expect(screen.getByRole('heading', { name: 'Checking' })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Switch to another account' }));
+      // Only the accounts the Active filter offers: the closed acc-3 and the
+      // brokerage acc-4 are absent.
+      expect(screen.getByRole('menuitem', { name: /Savings/ })).toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: /Old Account/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: /Brokerage/ })).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('menuitem', { name: /Savings/ }));
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Savings' })).toBeInTheDocument();
+      });
+      // The list narrowed to the chosen account and the status toggle is
+      // still Active: the persisted toggle would read '""' had it been reset.
+      await waitFor(() => {
+        const latest = mockGetAll.mock.calls.at(-1)?.[0];
+        expect(latest?.accountIds).toEqual(['acc-2']);
+      });
+      expect(window.localStorage.getItem('transactions.filter.accountStatus')).toBe(JSON.stringify('active'));
+    });
+
     it('falls back to the stored account balance when no daily-balance rows exist', async () => {
       mockGetAllAccounts.mockResolvedValue(mockAccounts);
       mockGetDailyBalances.mockResolvedValue([]);

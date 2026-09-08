@@ -566,6 +566,91 @@ describe('AccountInfoWidget', () => {
     });
   });
 
+  describe('account switcher', () => {
+    const others = [
+      makeAccount({ id: 'a-2', name: 'Savings', accountType: 'SAVINGS' }),
+      makeAccount({ id: 'a-3', name: 'Old Chequing', isClosed: true }),
+    ];
+
+    it('hides the caret when no switch handler is supplied', () => {
+      render(
+        <AccountInfoWidget
+          account={makeAccount()}
+          switchableAccounts={[makeAccount(), ...others]}
+          onEdit={vi.fn()}
+          onCollapse={vi.fn()}
+        />,
+      );
+      expect(
+        screen.queryByRole('button', { name: 'Switch to another account' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('hides the caret when the filter offers no other account', () => {
+      render(
+        <AccountInfoWidget
+          account={makeAccount()}
+          switchableAccounts={[makeAccount()]}
+          onSwitchAccount={vi.fn()}
+          onEdit={vi.fn()}
+          onCollapse={vi.fn()}
+        />,
+      );
+      expect(
+        screen.queryByRole('button', { name: 'Switch to another account' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('offers exactly the accounts the filter offers, minus the current one', () => {
+      render(
+        <AccountInfoWidget
+          account={makeAccount()}
+          switchableAccounts={[makeAccount(), ...others]}
+          onSwitchAccount={vi.fn()}
+          onEdit={vi.fn()}
+          onCollapse={vi.fn()}
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Switch to another account' }));
+      const names = screen.getAllByRole('menuitem').map((item) => item.textContent);
+      // Sorted by name like the Accounts filter, each qualified by its type;
+      // a closed account offered by the filter is offered here too.
+      expect(names).toEqual(['Old ChequingChequing', 'SavingsSavings']);
+    });
+
+    it('does not offer an account the filter has narrowed away', () => {
+      render(
+        <AccountInfoWidget
+          account={makeAccount()}
+          switchableAccounts={[makeAccount(), others[0]]}
+          onSwitchAccount={vi.fn()}
+          onEdit={vi.fn()}
+          onCollapse={vi.fn()}
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Switch to another account' }));
+      expect(screen.queryByRole('menuitem', { name: /Old Chequing/ })).not.toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: /Savings/ })).toBeInTheDocument();
+    });
+
+    it('reports the chosen account id and closes the menu', () => {
+      const onSwitchAccount = vi.fn();
+      render(
+        <AccountInfoWidget
+          account={makeAccount()}
+          switchableAccounts={[makeAccount(), ...others]}
+          onSwitchAccount={onSwitchAccount}
+          onEdit={vi.fn()}
+          onCollapse={vi.fn()}
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Switch to another account' }));
+      fireEvent.click(screen.getByRole('menuitem', { name: /Savings/ }));
+      expect(onSwitchAccount).toHaveBeenCalledWith('a-2');
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    });
+  });
+
   it('omits optional fields that are absent', () => {
     render(<AccountInfoWidget account={makeAccount()} onEdit={vi.fn()} onCollapse={vi.fn()} />);
     expect(screen.queryByText('Account Number')).not.toBeInTheDocument();

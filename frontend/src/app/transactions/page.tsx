@@ -701,6 +701,17 @@ function TransactionsContent() {
     );
   }, [filters.filterAccountIds, filters.selectedAccounts, accounts]);
 
+  // Selecting from the widget's caret is the same command as picking one
+  // account in the Accounts filter, never `handleAccountFilterClick`, which
+  // resets the Show Accounts toggle to All.
+  const { handleArrayFilterChange, setFilterAccountIds } = filters;
+  const handleWidgetAccountSwitch = useCallback(
+    (accountId: string) => {
+      handleArrayFilterChange(setFilterAccountIds, [accountId]);
+    },
+    [handleArrayFilterChange, setFilterAccountIds],
+  );
+
   // The accounts list is fetched once per page load, so account.currentBalance
   // goes stale as transactions are added or edited. The daily-balance series is
   // refetched alongside the transactions, so the widget's balance is derived
@@ -1118,6 +1129,13 @@ function TransactionsContent() {
                       institution={widgetInstitution}
                       scheduledTransactions={scheduledTransactions}
                       refreshKey={reloadKey}
+                      // The caret offers exactly what the Accounts filter
+                      // offers (its status-narrowed list) and changes the
+                      // filter the way the filter's own control does, so the
+                      // Show Accounts toggle and every other filter survive
+                      // the switch.
+                      switchableAccounts={filters.filteredAccounts}
+                      onSwitchAccount={handleWidgetAccountSwitch}
                       onEdit={() => accountModal.openEdit(retainedWidget.account)}
                       onCollapse={() => setAccountWidgetCollapsed(true)}
                     />
