@@ -645,6 +645,20 @@ function stopReminderFromAction(reminderId) {
     });
 }
 
+// Focusing is a courtesy the browser may refuse: WindowClient.focus() needs
+// transient activation, and without it Chromium rejects with InvalidAccessError
+// (headless has none at all). By then the navigation below has already put the
+// user's window on the page they asked for, which is the outcome -- so a refused
+// focus resolves quietly rather than rejecting the waitUntil the click handler
+// is holding.
+function focusQuietly(client) {
+  try {
+    return Promise.resolve(client.focus()).catch(function () {});
+  } catch (error) {
+    return Promise.resolve();
+  }
+}
+
 // Focus an open same-origin window and navigate it, or open one. Shared by the
 // ordinary body click and the Stop-action fallback.
 function focusOrOpen(url) {
@@ -655,16 +669,21 @@ function focusOrOpen(url) {
         var client = clientList[i];
         if (new URL(client.url).origin !== self.location.origin) continue;
         if (typeof client.navigate === 'function') {
+          // The catch belongs to the NAVIGATE: a client that cannot be
+          // navigated is still worth focusing. Written around the focus as
+          // well, it answered a refused focus by calling the identical focus
+          // again -- a retry that changes nothing, so it failed twice and the
+          // second rejection escaped.
           return client
             .navigate(url)
-            .then(function (navigated) {
-              return (navigated || client).focus();
-            })
             .catch(function () {
-              return client.focus();
+              return client;
+            })
+            .then(function (navigated) {
+              return focusQuietly(navigated || client);
             });
         }
-        return client.focus();
+        return focusQuietly(client);
       }
       return self.clients.openWindow(url);
     });

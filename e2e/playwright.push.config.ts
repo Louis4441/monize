@@ -9,6 +9,17 @@ export default defineConfig({
   timeout: 30000,
   reporter: [['list'], ['html', { outputFolder: 'playwright-push-report', open: 'never' }]],
   outputDir: 'test-results-push',
-  use: { ...devices['Desktop Chrome'], trace: 'retain-on-failure' },
+  // `channel: 'chromium'` launches the full browser. Without it Playwright runs
+  // `chrome-headless-shell` for a headless chromium, and the shell implements no
+  // Notifications API: `registration.showNotification()` resolves, nothing is
+  // shown, and `getNotifications()` answers []. Every test here begins by
+  // waiting for a notification, so all nine timed out on the same line while the
+  // worker was behaving correctly -- the suite could not have caught a real
+  // defect in the code it exists to test.
+  use: {
+    ...devices['Desktop Chrome'],
+    channel: 'chromium',
+    trace: 'retain-on-failure',
+  },
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
 });
