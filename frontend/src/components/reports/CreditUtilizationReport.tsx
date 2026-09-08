@@ -705,15 +705,21 @@ export function CreditUtilizationReport() {
                 </td>
                 <td role="cell" className={`col-start-1 col-span-2 row-start-2 font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                   <CellLabel className={CAPTION_CLASS}>{columns.limit.label}</CellLabel>
-                  {formatCurrency(totals.limit, displayCurrency)}
+                  <PartialTotal total={{ value: totals.limit, ...totalsMarker }} displayCurrency={displayCurrency}>
+                    {formatCurrency(totals.limit, displayCurrency)}
+                  </PartialTotal>
                 </td>
                 <td role="cell" className={`col-start-3 col-span-2 row-start-2 font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                   <CellLabel className={CAPTION_CLASS}>{columns.used.label}</CellLabel>
-                  {formatCurrency(totals.used, displayCurrency)}
+                  <PartialTotal total={{ value: totals.used, ...totalsMarker }} displayCurrency={displayCurrency}>
+                    {formatCurrency(totals.used, displayCurrency)}
+                  </PartialTotal>
                 </td>
                 <td role="cell" className={`col-start-5 col-span-2 row-start-2 font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                   <CellLabel className={CAPTION_CLASS}>{columns.available.label}</CellLabel>
-                  {formatCurrency(totals.available, displayCurrency)}
+                  <PartialTotal total={{ value: totals.available, ...totalsMarker }} displayCurrency={displayCurrency}>
+                    {formatCurrency(totals.available, displayCurrency)}
+                  </PartialTotal>
                 </td>
                 <td role="cell" className={`col-start-4 col-span-3 row-start-1 font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                   <CellLabel className={CAPTION_CLASS}>{columns.utilization.label}</CellLabel>

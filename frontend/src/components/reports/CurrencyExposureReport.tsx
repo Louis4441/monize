@@ -707,7 +707,12 @@ export function CurrencyExposureReport() {
                 <td role="cell" aria-colindex={colIndexOf('rate')} className="hidden sm:table-cell" />
                 <td role="cell" aria-colindex={colIndexOf('convertedValue')} className={`col-start-3 row-start-1 font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                   <CellLabel className={CAPTION_CLASS}>{columns.convertedValue.label}</CellLabel>
-                  {formatCurrencyFull(totalPortfolioValue, defaultCurrency)}
+                  <PartialTotal
+                    total={{ value: totalPortfolioValue, missingCurrencies: exposureGaps.missingCurrencies, excludedCount: exposureGaps.excludedCount }}
+                    displayCurrency={defaultCurrency}
+                  >
+                    {formatCurrencyFull(totalPortfolioValue, defaultCurrency)}
+                  </PartialTotal>
                 </td>
                 <td role="cell" aria-colindex={colIndexOf('percentage')} className={`col-start-2 row-start-2 font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                   <CellLabel className={CAPTION_CLASS}>{columns.percentage.label}</CellLabel>

@@ -259,6 +259,13 @@ describe('CreditUtilizationReport (phone wrapped table)', () => {
     }
     expect(footRow.textContent).toContain('Credit Limit');
     expect(footRow.textContent).toContain('Utilization');
+    // CHF could not be converted, so each money subtotal in the footer must
+    // carry the same visible and accessible partial marker as the summary.
+    for (const cell of [limit, used, available]) {
+      expect(cell.querySelector('[data-testid="partial-total"]')).toBeInTheDocument();
+      expect(cell.querySelector('[data-testid="partial-total-marker"]')).toBeInTheDocument();
+      expect(cell.textContent).toContain('partial total');
+    }
   });
 
   it('keeps the account name shrinkable and readable in full', async () => {
