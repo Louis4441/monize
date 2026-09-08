@@ -101,7 +101,6 @@ const RTL_IMPORT_BASELINE = new Set([
   '/src/components/ui/LoadingSpinner.test.tsx',
   '/src/components/ui/NumericInput.test.tsx',
   '/src/components/ui/Select.test.tsx',
-  '/src/components/ui/SortableHeader.test.tsx',
   '/src/components/ui/SummaryCard.test.tsx',
   '/src/hooks/useAnchorRect.test.ts',
   '/src/hooks/useBillsFilters.test.ts',
