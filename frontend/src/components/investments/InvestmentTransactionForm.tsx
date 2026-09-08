@@ -52,6 +52,7 @@ import {
   INVESTMENT_TRANSACTION_SUBMIT_MODE_KEY,
   useTransactionSubmitMode,
 } from '@/hooks/useTransactionSubmitMode';
+import { TRANSACTION_NOTE_MAX_LENGTH } from '@/lib/transaction-note';
 
 const logger = createLogger('InvestmentTxForm');
 
@@ -1420,6 +1421,7 @@ function InvestmentTransactionFormFields({
       <Input
         label={t('transactionForm.description')}
         placeholder={t('transactionForm.descriptionPlaceholder')}
+        maxLength={TRANSACTION_NOTE_MAX_LENGTH}
         error={errors.description?.message}
         {...register('description')}
       />

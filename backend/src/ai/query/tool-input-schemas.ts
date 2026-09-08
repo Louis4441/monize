@@ -12,6 +12,7 @@ import {
   SECURITY_EXCHANGES,
   SECURITY_TYPES,
 } from "../../securities/security-enums";
+import { TRANSACTION_NOTE_MAX_LENGTH } from "../../common/transaction-note";
 
 /**
  * LLM07-F1: Zod schemas for validating AI tool inputs server-side.
@@ -242,7 +243,7 @@ export const createTransactionSchema = z.object({
   date: isoDateSchema,
   payeeName: z.string().max(100).optional(),
   categoryName: z.string().max(100).optional(),
-  description: z.string().max(500).optional(),
+  description: z.string().max(TRANSACTION_NOTE_MAX_LENGTH).optional(),
   createPayeeIfMissing: booleanArg().optional(),
 });
 
@@ -365,7 +366,7 @@ const manageInvestmentItemSchema = z
     commission: nonNegativeAmountSchema.optional(),
     accruedInterest: nonNegativeAmountSchema.optional(),
     exchangeRate: nonNegativeAmountSchema.optional(),
-    description: z.string().max(500).optional(),
+    description: z.string().max(TRANSACTION_NOTE_MAX_LENGTH).optional(),
     transactionId: z.string().uuid().optional(),
   })
   .passthrough();
@@ -450,7 +451,7 @@ export const updateTransactionSchema = z
     date: isoDateSchema.optional(),
     payeeName: z.string().max(100).optional(),
     categoryName: z.string().max(100).optional(),
-    description: z.string().max(500).optional(),
+    description: z.string().max(TRANSACTION_NOTE_MAX_LENGTH).optional(),
     createPayeeIfMissing: booleanArg().optional(),
   })
   .refine(
@@ -486,7 +487,7 @@ export const deleteTransactionSchema = z.object({
 const manageTransactionSplitSchema = z.object({
   categoryName: z.string().min(1).max(100),
   amount: amountSchema,
-  memo: z.string().max(500).optional(),
+  memo: z.string().max(TRANSACTION_NOTE_MAX_LENGTH).optional(),
 });
 
 /** Largest split set a single transaction row may carry through the tool. */
@@ -506,7 +507,7 @@ const manageTransactionItemSchema = z
     date: isoDateSchema.optional(),
     payeeName: z.string().max(100).optional(),
     categoryName: z.string().max(100).optional(),
-    description: z.string().max(500).optional(),
+    description: z.string().max(TRANSACTION_NOTE_MAX_LENGTH).optional(),
     createPayeeIfMissing: booleanArg().optional(),
     exchangeRate: numberArg(
       z.number().finite().min(0).max(1_000_000),

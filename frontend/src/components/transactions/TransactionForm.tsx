@@ -70,6 +70,7 @@ import {
   TRANSACTION_SUBMIT_MODE_KEY,
   useTransactionSubmitMode,
 } from '@/hooks/useTransactionSubmitMode';
+import { TRANSACTION_NOTE_MAX_LENGTH } from '@/lib/transaction-note';
 
 const logger = createLogger('TransactionForm');
 
@@ -1727,6 +1728,7 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
           </label>
           <textarea
             rows={3}
+            maxLength={TRANSACTION_NOTE_MAX_LENGTH}
             className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:ring-blue-400"
             {...register('description')}
           />

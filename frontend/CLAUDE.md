@@ -822,6 +822,59 @@ Coerce before comparing: `'-67.9900' < 0` is false, and a decimal string is what
 
 A transfer created with a blank payee is PERSISTED blank (issue #1214); migration 161 blanked the legacy-stamped rows. The label is resolved at render time: `usePayeeDisplay()` (`hooks/usePayeeDisplay.ts`) returns the stored payee when there is one, otherwise for a transfer leg the localized `common.transferPayee` string built from `linkedTransaction.account.name` -- the counterpart's CURRENT name, so renames and language switches reach every historical row. A surface reading `tx.payeeName || tx.payee?.name` directly shows those transfers as unnamed. English CSV exports use `transferPayeeCsvLabel` (`lib/transfer-label.ts`), byte-identical twin of the backend's `transferPayeeLabel`.
 
+### A note field stops the user at the cap -- `TRANSACTION_NOTE_MAX_LENGTH`
+
+Every input that takes a transaction's description or a split's memo carries
+`maxLength={TRANSACTION_NOTE_MAX_LENGTH}` (`lib/transaction-note.ts`), so the
+limit is something the user runs into rather than something the save reports
+afterwards. Eight forms take one of these fields and exactly one of them capped
+anything, so typing past the limit in the main transaction form came back as a
+bare 400 with nothing pointing at the field.
+
+The number is the server's, mirrored (`backend/src/common/transaction-note.ts`),
+and `backend/src/common/transaction-note.contract.spec.ts` fails when the two
+layers disagree -- below it the form truncates text the user may legitimately
+store, above it we are back to the rejected save.
+`src/test/transaction-note.guard.test.ts` names the eight forms and fails one
+that loses its cap, counts the inputs in the forms that render the field twice,
+and refuses a literal written beside the constant. A description belonging to
+another entity -- a budget's, a security's, a custom report's -- keeps its own
+limit and is deliberately out of scope.
+
+### A description is plain text that RENDERS as a link -- `LinkifiedText`
+
+A transaction's description is where a ticket, receipt or order page ends up, so
+the address in it is clickable. What makes that safe is that nothing about the
+storage changed: the field is still plain text, `@SanitizeHtml()` still strips
+`<` and `>` on write, and `dangerouslySetInnerHTML` still appears **nowhere** in
+this tree. `linkifySegments` (`lib/linkify.ts`) splits the stored string into
+prose and addresses, and `LinkifiedText` (`components/ui/LinkifiedText.tsx`)
+draws the anchors -- around text it hands back verbatim. Two properties carry
+that argument and both are tests, not prose: the segments concatenate back to
+the input exactly, and a link's visible label is always its own `href`, so a
+description can never present one destination and navigate to another. An
+`href` is only ever built through `toSafeExternalUrl`, and only from an explicit
+`http`/`https` scheme -- a bare `www.example.com` stays text, because a guessed
+host is a link to somewhere the writer did not name.
+
+This matters more than it looks: a description is visible to joint owners and
+delegates, so the field is a cross-tenant surface. Storing markup there and
+rendering it would be stored XSS with an audience.
+
+**An anchor in the register is a control inside a clickable row**, so it stops
+the event the way the favourite star and `RowActions` do -- `click`, `mousedown`,
+`touchstart` and `contextmenu`, or a tap opens the ticket page *and* the edit
+modal behind it. Stopping no more than that keeps the rest of the cell opening
+the transaction, which is the dead-area mistake the row-click rule warns about.
+
+**Which surfaces linkify is a decision recorded in both directions.**
+`src/test/linkified-description.guard.test.ts` names the four that draw links
+(the register row and the three report tables) and every other place a
+`.description` or `.memo` reaches the screen as text, each with the reason it
+stays inert -- a different entity's field, a row not saved yet, or text inside a
+`<button>`. A new render in neither list fails there rather than shipping as a
+silent third answer.
+
 ### A CSV file is written by `exportToCsv`, and a number in it is a number
 
 `lib/csv-export.ts` is the only CSV writer: BOM, CRLF, RFC 4180 quoting, formula-injection guard, download. Multi-table exports take `exportCsvSections` (`MonteCarloReport` had a hand-rolled copy that quoted every field and guarded none). `ui-conventions.test.ts` fails on a second `text/csv` Blob or a second `replace(/"/g, '""')`.

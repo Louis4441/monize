@@ -67,6 +67,7 @@ import {
   itemsArray,
 } from "./schema-fragments";
 import { numberArg, booleanArg } from "../../common/tool-schemas";
+import { TRANSACTION_NOTE_MAX_LENGTH } from "../../common/transaction-note";
 
 type ManageInvOperation = "create" | "update" | "delete";
 type ManageSecOperation = "create" | "update" | "delete";
@@ -560,7 +561,7 @@ export class McpInvestmentsTools {
                 ),
               description: z
                 .string()
-                .max(500)
+                .max(TRANSACTION_NOTE_MAX_LENGTH)
                 .optional()
                 .describe("Description or memo."),
               transactionId: uuidString()

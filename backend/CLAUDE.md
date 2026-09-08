@@ -255,6 +255,28 @@ beside grouped digits on the payee page is one number printed two ways.
 
 Every `@IsArray()` DTO property carries `@ArrayMaxSize(n)` -- an unbounded array turns per-element work downstream into a denial-of-service lever (CodeQL `js/loop-bound-injection`, CWE-834). `src/common/array-bound-dto.spec.ts` sweeps validator metadata; its grandfather list may only shrink. Relatedly, never use a request value's `.length` as a loop bound inside a `withScopedDb` callback (CodeQL cannot track the outer guard through the closure): iterate `for (const [i, v] of xs.entries())`.
 
+### The note on a transaction has one length -- `TRANSACTION_NOTE_MAX_LENGTH`
+
+A transaction's `description` and a split's `memo` are one field to the person
+typing in them, so they share one cap (`src/common/transaction-note.ts`) across
+all twenty-three places that write one: fifteen DTO fields plus the AI query
+schemas and the MCP tools, which write the same field with no DTO in the path.
+Splitting the number is how a split memo comes to be rejected at a length its
+parent's description accepts, with nothing on screen saying why.
+
+The columns are all `TEXT`, so the cap is a product decision about how much a
+person should type, not a storage limit -- it went 500 to 750 when descriptions
+started rendering their web addresses as links, since a ticket URL plus a note
+does not fit in 500. Raising it needs no migration, and
+`transaction-note.contract.spec.ts` proves that by checking those columns are
+still unbounded.
+
+**The frontend has the same number**, in `frontend/src/lib/transaction-note.ts`:
+without it a form accepts a save the server rejects, which is what the main
+transaction form did -- a bare 400 with nothing pointing at the field, while the
+one form that did cap reported it properly. The contract spec reads the
+frontend's file and fails when the two disagree.
+
 ## `complete()` is not `completeWithTools()` with the tools left off
 
 Both take `AiCompletionRequest`, but `complete()` maps messages through `toSimpleMessages`, which **filters `role: "tool"` out entirely** -- summarising a tool-use conversation through it sends a transcript stripped of every tool result and returns a confident summary of nothing.

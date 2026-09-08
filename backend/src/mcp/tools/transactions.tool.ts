@@ -77,6 +77,7 @@ import {
   dryRun,
   itemsArray,
 } from "./schema-fragments";
+import { TRANSACTION_NOTE_MAX_LENGTH } from "../../common/transaction-note";
 
 type ManageOperation = "create" | "update" | "delete";
 
@@ -431,7 +432,7 @@ export class McpTransactionsTools {
                 ),
               description: z
                 .string()
-                .max(500)
+                .max(TRANSACTION_NOTE_MAX_LENGTH)
                 .optional()
                 .describe("Description or memo."),
               createPayeeIfMissing: booleanArg()
@@ -462,7 +463,7 @@ export class McpTransactionsTools {
                     ).describe("Signed amount for this line."),
                     memo: z
                       .string()
-                      .max(500)
+                      .max(TRANSACTION_NOTE_MAX_LENGTH)
                       .optional()
                       .describe("Memo for this line."),
                   }),
