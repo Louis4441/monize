@@ -60,6 +60,36 @@ function validateSelection(
   return null;
 }
 
+/**
+ * The section title with the Scan and Add controls, shared by both modes.
+ *
+ * On a phone the title takes a line of its own and the two buttons share the
+ * next one edge to edge: beside the title, two labelled buttons overran the
+ * dialog's width. The buttons are grid items there, so they stretch to their
+ * half without knowing about the layout -- each control's hidden file input
+ * is `display: none` and takes no cell. From `sm` up the title and the
+ * buttons sit on one line as before.
+ */
+function AttachmentsHeader({ children }: { children: React.ReactNode }) {
+  const t = useTranslations('attachments');
+  return (
+    <div
+      data-testid="attachments-header"
+      className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+        {t('title')}
+      </span>
+      <div
+        data-testid="attachments-actions"
+        className="grid grid-cols-2 gap-2 sm:flex sm:items-center"
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 /** The Add-attachment button plus its hidden file input, shared by both modes. */
 function UploadControl({
   onFileSelected,
@@ -218,23 +248,18 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          {t('title')}
-        </span>
-        <div className="flex items-center gap-2">
-          <ScanDocumentControl
-            onFileSelected={handleScanSelected}
-            onReady={rememberScanPicker}
-            disabled={uploading || atLimit}
-          />
-          <UploadControl
-            onFileSelected={handleFileSelected}
-            loading={uploading}
-            disabled={uploading || atLimit}
-          />
-        </div>
-      </div>
+      <AttachmentsHeader>
+        <ScanDocumentControl
+          onFileSelected={handleScanSelected}
+          onReady={rememberScanPicker}
+          disabled={uploading || atLimit}
+        />
+        <UploadControl
+          onFileSelected={handleFileSelected}
+          loading={uploading}
+          disabled={uploading || atLimit}
+        />
+      </AttachmentsHeader>
 
       {attachments.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">{t('empty')}</p>
@@ -424,22 +449,17 @@ function StagedAttachments({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          {t('title')}
-        </span>
-        <div className="flex items-center gap-2">
-          <ScanDocumentControl
-            onFileSelected={handleScanSelected}
-            onReady={rememberScanPicker}
-            disabled={atLimit}
-          />
-          <UploadControl
-            onFileSelected={handleFileSelected}
-            disabled={atLimit}
-          />
-        </div>
-      </div>
+      <AttachmentsHeader>
+        <ScanDocumentControl
+          onFileSelected={handleScanSelected}
+          onReady={rememberScanPicker}
+          disabled={atLimit}
+        />
+        <UploadControl
+          onFileSelected={handleFileSelected}
+          disabled={atLimit}
+        />
+      </AttachmentsHeader>
 
       {files.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">{t('empty')}</p>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@/test/render';
+import { render, screen, fireEvent, waitFor, act, cleanup } from '@/test/render';
 import toast from 'react-hot-toast';
 import { AttachmentsSection } from './AttachmentsSection';
 import { attachmentsApi } from '@/lib/attachments';
@@ -139,6 +139,37 @@ describe('AttachmentsSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockList.mockResolvedValue([]);
+  });
+
+  it('stacks the title over two half-width buttons on a phone, in both modes', async () => {
+    // Beside the title, Scan document and Add attachment overran a phone's
+    // width. The header is a column there and a row from `sm` up, and the
+    // buttons are grid cells that each take half the line.
+    const expectHeaderLayout = () => {
+      const header = screen.getByTestId('attachments-header');
+      expect(header.className).toContain('flex-col');
+      expect(header.className).toContain('sm:flex-row');
+      const actions = screen.getByTestId('attachments-actions');
+      expect(actions.className).toContain('grid-cols-2');
+      expect(actions.className).toContain('sm:flex');
+      const buttons = Array.from(actions.querySelectorAll('button'));
+      expect(buttons.map((b) => b.textContent)).toEqual([
+        'Scan document',
+        'Add attachment',
+      ]);
+      // The section title is not in the button row: it has a line of its own.
+      expect(actions.textContent).not.toContain('Attachments');
+      expect(header.textContent).toContain('Attachments');
+    };
+
+    await renderSection();
+    expectHeaderLayout();
+    cleanup();
+
+    await act(async () => {
+      render(<AttachmentsSection stagedFiles={[]} onStagedFilesChange={vi.fn()} />);
+    });
+    expectHeaderLayout();
   });
 
   it('shows the empty state when there are no attachments', async () => {

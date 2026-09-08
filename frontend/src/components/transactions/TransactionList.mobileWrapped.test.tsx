@@ -197,6 +197,51 @@ describe('the register on a phone', () => {
     expect(plain.querySelectorAll('.col-span-3')).toHaveLength(1);
   });
 
+  it('shows the attachment count left of the category, and nothing at all for a row without one', async () => {
+    setPhoneViewport(true);
+    useDensityStore.setState({ densities: { transactions: 'normal' } });
+
+    const { container } = render(
+      <TransactionList
+        transactions={[
+          createTransaction({ id: 'tx-attached', attachmentCount: 2 }),
+          createTransaction({ id: 'tx-plain', attachmentCount: 0 }),
+        ]}
+        onEdit={vi.fn()}
+        onRefresh={vi.fn()}
+        isSingleAccountView
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Grocery Store')).toHaveLength(2);
+    });
+
+    const [attached, plain] = bodyRows(container);
+
+    // The same badge the tier table's Attachments column shows, in the
+    // category line and before the category pill.
+    const line2 = attached.querySelector('.col-span-3')!;
+    const badge = line2.querySelector('[data-testid="attachment-badge"]');
+    expect(badge).toBeTruthy();
+    expect(badge!.getAttribute('title')).toBe('2 attachments');
+    expect(badge!.textContent).toContain('2');
+    const category = screen.getAllByText('Groceries')[0];
+    expect(
+      badge!.compareDocumentPosition(category) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    // A row with no attachments renders neither the badge nor the tier
+    // cell's dash: the category is the line's first element, flush left.
+    const plainLine2 = plain.querySelector('.col-span-3')!;
+    expect(plainLine2.querySelector('[data-testid="attachment-badge"]')).toBeNull();
+    const text = plainLine2.textContent ?? '';
+    // Nothing precedes the category -- the trailing dash further along the
+    // line is the running-balance placeholder, not an attachment cell.
+    expect(text.slice(0, text.indexOf('Groceries'))).toBe('');
+    expect(plainLine2.firstElementChild?.textContent).toContain('Groceries');
+  });
+
   it('keeps the tier table at Compact density', async () => {
     setPhoneViewport(true);
     useDensityStore.setState({ densities: { transactions: 'compact' } });
