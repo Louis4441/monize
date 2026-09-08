@@ -87,6 +87,31 @@ describe("security price movement", () => {
       ).toBe(true);
     },
   );
+
+  it.each([0.125, 2.345, 12.0001])(
+    "refuses a precision the form cannot represent (%s)",
+    async (priceAlertPercent) => {
+      // `SecurityForm` renders this through `NumericInput decimalPlaces={2}`,
+      // so a stored 0.125 shows as 0.13 and is committed on the next blur --
+      // a threshold changed by a save the user made about another field. The
+      // form is not the only writer, so the bound belongs on the DTO the API,
+      // the assistant and MCP all reach.
+      const dto = plainToInstance(CreateSecurityDto, { priceAlertPercent });
+      expect(
+        (await validate(dto)).some((e) => e.property === "priceAlertPercent"),
+      ).toBe(true);
+    },
+  );
+
+  it.each([0.1, 0.15, 5.5, 12.25, 1000])(
+    "still accepts a threshold the form round-trips exactly (%s)",
+    async (priceAlertPercent) => {
+      const dto = plainToInstance(CreateSecurityDto, { priceAlertPercent });
+      expect(
+        (await validate(dto)).filter((e) => e.property === "priceAlertPercent"),
+      ).toEqual([]);
+    },
+  );
 });
 
 describe("security price alert producer", () => {

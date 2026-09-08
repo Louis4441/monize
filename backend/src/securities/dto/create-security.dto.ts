@@ -45,9 +45,23 @@ export class CreateSecurityDto {
   @IsBoolean()
   priceChartEnabled?: boolean;
 
+  /**
+   * The alert threshold, in percent. Two decimals, because that is the
+   * precision the only control for this field can represent: `SecurityForm`
+   * renders it through `NumericInput decimalPlaces={2}`, as its sibling
+   * `PortfolioAlertControl` does for the portfolio threshold.
+   *
+   * The bound is here rather than only in the form because the form is not the
+   * only writer -- the API, the AI assistant and MCP reach this DTO too, and a
+   * stored 0.125 would make the form DISPLAY 0.13 and then commit it on the
+   * next blur (`NumericInput.handleBlur` re-emits when rounding moved the
+   * value), changing a threshold on a save the user made about another field.
+   * A column with no declared scale plus a control with one is what makes that
+   * reachable; this is the declaration.
+   */
   @ApiProperty({ required: false, nullable: true, minimum: 0.1, maximum: 1000 })
   @IsOptional()
-  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @IsNumber({ allowNaN: false, allowInfinity: false, maxDecimalPlaces: 2 })
   @Min(0.1)
   @Max(1000)
   priceAlertPercent?: number | null;
