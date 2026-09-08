@@ -170,8 +170,88 @@ describe('a transaction description renders through LinkifiedText', () => {
   });
 });
 
+/**
+ * A note being EDITED cannot have its links drawn in place -- a `<textarea>`
+ * renders no elements -- so `NoteLinks` offers them beneath the field. Which
+ * editors do that is the same kind of decision as which readers linkify, and is
+ * recorded the same way.
+ */
+const LINKS_UNDER_FIELD = [
+  '/src/components/transactions/TransactionForm.tsx',
+  '/src/components/transactions/SplitTransactionFields.tsx',
+];
+
+/** The other note editors, and why the field there carries no link row. */
+const NO_LINKS_UNDER_FIELD: Record<string, string> = {
+  '/src/components/transactions/SplitEditor.tsx':
+    'a dense table of one-line memo inputs; a link row under each would double the row height',
+  '/src/components/transactions/BulkUpdateModal.tsx':
+    'writes one description across a selection rather than reading an existing note back',
+  '/src/components/scheduled-transactions/ScheduledTransactionForm.tsx':
+    'not yet offered here -- the same affordance would fit, it is simply not built',
+  '/src/components/scheduled-transactions/PostTransactionDialog.tsx':
+    'not yet offered here -- the same affordance would fit, it is simply not built',
+  '/src/components/scheduled-transactions/OverrideEditorDialog.tsx':
+    'not yet offered here -- the same affordance would fit, it is simply not built',
+  '/src/components/investments/InvestmentTransactionForm.tsx':
+    'not yet offered here -- the same affordance would fit, it is simply not built',
+};
+
+describe('a note being edited offers its links beside the field', () => {
+  it('offers them on the New/Edit Transaction modal, in both its modes', () => {
+    // The modal renders the description textarea normally and
+    // SplitTransactionFields in split mode, so covering only one leaves the
+    // link unreachable for half the transactions a user creates.
+    for (const path of LINKS_UNDER_FIELD) {
+      const source = sources[path];
+      expect(source, `${path} not found -- update this list`).toBeTruthy();
+      expect(source, `${path} no longer renders NoteLinks`).toContain('<NoteLinks');
+    }
+  });
+
+  it('records why the other note editors do not', () => {
+    const offering = Object.keys(NO_LINKS_UNDER_FIELD).filter((path) =>
+      sources[path]?.includes('<NoteLinks'),
+    );
+    expect(
+      offering,
+      'this editor now offers links -- move it to LINKS_UNDER_FIELD',
+    ).toEqual([]);
+    for (const [path, reason] of Object.entries(NO_LINKS_UNDER_FIELD)) {
+      expect(sources[path], `${path} not found -- update this list`).toBeTruthy();
+      expect(reason.length, `${path} has no reason`).toBeGreaterThan(20);
+    }
+  });
+
+  it('covers every form that takes a note, between the two lists', () => {
+    // The set comes from the length guard, which already names every note
+    // editor: a new one has to be classified here rather than quietly shipping
+    // with no way to reach the address in it.
+    const block = /const NOTE_FORMS: Record<string, string> = \{([\s\S]*?)\n\};/.exec(
+      sources['/src/test/transaction-note.guard.test.ts'],
+    );
+    expect(block, 'NOTE_FORMS not found -- has the length guard been renamed?').not.toBeNull();
+    // The keys only. The reasons beside them are prose with apostrophes in it,
+    // so anything that tries to parse the whole literal breaks on the first one.
+    const noteForms = [...block![1].matchAll(/'(\/src\/[^']+\.tsx)':/g)].map(
+      (match) => match[1],
+    );
+    expect(noteForms.length).toBeGreaterThan(0);
+    expect([...LINKS_UNDER_FIELD, ...Object.keys(NO_LINKS_UNDER_FIELD)].sort()).toEqual(
+      noteForms.sort(),
+    );
+  });
+});
+
 describe('LinkifiedText is the only renderer of linkified segments', () => {
   const RENDERER = '/src/components/ui/LinkifiedText.tsx';
+
+  it('draws its anchor in exactly one place', () => {
+    // `LinkifiedText` and `NoteLinks` share one `NoteLink`, so the target, rel
+    // and event-stopping cannot drift between reading a note and editing one.
+    const anchors = withoutComments(sources[RENDERER]).match(/<a\b/g) ?? [];
+    expect(anchors).toHaveLength(1);
+  });
 
   it('calls linkifySegments nowhere else', () => {
     // A second hand-rolled renderer is how the anchor's rel, target and

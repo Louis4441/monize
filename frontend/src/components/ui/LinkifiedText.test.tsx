@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@/test/render';
-import { LinkifiedText } from './LinkifiedText';
+import { LinkifiedText, NoteLinks } from './LinkifiedText';
 
 describe('LinkifiedText', () => {
   it('draws an anchor around the address and leaves the prose alone', () => {
@@ -138,5 +138,77 @@ describe('LinkifiedText', () => {
       fireEvent.click(screen.getByText(/Tickets/));
       expect(onClick).toHaveBeenCalled();
     });
+  });
+});
+
+describe('NoteLinks', () => {
+  /**
+   * The affordance for a note being EDITED. A `<textarea>` renders no elements,
+   * so the address in a draft was reachable only after saving and finding the
+   * row in the register. These sit under the field instead.
+   */
+
+  it('offers each address in the text', () => {
+    render(<NoteLinks text="Tickets https://tix.test/a and https://tix.test/b" />);
+    const links = screen.getAllByRole('link');
+    expect(links.map((link) => link.getAttribute('href'))).toEqual([
+      'https://tix.test/a',
+      'https://tix.test/b',
+    ]);
+  });
+
+  it('renders nothing when the note holds no address', () => {
+    // A field the user is still filling in must not reserve space for a row
+    // that is not coming.
+    const { container } = render(<NoteLinks text="Coffee with Sam" />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('renders nothing for an empty note', () => {
+    const { container } = render(<NoteLinks text="" />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('does not repeat the prose around the address', () => {
+    // It lists destinations; the text itself is in the field above, and showing
+    // it twice would read as a second copy of what the user is typing.
+    const { container } = render(<NoteLinks text="Concert tickets https://tix.test/a for two" />);
+    expect(container.textContent).toBe('https://tix.test/a');
+  });
+
+  it('opens in a new tab without handing the opener over', () => {
+    render(<NoteLinks text="https://tix.test/a" />);
+    const link = screen.getByRole('link');
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+  });
+
+  it('draws no link for a scheme that would run something on click', () => {
+    const { container } = render(<NoteLinks text="javascript:alert(1)" />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('labels each link with its own destination', () => {
+    // The same property the read-only renderer has, and for the same reason:
+    // there is no label to supply, so none can disagree with the href.
+    const { container } = render(
+      <NoteLinks text='<a href="https://evil.test">Your bank</a>' />,
+    );
+    for (const link of container.querySelectorAll('a')) {
+      expect(link.textContent).toBe(link.getAttribute('href'));
+    }
+  });
+
+  it('agrees with the read-only renderer about what is a link', () => {
+    // One parser, one anchor. If these ever diverge, an address is clickable on
+    // one surface and inert on the other for the same stored text.
+    const text = 'Tickets (https://tix.test/a). Also www.tix.test and javascript:x';
+    const inList = render(<NoteLinks text={text} />);
+    const listed = [...inList.container.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    inList.unmount();
+    const inProse = render(<LinkifiedText text={text} />);
+    const anchored = [...inProse.container.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    expect(listed).toEqual(anchored);
+    expect(listed).toEqual(['https://tix.test/a']);
   });
 });

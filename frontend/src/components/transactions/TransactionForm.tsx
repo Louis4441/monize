@@ -71,6 +71,7 @@ import {
   useTransactionSubmitMode,
 } from '@/hooks/useTransactionSubmitMode';
 import { TRANSACTION_NOTE_MAX_LENGTH } from '@/lib/transaction-note';
+import { NoteLinks } from '@/components/ui/LinkifiedText';
 
 const logger = createLogger('TransactionForm');
 
@@ -369,6 +370,10 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
   const watchedAmount = watch('amount');
   const watchedCurrencyCode = watch('currencyCode');
   const watchedPayeeName = watch('payeeName');
+  // Read live so the links under the field track what is being typed. The
+  // textarea itself cannot hold an anchor, so this is the only way the address
+  // in a draft is reachable without saving first.
+  const watchedDescription = watch('description');
   const watchedDate = watch('transactionDate');
 
   // Foreign-currency entry is active only for non-transfer transactions whose
@@ -1611,6 +1616,7 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
           watchedAmount={watchedAmount}
           watchedCurrencyCode={watchedCurrencyCode}
           watchedPayeeName={watchedPayeeName}
+          watchedDescription={watchedDescription}
           accounts={accounts}
           selectedPayeeId={selectedPayeeId}
           payees={effectivePayees}
@@ -1732,6 +1738,7 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
             className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:ring-blue-400"
             {...register('description')}
           />
+          <NoteLinks text={watchedDescription ?? ''} />
           {errors.description && (
             <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.description.message}</p>
           )}

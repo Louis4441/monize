@@ -867,13 +867,28 @@ the event the way the favourite star and `RowActions` do -- `click`, `mousedown`
 modal behind it. Stopping no more than that keeps the rest of the cell opening
 the transaction, which is the dead-area mistake the row-click rule warns about.
 
+**A note being EDITED gets the same affordance a different way.** A `<textarea>`
+renders no elements, so the address in a draft cannot be anchored in place --
+before this, reaching a link meant saving, finding the row in the register and
+clicking it there. `NoteLinks` (same file) lists the addresses beneath the field
+instead, live as the text is typed, and renders nothing when there are none.
+It shares `LinkifiedText`'s single `NoteLink` anchor, so `target`, `rel` and the
+event-stopping cannot drift between reading a note and writing one; the guard
+fails a second `<a>` in that file. Its label is the address for the same reason
+as everywhere else -- there is no `children` to pass.
+
 **Which surfaces linkify is a decision recorded in both directions.**
-`src/test/linkified-description.guard.test.ts` names the four that draw links
-(the register row and the three report tables) and every other place a
+`src/test/linkified-description.guard.test.ts` names the four that draw links in
+place (the register row and the three report tables) and every other place a
 `.description` or `.memo` reaches the screen as text, each with the reason it
 stays inert -- a different entity's field, a row not saved yet, or text inside a
-`<button>`. A new render in neither list fails there rather than shipping as a
-silent third answer.
+`<button>`. It does the same for the note editors: the two that make up the
+New/Edit Transaction modal offer `NoteLinks` (both, because the modal swaps the
+plain description for `SplitTransactionFields` in split mode, and covering one
+leaves the link unreachable for half the transactions a user creates), and the
+other six say why they do not. The two lists must between them account for every
+form the length guard names, so a new note field cannot ship with no way to
+reach the address in it.
 
 ### A CSV file is written by `exportToCsv`, and a number in it is a number
 
