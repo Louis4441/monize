@@ -9,6 +9,13 @@ import {
   type EntitySwitcherItem,
 } from './EntitySwitcher';
 
+// The pointer decides whether the filter is focused on open (a finger would
+// get the keyboard over the list); flipped per test below.
+const touch = { current: false };
+vi.mock('@/lib/touch-device', () => ({
+  isTouchDevice: () => touch.current,
+}));
+
 const LABELS = {
   triggerLabel: 'Switch thing',
   filterPlaceholder: 'Filter things...',
@@ -267,7 +274,7 @@ describe('EntitySwitcher', () => {
       }
     }
 
-    it('focuses the filter without scrolling it into view', () => {
+    it('focuses the filter without scrolling it into view, for a mouse', () => {
       const focus = vi.spyOn(HTMLInputElement.prototype, 'focus');
       try {
         open(many(12));
@@ -275,6 +282,21 @@ describe('EntitySwitcher', () => {
         expect(screen.getByPlaceholderText(LABELS.filterPlaceholder)).toHaveFocus();
       } finally {
         focus.mockRestore();
+      }
+    });
+
+    it('leaves the filter unfocused on a touch device, so the keyboard stays down', () => {
+      touch.current = true;
+      try {
+        open(many(12));
+        const filter = screen.getByPlaceholderText(LABELS.filterPlaceholder);
+        expect(filter).toBeInTheDocument();
+        expect(filter).not.toHaveFocus();
+        // Still there to be tapped.
+        fireEvent.change(filter, { target: { value: 'number 7' } });
+        expect(screen.getByRole('menuitem', { name: /Thing number 7/ })).toBeInTheDocument();
+      } finally {
+        touch.current = false;
       }
     });
 

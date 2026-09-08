@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from '
 import { createPortal } from 'react-dom';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { useClickOutside } from '@/hooks/useClickOutside';
+import { isTouchDevice } from '@/lib/touch-device';
 
 export interface EntitySwitcherItem {
   id: string;
@@ -125,7 +126,11 @@ export function placeMenu(
  * fixed one. Page scroll and resize re-measure the caret so the menu follows
  * it: closing on them instead made the menu vanish as it opened, because
  * focusing the filter scrolled it into view and a phone's keyboard resized the
- * viewport. The filter is focused with `preventScroll` for the same reason.
+ * viewport. The filter is focused with `preventScroll` for the same reason --
+ * and only where a pointer is a mouse: focusing a text box on a touch device
+ * raises the keyboard over the list the reader opened the menu to see, so
+ * there the filter waits to be tapped. The pointer decides, never the
+ * viewport (`isTouchDevice`).
  */
 export function EntitySwitcher({
   currentId,
@@ -192,9 +197,10 @@ export function EntitySwitcher({
   }, [isOpen]);
 
   // Focus the filter once the menu is up, without scrolling it into view: the
-  // scroll that `autoFocus` triggered is what closed the menu on open.
+  // scroll that `autoFocus` triggered is what closed the menu on open. Not on
+  // a touch device, where focus raises the keyboard over the list.
   useEffect(() => {
-    if (isOpen) filterRef.current?.focus({ preventScroll: true });
+    if (isOpen && !isTouchDevice()) filterRef.current?.focus({ preventScroll: true });
   }, [isOpen]);
 
   const others = useMemo(
