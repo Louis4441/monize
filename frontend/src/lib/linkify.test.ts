@@ -84,6 +84,82 @@ describe('linkifySegments', () => {
     });
   });
 
+  describe('a character that changes how the label reads', () => {
+    // The defect this fixes: the label and the href are the SAME string, so a
+    // test comparing them as strings passes while a bidi override makes the two
+    // RENDER differently. `https://evil.test/<RLO>moc.knab//:sptth` reads as
+    // `https://evil.test/https://bank.com` and navigates to evil.test. A note
+    // is written by one person and read by another (joint owners, delegates),
+    // so the label has to be honest to a reader, not only to `===`.
+    const RLO = '\u202E';
+    const LRI = '\u2066';
+    const POP = '\u2069';
+    const ZWSP = '\u200B';
+    const ZWJ = '\u200D';
+    const BOM = '\uFEFF';
+    const NUL = '\u0000';
+
+    it('ends the address before a bidi override', () => {
+      expect(hrefs(`https://evil.test/${RLO}moc.knab//:sptth`)).toEqual([
+        'https://evil.test/',
+      ]);
+    });
+
+    it('ends the address before a bidi isolate', () => {
+      expect(hrefs(`https://evil.test/${LRI}x${POP}`)).toEqual(['https://evil.test/']);
+    });
+
+    it('ends the address before a zero-width or invisible character', () => {
+      for (const hidden of [ZWSP, ZWJ, BOM, NUL]) {
+        expect(hrefs(`https://tix.test/a${hidden}b`), JSON.stringify(hidden)).toEqual([
+          'https://tix.test/a',
+        ]);
+      }
+    });
+
+    it('never puts one in a label, whatever the text', () => {
+      // The property, stated once over every shape: nothing a reader cannot see
+      // gets to sit inside something they are asked to trust.
+      const inputs = [
+        `https://evil.test/${RLO}moc.knab//:sptth`,
+        `${RLO}https://evil.test/x`,
+        `https://${ZWSP}bank.test/x`,
+        `https://tix.test/${LRI}a${POP}b`,
+        `see ${BOM}https://tix.test/a`,
+      ];
+      for (const input of inputs) {
+        for (const segment of linkifySegments(input)) {
+          if (segment.kind !== 'link') continue;
+          expect(
+            /[\u0000-\u001F\u007F-\u009F\u061C\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF\uFFF9-\uFFFB]/.test(
+              segment.value,
+            ),
+            `${JSON.stringify(input)} -> ${JSON.stringify(segment.value)}`,
+          ).toBe(false);
+        }
+      }
+    });
+
+    it('still reproduces the text exactly, invisible characters included', () => {
+      // What is refused a LINK is not refused the note: the character stays in
+      // the prose, so nothing the user stored is dropped.
+      for (const input of [
+        `https://evil.test/${RLO}moc.knab//:sptth`,
+        `https://tix.test/a${ZWSP}b`,
+      ]) {
+        expect(roundTrips(input)).toBe(input);
+      }
+    });
+
+    it('keeps an address that only mentions those characters percent-encoded', () => {
+      // %E2%80%AE is ASCII in the raw string -- a real URL carrying a real
+      // override, which a browser will encode anyway. Nothing invisible renders.
+      expect(hrefs('https://tix.test/a%E2%80%AEb')).toEqual([
+        'https://tix.test/a%E2%80%AEb',
+      ]);
+    });
+  });
+
   describe('where the address ends', () => {
     it('leaves sentence punctuation out of the link', () => {
       expect(hrefs('Tickets: https://tix.test/a.')).toEqual(['https://tix.test/a']);

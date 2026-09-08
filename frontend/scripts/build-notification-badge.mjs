@@ -34,8 +34,25 @@ const MARGIN = 0.06;
 const SUBSAMPLES = 4;
 const CURVE_STEPS = 24;
 
+/**
+ * Every command letter, not only the four this parser implements.
+ *
+ * Matching `[MmLlCcZz]` alone did not reject an `H` or a `V` -- it did not SEE
+ * one. The letter fell out of the token stream and its coordinates were eaten
+ * by whatever command was still active, so `M10,10 H90 V90` parsed as
+ * `M10,10 L90,90` and the `default: throw` below could never fire. SVGO and
+ * most design tools emit those commands, so a re-exported logo would have
+ * produced a silently wrong glyph -- and the badge test, which rebuilds from
+ * this same generator, would have compared wrong to wrong and passed.
+ *
+ * The number alternative comes first so an exponent (`1e-5`) is consumed as one
+ * number rather than a number, a letter and another number.
+ */
+const PATH_TOKEN = /-?\d*\.?\d+(?:e[-+]?\d+)?|[A-Za-z]/gi;
+const COMMAND_LETTER = /^[A-Za-z]$/;
+
 function parsePath(d) {
-  const tokens = d.match(/[MmLlCcZz]|-?\d*\.?\d+(?:e[-+]?\d+)?/gi) ?? [];
+  const tokens = d.match(PATH_TOKEN) ?? [];
   const subpaths = [];
   let current = [];
   let cursor = [0, 0];
@@ -50,7 +67,8 @@ function parsePath(d) {
   };
 
   while (i < tokens.length) {
-    if (/[MmLlCcZz]/.test(tokens[i])) command = tokens[i++];
+    const startedAt = i;
+    if (COMMAND_LETTER.test(tokens[i])) command = tokens[i++];
     switch (command) {
       case 'M':
       case 'm': {
@@ -100,6 +118,14 @@ function parsePath(d) {
       }
       default:
         throw new Error(`Unsupported path command: ${command}`);
+    }
+    // `Z` consumes no operand, so a number after one leaves the loop with the
+    // same command and the same index -- it used to hang rather than fail. Any
+    // iteration that reads nothing is a malformed path, whichever case it was.
+    if (i === startedAt) {
+      throw new Error(
+        `Malformed path: token ${JSON.stringify(tokens[i])} at ${i} follows command '${command}', which takes no operand`,
+      );
     }
   }
   flush();
@@ -245,6 +271,7 @@ export function buildBadgePng() {
   return encodePng(SIZE, rasterize(placed, SIZE, SUBSAMPLES));
 }
 
+export { parsePath };
 export const BADGE_OUTPUT_PATH = OUTPUT_PNG;
 export const BADGE_SIZE = SIZE;
 

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { inflateSync } from 'node:zlib';
-import { buildBadgePng, BADGE_SIZE } from '../../scripts/build-notification-badge.mjs';
+import { buildBadgePng, BADGE_SIZE, parsePath } from '../../scripts/build-notification-badge.mjs';
 import { buildManifest } from '../lib/pwa-manifest';
 
 // A notification's `badge` is a MASK. Chrome on Android keeps its alpha channel,
@@ -128,6 +128,48 @@ describe('push notification badge', () => {
   it('is 96x96 -- a 24dp badge at the densest screen Chrome asks for', () => {
     expect([badgePng.width, badgePng.height]).toEqual([BADGE_SIZE, BADGE_SIZE]);
     expect(BADGE_SIZE).toBe(96);
+  });
+
+  describe('the path parser refuses what it cannot draw', () => {
+    // It used to match only `[MmLlCcZz]`, which did not reject an `H` or a `V`
+    // -- it did not see one. The letter fell out of the token stream and its
+    // coordinates were consumed by whatever command was still active, so a
+    // re-exported logo would have rasterized to a silently wrong glyph. These
+    // tests exist because the comparison above cannot catch that: it rebuilds
+    // from this same generator, so it would compare wrong to wrong and pass.
+
+    it('parses the commands the brand mark actually uses', () => {
+      expect(() => parsePath('M0,0 C1,1 2,2 3,3 L4,4 z')).not.toThrow();
+      expect(() => parsePath('m0,0 c1,1 2,2 3,3 l4,4 z')).not.toThrow();
+    });
+
+    it('throws on a command it does not implement, rather than dropping it', () => {
+      // H and V are what SVGO and most design tools emit.
+      for (const [command, path] of [
+        ['H', 'M10,10 H90 V90 L10,90 Z'],
+        ['V', 'M10,10 V90 L10,90 Z'],
+        ['A', 'M0,0 A5,5 0 0 1 10,10'],
+        ['Q', 'M0,0 Q5,5 10,10'],
+        ['S', 'M0,0 C1,1 2,2 3,3 S4,4 5,5'],
+        ['T', 'M0,0 T3,3'],
+      ] as const) {
+        expect(() => parsePath(path), path).toThrow(
+          `Unsupported path command: ${command}`,
+        );
+      }
+    });
+
+    it('throws instead of hanging on an operand a command cannot take', () => {
+      // `Z` consumes nothing, so a number after one left the loop on the same
+      // index with the same command -- an infinite loop, not an error.
+      expect(() => parsePath('M0,0 L10,0 z 5 5')).toThrow(/takes no operand/);
+    });
+
+    it('reads an exponent as one number, not a number and a letter', () => {
+      // The token pattern has to prefer the number branch, or the `e` in
+      // `1e-5` becomes an unsupported command.
+      expect(() => parsePath('M1e-5,0 L1,1 z')).not.toThrow();
+    });
   });
 
   it('still matches the logo it is generated from', () => {

@@ -34,13 +34,38 @@ export interface LinkifiedLinkSegment {
 export type LinkifiedSegment = LinkifiedTextSegment | LinkifiedLinkSegment;
 
 /**
+ * Characters that must never reach a link's label.
+ *
+ * Bidi overrides and isolates (U+202A-202E, U+2066-2069) reorder what is drawn
+ * without changing the string, so `https://evil.test/<U+202E>moc.knab//:sptth`
+ * is one string that READS as `https://evil.test/https://bank.com` -- a label
+ * whose bytes equal its `href` and whose rendering does not. Zero-width and
+ * word-joiner characters hide inside a host, and C0/C1 controls have no visible
+ * form at all. `@SanitizeHtml()` strips none of these: it removes `<` and `>`.
+ *
+ * None of them is legitimate in an address either -- RFC 3986 is ASCII, and a
+ * browser percent-encodes anything else on the way out -- so a URL simply ends
+ * at the first one, and the remainder stays in the prose where it can mislead
+ * nobody about where a click goes.
+ *
+ * This does NOT address a homograph host (Cyrillic `a` in `bank.com`). That is
+ * the browser's job, through the punycode rules its address bar applies, and
+ * claiming it here would be a worse promise than the one this fixes.
+ */
+const INVISIBLE_CHARS =
+  '\\u0000-\\u001F\\u007F-\\u009F\\u061C\\u200B-\\u200F\\u202A-\\u202E\\u2060-\\u2064\\u2066-\\u2069\\uFEFF\\uFFF9-\\uFFFB';
+
+/** The same set, for asserting a candidate is clean before it becomes an href. */
+const HAS_INVISIBLE = new RegExp(`[${INVISIBLE_CHARS}]`);
+
+/**
  * An explicit scheme is required. `www.example.com` and `example.com` are left
  * as text: a bare host has to be guessed at, and a guess that is wrong renders
  * a link to somewhere the writer did not name. `<` and `>` are excluded so the
  * match cannot run past the address even in a legacy row that predates the
- * write-time sanitizer.
+ * write-time sanitizer, and the invisible set above for the reason given there.
  */
-const URL_CANDIDATE = /https?:\/\/[^\s<>]+/gi;
+const URL_CANDIDATE = new RegExp(`https?://[^\\s<>${INVISIBLE_CHARS}]+`, 'gi');
 
 /** Closing brackets, and the opener each one balances. */
 const CLOSERS: Record<string, string> = { ')': '(', ']': '[', '}': '{' };
@@ -94,6 +119,11 @@ function trimTrailingPunctuation(candidate: string): string {
  * a browser would resolve oddly -- `https://` with no host at all.
  */
 function hrefFor(candidate: string): string | null {
+  // Belt and braces: the pattern above already ends a match at one of these, so
+  // this only fires if that character class is ever loosened. The label and the
+  // destination are the same string, so a character that changes how the label
+  // renders is a character that makes them disagree.
+  if (HAS_INVISIBLE.test(candidate)) return null;
   const safe = toSafeExternalUrl(candidate);
   if (safe === null) return null;
   try {

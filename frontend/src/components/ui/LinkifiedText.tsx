@@ -56,6 +56,15 @@ function NoteLink({
       href={segment.href}
       target="_blank"
       rel="noopener noreferrer"
+      // An address is LTR whatever the reader's locale, and isolating it stops
+      // a bidi control ELSEWHERE in the note -- or in the surrounding UI -- from
+      // reordering the label. `linkify.ts` keeps such characters out of the
+      // label itself; this keeps them out of its rendering context. HTML's own
+      // rendering rules give `[dir]` `unicode-bidi: isolate`, and the style says
+      // so explicitly rather than resting on a UA stylesheet for a property the
+      // label's honesty depends on.
+      dir="ltr"
+      style={{ unicodeBidi: 'isolate' }}
       onClick={stopRowActivation}
       onMouseDown={stopRowActivation}
       onTouchStart={stopRowActivation}

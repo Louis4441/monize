@@ -849,13 +849,28 @@ storage changed: the field is still plain text, `@SanitizeHtml()` still strips
 `<` and `>` on write, and `dangerouslySetInnerHTML` still appears **nowhere** in
 this tree. `linkifySegments` (`lib/linkify.ts`) splits the stored string into
 prose and addresses, and `LinkifiedText` (`components/ui/LinkifiedText.tsx`)
-draws the anchors -- around text it hands back verbatim. Two properties carry
-that argument and both are tests, not prose: the segments concatenate back to
-the input exactly, and a link's visible label is always its own `href`, so a
-description can never present one destination and navigate to another. An
-`href` is only ever built through `toSafeExternalUrl`, and only from an explicit
-`http`/`https` scheme -- a bare `www.example.com` stays text, because a guessed
-host is a link to somewhere the writer did not name.
+draws the anchors -- around text it hands back verbatim. An `href` is only ever
+built through `toSafeExternalUrl`, and only from an explicit `http`/`https`
+scheme -- a bare `www.example.com` stays text, because a guessed host is a link
+to somewhere the writer did not name.
+
+**A label has to be honest to a reader, not only to `===`.** Three properties
+carry that, and each is a test rather than prose: the segments concatenate back
+to the input exactly; the label and the `href` are one string, because
+`NoteLink` takes no children and so has no second value to disagree; and that
+string contains no character that changes how it renders. The third is the one
+that was missing. `https://evil.test/<U+202E>moc.knab//:sptth` READS as
+`https://evil.test/https://bank.com` and navigates to `evil.test` -- label and
+`href` equal as strings, different on screen -- and `@SanitizeHtml()` strips
+none of it, since its job is `<` and `>`. So an address ENDS at the first bidi
+control, zero-width or C0/C1 character (`INVISIBLE_CHARS` in `lib/linkify.ts`;
+none is legitimate in an RFC 3986 address, and the remainder stays in the prose
+where it can mislead nobody about where a click goes), and the anchor carries
+`dir="ltr"` with `unicode-bidi: isolate` so an override elsewhere in the note --
+or an RTL locale around it -- cannot reorder the label either. A homograph host
+(Cyrillic `a` in `bank.com`) is deliberately NOT claimed: that is the browser's
+punycode job, and asserting it here would be a worse promise than the one this
+replaced.
 
 This matters more than it looks: a description is visible to joint owners and
 delegates, so the field is a cross-tenant surface. Storing markup there and

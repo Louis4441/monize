@@ -19,6 +19,30 @@ describe('LinkifiedText', () => {
     expect(link.getAttribute('rel')).toBe('noopener noreferrer');
   });
 
+  it('isolates the label from the direction of the text around it', () => {
+    // Keeping bidi controls out of the label is half of it: an unterminated
+    // override EARLIER in the note -- or in the surrounding UI, which is RTL in
+    // several supported locales -- would otherwise reorder the label too. An
+    // address is LTR whatever the reader's locale.
+    render(<LinkifiedText text="https://tix.test/a" />);
+    const link = screen.getByRole('link');
+    expect(link.getAttribute('dir')).toBe('ltr');
+    expect(link.style.unicodeBidi).toBe('isolate');
+  });
+
+  it('draws no link around an address carrying a bidi override', () => {
+    // The label and the href are one string, so a character that changes how
+    // the label RENDERS makes the two disagree about the destination while
+    // still comparing equal. See linkify.test.ts for the full set.
+    const { container } = render(
+      <LinkifiedText text={'https://evil.test/\u202Emoc.knab//:sptth'} />,
+    );
+    const link = container.querySelector('a');
+    expect(link?.getAttribute('href')).toBe('https://evil.test/');
+    expect(link?.textContent).toBe('https://evil.test/');
+    expect(container.textContent).toBe('https://evil.test/\u202Emoc.knab//:sptth');
+  });
+
   it('renders exactly the text it was given', () => {
     // The visible string is unchanged by linkifying -- only the affordance is
     // new. A renderer that dropped or rewrote a character would be editing a
@@ -51,12 +75,23 @@ describe('LinkifiedText', () => {
       '<a href="https://evil.test">Your bank</a>',
       '[Your bank](https://evil.test)',
       'https://bank.test@evil.test/login',
+      'https://evil.test/\u202Emoc.knab//:sptth',
+      '\u202Ehttps://evil.test/x',
       'Click https://evil.test/a then https://evil.test/b',
     ];
     for (const text of texts) {
       const { container, unmount } = render(<LinkifiedText text={text} />);
       for (const link of container.querySelectorAll('a')) {
         expect(link.textContent, text).toBe(link.getAttribute('href'));
+        // Equal as strings is not the whole claim -- see the bidi case above.
+        // The label must also RENDER as its destination, which it cannot do
+        // while carrying a character that reorders or hides part of itself.
+        expect(
+          /[\u0000-\u001F\u007F-\u009F\u061C\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF\uFFF9-\uFFFB]/.test(
+            link.textContent ?? '',
+          ),
+          text,
+        ).toBe(false);
       }
       unmount();
     }
