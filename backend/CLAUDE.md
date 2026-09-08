@@ -376,8 +376,10 @@ the endpoint the same way (`releaseLocalPushSubscription`).
 ## The notifications table has one writer
 
 `NotificationService.create` (`src/notification-center/notification.service.ts`)
-is the only place a notification row is written, and
-`notification-write-door.spec.ts` fails on a second one. A producer decides
+is the only producer write door. Backup restore preserves archive IDs and
+timestamps through its own insert, using the same `notification-bounds.ts`
+helpers via `boundRestoredNotification`. For producer writes,
+`notification-write-door.spec.ts` fails on a second door. A producer decides
 *what* to say; the row's shape is not its decision. There were three writers
 with three opinions -- a raw `INSERT` for budget alerts with its own conflict
 target and no title bound, an entity `save` for bill reminders with no conflict
@@ -425,6 +427,12 @@ despite the names: a Web Push body is composed on the server, in a cron or a
 background write with no request locale to inherit, so it resolves the
 recipient's stored `user_preferences.language` exactly as an email does. Reuse
 those two; a second locale resolver is how the answers drift.
+
+Notification email bodies and dynamic subjects go through `notificationEmailCopy`
+(`src/notifications/notification-email-copy.ts`) at delivery time, including
+immediate dispatch, admin alerts and budget digests. Supply the snapshot's currency
+in `data`; missing facts on legacy rows retain the stored copy rather than inventing
+amounts or currency. HTML templates escape the composed strings once.
 
 ## A case-sensitive `LIKE` is not a search
 

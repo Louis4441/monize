@@ -1,3 +1,4 @@
+import { SecurityPriceAlertService } from "../notification-center/security-price-alert.service";
 import { Module, forwardRef } from "@nestjs/common";
 import { EmailService } from "./email.service";
 import { BillReminderService } from "./bill-reminder.service";
@@ -54,6 +55,7 @@ import { BalanceThresholdAlertService } from "../notification-center/balance-thr
     // PortfolioService and the exchange-rate service, so it lives here where the
     // dispatch is, not in NotificationCenterModule (which stays connection-only).
     PortfolioMovementAlertService,
+    SecurityPriceAlertService,
     // Event-driven balance-threshold crossings (BALANCES category). Triggered
     // from the post-commit balance-invalidation seam (NetWorthService), so it is
     // exported for that module to call.

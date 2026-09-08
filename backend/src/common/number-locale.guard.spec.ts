@@ -137,6 +137,23 @@ describe("a percentage addressed to a person", () => {
   };
 
   /**
+   * Modules whose `%` is a TRANSLATABLE LITERAL rather than a figure this code
+   * formats -- the English source of a catalog string, whose `{{ percent }}`
+   * arrives already rendered through the recipient's formatter and whose sign
+   * every other locale places for itself (`12,3 %` in French). Exempt because
+   * there is nothing here to route through a locale, which is a different claim
+   * from {@link MACHINE_PERCENT}'s "nobody reads this but a machine": these
+   * strings are read by a person, in their own language.
+   *
+   * The honesty check below is therefore not the same one either -- it holds
+   * that the file is still a catalog and formats nothing.
+   */
+  const MESSAGE_CATALOGS: Record<string, string> = {
+    "notifications/notification-email-messages.ts":
+      "English source strings for `notificationEmailCopy`; the figure is interpolated already formatted, and `backend/src/i18n/locales/*/emails.json` carries each locale's own placement",
+  };
+
+  /**
    * Two shapes that are not a figure addressed to a person. A CSS length
    * (`width: ${pct}%`) has to stay a plain number -- CSS does not read a locale
    * -- and a log line is read by an operator, not by the account holder.
@@ -223,7 +240,9 @@ describe("a percentage addressed to a person", () => {
   it("is not composed with toFixed and a literal % outside the machine set", () => {
     const offenders = sourceFiles().filter(
       (file) =>
-        !(file in MACHINE_PERCENT) && percentLines(read(file)).length > 0,
+        !(file in MACHINE_PERCENT) &&
+        !(file in MESSAGE_CATALOGS) &&
+        percentLines(read(file)).length > 0,
     );
 
     // Use `numberFormatterFor(...).formatPercent(value, decimals)`; it takes
@@ -237,6 +256,22 @@ describe("a percentage addressed to a person", () => {
       // A stale entry silently covers a future offender in the same path.
       expect(files).toContain(file);
       expect(percentLines(read(file)).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("keeps the catalog exemptions to files that format nothing", () => {
+    const files = sourceFiles();
+    for (const file of Object.keys(MESSAGE_CATALOGS)) {
+      expect(files).toContain(file);
+      const source = read(file);
+      // Still a catalog, and still the subject of this scan.
+      expect(percentLines(source).length).toBeGreaterThan(0);
+      // The exemption is "there is no formatting here to route through a
+      // locale". The day a formatter appears in one of these files, that stops
+      // being true and the reason on the entry stops covering it.
+      expect(source).not.toMatch(/\bIntl\./);
+      expect(source).not.toMatch(/\.toFixed\(/);
+      expect(source).not.toMatch(/\bformatCurrency|numberFormatterFor\b/);
     }
   });
 });

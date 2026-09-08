@@ -341,5 +341,11 @@
     "dateRequired": "Datum is verplicht",
     "priceRequired": "Koers is verplicht",
     "priceNonNegative": "Koers moet een niet-negatief getal zijn"
+  },
+  "priceAlert": {
+    "label": "Melding bij koerswijziging (%)",
+    "help": "Laat leeg om uit te schakelen. Meldt stijgingen of dalingen sinds de vorige beschikbare sessie, maximaal eenmaal per effect per UTC-dag.",
+    "range": "Voer een percentage van 0,1 tot 1000 in.",
+    "chartLabel": "Grafiek toevoegen aan koersmeldingen"
   }
 }

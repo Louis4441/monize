@@ -1,4 +1,5 @@
 import { readFileSync } from "fs";
+import { decode } from "he";
 import { join } from "path";
 
 import {
@@ -81,6 +82,115 @@ describe("NotificationDispatchService", () => {
       { get: (_k: string, d: string) => d } as never,
       { translate } as never,
     );
+  });
+
+  it.each([false, true])(
+    "localizes immediate email and reminder re-emits in the recipient locale (%s)",
+    async (reminder) => {
+      resolveDelivery.mockResolvedValue({
+        emailNotification: true,
+        push: false,
+        unifiedpush: false,
+        throttleMinutes: 0,
+      });
+      prefRepo.findOne.mockResolvedValue({ language: "pl" });
+      const stored = row({
+        type: NotificationType.BALANCE_BELOW_THRESHOLD,
+        data: {
+          accountName: "Current",
+          balance: -25,
+          threshold: 0,
+          currencyCode: "PLN",
+          ...(reminder ? { reminderId: "rem-1" } : {}),
+        },
+      });
+      create.mockResolvedValue(stored);
+      translate.mockImplementation(
+        (
+          key: string,
+          options: {
+            lang: string;
+            defaultValue: string;
+            args?: Record<string, unknown>;
+          },
+        ) => {
+          if (key === "emails.notificationCopy.balanceThreshold.titleLow")
+            return `Saldo: ${options.args?.account}`;
+          if (key === "emails.notificationCopy.balanceThreshold.messageLow")
+            return `Poniżej progu: ${options.args?.balance}`;
+          return options.defaultValue;
+        },
+      );
+      await service.notify("u1", {} as never);
+      const html = decode(sendMail.mock.calls[0][2]);
+      expect(html).toContain("Saldo: Current");
+      expect(html).toContain("Poniżej progu: -25,00");
+      expect(html).not.toContain(stored.title);
+      expect(stored.title).toBe("Groceries over budget");
+      for (const [, options] of translate.mock.calls)
+        expect(options.lang).toBe("pl");
+    },
+  );
+
+  it("formats the email's figures by the recipient's numberFormat, not their language", async () => {
+    // The two preferences are independent (INV-DISPLAY-001): an English UI with
+    // Polish grouping is a supported choice. The test above proves only that
+    // `language` travels -- with the two AGREEING, dropping the number
+    // preference anywhere between the preferences read and the composer still
+    // renders Polish. Here they disagree, so this is the case that fails if
+    // `resolveUserEmailFormats` stops reporting `numberFormat`, or if
+    // `sendEmail` stops passing it on.
+    resolveDelivery.mockResolvedValue({
+      emailNotification: true,
+      push: false,
+      unifiedpush: false,
+      throttleMinutes: 0,
+    });
+    prefRepo.findOne.mockResolvedValue({
+      language: "en",
+      numberFormat: "pl-PL",
+    });
+    create.mockResolvedValue(
+      row({
+        type: NotificationType.BALANCE_BELOW_THRESHOLD,
+        data: {
+          accountName: "Current",
+          balance: -25,
+          threshold: 0,
+          currencyCode: "PLN",
+        },
+      }),
+    );
+    await service.notify("u1", {} as never);
+    const html = decode(sendMail.mock.calls[0][2]);
+    // English prose around a Polish figure is the point, not an accident.
+    expect(html).toContain("dropped to");
+    expect(html).toContain("-25,00");
+    expect(html).not.toContain("-25.00");
+  });
+
+  it("passes validated price facts to chart delivery only for price alerts", async () => {
+    const data = {
+      securityId: "11111111-1111-4111-8111-111111111111",
+      priceDate: "2026-09-02",
+      price: 110,
+    };
+    create.mockResolvedValue(
+      row({ type: NotificationType.SECURITY_PRICE_MOVEMENT, data }),
+    );
+    resolveDelivery.mockResolvedValue({
+      push: true,
+      unifiedpush: false,
+      emailNotification: false,
+      throttleMinutes: 0,
+    });
+    await service.notify("u1", {
+      type: NotificationType.SECURITY_PRICE_MOVEMENT,
+      severity: NotificationSeverity.INFO,
+      title: "Price",
+      message: "Changed",
+    });
+    expect(sendToUser.mock.calls[0][3]).toEqual(data);
   });
 
   it("writes through the one write door and returns the row (INV-DISPATCH-001)", async () => {

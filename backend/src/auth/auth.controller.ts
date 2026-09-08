@@ -717,12 +717,19 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: "Refresh CSRF token cookie" })
   async csrfRefresh(@Request() req, @Res() res: Response) {
+    const csrfToken = generateCsrfToken(
+      req.user.id,
+      this.authService.getCsrfKey(),
+    );
+    // Workers without Cookie Store cannot read Set-Cookie. Return the same
+    // session-bound token as JSON, protected by JWT authentication and CORS.
+    res.setHeader("Cache-Control", "no-store");
     res.cookie(
       "csrf_token",
-      generateCsrfToken(req.user.id, this.authService.getCsrfKey()),
+      csrfToken,
       getCsrfCookieOptions(this.useSecureCookies),
     );
-    res.json({ message: "CSRF token refreshed" });
+    res.json({ message: "CSRF token refreshed", csrfToken });
   }
 
   @Get("profile")

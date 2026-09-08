@@ -134,6 +134,30 @@ describe('SecurityForm', () => {
     });
   });
 
+  it.each(['5', ''])('saves or clears a security price threshold (%s)', async (value) => {
+    render(<SecurityForm security={createSecurity({ priceAlertPercent: 10 })} onSubmit={onSubmit} onCancel={onCancel} />);
+    const input = await screen.findByLabelText('Price change alert (%)');
+    // A text input formatted by `NumericInput`, not a native number one, at the
+    // column's own scale: NUMERIC(9,4), so four decimals in the reader's number
+    // locale. Fewer would DISPLAY a stored 0.1250 as 0.13 and commit that on
+    // the next blur (`ui-conventions.test.ts` bans the native control).
+    expect(input).toHaveValue('10.0000');
+    fireEvent.change(input, { target: { value } });
+    fireEvent.click(screen.getByText('Update Security'));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      priceAlertPercent: value ? 5 : null,
+    })));
+  });
+
+  it.each([false, true])('saves an explicit chart opt-in (initial %s)', async (enabled) => {
+    render(<SecurityForm security={createSecurity({ priceChartEnabled: enabled })} onSubmit={onSubmit} onCancel={onCancel} />);
+    const checkbox = await screen.findByLabelText('Include a chart in price alerts');
+    expect((checkbox as HTMLInputElement).checked).toBe(enabled);
+    fireEvent.click(checkbox);
+    fireEvent.click(screen.getByText('Update Security'));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({priceChartEnabled: !enabled})));
+  });
+
   it('calls onCancel when cancel is clicked', async () => {
     render(<SecurityForm onSubmit={onSubmit} onCancel={onCancel} />);
     fireEvent.click(screen.getByText('Cancel'));

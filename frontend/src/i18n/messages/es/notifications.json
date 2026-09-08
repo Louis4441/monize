@@ -43,7 +43,14 @@
     "durationMinutes": "{minutes, plural, one {# minuto} other {# minutos}}",
     "durationHours": "{hours, plural, one {# hora} other {# horas}}",
     "cancel": "Cancelar",
-    "confirm": "Establecer recordatorio"
+    "confirm": "Establecer recordatorio",
+    "pageTitle": "Recordatorios activos",
+    "empty": "No hay recordatorios activos",
+    "loadFailed": "No se pudieron cargar los recordatorios",
+    "retry": "Intentar de nuevo",
+    "nextFire": "Próximo recordatorio: {date}",
+    "openTarget": "Abrir página relacionada",
+    "delegateUnavailable": "Vuelve a tu propia cuenta para gestionar los recordatorios."
   },
   "billDue": {
     "titleOverdue": "{payee} vencido",
@@ -104,5 +111,9 @@
       "title": "{name} no se pudo registrar",
       "message": "Su transacción programada con vencimiento el {date} no se registró automáticamente: {error}. Puede registrarla manualmente desde Facturas y depósitos."
     }
+  },
+  "priceMovement": {
+    "title": "Alerta de cambio de precio: {symbol} ({percent}%)",
+    "message": "{symbol}: {percent}% respecto a la sesión anterior disponible."
   }
 }

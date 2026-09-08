@@ -341,5 +341,11 @@
     "dateRequired": "Datum ist erforderlich",
     "priceRequired": "Kurs ist erforderlich",
     "priceNonNegative": "Kurs muss eine nicht-negative Zahl sein"
+  },
+  "priceAlert": {
+    "label": "Alarm bei Kursänderung (%)",
+    "help": "Leer lassen zum Deaktivieren. Meldet Anstieg oder Rückgang seit der letzten verfügbaren Sitzung, höchstens einmal pro Instrument und UTC-Tag.",
+    "range": "Prozentwert zwischen 0,1 und 1000 eingeben.",
+    "chartLabel": "Diagramm in Kursbenachrichtigungen anzeigen"
   }
 }

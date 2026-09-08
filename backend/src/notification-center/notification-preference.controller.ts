@@ -1,3 +1,4 @@
+import { OwnerOnly } from "../delegation/decorators/delegate-access.decorator";
 import {
   Body,
   Controller,
@@ -36,6 +37,7 @@ function categoriesFor(req: AuthenticatedRequest) {
 
 @Controller("notifications/preferences")
 @UseGuards(AuthGuard("jwt"))
+@OwnerOnly()
 export class NotificationPreferenceController {
   constructor(private readonly preferences: NotificationPreferenceService) {}
 

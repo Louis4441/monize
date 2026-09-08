@@ -1,3 +1,4 @@
+import { OwnerOnly } from "../delegation/decorators/delegate-access.decorator";
 import {
   Body,
   Controller,
@@ -29,6 +30,7 @@ import { CreateNotificationReminderDto } from "./dto/create-notification-reminde
 @ApiTags("Notifications")
 @Controller("notifications/reminders")
 @UseGuards(AuthGuard("jwt"))
+@OwnerOnly()
 @ApiBearerAuth()
 export class NotificationReminderController {
   constructor(private readonly reminders: NotificationReminderService) {}

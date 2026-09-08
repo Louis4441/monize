@@ -1,3 +1,4 @@
+import { verifyCsrfToken } from "../common/csrf.util";
 import { Test, TestingModule } from "@nestjs/testing";
 import { DataSource } from "typeorm";
 import {
@@ -71,6 +72,7 @@ describe("AuthController", () => {
   };
 
   const mockRes = () => ({
+    setHeader: jest.fn(),
     json: jest.fn(),
     cookie: jest.fn(),
     clearCookie: jest.fn(),
@@ -1300,7 +1302,7 @@ describe("AuthController", () => {
   });
 
   describe("csrfRefresh", () => {
-    it("sets csrf_token cookie and returns success message", async () => {
+    it("returns the same session-bound token in a non-cacheable JSON response", async () => {
       const res = mockRes();
       const req = { user: { id: "user-1", realUserId: "user-1" } };
 
@@ -1315,8 +1317,13 @@ describe("AuthController", () => {
           path: "/",
         }),
       );
+      const token = res.cookie.mock.calls[0][1];
+      expect(verifyCsrfToken(token, "user-1", "test-csrf-key")).toBe(true);
+      expect(verifyCsrfToken(token, "other-user", "test-csrf-key")).toBe(false);
+      expect(res.setHeader).toHaveBeenCalledWith("Cache-Control", "no-store");
       expect(res.json).toHaveBeenCalledWith({
         message: "CSRF token refreshed",
+        csrfToken: token,
       });
     });
   });

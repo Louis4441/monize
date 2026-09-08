@@ -9,8 +9,9 @@ import {
 } from "../notification-center/entities/notification.entity";
 import { EmailService } from "../notifications/email.service";
 import { systemAlertTemplate } from "../notifications/email-templates";
+import { notificationEmailCopy } from "../notifications/notification-email-copy";
 import { emailTranslator } from "../i18n/email-translator";
-import { resolveUserEmailLocale } from "../i18n/resolve-user-email-locale";
+import { resolveUserEmailFormats } from "../i18n/resolve-user-email-locale";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import {
   AdminRecipient,
@@ -37,11 +38,11 @@ export {
 export interface SystemAlertInput {
   type: NotificationType;
   severity: NotificationSeverity;
-  /** Stored English fallback; the client composes localized copy from `data`. */
+  /** Stored English fallback; the client and email composer localize from `data`. */
   title: string;
-  /** Stored English fallback; the client composes localized copy from `data`. */
+  /** Stored English fallback; the client and email composer localize from `data`. */
   message: string;
-  /** Facts for client-side localization. Include `system: true`; never store a
+  /** Facts for client and email localization. Include `system: true`; never store a
    *  value that goes stale while the row lives. */
   data: Record<string, unknown>;
   /**
@@ -285,29 +286,27 @@ export class SystemAlertService {
   ): Promise<boolean> {
     if (!this.emailService.getStatus().configured) return false;
     try {
-      const lang = await withScopedDb(this.dataSource, (manager) =>
-        resolveUserEmailLocale(
-          manager.getRepository(UserPreference),
-          admin.userId,
-        ),
+      const { lang, numberFormat } = await withScopedDb(
+        this.dataSource,
+        (manager) =>
+          resolveUserEmailFormats(
+            manager.getRepository(UserPreference),
+            admin.userId,
+          ),
       );
       const t = emailTranslator(this.i18n, lang);
+      const copy = notificationEmailCopy(input, t, lang, { numberFormat });
       const html = systemAlertTemplate(
         admin.firstName,
         {
           severity: input.severity,
-          title: input.title,
-          message: input.message,
+          ...copy,
         },
         t,
       );
-      const subject = t(
-        "emails.systemAlert.subject",
-        `Monize: ${input.title}`,
-        {
-          title: input.title,
-        },
-      );
+      const subject = t("emails.systemAlert.subject", `Monize: ${copy.title}`, {
+        title: copy.title,
+      });
       await this.emailService.sendMail(admin.email, subject, html);
       return true;
     } catch (error) {

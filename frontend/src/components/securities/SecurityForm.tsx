@@ -9,6 +9,7 @@ import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { Select } from '@/components/ui/Select';
 import { Combobox } from '@/components/ui/Combobox';
 import { MultiSelect } from '@/components/ui/MultiSelect';
@@ -66,6 +67,8 @@ const buildSecuritySchema = (t: (key: string) => string) => z.object({
   irWebsite: z.string().max(2048).optional(),
   quoteProvider: z.enum(['', 'yahoo', 'msn']).optional(),
   msnInstrumentId: z.string().max(50).optional(),
+  priceChartEnabled: z.boolean().optional(),
+  priceAlertPercent: z.string().optional().refine((v) => !v?.trim() || (Number.isFinite(Number(v)) && Number(v) >= 0.1 && Number(v) <= 1000), t('priceAlert.range')),
   isFavourite: z.boolean().optional(),
 });
 
@@ -231,6 +234,8 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       quoteProvider: security?.quoteProvider || '',
       msnInstrumentId: security?.msnInstrumentId || '',
       isFavourite: security?.isFavourite || false,
+      priceChartEnabled: security?.priceChartEnabled ?? false,
+      priceAlertPercent: security?.priceAlertPercent == null ? '' : String(security.priceAlertPercent),
     },
   });
 
@@ -380,6 +385,8 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
         quoteProvider: '',
         msnInstrumentId: '',
         isFavourite: false,
+        priceChartEnabled: false,
+        priceAlertPercent: '',
       });
       setSelectedTagIds([]);
       setCountryRows([]);
@@ -464,6 +471,8 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       irWebsite: data.irWebsite?.trim() ?? '',
       msnInstrumentId: data.msnInstrumentId?.trim() || undefined,
       isFavourite: data.isFavourite ?? false,
+      priceChartEnabled: data.priceChartEnabled ?? false,
+      priceAlertPercent: data.priceAlertPercent?.trim() ? Number(data.priceAlertPercent) : null,
       // Only ETFs/funds carry the manual breakdowns; send [] to clear them.
       ...(isFund
         ? {
@@ -616,6 +625,52 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
           </p>
         )}
       </div>
+
+      {/*
+        A threshold is a number the user types, so it goes through
+        `NumericInput` like every other one: a native number input adds spinner
+        arrows, changes value on the scroll wheel, and parses what was typed
+        against the browser's locale rather than the user's chosen one.
+
+        Shaped after its sibling `PortfolioAlertControl`, which renders the
+        portfolio movement threshold: same `decimalPlaces`, same `min`/`max`.
+        `min` clamps the value handed back while typing, but not the field's
+        own text -- `handleChange` calls `setDisplayValue` before the clamp --
+        so typing "0.5" still works, and the transient value converges on the
+        next keystroke. The Zod schema keeps the range too, because it owns the
+        message the field renders.
+
+        The value is bridged as a canonical string (`String(value)`), never the
+        locale text the user sees: `onSubmit` does `Number(...)` on this field,
+        and "0,13" would arrive as NaN for a comma-decimal reader.
+      */}
+      <NumericInput
+        label={t('priceAlert.label')}
+        value={
+          watch('priceAlertPercent')?.trim()
+            ? Number(watch('priceAlertPercent'))
+            : undefined
+        }
+        onChange={(value) =>
+          setValue(
+            'priceAlertPercent',
+            value === undefined ? '' : String(value),
+            { shouldDirty: true, shouldValidate: true },
+          )
+        }
+        decimalPlaces={4}
+        min={0.1}
+        max={1000}
+        error={errors.priceAlertPercent?.message}
+        aria-describedby="price-alert-help"
+      />
+
+      <p id="price-alert-help" className="text-sm text-gray-500 dark:text-gray-400">{t('priceAlert.help')}</p>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" {...register('priceChartEnabled')} />
+        {t('priceAlert.chartLabel')}
+      </label>
 
       {watch('quoteProvider') === 'msn' && (
         <Input

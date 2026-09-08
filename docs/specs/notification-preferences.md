@@ -288,11 +288,12 @@ Findings (to be re-verified against the shipping browsers):
   chart/<token>.png'`, where `<token>` is a single-use, short-TTL, HMAC-signed
   reference to a pre-rendered chart the backend holds (no user input in the path;
   CWE-22 validated). The renderer produces a small sparkline of the security's
-  recent closes. The SW passes `image` straight through to `showNotification`.
-- Fallback: where `image` is unsupported the notification is text-only with the
-  price move in the body; the deep link (R6) opens the full chart on
-  `/securities/<id>`. **The chart is a nicety; the number and the link are the
-  contract.**
+  recent closes. The SW passes only the validated same-origin chart path to `showNotification`.
+- Fallback: where `image` is unsupported, the shipping implementation retains
+  generic localized Investments text for lock-screen privacy (Section 14.6).
+  The deep link (R6) opens the instrument on `/securities/<id>`. The original
+  proposal to put the price move in every push body is not enabled by this
+  image-only opt-in; numerical details remain in the bell and immediate email.
 
 This is the highest-risk, lowest-portability requirement; it ships last (Phase 5)
 and behind a per-group toggle, defaulting off until validated on real devices.
@@ -345,7 +346,8 @@ and behind a per-group toggle, defaulting off until validated on real devices.
   service worker's `push`/`notificationclick` handlers exist; `collapseTag` does
   device-side collapse; **no `actions` and no `image` are used yet**.
 - **Existing prefs:** `notification_email` (enforced), `notification_browser`
-  (persisted, gates nothing today -- a dormant hook), `budget_digest_enabled` /
+  (dormant at survey time; removed by migration 188, superseded by the
+  per-category `push` setting), `budget_digest_enabled` /
   `budget_digest_day`. No per-category, per-channel, quiet-hours or throttle
   preference exists. Settings UI: `NotificationsSection.tsx` (email toggle +
   digest + test-email, then the push panels).
@@ -548,9 +550,9 @@ data): `export-table-queries.ts`, `restore-plan.ts` after `notifications` (the
 `@Cron` every minute (the interval floor is 5, so a one-minute tick is cheap and
 precise). Every replica runs it, so the claim must be idempotent across replicas
 **without** an advisory lock -- a single conditional `UPDATE ... RETURNING`
-(bounded to `CLAIM_BATCH` rows per tick through a `FOR UPDATE SKIP LOCKED` CTE,
+(bounded to the configured claim batch per tick through a `FOR UPDATE SKIP LOCKED` CTE,
 so a replica's tick takes rows another replica is not already holding, and the
-rest go next minute; re-emits run `REEMIT_CONCURRENCY` at a time behind an
+rest go next minute; re-emits run at the configured concurrency behind an
 in-process overlap guard) is
 the mechanism (`docs/concurrency-and-idempotency.md`, "atomic delta / CAS"):
 
@@ -584,6 +586,21 @@ runs **inside the same transaction that writes the notification** (Section 13.3)
 INSERT and the `UPDATE ... SET stopped_at ... WHERE id = $1 AND stopped_at IS
 NULL` commit together. A failure rolls back both, leaving the reminder claimable
 next interval -- it delivers exactly once, never zero and never twice.
+
+### Reminder cron capacity
+
+The every-minute cron claims at most `NOTIFICATION_REMINDER_CLAIM_BATCH` due
+rows per replica (default 100, accepted range 1..10000), and re-emits at most
+`NOTIFICATION_REMINDER_REEMIT_CONCURRENCY` concurrently per replica (default 5,
+range 1..100). Both environment settings are read at backend startup; missing
+values use the defaults, and invalid or out-of-range values log a warning and
+fall back. Set them in the backend container's environment and restart it. Docker Compose
+dev/prod forward them from `.env`; Helm deployments can use `backend.extraEnv`.
+
+The `LIMIT` and `FOR UPDATE SKIP LOCKED` claim keep each tick bounded and divide
+work between replicas. Increasing the limits raises database and transport load;
+it does not remove the backlog policy. Rows beyond the claim limit stay due for
+later ticks. A tick still in flight suppresses another tick on that replica.
 
 ### 13.3 What a fire re-emits (through the dispatch seam)
 
@@ -624,7 +641,12 @@ All three doors land on `stopReminder(userId, id)` (idempotent: stopping a
 stopped reminder is a no-op, not a 404-after-the-fact):
 
 1. **From the app** -- `POST /notifications/reminders/:id/stop` (JWT), and a Stop
-   control on any bell row carrying `data.reminderId`.
+   control on any bell row carrying `data.reminderId`. The bell links to
+   `/reminders`, a standalone owner-only list of active reminders. Each row shows
+   its localized subject, interval, next occurrence and a Stop control. The
+   list reads structured template facts from the owner-scoped reminder endpoint
+   and uses the same copy composer as the bell, with the existing legacy text
+   fallback. Delegates must switch back to their own account to manage it.
 2. **From the push notification** -- a re-emitted nag's payload carries
    `reminderId` and `actions: [{ action: "stop-reminder", title }]` (the title
    rendered on the server in the recipient's locale, `push.actions.stopReminder`),
@@ -632,18 +654,19 @@ stopped reminder is a no-op, not a 404-after-the-fact):
    session cookie, which outlives the app by fifteen minutes at most, so a 401 is
    answered by one same-origin `POST /auth/refresh` (the refresh cookie is
    same-origin, path `/`) and a single retry; a stop that still fails opens the
-   app at the notification's target, where the bell carries the row's Stop
-   control -- there is no standalone reminders page. The SW `notificationclick`
+   active reminders page at `/reminders`, where each active reminder has a Stop
+   control. The SW `notificationclick`
    handler, on `event.action === "stop-reminder"`, `fetch`es that same endpoint
-   same-origin with the CSRF header (read from the Cookie Store where the browser
-   offers it). The handler is written now (inert until a push carries the action)
-   so Phase 5 only has to populate `actions`. It checks the response: if the stop
-   did not take -- a network error, or a 403 where the worker could not read the
-   CSRF cookie (Firefox/Safari expose no Cookie Store to a worker) -- it opens the
-   app at the notification's target so the user can finish stopping it there,
-   rather than being left with a nag that keeps firing. The fuller door #2 UX (a
-   single retry, then a "could not stop -- open Monize" follow-up notification)
-   ships with the Phase 5 push dispatch that actually sends the action.
+   same-origin with the CSRF header. It reads Cookie Store where available;
+   otherwise it calls authenticated `GET /auth/csrf-refresh`, which returns the
+   same session-bound token in its cookie and a non-cacheable JSON response.
+   A token retrieval failure never sends an unprotected Stop request. A 401 at
+   token retrieval or Stop triggers at most one session refresh and retry,
+   acquiring a fresh CSRF token because refresh rotates the cookie. JWT,
+   ownership and double-submit CSRF checks on Stop remain required. Failure
+   opens `/reminders` so the user can finish stopping it there. This removes
+   the Cookie Store dependency for browsers that deliver the Stop action;
+   native action availability and delivery still require browser validation.
 3. **Source gone / condition cleared** -- the firing cron's sweep stops any
    reminder whose source was **dismissed** *or* **deleted**. The source FK is
    `ON DELETE SET NULL`, so a source that is read-but-never-dismissed and then
@@ -804,9 +827,24 @@ skipped (Section 4). `throttle_minutes = 0` disables the window.
   names, and a Web Push body is composed outside any request, so it follows the
   email rule. The wire is encrypted end to end (Section 15), the lock screen is
   not; the in-app row, one tap away through `target`, carries the detail.
-  `collapseKey` stays the row's dedupe key or id. The immediate email keeps the
-  row's copy inside a localized frame (known gap: the row's copy itself is
-  English for every producer today).
+  `collapseKey` stays the row's dedupe key or id. Email detail is composed from
+  `type` and `data` with `notificationEmailCopy` in the recipient's stored
+  language. This applies to immediate dispatch (including reminder re-emits),
+  critical budget emails, weekly budget digests and system-admin emails; dynamic
+  subjects use the same localized title. Each admin is rendered separately.
+  Catalogs under `emails.notificationCopy` cover all active notification types.
+  Numbers, snapshot currencies, dates and month names use the recipient's locale;
+  bill headlines are recomputed at delivery time against the UTC calendar day,
+  matching the server's bill-date convention. Push stays generic per category.
+  Names, symbols and diagnostic errors stay literal and are HTML-escaped by the
+  templates. New budget snapshots carry their currency code alongside the amounts.
+  Missing or malformed facts on legacy/restored rows retain the entire stored
+  title/message; no amount, currency, date or GEM state is invented. The dormant
+  `PACE_WARNING` enum has no producer or data contract and retains that fallback.
+  Tests: `backend/src/notifications/notification-email-copy.spec.ts` exercises
+  real nestjs-i18n, the active type set, English fallback, locales, incomplete
+  data and escaping; the dispatch, budget and system-alert service suites check
+  the four delivery paths and localized subjects.
 - **Concurrency, stated honestly:** the throttle is a **best-effort rate limit on
   external side effects**, not an exactly-once guarantee -- two replicas firing
   the same group within the window can both pass the `SELECT` and both send. Push
@@ -898,21 +936,46 @@ an address nobody was at, indistinguishable from a genuine loopback connection.
 A deployment fronted by nothing has no client address to record, and the column
 says so.
 
-### 14.6 Chart-in-push (R5) -- feasibility and the security envelope
+### 14.6 Chart-in-push (R5) -- delivery and security envelope
 
-Per Section 7: Android-Chrome-only progressive enhancement, default off, ships
-last. A `prices` notification (a future producer) may set
-`payload.image = '/api/v1/push/chart/<token>.png'`, where `<token>` is a
-**single-use, short-TTL, HMAC-signed** reference to a pre-rendered PNG the
-backend holds -- no user input in the path (CWE-22: the token is validated and
-resolves server-side to a stored artifact, never a filesystem path built from
-input). The fetch is **unauthenticated** (the browser, not our page, fetches it
-when it expands the notification), which is why the token is unguessable and
-expires. The SW passes `image` straight to `showNotification`. Where `image` is
-unsupported the notification is text-only and the deep link opens the full chart
-on `/securities/<id>`: **the number and the link are the contract; the chart is a
-nicety.** No `prices` producer exists yet, so this lands with the first
-price-alert producer, behind a per-group toggle defaulting off.
+The `SECURITY_PRICE_MOVEMENT` producer (`security-price-alerts.md`) can now
+attach a PNG to Web Push. Each instrument is one collapse group and has a
+separate `priceChartEnabled` opt-in, default false. The price-alert threshold
+alone does not authorize images. The sender rechecks the owner, active status,
+threshold and chart opt-in before reading stored quotes. UnifiedPush remains
+text-only. Category delivery gates and throttling apply before rendering.
+
+The renderer uses at most 60 stored closes, with the alert's own price/date as
+the last point, and produces a 640 × 280 PNG without browser or native runtime
+dependencies. It makes no provider requests. A chart shows quoted prices, not
+portfolio holdings or returns; axes use numeric prices and ISO dates.
+
+Each target device receives a separate
+`payload.image = '/api/v1/push/chart/<token>.png'`. The opaque token contains a
+random 256-bit nonce, expiry and purpose-separated HMAC. The endpoint requires
+this bearer credential rather than a session: anyone holding it can view that
+one image once within five minutes. Signature, format and TTL are checked
+before database access; PostgreSQL `DELETE RETURNING` consumes it atomically
+across replicas. HEAD does not consume it. No token becomes a filesystem path.
+The response is non-cacheable; the service worker accepts only this exact
+same-origin path format, without query strings, fragments or external URLs.
+
+Storage is shared PostgreSQL infrastructure, excluded from backups, capped at
+1,000 images of at most 64 KiB each. An advisory transaction lock serializes
+quota decisions; expired rows are removed on issue and every five minutes.
+Invalid data, missing history, a full store or rendering/storage failure leaves
+the existing localized, generic Investments text and instrument deep link.
+Images are a progressive enhancement: browsers without image support and
+notifications received after the image expires remain text-only. Push retention
+is longer than image retention by design. The opt-in permits a price chart on
+the device's notification screen; text otherwise retains the existing privacy
+policy and does not disclose amounts.
+
+Unit tests cover rendering, owner/opt-in gating, per-device issuance, invalid
+payloads, token validation and safe worker image paths. A PostgreSQL integration
+test covers concurrent consumption and replay. It has not run in the local
+workspace (no PostgreSQL); native browser image rendering also remains a manual
+validation item, alongside the existing browser test environment limitation.
 
 ### 14.7 Invariants and the test obligations
 
@@ -978,12 +1041,41 @@ notification layer for a notification, never a transport. There is no second
 sender, no ntfy-native JSON publish, and no new outbound-request shape: the
 endpoint is still a URL the server POSTs an encrypted body to, validated with the
 same `IsPushEndpoint` (https floor + SSRF resolve), so no new CWE-918 surface.
-**Known limitation, by design for now:** that check refuses a distributor on a
-private network (`https://ntfy.home.lan`), at registration and again before every
-send, so a UnifiedPush subscription must name a publicly resolvable https
-distributor. A self-hoster whose distributor is LAN-only needs an operator
-allowlist consulted only for `transport = 'unifiedpush'` endpoints; that is
-future work, not something the web UI can promise today.
+Private distributors are disabled by default. An operator can enable exact
+HTTPS DNS origins through `UNIFIEDPUSH_PRIVATE_ENDPOINTS`, a JSON mapping from
+origin to a pinned RFC1918 IPv4 or IPv6 ULA address. Example:
+`{"https://ntfy.home.lan:8443":"192.168.20.5"}`. Pass it to the backend environment
+and restart every replica; both Compose variants forward the variable.
+
+The exception applies only when `transport = 'unifiedpush'`, at registration
+and before each send. Hostname and port must match exactly; subdomains,
+wildcards, URL credentials, fragments, path-prefixed entries and IP-literal
+origins are not admitted. At most 32 entries and 16 KiB of configuration are
+accepted. Invalid configuration prevents backend startup. User preferences,
+subscription fields and administrator API requests cannot edit this setting.
+
+Each private delivery's HTTPS agent resolves only to the configured IP, with
+normal certificate verification and SNI for the original hostname. DNS changes
+cannot redirect that exception elsewhere. Loopback, link-local, metadata,
+multicast and public addresses cannot be pins. Use a dedicated distributor
+origin: the exception authorizes encrypted POSTs to paths on that origin, not
+an arbitrary host in a network range. Certificates must chain to a CA trusted
+by Node; no insecure TLS switch is introduced. The recipient client must also
+be able to reach and trust this server.
+
+Removing an entry and restarting the backend removes the private exception;
+existing subscriptions are rechecked before delivery. Public endpoints retain
+the existing bounded SSRF validation. Browser `webpush` subscriptions receive
+no private exception, even if their origin appears in the mapping. Tests cover
+configuration, exact matching, DTO transport, pinned lookup callback forms and
+sender refusal after removal. `npm run push:tls:test` also exercises real HTTPS
+on loopback: the production lookup helper preserves SNI, encrypted Web Push is
+decrypted by the reference receiver, and untrusted or mismatched certificates
+are rejected before an HTTP body arrives. It creates an ephemeral certificate
+with OpenSSL and trusts it only in the test agent. Loopback remains forbidden
+in production configuration. These four tests passed locally and run in CI;
+delivery to the actual ntfy deployment over LAN remains a smoke test.
+
 
 **What it is not.** A browser PWA cannot *receive* at an arbitrary endpoint --
 `pushManager.subscribe()` is bound to the browser's own push service. So a
@@ -996,6 +1088,24 @@ surface **manages and gates** UnifiedPush subscriptions (lists them with a
 transport badge, renames, removes, and exposes the channel toggle); it does not
 mint the keys, because the client that will decrypt owns them. Copy says so
 rather than offering a browser button that could never receive.
+
+### 15.1.1 ntfy reference receiver
+
+`backend/scripts/unifiedpush-client/` now provides a Node.js receiver with local
+recipient key storage, owner-authenticated registration, encrypted ntfy polling,
+checkpointed reconnects and subscription removal. It uses the existing
+`POST /push/subscriptions` with `transport: "unifiedpush"`; no authentication,
+SSRF or delivery gate is relaxed. Monize session credentials are sent only to
+Monize and are unnecessary while listening. Message copy is localized by the
+server; the receiver emits JSON and accepts only same-origin navigation targets.
+
+This closes the absence of any registering receiver in the tree for ntfy.
+It does not provide an Android package, a D-Bus connector, desktop banners,
+or browser registration to arbitrary distributors. Session handoff is manual
+and ntfy endpoints requiring separate HTTP credentials are unsupported. The
+README specifies installation, lifecycle and the deployment smoke test.
+The automated registration-to-decryption harness uses real Web Push encryption
+with mocked HTTP boundaries; live distributor verification remains outstanding.
 
 ### 15.2 Data model (migration 184)
 
@@ -1127,9 +1237,10 @@ verify it against the discussion rather than trusting this summary.)
   is a specific transaction is removed when that transaction is deleted. Needs a
   bounded design (Section 16.4): which producers tie a row to a transaction id,
   and delete-vs-null per row.
-- **Async localization** -- the recipient's chosen language. Done for the push
-  body and the email frame; the immediate-email body is producer-composed English
-  today (PR #1304 open item 2, spec Section 14).
+- **Async localization** -- the recipient's chosen language. Implemented for
+  push category copy, email framing and structured notification titles/messages,
+  including admin alerts and budget digests (PR #1304 open item 2, Section 14).
+  Legacy rows without the required facts retain their stored English fallback.
 
 ### 16.4 What still needs a spec before code
 
@@ -1170,3 +1281,36 @@ claiming the budget producer's applies unchanged.
   bill.reminderDaysBefore)`).
 - The bell's filter by **severity** and by **type** (financial vs system) is
   preserved and must not regress (`NotificationBell`, `NotificationList`).
+
+
+### Delegate access policy (TODO 10)
+
+Notification delivery and read state are personal to the owner. An acting
+delegate may read the existing notification feed only with the Budgets section
+grant. Reading as a delegate does not materialize new bill notifications.
+
+| Operation while acting as an owner | Policy |
+| --- | --- |
+| Read the notification feed | Budgets section grant required |
+| Mark read, mark all read, dismiss one or many | Owner only |
+| Read or change channel preferences and portfolio alert thresholds | Owner only |
+| Read push configuration, list/register/remove devices, send test push | Owner only |
+| List, create or stop reminders, including the push Stop request | Owner only |
+
+`@OwnerOnly()` makes this explicit on the four controllers; only the feed's
+list method overrides it with `@AllowDelegate()`. The global delegate guard
+continues to enforce the policy for direct API calls. Managing one's own
+notifications requires switching back to one's own account context. There is
+no notification-management delegation capability in this feature.
+
+The bell follows the same grant check and hides all write controls for an
+acting delegate. Opening a row navigates without marking the owner's row read.
+Context changes discard the previous feed and cancel pending dismiss timers.
+Settings already exposes only the actor's security controls in delegated mode;
+the reminders page already declines delegated access without fetching rows.
+
+`notification-delegate-policy.spec.ts` exercises the production guard with real
+route metadata and signed tokens for all four controllers. UI regressions cover
+read-only rows and the missing-grant case. Feed category visibility remains the
+existing Budgets-section policy; this decision does not add account/category
+filtering or grant delegates access to the owner's delivery destinations.

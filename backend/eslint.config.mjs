@@ -48,6 +48,11 @@ const WITH_CONTEXT_ALLOWLIST = [
   // post-commit timer (no request), so it seeds its own withUserContext
   // (docs/specs/balance-threshold-notifications.md).
   "src/notification-center/balance-threshold-alert.service.ts",
+  // Per-security price-movement cron, the same two-part shape as the portfolio
+  // one above: a system-context keyset scan to enumerate every opted-in
+  // security's owner, then a per-user body (withUserContext) that re-reads the
+  // opt-in under that owner's own scope before it writes. No request behind it.
+  "src/notification-center/security-price-alert.service.ts",
   "src/common/interceptors/request-context.interceptor.ts",
   // The Google Places quota claim for the OPERATOR's key. That counter belongs
   // to the deployment rather than to whoever's lookup spent it -- there is no
@@ -133,6 +138,13 @@ const WITH_CONTEXT_ALLOWLIST = [
   // Reading the row itself runs under the caller's own identity -- the table is
   // RLS-exempt, so a bypass there would widen the fence for nothing.
   "src/push/push-config.service.ts",
+  // Push chart artifacts: ephemeral pre-rendered images authorized by a one-use
+  // HMAC bearer token and consumed atomically, with no owner column to policy on
+  // (the table is RLS-exempt, and `rls-exempt-tables.ts` carries that reasoning).
+  // Both call sites are cross-user by construction -- the expiry sweep is a cron
+  // with no request behind it, and the per-issue cap counts every artifact on
+  // the instance -- so neither has a caller identity that could own the row.
+  "src/push/push-chart-artifact.service.ts",
   // Daily sweep of long-retired push devices: a cross-user cron with no request
   // behind it, and every row it can reach belongs to somebody who can no longer
   // receive on it.

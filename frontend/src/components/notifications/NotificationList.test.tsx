@@ -80,6 +80,44 @@ describe('NotificationList', () => {
     onDeleteAll: vi.fn(),
   };
 
+  it('links to the active reminders page and closes the panel', () => {
+    render(<NotificationList {...defaultProps} />);
+    const link = screen.getByRole('link', { name: 'Active reminders' });
+    expect(link).toHaveAttribute('href', '/reminders');
+    link.addEventListener('click', (event) => event.preventDefault());
+    fireEvent.click(link);
+    expect(defaultProps.onClose).toHaveBeenCalled();
+  });
+
+  it('hides reminder management when the caller is a delegate', () => {
+    render(<NotificationList {...defaultProps} canManageNotifications={false} />);
+    expect(screen.queryByRole('link', { name: 'Active reminders' })).not.toBeInTheDocument();
+  });
+
+  it('lets a delegate open a row without changing read state or exposing write controls', () => {
+    render(<NotificationList {...defaultProps} canManageNotifications={false}
+      notifications={[makeNotification(), makeNotification({ id: 'nag', data: { reminderId: 'rem-1' } })]} />);
+    for (const id of ['mark-all-read', 'delete-all-notifications', 'dismiss-notification-notification-1',
+      'remind-me-notification-1', 'stop-reminder-nag']) {
+      expect(screen.queryByTestId(id)).not.toBeInTheDocument();
+    }
+    fireEvent.click(screen.getByTestId('notification-item-notification-1'));
+    expect(defaultProps.onMarkRead).not.toHaveBeenCalled();
+    expect(defaultProps.onClose).toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith('/budgets/budget-1');
+  });
+
+  it('renders structured security price facts and navigates to the instrument', () => {
+    render(<NotificationList {...defaultProps} notifications={[makeNotification({
+      type: 'SECURITY_PRICE_MOVEMENT', title: 'stored English', message: 'stored English',
+      target: '/securities/sec-1', data: { symbol: 'AAPL', changePercent: -5.25 },
+    })]} />);
+    expect(screen.getByText('Price change alert: AAPL (-5.25%)')).toBeInTheDocument();
+    expect(screen.getByText('AAPL: -5.25% compared with the previous available session.')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('notification-item-notification-1'));
+    expect(mockPush).toHaveBeenCalledWith('/securities/sec-1');
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     // A due date on a notification row is a calendar string; the UI must render

@@ -154,11 +154,26 @@ export async function createIntegrationModule(
   // into enforcement -- see rls-setup.ts.
   await applyRlsPolicies(module.get(DataSource));
 
-  // Mock triggerDebouncedRecalc to prevent timer leaks
-  const netWorthService = module.get(NetWorthService);
-  jest
-    .spyOn(netWorthService, "triggerDebouncedRecalc")
-    .mockImplementation(() => {});
+  // Mock triggerDebouncedRecalc to prevent timer leaks.
+  //
+  // Only when the graph actually holds one. A suite that imports no application
+  // module -- `createIntegrationModule([])`, which the push chart token spec
+  // uses because it wants a DataSource and constructs its own service -- has no
+  // debounced recalc to leak, and `get` THROWS for an absent provider rather
+  // than returning undefined. The catch is narrow on purpose: a
+  // NetWorthService that is present resolves, so this only swallows the
+  // "nobody asked for it" case and never a broken provider.
+  let netWorthService: NetWorthService | null = null;
+  try {
+    netWorthService = module.get(NetWorthService, { strict: false });
+  } catch {
+    netWorthService = null;
+  }
+  if (netWorthService) {
+    jest
+      .spyOn(netWorthService, "triggerDebouncedRecalc")
+      .mockImplementation(() => {});
+  }
 
   return module;
 }
