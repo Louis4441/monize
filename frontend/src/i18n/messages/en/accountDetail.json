@@ -5,6 +5,8 @@
     "edit": "Edit Account",
     "back": "Back to Accounts",
     "switchAccount": "Switch to another account",
+    "switchFavourites": "Favourites",
+    "switchOtherAccounts": "Other accounts",
     "switchPlaceholder": "Filter accounts...",
     "switchNoMatches": "No accounts match",
     "jointBadge": "Joint",

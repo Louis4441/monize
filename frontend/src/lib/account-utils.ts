@@ -7,6 +7,33 @@ export interface AccountSelectOption {
 }
 
 /**
+ * The order every account picker offers accounts in: the user's favourites
+ * first, in the order they arranged them, then everything else by name.
+ *
+ * The two halves are returned separately rather than concatenated, because
+ * every caller needs the boundary as well as the order -- a `<select>` draws a
+ * separator rule across it, a switcher menu puts a section heading above each
+ * side. Handing back one flat list would have each of them re-deriving where
+ * favourites stop, which is the copy that drifts.
+ *
+ * Sorting happens on copies: `Array.prototype.sort` reorders in place, and the
+ * array reaching here is usually one a caller memoized for other consumers too.
+ */
+export function orderAccountsForPicker(accounts: readonly Account[]): {
+  favourites: Account[];
+  rest: Account[];
+} {
+  return {
+    favourites: accounts
+      .filter((a) => a.isFavourite)
+      .sort((a, b) => a.favouriteSortOrder - b.favouriteSortOrder),
+    rest: accounts
+      .filter((a) => !a.isFavourite)
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  };
+}
+
+/**
  * Build account dropdown options with favourite accounts listed first
  * (sorted by user-defined order), a visual separator, then remaining
  * accounts sorted alphabetically.
@@ -17,15 +44,7 @@ export function buildAccountDropdownOptions(
   labelFn: (account: Account) => string = (a) =>
     `${a.name} (${a.currencyCode})${a.isClosed ? ' (Closed)' : ''}`,
 ): AccountSelectOption[] {
-  const filtered = accounts.filter(filter);
-
-  const favourites = filtered
-    .filter((a) => a.isFavourite)
-    .sort((a, b) => a.favouriteSortOrder - b.favouriteSortOrder);
-
-  const rest = filtered
-    .filter((a) => !a.isFavourite)
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const { favourites, rest } = orderAccountsForPicker(accounts.filter(filter));
 
   const options: AccountSelectOption[] = [];
 

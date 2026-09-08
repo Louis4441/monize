@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildAccountDropdownOptions,
+  orderAccountsForPicker,
   buildAccountFilterLabel,
   formatAccountType,
   isInvestmentBrokerageAccount,
@@ -27,6 +28,43 @@ function makeAccount(overrides: Partial<Account> & { id: string; name: string })
     ...overrides,
   };
 }
+
+describe('orderAccountsForPicker', () => {
+  const accounts = [
+    makeAccount({ id: 'z', name: 'Zebra' }),
+    makeAccount({ id: 'f2', name: 'Beta', isFavourite: true, favouriteSortOrder: 2 }),
+    makeAccount({ id: 'a', name: 'Alpha' }),
+    makeAccount({ id: 'f1', name: 'Yankee', isFavourite: true, favouriteSortOrder: 1 }),
+  ];
+
+  it('puts the starred accounts in the order the user arranged them', () => {
+    // `favouriteSortOrder`, never the name: the user dragged them into that
+    // order and every picker honours it.
+    expect(orderAccountsForPicker(accounts).favourites.map((a) => a.name)).toEqual([
+      'Yankee',
+      'Beta',
+    ]);
+  });
+
+  it('sorts everything else by name', () => {
+    expect(orderAccountsForPicker(accounts).rest.map((a) => a.name)).toEqual([
+      'Alpha',
+      'Zebra',
+    ]);
+  });
+
+  it('leaves the array it was handed alone', () => {
+    // `Array.prototype.sort` reorders in place, and callers pass a list they
+    // memoized for other consumers too.
+    const input = [...accounts];
+    orderAccountsForPicker(input);
+    expect(input.map((a) => a.id)).toEqual(['z', 'f2', 'a', 'f1']);
+  });
+
+  it('returns two empty halves for no accounts', () => {
+    expect(orderAccountsForPicker([])).toEqual({ favourites: [], rest: [] });
+  });
+});
 
 describe('buildAccountDropdownOptions', () => {
   const accounts: Account[] = [

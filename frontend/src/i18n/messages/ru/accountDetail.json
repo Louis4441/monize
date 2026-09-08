@@ -5,6 +5,8 @@
     "edit": "Изменить счёт",
     "back": "Назад к счетам",
     "switchAccount": "Перейти к другому счёту",
+    "switchFavourites": "Избранное",
+    "switchOtherAccounts": "Другие счета",
     "switchPlaceholder": "Фильтр счетов...",
     "switchNoMatches": "Нет подходящих счетов",
     "jointBadge": "Совместный",

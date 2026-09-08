@@ -11,7 +11,11 @@ import {
 } from '@heroicons/react/24/outline';
 import { Account } from '@/types/account';
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
-import { formatAccountType, maskAccountNumber } from '@/lib/account-utils';
+import {
+  formatAccountType,
+  maskAccountNumber,
+  orderAccountsForPicker,
+} from '@/lib/account-utils';
 import { getOrdinal } from '@/lib/ordinal';
 import { balanceColor } from '@/lib/format';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -106,24 +110,43 @@ export function AccountInfoWidget({
   // URIs ever reaching the href.
   const institutionWebsite = safeHttpUrl(institution?.website);
 
-  // One row per account the Accounts filter offers, in the filter's own order
-  // (by name), each qualified by its type the way the account detail page's
-  // switcher does, so alike-named accounts at two banks are told apart.
-  const switcherItems = useMemo<EntitySwitcherItem[]>(
-    () =>
-      [...(switchableAccounts ?? [])]
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map((candidate) => {
-          const type = formatAccountType(candidate.accountType, tc);
-          return {
-            id: candidate.id,
-            primary: candidate.name,
-            secondary: type,
-            searchText: `${candidate.name} ${type}`,
-          };
-        }),
-    [switchableAccounts, tc],
-  );
+  // One row per account the Accounts filter offers, each qualified by its type
+  // the way the account detail page's switcher does, so alike-named accounts at
+  // two banks are told apart. The order is `orderAccountsForPicker`'s -- the
+  // starred accounts in the order the user arranged them, then the rest by name
+  // -- so this menu opens on the same accounts, in the same order, as every
+  // account `<select>` in the app.
+  const switcherItems = useMemo<EntitySwitcherItem[]>(() => {
+    const { favourites, rest } = orderAccountsForPicker(switchableAccounts ?? []);
+    // Whether the menu is sectioned at all is decided by the favourites it will
+    // actually OFFER, not by the ones the user has: `EntitySwitcher` drops the
+    // account already on screen, so a reader whose only starred account is the
+    // one they are looking at would otherwise get an "Other accounts" heading
+    // over the whole list with nothing above it.
+    const sectioned = favourites.some((candidate) => candidate.id !== account.id);
+    const toItem = (candidate: Account, group?: string): EntitySwitcherItem => {
+      const type = formatAccountType(candidate.accountType, tc);
+      return {
+        id: candidate.id,
+        primary: candidate.name,
+        secondary: type,
+        // A starred account is still findable by its own name and type, so
+        // typing narrows across both sections rather than only below the fold.
+        searchText: `${candidate.name} ${type}`,
+        group,
+      };
+    };
+    // Emitted favourites-first because `EntitySwitcher` takes its section order
+    // from the order the items appear in.
+    return [
+      ...favourites.map((candidate) =>
+        toItem(candidate, sectioned ? ta('header.switchFavourites') : undefined),
+      ),
+      ...rest.map((candidate) =>
+        toItem(candidate, sectioned ? ta('header.switchOtherAccounts') : undefined),
+      ),
+    ];
+  }, [switchableAccounts, account.id, ta, tc]);
 
   // The soonest active scheduled bill/deposit booked against this account.
   const nextPayment = useMemo(

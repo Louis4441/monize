@@ -310,7 +310,9 @@ Every detail page carries the same two controls: a chevron and "Back to <List>" 
 
 **A detail page's actions sit on the title row, not in a row above the body.** `AccountDetailShell` takes `headerActions` for type-specific actions beside the standard set; a signal they need to send the body travels down as a prop (`refreshKey`) rather than keeping the button in the body. A `size="sm"` button in a report toolbar takes `size="md"` in that header.
 
-A switcher list too long to scan takes `group` on its items (`ReportSwitcher` groups in `REPORT_CATEGORIES` order); sections follow the order their first item appears in, so ordering happens in the caller.
+A switcher list too long to scan takes `group` on its items (`ReportSwitcher` groups in `REPORT_CATEGORIES` order); sections follow the order their first item appears in, so ordering happens in the caller. An item with no `group` renders ungrouped, so a menu whose sections would be a lone heading over everything is better emitted with none at all -- and whether that heading has anything under it is decided by the items the switcher will actually OFFER, since it drops the entity already on screen (the Transactions account widget sections only when a starred account other than the current one exists).
+
+**Which accounts a picker offers, and in what order, is `orderAccountsForPicker`** (`lib/account-utils.ts`): the starred accounts by `favouriteSortOrder` -- the order the user dragged them into -- then everything else by name. It hands back the two halves rather than one list, because each caller needs the boundary as well as the order (`buildAccountDropdownOptions` rules a separator across it; the account switcher puts a section heading above each side), and a flat list would have each of them re-deriving where favourites stop.
 
 ### A category picker lists every category in tree order as "Parent: Child"
 
