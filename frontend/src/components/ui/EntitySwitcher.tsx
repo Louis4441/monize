@@ -122,8 +122,10 @@ export function placeMenu(
  * follows a long account name and the menu ran off the right edge, and on a
  * desktop the widget column is `overflow-hidden` and translated, which both
  * clips an absolute child and makes the column the containing block of a
- * fixed one. Page scroll and resize close it rather than chase the caret, as
- * `MultiSelect` does.
+ * fixed one. Page scroll and resize re-measure the caret so the menu follows
+ * it: closing on them instead made the menu vanish as it opened, because
+ * focusing the filter scrolled it into view and a phone's keyboard resized the
+ * viewport. The filter is focused with `preventScroll` for the same reason.
  */
 export function EntitySwitcher({
   currentId,
@@ -140,6 +142,7 @@ export function EntitySwitcher({
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const filterRef = useRef<HTMLInputElement>(null);
   const isOpen = placement !== null;
 
   const open = () => {
@@ -163,21 +166,35 @@ export function EntitySwitcher({
   });
 
   // A fixed menu measured once would drift from a caret that scrolls or
-  // reflows away from it; closing is simpler than tracking. Scrolling the
-  // menu's own list is not the page moving.
+  // reflows away from it, so every scroll and resize re-measures (one
+  // measurement per frame). It must never CLOSE on them: opening itself
+  // scrolls and resizes -- the filter taking focus scrolls its container, and
+  // a phone's keyboard shrinks the viewport -- so a menu that closed on either
+  // flashed open and shut. Scrolling the menu's own list moves no caret.
   useEffect(() => {
     if (!isOpen) return;
-    const handleScrollOrResize = (event: Event) => {
+    let raf = 0;
+    const reposition = (event: Event) => {
       if (event.target instanceof Node && menuRef.current?.contains(event.target)) return;
-      setPlacement(null);
-      setQuery('');
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const rect = triggerRef.current?.getBoundingClientRect();
+        if (rect) setPlacement(placeMenu(rect, window.innerWidth, window.innerHeight));
+      });
     };
-    window.addEventListener('scroll', handleScrollOrResize, true);
-    window.addEventListener('resize', handleScrollOrResize);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
     return () => {
-      window.removeEventListener('scroll', handleScrollOrResize, true);
-      window.removeEventListener('resize', handleScrollOrResize);
+      cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
     };
+  }, [isOpen]);
+
+  // Focus the filter once the menu is up, without scrolling it into view: the
+  // scroll that `autoFocus` triggered is what closed the menu on open.
+  useEffect(() => {
+    if (isOpen) filterRef.current?.focus({ preventScroll: true });
   }, [isOpen]);
 
   const others = useMemo(
@@ -288,12 +305,12 @@ export function EntitySwitcher({
           {showFilter && (
             <div className="shrink-0 border-b border-gray-200 p-2 dark:border-gray-700">
               <input
+                ref={filterRef}
                 type="text"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={filterPlaceholder}
                 aria-label={filterPlaceholder}
-                autoFocus
                 className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
               />
             </div>

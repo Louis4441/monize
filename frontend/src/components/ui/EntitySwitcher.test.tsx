@@ -253,27 +253,81 @@ describe('EntitySwitcher', () => {
       expect(screen.queryByRole('menu')).toBeNull();
     });
 
-    it('closes when the page scrolls, but not when its own list does', async () => {
-      open(many(12));
-      const list = screen.getByRole('menu').querySelector('.overflow-y-auto') as HTMLElement;
-      // The listener is a capturing one on window, so a non-bubbling scroll on
-      // the list still reaches it and is told apart by its target.
-      await act(async () => {
-        list.dispatchEvent(new Event('scroll', { bubbles: false }));
+    /** Run the re-measure synchronously; jsdom has no frames to wait for. */
+    function withImmediateFrames<T>(run: () => T): T {
+      vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+        cb(0);
+        return 0;
       });
-      expect(screen.getByRole('menu')).toBeInTheDocument();
-      await act(async () => {
-        document.documentElement.dispatchEvent(new Event('scroll', { bubbles: false }));
-      });
-      expect(screen.queryByRole('menu')).toBeNull();
+      vi.stubGlobal('cancelAnimationFrame', () => undefined);
+      try {
+        return run();
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    }
+
+    it('focuses the filter without scrolling it into view', () => {
+      const focus = vi.spyOn(HTMLInputElement.prototype, 'focus');
+      try {
+        open(many(12));
+        expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+        expect(screen.getByPlaceholderText(LABELS.filterPlaceholder)).toHaveFocus();
+      } finally {
+        focus.mockRestore();
+      }
     });
 
-    it('closes when the window resizes', async () => {
-      open(two);
-      await act(async () => {
-        window.dispatchEvent(new Event('resize'));
+    it('stays open and follows the caret when the page scrolls', async () => {
+      // Opening focuses the filter, which scrolls its container into view; a
+      // menu that closed on scroll flashed open and shut. It re-measures instead.
+      const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
+      const at = (top: number) =>
+        ({ left: 40, right: 64, top, bottom: top + 24, width: 24, height: 24, x: 40, y: top, toJSON: () => ({}) }) as DOMRect;
+      rectSpy.mockReturnValue(at(100));
+      try {
+        await withImmediateFrames(async () => {
+          open(many(12));
+          expect(screen.getByRole('menu').style.top).toBe(`${100 + 24 + 4}px`);
+          rectSpy.mockReturnValue(at(60));
+          await act(async () => {
+            document.documentElement.dispatchEvent(new Event('scroll', { bubbles: false }));
+          });
+          expect(screen.getByRole('menu')).toBeInTheDocument();
+          expect(screen.getByRole('menu').style.top).toBe(`${60 + 24 + 4}px`);
+        });
+      } finally {
+        rectSpy.mockRestore();
+      }
+    });
+
+    it('stays open when the viewport resizes, as it does when a phone keyboard appears', async () => {
+      await withImmediateFrames(async () => {
+        open(two);
+        await act(async () => {
+          window.dispatchEvent(new Event('resize'));
+        });
+        expect(screen.getByRole('menu')).toBeInTheDocument();
       });
-      expect(screen.queryByRole('menu')).toBeNull();
+    });
+
+    it('does not re-measure for a scroll inside its own list', async () => {
+      const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
+      rectSpy.mockReturnValue({ left: 40, right: 64, top: 100, bottom: 124, width: 24, height: 24, x: 40, y: 100, toJSON: () => ({}) } as DOMRect);
+      try {
+        await withImmediateFrames(async () => {
+          open(many(12));
+          const calls = rectSpy.mock.calls.length;
+          const list = screen.getByRole('menu').querySelector('.overflow-y-auto') as HTMLElement;
+          await act(async () => {
+            list.dispatchEvent(new Event('scroll', { bubbles: false }));
+          });
+          expect(rectSpy.mock.calls.length).toBe(calls);
+          expect(screen.getByRole('menu')).toBeInTheDocument();
+        });
+      } finally {
+        rectSpy.mockRestore();
+      }
     });
   });
 });
