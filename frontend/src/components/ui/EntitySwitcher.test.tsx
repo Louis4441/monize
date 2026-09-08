@@ -1,7 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
-import { screen, fireEvent, within } from '@testing-library/react';
+import { act, screen, fireEvent, within } from '@testing-library/react';
 import { render } from '@/test/render';
-import { EntitySwitcher, type EntitySwitcherItem } from './EntitySwitcher';
+import {
+  EntitySwitcher,
+  MENU_WIDTH,
+  VIEWPORT_MARGIN,
+  placeMenu,
+  type EntitySwitcherItem,
+} from './EntitySwitcher';
 
 const LABELS = {
   triggerLabel: 'Switch thing',
@@ -166,5 +172,108 @@ describe('EntitySwitcher', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('menu')).toBeNull();
     expect(screen.getByRole('button', { name: LABELS.triggerLabel })).toHaveFocus();
+  });
+
+  describe('placement', () => {
+    /**
+     * The caret sits at the end of a long account name in the Transactions
+     * page's Account Info widget, and on a phone that is near the right edge.
+     * An absolute `left-0 w-72` menu from there ran off the screen.
+     */
+    const caretNearRightEdge = { left: 300, top: 16, bottom: 40 };
+
+    it('slides the menu left so it stays inside a narrow viewport', () => {
+      const placed = placeMenu(caretNearRightEdge, 360, 800);
+      expect(placed.width).toBe(MENU_WIDTH);
+      expect(placed.left + placed.width).toBeLessThanOrEqual(360 - VIEWPORT_MARGIN);
+      expect(placed.left).toBeGreaterThanOrEqual(VIEWPORT_MARGIN);
+      expect(placed.top).toBe(caretNearRightEdge.bottom + 4);
+    });
+
+    it('opens at the caret when there is room to its right', () => {
+      const placed = placeMenu({ left: 40, top: 16, bottom: 40 }, 1280, 800);
+      expect(placed.left).toBe(40);
+      expect(placed.width).toBe(MENU_WIDTH);
+    });
+
+    it('shrinks the menu on a viewport narrower than the menu itself', () => {
+      const placed = placeMenu(caretNearRightEdge, 240, 800);
+      expect(placed.width).toBe(240 - 2 * VIEWPORT_MARGIN);
+      expect(placed.left).toBe(VIEWPORT_MARGIN);
+    });
+
+    it('opens upward when the caret is near the bottom and the room is above', () => {
+      const placed = placeMenu({ left: 40, top: 700, bottom: 724 }, 1280, 800);
+      expect(placed.bottom).toBe(800 - 700 + 4);
+      expect(placed.top).toBeUndefined();
+      expect(placed.maxHeight).toBeLessThanOrEqual(700);
+    });
+
+    it('renders the menu in a portal, so a clipping or transformed ancestor cannot cut it off', () => {
+      open(two);
+      const menu = screen.getByRole('menu');
+      expect(menu.parentElement).toBe(document.body);
+      expect(menu.style.position).toBe('fixed');
+    });
+
+    it('positions the rendered menu from the caret, clamped to the viewport', () => {
+      const originalWidth = window.innerWidth;
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 360 });
+      const rectSpy = vi
+        .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+        .mockReturnValue({
+          left: 300,
+          right: 324,
+          top: 16,
+          bottom: 40,
+          width: 24,
+          height: 24,
+          x: 300,
+          y: 16,
+          toJSON: () => ({}),
+        } as DOMRect);
+      try {
+        open(two);
+        const menu = screen.getByRole('menu');
+        const left = parseFloat(menu.style.left);
+        const width = parseFloat(menu.style.width);
+        expect(left + width).toBeLessThanOrEqual(360 - VIEWPORT_MARGIN);
+        expect(left).toBeGreaterThanOrEqual(VIEWPORT_MARGIN);
+      } finally {
+        rectSpy.mockRestore();
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth });
+      }
+    });
+
+    it('treats a click inside the portalled menu as inside, and one elsewhere as outside', () => {
+      open(many(12));
+      fireEvent.mouseDown(screen.getByPlaceholderText(LABELS.filterPlaceholder));
+      expect(screen.getByRole('menu')).toBeInTheDocument();
+      fireEvent.mouseDown(document.body);
+      expect(screen.queryByRole('menu')).toBeNull();
+    });
+
+    it('closes when the page scrolls, but not when its own list does', async () => {
+      open(many(12));
+      const list = screen.getByRole('menu').querySelector('.overflow-y-auto') as HTMLElement;
+      // The listener is a capturing one on window, so a non-bubbling scroll on
+      // the list still reaches it and is told apart by its target.
+      await act(async () => {
+        list.dispatchEvent(new Event('scroll', { bubbles: false }));
+      });
+      expect(screen.getByRole('menu')).toBeInTheDocument();
+      await act(async () => {
+        document.documentElement.dispatchEvent(new Event('scroll', { bubbles: false }));
+      });
+      expect(screen.queryByRole('menu')).toBeNull();
+    });
+
+    it('closes when the window resizes', async () => {
+      open(two);
+      await act(async () => {
+        window.dispatchEvent(new Event('resize'));
+      });
+      expect(screen.queryByRole('menu')).toBeNull();
+    });
   });
 });

@@ -1,6 +1,7 @@
 'use client';
 
-import { Fragment, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { useClickOutside } from '@/hooks/useClickOutside';
 
@@ -52,6 +53,54 @@ interface EntitySwitcherProps {
 /** Beyond this many, scanning the list is slower than typing into the filter. */
 const FILTER_THRESHOLD = 8;
 
+/** The menu's preferred width (Tailwind `w-72`), narrowed only on a viewport that cannot hold it. */
+export const MENU_WIDTH = 288;
+/** Breathing room kept between the menu and every viewport edge. */
+export const VIEWPORT_MARGIN = 8;
+/** Space between the caret and the menu below (or above) it. */
+const MENU_GAP = 4;
+/** The menu never grows past this; the list inside it scrolls instead. */
+const MENU_MAX_HEIGHT = 336;
+/** Below this much room under the caret, the menu opens upward if that side has more. */
+const FLIP_THRESHOLD = 200;
+
+interface MenuPlacement {
+  left: number;
+  width: number;
+  maxHeight: number;
+  /** Set when the menu hangs below the caret. */
+  top?: number;
+  /** Set when the menu stands above the caret, measured from the viewport bottom. */
+  bottom?: number;
+}
+
+/**
+ * Where the menu goes for a caret at `rect`, in a viewport `viewportWidth` by
+ * `viewportHeight`. Pure so the placement can be tested without a layout
+ * engine: the menu starts at the caret's left edge and slides left as far as
+ * it must to stay `VIEWPORT_MARGIN` inside the right edge; on a viewport
+ * narrower than the menu it shrinks to fit instead. It hangs below the caret
+ * unless that side is cramped and the space above is larger.
+ */
+export function placeMenu(
+  rect: Pick<DOMRect, 'left' | 'top' | 'bottom'>,
+  viewportWidth: number,
+  viewportHeight: number,
+): MenuPlacement {
+  const width = Math.max(0, Math.min(MENU_WIDTH, viewportWidth - 2 * VIEWPORT_MARGIN));
+  const left = Math.min(
+    Math.max(VIEWPORT_MARGIN, rect.left),
+    viewportWidth - width - VIEWPORT_MARGIN,
+  );
+  const spaceBelow = viewportHeight - rect.bottom - MENU_GAP - VIEWPORT_MARGIN;
+  const spaceAbove = rect.top - MENU_GAP - VIEWPORT_MARGIN;
+  const openUp = spaceBelow < FLIP_THRESHOLD && spaceAbove > spaceBelow;
+  const maxHeight = Math.min(MENU_MAX_HEIGHT, Math.max(0, openUp ? spaceAbove : spaceBelow));
+  return openUp
+    ? { left, width, maxHeight, bottom: viewportHeight - rect.top + MENU_GAP }
+    : { left, width, maxHeight, top: rect.bottom + MENU_GAP };
+}
+
 /**
  * A caret beside a detail page's title that jumps straight to another entity of
  * the same kind, without going back to the list and clicking through again. The
@@ -65,6 +114,16 @@ const FILTER_THRESHOLD = 8;
  * of entities the box is one more thing to skip past, and for a hundred it is
  * the only way through. Closes on click-outside and on Escape, which returns
  * focus to the caret -- the same behaviour as the app's other header menus.
+ *
+ * The menu is rendered through a portal at a fixed position measured from the
+ * caret and clamped to the viewport (`placeMenu`), the way `MultiSelect` and
+ * the portal `InfoTooltip` place theirs. An `absolute` box under the caret was
+ * cut off in the Transactions page's Account Info widget: on a phone the caret
+ * follows a long account name and the menu ran off the right edge, and on a
+ * desktop the widget column is `overflow-hidden` and translated, which both
+ * clips an absolute child and makes the column the containing block of a
+ * fixed one. Page scroll and resize close it rather than chase the caret, as
+ * `MultiSelect` does.
  */
 export function EntitySwitcher({
   currentId,
@@ -76,23 +135,50 @@ export function EntitySwitcher({
   noMatchesLabel,
   secondaryAlign = 'end',
 }: EntitySwitcherProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [placement, setPlacement] = useState<MenuPlacement | null>(null);
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const isOpen = placement !== null;
+
+  const open = () => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPlacement(placeMenu(rect, window.innerWidth, window.innerHeight));
+  };
 
   const close = () => {
-    setIsOpen(false);
+    setPlacement(null);
     setQuery('');
   };
 
-  useClickOutside(containerRef, close, {
+  // The menu lives in a portal, so it is its own "inside" beside the caret.
+  useClickOutside([containerRef, menuRef], close, {
     enabled: isOpen,
     onEscape: () => {
       close();
       triggerRef.current?.focus();
     },
   });
+
+  // A fixed menu measured once would drift from a caret that scrolls or
+  // reflows away from it; closing is simpler than tracking. Scrolling the
+  // menu's own list is not the page moving.
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleScrollOrResize = (event: Event) => {
+      if (event.target instanceof Node && menuRef.current?.contains(event.target)) return;
+      setPlacement(null);
+      setQuery('');
+    };
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [isOpen]);
 
   const others = useMemo(
     () => items.filter((item) => item.id !== currentId),
@@ -167,7 +253,7 @@ export function EntitySwitcher({
         // Toggling `isOpen` alone left the query behind, and reopening then
         // showed the previous search instead of the list -- which reads as most
         // of the entries having disappeared.
-        onClick={() => (isOpen ? close() : setIsOpen(true))}
+        onClick={() => (isOpen ? close() : open())}
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-label={triggerLabel}
@@ -183,14 +269,24 @@ export function EntitySwitcher({
         />
       </button>
 
-      {isOpen && (
+      {placement &&
+        createPortal(
         <div
+          ref={menuRef}
           role="menu"
           aria-label={triggerLabel}
-          className="absolute left-0 z-50 mt-1 w-72 rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+          style={{
+            position: 'fixed',
+            left: placement.left,
+            width: placement.width,
+            maxHeight: placement.maxHeight,
+            top: placement.top,
+            bottom: placement.bottom,
+          }}
+          className="z-[100] flex flex-col overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
         >
           {showFilter && (
-            <div className="border-b border-gray-200 p-2 dark:border-gray-700">
+            <div className="shrink-0 border-b border-gray-200 p-2 dark:border-gray-700">
               <input
                 type="text"
                 value={query}
@@ -202,7 +298,7 @@ export function EntitySwitcher({
               />
             </div>
           )}
-          <div className="max-h-72 overflow-y-auto py-1">
+          <div className="min-h-0 flex-1 overflow-y-auto py-1">
             {matches.length === 0 ? (
               <p className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
                 {noMatchesLabel}
@@ -230,7 +326,8 @@ export function EntitySwitcher({
               )
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

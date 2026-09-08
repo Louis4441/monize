@@ -562,6 +562,10 @@ Below `sm` a table that cannot fit five or more columns does not scroll sideways
 
 The sliding `AppHeader` always carries a `transform` (`useHideOnScroll`), which makes the header -- not the viewport -- the containing block for every `position: fixed` descendant. A panel mounted in the header (the notifications dropdown, `ActionHistoryPanel`) that anchors with `bottom-0`/`inset-0` is therefore capped at the header's own ~56px box: the full-screen notifications panel only *looked* full while rows overflowed it, and collapsed when empty. Size such a panel with an explicit height (`h-dvh` for the mobile full-screen treatment) and edge offsets that grow past the containing block; `NotificationList.test.tsx` pins the class shape.
 
+### A menu anchored to a caret is portalled and clamped, never an `absolute` box
+
+`EntitySwitcher` renders its menu through `createPortal` at a fixed position measured from the caret and clamped to the viewport (`placeMenu`, tested pure), the way `MultiSelect`, `CalendarPopover` and the portal `InfoTooltip` place theirs. The `absolute left-0 w-72` box it replaced was fine beside a page title at the left edge and wrong the first time the caret sat anywhere else: in the Transactions page's Account Info widget it followed a long account name off the right of a phone, and on a desktop the widget column is `overflow-hidden` and translated -- which clips an absolute child *and* makes the column the containing block of a fixed one (the header rule above, again). A popover that can be opened from inside a card, a column or a table cell goes through a portal with a viewport clamp; page scroll and resize close it rather than chase the anchor. `EntitySwitcher.test.tsx` holds the clamp, the portal and the flip.
+
 ### A control is not offered when nothing can answer it -- and which question to ask depends on the control
 
 Two hooks, because two different prerequisites. A control whose one possible outcome is "configure something first" is worse than an absent one: it costs a click to learn nothing.
