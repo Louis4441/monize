@@ -522,13 +522,46 @@ jobs:
           # Exclude some false positives and low-risk findings that we are aware of and have accepted for now.
           # Each entry has a "review-by" date; the bearer-exceptions-review workflow
           # opens an issue when any entry is past due, so exceptions don't become permanent debt.
-          # b65bd7b1a0585cd1d0a326cdb09ce40d_0 - Hard-coded secret used for demo site - review-by: 2026-09-04
-          # da119900eefffd8b84e7693e0388568a_0 - Hard-coded secret used for E2E tests - review-by: 2026-09-04
-          # 95857358158e4664c01c05441df9f2a9_0 - Hard-coded secret used for demo site - review-by: 2026-09-04
-          # 842822dd22cd4403ab5800ac89480c0a_0 - Insufficient randomness for inconsequential task - review-by: 2026-09-04
-          # b04cb91b90deb5e16504baa7ab95f678_0 - Unsanitized dynamic input in file path [CWE-22] - review-by: 2026-09-04
-          # b04cb91b90deb5e16504baa7ab95f678_1 - Unsanitized dynamic input in file path [CWE-22] - review-by: 2026-09-04
-          # 30770548d4592a14c9099ac0103a2564_0 - Observable timing discrepancy [CWE-208] comparing payee-name tokens in longestCommonTokenPrefix (no secret involved) - review-by: 2026-09-11
+          #
+          # A fingerprint is md5("<rule id>_<path>") plus an instance index, so an
+          # accepted finding that moves file re-reports under a new id, and a finding
+          # whose code was fixed simply stops being reported. Bearer prints the ids in
+          # the list that it no longer detects; an id it names is dead weight, not an
+          # exception, and belongs deleted (issue #1323 found three).
+          #
+          # The demo login. DEMO_MODE deployments publish their own credentials
+          # (.env.example prints them, the login page pre-fills them), so the literal
+          # is public by design and cannot be moved out of the source. What the
+          # review changed is how many places spell it: the seed, the nightly reset,
+          # the start-up probe and the client each had their own copy, so the value
+          # now lives in one module per layer and a guard fails a second spelling
+          # (backend/src/database/demo-credentials.spec.ts scans backend/src;
+          # frontend/src/lib/demo-credentials.contract.test.ts scans frontend/src and
+          # checks the two layers agree). The two ids below replace
+          # b65bd7b1a0585cd1d0a326cdb09ce40d_0 (seed.service.ts) and
+          # 95857358158e4664c01c05441df9f2a9_0 (login/page.tsx), which no longer hold
+          # the literal.
+          # df1db3090cab23fd55c9a22789aa6b2f_0 - Demo login [CWE-798], backend/src/database/demo-credentials.ts, public by design - review-by: 2026-12-08
+          # 9a51af5fd92c92c4c022addd331ee9c6_0 - Demo login [CWE-798], frontend/src/lib/demo-credentials.ts, public by design and contract-tested against the backend copy - review-by: 2026-12-08
+          # The password the E2E suite registers every throwaway user with. It opens
+          # nothing outside the e2e database the run creates and drops, and the admin
+          # fixture already overrides it from the environment. Eight literal copies
+          # across helpers and specs became one constant in e2e/helpers/credentials.ts;
+          # the id below replaces da119900eefffd8b84e7693e0388568a_0 (e2e/helpers/auth.ts).
+          # 8145f16fcf77da087020769e5609a11b_0 - E2E test password [CWE-798], e2e/helpers/credentials.ts, throwaway database only - review-by: 2026-12-08
+          # Retired by the same review, with no replacement:
+          #   842822dd22cd4403ab5800ac89480c0a_0 (Math.random for a split row's temporary
+          #     id in SplitEditor.tsx) -- fixed: crypto.randomUUID(), and
+          #     frontend/src/test/ui-conventions.test.ts now fails Math.random in any
+          #     production source.
+          #   30770548d4592a14c9099ac0103a2564_0 (CWE-208 in longestCommonTokenPrefix,
+          #     payee-auto-merge.service.ts) -- the compared value was a payee-name word
+          #     held in a local named `token`, which is what the rule keys on; renamed,
+          #     so the rule reads the comparison correctly and no exception is needed.
+          #   b04cb91b90deb5e16504baa7ab95f678_0/_1 (CWE-22 in
+          #     backend/src/backup/auto-backup.service.ts) -- no longer detected: the
+          #     folder path is validated by assertAllowedRoot before any resolve(), and
+          #     Bearer itself reports both ids as "no longer detected".
           # The five below are in backend/src/updates/release-notes.service.ts, which reads the
           # committed docs/release-notes/<version>.md digest. The version is the trusted
           # package.json value matched against a strict semver regex that forbids path separators,
@@ -616,7 +649,7 @@ jobs:
           # exact line, so hoisting the two `token.trim()` calls into a local will
           # re-report it under a new id.
           # 173289a7a56f6f6b27dc2314746e9451_0 - Observable timing discrepancy [CWE-208] on the ticket presence check, no secret compared - review-by: 2026-11-26
-          exclude-fingerprint: "b65bd7b1a0585cd1d0a326cdb09ce40d_0,da119900eefffd8b84e7693e0388568a_0,95857358158e4664c01c05441df9f2a9_0,842822dd22cd4403ab5800ac89480c0a_0,b04cb91b90deb5e16504baa7ab95f678_0,b04cb91b90deb5e16504baa7ab95f678_1,30770548d4592a14c9099ac0103a2564_0,b6c4552155ecc9b65a9205911f502bf1_0,b6c4552155ecc9b65a9205911f502bf1_1,b6c4552155ecc9b65a9205911f502bf1_2,b6c4552155ecc9b65a9205911f502bf1_3,c055716bae113b20589f9ea5c5963e65_0,f9b26e7d59d0f577ff9a0e93ea4f7b7c_0,f9b26e7d59d0f577ff9a0e93ea4f7b7c_1,f6196720ad017b3d11d24487792c1479_0,45093073db7d96d61cd30bceb943f63f_0,45093073db7d96d61cd30bceb943f63f_1,45093073db7d96d61cd30bceb943f63f_2,b7502b6ea7c0a272ab08099b55d0392c_0,4beb484f871a7489b5f5ff2df93f72f1_0,0ff64c8083ce01b1e8c867832c0dff85_0,1f87dd3b3950178c2eac383cfcead816_0,e717be7fe9c133adba7d48ccb371c6ba_0,173289a7a56f6f6b27dc2314746e9451_0"
+          exclude-fingerprint: "df1db3090cab23fd55c9a22789aa6b2f_0,9a51af5fd92c92c4c022addd331ee9c6_0,8145f16fcf77da087020769e5609a11b_0,b6c4552155ecc9b65a9205911f502bf1_0,b6c4552155ecc9b65a9205911f502bf1_1,b6c4552155ecc9b65a9205911f502bf1_2,b6c4552155ecc9b65a9205911f502bf1_3,c055716bae113b20589f9ea5c5963e65_0,f9b26e7d59d0f577ff9a0e93ea4f7b7c_0,f9b26e7d59d0f577ff9a0e93ea4f7b7c_1,f6196720ad017b3d11d24487792c1479_0,45093073db7d96d61cd30bceb943f63f_0,45093073db7d96d61cd30bceb943f63f_1,45093073db7d96d61cd30bceb943f63f_2,b7502b6ea7c0a272ab08099b55d0392c_0,4beb484f871a7489b5f5ff2df93f72f1_0,0ff64c8083ce01b1e8c867832c0dff85_0,1f87dd3b3950178c2eac383cfcead816_0,e717be7fe9c133adba7d48ccb371c6ba_0,173289a7a56f6f6b27dc2314746e9451_0"
 
   # Resolve the release version and shared build metadata ONCE, so the parallel
   # backend/frontend build jobs below stamp identical version/date/sha values.

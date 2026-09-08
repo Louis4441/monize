@@ -256,6 +256,14 @@ when they widened it. The media query lives in that one helper -- `DateInput`
 held the only other copy -- and `ui-conventions.test.ts` fails a `capture` in a
 file that imports `useIsMobile`, and a second hand-rolled `pointer: coarse`.
 
+### A random value is `crypto.randomUUID()`, never `Math.random()`
+
+Every client-side use so far has been an id -- a list key, a removal handle, a temporary split row -- and those want uniqueness, which `crypto.randomUUID()` gives (`lib/ai-attachments.ts` is the pattern). `Math.random()` is not a security primitive, and Bearer flags it as CWE-330; `SplitEditor` carried that as a dated exception rather than a fix until issue #1323. `ui-conventions.test.ts` fails on `Math.random` in any production source.
+
+### The demo login is `lib/demo-credentials.ts`, and it matches the server's
+
+The login page pre-fills `DEMO_USER_EMAIL` / `DEMO_USER_PASSWORD` from that module; the seed that creates the account reads its own copy in `backend/src/database/demo-credentials.ts`, and `demo-credentials.contract.test.ts` fails when the two drift or a second spelling appears under `src/`. Public by design, so not a secret -- but a form that pre-fills a password the seed no longer sets is a demo nobody can enter.
+
 ### Date entry -- `DateInput`, never a raw `<input type="date">`
 
 `components/ui/DateInput.tsx` is the only place a raw date input is allowed; `ui-conventions.test.ts` fails the build if another appears. It carries lenient parsing of typed text, keyboard shortcuts, and `CalendarPopover`. Key behaviors:
