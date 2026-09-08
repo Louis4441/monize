@@ -46,22 +46,24 @@ export class CreateSecurityDto {
   priceChartEnabled?: boolean;
 
   /**
-   * The alert threshold, in percent. Two decimals, because that is the
-   * precision the only control for this field can represent: `SecurityForm`
-   * renders it through `NumericInput decimalPlaces={2}`, as its sibling
-   * `PortfolioAlertControl` does for the portfolio threshold.
+   * The alert threshold, in percent, at the column's own scale: NUMERIC(9,4),
+   * the same as its sibling `notification_portfolio_state.move_alert_percent`.
    *
-   * The bound is here rather than only in the form because the form is not the
-   * only writer -- the API, the AI assistant and MCP reach this DTO too, and a
-   * stored 0.125 would make the form DISPLAY 0.13 and then commit it on the
-   * next blur (`NumericInput.handleBlur` re-emits when rounding moved the
-   * value), changing a threshold on a save the user made about another field.
-   * A column with no declared scale plus a control with one is what makes that
-   * reachable; this is the declaration.
+   * Four, not two, and the number is not a taste: the column, this validator
+   * and `NumericInput decimalPlaces={4}` in `SecurityForm` all state the same
+   * precision, so a stored value always round-trips through the form exactly.
+   * Where they disagree the finer side is displayed rounded and then committed
+   * at that rounding on the next blur (`NumericInput.handleBlur` re-emits when
+   * rounding moved the value), which moves a threshold on a save the user made
+   * about another field.
+   *
+   * The bound is on the DTO because the form is not the only writer -- the API,
+   * the AI assistant and MCP reach this too, and PostgreSQL would silently
+   * round a finer value into the column rather than refuse it.
    */
   @ApiProperty({ required: false, nullable: true, minimum: 0.1, maximum: 1000 })
   @IsOptional()
-  @IsNumber({ allowNaN: false, allowInfinity: false, maxDecimalPlaces: 2 })
+  @IsNumber({ allowNaN: false, allowInfinity: false, maxDecimalPlaces: 4 })
   @Min(0.1)
   @Max(1000)
   priceAlertPercent?: number | null;

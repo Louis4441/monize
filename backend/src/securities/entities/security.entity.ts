@@ -14,6 +14,13 @@ import { ApiProperty } from "@nestjs/swagger";
 import { User } from "../../users/entities/user.entity";
 import { Tag } from "../../tags/entities/tag.entity";
 
+/** NUMERIC(9,4) comes back from pg as a string; keep it a number. */
+const numericTransformer = {
+  to: (value: number | null): number | null => value,
+  from: (value: string | null): number | null =>
+    value === null ? null : Number(value),
+};
+
 @Entity("securities")
 @Unique(["userId", "symbol"])
 export class Security {
@@ -90,9 +97,12 @@ export class Security {
       "Daily quoted-price movement threshold (%); null disables alerts",
   })
   @Column({
-    type: "double precision",
+    type: "numeric",
     name: "price_alert_percent",
+    precision: 9,
+    scale: 4,
     nullable: true,
+    transformer: numericTransformer,
   })
   priceAlertPercent: number | null;
 

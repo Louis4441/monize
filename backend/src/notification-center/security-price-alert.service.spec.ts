@@ -88,14 +88,15 @@ describe("security price movement", () => {
     },
   );
 
-  it.each([0.125, 2.345, 12.0001])(
-    "refuses a precision the form cannot represent (%s)",
+  it.each([0.12345, 2.00001, 12.123456])(
+    "refuses a precision the column cannot hold (%s)",
     async (priceAlertPercent) => {
-      // `SecurityForm` renders this through `NumericInput decimalPlaces={2}`,
-      // so a stored 0.125 shows as 0.13 and is committed on the next blur --
-      // a threshold changed by a save the user made about another field. The
-      // form is not the only writer, so the bound belongs on the DTO the API,
-      // the assistant and MCP all reach.
+      // The column is NUMERIC(9,4) and `SecurityForm` renders it through
+      // `NumericInput decimalPlaces={4}`, so anything finer is displayed
+      // rounded and then committed at that rounding on the next blur -- a
+      // threshold changed by a save the user made about another field.
+      // PostgreSQL would round such a value in silently, so the DTO every
+      // writer reaches is where it has to be refused.
       const dto = plainToInstance(CreateSecurityDto, { priceAlertPercent });
       expect(
         (await validate(dto)).some((e) => e.property === "priceAlertPercent"),
@@ -103,8 +104,8 @@ describe("security price movement", () => {
     },
   );
 
-  it.each([0.1, 0.15, 5.5, 12.25, 1000])(
-    "still accepts a threshold the form round-trips exactly (%s)",
+  it.each([0.1, 0.125, 5.0001, 12.3456, 1000])(
+    "accepts a threshold the column and the form both hold exactly (%s)",
     async (priceAlertPercent) => {
       const dto = plainToInstance(CreateSecurityDto, { priceAlertPercent });
       expect(

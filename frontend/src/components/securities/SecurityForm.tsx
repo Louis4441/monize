@@ -658,7 +658,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
             { shouldDirty: true, shouldValidate: true },
           )
         }
-        decimalPlaces={2}
+        decimalPlaces={4}
         min={0.1}
         max={1000}
         error={errors.priceAlertPercent?.message}
