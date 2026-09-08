@@ -77,6 +77,14 @@
           "title": "Akun Anda",
           "body": "Tambahkan akun bank, kartu kredit, pinjaman, dan investasi Anda di sini dengan tombol yang disorot. Setiap saldo dan transaksi terkait dengan sebuah akun."
         },
+        "openAccountDetail": {
+          "title": "Buka tampilan detail sebuah akun",
+          "body": "Setiap akun punya halaman yang disesuaikan dengan jenisnya. Pilih **Detail** — ikon mata pada baris akun — untuk membukanya. Di ponsel, tekan lama akunnya lalu pilih **Detail**."
+        },
+        "accountDetailView": {
+          "title": "Tampilan yang dibuat untuk akun ini",
+          "body": "Halaman ini berubah mengikuti jenis akun, sehingga rekening bank, kartu kredit, pinjaman, akun investasi, atau aset masing-masing menampilkan angka dan alat yang paling berguna baginya. Kembali kapan saja lewat **Detail** di daftar akun."
+        },
         "transactions": {
           "title": "Transaksi",
           "body": "Ini adalah daftar transaksi Anda — setiap pembayaran dan setoran untuk akun Anda tercatat di sini, siap untuk dicari dan disaring."
@@ -302,6 +310,49 @@
           "finish": {
             "title": "Kembalilah pada evaluasi berikutnya",
             "body": "GEM mengambil satu keputusan per periode, dan tanggal evaluasi berikutnya ada di bagian atas laporan. Sampai hari itu tidak ada yang perlu dilakukan. Ketika tiba, periksa apakah sinyalnya berubah; jika ya, lakukan transaksinya melalui broker Anda dan catat di Monize agar perbandingan portofolio tetap cocok. Anda dapat mengulangi tur ini kapan saja dari **Tur berpandu** di **Pengaturan**."
+          }
+        }
+      }
+    },
+    "v1_16_0": {
+      "notifications": {
+        "title": "Notifikasi",
+        "steps": {
+          "welcome": {
+            "title": "Monize kini bisa memberi tahu Anda",
+            "body": "Tagihan yang jatuh tempo, anggaran yang terlampaui, saldo yang melewati batas yang Anda tetapkan, cadangan yang gagal. Panduan ini menunjukkan ke mana semua itu tiba, dan bagaimana Anda memilih mana yang sampai lewat email atau di ponsel."
+          },
+          "bell": {
+            "title": "Loncengnya adalah catatannya",
+            "body": "Setiap notifikasi yang dibuat Monize ditulis di sini, apa pun yang Anda nyalakan atau matikan di tempat lain. Email dan push adalah salinan yang dikirim menyusul; daftar ini adalah aslinya, dan angka pada lonceng menghitung yang belum Anda baca."
+          },
+          "panel": {
+            "title": "Apa yang dibawa sebuah notifikasi",
+            "body": "Masing-masing menyebut apa yang terjadi dan menautkan ke halaman yang menampilkannya: tagihan, anggaran, rekening. **Tandai semua sudah dibaca** menihilkan penghitung tanpa menghapus apa pun. Bila ingin diingatkan, setiap notifikasi punya **Ingatkan saya**: sekali lagi setelah jeda, atau berulang sampai Anda hentikan — dan Anda bisa menghentikannya dari notifikasi itu sendiri saat sampai di ponsel."
+          },
+          "filters": {
+            "title": "Persempit daftarnya, lalu bertindak",
+            "body": "Baris atas menyaring menurut tingkat kegawatan, baris bawah memisahkan **Keuangan** dari **Sistem** — cadangan, pengiriman surel, dan hal lain yang hanya bisa ditangani administrator. **Hapus semua** mengikuti saringan yang sedang tampil dan menjangkau seluruh yang cocok, bukan hanya yang di layar, sehingga Anda bisa membersihkan serangkaian peringatan sistem yang sudah selesai dan menyisakan sisanya."
+          },
+          "settings": {
+            "title": "Tempat pengiriman diputuskan",
+            "body": "**Pengaturan → Notifikasi** memuat sisa panduan ini. Di bagian atas kartu ada sakelar email dan ringkasan anggaran mingguan; di bawahnya kisi yang memutuskan segalanya, lalu perangkat push Anda."
+          },
+          "matrix": {
+            "title": "Satu baris per jenis, satu kolom per kanal",
+            "body": "Untuk tiap jenis notifikasi, pilih apakah ia keluar sebagai **Email (laporan)**, **Email (peringatan)**, **Push**, atau lewat **UnifiedPush** ke distributor yang Anda jalankan sendiri. Tidak ada kolom untuk lonceng, karena lonceng selalu menerima barisnya. **Jeda** adalah kolom terakhir: email dan push dilewati bila sesuatu dari grup yang sama sudah keluar dalam rentang itu — catatan di lonceng tetap ditulis. Setiap sakelar tersimpan begitu Anda ubah."
+          },
+          "push": {
+            "title": "Perangkat Anda",
+            "body": "Daftarkan sebuah peramban di sini dan Monize bisa menjangkaunya meski aplikasi tertutup. Monize menandatangani pesannya sendiri, jadi tidak ada akun Google atau Apple di tengah. Tiap perangkat bisa diuji dan dilepas sendiri-sendiri, dan perangkat yang tak lagi terjangkau menyebutkan alasannya. Di iPhone ini berjalan setelah Monize ditambahkan ke Layar Utama; bila administrator belum mengaktifkan push pada instansi ini, keterangannya muncul di sini."
+          },
+          "portfolio": {
+            "title": "Pergerakan nilai investasi",
+            "body": "Sekali sehari, ketika rekening investasi Anda bergerak melebihi jumlah yang Anda tetapkan di sini. Yang diukur adalah gerak pasar dan dividen — uang yang Anda setor atau tarik bukan pergerakan."
+          },
+          "finish": {
+            "title": "Satu tempat lagi",
+            "body": "Peringatan saldo ada pada rekeningnya sendiri: sunting rekening mana pun lalu isi **Beri tahu di bawah** atau **Beri tahu di atas**. Keduanya berbunyi saat saldo *melewati* batasnya, jadi Anda diberi tahu sekali, bukan setelah setiap pembayaran yang menahannya di sana. Panduan ini bisa Anda ulang kapan saja dari Pengaturan."
           }
         }
       }

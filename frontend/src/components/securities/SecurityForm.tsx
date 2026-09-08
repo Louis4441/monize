@@ -9,6 +9,7 @@ import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { Select } from '@/components/ui/Select';
 import { Combobox } from '@/components/ui/Combobox';
 import { MultiSelect } from '@/components/ui/MultiSelect';
@@ -625,10 +626,32 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
         )}
       </div>
 
-      <Input
+      {/*
+        A threshold is a number the user types, so it goes through
+        `NumericInput` like every other one: a native number input adds spinner
+        arrows, changes value on the scroll wheel, and parses what was typed
+        against the browser's locale rather than the user's chosen one.
+
+        The range stays on the Zod schema rather than on `min`/`max` here.
+        `NumericInput` clamps `min` WHILE TYPING, so a floor of 0.1 would rewrite
+        the "0" of "0.5" the moment it was pressed; the schema already refuses
+        the same range with a message the field renders.
+      */}
+      <NumericInput
         label={t('priceAlert.label')}
-        type="number" min="0.1" max="1000" step="any"
-        {...register('priceAlertPercent')}
+        value={
+          watch('priceAlertPercent')?.trim()
+            ? Number(watch('priceAlertPercent'))
+            : undefined
+        }
+        onChange={(value) =>
+          setValue(
+            'priceAlertPercent',
+            value === undefined ? '' : String(value),
+            { shouldDirty: true, shouldValidate: true },
+          )
+        }
+        decimalPlaces={2}
         error={errors.priceAlertPercent?.message}
         aria-describedby="price-alert-help"
       />

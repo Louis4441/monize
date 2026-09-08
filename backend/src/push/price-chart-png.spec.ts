@@ -29,18 +29,20 @@ describe("price chart PNG", () => {
     expect(
       renderPriceChart(points.map((p) => ({ ...p, close: 100 }))),
     ).not.toBeNull());
-  it.each([
-    [],
-    points.slice(0, 1),
-    Array.from({ length: 61 }, () => points[0]),
-    [...points].reverse(),
-    [points[0], points[0]],
-    [{ ...points[0], date: "2026-02-30" }, points[1]],
-    [{ ...points[0], close: NaN }, points[1]],
-    [{ ...points[0], close: Infinity }, points[1]],
-    [{ ...points[0], close: 0 }, points[1]],
-    [{ ...points[0], close: 1e100 }, points[1]],
-  ].map(input => ({ input })))("rejects invalid input", ({ input }) => {
+  it.each(
+    [
+      [],
+      points.slice(0, 1),
+      Array.from({ length: 61 }, () => points[0]),
+      [...points].reverse(),
+      [points[0], points[0]],
+      [{ ...points[0], date: "2026-02-30" }, points[1]],
+      [{ ...points[0], close: NaN }, points[1]],
+      [{ ...points[0], close: Infinity }, points[1]],
+      [{ ...points[0], close: 0 }, points[1]],
+      [{ ...points[0], close: 1e100 }, points[1]],
+    ].map((input) => ({ input })),
+  )("rejects invalid input", ({ input }) => {
     expect(renderPriceChart(input)).toBeNull();
   });
 });

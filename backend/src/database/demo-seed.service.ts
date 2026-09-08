@@ -4,6 +4,7 @@ import { withScopedDb } from "../common/db/scoped-db";
 
 import { withSystemContext } from "../common/db/with-context";
 import { SeedService } from "./seed.service";
+import { DEMO_USER_EMAIL } from "./demo-credentials";
 import { FaviconService } from "../common/favicon/favicon.service";
 import { demoAccounts } from "./demo-seed-data/accounts";
 import { demoInstitutions } from "./demo-seed-data/institutions";
@@ -43,9 +44,7 @@ export class DemoSeedService {
 
     // Get the demo user ID (created by seedService)
     const [demoUser] = await withScopedDb(this.dataSource, (manager) =>
-      manager.query("SELECT id FROM users WHERE email = $1", [
-        "demo@monize.com",
-      ]),
+      manager.query("SELECT id FROM users WHERE email = $1", [DEMO_USER_EMAIL]),
     );
 
     if (!demoUser) {

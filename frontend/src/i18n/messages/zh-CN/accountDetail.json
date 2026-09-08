@@ -5,6 +5,8 @@
     "edit": "编辑账户",
     "back": "返回账户",
     "switchAccount": "切换到其他账户",
+    "switchFavourites": "收藏",
+    "switchOtherAccounts": "其他账户",
     "switchPlaceholder": "筛选账户...",
     "switchNoMatches": "没有匹配的账户",
     "jointBadge": "联名",

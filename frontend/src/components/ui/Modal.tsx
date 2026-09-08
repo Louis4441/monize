@@ -87,6 +87,16 @@ interface ModalProps {
    *  and a default would double it on every one of them. New call sites using
    *  `title` should pass `md`. */
   padding?: 'none' | 'md';
+  /** Fill the phone's viewport, and stay the centred card everywhere else.
+   *
+   *  For a surface whose content wants every pixel a phone has -- an
+   *  attachment preview -- the 16px backdrop inset and the 90vh cap are
+   *  wasted space, and the backdrop's padding is not reachable from
+   *  `className` (it sits on the outer element). Spelled with `max-sm:`
+   *  variants only: Tailwind emits those after every base utility, so they
+   *  win below 640px and vanish above it without touching the base classes
+   *  the other call sites rely on. Centre variant only. */
+  fullScreenOnPhone?: boolean;
 }
 
 const maxWidthClasses = {
@@ -116,6 +126,7 @@ export function Modal({
   description,
   footer,
   padding = 'none',
+  fullScreenOnPhone = false,
 }: ModalProps) {
   const t = useTranslations('common');
   const generatedId = useId();
@@ -328,6 +339,7 @@ export function Modal({
   if (!isOpen) return null;
 
   const isDrawer = variant === 'drawer-left';
+  const fillPhone = fullScreenOnPhone && !isDrawer;
 
   // Backdrop alignment: drawer pins its panel to the left edge; the default
   // centers the card with padding.
@@ -337,7 +349,7 @@ export function Modal({
     isDrawer
       ? 'justify-start'
       : 'items-center justify-center p-4'
-  }`;
+  }${fillPhone ? ' max-sm:p-0' : ''}`;
 
   // Panel shape. The drawer is a full-height left sheet that slides in from
   // off-screen via the CSS @starting-style (`starting:`) variant -- no extra
@@ -350,7 +362,7 @@ export function Modal({
   // and popstate machinery for a few hundred milliseconds of polish.
   const panelClassName = isDrawer
     ? `bg-white dark:bg-gray-800 shadow-xl dark:shadow-gray-700/50 h-full w-[85%] max-w-sm ${overflowClass} outline-none transition-transform duration-200 ease-out translate-x-0 starting:-translate-x-full motion-reduce:transition-none ${className}`
-    : `bg-white dark:bg-gray-800 rounded-lg shadow-xl dark:shadow-gray-700/50 ${maxWidthClasses[maxWidth]} w-full max-h-[90vh] ${overflowClass} outline-none transition duration-200 ease-out opacity-100 scale-100 starting:opacity-0 starting:scale-95 motion-reduce:transition-none ${className}`;
+    : `bg-white dark:bg-gray-800 rounded-lg shadow-xl dark:shadow-gray-700/50 ${maxWidthClasses[maxWidth]} w-full max-h-[90vh] ${overflowClass} outline-none transition duration-200 ease-out opacity-100 scale-100 starting:opacity-0 starting:scale-95 motion-reduce:transition-none${fillPhone ? ' max-sm:h-dvh max-sm:max-h-none max-sm:max-w-none max-sm:rounded-none' : ''} ${className}`;
 
   return createPortal(
     <div

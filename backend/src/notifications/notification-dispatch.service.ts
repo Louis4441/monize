@@ -6,7 +6,7 @@ import { I18nService } from "nestjs-i18n";
 import { withScopedDb } from "../common/db/scoped-db";
 import { returnedRows } from "../common/db/query-result";
 import { emailTranslator } from "../i18n/email-translator";
-import { resolveUserEmailLocale } from "../i18n/resolve-user-email-locale";
+import { resolveUserEmailFormats } from "../i18n/resolve-user-email-locale";
 import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import {
@@ -281,25 +281,35 @@ export class NotificationDispatchService {
   }
 
   /**
-   * The recipient's stored language and, only when the email channel is on,
-   * their address -- one tenant transaction either way. A push-only fan-out
-   * (SYSTEM, or a category with notification email off) never needs the users
-   * row, and the budget cron runs this once per new alert per user.
+   * The recipient's stored language and number format and, only when the email
+   * channel is on, their address -- one tenant transaction either way. A
+   * push-only fan-out (SYSTEM, or a category with notification email off) never
+   * needs the users row, and the budget cron runs this once per new alert per
+   * user.
+   *
+   * Both formats come from the same preferences read: a figure follows
+   * `numberFormat`, which is independent of `language` (issue #1316), and
+   * resolving them separately is how one email ends up with translated copy
+   * around a figure the reader never sees on screen.
    */
   private async resolveRecipient(
     userId: string,
     withAddress: boolean,
-  ): Promise<{ email: string | null; lang: string }> {
+  ): Promise<{
+    email: string | null;
+    lang: string;
+    numberFormat: string | null;
+  }> {
     return withScopedDb(this.dataSource, async (manager) => {
-      const lang = await resolveUserEmailLocale(
+      const { lang, numberFormat } = await resolveUserEmailFormats(
         manager.getRepository(UserPreference),
         userId,
       );
-      if (!withAddress) return { email: null, lang };
+      if (!withAddress) return { email: null, lang, numberFormat };
       const user = await manager
         .getRepository(User)
         .findOne({ where: { id: userId } });
-      return { email: user?.email ?? null, lang };
+      return { email: user?.email ?? null, lang, numberFormat };
     });
   }
 
@@ -418,7 +428,11 @@ export class NotificationDispatchService {
 
   /** Render and send the immediate email in the recipient's locale, best-effort. */
   private async sendEmail(
-    recipient: { email: string | null; lang: string },
+    recipient: {
+      email: string | null;
+      lang: string;
+      numberFormat: string | null;
+    },
     row: Notification,
   ): Promise<void> {
     if (!this.email.getStatus().configured) return;
@@ -432,7 +446,9 @@ export class NotificationDispatchService {
     const t = emailTranslator(this.i18n, recipient.lang);
     const html = notificationImmediateTemplate(
       {
-        ...notificationEmailCopy(row, t, recipient.lang),
+        ...notificationEmailCopy(row, t, recipient.lang, {
+          numberFormat: recipient.numberFormat,
+        }),
         url: `${appUrl}${target}`,
         severity: row.severity,
       },

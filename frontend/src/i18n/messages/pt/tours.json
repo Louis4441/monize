@@ -77,6 +77,14 @@
           "title": "As suas contas",
           "body": "Adicione aqui as suas contas bancárias, de cartão de crédito, de empréstimo e de investimento com o botão destacado. Cada saldo e transação pertence a uma conta."
         },
+        "openAccountDetail": {
+          "title": "Abra a vista detalhada de uma conta",
+          "body": "Cada conta tem uma página adaptada ao seu tipo. Escolha **Detalhes** — o ícone de olho na linha de uma conta — para a abrir. No telemóvel, mantenha a conta premida e escolha **Detalhes**."
+        },
+        "accountDetailView": {
+          "title": "Uma vista feita para esta conta",
+          "body": "Esta página muda consoante o tipo de conta, por isso uma conta bancária, um cartão de crédito, um empréstimo, uma conta de investimento ou um ativo mostram cada um os valores e as ferramentas que lhes convêm. Volte aqui quando quiser através de **Detalhes** na lista de contas."
+        },
         "transactions": {
           "title": "Transações",
           "body": "Este é o seu registo de transações — todos os pagamentos e depósitos das suas contas encontram-se aqui, prontos a pesquisar e filtrar."
@@ -302,6 +310,49 @@
           "finish": {
             "title": "Volte na avaliação seguinte",
             "body": "A GEM toma uma decisão por período, e a data da próxima está no topo do relatório. Até esse dia não há nada a fazer. Quando chegar, verifique se o sinal mudou; se mudou, execute as operações através da sua corretora e registe-as no Monize, para que a comparação da carteira continue a bater. Pode repetir esta visita a qualquer momento em **Visitas guiadas** nas **Definições**."
+          }
+        }
+      }
+    },
+    "v1_16_0": {
+      "notifications": {
+        "title": "Notificações",
+        "steps": {
+          "welcome": {
+            "title": "O Monize já o pode avisar",
+            "body": "Uma fatura a vencer, um orçamento ultrapassado, um saldo que cruza um limite que definiu, uma cópia de segurança falhada. Esta visita mostra onde isso chega e como escolhe o que o alcança por email ou no telemóvel."
+          },
+          "bell": {
+            "title": "O sino é o registo",
+            "body": "Todas as notificações que o Monize gera são escritas aqui, independentemente do que ligue ou desligue. O email e as notificações push são cópias enviadas depois; esta lista é o original, e o número no sino conta o que ainda não leu."
+          },
+          "panel": {
+            "title": "O que uma notificação traz",
+            "body": "Cada uma diz o que aconteceu e liga para a página que o mostra: a fatura, o orçamento, a conta. **Marcar todos como lidos** limpa o contador sem remover nada. Se quiser ser relembrado, cada notificação tem **Lembrar-me**: mais uma vez após um intervalo, ou a repetir até a parar — e pode pará-la a partir da própria notificação quando chega ao telemóvel."
+          },
+          "filters": {
+            "title": "Reduza a lista e depois atue sobre ela",
+            "body": "A linha de cima filtra por gravidade e a de baixo separa **Financeiros** de **Sistema** — cópias de segurança, entrega de correio e tudo aquilo em que só um administrador pode agir. **Eliminar todos** segue o filtro que estiver aplicado e alcança todas as correspondências, não apenas as visíveis, pelo que pode limpar uma série de alertas de sistema já resolvidos e deixar os restantes."
+          },
+          "settings": {
+            "title": "Onde a entrega é decidida",
+            "body": "**Definições → Notificações** contém o resto desta visita. No topo do cartão estão o interruptor do email e o resumo semanal de orçamentos; abaixo, a grelha que decide tudo o resto e, a seguir, os seus dispositivos push."
+          },
+          "matrix": {
+            "title": "Uma linha por tipo, uma coluna por canal",
+            "body": "Escolha, para cada tipo de notificação, se sai como **Email (relatório)**, **Email (alerta)**, **Push** ou por **UnifiedPush** para um distribuidor que aloja você mesmo. Não há coluna para o sino, porque o sino recebe sempre a linha. **Intervalo** é a última coluna: dispensa o email e o push quando algo do mesmo grupo já saiu dentro dessa janela — a entrada no sino é escrita à mesma. Cada interruptor guarda no momento em que o muda."
+          },
+          "push": {
+            "title": "Os seus dispositivos",
+            "body": "Registe aqui um navegador e o Monize consegue alcançá-lo com a aplicação fechada. Assina as suas próprias mensagens, por isso não há nenhuma conta Google ou Apple pelo meio. Cada dispositivo pode ser testado e removido por si só, e um dispositivo que deixa de estar acessível diz porquê. No iPhone funciona depois de adicionar o Monize ao ecrã principal; se o seu administrador não tiver ligado as notificações push nesta instância, é isso que aparece aqui."
+          },
+          "portfolio": {
+            "title": "Movimento dos investimentos",
+            "body": "Uma vez por dia, quando as suas contas de investimento se movem mais do que o valor que definir aqui. Mede o movimento de mercado e os dividendos: dinheiro que deposita ou levanta não é um movimento."
+          },
+          "finish": {
+            "title": "Mais um sítio onde olhar",
+            "body": "Os alertas de saldo vivem na própria conta: edite qualquer conta e defina **Avisar abaixo de** ou **Avisar acima de**. Disparam quando o saldo *cruza* o limite, por isso é avisado uma vez em vez de a cada pagamento que o mantém lá. Pode repetir esta visita quando quiser a partir das Definições."
           }
         }
       }

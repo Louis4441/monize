@@ -140,6 +140,24 @@ The header's link arrays and the per-route Heroicon map are declared side by sid
 
 `ACCOUNT_TYPE_META` maps each account type to its pill classes and Heroicon; render `AccountTypePill` / `AccountTypeIcon` rather than re-deriving either. `ui-conventions.test.ts` fails on a second type-to-pill-class mapping. An account with no institution shows its type icon in the brand-badge slot (`InstitutionLogo`'s `fallbackIcon`), not a generic glyph.
 
+### Which account types have a detail page is `lib/account-detail-views.ts`
+
+`ACCOUNT_DETAIL_VIEWS` maps an account type to the view `/accounts/<id>` renders for it, and everything else about "does this account have a Details page" derives from that one registry: `resolveAccountDetailView` (the route), `hasAccountDetailView` (the row action, the tour requirement), `DETAIL_ACCOUNT_TYPES` (the key set). Three surfaces ask the question, so three copies of the list is how they come to disagree -- the account row and the route registry already held one each. `loan-rate-changes.contract.test.ts` checks the `loan` arm against `RATE_CHANGE_ACCOUNT_TYPES` and against the branch the account page actually fetches rate history in.
+
+### A tour step pinned to a dynamic route is reachable only by the user
+
+`routeMatch: '/accounts/'` names an id the tour never knew, so the engine cannot navigate there: pushing the step's `route` can never satisfy the prefix, and the step sits in its `navigating` phase behind an overlay that renders nothing -- the tour disappearing mid-run. `isStepReachable` (`lib/tours/navigation.ts`) is the one test, and both doors use it: Back walks past such a step once the user has left that route, and `TourHost` skips it rather than hanging when the user arrives any other way (they skipped the step that asks them to open the page). The step's own `route` satisfying the prefix is the ordinary case and stays navigable ('/reports?category=insights' for '/reports').
+
+A step gated by `requires` is the omit effect's to remove: the engine neither navigates to it nor skips it as unreachable while its requirement is unmet or still resolving, or the two race and a deliberate omission is reported as a degraded tour.
+
+### A step inside a dropdown asks the engine to hold it open
+
+A menu or panel in the header closes on a click outside itself, and the tour card is outside it -- so a `click` advance on the trigger opens the dropdown and the reader's very next press closes it under the step describing its contents. The step declares the intent instead (`openToolsMenu` for the header's Tools menu, `openNotificationBell` for the notification panel) and the component ORs that flag over its own state, so the flag also wins over the click-outside close. Two consequences: the step pointing at the closed trigger must NOT carry the flag (the open panel covers the button it names), and every step anchored inside the panel must, or the panel vanishes mid-tour. `NotificationBell.test.tsx` holds all three cases -- opens without a click, survives a click on `document.body`, closes again once the tour steps past.
+
+### A coach mark parks in the corner the step is not about
+
+An `unobtrusive` anchorless step parks its card in the bottom-**right** corner, which is exactly where every list puts its row actions (`RowActions` is `justify-end`, in a sticky-right cell). A step that asks the user to click one therefore had its own card intercepting that click -- CI caught the account-detail step's card over the **Details** button at a 720px-tall viewport, and the shipped 1.13 foreign-currency tour had the same collision. Such a step sets `placement: 'left'` (the only meaning `placement` has for a corner-parked card). The card is also draggable, but a tour whose first move is "get my card out of the way" is not one to ship: park it clear. `tours.spec.ts` clicks the real row action, so the collision fails the E2E rather than the user.
+
 ### A register's category chip is `CategoryPill`
 
 `components/transactions/CategoryPill.tsx` owns the colour-mix pill and the category's optional icon (via `getIconComponent`, as tag chips do). Categories carry `icon` end-to-end -- `CategoryForm` collects it through the shared `IconPicker` (whose `onClear`/`clearLabel` props make "no icon" a real state) -- so a surface showing a category name with its colour shows its icon too, and an unset icon renders nothing, never a default glyph.
@@ -161,6 +179,94 @@ site: a second caller that skipped it would be a rule nobody enforces. And both
 ask about the *platform* (`detectMapPlatform`, `pointer: coarse`), never
 `useIsMobile` -- that is a 639px viewport query, so a narrow desktop window would
 flip the behaviour mid-session.
+
+### A gate belongs to the thing it admits, not to the thing that produced it
+
+The scan control checked the picked photo against `MAX_ATTACHMENT_BYTES` before
+opening the scanner, copied from the plain upload where it is right -- there the
+file *is* the attachment. Here it is the scanner's INPUT: what gets attached is
+a JPEG capped at `OUTPUT_MAX_EDGE`, so the check refused exactly the captures
+the feature exists for (a 12MP phone photo is routinely over 10 MB and scans to
+well under it), and it made the dialog's own "the original is too large to keep"
+path unreachable outside its unit test -- two suites asserting opposite
+behaviours, both green. Before copying an admission check, ask which artefact
+the limit describes.
+
+The other half of that fix is the same rule pointing the other way: once such a
+photo can reach the dialog, "Keep original only" would upload a file the server
+answers **413** to, so it is disabled there. A control offering an action the
+server will refuse is worse than an absent one.
+
+### An attachment is opened in `AttachmentPreviewDialog`, never downloaded from a row
+
+Clicking an attachment previews it; Download is a footer action of the preview.
+Four rules the viewer holds, each with a test:
+
+- **Bytes come through `attachmentsApi.fetchBytes`**, never a bare `<img src>`
+  or `fetch`: the axios client's 401-refresh interceptor is the only thing that
+  can renew an expired token, and an `<img>` whose request 401s simply fails to
+  load. The row's thumbnail still uses `attachmentDownloadUrl` directly, and
+  that is why the preview's request is answered from the HTTP cache it primed.
+  `useAttachmentBytes` keys the payload to its source, so switching Enhanced to
+  Original and back cannot paint the slower answer over the newer one, and a
+  failed read is `error`, never an empty result.
+- **pdf.js is reached from one module behind a dynamic import.**
+  `lib/attachment-preview/pdf-engine.ts` is the only file naming `pdfjs-dist`
+  or `/vendor/pdfjs/`, and `PdfPages` is the only place it is `import()`ed, so
+  no page pays for a PDF renderer until somebody previews a PDF (the module
+  also touches `DOMMatrix` at load, which a server render must never reach).
+  `lib/attachment-preview/attachment-preview.guard.test.ts` scans for both.
+- **The worker is vendored and version-pinned.** pdf.js constructs its own
+  Web Worker from `GlobalWorkerOptions.workerSrc`; the script must match the
+  bundled API exactly, so `frontend/scripts/copy-vendor.mjs` copies it out of the
+  installed package on `predev`/`prebuild`/`pretest` (beside the OpenCV build,
+  same script) and the engine appends `?v=<pdfjs.version>` so a stale copy in
+  the HTTP cache cannot answer for a newer API. `public/sw.js` deliberately
+  does not cache `.mjs`.
+- **A PDF page is drawn when the reader can see it.** A canvas costs its
+  pixels whether or not anyone is looking, and at the dialog's width a full
+  page clamps to `MAX_PAGE_PIXELS`, which is 16 MB: drawing all of a 20-page
+  statement up front asks for hundreds of megabytes and loses the tab on a
+  phone. `PdfPages` observes each page and releases the backing store of one
+  scrolled away, keeping the box it measured so nothing jumps. What bounds the
+  cost is what is on screen, never the length of the document.
+- **What the reader chose belongs to the attachment, not to the prop object.**
+  The dialog keys its Enhanced/Original and Fit/Actual state on the subject
+  being previewed (`previewSourceKey`), because a caller that composes `target`
+  in its JSX rebuilds it on every one of its own renders -- and keyed on
+  identity that threw the reader back to the enhanced image mid-read, and
+  re-fetched it. The saved list also holds the whole target in state, as the
+  staged list already did. Which controls the toolbar offers likewise comes
+  from the metadata, not from the bytes in flight, or they appear late and
+  shift the picture underneath.
+- **A phone gets the whole viewport through `Modal`'s `fullScreenOnPhone`**,
+  spelled with `max-sm:` variants so the base classes every other dialog
+  relies on are untouched. The layout is a CSS question, so it is not
+  `useIsMobile` (see the next section). A scan pair's Enhanced / Original
+  switch is the same two-button pattern `DocumentScanDialog` draws, and the
+  original's Download carries no filename because the list does not know it --
+  the server names it through Content-Disposition.
+
+### A platform capability is not decided by the window's width -- `isTouchDevice`
+
+`useIsMobile` is a 639px media query; `isTouchDevice` (`lib/touch-device.ts`) is
+`(pointer: coarse)`, and they answer different questions. The viewport hook is
+right for choosing a *layout* (the register's card rows show the same figures
+either way) and wrong for anything that changes what a control can do:
+`capture="environment"` on the scan input replaces the OS file picker with the
+camera on a browser that honours it, so keyed off the width it took "choose an
+existing photo" away from anyone with a narrow desktop window and handed it back
+when they widened it. The media query lives in that one helper -- `DateInput`
+held the only other copy -- and `ui-conventions.test.ts` fails a `capture` in a
+file that imports `useIsMobile`, and a second hand-rolled `pointer: coarse`.
+
+### A random value is `crypto.randomUUID()`, never `Math.random()`
+
+Every client-side use so far has been an id -- a list key, a removal handle, a temporary split row -- and those want uniqueness, which `crypto.randomUUID()` gives (`lib/ai-attachments.ts` is the pattern). `Math.random()` is not a security primitive, and Bearer flags it as CWE-330; `SplitEditor` carried that as a dated exception rather than a fix until issue #1323. `ui-conventions.test.ts` fails on `Math.random` in any production source.
+
+### The demo login is `lib/demo-credentials.ts`, and it matches the server's
+
+The login page pre-fills `DEMO_USER_EMAIL` / `DEMO_USER_PASSWORD` from that module; the seed that creates the account reads its own copy in `backend/src/database/demo-credentials.ts`, and `demo-credentials.contract.test.ts` fails when the two drift or a second spelling appears under `src/`. Public by design, so not a secret -- but a form that pre-fills a password the seed no longer sets is a demo nobody can enter.
 
 ### Date entry -- `DateInput`, never a raw `<input type="date">`
 
@@ -204,7 +310,13 @@ Every detail page carries the same two controls: a chevron and "Back to <List>" 
 
 **A detail page's actions sit on the title row, not in a row above the body.** `AccountDetailShell` takes `headerActions` for type-specific actions beside the standard set; a signal they need to send the body travels down as a prop (`refreshKey`) rather than keeping the button in the body. A `size="sm"` button in a report toolbar takes `size="md"` in that header.
 
-A switcher list too long to scan takes `group` on its items (`ReportSwitcher` groups in `REPORT_CATEGORIES` order); sections follow the order their first item appears in, so ordering happens in the caller.
+A switcher list too long to scan takes `group` on its items (`ReportSwitcher` groups in `REPORT_CATEGORIES` order); sections follow the order their first item appears in, so ordering happens in the caller. An item with no `group` renders ungrouped, so a menu whose sections would be a lone heading over everything is better emitted with none at all -- and whether that heading has anything under it is decided by the items the switcher will actually OFFER, since it drops the entity already on screen (the Transactions account widget sections only when a starred account other than the current one exists).
+
+**Which accounts a picker offers, and in what order, is `orderAccountsForPicker`** (`lib/account-utils.ts`): the starred accounts by `favouriteSortOrder` -- the order the user dragged them into -- then everything else by name. It hands back the two halves rather than one list, because each caller needs the boundary as well as the order (`buildAccountDropdownOptions` rules a separator across it; the two account switchers put a section heading above each side), and a flat list would have each of them re-deriving where favourites stop.
+
+Two details it decides so no caller has to. **The favourites are alphabetical within the arrangement**, because `favourite_sort_order` defaults to 0 -- a user who has starred three accounts and never dragged them has three ties, and a stable sort leaves those in whatever order the API answered in, so the same accounts read differently on two screens. And **the name it sorts on is the one the picker DISPLAYS**, which is why `orderForPicker` takes a reader rather than only accepting `Account`: the detail page's switcher shows a linked brokerage/cash pair under one stripped `displayName`, and ordering that list on the stored name reads as unsorted. A pair's star is the *primary's*, because that is the row the accounts list draws and stars.
+
+Four surfaces order account favourites, and they all go through this: both switchers, `buildAccountDropdownOptions`, the Transactions filter's favourite chips (which sit on the same page as one of the switchers, so a second arrangement there is visible drift) and the CSV transfer-rule picker, which held a hand-copied version of the whole rule. The dashboard's `FavouriteAccounts` deliberately does not -- it is the drag-to-arrange surface itself, and its order is the thing being edited.
 
 ### A category picker lists every category in tree order as "Parent: Child"
 
@@ -213,6 +325,73 @@ However a surface selects a category, the option list is one shape: built from `
 **A picker the user types into creates through `createCategoryFromInput` (`lib/category-create.ts`), never inline.** It owns title casing and the `Parent: Child` shorthand (create or reuse the parent, then the child), and returns every row it created so the caller can append all of them. The guard in `src/test/ui-conventions.test.ts` fails on a second `categoriesApi.create` call site outside the helper and the Categories page's own full create form.
 
 Whether a picker *offers* to create is a property of the surface, not the field: a form that can create passes the creator to **every** category picker it renders, split lines included (`SplitEditor`'s lines silently discarded unmatched text while the Category field offered "+ Create" -- issue #1187). An asynchronous create addresses the row it came from **by id** (rows can move while the request is in flight), and the new category's `isIncome` comes from what the creator returned.
+
+### A number a person reads is formatted by `useNumberFormat()`, never by `toFixed`, `toLocaleString()` or the raw `@/lib/format` helpers
+
+`useNumberFormat()` is to numbers what `useDateFormat()` is to dates: the one seam
+where the user's `numberFormat` preference decides separators, grouping, decimal
+mark and currency placement. `@/lib/format` keeps `formatCurrency` and
+`formatShareQuantity` as pure deterministic `en-US` helpers -- fine in a non-React,
+non-user-facing context, and exactly wrong in a component, which is how a Polish
+reader came to see `zl18,812.71` and `755.8342` on Securities while every other
+screen used their own convention (issue #1316).
+
+Three ways in, and the second is the one that looks like a fix and is not:
+
+- **A literal `%` beside a number** -- `` `${x.toFixed(1)}%` `` and the far
+  commoner `{percentage}%` -- writes a `.` decimal in every locale and puts the
+  `%` where English puts it (fr-FR writes `12,3 %`). Use
+  `formatPercent(value, decimals)` where the surface has decided a decimal count,
+  `formatPercentTrimmed(value)` where the value arrives already rounded (the
+  server rounds `percentUsed` to 2dp, so the same expression must still render
+  `80%`, `80.5%` and `80.55%` -- pinning a count would change the figure, which
+  is the one thing a localization fix must not do), or `formatSignedPercent`
+  where an explicit leading sign is wanted. A CSS length (`width: ${pct}%`) is
+  the one legitimate case and stays a plain number: CSS reads no locale.
+- **A bare `toLocaleString()`** follows the *browser*, and an explicit
+  `numberFormat` exists precisely to override the browser: a reader on `en-US`
+  hardware who picked `pl-PL` still gets `12,345`. Swapping a hardcoded `en-US`
+  for `toLocaleString()` is not a migration. Use `formatNumber(value, 0)` for a
+  count.
+- **The raw helpers**, imported into a component because the hook needs a hook.
+  A tooltip, a table cell and a recharts `content={<Tooltip/>}` are all React
+  components and can call it; a genuinely pure module takes the formatters as an
+  argument (`NumberFormatters`, exported from the hook -- `compareMetricRows`,
+  `MonteCarloPerformanceSummary` and `HoldingStatsTable` are the worked examples).
+
+**A share count is `formatShareQuantity`, not `formatQuantity`.** Eight decimals,
+not four: a residual position of `0.0003` shares is what the holdings column
+exists to expose, and the migration must not round it away. It normalizes the
+`-0` Intl produces for a residue that rounds to zero, and renders a nullish or
+NaN quantity as `0`.
+
+**A file size is a number too, and its unit is localized with it.** `formatBytes`
+off the hook renders through `Intl.NumberFormat`'s `style: 'unit'`, which
+localizes the unit abbreviation as well as the digits (`1,5 ko`, `1,5 кБ`) -- so no
+unit name is ever translated into a catalog. Picking the unit is pure and lives
+in `scaleBytes` (`lib/bytes.ts`); only the rendering needs a locale, which is why
+a pure validator takes the formatter as an argument (`validateSelection` in
+`AttachmentsSection`) rather than importing one. Never hand-roll a
+`(bytes / 1024).toFixed(1) + ' KB'` helper: four surfaces shared one, and it wrote
+a `.` decimal beside a reader's own `1 234,56 zł`.
+
+**The ISO code beside a foreign amount is not this rule.** `withCurrencyCode`
+appends it deliberately when a security's currency is not the reader's; localize
+the number *before* the suffix and leave the suffix alone.
+
+`src/test/number-locale.guard.test.ts` scans for all four fingerprints with a
+classified allowlist (a `new Date(...).toLocaleString()` is a date, which
+`useDateFormat` governs; `lib/utils.ts`'s `sv-SE` timestamps are machine-shaped).
+**Its percentage scan is keyed on the literal `%`, not on `toFixed`** -- written
+from the diff it matched only the shapes the migration had just removed and
+reported clean over fourteen survivors, because the shape that actually
+dominates names no formatter at all. A scan written from a diff sees what was
+fixed; write it from the rule.
+A component test must not build its expectation with the same helper the
+component uses -- `SecurityList.test.tsx` did, so it proved the component agreed
+with a hardcoded formatter while the screen disagreed with the user. Set a real
+preference row and assert the rendered string, including one case where the
+preference deliberately differs from the host locale.
 
 ### An account balance is coloured by its sign -- `balanceColor`, never by account type
 
@@ -294,7 +473,7 @@ Filtering follows the same rule: a trade is narrowed by symbol and action (the b
 
 ### The transaction register's columns are one contract -- `register-columns.ts`
 
-The register's column order and the width each column appears at live once, in `components/transactions/register-columns.ts`: an ordered id list and a priority tier per column (`always` / `high` / `medium` / `low` / `exceptPhones`), each tier mapping to one breakpoint. Hand-written visibility classes are the defect this replaced -- Status (ranked high) surfaced last at 1400px, Attachments (low) before Tags (medium). **The tiers are container queries, never viewport breakpoints**: the register sits inside page padding, so viewport-keyed columns appeared before the table could hold them, it overflowed its `overflow-x-auto` wrapper, and with Actions pinned sticky-right it was exactly Status -- ranked high -- that scrolled out of view while low-ranked Description stayed on screen. The wrapper carries `REGISTER_TABLE_CONTAINER` and every tier measures that container; **Description is the column that yields** (`REGISTER_DESCRIPTION_CELL_FLEX`, `w-full max-w-0` + truncate), growing with the page when there is room and shrinking to nothing before the table can outgrow its container, and once even a squeezed Description is not worth having the low tier removes it and Ref # together. **Payee outranks Description for width, and its cap is never a fixed pixel figure** (`REGISTER_PAYEE_NAME_CAP`): the cap scales with the register in `cqw` -- `max(280px, 35cqw)` while nothing can yield, opening to `60cqw` once Description is on screen to yield, so the longest realistic payee renders in full and a wider register always shows more payee. It stays a bound rather than `max-w-none` because a payee at the column's 255-char maximum would overflow the table and push Amount, Balance and Status into the horizontal scroll. **A yielding column takes the leftover, so the columns above it have to say what they need** (`REGISTER_PAYEE_CELL_FLOOR`, on the payee `<th>` and `<td>` alike): `w-full` is not "take what is spare", it is a claim on 100% of the table, and an auto-layout table settles that claim against the content columns *in proportion to their content*. So filtering the register to one payee -- which shortens Payee, Category, Ref # and the amounts at once -- handed Description the difference: on a 1710px register Payee went 270px to 212px and Description 386px to 517px, truncating the very payee just filtered for while Description rendered a column of "-". The floor is a length because `min-width: max-content` and `fit-content` are both ignored on a table cell, and it is `sm:`-scoped because `min-width` beats `max-width` and would otherwise override the payee cell's phone caps. `TransactionList` and `TransactionRow` read `registerColumnClass(id)`; `register-columns.guard.test.ts` fails a `hidden *:table-cell` spelled in either file (viewport or container variant), a column mentioned out of order, tiers whose breakpoints invert their rank, a wrapper missing the container mark, a description cell without the yield classes, and a payee header or cell that does not carry the floor (or hand-writes one instead of importing it). Two rules the tiers cannot express: **density never changes which columns exist** (Normal/Compact/Dense move padding and secondary content only), and **the Account column is structural** -- rendered only when the list spans more than one account (`!isSingleAccountView`), omitted from the DOM entirely on a single account's page. The day/month date view (`useCompactMobileDates`) is selectable at every width on this register, not only on phones; the reconcile table still shortens below `sm` only.
+The register's column order and the width each column appears at live once, in `components/transactions/register-columns.ts`: an ordered id list and a priority tier per column (`always` / `high` / `medium` / `low` / `exceptPhones`), each tier mapping to one breakpoint. Hand-written visibility classes are the defect this replaced -- Status (ranked high) surfaced last at 1400px, Attachments (low) before Tags (medium). **The tiers are container queries, never viewport breakpoints**: the register sits inside page padding, so viewport-keyed columns appeared before the table could hold them, it overflowed its `overflow-x-auto` wrapper, and with Actions pinned sticky-right it was exactly Status -- ranked high -- that scrolled out of view while low-ranked Description stayed on screen. The wrapper carries `REGISTER_TABLE_CONTAINER` and every tier measures that container; **Description is the column that yields** (`REGISTER_DESCRIPTION_CELL_FLEX`, `w-full max-w-0` + truncate), growing with the page when there is room and shrinking to nothing before the table can outgrow its container, and once even a squeezed Description is not worth having the low tier removes it and Ref # together. **Payee outranks Description for width, and its cap is never a fixed pixel figure** (`REGISTER_PAYEE_NAME_CAP`): the cap scales with the register in `cqw` -- `max(280px, 35cqw)` while nothing can yield, opening to `60cqw` once Description is on screen to yield, so the longest realistic payee renders in full and a wider register always shows more payee. It stays a bound rather than `max-w-none` because a payee at the column's 255-char maximum would overflow the table and push Amount, Balance and Status into the horizontal scroll. **A yielding column takes the leftover, so the columns above it have to say what they need** (`REGISTER_PAYEE_CELL_FLOOR`, on the payee `<th>` and `<td>` alike): `w-full` is not "take what is spare", it is a claim on 100% of the table, and an auto-layout table settles that claim against the content columns *in proportion to their content*. So filtering the register to one payee -- which shortens Payee, Category, Ref # and the amounts at once -- handed Description the difference: on a 1710px register Payee went 270px to 212px and Description 386px to 517px, truncating the very payee just filtered for while Description rendered a column of "-". The floor is a length because `min-width: max-content` and `fit-content` are both ignored on a table cell, and it is `sm:`-scoped because `min-width` beats `max-width` and would otherwise override the payee cell's phone caps. `TransactionList` and `TransactionRow` read `registerColumnClass(id)`; `register-columns.guard.test.ts` fails a `hidden *:table-cell` spelled in either file (viewport or container variant), a column mentioned out of order, tiers whose breakpoints invert their rank, a wrapper missing the container mark, a description cell without the yield classes, and a payee header or cell that does not carry the floor (or hand-writes one instead of importing it). Two rules the tiers cannot express: **density never changes which columns exist** (Normal/Compact/Dense move padding and secondary content only), and **the Account column is structural** -- rendered only when the list spans more than one account (`!isSingleAccountView`), omitted from the DOM entirely on a single account's page. The first of those two has one exception, and it is a **layout** mode rather than a data or behaviour predicate: on a phone (`useIsMobile`) at Normal density `TransactionList` passes `TransactionRow` a `wrapped` prop and the row renders as a two-line card in a single `<td>` -- date, payee, amount, balance, category, status and account, with the row's tags on a third line of their own under the category when it has any, and description, ref #, attachments and the row actions omitted; the full column header is replaced by a slim control header keeping the day/month date toggle and the select-all-on-page box -- while Compact and Dense keep the tier table on a phone and every non-phone width keeps it at all three levels. The foreign-currency fee surfaces (`showFxColumns`) also keep the tier table on a phone, since the card carries none of their paid-currency / amount / fee columns. `useIsMobile` is acceptable here because it selects a *presentation*, not a different set of facts or a different answer to a money question (contrast `DateInput` and `mapsUrl`, which ask about the *platform*): both layouts show the same figures, the date toggle and select-all stay in the card's slim header, and the row's Edit / Copy / Delete move to the long-press or right-click action sheet a mouse can still open, so a narrow desktop window flipping between the two loses no capability. Column presence in the tier table itself is still never density-dependent. The day/month date view (`useCompactMobileDates`) is selectable at every width on this register, not only on phones; the reconcile table still shortens below `sm` only.
 
 ### Row density is remembered per view, by one store -- `useDensityPreference(view)`
 
@@ -378,13 +557,35 @@ Bound the height rather than letting the card grow or hiding rows behind a "Show
 
 Mobile Chrome sizes the viewport that `position: fixed` elements attach to from the page's *widest* content, and a table inside `overflow-x-auto` still counts even though it scrolls -- the reconcile table at ~690px put every modal on its page (the transaction edit form) hundreds of pixels off a 390px screen while the page itself looked fine. Desktop windows and plain narrow viewports never show this; only real mobile emulation (`isMobile`) or a phone does. So a register-like table makes the register's trades rather than relying on horizontal scroll: hide the secondary columns below `sm` (`hidden sm:table-cell`), collapse the actions column with them and back it on every width with the shared `RowActionSheet` opened by `useLongPress` (press-and-hold, or right-click), offer the register's year-hiding toggle (`useCompactMobileDates` + `registerDateColumnPadding`, one store for every register surface), cap the payee (`max-w-* sm:max-w-none overflow-hidden`), and give a grouping row per-column filler cells that collapse with their columns instead of one desktop-sized `colSpan`. The mobile reconcile spec in `e2e/tests/mobile.spec.ts` holds the property end to end: `window.innerWidth` stays at device width with the table on screen, and the modal's box fits the viewport.
 
+### A wide table wraps each row into a card on a phone, by one of two mechanisms
+
+Below `sm` a table that cannot fit five or more columns does not scroll sideways; each row becomes a two-to-four-line grid card so every column keeps half (or a third) of the width. Twenty-odd surfaces were converted this way, three high-effort review passes each, and the rules below are the ones a reviewer caught at least once. `docs/mobile-table-review.html` is the device checklist for them.
+
+- **Mechanism A (CSS single tree)** for a table with no density toggle: `<table className="block ... sm:table">`, `thead`/`tbody`/`tfoot` block below `sm`, each `<tr>` a `grid grid-cols-N ... sm:table-row`, every `<td>` with explicit `col-start`/`row-start` (never auto-flow) and `role="cell"`, explicit `role="table"/"rowgroup"/"row"` (restyling `display` strips the implicit semantics). The `sm`+ output is identical *as resolved* at 640px and above; prove it with a DOM diff normalised for `sm:` restorations and an 800px pixel diff, never by class-attribute equality. `IncomeVsExpensesReport` is the worked example. **Mechanism B (Model B)** for a list that reads `useDensityPreference`: on a phone Normal density renders the card, Compact and Dense keep the tier table (the register section above has the full contract).
+- **Every bare figure carries `CellLabel`** (`components/ui/Table.tsx`, `className="sm:hidden"` under A) reusing the column's existing header key; self-describing pills, names and a descriptor sitting under its identity (a category under a payee) carry none. `CellLabel` owns `whitespace-normal` because `white-space` is inherited from the nowrap money cell around it. Captions are separate text nodes, so an existing `getByText(<value>)` still matches; an existing test that *clicks* a header by label must address the column header row by its displaying class.
+- **A header that holds controls is replaced, never hidden.** Sort controls come back as a phone-only strip of the same `SortableHeader` chips (30px targets) rendered from one exhaustive mapped-type record `{ [K in SortField]: SortColumn & { field: K } }` whose `Object.values` both header rows render; the register's slim header keeps its date toggle and select-all. A dropped chip strands a persisted sort field.
+- **Money never truncates or wraps, so the tracks are sized by measurement**: a hand-CSS replica at 320 and 390 with the real page and card insets, the widest cell that wears the class (the bold footer total in the ISO-code currency fallback), and the `overflow-x-auto` wrapper's `scrollWidth === clientWidth` (the table's own is not the check, and `document.scrollWidth` hides it). The line count is `ceil(cells / tracks)`; 2dp money is two per line, the compact formatter three. `whitespace-nowrap` is for numbers and formatted dates; a translated word keeps wrapping.
+- **The identity wraps unclamped** in a `min-w-0` `minmax(0,1fr)` track with `break-words sm:break-normal`; a clamp cuts a trailing marker before the tail of the name, and no width assertion sees it. `auto` tracks are sized by their caption, not their value; a bounded caption-less identity (a month) is the one thing that takes `auto`.
+- **A footer that hides cells below `sm` states `aria-colindex`** on every cell; a footer with 1x1 cells over the same columns owes none.
+
 ### A header panel is `fixed` inside a transformed ancestor -- give it a height, never a bottom anchor
 
 The sliding `AppHeader` always carries a `transform` (`useHideOnScroll`), which makes the header -- not the viewport -- the containing block for every `position: fixed` descendant. A panel mounted in the header (the notifications dropdown, `ActionHistoryPanel`) that anchors with `bottom-0`/`inset-0` is therefore capped at the header's own ~56px box: the full-screen notifications panel only *looked* full while rows overflowed it, and collapsed when empty. Size such a panel with an explicit height (`h-dvh` for the mobile full-screen treatment) and edge offsets that grow past the containing block; `NotificationList.test.tsx` pins the class shape.
 
-### A control that needs an AI provider is not offered without one -- `useAiConfigured()`
+### A menu anchored to a caret is portalled and clamped, never an `absolute` box
 
-A provider is the prerequisite for the payee contact lookup and the assistant alike, so every surface offering either asks `hooks/useAiConfigured.ts` and renders nothing when the answer is no: the payee form's and detail card's lookup buttons, the transaction page's quick-create confirmation, and both AI settings toggles. A control whose one possible outcome is "configure a provider first" is worse than an absent one -- it costs a click to learn nothing.
+`EntitySwitcher` renders its menu through `createPortal` at a fixed position measured from the caret and clamped to the viewport (`placeMenu`, tested pure), the way `MultiSelect`, `CalendarPopover` and the portal `InfoTooltip` place theirs. The `absolute left-0 w-72` box it replaced was fine beside a page title at the left edge and wrong the first time the caret sat anywhere else: in the Transactions page's Account Info widget it followed a long account name off the right of a phone, and on a desktop the widget column is `overflow-hidden` and translated -- which clips an absolute child *and* makes the column the containing block of a fixed one (the header rule above, again). A popover that can be opened from inside a card, a column or a table cell goes through a portal with a viewport clamp, and on scroll and resize it **re-measures the anchor, never closes**: opening is itself a scroll and a resize (focusing the filter scrolls its container into view; a phone's keyboard shrinks the viewport), so the first cut, which closed on both like `MultiSelect`, flashed open and shut. Focus the filter with `preventScroll`, not `autoFocus`, and only for a mouse: on a touch device focus raises the keyboard over the list the reader opened the menu to see, so the filter waits to be tapped -- decided by `isTouchDevice`, never the viewport, per the rule below. `EntitySwitcher.test.tsx` holds the clamp, the portal, the flip, the menu surviving its own opening, and the keyboard staying down.
+
+### A control is not offered when nothing can answer it -- and which question to ask depends on the control
+
+Two hooks, because two different prerequisites. A control whose one possible outcome is "configure something first" is worse than an absent one: it costs a click to learn nothing.
+
+- **A payee contact lookup asks `hooks/useContactLookupAvailable.ts`.** Google Places can answer that lookup as well as an AI provider, so the question is "can a lookup run", never "is there a model". Gated on the AI hook instead, the button disappears for a user who configured Places and no AI -- exactly the configuration the feature exists for. The surfaces are the payee form's and detail card's lookup buttons, the transaction page's quick-create confirmation, and the automatic-lookup toggle in Settings. The guard in `src/test/ui-conventions.test.ts` fails any file that reaches a lookup API and imports `useAiConfigured`.
+
+  **A control the user is looking AT is disabled, not hidden.** The buttons on the payee form and detail card are withheld when nothing can answer, because their surface says nothing about why. The automatic-lookup toggle sits directly under the two source rows that cause the state, so switching the last source off makes it read off and disabled (with copy naming the repair) rather than vanish -- a control that disappears under the change you just made reads as a bug. It shows off without WRITING false: switching a source back on restores the setting the user chose.
+
+  **The hook is read once on mount, so the one surface that changes the answer re-reads it.** `refresh()` exists for `PayeeLookupSection` alone: it writes the switches that decide `available`, and `payeeLookupApi.updateSettings` dropping the cache does nothing for a hook already holding its value. It is awaited inside the save, while the card is still in its saving state, so the toggle never renders live against a source that was just switched off. Re-deriving availability from the settings row on the client instead is the thing not to do -- the server's answer already folds in the spent cap and a key it cannot decrypt.
+- **The assistant asks `hooks/useAiConfigured.ts`**, because a chat genuinely needs a model: the floating bubble and its own settings toggle.
 
 **A preference outlives the provider that justified it.** `aiBubbleEnabled` stays true after the last provider is deleted, so the floating chat bubble gates on the provider as well as on the opt-in; without that it sits on every page and opens a chat that can only fail. Any future preference guarding provider-backed work inherits the same pair.
 
@@ -424,6 +625,86 @@ states the user changes *elsewhere* and then comes back, so the panel re-reads
 them when the page becomes visible. Read once on mount, it kept telling the user
 the browser had refused after they had allowed it, with the Enable button hidden.
 
+### A shared file has one accept list and one reader -- `share-target.ts`, `share-inbox.ts`
+
+The Web Share Target puts Monize in the OS share sheet, and the two halves of it
+each live in exactly one file:
+
+- **`lib/share-target.ts` is the accept list, the limits and the
+  classification.** `SHARE_TARGET_ACCEPT` is *derived* from
+  `ACCEPTED_ATTACHMENT_TYPES` plus `SHARE_STATEMENT_EXTENSIONS`, so the share
+  sheet cannot offer a type the upload then refuses (nor hide one it would take);
+  the per-file and per-share caps come from `MAX_ATTACHMENT_BYTES` and
+  `MAX_ATTACHMENTS_PER_TRANSACTION` rather than being written again. `.mny` is
+  deliberately absent -- a Money file is a whole profile behind a password prompt
+  and a wipe confirmation.
+- **`lib/share-inbox.ts` is the only reader of the stash.** Nothing else names
+  `SHARE_CACHE_NAME` or builds a stash key; a second reader is how the key shape
+  and the worker's writer drift apart. Every function treats an unusable Cache
+  API as an *empty inbox* and resolves rather than rejecting, which is what lets
+  `ShareInboxNotice` call it on mount without a guard -- and why a `catch` around
+  it would put a `setState` on the synchronous path the
+  `react-hooks/set-state-in-effect` rule forbids.
+
+**A bundle belongs to the first authenticated reader that observes it, and the
+reader's id is a required argument.** The worker cannot decide whose share it is
+-- a share can arrive with nobody signed in, which is the whole point of the
+logged-out resume -- so `listSharedBundles(viewerUserId)` and
+`readSharedBundle(id, viewerUserId)` stamp `ownerUserId` on an unclaimed index
+and treat a bundle owned by anybody else as absent. **Listing claims too**: a
+share the sharer was merely notified about is already theirs, and it is exactly
+the one nothing else ever observed. Clearing the stash on `logout` is a sweep,
+not the access rule -- two people share a browser profile, and a session that
+simply expired never ran `logout`, which is the same reasoning as the
+push-registration marker's owner. The id is **required**, not optional, because
+an omitted argument is silently indistinguishable from "everyone's": a caller
+that has not resolved the reader yet reads nothing and shows its loading state
+(`src/app/share/page.tsx`, `ShareInboxNotice`, `useSharedFilesHandoff`), rather
+than claiming a share on behalf of whoever the app is still fetching.
+INV-SHARE-005.
+
+**Do not classify a shared file with the import wizard's `detectFileType`.** That
+function falls through to `qif` for every extension it does not recognise, which
+is right for a picker (the user chose the file) and wrong for a share sheet (the
+OS chose it, so anything outside the accept list must be refused with a reason
+rather than handed to the QIF parser). `classifySharedFile` is the share path's
+rule and answers `null` for exactly that case.
+
+**`public/sw.js` cannot import any of this**, so it repeats the paths, keys,
+limits and accept lists as literals and `src/test/sw-share-target.test.ts`
+asserts the two agree -- the mirroring discipline `sw-offline.test.ts` already
+applies to the boot palette. It also reads the worker's own
+`classifySharedFile` out of the sandbox and compares it, case by case, against
+the app's.
+
+**A refused file stays on the list.** The worker records the reason and discards
+the bytes, so the review screen can say which of the files the user picked was
+not used and why; an accepted file whose bytes were later evicted is reported as
+*unavailable*, never silently dropped from a list that would then look complete.
+Those are two different states and the copy for each says so.
+
+**An automatic hand-off makes reference data a prerequisite, not a late
+arrival.** `useSharedFilesHandoff` drives the import wizard from the shared files
+on mount, and the wizard matches the file's categories against the user's
+categories, its symbols against their securities and its filename against their
+accounts. A human picking a file cannot realistically get ahead of those five
+parallel requests; a hand-off that fires on mount loses that race every time --
+and a failed category match is not neutral, it is an offer to **create** a
+category the user already has. So the wizard exposes `dataLoaded` and the
+hand-off waits for it, claiming its one-shot ref only once it actually proceeds.
+A load that failed leaves `dataLoaded` false and the bundle in the stash, which
+is the honest outcome: the files are offered again rather than matched against
+nothing. `src/app/import/share-handoff.test.tsx` holds the ordering with deferred
+requests, and fails if the gate is removed.
+
+**The kind a shared file is comes off the entry the worker wrote, never
+recomputed from the `File`.** The review screen's destination and the glyph in
+its list both read `entry.kind`; deriving it a second time from the rebuilt
+`File` is how a row drawn as a statement comes to offer an attachment's
+destination. `null` there means the worker never classified it, so the file is
+not usable and the screen says exactly that rather than calling the share
+mixed.
+
 ### The notification permission is asked for once, from a click
 
 `Notification.requestPermission()` appears in exactly one file -- `lib/push.ts`,
@@ -457,6 +738,16 @@ account for the reason the registered-endpoint marker carries one, and the kind
 because waving away the offer says nothing about wanting to know, later, that the
 browser has started blocking Monize.
 
+### A `<details>` disclosure is controlled, because jsdom half-implements it
+
+`<details>`/`<summary>` is the disclosure this codebase uses (`PushDiagnostics`, and the foldable Browser push block beside it): native keyboard operation, and the expanded state announced without an `aria-expanded` of our own. But React does not manage `open` the way it manages an input's `value` -- it writes the attribute and stops -- so a component that renders anything off "is this open" must hold that in state, pass `open={state}`, and move it itself. **`onToggle` cannot be the only mover**: jsdom flips `open` on a summary click and fires no `toggle` event at all, so the behaviour is untestable through it and a browser that misses the event leaves the summary describing the wrong state. Handle the summary's `onClick`, `preventDefault()` to cancel the element's own activation behaviour, and toggle state there (Enter and Space on a focused summary dispatch a click, so the keyboard comes with it); keep `onToggle` wired for the toggles no click produces, such as Chrome expanding a `<details>` to reveal a find-in-page match.
+
+**What a collapsed summary stands in for is not the same text the open block shows.** It replaces the block, so it answers the question the block would have -- Browser push collapses to how many devices can be *delivered to*, retired rows named separately rather than summed in, and "Device list unavailable" where the read failed, never the `0` an empty `devices` array would give (the failed-lookup rule, one more time). And a block whose whole content is one sentence explaining why a feature is unavailable does not get a disclosure: hiding the reason behind a click is worse than not folding.
+
+**Which Settings sections are folded is remembered by one store, `settingsSectionStore`** (`monize-settings-sections`), read through `useSettingsSectionCollapsed(section)`. Browser-local for the reason row density is: whether a panel is worth its height is a fact about the screen in front of the reader, not about the account. The store is the density store's lesson applied before it can be relearned -- a second foldable section adds a member to `SettingsSectionId` and a default to `SETTINGS_SECTION_DEFAULT_COLLAPSED` (a `Record` over the union, so the compiler asks for that default), never a second store and never a second line in `persisted-storage.guard.test.ts`. Every default is `false` and that is the rule, not today's coincidence: a section that folds itself before the reader asked has to be found before it can be read. A stored value that is not a boolean, and a key naming a section that no longer exists, both fall back to the default rather than hiding a panel behind a corrupted entry.
+
+**A persisted fold outlives a test, so a suite that drives one resets the store.** `setup.ts` clears `localStorage` between tests and cannot reach a store that has already read it, so the first test to collapse a section leaves it collapsed for the rest of the file -- reset it in `beforeEach`, where nothing is mounted and the write needs no `act()`. And assert the fold on `details.open`, not on the content having gone: jsdom applies no user-agent stylesheet, so the children stay in the document whatever `open` says, and "the button is not there" would pass in a browser and fail here for a reason that is nothing to do with the component.
+
 ### A settings screen has one save contract, and it is save-on-change
 
 `PreferencesSection` had two: language, theme and colour theme persisted the
@@ -488,6 +779,8 @@ lives in `e2e/`, outside `frontend/src`, so a green Vitest run says nothing abou
 it: deleting the Save button left `e2e/tests/settings.spec.ts` clicking a button
 that no longer exists, and only CI found it. Deleting or renaming any control an
 E2E spec drives means grepping `e2e/` for its accessible name in the same commit.
+
+**An E2E alert locator is scoped to a region, never page-wide.** Next mounts its route announcer (`__next-route-announcer__`, `role="alert"`, in a shadow root under `<body>`) on every hydrated page, and Playwright's role engine matches it, so `page.getByRole('alert')` resolves to two elements the moment an error panel renders -- a strict-mode failure. The payee and category detail specs passed for months only because the poll that saw the announcer alone, before the panel, satisfied `toBeVisible`. Scope it: `page.getByRole('main').getByRole('alert')`, or a dialog. `src/test/e2e-conventions.test.ts` scans `e2e/tests` for the bare form.
 
 ### A password field declares what may be autofilled into it
 
@@ -915,6 +1208,20 @@ So: **`renderHook` is exported from `@/test/render` too**, wrapped in the same p
 `intl-harness.guard.test.ts` scans for the two ways round it: `render`/`renderHook` imported from `@testing-library/react`, and a `NextIntlClientProvider` built in a test. Its `ALLOWED_*` sets are deliberate exceptions -- tests that genuinely vary the locale, and the boot-path components defined by having no providers -- while `RTL_IMPORT_BASELINE` is shrink-only: 45 older tests that work today only because their subjects happen not to translate anything. Converting one means deleting its line.
 
 Fix the lookup, never the symptom. Adding a code to the ignore list only restores the silence the guard exists to remove.
+
+**A `useNumberFormat` mock spreads `numberFormatMockDefaults()`.** That hook is
+mocked in ~127 files, each with a bare factory listing the formatters its
+component used the day the test was written -- and a bare factory REPLACES the
+module, so the literal is the hook's whole surface for that file. Nothing failed
+while those lists rotted; adding a `formatPercent` call to a component turned
+thirty-nine unrelated suites red with "formatPercent is not a function", not one
+of which was a real defect. Spread `numberFormatMockDefaults()`
+(`@/test/number-format-mock`) first and override only what the case asserts on.
+The factory has to be `async` so it can `await import` the helper past
+`vi.mock`'s hoisting. The defaults are functions only: `defaultCurrency`,
+`numberFormat` and `numberLocale` are identity-bearing values a case states for
+itself, and defaulting them would change what an existing assertion is about,
+while a missing function can only ever have been a crash.
 
 **Global mocks** (`test/setup.ts`): `next/navigation` (useRouter, usePathname, useSearchParams), `react-hot-toast`, `localStorage`, `window.scrollTo`, `window.matchMedia`.
 

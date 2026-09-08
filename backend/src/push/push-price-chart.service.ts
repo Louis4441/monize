@@ -64,12 +64,10 @@ export class PushPriceChartService {
       if (!prices.length) return null;
       // Preserve the alert's quoted close even if the provider updates it later.
       return renderPriceChart([
-        ...prices
-          .reverse()
-          .map((p: { date: string; close: string }) => ({
-            date: p.date,
-            close: Number(p.close),
-          })),
+        ...prices.reverse().map((p: { date: string; close: string }) => ({
+          date: p.date,
+          close: Number(p.close),
+        })),
         { date: r.priceDate, close: r.price },
       ]);
     } catch {

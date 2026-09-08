@@ -15,12 +15,15 @@ vi.mock('@/hooks/useDateFormat', () => ({
   useDateFormat: () => ({ dateFormat: 'browser', datePattern: 'YYYY-MM-DD', formatDate: (d: string) => d }),
 }));
 
-vi.mock('@/hooks/useNumberFormat', () => ({
-  useNumberFormat: () => ({
-    formatCurrency: (n: number, _c?: string) => `$${n.toFixed(2)}`,
-  }),
-}));
-
+vi.mock('@/hooks/useNumberFormat', async () => {
+  const { numberFormatMockDefaults } = await import('@/test/number-format-mock');
+  return {
+    useNumberFormat: () => ({
+      ...numberFormatMockDefaults(),
+      formatCurrency: (n: number, _c?: string) => `$${n.toFixed(2)}`,
+    }),
+  };
+});
 const mockPost = vi.fn().mockResolvedValue({});
 const mockSkip = vi.fn().mockResolvedValue({});
 const mockDelete = vi.fn().mockResolvedValue({});
@@ -650,6 +653,24 @@ describe('ScheduledTransactionList', () => {
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('Failed to delete');
     });
+  });
+
+  it('does not refresh the list when an action fails', async () => {
+    // A refetch is a claim that the ledger moved. Before the row actions were
+    // extracted, the rejected `await` skipped `onRefresh` by leaving the try
+    // block; now `runScheduledAction` reports the outcome and the caller checks
+    // it, so the invariant lives in a returned boolean nothing was asserting.
+    mockDelete.mockRejectedValueOnce(new Error('Delete failed'));
+    const onRefresh = vi.fn();
+    render(<ScheduledTransactionList transactions={[createTransaction()]} onRefresh={onRefresh} />);
+
+    fireEvent.click(screen.getByTitle('Delete'));
+    fireEvent.click(screen.getByText('Delete'));
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Failed to delete');
+    });
+    expect(onRefresh).not.toHaveBeenCalled();
   });
 
   // --- Post with confirmation ---

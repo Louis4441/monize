@@ -750,16 +750,31 @@ describe("SecuritiesService", () => {
       expect(saved.quoteProvider).toBeNull();
     });
 
-    it.each([5, null])("persists or clears the price alert threshold %s", async (threshold) => {
-      securitiesRepository.findOne.mockResolvedValue({ ...mockSecurity, priceAlertPercent: 10 });
-      await service.update("user-1", "sec-1", { priceAlertPercent: threshold });
-      expect(queryRunnerManager.save.mock.calls[0][1].priceAlertPercent).toBe(threshold);
-    });
+    it.each([5, null])(
+      "persists or clears the price alert threshold %s",
+      async (threshold) => {
+        securitiesRepository.findOne.mockResolvedValue({
+          ...mockSecurity,
+          priceAlertPercent: 10,
+        });
+        await service.update("user-1", "sec-1", {
+          priceAlertPercent: threshold,
+        });
+        expect(queryRunnerManager.save.mock.calls[0][1].priceAlertPercent).toBe(
+          threshold,
+        );
+      },
+    );
 
     it.each([true, false])("persists chart opt-in %s", async (enabled) => {
-      securitiesRepository.findOne.mockResolvedValue({ ...mockSecurity, priceChartEnabled: !enabled });
+      securitiesRepository.findOne.mockResolvedValue({
+        ...mockSecurity,
+        priceChartEnabled: !enabled,
+      });
       await service.update("user-1", "sec-1", { priceChartEnabled: enabled });
-      expect(queryRunnerManager.save.mock.calls[0][1].priceChartEnabled).toBe(enabled);
+      expect(queryRunnerManager.save.mock.calls[0][1].priceChartEnabled).toBe(
+        enabled,
+      );
     });
 
     it("persists isFavourite updates", async () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@/test/render';
-import { Button } from './Button';
+import { Button, ButtonLink, buttonClassName } from './Button';
 
 describe('Button', () => {
   it('renders children text', () => {
@@ -78,5 +78,26 @@ describe('Button', () => {
     const ref = vi.fn();
     render(<Button ref={ref}>Ref</Button>);
     expect(ref).toHaveBeenCalled();
+  });
+
+  describe('ButtonLink', () => {
+    it('is an anchor wearing the button classes', () => {
+      render(
+        <ButtonLink href="/api/v1/attachments/a-1/download" download="receipt.png" variant="outline" size="sm">
+          Download
+        </ButtonLink>,
+      );
+      const link = screen.getByRole('link', { name: 'Download' });
+      expect(link).toHaveAttribute('href', '/api/v1/attachments/a-1/download');
+      expect(link).toHaveAttribute('download', 'receipt.png');
+      expect(link.className).toBe(buttonClassName('outline', 'sm'));
+    });
+
+    it('shares its classes with the button', () => {
+      render(<Button variant="outline" size="sm">Same</Button>);
+      expect(screen.getByRole('button', { name: 'Same' }).className).toBe(
+        buttonClassName('outline', 'sm'),
+      );
+    });
   });
 });

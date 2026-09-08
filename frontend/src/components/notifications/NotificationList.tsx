@@ -6,6 +6,7 @@ import { useNotificationCopy } from '@/hooks/useNotificationCopy';
 import Link from 'next/link';
 import type { NotificationFilters } from '@/lib/notification-filters';
 import { hasActiveNotificationFilters } from '@/lib/notification-filters';
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import type { NotificationFilterCategory, Notification, NotificationSeverity } from '@/types/notification';
@@ -197,6 +198,7 @@ export function NotificationList({
     // *looked* full when notification rows overflowed it). An explicit viewport
     // height grows past the containing block instead.
     <div
+      {...tourAnchor(TOUR_ANCHORS.notificationPanel)}
       className="fixed inset-x-0 top-0 h-dvh sm:absolute sm:inset-auto sm:right-0 sm:mt-1 sm:h-auto sm:w-[30rem] bg-white dark:bg-gray-800 sm:rounded-lg shadow-lg dark:shadow-gray-700/50 sm:border border-gray-200 dark:border-gray-700 z-50 sm:max-h-[28rem] flex flex-col"
       data-testid="notification-list"
     >
@@ -264,6 +266,7 @@ export function NotificationList({
 
       {/* Filters */}
       <div
+        {...tourAnchor(TOUR_ANCHORS.notificationPanelFilters)}
         className="flex flex-col gap-1.5 px-4 py-2 border-b border-gray-200 dark:border-gray-700"
         data-testid="notification-filters"
       >

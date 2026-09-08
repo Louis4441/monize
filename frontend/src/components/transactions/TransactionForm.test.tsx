@@ -185,6 +185,18 @@ const mockCreateTransfer = vi.fn().mockResolvedValue({});
 const mockUpdateTransfer = vi.fn().mockResolvedValue({});
 const mockGetRecent = vi.fn().mockResolvedValue([]);
 
+const mockAttachmentUpload = vi.fn().mockResolvedValue({});
+// Spread the original: AttachmentsSection also imports `attachmentDownloadUrl`
+// from here, and a bare factory would blank it for the whole module graph.
+vi.mock('@/lib/attachments', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/attachments')>()),
+  attachmentsApi: {
+    list: vi.fn().mockResolvedValue([]),
+    upload: (...args: any[]) => mockAttachmentUpload(...args),
+    delete: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 vi.mock('@/lib/transactions', () => ({
   transactionsApi: {
     create: (...args: any[]) => mockCreate(...args),
@@ -224,13 +236,18 @@ vi.mock('@/lib/payees', () => ({
 }));
 
 // Whether a payee created here gets its contact details looked up turns on two
-// facts the form cannot control: the opt-in preference and whether an AI
-// provider exists at all. Both are mocked so each test says which world it is
-// in; both default to off, which is what an untouched account has.
-let mockAiConfigured = false;
+// facts the form cannot control: the opt-in preference and whether ANY lookup
+// source exists -- Google Places or an AI provider. Both are mocked so each
+// test says which world it is in; both default to off, which is what an
+// untouched account has.
+let mockLookupAvailable = false;
 
-vi.mock('@/hooks/useAiConfigured', () => ({
-  useAiConfigured: () => ({ configured: mockAiConfigured, resolved: true }),
+vi.mock('@/hooks/useContactLookupAvailable', () => ({
+  useContactLookupAvailable: () => ({
+    available: mockLookupAvailable,
+    resolved: true,
+    source: mockLookupAvailable ? 'ai' : null,
+  }),
 }));
 
 const mockCategoriesGetAll = vi.fn().mockResolvedValue(mockCategories);
@@ -284,17 +301,20 @@ vi.mock('@/lib/exchange-rates', () => ({
   CreateCurrencyData: {},
 }));
 
-vi.mock('@/hooks/useNumberFormat', () => ({
-  useNumberFormat: () => ({
-    defaultCurrency: 'CAD',
-    formatCurrency: (amount: number, currency: string) =>
-      `${currency} ${(Math.round(amount * 100) / 100).toFixed(2)}`,
-    formatNumber: (value: number, decimals: number = 2) => value.toFixed(decimals),
-    numberLocale: 'en-US',
-    numberSeparators: { decimal: '.', group: ',' },
-  }),
-}));
-
+vi.mock('@/hooks/useNumberFormat', async () => {
+  const { numberFormatMockDefaults } = await import('@/test/number-format-mock');
+  return {
+    useNumberFormat: () => ({
+      ...numberFormatMockDefaults(),
+      defaultCurrency: 'CAD',
+      formatCurrency: (amount: number, currency: string) =>
+        `${currency} ${(Math.round(amount * 100) / 100).toFixed(2)}`,
+      formatNumber: (value: number, decimals: number = 2) => value.toFixed(decimals),
+      numberLocale: 'en-US',
+      numberSeparators: { decimal: '.', group: ',' },
+    }),
+  };
+});
 vi.mock('@/lib/format', () => ({
   FX_RATE_DISPLAY_DECIMALS: 6,
   getCurrencySymbol: () => '$',
@@ -1936,7 +1956,7 @@ describe('TransactionForm', () => {
       mockLookupContactForPayee.mockResolvedValue({ reason: 'none', suggestions: [] });
       mockPayeeUpdate.mockReset();
       mockPayeeUpdate.mockResolvedValue({ ...created, website: suggestion.website });
-      mockAiConfigured = true;
+      mockLookupAvailable = true;
       usePreferencesStore.setState({
         preferences: { payeeContactLookupEnabled: true } as any,
       });
@@ -1946,7 +1966,7 @@ describe('TransactionForm', () => {
       // The tree is still mounted when a file's own after-hook runs, and a
       // Zustand write re-renders it outside act -- so unmount first.
       cleanup();
-      mockAiConfigured = false;
+      mockLookupAvailable = false;
       usePreferencesStore.setState({ preferences: null });
     });
 
@@ -2006,7 +2026,7 @@ describe('TransactionForm', () => {
     });
 
     it('leaves the lookup to the server when no AI provider is configured', async () => {
-      mockAiConfigured = false;
+      mockLookupAvailable = false;
 
       await createPayee();
 
@@ -4814,5 +4834,92 @@ describe('TransactionForm', () => {
       expect(onCreateAndNew).toHaveBeenCalledTimes(1);
       expect(mockOnSuccess).not.toHaveBeenCalled();
     });
+  });
+});
+
+// =========================================================================
+// Web Share Target: the review screen opens this form with the shared files
+// already staged. They travel the same path as files picked in this window --
+// held client-side while the transaction does not exist, uploaded once it does.
+// =========================================================================
+describe('TransactionForm initialStagedFiles', () => {
+  const mockOnSuccess = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAccountsGetAll.mockResolvedValue(mockAccounts);
+    mockGetJointReferenceData.mockResolvedValue({
+      categories: [],
+      payees: [],
+      payeesCanCreate: false,
+      categoriesCanCreate: false,
+    });
+    mockPayeesGetAll.mockResolvedValue(mockPayees);
+    mockCategoriesGetAll.mockResolvedValue(mockCategories);
+    mockGetRecent.mockResolvedValue([]);
+    mockGetCurrencies.mockResolvedValue([
+      { code: 'CAD', name: 'Canadian Dollar', symbol: 'CA$', decimalPlaces: 2, isActive: true },
+    ]);
+    mockCreate.mockResolvedValue({ id: 'tx-created' });
+  });
+
+  it('seeds the staged attachment list from the shared files', async () => {
+    render(
+      <TransactionForm
+        onSuccess={mockOnSuccess}
+        defaultAccountId="acc-1"
+        initialStagedFiles={[
+          new File(['a'], 'receipt.png', { type: 'image/png' }),
+          new File(['b'], 'invoice.pdf', { type: 'application/pdf' }),
+        ]}
+      />
+    );
+
+    expect(await screen.findByText('receipt.png')).toBeInTheDocument();
+    expect(screen.getByText('invoice.pdf')).toBeInTheDocument();
+    // Staged, not uploaded: there is no transaction to attach them to yet.
+    expect(mockAttachmentUpload).not.toHaveBeenCalled();
+  });
+
+  it('uploads each shared file to the transaction once it has been created', async () => {
+    render(
+      <TransactionForm
+        onSuccess={mockOnSuccess}
+        defaultAccountId="acc-1"
+        initialStagedFiles={[
+          new File(['a'], 'receipt.png', { type: 'image/png' }),
+          new File(['b'], 'invoice.pdf', { type: 'application/pdf' }),
+        ]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Create Transaction/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Create Transaction/i }));
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+    await waitFor(() => expect(mockAttachmentUpload).toHaveBeenCalledTimes(2));
+
+    // Addressed to the created transaction, with no scan original beside them:
+    // a shared file is one file, not half of a scan pair.
+    expect(mockAttachmentUpload.mock.calls[0][0]).toBe('tx-created');
+    expect(mockAttachmentUpload.mock.calls[0][1].name).toBe('receipt.png');
+    expect(mockAttachmentUpload.mock.calls[0][2]).toBeUndefined();
+    expect(mockAttachmentUpload.mock.calls[1][1].name).toBe('invoice.pdf');
+    expect(mockOnSuccess).toHaveBeenCalled();
+  });
+
+  it('stages nothing when no shared files are handed over', async () => {
+    render(<TransactionForm onSuccess={mockOnSuccess} defaultAccountId="acc-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Create Transaction/i })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Create Transaction/i }));
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+    expect(mockAttachmentUpload).not.toHaveBeenCalled();
   });
 });

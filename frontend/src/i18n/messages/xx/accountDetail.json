@@ -5,6 +5,8 @@
     "edit": "[XX-Edit Account-XX]",
     "back": "[XX-Back to Accounts-XX]",
     "switchAccount": "[XX-Switch to another account-XX]",
+    "switchFavourites": "[XX-Favourites-XX]",
+    "switchOtherAccounts": "[XX-Other accounts-XX]",
     "switchPlaceholder": "[XX-Filter accounts...-XX]",
     "switchNoMatches": "[XX-No accounts match-XX]",
     "jointBadge": "[XX-Joint-XX]",

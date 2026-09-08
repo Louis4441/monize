@@ -3,6 +3,8 @@ import { Cron } from "@nestjs/schedule";
 import { DataSource } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
+import { numberFormatterFor } from "../common/number-locale.util";
+import { UserPreference } from "../users/entities/user-preference.entity";
 import { NotificationDispatchService } from "../notifications/notification-dispatch.service";
 import {
   NotificationSeverity,
@@ -129,13 +131,24 @@ export class SecurityPriceAlertService {
       today,
     );
     if (changePercent === null) return;
+    // Only now that there is something to say, and in its own short read: the
+    // stored English `title`/`message` below is what `notificationEmailCopy`
+    // falls back to WHOLE for a row it cannot rebuild, and an email renders that
+    // fallback to this person -- so the percentage inside it follows their
+    // number locale, not the server's (issue #1316). Most evaluations return
+    // above, so the scan pays for this read only when it alerts.
+    const prefs = await withScopedDb(this.db, (m) =>
+      m.getRepository(UserPreference).findOne({ where: { userId } }),
+    );
+    const n = numberFormatterFor(prefs?.numberFormat, prefs?.language);
+    const shownPercent = n.formatPercent(changePercent, 2);
     await this.dispatch.notify(
       userId,
       {
         type: NotificationType.SECURITY_PRICE_MOVEMENT,
         severity: NotificationSeverity.INFO,
-        title: `${security.symbol}: ${changePercent.toFixed(2)}%`,
-        message: `${security.symbol}: ${changePercent.toFixed(2)}% since the previous available session.`,
+        title: `${security.symbol}: ${shownPercent}`,
+        message: `${security.symbol}: ${shownPercent} since the previous available session.`,
         target: `/securities/${securityId}`,
         dedupeKey: `security-price:${securityId}:${today}`,
         periodStart: today,

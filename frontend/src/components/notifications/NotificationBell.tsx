@@ -5,6 +5,8 @@ import { useAuthStore } from '@/store/authStore';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { useClickOutside } from '@/hooks/useClickOutside';
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
+import { useTourOpensNotificationBell } from '@/store/tourStore';
 import { notificationsApi } from '@/lib/notifications';
 import {
   NotificationFilters,
@@ -35,6 +37,11 @@ function NotificationBellContent({ canManage }: { canManage: boolean }) {
   const [filters, setFilters] = useState<NotificationFilters>(NO_NOTIFICATION_FILTERS);
   const [confirmingDeleteAll, setConfirmingDeleteAll] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  // A tour step can ask for the panel to stay open so it can describe what is
+  // inside; that wins over local state (and over the click-outside close), the
+  // same way the header's Tools dropdown handles it.
+  const tourOpensPanel = useTourOpensNotificationBell();
+  const panelOpen = isOpen || tourOpensPanel;
   const undoTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   // The bell's count is about every notification, not the filtered view.
@@ -172,6 +179,7 @@ function NotificationBellContent({ canManage }: { canManage: boolean }) {
   return (
     <div className="relative" ref={dropdownRef}>
       <button
+        {...tourAnchor(TOUR_ANCHORS.notificationBell)}
         onClick={() => setIsOpen(!isOpen)}
         className="relative p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
         title={t('buttonTitle')}
@@ -202,7 +210,7 @@ function NotificationBellContent({ canManage }: { canManage: boolean }) {
         )}
       </button>
 
-      {isOpen && (
+      {panelOpen && (
         <NotificationList
           canManageNotifications={canManage}
           notifications={visibleNotifications}

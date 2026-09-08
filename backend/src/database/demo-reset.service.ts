@@ -8,6 +8,7 @@ import { DemoModeService } from "../common/demo-mode.service";
 import { DemoSeedService } from "./demo-seed.service";
 import { INTRADAY_TEMPLATES } from "./demo-seed-data/intraday-templates";
 import { withSystemContext } from "../common/db/with-context";
+import { DEMO_USER_EMAIL, DEMO_USER_PASSWORD } from "./demo-credentials";
 import {
   JobClaimService,
   JobClaimType,
@@ -51,7 +52,7 @@ export class DemoResetService {
   /** The demo user's id, or null when the demo user has not been created. */
   private async findDemoUserId(): Promise<string | null> {
     const [demoUser] = await withScopedDb(this.dataSource, (manager) =>
-      manager.query("SELECT id FROM users WHERE email = 'demo@monize.com'"),
+      manager.query("SELECT id FROM users WHERE email = $1", [DEMO_USER_EMAIL]),
     );
     return demoUser?.id ?? null;
   }
@@ -184,7 +185,7 @@ export class DemoResetService {
         ]);
 
         // 2. Reset user record
-        const hashedPassword = await bcrypt.hash("Demo123!", 10);
+        const hashedPassword = await bcrypt.hash(DEMO_USER_PASSWORD, 10);
         await manager.query(
           `UPDATE users SET
           password_hash = $1,

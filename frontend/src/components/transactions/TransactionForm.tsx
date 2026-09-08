@@ -50,7 +50,7 @@ import { Account, TransferCandidate } from '@/types/account';
 import { Tag } from '@/types/tag';
 import { ReactivatePayeeDialog } from '@/components/payees/ReactivatePayeeDialog';
 import { ContactLookupDialog } from '@/components/payees/ContactLookupDialog';
-import { useAiConfigured } from '@/hooks/useAiConfigured';
+import { useContactLookupAvailable } from '@/hooks/useContactLookupAvailable';
 import { usePayeeContactLookup } from '@/hooks/usePayeeContactLookup';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { buildCategoryTree } from '@/lib/categoryUtils';
@@ -61,6 +61,7 @@ import { createLogger } from '@/lib/logger';
 import { getErrorMessage } from '@/lib/errors';
 import { AttachmentsSection } from './AttachmentsSection';
 import { attachmentsApi } from '@/lib/attachments';
+import type { StagedAttachment } from '@/types/attachment';
 import { optionalUuid, optionalString } from '@/lib/zod-helpers';
 import { useFormSubmitRef } from '@/hooks/useFormSubmitRef';
 import { useFormDirtyNotify } from '@/hooks/useFormDirtyNotify';
@@ -146,6 +147,14 @@ interface TransactionFormProps {
    * off and the submit button offers no such option.
    */
   onCreateAndNew?: () => void;
+  /**
+   * Files to open the form with already staged, used by the Web Share Target's
+   * review screen. They travel the same path as files picked in this window:
+   * held client-side while the transaction does not exist, then uploaded by
+   * `uploadStagedAttachments` once it does. Plain files with no scan original,
+   * so each becomes a `StagedAttachment` carrying only `file`.
+   */
+  initialStagedFiles?: File[];
 }
 
 interface TransactionFormFieldsProps extends TransactionFormProps {
@@ -156,7 +165,7 @@ interface TransactionFormFieldsProps extends TransactionFormProps {
 // Transaction mode type
 type TransactionMode = 'normal' | 'split' | 'transfer';
 
-function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, defaultCategoryId, onSuccess, onCancel, onDirtyChange, submitRef, onCreateAnother }: TransactionFormFieldsProps) {
+function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, defaultCategoryId, onSuccess, onCancel, onDirtyChange, submitRef, onCreateAnother, initialStagedFiles }: TransactionFormFieldsProps) {
   const t = useTranslations('transactions');
   const { defaultCurrency, formatCurrency, formatNumber } = useNumberFormat();
   const showCreatedAt = usePreferencesStore((s) => s.preferences?.showCreatedAt ?? false);
@@ -170,7 +179,9 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
   const canCreateAnother = !transaction && !!onCreateAnother;
   // Files chosen in the New Transaction window before the transaction exists;
   // uploaded once it has been created. Empty (and unused) when editing.
-  const [stagedAttachments, setStagedAttachments] = useState<File[]>([]);
+  const [stagedAttachments, setStagedAttachments] = useState<
+    StagedAttachment[]
+  >(() => (initialStagedFiles ?? []).map((file) => ({ file })));
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transferCandidates, setTransferCandidates] = useState<
     TransferCandidate[]
@@ -204,10 +215,10 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
   const payeeLookupEnabled = usePreferencesStore(
     (s) => s.preferences?.payeeContactLookupEnabled ?? false,
   );
-  const { configured: aiConfigured } = useAiConfigured();
+  const { available: lookupAvailable } = useContactLookupAvailable();
   // Both conditions, because either one missing makes the lookup impossible:
   // the preference is the user asking for it, the provider is what answers.
-  const offerContactLookup = payeeLookupEnabled && aiConfigured;
+  const offerContactLookup = payeeLookupEnabled && lookupAvailable;
   const contactLookup = usePayeeContactLookup({
     onApplied: (saved) =>
       setPayees((prev) => prev.map((p) => (p.id === saved.id ? saved : p))),
@@ -1148,9 +1159,12 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
   const uploadStagedAttachments = async (newTransactionId: string) => {
     if (stagedAttachments.length === 0) return;
     let failed = 0;
-    for (const file of stagedAttachments) {
+    for (const { file, original } of stagedAttachments) {
       try {
-        await attachmentsApi.upload(newTransactionId, file);
+        // Both halves of a scan pair go in ONE request: the server writes them
+        // in one transaction, so uploading the original separately would leave
+        // a window where the pair is half stored.
+        await attachmentsApi.upload(newTransactionId, file, original);
       } catch (error) {
         failed += 1;
         logger.error('Failed to upload staged attachment:', error);
@@ -1829,6 +1843,9 @@ export function TransactionForm(props: TransactionFormProps) {
       // A restarted form is a blank new entry, not another copy of whatever the
       // first one was duplicated from.
       duplicateFrom={restart ? undefined : props.duplicateFrom}
+      // Same for shared files: they were uploaded to the entry just created, so
+      // re-staging them here would attach a second copy to the next one.
+      initialStagedFiles={restart ? undefined : props.initialStagedFiles}
       defaultAccountId={restart?.accountId ?? defaultAccountId}
       // The host's default category belongs to the account the host named (an
       // asset account's own category). Once the user has filed an entry against

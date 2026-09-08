@@ -5,6 +5,8 @@
     "edit": "계정 수정",
     "back": "계정으로 돌아가기",
     "switchAccount": "다른 계좌로 이동",
+    "switchFavourites": "즐겨찾기",
+    "switchOtherAccounts": "기타 계좌",
     "switchPlaceholder": "계좌 검색...",
     "switchNoMatches": "일치하는 계좌가 없습니다",
     "jointBadge": "공동",

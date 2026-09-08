@@ -40,6 +40,7 @@ Every user-facing string must be internationalized -- no hardcoded literals in t
 - Parity tests (`frontend/src/i18n/messages.parity.test.ts`, `backend/src/i18n/locales.parity.spec.ts`) fail when a locale is missing a key or references a placeholder `en` does not supply.
 - After editing any `en/*.json`, regenerate the pseudo-locale: `npm run i18n:pseudo` (CI enforces freshness via `npm run i18n:check`) -- never hand-edit `xx/*`.
 - **Grep for a key before adding it.** `JSON.parse` keeps the *last* duplicate, so a key added to a catalog that already has it loads, passes parity and `i18n:check`, and silently ships the wrong copy. Textual auto-merges (both branches appending to the same object) are how it happens. `frontend/src/i18n/messages.duplicate-keys.test.ts` scans the raw bytes of every catalog.
+- **A number is localized too, and by its own preference.** `user_preferences.numberFormat` decides separators, grouping and currency placement, and it is independent of `language` -- an explicit `numberFormat` wins, `"browser"` falls back to the UI language. Every figure addressed to a person goes through that resolution: `useNumberFormat()` on the client (`frontend/CLAUDE.md` has the four banned fingerprints and the guard), `backend/src/common/number-locale.util.ts` on the server, where `"browser"` cannot be resolved and lands on `DEFAULT_LOCALE`. `backend/src/common/format-currency.util.ts`'s `en-US` helpers stay for output read by a MACHINE -- an LLM prompt, and the English `description`/`message` fallback stored on a row whose UI composes its own copy from the structured `data` -- and `number-locale.guard.spec.ts` holds that classification, caller by caller, with the reason each is exempt. A pre-formatted money string in a notification's params is neither: send `amountValue` + `amountCurrency` beside the English `amount` so the reader's client formats it.
 - The user's language lives in `user_preferences.language` (Settings -> Preferences, `LanguageSelector`); unauthenticated screens offer `AuthLanguageSwitcher` (cookie-only). Full contributor flow: `frontend/src/i18n/messages/README.md` and `backend/src/i18n/README.md`.
 
 ### Code Style
@@ -135,6 +136,24 @@ Anything the server writes to disk goes through `shardedSegments` in `backend/sr
 So a backup's owner is recoverable from its path and **an attachment's owner is not**. Attachment ownership is database-authoritative via its metadata row; no cleanup, retention or migration tool may infer it from the filesystem. Sharding is storage distribution, never tenant isolation or authorization. `docs/adr/0003` has the reasoning.
 
 A path built from an id must still be validated (`isShardableId`) and asserted to resolve inside its base before it reaches the filesystem, even when the id is server-generated (CWE-22).
+
+### A scanned document and its original are one attachment
+
+A scan is stored as two rows -- the enhanced image the user sees and the photo
+it came from -- linked by `transaction_attachments.original_of_attachment_id`,
+which is set on the ORIGINAL and NULL on everything a user is meant to see. So
+"is this a visible attachment" is a predicate, not a table scan, and it is
+written once: `primaryAttachmentWhere` / `primaryAttachmentSql`
+(`backend/src/attachments/primary-attachment.util.ts`). Its four readers -- the
+per-transaction cap, the list, the register's `attachmentCount` and the
+`hasAttachments` filter -- all go through it, because four hand-written copies
+of one condition is how a list showing one attachment ends up beside a register
+cell reading "2". `primary-attachment.guard.spec.ts` fails the column being
+named anywhere else without a reason on the record. INV-ATTACHMENT-002.
+
+The pair is written in one transaction and deleted by one cascade; a caller
+that wants both halves sends them in one request (`upload(id, file, original)`)
+rather than uploading the original afterwards.
 
 ### Security (Do Not Regress)
 - Parameterized queries only (TypeORM QueryBuilder or parameterized raw SQL). Never interpolate user input into SQL strings

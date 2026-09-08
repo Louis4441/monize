@@ -229,6 +229,57 @@ describe('every password field says what may be autofilled into it', () => {
   });
 });
 
+describe("a platform capability is not decided by the window's width", () => {
+  /**
+   * `useIsMobile` is a 639px media query, so a narrow desktop window answers
+   * yes to it. That is fine for choosing a LAYOUT -- the register's card rows
+   * show the same figures either way -- and wrong for anything that changes
+   * what a control can do, which is what `isTouchDevice` (`lib/touch-device.ts`)
+   * is for.
+   *
+   * `capture` is the case that made this a scan: on a browser that honours it
+   * the OS file picker is replaced by the camera, so keyed off the viewport it
+   * took "choose an existing photo" away from anyone with a narrow window and
+   * handed it back when they widened it.
+   */
+  function filesUsing(pattern: RegExp): string[] {
+    return productionSources()
+      .filter(([, source]) => pattern.test(withoutComments(source)))
+      .map(([path]) => path);
+  }
+
+  it("keeps the camera handoff off the viewport hook", () => {
+    const offenders = productionSources()
+      .filter(([, source]) => {
+        const code = withoutComments(source);
+        return /\bcapture\s*[:=]/.test(code) && /useIsMobile/.test(code);
+      })
+      .map(([path]) => path);
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("asks the pointer through one helper", () => {
+    // A third hand-rolled copy is how the two existing ones came to be worth
+    // extracting; the media query belongs in `lib/touch-device.ts` alone.
+    const offenders = filesUsing(/pointer:\s*coarse/).filter(
+      (path) => path !== "/src/lib/touch-device.ts",
+    );
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("catches the pattern it bans", () => {
+    const bad = 'const m = useIsMobile();\n<input capture="environment" />';
+    expect(/\bcapture\s*[:=]/.test(withoutComments(bad))).toBe(true);
+    expect(/useIsMobile/.test(withoutComments(bad))).toBe(true);
+    // ...and reads its own explanation as prose, not as a violation.
+    expect(
+      /pointer:\s*coarse/.test(withoutComments("// never (pointer: coarse)")),
+    ).toBe(false);
+  });
+});
+
 describe("a scrollbar you need is not hidden", () => {
   /**
    * `scrollbar-hide` is for a horizontal strip of chips, where the content being
@@ -405,12 +456,23 @@ describe("a tab bar is the shared Tabs component", () => {
   const TABLIST = /role=["']tablist["']/;
 
   it("declares role=tablist in exactly one place", () => {
+    // Comments stripped, like the other scans whose banned pattern has to be
+    // NAMED to explain itself: a call site that deliberately uses two buttons
+    // instead says so, and quoting the role it avoided is not a violation.
     const offenders = productionSources()
       .filter(([path]) => path !== SHARED)
-      .filter(([, source]) => TABLIST.test(source))
+      .filter(([, source]) => TABLIST.test(withoutComments(source)))
       .map(([path]) => path);
 
     expect(offenders).toEqual([]);
+  });
+
+  it("reads a tablist in code but not one named in a comment", () => {
+    // Both directions, so the stripping cannot quietly disarm the rule.
+    expect(TABLIST.test(withoutComments('<div role="tablist">'))).toBe(true);
+    expect(
+      TABLIST.test(withoutComments('// never hand-roll role="tablist"')),
+    ).toBe(false);
   });
 
   it("still finds the shared tablist, so the rule cannot pass by accident", () => {
@@ -2445,5 +2507,95 @@ describe("a date-only string reaches formatDate unwrapped", () => {
     // rule holds rather than that the regex stopped working.
     expect(WRAPPED.test("{formatDate(new Date(preview.endDate))}")).toBe(true);
     expect(WRAPPED.test("{formatDate(preview.endDate)}")).toBe(false);
+  });
+});
+
+describe("a payee contact lookup surface asks whether a lookup can run", () => {
+  /**
+   * `useAiConfigured` answers "does this user have an AI provider", which was
+   * the whole question while AI was the only lookup source. Google Places now
+   * answers the same lookup, so a surface gated on the AI hook hides its
+   * button from exactly the user this feature exists for -- one who configured
+   * Places and no AI. `useContactLookupAvailable` is the question those
+   * surfaces have to ask.
+   *
+   * The assistant is deliberately unaffected: a chat genuinely needs a model,
+   * so `AiChatBubble` and `AiBubbleToggle` keep the AI hook.
+   */
+  const LOOKUP_CALLERS =
+    /payeesApi\.lookupContact|usePayeeContactLookup|ContactLookupDialog/;
+  const AI_HOOK = /useAiConfigured/;
+
+  function lookupSurfaces(): [string, string][] {
+    return productionSources()
+      .map(([path, content]) => [path, withoutComments(content)] as [string, string])
+      .filter(([path, content]) => {
+        // The hook and the dialog's own module define these names rather than
+        // consuming them.
+        if (path.endsWith("/useContactLookupAvailable.ts")) return false;
+        if (path.endsWith("/ContactLookupDialog.tsx")) return false;
+        return LOOKUP_CALLERS.test(content);
+      });
+  }
+
+  it("finds the lookup surfaces, so the rule below is not vacuous", () => {
+    // A scan that silently matched nothing is the failure mode of every guard
+    // here, so it asserts its own subject first.
+    expect(lookupSurfaces().length).toBeGreaterThan(1);
+  });
+
+  it("gates no lookup surface on the AI-only hook", () => {
+    const offenders = lookupSurfaces()
+      .filter(([, content]) => AI_HOOK.test(content))
+      .map(([path]) => path);
+    expect(offenders).toEqual([]);
+  });
+
+  it("still recognises the pattern it bans", () => {
+    // Comments are stripped first, so the paragraph above -- which has to name
+    // the banned hook to explain itself -- cannot fail its own rule.
+    const offending = `import { useAiConfigured } from '@/hooks/useAiConfigured';
+      const x = usePayeeContactLookup();`;
+    expect(LOOKUP_CALLERS.test(offending)).toBe(true);
+    expect(AI_HOOK.test(withoutComments(offending))).toBe(true);
+    expect(AI_HOOK.test(withoutComments("// useAiConfigured is banned here"))).toBe(
+      false,
+    );
+  });
+});
+
+describe("a random value comes from the Web Crypto API", () => {
+  /**
+   * `Math.random()` is not a security primitive, and every use of it in the
+   * client so far has been an id: a list key, a removal handle, a temporary
+   * split row. Those want uniqueness, which `crypto.randomUUID()` gives with
+   * no argument about strength -- and Bearer flags the alternative as
+   * CWE-330, which cost an exception with a review date rather than a fix
+   * (issue #1323). `lib/ai-attachments.ts` is the pattern; `SplitEditor` was
+   * the last holdout.
+   */
+  const WEAK_RANDOM = /\bMath\.random\b/;
+
+  it("never calls Math.random in a production source", () => {
+    const offenders = productionSources()
+      .filter(([, source]) => WEAK_RANDOM.test(withoutComments(source)))
+      .map(([path]) => path);
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("still finds the sanctioned helper, so the rule cannot pass by accident", () => {
+    const users = productionSources().filter(([, source]) =>
+      /crypto\.randomUUID\(\)/.test(withoutComments(source)),
+    );
+    expect(users.length).toBeGreaterThan(0);
+  });
+
+  it("catches the pattern it bans", () => {
+    expect(
+      WEAK_RANDOM.test(withoutComments("id: `temp-${Date.now()}-${Math.random()}`")),
+    ).toBe(true);
+    // ...and reads its own explanation as prose, not as a violation.
+    expect(WEAK_RANDOM.test(withoutComments("// not Math.random"))).toBe(false);
   });
 });

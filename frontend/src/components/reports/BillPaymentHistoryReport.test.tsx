@@ -22,15 +22,18 @@ vi.mock('@/lib/csv-export', () => ({
   exportToCsv: (...args: any[]) => mockExportToCsv(...args),
 }));
 
-vi.mock('@/hooks/useNumberFormat', () => ({
-  useNumberFormat: () => ({
-    formatCurrencyCompact: (n: number) => `$${n.toFixed(2)}`,
-    formatCurrency: (n: number) => `$${n.toFixed(2)}`,
-    formatCurrencyAxis: (n: number) => `$${n}`,
-    defaultCurrency: 'CAD',
-  }),
-}));
-
+vi.mock('@/hooks/useNumberFormat', async () => {
+  const { numberFormatMockDefaults } = await import('@/test/number-format-mock');
+  return {
+    useNumberFormat: () => ({
+      ...numberFormatMockDefaults(),
+      formatCurrencyCompact: (n: number) => `$${n.toFixed(2)}`,
+      formatCurrency: (n: number) => `$${n.toFixed(2)}`,
+      formatCurrencyAxis: (n: number) => `$${n}`,
+      defaultCurrency: 'CAD',
+    }),
+  };
+});
 const STABLE_RANGE = { start: '2024-01-01', end: '2025-01-01' };
 vi.mock('@/hooks/useDateRange', () => ({
   useDateRange: () => ({
@@ -41,7 +44,11 @@ vi.mock('@/hooks/useDateRange', () => ({
   }),
 }));
 
-vi.mock('@/lib/utils', () => ({
+// Spread the real module rather than replacing it: the by-bill table's phone
+// captions render `CellLabel`, which reads `cn` from here, and a bare factory
+// blanks every other export of the module for the whole graph under test.
+vi.mock('@/lib/utils', async (importActual) => ({
+  ...(await importActual<typeof import('@/lib/utils')>()),
   parseLocalDate: (d: string) => new Date(d + 'T00:00:00'),
 }));
 

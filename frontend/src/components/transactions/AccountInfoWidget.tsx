@@ -11,7 +11,11 @@ import {
 } from '@heroicons/react/24/outline';
 import { Account } from '@/types/account';
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
-import { formatAccountType, maskAccountNumber } from '@/lib/account-utils';
+import {
+  formatAccountType,
+  maskAccountNumber,
+  orderAccountsForPicker,
+} from '@/lib/account-utils';
 import { getOrdinal } from '@/lib/ordinal';
 import { balanceColor } from '@/lib/format';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -20,6 +24,7 @@ import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import { useLoanProjection } from '@/hooks/useLoanProjection';
 import { InstitutionLogo, InstitutionLogoData } from '@/components/institutions/InstitutionLogo';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
+import { EntitySwitcher, type EntitySwitcherItem } from '@/components/ui/EntitySwitcher';
 import { safeHttpUrl } from '@/lib/safe-url';
 import { getNextScheduled } from '@/lib/scheduled-utils';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
@@ -38,6 +43,15 @@ interface AccountInfoWidgetProps {
   scheduledTransactions?: ScheduledTransaction[];
   /** Bumped by the page on every reload so the loan projection refetches in lockstep. */
   refreshKey?: number;
+  /**
+   * The accounts the Accounts filter currently offers -- already narrowed by
+   * the Show Accounts (All/Active/Closed) toggle -- so the caret beside the
+   * name switches only to an account the filter itself could select. Omit to
+   * hide the caret.
+   */
+  switchableAccounts?: readonly Account[];
+  /** Narrow the list to the chosen account, leaving every other filter as is. */
+  onSwitchAccount?: (accountId: string) => void;
   /** Open the shared account edit modal for this account. */
   onEdit: () => void;
   /** Collapse the widget so the chart can use the full width. */
@@ -55,13 +69,18 @@ export function AccountInfoWidget({
   institution,
   scheduledTransactions = [],
   refreshKey,
+  switchableAccounts,
+  onSwitchAccount,
   onEdit,
   onCollapse,
 }: AccountInfoWidgetProps) {
   const t = useTranslations('transactions');
   const tc = useTranslations('common');
+  // The caret reuses the account detail page's switcher copy, so the two
+  // surfaces say the same thing.
+  const ta = useTranslations('accountDetail');
   const router = useRouter();
-  const { formatCurrency } = useNumberFormat();
+  const { formatCurrency, formatPercentTrimmed } = useNumberFormat();
   const { formatDate } = useDateFormat();
   const formatChartDate = useChartDateFormat();
   // Loan/mortgage figures: the current installment, the estimated payoff date
@@ -90,6 +109,44 @@ export function AccountInfoWidget({
   // Only treat http(s) URLs as a safe link target, to avoid javascript:/data:
   // URIs ever reaching the href.
   const institutionWebsite = safeHttpUrl(institution?.website);
+
+  // One row per account the Accounts filter offers, each qualified by its type
+  // the way the account detail page's switcher does, so alike-named accounts at
+  // two banks are told apart. The order is `orderAccountsForPicker`'s -- the
+  // starred accounts in the order the user arranged them, then the rest by name
+  // -- so this menu opens on the same accounts, in the same order, as every
+  // account `<select>` in the app.
+  const switcherItems = useMemo<EntitySwitcherItem[]>(() => {
+    const { favourites, rest } = orderAccountsForPicker(switchableAccounts ?? []);
+    // Whether the menu is sectioned at all is decided by the favourites it will
+    // actually OFFER, not by the ones the user has: `EntitySwitcher` drops the
+    // account already on screen, so a reader whose only starred account is the
+    // one they are looking at would otherwise get an "Other accounts" heading
+    // over the whole list with nothing above it.
+    const sectioned = favourites.some((candidate) => candidate.id !== account.id);
+    const toItem = (candidate: Account, group?: string): EntitySwitcherItem => {
+      const type = formatAccountType(candidate.accountType, tc);
+      return {
+        id: candidate.id,
+        primary: candidate.name,
+        secondary: type,
+        // A starred account is still findable by its own name and type, so
+        // typing narrows across both sections rather than only below the fold.
+        searchText: `${candidate.name} ${type}`,
+        group,
+      };
+    };
+    // Emitted favourites-first because `EntitySwitcher` takes its section order
+    // from the order the items appear in.
+    return [
+      ...favourites.map((candidate) =>
+        toItem(candidate, sectioned ? ta('header.switchFavourites') : undefined),
+      ),
+      ...rest.map((candidate) =>
+        toItem(candidate, sectioned ? ta('header.switchOtherAccounts') : undefined),
+      ),
+    ];
+  }, [switchableAccounts, account.id, ta, tc]);
 
   // The soonest active scheduled bill/deposit booked against this account.
   const nextPayment = useMemo(
@@ -143,7 +200,7 @@ export function AccountInfoWidget({
   if (displayedRate != null && displayedRate !== 0) {
     details.push({
       label: t('accountWidget.interestRate'),
-      value: `${displayedRate}%`,
+      value: `${formatPercentTrimmed(displayedRate)}`,
     });
   }
   if (loan.status !== 'idle') {
@@ -211,9 +268,23 @@ export function AccountInfoWidget({
             <InstitutionLogo institution={institution ?? undefined} size={40} fallbackGlyph="$" />
           )}
           <div className="min-w-0">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">
-              {account.name}
-            </h3>
+            <div className="flex min-w-0 items-center gap-1">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">
+                {account.name}
+              </h3>
+              {/* Jump straight to another account the Accounts filter offers,
+                  instead of reopening the filter and picking it there. */}
+              {onSwitchAccount && switcherItems.length > 0 && (
+                <EntitySwitcher
+                  currentId={account.id}
+                  items={switcherItems}
+                  onSelect={onSwitchAccount}
+                  triggerLabel={ta('header.switchAccount')}
+                  filterPlaceholder={ta('header.switchPlaceholder')}
+                  noMatchesLabel={ta('header.switchNoMatches')}
+                />
+              )}
+            </div>
             {(institutionName || account.isClosed) && (
               <div className="flex items-center gap-2 min-w-0">
                 {institutionName && (

@@ -591,7 +591,8 @@
     "fileTooLarge": "Bestand overschrijdt de maximale grootte van {{ max }} bytes",
     "unsupportedType": "Niet-ondersteund bestandstype. Toegestane types: {{ types }}",
     "tooMany": "Deze transactie heeft al het maximum van {{ max }} bijlagen",
-    "swept": "Het uploaden duurde te lang en de opslag is vrijgegeven. Probeer het opnieuw."
+    "swept": "Het uploaden duurde te lang en de opslag is vrijgegeven. Probeer het opnieuw.",
+    "pairRequiresImages": "Een gescand document en het origineel moeten allebei afbeeldingen zijn"
   },
   "strategies": {
     "accountNotFound": "Rekening niet gevonden",
@@ -604,5 +605,14 @@
   },
   "maintenance": {
     "inProgress": "Een andere bewerking vervangt momenteel de gegevens van dit account. Wacht tot deze klaar is en probeer het opnieuw."
+  },
+  "payeeLookup": {
+    "operatorManaged": "Google Places wordt ingesteld door de beheerder van deze server. Alleen de aan/uit-instelling kan hier worden gewijzigd.",
+    "encryptionKeyNotConfigured": "ENCRYPTION_KEY is niet ingesteld. De Google Places API-sleutel kan niet veilig worden opgeslagen.",
+    "notConfigured": "Er is geen Google Places API-sleutel ingesteld.",
+    "capReached": "De limiet voor Google Places-verzoeken van deze maand is bereikt.",
+    "testFailed": "De verbindingstest met Google Places is mislukt.",
+    "referrerRestricted": "Deze sleutel is beperkt op HTTP-referrer, maar deze installatie heeft geen PUBLIC_APP_URL ingesteld, dus er wordt geen referrer verzonden en geen enkele toegestane lijst kan overeenkomen. Stel PUBLIC_APP_URL in, of beperk de sleutel op IP-adres, de optie die een serversleutel daadwerkelijk beschermt.",
+    "referrerRejected": "Google heeft de HTTP-referrerbeperking van deze sleutel geweigerd. Monize verstuurt \"{referer}\" (uit PUBLIC_APP_URL); voeg precies die waarde toe aan de toegestane referrers, en let erop dat een patroon als *.example.com/* niet overeenkomt met een kaal example.com. De sleutel beperken op IP-adres is de optie die een serversleutel daadwerkelijk beschermt."
   }
 }

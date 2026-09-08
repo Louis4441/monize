@@ -77,6 +77,14 @@
           "title": "Tài khoản của bạn",
           "body": "Thêm tài khoản ngân hàng, thẻ tín dụng, khoản vay và đầu tư của bạn tại đây bằng nút được làm nổi bật. Mọi số dư và giao dịch đều thuộc về một tài khoản."
         },
+        "openAccountDetail": {
+          "title": "Mở trang chi tiết của một tài khoản",
+          "body": "Mỗi tài khoản có một trang riêng theo loại của nó. Chọn **Chi tiết** — biểu tượng con mắt trên dòng tài khoản — để mở trang đó. Trên điện thoại, nhấn giữ tài khoản rồi chọn **Chi tiết**."
+        },
+        "accountDetailView": {
+          "title": "Một trang dành riêng cho tài khoản này",
+          "body": "Trang này thay đổi theo loại tài khoản, nên tài khoản ngân hàng, thẻ tín dụng, khoản vay, tài khoản đầu tư hay tài sản đều hiển thị những con số và công cụ phù hợp nhất với nó. Bạn có thể quay lại bất cứ lúc nào bằng **Chi tiết** trong danh sách tài khoản."
+        },
         "transactions": {
           "title": "Giao dịch",
           "body": "Đây là sổ giao dịch của bạn — mọi khoản thanh toán và tiền gửi cho các tài khoản đều nằm ở đây, sẵn sàng để tìm kiếm và lọc."
@@ -302,6 +310,49 @@
           "finish": {
             "title": "Hãy trở lại vào lần đánh giá tới",
             "body": "GEM ra một quyết định cho mỗi kỳ, và ngày đánh giá kế tiếp nằm ở đầu báo cáo. Cho tới ngày đó bạn không cần làm gì. Khi đến hạn, hãy xem tín hiệu có đổi không; nếu có, hãy đặt lệnh qua công ty chứng khoán và ghi các giao dịch đó vào Monize để phần so sánh danh mục vẫn khớp. Bạn có thể chạy lại phần hướng dẫn này bất cứ lúc nào từ **Hướng dẫn sử dụng** trong **Cài đặt**."
+          }
+        }
+      }
+    },
+    "v1_16_0": {
+      "notifications": {
+        "title": "Thông báo",
+        "steps": {
+          "welcome": {
+            "title": "Monize giờ có thể báo cho bạn",
+            "body": "Một hóa đơn đến hạn, một ngân sách vượt mức, một số dư vượt qua ngưỡng bạn đặt, một bản sao lưu thất bại. Phần hướng dẫn này cho thấy những thứ đó đến đâu, và cách bạn chọn thứ nào sẽ tới bạn qua email hay trên điện thoại."
+          },
+          "bell": {
+            "title": "Chuông là bản ghi gốc",
+            "body": "Mọi thông báo Monize tạo ra đều được ghi ở đây, bất kể bạn bật hay tắt thứ gì khác. Email và push là bản sao gửi đi sau; danh sách này là bản gốc, và con số trên chuông đếm những gì bạn chưa đọc."
+          },
+          "panel": {
+            "title": "Một thông báo mang theo những gì",
+            "body": "Mỗi thông báo cho biết chuyện gì đã xảy ra và dẫn tới trang hiển thị nó: hóa đơn, ngân sách, tài khoản. **Đánh dấu tất cả đã đọc** đưa bộ đếm về không mà không xóa gì. Nếu muốn được nhắc lại, mỗi thông báo có **Nhắc tôi**: một lần nữa sau một khoảng, hoặc lặp lại cho tới khi bạn dừng — và bạn có thể dừng ngay từ chính thông báo khi nó tới điện thoại."
+          },
+          "filters": {
+            "title": "Thu hẹp danh sách rồi mới xử lý",
+            "body": "Hàng trên lọc theo mức nghiêm trọng, hàng dưới tách **Tài chính** khỏi **Hệ thống** — sao lưu, gửi thư và những việc chỉ quản trị viên xử lý được. **Xóa tất cả** đi theo bộ lọc đang bật và chạm tới mọi mục khớp, không chỉ những mục trên màn hình, nên bạn có thể dọn một loạt cảnh báo hệ thống đã xử lý xong và giữ lại phần còn lại."
+          },
+          "settings": {
+            "title": "Nơi quyết định việc gửi đi",
+            "body": "**Cài đặt → Thông báo** chứa phần còn lại của hướng dẫn này. Đầu thẻ là công tắc email và bản tóm tắt ngân sách hằng tuần; bên dưới là lưới quyết định mọi thứ còn lại, rồi tới các thiết bị push của bạn."
+          },
+          "matrix": {
+            "title": "Mỗi loại một hàng, mỗi kênh một cột",
+            "body": "Với từng loại thông báo, chọn xem nó đi ra dưới dạng **Email (báo cáo)**, **Email (cảnh báo)**, **Push**, hay qua **UnifiedPush** tới một bộ phân phối do chính bạn vận hành. Không có cột cho chuông, vì chuông luôn nhận được hàng đó. **Giãn cách** là cột cuối: bỏ qua email và push khi có thứ cùng nhóm đã gửi đi trong khoảng thời gian ấy — mục trong chuông vẫn được ghi. Mỗi công tắc lưu ngay khi bạn gạt."
+          },
+          "push": {
+            "title": "Thiết bị của bạn",
+            "body": "Đăng ký một trình duyệt ở đây và Monize có thể tới được nó ngay cả khi ứng dụng đã đóng. Monize tự ký các thông điệp của mình, nên không có tài khoản Google hay Apple nào ở giữa. Mỗi thiết bị có thể thử và gỡ riêng, và thiết bị không còn liên lạc được sẽ nói rõ lý do. Trên iPhone, việc này chạy được sau khi thêm Monize vào Màn hình chính; nếu quản trị viên chưa bật push cho bản cài đặt này, phần này sẽ ghi rõ như vậy."
+          },
+          "portfolio": {
+            "title": "Biến động giá trị đầu tư",
+            "body": "Mỗi ngày một lần, khi các tài khoản đầu tư của bạn biến động quá mức bạn đặt ở đây. Nó đo biến động thị trường và cổ tức — tiền bạn nạp vào hay rút ra không phải là biến động."
+          },
+          "finish": {
+            "title": "Còn một chỗ nữa",
+            "body": "Cảnh báo số dư nằm ngay trên tài khoản: sửa bất kỳ tài khoản nào và đặt **Thông báo khi dưới** hoặc **Thông báo khi trên**. Chúng kích hoạt khi số dư *vượt qua* ngưỡng, nên bạn được báo một lần thay vì sau mỗi khoản chi giữ nó ở đó. Bạn có thể xem lại hướng dẫn này bất cứ lúc nào trong Cài đặt."
           }
         }
       }

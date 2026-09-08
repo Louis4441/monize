@@ -133,10 +133,26 @@ describe("NotificationDispatchService", () => {
   );
 
   it("passes validated price facts to chart delivery only for price alerts", async () => {
-    const data = { securityId: "11111111-1111-4111-8111-111111111111", priceDate: "2026-09-02", price: 110 };
-    create.mockResolvedValue(row({ type: NotificationType.SECURITY_PRICE_MOVEMENT, data }));
-    resolveDelivery.mockResolvedValue({ push: true, unifiedpush: false, emailNotification: false, throttleMinutes: 0 });
-    await service.notify("u1", { type: NotificationType.SECURITY_PRICE_MOVEMENT, severity: NotificationSeverity.INFO, title: "Price", message: "Changed" });
+    const data = {
+      securityId: "11111111-1111-4111-8111-111111111111",
+      priceDate: "2026-09-02",
+      price: 110,
+    };
+    create.mockResolvedValue(
+      row({ type: NotificationType.SECURITY_PRICE_MOVEMENT, data }),
+    );
+    resolveDelivery.mockResolvedValue({
+      push: true,
+      unifiedpush: false,
+      emailNotification: false,
+      throttleMinutes: 0,
+    });
+    await service.notify("u1", {
+      type: NotificationType.SECURITY_PRICE_MOVEMENT,
+      severity: NotificationSeverity.INFO,
+      title: "Price",
+      message: "Changed",
+    });
     expect(sendToUser.mock.calls[0][3]).toEqual(data);
   });
 

@@ -52,6 +52,22 @@ const REFS: Record<string, RefRule[]> = {
       refTable: "transactions",
       onMissing: "dropRow",
     },
+    // A scan pair's original points at the visible attachment it was scanned
+    // from (INV-ATTACHMENT-002). `null` rather than `dropRow`, and the reason
+    // is structural: a self-referential `dropRow` is a cycle to the pass-bound
+    // guard, which cannot bound a chain whose length depends on the data
+    // (`support-backup-integrity.spec.ts`) -- which is why every other
+    // self-referential rule here nulls too. Nothing is lost by it, because the
+    // dangling case cannot arise: both halves of a pair carry the same
+    // `transaction_id`, so the rule above removes them together or not at all.
+    // The table is in `ALWAYS_EXCLUDED_TABLES` besides, so this entry exists to
+    // satisfy the coverage guard, which is driven by the FULL backup's table
+    // set rather than the support export's.
+    {
+      column: "original_of_attachment_id",
+      refTable: "transaction_attachments",
+      onMissing: "null",
+    },
   ],
   // The nullable source FK is modeled by the entity and covered by the live-FK
   // integration guard. A reminder retains its template after source deletion;

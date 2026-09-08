@@ -5,6 +5,8 @@
     "edit": "勘定科目を編集",
     "back": "勘定科目一覧に戻る",
     "switchAccount": "別の口座に切り替える",
+    "switchFavourites": "お気に入り",
+    "switchOtherAccounts": "その他の口座",
     "switchPlaceholder": "口座を絞り込む...",
     "switchNoMatches": "一致する口座はありません",
     "jointBadge": "共同",

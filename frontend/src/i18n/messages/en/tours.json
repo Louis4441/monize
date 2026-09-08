@@ -77,6 +77,14 @@
           "title": "Your accounts",
           "body": "Add your bank, credit card, loan, and investment accounts here with the highlighted button. Every balance and transaction belongs to an account."
         },
+        "openAccountDetail": {
+          "title": "Open an account's detailed view",
+          "body": "Each account has a page built for its type. Choose **Details** — the eye icon on an account row — to open it. On a phone, press and hold the account and choose **Details**."
+        },
+        "accountDetailView": {
+          "title": "A view built for this account",
+          "body": "This page changes with the account type, so a bank account, credit card, loan, investment account, or asset each shows the figures and tools that suit it. Come back anytime with **Details** from the Accounts list."
+        },
         "transactions": {
           "title": "Transactions",
           "body": "This is your transaction register — every payment and deposit for your accounts lives here, ready to search and filter."
@@ -302,6 +310,49 @@
           "finish": {
             "title": "Come back at the next evaluation",
             "body": "GEM makes one decision per period, and the date of the next one is at the top of the report. There is nothing to do until then. When it arrives, check whether the signal changed; if it did, place the trades through your broker and record them in Monize so the portfolio comparison keeps adding up. You can retake this tour anytime from **Guided tours** in **Settings**."
+          }
+        }
+      }
+    },
+    "v1_16_0": {
+      "notifications": {
+        "title": "Notifications",
+        "steps": {
+          "welcome": {
+            "title": "Monize can tell you things now",
+            "body": "A bill falling due, a budget going over, a balance crossing a line you set, a backup that failed. This walkthrough covers where those arrive, and how you choose which ones reach you by email or on your phone."
+          },
+          "bell": {
+            "title": "The bell is the record",
+            "body": "Every notification Monize raises is written here, whatever else you switch on or off. Email and push are copies sent onward; this list is the original, and the number on the bell counts what you have not read yet."
+          },
+          "panel": {
+            "title": "What a notification carries",
+            "body": "Each one says what happened and links to the page that shows it — the bill, the budget, the account. **Mark all read** clears the count without removing anything. A notification you want to be reminded about has a **Remind me** action: once more after a delay, or repeating until you stop it, and you can stop it from the notification itself when it reaches your phone."
+          },
+          "filters": {
+            "title": "Narrow the list, then act on it",
+            "body": "The top row filters by severity and the bottom row separates **Financial** from **System** — backups, mail delivery and other things only an administrator can act on. **Delete all** follows whatever filter is showing and reaches every match, not only the ones on screen, so you can clear a run of resolved system alerts and leave the rest."
+          },
+          "settings": {
+            "title": "Where delivery is decided",
+            "body": "**Settings → Notifications** holds the rest of this tour. The top of the card is the email switch and the weekly budget digest; below it is the grid that decides everything else, then your push devices."
+          },
+          "matrix": {
+            "title": "One row per kind, one column per channel",
+            "body": "Choose per notification type whether it goes out as a **report email**, an **alert email**, a **push**, or through **UnifiedPush** to a distributor you run yourself. There is no column for the bell because the bell always gets the row. **Cooldown** is the last column: skip the email and the push when something from the same group already went out inside that window — the bell entry is still written. Every switch saves the moment you flip it."
+          },
+          "push": {
+            "title": "Your devices",
+            "body": "Register a browser here and Monize can reach it while the app is closed. It signs its own messages, so there is no Google or Apple account in the middle. Each device can be tested and removed on its own, and a device that stops being reachable says why. On an iPhone this works once Monize is added to the Home Screen; if your administrator has not switched push on for this instance, this block says so instead."
+          },
+          "portfolio": {
+            "title": "Investment movement",
+            "body": "Once a day, when your investment accounts move by more than the amount you set here. It measures market movement and dividends — money you pay in or take out is not a move."
+          },
+          "finish": {
+            "title": "One more place to look",
+            "body": "Balance alerts live on the account itself: edit any account and set **Notify below** or **Notify above**. They fire when the balance *crosses* the line, so you are told once rather than after every payment that keeps it there. You can retake this tour anytime from Settings."
           }
         }
       }

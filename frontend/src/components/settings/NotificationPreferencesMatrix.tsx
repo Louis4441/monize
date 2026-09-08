@@ -17,6 +17,7 @@ import { currentDeviceFingerprint, pushApi, type PushDevice } from '@/lib/push';
 import type { NotificationCategory } from '@/types/notification';
 import { createLogger } from '@/lib/logger';
 import { subscribePushDevices } from '@/lib/pushDevicesSignal';
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 
 const logger = createLogger('NotificationPreferencesMatrix');
 
@@ -183,7 +184,10 @@ export function NotificationPreferencesMatrix({
     live.some((device) => device.endpointFingerprint === thisDevice);
 
   return (
-    <div className="border-t border-gray-200 pt-4 pb-4 dark:border-gray-700">
+    <div
+      {...tourAnchor(TOUR_ANCHORS.notificationChannelMatrix)}
+      className="border-t border-gray-200 pt-4 pb-4 dark:border-gray-700"
+    >
       <h3 className="mb-1 text-sm font-medium text-gray-900 dark:text-gray-100">
         {t('heading')}
       </h3>

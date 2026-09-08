@@ -11,7 +11,7 @@ import { EmailService } from "../notifications/email.service";
 import { systemAlertTemplate } from "../notifications/email-templates";
 import { notificationEmailCopy } from "../notifications/notification-email-copy";
 import { emailTranslator } from "../i18n/email-translator";
-import { resolveUserEmailLocale } from "../i18n/resolve-user-email-locale";
+import { resolveUserEmailFormats } from "../i18n/resolve-user-email-locale";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import {
   AdminRecipient,
@@ -286,14 +286,16 @@ export class SystemAlertService {
   ): Promise<boolean> {
     if (!this.emailService.getStatus().configured) return false;
     try {
-      const lang = await withScopedDb(this.dataSource, (manager) =>
-        resolveUserEmailLocale(
-          manager.getRepository(UserPreference),
-          admin.userId,
-        ),
+      const { lang, numberFormat } = await withScopedDb(
+        this.dataSource,
+        (manager) =>
+          resolveUserEmailFormats(
+            manager.getRepository(UserPreference),
+            admin.userId,
+          ),
       );
       const t = emailTranslator(this.i18n, lang);
-      const copy = notificationEmailCopy(input, t, lang);
+      const copy = notificationEmailCopy(input, t, lang, { numberFormat });
       const html = systemAlertTemplate(
         admin.firstName,
         {

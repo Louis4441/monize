@@ -6,6 +6,7 @@ import {
   priceMovement,
 } from "./security-price-alert.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+import { UserPreference } from "../users/entities/user-preference.entity";
 import {
   NotificationType,
   NotificationCategory,
@@ -91,14 +92,21 @@ describe("security price movement", () => {
 describe("security price alert producer", () => {
   const user = "11111111-1111-4111-8111-111111111111";
   const security = "22222222-2222-4222-8222-222222222222";
-  const setup = () => {
-    const { dataSource, manager } = createScopedDbMocks([]);
+  const setup = (
+    preferences: { numberFormat?: string; language?: string } | null = null,
+  ) => {
+    const prefsRepo = {
+      findOne: jest.fn().mockResolvedValue(preferences),
+    };
+    const { dataSource, manager } = createScopedDbMocks([
+      [UserPreference, prefsRepo],
+    ]);
     const notify = jest.fn().mockResolvedValue({ id: "written" });
     const service = new SecurityPriceAlertService(
       dataSource as any,
       { notify } as any,
     );
-    return { manager, notify, service };
+    return { manager, notify, service, prefsRepo };
   };
   it("addresses the owner, persists facts and a security deep link, and uses stable per-day dedupe", async () => {
     const { manager, notify, service } = setup();
@@ -127,6 +135,52 @@ describe("security price alert producer", () => {
       { collapseKey: `security-price:${security}` },
     );
   });
+  it.each([
+    [
+      "an explicit numberFormat, over an English UI",
+      { numberFormat: "pl-PL", language: "en" },
+    ],
+    [
+      "the UI language when numberFormat follows the browser",
+      { numberFormat: "browser", language: "pl" },
+    ],
+  ])(
+    "writes the stored fallback percentage in the recipient's own convention: %s",
+    async (_case, preferences) => {
+      // Issue #1316: `title`/`message` here are the English fallback, and
+      // `notificationEmailCopy` renders exactly that pair into an email for a
+      // row it cannot rebuild -- so the figure inside it is the recipient's to
+      // read. Polish writes it `10,00%`; `toFixed(2)` wrote `10.00`.
+      const { manager, notify, service } = setup(preferences);
+      manager.query
+        .mockResolvedValueOnce([
+          { symbol: "AAPL", currency_code: "USD", price_alert_percent: 5 },
+        ])
+        .mockResolvedValueOnce(prices());
+      await service.evaluate(user, security, today);
+      const written = notify.mock.calls[0][1];
+      expect(written.title).toContain("10,00");
+      expect(written.title).not.toContain("10.00");
+      expect(written.message).toContain("10,00");
+      // The structured fact is untouched: the client composes from `data`, and
+      // a localized string there would be unreadable to it.
+      expect(written.data.changePercent).toBe(10);
+    },
+  );
+
+  it("falls back to the deterministic default when the recipient has no preferences row", async () => {
+    // A user who has never opened Settings is not a reason to withhold or guess:
+    // `numberFormatterFor` lands on DEFAULT_LOCALE, which writes `10.00%`.
+    const { manager, notify, service } = setup(null);
+    manager.query
+      .mockResolvedValueOnce([
+        { symbol: "AAPL", currency_code: "USD", price_alert_percent: 5 },
+      ])
+      .mockResolvedValueOnce(prices());
+    await service.evaluate(user, security, today);
+    expect(notify.mock.calls[0][1].title).toContain("10.00");
+  });
+
   it("does nothing when the owner's active opt-in no longer exists", async () => {
     const { manager, notify, service } = setup();
     manager.query.mockResolvedValueOnce([]);

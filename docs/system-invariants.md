@@ -115,12 +115,19 @@ implied.
 | INV-AUTH-004 | A logout reports only what it achieved | enforced |
 | INV-ACTIVITY-001 | Activity is attributed to whoever acted, not to whoever was acted for | enforced |
 | INV-PROFILE-001 | A user-profile response is an allowlist | enforced |
+| INV-DISPLAY-001 | A figure addressed to a person is rendered in that person's number locale | enforced |
 | INV-MCP-001 | Identity comes from the credential on the request | enforced |
 | INV-MCP-002 | An MCP request is answered by the MCP transport, never by the app shell | enforced |
 | INV-MCP-003 | A write confirmation is bound to one credential and one change | enforced |
 | INV-MCP-004 | A write happens only on the round a human answered | enforced |
 | INV-CURRENCY-001 | A shared currency is deleted only by its creator, on a global count | enforced |
 | INV-ATTACHMENT-001 | Available metadata resolves to committed bytes | enforced |
+| INV-ATTACHMENT-002 | A scanned document and its original are one attachment | enforced |
+| INV-SHARE-001 | A shared file reaches the server only through an endpoint that already existed | enforced |
+| INV-SHARE-002 | Nothing is imported, attached or saved from a share without an explicit action | enforced |
+| INV-SHARE-003 | The share stash holds only files within the declared limits, and outlives neither its lifetime nor the session | enforced |
+| INV-SHARE-004 | A share always lands on a Monize page that explains what happened | enforced |
+| INV-SHARE-005 | A stashed share belongs to one account, and no other account can see it | enforced |
 | INV-BACKUP-001 | A backup file is complete, verified and owner-namespaced | enforced |
 | INV-PUSH-001 | A push subscription belongs to the authenticated caller, and no request touches another account's device | enforced |
 | INV-PUSH-002 | The VAPID private key never leaves the server, and is never stored unencrypted | enforced |
@@ -143,7 +150,9 @@ implied.
 | INV-RLS-001 | Enforced mode refuses to run on a role that can bypass RLS | enforced |
 | INV-CACHE-001 | A money-moving write invalidates every derived cache | enforced |
 | INV-PAYEE-001 | A contact lookup never overwrites a value the user entered, and the automatic one runs at most once per payee | enforced |
+| INV-PAYEE-002 | Google Places requests in one Pacific calendar month never exceed the cap for the key's owner | enforced |
 | INV-RELEASE-001 | The tested, imaged and tagged revisions are one revision | partial |
+| INV-MIGRATION-001 | Migrations apply in numeric prefix order, and a new migration's prefix cannot collide | enforced |
 
 ## Imports
 
@@ -1865,6 +1874,100 @@ A removal list would be wrong structurally: the default for a new column is
 file, and the route is delegate-accessible so the leak would cross users. The
 allowlist inverts that default.
 
+### INV-DISPLAY-001 -- a figure is rendered in the reader's number locale
+
+```text
+Statement           Any number addressed to a PERSON -- money, a percentage, a
+                    share count, a price, a plain count -- is rendered in that
+                    person's effective number locale, on every surface that shows
+                    it: the app, a PDF or CSV export, an email, a notification, a
+                    generated report note. The effective locale is one
+                    resolution, shared by both layers: an explicit
+                    `user_preferences.numberFormat` wins; `"browser"` falls back
+                    to `user_preferences.language`; a language that is not a real
+                    Intl tag (`browser`, the `xx` pseudo-locale) falls through --
+                    to the browser on the client, which has one, and to
+                    DEFAULT_LOCALE on the server, which does not.
+                    A fixed locale is permitted only where the output is read by
+                    a MACHINE and the contract is documented: an LLM prompt, and
+                    the English fallback string stored on a row whose client
+                    composes its own copy from the structured payload beside it.
+                    "It is already localized" is not a defence for
+                    `toLocaleString()`: that follows the browser, and an explicit
+                    numberFormat exists to override the browser -- a reader on
+                    en-US hardware who chose pl-PL still gets `12,345`.
+Source of truth     frontend/src/hooks/useNumberFormat.ts getEffectiveLocale;
+                    backend/src/common/number-locale.util.ts resolveNumberLocale
+Enforcement         Client: every figure goes through useNumberFormat(); a pure
+                    module takes its NumberFormatters as an argument.
+                    frontend/src/test/number-locale.guard.test.ts scans src/ for
+                    four fingerprints -- a UI file importing the raw
+                    formatCurrency/formatShareQuantity from @/lib/format, a
+                    numeric toLocaleString(), a literal '%' beside an
+                    interpolation, and an Intl.NumberFormat built on 'en-US' or
+                    on `undefined` (the browser, which an explicit preference
+                    exists to override) -- with a classified allowlist and a
+                    comment stripper so the prose that has to NAME the banned
+                    patterns does not trip its own scan.
+                    The percentage scan is keyed on the literal '%' rather than
+                    on `toFixed`: written from the diff it matched only the
+                    shapes the migration had just removed and reported clean over
+                    fourteen survivors, because the codebase's commonest shape
+                    (`{percentage}%`) names no formatter at all.
+                    Server: numberFormatterFor(numberFormat, language) built from
+                    the recipient's preference row, passed into the email
+                    templates, the budget-alert and bill-due message builders,
+                    the portfolio-movement push body, the anomaly-report
+                    descriptions and the monthly-comparison notes.
+                    backend/src/common/number-locale.guard.spec.ts holds the
+                    classification of every caller of the en-US helpers (each
+                    with the reason its output is not addressed to a person),
+                    fails on a second hardcoded en-US formatter in src/, and runs
+                    the same literal-'%' scan over the server -- excluding CSS
+                    lengths, SQL LIKE wildcards and logger arguments, the last by
+                    blanking whole logger CALLS, since a multi-line log message
+                    puts the '%' nowhere near the logger call that names it.
+Concurrency scope   per reader
+Failure response    An unknown currency code costs the SYMBOL and keeps the
+                    reader's separators.
+                    A stored preference Intl cannot use at all is a different
+                    case and is resolved BEFORE any formatter is built: `en_US`,
+                    the underscore form, makes Intl.NumberFormat throw RangeError,
+                    and nothing validated the column. The server falls back to
+                    DEFAULT_LOCALE, the client to the browser (which is what an
+                    absent preference already means). Catching the throw at the
+                    call site is not enough and was the first fix's mistake: its
+                    fallback rebuilt Intl from the same locale and threw too,
+                    which 500'd a report and silently stopped that user's bill
+                    reminders and budget alerts. IsNumberLocale on the DTO stops
+                    new such values; the two fallbacks cover rows already stored.
+Required tests      Present: useNumberFormat.test.ts (share quantity at 8dp under
+                    pl-PL and en-US, tiny residual preserved, -0 normalized;
+                    formatPercentTrimmed keeping 80 / 80.5 / 80.55 as they are;
+                    an unusable stored locale rendering rather than throwing);
+                    is-number-locale.validator.spec.ts;
+                    SecurityList.test.tsx "number locale" (the reported screen,
+                    under pl-PL, en-US chosen while the UI is Polish, browser
+                    fallback, and one case where the preference deliberately
+                    disagrees with the host locale); number-locale.guard.spec.ts
+                    (the resolver's truth table and pl-PL/en-US rendering);
+                    email-templates.spec.ts "recipient number locale" (a Polish
+                    bill reminder). A component test must not build its
+                    expectation with the same helper the component renders
+                    through -- SecurityList.test.tsx did, which is why the defect
+                    shipped green.
+Status              enforced
+```
+
+The number locale is a SEPARATE preference from the language, and that is the
+part a mechanical fix gets wrong twice over. Replacing a hardcoded `en-US` with
+`toLocaleString()` looks like a migration and is not -- it swaps one wrong locale
+for another, and the new one happens to be right on the developer's machine.
+Localizing the figure while leaving the sentence in English is right in one place
+and wrong in another: it is right inside a stored English FALLBACK a client
+overrides, and wrong as a substitute for putting the copy in a catalogue. Both
+halves are decided per surface, and the classification is what the guard holds.
+
 ### INV-MCP-001 -- identity comes from the credential on the request
 
 ```text
@@ -2071,6 +2174,193 @@ Crash semantics     A transient orphan on rollback is durably recoverable by the
 Status              enforced
 ```
 
+### INV-ATTACHMENT-002 -- a scan pair is one attachment
+
+```text
+Statement           A scanned document and the unprocessed photo it came from
+                    are one attachment to every reader: one row in the list,
+                    one against the per-transaction cap, one in the register's
+                    attachment count, one in the has-attachments filter. They
+                    are written together or not at all, and deleting the
+                    visible one deletes the original.
+Enforcement         `transaction_attachments.original_of_attachment_id` is set
+                    on the ORIGINAL and points at the visible row, so "a
+                    visible attachment" is `IS NULL` on that column -- written
+                    once in `backend/src/attachments/primary-attachment.util.ts`
+                    and used by all four readers, with
+                    `primary-attachment.guard.spec.ts` failing a second copy.
+                    The link carries ON DELETE CASCADE and a partial unique
+                    index (at most one original per attachment); a CHECK stops
+                    a row being its own original. Both rows and both objects
+                    are written inside one `withScopedDb`, the visible row
+                    first because the foreign key is immediate, each object
+                    behind its own upload intent so INV-ATTACHMENT-001 holds
+                    per object. `remove` deletes both and returns both storage
+                    keys, so the bytes are swept immediately rather than by the
+                    hourly pass.
+Concurrency scope   per transaction (the cap is counted under its row lock)
+Retry semantics     A failed pair leaves neither row; the compensation deletes
+                    whichever objects were written, and any it cannot reach are
+                    swept from their intents.
+Crash semantics     A crash between the two writes rolls both back; the
+                    intents outlive the process, so neither object is orphaned
+                    undiscoverably.
+Status              enforced
+```
+
+### INV-SHARE-001 -- a shared file uses the doors that already existed
+
+```text
+Statement           A file shared into the installed PWA from the OS share sheet
+                    reaches the server only through an endpoint that already
+                    existed, under the same authentication, CSRF, magic-byte
+                    sniffing and size rules as a file the user picked. No
+                    unauthenticated, unvalidated bytes are stored server-side on
+                    the share target's behalf.
+Enforcement         No backend route was added. The review screen uploads through
+                    `attachmentsApi.upload` and the import wizard through its own
+                    parse endpoints, both behind `AuthGuard('jwt')` and the CSRF
+                    double-submit cookie. The worker answers the manifest's POST
+                    itself and stashes the files in its own Cache API store, so
+                    on that path the request never leaves the device. When no
+                    worker is controlling the POST reaches `frontend/src/proxy.ts`,
+                    which redirects 303 before its auth check and without
+                    touching the body -- asserted behaviourally (`request.bodyUsed`
+                    stays false and `fetch` is never called) and structurally by
+                    a source scan holding the share branch ahead of any code that
+                    consumes a body.
+Concurrency scope   per share
+Retry semantics     Uploads are the attachment path's, so INV-ATTACHMENT-001
+                    governs them; re-sharing mints a new bundle rather than
+                    reusing one.
+Crash semantics     A share interrupted before its index is written leaves
+                    unreferenced bytes in the device's own cache, swept by the
+                    next purge. Nothing server-side is touched.
+Status              enforced
+```
+
+### INV-SHARE-002 -- a share is reviewed, never applied
+
+```text
+Statement           Nothing is imported, attached or saved as a consequence of a
+                    share arriving. Every write happens on a screen that shows
+                    what will happen, after the user presses the control that
+                    does it.
+Enforcement         The worker's only action is to stash and redirect. `/share`
+                    has no auto-advance for any bundle, single-file included:
+                    the two destinations are the existing transaction form's save
+                    and the import wizard's review step, both unchanged. A share
+                    whose usable files disagree about their destination is
+                    offered neither, rather than a guess. `src/app/share/page.test.tsx`
+                    asserts the form is not mounted until the button is pressed;
+                    `e2e/tests/share-target.spec.ts` shares a statement and a
+                    receipt end to end and asserts the account holds no
+                    transaction while the review screen and the wizard are open.
+Concurrency scope   per share
+Retry semantics     A consumed bundle is discarded, so a second press cannot
+                    apply it twice; the import wizard discards the bundle only
+                    once it holds the contents.
+Crash semantics     A crash mid-review leaves the bundle intact and unapplied,
+                    which is the state the screen is for.
+Status              enforced
+```
+
+### INV-SHARE-003 -- the stash is bounded, and it does not outlive the session
+
+```text
+Statement           The share stash holds only files within the declared limits
+                    (10 MB per file, 10 files and 50 MB per share), no bundle
+                    survives its one-hour lifetime, and none survives a logout.
+                    A file refused by a limit has its reason recorded and its
+                    bytes discarded. Logout is the sweep, not the access rule --
+                    INV-SHARE-005 is what keeps one account's share out of
+                    another's inbox when no logout ever runs.
+Enforcement         `public/sw.js` checks each file as it arrives and writes a
+                    reason instead of bytes; the limits mirror
+                    `src/lib/share-target.ts` (which derives the per-file and
+                    per-share caps from `MAX_ATTACHMENT_BYTES` and
+                    `MAX_ATTACHMENTS_PER_TRANSACTION`), and
+                    `src/test/sw-share-target.test.ts` fails when the two
+                    disagree. Expiry is swept by the worker on `activate` and
+                    before every new share, and by the app on mount
+                    (`ShareInboxNotice`); orphaned bytes whose index is gone are
+                    swept with them. The share cache is on the `activate`
+                    keep-list, so a worker update is not what empties an inbox.
+                    `authStore.logout` calls `clearShareInbox()` beside
+                    `clearAllCache()`.
+Concurrency scope   per bundle
+Retry semantics     Deletes are idempotent on a missing key; a purge that
+                    cannot open the cache is a no-op and runs again.
+Crash semantics     Expiry is a property of the stored timestamp, not of a timer,
+                    so a process that never runs again does not extend a
+                    bundle's life beyond the next purge by either door.
+Status              enforced
+```
+
+### INV-SHARE-004 -- a share never dead-ends
+
+```text
+Statement           On every path -- worker present or absent, body readable or
+                    not, browser capable or not, bundle live, expired, empty or
+                    gone -- the user lands on a Monize page that says what
+                    happened and what to do next. A share never produces a
+                    browser error page or a blank screen.
+Enforcement         `handleShareTarget` in the worker always resolves to a
+                    redirect: to `/share?id=` on success and `/share?error=stash`
+                    on any failure, including a malformed multipart body. The
+                    proxy's fallback redirects to `/share?missed=1`. The review
+                    screen renders a distinct explanation for each of missed,
+                    unreadable, unsupported browser, expired, unknown id, empty
+                    and nothing-usable, and every share-inbox function treats an
+                    unusable Cache API as an empty inbox rather than rejecting.
+                    Each state has a case in `src/app/share/page.test.tsx`, and
+                    the worker's redirect-on-failure has one in
+                    `src/test/sw-share-target.test.ts`.
+Concurrency scope   per share
+Retry semantics     Every state names the way forward (share again, or add the
+                    files from inside Monize).
+Crash semantics     A stash that cannot be read is reported as nothing to
+                    review, never as a share with no files in it.
+Status              enforced
+```
+
+### INV-SHARE-005 -- a stashed share belongs to one account
+
+```text
+Statement           A bundle in the share stash belongs to the first
+                    authenticated reader that observes it, and from that moment
+                    no other account signed in on the same browser can list it,
+                    read its bytes or be notified about it. An unobserved bundle
+                    is unclaimed, which is claimable -- never everyone's.
+Enforcement         The service worker cannot decide this: a share can arrive
+                    with nobody signed in, which is the whole point of the
+                    logged-out resume. So ownership is settled on the app side.
+                    `src/lib/share-inbox.ts` is the one reader, and both of its
+                    observing functions -- `listSharedBundles` and
+                    `readSharedBundle` -- require a `viewerUserId`, stamp
+                    `ownerUserId` on an unclaimed index, and filter out a bundle
+                    owned by anybody else. Listing claims as well as reading,
+                    because a share the sharer was merely NOTIFIED about is
+                    already theirs. The three call sites take the id from
+                    `useAuthStore` and read nothing while it is undefined
+                    (`src/app/share/page.tsx`, `components/share/ShareInboxNotice.tsx`,
+                    `useSharedFilesHandoff` in `src/app/import/page.tsx`).
+                    `share-inbox.test.ts`'s `ownership` block covers the claim,
+                    the claim on listing, another account's bundle reading as
+                    absent, an unreadable stamp reading as unclaimed, and an
+                    unnamed reader seeing and claiming nothing.
+Concurrency scope   per bundle
+Retry semantics     A claim that cannot be written (storage refused) leaves the
+                    index unclaimed and the next observation retries; the reader
+                    that failed to write still sees its own bundle.
+Crash semantics     The stamp is a property of the stored index, so a process
+                    that dies after the claim leaves the bundle owned. A crash
+                    before it leaves the bundle unclaimed and therefore
+                    claimable, which is the pre-existing state rather than a new
+                    exposure.
+Status              enforced
+```
+
 ### INV-PAYEE-001 -- a contact lookup never overwrites the user's value
 
 ```text
@@ -2172,6 +2462,81 @@ Required tests      payee-contact-enrichment.service.spec.ts (COALESCE and
 Status              enforced
 ```
 
+
+### INV-PAYEE-002 -- the Google Places monthly cap is never exceeded
+
+```text
+Statement           The number of Google Places requests made in one PACIFIC
+                    calendar month never exceeds the cap configured for the key
+                    that pays for them. Pacific because that is the month
+                    Google's free allowance resets on (midnight Pacific on the
+                    1st); a cap counted in any other zone rations a window that
+                    is not the one being billed. A user's own key is capped per user; the
+                    operator's key (GOOGLE_PLACES_API_KEY) is capped once for
+                    the whole deployment, because one key is one bill.
+Source of truth     payee_lookup_usage(user_id, month).google_places_requests
+                    for a user's key; google_places_instance_usage(month).requests
+                    for the operator's.
+Enforcement         One statement per scope, in PayeeLookupQuotaService.claim: an
+                    INSERT ... ON CONFLICT DO UPDATE SET requests = requests + 1
+                    WHERE $cap_disabled OR requests < $cap, RETURNING the new
+                    count. The predicate is part of the write, so a second
+                    claimant blocks on the first's row lock inside the statement
+                    and re-evaluates against the committed value -- there is no
+                    window between a read and a write. Zero rows back is the cap
+                    being reached, and the caller falls back to the AI adapter.
+                    The month is to_char(now() AT TIME ZONE
+                    'America/Los_Angeles', 'YYYY-MM') -- the zone named once as
+                    GOOGLE_PLACES_QUOTA_TIMEZONE and passed as a bind parameter
+                    -- evaluated by PostgreSQL, so every replica rolls over on
+                    one clock AND on the same instant Google's allowance does.
+                    A named zone rather than a fixed offset because Pacific
+                    observes DST. The claim runs through runOutsideActiveScopedManager
+                    and commits BEFORE the request leaves: Google bills an
+                    attempt whatever comes back, so a slot released because the
+                    request then failed would under-count what is being paid for.
+                    The operator's counter is claimed under withSystemContext
+                    (the table is RLS-exempt, having no owner); a user's counter
+                    is an ordinary policied row.
+Concurrency scope   per user for a user's key; per deployment for the operator's
+Retry semantics     Each attempt claims its own slot. A retry after a failed
+                    request spends another, which is correct: Google billed both.
+Crash semantics     A crash after the claim and before the request spends a slot
+                    for a request nobody made -- the survivable direction, since
+                    the alternative over-spends a paid quota.
+Backup/restore      payee_lookup_usage is exported and restored so a month's
+                    spend follows the user's key to another machine, and it is
+                    the one table in PRESERVED_ON_RESTORE: the restore does not
+                    clear it, so ON CONFLICT DO NOTHING gives the archive's
+                    count to a machine with no row and leaves a live count
+                    alone. No restore can lower a count and hand back spent
+                    quota. google_places_instance_usage is not exported: it has
+                    no owner and every user on the deployment spends it.
+Failure response    ContactLookupOutcome.reason = "quota_exceeded" when the cap
+                    is spent AND no AI provider can answer; otherwise the lookup
+                    silently falls back to the AI adapter. A pinned AI provider
+                    (payee_lookup_settings.ai_provider_config_id) that resolves
+                    to nothing reports "no_provider" rather than falling through
+                    to a model the user did not choose. payee_lookup_settings.ai_enabled
+                    = false is the same answer reached earlier: the AI adapter is
+                    not asked at all, so a spent cap is "quota_exceeded" with no
+                    model call behind it, and Places being unreachable as well is
+                    "no_provider".
+Required tests      Two-connection: concurrent claims over the last slot, one
+                    winner, for both scopes. Present in
+                    backend/test/integration/payee-lookup-quota.integration.spec.ts
+                    ("has exactly one winner when two claims race over the last
+                    slot", "has exactly one winner when two users race over the
+                    last slot"). The monthly reset is proven in the same file
+                    ("starts the new month at one, however much the previous
+                    month spent", both scopes) and the zone by "files the claim
+                    under the current Pacific month". Transaction independence
+                    -- the claim commits even when its caller is inside a
+                    transaction -- is
+                    payee-lookup-quota.transaction.spec.ts, because the sibling
+                    unit spec mocks that plumbing away.
+Status              enforced
+```
 ### INV-BACKUP-001 -- a backup is complete, verified, owner-namespaced
 
 ```text
@@ -2907,6 +3272,60 @@ Status              partial
 `docs/release-integrity.md` has the full rules and gap register, including
 REL-001's blanket pass-with-no-tests rule and what still remains unenforced
 under REL-002.
+
+### INV-MIGRATION-001 -- numeric prefix order, and a prefix that cannot collide
+
+```text
+Statement           Every place that orders database/migrations/*.sql orders
+                    them by the NUMERIC value of the filename prefix, then by
+                    the full filename; and a migration added after 2026-09-05
+                    carries a YYYYMMDDHHMMSS_ prefix (the UTC second of
+                    authoring), so two authors working in parallel cannot
+                    produce the same prefix. The NNN_ files are historical:
+                    never renumbered, never added to.
+Source of truth     The filename. schema_migrations keys on it, so a rename is
+                    a migration no database has recorded.
+Enforcement         backend/src/common/db/migration-filename.ts is the one
+                    definition of the prefix grammar and the comparator; the
+                    runner (db-migrate.ts), the integration harnesses
+                    (rls-setup.ts, migration-path.integration.spec.ts,
+                    migration-table-renames.spec.ts), the migration lint and
+                    scripts/check-migration-prefixes.mjs import it (the two
+                    .mjs scripts through Node type stripping);
+                    scripts/verify-schema.sh reproduces it with `sort -n` and
+                    migration-filename.spec.ts runs that pipeline against the
+                    comparator. The same spec fails a bare .sort() over a
+                    migrations listing anywhere under backend/ or scripts/, and
+                    holds LEGACY_PREFIX_CEILING equal to the directory's real
+                    maximum in both directions. check-migration-prefixes.mjs
+                    (Documentation vs Manifests job) refuses a duplicate prefix
+                    outside the six grandfathered pairs, a new NNN_ file (by
+                    ceiling with no git, by base comparison with it), a
+                    timestamp that is not a real UTC instant between adoption
+                    and now, and a base-branch migration gone missing.
+Concurrency scope   global (one directory, every branch)
+Retry semantics     n/a
+Crash semantics     n/a
+Failure response    db-migrate refuses to start on a filename it cannot order;
+                    CI fails on any of the check's findings.
+Required tests      migration-filename.spec.ts (unit, fixture the string sort
+                    gets wrong, shell equivalence, directory, source scan);
+                    db-migrate.spec.ts (runner applies the mixed-width fixture
+                    in numeric order and refuses an unparseable name).
+Why it exists       Prefixes collided eight times under the counter (022, 068,
+                    075, 116, 117, 124, then 165 and 166 within nine hours)
+                    because two branches read the same maximum; and the
+                    runner's readdirSync(...).sort() was a string sort, correct
+                    only by the coincidence that every historical prefix begins
+                    with 0 or 1 and every timestamp with 2 (issue #1277).
+Status              enforced
+```
+
+What this does NOT claim: that apply order equals merge order. Prefixes are
+assigned at authoring time under both schemes, so a migration merged later can
+carry an earlier prefix and replay first on a fresh install. A migration must
+not depend on the ordering of another in-flight migration; nothing checks that
+beyond review.
 
 ## Candidates not yet admitted
 

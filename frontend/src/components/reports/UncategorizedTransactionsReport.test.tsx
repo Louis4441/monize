@@ -30,14 +30,17 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
-vi.mock("@/hooks/useNumberFormat", () => ({
-  useNumberFormat: () => ({
-    formatCurrency: (n: number) => `$${n.toFixed(2)}`,
-    formatCurrencyCompact: (n: number) => `$${n.toFixed(0)}`,
-    defaultCurrency: "CAD",
-  }),
-}));
-
+vi.mock('@/hooks/useNumberFormat', async () => {
+  const { numberFormatMockDefaults } = await import('@/test/number-format-mock');
+  return {
+    useNumberFormat: () => ({
+      ...numberFormatMockDefaults(),
+      formatCurrency: (n: number) => `$${n.toFixed(2)}`,
+      formatCurrencyCompact: (n: number) => `$${n.toFixed(0)}`,
+      defaultCurrency: "CAD",
+    }),
+};
+});
 const stableResolvedRange = { start: "2025-01-01", end: "2025-03-31" };
 
 vi.mock("@/hooks/useDateRange", () => ({
@@ -49,7 +52,11 @@ vi.mock("@/hooks/useDateRange", () => ({
   }),
 }));
 
-vi.mock("@/lib/utils", () => ({
+// Spread the real module rather than replacing it: the table's phone captions
+// render `CellLabel`, which reads `cn` from here, and a bare factory blanks
+// every other export of the module for the whole graph under test.
+vi.mock("@/lib/utils", async (importActual) => ({
+  ...(await importActual<typeof import("@/lib/utils")>()),
   parseLocalDate: (d: string) => new Date(d + "T00:00:00"),
 }));
 
@@ -74,6 +81,26 @@ vi.mock("@/lib/logger", () => ({
     debug: vi.fn(),
   }),
 }));
+
+/**
+ * The sort control for a column, addressed by POSITION rather than by label.
+ * Since the phone layout landed, each column label names up to three nodes --
+ * the phone sort chip, the column header, and (for the three captioned columns)
+ * a caption in every body row -- so `getByText` matches more than one. Index is
+ * the column order: date, payee, account, amount.
+ *
+ * The ROW is addressed by the class that identifies it rather than by index:
+ * the two header rows are interchangeable to `[1]`, so a swap would leave this
+ * silently tapping the phone strip instead, and an absent header (the report's
+ * empty-state branch) would throw a `TypeError` naming nothing.
+ */
+const sortControl = (index: number) => {
+  const columnHeaderRow = document.querySelector("thead tr.sm\\:table-row");
+  if (!columnHeaderRow) throw new Error("no column header row is rendered");
+  const control = columnHeaderRow.querySelectorAll("th")[index];
+  if (!control) throw new Error(`no sort control at column ${index}`);
+  return control;
+};
 
 describe("UncategorizedTransactionsReport", () => {
   beforeEach(() => {
@@ -265,7 +292,7 @@ describe("UncategorizedTransactionsReport", () => {
     await waitFor(() => {
       expect(screen.getByText("Alpha")).toBeInTheDocument();
     });
-    const payeeHeader = screen.getByText("Payee / Description");
+    const payeeHeader = sortControl(1);
     fireEvent.click(payeeHeader);
     fireEvent.click(payeeHeader);
     expect(screen.getByText("Alpha")).toBeInTheDocument();
@@ -306,7 +333,7 @@ describe("UncategorizedTransactionsReport", () => {
     await waitFor(() => {
       expect(screen.getByText("Store A")).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByText("Amount"));
+    fireEvent.click(sortControl(3));
     expect(screen.getByText("Store B")).toBeInTheDocument();
   });
 
@@ -505,7 +532,7 @@ describe("UncategorizedTransactionsReport", () => {
     await waitFor(() => {
       expect(screen.getByText("Store A")).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByText("Account"));
+    fireEvent.click(sortControl(2));
     expect(screen.getByText("Zeta Account")).toBeInTheDocument();
     expect(screen.getByText("Alpha Account")).toBeInTheDocument();
   });

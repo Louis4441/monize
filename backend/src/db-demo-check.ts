@@ -1,5 +1,6 @@
 import { Logger } from "@nestjs/common";
 import { Client } from "pg";
+import { DEMO_USER_EMAIL } from "./database/demo-credentials";
 
 /**
  * Demo-mode startup probe: exits 0 when the demo user already exists (the
@@ -13,8 +14,6 @@ import { Client } from "pg";
  * rest of the boot sequence.
  */
 const logger = new Logger("DbDemoCheck");
-
-const DEMO_USER_EMAIL = "demo@monize.com";
 
 export async function demoUserExists(): Promise<boolean> {
   const client = new Client({

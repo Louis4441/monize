@@ -5,9 +5,14 @@ import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { getErrorMessage } from '@/lib/errors';
 import { attachmentsApi, attachmentDownloadUrl } from '@/lib/attachments';
+import { AttachmentPreviewDialog, type PreviewTarget } from './AttachmentPreviewDialog';
+import { DocumentScanDialog, type ScanOutcome } from './DocumentScanDialog';
+import { ScanDocumentControl } from './ScanDocumentControl';
 import {
+  StagedAttachment,
   Attachment,
   ACCEPTED_ATTACHMENT_TYPES,
   MAX_ATTACHMENT_BYTES,
@@ -22,20 +27,11 @@ import {
  */
 type AttachmentsSectionProps =
   | { transactionId: string }
-  | { stagedFiles: File[]; onStagedFilesChange: (files: File[]) => void };
+  | {
+      stagedFiles: StagedAttachment[];
+      onStagedFilesChange: (files: StagedAttachment[]) => void;
+    };
 
-/** Human-readable byte size (e.g. 1.4 MB). */
-export function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ['KB', 'MB', 'GB'];
-  let value = bytes / 1024;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  return `${value.toFixed(1)} ${units[unit]}`;
-}
 
 /**
  * Validate a freshly selected file against the shared limits. Returns a
@@ -48,6 +44,9 @@ function validateSelection(
   file: File,
   currentCount: number,
   t: (key: string, values?: Record<string, string | number>) => string,
+  // A pure function cannot call the hook, so the component hands its formatter
+  // down -- the `NumberFormatters` pattern, for one formatter.
+  formatBytes: (bytes: number) => string,
 ): string | null {
   if (currentCount >= MAX_ATTACHMENTS_PER_TRANSACTION) {
     return t('tooMany', { max: MAX_ATTACHMENTS_PER_TRANSACTION });
@@ -59,6 +58,36 @@ function validateSelection(
     return t('tooLarge', { max: formatBytes(MAX_ATTACHMENT_BYTES) });
   }
   return null;
+}
+
+/**
+ * The section title with the Scan and Add controls, shared by both modes.
+ *
+ * On a phone the title takes a line of its own and the two buttons share the
+ * next one edge to edge: beside the title, two labelled buttons overran the
+ * dialog's width. The buttons are grid items there, so they stretch to their
+ * half without knowing about the layout -- each control's hidden file input
+ * is `display: none` and takes no cell. From `sm` up the title and the
+ * buttons sit on one line as before.
+ */
+function AttachmentsHeader({ children }: { children: React.ReactNode }) {
+  const t = useTranslations('attachments');
+  return (
+    <div
+      data-testid="attachments-header"
+      className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+        {t('title')}
+      </span>
+      <div
+        data-testid="attachments-actions"
+        className="grid grid-cols-2 gap-2 sm:flex sm:items-center"
+      >
+        {children}
+      </div>
+    </div>
+  );
 }
 
 /** The Add-attachment button plus its hidden file input, shared by both modes. */
@@ -110,6 +139,7 @@ function UploadControl({
  */
 function SavedAttachments({ transactionId }: { transactionId: string }) {
   const t = useTranslations('attachments');
+  const { formatBytes } = useNumberFormat();
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [erroredImages, setErroredImages] = useState<Record<string, boolean>>(
@@ -117,6 +147,16 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
   );
   const [deleteTarget, setDeleteTarget] = useState<Attachment | null>(null);
   const [deleting, setDeleting] = useState(false);
+  /** The photo currently in the scan dialog, or null when it is closed. */
+  const [scanning, setScanning] = useState<File | null>(null);
+  /**
+   * The attachment open in the preview, or null when it is closed.
+   *
+   * The whole target is held here rather than composed in the JSX, so it keeps
+   * one identity for as long as it is on screen -- an object rebuilt on every
+   * render of this list is a different subject to anything downstream.
+   */
+  const [preview, setPreview] = useState<PreviewTarget | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -132,15 +172,18 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
   }, [load]);
 
   const handleFileSelected = async (file: File) => {
-    const error = validateSelection(file, attachments.length, t);
+    const error = validateSelection(file, attachments.length, t, formatBytes);
     if (error) {
       toast.error(error);
       return;
     }
+    await upload(file);
+  };
 
+  const upload = async (file: File, original?: File) => {
     setUploading(true);
     try {
-      await attachmentsApi.upload(transactionId, file);
+      await attachmentsApi.upload(transactionId, file, original);
       toast.success(t('uploaded'));
       await load();
     } catch (err) {
@@ -148,6 +191,42 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
     } finally {
       setUploading(false);
     }
+  };
+
+  /**
+   * A photo picked for scanning is checked against the cap, and against
+   * nothing else about the file.
+   *
+   * Neither its size nor its type says whether the scan can be attached: what
+   * gets attached is the dialog's output, a JPEG capped at `OUTPUT_MAX_EDGE`,
+   * so a HEIC is scannable and so is a 14 MB photo from a recent phone. The
+   * size rule applied here refused exactly the captures this feature exists
+   * for, and it made the dialog's own "the original is too large to keep"
+   * path unreachable outside its unit test.
+   */
+  const handleScanSelected = (file: File) => {
+    if (attachments.length >= MAX_ATTACHMENTS_PER_TRANSACTION) {
+      toast.error(t('tooMany', { max: MAX_ATTACHMENTS_PER_TRANSACTION }));
+      return;
+    }
+    setScanning(file);
+  };
+
+  const openScanPicker = useRef<(() => void) | null>(null);
+  const rememberScanPicker = useCallback((open: () => void) => {
+    openScanPicker.current = open;
+  }, []);
+
+  // Retake is not Cancel: it closes the review and asks for another photo.
+  // Wired to the same close, the two buttons did exactly the same thing.
+  const handleScanRetake = useCallback(() => {
+    setScanning(null);
+    openScanPicker.current?.();
+  }, []);
+
+  const handleScanAccepted = async (outcome: ScanOutcome) => {
+    setScanning(null);
+    await upload(outcome.file, outcome.original);
   };
 
   const handleDelete = async () => {
@@ -169,16 +248,18 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          {t('title')}
-        </span>
+      <AttachmentsHeader>
+        <ScanDocumentControl
+          onFileSelected={handleScanSelected}
+          onReady={rememberScanPicker}
+          disabled={uploading || atLimit}
+        />
         <UploadControl
           onFileSelected={handleFileSelected}
           loading={uploading}
           disabled={uploading || atLimit}
         />
-      </div>
+      </AttachmentsHeader>
 
       {attachments.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">{t('empty')}</p>
@@ -192,42 +273,49 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
                 key={attachment.id}
                 className="flex items-center gap-3 rounded-md border border-gray-200 dark:border-gray-700 p-2"
               >
-                {showThumb ? (
-                  // Served from our own backend; next/image adds no value and
-                  // cannot follow the onError fallback.
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={attachmentDownloadUrl(attachment.id)}
-                    alt={attachment.filename}
-                    loading="lazy"
-                    className="h-10 w-10 shrink-0 rounded object-cover"
-                    onError={() =>
-                      setErroredImages((prev) => ({
-                        ...prev,
-                        [attachment.id]: true,
-                      }))
-                    }
-                  />
-                ) : (
-                  <span
-                    aria-hidden="true"
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-lg"
-                  >
-                    {attachment.contentType === 'application/pdf' ? '📄' : '📎'}
+                {/* The row is the preview trigger: thumbnail, name and size
+                    in one button, with the filename as its accessible name.
+                    Delete stays a sibling -- a control inside a button is
+                    a control nobody can reach. */}
+                <button
+                  type="button"
+                  onClick={() => setPreview({ kind: 'saved', attachment })}
+                  aria-label={t('preview.open', { name: attachment.filename })}
+                  className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                >
+                  {showThumb ? (
+                    // Served from our own backend; next/image adds no value and
+                    // cannot follow the onError fallback.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={attachmentDownloadUrl(attachment.id)}
+                      alt=""
+                      loading="lazy"
+                      className="h-10 w-10 shrink-0 rounded object-cover"
+                      onError={() =>
+                        setErroredImages((prev) => ({
+                          ...prev,
+                          [attachment.id]: true,
+                        }))
+                      }
+                    />
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-lg"
+                    >
+                      {attachment.contentType === 'application/pdf' ? '📄' : '📎'}
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                      {attachment.filename}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {formatBytes(attachment.byteSize)}
+                    </span>
                   </span>
-                )}
-                <div className="min-w-0 flex-1">
-                  <a
-                    href={attachmentDownloadUrl(attachment.id)}
-                    download={attachment.filename}
-                    className="block truncate text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    {attachment.filename}
-                  </a>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {formatBytes(attachment.byteSize)}
-                  </span>
-                </div>
+                </button>
                 <Button
                   type="button"
                   variant="ghost"
@@ -243,6 +331,22 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
           })}
         </ul>
       )}
+
+      <DocumentScanDialog
+        isOpen={scanning !== null}
+        file={scanning}
+        onCancel={() => setScanning(null)}
+        // Retake closes the dialog and leaves the control ready: the input is
+        // cleared after every pick, so choosing the same photo again works.
+        onRetake={handleScanRetake}
+        onAccept={handleScanAccepted}
+      />
+
+      <AttachmentPreviewDialog
+        isOpen={preview !== null}
+        target={preview}
+        onClose={() => setPreview(null)}
+      />
 
       <ConfirmDialog
         isOpen={deleteTarget !== null}
@@ -267,17 +371,21 @@ function StagedAttachments({
   files,
   onChange,
 }: {
-  files: File[];
-  onChange: (files: File[]) => void;
+  files: StagedAttachment[];
+  onChange: (files: StagedAttachment[]) => void;
 }) {
   const t = useTranslations('attachments');
+  const { formatBytes } = useNumberFormat();
+  const [scanning, setScanning] = useState<File | null>(null);
+  /** The staged entry open in the preview, or null when it is closed. */
+  const [preview, setPreview] = useState<PreviewTarget | null>(null);
 
   // Object URLs for image previews, recreated whenever the file list changes
   // and revoked on cleanup so blobs are not leaked. Guarded for environments
   // (jsdom) where createObjectURL is unavailable.
   const previews = useMemo(
     () =>
-      files.map((file) =>
+      files.map(({ file }) =>
         file.type.startsWith('image/') &&
         typeof URL.createObjectURL === 'function'
           ? URL.createObjectURL(file)
@@ -297,12 +405,40 @@ function StagedAttachments({
   );
 
   const handleFileSelected = (file: File) => {
-    const error = validateSelection(file, files.length, t);
+    const error = validateSelection(file, files.length, t, formatBytes);
     if (error) {
       toast.error(error);
       return;
     }
-    onChange([...files, file]);
+    onChange([...files, { file }]);
+  };
+
+  /** Same admission as the saved list: the cap, and nothing about the photo. */
+  const handleScanSelected = (file: File) => {
+    if (files.length >= MAX_ATTACHMENTS_PER_TRANSACTION) {
+      toast.error(t('tooMany', { max: MAX_ATTACHMENTS_PER_TRANSACTION }));
+      return;
+    }
+    setScanning(file);
+  };
+
+  const openScanPicker = useRef<(() => void) | null>(null);
+  const rememberScanPicker = useCallback((open: () => void) => {
+    openScanPicker.current = open;
+  }, []);
+
+  // Retake is not Cancel: it closes the review and asks for another photo.
+  // Wired to the same close, the two buttons did exactly the same thing.
+  const handleScanRetake = useCallback(() => {
+    setScanning(null);
+    openScanPicker.current?.();
+  }, []);
+
+  const handleScanAccepted = (outcome: ScanOutcome) => {
+    setScanning(null);
+    // The pair is staged as one entry, so it counts once against the cap and
+    // is uploaded in one request when the transaction is created.
+    onChange([...files, { file: outcome.file, original: outcome.original }]);
   };
 
   const removeAt = (index: number) => {
@@ -313,48 +449,63 @@ function StagedAttachments({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          {t('title')}
-        </span>
-        <UploadControl onFileSelected={handleFileSelected} disabled={atLimit} />
-      </div>
+      <AttachmentsHeader>
+        <ScanDocumentControl
+          onFileSelected={handleScanSelected}
+          onReady={rememberScanPicker}
+          disabled={atLimit}
+        />
+        <UploadControl
+          onFileSelected={handleFileSelected}
+          disabled={atLimit}
+        />
+      </AttachmentsHeader>
 
       {files.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">{t('empty')}</p>
       ) : (
         <>
           <ul className="space-y-2">
-            {files.map((file, index) => {
-              const preview = previews[index];
+            {files.map(({ file, original }, index) => {
+              const thumbnail = previews[index];
               return (
                 <li
                   key={`${file.name}-${index}`}
                   className="flex items-center gap-3 rounded-md border border-gray-200 dark:border-gray-700 p-2"
                 >
-                  {preview ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={preview}
-                      alt={file.name}
-                      className="h-10 w-10 shrink-0 rounded object-cover"
-                    />
-                  ) : (
-                    <span
-                      aria-hidden="true"
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-lg"
-                    >
-                      {file.type === 'application/pdf' ? '📄' : '📎'}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPreview({ kind: 'file', file, original })
+                    }
+                    aria-label={t('preview.open', { name: file.name })}
+                    className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  >
+                    {thumbnail ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={thumbnail}
+                        alt=""
+                        className="h-10 w-10 shrink-0 rounded object-cover"
+                      />
+                    ) : (
+                      <span
+                        aria-hidden="true"
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-lg"
+                      >
+                        {file.type === 'application/pdf' ? '📄' : '📎'}
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm text-gray-900 dark:text-gray-100">
+                        {file.name}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {formatBytes(file.size)}
+                        {original ? ` · ${t('scan.originalKept')}` : ''}
+                      </span>
                     </span>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <span className="block truncate text-sm text-gray-900 dark:text-gray-100">
-                      {file.name}
-                    </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {formatBytes(file.size)}
-                    </span>
-                  </div>
+                  </button>
                   <Button
                     type="button"
                     variant="ghost"
@@ -373,6 +524,20 @@ function StagedAttachments({
           </p>
         </>
       )}
+
+      <DocumentScanDialog
+        isOpen={scanning !== null}
+        file={scanning}
+        onCancel={() => setScanning(null)}
+        onRetake={handleScanRetake}
+        onAccept={handleScanAccepted}
+      />
+
+      <AttachmentPreviewDialog
+        isOpen={preview !== null}
+        target={preview}
+        onClose={() => setPreview(null)}
+      />
     </div>
   );
 }

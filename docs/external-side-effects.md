@@ -61,6 +61,18 @@ the other two.
 Three providers behind one interface (`save`/`load`/`delete`), selected by
 deployment.
 
+**One upload can write two objects.** A scanned document is stored as a pair --
+the enhanced image the user sees and the original photo it came from
+(`docs/future-plans/document-scanner.md`) -- written by one `create` call in one
+transaction. That changes the quantity below, not the mechanism: each object
+gets its own upload intent committed before any byte is written, each intent is
+cleared inside the metadata transaction, and the compensation path deletes
+whichever objects were actually written rather than assuming both were. The
+failure windows described in this section are per object and are otherwise
+unchanged. Deletion is likewise per object: the metadata `DELETE` names the
+original as well as the visible row, so both storage keys come back and both are
+swept after the commit.
+
 **Database provider.** `save` opens `withScopedDb`, which joins the ambient
 transaction, so bytes and metadata are one PostgreSQL transaction. Genuinely
 atomic, genuinely rollback-safe. The FK cascade removes the blob when the
@@ -227,6 +239,35 @@ two the codebase has would be a regression, not a feature.
 The subscription itself is instance-bound state, not portable user data: see
 `INTENTIONALLY_EXCLUDED_TABLES` and INV-PUSH-005.
 
+## 4b. The web-share stash is the device's, not the server's
+
+The Web Share Target stores the files the OS hands over in a Cache API store on
+the device (`docs/future-plans/pwa-web-share-target.md`). It is in this document
+because it looks like an external side effect and is worth being explicit about
+*not* being one:
+
+- **Nothing on the server is written when a share arrives.** The service worker
+  answers the manifest's POST itself, so on the ordinary path the request never
+  leaves the device. When no worker is controlling, the proxy answers the same
+  POST with a redirect *before* its auth check and without reading the body, so
+  the bytes are not read into the frontend process either, let alone forwarded.
+- **So there is no ordering problem to get right.** The rule this document
+  exists for -- write bytes before the commit, delete them after it -- has
+  nothing to order here: there is no row, no transaction, and no server-side
+  object. The only thing the stash can leak is device storage, and the failure
+  mode is bytes nobody references, which is the survivable side by construction
+  (the bundle index is written last).
+- **What bounds it is expiry and logout, not a reconciliation job.** Bundles are
+  swept by the worker on `activate` and before each new share, and by the app on
+  mount; `authStore.logout` drops the whole store, because a share is one
+  account's document and a browser profile can be shared. INV-SHARE-003 is the
+  invariant; there is no server-side sweeper because there is nothing on the
+  server to sweep.
+
+A share only becomes a side effect this document governs at the moment the user
+presses a destination, and then it is an ordinary attachment upload or an
+ordinary import -- section 2 above, unchanged.
+
 ## 5. Emergency access
 
 The grant path is the only place in the codebase that gets the external-effect
@@ -317,6 +358,56 @@ does; two replicas can both pay for one lookup, and the second UPDATE then
 matches no row. The AI/MCP confirmation flow avoids the question by looking
 up in the *preview* and carrying the stamp down the signed descriptor to the
 commit, so the card and the row agree and nothing looks up twice.
+
+### Google Places, and the quota claimed before the call
+
+The same lookup can be answered by Google Places instead of an AI provider
+(`backend/src/payees/lookup/google-places/`), and the ordering rule there is the
+opposite of the usual one. Google bills a Text Search request whatever comes
+back, so the **quota claim commits before the request goes out**
+(`PayeeLookupQuotaService.claim`, INV-PAYEE-002): a slot released because the
+request then failed would under-count what the user is paying for, and an
+under-count is the direction that spends money. The claim therefore runs through
+`runOutsideActiveScopedManager`, so the count of what has been spent cannot be
+rolled back by whatever operation discovered it -- exactly as `provider_health`
+records an outage outside the request that found it.
+
+What that costs, stated rather than hidden: a crash between the claim and the
+call, or a transport failure after it, spends a slot for an answer nobody
+received. That is the survivable direction.
+
+The one **compensation** is `PayeeLookupQuotaService.release`, and only the Test
+button uses it. A request Google *answered with a refusal* was never served and
+never billed, so charging for it would make every check of a broken key cost a
+request. A transport failure is deliberately not released: nobody answered, so
+whether Google served it is unknown, and under-counting is the direction that
+spends money. `ContactLookupUnavailableError.httpStatus` is what tells an
+answered refusal from a stall. The release is `GREATEST(x - 1, 0)`, because a
+release that crossed a month boundary must return quota rather than mint it.
+
+Whose key is spent, and which source is asked first, are decided together in one
+read by `PayeeLookupSettingsService.resolveRouting`: the operator's
+`GOOGLE_PLACES_API_KEY` where the deployment set one (counted in
+`google_places_instance_usage`, deployment-wide, because one key is one bill),
+otherwise the user's own encrypted key (counted per user). The month those
+counters roll over on is **Pacific**, not UTC, because that is when Google's free
+allowance resets; a counter that rolled over first would hand back a cap the
+allowance behind it had not released.
+
+Availability goes through the same `ProviderHealthService` breaker as the
+market-data clients, with one asymmetry worth naming: a 400 or 403 from a
+rejected key is recorded as a **success**, because the host plainly answered --
+counting it as a failure would let one user's bad key open a deployment-wide
+breaker and page the operator.
+
+The client sends `PUBLIC_APP_URL`'s origin as `Referer`, which is what makes an
+HTTP-referrer key restriction satisfiable at all: a server sends none of its own,
+so such a key rejected every lookup. It buys availability rather than security --
+a referrer restriction protects a key that is public, shipped in browser
+JavaScript where the browser sets the header, and this key never leaves the
+server -- so an IP restriction is the one that actually constrains it. The header
+is sent because a deployment with no stable egress address cannot use an IP
+restriction at all.
 
 ## 7. There is no shared lifecycle, and one workflow shows what it would look like
 

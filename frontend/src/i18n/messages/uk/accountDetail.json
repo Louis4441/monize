@@ -5,6 +5,8 @@
     "edit": "Редагувати рахунок",
     "back": "Назад до рахунків",
     "switchAccount": "Перейти до іншого рахунку",
+    "switchFavourites": "Улюблені",
+    "switchOtherAccounts": "Інші рахунки",
     "switchPlaceholder": "Фільтр рахунків...",
     "switchNoMatches": "Немає відповідних рахунків",
     "jointBadge": "Спільний",

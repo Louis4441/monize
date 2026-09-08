@@ -9,7 +9,7 @@ import { externalUrlLabel, toSafeExternalUrl } from '@/lib/external-url';
 import { mailtoHref, mapsUrl, telHref } from '@/lib/contact-links';
 import { formatPhoneForDisplay } from '@/lib/phone-number';
 import { useMapProvider } from '@/hooks/useMapProvider';
-import { useAiConfigured } from '@/hooks/useAiConfigured';
+import { useContactLookupAvailable } from '@/hooks/useContactLookupAvailable';
 import { usePayeeContactLookup } from '@/hooks/usePayeeContactLookup';
 import { ContactLookupDialog } from '../ContactLookupDialog';
 import type { PayeeDetail } from '@/types/payee';
@@ -47,11 +47,11 @@ export function PayeeKeyInfoCard({
 }: PayeeKeyInfoCardProps) {
   const t = useTranslations('payeeDetail');
   const { formatDate } = useDateFormat();
-  const { formatCurrency } = useNumberFormat();
+  const { formatCurrency, formatNumber } = useNumberFormat();
   const mapProvider = useMapProvider();
   // The lookup runs on the user's AI provider, so without one there is nothing
   // behind the button: it is not offered rather than offered and refused.
-  const { configured: aiConfigured } = useAiConfigured();
+  const { available: lookupAvailable } = useContactLookupAvailable();
   const lookup = usePayeeContactLookup({ onApplied: () => onContactLookedUp?.() });
 
   const { payee, stats, largestTransaction, overpaymentForAccounts } = detail;
@@ -104,7 +104,7 @@ export function PayeeKeyInfoCard({
     {
       key: 'aliases',
       label: t('keyInfo.aliases'),
-      value: stats.aliasCount > 0 ? stats.aliasCount.toLocaleString() : null,
+      value: stats.aliasCount > 0 ? formatNumber(stats.aliasCount, 0) : null,
     },
     {
       key: 'largestTransaction',
@@ -222,7 +222,7 @@ export function PayeeKeyInfoCard({
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           {t('keyInfo.title')}
         </h3>
-        {aiConfigured && (
+        {lookupAvailable && (
           <Button
             type="button"
             variant="outline"

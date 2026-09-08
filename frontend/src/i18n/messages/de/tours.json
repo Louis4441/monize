@@ -77,6 +77,14 @@
           "title": "Ihre Konten",
           "body": "Fügen Sie hier über die hervorgehobene Schaltfläche Ihre Bank-, Kreditkarten-, Kredit- und Anlagekonten hinzu. Jeder Saldo und jede Buchung gehört zu einem Konto."
         },
+        "openAccountDetail": {
+          "title": "Detailansicht eines Kontos öffnen",
+          "body": "Jedes Konto hat eine auf seinen Typ zugeschnittene Seite. Wählen Sie **Details** — das Augensymbol in einer Kontozeile — um sie zu öffnen. Auf dem Handy halten Sie das Konto gedrückt und wählen **Details**."
+        },
+        "accountDetailView": {
+          "title": "Eine auf dieses Konto zugeschnittene Ansicht",
+          "body": "Diese Seite richtet sich nach dem Kontotyp: Ein Bankkonto, eine Kreditkarte, ein Kredit, ein Anlagekonto oder ein Vermögenswert zeigt jeweils die Zahlen und Werkzeuge, die dazu passen. Über **Details** in der Kontoliste kommen Sie jederzeit hierher zurück."
+        },
         "transactions": {
           "title": "Buchungen",
           "body": "Das ist Ihr Buchungsregister — jede Zahlung und Einzahlung Ihrer Konten befindet sich hier und kann durchsucht und gefiltert werden."
@@ -302,6 +310,49 @@
           "finish": {
             "title": "Kommen Sie zur nächsten Auswertung wieder",
             "body": "GEM trifft eine Entscheidung pro Zeitraum, und das Datum der nächsten steht oben im Bericht. Bis dahin ist nichts zu tun. Wenn sie ansteht, prüfen Sie, ob sich das Signal geändert hat; wenn ja, handeln Sie über Ihren Broker und erfassen Sie die Buchungen in Monize, damit der Portfoliovergleich weiter aufgeht. Diese Tour können Sie jederzeit über **Geführte Touren** in den **Einstellungen** erneut starten."
+          }
+        }
+      }
+    },
+    "v1_16_0": {
+      "notifications": {
+        "title": "Benachrichtigungen",
+        "steps": {
+          "welcome": {
+            "title": "Monize kann Ihnen jetzt Bescheid geben",
+            "body": "Eine fällige Rechnung, ein überschrittenes Budget, ein Kontostand, der eine von Ihnen gesetzte Grenze kreuzt, eine fehlgeschlagene Sicherung. Diese Führung zeigt, wo das ankommt und wie Sie festlegen, was Sie per E-Mail oder auf dem Handy erreicht."
+          },
+          "bell": {
+            "title": "Die Glocke ist das Original",
+            "body": "Jede Benachrichtigung, die Monize auslöst, wird hier festgehalten — unabhängig davon, was Sie sonst ein- oder ausschalten. E-Mail und Push sind Kopien, die weitergeschickt werden; diese Liste ist das Original, und die Zahl an der Glocke zählt, was Sie noch nicht gelesen haben."
+          },
+          "panel": {
+            "title": "Was eine Benachrichtigung mitbringt",
+            "body": "Jede sagt, was passiert ist, und verlinkt auf die Seite, die es zeigt — die Rechnung, das Budget, das Konto. **Alle als gelesen markieren** setzt die Zahl zurück, ohne etwas zu entfernen. Wo Sie erinnert werden möchten, gibt es **Erinnere mich**: einmal später oder wiederholt, bis Sie es beenden — und beenden können Sie es auch direkt aus der Benachrichtigung auf dem Handy."
+          },
+          "filters": {
+            "title": "Erst die Liste eingrenzen, dann handeln",
+            "body": "Die obere Reihe filtert nach Dringlichkeit, die untere trennt **Finanziell** von **System** — Sicherungen, Mailversand und anderes, um das sich nur eine Administratorin oder ein Administrator kümmern kann. **Alle löschen** folgt dem gesetzten Filter und erfasst jeden Treffer, nicht nur die sichtbaren, sodass Sie erledigte Systemmeldungen abräumen und den Rest behalten können."
+          },
+          "settings": {
+            "title": "Wo die Zustellung entschieden wird",
+            "body": "**Einstellungen → Benachrichtigungen** trägt den Rest dieser Führung. Oben in der Karte stehen der E-Mail-Schalter und die wöchentliche Budget-Übersicht, darunter das Raster für alles Weitere und dann Ihre Push-Geräte."
+          },
+          "matrix": {
+            "title": "Eine Zeile je Art, eine Spalte je Kanal",
+            "body": "Legen Sie pro Benachrichtigungsart fest, ob sie als **E-Mail (Bericht)**, **E-Mail (Warnung)**, **Push** oder über **UnifiedPush** an einen selbst betriebenen Verteiler geht. Für die Glocke gibt es keine Spalte, weil die Glocke die Zeile immer bekommt. **Sperrzeit** ist die letzte Spalte: E-Mail und Push entfallen, wenn aus derselben Gruppe innerhalb dieses Zeitfensters schon etwas hinausging — der Eintrag in der Glocke wird trotzdem geschrieben. Jeder Schalter speichert sofort."
+          },
+          "push": {
+            "title": "Ihre Geräte",
+            "body": "Melden Sie hier einen Browser an, dann erreicht Monize ihn auch bei geschlossener App. Monize signiert seine Nachrichten selbst, es steht also kein Google- oder Apple-Konto dazwischen. Jedes Gerät lässt sich einzeln testen und entfernen, und ein Gerät, das nicht mehr erreichbar ist, nennt den Grund. Auf dem iPhone funktioniert das, sobald Monize zum Home-Bildschirm hinzugefügt wurde; hat Ihre Administration Push für diese Instanz nicht freigeschaltet, steht das hier stattdessen."
+          },
+          "portfolio": {
+            "title": "Wertentwicklung der Anlagen",
+            "body": "Einmal täglich, wenn sich Ihre Anlagekonten um mehr als den hier gesetzten Betrag bewegen. Gemessen werden Kursbewegungen und Dividenden — Ein- und Auszahlungen zählen nicht als Bewegung."
+          },
+          "finish": {
+            "title": "Noch eine Stelle",
+            "body": "Kontostandsgrenzen liegen am Konto selbst: Bearbeiten Sie ein Konto und setzen Sie **Benachrichtigen unter** oder **Benachrichtigen über**. Sie lösen aus, wenn der Saldo die Grenze *überschreitet* — Sie hören also einmal davon und nicht nach jeder weiteren Buchung. Diese Führung können Sie jederzeit in den Einstellungen wiederholen."
           }
         }
       }

@@ -5,10 +5,12 @@ import { Security } from '@/types/investment';
 import { investmentsApi } from '@/lib/investments';
 import { exchangeRatesApi } from '@/lib/exchange-rates';
 
-vi.mock('@/hooks/useNumberFormat', () => ({
-  useNumberFormat: () => ({ defaultCurrency: 'CAD' }),
-}));
-
+vi.mock('@/hooks/useNumberFormat', async () => {
+  const { numberFormatMockDefaults } = await import('@/test/number-format-mock');
+  return {
+    useNumberFormat: () => ({ ...numberFormatMockDefaults(), defaultCurrency: 'CAD' }),
+  };
+});
 vi.mock('@hookform/resolvers/zod', () => ({
   zodResolver: () => async (values: any) => {
     const errors: any = {};
@@ -135,7 +137,10 @@ describe('SecurityForm', () => {
   it.each(['5', ''])('saves or clears a security price threshold (%s)', async (value) => {
     render(<SecurityForm security={createSecurity({ priceAlertPercent: 10 })} onSubmit={onSubmit} onCancel={onCancel} />);
     const input = await screen.findByLabelText('Price change alert (%)');
-    expect(input).toHaveValue(10);
+    // A text input formatted by `NumericInput`, not a native number one: the
+    // stored 10 shows at the field's own two decimal places, in the reader's
+    // number locale (`ui-conventions.test.ts` bans the native control).
+    expect(input).toHaveValue('10.00');
     fireEvent.change(input, { target: { value } });
     fireEvent.click(screen.getByText('Update Security'));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({

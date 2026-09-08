@@ -1,7 +1,10 @@
 import { useAuthStore } from '@/store/authStore';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@/test/render';
+import { render, screen, fireEvent, waitFor, act, cleanup } from '@/test/render';
 import { NotificationBell } from './NotificationBell';
+import { useTourStore } from '@/store/tourStore';
+import { TOUR_ANCHORS } from '@/lib/tours/anchors';
+import type { TourDefinition } from '@/lib/tours/types';
 import type { Notification } from '@/types/notification';
 
 const mockPush = vi.fn();
@@ -61,6 +64,8 @@ const makeNotification = (overrides: Partial<Notification> = {}): Notification =
 
 describe('NotificationBell', () => {
   beforeEach(() => {
+    cleanup();
+    useTourStore.setState({ active: null, progress: {}, progressLoaded: false });
     vi.clearAllMocks();
     useAuthStore.setState({ actingAsUserId: null, delegateSections: null });
     mockGetAlerts.mockResolvedValue([]);
@@ -482,6 +487,94 @@ describe('NotificationBell', () => {
       });
 
       expect(vi.mocked(toast.success)).toHaveBeenCalledWith('60 notifications deleted');
+    });
+  });
+
+  describe('a tour step that describes the panel', () => {
+    // A tour cannot leave this panel open by pointing at it: the panel closes on
+    // a click outside itself, so the reader's next click -- on the tour card,
+    // anywhere -- would close it under the step describing its contents. The
+    // step declares `openNotificationBell` and the bell honours it, the same way
+    // the header's Tools dropdown honours `openToolsMenu`.
+    const PANEL_TOUR: TourDefinition = {
+      id: 'test/notifications',
+      area: 'settings',
+      i18nPrefix: 'intro.basics',
+      steps: [
+        {
+          id: 'panel',
+          route: '/dashboard',
+          anchorId: TOUR_ANCHORS.notificationPanel,
+          openNotificationBell: true,
+        },
+        { id: 'after', route: '/settings', anchorId: null },
+      ],
+    };
+
+    it('opens the panel without a click', async () => {
+      render(<NotificationBell />);
+      await act(async () => {});
+      expect(screen.queryByTestId('notification-list')).not.toBeInTheDocument();
+
+      await act(async () => {
+        useTourStore.getState().startTour(PANEL_TOUR);
+      });
+
+      expect(screen.getByTestId('notification-list')).toBeInTheDocument();
+    });
+
+    it('keeps the panel open through a click outside it', async () => {
+      render(<NotificationBell />);
+      await act(async () => {});
+      await act(async () => {
+        useTourStore.getState().startTour(PANEL_TOUR);
+      });
+
+      // What the reader does next -- press Next on a card that is not inside
+      // the panel. Without the step's flag winning over local state this is the
+      // click that closes it.
+      await act(async () => {
+        fireEvent.mouseDown(document.body);
+        fireEvent.click(document.body);
+      });
+
+      expect(screen.getByTestId('notification-list')).toBeInTheDocument();
+    });
+
+    it('closes the panel again once the tour moves past that step', async () => {
+      render(<NotificationBell />);
+      await act(async () => {});
+      await act(async () => {
+        useTourStore.getState().startTour(PANEL_TOUR);
+      });
+      expect(screen.getByTestId('notification-list')).toBeInTheDocument();
+
+      await act(async () => {
+        useTourStore.getState().next();
+      });
+
+      expect(screen.queryByTestId('notification-list')).not.toBeInTheDocument();
+    });
+
+    it('carries the anchors the tour points at', async () => {
+      render(<NotificationBell />);
+      await act(async () => {});
+      expect(
+        document.querySelector(`[data-tour-id="${TOUR_ANCHORS.notificationBell}"]`),
+      ).not.toBeNull();
+
+      await act(async () => {
+        useTourStore.getState().startTour(PANEL_TOUR);
+      });
+
+      for (const anchor of [
+        TOUR_ANCHORS.notificationPanel,
+        TOUR_ANCHORS.notificationPanelFilters,
+      ]) {
+        expect(
+          document.querySelector(`[data-tour-id="${anchor}"]`),
+        ).not.toBeNull();
+      }
     });
   });
 });

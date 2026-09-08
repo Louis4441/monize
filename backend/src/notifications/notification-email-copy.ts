@@ -1,4 +1,4 @@
-import { formatCurrency } from "../common/format-currency.util";
+import { numberFormatterFor } from "../common/number-locale.util";
 import { DEFAULT_LOCALE, isSupportedLocale } from "../i18n/config";
 import { EmailT, englishEmailT } from "../i18n/email-translator";
 import { i18nFormatter } from "../i18n/i18n-formatter";
@@ -47,6 +47,24 @@ function calendarDate(value: unknown): Date | null {
 }
 
 /**
+ * How the recipient wants the figures and the clock this copy is composed
+ * against.
+ *
+ * `numberFormat` is their `user_preferences.number_format`, and it is
+ * INDEPENDENT of `language` (issue #1316): an explicit choice wins, so a reader
+ * with an English UI can ask for Polish grouping, and copy that answered from
+ * `lang` alone would disagree with every figure they see on screen. Omitted --
+ * a caller with no preferences row to hand -- `numberFormatterFor` falls back to
+ * `lang`, exactly as the stored `"browser"` sentinel does.
+ *
+ * `now` is what the relative copy counts from ("due in 3 days"); a spec pins it.
+ */
+export interface NotificationCopyOptions {
+  numberFormat?: string | null;
+  now?: Date;
+}
+
+/**
  * Render at the delivery boundary, without changing the stored English copy.
  * Old/restored rows lacking facts fall back as a whole: no invented zero, currency,
  * risk state or date. User names and diagnostic errors remain literal data; the
@@ -56,10 +74,10 @@ export function notificationEmailCopy(
   row: Source,
   t: EmailT = englishEmailT,
   lang = DEFAULT_LOCALE,
-  now = new Date(),
+  options: NotificationCopyOptions = {},
 ): Copy {
   return (
-    composeLocalizedNotificationCopy(row, t, lang, now) ?? {
+    composeLocalizedNotificationCopy(row, t, lang, options) ?? {
       title: row.title,
       message: row.message,
     }
@@ -70,8 +88,9 @@ export function composeLocalizedNotificationCopy(
   row: Pick<Source, "type" | "data">,
   t: EmailT,
   lang: string,
-  now = new Date(),
+  options: NotificationCopyOptions = {},
 ): Copy | null {
+  const now = options.now ?? new Date();
   if (!row.data || typeof row.data !== "object" || Array.isArray(row.data)) {
     return null;
   }
@@ -88,13 +107,16 @@ export function composeLocalizedNotificationCopy(
     title: text(title, args),
     message: text(message, args),
   });
+  // Every figure below is addressed to a person, so it follows THAT person's
+  // number locale rather than the server's `en-US` (issue #1316) -- and that
+  // locale is resolved from `numberFormat` first, because the two preferences
+  // are independent. Dates keep `locale`: which language a month is spelled in
+  // is the language preference, not the number one.
+  const n = numberFormatterFor(options.numberFormat, lang);
   const number = (value: number, decimals = 1): string =>
-    new Intl.NumberFormat(locale, {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    }).format(value);
+    n.formatNumber(value, decimals);
   const money = (value: number, currency: string): string =>
-    formatCurrency(value, currency, locale);
+    n.formatCurrency(value, currency);
   const dateLabel = (date: Date): string =>
     new Intl.DateTimeFormat(locale, {
       dateStyle: "medium",

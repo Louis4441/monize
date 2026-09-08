@@ -732,5 +732,47 @@ describe('Modal header, footer and body', () => {
     expect(wrapper).not.toBe(screen.getByRole('dialog'));
     expect(wrapper.className).toContain('p-4');
   });
-});
 
+  describe('fullScreenOnPhone', () => {
+    it('fills the phone viewport with max-sm variants and leaves the base classes alone', () => {
+      render(
+        <Modal isOpen={true} fullScreenOnPhone>
+          Content
+        </Modal>,
+      );
+      const dialog = screen.getByRole('dialog');
+      const backdrop = dialog.parentElement!;
+      expect(backdrop.className).toContain('max-sm:p-0');
+      // The base inset stays, so sm+ keeps the centred card.
+      expect(backdrop.className).toContain('p-4');
+      for (const cls of [
+        'max-sm:h-dvh',
+        'max-sm:max-h-none',
+        'max-sm:max-w-none',
+        'max-sm:rounded-none',
+      ]) {
+        expect(dialog.className).toContain(cls);
+      }
+      expect(dialog.className).toContain('max-h-[90vh]');
+      expect(dialog.className).toContain('rounded-lg');
+      // Never the bare utility: it would sort before `rounded-lg` and lose.
+      expect(dialog.className).not.toMatch(/(^|\s)h-dvh(\s|$)/);
+    });
+
+    it('emits none of it by default', () => {
+      render(<Modal isOpen={true}>Content</Modal>);
+      const dialog = screen.getByRole('dialog');
+      expect(dialog.className).not.toContain('max-sm:');
+      expect(dialog.parentElement!.className).not.toContain('max-sm:');
+    });
+
+    it('is ignored by the drawer variant', () => {
+      render(
+        <Modal isOpen={true} variant="drawer-left" fullScreenOnPhone>
+          Content
+        </Modal>,
+      );
+      expect(screen.getByRole('dialog').className).not.toContain('max-sm:');
+    });
+  });
+});

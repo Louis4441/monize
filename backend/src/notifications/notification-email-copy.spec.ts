@@ -161,21 +161,17 @@ describe("notification email copy", () => {
     "renders %s through real nestjs-i18n without an HTTP locale",
     (type, data) => {
       const row = source(type as NotificationType, data);
-      const en = notificationEmailCopy(
-        row,
-        emailTranslator(i18n, "en"),
-        "en",
+      const en = notificationEmailCopy(row, emailTranslator(i18n, "en"), "en", {
         now,
-      );
-      const xx = notificationEmailCopy(
-        row,
-        emailTranslator(i18n, "xx"),
-        "xx",
+      });
+      const xx = notificationEmailCopy(row, emailTranslator(i18n, "xx"), "xx", {
         now,
-      );
+      });
       expect(en.title).not.toBe(row.title);
       expect(en.message).not.toBe(row.message);
-      expect(en).toEqual(notificationEmailCopy(row, englishEmailT, "en", now));
+      expect(en).toEqual(
+        notificationEmailCopy(row, englishEmailT, "en", { now }),
+      );
       expect(xx.title).toContain("[XX-");
       expect(xx.message).toContain("[XX-");
       expect(JSON.stringify(xx)).not.toMatch(/\{\{|undefined|NaN/);
@@ -213,7 +209,7 @@ describe("notification email copy", () => {
         row,
         emailTranslator(i18n, lang),
         lang,
-        now,
+        { now },
       );
       expect(copy.title).toBe("Current is below your threshold");
       expect(copy.message).toContain("Current dropped to");
@@ -247,7 +243,7 @@ describe("notification email copy", () => {
         source(NotificationType.BILL_DUE, examples.BILL_DUE),
         englishEmailT,
         "pl",
-        now,
+        { now },
       ).message,
     ).toContain("7 wrz 2026");
     expect(
@@ -257,6 +253,44 @@ describe("notification email copy", () => {
         "pl",
       ).message,
     ).toContain("grudzień");
+  });
+
+  it("lets an explicit numberFormat decide the figures, and the language the dates", () => {
+    // The two preferences are independent (issue #1316): an English UI with
+    // Polish grouping is a supported choice, and reading the figure off `lang`
+    // is exactly what put `zl18,812.71` inside translated copy. The calendar
+    // date stays in the LANGUAGE, because which language a month is spelled in
+    // is not the number preference.
+    const copy = notificationEmailCopy(
+      source(NotificationType.BILL_DUE, {
+        ...examples.BILL_DUE,
+        amount: 123.45,
+      }),
+      englishEmailT,
+      "en",
+      { now, numberFormat: "pl-PL" },
+    );
+    expect(copy.message).toContain("123,45");
+    expect(copy.message).not.toContain("123.45");
+    expect(copy.message).toContain("Sep 7, 2026");
+  });
+
+  it("falls back to the language when numberFormat is absent or follows the browser", () => {
+    // `"browser"` cannot be resolved on a server, and a caller with no
+    // preferences row to hand passes nothing -- both mean "use the language",
+    // which is what `numberFormatterFor` already encodes.
+    const polish = (numberFormat?: string) =>
+      notificationEmailCopy(
+        source(NotificationType.BILL_DUE, {
+          ...examples.BILL_DUE,
+          amount: 123.45,
+        }),
+        englishEmailT,
+        "pl",
+        { now, numberFormat },
+      ).message;
+    expect(polish()).toContain("123,45");
+    expect(polish("browser")).toContain("123,45");
   });
 
   it.each([
@@ -271,7 +305,7 @@ describe("notification email copy", () => {
         source(NotificationType.BILL_DUE, { ...examples.BILL_DUE, dueDate }),
         englishEmailT,
         "en",
-        now,
+        { now },
       ).title,
     ).toBe(`Rent ${expected}`);
   });
@@ -283,7 +317,7 @@ describe("notification email copy", () => {
         source(NotificationType.BILL_DUE, { ...examples.BILL_DUE, ...over }),
         englishEmailT,
         "en",
-        now,
+        { now },
       );
       expect(copy.message).toContain("Amount unavailable");
       expect(copy.message).not.toContain("999");
@@ -431,7 +465,7 @@ describe("notification email copy", () => {
           source(type as NotificationType, data),
           emailTranslator(i18n, lang),
           lang,
-          now,
+          { now },
         );
         expect(copy.title).not.toBe("Stored title");
         expect(copy.message).not.toBe("Stored message");
@@ -441,7 +475,7 @@ describe("notification email copy", () => {
             source(type as NotificationType, data),
             englishEmailT,
             lang,
-            now,
+            { now },
           );
           expect(copy.title).not.toBe(english.title);
           expect(copy.message).not.toBe(english.message);
