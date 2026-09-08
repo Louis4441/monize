@@ -622,17 +622,15 @@ export function SecurityTypeAllocationReport() {
                 <React.Fragment key={item.type}>
                   <tr
                     role="row"
-                    /* Deliberately NO `aria-expanded`, though this row is the
-                       expand control and `role="row"` would take it: a `<tr>` is
-                       not focusable and this one carries a bare `onClick` with no
-                       key handler, so the state would announce a control a
-                       keyboard cannot operate -- a stated dead end rather than
-                       the silent one there is now. The two are one repair and it
-                       is a behaviour change: make the row operable through the
-                       repo's row-click convention (`useLongPress({ onClick })`),
-                       then state the expansion. Reported, not done here. */
-                    className="grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer sm:table-row sm:p-0"
-                    onClick={() => setExpandedType(expandedType === item.type ? null : item.type)}
+                    tabIndex={0}
+                    aria-expanded={expandedType === item.type}
+                    className="grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-600 dark:focus-visible:outline-blue-400 cursor-pointer sm:table-row sm:p-0"
+                    onClick={() => setExpandedType((current) => current === item.type ? null : item.type)}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return;
+                      event.preventDefault();
+                      setExpandedType((current) => current === item.type ? null : item.type);
+                    }}
                   >
                     {/* The identity; the `<tr>` around it stays the click target
                         at every width. A type label is bounded in practice (five
@@ -669,6 +667,7 @@ export function SecurityTypeAllocationReport() {
                         />
                         <span className="line-clamp-3 break-words sm:line-clamp-none sm:break-normal" title={item.label}>{item.label}</span>
                         <svg
+                          aria-hidden="true"
                           className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${expandedType === item.type ? 'rotate-180' : ''}`}
                           fill="none"
                           viewBox="0 0 24 24"

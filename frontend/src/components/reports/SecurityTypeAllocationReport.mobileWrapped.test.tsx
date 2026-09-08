@@ -250,20 +250,30 @@ describe('SecurityTypeAllocationReport (phone wrapped table)', () => {
     expect(container.textContent).not.toContain(`VTI - ${LONG_NAME}`);
   });
 
-  it('states no expansion the keyboard cannot reach', async () => {
+  it.each(['Enter', ' '])('operates a type row with %j and announces its expansion', async (key) => {
     const container = await renderReport();
 
-    // The row is the expand control and `role="row"` would take an
-    // `aria-expanded`, but a `<tr>` is not focusable and this one carries a
-    // bare `onClick` with no key handler: announcing the state would promise a
-    // control a keyboard user cannot operate. Focusability and the state are
-    // one repair, and it is a behaviour change rather than a layout one --
-    // this pins the pair so the attribute cannot arrive without the handling.
     const etfs = findTypeRow(container, 'ETFs')!;
-    const stated = etfs.getAttribute('aria-expanded') !== null;
-    const operable =
-      etfs.hasAttribute('tabindex') || etfs.getAttribute('role') === 'button';
-    expect(stated).toBe(operable);
+    expect(etfs).toHaveAttribute('role', 'row');
+    expect(etfs).toHaveAttribute('tabindex', '0');
+    expect(etfs).toHaveAttribute('aria-expanded', 'false');
+    expect(etfs.className).toContain('focus-visible:outline-2');
+    expect(etfs.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+
+    await act(async () => { fireEvent.keyDown(etfs, { key }); });
+
+    expect(findTypeRow(container, 'ETFs')).toHaveAttribute('aria-expanded', 'true');
+    expect(childRows(container)).toHaveLength(1);
+  });
+
+  it('ignores unrelated keys on an expandable type row', async () => {
+    const container = await renderReport();
+    const etfs = findTypeRow(container, 'ETFs')!;
+
+    await act(async () => { fireEvent.keyDown(etfs, { key: 'ArrowDown' }); });
+
+    expect(etfs).toHaveAttribute('aria-expanded', 'false');
+    expect(childRows(container)).toHaveLength(0);
   });
 
   it('flips the chevron rotation class with the expansion', async () => {
