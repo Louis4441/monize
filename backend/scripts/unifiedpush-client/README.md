@@ -107,6 +107,7 @@ do not direct it into shared service logs.
 
 ```sh
 npm run push:client:test
+npm run push:tls:test
 ```
 
 Tests use the real installed `web-push` encryptor and `http_ece` decryptor, and
@@ -115,6 +116,13 @@ CSRF credentials, receiver key ownership, malformed messages, navigation,
 checkpointing and private storage. CI runs them. No live distributor or signed-in
 Monize account was used in the development workspace; a deployment smoke test
 still needs the registration/listen/test-button sequence above.
+
+The separate TLS suite requires OpenSSL and permission to bind a loopback TCP
+port. It uses the production pinned lookup helper with a local fixture, sends
+real encrypted Web Push over HTTPS, decrypts it with this receiver, and checks
+certificate trust and hostname rejection. Its temporary key/certificate are
+removed afterwards. It does not relax the production rule rejecting loopback
+pins, and does not need a live distributor or Monize account.
 
 Protocol references: [ntfy UnifiedPush publishing](https://docs.ntfy.sh/publish/#unifiedpush),
 [ntfy JSON subscription API](https://docs.ntfy.sh/subscribe/api/),

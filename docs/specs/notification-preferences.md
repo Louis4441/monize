@@ -1068,8 +1068,13 @@ existing subscriptions are rechecked before delivery. Public endpoints retain
 the existing bounded SSRF validation. Browser `webpush` subscriptions receive
 no private exception, even if their origin appears in the mapping. Tests cover
 configuration, exact matching, DTO transport, pinned lookup callback forms and
-sender refusal after removal; live LAN/TLS delivery remains a deployment smoke
-test.
+sender refusal after removal. `npm run push:tls:test` also exercises real HTTPS
+on loopback: the production lookup helper preserves SNI, encrypted Web Push is
+decrypted by the reference receiver, and untrusted or mismatched certificates
+are rejected before an HTTP body arrives. It creates an ephemeral certificate
+with OpenSSL and trusts it only in the test agent. Loopback remains forbidden
+in production configuration. These four tests passed locally and run in CI;
+delivery to the actual ntfy deployment over LAN remains a smoke test.
 
 
 **What it is not.** A browser PWA cannot *receive* at an arbitrary endpoint --

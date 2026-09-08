@@ -76,6 +76,7 @@ jobs:
       # re-applied to an up-to-date database, or a half-applied migration
       # crash-loops the backend at startup (task B1). Self-test first, then lint.
       - run: npm run push:client:test
+      - run: npm run push:tls:test
       - run: npm run migration:lint:test
       - run: npm run migration:lint
 

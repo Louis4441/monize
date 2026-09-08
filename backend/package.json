@@ -35,7 +35,8 @@
     "mny:inspect": "ts-node -r tsconfig-paths/register src/import/mny/mny-inspect.ts",
     "backup:peak-rss": "ts-node -r tsconfig-paths/register src/backup/restore-peak-rss.harness.ts",
     "push:client": "node scripts/unifiedpush-client/cli.cjs",
-    "push:client:test": "node --test scripts/unifiedpush-client/*.test.cjs"
+    "push:client:test": "node --test scripts/unifiedpush-client/*.test.cjs",
+    "push:tls:test": "node --test scripts/push-private-tls.test.cjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.75.0",
