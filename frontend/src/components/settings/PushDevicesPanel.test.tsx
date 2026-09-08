@@ -5,6 +5,10 @@ import toast from 'react-hot-toast';
 import { PushPermissionError, type PushDevice } from '@/lib/push';
 import { useAuthStore } from '@/store/authStore';
 import { notifyPushDevicesChanged } from '@/lib/pushDevicesSignal';
+import {
+  SETTINGS_SECTION_DEFAULT_COLLAPSED,
+  useSettingsSectionStore,
+} from '@/store/settingsSectionStore';
 
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({
@@ -88,6 +92,13 @@ function device(overrides: Partial<PushDevice> = {}): PushDevice {
 describe('PushDevicesPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The fold outlives a remount by design, so it outlives a test too:
+    // `setup.ts` clears localStorage between tests but cannot reach the store
+    // that already read it. Nothing is mounted here (RTL's cleanup ran in the
+    // previous afterEach), so this write needs no act().
+    useSettingsSectionStore.setState({
+      collapsed: { ...SETTINGS_SECTION_DEFAULT_COLLAPSED },
+    });
     mockGetConfig.mockResolvedValue({
       enabled: true,
       publicKey: 'PUB',
@@ -139,6 +150,22 @@ describe('PushDevicesPanel', () => {
       return summary;
     }
 
+    /**
+     * Whether the block is folded, read off the element that does the folding.
+     *
+     * jsdom applies no user-agent stylesheet to `<details>`, so its children
+     * stay in the document whatever `open` says -- asserting the Enable button
+     * has gone would pass in a browser and fail here for a reason that has
+     * nothing to do with this component. `open` is the mechanism, so `open` is
+     * what is asserted, alongside the summary that stands in for the content.
+     */
+    function isFolded() {
+      const details = screen
+        .getByTestId('push-block-summary')
+        .closest('details');
+      return details !== null && !details.open;
+    }
+
     it('starts open, with nothing standing in for the block', async () => {
       mockListDevices.mockResolvedValue([device()]);
       render(<PushDevicesPanel />);
@@ -146,6 +173,7 @@ describe('PushDevicesPanel', () => {
       expect(
         await screen.findByRole('button', { name: /send test notification/i }),
       ).toBeInTheDocument();
+      expect(isFolded()).toBe(false);
       expect(
         screen.queryByTestId('push-block-collapsed-summary'),
       ).not.toBeInTheDocument();
@@ -163,6 +191,7 @@ describe('PushDevicesPanel', () => {
         await collapse();
       });
 
+      expect(isFolded()).toBe(true);
       expect(
         screen.getByTestId('push-block-collapsed-summary'),
       ).toHaveTextContent('2 devices registered');
@@ -223,6 +252,25 @@ describe('PushDevicesPanel', () => {
       const summary = screen.getByTestId('push-block-collapsed-summary');
       expect(summary).toHaveTextContent('Device list unavailable');
       expect(summary).not.toHaveTextContent(/No devices registered/);
+    });
+
+    it('stays folded across a remount', async () => {
+      // The whole point of storing it: a fold that reopened on the next visit
+      // to Settings would be a fold nobody could make stick.
+      mockListDevices.mockResolvedValue([device()]);
+      const { unmount } = render(<PushDevicesPanel />);
+      await screen.findByRole('button', { name: /send test notification/i });
+      await act(async () => {
+        await collapse();
+      });
+      unmount();
+
+      render(<PushDevicesPanel />);
+
+      expect(
+        await screen.findByTestId('push-block-collapsed-summary'),
+      ).toHaveTextContent('1 device registered');
+      expect(isFolded()).toBe(true);
     });
 
     it('leaves a one-sentence block unfoldable', async () => {

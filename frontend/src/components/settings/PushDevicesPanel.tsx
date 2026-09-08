@@ -33,6 +33,7 @@ import {
 } from '@/lib/pushDevicesSignal';
 import { getErrorMessage } from '@/lib/errors';
 import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
+import { useSettingsSectionCollapsed } from '@/store/settingsSectionStore';
 
 const logger = createLogger('PushDevices');
 
@@ -594,9 +595,12 @@ function DeviceFact({
  * anyway for the toggles no click produces -- Chrome expands a `<details>` to
  * show a find-in-page match.
  *
- * Deliberately not persisted. It is a fold, not a preference: the panel
- * remounts on every arrival at Settings and opens, so nothing about push can
- * be hidden from a reader who did not hide it themselves in that visit.
+ * The fold is remembered per browser (`settingsSectionStore`), not per account:
+ * whether this panel is worth its height is a fact about the screen in front of
+ * the reader, the same reasoning row density and the register's date view are
+ * stored on. It defaults to open, so a reader who has never folded it sees
+ * exactly what they saw before -- and a stored value that is not a boolean
+ * falls back to that default rather than hiding push behind a corrupted entry.
  */
 function PushBlock({
   heading,
@@ -613,7 +617,8 @@ function PushBlock({
   collapsedSummary?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(true);
+  const { collapsed, setCollapsed } = useSettingsSectionCollapsed('push');
+  const open = !collapsed;
 
   return (
     // The tour anchor lives here rather than on any one of the four branches
@@ -634,7 +639,7 @@ function PushBlock({
       ) : (
         <details
           open={open}
-          onToggle={(event) => setOpen(event.currentTarget.open)}
+          onToggle={(event) => setCollapsed(!event.currentTarget.open)}
         >
           <summary
             className="cursor-pointer"
@@ -644,7 +649,7 @@ function PushBlock({
               // only through this state. Enter and Space on a focused summary
               // dispatch a click too, so the keyboard path comes with it.
               event.preventDefault();
-              setOpen((wasOpen) => !wasOpen);
+              setCollapsed(open);
             }}
           >
             {/* `inline` keeps the heading on the disclosure marker's own line;
