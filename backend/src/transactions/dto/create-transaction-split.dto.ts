@@ -15,6 +15,7 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { SanitizeHtml } from "../../common/decorators/sanitize-html.decorator";
 import { InvestmentAction } from "../../securities/entities/investment-transaction.entity";
 import { SplitKind } from "../entities/split-kind.enum";
+import { TRANSACTION_NOTE_MAX_LENGTH } from "../../common/transaction-note";
 
 export class InvestmentSplitDto {
   @ApiProperty({ enum: InvestmentAction, description: "Investment action" })
@@ -78,7 +79,7 @@ export class InvestmentSplitDto {
   @ApiPropertyOptional({ description: "Description of the action" })
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(TRANSACTION_NOTE_MAX_LENGTH)
   @SanitizeHtml()
   description?: string;
 }
@@ -133,7 +134,7 @@ export class CreateTransactionSplitDto {
   @ApiPropertyOptional({ description: "Memo/note for this split" })
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(TRANSACTION_NOTE_MAX_LENGTH)
   @SanitizeHtml()
   memo?: string;
 

@@ -14,6 +14,7 @@ import { ApiPropertyOptional } from "@nestjs/swagger";
 import { TransactionStatus } from "../entities/transaction.entity";
 import { SanitizeHtml } from "../../common/decorators/sanitize-html.decorator";
 import { IsCurrencyCode } from "../../common/validators/is-currency-code.validator";
+import { TRANSACTION_NOTE_MAX_LENGTH } from "../../common/transaction-note";
 
 export class UpdateTransferDto {
   @ApiPropertyOptional({ description: "Source account ID" })
@@ -90,7 +91,7 @@ export class UpdateTransferDto {
   @ApiPropertyOptional({ description: "Transfer description/notes" })
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(TRANSACTION_NOTE_MAX_LENGTH)
   @SanitizeHtml()
   description?: string;
 

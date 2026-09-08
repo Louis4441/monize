@@ -1129,4 +1129,55 @@ describe('TransactionRow compact dates (the day/month view)', () => {
     const dateCell = container.querySelector('td')!;
     expect(dateCell.textContent).toBe('2025-06-15');
   });
+
+  describe('a web address in the description', () => {
+    const WITH_LINK = 'Concert tickets https://tix.test/a8Fq2';
+
+    it('is clickable, and opens away from the register', () => {
+      renderRow({}, { description: WITH_LINK });
+      const link = screen.getByRole('link', { name: 'https://tix.test/a8Fq2' });
+      expect(link.getAttribute('href')).toBe('https://tix.test/a8Fq2');
+      expect(link.getAttribute('target')).toBe('_blank');
+      expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+    });
+
+    it('does not open the transaction as well', () => {
+      // The row is clickable, so without stopping the event a tap on the link
+      // opened the ticket page and the edit modal behind it.
+      const { props } = renderRow({}, { description: WITH_LINK });
+      fireEvent.click(screen.getByRole('link'));
+      expect(props.onRowClick).not.toHaveBeenCalled();
+    });
+
+    it('does not start the row long-press', () => {
+      const { props } = renderRow({}, { description: WITH_LINK });
+      fireEvent.mouseDown(screen.getByRole('link'));
+      fireEvent.touchStart(screen.getByRole('link'));
+      expect(props.onLongPressStart).not.toHaveBeenCalled();
+      expect(props.onLongPressStartTouch).not.toHaveBeenCalled();
+    });
+
+    it('leaves the rest of the description cell opening the transaction', () => {
+      const { props } = renderRow({}, { description: WITH_LINK });
+      fireEvent.click(screen.getByText(/Concert tickets/));
+      expect(props.onRowClick).toHaveBeenCalled();
+    });
+
+    it('shows the description unchanged, link and all', () => {
+      renderRow({}, { description: WITH_LINK });
+      const cell = screen.getByText(/Concert tickets/).closest('td')!;
+      expect(cell.textContent).toBe(WITH_LINK);
+    });
+
+    it('leaves a description with no address as plain text', () => {
+      const { container } = renderRow({}, { description: 'Latte' });
+      expect(screen.getByText('Latte')).toBeInTheDocument();
+      expect(container.querySelector('a[target="_blank"]')).toBeNull();
+    });
+
+    it('still shows a dash when there is no description', () => {
+      renderRow({}, { description: null });
+      expect(screen.getAllByText('-').length).toBeGreaterThan(0);
+    });
+  });
 });

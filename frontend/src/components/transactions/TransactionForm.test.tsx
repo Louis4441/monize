@@ -3118,6 +3118,84 @@ describe('TransactionForm', () => {
   // Form initial empty state
   // =========================================================================
 
+  describe('a web address in the description field', () => {
+    /**
+     * The register makes the address in a saved description clickable, but the
+     * form that OWNS the text could not: a `<textarea>` renders no elements, so
+     * reaching a link in a draft meant saving, finding the row, and clicking it
+     * there. `NoteLinks` offers the addresses under the field instead.
+     */
+    async function renderAndType(description: string) {
+      render(<TransactionForm onSuccess={mockOnSuccess} onCancel={mockOnCancel} />);
+      await waitFor(() => {
+        expect(screen.getByText('Account')).toBeInTheDocument();
+      });
+      const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
+      fireEvent.change(textarea, { target: { value: description } });
+      return textarea;
+    }
+
+    it('offers the address as it is typed, before anything is saved', async () => {
+      await renderAndType('Concert tickets https://tix.test/a8Fq2');
+
+      const link = await screen.findByRole('link', { name: 'https://tix.test/a8Fq2' });
+      expect(link.getAttribute('href')).toBe('https://tix.test/a8Fq2');
+      expect(link.getAttribute('target')).toBe('_blank');
+      expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it('leaves the typed text in the field exactly as entered', async () => {
+      // The links are an addition beside the field, never an edit to it: the
+      // draft is the user's text and nothing here may rewrite it.
+      const typed = 'Concert tickets https://tix.test/a8Fq2 for two';
+      const textarea = await renderAndType(typed);
+      await screen.findByRole('link');
+      expect(textarea.value).toBe(typed);
+    });
+
+    it('offers nothing while the description has no address in it', async () => {
+      await renderAndType('Coffee with Sam');
+      await waitFor(() => {
+        expect((document.querySelector('textarea') as HTMLTextAreaElement).value).toBe(
+          'Coffee with Sam',
+        );
+      });
+      expect(screen.queryByRole('link', { name: /https?:/ })).toBeNull();
+    });
+
+    it('tracks the field, so correcting the address corrects the link', async () => {
+      const textarea = await renderAndType('https://tix.test/wrong');
+      expect(await screen.findByRole('link', { name: 'https://tix.test/wrong' })).toBeTruthy();
+
+      fireEvent.change(textarea, { target: { value: 'https://tix.test/right' } });
+      expect(await screen.findByRole('link', { name: 'https://tix.test/right' })).toBeTruthy();
+      expect(screen.queryByRole('link', { name: 'https://tix.test/wrong' })).toBeNull();
+    });
+
+    it('offers a link on an existing transaction being edited', async () => {
+      render(
+        <TransactionForm
+          transaction={createExistingTransaction({ description: 'Tickets https://tix.test/a8Fq2' })}
+          onSuccess={mockOnSuccess}
+          onCancel={mockOnCancel}
+        />,
+      );
+      const link = await screen.findByRole('link', { name: 'https://tix.test/a8Fq2' });
+      expect(link.getAttribute('href')).toBe('https://tix.test/a8Fq2');
+    });
+
+    it('draws no link for a scheme that would run something on click', async () => {
+      await renderAndType('javascript:alert(1)');
+      await waitFor(() => {
+        expect((document.querySelector('textarea') as HTMLTextAreaElement).value).toBe(
+          'javascript:alert(1)',
+        );
+      });
+      expect(screen.queryByRole('link', { name: /javascript:/ })).toBeNull();
+    });
+  });
+
   describe('form initial empty state', () => {
     it('renders all fields with empty/default values for new transaction', async () => {
       render(<TransactionForm onSuccess={mockOnSuccess} onCancel={mockOnCancel} />);

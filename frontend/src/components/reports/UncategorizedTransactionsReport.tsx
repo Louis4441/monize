@@ -19,6 +19,7 @@ import { CellLabel } from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
+import { LinkifiedText } from '@/components/ui/LinkifiedText';
 
 type SortField = 'date' | 'amount' | 'payee' | 'account';
 
@@ -539,7 +540,7 @@ export function UncategorizedTransactionsReport() {
                       </div>
                       {tx.description && (
                         <div className="text-gray-500 dark:text-gray-400 sm:truncate sm:max-w-xs">
-                          {tx.description}
+                          <LinkifiedText text={tx.description} />
                         </div>
                       )}
                     </td>

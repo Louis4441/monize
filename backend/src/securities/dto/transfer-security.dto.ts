@@ -9,6 +9,7 @@ import {
   MaxLength,
 } from "class-validator";
 import { SanitizeHtml } from "../../common/decorators/sanitize-html.decorator";
+import { TRANSACTION_NOTE_MAX_LENGTH } from "../../common/transaction-note";
 
 export class TransferSecurityDto {
   @ApiProperty({
@@ -45,7 +46,7 @@ export class TransferSecurityDto {
   @ApiProperty({ required: false, description: "Description of the transfer" })
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(TRANSACTION_NOTE_MAX_LENGTH)
   @SanitizeHtml()
   description?: string;
 }

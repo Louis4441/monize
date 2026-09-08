@@ -27,6 +27,7 @@ import { usePayeeDisplay } from '@/hooks/usePayeeDisplay';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useLocalizedAmount } from '@/hooks/useLocalizedAmount';
 import type { StaleUnreconciledReason } from '@/lib/stale-reconciliation';
+import { LinkifiedText } from '@/components/ui/LinkifiedText';
 
 const INVESTMENT_ACTION_LABELS: Record<string, string> = {
   BUY: 'Buy',
@@ -853,7 +854,11 @@ export const TransactionRow = memo(function TransactionRow({
           className={`truncate ${isVoid ? 'line-through' : ''}`}
           title={transaction.description || undefined}
         >
-          {transaction.description || '-'}
+          {transaction.description ? (
+            <LinkifiedText text={transaction.description} />
+          ) : (
+            '-'
+          )}
         </div>
       </td>
       <td className={`${cellPadding} text-sm text-gray-500 dark:text-gray-400 ${registerColumnClass('refNumber')}`}>

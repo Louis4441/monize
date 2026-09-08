@@ -15,6 +15,8 @@ import { getCurrencySymbol } from '@/lib/format';
 import { buildAccountDropdownOptions } from '@/lib/account-utils';
 import { useAccountOptionLabel } from '@/hooks/useMainAccountName';
 import { RecentTransactionsPopover } from './RecentTransactionsPopover';
+import { TRANSACTION_NOTE_MAX_LENGTH } from '@/lib/transaction-note';
+import { NoteLinks } from '@/components/ui/LinkifiedText';
 
 interface SplitTransactionFieldsProps {
   register: UseFormRegister<any>;
@@ -24,6 +26,8 @@ interface SplitTransactionFieldsProps {
   watchedAmount: number;
   watchedCurrencyCode: string;
   watchedPayeeName?: string;
+  /** The live description, so its links can be offered under the field. */
+  watchedDescription?: string;
   accounts: Account[];
   selectedPayeeId: string;
   payees: Payee[];
@@ -58,6 +62,7 @@ export function SplitTransactionFields({
   watchedAmount,
   watchedCurrencyCode,
   watchedPayeeName,
+  watchedDescription,
   accounts,
   selectedPayeeId,
   payees,
@@ -224,9 +229,11 @@ export function SplitTransactionFields({
           label={t('form.fields.description')}
           type="text"
           placeholder={t('form.placeholders.optionalDescription')}
+          maxLength={TRANSACTION_NOTE_MAX_LENGTH}
           error={errors.description?.message as string | undefined}
           {...register('description')}
         />
+        <NoteLinks text={watchedDescription ?? ''} />
       </div>
     </div>
   );

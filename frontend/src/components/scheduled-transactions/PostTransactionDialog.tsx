@@ -37,6 +37,7 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { getProjectedBalanceAtDate, FutureTransaction } from '@/lib/forecast';
 import { computeInvestmentCashImpact } from '@/lib/investmentCashImpact';
 import { InvestmentAction } from '@/types/investment';
+import { TRANSACTION_NOTE_MAX_LENGTH } from '@/lib/transaction-note';
 
 const logger = createLogger('PostTransactionDialog');
 
@@ -960,6 +961,7 @@ export function PostTransactionDialog({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder={t('postDialog.descriptionPlaceholder')}
+                maxLength={TRANSACTION_NOTE_MAX_LENGTH}
               />
             </div>
           </>
@@ -1174,6 +1176,7 @@ export function PostTransactionDialog({
           </label>
           <textarea
             rows={2}
+            maxLength={TRANSACTION_NOTE_MAX_LENGTH}
             className="block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             value={description}
             onChange={(e) => setDescription(e.target.value)}

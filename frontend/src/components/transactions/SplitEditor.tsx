@@ -19,6 +19,7 @@ import { useLocalizedAmount } from '@/hooks/useLocalizedAmount';
 import { buildAccountDropdownOptions } from '@/lib/account-utils';
 import { useAccountOptionLabel } from '@/hooks/useMainAccountName';
 import { InvestmentSplitFields } from './InvestmentSplitFields';
+import { TRANSACTION_NOTE_MAX_LENGTH } from '@/lib/transaction-note';
 
 export type SplitType = 'category' | 'transfer' | 'investment';
 
@@ -647,6 +648,7 @@ export function SplitEditor({
                     value={split.memo || ''}
                     onChange={(e) => handleSplitChange(index, 'memo', e.target.value)}
                     placeholder={t('splitEditor.mobileMemoPlaceholder')}
+                    maxLength={TRANSACTION_NOTE_MAX_LENGTH}
                     disabled={disabled}
                     className="w-full"
                   />
@@ -824,6 +826,7 @@ export function SplitEditor({
                     value={split.memo || ''}
                     onChange={(e) => handleSplitChange(index, 'memo', e.target.value)}
                     placeholder={t('splitEditor.memoPlaceholder')}
+                    maxLength={TRANSACTION_NOTE_MAX_LENGTH}
                     disabled={disabled}
                     className="w-full"
                   />

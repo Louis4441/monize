@@ -17,6 +17,7 @@ import { Type } from "class-transformer";
 import { SanitizeHtml } from "../../common/decorators/sanitize-html.decorator";
 import { InvestmentSplitDto } from "../../transactions/dto/create-transaction-split.dto";
 import { SplitKind } from "../../transactions/entities/split-kind.enum";
+import { TRANSACTION_NOTE_MAX_LENGTH } from "../../common/transaction-note";
 
 class InlineSplitDto {
   // Id of the scheduled/override split this inline row came from (issue #1167
@@ -76,7 +77,8 @@ class InlineSplitDto {
   @ApiPropertyOptional({ description: "Memo for this split" })
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(TRANSACTION_NOTE_MAX_LENGTH)
+  @SanitizeHtml()
   memo?: string | null;
 }
 
@@ -126,7 +128,8 @@ export class PostScheduledTransactionDto {
   })
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(TRANSACTION_NOTE_MAX_LENGTH)
+  @SanitizeHtml()
   description?: string | null;
 
   @ApiPropertyOptional({

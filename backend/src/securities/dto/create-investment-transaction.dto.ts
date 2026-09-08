@@ -13,6 +13,7 @@ import {
 import { InvestmentAction } from "../entities/investment-transaction.entity";
 import { TransactionStatus } from "../../transactions/entities/transaction.entity";
 import { SanitizeHtml } from "../../common/decorators/sanitize-html.decorator";
+import { TRANSACTION_NOTE_MAX_LENGTH } from "../../common/transaction-note";
 
 export class CreateInvestmentTransactionDto {
   @ApiProperty()
@@ -94,7 +95,7 @@ export class CreateInvestmentTransactionDto {
   })
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(TRANSACTION_NOTE_MAX_LENGTH)
   @SanitizeHtml()
   description?: string;
 
