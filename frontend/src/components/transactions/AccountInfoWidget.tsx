@@ -20,6 +20,7 @@ import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import { useLoanProjection } from '@/hooks/useLoanProjection';
 import { InstitutionLogo, InstitutionLogoData } from '@/components/institutions/InstitutionLogo';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
+import { EntitySwitcher, type EntitySwitcherItem } from '@/components/ui/EntitySwitcher';
 import { safeHttpUrl } from '@/lib/safe-url';
 import { getNextScheduled } from '@/lib/scheduled-utils';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
@@ -38,6 +39,15 @@ interface AccountInfoWidgetProps {
   scheduledTransactions?: ScheduledTransaction[];
   /** Bumped by the page on every reload so the loan projection refetches in lockstep. */
   refreshKey?: number;
+  /**
+   * The accounts the Accounts filter currently offers -- already narrowed by
+   * the Show Accounts (All/Active/Closed) toggle -- so the caret beside the
+   * name switches only to an account the filter itself could select. Omit to
+   * hide the caret.
+   */
+  switchableAccounts?: readonly Account[];
+  /** Narrow the list to the chosen account, leaving every other filter as is. */
+  onSwitchAccount?: (accountId: string) => void;
   /** Open the shared account edit modal for this account. */
   onEdit: () => void;
   /** Collapse the widget so the chart can use the full width. */
@@ -55,11 +65,16 @@ export function AccountInfoWidget({
   institution,
   scheduledTransactions = [],
   refreshKey,
+  switchableAccounts,
+  onSwitchAccount,
   onEdit,
   onCollapse,
 }: AccountInfoWidgetProps) {
   const t = useTranslations('transactions');
   const tc = useTranslations('common');
+  // The caret reuses the account detail page's switcher copy, so the two
+  // surfaces say the same thing.
+  const ta = useTranslations('accountDetail');
   const router = useRouter();
   const { formatCurrency, formatPercentTrimmed } = useNumberFormat();
   const { formatDate } = useDateFormat();
@@ -90,6 +105,25 @@ export function AccountInfoWidget({
   // Only treat http(s) URLs as a safe link target, to avoid javascript:/data:
   // URIs ever reaching the href.
   const institutionWebsite = safeHttpUrl(institution?.website);
+
+  // One row per account the Accounts filter offers, in the filter's own order
+  // (by name), each qualified by its type the way the account detail page's
+  // switcher does, so alike-named accounts at two banks are told apart.
+  const switcherItems = useMemo<EntitySwitcherItem[]>(
+    () =>
+      [...(switchableAccounts ?? [])]
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((candidate) => {
+          const type = formatAccountType(candidate.accountType, tc);
+          return {
+            id: candidate.id,
+            primary: candidate.name,
+            secondary: type,
+            searchText: `${candidate.name} ${type}`,
+          };
+        }),
+    [switchableAccounts, tc],
+  );
 
   // The soonest active scheduled bill/deposit booked against this account.
   const nextPayment = useMemo(
@@ -211,9 +245,23 @@ export function AccountInfoWidget({
             <InstitutionLogo institution={institution ?? undefined} size={40} fallbackGlyph="$" />
           )}
           <div className="min-w-0">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">
-              {account.name}
-            </h3>
+            <div className="flex min-w-0 items-center gap-1">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">
+                {account.name}
+              </h3>
+              {/* Jump straight to another account the Accounts filter offers,
+                  instead of reopening the filter and picking it there. */}
+              {onSwitchAccount && switcherItems.length > 0 && (
+                <EntitySwitcher
+                  currentId={account.id}
+                  items={switcherItems}
+                  onSelect={onSwitchAccount}
+                  triggerLabel={ta('header.switchAccount')}
+                  filterPlaceholder={ta('header.switchPlaceholder')}
+                  noMatchesLabel={ta('header.switchNoMatches')}
+                />
+              )}
+            </div>
             {(institutionName || account.isClosed) && (
               <div className="flex items-center gap-2 min-w-0">
                 {institutionName && (
