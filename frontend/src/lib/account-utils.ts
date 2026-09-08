@@ -6,9 +6,30 @@ export interface AccountSelectOption {
   disabled?: boolean;
 }
 
+/** What ordering a picker's entries needs to know about each one. */
+export interface PickerOrderFields {
+  isFavourite: boolean;
+  /** The user's own arrangement of their favourites; 0 until they arrange one. */
+  favouriteSortOrder: number;
+  /**
+   * The name the picker DISPLAYS, which is not always the stored one -- the
+   * account switcher shows a linked brokerage/cash pair under one name with the
+   * " - Brokerage" suffix stripped, and sorting that list on the stored name
+   * would read as unsorted.
+   */
+  name: string;
+}
+
 /**
- * The order every account picker offers accounts in: the user's favourites
- * first, in the order they arranged them, then everything else by name.
+ * The order every account picker offers its entries in: the user's favourites
+ * first, in the order they arranged them, then everything else alphabetically.
+ *
+ * **Alphabetically within the favourites too, where the arrangement does not
+ * separate them.** `favourite_sort_order` defaults to 0, so a user who has
+ * starred three accounts without ever dragging them into an order has three
+ * ties -- and a stable sort leaves those in whatever order the API answered in,
+ * which is arbitrary and differs between surfaces. The drag-to-arrange list
+ * writes real indices, so the tiebreak never fires once anybody has used it.
  *
  * The two halves are returned separately rather than concatenated, because
  * every caller needs the boundary as well as the order -- a `<select>` draws a
@@ -19,18 +40,44 @@ export interface AccountSelectOption {
  * Sorting happens on copies: `Array.prototype.sort` reorders in place, and the
  * array reaching here is usually one a caller memoized for other consumers too.
  */
+export function orderForPicker<T>(
+  items: readonly T[],
+  read: (item: T) => PickerOrderFields,
+): { favourites: T[]; rest: T[] } {
+  // Read once per item rather than twice per comparison: `read` is a caller's
+  // own function and a comparator calls it O(n log n) times.
+  const decorated = items.map((item) => ({ item, fields: read(item) }));
+  const byName = (
+    a: { fields: PickerOrderFields },
+    b: { fields: PickerOrderFields },
+  ) => a.fields.name.localeCompare(b.fields.name);
+
+  return {
+    favourites: decorated
+      .filter((entry) => entry.fields.isFavourite)
+      .sort(
+        (a, b) =>
+          a.fields.favouriteSortOrder - b.fields.favouriteSortOrder ||
+          byName(a, b),
+      )
+      .map((entry) => entry.item),
+    rest: decorated
+      .filter((entry) => !entry.fields.isFavourite)
+      .sort(byName)
+      .map((entry) => entry.item),
+  };
+}
+
+/** {@link orderForPicker} over plain accounts, which name themselves. */
 export function orderAccountsForPicker(accounts: readonly Account[]): {
   favourites: Account[];
   rest: Account[];
 } {
-  return {
-    favourites: accounts
-      .filter((a) => a.isFavourite)
-      .sort((a, b) => a.favouriteSortOrder - b.favouriteSortOrder),
-    rest: accounts
-      .filter((a) => !a.isFavourite)
-      .sort((a, b) => a.name.localeCompare(b.name)),
-  };
+  return orderForPicker(accounts, (account) => ({
+    isFavourite: account.isFavourite,
+    favouriteSortOrder: account.favouriteSortOrder,
+    name: account.name,
+  }));
 }
 
 /**
