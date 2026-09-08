@@ -549,7 +549,7 @@ jobs:
           # across helpers and specs became one constant in e2e/helpers/credentials.ts;
           # the id below replaces da119900eefffd8b84e7693e0388568a_0 (e2e/helpers/auth.ts).
           # 8145f16fcf77da087020769e5609a11b_0 - E2E test password [CWE-798], e2e/helpers/credentials.ts, throwaway database only - review-by: 2026-12-08
-          # Retired by the same review, with no replacement:
+          # Retired by the same review (issue #1323), with no replacement:
           #   842822dd22cd4403ab5800ac89480c0a_0 (Math.random for a split row's temporary
           #     id in SplitEditor.tsx) -- fixed: crypto.randomUUID(), and
           #     frontend/src/test/ui-conventions.test.ts now fails Math.random in any
@@ -558,10 +558,22 @@ jobs:
           #     payee-auto-merge.service.ts) -- the compared value was a payee-name word
           #     held in a local named `token`, which is what the rule keys on; renamed,
           #     so the rule reads the comparison correctly and no exception is needed.
-          #   b04cb91b90deb5e16504baa7ab95f678_0/_1 (CWE-22 in
-          #     backend/src/backup/auto-backup.service.ts) -- no longer detected: the
-          #     folder path is validated by assertAllowedRoot before any resolve(), and
-          #     Bearer itself reports both ids as "no longer detected".
+          # The two below are safePath() in backend/src/backup/auto-backup.service.ts:
+          # resolve(basePath, filename) and the containment check on its result. The
+          # same shape as the local-storage pair above, and the same false positive:
+          # Bearer's dataflow cannot see that the startsWith() guard constrains the
+          # value, so it reports the resolve() and the guard itself. What reaches it
+          # is the user id turned into shard segments, artifact names the service
+          # composes itself, and directory entries it just listed -- and the guard is
+          # what turns an id that is not a safe path segment into a refusal:
+          # auto-backup.service.spec.ts has runManualBackup("../../etc") rejecting
+          # with nothing written under the root. The folder the segments are joined
+          # to is validated separately by assertAllowedRoot. NOTE: the finding depends on
+          # Bearer's dataflow, and a local binary older than CI's (v2.1.1 at the time
+          # of writing) does not report it -- a scan that says these ids are "no
+          # longer detected" is only evidence if it ran the version CI runs.
+          # b04cb91b90deb5e16504baa7ab95f678_0 - resolve() of the backup filename against its validated base [CWE-22] - review-by: 2026-12-08
+          # b04cb91b90deb5e16504baa7ab95f678_1 - containment check on the resolved backup path [CWE-22] - review-by: 2026-12-08
           # The five below are in backend/src/updates/release-notes.service.ts, which reads the
           # committed docs/release-notes/<version>.md digest. The version is the trusted
           # package.json value matched against a strict semver regex that forbids path separators,
@@ -649,7 +661,7 @@ jobs:
           # exact line, so hoisting the two `token.trim()` calls into a local will
           # re-report it under a new id.
           # 173289a7a56f6f6b27dc2314746e9451_0 - Observable timing discrepancy [CWE-208] on the ticket presence check, no secret compared - review-by: 2026-11-26
-          exclude-fingerprint: "df1db3090cab23fd55c9a22789aa6b2f_0,9a51af5fd92c92c4c022addd331ee9c6_0,8145f16fcf77da087020769e5609a11b_0,b6c4552155ecc9b65a9205911f502bf1_0,b6c4552155ecc9b65a9205911f502bf1_1,b6c4552155ecc9b65a9205911f502bf1_2,b6c4552155ecc9b65a9205911f502bf1_3,c055716bae113b20589f9ea5c5963e65_0,f9b26e7d59d0f577ff9a0e93ea4f7b7c_0,f9b26e7d59d0f577ff9a0e93ea4f7b7c_1,f6196720ad017b3d11d24487792c1479_0,45093073db7d96d61cd30bceb943f63f_0,45093073db7d96d61cd30bceb943f63f_1,45093073db7d96d61cd30bceb943f63f_2,b7502b6ea7c0a272ab08099b55d0392c_0,4beb484f871a7489b5f5ff2df93f72f1_0,0ff64c8083ce01b1e8c867832c0dff85_0,1f87dd3b3950178c2eac383cfcead816_0,e717be7fe9c133adba7d48ccb371c6ba_0,173289a7a56f6f6b27dc2314746e9451_0"
+          exclude-fingerprint: "df1db3090cab23fd55c9a22789aa6b2f_0,9a51af5fd92c92c4c022addd331ee9c6_0,8145f16fcf77da087020769e5609a11b_0,b04cb91b90deb5e16504baa7ab95f678_0,b04cb91b90deb5e16504baa7ab95f678_1,b6c4552155ecc9b65a9205911f502bf1_0,b6c4552155ecc9b65a9205911f502bf1_1,b6c4552155ecc9b65a9205911f502bf1_2,b6c4552155ecc9b65a9205911f502bf1_3,c055716bae113b20589f9ea5c5963e65_0,f9b26e7d59d0f577ff9a0e93ea4f7b7c_0,f9b26e7d59d0f577ff9a0e93ea4f7b7c_1,f6196720ad017b3d11d24487792c1479_0,45093073db7d96d61cd30bceb943f63f_0,45093073db7d96d61cd30bceb943f63f_1,45093073db7d96d61cd30bceb943f63f_2,b7502b6ea7c0a272ab08099b55d0392c_0,4beb484f871a7489b5f5ff2df93f72f1_0,0ff64c8083ce01b1e8c867832c0dff85_0,1f87dd3b3950178c2eac383cfcead816_0,e717be7fe9c133adba7d48ccb371c6ba_0,173289a7a56f6f6b27dc2314746e9451_0"
 
   # Resolve the release version and shared build metadata ONCE, so the parallel
   # backend/frontend build jobs below stamp identical version/date/sha values.
