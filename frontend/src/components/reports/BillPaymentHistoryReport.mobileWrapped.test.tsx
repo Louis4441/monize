@@ -42,6 +42,13 @@ vi.mock('@/hooks/useNumberFormat', async () => {
   };
 });
 
+vi.mock('@/hooks/useDateFormat', () => ({
+  useDateFormat: () => ({
+    formatDate: (date: string) => `preferred-date:${date}`,
+    formatMonth: (month: string) => `preferred-month:${month}`,
+  }),
+}));
+
 const STABLE_RANGE = { start: '2024-01-01', end: '2025-01-01' };
 vi.mock('@/hooks/useDateRange', () => ({
   useDateRange: () => ({
@@ -50,13 +57,6 @@ vi.mock('@/hooks/useDateRange', () => ({
     resolvedRange: STABLE_RANGE,
     isValid: true,
   }),
-}));
-
-// Spread the real module: `CellLabel` reads `cn` from here, and a bare factory
-// blanks every other export of the module for the whole graph under test.
-vi.mock('@/lib/utils', async (importActual) => ({
-  ...(await importActual<typeof import('@/lib/utils')>()),
-  parseLocalDate: (d: string) => new Date(d + 'T00:00:00'),
 }));
 
 vi.mock('@/components/ui/DateRangeSelector', () => ({
@@ -113,7 +113,7 @@ const RESPONSE = {
       lastPaymentDate: null,
     },
   ],
-  monthlyTotals: [{ label: 'Jan 2025', total: 300 }],
+  monthlyTotals: [{ month: '2025-01', label: 'Jan 2025', total: 300 }],
   summary: { totalPaid: 900, monthlyAverage: 75, uniqueBills: 2, totalPayments: 15 },
 };
 
@@ -206,9 +206,9 @@ describe('BillPaymentHistoryReport (phone wrapped rows)', () => {
     expect(rowText(row)).toContain('Payments3');
     expect(rowText(row)).toContain('Average$50');
     expect(rowText(row)).toContain('Total Paid$300');
-    expect(rowText(row)).toContain('Last PaymentJun 15, 2024');
+    expect(rowText(row)).toContain('Last Paymentpreferred-date:2024-06-15');
     // The value really is its own node, not part of the caption's.
-    expect(screen.getByText('Jun 15, 2024')).toBeInTheDocument();
+    expect(screen.getByText('preferred-date:2024-06-15')).toBeInTheDocument();
   });
 
   it('renders the no-payee fallback and the missing date inside the wrapped row', async () => {

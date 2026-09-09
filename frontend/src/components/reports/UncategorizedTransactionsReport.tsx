@@ -5,11 +5,10 @@ import { useTranslations } from 'next-intl';
 import { gainLossColor } from '@/lib/format';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { useRouter } from 'next/navigation';
-import { format } from 'date-fns';
 import { builtInReportsApi } from '@/lib/built-in-reports';
 import { UncategorizedTransactionItem } from '@/types/built-in-reports';
-import { parseLocalDate } from '@/lib/utils';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { useDateFormat } from '@/hooks/useDateFormat';
 import { useDateRange } from '@/hooks/useDateRange';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { exportToCsv } from '@/lib/csv-export';
@@ -120,10 +119,10 @@ const PHONE_HEADER_CLASS =
 // card.
 const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
 
-// The date is a fixed-shape label, not a number: `format(..., 'MMM d, yyyy')`
-// renders `Dec 25, 2025` (72px at `text-xs`). It keeps the `whitespace-nowrap`
-// it wears today, because a date is one label and breaking it after `Dec` reads
-// as two values, and it is spelled out rather than aliased to `MONEY_CELL`
+// The date is a fixed-shape label, not a number. `useDateFormat` keeps the
+// user's full-date preference; its longest preset is the same width class as
+// the old `Dec 25, 2025` label. It keeps the `whitespace-nowrap` it wears today,
+// because a date is one label, and it is spelled out rather than aliased to `MONEY_CELL`
 // deliberately: the two hold nearly the same string for different reasons, and
 // an alias would carry a money-driven edit (a wider type for a longer figure)
 // silently onto the date. The one difference is the alignment -- this table's
@@ -139,6 +138,7 @@ export function UncategorizedTransactionsReport() {
   const t = useTranslations('reports');
   const router = useRouter();
   const { formatCurrency } = useNumberFormat();
+  const { formatDate } = useDateFormat();
   const { dateRange, setDateRange, resolvedRange, isValid } = useDateRange({ defaultRange: '3m', alignment: 'day' });
   const { sortField, sortDirection, handleSort } = useSortableTable<SortField>(
     'reports.uncategorized-transactions.sort',
@@ -229,7 +229,7 @@ export function UncategorizedTransactionsReport() {
       t('uncategorizedTransactions.csvColAmount'),
     ];
     const rows = filteredAndSortedTransactions.map((tx) => [
-      format(parseLocalDate(tx.transactionDate), 'yyyy-MM-dd'),
+      formatDate(tx.transactionDate),
       tx.payeeName || t('uncategorizedTransactions.unknownPayee'),
       tx.description || '',
       tx.accountName || t('uncategorizedTransactions.unknownAccount'),
@@ -529,7 +529,7 @@ export function UncategorizedTransactionsReport() {
                       className={`col-start-2 row-start-2 text-gray-900 dark:text-gray-100 ${DATE_CELL}`}
                     >
                       <CellLabel className={CAPTION_CLASS}>{columns.date.label}</CellLabel>
-                      {format(parseLocalDate(tx.transactionDate), 'MMM d, yyyy')}
+                      {formatDate(tx.transactionDate)}
                     </td>
                     <td
                       role="cell"

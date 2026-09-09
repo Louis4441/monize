@@ -12,11 +12,10 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { format } from 'date-fns';
 import { builtInReportsApi } from '@/lib/built-in-reports';
 import { BillPaymentHistoryResponse } from '@/types/built-in-reports';
-import { parseLocalDate } from '@/lib/utils';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { useDateFormat } from '@/hooks/useDateFormat';
 import { useDateRange } from '@/hooks/useDateRange';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { exportToCsv } from '@/lib/csv-export';
@@ -118,11 +117,11 @@ const PHONE_HEADER_CLASS =
 // being zero. The payment COUNT is bounded and trivial at 23px for `128`.
 const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
 
-// Last Payment is a WORD-shaped value, not a number: `format(..., 'MMM d,
-// yyyy')` renders `Sep 5, 2026` (72px at `text-xs`), or `-` where the bill has
-// never been paid. It resolves to the same rendering as a figure cell today --
-// including the nowrap, because a date is one label and breaking it after `Sep`
-// reads as two values -- and it is spelled out rather than aliased to
+// Last Payment is a WORD-shaped value, not a number. `useDateFormat` keeps the
+// user's full-date preference; its longest preset is the same width class as
+// the old `Sep 5, 2026` label, or `-` where the bill has never been paid. It
+// resolves to the same rendering as a figure cell today -- including the
+// nowrap, because a date is one label -- and it is spelled out rather than aliased to
 // `MONEY_CELL` deliberately: the two hold the same string for different
 // reasons, and an alias would carry a money-driven edit (dropping the nowrap
 // because a formatter stopped grouping, widening the type for a longer figure)
@@ -139,6 +138,7 @@ export function BillPaymentHistoryReport() {
   const t = useTranslations('reports');
   const router = useRouter();
   const { formatCurrencyCompact: formatCurrency, formatCurrencyAxis } = useNumberFormat();
+  const { formatDate, formatMonth } = useDateFormat();
   const chartRef = useRef<HTMLDivElement>(null);
   const { dateRange, setDateRange, resolvedRange } = useDateRange({ defaultRange: '1y', alignment: 'day' });
   const [viewType, setViewType] = useState<'overview' | 'byBill'>('overview');
@@ -156,6 +156,15 @@ export function BillPaymentHistoryReport() {
         endDate: rangeEnd,
       }),
     [rangeStart, rangeEnd],
+  );
+
+  const chartData = useMemo(
+    () =>
+      (billData?.monthlyTotals ?? []).map((entry) => ({
+        ...entry,
+        label: formatMonth(entry.month),
+      })),
+    [billData, formatMonth],
   );
 
   const sortedBillPayments = useMemo(() => {
@@ -219,7 +228,7 @@ export function BillPaymentHistoryReport() {
       bp.paymentCount,
       bp.averagePayment,
       bp.totalPaid,
-      bp.lastPaymentDate ? format(parseLocalDate(bp.lastPaymentDate), 'yyyy-MM-dd') : '',
+      bp.lastPaymentDate ? formatDate(bp.lastPaymentDate) : '',
     ]);
     return { headers, rows };
   };
@@ -367,7 +376,7 @@ export function BillPaymentHistoryReport() {
           </h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-              <BarChart data={billData.monthlyTotals}>
+              <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                 <YAxis tickFormatter={formatCurrencyAxis} />
@@ -550,7 +559,7 @@ export function BillPaymentHistoryReport() {
                     >
                       <CellLabel className={CAPTION_CLASS}>{columns.lastPayment.label}</CellLabel>
                       {bp.lastPaymentDate
-                        ? format(parseLocalDate(bp.lastPaymentDate), 'MMM d, yyyy')
+                        ? formatDate(bp.lastPaymentDate)
                         : '-'}
                     </td>
                   </tr>

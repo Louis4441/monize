@@ -18,6 +18,14 @@ vi.mock('@/hooks/useNumberFormat', async () => {
     }),
 };
 });
+
+vi.mock('@/hooks/useDateFormat', () => ({
+  useDateFormat: () => ({
+    formatDate: (date: string) => `preferred-date:${date}`,
+    formatDateWithoutYear: (date: string) => `preferred-short-date:${date}`,
+  }),
+}));
+
 vi.mock("recharts", () => ({
   ResponsiveContainer: ({ children }: any) => (
     <div data-testid="responsive-container">{children}</div>
@@ -337,6 +345,9 @@ describe("RecurringExpensesReport", () => {
       "Uncategorized",
       "Monthly",
     ]);
+    expect(mockExportToCsv.mock.calls[0][2][0][6]).toBe(
+      "preferred-date:2025-01-15",
+    );
   });
 
   it("changes min occurrences when selector changes", async () => {
@@ -379,6 +390,7 @@ describe("RecurringExpensesReport", () => {
     expect(arg.summaryCards).toHaveLength(3);
     expect(arg.chartLegend[0].label).toContain("Netflix");
     expect(arg.tableData.rows[0][0]).toBe("Netflix");
+    expect(arg.tableData.rows[0][6]).toBe("preferred-date:2025-01-15");
   });
 
   it("renders the custom tooltip and navigates on pie slice click", async () => {

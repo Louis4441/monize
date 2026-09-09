@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@/test/render';
-import { format } from 'date-fns';
 import { RecurringExpensesReport } from './RecurringExpensesReport';
 
 /**
@@ -32,6 +31,13 @@ vi.mock('@/hooks/useNumberFormat', async () => {
   }),
   };
 });
+
+vi.mock('@/hooks/useDateFormat', () => ({
+  useDateFormat: () => ({
+    formatDate: (date: string) => `preferred-date:${date}`,
+    formatDateWithoutYear: (date: string) => `preferred-short-date:${date}`,
+  }),
+}));
 
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: any) => <div>{children}</div>,
@@ -126,8 +132,6 @@ const EXPECTED_LABELS = [
  * deliberately unchanged here -- this expectation follows the component so the
  * test asserts the LAYOUT (the caption beside the value) rather than the parse.
  */
-const lastPaid = (iso: string) => format(new Date(iso), 'MMM d');
-
 const stripGlyph = (text: string | null | undefined) => (text ?? '').replace(/[↑↓↕]/g, '').trim();
 
 const rowText = (row: Element | null | undefined) => row?.textContent ?? '';
@@ -210,7 +214,7 @@ describe('RecurringExpensesReport (phone wrapped rows)', () => {
     expect(rowText(row)).toContain('Count6');
     expect(rowText(row)).toContain('Avg Amount$50');
     expect(rowText(row)).toContain('6-Mo Total$300');
-    expect(rowText(row)).toContain(`Last Paid${lastPaid('2024-06-15')}`);
+    expect(rowText(row)).toContain('Last Paidpreferred-short-date:2024-06-15');
     // The value really is its own node, not part of the caption's.
     expect(screen.getByText('$300')).toBeInTheDocument();
 
@@ -464,7 +468,7 @@ describe('RecurringExpensesReport (phone wrapped rows)', () => {
       6,
       50,
       300,
-      format(new Date('2024-06-15'), 'yyyy-MM-dd'),
+      'preferred-date:2024-06-15',
     ]);
     expect(rows[1][0]).toBe('Zebra Market');
   });

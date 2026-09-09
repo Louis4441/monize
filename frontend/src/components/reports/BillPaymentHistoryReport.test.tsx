@@ -22,6 +22,11 @@ vi.mock('@/lib/csv-export', () => ({
   exportToCsv: (...args: any[]) => mockExportToCsv(...args),
 }));
 
+const mockExportToPdf = vi.fn().mockResolvedValue(undefined);
+vi.mock('@/lib/pdf-export', () => ({
+  exportToPdf: (...args: any[]) => mockExportToPdf(...args),
+}));
+
 vi.mock('@/hooks/useNumberFormat', async () => {
   const { numberFormatMockDefaults } = await import('@/test/number-format-mock');
   return {
@@ -34,6 +39,14 @@ vi.mock('@/hooks/useNumberFormat', async () => {
     }),
   };
 });
+
+vi.mock('@/hooks/useDateFormat', () => ({
+  useDateFormat: () => ({
+    formatDate: (date: string) => `preferred-date:${date}`,
+    formatMonth: (month: string) => `preferred-month:${month}`,
+  }),
+}));
+
 const STABLE_RANGE = { start: '2024-01-01', end: '2025-01-01' };
 vi.mock('@/hooks/useDateRange', () => ({
   useDateRange: () => ({
@@ -44,21 +57,20 @@ vi.mock('@/hooks/useDateRange', () => ({
   }),
 }));
 
-// Spread the real module rather than replacing it: the by-bill table's phone
-// captions render `CellLabel`, which reads `cn` from here, and a bare factory
-// blanks every other export of the module for the whole graph under test.
-vi.mock('@/lib/utils', async (importActual) => ({
-  ...(await importActual<typeof import('@/lib/utils')>()),
-  parseLocalDate: (d: string) => new Date(d + 'T00:00:00'),
-}));
-
 vi.mock('@/components/ui/DateRangeSelector', () => ({
   DateRangeSelector: () => <div data-testid="date-range-selector" />,
 }));
 
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: any) => <div data-testid="responsive-container">{children}</div>,
-  BarChart: ({ children }: any) => <div data-testid="bar-chart">{children}</div>,
+  BarChart: ({ children, data }: any) => (
+    <div
+      data-testid="bar-chart"
+      data-labels={data.map((entry: { label: string }) => entry.label).join(',')}
+    >
+      {children}
+    </div>
+  ),
   Bar: () => null,
   XAxis: () => null,
   YAxis: () => null,
@@ -119,7 +131,7 @@ describe('BillPaymentHistoryReport', () => {
           lastPaymentDate: '2025-01-01',
         },
       ],
-      monthlyTotals: [{ label: 'Jan 2025', total: 1500 }],
+      monthlyTotals: [{ month: '2025-01', label: 'Jan 2025', total: 1500 }],
       summary: { totalPaid: 18000, monthlyAverage: 1500, uniqueBills: 1, totalPayments: 12 },
     });
     render(<BillPaymentHistoryReport />);
@@ -128,6 +140,10 @@ describe('BillPaymentHistoryReport', () => {
     });
     expect(screen.getByText('Monthly Average')).toBeInTheDocument();
     expect(screen.getByText('Bills Paid')).toBeInTheDocument();
+    expect(screen.getByTestId('bar-chart')).toHaveAttribute(
+      'data-labels',
+      'preferred-month:2025-01',
+    );
   });
 
   it('renders error state when the fetch fails', async () => {
@@ -151,7 +167,7 @@ describe('BillPaymentHistoryReport', () => {
           lastPaymentDate: '2025-01-01',
         },
       ],
-      monthlyTotals: [{ label: 'Jan 2025', total: 1500 }],
+      monthlyTotals: [{ month: '2025-01', label: 'Jan 2025', total: 1500 }],
       summary: { totalPaid: 18000, monthlyAverage: 1500, uniqueBills: 1, totalPayments: 12 },
     });
     render(<BillPaymentHistoryReport />);
@@ -161,7 +177,7 @@ describe('BillPaymentHistoryReport', () => {
       expect(screen.getByText('Payment History by Bill')).toBeInTheDocument();
     });
     expect(screen.getByText('Rent')).toBeInTheDocument();
-    expect(screen.getByText('Jan 1, 2025')).toBeInTheDocument();
+    expect(screen.getByText('preferred-date:2025-01-01')).toBeInTheDocument();
   });
 
   it('shows No payee when payeeName is null', async () => {
@@ -234,6 +250,36 @@ describe('BillPaymentHistoryReport', () => {
       'bill-payment-history',
       expect.any(Array),
       expect.any(Array),
+    );
+    expect(mockExportToCsv.mock.calls[0][2][0][5]).toBe(
+      'preferred-date:2025-01-01',
+    );
+  });
+
+  it('exports preferred dates to PDF', async () => {
+    mockGetBillPaymentHistory.mockResolvedValue({
+      billPayments: [
+        {
+          scheduledTransactionId: 'st-1',
+          scheduledTransactionName: 'Rent',
+          payeeName: 'Landlord',
+          paymentCount: 12,
+          averagePayment: 1500,
+          totalPaid: 18000,
+          lastPaymentDate: '2025-01-01',
+        },
+      ],
+      monthlyTotals: [],
+      summary: { totalPaid: 18000, monthlyAverage: 1500, uniqueBills: 1, totalPayments: 12 },
+    });
+    render(<BillPaymentHistoryReport />);
+    await waitFor(() => expect(screen.getByTestId('export-pdf')).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('export-pdf'));
+    });
+    await waitFor(() => expect(mockExportToPdf).toHaveBeenCalledTimes(1));
+    expect(mockExportToPdf.mock.calls[0][0].tableData.rows[0][5]).toBe(
+      'preferred-date:2025-01-01',
     );
   });
 

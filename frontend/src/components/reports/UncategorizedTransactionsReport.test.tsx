@@ -41,6 +41,13 @@ vi.mock('@/hooks/useNumberFormat', async () => {
     }),
 };
 });
+
+vi.mock('@/hooks/useDateFormat', () => ({
+  useDateFormat: () => ({
+    formatDate: (date: string) => `preferred-date:${date}`,
+  }),
+}));
+
 const stableResolvedRange = { start: "2025-01-01", end: "2025-03-31" };
 
 vi.mock("@/hooks/useDateRange", () => ({
@@ -50,14 +57,6 @@ vi.mock("@/hooks/useDateRange", () => ({
     resolvedRange: stableResolvedRange,
     isValid: true,
   }),
-}));
-
-// Spread the real module rather than replacing it: the table's phone captions
-// render `CellLabel`, which reads `cn` from here, and a bare factory blanks
-// every other export of the module for the whole graph under test.
-vi.mock("@/lib/utils", async (importActual) => ({
-  ...(await importActual<typeof import("@/lib/utils")>()),
-  parseLocalDate: (d: string) => new Date(d + "T00:00:00"),
 }));
 
 vi.mock("@/components/ui/DateRangeSelector", () => ({
@@ -159,6 +158,7 @@ describe("UncategorizedTransactionsReport", () => {
       expect(screen.getByText("Unknown Store")).toBeInTheDocument();
     });
     expect(screen.getByText("Total Uncategorized")).toBeInTheDocument();
+    expect(screen.getByText("preferred-date:2025-02-15")).toBeInTheDocument();
   });
 
   it("renders summary cards", async () => {
@@ -568,6 +568,9 @@ describe("UncategorizedTransactionsReport", () => {
       expect.arrayContaining(["Date", "Payee", "Description", "Account", "Amount"]),
       expect.any(Array),
     );
+    expect(mockExportToCsv.mock.calls[0][2][0][0]).toBe(
+      "preferred-date:2025-02-15",
+    );
   });
 
   it("exports PDF with the current transaction data", async () => {
@@ -610,6 +613,9 @@ describe("UncategorizedTransactionsReport", () => {
           rows: expect.any(Array),
         }),
       }),
+    );
+    expect(mockExportToPdf.mock.calls[0][0].tableData.rows[0][0]).toBe(
+      "preferred-date:2025-02-15",
     );
   });
 });

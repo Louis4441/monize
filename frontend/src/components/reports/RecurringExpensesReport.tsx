@@ -11,13 +11,13 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts';
-import { format } from 'date-fns';
 import { builtInReportsApi } from '@/lib/built-in-reports';
 import {
   RecurringExpenseItem,
   RecurringExpenseFrequency,
 } from '@/types/built-in-reports';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { useDateFormat } from '@/hooks/useDateFormat';
 import { chartSeriesColor } from '@/lib/chart-colors';
 import { resolvePdfColor } from '@/components/reports/resolve-pdf-color';
 import { exportToCsv } from '@/lib/csv-export';
@@ -152,11 +152,11 @@ const PHONE_HEADER_CLASS =
 // for seven columns, is what this box can hold.
 const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
 
-// Last Paid is a WORD-shaped value, not a number: `format(..., 'MMM d')`
-// renders `Sep 5` (34px at `text-xs`). It resolves to the same rendering as a
-// figure cell today -- including the nowrap, because a date is one label and
-// breaking it after `Sep` reads as two values -- and it is spelled out rather
-// than aliased to `MONEY_CELL` deliberately: the two hold the same string for
+// Last Paid is a WORD-shaped value, not a number. `formatDateWithoutYear`
+// preserves the user's day/month order while keeping the narrow no-year shape
+// of the old `Sep 5` label. It resolves to the same rendering as a figure cell
+// today -- including the nowrap, because a date is one label -- and it is
+// spelled out rather than aliased to `MONEY_CELL` deliberately: the two hold the same string for
 // different reasons, and an alias would carry a money-driven edit (dropping the
 // nowrap because a formatter stopped grouping, widening the type for a longer
 // figure) silently onto the date.
@@ -177,6 +177,7 @@ export function RecurringExpensesReport() {
   const t = useTranslations('reports');
   const router = useRouter();
   const { formatCurrencyCompact: formatCurrency } = useNumberFormat();
+  const { formatDate, formatDateWithoutYear } = useDateFormat();
   const chartRef = useRef<HTMLDivElement>(null);
   const [minOccurrences, setMinOccurrences] = useState(3);
   const { sortField, sortDirection, handleSort } = useSortableTable<RecurringSortField>(
@@ -287,15 +288,7 @@ export function RecurringExpensesReport() {
       label: t('recurringExpenses.colLastPaid'),
       align: 'right',
       csvLabel: t('recurringExpenses.csvColLastPaid'),
-      // The export's own date format, unchanged. Both this and the cell's
-      // `MMM d` parse the server's `YYYY-MM-DD` through `new Date(...)`, which
-      // reads it as UTC midnight and then formats it LOCALLY: a negative
-      // offset pushes it back into the previous day, so every reader WEST of
-      // Greenwich sees the date before the one the server sent. `parseLocalDate`
-      // (`@/lib/utils`) is what the sibling report tables use for exactly this.
-      // The defect is pre-existing on both paths and is reported rather than
-      // fixed inside a layout change, so that neither hides the other.
-      csvValue: (e) => format(new Date(e.lastTransactionDate), 'yyyy-MM-dd'),
+      csvValue: (e) => formatDate(e.lastTransactionDate),
     },
   };
 
@@ -671,7 +664,7 @@ export function RecurringExpensesReport() {
                         className={`col-start-2 row-start-3 text-gray-500 dark:text-gray-400 ${DATE_CELL}`}
                       >
                         <CellLabel className={CAPTION_CLASS}>{columns.lastPaid.label}</CellLabel>
-                        {format(new Date(expense.lastTransactionDate), 'MMM d')}
+                        {formatDateWithoutYear(expense.lastTransactionDate)}
                       </td>
                     </tr>
                   ))}
