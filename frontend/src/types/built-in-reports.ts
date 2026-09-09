@@ -261,6 +261,7 @@ export interface UncategorizedTransactionItem {
   id: string;
   transactionDate: string;
   amount: number;
+  currencyCode: string;
   payeeName: string | null;
   description: string | null;
   accountName: string | null;
@@ -275,6 +276,7 @@ export interface UncategorizedTransactionsResponse {
     expenseTotal: number;
     incomeCount: number;
     incomeTotal: number;
+    currencyCode: string;
   };
 }
 

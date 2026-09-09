@@ -137,7 +137,7 @@ const CAPTION_CLASS = 'sm:hidden';
 export function UncategorizedTransactionsReport() {
   const t = useTranslations('reports');
   const router = useRouter();
-  const { formatCurrency } = useNumberFormat();
+  const { formatCurrency, defaultCurrency } = useNumberFormat();
   const { formatDate } = useDateFormat();
   const { dateRange, setDateRange, resolvedRange, isValid } = useDateRange({ defaultRange: '3m', alignment: 'day' });
   const { sortField, sortDirection, handleSort } = useSortableTable<SortField>(
@@ -233,7 +233,7 @@ export function UncategorizedTransactionsReport() {
       tx.payeeName || t('uncategorizedTransactions.unknownPayee'),
       tx.description || '',
       tx.accountName || t('uncategorizedTransactions.unknownAccount'),
-      tx.amount,
+      formatCurrency(tx.amount, tx.currencyCode),
     ]);
     return { headers, rows };
   };
@@ -275,6 +275,7 @@ export function UncategorizedTransactionsReport() {
     expenseTotal: 0,
     incomeCount: 0,
     incomeTotal: 0,
+    currencyCode: defaultCurrency,
   };
 
   return (
@@ -293,7 +294,7 @@ export function UncategorizedTransactionsReport() {
             {summary.expenseCount}
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">
-            {formatCurrency(summary.expenseTotal)}
+            {formatCurrency(summary.expenseTotal, summary.currencyCode)}
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
@@ -302,7 +303,7 @@ export function UncategorizedTransactionsReport() {
             {summary.incomeCount}
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">
-            {formatCurrency(summary.incomeTotal)}
+            {formatCurrency(summary.incomeTotal, summary.currencyCode)}
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
@@ -556,7 +557,7 @@ export function UncategorizedTransactionsReport() {
                       className={`col-start-2 row-start-1 font-medium ${gainLossColor(tx.amount)} ${MONEY_CELL}`}
                     >
                       <CellLabel className={CAPTION_CLASS}>{columns.amount.label}</CellLabel>
-                      {formatCurrency(tx.amount)}
+                      {formatCurrency(tx.amount, tx.currencyCode)}
                     </td>
                   </tr>
                 ))}

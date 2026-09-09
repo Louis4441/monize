@@ -10,6 +10,9 @@ export class UncategorizedTransactionItem {
   @ApiProperty()
   amount: number;
 
+  @ApiProperty()
+  currencyCode: string;
+
   @ApiProperty({ nullable: true })
   payeeName: string | null;
 
@@ -38,6 +41,9 @@ export class UncategorizedTransactionsSummary {
 
   @ApiProperty()
   incomeTotal: number;
+
+  @ApiProperty()
+  currencyCode: string;
 }
 
 export class UncategorizedTransactionsResponse {

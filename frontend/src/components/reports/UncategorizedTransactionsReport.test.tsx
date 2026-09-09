@@ -35,7 +35,8 @@ vi.mock('@/hooks/useNumberFormat', async () => {
   return {
     useNumberFormat: () => ({
       ...numberFormatMockDefaults(),
-      formatCurrency: (n: number) => `$${n.toFixed(2)}`,
+      formatCurrency: (n: number, currencyCode = 'CAD') =>
+        currencyCode === 'CAD' ? `$${n.toFixed(2)}` : `${currencyCode} ${n.toFixed(2)}`,
       formatCurrencyCompact: (n: number) => `$${n.toFixed(0)}`,
       defaultCurrency: "CAD",
     }),
@@ -178,6 +179,63 @@ describe("UncategorizedTransactionsReport", () => {
     });
     expect(screen.getByText("Uncategorized Expenses")).toBeInTheDocument();
     expect(screen.getByText("Uncategorized Income")).toBeInTheDocument();
+  });
+
+  it("formats rows, summary totals, CSV, and PDF in the response currency", async () => {
+    mockGetUncategorizedTransactions.mockResolvedValue({
+      transactions: [
+        {
+          id: "tx-first",
+          transactionDate: "2025-02-15",
+          payeeName: "First Store",
+          description: "",
+          accountName: "Primary Account",
+          accountId: "acc-primary",
+          amount: -50,
+          currencyCode: "EUR",
+        },
+        {
+          id: "tx-eur",
+          transactionDate: "2025-02-16",
+          payeeName: "Euro Store",
+          description: "",
+          accountName: "EUR Account",
+          accountId: "acc-eur",
+          amount: 200,
+          currencyCode: "EUR",
+        },
+      ],
+      summary: {
+        totalCount: 2,
+        expenseCount: 1,
+        expenseTotal: 50,
+        incomeCount: 1,
+        incomeTotal: 200,
+        currencyCode: "EUR",
+      },
+    });
+
+    render(<UncategorizedTransactionsReport />);
+
+    await waitFor(() => expect(screen.getByText("Euro Store")).toBeInTheDocument());
+    expect(screen.getAllByText("EUR -50.00")).toHaveLength(1);
+    expect(screen.getAllByText("EUR 200.00")).toHaveLength(2);
+    expect(screen.getByText("EUR 50.00")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("export-csv"));
+    expect(mockExportToCsv.mock.calls[0][2].map((row: unknown[]) => row[4])).toEqual([
+      "EUR 200.00",
+      "EUR -50.00",
+    ]);
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-pdf"));
+    });
+    await waitFor(() => expect(mockExportToPdf).toHaveBeenCalledTimes(1));
+    expect(mockExportToPdf.mock.calls[0][0].tableData.rows.map((row: unknown[]) => row[4])).toEqual([
+      "EUR 200.00",
+      "EUR -50.00",
+    ]);
   });
 
   it("filters transactions by expense type", async () => {
@@ -548,6 +606,7 @@ describe("UncategorizedTransactionsReport", () => {
           accountName: "Chequing",
           accountId: "acc-1",
           amount: -50,
+          currencyCode: "EUR",
         },
       ],
       summary: {
@@ -571,6 +630,7 @@ describe("UncategorizedTransactionsReport", () => {
     expect(mockExportToCsv.mock.calls[0][2][0][0]).toBe(
       "preferred-date:2025-02-15",
     );
+    expect(mockExportToCsv.mock.calls[0][2][0][4]).toBe("EUR -50.00");
   });
 
   it("exports PDF with the current transaction data", async () => {
@@ -584,6 +644,7 @@ describe("UncategorizedTransactionsReport", () => {
           accountName: null,
           accountId: "acc-1",
           amount: -50,
+          currencyCode: "EUR",
         },
       ],
       summary: {
@@ -616,6 +677,9 @@ describe("UncategorizedTransactionsReport", () => {
     );
     expect(mockExportToPdf.mock.calls[0][0].tableData.rows[0][0]).toBe(
       "preferred-date:2025-02-15",
+    );
+    expect(mockExportToPdf.mock.calls[0][0].tableData.rows[0][4]).toBe(
+      "EUR -50.00",
     );
   });
 });

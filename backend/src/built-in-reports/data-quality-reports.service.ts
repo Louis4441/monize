@@ -120,6 +120,7 @@ export class DataQualityReportsService {
         defaultCurrency,
         rateMap,
       ),
+      currencyCode: defaultCurrency,
       payeeName: row.payee_name,
       description: row.description,
       accountName: row.account_name,
@@ -216,6 +217,7 @@ export class DataQualityReportsService {
         expenseTotal: roundMoney(expenseTotal),
         incomeCount,
         incomeTotal: roundMoney(incomeTotal),
+        currencyCode: defaultCurrency,
       },
     };
   }

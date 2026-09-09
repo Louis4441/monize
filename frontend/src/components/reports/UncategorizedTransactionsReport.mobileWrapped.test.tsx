@@ -25,7 +25,8 @@ vi.mock('@/hooks/useNumberFormat', async () => {
   return {
   useNumberFormat: () => ({
     ...numberFormatMockDefaults(),
-    formatCurrency: (n: number) => `$${n.toFixed(2)}`,
+    formatCurrency: (n: number, currencyCode = 'CAD') =>
+      currencyCode === 'CAD' ? `$${n.toFixed(2)}` : `${currencyCode} ${n.toFixed(2)}`,
     formatCurrencyCompact: (n: number) => `$${n.toFixed(0)}`,
     defaultCurrency: "CAD",
   }),
@@ -89,6 +90,7 @@ const RESPONSE = {
       accountName: "Zeta Chequing",
       accountId: "acc-z",
       amount: -123456.78,
+      currencyCode: "CAD",
     },
     {
       id: "tx-late",
@@ -98,6 +100,7 @@ const RESPONSE = {
       accountName: "Alpha Savings",
       accountId: "acc-a",
       amount: 200,
+      currencyCode: "CAD",
     },
     {
       id: "tx-unknown",
@@ -107,6 +110,7 @@ const RESPONSE = {
       accountName: null,
       accountId: "acc-u",
       amount: -75,
+      currencyCode: "CAD",
     },
   ],
   summary: {
@@ -115,6 +119,7 @@ const RESPONSE = {
     expenseTotal: 123531.78,
     incomeCount: 1,
     incomeTotal: 200,
+    currencyCode: "CAD",
   },
 };
 
