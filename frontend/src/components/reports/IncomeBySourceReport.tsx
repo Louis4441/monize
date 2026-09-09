@@ -25,7 +25,7 @@ import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import { ChartTooltipPanel } from '@/components/reports/ChartTooltip';
 import { ReportError } from '@/components/reports/ReportError';
 import { CHART_COLOURS_INCOME } from '@/lib/chart-colours';
@@ -70,17 +70,6 @@ type SortColumnsByField = {
 // stays identical to today).
 const HEADER_CLASS =
   'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase';
-
-// The same sort controls in the phone strip: a wrapped row of compact chips.
-// Column alignment means nothing there -- the column header row is hidden and
-// each data row is a grid -- so every control is left-aligned and self-naming.
-// The border and card background are what say "tappable": there is no hover on a
-// touch screen, and without them the strip reads as one more row of captions.
-const PHONE_HEADER_CLASS =
-  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
-
-// Every caption in a wrapped cell is phone-only.
-const CAPTION_CLASS = 'sm:hidden';
 
 // Where each column sits on the phone grid for a SOURCE row and for the totals
 // footer, written once: both shapes are 1x1 over the same three columns, so the

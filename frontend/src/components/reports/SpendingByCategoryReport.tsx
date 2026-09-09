@@ -28,7 +28,7 @@ import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import { ChartTooltipPanel } from '@/components/reports/ChartTooltip';
 import { ReportError } from '@/components/reports/ReportError';
 import { exportToCsv } from '@/lib/csv-export';
@@ -74,18 +74,6 @@ type SortColumnsByField = {
 // (no `tracking-wider`); the `sm`-and-up header is byte-for-byte today's.
 const HEADER_CLASS =
   'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase';
-
-// The same sort controls in the phone strip: a wrapped row of compact chips.
-// Column alignment means nothing there -- the column header row is hidden and
-// each data row is a grid -- so every control is left-aligned and self-naming.
-// The border and card background are what say "tappable": there is no hover on
-// a touch screen, and without them the strip reads as another row of the
-// captions the cells below carry.
-const PHONE_HEADER_CLASS =
-  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
-
-// A wrapped cell's caption is replaced by the real column header from `sm` up.
-const CAPTION_CLASS = 'sm:hidden';
 
 // A figure cell inside a wrapped card: no padding of its own below `sm` (the
 // row supplies it and the grid does the spacing), the table cell's own padding
