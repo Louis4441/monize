@@ -1229,6 +1229,14 @@
     "inLast6Months": "(son 6 ayda)",
     "noRecurring": "Son 6 ayda {count}+ tekrarla tekrarlayan gider bulunamadı.",
     "failedToLoad": "Tekrarlayan gider verileri yüklenemedi.",
+    "categoryUncategorized": "Kategorisiz",
+    "frequency": {
+      "WEEKLY": "Haftalık",
+      "BIWEEKLY": "Her 2 Haftada Bir",
+      "MONTHLY": "Aylık",
+      "OCCASIONAL": "Ara sıra",
+      "IRREGULAR": "Düzensiz"
+    },
     "top10ChartTitle": "En Çok Tekrarlayan 10 Gider",
     "allRecurringTitle": "Tüm Tekrarlayan Giderler",
     "tooltipTransactions": "{count} işlem - {frequency}",

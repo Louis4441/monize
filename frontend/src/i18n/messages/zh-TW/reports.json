@@ -1229,6 +1229,14 @@
     "inLast6Months": "（過去 6 個月內）",
     "noRecurring": "過去 6 個月內未找到出現 {count} 次以上的固定支出。",
     "failedToLoad": "載入固定支出資料失敗。",
+    "categoryUncategorized": "未分類",
+    "frequency": {
+      "WEEKLY": "每週",
+      "BIWEEKLY": "每兩週",
+      "MONTHLY": "每月",
+      "OCCASIONAL": "偶爾",
+      "IRREGULAR": "不定期"
+    },
     "top10ChartTitle": "前 10 大固定支出",
     "allRecurringTitle": "所有固定支出",
     "tooltipTransactions": "{count} 筆交易 - {frequency}",

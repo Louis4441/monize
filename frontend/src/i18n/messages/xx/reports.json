@@ -1229,6 +1229,14 @@
     "inLast6Months": "[XX-(in last 6 months)-XX]",
     "noRecurring": "[XX-No recurring expenses found with {count}+ occurrences in the last 6 months.-XX]",
     "failedToLoad": "[XX-Failed to load recurring expenses data.-XX]",
+    "categoryUncategorized": "[XX-Uncategorized-XX]",
+    "frequency": {
+      "WEEKLY": "[XX-Weekly-XX]",
+      "BIWEEKLY": "[XX-Every 2 Weeks-XX]",
+      "MONTHLY": "[XX-Monthly-XX]",
+      "OCCASIONAL": "[XX-Occasional-XX]",
+      "IRREGULAR": "[XX-Irregular-XX]"
+    },
     "top10ChartTitle": "[XX-Top 10 Recurring Expenses-XX]",
     "allRecurringTitle": "[XX-All Recurring Expenses-XX]",
     "tooltipTransactions": "[XX-{count} transactions - {frequency}-XX]",

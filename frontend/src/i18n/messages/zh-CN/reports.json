@@ -1229,6 +1229,14 @@
     "inLast6Months": "（过去 6 个月内）",
     "noRecurring": "过去 6 个月内未找到 {count}+ 次发生的定期支出。",
     "failedToLoad": "加载定期支出数据失败。",
+    "categoryUncategorized": "未分类",
+    "frequency": {
+      "WEEKLY": "每周",
+      "BIWEEKLY": "每两周",
+      "MONTHLY": "每月",
+      "OCCASIONAL": "偶尔",
+      "IRREGULAR": "不定期"
+    },
     "top10ChartTitle": "前 10 大定期支出",
     "allRecurringTitle": "所有定期支出",
     "tooltipTransactions": "{count} 笔交易 - {frequency}",

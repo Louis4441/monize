@@ -1229,6 +1229,14 @@
     "inLast6Months": "(in de afgelopen 6 maanden)",
     "noRecurring": "Geen terugkerende uitgaven gevonden met {count}+ keer in de afgelopen 6 maanden.",
     "failedToLoad": "Gegevens terugkerende uitgaven konden niet worden geladen.",
+    "categoryUncategorized": "Niet gecategoriseerd",
+    "frequency": {
+      "WEEKLY": "Wekelijks",
+      "BIWEEKLY": "Elke 2 weken",
+      "MONTHLY": "Maandelijks",
+      "OCCASIONAL": "Incidenteel",
+      "IRREGULAR": "Onregelmatig"
+    },
     "top10ChartTitle": "Top 10 terugkerende uitgaven",
     "allRecurringTitle": "Alle terugkerende uitgaven",
     "tooltipTransactions": "{count} transacties - {frequency}",

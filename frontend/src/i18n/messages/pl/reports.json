@@ -1229,6 +1229,14 @@
     "inLast6Months": "(w ostatnich 6 miesiącach)",
     "noRecurring": "Nie znaleziono wydatków cyklicznych z co najmniej {count} wystąpieniami w ostatnich 6 miesiącach.",
     "failedToLoad": "Nie udało się załadować danych o wydatkach cyklicznych.",
+    "categoryUncategorized": "Bez kategorii",
+    "frequency": {
+      "WEEKLY": "Co tydzień",
+      "BIWEEKLY": "Co 2 tygodnie",
+      "MONTHLY": "Co miesiąc",
+      "OCCASIONAL": "Okazjonalnie",
+      "IRREGULAR": "Nieregularnie"
+    },
     "top10ChartTitle": "10 największych wydatków cyklicznych",
     "allRecurringTitle": "Wszystkie wydatki cykliczne",
     "tooltipTransactions": "{count} transakcji - {frequency}",

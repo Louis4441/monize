@@ -71,11 +71,11 @@ vi.mock('@/lib/logger', () => ({
  * re-sort and leave the rows in the order they were already in.
  *
  * Their figures are the SERVER's, not invented: `averageAmount` is
- * `totalAmount / occurrences` and the frequency label is derived from the
- * occurrence count (>= 24 Weekly, >= 12 Bi-weekly, >= 5 Monthly, >= 3
- * Occasional, else Irregular) in
- * `backend/src/built-in-reports/tax-recurring-reports.service.ts`, which also
- * substitutes the literal `Uncategorized` for a row with no category.
+ * `totalAmount / occurrences` and the frequency code is derived from the
+ * occurrence count (>= 24 WEEKLY, >= 12 BIWEEKLY, >= 5 MONTHLY, >= 3
+ * OCCASIONAL, else IRREGULAR) in
+ * `backend/src/built-in-reports/tax-recurring-reports.service.ts`. The server
+ * keeps a missing category as null; the report localizes both structures.
  *
  * The second carries the absence the row has to render without navigating: no
  * payee id, which the recurring query produces for a transaction whose payee is
@@ -87,7 +87,7 @@ const RESPONSE = {
       payeeId: 'p-water',
       payeeName: 'Water Utility',
       categoryName: 'Utilities',
-      frequency: 'Monthly',
+      frequency: 'MONTHLY',
       occurrences: 6,
       averageAmount: 50,
       totalAmount: 300,
@@ -96,8 +96,8 @@ const RESPONSE = {
     {
       payeeId: null,
       payeeName: 'Zebra Market',
-      categoryName: 'Uncategorized',
-      frequency: 'Weekly',
+      categoryName: null,
+      frequency: 'WEEKLY',
       occurrences: 26,
       averageAmount: 25,
       totalAmount: 650,

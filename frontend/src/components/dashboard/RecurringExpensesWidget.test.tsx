@@ -40,7 +40,7 @@ describe('RecurringExpensesWidget', () => {
   it('fetches with the configured minimum occurrences and renders the estimate', async () => {
     getRecurringExpenses.mockResolvedValue({
       data: [
-        { payeeName: 'Netflix', payeeId: 'p1', occurrences: 6, totalAmount: 90, averageAmount: 15, lastTransactionDate: '2026-06-01', frequency: 'monthly', categoryName: 'Streaming' },
+        { payeeName: 'Netflix', payeeId: 'p1', occurrences: 6, totalAmount: 90, averageAmount: 15, lastTransactionDate: '2026-06-01', frequency: 'MONTHLY', categoryName: 'Streaming' },
       ],
       summary: { totalRecurring: 90, monthlyEstimate: 15, uniquePayees: 1 },
     });

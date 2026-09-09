@@ -1229,6 +1229,14 @@
     "inLast6Months": "(dalam 6 bulan terakhir)",
     "noRecurring": "Tidak ada pengeluaran berulang ditemukan dengan {count}+ kejadian dalam 6 bulan terakhir.",
     "failedToLoad": "Gagal memuat data pengeluaran berulang.",
+    "categoryUncategorized": "Belum Dikategorikan",
+    "frequency": {
+      "WEEKLY": "Mingguan",
+      "BIWEEKLY": "Setiap 2 Minggu",
+      "MONTHLY": "Bulanan",
+      "OCCASIONAL": "Sesekali",
+      "IRREGULAR": "Tidak teratur"
+    },
     "top10ChartTitle": "10 Pengeluaran Berulang Teratas",
     "allRecurringTitle": "Semua Pengeluaran Berulang",
     "tooltipTransactions": "{count} transaksi - {frequency}",

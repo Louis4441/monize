@@ -1229,6 +1229,14 @@
     "inLast6Months": "(지난 6개월)",
     "noRecurring": "지난 6개월 동안 {count}회 이상의 반복 지출을 찾을 수 없습니다.",
     "failedToLoad": "반복 지출 데이터를 불러오지 못했습니다.",
+    "categoryUncategorized": "미분류",
+    "frequency": {
+      "WEEKLY": "매주",
+      "BIWEEKLY": "2주마다",
+      "MONTHLY": "매월",
+      "OCCASIONAL": "가끔",
+      "IRREGULAR": "불규칙"
+    },
     "top10ChartTitle": "상위 10개 반복 지출",
     "allRecurringTitle": "모든 반복 지출",
     "tooltipTransactions": "{count}건의 거래 - {frequency}",

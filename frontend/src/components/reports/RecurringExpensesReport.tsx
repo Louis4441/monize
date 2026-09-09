@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useCallback, useState, useMemo, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { useRouter } from 'next/navigation';
@@ -13,7 +13,10 @@ import {
 } from 'recharts';
 import { format } from 'date-fns';
 import { builtInReportsApi } from '@/lib/built-in-reports';
-import { RecurringExpenseItem } from '@/types/built-in-reports';
+import {
+  RecurringExpenseItem,
+  RecurringExpenseFrequency,
+} from '@/types/built-in-reports';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { chartSeriesColor } from '@/lib/chart-colors';
 import { resolvePdfColor } from '@/components/reports/resolve-pdf-color';
@@ -162,6 +165,14 @@ const DATE_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-
 /** Every caption in a wrapped cell is phone-only. */
 const CAPTION_CLASS = 'sm:hidden';
 
+const FREQUENCY_BADGE_CLASS: Record<RecurringExpenseFrequency, string> = {
+  WEEKLY: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  BIWEEKLY: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  MONTHLY: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  OCCASIONAL: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400',
+  IRREGULAR: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400',
+};
+
 export function RecurringExpensesReport() {
   const t = useTranslations('reports');
   const router = useRouter();
@@ -178,6 +189,16 @@ export function RecurringExpensesReport() {
     [minOccurrences],
   );
 
+  const frequencyLabel = useCallback(
+    (frequency: RecurringExpenseFrequency) => t(`recurringExpenses.frequency.${frequency}`),
+    [t],
+  );
+  const categoryLabel = useCallback(
+    (categoryName: string | null) =>
+      categoryName ?? t('recurringExpenses.categoryUncategorized'),
+    [t],
+  );
+
   const sortedExpenses = useMemo(() => {
     if (!recurringData) return [];
     const sorted = [...recurringData.data].sort((a, b) => {
@@ -187,10 +208,10 @@ export function RecurringExpensesReport() {
           comparison = compareValues(a.payeeName, b.payeeName);
           break;
         case 'category':
-          comparison = compareValues(a.categoryName, b.categoryName);
+          comparison = compareValues(categoryLabel(a.categoryName), categoryLabel(b.categoryName));
           break;
         case 'frequency':
-          comparison = compareValues(a.frequency, b.frequency);
+          comparison = compareValues(frequencyLabel(a.frequency), frequencyLabel(b.frequency));
           break;
         case 'count':
           comparison = compareValues(a.occurrences, b.occurrences);
@@ -208,7 +229,7 @@ export function RecurringExpensesReport() {
       return sortDirection === 'asc' ? comparison : -comparison;
     });
     return sorted;
-  }, [recurringData, sortField, sortDirection]);
+  }, [categoryLabel, frequencyLabel, recurringData, sortField, sortDirection]);
 
   const chartData = useMemo(() => {
     if (!recurringData) return [];
@@ -231,14 +252,14 @@ export function RecurringExpensesReport() {
       field: 'category',
       label: t('recurringExpenses.colCategory'),
       csvLabel: t('recurringExpenses.csvColCategory'),
-      csvValue: (e) => e.categoryName,
+      csvValue: (e) => categoryLabel(e.categoryName),
     },
     frequency: {
       field: 'frequency',
       label: t('recurringExpenses.colFrequency'),
       align: 'center',
       csvLabel: t('recurringExpenses.csvColFrequency'),
-      csvValue: (e) => e.frequency,
+      csvValue: (e) => frequencyLabel(e.frequency),
     },
     count: {
       field: 'count',
@@ -335,7 +356,10 @@ export function RecurringExpensesReport() {
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
           <p className="font-medium text-gray-900 dark:text-gray-100">{data.payeeName}</p>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            {t('recurringExpenses.tooltipTransactions', { count: data.occurrences, frequency: data.frequency })}
+            {t('recurringExpenses.tooltipTransactions', {
+              count: data.occurrences,
+              frequency: frequencyLabel(data.frequency),
+            })}
           </p>
           <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">
             {t('recurringExpenses.tooltipTotal', { amount: formatCurrency(data.totalAmount) })}
@@ -522,8 +546,9 @@ export function RecurringExpensesReport() {
                 opportunity. So a future translation that outgrows the track
                 spends the 12px column gap there rather than reopening the
                 wrapper's sideways scroll on the right. It also lands where it
-                belongs: the server derives the frequency label FROM the
-                occurrence count, so the two sit one above the other.
+                belongs: the server derives the frequency code FROM the
+                occurrence count, and this component localizes it, so the two
+                sit one above the other.
 
                 The frequency pill is its OWN column, not a badge inside the
                 identity cell, so it cannot join the payee's line; it takes the
@@ -604,7 +629,7 @@ export function RecurringExpensesReport() {
                         role="cell"
                         className="col-start-1 row-start-2 min-w-0 break-words p-0 text-sm text-gray-500 dark:text-gray-400 sm:table-cell sm:break-normal sm:px-4 sm:py-3"
                       >
-                        {expense.categoryName}
+                        {categoryLabel(expense.categoryName)}
                       </td>
                       {/* The pill is centred from `sm` up, as it is today; on a
                           phone it starts at its track's left edge. */}
@@ -612,16 +637,8 @@ export function RecurringExpensesReport() {
                         role="cell"
                         className="col-start-1 row-start-3 min-w-0 p-0 text-sm sm:table-cell sm:px-4 sm:py-3 sm:text-center"
                       >
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium max-sm:inline-block max-sm:max-w-full ${
-                          expense.frequency === 'Weekly'
-                            ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
-                            : expense.frequency === 'Bi-weekly'
-                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                            : expense.frequency === 'Monthly'
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                            : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
-                        }`}>
-                          {expense.frequency}
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium max-sm:inline-block max-sm:max-w-full ${FREQUENCY_BADGE_CLASS[expense.frequency]}`}>
+                          {frequencyLabel(expense.frequency)}
                         </span>
                       </td>
                       {/* The count is centred from `sm` up, as it is today; on a

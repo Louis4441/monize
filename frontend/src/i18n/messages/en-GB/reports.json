@@ -26,6 +26,9 @@
   "filterBuilder": {
     "categoryUncategorized": "Uncategorised"
   },
+  "recurringExpenses": {
+    "categoryUncategorized": "Uncategorised"
+  },
   "uncategorizedTransactions": {
     "totalUncategorized": "Total Uncategorised",
     "uncategorizedExpenses": "Uncategorised Expenses",

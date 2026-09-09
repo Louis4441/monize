@@ -11,6 +11,7 @@ import {
   BillPaymentItem,
   MonthlyBillTotal,
 } from "./dto";
+import type { RecurringExpenseFrequency } from "./dto/recurring-expenses.dto";
 import { formatDateYMD } from "../common/date-utils";
 import { roundMoney, sumMoney, toMoneyNumber } from "../common/round.util";
 import {
@@ -305,11 +306,11 @@ export class TaxRecurringReportsService {
         const totalAmount = row.totalAmount;
         const occurrences = row.occurrences;
 
-        let frequency = "Irregular";
-        if (occurrences >= 24) frequency = "Weekly";
-        else if (occurrences >= 12) frequency = "Bi-weekly";
-        else if (occurrences >= 5) frequency = "Monthly";
-        else if (occurrences >= 3) frequency = "Occasional";
+        let frequency: RecurringExpenseFrequency = "IRREGULAR";
+        if (occurrences >= 24) frequency = "WEEKLY";
+        else if (occurrences >= 12) frequency = "BIWEEKLY";
+        else if (occurrences >= 5) frequency = "MONTHLY";
+        else if (occurrences >= 3) frequency = "OCCASIONAL";
 
         return {
           payeeName: row.payeeName,
@@ -319,7 +320,7 @@ export class TaxRecurringReportsService {
           averageAmount: roundMoney(totalAmount / occurrences),
           lastTransactionDate: formatDateYMD(row.lastTransactionDate),
           frequency,
-          categoryName: row.categoryName || "Uncategorized",
+          categoryName: row.categoryName,
         };
       },
     );

@@ -198,6 +198,16 @@ export interface TaxSummaryResponse {
 }
 
 // Recurring expenses types
+export const RECURRING_EXPENSE_FREQUENCIES = [
+  'WEEKLY',
+  'BIWEEKLY',
+  'MONTHLY',
+  'OCCASIONAL',
+  'IRREGULAR',
+] as const;
+
+export type RecurringExpenseFrequency = (typeof RECURRING_EXPENSE_FREQUENCIES)[number];
+
 export interface RecurringExpenseItem {
   payeeName: string;
   payeeId: string | null;
@@ -205,8 +215,8 @@ export interface RecurringExpenseItem {
   totalAmount: number;
   averageAmount: number;
   lastTransactionDate: string;
-  frequency: string;
-  categoryName: string;
+  frequency: RecurringExpenseFrequency;
+  categoryName: string | null;
 }
 
 export interface RecurringExpensesResponse {

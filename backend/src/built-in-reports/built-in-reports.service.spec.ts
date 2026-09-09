@@ -1383,7 +1383,7 @@ describe("BuiltInReportsService", () => {
 
       expect(result.data).toHaveLength(1);
       expect(result.data[0].payeeName).toBe("Netflix");
-      expect(result.data[0].frequency).toBe("Monthly");
+      expect(result.data[0].frequency).toBe("MONTHLY");
       expect(result.data[0].totalAmount).toBe(90);
       expect(result.data[0].averageAmount).toBe(15);
       expect(result.data[0].occurrences).toBe(6);
@@ -1429,9 +1429,9 @@ describe("BuiltInReportsService", () => {
       const biweekly = result.data.find((d) => d.payeeName === "Biweekly");
       const occasional = result.data.find((d) => d.payeeName === "Occasional");
 
-      expect(weekly?.frequency).toBe("Weekly");
-      expect(biweekly?.frequency).toBe("Bi-weekly");
-      expect(occasional?.frequency).toBe("Occasional");
+      expect(weekly?.frequency).toBe("WEEKLY");
+      expect(biweekly?.frequency).toBe("BIWEEKLY");
+      expect(occasional?.frequency).toBe("OCCASIONAL");
     });
 
     it("merges multi-currency rows for the same payee", async () => {

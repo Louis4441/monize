@@ -479,7 +479,7 @@ describe("TaxRecurringReportsService", () => {
       expect(result.data[0].totalAmount).toBe(90);
       expect(result.data[0].averageAmount).toBe(15);
       expect(result.data[0].occurrences).toBe(6);
-      expect(result.data[0].frequency).toBe("Monthly");
+      expect(result.data[0].frequency).toBe("MONTHLY");
     });
 
     it("determines frequency based on occurrence count", async () => {
@@ -525,15 +525,26 @@ describe("TaxRecurringReportsService", () => {
           total_amount: "30.00",
           last_transaction_date: lastDate,
         },
+        {
+          payee_id: "p-5",
+          payee_name_normalized: "irregular",
+          payee_name: "Irregular",
+          category_name: null,
+          currency_code: "USD",
+          occurrences: 2,
+          total_amount: "20.00",
+          last_transaction_date: lastDate,
+        },
       ]);
 
-      const result = await service.getRecurringExpenses(mockUserId);
+      const result = await service.getRecurringExpenses(mockUserId, 2);
 
       const byName = new Map(result.data.map((d) => [d.payeeName, d]));
-      expect(byName.get("Weekly")!.frequency).toBe("Weekly");
-      expect(byName.get("Biweekly")!.frequency).toBe("Bi-weekly");
-      expect(byName.get("Monthly")!.frequency).toBe("Monthly");
-      expect(byName.get("Occasional")!.frequency).toBe("Occasional");
+      expect(byName.get("Weekly")!.frequency).toBe("WEEKLY");
+      expect(byName.get("Biweekly")!.frequency).toBe("BIWEEKLY");
+      expect(byName.get("Monthly")!.frequency).toBe("MONTHLY");
+      expect(byName.get("Occasional")!.frequency).toBe("OCCASIONAL");
+      expect(byName.get("Irregular")!.frequency).toBe("IRREGULAR");
     });
 
     it("merges payees with different currencies by normalized name", async () => {
@@ -683,7 +694,7 @@ describe("TaxRecurringReportsService", () => {
       expect(result.data[0].averageAmount).toBe(11.111);
     });
 
-    it("uses 'Uncategorized' when category_name is null", async () => {
+    it("keeps categoryName null when category_name is null", async () => {
       const lastDate = new Date();
       scopedManager.query.mockResolvedValue([
         {
@@ -700,7 +711,7 @@ describe("TaxRecurringReportsService", () => {
 
       const result = await service.getRecurringExpenses(mockUserId);
 
-      expect(result.data[0].categoryName).toBe("Uncategorized");
+      expect(result.data[0].categoryName).toBeNull();
     });
 
     it("calls currency service with correct user id", async () => {

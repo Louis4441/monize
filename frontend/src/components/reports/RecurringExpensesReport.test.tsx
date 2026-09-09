@@ -47,7 +47,7 @@ vi.mock("recharts", () => ({
           <C
             {...props}
             active={true}
-            payload={[{ payload: { payeeName: "Tooltip Payee", occurrences: 9, frequency: "Weekly", totalAmount: 12.34, averageAmount: 1.23, color: "#3b82f6" } }]}
+            payload={[{ payload: { payeeName: "Tooltip Payee", occurrences: 9, frequency: "WEEKLY", totalAmount: 12.34, averageAmount: 1.23, color: "#3b82f6" } }]}
           />
           <C {...props} active={false} payload={[]} />
         </div>
@@ -125,7 +125,7 @@ describe("RecurringExpensesReport", () => {
           payeeId: "p-1",
           payeeName: "Netflix",
           categoryName: "Entertainment",
-          frequency: "Monthly",
+          frequency: "MONTHLY",
           occurrences: 6,
           averageAmount: 15.99,
           totalAmount: 95.94,
@@ -167,7 +167,7 @@ describe("RecurringExpensesReport", () => {
           payeeId: "p-1",
           payeeName: "Netflix",
           categoryName: "Entertainment",
-          frequency: "Monthly",
+          frequency: "MONTHLY",
           occurrences: 6,
           averageAmount: 15.99,
           totalAmount: 95.94,
@@ -177,7 +177,7 @@ describe("RecurringExpensesReport", () => {
           payeeId: "p-2",
           payeeName: "Gym",
           categoryName: "Health",
-          frequency: "Monthly",
+          frequency: "MONTHLY",
           occurrences: 6,
           averageAmount: 50.0,
           totalAmount: 300.0,
@@ -206,7 +206,7 @@ describe("RecurringExpensesReport", () => {
           payeeId: "p-1",
           payeeName: "Weekly Sub",
           categoryName: "Subscriptions",
-          frequency: "Weekly",
+          frequency: "WEEKLY",
           occurrences: 24,
           averageAmount: 5.0,
           totalAmount: 120.0,
@@ -216,7 +216,7 @@ describe("RecurringExpensesReport", () => {
           payeeId: "p-2",
           payeeName: "Bi-weekly Pay",
           categoryName: "Services",
-          frequency: "Bi-weekly",
+          frequency: "BIWEEKLY",
           occurrences: 12,
           averageAmount: 30.0,
           totalAmount: 360.0,
@@ -225,8 +225,8 @@ describe("RecurringExpensesReport", () => {
         {
           payeeId: null,
           payeeName: "Quarterly Bill",
-          categoryName: "Utilities",
-          frequency: "Quarterly",
+          categoryName: null,
+          frequency: "OCCASIONAL",
           occurrences: 3,
           averageAmount: 100.0,
           totalAmount: 300.0,
@@ -239,8 +239,11 @@ describe("RecurringExpensesReport", () => {
     await waitFor(() => {
       expect(screen.getByText("Weekly")).toBeInTheDocument();
     });
-    expect(screen.getByText("Bi-weekly")).toBeInTheDocument();
-    expect(screen.getByText("Quarterly")).toBeInTheDocument();
+    expect(screen.getByText("Every 2 Weeks")).toBeInTheDocument();
+    expect(screen.getByText("Occasional")).toBeInTheDocument();
+    expect(screen.getByText("Uncategorized")).toBeInTheDocument();
+    expect(screen.getByText("Weekly")).toHaveClass("bg-purple-100");
+    expect(screen.getByText("Occasional")).toHaveClass("bg-gray-100");
   });
 
   it("renders minimum occurrences selector", async () => {
@@ -262,7 +265,7 @@ describe("RecurringExpensesReport", () => {
           payeeId: "p-1",
           payeeName: "Netflix",
           categoryName: "Entertainment",
-          frequency: "Monthly",
+          frequency: "MONTHLY",
           occurrences: 6,
           averageAmount: 15.99,
           totalAmount: 95.94,
@@ -290,7 +293,7 @@ describe("RecurringExpensesReport", () => {
           payeeId: null,
           payeeName: "Unknown Store",
           categoryName: "Shopping",
-          frequency: "Monthly",
+          frequency: "MONTHLY",
           occurrences: 4,
           averageAmount: 50,
           totalAmount: 200,
@@ -311,8 +314,8 @@ describe("RecurringExpensesReport", () => {
         {
           payeeId: "p-1",
           payeeName: "Netflix",
-          categoryName: "Entertainment",
-          frequency: "Monthly",
+          categoryName: null,
+          frequency: "MONTHLY",
           occurrences: 6,
           averageAmount: 15.99,
           totalAmount: 95.94,
@@ -329,6 +332,11 @@ describe("RecurringExpensesReport", () => {
       expect.any(Array),
       expect.any(Array),
     );
+    expect(mockExportToCsv.mock.calls[0][2][0].slice(0, 3)).toEqual([
+      "Netflix",
+      "Uncategorized",
+      "Monthly",
+    ]);
   });
 
   it("changes min occurrences when selector changes", async () => {
@@ -350,7 +358,7 @@ describe("RecurringExpensesReport", () => {
           payeeId: "p-1",
           payeeName: "Netflix",
           categoryName: "Entertainment",
-          frequency: "Monthly",
+          frequency: "MONTHLY",
           occurrences: 6,
           averageAmount: 15.99,
           totalAmount: 95.94,
@@ -380,7 +388,7 @@ describe("RecurringExpensesReport", () => {
           payeeId: "p-1",
           payeeName: "Netflix",
           categoryName: "Entertainment",
-          frequency: "Monthly",
+          frequency: "MONTHLY",
           occurrences: 6,
           averageAmount: 15.99,
           totalAmount: 95.94,
@@ -404,7 +412,7 @@ describe("RecurringExpensesReport", () => {
           payeeId: "p1",
           payeeName: "Netflix",
           categoryName: "Entertainment",
-          frequency: "Monthly",
+          frequency: "MONTHLY",
           occurrences: 6,
           averageAmount: 15,
           totalAmount: 90,
@@ -414,7 +422,7 @@ describe("RecurringExpensesReport", () => {
           payeeId: "p2",
           payeeName: "Spotify",
           categoryName: "Entertainment",
-          frequency: "Monthly",
+          frequency: "MONTHLY",
           occurrences: 6,
           averageAmount: 10,
           totalAmount: 60,
