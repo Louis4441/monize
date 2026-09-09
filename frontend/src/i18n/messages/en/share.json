@@ -42,8 +42,5 @@
   "unsupportedBrowserTitle": "This browser cannot receive shared files",
   "unsupportedBrowserMessage": "Sharing into an installed app is not available here. You can still add files from inside Monize.",
   "goToTransactions": "Add from Transactions",
-  "goToImport": "Go to Import",
-  "noticeTitle": "{count, plural, one {# file was} other {# files were}} shared with Monize",
-  "noticeAction": "Review",
-  "noticeDismiss": "Dismiss"
+  "goToImport": "Go to Import"
 }

@@ -9,7 +9,7 @@ import { DemoModeBanner } from './DemoModeBanner';
 import { HttpWarningBanner } from './HttpWarningBanner';
 import { SwipeIndicator } from './SwipeIndicator';
 import { PushEnableBanner } from './PushEnableBanner';
-import { ShareInboxNotice } from '@/components/share/ShareInboxNotice';
+import { ShareStashSweeper } from '@/components/share/ShareStashSweeper';
 import { UpdateAvailableBanner } from './UpdateAvailableBanner';
 import { AiChatBubble } from '@/components/ai/AiChatBubble';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
@@ -51,7 +51,9 @@ export function SwipeShell({ children, httpsHeadersActive = false }: SwipeShellP
       <DemoModeBanner />
       <UpdateAvailableBanner />
       <PushEnableBanner />
-      <ShareInboxNotice />
+      {/* Renders nothing: the stash lifetime sweep, all that is left of the
+          share inbox banner that used to sit here. */}
+      <ShareStashSweeper />
       <SwipeIndicator currentIndex={currentIndex} totalPages={totalPages} isSwipePage={isSwipePage} />
       <div ref={contentRef}>
         {children}

@@ -2328,8 +2328,8 @@ Enforcement         `public/sw.js` checks each file as it arrives and writes a
                     `MAX_ATTACHMENTS_PER_TRANSACTION`), and
                     `src/test/sw-share-target.test.ts` fails when the two
                     disagree. Expiry is swept by the worker on `activate` and
-                    before every new share, and by the app on mount
-                    (`ShareInboxNotice`); orphaned bytes whose index is gone are
+                    before every new share, and by the app on every navigation
+                    (`ShareStashSweeper`); orphaned bytes whose index is gone are
                     swept with them. The share cache is on the `activate`
                     keep-list, so a worker update is not what empties an inbox.
                     `authStore.logout` calls `clearShareInbox()` beside
@@ -2387,10 +2387,13 @@ Enforcement         The service worker cannot decide this: a share can arrive
                     `ownerUserId` on an unclaimed index, and filter out a bundle
                     owned by anybody else. Listing claims as well as reading,
                     because a share the sharer was merely NOTIFIED about is
-                    already theirs. The three call sites take the id from
+                    already theirs. The two call sites take the id from
                     `useAuthStore` and read nothing while it is undefined
-                    (`src/app/share/page.tsx`, `components/share/ShareInboxNotice.tsx`,
-                    `useSharedFilesHandoff` in `src/app/import/page.tsx`).
+                    (`src/app/share/page.tsx`, and `useSharedFilesHandoff` in
+                    `src/app/import/page.tsx` and `src/app/ai/page.tsx`).
+                    `ShareStashSweeper` is not one of them: a lifetime sweep
+                    decides on `createdAt` alone, observes no bundle and claims
+                    none, so it needs no reader.
                     `share-inbox.test.ts`'s `ownership` block covers the claim,
                     the claim on listing, another account's bundle reading as
                     absent, an unreadable stamp reading as unclaimed, and an

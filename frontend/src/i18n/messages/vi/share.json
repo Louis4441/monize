@@ -42,8 +42,5 @@
   "unsupportedBrowserTitle": "Trình duyệt này không thể nhận tệp được chia sẻ",
   "unsupportedBrowserMessage": "Chia sẻ vào một ứng dụng đã cài đặt không khả dụng ở đây. Bạn vẫn có thể thêm tệp từ trong Monize.",
   "goToTransactions": "Thêm từ Giao dịch",
-  "goToImport": "Đến phần Nhập",
-  "noticeTitle": "{count, plural, other {# tệp đã được chia sẻ với Monize}}",
-  "noticeAction": "Xem lại",
-  "noticeDismiss": "Đóng"
+  "goToImport": "Đến phần Nhập"
 }
