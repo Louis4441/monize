@@ -678,6 +678,28 @@ export class AuthController {
         "OIDC callback error",
         error instanceof Error ? error.stack : undefined,
       );
+      // DIAGNOSTIC: openid-client wraps the failing back-channel HTTP response
+      // in `error.cause` (a fetch Response). The generic message ("unexpected
+      // HTTP response status code") hides the real status/body from the IdP
+      // token endpoint -- surface them so 5xx/3xx/HTML answers are diagnosable.
+      const cause = (error as { cause?: unknown })?.cause;
+      if (cause instanceof Response) {
+        let body = "";
+        try {
+          body = (await cause.clone().text()).slice(0, 2000);
+        } catch {
+          body = "<body already consumed>";
+        }
+        this.logger.error(
+          `OIDC back-channel response: ${cause.status} ${cause.statusText} ` +
+            `url=${cause.url || "?"} ` +
+            `content-type=${cause.headers.get("content-type") ?? "-"} ` +
+            `location=${cause.headers.get("location") ?? "-"} ` +
+            `body=${body}`,
+        );
+      } else if (cause) {
+        this.logger.error(`OIDC error cause: ${String(cause)}`);
+      }
       // Return generic error message to prevent information disclosure
       res.redirect(`${frontendUrl}/auth/callback?error=authentication_failed`);
     }
