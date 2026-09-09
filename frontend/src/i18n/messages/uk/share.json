@@ -42,8 +42,5 @@
   "unsupportedBrowserTitle": "Цей браузер не може отримувати надіслані файли",
   "unsupportedBrowserMessage": "Надсилання до встановленого застосунку тут недоступне. Ви все одно можете додавати файли безпосередньо в Monize.",
   "goToTransactions": "Додати в розділі «Транзакції»",
-  "goToImport": "Перейти до імпорту",
-  "noticeTitle": "{count, plural, one {У Monize надіслано # файл} few {У Monize надіслано # файли} many {У Monize надіслано # файлів} other {У Monize надіслано # файла}}",
-  "noticeAction": "Перевірити",
-  "noticeDismiss": "Закрити"
+  "goToImport": "Перейти до імпорту"
 }

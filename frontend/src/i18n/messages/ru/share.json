@@ -42,8 +42,5 @@
   "unsupportedBrowserTitle": "Этот браузер не может получать отправленные файлы",
   "unsupportedBrowserMessage": "Отправка в установленное приложение здесь недоступна. Вы по-прежнему можете добавлять файлы прямо в Monize.",
   "goToTransactions": "Добавить в разделе «Транзакции»",
-  "goToImport": "Перейти к импорту",
-  "noticeTitle": "{count, plural, one {В Monize отправлен # файл} few {В Monize отправлено # файла} many {В Monize отправлено # файлов} other {В Monize отправлено # файла}}",
-  "noticeAction": "Проверить",
-  "noticeDismiss": "Закрыть"
+  "goToImport": "Перейти к импорту"
 }

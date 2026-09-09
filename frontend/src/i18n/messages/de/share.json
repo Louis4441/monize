@@ -42,8 +42,5 @@
   "unsupportedBrowserTitle": "Dieser Browser kann keine geteilten Dateien empfangen",
   "unsupportedBrowserMessage": "Das Teilen in eine installierte App ist hier nicht verfügbar. Sie können Dateien weiterhin direkt in Monize hinzufügen.",
   "goToTransactions": "Über Transaktionen hinzufügen",
-  "goToImport": "Zum Import",
-  "noticeTitle": "{count, plural, one {# Datei wurde mit Monize geteilt} other {# Dateien wurden mit Monize geteilt}}",
-  "noticeAction": "Prüfen",
-  "noticeDismiss": "Schließen"
+  "goToImport": "Zum Import"
 }

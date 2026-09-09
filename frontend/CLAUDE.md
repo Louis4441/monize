@@ -642,9 +642,9 @@ each live in exactly one file:
   `SHARE_CACHE_NAME` or builds a stash key; a second reader is how the key shape
   and the worker's writer drift apart. Every function treats an unusable Cache
   API as an *empty inbox* and resolves rather than rejecting, which is what lets
-  `ShareInboxNotice` call it on mount without a guard -- and why a `catch` around
-  it would put a `setState` on the synchronous path the
-  `react-hooks/set-state-in-effect` rule forbids.
+  `ShareStashSweeper` call it from an effect without a guard -- and why a
+  `catch` around it in a reader would put a `setState` on the synchronous path
+  the `react-hooks/set-state-in-effect` rule forbids.
 
 **A bundle belongs to the first authenticated reader that observes it, and the
 reader's id is a required argument.** The worker cannot decide whose share it is
@@ -659,9 +659,20 @@ simply expired never ran `logout`, which is the same reasoning as the
 push-registration marker's owner. The id is **required**, not optional, because
 an omitted argument is silently indistinguishable from "everyone's": a caller
 that has not resolved the reader yet reads nothing and shows its loading state
-(`src/app/share/page.tsx`, `ShareInboxNotice`, `useSharedFilesHandoff`), rather
-than claiming a share on behalf of whoever the app is still fetching.
-INV-SHARE-005.
+(`src/app/share/page.tsx`, `useSharedFilesHandoff`), rather than claiming a
+share on behalf of whoever the app is still fetching. INV-SHARE-005.
+
+**A sweep is not an observation, so it takes no reader.** `ShareStashSweeper`
+(`components/share/ShareStashSweeper.tsx`) is a null-rendering component in the
+shell that runs `purgeExpiredSharedBundles` on every navigation but `/share`,
+where an expired bundle stays readable so the review screen can say "expired"
+rather than "nothing here". It is what is left of `ShareInboxNotice`, a banner
+offering a Review link that dead-ended on exactly the share the user had just
+routed to the assistant; the UI was redundant, the sweep is one of the three
+mechanisms behind INV-SHARE-003, so it outlived the banner rather than being
+deleted with it. Do not give it an auth gate copied from the banner: the banner
+waited for a reader because listing also CLAIMS, and a sweep decides on
+`createdAt` alone.
 
 **A destination is offered only when it can actually accept the share, and it
 asks the destination's own validators.** The assistant sits beside the
@@ -816,6 +827,8 @@ that no longer exists, and only CI found it. Deleting or renaming any control an
 E2E spec drives means grepping `e2e/` for its accessible name in the same commit.
 
 **An E2E alert locator is scoped to a region, never page-wide.** Next mounts its route announcer (`__next-route-announcer__`, `role="alert"`, in a shadow root under `<body>`) on every hydrated page, and Playwright's role engine matches it, so `page.getByRole('alert')` resolves to two elements the moment an error panel renders -- a strict-mode failure. The payee and category detail specs passed for months only because the poll that saw the announcer alone, before the panel, satisfied `toBeVisible`. Scope it: `page.getByRole('main').getByRole('alert')`, or a dialog. `src/test/e2e-conventions.test.ts` scans `e2e/tests` for the bare form.
+
+**Reading Chromium's notification list destroys a notification still being displayed, so a push test never polls for one.** `registration.getNotifications()` is answered by reconciling the browser's stored notification records against what the platform reports as displayed, and a record whose display has not landed yet is *erased*, not reported "not yet" -- while `showNotification` resolves before that display lands. So a read taken straight after a push deletes the notification the test is waiting for, and the poll beside it then burns its whole timeout on something that can no longer arrive: one of the nine push tests failing per CI run, a different one each time, on branches whose diffs cannot touch push. Deliver and observe only through `e2e/push/fixture.ts`, whose `push()` waits for the worker's own `showNotification` promise, looks exactly once, and repairs an early look by delivering again (safe because `collapseTag` makes a repeat replace rather than stack). Never call `deliverPushMessage` or `getNotifications()` from a spec; `src/test/e2e-conventions.test.ts` scans `e2e/push` for both.
 
 ### A password field declares what may be autofilled into it
 
