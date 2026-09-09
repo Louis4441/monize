@@ -9,6 +9,7 @@ import { describe, it, expect } from "vitest";
  * into a rule the machine checks. The rule is in `frontend/CLAUDE.md`.
  */
 const E2E_TESTS_DIR = resolve(__dirname, "../../../e2e/tests");
+const E2E_PUSH_DIR = resolve(__dirname, "../../../e2e/push");
 
 function e2eSpecs(): [string, string][] {
   return readdirSync(E2E_TESTS_DIR)
@@ -16,6 +17,16 @@ function e2eSpecs(): [string, string][] {
     .map((name) => [
       `e2e/tests/${name}`,
       readFileSync(resolve(E2E_TESTS_DIR, name), "utf8"),
+    ]);
+}
+
+/** Everything under `e2e/push` except the harness itself. */
+function e2ePushFilesOutsideTheFixture(): [string, string][] {
+  return readdirSync(E2E_PUSH_DIR)
+    .filter((name) => name.endsWith(".ts") && name !== "fixture.ts")
+    .map((name) => [
+      `e2e/push/${name}`,
+      readFileSync(resolve(E2E_PUSH_DIR, name), "utf8"),
     ]);
 }
 
@@ -51,5 +62,44 @@ describe("an alert locator is scoped to a region", () => {
   it("would fail the shape it bans", () => {
     expect(PAGE_WIDE_ALERT.test("await expect(page.getByRole('alert')).toBeVisible();")).toBe(true);
     expect(PAGE_WIDE_ALERT.test("page.getByRole('main').getByRole('alert')")).toBe(false);
+  });
+});
+
+describe("a push spec goes through the harness for both halves of a push", () => {
+  // Reading Chromium's notification list is DESTRUCTIVE while a display is in
+  // flight: a record whose display has not landed yet is erased rather than
+  // reported "not yet", and no later read brings it back. So a push is only
+  // observable through `fixture.ts`, which looks once per delivery and repairs
+  // a look that came too early by delivering again. A spec that delivers or
+  // reads on its own re-opens the flake this suite spent three CI runs on.
+  const RAW_DELIVERY = /deliverPushMessage/;
+  const RAW_NOTIFICATION_READ = /getNotifications\s*\(/;
+
+  it("delivers only through the fixture", () => {
+    const offenders = e2ePushFilesOutsideTheFixture()
+      .map(([path, content]) => [path, withoutComments(content)] as const)
+      .filter(([, content]) => RAW_DELIVERY.test(content))
+      .map(([path]) => path);
+    expect(offenders).toEqual([]);
+  });
+
+  it("reads notifications only through the fixture", () => {
+    const offenders = e2ePushFilesOutsideTheFixture()
+      .map(([path, content]) => [path, withoutComments(content)] as const)
+      .filter(([, content]) => RAW_NOTIFICATION_READ.test(content))
+      .map(([path]) => path);
+    expect(offenders).toEqual([]);
+  });
+
+  it("reads the real push directory", () => {
+    // A guard over an empty list is green for the wrong reason.
+    const files = e2ePushFilesOutsideTheFixture();
+    expect(files.map(([path]) => path)).toContain("e2e/push/notifications.spec.ts");
+  });
+
+  it("would fail the shapes it bans", () => {
+    expect(RAW_DELIVERY.test("cdp.send('ServiceWorker.deliverPushMessage', {})")).toBe(true);
+    expect(RAW_NOTIFICATION_READ.test("await registration.getNotifications()")).toBe(true);
+    expect(RAW_NOTIFICATION_READ.test("await shown(h.worker)")).toBe(false);
   });
 });

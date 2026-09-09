@@ -15,33 +15,45 @@ type PushHarness = {
   click: (action?: string) => Promise<void>;
 };
 
-/** How long one push may take to reach the worker before the test gives up. */
+/** How long one push may take to become visible before the test gives up. */
 const PUSH_DELIVERY_TIMEOUT_MS = 10_000;
 
-/** How long to wait for a delivery to land before sending it again. */
-const PUSH_REDELIVERY_INTERVAL_MS = 400;
+/** How long one delivery may take to reach the worker before it is sent again. */
+const PUSH_HANDLER_WAIT_MS = 1_000;
+
+type ShowState = { calls: number; title: string | null; tag: string | null };
 
 /**
- * How many `push` events this worker instance has seen.
+ * What `sw.js` has finished showing in this worker instance.
  *
- * Self-installing, because the counter lives in the worker's global scope and a
+ * Self-installing, because the record lives in the worker's global scope and a
  * worker Chromium stops for idleness loses it along with everything else; the
- * caller detects that as the count going backwards.
+ * caller detects that as `calls` going backwards.
+ *
+ * The wrapper counts a call when the worker's own `showNotification` promise
+ * RESOLVES, so `calls` moving means the product handled the push and finished
+ * its side of the work -- one fact, rather than the two ("a push arrived" and
+ * "something was shown") a bare `push` listener would leave the caller to
+ * correlate.
  */
-async function pushEventsSeen(worker: Worker): Promise<number> {
+async function showState(worker: Worker): Promise<ShowState> {
   return worker.evaluate(() => {
     const scope = self as unknown as ServiceWorkerGlobalScope & {
-      __monizePushSeen?: number;
+      __monizeShown?: ShowState;
     };
-    if (scope.__monizePushSeen === undefined) {
-      scope.__monizePushSeen = 0;
-      // Purely an observer: it neither cancels the event nor extends its
-      // lifetime, so the real handler below it is unaffected.
-      scope.addEventListener('push', () => {
-        scope.__monizePushSeen = (scope.__monizePushSeen ?? 0) + 1;
-      });
+    if (scope.__monizeShown === undefined) {
+      const state: ShowState = { calls: 0, title: null, tag: null };
+      scope.__monizeShown = state;
+      const registration = scope.registration;
+      const show = registration.showNotification.bind(registration);
+      registration.showNotification = (title, options) =>
+        show(title, options).then(() => {
+          state.calls += 1;
+          state.title = title;
+          state.tag = options?.tag ?? null;
+        });
     }
-    return scope.__monizePushSeen;
+    return { ...scope.__monizeShown };
   });
 }
 
@@ -131,24 +143,46 @@ export const test = base.extend<{ pushHarness: PushHarness }>({
         set refreshStatus(value) {
           state.refreshStatus = value;
         },
-        // Deliver a push and do not return until the worker has actually
-        // received it.
+        // Deliver a push and do not return until its notification is one the
+        // browser will hand back.
         //
-        // `ServiceWorker.deliverPushMessage` resolves when the browser accepts
-        // the command, NOT when the worker handles it, and nothing retries a
-        // message the browser drops. So a lost delivery is indistinguishable
-        // from a worker that showed nothing, and every later `shown()` poll
-        // spends its whole 5s waiting for something that was never coming --
-        // which is exactly what the CI flake looked like: one test of the nine
-        // failing on a notification assertion with the full timeout burned, a
-        // different test each run, on branches whose diffs cannot touch push.
+        // Two separate things make a naive delivery unreliable, and only the
+        // second one was actually behind the CI flake:
         //
-        // Delivery is made observable instead of assumed: the worker counts the
-        // `push` events it sees, so this waits for that count to move and
-        // re-delivers if it has not. Repeating one payload cannot double a
-        // notification -- `sw.js` tags every notification with
-        // `collapseTag(payload)`, so a repeat REPLACES rather than stacks, and
-        // that is the property the first test in this file asserts.
+        // 1. `ServiceWorker.deliverPushMessage` resolves when the browser
+        //    accepts the command, NOT when the worker handles it, and nothing
+        //    retries a message the browser drops.
+        // 2. `registration.getNotifications()` is DESTRUCTIVE while a display
+        //    is in flight. Chromium answers it by reconciling its stored
+        //    notification records against what the platform reports as
+        //    displayed, and a record whose display has not landed yet is not
+        //    reported "not yet" -- it is erased. `showNotification` resolves
+        //    BEFORE the display reaches the platform, so a read taken straight
+        //    after it deletes the very notification the test is waiting for,
+        //    and every later poll then spends its whole 5s waiting for
+        //    something that can no longer arrive.
+        //
+        // That is exactly what CI showed: one test of the nine failing on a
+        // notification assertion with the full timeout burned, a different test
+        // each run, on branches whose diffs cannot touch push. Instrumenting
+        // the worker settled it -- `showNotification` had been called and had
+        // resolved, and `getNotifications()` stayed empty for the whole poll
+        // and after it.
+        //
+        // There is no non-destructive way to observe a displayed notification,
+        // so the harness cannot poll its way out of the race -- polling is what
+        // does the damage. Instead it looks exactly ONCE per delivery, after
+        // the worker's own `showNotification` promise has resolved, and a look
+        // that came too early is repaired by DELIVERING AGAIN rather than by
+        // looking again. A repeat cannot double a notification: `sw.js` tags
+        // every one with `collapseTag(payload)`, so a repeat REPLACES rather
+        // than stacks, and that is the property the first test in this file
+        // asserts.
+        //
+        // Waiting on that promise is most of the fix on its own -- it moves the
+        // look past the window the old harness read in, which returned as soon
+        // as the CDP command was accepted. The re-delivery is what makes the
+        // remainder converge instead of failing.
         push: async (payload) => {
           const deliver = () =>
             cdp.send('ServiceWorker.deliverPushMessage', {
@@ -157,25 +191,42 @@ export const test = base.extend<{ pushHarness: PushHarness }>({
               data: JSON.stringify(payload),
             });
 
-          let seen = await pushEventsSeen(worker);
           const deadline = Date.now() + PUSH_DELIVERY_TIMEOUT_MS;
+          let unmet = 'nothing was delivered';
 
           for (;;) {
+            let before = await showState(worker);
             await deliver();
-            const nextAttemptAt = Date.now() + PUSH_REDELIVERY_INTERVAL_MS;
-            while (Date.now() < nextAttemptAt) {
-              const now = await pushEventsSeen(worker);
-              if (now > seen) return;
+
+            const handledBy = Date.now() + PUSH_HANDLER_WAIT_MS;
+            let handled: ShowState | null = null;
+            for (;;) {
+              const now = await showState(worker);
+              if (now.calls > before.calls) {
+                handled = now;
+                break;
+              }
               // A worker Chromium restarted counts from zero again, and our
               // delivery went down with the instance that was stopped. Re-base
               // rather than waiting for a count that can no longer be reached.
-              if (now < seen) seen = now;
+              if (now.calls < before.calls) before = now;
+              if (Date.now() >= handledBy) break;
               await new Promise((resolve) => setTimeout(resolve, 25));
             }
+
+            if (handled !== null) {
+              const wanted = handled;
+              const displayed = await shown(worker);
+              if (displayed.some((n) => n.title === wanted.title && n.tag === wanted.tag)) return;
+              unmet = 'the worker showed it but the browser never listed it';
+            } else {
+              unmet = 'the worker never received it';
+            }
+
             if (Date.now() >= deadline) {
               throw new Error(
-                `Service worker never received a push after ${PUSH_DELIVERY_TIMEOUT_MS}ms: ` +
-                  JSON.stringify(payload),
+                `Push never became visible after ${PUSH_DELIVERY_TIMEOUT_MS}ms ` +
+                  `(${unmet}): ${JSON.stringify(payload)}`,
               );
             }
           }
