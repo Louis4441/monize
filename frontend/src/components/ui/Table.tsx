@@ -36,6 +36,13 @@ export const TH_CLASS =
 /** The ordinary body cell. */
 export const TD_CLASS = 'px-4 py-3 text-sm text-gray-900 dark:text-gray-100';
 
+/** Compact sortable-column control shown above wrapped table rows on phones. */
+export const PHONE_HEADER_CLASS =
+  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
+
+/** A wrapped cell's caption is replaced by the real column header from `sm`. */
+export const CAPTION_CLASS = 'sm:hidden';
+
 /**
  * The per-cell caption a wide table's value carries on a phone.
  *

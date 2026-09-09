@@ -21,7 +21,7 @@ import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { exportToCsv } from '@/lib/csv-export';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useTranslations } from 'next-intl';
 import { useReportData } from '@/hooks/useReportData';
@@ -69,18 +69,14 @@ const HEADER_CLASS = 'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray
 // the chip's own fill is a shade off the header band it sits on (this table's
 // `<thead>` keeps its `bg-gray-50` / `dark:bg-gray-900/50`, so the strip is on
 // that band rather than on the card, as it is on the sibling tables whose card
-// has no header band). (The class is kept identical to those siblings; the
-// copies are one of the duplications the converted-table consolidation pass
-// folds into one home -- `components/ui/` is not this change's to edit.)
+// has no header band). The shared `PHONE_HEADER_CLASS` keeps those controls
+// identical across the reports.
 //
 // Five chips wrap to three lines at 320px in `en`/`pl`/`ru`/`id` (114px), four
 // in `de` (148px) and five in the pseudo-locale (182px) above the first row.
 // That is a measured cost, not a reason to drop a control: `reports.bill-
 // payment-history.sort` persists any of the five, so a field with no control
 // anywhere would leave a phone POINTING at a sort with no pointer back.
-const PHONE_HEADER_CLASS =
-  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
-
 // A value cell inside a wrapped row: no padding of its own below `sm` and this
 // table's own `px-4 py-3` from `sm` up. Smaller type on phones so an
 // eight-figure compact amount still fits half the width.
@@ -132,8 +128,6 @@ const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px
 const DATE_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
 
 /** Every caption in a wrapped cell is phone-only. */
-const CAPTION_CLASS = 'sm:hidden';
-
 export function BillPaymentHistoryReport() {
   const t = useTranslations('reports');
   const router = useRouter();

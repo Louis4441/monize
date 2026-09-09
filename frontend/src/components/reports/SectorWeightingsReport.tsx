@@ -26,7 +26,7 @@ import { MultiSelect } from '@/components/ui/MultiSelect';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
@@ -76,9 +76,6 @@ const HEADER_CLASS =
 // The border and card background are what say "tappable": there is no hover on
 // a touch screen, and without them the strip reads as another row of the
 // captions the cells below carry.
-const PHONE_HEADER_CLASS =
-  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
-
 // Where each column sits on the phone grid, written ONCE. The table has three
 // row shapes -- a sector row, the optional unclassified row and the totals
 // footer -- and all three place their cells from this record, so a reader
@@ -157,8 +154,6 @@ const IDENTITY_CELL =
   `${CELL_PLACEMENT.sector} min-w-0 p-0 text-sm sm:table-cell sm:px-4 sm:py-3`;
 
 /** Every caption in a wrapped cell is phone-only. */
-const CAPTION_CLASS = 'sm:hidden';
-
 function CustomTooltip({ active, payload, formatCurrencyFull, defaultCurrency, labelDirect, labelEtf, labelTotal }: {
   active?: boolean;
   payload?: Array<{ payload: { sector: string; direct: number; etf: number; total: number; percentage: number } }>;

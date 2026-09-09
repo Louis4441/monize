@@ -23,7 +23,7 @@ import { resolvePdfColor } from '@/components/reports/resolve-pdf-color';
 import { exportToCsv } from '@/lib/csv-export';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
@@ -85,10 +85,8 @@ const HEADER_CLASS = 'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray
 // each data row is a grid -- so every control is left-aligned and self-naming.
 // The border is what says "tappable": there is no hover on a touch screen, and
 // the chip's own fill is a shade off the header band it sits on (this table's
-// `<thead>` keeps its `bg-gray-50` / `dark:bg-gray-900/50`). The class is kept
-// identical to the sibling report tables that ship this strip; the copies are
-// one of the duplications the converted-table consolidation pass folds into one
-// home -- `components/ui/` is not this change's to edit.
+// `<thead>` keeps its `bg-gray-50` / `dark:bg-gray-900/50`). The shared
+// `PHONE_HEADER_CLASS` keeps this strip identical to its sibling reports.
 //
 // Seven chips is the second-widest strip of the converted family: measured on
 // the Chromium replica at 320px they wrap to four lines in `en`/`pl` (148px),
@@ -97,9 +95,6 @@ const HEADER_CLASS = 'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray
 // cost, not a reason to drop a control: `reports.recurring-expenses.sort`
 // persists any of the seven, so a field with no control anywhere would leave a
 // phone POINTING at a sort with no pointer back.
-const PHONE_HEADER_CLASS =
-  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
-
 // A value cell inside a wrapped row: no padding of its own below `sm` and this
 // table's own `px-4 py-3` from `sm` up. Smaller type on phones so a
 // seven-figure compact amount still fits half the width.
@@ -163,8 +158,6 @@ const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px
 const DATE_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
 
 /** Every caption in a wrapped cell is phone-only. */
-const CAPTION_CLASS = 'sm:hidden';
-
 const FREQUENCY_BADGE_CLASS: Record<RecurringExpenseFrequency, string> = {
   WEEKLY: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
   BIWEEKLY: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',

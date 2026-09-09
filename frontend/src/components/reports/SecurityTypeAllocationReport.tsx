@@ -25,7 +25,7 @@ import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMult
 import { resolvePdfColor } from '@/components/reports/resolve-pdf-color';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import { PartialTotal } from '@/components/ui/PartialTotal';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
@@ -73,9 +73,6 @@ const HEADER_CLASS =
 // each data row is a grid -- so every control is left-aligned and self-naming.
 // The border and card background are what say "tappable": there is no hover on a
 // touch screen, and without them the strip reads as one more row of captions.
-const PHONE_HEADER_CLASS =
-  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
-
 // Where each column sits on the phone grid for an ASSET TYPE row and for the
 // totals footer, written once: those two shapes are 1x1 over the same four
 // columns, so the footer takes the type row's placement verbatim and a reader
@@ -181,8 +178,6 @@ const CHILD_IDENTITY_CELL =
   `${CHILD_CELL_PLACEMENT.label} min-w-0 p-0 pl-8 text-sm break-words sm:table-cell sm:px-4 sm:py-2 sm:pl-10 sm:break-normal`;
 
 /** Every caption in a wrapped cell is phone-only. */
-const CAPTION_CLASS = 'sm:hidden';
-
 const TYPE_COLOURS: Record<string, string> = {
   STOCK: CHART_SERIES[0],
   ETF: CHART_SERIES[1],

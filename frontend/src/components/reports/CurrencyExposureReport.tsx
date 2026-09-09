@@ -19,7 +19,7 @@ import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import { PartialTotal } from '@/components/ui/PartialTotal';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
@@ -98,9 +98,6 @@ const HEADER_CLASS =
 // The border and card background are what say "tappable": there is no hover on
 // a touch screen, and without them the strip reads as another row of the
 // captions the cells below carry.
-const PHONE_HEADER_CLASS =
-  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
-
 // A figure cell inside a wrapped card: no padding of its own below `sm` (the
 // row supplies it and the grid does the spacing), the table cell's own padding
 // from `sm` up. Smaller type on phones. The colour stays on each cell, because
@@ -153,8 +150,6 @@ const FIGURE_CELL =
   'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
 
 /** Every caption in a wrapped cell is phone-only. */
-const CAPTION_CLASS = 'sm:hidden';
-
 interface CurrencyAllocation {
   currency: string;
   nativeValue: number;

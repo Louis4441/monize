@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef } from "react";
-import { CellLabel } from "@/components/ui/Table";
+import { CellLabel, PHONE_HEADER_CLASS } from "@/components/ui/Table";
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { useRouter } from "next/navigation";
 import {
@@ -55,9 +55,6 @@ const HEADER_CLASS =
 // The border and card background are what say "tappable": there is no hover on
 // a touch screen, and without them the strip reads as another row of the
 // captions the cells below carry.
-const PHONE_HEADER_CLASS =
-  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
-
 // A money cell inside a wrapped card: no padding of its own below `sm` (the row
 // supplies it and the grid does the spacing), the table cell's own padding from
 // `sm` up. Smaller type on phones so a six-figure amount still fits a

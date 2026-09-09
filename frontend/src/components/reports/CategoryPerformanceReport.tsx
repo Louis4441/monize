@@ -9,7 +9,7 @@ import { useReportData } from '@/hooks/useReportData';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportError } from '@/components/reports/ReportError';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 import { useTranslations } from 'next-intl';
@@ -117,9 +117,8 @@ const cellPadding = (col: SortColumn) => (col.last ? 'sm:py-2.5' : 'sm:py-2.5 sm
 // each data row is a grid -- so every control is left-aligned and self-naming.
 // The border is what says "tappable" here: there is no hover on a touch screen,
 // and the strip sits directly on the card, whose background this already is --
-// so the border is the whole of the affordance. (The class is kept identical to
-// the sibling report tables that ship this strip; the copies are one of the
-// duplications the converted-table consolidation pass folds into one home.)
+// so the border is the whole of the affordance. The shared
+// `PHONE_HEADER_CLASS` keeps this strip identical to its sibling reports.
 //
 // This is the WIDEST strip of the converted family: eight fields, against the
 // five and six the sibling reports carry. In a long-caption locale that is
@@ -130,9 +129,6 @@ const cellPadding = (col: SortColumn) => (col.last ? 'sm:py-2.5' : 'sm:py-2.5 sm
 // `SortableHeader`'s pre-existing gap for a keyboard or switch user (a `<th>`
 // with an `onClick` and no `tabIndex`, `role` or key handler), which is shared
 // by every report table and is a separate fix.
-const PHONE_HEADER_CLASS =
-  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
-
 // A figure cell inside a wrapped row: no padding of its own below `sm` and
 // this table's own from `sm` up, which each cell adds through `cellPadding` so
 // "which column is last" stays decided in one place. Smaller type on phones so
@@ -218,8 +214,6 @@ const FIGURE_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:t
 const WORD_CELL = 'p-0 text-right text-xs sm:table-cell sm:text-sm';
 
 /** Every caption in a wrapped cell is phone-only. */
-const CAPTION_CLASS = 'sm:hidden';
-
 export function CategoryPerformanceReport() {
   const t = useTranslations('reports');
   const { formatCurrencyCompact: formatCurrency, formatPercentTrimmed } = useNumberFormat();

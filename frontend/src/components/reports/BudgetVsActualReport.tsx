@@ -24,7 +24,7 @@ import { BudgetCategoryTrend } from '@/components/budgets/BudgetCategoryTrend';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportError } from '@/components/reports/ReportError';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { chartColors } from '@/lib/chart-colors';
 
@@ -92,12 +92,8 @@ const cellPadding = (col: SortColumn) => (col.last ? 'sm:py-2' : 'sm:py-2 sm:pr-
 // each data row is a grid -- so every control is left-aligned and self-naming.
 // The border is what says "tappable" here: there is no hover on a touch screen,
 // and the strip sits directly on the card, whose background this already is --
-// so the border is the whole of the affordance. (The class is kept identical to
-// the sibling report tables that ship this strip; the copies are one of the
-// duplications the converted-table consolidation pass folds into one home.)
-const PHONE_HEADER_CLASS =
-  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
-
+// so the border is the whole of the affordance. The shared
+// `PHONE_HEADER_CLASS` keeps this strip identical to its sibling reports.
 // A money (or percent) cell inside a wrapped row: no padding of its own below
 // `sm` and this table's own from `sm` up, which each cell adds through
 // `cellPadding` so "which column is last" stays decided in one place. Smaller
@@ -171,8 +167,6 @@ const PHONE_HEADER_CLASS =
 const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:text-sm';
 
 /** Every caption in a wrapped cell is phone-only. */
-const CAPTION_CLASS = 'sm:hidden';
-
 export function BudgetVsActualReport() {
   const t = useTranslations('reports');
   const { formatCurrencyCompact: formatCurrency, formatPercentTrimmed } = useNumberFormat();

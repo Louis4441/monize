@@ -73,10 +73,9 @@ export const HEADER_CLASS = 'px-4 py-3 text-xs font-medium text-gray-500 dark:te
 // each data row is a grid -- so every control is left-aligned and self-naming.
 // The border is what says "tappable": there is no hover on a touch screen, and
 // the chip's own fill is a shade off the header band it sits on (this table's
-// `<thead>` keeps its `bg-gray-50` / `dark:bg-gray-900/50`). The class is kept
-// identical to the sibling report tables that ship this strip; the copies are
-// one of the duplications the converted-table consolidation pass folds into one
-// home -- `components/ui/` is not this change's to edit.
+// `<thead>` keeps its `bg-gray-50` / `dark:bg-gray-900/50`). The shared
+// `PHONE_HEADER_CLASS` in `components/ui/Table.tsx` keeps this strip identical
+// to its sibling reports.
 //
 // Seven chips. Measured on the Chromium replica at 320px they wrap to four
 // lines in `en`/`pl`/`de`, five in `ru`/`id` and seven in the pseudo-locale
@@ -86,9 +85,6 @@ export const HEADER_CLASS = 'px-4 py-3 text-xs font-medium text-gray-500 dark:te
 // with no control anywhere would leave a phone POINTING at a sort with no
 // pointer back -- and Account is exactly that field today, offered by a column
 // header that no phone and no tablet can see.
-export const PHONE_HEADER_CLASS =
-  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
-
 // A figure cell inside a wrapped row: no padding of its own below `sm` and this
 // table's own `px-4 py-3` from `sm` up. Smaller type on phones so a seven-figure
 // 2dp amount still fits half the width.
@@ -145,9 +141,6 @@ export const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cel
 // the phone's right alignment inside the right-hand track is scoped `max-sm:`
 // and the desktop is untouched.
 export const DATE_CELL = 'p-0 text-xs whitespace-nowrap max-sm:text-right sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
-
-/** Every caption in a wrapped cell is phone-only. */
-export const CAPTION_CLASS = 'sm:hidden';
 
 export const ACTION_COLORS: Record<InvestmentAction, string> = {
   BUY: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',

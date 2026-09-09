@@ -20,7 +20,7 @@ import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { ReportError } from '@/components/reports/ReportError';
 import { exportToCsv } from '@/lib/csv-export';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import { PartialTotal } from '@/components/ui/PartialTotal';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
@@ -28,11 +28,9 @@ import { useTranslations } from 'next-intl';
 import { useMainAccountName } from '@/hooks/useMainAccountName';
 import {
   ACTION_COLORS,
-  CAPTION_CLASS,
   DATE_CELL,
   HEADER_CLASS,
   MONEY_CELL,
-  PHONE_HEADER_CLASS,
   type InvestmentTxSortField,
   type SortColumn,
   type SortColumnsByField,

@@ -12,7 +12,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { chartSeriesColor } from '@/lib/chart-colors';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel } from '@/components/ui/Table';
 import type { CategoryTrendSeries } from '@/types/budget';
 import { useDateFormat } from '@/hooks/useDateFormat';
 
@@ -54,8 +54,6 @@ const CELL_PADDING = 'sm:py-2 sm:pr-4';
 const LAST_CELL_PADDING = 'sm:py-2';
 
 /** Every caption in a wrapped cell is phone-only. */
-const CAPTION_CLASS = 'sm:hidden';
-
 function CategoryTrendTooltip({
   active,
   payload,
