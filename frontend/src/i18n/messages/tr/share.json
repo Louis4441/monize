@@ -18,6 +18,8 @@
   "newTransactionTitle": "Yeni işlem",
   "import": "Hesap özeti olarak içe aktar",
   "importHint": "İçe aktarma sihirbazını açar; önce sütunları eşleyip her satırı gözden geçirebilirsiniz.",
+  "sendToAssistant": "Yapay zekâ asistanına gönder",
+  "sendToAssistantHint": "{count, plural, one {Asistanı bu dosya ekli olarak açar; böylece hiçbir şey kaydedilmeden önce onunla ilgili soru sorabilirsiniz.} other {Asistanı bu dosyalar ekli olarak açar; böylece hiçbir şey kaydedilmeden önce onlarla ilgili soru sorabilirsiniz.}}",
   "discard": "Sil",
   "discardConfirmTitle": "Paylaşılan dosyalar silinsin mi?",
   "discardConfirmMessage": "Paylaşılan dosyalar bu cihazdan kaldırılacak. Monize içinde hiçbir şey değişmez.",

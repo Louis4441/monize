@@ -223,8 +223,8 @@ be refused with a reason, not parsed as QIF).
 
 | Bundle | Offered |
 | --- | --- |
-| All attachment-type | New transaction (files staged); Ask the assistant (Phase 2) |
-| All statement-type | Import |
+| All attachment-type | New transaction (files staged); Send to AI Assistant (when a provider is configured and the chat accepts the files) |
+| All statement-type | Import; Send to AI Assistant (same conditions -- CSV only, since the assistant cannot read OFX/QFX/QIF) |
 | Mixed | Neither; the screen says to share receipts and statements separately, and offers Discard |
 | Nothing accepted | The per-file reasons, and Discard |
 
@@ -385,10 +385,12 @@ pseudo-locale during development and the full translation pass as the final
 commit.
 
 **Phase 2 (separate plan):** attach to an existing transaction (a transaction
-picker), and Ask the assistant (hand the files to `ChatInterface` as
-`ChatAttachment`s, which already accepts images, PDF and CSV under its own
-5 MB / 20 MB caps -- the classification table gains a column and nothing else
-moves).
+picker). Send to AI Assistant has shipped: `/share` routes to `/ai?share=<id>`
+with the same hand-off the wizard uses, and `ChatInterface` stages the files as
+`ChatAttachment`s under its own 5 MB / 20 MB caps. The offer is gated on
+`useAiConfigured` and on `assistantAcceptsFiles`, which asks the chat's own
+validators whether it would take this exact set -- a share inside the stash's
+10-file / 10 MB caps can be outside the assistant's.
 
 **Phase 3 (separate plan; the first part of #1292 has since shipped):** the scan
 pipeline runs on the review screen before the New transaction destination, with

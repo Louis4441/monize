@@ -18,6 +18,8 @@
   "newTransactionTitle": "Nuova transazione",
   "import": "Importa come estratto conto",
   "importHint": "Apre la procedura di importazione per associare le colonne e controllare ogni riga prima di procedere.",
+  "sendToAssistant": "Invia all'assistente IA",
+  "sendToAssistantHint": "{count, plural, one {Apre l'assistente con questo file allegato, così puoi porre domande prima che venga salvato qualcosa.} other {Apre l'assistente con questi file allegati, così puoi porre domande prima che venga salvato qualcosa.}}",
   "discard": "Scarta",
   "discardConfirmTitle": "Scartare i file condivisi?",
   "discardConfirmMessage": "I file condivisi saranno rimossi da questo dispositivo. In Monize non cambia nulla.",

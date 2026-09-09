@@ -18,6 +18,8 @@
   "newTransactionTitle": "Giao dịch mới",
   "import": "Nhập dưới dạng bảng kê",
   "importHint": "Mở trình hướng dẫn nhập để bạn ánh xạ các cột và xem lại từng dòng trước.",
+  "sendToAssistant": "Gửi tới Trợ lý AI",
+  "sendToAssistantHint": "{count, plural, other {Mở trợ lý với các tệp này làm tệp đính kèm, để bạn có thể hỏi về chúng trước khi có gì được lưu.}}",
   "discard": "Loại bỏ",
   "discardConfirmTitle": "Loại bỏ các tệp đã chia sẻ?",
   "discardConfirmMessage": "Các tệp đã chia sẻ sẽ bị xóa khỏi thiết bị này. Không có gì trong Monize thay đổi.",

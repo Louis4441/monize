@@ -158,3 +158,20 @@ export async function fileToAttachment(file: File): Promise<ChatAttachment> {
     previewUrl: kind === 'image' ? URL.createObjectURL(file) : undefined,
   };
 }
+
+/**
+ * Whether this exact set of files could be attached to a chat message as it
+ * stands, with nothing already staged.
+ *
+ * A surface that offers "send these to the assistant" has to answer that before
+ * it shows the control, and it answers it through the same two validators the
+ * chat itself runs -- a second copy of the caps is how an offer comes to promise
+ * what the chat then refuses. All-or-nothing on purpose: dropping the files the
+ * assistant cannot read would hand it a subset of what the user shared and say
+ * nothing about it.
+ */
+export function assistantAcceptsFiles(files: File[]): boolean {
+  if (files.length === 0) return false;
+  if (validateAddition([], files)) return false;
+  return files.every((file) => validateFile(file) === null);
+}

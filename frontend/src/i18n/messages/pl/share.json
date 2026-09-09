@@ -18,6 +18,8 @@
   "newTransactionTitle": "Nowa transakcja",
   "import": "Zaimportuj jako wyciąg",
   "importHint": "Otwiera kreatora importu, aby najpierw przypisać kolumny i sprawdzić każdy wiersz.",
+  "sendToAssistant": "Wyślij do asystenta AI",
+  "sendToAssistantHint": "{count, plural, one {Otwiera asystenta z tym plikiem w załączniku, aby zapytać o niego, zanim cokolwiek zostanie zapisane.} few {Otwiera asystenta z tymi plikami w załącznikach, aby zapytać o nie, zanim cokolwiek zostanie zapisane.} many {Otwiera asystenta z tymi plikami w załącznikach, aby zapytać o nie, zanim cokolwiek zostanie zapisane.} other {Otwiera asystenta z tymi plikami w załącznikach, aby zapytać o nie, zanim cokolwiek zostanie zapisane.}}",
   "discard": "Odrzuć",
   "discardConfirmTitle": "Odrzucić udostępnione pliki?",
   "discardConfirmMessage": "Udostępnione pliki zostaną usunięte z tego urządzenia. W Monize nic się nie zmieni.",
