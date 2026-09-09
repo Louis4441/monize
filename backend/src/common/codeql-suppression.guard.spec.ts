@@ -8,11 +8,11 @@ import { findRepoRoot, gitListFiles, requireRepoRoot } from "./repo-tree.util";
  * CodeQL's own suppression library (`codeql/util/suppression`) reads a
  * `codeql` bracket annotation anywhere in a single-line comment, provided
  * nothing precedes the comment on its line, and applies it to the whole of the
- * line directly below -- and to nothing else. Three annotations for
+ * line directly below -- and to nothing else. Two annotations for
  * `js/insufficient-password-hash` sat above the `const sha1 = crypto`
  * statement while CodeQL reports that query on the `.update(password)` call
  * three lines further down, so the source claimed the alerts were handled and
- * the Security tab kept all three open.
+ * the Security tab kept them open.
  *
  * The placement rule is the mechanism, not a style preference, so it is
  * checked here rather than described. Note what this guard does NOT claim:
@@ -177,7 +177,7 @@ describeTree(
       }
 
       expect(offenders).toEqual([]);
-      expect(seen).toBeGreaterThanOrEqual(3);
+      expect(seen).toBeGreaterThanOrEqual(1);
     });
   },
 );

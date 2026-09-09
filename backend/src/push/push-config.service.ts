@@ -90,21 +90,11 @@ export interface VapidIdentity {
  * instances apart without reading 87 base64 characters.
  */
 export function fingerprintPublicKey(publicKey: string): string {
-  return (
-    crypto
-      .createHash("sha256")
-      // The input is the PUBLIC half of the VAPID pair -- published to every
-      // subscriber -- and the output is a display name for it, never something
-      // a password hash protects. CodeQL classifies anything flowing out of
-      // `generateVAPIDKeys` as a password and asks for bcrypt here; that would
-      // be wrong (a fingerprint must be deterministic and comparable). The
-      // alert belongs dismissed as a false positive on the Security tab; the
-      // annotation covers only the next line, which is where CodeQL reports it.
-      // codeql[js/insufficient-password-hash]
-      .update(publicKey)
-      .digest("hex")
-      .slice(0, 16)
-  );
+  return crypto
+    .createHash("sha256")
+    .update(publicKey)
+    .digest("hex")
+    .slice(0, 16);
 }
 
 /**
