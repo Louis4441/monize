@@ -30,6 +30,11 @@ import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { aggregateHoldingsBySecurity } from '@/lib/aggregate-holdings';
 import { renderChartFlagDot, ChartFlagShadowFilter } from '@/components/investments/portfolio-chart-utils';
@@ -55,6 +60,34 @@ const INDEX_GROUP_PREFIX = 'region:';
 
 type TradeSortField = 'date' | 'account' | 'action' | 'shares' | 'price' | 'total';
 type DividendSortField = 'date' | 'account' | 'type' | 'amount';
+
+/**
+ * One sortable column of each history table. Declared once, as a record over the
+ * sort-field union, and rendered by BOTH header rows -- the column header row
+ * (from `sm` up) and the phone sort strip -- so the two can never list different
+ * fields, and adding a member to a union fails `tsc` here rather than stranding
+ * a phone with no control for it.
+ */
+type TradeSortColumn = TableSortColumn<TradeSortField, 'right'>;
+type DividendSortColumn = TableSortColumn<DividendSortField, 'right'>;
+
+// Today's header cell, unchanged (no `tracking-wider`, matching what these two
+// tables render). Kept local -- `PHONE_HEADER_CLASS`/`CAPTION_CLASS`/`CellLabel`
+// are shared, but a table's own header and money cells stay per-report because
+// their track budgets differ.
+const HEADER_CLASS = 'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase';
+
+// A money (or share-count) cell inside a wrapped row: no padding of its own
+// below `sm` (the row supplies it and the grid does the spacing), this table's
+// own `px-4 py-3 text-sm` from `sm` up, smaller type on phones. The colour and
+// weight stay on each cell.
+//
+// `whitespace-nowrap` is the one property here that is NOT phone-only, and it is
+// the single respect in which the `sm`-and-up cell differs from today's: a
+// locale that groups thousands with a space (`1 234 567 zl`) could otherwise
+// break a figure in the middle at any width. A number must not break; the
+// caption inside takes `whitespace-normal` back for itself (`CellLabel`).
+const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
 
 interface PriceChartPoint {
   date: string;
@@ -434,6 +467,30 @@ export function SecurityPerformanceReport() {
   }, [transactions, tradeSort.sortField, tradeSort.sortDirection, accountNameById]);
 
   const displayCurrency = selectedSecurity?.currencyCode || defaultCurrency;
+
+  // The trade table's six sortable columns, keyed by field so the record is
+  // exhaustive: adding a member to `TradeSortField` is a compile error here
+  // rather than a header with no control. Their declaration order is the column
+  // (and cell DOM) order, rendered by BOTH the column header row and the phone
+  // sort strip from the derived `Object.values`.
+  const tradeColumns: TableSortColumnsByField<TradeSortField, TradeSortColumn> = {
+    date: { field: 'date', label: t('securityPerformance.colDate') },
+    account: { field: 'account', label: t('securityPerformance.colAccount') },
+    action: { field: 'action', label: t('securityPerformance.colAction') },
+    shares: { field: 'shares', label: t('securityPerformance.colShares'), align: 'right' },
+    price: { field: 'price', label: t('securityPerformance.colPrice'), align: 'right' },
+    total: { field: 'total', label: t('securityPerformance.colTotal'), align: 'right' },
+  };
+  const tradeSortColumns: readonly TradeSortColumn[] = Object.values(tradeColumns);
+
+  // The dividend table's four sortable columns, same shape and same rule.
+  const dividendColumns: TableSortColumnsByField<DividendSortField, DividendSortColumn> = {
+    date: { field: 'date', label: t('securityPerformance.colDate') },
+    account: { field: 'account', label: t('securityPerformance.colAccount') },
+    type: { field: 'type', label: t('securityPerformance.colType') },
+    amount: { field: 'amount', label: t('securityPerformance.colAmount'), align: 'right' },
+  };
+  const dividendSortColumns: readonly DividendSortColumn[] = Object.values(dividendColumns);
 
   const handleExportPdf = async () => {
     if (isComparison) {
@@ -842,79 +899,72 @@ export function SecurityPerformanceReport() {
                 </h3>
               </div>
               {tradeTx.length > 0 ? (
+                /* Below `sm` the table becomes a block and each row wraps into a
+                   three-column, two-line grid card so all six columns fit a
+                   phone without a horizontal scroll: line 1 is the date (the row
+                   identity), the action pill and the total (the headline);
+                   line 2 is the account, the share count and the price. Nothing
+                   is dropped, and no figure is truncated -- a money value never
+                   wraps (`MONEY_CELL`). From `sm` up it is the ordinary table,
+                   resolving identically to today (each cell restores its own
+                   `sm:px-4 sm:py-3 sm:text-sm`), and the sort controls survive
+                   as their own phone-only header row because the column header
+                   row that carries them on desktop is hidden there. Restyling
+                   `display` strips the implicit table semantics below `sm`, so
+                   the roles are restated and every bare figure carries a
+                   `CellLabel` naming its column; the pill and the date name
+                   themselves. */
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead className="bg-gray-50 dark:bg-gray-900/50">
-                      <tr>
-                        <SortableHeader<TradeSortField>
-                          field="date"
-                          sortField={tradeSort.sortField}
-                          sortDirection={tradeSort.sortDirection}
-                          onSort={tradeSort.handleSort}
-                          className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                        >
-                          {t('securityPerformance.colDate')}
-                        </SortableHeader>
-                        <SortableHeader<TradeSortField>
-                          field="account"
-                          sortField={tradeSort.sortField}
-                          sortDirection={tradeSort.sortDirection}
-                          onSort={tradeSort.handleSort}
-                          className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                        >
-                          {t('securityPerformance.colAccount')}
-                        </SortableHeader>
-                        <SortableHeader<TradeSortField>
-                          field="action"
-                          sortField={tradeSort.sortField}
-                          sortDirection={tradeSort.sortDirection}
-                          onSort={tradeSort.handleSort}
-                          className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                        >
-                          {t('securityPerformance.colAction')}
-                        </SortableHeader>
-                        <SortableHeader<TradeSortField>
-                          field="shares"
-                          sortField={tradeSort.sortField}
-                          sortDirection={tradeSort.sortDirection}
-                          onSort={tradeSort.handleSort}
-                          align="right"
-                          className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                        >
-                          {t('securityPerformance.colShares')}
-                        </SortableHeader>
-                        <SortableHeader<TradeSortField>
-                          field="price"
-                          sortField={tradeSort.sortField}
-                          sortDirection={tradeSort.sortDirection}
-                          onSort={tradeSort.handleSort}
-                          align="right"
-                          className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                        >
-                          {t('securityPerformance.colPrice')}
-                        </SortableHeader>
-                        <SortableHeader<TradeSortField>
-                          field="total"
-                          sortField={tradeSort.sortField}
-                          sortDirection={tradeSort.sortDirection}
-                          onSort={tradeSort.handleSort}
-                          align="right"
-                          className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                        >
-                          {t('securityPerformance.colTotal')}
-                        </SortableHeader>
+                  <table role="table" className="block min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
+                    <thead role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-header-group">
+                      {/* Phone sort strip: the same six controls, wrapped. */}
+                      <tr role="row" className="flex flex-wrap gap-x-2 gap-y-1 px-2 py-2 sm:hidden">
+                        {tradeSortColumns.map((col) => (
+                          <SortableHeader<TradeSortField>
+                            key={col.field}
+                            field={col.field}
+                            sortField={tradeSort.sortField}
+                            sortDirection={tradeSort.sortDirection}
+                            onSort={tradeSort.handleSort}
+                            className={PHONE_HEADER_CLASS}
+                          >
+                            {col.label}
+                          </SortableHeader>
+                        ))}
+                      </tr>
+                      <tr role="row" className="hidden sm:table-row">
+                        {tradeSortColumns.map((col) => (
+                          <SortableHeader<TradeSortField>
+                            key={col.field}
+                            field={col.field}
+                            sortField={tradeSort.sortField}
+                            sortDirection={tradeSort.sortDirection}
+                            onSort={tradeSort.handleSort}
+                            align={col.align}
+                            className={HEADER_CLASS}
+                          >
+                            {col.label}
+                          </SortableHeader>
+                        ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    <tbody role="rowgroup" className="block divide-y divide-gray-200 dark:divide-gray-700 sm:table-row-group">
                       {tradeTx.map((tx) => (
-                        <tr key={tx.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                          <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                        <tr
+                          key={tx.id}
+                          role="row"
+                          className="grid grid-cols-3 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row sm:p-0"
+                        >
+                          {/* Date: the row identity. A formatted date never wraps. */}
+                          <td role="cell" className="col-start-1 row-start-1 p-0 text-xs whitespace-nowrap text-gray-900 dark:text-gray-100 sm:table-cell sm:px-4 sm:py-3 sm:text-sm">
                             {format(parseLocalDate(tx.transactionDate), 'MMM d, yyyy')}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                          <td role="cell" className="col-start-1 row-start-2 p-0 text-xs break-words text-gray-600 dark:text-gray-400 sm:table-cell sm:px-4 sm:py-3 sm:text-sm sm:break-normal">
+                            <CellLabel className={CAPTION_CLASS}>{tradeColumns.account.label}</CellLabel>
                             {accountNameById.get(tx.accountId) || '-'}
                           </td>
-                          <td className="px-4 py-3 text-sm">
+                          {/* Action: a self-describing pill, so no caption. */}
+                          <td role="cell" className="col-start-2 row-start-1 p-0 text-sm sm:table-cell sm:px-4 sm:py-3">
                             <span className={`px-2 py-0.5 text-xs font-medium rounded ${
                               ['BUY', 'ADD_SHARES', 'TRANSFER_IN', 'REINVEST'].includes(baseInvestmentAction(tx.action))
                                 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
@@ -925,13 +975,17 @@ export function SecurityPerformanceReport() {
                               {tx.action}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-sm text-right text-gray-600 dark:text-gray-400">
+                          <td role="cell" className={`col-start-2 row-start-2 text-gray-600 dark:text-gray-400 ${MONEY_CELL}`}>
+                            <CellLabel className={CAPTION_CLASS}>{tradeColumns.shares.label}</CellLabel>
                             {tx.quantity ?? '-'}
                           </td>
-                          <td className="px-4 py-3 text-sm text-right text-gray-600 dark:text-gray-400">
+                          <td role="cell" className={`col-start-3 row-start-2 text-gray-600 dark:text-gray-400 ${MONEY_CELL}`}>
+                            <CellLabel className={CAPTION_CLASS}>{tradeColumns.price.label}</CellLabel>
                             {tx.price != null ? formatCurrencyFull(tx.price, displayCurrency) : '-'}
                           </td>
-                          <td className="px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-gray-100">
+                          {/* Total: the headline figure, beside the date. */}
+                          <td role="cell" className={`col-start-3 row-start-1 font-medium text-gray-900 dark:text-gray-100 ${MONEY_CELL}`}>
+                            <CellLabel className={CAPTION_CLASS}>{tradeColumns.total.label}</CellLabel>
                             {formatCurrencyFull(Math.abs(tx.totalAmount), displayCurrency)}
                           </td>
                         </tr>
@@ -952,75 +1006,90 @@ export function SecurityPerformanceReport() {
                 </h3>
               </div>
               {dividendTx.length > 0 ? (
+                /* Below `sm` the table becomes a block and each row wraps into a
+                   two-column, two-line grid card so all four columns fit a phone
+                   without a horizontal scroll: line 1 is the date (identity) and
+                   the amount (headline); line 2 is the account and the type pill.
+                   Nothing is dropped, and the amount never wraps (`MONEY_CELL`).
+                   From `sm` up it is the ordinary table, resolving identically to
+                   today, and the sort controls survive as their own phone-only
+                   header row. The footer wraps the same way -- "Total Dividends"
+                   beside the total -- and keeps its desktop `colSpan={3}`, so its
+                   cells carry `aria-colindex` (they do not map one-to-one to the
+                   body columns). */
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead className="bg-gray-50 dark:bg-gray-900/50">
-                      <tr>
-                        <SortableHeader<DividendSortField>
-                          field="date"
-                          sortField={dividendSort.sortField}
-                          sortDirection={dividendSort.sortDirection}
-                          onSort={dividendSort.handleSort}
-                          className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                        >
-                          {t('securityPerformance.colDate')}
-                        </SortableHeader>
-                        <SortableHeader<DividendSortField>
-                          field="account"
-                          sortField={dividendSort.sortField}
-                          sortDirection={dividendSort.sortDirection}
-                          onSort={dividendSort.handleSort}
-                          className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                        >
-                          {t('securityPerformance.colAccount')}
-                        </SortableHeader>
-                        <SortableHeader<DividendSortField>
-                          field="type"
-                          sortField={dividendSort.sortField}
-                          sortDirection={dividendSort.sortDirection}
-                          onSort={dividendSort.handleSort}
-                          className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                        >
-                          {t('securityPerformance.colType')}
-                        </SortableHeader>
-                        <SortableHeader<DividendSortField>
-                          field="amount"
-                          sortField={dividendSort.sortField}
-                          sortDirection={dividendSort.sortDirection}
-                          onSort={dividendSort.handleSort}
-                          align="right"
-                          className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                        >
-                          {t('securityPerformance.colAmount')}
-                        </SortableHeader>
+                  <table role="table" className="block min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
+                    <thead role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-header-group">
+                      {/* Phone sort strip: the same four controls, wrapped. */}
+                      <tr role="row" className="flex flex-wrap gap-x-2 gap-y-1 px-2 py-2 sm:hidden">
+                        {dividendSortColumns.map((col) => (
+                          <SortableHeader<DividendSortField>
+                            key={col.field}
+                            field={col.field}
+                            sortField={dividendSort.sortField}
+                            sortDirection={dividendSort.sortDirection}
+                            onSort={dividendSort.handleSort}
+                            className={PHONE_HEADER_CLASS}
+                          >
+                            {col.label}
+                          </SortableHeader>
+                        ))}
+                      </tr>
+                      <tr role="row" className="hidden sm:table-row">
+                        {dividendSortColumns.map((col) => (
+                          <SortableHeader<DividendSortField>
+                            key={col.field}
+                            field={col.field}
+                            sortField={dividendSort.sortField}
+                            sortDirection={dividendSort.sortDirection}
+                            onSort={dividendSort.handleSort}
+                            align={col.align}
+                            className={HEADER_CLASS}
+                          >
+                            {col.label}
+                          </SortableHeader>
+                        ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    <tbody role="rowgroup" className="block divide-y divide-gray-200 dark:divide-gray-700 sm:table-row-group">
                       {dividendTx.map((tx) => (
-                        <tr key={tx.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                          <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                        <tr
+                          key={tx.id}
+                          role="row"
+                          className="grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row sm:p-0"
+                        >
+                          {/* Date: the row identity. A formatted date never wraps. */}
+                          <td role="cell" className="col-start-1 row-start-1 p-0 text-xs whitespace-nowrap text-gray-900 dark:text-gray-100 sm:table-cell sm:px-4 sm:py-3 sm:text-sm">
                             {format(parseLocalDate(tx.transactionDate), 'MMM d, yyyy')}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                          <td role="cell" className="col-start-1 row-start-2 p-0 text-xs break-words text-gray-600 dark:text-gray-400 sm:table-cell sm:px-4 sm:py-3 sm:text-sm sm:break-normal">
+                            <CellLabel className={CAPTION_CLASS}>{dividendColumns.account.label}</CellLabel>
                             {accountNameById.get(tx.accountId) || '-'}
                           </td>
-                          <td className="px-4 py-3 text-sm">
+                          {/* Type: a self-describing pill, so no caption. */}
+                          <td role="cell" className="col-start-2 row-start-2 p-0 text-sm sm:table-cell sm:px-4 sm:py-3">
                             <span className="px-2 py-0.5 text-xs font-medium rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                               {tx.action}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-sm text-right font-medium text-green-600 dark:text-green-400">
+                          {/* Amount: the headline figure, beside the date. */}
+                          <td role="cell" className={`col-start-2 row-start-1 font-medium text-green-600 dark:text-green-400 ${MONEY_CELL}`}>
+                            <CellLabel className={CAPTION_CLASS}>{dividendColumns.amount.label}</CellLabel>
                             {formatCurrencyFull(Math.abs(tx.totalAmount), displayCurrency)}
                           </td>
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="bg-gray-50 dark:bg-gray-900/50">
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-bold text-gray-900 dark:text-gray-100" colSpan={3}>
+                    <tfoot role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-footer-group">
+                      {/* "Total Dividends" stands in for the identity; the total
+                          sits beside it. The label keeps its desktop `colSpan={3}`,
+                          so both cells state `aria-colindex`. The total names
+                          itself from that label, so it carries no caption. */}
+                      <tr role="row" className="grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 sm:table-row sm:p-0">
+                        <td role="cell" aria-colindex={1} colSpan={3} className="col-start-1 row-start-1 p-0 text-sm font-bold text-gray-900 dark:text-gray-100 sm:table-cell sm:px-4 sm:py-3">
                           {t('securityPerformance.totalDividends')}
                         </td>
-                        <td className="px-4 py-3 text-sm text-right font-bold text-green-600 dark:text-green-400">
+                        <td role="cell" aria-colindex={4} className={`col-start-2 row-start-1 font-bold text-green-600 dark:text-green-400 ${MONEY_CELL}`}>
                           {formatCurrencyFull(
                             dividendTx.reduce((sum, tx) => sum + Math.abs(tx.totalAmount), 0),
                             displayCurrency,
