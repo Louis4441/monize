@@ -310,6 +310,34 @@ describe("a scrollbar you need is not hidden", () => {
   });
 });
 
+describe("the mobile-table chrome constants live once in Table.tsx", () => {
+  /**
+   * The phone sort-strip control class and the phone-only caption class are
+   * identical across every wrapped report, so they are exported from
+   * components/ui/Table.tsx and imported -- three copies had already drifted (a
+   * lost tracking token) before they were centralized. A local const
+   * re-declaration is that drift starting again. The per-row figure and header
+   * cell classes stay per-report deliberately, because their track budgets
+   * genuinely differ, so they are not policed here.
+   */
+  const LOCAL_DECL = /\bconst\s+(PHONE_HEADER_CLASS|CAPTION_CLASS)\s*=/;
+  const HOME = "/src/components/ui/Table.tsx";
+
+  it("no file re-declares the shared chrome classes locally", () => {
+    const offenders: string[] = [];
+    for (const [path, content] of productionSources()) {
+      if (path === HOME) continue;
+      withoutComments(content)
+        .split("\n")
+        .forEach((line, i) => {
+          const match = line.match(LOCAL_DECL);
+          if (match) offenders.push(`${path}:${i + 1} re-declares ${match[1]}`);
+        });
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
 describe("chart colours come from the theme tokens", () => {
   /**
    * `src/lib/chart-colors.ts` exposes `var(--chart-*)` strings so a chart
