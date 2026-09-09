@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { budgetsApi } from '@/lib/budgets';
 import { BudgetHealthGauge } from '@/components/budgets/BudgetHealthGauge';
@@ -165,12 +165,12 @@ export function BudgetHealthScoreReport() {
   const { formatPercentTrimmed } = useNumberFormat();
   const chartRef = useRef<HTMLDivElement>(null);
 
-  const getGroupLabel = (group: string | null): string => {
+  const getGroupLabel = useCallback((group: string | null): string => {
     if (group === 'NEED') return t('budgetHealthScore.groupNeed');
     if (group === 'WANT') return t('budgetHealthScore.groupWant');
     if (group === 'SAVING') return t('budgetHealthScore.groupSaving');
     return t('budgetHealthScore.groupUncategorized');
-  };
+  }, [t]);
   const [selectedBudgetIdState, setSelectedBudgetId] = useState<string>('');
   const { sortField, sortDirection, handleSort } = useSortableTable<CategoryImpactSortField>(
     'reports.budget-health-score.categoryImpact.sort',
@@ -223,7 +223,12 @@ export function BudgetHealthScoreReport() {
           comparison = compareValues(a.categoryName, b.categoryName);
           break;
         case 'group':
-          comparison = compareValues(a.categoryGroup, b.categoryGroup);
+          // Sort by the label the row DISPLAYS, not the raw enum: the enum is
+          // English (`NEED`/`WANT`/`SAVING`), so ordering on it puts a
+          // localized reader's rows in an order unrelated to what they see, and
+          // a null group sorts as an empty string rather than beside its
+          // "Uncategorized" label.
+          comparison = compareValues(getGroupLabel(a.categoryGroup), getGroupLabel(b.categoryGroup));
           break;
         case 'percentUsed':
           comparison = compareValues(a.percentUsed, b.percentUsed);
@@ -235,7 +240,7 @@ export function BudgetHealthScoreReport() {
       return sortDirection === 'asc' ? comparison : -comparison;
     });
     return sorted;
-  }, [healthScore, sortField, sortDirection]);
+  }, [healthScore, sortField, sortDirection, getGroupLabel]);
 
   // The four sortable columns, keyed by field so the record is exhaustive and
   // each entry must name its own key (see `SortColumnsByField`).
