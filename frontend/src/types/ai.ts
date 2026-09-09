@@ -170,7 +170,7 @@ export const AI_PROVIDER_DEFAULT_MODELS: Record<AiProviderType, string[]> = {
   'ollama-cloud': [
     'gpt-oss:120b-cloud',
     'gpt-oss:20b-cloud',
-    'deepseek-v3.1:671b-cloud',
+    'gemma4:31b-cloud',
   ],
   'openai-compatible': [],
   mcp_relay: [],
