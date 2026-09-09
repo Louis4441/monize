@@ -95,7 +95,7 @@ const makeSeries = (
   categoryId: id,
   categoryName: name,
   data: budgeted.map((b, i) => ({
-    month: `2025-${String(i + 1).padStart(2, '0')}`,
+    monthKey: `2025-${String(i + 1).padStart(2, '0')}`,
     budgeted: b,
     actual: actual[i],
     variance: actual[i] - b,

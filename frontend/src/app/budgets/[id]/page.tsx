@@ -24,6 +24,7 @@ import type {
   BudgetSummary,
   BudgetVelocity,
   BudgetPeriod,
+  BudgetTrendPoint,
 } from '@/types/budget';
 import type { ScheduledTransaction } from '@/types/scheduled-transaction';
 
@@ -75,7 +76,7 @@ function BudgetDetailContent() {
     Array<{ date: string; amount: number }>
   >([]);
   const [trendData, setTrendData] = useState<
-    Array<{ month: string; budgeted: number; actual: number }>
+    BudgetTrendPoint[]
   >([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState<string | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<BudgetPeriod | null>(null);

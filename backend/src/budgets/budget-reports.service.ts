@@ -10,7 +10,7 @@ import {
 } from "./budget-date.utils";
 
 export interface BudgetTrendPoint {
-  month: string;
+  monthKey: string;
   budgeted: number;
   actual: number;
   variance: number;
@@ -18,7 +18,7 @@ export interface BudgetTrendPoint {
 }
 
 export interface CategoryTrendPoint {
-  month: string;
+  monthKey: string;
   categoryId: string;
   categoryName: string;
   budgeted: number;
@@ -31,7 +31,7 @@ export interface CategoryTrendSeries {
   categoryId: string;
   categoryName: string;
   data: Array<{
-    month: string;
+    monthKey: string;
     budgeted: number;
     actual: number;
     variance: number;

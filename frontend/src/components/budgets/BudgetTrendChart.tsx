@@ -12,15 +12,11 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { chartColors } from '@/lib/chart-colors';
-
-interface TrendDataPoint {
-  month: string;
-  budgeted: number;
-  actual: number;
-}
+import { useDateFormat } from '@/hooks/useDateFormat';
+import type { BudgetTrendPoint } from '@/types/budget';
 
 interface BudgetTrendChartProps {
-  data: TrendDataPoint[];
+  data: BudgetTrendPoint[];
   formatCurrency: (amount: number) => string;
 }
 
@@ -31,6 +27,7 @@ function CustomTooltip({
   formatCurrency,
   budgetedLabel,
   actualLabel,
+  formatMonth,
 }: {
   active?: boolean;
   payload?: Array<{ value: number; dataKey: string; color: string }>;
@@ -38,13 +35,14 @@ function CustomTooltip({
   formatCurrency: (amount: number) => string;
   budgetedLabel: string;
   actualLabel: string;
+  formatMonth: (monthKey: string) => string;
 }) {
   if (!active || !payload || payload.length === 0) return null;
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
       <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
-        {label}
+        {formatMonth(String(label))}
       </p>
       {payload.map((entry) => (
         <p
@@ -65,6 +63,7 @@ export function BudgetTrendChart({
   formatCurrency,
 }: BudgetTrendChartProps) {
   const t = useTranslations('budgets');
+  const { formatMonth } = useDateFormat();
   const budgetedLabel = t('trendChart.budgeted');
   const actualLabel = t('trendChart.actual');
 
@@ -91,9 +90,10 @@ export function BudgetTrendChart({
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
             <XAxis
-              dataKey="month"
+              dataKey="monthKey"
               tick={{ fontSize: 12 }}
               className="text-gray-500"
+              tickFormatter={formatMonth}
             />
             <YAxis
               tick={{ fontSize: 12 }}
@@ -102,7 +102,12 @@ export function BudgetTrendChart({
             />
             <Tooltip
               content={
-                <CustomTooltip formatCurrency={formatCurrency} budgetedLabel={budgetedLabel} actualLabel={actualLabel} />
+                <CustomTooltip
+                  formatCurrency={formatCurrency}
+                  formatMonth={formatMonth}
+                  budgetedLabel={budgetedLabel}
+                  actualLabel={actualLabel}
+                />
               }
             />
             <Legend />

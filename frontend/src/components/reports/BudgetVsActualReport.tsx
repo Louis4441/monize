@@ -17,6 +17,7 @@ import {
 import { budgetsApi } from '@/lib/budgets';
 import type { BudgetTrendPoint, CategoryTrendSeries } from '@/types/budget';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { useDateFormat } from '@/hooks/useDateFormat';
 import { useTranslations } from 'next-intl';
 import { useReportData } from '@/hooks/useReportData';
 import { BudgetCategoryTrend } from '@/components/budgets/BudgetCategoryTrend';
@@ -114,9 +115,9 @@ const PHONE_HEADER_CLASS =
 //
 // The two money tracks are `minmax(0,1fr)` beside an `auto` identity track,
 // NOT three equal thirds, and that is what makes the figures fit. The month is
-// the only bounded thing in the row -- the server sends a three-letter English
-// month and a four-digit year (`formatPeriodMonth`) -- and its cell carries no
-// caption, so an `auto` track costs it the 61px it actually uses instead of a
+// the only bounded thing in the row -- `formatMonth` renders its canonical
+// `YYYY-MM` key in the reader's configured date format -- and its cell carries
+// no caption, so an `auto` track costs only the label it actually uses instead of a
 // third of the width, and hands the difference to the figures. The resolved
 // tracks, read off `getComputedStyle` rather than divided out: 61/93/93 at
 // 320px and 61/128/128 at 390px, against 83 and 106 on three equal thirds.
@@ -175,6 +176,7 @@ const CAPTION_CLASS = 'sm:hidden';
 export function BudgetVsActualReport() {
   const t = useTranslations('reports');
   const { formatCurrencyCompact: formatCurrency, formatPercentTrimmed } = useNumberFormat();
+  const { formatMonth } = useDateFormat();
   const [selectedBudgetIdState, setSelectedBudgetId] = useState<string>('');
   const [months, setMonths] = useState(6);
   const [viewMode, setViewMode] = useState<'overview' | 'categories'>('overview');
@@ -235,7 +237,7 @@ export function BudgetVsActualReport() {
       let comparison = 0;
       switch (sortField) {
         case 'month':
-          comparison = compareValues(a.month, b.month);
+          comparison = compareValues(a.monthKey, b.monthKey);
           break;
         case 'budgeted':
           comparison = compareValues(a.budgeted, b.budgeted);
@@ -261,7 +263,7 @@ export function BudgetVsActualReport() {
     month: {
       field: 'month',
       label: t('budgetVsActual.colMonth'),
-      value: (point) => point.month,
+      value: (point) => formatMonth(point.monthKey),
     },
     budgeted: {
       field: 'budgeted',
@@ -412,14 +414,14 @@ export function BudgetVsActualReport() {
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <BarChart data={trendData}>
                     <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                    <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                    <XAxis dataKey="monthKey" tick={{ fontSize: 12 }} tickFormatter={formatMonth} />
                     <YAxis tickFormatter={(v) => formatCurrency(v)} tick={{ fontSize: 12 }} />
                     <Tooltip
                       content={({ active, payload, label }) => {
                         if (!active || !payload || payload.length === 0) return null;
                         return (
                           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">{label}</p>
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">{formatMonth(String(label))}</p>
                             {payload.map((entry, idx) => (
                               <p key={(entry.dataKey as string) ?? entry.name ?? idx} className="text-sm" style={{ color: entry.color }}>
                                 {entry.name}: {formatCurrency(entry.value as number)}
@@ -443,7 +445,7 @@ export function BudgetVsActualReport() {
                   <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                     <LineChart data={trendData}>
                       <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                      <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                      <XAxis dataKey="monthKey" tick={{ fontSize: 12 }} tickFormatter={formatMonth} />
                       <YAxis tickFormatter={(v) => formatCurrency(v)} tick={{ fontSize: 12 }} />
                       <Tooltip
                         content={({ active, payload, label }) => {
@@ -451,7 +453,7 @@ export function BudgetVsActualReport() {
                           const variance = payload[0]?.value as number;
                           return (
                             <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-                              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{label}</p>
+                              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{formatMonth(String(label))}</p>
                               <p className={`text-sm font-medium ${variance > 0 ? 'text-red-500' : 'text-green-500'}`}>
                                 {t('budgetVsActual.tooltipVariance')} {variance > 0 ? '+' : ''}{formatCurrency(variance)}
                               </p>
@@ -551,11 +553,11 @@ export function BudgetVsActualReport() {
                   <tbody role="rowgroup" className="block sm:table-row-group">
                     {sortedTrendData.map((point) => (
                       <tr
-                        key={point.month}
+                        key={point.monthKey}
                         role="row"
                         className="grid grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 py-2 border-b border-gray-100 dark:border-gray-700/50 sm:table-row sm:py-0"
                       >
-                        <td role="cell" className={`col-start-1 row-start-1 p-0 text-gray-900 dark:text-gray-100 sm:table-cell ${cellPadding(columns.month)}`}>{point.month}</td>
+                        <td role="cell" className={`col-start-1 row-start-1 p-0 text-gray-900 dark:text-gray-100 sm:table-cell ${cellPadding(columns.month)}`}>{formatMonth(point.monthKey)}</td>
                         <td role="cell" className={`col-start-1 col-span-2 row-start-2 text-gray-600 dark:text-gray-400 ${cellPadding(columns.budgeted)} ${MONEY_CELL}`}>
                           <CellLabel className={CAPTION_CLASS}>{columns.budgeted.label}</CellLabel>
                           {formatCurrency(point.budgeted)}

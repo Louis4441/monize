@@ -312,11 +312,11 @@ describe("BudgetTrendReportsService", () => {
       const result = await service.getTrend("user-1", "budget-1", 6);
 
       expect(result).toHaveLength(2);
-      expect(result[0].month).toBe("Dec 2025");
+      expect(result[0].monthKey).toBe("2025-12");
       expect(result[0].budgeted).toBe(800);
       expect(result[0].actual).toBe(750);
       expect(result[0].variance).toBe(-50);
-      expect(result[1].month).toBe("Jan 2026");
+      expect(result[1].monthKey).toBe("2026-01");
       expect(result[1].actual).toBe(820);
       expect(result[1].variance).toBe(20);
     });
@@ -360,7 +360,7 @@ describe("BudgetTrendReportsService", () => {
       const result = await service.getTrend("user-1", "budget-1", 6);
 
       expect(result).toHaveLength(2);
-      expect(result[1].month).toBe("Feb 2026");
+      expect(result[1].monthKey).toBe("2026-02");
       expect(result[1].actual).toBe(450);
       expect(result[1].budgeted).toBe(800);
     });
@@ -404,6 +404,9 @@ describe("BudgetTrendReportsService", () => {
 
       expect(result).toHaveLength(3);
       expect(budgetsService.findOne).toHaveBeenCalledWith("user-1", "budget-1");
+      expect(
+        result.every((point) => /^\d{4}-\d{2}$/.test(point.monthKey)),
+      ).toBe(true);
     });
 
     it("should return empty when no categories and no transfers in live mode", async () => {
@@ -743,6 +746,7 @@ describe("BudgetTrendReportsService", () => {
       expect(result).toHaveLength(1);
       expect(result[0].categoryId).toBe("cat-1");
       expect(result[0].categoryName).toBe("Groceries");
+      expect(result[0].data[0].monthKey).toBe("2026-01");
       expect(result[0].data[0].budgeted).toBe(500);
       expect(result[0].data[0].actual).toBe(420);
     });
@@ -975,6 +979,7 @@ describe("BudgetTrendReportsService", () => {
 
       // Current month for cat-1: 350 + 50 = 400
       const cat1CurrentMonth = cat1!.data[cat1!.data.length - 1];
+      expect(cat1CurrentMonth.monthKey).toBe(monthKey);
       expect(cat1CurrentMonth.actual).toBe(400);
       expect(cat1CurrentMonth.budgeted).toBe(500);
       expect(cat1CurrentMonth.variance).toBe(-100);

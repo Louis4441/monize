@@ -12,7 +12,7 @@ import { BudgetZeroBasedBar } from './BudgetZeroBasedBar';
 import { Budget503020Summary } from './Budget503020Summary';
 import { BudgetScenarioPlanner } from './BudgetScenarioPlanner';
 import { STRATEGY_LABELS, STRATEGY_DESCRIPTIONS } from './utils/budget-labels';
-import type { BudgetSummary, BudgetVelocity } from '@/types/budget';
+import type { BudgetSummary, BudgetTrendPoint, BudgetVelocity } from '@/types/budget';
 import type { ScheduledTransaction } from '@/types/scheduled-transaction';
 
 interface DailySpending {
@@ -20,18 +20,12 @@ interface DailySpending {
   amount: number;
 }
 
-interface TrendDataPoint {
-  month: string;
-  budgeted: number;
-  actual: number;
-}
-
 interface BudgetDashboardProps {
   summary: BudgetSummary;
   velocity: BudgetVelocity;
   scheduledTransactions: ScheduledTransaction[];
   dailySpending: DailySpending[];
-  trendData: TrendDataPoint[];
+  trendData: BudgetTrendPoint[];
   healthScore: number;
   /**
    * The budget's own currency: what `formatCurrency` labels a bare amount with,

@@ -14,6 +14,7 @@ import {
 import { chartSeriesColor } from '@/lib/chart-colors';
 import { CellLabel } from '@/components/ui/Table';
 import type { CategoryTrendSeries } from '@/types/budget';
+import { useDateFormat } from '@/hooks/useDateFormat';
 
 interface BudgetCategoryTrendProps {
   data: CategoryTrendSeries[];
@@ -60,6 +61,7 @@ function CategoryTrendTooltip({
   payload,
   label,
   formatCurrency,
+  formatMonth,
 }: {
   active?: boolean;
   payload?: Array<{
@@ -70,13 +72,14 @@ function CategoryTrendTooltip({
   }>;
   label?: string;
   formatCurrency: (amount: number) => string;
+  formatMonth: (monthKey: string) => string;
 }) {
   if (!active || !payload || payload.length === 0) return null;
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3 max-w-xs">
       <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-        {label}
+        {formatMonth(String(label))}
       </p>
       {payload.map((entry) => (
         <div
@@ -98,6 +101,7 @@ export function BudgetCategoryTrend({
   formatCurrency,
 }: BudgetCategoryTrendProps) {
   const t = useTranslations('budgets');
+  const { formatMonth } = useDateFormat();
   // The four column labels, read once. Both the column header row (from `sm`
   // up) and the per-cell captions that replace it on a phone come from here,
   // so a caption cannot go on naming a column the header has renamed.
@@ -118,18 +122,18 @@ export function BudgetCategoryTrend({
     const monthSet = new Set<string>();
     for (const series of data) {
       for (const point of series.data) {
-        monthSet.add(point.month);
+        monthSet.add(point.monthKey);
       }
     }
 
-    const months = Array.from(monthSet);
+    const months = Array.from(monthSet).sort();
 
     // Build chart data: one entry per month with each category as a field
-    return months.map((month) => {
-      const entry: Record<string, unknown> = { month };
+    return months.map((monthKey) => {
+      const entry: Record<string, unknown> = { monthKey };
       for (const series of data) {
         if (!selectedCategories.has(series.categoryId)) continue;
-        const point = series.data.find((p) => p.month === month);
+        const point = series.data.find((p) => p.monthKey === monthKey);
         entry[series.categoryId] = point?.actual ?? 0;
       }
       return entry;
@@ -196,9 +200,10 @@ export function BudgetCategoryTrend({
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
             <XAxis
-              dataKey="month"
+              dataKey="monthKey"
               tick={{ fontSize: 12 }}
               className="text-gray-500"
+              tickFormatter={formatMonth}
             />
             <YAxis
               tick={{ fontSize: 12 }}
@@ -207,7 +212,10 @@ export function BudgetCategoryTrend({
             />
             <Tooltip
               content={
-                <CategoryTrendTooltip formatCurrency={formatCurrency} />
+                <CategoryTrendTooltip
+                  formatCurrency={formatCurrency}
+                  formatMonth={formatMonth}
+                />
               }
             />
             {/* No `<Legend />`: the toggle pills above the chart already name

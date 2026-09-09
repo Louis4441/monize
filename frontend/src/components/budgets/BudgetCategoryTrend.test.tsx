@@ -3,16 +3,37 @@ import { render, screen, fireEvent } from '@/test/render';
 import { BudgetCategoryTrend } from './BudgetCategoryTrend';
 import type { CategoryTrendSeries } from '@/types/budget';
 
+vi.mock('@/hooks/useDateFormat', () => ({
+  useDateFormat: () => ({ formatMonth: (monthKey: string) => `localized:${monthKey}` }),
+}));
+
 // Mock recharts
 vi.mock('recharts', () => ({
-  LineChart: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="line-chart">{children}</div>
+  LineChart: ({ children, data }: { children: React.ReactNode; data: Array<{ monthKey: string }> }) => (
+    <div data-testid="line-chart" data-month-keys={data.map((point) => point.monthKey).join(',')}>
+      {children}
+    </div>
   ),
   Line: ({ name }: { name: string }) => <div data-testid={`line-${name}`} />,
-  XAxis: () => <div data-testid="x-axis" />,
+  XAxis: ({ dataKey, tickFormatter }: any) => (
+    <div data-testid="x-axis">{dataKey}:{tickFormatter('2026-01')}</div>
+  ),
   YAxis: () => <div data-testid="y-axis" />,
   CartesianGrid: () => <div data-testid="grid" />,
-  Tooltip: () => <div data-testid="tooltip" />,
+  Tooltip: ({ content }: any) => {
+    if (!content) return <div data-testid="tooltip" />;
+    const Content = content.type;
+    return (
+      <div data-testid="tooltip">
+        <Content
+          {...content.props}
+          active
+          label="2026-02"
+          payload={[{ dataKey: 'cat-1', value: 530, color: 'red', name: 'Groceries' }]}
+        />
+      </div>
+    );
+  },
   Legend: () => <div data-testid="legend" />,
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="responsive-container">{children}</div>
@@ -26,16 +47,16 @@ const mockData: CategoryTrendSeries[] = [
     categoryId: 'cat-1',
     categoryName: 'Groceries',
     data: [
-      { month: 'Jan 2026', budgeted: 500, actual: 420, variance: -80, percentUsed: 84 },
-      { month: 'Feb 2026', budgeted: 500, actual: 530, variance: 30, percentUsed: 106 },
+      { monthKey: '2026-01', budgeted: 500, actual: 420, variance: -80, percentUsed: 84 },
+      { monthKey: '2026-02', budgeted: 500, actual: 530, variance: 30, percentUsed: 106 },
     ],
   },
   {
     categoryId: 'cat-2',
     categoryName: 'Dining',
     data: [
-      { month: 'Jan 2026', budgeted: 300, actual: 250, variance: -50, percentUsed: 83.33 },
-      { month: 'Feb 2026', budgeted: 300, actual: 310, variance: 10, percentUsed: 103.33 },
+      { monthKey: '2026-01', budgeted: 300, actual: 250, variance: -50, percentUsed: 83.33 },
+      { monthKey: '2026-02', budgeted: 300, actual: 310, variance: 10, percentUsed: 103.33 },
     ],
   },
 ];
@@ -56,6 +77,27 @@ describe('BudgetCategoryTrend', () => {
     render(<BudgetCategoryTrend data={mockData} formatCurrency={mockFormat} />);
     expect(screen.getByTestId('category-trend-chart')).toBeInTheDocument();
     expect(screen.getByTestId('line-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('x-axis')).toHaveTextContent('monthKey:localized:2026-01');
+    expect(screen.getByTestId('tooltip')).toHaveTextContent('localized:2026-02');
+  });
+
+  it('groups and orders chart points by the structural month key', () => {
+    const reverseLocalizedOrder: CategoryTrendSeries[] = [
+      {
+        categoryId: 'cat-1',
+        categoryName: 'Groceries',
+        data: [mockData[0].data[1], mockData[0].data[0]],
+      },
+    ];
+
+    render(
+      <BudgetCategoryTrend data={reverseLocalizedOrder} formatCurrency={mockFormat} />,
+    );
+
+    expect(screen.getByTestId('line-chart')).toHaveAttribute(
+      'data-month-keys',
+      '2026-01,2026-02',
+    );
   });
 
   it('draws no chart legend: the toggle pills are the legend', () => {
@@ -123,7 +165,7 @@ describe('BudgetCategoryTrend', () => {
         categoryId: 'cat-1',
         categoryName: 'Dining',
         data: [
-          { month: 'Jan 2026', budgeted: 200, actual: 350, variance: 150, percentUsed: 175 },
+          { monthKey: '2026-01', budgeted: 200, actual: 350, variance: 150, percentUsed: 175 },
         ],
       },
     ];

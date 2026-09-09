@@ -298,7 +298,7 @@ export interface BudgetVelocity {
 // --- Report Types ---
 
 export interface BudgetTrendPoint {
-  month: string;
+  monthKey: string;
   budgeted: number;
   actual: number;
   variance: number;
@@ -306,7 +306,7 @@ export interface BudgetTrendPoint {
 }
 
 export interface CategoryTrendDataPoint {
-  month: string;
+  monthKey: string;
   budgeted: number;
   actual: number;
   variance: number;

@@ -28,6 +28,13 @@ vi.mock('@/hooks/useNumberFormat', async () => {
     }),
   };
 });
+vi.mock('@/hooks/useDateFormat', () => ({
+  useDateFormat: () => ({
+    formatMonth: (monthKey: string) =>
+      ({ '2025-01': 'Zulu month', '2025-02': 'Alpha month' })[monthKey as '2025-01' | '2025-02'] ??
+      `localized:${monthKey}`,
+  }),
+}));
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
 }));
@@ -48,7 +55,9 @@ vi.mock('recharts', () => ({
   Bar: () => null,
   LineChart: ({ children }: any) => <div data-testid="line-chart">{children}</div>,
   Line: () => null,
-  XAxis: () => null,
+  XAxis: ({ dataKey, tickFormatter }: any) => (
+    <div data-testid={`x-axis-${dataKey}`}>{tickFormatter?.('2025-02')}</div>
+  ),
   YAxis: () => null,
   CartesianGrid: () => null,
   Legend: () => null,
@@ -56,9 +65,9 @@ vi.mock('recharts', () => ({
     const C = content;
     if (!C) return null;
     const samples = [
-      { active: true, payload: [{ dataKey: 'budgeted', name: 'Budgeted', color: 'var(--chart-primary)', value: 1000 }, { dataKey: 'actual', name: 'Actual', color: 'var(--chart-income)', value: 1100 }], label: 'tip-1' },
-      { active: true, payload: [{ value: 100 }], label: 'tip-2' },
-      { active: true, payload: [{ value: -50 }], label: 'tip-3' },
+      { active: true, payload: [{ dataKey: 'budgeted', name: 'Budgeted', color: 'var(--chart-primary)', value: 1000 }, { dataKey: 'actual', name: 'Actual', color: 'var(--chart-income)', value: 1100 }], label: '2025-01' },
+      { active: true, payload: [{ value: 100 }], label: '2025-02' },
+      { active: true, payload: [{ value: -50 }], label: '2025-03' },
       { active: false, payload: [], label: '' },
       { active: true, payload: null, label: 'no payload' },
     ];
@@ -70,11 +79,11 @@ const makeBudget = (overrides: Partial<Budget> = {}): Budget =>
   ({ id: 'b-1', name: 'Default', isActive: true, ...overrides } as Budget);
 
 const makePoint = (
-  month: string,
+  monthKey: string,
   budgeted: number,
   actual: number,
 ): BudgetTrendPoint => ({
-  month,
+  monthKey,
   budgeted,
   actual,
   variance: actual - budgeted,
@@ -145,9 +154,17 @@ describe('BudgetVsActualReport', () => {
     mockGetCategoryTrend.mockResolvedValue([]);
     await renderReport();
     await waitFor(() => {
-      expect(screen.getByText('2025-01')).toBeInTheDocument();
+      expect(screen.getAllByText('Zulu month').length).toBeGreaterThan(0);
     });
-    expect(screen.getByText('2025-02')).toBeInTheDocument();
+    expect(screen.getAllByText('Alpha month').length).toBeGreaterThan(0);
+    expect(screen.queryByText('2025-01')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('x-axis-monthKey')).toHaveLength(2);
+    const renderedMonths = Array.from(document.querySelectorAll('tbody tr')).map(
+      (row) => row.querySelector('td')?.textContent,
+    );
+    // Localized labels sort in the opposite order. The table must still use
+    // the structural key, so January remains before February.
+    expect(renderedMonths).toEqual(['Zulu month', 'Alpha month']);
   });
 
   it('toggles to By Category view', async () => {
@@ -208,5 +225,6 @@ describe('BudgetVsActualReport', () => {
     await act(async () => { fireEvent.click(exportBtn); });
     await waitFor(() => expect(mockExportToPdf).toHaveBeenCalled());
     expect(mockExportToPdf.mock.calls[0][0].title).toBe('Budget vs Actual');
+    expect(mockExportToPdf.mock.calls[0][0].tableData.rows[0][0]).toBe('Zulu month');
   });
 });

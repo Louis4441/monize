@@ -14,6 +14,7 @@ import {
 } from 'recharts';
 import { budgetsApi } from '@/lib/budgets';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { useDateFormat } from '@/hooks/useDateFormat';
 import { useTranslations } from 'next-intl';
 import { useReportData } from '@/hooks/useReportData';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
@@ -25,6 +26,7 @@ import { resolvePdfColor } from '@/components/reports/resolve-pdf-color';
 export function BudgetTrendReport() {
   const t = useTranslations('reports');
   const { formatCurrencyCompact: formatCurrency, formatPercentTrimmed } = useNumberFormat();
+  const { formatMonth } = useDateFormat();
   const chartRef = useRef<HTMLDivElement>(null);
   const [selectedBudgetIdState, setSelectedBudgetId] = useState<string>('');
   const [months, setMonths] = useState(12);
@@ -71,7 +73,7 @@ export function BudgetTrendReport() {
     const { exportToPdf } = await import('@/lib/pdf-export');
     const headers = [t('budgetTrend.colMonth'), t('budgetTrend.colBudgeted'), t('budgetTrend.colActual'), t('budgetTrend.colPercentUsed')];
     const rows = trendData.map((point) => [
-      point.month,
+      formatMonth(point.monthKey),
       formatCurrency(point.budgeted),
       formatCurrency(point.actual),
       `${formatPercentTrimmed(point.percentUsed)}`,
@@ -154,14 +156,14 @@ export function BudgetTrendReport() {
               <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <LineChart data={trendData}>
                   <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                  <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                  <XAxis dataKey="monthKey" tick={{ fontSize: 12 }} tickFormatter={formatMonth} />
                   <YAxis tickFormatter={(v) => formatCurrency(v)} tick={{ fontSize: 12 }} />
                   <Tooltip
                     content={({ active, payload, label }) => {
                       if (!active || !payload || payload.length === 0) return null;
                       return (
                         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">{label}</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">{formatMonth(String(label))}</p>
                           {payload.map((entry) => (
                             <p key={entry.dataKey as string} className="text-sm" style={{ color: entry.color }}>
                               {entry.name}: {formatCurrency(entry.value as number)}
