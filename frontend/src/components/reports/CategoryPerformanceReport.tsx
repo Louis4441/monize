@@ -10,6 +10,10 @@ import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportError } from '@/components/reports/ReportError';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 import { useTranslations } from 'next-intl';
@@ -62,9 +66,7 @@ const varianceColor = (totalVariance: number) =>
  * by BOTH header rows -- the column header row (from `sm` up) and the phone
  * sort strip -- so the two can never list different fields.
  */
-interface SortColumn {
-  field: CategoryPerformanceSortField;
-  label: string;
+interface SortColumn extends TableSortColumn<CategoryPerformanceSortField> {
   /**
    * This column's cell, as text. The PDF export builds its headings AND its
    * row cells from the same ordered record the table renders, so the export
@@ -73,8 +75,6 @@ interface SortColumn {
    * the new headings.
    */
   value: (row: CategoryPerformanceRow) => string;
-  /** How the column header and its cells align from `sm` up. */
-  align?: 'right' | 'center';
   /**
    * The last column carries no right padding, exactly as it does today. This
    * flag is the ONE place that is decided: the header cell and the body cell
@@ -96,9 +96,7 @@ interface SortColumn {
  * would be unsortable -- none of which a test comparing header LABELS can see,
  * because the labels stay right. Here it is a compile error instead.
  */
-type SortColumnsByField = {
-  [K in CategoryPerformanceSortField]: SortColumn & { field: K };
-};
+type SortColumnsByField = TableSortColumnsByField<CategoryPerformanceSortField, SortColumn>;
 
 // Today's header cell, unchanged.
 const headerClass = (col: SortColumn) =>

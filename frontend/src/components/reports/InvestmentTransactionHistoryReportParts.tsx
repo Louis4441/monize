@@ -7,6 +7,10 @@
  * baselines are keyed per file.
  */
 import { InvestmentAction, InvestmentTransaction } from '@/types/investment';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 
 export type InvestmentTxSortField = 'date' | 'action' | 'security' | 'account' | 'quantity' | 'price' | 'total';
 
@@ -17,11 +21,7 @@ export type InvestmentTxSortField = 'date' | 'action' | 'security' | 'account' |
  * value cell takes its phone caption from the same entry as its header, and the
  * CSV / PDF export builds its headings from that same ordered record.
  */
-export interface SortColumn {
-  field: InvestmentTxSortField;
-  label: string;
-  /** How the column header aligns from `sm` up; the cells restate it. */
-  align?: 'right' | 'center';
+export interface SortColumn extends TableSortColumn<InvestmentTxSortField> {
   /**
    * The tier this column belongs to, spelled for BOTH of its halves here so
    * they cannot drift -- a header that returns at one breakpoint over values
@@ -61,9 +61,7 @@ export interface SortColumn {
  * comparing header LABELS can see, because the labels stay right. Here it is a
  * compile error instead.
  */
-export type SortColumnsByField = {
-  [K in InvestmentTxSortField]: SortColumn & { field: K };
-};
+export type SortColumnsByField = TableSortColumnsByField<InvestmentTxSortField, SortColumn>;
 
 // Today's header cell, unchanged.
 export const HEADER_CLASS = 'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase';

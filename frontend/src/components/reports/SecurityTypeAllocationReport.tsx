@@ -26,6 +26,10 @@ import { resolvePdfColor } from '@/components/reports/resolve-pdf-color';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 import { PartialTotal } from '@/components/ui/PartialTotal';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
@@ -44,12 +48,7 @@ type SecurityTypeSortField = 'label' | 'totalValue' | 'percentage' | 'count';
  * different fields, and a new union member fails `tsc` rather than stranding a
  * phone with no control for it.
  */
-interface SortColumn {
-  field: SecurityTypeSortField;
-  label: string;
-  /** Money, percent and count columns are right-aligned on desktop. */
-  align?: 'right';
-}
+type SortColumn = TableSortColumn<SecurityTypeSortField, 'right'>;
 
 /**
  * The record the two header rows are built from, each key tied to its entry's
@@ -60,9 +59,7 @@ interface SortColumn {
  * share, and "Holdings" unsortable -- none of which a test comparing header
  * LABELS can see, because the labels stay right. Here it is a compile error.
  */
-type SortColumnsByField = {
-  [K in SecurityTypeSortField]: SortColumn & { field: K };
-};
+type SortColumnsByField = TableSortColumnsByField<SecurityTypeSortField, SortColumn>;
 
 // Today's header cell, unchanged.
 const HEADER_CLASS =

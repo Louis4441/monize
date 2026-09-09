@@ -30,6 +30,10 @@ import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMult
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 import { PartialTotal } from '@/components/ui/PartialTotal';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { ReportError } from '@/components/reports/ReportError';
@@ -58,12 +62,7 @@ type CreditUtilizationSortField =
  * never list different fields, and adding a member to the union fails `tsc`
  * rather than stranding a phone with no control for it.
  */
-interface SortColumn {
-  field: CreditUtilizationSortField;
-  label: string;
-  /** Money and percent columns are right-aligned in the column header row. */
-  align?: 'right';
-}
+type SortColumn = TableSortColumn<CreditUtilizationSortField, 'right'>;
 
 /**
  * The record the two header rows are built from, keyed by sort field.
@@ -77,9 +76,7 @@ interface SortColumn {
  * and a test comparing header LABELS cannot see any of it, because the labels
  * stay right. Here it is a compile error instead.
  */
-type SortColumnsByField = {
-  [K in CreditUtilizationSortField]: SortColumn & { field: K };
-};
+type SortColumnsByField = TableSortColumnsByField<CreditUtilizationSortField, SortColumn>;
 
 // Utilization thresholds drive the bar colour: low (green), moderate (amber),
 // high (red). 30% / 75% mirror the common "keep utilization under 30%" guidance.

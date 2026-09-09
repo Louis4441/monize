@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef } from "react";
 import { CellLabel, PHONE_HEADER_CLASS } from "@/components/ui/Table";
+import type { SortColumn as TableSortColumn } from '@/components/ui/Table';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { useRouter } from "next/navigation";
 import {
@@ -39,12 +40,7 @@ type IncomeVsExpensesSortField = 'name' | 'income' | 'expenses' | 'savings' | 's
  * rendered by BOTH header rows -- the column header row (from `sm` up) and the
  * phone sort strip -- so the two can never list different fields.
  */
-interface SortColumn {
-  field: IncomeVsExpensesSortField;
-  label: string;
-  /** Money columns are right-aligned in the column header row. */
-  align?: 'right';
-}
+type SortColumn = TableSortColumn<IncomeVsExpensesSortField, 'right'>;
 
 const HEADER_CLASS =
   'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase';

@@ -24,6 +24,10 @@ import { exportToCsv } from '@/lib/csv-export';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
@@ -37,11 +41,7 @@ type RecurringSortField = 'payee' | 'category' | 'frequency' | 'count' | 'averag
  * cell takes its phone caption from the same entry as its header, and the CSV /
  * PDF export builds its headings and its cells from that same ordered record.
  */
-interface SortColumn {
-  field: RecurringSortField;
-  label: string;
-  /** How the column header aligns from `sm` up; the cells restate it. */
-  align?: 'right' | 'center';
+interface SortColumn extends TableSortColumn<RecurringSortField> {
   /**
    * This column's export heading and cell. They are separate from `label`
    * because the catalogue has always carried a second set of keys for the
@@ -73,9 +73,7 @@ interface SortColumn {
  * -- none of which a test comparing header LABELS can see, because the labels
  * stay right. Here it is a compile error instead.
  */
-type SortColumnsByField = {
-  [K in RecurringSortField]: SortColumn & { field: K };
-};
+type SortColumnsByField = TableSortColumnsByField<RecurringSortField, SortColumn>;
 
 // Today's header cell, unchanged.
 const HEADER_CLASS = 'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase';

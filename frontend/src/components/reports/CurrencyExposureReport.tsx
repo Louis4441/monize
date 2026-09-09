@@ -20,6 +20,10 @@ import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMult
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 import { PartialTotal } from '@/components/ui/PartialTotal';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
@@ -63,13 +67,9 @@ const FALLBACK_COLOURS = [CHART_SERIES[8], CHART_SERIES[9]];
  * Deriving only the headings would relabel the exported columns while leaving
  * the values in the old order -- a silently mislabelled export.
  */
-interface SortColumn {
-  field: CurrencyExposureSortField;
-  label: string;
+interface SortColumn extends TableSortColumn<CurrencyExposureSortField, 'right'> {
   /** The cell's text, rendered on screen and written to the PDF. */
   value: (item: CurrencyAllocation) => string;
-  /** Money, rate, percent and count columns are right-aligned on desktop. */
-  align?: 'right';
 }
 
 /**
@@ -84,9 +84,7 @@ interface SortColumn {
  * unsortable -- and a test comparing header LABELS cannot see any of it,
  * because the labels stay right. Here it is a compile error instead.
  */
-type SortColumnsByField = {
-  [K in CurrencyExposureSortField]: SortColumn & { field: K };
-};
+type SortColumnsByField = TableSortColumnsByField<CurrencyExposureSortField, SortColumn>;
 
 // Today's header cell, unchanged.
 const HEADER_CLASS =

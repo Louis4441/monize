@@ -22,6 +22,7 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type { SortColumn as TableSortColumn } from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
@@ -36,11 +37,7 @@ type SavingsRateSortField = 'month' | 'income' | 'expenses' | 'savings' | 'rate'
  * once and rendered by BOTH header rows -- the column header row (from `sm`
  * up) and the phone sort strip -- so the two can never list different fields.
  */
-interface SortColumn {
-  field: SavingsRateSortField;
-  label: string;
-  /** Money columns are right-aligned in the column header row. */
-  align?: 'right';
+interface SortColumn extends TableSortColumn<SavingsRateSortField, 'right'> {
   /**
    * The last column carries no right padding, exactly as it does today. This
    * flag is the ONE place that is decided: the header cell and the body cell

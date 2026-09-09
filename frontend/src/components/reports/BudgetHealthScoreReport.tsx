@@ -8,6 +8,10 @@ import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportError } from '@/components/reports/ReportError';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 import { useTranslations } from 'next-intl';
 import { useReportData } from '@/hooks/useReportData';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
@@ -46,9 +50,7 @@ type CategoryImpactSortField = 'category' | 'group' | 'percentUsed' | 'impact';
  * and rendered by BOTH header rows -- the column header row (from `sm` up) and
  * the phone sort strip -- so the two can never list different fields.
  */
-interface SortColumn {
-  field: CategoryImpactSortField;
-  label: string;
+interface SortColumn extends TableSortColumn<CategoryImpactSortField, 'right'> {
   /**
    * This column's cell, as text -- rendered by the `<td>` AND by the PDF
    * export, which also takes its headings from this record. So the export
@@ -64,8 +66,6 @@ interface SortColumn {
    * (the group pill), never a second derivation of the value.
    */
   value: (cat: HealthScoreCategoryDetail) => string;
-  /** The two figure columns are right-aligned in the column header row. */
-  align?: 'right';
   /** The two text columns state today's explicit left alignment. */
   headerAlign?: 'left';
   /**
@@ -89,9 +89,7 @@ interface SortColumn {
  * column would be unsortable -- none of which a test comparing header LABELS
  * can see, because the labels stay right. Here it is a compile error instead.
  */
-type SortColumnsByField = {
-  [K in CategoryImpactSortField]: SortColumn & { field: K };
-};
+type SortColumnsByField = TableSortColumnsByField<CategoryImpactSortField, SortColumn>;
 
 // Today's header cell, unchanged: the two text columns are explicitly
 // left-aligned and the last column drops its right padding.

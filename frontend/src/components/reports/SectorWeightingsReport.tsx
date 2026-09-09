@@ -27,6 +27,10 @@ import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMult
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
@@ -43,12 +47,7 @@ type SectorSortField = 'sector' | 'direct' | 'etf' | 'total' | 'percentage';
  * different fields, and adding a member to the union fails `tsc` rather than
  * stranding a phone with no control for it.
  */
-interface SortColumn {
-  field: SectorSortField;
-  label: string;
-  /** Money and percent columns are right-aligned on desktop. */
-  align?: 'right';
-}
+type SortColumn = TableSortColumn<SectorSortField, 'right'>;
 
 /**
  * The record the two header rows are built from, keyed by sort field.
@@ -62,9 +61,7 @@ interface SortColumn {
  * unsortable -- and a test comparing header LABELS cannot see any of it,
  * because the labels stay right. Here it is a compile error instead.
  */
-type SortColumnsByField = {
-  [K in SectorSortField]: SortColumn & { field: K };
-};
+type SortColumnsByField = TableSortColumnsByField<SectorSortField, SortColumn>;
 
 // Today's header cell, unchanged.
 const HEADER_CLASS =
