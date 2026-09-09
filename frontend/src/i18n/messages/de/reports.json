@@ -1405,6 +1405,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "Anteile",
     "noData": "Keine Anlagebestände gefunden. Fügen Sie Wertpapiere hinzu, um die Anlageklassenaufschlüsselung zu sehen.",
     "totalPortfolio": "Gesamtportfolio",
     "assetTypes": "Anlageklassen",

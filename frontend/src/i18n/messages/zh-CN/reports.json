@@ -1405,6 +1405,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "股数",
     "noData": "未找到投资持仓。添加证券以查看资产类型明细。",
     "totalPortfolio": "投资组合总计",
     "assetTypes": "资产类型",

@@ -1405,6 +1405,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "Shares",
     "noData": "No investment holdings found. Add securities to see the asset type breakdown.",
     "totalPortfolio": "Total Portfolio",
     "assetTypes": "Asset Types",

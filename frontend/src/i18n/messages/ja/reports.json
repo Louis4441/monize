@@ -1405,6 +1405,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "株数",
     "noData": "投資保有銘柄が見つかりません。資産タイプ内訳を確認するには有価証券を追加してください。",
     "totalPortfolio": "ポートフォリオ合計",
     "assetTypes": "資産タイプ",

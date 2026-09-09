@@ -1405,6 +1405,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "股數",
     "noData": "找不到投資持倉。請新增證券以查看資產類型明細。",
     "totalPortfolio": "投資組合總值",
     "assetTypes": "資產類型",

@@ -1405,6 +1405,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "Aandelen",
     "noData": "Geen beleggingsposities gevonden. Voeg waardepapieren toe om de activatypeuitsplitsing te zien.",
     "totalPortfolio": "Totale portefeuille",
     "assetTypes": "Activatypen",

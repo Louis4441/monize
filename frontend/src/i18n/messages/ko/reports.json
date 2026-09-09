@@ -1405,6 +1405,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "수량",
     "noData": "투자 보유 항목을 찾을 수 없습니다. 자산 유형 분류를 보려면 유가증권을 추가하세요.",
     "totalPortfolio": "총 포트폴리오",
     "assetTypes": "자산 유형",

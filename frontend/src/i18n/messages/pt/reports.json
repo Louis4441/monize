@@ -1405,6 +1405,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "Ações",
     "noData": "Nenhuma posição de investimento encontrada. Adicione títulos para ver a análise por tipo de ativo.",
     "totalPortfolio": "Total do Portefólio",
     "assetTypes": "Tipos de Ativo",

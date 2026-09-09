@@ -308,10 +308,10 @@ describe('SecurityTypeAllocationReport (phone wrapped table)', () => {
     // painted order would silently swap Total Value and % of Portfolio on
     // every desktop.
     expect(placements(child)).toEqual(['c1+2/r1', 'c2/r2', 'c1/r2', 'c2/r3']);
-    // The same claim as an ASSOCIATION rather than a placement string: each
-    // captioned child cell carries the caption of the column its DOM position
-    // puts it in from `sm` up. Reordering the cells to match the painted order
-    // fails here even if every placement string is still right.
+    // The same claim as an ASSOCIATION rather than a placement string. The
+    // quantity cell is the deliberate exception: the desktop column counts
+    // holdings on a type row, while this child value is a number of shares, so
+    // its phone caption names the value rather than borrowing the header.
     const columnHeader = Array.from(container.querySelectorAll('thead tr'))[1];
     const headerLabels = Array.from(columnHeader.querySelectorAll('th')).map((th) =>
       th.textContent?.replace(/[↑↓↕]/g, '').trim(),
@@ -323,7 +323,7 @@ describe('SecurityTypeAllocationReport (phone wrapped table)', () => {
       null,
       headerLabels[1],
       headerLabels[2],
-      headerLabels[3],
+      'Shares',
     ]);
     expect(child.className).toContain('grid grid-cols-2');
     expect(child.className).toContain('sm:table-row');
@@ -353,12 +353,11 @@ describe('SecurityTypeAllocationReport (phone wrapped table)', () => {
     expect(identity.querySelector('span.sm\\:hidden')).toBeNull();
     expect(share.textContent).toBe('% of Portfolio84.7%');
     expect(value.textContent).toBe('Total ValueCAD 1234567.89');
-    // The share count is captioned too, and the reason is placement rather
-    // than kind: it sits at `col-start-2 row-start-3`, directly under this
-    // row's money figure in the same track, size and alignment, so bare it
-    // reads as a second amount. The caption names the COLUMN, exactly as the
-    // desktop header above it does.
-    expect(quantity.textContent).toBe('Holdings1244.5678');
+    // The share count is captioned too. It sits at `col-start-2 row-start-3`,
+    // directly under this row's money figure, so bare it reads as a second
+    // amount. It names shares rather than borrowing the Holdings header, which
+    // counts securities on the parent row.
+    expect(quantity.textContent).toBe('Shares1244.5678');
     expect(quantity.querySelector('span.sm\\:hidden')).not.toBeNull();
     for (const cell of [share, value, quantity]) {
       expect(cell.className).toContain('whitespace-nowrap');

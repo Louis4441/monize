@@ -1405,6 +1405,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "Acciones",
     "noData": "No se encontraron posiciones de inversión. Agrega valores para ver el desglose por tipo de activo.",
     "totalPortfolio": "Total de la cartera",
     "assetTypes": "Tipos de activos",

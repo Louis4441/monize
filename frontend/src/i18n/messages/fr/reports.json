@@ -1405,6 +1405,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "Parts",
     "noData": "Aucune position d'investissement trouvée. Ajoutez des titres pour voir la ventilation par type d'actif.",
     "totalPortfolio": "Total du portefeuille",
     "assetTypes": "Types d'actifs",

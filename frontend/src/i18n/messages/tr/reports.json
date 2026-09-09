@@ -1405,6 +1405,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "Hisse",
     "noData": "Yatırım varlığı bulunamadı. Varlık türü dökümünü görmek için menkul kıymet ekleyin.",
     "totalPortfolio": "Toplam Portföy",
     "assetTypes": "Varlık Türleri",

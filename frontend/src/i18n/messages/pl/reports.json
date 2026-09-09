@@ -1405,6 +1405,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "Udziały",
     "noData": "Nie znaleziono pozycji inwestycyjnych. Dodaj papiery wartościowe, aby zobaczyć rozbicie według typu aktywów.",
     "totalPortfolio": "Cały portfel",
     "assetTypes": "Typy aktywów",

@@ -1405,6 +1405,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "Saham",
     "noData": "Tidak ada kepemilikan investasi ditemukan. Tambah keamanan dokumen untuk melihat rincian tipe aset.",
     "totalPortfolio": "Total Portofolio",
     "assetTypes": "Tipe Aset",

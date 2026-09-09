@@ -1405,6 +1405,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "[XX-Shares-XX]",
     "noData": "[XX-No investment holdings found. Add securities to see the asset type breakdown.-XX]",
     "totalPortfolio": "[XX-Total Portfolio-XX]",
     "assetTypes": "[XX-Asset Types-XX]",

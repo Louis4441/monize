@@ -191,13 +191,11 @@ const TYPE_COLOURS: Record<string, string> = {
   CASH: chartColors.axis,
 };
 
-const TYPE_LABELS: Record<string, string> = {
-  STOCK: 'Stocks',
-  ETF: 'ETFs',
-  MUTUAL_FUND: 'Mutual Funds',
-  BOND: 'Bonds',
-  CASH: 'Cash',
-};
+const KNOWN_SECURITY_TYPES = ['STOCK', 'ETF', 'MUTUAL_FUND', 'BOND', 'CASH'] as const;
+
+function isKnownSecurityType(type: string): type is (typeof KNOWN_SECURITY_TYPES)[number] {
+  return (KNOWN_SECURITY_TYPES as readonly string[]).includes(type);
+}
 
 interface TypeAllocation {
   type: string;
@@ -235,6 +233,7 @@ const ACCOUNTS_STORAGE_KEY = 'monize-reports-security-type-allocation-accounts';
 
 export function SecurityTypeAllocationReport() {
   const t = useTranslations('reports');
+  const tDashboard = useTranslations('dashboard');
   const tCommon = useTranslations('common');
   const { formatCurrencyCompact: formatCurrency, formatCurrency: formatCurrencyFull, formatPercent } = useNumberFormat();
   const { defaultCurrency, convertToDefault } = useExchangeRates();
@@ -302,7 +301,9 @@ export function SecurityTypeAllocationReport() {
     return Array.from(typeMap.entries())
       .map(([type, data]) => ({
         type,
-        label: TYPE_LABELS[type] || type,
+        label: isKnownSecurityType(type)
+          ? tDashboard(`securityTypeAllocation.types.${type}`)
+          : type,
         totalValue: data.totalValue,
         percentage: totalValue > 0 ? (data.totalValue / totalValue) * 100 : 0,
         count: data.holdings.length,
@@ -323,7 +324,7 @@ export function SecurityTypeAllocationReport() {
         }),
       }))
       .sort((a, b) => b.totalValue - a.totalValue);
-  }, [holdings, convertToDefault]);
+  }, [holdings, convertToDefault, tDashboard]);
 
   const totalPortfolioValue = useMemo(
     () => allocationData.reduce((sum, a) => sum + a.totalValue, 0),
@@ -743,16 +744,14 @@ export function SecurityTypeAllocationReport() {
                           ? '-'
                           : formatPercent((value / totalPortfolioValue) * 100, 1)}
                       </td>
-                      {/* A caption names the COLUMN its cell is in, not the kind
-                          of the value, so this one is as true as the Holdings
-                          header above it on a desktop and no truer: the column
-                          holds a count of holdings on a type row and a count of
-                          SHARES here. That conflation is pre-existing and
-                          reported; bare, the cell would add a new one, since at
-                          `col-start-2 row-start-3` it sits directly under this
-                          row's money figure in the same track. */}
+                      {/* This cell holds a share quantity rather than the type
+                          row's count of holdings, so its phone caption names
+                          that value directly instead of borrowing the desktop
+                          column header. Bare, it would read as a second amount:
+                          at `col-start-2 row-start-3` it sits directly under the
+                          money figure in the same track. */}
                       <td role="cell" className={`${CHILD_CELL_PLACEMENT.count} text-gray-500 dark:text-gray-500 ${CHILD_FIGURE_CELL}`}>
-                        <CellLabel className={CAPTION_CLASS}>{columns.count.label}</CellLabel>
+                        <CellLabel className={CAPTION_CLASS}>{t('securityTypeAllocation.colShares')}</CellLabel>
                         {h.quantity}
                       </td>
                     </tr>

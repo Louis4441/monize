@@ -1405,6 +1405,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "Cổ phiếu",
     "noData": "Không tìm thấy vị thế đầu tư. Thêm chứng khoán để xem phân tích theo loại tài sản.",
     "totalPortfolio": "Tổng danh mục",
     "assetTypes": "Loại tài sản",
