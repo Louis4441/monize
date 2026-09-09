@@ -327,8 +327,10 @@ describe('DividendYieldGrowthReport', () => {
     expect(screen.getByText('VFV')).toBeInTheDocument();
     // The unknown-security fallback name would only appear if an unknown row rendered
     expect(screen.queryByText('Unknown Security')).not.toBeInTheDocument();
-    // Only the header row and a single VFV data row should be present
-    expect(screen.getAllByRole('row')).toHaveLength(2);
+    // Only a single VFV data row should render. The phone-wrapped yield table
+    // carries two header rows (the column header and the phone sort strip), so
+    // count body rows rather than every row.
+    expect(document.querySelectorAll('tbody tr')).toHaveLength(1);
   });
 
   it('excludes dividend transactions with no securityId', async () => {
@@ -368,7 +370,9 @@ describe('DividendYieldGrowthReport', () => {
     });
     expect(screen.getByText('VFV')).toBeInTheDocument();
     expect(screen.queryByText('Unknown Security')).not.toBeInTheDocument();
-    expect(screen.getAllByRole('row')).toHaveLength(2);
+    // Single data row; the wrapped yield table's header is two rows (column
+    // header plus phone sort strip), so count body rows.
+    expect(document.querySelectorAll('tbody tr')).toHaveLength(1);
   });
 
   it('shows growth view with annual data table', async () => {
