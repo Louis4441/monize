@@ -28,6 +28,7 @@ import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
+import { CellLabel } from '@/components/ui/Table';
 import { ChartTooltipPanel } from '@/components/reports/ChartTooltip';
 import { ReportError } from '@/components/reports/ReportError';
 import { exportToCsv } from '@/lib/csv-export';
@@ -36,6 +37,81 @@ import type { ChartDatum } from '@/types/chart';
 type SpendingCategorySortField = 'name' | 'value' | 'percentage';
 
 type ChartDataItem = ChartDatum & { id: string; colour: string };
+
+/**
+ * One column of the data table. The three are declared once, as a record over
+ * the sort field union, and rendered by BOTH header rows -- the column header
+ * row (from `sm` up) and the phone sort strip -- so the two can never list
+ * different fields, and adding a member to the union fails `tsc` rather than
+ * stranding a phone with no control for it. The labels double as the phone
+ * captions, so a value reads under exactly the label its column header uses.
+ */
+interface SortColumn {
+  field: SpendingCategorySortField;
+  label: string;
+  /** The amount and percentage columns are right-aligned on desktop. */
+  align?: 'right';
+}
+
+/**
+ * The record the two header rows are built from, keyed by sort field.
+ *
+ * The key is tied to the entry's own `field`, which a plain
+ * `Record<SpendingCategorySortField, SortColumn>` does not do: that forces an
+ * entry to EXIST for every member of the union but lets it name a different
+ * one, so `value: { field: 'name', label: colAmount }` type-checks. Both header
+ * rows would then render two controls keyed `name` (a duplicate React key),
+ * tapping "Amount" would sort by Category, and "Amount" would be unsortable --
+ * and a test comparing header LABELS cannot see any of it, because the labels
+ * stay right. Here it is a compile error instead.
+ */
+type SortColumnsByField = {
+  [K in SpendingCategorySortField]: SortColumn & { field: K };
+};
+
+// Today's header cell, unchanged. This report's SortableHeader is not
+// upper-tracked, so the local class matches the pre-conversion markup exactly
+// (no `tracking-wider`); the `sm`-and-up header is byte-for-byte today's.
+const HEADER_CLASS =
+  'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase';
+
+// The same sort controls in the phone strip: a wrapped row of compact chips.
+// Column alignment means nothing there -- the column header row is hidden and
+// each data row is a grid -- so every control is left-aligned and self-naming.
+// The border and card background are what say "tappable": there is no hover on
+// a touch screen, and without them the strip reads as another row of the
+// captions the cells below carry.
+const PHONE_HEADER_CLASS =
+  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
+
+// A wrapped cell's caption is replaced by the real column header from `sm` up.
+const CAPTION_CLASS = 'sm:hidden';
+
+// A figure cell inside a wrapped card: no padding of its own below `sm` (the
+// row supplies it and the grid does the spacing), the table cell's own padding
+// from `sm` up. Smaller type on phones. `whitespace-nowrap` is the one property
+// here that is NOT phone-only -- the single respect in which the `sm`-and-up
+// cell differs from today's -- so a locale that groups thousands with a space
+// cannot break a figure in the middle of a number. The amount uses the compact
+// formatter, so the two figures share line 2 comfortably at 320px.
+const FIGURE_CELL =
+  'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
+
+// The row's phone grid: two equal tracks. The category takes the whole of line
+// 1 (it is an unbounded name and wraps), the amount and the share split line 2
+// -- the amount under the left half, the share under the right. Shared by the
+// data rows and the totals footer so a reader finds each figure in the same
+// corner of every card. Inert from `sm` up, where each row is a table row again.
+const ROW_GRID =
+  'grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 px-4 py-3';
+
+// The identity cell (the coloured dot and the category name), the same box in
+// the data rows and the footer. `min-w-0` lets the name shrink in its track;
+// the name itself wraps unclamped below `sm` (`break-words`) and takes today's
+// `break-normal` back from `sm` up. Keeps `text-sm` on phones -- a category
+// name is prose, not a figure.
+const IDENTITY_CELL =
+  'col-start-1 col-span-2 row-start-1 min-w-0 p-0 text-sm sm:table-cell sm:px-4 sm:py-3';
 
 export function SpendingByCategoryReport() {
   const t = useTranslations('reports');
@@ -105,6 +181,24 @@ export function SpendingByCategoryReport() {
     });
     return sorted;
   }, [chartData, sortField, sortDirection, totalExpenses]);
+
+  // Exhaustive over the sort field union, so a new field is a compile error
+  // rather than a column with no control in either header -- and each entry
+  // must name its own key (see `SortColumnsByField`). These labels are also the
+  // phone captions, so a value reads under exactly the label its column header
+  // uses.
+  const columns: SortColumnsByField = {
+    name: { field: 'name', label: t('spendingByCategory.colCategory') },
+    value: { field: 'value', label: t('spendingByCategory.colAmount'), align: 'right' },
+    percentage: { field: 'percentage', label: t('spendingByCategory.colPctOfTotal'), align: 'right' },
+  };
+
+  // Their order, rendered by BOTH header rows and matched by the cells' DOM
+  // order. DERIVED from the record rather than re-listed, so a field added to
+  // the union cannot ship with no sort control in either header. The record's
+  // declaration order IS the column order, and it is today's: category, amount,
+  // share.
+  const sortColumns: readonly SortColumn[] = Object.values(columns);
 
   const handleExportPdf = async () => {
     const { exportToPdf } = await import('@/lib/pdf-export');
@@ -209,73 +303,119 @@ export function SpendingByCategoryReport() {
           </p>
         ) : viewType === 'table' ? (
           <>
+            {/* Data Table
+
+                Below `sm` the table becomes a block and each row wraps into a
+                two-track grid so all three columns fit a phone without a
+                horizontal scroll, on two lines: the category takes line 1 (it
+                is an unbounded name and wraps freely), the amount and the
+                portfolio share share line 2. Nothing is dropped -- the card
+                carries all three columns -- and the row stays what it is today:
+                hovering, and clickable when it names a category. From `sm` up it
+                is the ordinary table. The sort controls survive as their own
+                phone-only header row, because the column header row that carries
+                them on desktop is hidden there.
+
+                Restyling `display` below `sm` strips the implicit table
+                semantics, so the explicit ARIA roles put them back (inert from
+                `sm` up). Every row exposes all three cells at every width, so no
+                cell leaves the DOM and no `aria-colindex` is owed. The
+                `CellLabel` captions name each figure's column for a sighted
+                phone reader, who has no column header to look up. */}
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-900/50">
-                  <tr>
-                    <SortableHeader<SpendingCategorySortField>
-                      field="name"
-                      sortField={sortField}
-                      sortDirection={sortDirection}
-                      onSort={handleSort}
-                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                    >
-                      {t('spendingByCategory.colCategory')}
-                    </SortableHeader>
-                    <SortableHeader<SpendingCategorySortField>
-                      field="value"
-                      sortField={sortField}
-                      sortDirection={sortDirection}
-                      onSort={handleSort}
-                      align="right"
-                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                    >
-                      {t('spendingByCategory.colAmount')}
-                    </SortableHeader>
-                    <SortableHeader<SpendingCategorySortField>
-                      field="percentage"
-                      sortField={sortField}
-                      sortDirection={sortDirection}
-                      onSort={handleSort}
-                      align="right"
-                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                    >
-                      {t('spendingByCategory.colPctOfTotal')}
-                    </SortableHeader>
+              {/* Explicit roles: restyling `display` below `sm` strips the
+                  implicit table semantics, and these put them back (inert from
+                  `sm` up). */}
+              <table role="table" className="block min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
+                <thead role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-header-group">
+                  {/* Phone sort strip: the same three controls, wrapped. */}
+                  <tr role="row" className="flex flex-wrap gap-x-2 gap-y-1 px-2 py-2 sm:hidden">
+                    {sortColumns.map((col) => (
+                      <SortableHeader<SpendingCategorySortField>
+                        key={col.field}
+                        field={col.field}
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        className={PHONE_HEADER_CLASS}
+                      >
+                        {col.label}
+                      </SortableHeader>
+                    ))}
+                  </tr>
+                  <tr role="row" className="hidden sm:table-row">
+                    {sortColumns.map((col) => (
+                      <SortableHeader<SpendingCategorySortField>
+                        key={col.field}
+                        field={col.field}
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        align={col.align}
+                        className={HEADER_CLASS}
+                      >
+                        {col.label}
+                      </SortableHeader>
+                    ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody role="rowgroup" className="block divide-y divide-gray-200 dark:divide-gray-700 sm:table-row-group">
                   {sortedTableData.map((item) => {
                     const percentage = totalExpenses > 0 ? (item.value / totalExpenses) * 100 : 0;
                     return (
                       <tr
                         key={item.id || item.name}
-                        className={`${item.id ? 'cursor-pointer' : ''} hover:bg-gray-50 dark:hover:bg-gray-700/50`}
+                        role="row"
+                        className={`${ROW_GRID} ${item.id ? 'cursor-pointer' : ''} hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row sm:p-0`}
                         onClick={() => item.id && handleCategoryClick(item.id)}
                       >
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {/* The identity. A category name is unbounded, so it
+                            takes the whole of line 1 and wraps unclamped
+                            (`break-words`), taking today's wrapping back from
+                            `sm` up. */}
+                        <td role="cell" className={`${IDENTITY_CELL} font-medium text-gray-900 dark:text-gray-100`}>
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: item.colour }} />
-                            {item.name}
+                            <span className="min-w-0 break-words sm:break-normal">{item.name}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-gray-100">
+                        {/* The amount is the headline: the left of line 2. */}
+                        <td role="cell" className={`col-start-1 row-start-2 text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                          <CellLabel className={CAPTION_CLASS}>{columns.value.label}</CellLabel>
                           {formatCurrency(item.value)}
                         </td>
-                        <td className="px-4 py-3 text-right text-sm text-gray-600 dark:text-gray-400">
+                        {/* The share ends line 2, under the amount it is a share
+                            of. Its value is bounded (`100.0%`) but its caption is
+                            not, so it takes the same track as the amount rather
+                            than an `auto` one sized by the caption. */}
+                        <td role="cell" className={`col-start-2 row-start-2 text-gray-600 dark:text-gray-400 ${FIGURE_CELL}`}>
+                          <CellLabel className={CAPTION_CLASS}>{columns.percentage.label}</CellLabel>
                           {formatPercent(percentage, 1)}
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
-                <tfoot className="bg-gray-50 dark:bg-gray-900/50">
-                  <tr>
-                    <td className="px-4 py-3 text-sm font-bold text-gray-900 dark:text-gray-100">{t('spendingByCategory.total')}</td>
-                    <td className="px-4 py-3 text-right text-sm font-bold text-gray-900 dark:text-gray-100">
+                <tfoot role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-footer-group">
+                  {/* The totals are the largest figures on the table, so this
+                      row wraps exactly the way a data row does -- the same two
+                      tracks and the same placement, each figure captioned --
+                      with "Total" standing in for the category in the identity
+                      track. Every column has a total, so no cell leaves the DOM
+                      below `sm` and the footer stays a full three-cell row at
+                      every width. */}
+                  <tr role="row" className={`${ROW_GRID} sm:table-row sm:p-0`}>
+                    <td role="cell" className={`${IDENTITY_CELL} font-bold text-gray-900 dark:text-gray-100`}>
+                      <span className="min-w-0 break-words sm:break-normal">{t('spendingByCategory.total')}</span>
+                    </td>
+                    <td role="cell" className={`col-start-1 row-start-2 font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{columns.value.label}</CellLabel>
                       {formatCurrency(totalExpenses)}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-bold text-gray-900 dark:text-gray-100">100%</td>
+                    <td role="cell" className={`col-start-2 row-start-2 font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{columns.percentage.label}</CellLabel>
+                      100%
+                    </td>
                   </tr>
                 </tfoot>
               </table>

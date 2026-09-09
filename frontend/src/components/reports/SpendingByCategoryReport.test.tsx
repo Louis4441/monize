@@ -417,10 +417,13 @@ describe("SpendingByCategoryReport", () => {
       expect(screen.getByTestId("toggle-table")).toBeInTheDocument();
     });
     fireEvent.click(screen.getByTestId("toggle-table"));
-    // Click each sort header to exercise comparators (default desc by value).
-    const categoryHeader = screen.getByText("Category");
-    const amountHeader = screen.getByText("Amount");
-    const pctHeader = screen.getByText("% of Total");
+    // Each header label now appears in three places (the phone sort strip, the
+    // column header row and the cell captions), so address the column header
+    // row by position rather than by label.
+    const columnHeader = document.querySelectorAll("table thead tr")[1];
+    const [categoryHeader, amountHeader, pctHeader] = Array.from(
+      columnHeader.querySelectorAll("th"),
+    );
     fireEvent.click(categoryHeader); // sort by name
     fireEvent.click(categoryHeader); // toggle desc
     fireEvent.click(pctHeader);
