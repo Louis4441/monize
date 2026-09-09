@@ -19,14 +19,19 @@ describe("PasswordBreachService", () => {
 
   // SHA-1 is used here only to replicate HIBP's k-Anonymity API format
   // inside unit-test fixtures. This is not a password-storage hash.
-  // codeql[js/insufficient-password-hash]
   function sha1Suffix(password: string): string {
-    return crypto
-      .createHash("sha1")
-      .update(password)
-      .digest("hex")
-      .toUpperCase()
-      .substring(5);
+    return (
+      crypto
+        .createHash("sha1")
+        // Reported on the `.update(password)` line; the alert belongs dismissed
+        // on the Security tab as "used in tests". The annotation covers only
+        // the next line.
+        // codeql[js/insufficient-password-hash]
+        .update(password)
+        .digest("hex")
+        .toUpperCase()
+        .substring(5)
+    );
   }
 
   it("returns true when password is found in breach data", async () => {
