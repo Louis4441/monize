@@ -1647,6 +1647,40 @@ describe("SecurityPriceService", () => {
       );
     });
 
+    it("keeps the full 1Y of fetched bars even when the security was bought last month", async () => {
+      // A security purchased recently should still get the whole year of
+      // history the "1y" fetch already pulled -- clipping to the purchase
+      // date threw away everything before it, leaving a security bought a
+      // month ago with only a month of stored prices.
+      securitiesRepository.findOne.mockResolvedValue(mockSecurity);
+      const recent = new Date();
+      recent.setMonth(recent.getMonth() - 1);
+      const recentStr = recent.toISOString().substring(0, 10);
+      dataSourceMock.query.mockResolvedValueOnce([{ earliest: recentStr }]);
+
+      const eightMonthsAgo = nowSeconds - 8 * 30 * daySeconds;
+      const historicalData = makeYahooHistoricalResponse({
+        timestamps: [eightMonthsAgo, nowSeconds - daySeconds],
+        closes: [180.0, 194.0],
+      });
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(historicalData),
+        ) as jest.Mock;
+      dataSourceMock.query.mockResolvedValue(undefined);
+
+      const result = await service.backfillSecurityHoldingPeriod(
+        TEST_USER_ID,
+        "sec-1",
+      );
+
+      expect(result.success).toBe(true);
+      // Both bars are kept, including the one eight months before the
+      // purchase date -- the clip only excludes anything older than 1y.
+      expect(result.pricesLoaded).toBe(2);
+    });
+
     it("fetches max history when the earliest transaction predates one year", async () => {
       securitiesRepository.findOne.mockResolvedValue(mockSecurity);
       dataSourceMock.query.mockResolvedValueOnce([{ earliest: "2018-01-01" }]);
@@ -2213,8 +2247,56 @@ describe("SecurityPriceService", () => {
       expect(result.pricesLoaded).toBe(40);
     });
 
-    it("still clips when no range is given", async () => {
-      dataSourceMock.query.mockResolvedValueOnce([{ earliest: "2026-08-01" }]);
+    /**
+     * "No range" still clips -- but only to the 1y-ago floor, never to a
+     * *recent* purchase date. A holding bought a month ago is not the case
+     * this clip exists for (that would throw away the very 1y of daily bars
+     * the default path just fetched); a holding bought years ago still gets
+     * its pre-purchase prices dropped.
+     */
+    it("still clips to the earliest transaction when it predates a year, with no range given", async () => {
+      dataSourceMock.query.mockResolvedValueOnce([{ earliest: "2023-01-01" }]);
+      const beforePurchase = Math.floor(
+        new Date("2019-01-01T00:00:00Z").getTime() / 1000,
+      );
+      const afterPurchase = Math.floor(
+        new Date("2023-06-01T00:00:00Z").getTime() / 1000,
+      );
+      const recent = Math.floor(Date.now() / 1000) - DAY;
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(
+            makeYahooHistoricalResponse({
+              timestamps: [beforePurchase, afterPurchase, recent],
+              closes: [50, 60, 70],
+            }),
+          ),
+        ) as jest.Mock;
+
+      const result = await service.backfillSecurityHoldingPeriod(
+        TEST_USER_ID,
+        mockSecurity.id,
+      );
+
+      // The 2019 bar predates the 2023 purchase and is clipped; the other
+      // two -- one before the 1y-ago floor, one after -- are both kept.
+      expect(result.pricesLoaded).toBe(2);
+    });
+
+    /**
+     * The recent-purchase counterpart to the test above: with no range given
+     * and a holding bought within the last year, the clip must not undo the
+     * default 1y fetch. See `security-price.service.spec.ts`'s
+     * "keeps the full 1Y of fetched bars even when the security was bought
+     * last month" for the same guarantee against the unranged daily-only path.
+     */
+    it("does not clip a recent purchase back below the 1y floor, with no range given", async () => {
+      const recentPurchase = new Date();
+      recentPurchase.setMonth(recentPurchase.getMonth() - 1);
+      dataSourceMock.query.mockResolvedValueOnce([
+        { earliest: recentPurchase.toISOString().substring(0, 10) },
+      ]);
       global.fetch = jest
         .fn()
         .mockResolvedValue(
@@ -2226,7 +2308,7 @@ describe("SecurityPriceService", () => {
         mockSecurity.id,
       );
 
-      expect(result.pricesLoaded).toBeLessThan(40);
+      expect(result.pricesLoaded).toBe(40);
     });
   });
 

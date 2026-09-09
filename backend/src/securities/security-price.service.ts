@@ -1875,7 +1875,13 @@ export class SecurityPriceService {
 
     // Clip to the holding period: from the first transaction date (or 1y ago
     // when the security has never been transacted) through the latest price.
-    const cutoffStr = earliestTx ?? oneYearAgoStr;
+    // Never later than 1y ago, though -- a security bought last month is a
+    // holding period the user can already see on the register; what a force
+    // update exists to fill in is the price *history* behind it, and clipping
+    // to the purchase date threw away the 1y of daily bars already fetched
+    // above for exactly this security.
+    const cutoffStr =
+      earliestTx && earliestTx < oneYearAgoStr ? earliestTx : oneYearAgoStr;
     // UTC midnight, matching the UTC-midnight dates `barDate` produces. The
     // old `setHours(0, 0, 0, 0)` made this local midnight, so the cutoff moved
     // by a day depending on where the container runs.

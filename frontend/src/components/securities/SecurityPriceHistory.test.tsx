@@ -156,10 +156,15 @@ describe('SecurityPriceHistory', () => {
     window.removeEventListener('unhandledrejection', swallowExpected);
   });
 
-  async function renderComponent() {
+  async function renderComponent(onPricesChanged?: () => void) {
     let result: ReturnType<typeof render>;
     await act(async () => {
-      result = render(<SecurityPriceHistory security={mockSecurity} />);
+      result = render(
+        <SecurityPriceHistory
+          security={mockSecurity}
+          onPricesChanged={onPricesChanged}
+        />,
+      );
     });
     return result!;
   }
@@ -717,6 +722,97 @@ describe('SecurityPriceHistory', () => {
       await act(async () => {});
 
       expect(toast.error).toHaveBeenCalledWith('Failed to update prices');
+    });
+  });
+
+  // The detail page's chart and quote card hold their own copy of the price
+  // series, fetched once on load -- this pane changing the stored rows must
+  // tell the page to reload its copy too, or the chart keeps showing the
+  // pre-update line until the reader presses the page's separate refresh
+  // button (a different control, easy to miss the connection to).
+  describe('onPricesChanged', () => {
+    it('notifies the parent after a successful force update', async () => {
+      (investmentsApi.backfillSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue({
+        symbol: 'AAPL',
+        success: true,
+        pricesLoaded: 252,
+        provider: 'yahoo',
+      });
+      const onPricesChanged = vi.fn();
+      await renderComponent(onPricesChanged);
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Force Update Prices' }));
+      });
+
+      expect(onPricesChanged).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not notify the parent when the force update reports failure', async () => {
+      (investmentsApi.backfillSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue({
+        symbol: 'AAPL',
+        success: false,
+        error: 'No historical data available',
+      });
+      const onPricesChanged = vi.fn();
+      await renderComponent(onPricesChanged);
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Force Update Prices' }));
+      });
+
+      expect(onPricesChanged).not.toHaveBeenCalled();
+    });
+
+    it('does not notify the parent when the force update request throws', async () => {
+      (investmentsApi.backfillSecurityPrices as ReturnType<typeof vi.fn>).mockRejectedValue(
+        'boom',
+      );
+      const onPricesChanged = vi.fn();
+      await renderComponent(onPricesChanged);
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Force Update Prices' }));
+      });
+      await act(async () => {});
+
+      expect(onPricesChanged).not.toHaveBeenCalled();
+    });
+
+    it('notifies the parent after adding a price', async () => {
+      (investmentsApi.createSecurityPrice as ReturnType<typeof vi.fn>).mockResolvedValue(
+        mockPrices[0],
+      );
+      const onPricesChanged = vi.fn();
+      await renderComponent(onPricesChanged);
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('+ Add Price'));
+      });
+      fireEvent.change(screen.getByLabelText('Close Price'), {
+        target: { value: '15.5' },
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Add Price' }));
+      });
+
+      expect(onPricesChanged).toHaveBeenCalledTimes(1);
+    });
+
+    it('notifies the parent after deleting a price', async () => {
+      (investmentsApi.deleteSecurityPrice as ReturnType<typeof vi.fn>).mockResolvedValue(
+        undefined,
+      );
+      const onPricesChanged = vi.fn();
+      await renderComponent(onPricesChanged);
+
+      fireEvent.click(screen.getAllByText('Delete')[0]);
+      const confirmButtons = screen.getAllByRole('button', { name: 'Delete' });
+      await act(async () => {
+        fireEvent.click(confirmButtons[confirmButtons.length - 1]);
+      });
+
+      expect(onPricesChanged).toHaveBeenCalledTimes(1);
     });
   });
 });
