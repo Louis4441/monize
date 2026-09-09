@@ -29,6 +29,15 @@ import { SecurityPriceForm } from './SecurityPriceForm';
 
 interface SecurityPriceHistoryProps {
   security: Security;
+  /**
+   * Called after a write here actually changes the stored series (add, edit,
+   * delete, or a successful force update) -- never on a failure, which leaves
+   * the series exactly as it was. The detail page's chart and quote card read
+   * their own copy of the prices, fetched once on load; without this they kept
+   * showing the pre-update line until the reader pressed the page's separate
+   * refresh button.
+   */
+  onPricesChanged?: () => void | Promise<void>;
 }
 
 function getSourceLabel(source: string | null): string {
@@ -79,7 +88,10 @@ function formatPrice(
   return formatNumber(Number(value), decimals);
 }
 
-export function SecurityPriceHistory({ security }: SecurityPriceHistoryProps) {
+export function SecurityPriceHistory({
+  security,
+  onPricesChanged,
+}: SecurityPriceHistoryProps) {
   const t = useTranslations('securities');
   const { formatDate, formatMonth } = useDateFormat();
   const { formatNumber } = useNumberFormat();
@@ -126,11 +138,12 @@ export function SecurityPriceHistory({ security }: SecurityPriceHistoryProps) {
       toast.success(t('priceHistory.toasts.added'));
       setShowAddForm(false);
       loadPrices();
+      onPricesChanged?.();
     } catch (error) {
       toast.error(getErrorMessage(error, t('priceHistory.toasts.addFailed')));
       throw error;
     }
-  }, [security.id, loadPrices, t]);
+  }, [security.id, loadPrices, onPricesChanged, t]);
 
   const handleEdit = useCallback(async (data: CreateSecurityPriceData) => {
     if (!editingPrice) return;
@@ -139,11 +152,12 @@ export function SecurityPriceHistory({ security }: SecurityPriceHistoryProps) {
       toast.success(t('priceHistory.toasts.updated'));
       setEditingPrice(undefined);
       loadPrices();
+      onPricesChanged?.();
     } catch (error) {
       toast.error(getErrorMessage(error, t('priceHistory.toasts.updateFailed')));
       throw error;
     }
-  }, [security.id, editingPrice, loadPrices, t]);
+  }, [security.id, editingPrice, loadPrices, onPricesChanged, t]);
 
   const startEdit = useCallback((price: SecurityPrice) => {
     setShowAddForm(false);
@@ -182,10 +196,11 @@ export function SecurityPriceHistory({ security }: SecurityPriceHistoryProps) {
       toast.success(t('priceHistory.toasts.deleted'));
       setDeletingPrice(undefined);
       loadPrices();
+      onPricesChanged?.();
     } catch (error) {
       toast.error(getErrorMessage(error, t('priceHistory.toasts.deleteFailed')));
     }
-  }, [security.id, deletingPrice, loadPrices, t]);
+  }, [security.id, deletingPrice, loadPrices, onPricesChanged, t]);
 
   const handleForceUpdate = useCallback(async () => {
     setIsUpdating(true);
@@ -198,6 +213,10 @@ export function SecurityPriceHistory({ security }: SecurityPriceHistoryProps) {
             : t('priceHistory.toasts.noPricesFound', { symbol: result.symbol }),
         );
         await loadPrices();
+        // The series changed even when zero *new* rows were reported (an
+        // existing row can still have been overwritten), so this only skips
+        // the parent refresh on the `else` (failure) branch below.
+        await onPricesChanged?.();
       } else {
         toast.error(result.error || t('priceHistory.toasts.updatePricesFailed', { symbol: result.symbol }));
       }
@@ -206,7 +225,7 @@ export function SecurityPriceHistory({ security }: SecurityPriceHistoryProps) {
     } finally {
       setIsUpdating(false);
     }
-  }, [security.id, loadPrices, t]);
+  }, [security.id, loadPrices, onPricesChanged, t]);
 
   const isFormOpen = showAddForm || !!editingPrice;
   // One decimal count across every price column and every row, so the figures
