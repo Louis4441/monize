@@ -341,5 +341,11 @@
     "dateRequired": "日期為必填",
     "priceRequired": "價格為必填",
     "priceNonNegative": "價格必須為非負數"
+  },
+  "priceAlert": {
+    "label": "價格變動提醒 (%)",
+    "help": "留空以停用。相對於上一個有資料的交易日，價格上漲或下跌時提醒，每個證券每個 UTC 日最多一次。",
+    "range": "請輸入 0.1 至 1000 之間的百分比。",
+    "chartLabel": "在價格提醒中附加圖表"
   }
 }

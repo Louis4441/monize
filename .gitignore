@@ -81,3 +81,7 @@ credentials/
 # Claude Code
 .claude/worktrees/
 .claude/settings.local.json
+
+# Standalone Chromium push integration artifacts
+e2e/playwright-push-report/
+e2e/test-results-push/

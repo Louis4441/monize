@@ -152,11 +152,19 @@ export function PortfolioAlertControl() {
           <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">
             {t('thresholdLabel')}
           </label>
+          {/*
+            Four decimals, matching this field's own column
+            (notification_portfolio_state.move_alert_percent NUMERIC(9,4)) and
+            the security price-alert control beside it. At two, a stored 0.1250
+            was DISPLAYED as 0.13 and then saved at that rounding on the next
+            blur, because NumericInput re-emits when rounding moved the value --
+            so a control narrower than its column silently edits what it shows.
+          */}
           <NumericInput
             value={percent}
             onChange={handlePercentChange}
             suffix="%"
-            decimalPlaces={2}
+            decimalPlaces={4}
             min={0.1}
             max={100}
             className="w-32"

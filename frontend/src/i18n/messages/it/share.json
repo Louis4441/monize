@@ -18,6 +18,8 @@
   "newTransactionTitle": "Nuova transazione",
   "import": "Importa come estratto conto",
   "importHint": "Apre la procedura di importazione per associare le colonne e controllare ogni riga prima di procedere.",
+  "sendToAssistant": "Invia all'assistente IA",
+  "sendToAssistantHint": "{count, plural, one {Apre l'assistente con questo file allegato, così puoi porre domande prima che venga salvato qualcosa.} other {Apre l'assistente con questi file allegati, così puoi porre domande prima che venga salvato qualcosa.}}",
   "discard": "Scarta",
   "discardConfirmTitle": "Scartare i file condivisi?",
   "discardConfirmMessage": "I file condivisi saranno rimossi da questo dispositivo. In Monize non cambia nulla.",
@@ -40,8 +42,5 @@
   "unsupportedBrowserTitle": "Questo browser non può ricevere file condivisi",
   "unsupportedBrowserMessage": "La condivisione verso un'app installata non è disponibile qui. Puoi comunque aggiungere file da dentro Monize.",
   "goToTransactions": "Aggiungi da Transazioni",
-  "goToImport": "Vai a Importa",
-  "noticeTitle": "{count, plural, one {# file è stato condiviso con Monize} other {# file sono stati condivisi con Monize}}",
-  "noticeAction": "Controlla",
-  "noticeDismiss": "Ignora"
+  "goToImport": "Vai a Importa"
 }

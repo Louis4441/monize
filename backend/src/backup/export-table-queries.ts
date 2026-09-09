@@ -149,6 +149,7 @@ export const INTENTIONALLY_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
   // The key pair itself: an installation secret, not user content. It shares
   // the backup/restore lifecycle of ENCRYPTION_KEY rather than of a ledger.
   "push_instance_config",
+  "push_chart_artifacts",
 ]);
 
 export function buildExportTableQueries(

@@ -18,6 +18,8 @@
   "newTransactionTitle": "[XX-New transaction-XX]",
   "import": "[XX-Import as a statement-XX]",
   "importHint": "[XX-Open the import wizard so you can map the columns and review every row first.-XX]",
+  "sendToAssistant": "[XX-Send to AI Assistant-XX]",
+  "sendToAssistantHint": "[XX-Open the assistant with {count, plural, one {this file} other {these files}} attached, so you can ask about {count, plural, one {it} other {them}} before anything is saved.-XX]",
   "discard": "[XX-Discard-XX]",
   "discardConfirmTitle": "[XX-Discard shared files?-XX]",
   "discardConfirmMessage": "[XX-The shared files will be removed from this device. Nothing in Monize changes.-XX]",
@@ -40,8 +42,5 @@
   "unsupportedBrowserTitle": "[XX-This browser cannot receive shared files-XX]",
   "unsupportedBrowserMessage": "[XX-Sharing into an installed app is not available here. You can still add files from inside Monize.-XX]",
   "goToTransactions": "[XX-Add from Transactions-XX]",
-  "goToImport": "[XX-Go to Import-XX]",
-  "noticeTitle": "[XX-{count, plural, one {# file was} other {# files were}} shared with Monize-XX]",
-  "noticeAction": "[XX-Review-XX]",
-  "noticeDismiss": "[XX-Dismiss-XX]"
+  "goToImport": "[XX-Go to Import-XX]"
 }

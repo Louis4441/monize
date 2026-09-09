@@ -1,3 +1,4 @@
+import { useAuthStore } from '@/store/authStore';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act, cleanup } from '@/test/render';
 import { NotificationBell } from './NotificationBell';
@@ -66,11 +67,66 @@ describe('NotificationBell', () => {
     cleanup();
     useTourStore.setState({ active: null, progress: {}, progressLoaded: false });
     vi.clearAllMocks();
+    useAuthStore.setState({ actingAsUserId: null, delegateSections: null });
     mockGetAlerts.mockResolvedValue([]);
     mockMarkAlertRead.mockResolvedValue({});
     mockMarkAllAlertsRead.mockResolvedValue({ updated: 0 });
     mockDeleteAlert.mockResolvedValue(undefined);
     mockDismissAlerts.mockResolvedValue({ dismissed: 0 });
+  });
+
+  it('does not fetch or render the feed for a delegate without Budgets access', async () => {
+    useAuthStore.setState({ actingAsUserId: 'owner-1', delegateSections: null });
+    render(<NotificationBell />);
+    await act(async () => {});
+    expect(mockGetAlerts).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('notification-badge-button')).not.toBeInTheDocument();
+  });
+
+  it('renders a read-only feed for a delegate with Budgets access', async () => {
+    useAuthStore.setState({ actingAsUserId: 'owner-1', delegateSections: {
+      budgets: true, bills: false, investments: false, reports: false, ai: false,
+    } });
+    mockGetAlerts.mockResolvedValue([makeNotification()]);
+    render(<NotificationBell />);
+    await act(async () => {});
+    fireEvent.click(screen.getByTestId('notification-badge-button'));
+    expect(screen.queryByTestId('delete-all-notifications')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('remind-me-notification-1')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('notification-item-notification-1'));
+    expect(mockMarkAlertRead).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith('/budgets/budget-1');
+  });
+
+  it('cancels a pending dismissal when switching into a delegated context', async () => {
+    vi.useFakeTimers();
+    try {
+      mockGetAlerts.mockResolvedValue([makeNotification()]);
+      render(<NotificationBell />);
+      await act(async () => {});
+      fireEvent.click(screen.getByTestId('notification-badge-button'));
+      fireEvent.click(screen.getByTestId('dismiss-notification-notification-1'));
+      act(() => useAuthStore.setState({ actingAsUserId: 'owner-2', delegateSections: null }));
+      await act(async () => { vi.advanceTimersByTime(6000); });
+      expect(mockDeleteAlert).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not display a previous context response after switching owners', async () => {
+    let finishOld!: (rows: Notification[]) => void;
+    mockGetAlerts.mockReturnValueOnce(new Promise<Notification[]>((resolve) => { finishOld = resolve; }));
+    render(<NotificationBell />);
+    mockGetAlerts.mockResolvedValueOnce([makeNotification({ id: 'current-owner-row' })]);
+    act(() => useAuthStore.setState({ actingAsUserId: 'owner-2', delegateSections: {
+      budgets: true, bills: false, investments: false, reports: false, ai: false,
+    } }));
+    await act(async () => {});
+    await act(async () => { finishOld([makeNotification({ id: 'previous-context-row' })]); });
+    fireEvent.click(screen.getByTestId('notification-badge-button'));
+    expect(screen.getByTestId('notification-item-current-owner-row')).toBeInTheDocument();
+    expect(screen.queryByTestId('notification-item-previous-context-row')).not.toBeInTheDocument();
   });
 
   it('renders the bell icon button', async () => {

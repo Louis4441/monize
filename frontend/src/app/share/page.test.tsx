@@ -49,6 +49,13 @@ vi.mock('@/components/auth/ProtectedRoute', () => ({
   ProtectedRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+// Whether an AI provider can answer at all. The real hook reads the cached
+// status endpoint; the screen only ever asks it the one question.
+const aiConfigured = vi.hoisted(() => ({ value: false }));
+vi.mock('@/hooks/useAiConfigured', () => ({
+  useAiConfigured: () => ({ configured: aiConfigured.value, resolved: true }),
+}));
+
 // The form is a heavy dynamic import with its own data loading; this screen's
 // contract is only that it opens with the shared files staged.
 const transactionForm = vi.hoisted(() => vi.fn());
@@ -130,6 +137,7 @@ describe('share review screen', () => {
     mocks.listSharedBundles.mockResolvedValue([]);
     mocks.discardSharedBundle.mockResolvedValue(undefined);
     mocks.readSharedBundle.mockResolvedValue(null);
+    aiConfigured.value = false;
     transactionForm.mockClear();
   });
 
@@ -368,6 +376,101 @@ describe('share review screen', () => {
 
     expect(await screen.findByText('receipt.jpg')).toBeInTheDocument();
     expect(mocks.readSharedBundle).toHaveBeenCalledWith('bundle-1', VIEWER_ID);
+  });
+
+  // The assistant is a third destination, and it is offered only when a
+  // provider can actually answer: a button whose one outcome is "configure a
+  // provider first" costs a press to learn nothing.
+  describe('the assistant destination', () => {
+    it('is not offered when no AI provider is configured', async () => {
+      mocks.readSharedBundle.mockResolvedValue(
+        bundle([item('receipt.jpg', 'image/jpeg')]),
+      );
+
+      await renderPage();
+
+      expect(await screen.findByText('receipt.jpg')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /send to ai assistant/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('hands the bundle to the chat rather than the files, and leaves it in the stash', async () => {
+      aiConfigured.value = true;
+      mocks.readSharedBundle.mockResolvedValue(
+        bundle([item('receipt.jpg', 'image/jpeg'), item('bill.pdf', 'application/pdf')]),
+      );
+
+      await renderPage();
+
+      const send = await screen.findByRole('button', {
+        name: /send to ai assistant/i,
+      });
+      await act(async () => {
+        send.click();
+      });
+
+      expect(routerMock.push).toHaveBeenCalledWith('/ai?share=bundle-1');
+      // The chat discards it once it holds the contents; dropping it here would
+      // leave the user with neither the share nor the attachments.
+      expect(mocks.discardSharedBundle).not.toHaveBeenCalled();
+    });
+
+    it('is offered beside the import wizard for a CSV statement the assistant can read', async () => {
+      aiConfigured.value = true;
+      mocks.readSharedBundle.mockResolvedValue(
+        bundle([item('january.csv', 'text/csv')]),
+      );
+
+      await renderPage();
+
+      expect(
+        await screen.findByRole('button', { name: /import as a statement/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /send to ai assistant/i }),
+      ).toBeInTheDocument();
+    });
+
+    // A QIF is a statement the wizard reads and the assistant cannot. Offering
+    // the row here would promise something the chat then refuses file by file.
+    it('is withheld for a statement type the assistant cannot read', async () => {
+      aiConfigured.value = true;
+      mocks.readSharedBundle.mockResolvedValue(
+        bundle([item('january.qif', 'application/x-qw')]),
+      );
+
+      await renderPage();
+
+      expect(
+        await screen.findByRole('button', { name: /import as a statement/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /send to ai assistant/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    // The stash takes 10 files; the assistant takes 5. A share inside one cap
+    // can be outside the other.
+    it('is withheld for a share of more files than the assistant accepts', async () => {
+      aiConfigured.value = true;
+      mocks.readSharedBundle.mockResolvedValue(
+        bundle(
+          Array.from({ length: 6 }, (_, i) =>
+            item(`page-${i}.png`, 'image/png'),
+          ),
+        ),
+      );
+
+      await renderPage();
+
+      expect(
+        await screen.findByRole('button', { name: /attach to a new transaction/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /send to ai assistant/i }),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it('discards only after the confirmation is accepted', async () => {

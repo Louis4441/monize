@@ -26,6 +26,8 @@ import {
   type SharedBundle,
 } from '@/lib/share-inbox';
 import { isShareBundleId } from '@/lib/share-target';
+import { assistantAcceptsFiles } from '@/lib/ai-attachments';
+import { useAiConfigured } from '@/hooks/useAiConfigured';
 import { createLogger } from '@/lib/logger';
 
 const TransactionForm = dynamic(
@@ -86,6 +88,11 @@ function ShareContent() {
   // that sees it, so nothing is read before the reader is known -- an unknown
   // viewer must not be shown, or be able to claim, anybody's share.
   const viewerUserId = useAuthStore((state) => state.user?.id);
+
+  // Whether the assistant is a destination at all. A provider that cannot
+  // answer means no row: a button whose only outcome is "configure a provider
+  // first" is not a destination.
+  const { configured: aiConfigured } = useAiConfigured();
 
   const requestedId = searchParams?.get('id') ?? null;
   const missed = searchParams?.get('missed') === '1';
@@ -188,6 +195,15 @@ function ShareContent() {
     }
   }, [bundle, router, t]);
 
+  const goToAssistant = useCallback(() => {
+    if (!bundle) return;
+    // Same hand-off as the wizard's: the chat reads the bundle and discards it
+    // once it holds the contents, so those bytes keep one owner. Nothing is
+    // asked on arrival -- the files land staged on the composer and the user
+    // still presses send.
+    router.push(`/ai?share=${encodeURIComponent(bundle.index.id)}`);
+  }, [bundle, router]);
+
   const goToImport = useCallback(() => {
     if (!bundle) return;
     // The wizard reads the bundle itself and discards it once it holds the
@@ -233,6 +249,11 @@ function ShareContent() {
               fileCount={usable.files.length}
               onAttach={() => setShowForm(true)}
               onImport={goToImport}
+              onSendToAssistant={
+                aiConfigured && assistantAcceptsFiles(usable.files)
+                  ? goToAssistant
+                  : undefined
+              }
               onDiscard={() => setConfirmDiscard(true)}
               busy={busy}
             />

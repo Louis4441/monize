@@ -17,6 +17,7 @@ import { Type } from "class-transformer";
 import { SanitizeHtml } from "../../common/decorators/sanitize-html.decorator";
 import { InvestmentSplitDto } from "../../transactions/dto/create-transaction-split.dto";
 import { SplitKind } from "../../transactions/entities/split-kind.enum";
+import { TRANSACTION_NOTE_MAX_LENGTH } from "../../common/transaction-note";
 
 export class OverrideSplitDto {
   // Stable id of the override split this row continues (issue #1167 F4). Echoed
@@ -75,7 +76,7 @@ export class OverrideSplitDto {
   @ApiPropertyOptional({ description: "Memo for this split" })
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(TRANSACTION_NOTE_MAX_LENGTH)
   @SanitizeHtml()
   memo?: string | null;
 }
@@ -110,7 +111,7 @@ export class CreateScheduledTransactionOverrideDto {
   @ApiPropertyOptional({ description: "Overridden description" })
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(TRANSACTION_NOTE_MAX_LENGTH)
   @SanitizeHtml()
   description?: string | null;
 
@@ -185,7 +186,7 @@ export class UpdateScheduledTransactionOverrideDto {
   @ApiPropertyOptional({ description: "Overridden description" })
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(TRANSACTION_NOTE_MAX_LENGTH)
   @SanitizeHtml()
   description?: string | null;
 

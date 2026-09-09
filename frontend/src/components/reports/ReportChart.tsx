@@ -22,6 +22,7 @@ import { CHART_COLOURS } from '@/lib/chart-colours';
 import { chartColors } from '@/lib/chart-colors';
 import { exportToCsv } from '@/lib/csv-export';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { LinkifiedText } from '@/components/ui/LinkifiedText';
 
 // Default columns if none specified
 const DEFAULT_TABLE_COLUMNS = [TableColumn.LABEL, TableColumn.VALUE, TableColumn.PERCENTAGE, TableColumn.COUNT];
@@ -344,12 +345,16 @@ export function ReportChart({ viewType, data, groupBy, onDataPointClick, tableCo
                   )}
                   {columns.includes(TableColumn.DESCRIPTION) && (
                     <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 max-w-xs truncate">
-                      {item.description || '-'}
+                      {item.description ? (
+                        <LinkifiedText text={item.description} />
+                      ) : (
+                        '-'
+                      )}
                     </td>
                   )}
                   {columns.includes(TableColumn.MEMO) && (
                     <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate">
-                      {item.memo || '-'}
+                      {item.memo ? <LinkifiedText text={item.memo} /> : '-'}
                     </td>
                   )}
                   {columns.includes(TableColumn.CATEGORY) && (

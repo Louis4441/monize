@@ -46,6 +46,7 @@ export const ALWAYS_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
   "payee_lookup_settings",
   "transaction_attachments",
   "attachment_blobs",
+  "push_chart_artifacts",
 ]);
 
 export const RULES: Record<string, TableRules> = {
@@ -76,7 +77,6 @@ export const RULES: Record<string, TableRules> = {
     color_theme: keep,
     timezone: konst("UTC"),
     notification_email: keep,
-    notification_browser: keep,
     two_factor_enabled: keep,
     getting_started_dismissed: keep,
     week_starts_on: keep,
@@ -366,6 +366,8 @@ export const RULES: Record<string, TableRules> = {
     is_active: keep,
     is_favourite: keep,
     skip_price_updates: keep,
+    price_alert_percent: keep,
+    price_chart_enabled: keep,
     sector: keep,
     industry: keep,
     sector_weightings: keep, // public weightings

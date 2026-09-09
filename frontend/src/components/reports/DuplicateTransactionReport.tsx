@@ -15,6 +15,7 @@ import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { exportToCsv } from '@/lib/csv-export';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
+import { LinkifiedText } from '@/components/ui/LinkifiedText';
 import { useTranslations } from 'next-intl';
 
 export function DuplicateTransactionReport() {
@@ -238,7 +239,7 @@ export function DuplicateTransactionReport() {
                         </div>
                         {tx.description && (
                           <div className="text-sm text-gray-500 dark:text-gray-400 truncate mt-0.5">
-                            {tx.description}
+                            <LinkifiedText text={tx.description} />
                           </div>
                         )}
                         <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">

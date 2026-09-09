@@ -43,7 +43,14 @@
     "durationMinutes": "{minutes, plural, other {# 分鐘}}",
     "durationHours": "{hours, plural, other {# 小時}}",
     "cancel": "取消",
-    "confirm": "設定提醒"
+    "confirm": "設定提醒",
+    "pageTitle": "有效提醒",
+    "empty": "沒有有效提醒",
+    "loadFailed": "無法載入提醒",
+    "retry": "重試",
+    "nextFire": "下次提醒：{date}",
+    "openTarget": "開啟相關頁面",
+    "delegateUnavailable": "請切換回您自己的帳戶以管理提醒。"
   },
   "billDue": {
     "titleOverdue": "{payee} 已逾期",
@@ -104,5 +111,9 @@
       "title": "無法登錄 {name}",
       "message": "您到期日為 {date} 的定期交易未能自動登錄：{error}。您可以在「帳單與存款」中手動登錄。"
     }
+  },
+  "priceMovement": {
+    "title": "價格變動提醒: {symbol} ({percent}%)",
+    "message": "{symbol}：相對於上一個有資料的交易日變動 {percent}%。"
   }
 }

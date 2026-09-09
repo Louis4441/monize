@@ -18,6 +18,8 @@
   "newTransactionTitle": "Nieuwe transactie",
   "import": "Als afschrift importeren",
   "importHint": "Opent de importwizard, zodat u eerst de kolommen kunt toewijzen en elke regel kunt controleren.",
+  "sendToAssistant": "Naar de AI-assistent sturen",
+  "sendToAssistantHint": "{count, plural, one {Opent de assistent met dit bestand als bijlage, zodat u er vragen over kunt stellen voordat er iets wordt opgeslagen.} other {Opent de assistent met deze bestanden als bijlage, zodat u er vragen over kunt stellen voordat er iets wordt opgeslagen.}}",
   "discard": "Verwijderen",
   "discardConfirmTitle": "Gedeelde bestanden verwijderen?",
   "discardConfirmMessage": "De gedeelde bestanden worden van dit apparaat verwijderd. In Monize verandert niets.",
@@ -40,8 +42,5 @@
   "unsupportedBrowserTitle": "Deze browser kan geen gedeelde bestanden ontvangen",
   "unsupportedBrowserMessage": "Delen met een geïnstalleerde app is hier niet beschikbaar. U kunt bestanden nog steeds vanuit Monize toevoegen.",
   "goToTransactions": "Toevoegen via Transacties",
-  "goToImport": "Naar Importeren",
-  "noticeTitle": "{count, plural, one {# bestand is met Monize gedeeld} other {# bestanden zijn met Monize gedeeld}}",
-  "noticeAction": "Controleren",
-  "noticeDismiss": "Sluiten"
+  "goToImport": "Naar Importeren"
 }

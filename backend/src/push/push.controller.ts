@@ -1,3 +1,4 @@
+import { OwnerOnly } from "../delegation/decorators/delegate-access.decorator";
 import {
   Body,
   Controller,
@@ -37,6 +38,7 @@ import { clientIpOf } from "../common/client-ip.util";
 @ApiTags("Push")
 @Controller("push")
 @UseGuards(AuthGuard("jwt"))
+@OwnerOnly()
 @ApiBearerAuth()
 export class PushController {
   constructor(

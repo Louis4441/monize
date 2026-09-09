@@ -18,6 +18,8 @@
   "newTransactionTitle": "新交易",
   "import": "作為對帳單匯入",
   "importHint": "開啟匯入精靈，先對應各欄並逐列核對。",
+  "sendToAssistant": "傳送給 AI 助理",
+  "sendToAssistantHint": "{count, plural, other {開啟助理並附上這些檔案，可在儲存任何內容之前先提問。}}",
   "discard": "捨棄",
   "discardConfirmTitle": "捨棄已分享的檔案？",
   "discardConfirmMessage": "已分享的檔案將從本裝置移除。Monize 中的內容不會改變。",
@@ -40,8 +42,5 @@
   "unsupportedBrowserTitle": "此瀏覽器無法接收分享的檔案",
   "unsupportedBrowserMessage": "此處無法分享到已安裝的應用程式。你仍然可以在 Monize 內新增檔案。",
   "goToTransactions": "從「交易」新增",
-  "goToImport": "前往匯入",
-  "noticeTitle": "{count, plural, other {已向 Monize 分享 # 個檔案}}",
-  "noticeAction": "查看",
-  "noticeDismiss": "關閉"
+  "goToImport": "前往匯入"
 }

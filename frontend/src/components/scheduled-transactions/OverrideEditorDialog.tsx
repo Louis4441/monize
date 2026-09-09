@@ -27,6 +27,7 @@ import { createLogger } from '@/lib/logger';
 import { useTranslations } from 'next-intl';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
+import { TRANSACTION_NOTE_MAX_LENGTH } from '@/lib/transaction-note';
 
 const logger = createLogger('OverrideEditorDialog');
 interface OverrideEditorDialogProps {
@@ -750,6 +751,7 @@ export function OverrideEditorDialog({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder={t('overrideEditor.descriptionPlaceholder')}
+            maxLength={TRANSACTION_NOTE_MAX_LENGTH}
           />
         </div>
       </div>

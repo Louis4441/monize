@@ -771,14 +771,17 @@ export class BudgetsService {
           type: NotificationType.BILL_DUE,
           severity,
           // `title`/`message` are the English fallbacks for a reader with no
-          // client to render them. The UI composes both from `type` and `data`
-          // in the reader's own language -- a stored sentence cannot be
-          // translated after the fact, and the missing-rate case is exactly the
-          // one a non-English reader hits.
+          // client to render them (an API consumer). The UI and the email
+          // composer render `type` and `data` in the recipient's own language --
+          // a stored sentence cannot be translated after the fact, and the
+          // missing-rate case is exactly the one a non-English reader hits.
           //
           // The FIGURE in that fallback is still the recipient's to read, and
           // this one is not hypothetical: PAYMENTS supports `emailNotification`,
-          // so `notificationImmediateTemplate` renders this very string into an
+          // and `composeLocalizedNotificationCopy` falls back WHOLE to this
+          // stored pair for a row it cannot rebuild (a legacy or restored
+          // BILL_DUE carrying no `payeeName`, `dueDate` or `currencyCode`), so
+          // `notificationImmediateTemplate` renders this very string into an
           // email built with the recipient's translator. Formatting it en-US put
           // `zl18,812.71` inside Polish copy -- issue #1316 on the one path whose
           // English prose is not a machine format.

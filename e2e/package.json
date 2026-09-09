@@ -5,7 +5,8 @@
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug",
-    "test:report": "playwright show-report"
+    "test:report": "playwright show-report",
+    "test:push": "playwright test --config playwright.push.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.50.0",

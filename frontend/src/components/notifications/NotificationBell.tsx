@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useAuthStore } from '@/store/authStore';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { useClickOutside } from '@/hooks/useClickOutside';
@@ -18,6 +19,15 @@ import type { Notification } from '@/types/notification';
 import { NotificationList } from './NotificationList';
 
 export function NotificationBell() {
+  const actingAsUserId = useAuthStore((s) => s.actingAsUserId);
+  const userId = useAuthStore((s) => s.user?.id);
+  const budgetsGranted = useAuthStore((s) => s.delegateSections?.budgets);
+  if (actingAsUserId && !budgetsGranted) return null;
+  // Changing identity unmounts the old feed and cancels its delayed dismissals.
+  return <NotificationBellContent key={`${userId}:${actingAsUserId}`} canManage={!actingAsUserId} />;
+}
+
+function NotificationBellContent({ canManage }: { canManage: boolean }) {
   const t = useTranslations('notifications');
   const [notifications, setAlerts] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -202,6 +212,7 @@ export function NotificationBell() {
 
       {panelOpen && (
         <NotificationList
+          canManageNotifications={canManage}
           notifications={visibleNotifications}
           isLoading={isLoading}
           onMarkRead={handleMarkRead}

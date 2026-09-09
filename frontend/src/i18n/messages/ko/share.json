@@ -18,6 +18,8 @@
   "newTransactionTitle": "새 거래",
   "import": "거래 내역서로 가져오기",
   "importHint": "가져오기 마법사를 열어 열을 먼저 연결하고 모든 행을 확인할 수 있습니다.",
+  "sendToAssistant": "AI 어시스턴트로 보내기",
+  "sendToAssistantHint": "{count, plural, other {이 파일을 첨부한 채로 어시스턴트를 엽니다. 아무것도 저장되기 전에 질문할 수 있습니다.}}",
   "discard": "버리기",
   "discardConfirmTitle": "공유된 파일을 버릴까요?",
   "discardConfirmMessage": "공유된 파일이 이 기기에서 제거됩니다. Monize 안에서는 아무것도 바뀌지 않습니다.",
@@ -40,8 +42,5 @@
   "unsupportedBrowserTitle": "이 브라우저는 공유된 파일을 받을 수 없습니다",
   "unsupportedBrowserMessage": "설치된 앱으로 공유하는 기능은 여기서 사용할 수 없습니다. Monize 안에서 파일을 추가하는 것은 계속 가능합니다.",
   "goToTransactions": "거래에서 추가",
-  "goToImport": "가져오기로 이동",
-  "noticeTitle": "{count, plural, other {파일 #개가 Monize로 공유되었습니다}}",
-  "noticeAction": "확인",
-  "noticeDismiss": "닫기"
+  "goToImport": "가져오기로 이동"
 }

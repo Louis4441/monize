@@ -109,6 +109,10 @@ function subscribeInsert(
 }
 
 describe("PushSubscriptionService", () => {
+  const charts = {
+    render: jest.fn().mockResolvedValue(null),
+    issue: jest.fn().mockResolvedValue(null),
+  };
   let service: PushSubscriptionService;
   let subscriptionRepo: Record<string, jest.Mock>;
   let preferenceRepo: Record<string, jest.Mock>;
@@ -150,6 +154,7 @@ describe("PushSubscriptionService", () => {
       pushConfig as unknown as PushConfigService,
       sender as unknown as WebPushSender,
       { translate: jest.fn((key: string) => key) } as unknown as I18nService,
+      charts as any,
     );
   });
 
@@ -605,6 +610,7 @@ describe("PushSubscriptionService", () => {
         pushConfig as unknown as PushConfigService,
         sender as unknown as WebPushSender,
         { translate } as unknown as I18nService,
+        charts as any,
       );
 
       await service.sendTest(USER);
@@ -829,6 +835,55 @@ describe("PushSubscriptionService", () => {
       ).resolves.toEqual({ attempted: 0, delivered: 0 });
       expect(subscriptionRepo.find).not.toHaveBeenCalled();
       expect(sender.send).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("per-device chart fan-out", () => {
+    const request = {
+      securityId: "11111111-1111-4111-8111-111111111111",
+      priceDate: "2026-09-02",
+      price: 110,
+    };
+    const payload = {
+      type: "SECURITY_PRICE_MOVEMENT",
+      title: "Price",
+      body: "Price changed",
+      collapseKey: null,
+    };
+    afterEach(() => {
+      charts.render.mockReset().mockResolvedValue(null);
+      charts.issue.mockReset().mockResolvedValue(null);
+    });
+    it("renders once, issues separate webpush tokens and leaves UnifiedPush text-only", async () => {
+      subscriptionRepo.find.mockResolvedValue([
+        storedDevice({ transport: "webpush" }),
+        storedDevice({ id: "device-2", transport: "webpush" }),
+        storedDevice({ id: "device-3", transport: "unifiedpush" }),
+      ]);
+      charts.render.mockResolvedValue(Buffer.from("png"));
+      charts.issue
+        .mockResolvedValueOnce("/one.png")
+        .mockResolvedValueOnce("/two.png");
+      await service.sendToUser(USER, payload, undefined, request);
+      expect(charts.render).toHaveBeenCalledTimes(1);
+      expect(charts.render).toHaveBeenCalledWith(USER, request);
+      const delivered = send.mock.calls.map((call) => call[1]);
+      expect(
+        delivered
+          .filter((p) => p.image)
+          .map((p) => p.image)
+          .sort(),
+      ).toEqual(["/one.png", "/two.png"]);
+      expect(delivered.filter((p) => !p.image)).toEqual([payload]);
+      expect(payload).not.toHaveProperty("image");
+    });
+    it("still delivers text when no artifact can be minted", async () => {
+      subscriptionRepo.find.mockResolvedValue([
+        storedDevice({ transport: "webpush" }),
+      ]);
+      charts.render.mockResolvedValue(Buffer.from("png"));
+      await service.sendToUser(USER, payload, undefined, request);
+      expect(send.mock.calls[0][1]).toEqual(payload);
     });
   });
 

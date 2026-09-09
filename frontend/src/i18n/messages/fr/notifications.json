@@ -43,7 +43,14 @@
     "durationMinutes": "{minutes, plural, one {# minute} other {# minutes}}",
     "durationHours": "{hours, plural, one {# heure} other {# heures}}",
     "cancel": "Annuler",
-    "confirm": "Définir le rappel"
+    "confirm": "Définir le rappel",
+    "pageTitle": "Rappels actifs",
+    "empty": "Aucun rappel actif",
+    "loadFailed": "Impossible de charger les rappels",
+    "retry": "Réessayer",
+    "nextFire": "Prochain rappel : {date}",
+    "openTarget": "Ouvrir la page associée",
+    "delegateUnavailable": "Revenez à votre propre compte pour gérer les rappels."
   },
   "billDue": {
     "titleOverdue": "{payee} en retard",
@@ -104,5 +111,9 @@
       "title": "{name} n'a pas pu être enregistrée",
       "message": "Votre transaction planifiée arrivant à échéance le {date} n'a pas été enregistrée automatiquement : {error}. Vous pouvez l'enregistrer manuellement depuis Factures et dépôts."
     }
+  },
+  "priceMovement": {
+    "title": "Alerte de variation du cours: {symbol} ({percent}%)",
+    "message": "{symbol} : {percent}% par rapport à la séance précédente disponible."
   }
 }

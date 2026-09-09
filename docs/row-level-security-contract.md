@@ -235,3 +235,9 @@ hundreds of correct call sites -- and `lint-bans.spec.ts` scrapes selector shape
 out of the config and requires the root `CLAUDE.md` and `CONTRIBUTING.md` to name
 each banned call, which would put actively false guidance in the instruction
 files. The restriction is on the import, where it can be stated truthfully.
+
+
+`push_chart_artifacts` is ephemeral deployment infrastructure, not an owner-queryable
+resource. Only a valid short-lived HMAC bearer token authorizes its atomic
+DELETE RETURNING download. Tokens are minted by owner-scoped opted-in push
+fan-out, independently per device; the table is capped and excluded from backups.

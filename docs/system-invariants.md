@@ -142,7 +142,7 @@ implied.
 | INV-CRON-001 | One logical cron effect per schedule tick, across replicas | partial |
 | INV-PROVIDER-001 | An unreachable provider stops being called, and produces at most one alert pair per outage | enforced |
 | INV-ALERT-001 | A system alert row lands at most once per (recipient, dedupe key), and only the insert winner emails | enforced |
-| INV-NOTIFY-001 | Every notification a producer creates is written by NotificationService.create; the restore's dynamic-table insert is outside the scan | partial |
+| INV-NOTIFY-001 | Producers use NotificationService.create; restore shares its field bounds through boundRestoredNotification | enforced |
 | INV-DISPATCH-001 | The dispatch seam never writes a notification row itself; `create` stays the sole writer | enforced |
 | INV-DISPATCH-002 | The in-app row is written for every `notify`, whatever the matrix or the throttle says | enforced |
 | INV-DISPATCH-003 | The throttle gates only the notification-mode fan-out, never the in-app row or a report, and never an escalation | enforced |
@@ -1919,6 +1919,31 @@ Enforcement         Client: every figure goes through useNumberFormat(); a pure
                     templates, the budget-alert and bill-due message builders,
                     the portfolio-movement push body, the anomaly-report
                     descriptions and the monthly-comparison notes.
+                    notificationEmailCopy takes the pair through
+                    NotificationCopyOptions.numberFormat, so the immediate
+                    dispatch, the admin system alerts and the budget digests all
+                    compose their figures from it; resolveUserEmailFormats
+                    answers the language and the number format from the ONE
+                    preferences read resolveUserEmailLocale already made, since
+                    two readers of that row are two chances for the language
+                    precedence to be spelled differently. The DATE in that copy
+                    stays on the language: which language a month is spelled in
+                    is not the number preference.
+                    A producer that stores an English fallback a person can
+                    still be shown formats the figure inside it the same way --
+                    budgets.service.ts for BILL_DUE and
+                    security-price-alert.service.ts for the price movement,
+                    because notificationEmailCopy falls back WHOLE to that
+                    stored pair for a row it cannot rebuild and an email then
+                    renders it to the recipient.
+                    A message CATALOG is the exception and carries its own list
+                    in the guard: notification-email-messages.ts holds
+                    '{{ percent }}%' as translatable source whose figure arrives
+                    already formatted, and whose sign each locale places for
+                    itself -- exempt because there is nothing there to route
+                    through a locale, which is a different claim from "only a
+                    machine reads this", and checked by asserting the file still
+                    formats nothing.
                     backend/src/common/number-locale.guard.spec.ts holds the
                     classification of every caller of the en-US helpers (each
                     with the reason its output is not addressed to a person),
@@ -1952,7 +1977,21 @@ Required tests      Present: useNumberFormat.test.ts (share quantity at 8dp unde
                     disagrees with the host locale); number-locale.guard.spec.ts
                     (the resolver's truth table and pl-PL/en-US rendering);
                     email-templates.spec.ts "recipient number locale" (a Polish
-                    bill reminder). A component test must not build its
+                    bill reminder);
+                    resolve-user-email-locale.spec.ts (the number format
+                    surviving a language that falls back, and the 'browser'
+                    sentinel returned as stored rather than resolved);
+                    notification-email-copy.spec.ts (an explicit numberFormat
+                    beating the language, with the DATE staying on the language);
+                    notification-dispatch.service.spec.ts (the same pair
+                    DISAGREEING, end to end through sendEmail);
+                    security-price-alert.service.spec.ts (the stored English
+                    fallback's percentage, and the DTO refusing a precision the
+                    form cannot round-trip).
+                    A test whose two preferences AGREE cannot see this invariant
+                    at all: with language pl and no numberFormat, dropping the
+                    number preference anywhere in the chain still renders Polish.
+                    Make them disagree. And a component test must not build its
                     expectation with the same helper the component renders
                     through -- SecurityList.test.tsx did, which is why the defect
                     shipped green.
@@ -2248,18 +2287,25 @@ Statement           Nothing is imported, attached or saved as a consequence of a
                     does it.
 Enforcement         The worker's only action is to stash and redirect. `/share`
                     has no auto-advance for any bundle, single-file included:
-                    the two destinations are the existing transaction form's save
-                    and the import wizard's review step, both unchanged. A share
-                    whose usable files disagree about their destination is
+                    the three destinations are the existing transaction form's
+                    save, the import wizard's review step, and the assistant's
+                    composer -- all unchanged, and each still submitted by the
+                    user. The assistant is offered only when a provider can
+                    answer (`useAiConfigured`) and the chat accepts every usable
+                    file (`assistantAcceptsFiles`), so no destination is a button
+                    whose press can only fail. A share whose usable files
+                    disagree about their destination is
                     offered neither, rather than a guess. `src/app/share/page.test.tsx`
-                    asserts the form is not mounted until the button is pressed;
+                    asserts the form is not mounted until the button is pressed,
+                    and `src/components/ai/ChatInterface.test.tsx` that handed-over
+                    files are staged on the composer with nothing sent;
                     `e2e/tests/share-target.spec.ts` shares a statement and a
                     receipt end to end and asserts the account holds no
                     transaction while the review screen and the wizard are open.
 Concurrency scope   per share
 Retry semantics     A consumed bundle is discarded, so a second press cannot
-                    apply it twice; the import wizard discards the bundle only
-                    once it holds the contents.
+                    apply it twice; the import wizard and the assistant's page
+                    each discard the bundle only once they hold the contents.
 Crash semantics     A crash mid-review leaves the bundle intact and unapplied,
                     which is the state the screen is for.
 Status              enforced
@@ -2282,8 +2328,8 @@ Enforcement         `public/sw.js` checks each file as it arrives and writes a
                     `MAX_ATTACHMENTS_PER_TRANSACTION`), and
                     `src/test/sw-share-target.test.ts` fails when the two
                     disagree. Expiry is swept by the worker on `activate` and
-                    before every new share, and by the app on mount
-                    (`ShareInboxNotice`); orphaned bytes whose index is gone are
+                    before every new share, and by the app on every navigation
+                    (`ShareStashSweeper`); orphaned bytes whose index is gone are
                     swept with them. The share cache is on the `activate`
                     keep-list, so a worker update is not what empties an inbox.
                     `authStore.logout` calls `clearShareInbox()` beside
@@ -2341,10 +2387,13 @@ Enforcement         The service worker cannot decide this: a share can arrive
                     `ownerUserId` on an unclaimed index, and filter out a bundle
                     owned by anybody else. Listing claims as well as reading,
                     because a share the sharer was merely NOTIFIED about is
-                    already theirs. The three call sites take the id from
+                    already theirs. The two call sites take the id from
                     `useAuthStore` and read nothing while it is undefined
-                    (`src/app/share/page.tsx`, `components/share/ShareInboxNotice.tsx`,
-                    `useSharedFilesHandoff` in `src/app/import/page.tsx`).
+                    (`src/app/share/page.tsx`, and `useSharedFilesHandoff` in
+                    `src/app/import/page.tsx` and `src/app/ai/page.tsx`).
+                    `ShareStashSweeper` is not one of them: a lifetime sweep
+                    decides on `createdAt` alone, observes no bundle and claims
+                    none, so it needs no reader.
                     `share-inbox.test.ts`'s `ownership` block covers the claim,
                     the claim on listing, another account's bundle reading as
                     absent, an unreadable stamp reading as unclaimed, and an
@@ -2949,62 +2998,41 @@ Required tests      system-alerts/system-alert.service.spec.ts (fan-out,
 Status              enforced
 ```
 
-### INV-NOTIFY-001 -- one writer owns the notifications table
+### INV-NOTIFY-001 -- one producer door and shared restore bounds
 
 ```text
-Statement           Every notification a PRODUCER creates is written by
-                    NotificationService.create, so the column bounds, the
-                    conflict handling and the period_start default are one rule
-                    rather than one rule per producer. The backup restore is the
-                    one exception, and it is not covered (see Status).
-Source of truth     src/notification-center/notification.service.ts
-Enforcement         notification-write-door.spec.ts scans every tracked
-                    non-spec file under backend/src for a raw INSERT/UPDATE/
-                    DELETE naming the table and for a repository write on the
-                    Notification entity, with comments blanked so the prose
-                    explaining the ban cannot trip it. Three files are
-                    allowlisted with reasons -- the door, delete-my-data, and
-                    the restore -- and the spec also fails if an allowlisted
-                    file stops writing, because a standing permission nobody
-                    uses is inherited by the next writer in that file.
-                    What the scan CANNOT see: backup-restore-database.service.ts
-                    inserts through a dynamic table name
-                    (`INSERT INTO "${table}"`, driven by RESTORE_PLAN, whose
-                    notifications entry this branch added), so a restored row
-                    never passes boundedTitle, boundedDedupeKey or
-                    boundedTarget. The one field where that has a consequence a
-                    reader can see is `target`, and it is re-validated at the
-                    consumer instead: safeNotificationTarget resolves it against
-                    this origin before any navigation, on the app side and again
-                    in the service worker. The column widths are the database's
-                    own (a longer value raises 22001 and fails the restore
-                    loudly, which is the honest failure for an artifact that
-                    does not fit).
-Concurrency scope   n/a -- a static property of the source
-Retry semantics     n/a
-Crash semantics     n/a
-Failure response    n/a
-Required tests      notification-write-door.spec.ts (the scan, plus a
-                    stripper test in both directions);
-                    notification.service.spec.ts (the bounds and the conflict
-                    answer the door enforces on every producer's behalf).
-Why it exists       There were three writers with three opinions: a raw INSERT
-                    for budget alerts with its own conflict target and no title
-                    bound, an entity save for bill reminders with no conflict
-                    handling at all, and a second raw INSERT for system alerts
-                    with its own truncation helpers. Every rule the row has to
-                    obey therefore held on one path and not the others -- an
-                    over-long scheduled-transaction name raised 22001 inside a
-                    never-throws catch, and the notification the user needed
-                    silently never existed.
-Status              partial -- every producer goes through the door and the scan
-                    proves it, but the restore's dynamic-table insert is outside
-                    what a source scan on the table name can reach. Closing it
-                    means the restore calling the door per row (which would
-                    rewrite ids and conflict handling the restore owns) or the
-                    scan understanding RESTORE_PLAN; neither is done, so this
-                    entry says so rather than claiming a coverage it does not
-                    have.
+Statement           Producers write through NotificationService.create. Restore
+                    owns its archive IDs, timestamps and conflict handling, but
+                    applies the same title, dedupe-key and target length bounds.
+Source of truth     src/notification-center/notification-bounds.ts
+Enforcement         notification-write-door.spec.ts scans tracked backend source
+                    for raw table writes and Notification repository writes,
+                    excluding the producer door, delete-my-data and restore.
+                    Its comment stripper and allowlist are checked both ways.
+                    The restore's dynamic table INSERT cannot be resolved by
+                    that scan. It calls boundRestoredNotification instead;
+                    notification-restore-bounds.spec.ts exercises the INSERT
+                    parameters through BackupRestoreDatabaseService.insertRows.
+                    Malformed field types are rejected by preflight validation
+                    before authentication, staging and destructive SQL.
+                    Targets are length-bounded here and validated for same-origin
+                    navigation again by consumers in the app and service worker.
+Concurrency scope   n/a -- deterministic field normalization
+Retry semantics     Bounds are deterministic and idempotent. Restore keeps its
+                    existing ON CONFLICT DO NOTHING policy.
+Crash semantics     Restore SQL remains inside its existing transaction.
+Failure response    Overlong titles/keys are truncated with a log; overlong
+                    targets become null. Invalid field types produce HTTP 400
+                    before destructive SQL or consuming an OIDC artifact.
+Required tests      notification-write-door.spec.ts (producer writer scan);
+                    notification.service.spec.ts (producer bounds/conflicts);
+                    notification-restore-bounds.spec.ts (dynamic restore insert);
+                    backup.service.spec.ts (preflight rejection ordering).
+Why it exists       Separate producers previously applied different rules, and
+                    the generic restore bypassed every producer-side bound.
+Status              enforced -- producer and restore use shared field bounds;
+                    the dynamic insert is checked behaviorally, not inferred
+                    from a literal-table source scan.
 ```
 
 ### INV-PUSH-007 -- UnifiedPush rides the one Web Push sender

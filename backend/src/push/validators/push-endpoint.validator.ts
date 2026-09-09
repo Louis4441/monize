@@ -1,6 +1,8 @@
+import { privatePushEndpoint } from "../unifiedpush-private-endpoints";
 import {
   registerDecorator,
   ValidationOptions,
+  ValidationArguments,
   ValidatorConstraint,
   ValidatorConstraintInterface,
 } from "class-validator";
@@ -29,7 +31,7 @@ export const MAX_PUSH_ENDPOINT_LENGTH = 1024;
  */
 @ValidatorConstraint({ async: true })
 export class IsPushEndpointConstraint implements ValidatorConstraintInterface {
-  async validate(value: unknown): Promise<boolean> {
+  async validate(value: unknown, args?: ValidationArguments): Promise<boolean> {
     if (typeof value !== "string") return false;
     if (value.length > MAX_PUSH_ENDPOINT_LENGTH) return false;
 
@@ -41,6 +43,9 @@ export class IsPushEndpointConstraint implements ValidatorConstraintInterface {
     }
     if (parsed.protocol !== "https:") return false;
 
+    const transport = (args?.object as { transport?: string } | undefined)
+      ?.transport;
+    if (privatePushEndpoint(value, transport)) return true;
     return validateUrlIsSafeWithin(value);
   }
 

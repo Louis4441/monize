@@ -50,6 +50,7 @@ import { optionalUuid, optionalString, optionalNumber } from '@/lib/zod-helpers'
 import { useFormSubmitRef } from '@/hooks/useFormSubmitRef';
 import { useFormDirtyNotify } from '@/hooks/useFormDirtyNotify';
 import { FormActions } from '@/components/ui/FormActions';
+import { TRANSACTION_NOTE_MAX_LENGTH } from '@/lib/transaction-note';
 
 const logger = createLogger('ScheduledTxForm');
 
@@ -1363,6 +1364,7 @@ export function ScheduledTransactionForm({
       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('form.descriptionLabel')}</label>
       <textarea
         rows={2}
+        maxLength={TRANSACTION_NOTE_MAX_LENGTH}
         className="block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500"
         {...register('description')}
       />
@@ -1628,6 +1630,7 @@ export function ScheduledTransactionForm({
               label={t('form.descriptionLabel')}
               type="text"
               placeholder={t('form.descriptionPlaceholder')}
+              maxLength={TRANSACTION_NOTE_MAX_LENGTH}
               error={errors.description?.message}
               {...register('description')}
             />

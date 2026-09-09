@@ -341,5 +341,11 @@
     "dateRequired": "Tarih zorunludur",
     "priceRequired": "Fiyat zorunludur",
     "priceNonNegative": "Fiyat negatif olmayan bir sayı olmalıdır"
+  },
+  "priceAlert": {
+    "label": "Fiyat değişimi uyarısı (%)",
+    "help": "Devre dışı bırakmak için boş bırakın. Önceki mevcut seansa göre yükseliş veya düşüşü, araç başına UTC gününde en fazla bir kez bildirir.",
+    "range": "0,1 ile 1000 arasında bir yüzde girin.",
+    "chartLabel": "Fiyat uyarılarına grafik ekle"
   }
 }

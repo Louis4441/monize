@@ -642,9 +642,9 @@ each live in exactly one file:
   `SHARE_CACHE_NAME` or builds a stash key; a second reader is how the key shape
   and the worker's writer drift apart. Every function treats an unusable Cache
   API as an *empty inbox* and resolves rather than rejecting, which is what lets
-  `ShareInboxNotice` call it on mount without a guard -- and why a `catch` around
-  it would put a `setState` on the synchronous path the
-  `react-hooks/set-state-in-effect` rule forbids.
+  `ShareStashSweeper` call it from an effect without a guard -- and why a
+  `catch` around it in a reader would put a `setState` on the synchronous path
+  the `react-hooks/set-state-in-effect` rule forbids.
 
 **A bundle belongs to the first authenticated reader that observes it, and the
 reader's id is a required argument.** The worker cannot decide whose share it is
@@ -659,9 +659,37 @@ simply expired never ran `logout`, which is the same reasoning as the
 push-registration marker's owner. The id is **required**, not optional, because
 an omitted argument is silently indistinguishable from "everyone's": a caller
 that has not resolved the reader yet reads nothing and shows its loading state
-(`src/app/share/page.tsx`, `ShareInboxNotice`, `useSharedFilesHandoff`), rather
-than claiming a share on behalf of whoever the app is still fetching.
-INV-SHARE-005.
+(`src/app/share/page.tsx`, `useSharedFilesHandoff`), rather than claiming a
+share on behalf of whoever the app is still fetching. INV-SHARE-005.
+
+**A sweep is not an observation, so it takes no reader.** `ShareStashSweeper`
+(`components/share/ShareStashSweeper.tsx`) is a null-rendering component in the
+shell that runs `purgeExpiredSharedBundles` on every navigation but `/share`,
+where an expired bundle stays readable so the review screen can say "expired"
+rather than "nothing here". It is what is left of `ShareInboxNotice`, a banner
+offering a Review link that dead-ended on exactly the share the user had just
+routed to the assistant; the UI was redundant, the sweep is one of the three
+mechanisms behind INV-SHARE-003, so it outlived the banner rather than being
+deleted with it. Do not give it an auth gate copied from the banner: the banner
+waited for a reader because listing also CLAIMS, and a sweep decides on
+`createdAt` alone.
+
+**A destination is offered only when it can actually accept the share, and it
+asks the destination's own validators.** The assistant sits beside the
+transaction form and the import wizard on the review screen, gated on two
+questions: `useAiConfigured()` (a provider that can answer -- the rule above),
+and `assistantAcceptsFiles` (`lib/ai-attachments.ts`), which runs the chat's own
+`validateFile`/`validateAddition` over the exact set. Re-stating the caps here
+would be a second copy that drifts, and they genuinely differ: the stash holds
+10 files at 10 MB, the assistant takes 5 at 5 MB and cannot read OFX, QFX or
+QIF, so a share the wizard imports happily is often one the chat would refuse
+file by file. All-or-nothing, because staging the readable subset would send the
+assistant part of what the user shared and say nothing about the rest. The
+hand-off is the wizard's: `/ai?share=<id>`, the page reads the bundle as the
+signed-in reader, and the stash is discarded only once `ChatInterface` reports
+the bytes staged (`onInitialFilesStaged`) -- dropping it on the way in would
+leave the user with neither the share nor the attachments. Staged, never sent:
+the user still presses send (INV-SHARE-002).
 
 **Do not classify a shared file with the import wizard's `detectFileType`.** That
 function falls through to `qif` for every extension it does not recognise, which
@@ -738,6 +766,24 @@ account for the reason the registered-endpoint marker carries one, and the kind
 because waving away the offer says nothing about wanting to know, later, that the
 browser has started blocking Monize.
 
+### A notification's `badge` is a mask, its `icon` is a picture
+
+Chrome on Android draws `showNotification`'s `badge` by keeping the image's
+**alpha channel**, discarding the colours and tinting the shape that is left into
+the status bar and the toolbar. So the alpha channel has to *be* the glyph, and
+an image that is opaque everywhere is a request to draw a filled square -- which
+is what shipped, because `PUSH_BADGE` pointed at `icon-maskable-192x192.png`, and
+a maskable icon is opaque edge to edge by definition of that purpose. The
+notification body's `icon` is the opposite -- a picture, drawn in colour -- which
+is why the drawer looked right while the toolbar showed a block.
+
+The badge is therefore its own asset: `public/icons/badge-monochrome.png`, white
+on transparent at 96x96 (24dp at the densest screen Chrome asks for), generated
+from the brand mark by `frontend/scripts/build-notification-badge.mjs`, and never
+taken from `buildManifest`'s icon list. `src/test/notification-badge.test.ts`
+fails on a fully opaque badge, on a badge borrowed from an app icon, and on a
+committed PNG that has stopped matching the logo it is generated from.
+
 ### A `<details>` disclosure is controlled, because jsdom half-implements it
 
 `<details>`/`<summary>` is the disclosure this codebase uses (`PushDiagnostics`, and the foldable Browser push block beside it): native keyboard operation, and the expanded state announced without an `aria-expanded` of our own. But React does not manage `open` the way it manages an input's `value` -- it writes the attribute and stops -- so a component that renders anything off "is this open" must hold that in state, pass `open={state}`, and move it itself. **`onToggle` cannot be the only mover**: jsdom flips `open` on a summary click and fires no `toggle` event at all, so the behaviour is untestable through it and a browser that misses the event leaves the summary describing the wrong state. Handle the summary's `onClick`, `preventDefault()` to cancel the element's own activation behaviour, and toggle state there (Enter and Space on a focused summary dispatch a click, so the keyboard comes with it); keep `onToggle` wired for the toggles no click produces, such as Chrome expanding a `<details>` to reveal a find-in-page match.
@@ -782,6 +828,8 @@ E2E spec drives means grepping `e2e/` for its accessible name in the same commit
 
 **An E2E alert locator is scoped to a region, never page-wide.** Next mounts its route announcer (`__next-route-announcer__`, `role="alert"`, in a shadow root under `<body>`) on every hydrated page, and Playwright's role engine matches it, so `page.getByRole('alert')` resolves to two elements the moment an error panel renders -- a strict-mode failure. The payee and category detail specs passed for months only because the poll that saw the announcer alone, before the panel, satisfied `toBeVisible`. Scope it: `page.getByRole('main').getByRole('alert')`, or a dialog. `src/test/e2e-conventions.test.ts` scans `e2e/tests` for the bare form.
 
+**Reading Chromium's notification list destroys a notification still being displayed, so a push test never polls for one.** `registration.getNotifications()` is answered by reconciling the browser's stored notification records against what the platform reports as displayed, and a record whose display has not landed yet is *erased*, not reported "not yet" -- while `showNotification` resolves before that display lands. So a read taken straight after a push deletes the notification the test is waiting for, and the poll beside it then burns its whole timeout on something that can no longer arrive: one of the nine push tests failing per CI run, a different one each time, on branches whose diffs cannot touch push. Deliver and observe only through `e2e/push/fixture.ts`, whose `push()` waits for the worker's own `showNotification` promise, looks exactly once, and repairs an early look by delivering again (safe because `collapseTag` makes a repeat replace rather than stack). Never call `deliverPushMessage` or `getNotifications()` from a spec; `src/test/e2e-conventions.test.ts` scans `e2e/push` for both.
+
 ### A password field declares what may be autofilled into it
 
 Every `<Input type="password">` carries an `autoComplete`: `current-password` when it really is this account's password, `new-password` when one is being set here, `off` when it is not a credential of this site at all. Omitting it is not neutral -- a password manager fills a bare box with the saved credential, and the form submits it as typed: the AI provider's API key field silently replaced the stored key ("Saved" on screen, provider dead, row shows `****` either way), and the backup export password is the same shape and worse. `ui-conventions.test.ts` fails on a password input with no `autoComplete`, and on a value outside those three.
@@ -803,6 +851,89 @@ Coerce before comparing: `'-67.9900' < 0` is false, and a decimal string is what
 ### A transaction's payee display is `usePayeeDisplay`, never a bare `payeeName` read
 
 A transfer created with a blank payee is PERSISTED blank (issue #1214); migration 161 blanked the legacy-stamped rows. The label is resolved at render time: `usePayeeDisplay()` (`hooks/usePayeeDisplay.ts`) returns the stored payee when there is one, otherwise for a transfer leg the localized `common.transferPayee` string built from `linkedTransaction.account.name` -- the counterpart's CURRENT name, so renames and language switches reach every historical row. A surface reading `tx.payeeName || tx.payee?.name` directly shows those transfers as unnamed. English CSV exports use `transferPayeeCsvLabel` (`lib/transfer-label.ts`), byte-identical twin of the backend's `transferPayeeLabel`.
+
+### A note field stops the user at the cap -- `TRANSACTION_NOTE_MAX_LENGTH`
+
+Every input that takes a transaction's description or a split's memo carries
+`maxLength={TRANSACTION_NOTE_MAX_LENGTH}` (`lib/transaction-note.ts`), so the
+limit is something the user runs into rather than something the save reports
+afterwards. Eight forms take one of these fields and exactly one of them capped
+anything, so typing past the limit in the main transaction form came back as a
+bare 400 with nothing pointing at the field.
+
+The number is the server's, mirrored (`backend/src/common/transaction-note.ts`),
+and `backend/src/common/transaction-note.contract.spec.ts` fails when the two
+layers disagree -- below it the form truncates text the user may legitimately
+store, above it we are back to the rejected save.
+`src/test/transaction-note.guard.test.ts` names the eight forms and fails one
+that loses its cap, counts the inputs in the forms that render the field twice,
+and refuses a literal written beside the constant. A description belonging to
+another entity -- a budget's, a security's, a custom report's -- keeps its own
+limit and is deliberately out of scope.
+
+### A description is plain text that RENDERS as a link -- `LinkifiedText`
+
+A transaction's description is where a ticket, receipt or order page ends up, so
+the address in it is clickable. What makes that safe is that nothing about the
+storage changed: the field is still plain text, `@SanitizeHtml()` still strips
+`<` and `>` on write, and `dangerouslySetInnerHTML` still appears **nowhere** in
+this tree. `linkifySegments` (`lib/linkify.ts`) splits the stored string into
+prose and addresses, and `LinkifiedText` (`components/ui/LinkifiedText.tsx`)
+draws the anchors -- around text it hands back verbatim. An `href` is only ever
+built through `toSafeExternalUrl`, and only from an explicit `http`/`https`
+scheme -- a bare `www.example.com` stays text, because a guessed host is a link
+to somewhere the writer did not name.
+
+**A label has to be honest to a reader, not only to `===`.** Three properties
+carry that, and each is a test rather than prose: the segments concatenate back
+to the input exactly; the label and the `href` are one string, because
+`NoteLink` takes no children and so has no second value to disagree; and that
+string contains no character that changes how it renders. The third is the one
+that was missing. `https://evil.test/<U+202E>moc.knab//:sptth` READS as
+`https://evil.test/https://bank.com` and navigates to `evil.test` -- label and
+`href` equal as strings, different on screen -- and `@SanitizeHtml()` strips
+none of it, since its job is `<` and `>`. So an address ENDS at the first bidi
+control, zero-width or C0/C1 character (`INVISIBLE_CHARS` in `lib/linkify.ts`;
+none is legitimate in an RFC 3986 address, and the remainder stays in the prose
+where it can mislead nobody about where a click goes), and the anchor carries
+`dir="ltr"` with `unicode-bidi: isolate` so an override elsewhere in the note --
+or an RTL locale around it -- cannot reorder the label either. A homograph host
+(Cyrillic `a` in `bank.com`) is deliberately NOT claimed: that is the browser's
+punycode job, and asserting it here would be a worse promise than the one this
+replaced.
+
+This matters more than it looks: a description is visible to joint owners and
+delegates, so the field is a cross-tenant surface. Storing markup there and
+rendering it would be stored XSS with an audience.
+
+**An anchor in the register is a control inside a clickable row**, so it stops
+the event the way the favourite star and `RowActions` do -- `click`, `mousedown`,
+`touchstart` and `contextmenu`, or a tap opens the ticket page *and* the edit
+modal behind it. Stopping no more than that keeps the rest of the cell opening
+the transaction, which is the dead-area mistake the row-click rule warns about.
+
+**A note being EDITED gets the same affordance a different way.** A `<textarea>`
+renders no elements, so the address in a draft cannot be anchored in place --
+before this, reaching a link meant saving, finding the row in the register and
+clicking it there. `NoteLinks` (same file) lists the addresses beneath the field
+instead, live as the text is typed, and renders nothing when there are none.
+It shares `LinkifiedText`'s single `NoteLink` anchor, so `target`, `rel` and the
+event-stopping cannot drift between reading a note and writing one; the guard
+fails a second `<a>` in that file. Its label is the address for the same reason
+as everywhere else -- there is no `children` to pass.
+
+**Which surfaces linkify is a decision recorded in both directions.**
+`src/test/linkified-description.guard.test.ts` names the four that draw links in
+place (the register row and the three report tables) and every other place a
+`.description` or `.memo` reaches the screen as text, each with the reason it
+stays inert -- a different entity's field, a row not saved yet, or text inside a
+`<button>`. It does the same for the note editors: the two that make up the
+New/Edit Transaction modal offer `NoteLinks` (both, because the modal swaps the
+plain description for `SplitTransactionFields` in split mode, and covering one
+leaves the link unreachable for half the transactions a user creates), and the
+other six say why they do not. The two lists must between them account for every
+form the length guard names, so a new note field cannot ship with no way to
+reach the address in it.
 
 ### A CSV file is written by `exportToCsv`, and a number in it is a number
 

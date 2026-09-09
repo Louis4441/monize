@@ -18,6 +18,8 @@
   "newTransactionTitle": "Nouvelle transaction",
   "import": "Importer comme relevé",
   "importHint": "Ouvrir l'assistant d'importation pour associer les colonnes et vérifier chaque ligne au préalable.",
+  "sendToAssistant": "Envoyer à l'assistant IA",
+  "sendToAssistantHint": "{count, plural, one {Ouvre l'assistant avec ce fichier en pièce jointe, pour poser des questions à son sujet avant tout enregistrement.} other {Ouvre l'assistant avec ces fichiers en pièces jointes, pour poser des questions à leur sujet avant tout enregistrement.}}",
   "discard": "Supprimer",
   "discardConfirmTitle": "Supprimer les fichiers partagés ?",
   "discardConfirmMessage": "Les fichiers partagés seront retirés de cet appareil. Rien ne change dans Monize.",
@@ -40,8 +42,5 @@
   "unsupportedBrowserTitle": "Ce navigateur ne peut pas recevoir de fichiers partagés",
   "unsupportedBrowserMessage": "Le partage vers une application installée n'est pas disponible ici. Vous pouvez toujours ajouter des fichiers depuis Monize.",
   "goToTransactions": "Ajouter depuis Transactions",
-  "goToImport": "Aller à l'importation",
-  "noticeTitle": "{count, plural, one {# fichier a été partagé avec Monize} other {# fichiers ont été partagés avec Monize}}",
-  "noticeAction": "Vérifier",
-  "noticeDismiss": "Ignorer"
+  "goToImport": "Aller à l'importation"
 }

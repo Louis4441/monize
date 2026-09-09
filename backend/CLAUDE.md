@@ -255,6 +255,28 @@ beside grouped digits on the payee page is one number printed two ways.
 
 Every `@IsArray()` DTO property carries `@ArrayMaxSize(n)` -- an unbounded array turns per-element work downstream into a denial-of-service lever (CodeQL `js/loop-bound-injection`, CWE-834). `src/common/array-bound-dto.spec.ts` sweeps validator metadata; its grandfather list may only shrink. Relatedly, never use a request value's `.length` as a loop bound inside a `withScopedDb` callback (CodeQL cannot track the outer guard through the closure): iterate `for (const [i, v] of xs.entries())`.
 
+### The note on a transaction has one length -- `TRANSACTION_NOTE_MAX_LENGTH`
+
+A transaction's `description` and a split's `memo` are one field to the person
+typing in them, so they share one cap (`src/common/transaction-note.ts`) across
+all twenty-three places that write one: fifteen DTO fields plus the AI query
+schemas and the MCP tools, which write the same field with no DTO in the path.
+Splitting the number is how a split memo comes to be rejected at a length its
+parent's description accepts, with nothing on screen saying why.
+
+The columns are all `TEXT`, so the cap is a product decision about how much a
+person should type, not a storage limit -- it went 500 to 750 when descriptions
+started rendering their web addresses as links, since a ticket URL plus a note
+does not fit in 500. Raising it needs no migration, and
+`transaction-note.contract.spec.ts` proves that by checking those columns are
+still unbounded.
+
+**The frontend has the same number**, in `frontend/src/lib/transaction-note.ts`:
+without it a form accepts a save the server rejects, which is what the main
+transaction form did -- a bare 400 with nothing pointing at the field, while the
+one form that did cap reported it properly. The contract spec reads the
+frontend's file and fails when the two disagree.
+
 ## `complete()` is not `completeWithTools()` with the tools left off
 
 Both take `AiCompletionRequest`, but `complete()` maps messages through `toSimpleMessages`, which **filters `role: "tool"` out entirely** -- summarising a tool-use conversation through it sends a transcript stripped of every tool result and returns a confident summary of nothing.
@@ -298,6 +320,10 @@ The guard also asks what a value *is* rather than what it starts with, matching 
 ## A partial escape is indistinguishable from a correct one
 
 Interpolating a literal into a pattern goes through `escapeRegExp` (`src/common/escape-regexp.util.ts`) -- never a hand-written character class, and never a subset of one (`repo-paths.util.ts` escaped only dots and left `\` alone; CodeQL `js/incomplete-sanitization`, CWE-020). `escape-regexp.guard.spec.ts` scans `src/` for either shape. Where the pattern is built from a list, export the builder and test it against a prefix carrying a metacharacter (`buildPlainRootedPathPattern`) -- over real inputs the broken and correct escapes can agree exactly. Do not escape `-`: outside a class it is literal, and `\-` is a SyntaxError under the `u` flag -- so never interpolate the result *inside* a class.
+
+## CodeQL runs as default setup, and a suppression annotation closes nothing there
+
+Code scanning on this repository is CodeQL *default setup*, which runs the standard code-scanning suite and never the alert-suppression query -- so a `codeql` bracket annotation in the source does not close an alert on the Security tab. Two of them sat in `password-breach.service.ts` and its spec for months, above the wrong line as well, while the `js/insufficient-password-hash` alerts they named stayed open. An accepted false positive (SHA-1 is what the HIBP k-anonymity protocol hashes with; `fingerprintPublicKey` in `push-config.service.ts` hashes a *public* key, which is not a password hash) is **dismissed on the Security tab, with its reason**, by someone with security-events write. Touching the flagged line in a PR re-reports the alert as new in that PR and fails its CodeQL check, so a false positive is dismissed first and its file left alone. Prefer a test fixture that carries a known hash over one that recomputes it: the spec now holds SHA-1("password123") as a constant, which proves the protocol against an independent value and gives CodeQL nothing to report. The annotation still goes in, on the line directly above the reported location -- the only line CodeQL's suppression library lets it cover, and for `js/insufficient-password-hash` that is the `.update(...)` call, not the `createHash` statement -- so it takes effect the day the suppression query is added to the analysis. `src/common/codeql-suppression.guard.spec.ts` fails an annotation that follows code on its line, names no query id, sits above a blank or a comment, or sits above the wrong line for a query it knows.
 
 ## A cached brand favicon is four columns, one fetcher, and one export rule
 
@@ -376,8 +402,10 @@ the endpoint the same way (`releaseLocalPushSubscription`).
 ## The notifications table has one writer
 
 `NotificationService.create` (`src/notification-center/notification.service.ts`)
-is the only place a notification row is written, and
-`notification-write-door.spec.ts` fails on a second one. A producer decides
+is the only producer write door. Backup restore preserves archive IDs and
+timestamps through its own insert, using the same `notification-bounds.ts`
+helpers via `boundRestoredNotification`. For producer writes,
+`notification-write-door.spec.ts` fails on a second door. A producer decides
 *what* to say; the row's shape is not its decision. There were three writers
 with three opinions -- a raw `INSERT` for budget alerts with its own conflict
 target and no title bound, an entity `save` for bill reminders with no conflict
@@ -425,6 +453,12 @@ despite the names: a Web Push body is composed on the server, in a cron or a
 background write with no request locale to inherit, so it resolves the
 recipient's stored `user_preferences.language` exactly as an email does. Reuse
 those two; a second locale resolver is how the answers drift.
+
+Notification email bodies and dynamic subjects go through `notificationEmailCopy`
+(`src/notifications/notification-email-copy.ts`) at delivery time, including
+immediate dispatch, admin alerts and budget digests. Supply the snapshot's currency
+in `data`; missing facts on legacy rows retain the stored copy rather than inventing
+amounts or currency. HTML templates escape the composed strings once.
 
 ## A case-sensitive `LIKE` is not a search
 

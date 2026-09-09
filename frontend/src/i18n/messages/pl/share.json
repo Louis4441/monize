@@ -18,6 +18,8 @@
   "newTransactionTitle": "Nowa transakcja",
   "import": "Zaimportuj jako wyciąg",
   "importHint": "Otwiera kreatora importu, aby najpierw przypisać kolumny i sprawdzić każdy wiersz.",
+  "sendToAssistant": "Wyślij do asystenta AI",
+  "sendToAssistantHint": "{count, plural, one {Otwiera asystenta z tym plikiem w załączniku, aby zapytać o niego, zanim cokolwiek zostanie zapisane.} few {Otwiera asystenta z tymi plikami w załącznikach, aby zapytać o nie, zanim cokolwiek zostanie zapisane.} many {Otwiera asystenta z tymi plikami w załącznikach, aby zapytać o nie, zanim cokolwiek zostanie zapisane.} other {Otwiera asystenta z tymi plikami w załącznikach, aby zapytać o nie, zanim cokolwiek zostanie zapisane.}}",
   "discard": "Odrzuć",
   "discardConfirmTitle": "Odrzucić udostępnione pliki?",
   "discardConfirmMessage": "Udostępnione pliki zostaną usunięte z tego urządzenia. W Monize nic się nie zmieni.",
@@ -40,8 +42,5 @@
   "unsupportedBrowserTitle": "Ta przeglądarka nie może odbierać udostępnionych plików",
   "unsupportedBrowserMessage": "Udostępnianie do zainstalowanej aplikacji nie jest tutaj dostępne. Nadal możesz dodawać pliki z wnętrza Monize.",
   "goToTransactions": "Dodaj w Transakcjach",
-  "goToImport": "Przejdź do importu",
-  "noticeTitle": "{count, plural, one {# plik został udostępniony w Monize} few {# pliki zostały udostępnione w Monize} many {# plików zostało udostępnionych w Monize} other {# pliku zostało udostępnione w Monize}}",
-  "noticeAction": "Sprawdź",
-  "noticeDismiss": "Zamknij"
+  "goToImport": "Przejdź do importu"
 }

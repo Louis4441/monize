@@ -101,6 +101,12 @@ test.describe('Web Share Target', () => {
     await expect(
       page.getByRole('button', { name: /attach to a new transaction/i }),
     ).toHaveCount(0);
+    // This account has no AI provider, so the assistant is not a destination:
+    // a button whose one outcome is "configure a provider first" costs a press
+    // to learn nothing.
+    await expect(
+      page.getByRole('button', { name: /send to ai assistant/i }),
+    ).toHaveCount(0);
 
     // Landing here has written nothing.
     const before = await api.get<{ data: unknown[] }>(

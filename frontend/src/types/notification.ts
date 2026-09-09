@@ -36,6 +36,7 @@ export type NotificationType =
   | 'BALANCE_BELOW_THRESHOLD'
   | 'BALANCE_ABOVE_THRESHOLD'
   | 'PORTFOLIO_MOVEMENT'
+  | 'SECURITY_PRICE_MOVEMENT'
   | 'GEM_SIGNAL_CHANGED';
 
 /** How urgent, and how it is drawn. */

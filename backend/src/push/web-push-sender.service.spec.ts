@@ -142,6 +142,39 @@ describe("WebPushSender", () => {
   const sendOne = (t: ReturnType<typeof target>, p: typeof PAYLOAD) =>
     sender.openBatch().then((batch) => batch.send(t, p));
 
+  it("uses a pinned private address only for UnifiedPush, and rechecks after removal", async () => {
+    const original = process.env.UNIFIEDPUSH_PRIVATE_ENDPOINTS;
+    process.env.UNIFIEDPUSH_PRIVATE_ENDPOINTS = JSON.stringify({
+      "https://ntfy.home.lan:8443": "192.168.20.5",
+    });
+    validateUrlIsSafeWithin.mockResolvedValue(false);
+    sendNotification.mockResolvedValue(undefined);
+    try {
+      const t = target({
+        endpoint: "https://ntfy.home.lan:8443/topic",
+        transport: "unifiedpush",
+      });
+      expect(await sendOne(t, PAYLOAD)).toEqual({ status: "sent" });
+      const options = sendNotification.mock.calls[0][2];
+      const callback = jest.fn();
+      options.agent.options.lookup("ntfy.home.lan", {}, callback);
+      expect(callback).toHaveBeenCalledWith(null, "192.168.20.5", 4);
+      expect(options.agent.options.rejectUnauthorized).not.toBe(false);
+      sendNotification.mockClear();
+      expect(
+        await sendOne({ ...t, transport: "webpush" }, PAYLOAD),
+      ).toMatchObject({ status: "transient" });
+      expect(sendNotification).not.toHaveBeenCalled();
+      process.env.UNIFIEDPUSH_PRIVATE_ENDPOINTS = "";
+      expect(await sendOne(t, PAYLOAD)).toMatchObject({ status: "transient" });
+      expect(sendNotification).not.toHaveBeenCalled();
+    } finally {
+      if (original === undefined)
+        delete process.env.UNIFIEDPUSH_PRIVATE_ENDPOINTS;
+      else process.env.UNIFIEDPUSH_PRIVATE_ENDPOINTS = original;
+    }
+  });
+
   it("reads the instance identity once for a whole batch, and not at all for nothing", async () => {
     sendNotification.mockResolvedValue(undefined);
     const batch = await sender.openBatch();

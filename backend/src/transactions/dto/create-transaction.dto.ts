@@ -19,6 +19,7 @@ import { CreateTransactionSplitDto } from "./create-transaction-split.dto";
 import { TransactionStatus } from "../entities/transaction.entity";
 import { SanitizeHtml } from "../../common/decorators/sanitize-html.decorator";
 import { IsCurrencyCode } from "../../common/validators/is-currency-code.validator";
+import { TRANSACTION_NOTE_MAX_LENGTH } from "../../common/transaction-note";
 
 export class CreateTransactionDto {
   @ApiProperty({ description: "Account ID where the transaction occurs" })
@@ -91,7 +92,7 @@ export class CreateTransactionDto {
   @ApiPropertyOptional({ description: "Transaction description/notes" })
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(TRANSACTION_NOTE_MAX_LENGTH)
   @SanitizeHtml()
   description?: string;
 

@@ -43,7 +43,14 @@
     "durationMinutes": "{minutes, plural, one {# minuto} other {# minutos}}",
     "durationHours": "{hours, plural, one {# hora} other {# horas}}",
     "cancel": "Cancelar",
-    "confirm": "Definir lembrete"
+    "confirm": "Definir lembrete",
+    "pageTitle": "Lembretes ativos",
+    "empty": "Sem lembretes ativos",
+    "loadFailed": "Não foi possível carregar os lembretes",
+    "retry": "Tentar novamente",
+    "nextFire": "Próximo lembrete: {date}",
+    "openTarget": "Abrir página relacionada",
+    "delegateUnavailable": "Volte à sua própria conta para gerir os lembretes."
   },
   "billDue": {
     "titleOverdue": "{payee} em atraso",
@@ -104,5 +111,9 @@
       "title": "Não foi possível registar {name}",
       "message": "A sua transação agendada com vencimento em {date} não foi registada automaticamente: {error}. Pode registá-la manualmente em Faturas e depósitos."
     }
+  },
+  "priceMovement": {
+    "title": "Alerta de variação do preço: {symbol} ({percent}%)",
+    "message": "{symbol}: {percent}% face à sessão anterior disponível."
   }
 }

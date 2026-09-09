@@ -18,6 +18,8 @@
   "newTransactionTitle": "नया लेन-देन",
   "import": "विवरण के रूप में आयात करें",
   "importHint": "आयात विज़ार्ड खोलता है, ताकि आप पहले स्तंभ मैप कर सकें और हर पंक्ति की जाँच कर सकें।",
+  "sendToAssistant": "AI सहायक को भेजें",
+  "sendToAssistantHint": "{count, plural, one {सहायक को इस फ़ाइल के साथ खोलता है, ताकि कुछ भी सहेजे जाने से पहले आप इसके बारे में पूछ सकें।} other {सहायक को इन फ़ाइलों के साथ खोलता है, ताकि कुछ भी सहेजे जाने से पहले आप इनके बारे में पूछ सकें।}}",
   "discard": "हटाएँ",
   "discardConfirmTitle": "साझा की गई फ़ाइलें हटाएँ?",
   "discardConfirmMessage": "साझा की गई फ़ाइलें इस डिवाइस से हटा दी जाएँगी। Monize में कुछ नहीं बदलेगा।",
@@ -40,8 +42,5 @@
   "unsupportedBrowserTitle": "यह ब्राउज़र साझा की गई फ़ाइलें प्राप्त नहीं कर सकता",
   "unsupportedBrowserMessage": "इंस्टॉल किए गए ऐप में साझा करना यहाँ उपलब्ध नहीं है। आप फ़ाइलें Monize के भीतर से जोड़ सकते हैं।",
   "goToTransactions": "लेन-देन से जोड़ें",
-  "goToImport": "आयात पर जाएँ",
-  "noticeTitle": "{count, plural, one {Monize के साथ # फ़ाइल साझा की गई} other {Monize के साथ # फ़ाइलें साझा की गईं}}",
-  "noticeAction": "जाँचें",
-  "noticeDismiss": "बंद करें"
+  "goToImport": "आयात पर जाएँ"
 }

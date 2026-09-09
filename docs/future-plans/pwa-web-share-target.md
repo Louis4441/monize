@@ -223,8 +223,8 @@ be refused with a reason, not parsed as QIF).
 
 | Bundle | Offered |
 | --- | --- |
-| All attachment-type | New transaction (files staged); Ask the assistant (Phase 2) |
-| All statement-type | Import |
+| All attachment-type | New transaction (files staged); Send to AI Assistant (when a provider is configured and the chat accepts the files) |
+| All statement-type | Import; Send to AI Assistant (same conditions -- CSV only, since the assistant cannot read OFX/QFX/QIF) |
 | Mixed | Neither; the screen says to share receipts and statements separately, and offers Discard |
 | Nothing accepted | The per-file reasons, and Discard |
 
@@ -262,12 +262,11 @@ that drops it, a user who opens the app from the launcher instead):
 - The proxy's unauthenticated redirect carries `returnTo` for this path. Today
   it redirects to a bare `/login`; the change is scoped to `/share` so no other
   page's behaviour moves in this plan.
-- `ShareInboxNotice`, mounted in the shell's banner stack beside
-  `PushEnableBanner` (section 10),
-  calls `purgeExpiredSharedBundles()` then `listSharedBundles()` on mount and
-  shows a dismissible banner ("2 files were shared with Monize -- review them")
-  linking to `/share?id=`. A stash the user never reaches is still purged by
-  its lifetime.
+- `ShareInboxNotice`, a dismissible banner linking back to `/share?id=`, was
+  built for this and has since been REMOVED -- see section 10. What survives is
+  `ShareStashSweeper`, which keeps the lifetime purge and offers no link. A
+  share whose redirect does not survive is therefore no longer resumable from
+  inside the app; it is purged by its lifetime, and the user shares again.
 
 ### 4.4 Lifetime and privacy of the stash
 
@@ -319,7 +318,7 @@ New:
 - a new `share` route segment under frontend/src/app -- the review screen and
   its test.
 - `frontend/src/components/share/` -- `SharedFileList`, `ShareDestinations`,
-  `ShareInboxNotice`.
+  and `ShareStashSweeper` (originally `ShareInboxNotice`; section 10).
 - `frontend/src/i18n/messages/en/share.json` (registered in
   `src/i18n/messages.ts`), pseudo-locale regenerated.
 - `frontend/src/test/sw-share-target.test.ts`.
@@ -337,8 +336,8 @@ Changed:
 - `frontend/src/components/transactions/TransactionForm.tsx` --
   `initialStagedFiles`.
 - `frontend/src/store/authStore.ts` -- `clearShareInbox()` on logout.
-- `frontend/src/components/layout/SwipeShell.tsx` -- mounts `ShareInboxNotice`
-  in the shell's banner stack (see section 10).
+- `frontend/src/components/layout/SwipeShell.tsx` -- mounts `ShareStashSweeper`
+  (see section 10).
 - `docs/system-invariants.md`, `docs/external-side-effects.md` (the stash is a
   client-side store; a short entry says it is not the server's and what bounds
   it), `frontend/CLAUDE.md` (a paragraph naming `lib/share-inbox.ts` as the one
@@ -385,10 +384,12 @@ pseudo-locale during development and the full translation pass as the final
 commit.
 
 **Phase 2 (separate plan):** attach to an existing transaction (a transaction
-picker), and Ask the assistant (hand the files to `ChatInterface` as
-`ChatAttachment`s, which already accepts images, PDF and CSV under its own
-5 MB / 20 MB caps -- the classification table gains a column and nothing else
-moves).
+picker). Send to AI Assistant has shipped: `/share` routes to `/ai?share=<id>`
+with the same hand-off the wizard uses, and `ChatInterface` stages the files as
+`ChatAttachment`s under its own 5 MB / 20 MB caps. The offer is gated on
+`useAiConfigured` and on `assistantAcceptsFiles`, which asks the chat's own
+validators whether it would take this exact set -- a share inside the stash's
+10-file / 10 MB caps can be outside the assistant's.
 
 **Phase 3 (separate plan; the first part of #1292 has since shipped):** the scan
 pipeline runs on the review screen before the New transaction destination, with
@@ -486,3 +487,27 @@ should say where it was wrong.
     `style: 'unit'`, which localizes the number and the unit abbreviation
     together. English output changes as a result (CLDR short forms: `2.0 kB`,
     `512 byte`).
+13. **`ShareInboxNotice` was removed; only its sweep survives.** The banner sat
+    in the shell reading the newest bundle and offering "Review", and the
+    reported experience of it was a dead end: a user who shared a file, landed
+    on `/share` and pressed **Send to AI Assistant** got the files staged on the
+    composer as designed -- and then the banner, mounted above the route that
+    had just consumed the stash, announced "1 file was shared with Monize" over
+    the assistant, whose Review link led to "Nothing here to review". It was
+    offering a way back to a share the user had already finished routing.
+
+    The resume case it was built for (section 4.4: an OIDC round trip that drops
+    `returnTo`, or opening Monize from the launcher) is real but rarer than the
+    just-consumed case it collided with, and its cost was paid on the common
+    path. Rather than teach the banner to tell the two apart -- which is a
+    second piece of state about a stash the user is already done with -- the
+    banner is gone and a share whose redirect does not survive is shared again.
+
+    `purgeExpiredSharedBundles()` is NOT gone with it. It is one of the three
+    mechanisms behind INV-SHARE-003, and the worker's own sweeps (`activate`,
+    and before each new share) leave a gap: a returning visit that neither
+    updates the worker nor shares anything new would never age a stash out, so
+    files the user shared would sit on the device past the lifetime the screen
+    promises. `ShareStashSweeper` is that call and nothing else -- a
+    null-rendering component keeping the `/share` exclusion, and deliberately
+    NOT the banner's auth gate, which existed because listing also claims.

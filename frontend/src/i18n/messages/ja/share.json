@@ -18,6 +18,8 @@
   "newTransactionTitle": "新しい取引",
   "import": "明細としてインポート",
   "importHint": "インポートウィザードを開きます。先に列の対応付けを行い、各行を確認できます。",
+  "sendToAssistant": "AI アシスタントに送る",
+  "sendToAssistantHint": "{count, plural, other {これらのファイルを添付してアシスタントを開きます。何も保存されないうちに質問できます。}}",
   "discard": "破棄",
   "discardConfirmTitle": "共有されたファイルを破棄しますか?",
   "discardConfirmMessage": "共有されたファイルはこの端末から削除されます。Monize 内は何も変わりません。",
@@ -40,8 +42,5 @@
   "unsupportedBrowserTitle": "このブラウザーは共有されたファイルを受け取れません",
   "unsupportedBrowserMessage": "インストール済みアプリへの共有はここでは利用できません。Monize 内からファイルを追加することはできます。",
   "goToTransactions": "取引から追加",
-  "goToImport": "インポートへ",
-  "noticeTitle": "{count, plural, other {# 件のファイルが Monize に共有されました}}",
-  "noticeAction": "確認",
-  "noticeDismiss": "閉じる"
+  "goToImport": "インポートへ"
 }

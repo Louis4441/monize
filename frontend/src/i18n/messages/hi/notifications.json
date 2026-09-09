@@ -43,7 +43,14 @@
     "durationMinutes": "{minutes, plural, one {# मिनट} other {# मिनट}}",
     "durationHours": "{hours, plural, one {# घंटा} other {# घंटे}}",
     "cancel": "रद्द करें",
-    "confirm": "अनुस्मारक सेट करें"
+    "confirm": "अनुस्मारक सेट करें",
+    "pageTitle": "सक्रिय रिमाइंडर",
+    "empty": "कोई सक्रिय रिमाइंडर नहीं",
+    "loadFailed": "रिमाइंडर लोड नहीं हो सके",
+    "retry": "फिर से कोशिश करें",
+    "nextFire": "अगला रिमाइंडर: {date}",
+    "openTarget": "संबंधित पेज खोलें",
+    "delegateUnavailable": "रिमाइंडर प्रबंधित करने के लिए अपने खाते पर वापस जाएँ।"
   },
   "billDue": {
     "titleOverdue": "{payee} अतिदेय",
@@ -104,5 +111,9 @@
       "title": "{name} पोस्ट नहीं हो सका",
       "message": "{date} को देय आपका नियोजित लेनदेन स्वचालित रूप से पोस्ट नहीं हुआ: {error}। आप इसे बिल और जमा अनुभाग से मैन्युअल रूप से पोस्ट कर सकते हैं।"
     }
+  },
+  "priceMovement": {
+    "title": "कीमत में बदलाव का अलर्ट: {symbol} ({percent}%)",
+    "message": "{symbol}: पिछले उपलब्ध कारोबारी सत्र की तुलना में {percent}%।"
   }
 }

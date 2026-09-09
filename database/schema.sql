@@ -596,6 +596,8 @@ CREATE TABLE securities (
     description TEXT, -- free-text notes, optionally pre-filled from the quote provider
     is_active BOOLEAN DEFAULT true,
     is_favourite BOOLEAN NOT NULL DEFAULT false, -- pinned to the dashboard Favourite Securities widget
+    price_chart_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    price_alert_percent NUMERIC(9,4) CHECK (price_alert_percent >= 0.1 AND price_alert_percent <= 1000),
     skip_price_updates BOOLEAN DEFAULT false, -- for auto-generated symbols that can't be looked up
     sector VARCHAR(100),             -- stock sector from Yahoo Finance (e.g. 'Technology')
     industry VARCHAR(100),           -- stock industry (e.g. 'Consumer Electronics')
@@ -994,7 +996,6 @@ CREATE TABLE user_preferences (
     color_theme VARCHAR(20) NOT NULL DEFAULT 'default',
     timezone VARCHAR(50) DEFAULT 'browser',
     notification_email BOOLEAN DEFAULT true,
-    notification_browser BOOLEAN DEFAULT true,
     two_factor_enabled BOOLEAN DEFAULT false,
     getting_started_dismissed BOOLEAN DEFAULT false,
     week_starts_on SMALLINT DEFAULT 1,
@@ -2387,6 +2388,13 @@ CREATE INDEX idx_gem_strategy_signals_user ON gem_strategy_signals(user_id);
 -- to push to real phones.
 -- ---------------------------------------------------------------------------
 
+CREATE TABLE push_chart_artifacts (
+    id VARCHAR(64) PRIMARY KEY CHECK (id ~ '^[a-f0-9]{64}$'),
+    expires_at TIMESTAMPTZ NOT NULL,
+    png BYTEA NOT NULL CHECK (octet_length(png) <= 65536)
+);
+CREATE INDEX idx_push_chart_artifacts_expiry ON push_chart_artifacts(expires_at);
+
 CREATE TABLE push_instance_config (
     -- Singleton. The key admits exactly one value, so a second insert is a
     -- conflict rather than a second push identity for one deployment.
@@ -3068,6 +3076,7 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- rls-exempt: market_index_sync
 -- rls-exempt: oauth_payloads
 -- rls-exempt: provider_health
+-- rls-exempt: push_chart_artifacts
 -- rls-exempt: push_instance_config
 -- rls-exempt: schema_migrations
 -- ---------------------------------------------------------------------------
