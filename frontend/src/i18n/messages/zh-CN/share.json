@@ -18,6 +18,8 @@
   "newTransactionTitle": "新交易",
   "import": "作为对账单导入",
   "importHint": "打开导入向导，先映射各列并逐行核对。",
+  "sendToAssistant": "发送给 AI 助手",
+  "sendToAssistantHint": "{count, plural, other {打开助手并附上这些文件，可在保存任何内容之前先提问。}}",
   "discard": "丢弃",
   "discardConfirmTitle": "丢弃已分享的文件？",
   "discardConfirmMessage": "已分享的文件将从本设备移除。Monize 中的内容不会改变。",

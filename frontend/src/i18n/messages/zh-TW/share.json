@@ -18,6 +18,8 @@
   "newTransactionTitle": "新交易",
   "import": "作為對帳單匯入",
   "importHint": "開啟匯入精靈，先對應各欄並逐列核對。",
+  "sendToAssistant": "傳送給 AI 助理",
+  "sendToAssistantHint": "{count, plural, other {開啟助理並附上這些檔案，可在儲存任何內容之前先提問。}}",
   "discard": "捨棄",
   "discardConfirmTitle": "捨棄已分享的檔案？",
   "discardConfirmMessage": "已分享的檔案將從本裝置移除。Monize 中的內容不會改變。",

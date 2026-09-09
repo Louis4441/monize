@@ -18,6 +18,8 @@
   "newTransactionTitle": "[XX-New transaction-XX]",
   "import": "[XX-Import as a statement-XX]",
   "importHint": "[XX-Open the import wizard so you can map the columns and review every row first.-XX]",
+  "sendToAssistant": "[XX-Send to AI Assistant-XX]",
+  "sendToAssistantHint": "[XX-Open the assistant with {count, plural, one {this file} other {these files}} attached, so you can ask about {count, plural, one {it} other {them}} before anything is saved.-XX]",
   "discard": "[XX-Discard-XX]",
   "discardConfirmTitle": "[XX-Discard shared files?-XX]",
   "discardConfirmMessage": "[XX-The shared files will be removed from this device. Nothing in Monize changes.-XX]",

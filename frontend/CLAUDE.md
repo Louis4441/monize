@@ -663,6 +663,23 @@ that has not resolved the reader yet reads nothing and shows its loading state
 than claiming a share on behalf of whoever the app is still fetching.
 INV-SHARE-005.
 
+**A destination is offered only when it can actually accept the share, and it
+asks the destination's own validators.** The assistant sits beside the
+transaction form and the import wizard on the review screen, gated on two
+questions: `useAiConfigured()` (a provider that can answer -- the rule above),
+and `assistantAcceptsFiles` (`lib/ai-attachments.ts`), which runs the chat's own
+`validateFile`/`validateAddition` over the exact set. Re-stating the caps here
+would be a second copy that drifts, and they genuinely differ: the stash holds
+10 files at 10 MB, the assistant takes 5 at 5 MB and cannot read OFX, QFX or
+QIF, so a share the wizard imports happily is often one the chat would refuse
+file by file. All-or-nothing, because staging the readable subset would send the
+assistant part of what the user shared and say nothing about the rest. The
+hand-off is the wizard's: `/ai?share=<id>`, the page reads the bundle as the
+signed-in reader, and the stash is discarded only once `ChatInterface` reports
+the bytes staged (`onInitialFilesStaged`) -- dropping it on the way in would
+leave the user with neither the share nor the attachments. Staged, never sent:
+the user still presses send (INV-SHARE-002).
+
 **Do not classify a shared file with the import wizard's `detectFileType`.** That
 function falls through to `qif` for every extension it does not recognise, which
 is right for a picker (the user chose the file) and wrong for a share sheet (the

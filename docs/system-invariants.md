@@ -2287,18 +2287,25 @@ Statement           Nothing is imported, attached or saved as a consequence of a
                     does it.
 Enforcement         The worker's only action is to stash and redirect. `/share`
                     has no auto-advance for any bundle, single-file included:
-                    the two destinations are the existing transaction form's save
-                    and the import wizard's review step, both unchanged. A share
-                    whose usable files disagree about their destination is
+                    the three destinations are the existing transaction form's
+                    save, the import wizard's review step, and the assistant's
+                    composer -- all unchanged, and each still submitted by the
+                    user. The assistant is offered only when a provider can
+                    answer (`useAiConfigured`) and the chat accepts every usable
+                    file (`assistantAcceptsFiles`), so no destination is a button
+                    whose press can only fail. A share whose usable files
+                    disagree about their destination is
                     offered neither, rather than a guess. `src/app/share/page.test.tsx`
-                    asserts the form is not mounted until the button is pressed;
+                    asserts the form is not mounted until the button is pressed,
+                    and `src/components/ai/ChatInterface.test.tsx` that handed-over
+                    files are staged on the composer with nothing sent;
                     `e2e/tests/share-target.spec.ts` shares a statement and a
                     receipt end to end and asserts the account holds no
                     transaction while the review screen and the wizard are open.
 Concurrency scope   per share
 Retry semantics     A consumed bundle is discarded, so a second press cannot
-                    apply it twice; the import wizard discards the bundle only
-                    once it holds the contents.
+                    apply it twice; the import wizard and the assistant's page
+                    each discard the bundle only once they hold the contents.
 Crash semantics     A crash mid-review leaves the bundle intact and unapplied,
                     which is the state the screen is for.
 Status              enforced

@@ -18,6 +18,8 @@
   "newTransactionTitle": "Neue Transaktion",
   "import": "Als Kontoauszug importieren",
   "importHint": "Den Importassistenten öffnen, um zuerst die Spalten zuzuordnen und jede Zeile zu prüfen.",
+  "sendToAssistant": "An den KI-Assistenten senden",
+  "sendToAssistantHint": "{count, plural, one {Öffnet den Assistenten mit dieser Datei als Anhang, damit Sie dazu Fragen stellen können, bevor etwas gespeichert wird.} other {Öffnet den Assistenten mit diesen Dateien als Anhang, damit Sie dazu Fragen stellen können, bevor etwas gespeichert wird.}}",
   "discard": "Verwerfen",
   "discardConfirmTitle": "Geteilte Dateien verwerfen?",
   "discardConfirmMessage": "Die geteilten Dateien werden von diesem Gerät entfernt. In Monize ändert sich nichts.",

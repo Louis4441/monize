@@ -18,6 +18,8 @@
   "newTransactionTitle": "Transaksi baru",
   "import": "Impor sebagai rekening koran",
   "importHint": "Membuka panduan impor agar Anda dapat memetakan kolom dan memeriksa setiap baris lebih dahulu.",
+  "sendToAssistant": "Kirim ke Asisten AI",
+  "sendToAssistantHint": "{count, plural, other {Membuka asisten dengan berkas ini sebagai lampiran, sehingga Anda dapat bertanya tentangnya sebelum ada yang disimpan.}}",
   "discard": "Buang",
   "discardConfirmTitle": "Buang berkas yang dibagikan?",
   "discardConfirmMessage": "Berkas yang dibagikan akan dihapus dari perangkat ini. Tidak ada yang berubah di Monize.",
