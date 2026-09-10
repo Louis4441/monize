@@ -19,7 +19,7 @@ import { gainLossColor } from '@/lib/format';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
-import { SecurityComparisonChart } from '@/components/reports/SecurityComparisonChart';
+import { SecurityComparisonChart, SecurityComparisonChartHandle } from '@/components/reports/SecurityComparisonChart';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { useDateRange } from '@/hooks/useDateRange';
 import { CHART_RANGES } from '@/lib/security-detail';
@@ -61,6 +61,12 @@ const CELL_PLACEMENT: Record<HoldingsSortField, string> = {
 
 const ACCOUNTS_STORAGE_KEY = 'monize-reports-investment-performance-accounts';
 
+// The comparison endpoint caps `securityIds` at 20 (`@ArrayMaxSize(20)` on
+// `PerformanceComparisonQueryDto`): sending more returns 400 and the whole chart
+// falls into its error state. A portfolio of 21+ securities plots only its 20
+// largest holdings by market value, and a note says so.
+const PERFORMANCE_CHART_MAX_SECURITIES = 20;
+
 export function InvestmentPerformanceReport() {
   const t = useTranslations('reports');
   const mainAccountName = useMainAccountName();
@@ -72,6 +78,9 @@ export function InvestmentPerformanceReport() {
   } = useNumberFormat();
   const { defaultCurrency } = useExchangeRates();
   const chartRef = useRef<HTMLDivElement>(null);
+  // The comparison chart owns its own fetched series, colours and chart DOM, so
+  // its PDF export is delegated to this handle (matching SecurityPerformanceReport).
+  const comparisonExportRef = useRef<SecurityComparisonChartHandle>(null);
   // Persisted so the report opens on the accounts the user last chose.
   // Accounts arrive with the data below, so stale IDs are pruned there.
   const [selectedAccountIds, setSelectedAccountIds, pruneAccountFilter] =
@@ -219,15 +228,6 @@ export function InvestmentPerformanceReport() {
     return aggregated;
   }, [portfolio, sortField, sortDirection]);
 
-  const holdingsData = useMemo(() => {
-    return aggregatedHoldings
-      .filter((h) => h.marketValue && h.marketValue > 0)
-      .map((h, index) => ({
-        ...h,
-        color: CHART_COLOURS[index % CHART_COLOURS.length],
-      }));
-  }, [aggregatedHoldings]);
-
   const allocationData = useMemo(() => {
     if (!portfolio) return [];
     return portfolio.allocation.map((item, index) => ({
@@ -236,18 +236,49 @@ export function InvestmentPerformanceReport() {
     }));
   }, [portfolio]);
 
-  // The securities to plot on the historical performance chart: every distinct
-  // security the selected accounts currently hold. `getPortfolioSummary` is
-  // already fetched with `selectedAccountIds`, so this list is the selected
-  // scope's holdings -- the account filter reaches the chart through the data,
-  // not through a second request key. Deduped so one security held in two
-  // accounts is one line, not two identical ones.
-  const performanceSecurityIds = useMemo(() => {
+  // Every distinct security the selected accounts currently hold. Deduped so a
+  // security held in two accounts is one line, not two identical ones, and in a
+  // stable order (holdings order) independent of the table's user-chosen sort.
+  // `getPortfolioSummary` is already fetched with `selectedAccountIds`, so this
+  // is the selected scope's holdings -- the account filter reaches the chart
+  // through the data, not a second request key.
+  const heldSecurityIds = useMemo(() => {
     if (!portfolio) return [];
     return [...new Set(portfolio.holdings.map((h) => h.securityId))];
   }, [portfolio]);
 
+  // The securities actually plotted: capped at the backend's 20 so a 21+
+  // security portfolio does not 400 the whole chart. When capped, the survivors
+  // are the 20 largest holdings by market value (aggregated across accounts, so
+  // a security split over two accounts is weighed by its combined value), kept
+  // in the same stable order as `heldSecurityIds`.
+  const performanceSecurityIds = useMemo(() => {
+    if (heldSecurityIds.length <= PERFORMANCE_CHART_MAX_SECURITIES) {
+      return heldSecurityIds;
+    }
+    const topIds = new Set(
+      [...aggregateHoldingsBySecurity(portfolio!.holdings)]
+        .sort((a, b) => (b.marketValue ?? 0) - (a.marketValue ?? 0))
+        .slice(0, PERFORMANCE_CHART_MAX_SECURITIES)
+        .map((h) => h.securityId),
+    );
+    return heldSecurityIds.filter((id) => topIds.has(id));
+  }, [heldSecurityIds, portfolio]);
+
+  // True when more securities are held than the chart can plot, so the note
+  // telling the reader only the largest are shown renders.
+  const isPerformanceChartCapped =
+    heldSecurityIds.length > performanceSecurityIds.length;
+
   const handleExportPdf = async () => {
+    // The Performance view plots percent return with the chart's own colours and
+    // series legend; only the chart handle can draw that legend correctly, so it
+    // owns the export (the report's holdings-value legend would match nothing).
+    if (viewType === 'performance') {
+      await comparisonExportRef.current?.exportPdf();
+      return;
+    }
+
     const { exportToPdf } = await import('@/lib/pdf-export');
 
     const cards = summaryValues ? [
@@ -268,9 +299,10 @@ export function InvestmentPerformanceReport() {
       h.gainLossPercent !== null ? formatPercent(h.gainLossPercent) : 'N/A',
     ]);
 
-    const legendItems = holdingsData.map((h) => ({
-      color: h.color,
-      label: `${h.symbol} - ${fmtHolding(h.marketValue, h.currencyCode)}`,
+    // The Allocation donut's legend, from the same data the donut draws.
+    const legendItems = allocationData.map((item) => ({
+      color: item.color,
+      label: `${item.name} - ${formatCurrencyFull(item.value)}`,
     }));
 
     await exportToPdf({
@@ -403,6 +435,9 @@ export function InvestmentPerformanceReport() {
           <div className="mb-6 flex justify-end">
             <DateRangeSelector
               ranges={CHART_RANGES}
+              // Only `all` needs translating; 1M/3M/YTD/1Y/5Y are
+              // locale-neutral abbreviations `formatLabel` handles.
+              labels={{ all: t('investmentPerformance.rangeAll') }}
               value={perfRange}
               onChange={setPerfRange}
               activeColour="bg-blue-600"
@@ -414,8 +449,18 @@ export function InvestmentPerformanceReport() {
             indexCodes={[]}
             startDate={perfResolvedRange.start}
             endDate={perfResolvedRange.end}
+            subtitle={t('investmentPerformance.chartSubtitle')}
             reloadKey={reloadKey}
+            exportRef={comparisonExportRef}
           />
+          {isPerformanceChartCapped && (
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              {t('investmentPerformance.chartLimitedNote', {
+                shown: performanceSecurityIds.length,
+                total: heldSecurityIds.length,
+              })}
+            </p>
+          )}
 
           {/* Holdings Table */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 overflow-hidden">

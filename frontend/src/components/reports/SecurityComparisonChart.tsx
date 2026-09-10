@@ -113,6 +113,14 @@ interface SecurityComparisonChartProps {
   /** Window start (`''` means all history, resolved server-side from the data). */
   startDate: string;
   endDate: string;
+  /**
+   * Overrides the subtitle shown above the chart and used as the PDF
+   * description. Defaults to the comparison-report copy, which names "each
+   * selected instrument" and "dashed index lines" -- both wrong for a caller
+   * plotting a whole portfolio with no benchmarks (`indexCodes={[]}`), so such
+   * a caller passes its own portfolio-appropriate string.
+   */
+  subtitle?: string;
   /** Bumped by the RefreshPricesButton so a manual price refresh re-fetches. */
   reloadKey?: number;
   /**
@@ -139,6 +147,7 @@ export function SecurityComparisonChart({
   indexCodes,
   startDate,
   endDate,
+  subtitle,
   reloadKey = 0,
   exportRef,
 }: SecurityComparisonChartProps) {
@@ -147,6 +156,11 @@ export function SecurityComparisonChart({
   const formatChartDate = useChartDateFormat();
   const { formatSignedPercent } = useNumberFormat();
   const chartRef = useRef<HTMLDivElement>(null);
+  // The comparison report's default copy speaks of "each selected instrument"
+  // and "dashed index lines"; a caller plotting a whole portfolio with no
+  // benchmarks passes its own subtitle instead. Used for both the on-screen
+  // subtitle and the PDF description so the two never disagree.
+  const resolvedSubtitle = subtitle ?? t('securityPerformance.comparisonSubtitle');
 
   // Everything that changes the *meaning* of the response is in the key, so a
   // payload can never be mistaken for the answer to a different selection
@@ -220,7 +234,7 @@ export function SecurityComparisonChart({
         await exportToPdf({
           title: t('securityPerformance.comparisonTitle'),
           subtitle: series.map((s) => seriesName(s)).join(', ') || undefined,
-          description: t('securityPerformance.comparisonSubtitle'),
+          description: resolvedSubtitle,
           chartContainer: chartRef.current,
           chartLegend: series.map((s) => ({
             color: resolvePdfColor(s.color),
@@ -236,7 +250,7 @@ export function SecurityComparisonChart({
       },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [series, t, ti],
+    [series, resolvedSubtitle, t, ti],
   );
 
   if (error) {
@@ -260,7 +274,7 @@ export function SecurityComparisonChart({
         {t('securityPerformance.comparisonTitle')}
       </h3>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-        {t('securityPerformance.comparisonSubtitle')}
+        {resolvedSubtitle}
       </p>
 
       {isLoading ? (
