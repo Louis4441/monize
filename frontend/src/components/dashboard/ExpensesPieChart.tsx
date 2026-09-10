@@ -11,6 +11,8 @@ import { transactionsApi } from '@/lib/transactions';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { PartialTotal } from '@/components/ui/PartialTotal';
+import { DonutCenterTotal } from '@/components/ui/DonutCenterTotal';
+import { ChartLegend } from '@/components/ui/ChartLegend';
 import { useReportData } from '@/hooks/useReportData';
 import { useWidgetConfig } from '@/hooks/useWidgetConfig';
 import { resolveRangePreset } from '@/lib/date-range';
@@ -282,7 +284,7 @@ export function ExpensesPieChart({
         <WidgetMessage>{t('expensesPieChart.empty')}</WidgetMessage>
       ) : (
         <>
-          <div className="h-64">
+          <div className="relative h-64">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <PieChart>
                 <Pie
@@ -303,38 +305,37 @@ export function ExpensesPieChart({
                 <Tooltip content={<CustomTooltip />} />
               </PieChart>
             </ResponsiveContainer>
+            {/* The aggregate belongs in the donut's hole, not in a row beneath
+                the legend that a phone has to scroll to. */}
+            <DonutCenterTotal
+              label={t('expensesPieChart.total')}
+              value={
+                <PartialTotal
+                  total={{
+                    value: totalExpenses,
+                    missingCurrencies: breakdown.missingCurrencies,
+                    excludedCount: breakdown.excludedCount,
+                  }}
+                  displayCurrency={defaultCurrency}
+                >
+                  {formatCurrency(totalExpenses)}
+                </PartialTotal>
+              }
+            />
           </div>
-          <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-1.5">
-            {chartData.map((item, index) => (
-              <button
-                key={index}
-                onClick={() => handleCategoryClick(item.id)}
-                className={`flex items-center gap-2 text-sm text-left ${item.id ? 'hover:underline cursor-pointer' : ''}`}
-                disabled={!item.id}
-              >
-                <div
-                  className="w-3 h-3 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: item.colour }}
-                />
-                <span className="text-gray-600 dark:text-gray-400 truncate">{item.name}</span>
-              </button>
-            ))}
-          </div>
-          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-center flex-shrink-0">
-            <div className="text-sm text-gray-500 dark:text-gray-400">{t('expensesPieChart.total')}</div>
-            <div className="font-semibold text-gray-900 dark:text-gray-100">
-              <PartialTotal
-                total={{
-                  value: totalExpenses,
-                  missingCurrencies: breakdown.missingCurrencies,
-                  excludedCount: breakdown.excludedCount,
-                }}
-                displayCurrency={defaultCurrency}
-              >
-                {formatCurrency(totalExpenses)}
-              </PartialTotal>
-            </div>
-          </div>
+          {/* One vertical column on a phone, three from `sm` up -- the desktop
+              density this legend carried before the mobile-first redesign. */}
+          <ChartLegend
+            className="mt-4"
+            columnsClassName="sm:grid-cols-3"
+            items={chartData.map((item, index) => ({
+              key: String(index),
+              name: item.name,
+              color: item.colour,
+              onClick: () => handleCategoryClick(item.id),
+              disabled: !item.id,
+            }))}
+          />
         </>
       )}
     </WidgetCard>

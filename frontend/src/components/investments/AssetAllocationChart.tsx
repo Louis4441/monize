@@ -14,6 +14,7 @@ import { investmentsApi } from '@/lib/investments';
 import { CHART_SERIES, chartColors } from '@/lib/chart-colors';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
+import { ChartLegend } from '@/components/ui/ChartLegend';
 
 type GroupBy = 'security' | 'tag' | 'tagKey' | 'country' | 'assetClass';
 
@@ -591,28 +592,30 @@ export function AssetAllocationChart({
           </PieChart>
         </ResponsiveContainer>
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-x-6 gap-y-2">
-        {legendData.map((item, index) => {
+      {/* One vertical column on a phone, three from `sm` up -- the desktop
+          density this legend carried before the mobile-first redesign, restored;
+          a three-column legend on a 320px screen wrapped every name onto its own
+          cramped third, which is why the phone stays single-column. */}
+      <ChartLegend
+        className="mt-4"
+        columnsClassName="sm:grid-cols-3"
+        items={legendData.map((item, index) => {
           const isForeign = !foreignCurrency && item.currencyCode && item.currencyCode !== defaultCurrency;
-          return (
-            <div key={index} className="flex items-center gap-2 text-sm">
-              <div
-                className="w-3 h-3 rounded-full flex-shrink-0"
-                style={{ backgroundColor: item.color }}
-              />
-              <span className="text-gray-600 dark:text-gray-400 truncate">
+          return {
+            key: String(index),
+            color: item.color,
+            name: (
+              <>
                 {item.name}
                 {isForeign && (
                   <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">({item.currencyCode})</span>
                 )}
-              </span>
-              <span className="text-gray-900 dark:text-gray-100 ml-auto">
-                {formatPercent(item.percentage, 1)}
-              </span>
-            </div>
-          );
+              </>
+            ),
+            trailing: formatPercent(item.percentage, 1),
+          };
         })}
-      </div>
+      />
     </div>
   );
 }
