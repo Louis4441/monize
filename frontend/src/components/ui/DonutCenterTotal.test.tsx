@@ -39,4 +39,50 @@ describe('DonutCenterTotal', () => {
     );
     expect(screen.getByTestId('wrapped')).toBeInTheDocument();
   });
+
+  it('never truncates the figure, so a PartialTotal marker inside it stays visible', () => {
+    // A `PartialTotal` renders its subtotal beside a `*` marker and an info
+    // trigger. `truncate` would clip that trailing marker -- the very signal
+    // ("a subtotal is not a total") the repo insists stays on screen, and money
+    // must never truncate either.
+    render(
+      <DonutCenterTotal
+        label="Total"
+        value={
+          <span data-testid="partial">
+            <span>$1,234,567.00</span>
+            <button type="button" data-testid="marker">
+              *
+            </button>
+          </span>
+        }
+      />,
+    );
+    const marker = screen.getByTestId('marker');
+    expect(marker).toBeInTheDocument();
+
+    // The figure's wrapping span (the pointer-events-auto element that holds the
+    // value) must not truncate and must not be a full-width block: a full-width
+    // figure would swallow slice hover across the whole hole.
+    const figure = screen.getByTestId('partial').parentElement as HTMLElement;
+    const figureTokens = figure.className.split(/\s+/);
+    expect(figureTokens).toContain('pointer-events-auto');
+    expect(figureTokens).not.toContain('truncate');
+    // Not a full-width block (which would swallow slice hover across the hole);
+    // `max-w-full` only bounds it, it does not claim the width.
+    expect(figureTokens).not.toContain('w-full');
+
+    // Nothing between the marker and that figure span may be a truncate box.
+    let node: HTMLElement | null = marker;
+    while (node && node !== figure.parentElement) {
+      expect(node.className ?? '').not.toContain('truncate');
+      node = node.parentElement;
+    }
+  });
+
+  it('keeps the container inert (pointer-events-none) so slice hover passes through', () => {
+    const { container } = render(<DonutCenterTotal label="Total" value="$0" />);
+    const overlay = container.firstElementChild as HTMLElement;
+    expect(overlay.className).toContain('pointer-events-none');
+  });
 });

@@ -2,6 +2,8 @@
 
 import { ReactNode } from 'react';
 
+import { HOVER_ROW_ON_CARD } from '@/components/ui/Card';
+
 export interface ChartLegendItem {
   /** Stable React key. */
   key: string;
@@ -70,7 +72,7 @@ export function ChartLegend({
                 {item.name}
               </span>
               {item.detail != null && (
-                <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
+                <span className="block text-xs text-gray-500 dark:text-gray-400">
                   {item.detail}
                 </span>
               )}
@@ -90,12 +92,12 @@ export function ChartLegend({
                 type="button"
                 onClick={item.onClick}
                 disabled={item.disabled}
-                className="flex w-full items-start gap-2 rounded-md p-1 text-left text-sm transition-colors motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 enabled:cursor-pointer enabled:hover:bg-gray-100 disabled:cursor-default dark:enabled:hover:bg-gray-700/50"
+                className={`flex w-full items-start gap-2 rounded-md p-2 text-left text-sm ${HOVER_ROW_ON_CARD} disabled:hover:bg-transparent dark:disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 enabled:cursor-pointer disabled:cursor-default`}
               >
                 {inner}
               </button>
             ) : (
-              <div className="flex items-start gap-2 p-1 text-sm">{inner}</div>
+              <div className="flex items-start gap-2 p-2 text-sm">{inner}</div>
             )}
           </li>
         );

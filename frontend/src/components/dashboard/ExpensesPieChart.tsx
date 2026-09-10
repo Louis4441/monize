@@ -323,9 +323,11 @@ export function ExpensesPieChart({
               }
             />
           </div>
-          {/* One vertical column on a phone, the dense grid from `sm` up. */}
+          {/* One vertical column on a phone, three from `sm` up -- the desktop
+              density this legend carried before the mobile-first redesign. */}
           <ChartLegend
             className="mt-4"
+            columnsClassName="sm:grid-cols-3"
             items={chartData.map((item, index) => ({
               key: String(index),
               name: item.name,

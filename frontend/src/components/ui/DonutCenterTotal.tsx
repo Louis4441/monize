@@ -22,7 +22,14 @@ interface DonutCenterTotalProps {
  * `relative` and drops this beside the `ResponsiveContainer`. The container is
  * `pointer-events-none` so a hover still reaches the slices beneath it, while
  * the figure itself re-enables pointer events so a `PartialTotal` marker inside
- * `value` stays hoverable.
+ * `value` stays hoverable. The figure is sized to its own content (not a
+ * full-width block), so pointer events return ONLY over the text and the ring
+ * around the hole keeps receiving hover everywhere else.
+ *
+ * The figure is never truncated: money must stay legible, and a `PartialTotal`
+ * passed as `value` carries a trailing `*` marker and its info trigger that
+ * clipping would hide -- a subtotal must not be dressed up as a total. It wraps
+ * if it must rather than losing a character.
  *
  * The figure is passed already formatted -- this file names no formatter and no
  * separator, which is what keeps it out of the number-locale guard: a number a
@@ -35,7 +42,7 @@ export function DonutCenterTotal({ label, value, className }: DonutCenterTotalPr
       className={`pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6 text-center ${className ?? ''}`}
     >
       <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
-      <span className="pointer-events-auto mt-0.5 max-w-full truncate text-base font-semibold text-gray-900 dark:text-gray-100 sm:text-lg">
+      <span className="pointer-events-auto mt-0.5 inline-flex max-w-full flex-wrap items-center justify-center text-base font-semibold text-gray-900 dark:text-gray-100 sm:text-lg">
         {value}
       </span>
     </div>

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@/test/render';
 import { ChartLegend, ChartLegendItem } from './ChartLegend';
+import { HOVER_ROW_ON_CARD } from './Card';
 
 /**
  * The legend beside a categorical chart. The one behaviour that matters on a
@@ -81,5 +82,46 @@ describe('ChartLegend', () => {
     render(<ChartLegend items={[{ key: 'a', name: 'Cash', color: '#000' }]} />);
     expect(screen.queryByRole('button')).toBeNull();
     expect(screen.getByText('Cash')).toBeInTheDocument();
+  });
+
+  it('gives the interactive row a comfortable tap target (p-2)', () => {
+    render(
+      <ChartLegend items={[{ key: 'a', name: 'Groceries', color: '#000', onClick: () => {} }]} />,
+    );
+    const button = screen.getByRole('button', { name: /Groceries/ });
+    expect(button.className).toContain('p-2');
+    // The old ~24px target is gone.
+    expect(button.className).not.toMatch(/(^|\s)p-1(\s|$)/);
+  });
+
+  it('takes its row hover from the shared HOVER_ROW_ON_CARD constant, not a hand-picked grey', () => {
+    render(
+      <ChartLegend items={[{ key: 'a', name: 'Groceries', color: '#000', onClick: () => {} }]} />,
+    );
+    const button = screen.getByRole('button', { name: /Groceries/ });
+    for (const token of HOVER_ROW_ON_CARD.split(/\s+/)) {
+      expect(button.className).toContain(token);
+    }
+    // The evade-the-guard hand-picked pair is gone.
+    expect(button.className).not.toContain('enabled:hover:bg-gray-100');
+    expect(button.className).not.toContain('dark:enabled:hover:bg-gray-700/50');
+    // A disabled row does not light up on hover.
+    expect(button.className).toContain('disabled:hover:bg-transparent');
+    expect(button.className).toContain('dark:disabled:hover:bg-transparent');
+  });
+
+  it('does not truncate the money detail line (money must not clip)', () => {
+    const { container } = render(
+      <ChartLegend
+        items={[{ key: 'a', name: 'Groceries', color: '#000', detail: '$1,234,567 (12.3%)' }]}
+      />,
+    );
+    const detail = screen.getByText('$1,234,567 (12.3%)');
+    expect(detail.className).not.toContain('truncate');
+    // The name line may still clip a long category name.
+    const name = screen.getByText('Groceries');
+    expect(name.className).toContain('truncate');
+    // Sanity: the detail sits inside the rendered legend.
+    expect(container.contains(detail)).toBe(true);
   });
 });

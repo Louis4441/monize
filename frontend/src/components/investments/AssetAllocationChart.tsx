@@ -592,12 +592,13 @@ export function AssetAllocationChart({
           </PieChart>
         </ResponsiveContainer>
       </div>
-      {/* One vertical column on a phone, the dense grid from `sm` up -- a
-          three-column legend on a 320px screen wrapped every name onto its own
-          cramped third. */}
+      {/* One vertical column on a phone, three from `sm` up -- the desktop
+          density this legend carried before the mobile-first redesign, restored;
+          a three-column legend on a 320px screen wrapped every name onto its own
+          cramped third, which is why the phone stays single-column. */}
       <ChartLegend
         className="mt-4"
-        columnsClassName="sm:grid-cols-2 lg:grid-cols-3"
+        columnsClassName="sm:grid-cols-3"
         items={legendData.map((item, index) => {
           const isForeign = !foreignCurrency && item.currencyCode && item.currencyCode !== defaultCurrency;
           return {
