@@ -32,6 +32,13 @@ import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
+import {
+  CAPTION_CLASS,
+  CellLabel,
+  PHONE_HEADER_CLASS,
+  type SortColumn,
+  type SortColumnsByField,
+} from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { exportToCsv } from '@/lib/csv-export';
 import { chartColors, CHART_SERIES } from '@/lib/chart-colors';
@@ -88,6 +95,18 @@ const SERIES_COLORS: Record<SeriesKey, { positive: string; negative: string }> =
 
 const ACCOUNTS_STORAGE_KEY = 'monize-reports-dividend-income-accounts';
 
+// Today's header cell, unchanged. Kept local -- PHONE_HEADER_CLASS/CAPTION_CLASS/
+// CellLabel are shared, but a table's own header stays per-report because track
+// budgets differ.
+const HEADER_CLASS =
+  'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase';
+// A money cell inside a wrapped row: no padding of its own below `sm` (the grid
+// spaces it), this table's own `px-4 py-3 text-sm` from `sm` up, smaller type on
+// phones. `whitespace-nowrap` is the one property that is not phone-only -- a
+// number must never break; the caption inside takes it back (`CellLabel`).
+const FIGURE_CELL =
+  'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
+
 export function DividendIncomeReport() {
   const t = useTranslations('reports');
   const formatChartDate = useChartDateFormat();
@@ -134,6 +153,23 @@ export function DividendIncomeReport() {
     'reports.dividend-income.security.sort',
     { field: 'total', direction: 'desc' },
   );
+
+  // The by-security table's five sortable columns, keyed by field so the record
+  // is exhaustive: adding a member to `SecurityIncomeSortField` is a compile
+  // error here rather than a header with no control. Declaration order is the
+  // column (and cell DOM) order, rendered by BOTH the column header row and the
+  // phone sort strip from the derived `Object.values`.
+  const securityColumns: SortColumnsByField<
+    SecurityIncomeSortField,
+    SortColumn<SecurityIncomeSortField>
+  > = {
+    symbol: { field: 'symbol', label: t('dividendIncome.colSecurity') },
+    dividends: { field: 'dividends', label: t('dividendIncome.colDividends'), align: 'right' },
+    interest: { field: 'interest', label: t('dividendIncome.colInterest'), align: 'right' },
+    capitalGains: { field: 'capitalGains', label: t('dividendIncome.colCapitalGains'), align: 'right' },
+    total: { field: 'total', label: t('dividendIncome.colTotal'), align: 'right' },
+  };
+  const securitySortColumns = Object.values(securityColumns);
 
   const { start: rangeStart, end: rangeEnd } = resolvedRange;
   // Capital gains require a window; fall back to a wide window when the user
@@ -1641,80 +1677,81 @@ export function DividendIncomeReport() {
               {t('dividendIncome.incomeBySecurityTitle')}
             </h3>
           </div>
+          {/* Below `sm` the table becomes a block and each row wraps into a
+              two-column, three-line grid card so all five columns fit a phone
+              without a horizontal scroll: line 1 is the security identity and
+              its Dividends; line 2 is Interest and Capital Gains; line 3 is the
+              Total, spanning both tracks as the row's headline. Nothing is
+              dropped, and no figure is truncated -- a money value never wraps
+              (`FIGURE_CELL`). From `sm` up it is the ordinary table, resolving
+              identically to today (each cell restores its own
+              `sm:px-4 sm:py-3 sm:text-sm`; the identity cell keeps its 16px
+              symbol by carrying no `sm:text-*`), and the sort controls survive
+              as their own phone-only header row because the column header row
+              that carries them on desktop is hidden there. Restyling `display`
+              strips the implicit table semantics below `sm`, so the roles are
+              restated and every bare figure carries a `CellLabel` naming its
+              column; the symbol names itself. */}
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-900/50">
-                <tr>
-                  <SortableHeader<SecurityIncomeSortField>
-                    field="symbol"
-                    sortField={securitySort.sortField}
-                    sortDirection={securitySort.sortDirection}
-                    onSort={securitySort.handleSort}
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('dividendIncome.colSecurity')}
-                  </SortableHeader>
-                  <SortableHeader<SecurityIncomeSortField>
-                    field="dividends"
-                    sortField={securitySort.sortField}
-                    sortDirection={securitySort.sortDirection}
-                    onSort={securitySort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('dividendIncome.colDividends')}
-                  </SortableHeader>
-                  <SortableHeader<SecurityIncomeSortField>
-                    field="interest"
-                    sortField={securitySort.sortField}
-                    sortDirection={securitySort.sortDirection}
-                    onSort={securitySort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('dividendIncome.colInterest')}
-                  </SortableHeader>
-                  <SortableHeader<SecurityIncomeSortField>
-                    field="capitalGains"
-                    sortField={securitySort.sortField}
-                    sortDirection={securitySort.sortDirection}
-                    onSort={securitySort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('dividendIncome.colCapitalGains')}
-                  </SortableHeader>
-                  <SortableHeader<SecurityIncomeSortField>
-                    field="total"
-                    sortField={securitySort.sortField}
-                    sortDirection={securitySort.sortDirection}
-                    onSort={securitySort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('dividendIncome.colTotal')}
-                  </SortableHeader>
+            <table role="table" className="block min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
+              <thead role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-header-group">
+                {/* Phone sort strip: the same five controls, wrapped. */}
+                <tr role="row" className="flex flex-wrap gap-x-2 gap-y-1 px-2 py-2 sm:hidden">
+                  {securitySortColumns.map((column) => (
+                    <SortableHeader<SecurityIncomeSortField>
+                      key={column.field}
+                      field={column.field}
+                      sortField={securitySort.sortField}
+                      sortDirection={securitySort.sortDirection}
+                      onSort={securitySort.handleSort}
+                      className={PHONE_HEADER_CLASS}
+                    >
+                      {column.label}
+                    </SortableHeader>
+                  ))}
+                </tr>
+                <tr role="row" className="hidden sm:table-row">
+                  {securitySortColumns.map((column) => (
+                    <SortableHeader<SecurityIncomeSortField>
+                      key={column.field}
+                      field={column.field}
+                      sortField={securitySort.sortField}
+                      sortDirection={securitySort.sortDirection}
+                      onSort={securitySort.handleSort}
+                      align={column.align}
+                      className={HEADER_CLASS}
+                    >
+                      {column.label}
+                    </SortableHeader>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody role="rowgroup" className="block divide-y divide-gray-200 dark:divide-gray-700 sm:table-row-group">
                 {sortedSecurityData.map((security) => (
-                  <tr key={security.symbol} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                    <td className="px-4 py-3">
+                  <tr
+                    key={security.symbol}
+                    role="row"
+                    className="grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row sm:p-0"
+                  >
+                    {/* Security: the row identity, wrapping unclamped. No caption. */}
+                    <td role="cell" className="col-start-1 row-start-1 min-w-0 p-0 sm:table-cell sm:px-4 sm:py-3">
                       <div className="font-medium text-gray-900 dark:text-gray-100">
                         {security.symbol}
                       </div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                      <div className="break-words text-sm text-gray-500 dark:text-gray-400 sm:break-normal">
                         {security.name}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right text-sm text-green-600 dark:text-green-400">
+                    <td role="cell" className={`col-start-2 row-start-1 text-green-600 dark:text-green-400 ${FIGURE_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{securityColumns.dividends.label}</CellLabel>
                       {security.dividends === null
                         ? fmtValue(null)
                         : security.dividends > 0
                           ? fmtValue(security.dividends)
                           : '-'}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm text-blue-600 dark:text-blue-400">
+                    <td role="cell" className={`col-start-1 row-start-2 text-blue-600 dark:text-blue-400 ${FIGURE_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{securityColumns.interest.label}</CellLabel>
                       {security.interest === null
                         ? fmtValue(null)
                         : security.interest > 0
@@ -1722,21 +1759,25 @@ export function DividendIncomeReport() {
                           : '-'}
                     </td>
                     <td
-                      className={`px-4 py-3 text-right text-sm ${
+                      role="cell"
+                      className={`col-start-2 row-start-2 ${
                         security.capitalGains !== null && security.capitalGains < 0
                           ? 'text-red-600 dark:text-red-400'
                           : 'text-purple-600 dark:text-purple-400'
-                      }`}
+                      } ${FIGURE_CELL}`}
                     >
+                      <CellLabel className={CAPTION_CLASS}>{securityColumns.capitalGains.label}</CellLabel>
                       {security.capitalGains !== 0 ? fmtValue(security.capitalGains) : '-'}
                     </td>
                     <td
-                      className={`px-4 py-3 text-right text-sm font-medium ${
+                      role="cell"
+                      className={`col-start-1 col-span-2 row-start-3 font-medium ${
                         security.total !== null && security.total < 0
                           ? 'text-red-600 dark:text-red-400'
                           : 'text-gray-900 dark:text-gray-100'
-                      }`}
+                      } ${FIGURE_CELL}`}
                     >
+                      <CellLabel className={CAPTION_CLASS}>{securityColumns.total.label}</CellLabel>
                       {fmtValue(security.total)}
                     </td>
                   </tr>
