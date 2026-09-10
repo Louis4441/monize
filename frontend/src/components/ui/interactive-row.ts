@@ -44,6 +44,14 @@ import type { KeyboardEvent } from 'react';
  *
  * Byte-identical to the four utilities the three converted call sites spelled
  * out, so moving them here changed no rendering at any width.
+ *
+ * `outline-offset-[-2px]` now appears nowhere else in the tree, and Tailwind v4
+ * emits utilities only for classes it finds in a source file -- so the move is
+ * only safe because its automatic source detection covers `.ts` as well as
+ * `.tsx`. Checked by compiling `globals.css` through `@tailwindcss/postcss`
+ * against this file: `outline-offset: -2px` is in the output under a
+ * `:focus-visible` selector. (`lib/scheduled-kind.ts` holds class constants for
+ * the same reason.)
  */
 export const INTERACTIVE_ROW_FOCUS_CLASS =
   'focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-600 dark:focus-visible:outline-blue-400';
