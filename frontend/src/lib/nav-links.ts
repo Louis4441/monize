@@ -15,6 +15,7 @@ import {
   CurrencyDollarIcon,
   HashtagIcon,
   LightBulbIcon,
+  ServerStackIcon,
   ShieldCheckIcon,
   Squares2X2Icon,
   TagIcon,
@@ -65,6 +66,7 @@ export const TOOLS_LINKS: NavLinkDef[] = [
 export const ADMIN_LINKS: NavLinkDef[] = [
   { href: '/admin/users', labelKey: 'userManagement' },
   { href: '/admin/notifications', labelKey: 'notificationSettings' },
+  { href: '/admin/backups', labelKey: 'backups' },
 ];
 
 export const AI_LINKS: NavLinkDef[] = [
@@ -92,5 +94,6 @@ export const NAV_ICONS: Record<string, NavIcon> = {
   '/import': ArrowDownTrayIcon,
   '/admin/users': ShieldCheckIcon,
   '/admin/notifications': BellAlertIcon,
+  '/admin/backups': ServerStackIcon,
   '/settings': Cog6ToothIcon,
 };

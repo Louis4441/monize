@@ -169,5 +169,15 @@
       "rotated": "{count, plural, =0 {Key pair rotated} one {Key pair rotated; 1 device must register again} other {Key pair rotated; # devices must register again}}",
       "rotateFailed": "Could not rotate the key pair"
     }
+  },
+  "backupsPage": {
+    "title": "Backups",
+    "subtitle": "Automatic, scheduled backups for every account on this deployment.",
+    "scope": {
+      "heading": "Not a full database backup",
+      "perUser": "Automatic backup writes a separate backup file for each user account on this deployment — the same per-account export a person can download from Settings, taken on a schedule and kept on the server.",
+      "notFullDatabase": "It is not a full PostgreSQL or database dump. It does not capture the database schema, another deployment's data, application configuration, or anything outside a user's own financial records.",
+      "disasterRecovery": "For disaster recovery of the whole instance, back up the PostgreSQL database and the attachment storage separately using your infrastructure's own tools."
+    }
   }
 }

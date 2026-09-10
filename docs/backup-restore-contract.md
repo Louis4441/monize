@@ -809,6 +809,36 @@ this one, and it is what would replace a measured multiple with a bound.
 
 ## 7. Automatic backups on disk
 
+**Who configures it, and where.** Automatic backup is a deployment/operator
+concern, not an account preference, so its configuration surface is admin-only:
+**Admin → Backups** (`frontend/src/app/admin/backups/page.tsx`, route
+`/admin/backups`), reading and writing the admin-restricted `AutoBackupController`
+endpoints. That page states plainly what an automatic backup is — a **separate
+per-user backup file** for every account, the same per-account export a person can
+download themselves, taken on a schedule — and what it is **not**: a full
+PostgreSQL/database dump. It does not capture the schema, another deployment's
+data, or server configuration; whole-instance disaster recovery is a separate
+backup of PostgreSQL and the attachment storage. A person's own manual
+export/restore stays in **Settings → Backup & Restore**
+(`frontend/src/components/settings/BackupRestoreSection.tsx`), open to every user
+and touching only their own data. The two were previously stacked in one Settings
+screen, which made a deployment policy look like a personal preference.
+
+**Known gap — the stored policy is per-user, not instance-level.** The admin's
+`updateSettings` writes the administrator's *own* `auto_backup_settings` row
+(keyed by `req.user.id`), so the schedule, folder and retention chosen on Admin →
+Backups govern only the administrator's own backups. Every non-admin is enrolled
+each hour by `AutoBackupService.enrollManagedUsers`, which reconciles their rows
+to `applyManagedDefaults` — and those defaults come from the **hardcoded**
+`defaultSettingsFor` (daily at 02:00 UTC, 7/4/6 retention, `BACKUP_CONTAINER_DIR`),
+not from the administrator's row. So an operator who changes the frequency or
+retention here changes nothing for anyone else. A correct instance-level model
+would store a single deployment policy (a settings singleton, or environment-
+derived defaults) that both the admin surface edits and `enrollManagedUsers`
+reads. That is a persistence/schema change and is deliberately **not** made by the
+UI-split change that added this note; it is recorded here so the next change to
+this area starts from the right question — "whose row is this policy on".
+
 - **Per-user directory.** Each user's artifacts go in a server-computed
   subdirectory of the root, named by their user id. Filenames carry only
   frequency and date, so isolation has to come from the path — and retention only

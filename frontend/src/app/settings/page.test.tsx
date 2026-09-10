@@ -178,30 +178,29 @@ describe('SettingsPage', () => {
   });
 
   describe('automatic backup section', () => {
-    it('is hidden from a non-admin, in the page and in the nav', async () => {
+    // Automatic-backup configuration is a deployment/operator concern and has
+    // moved out of user Settings onto its own admin-only surface
+    // (Admin -> Backups, `/admin/backups`). It is no longer rendered here for
+    // anyone, ordinary user or administrator.
+    it('is not in Settings for a non-admin', async () => {
       const { container } = render(<SettingsPage />);
       await waitFor(() => {
         expect(screen.getByText('Settings')).toBeInTheDocument();
       });
 
-      // Automatic backups decide what the server writes to its own disk, so
-      // they are an operator setting; non-admins are enrolled by the backend
-      // and have nothing to configure.
       expect(container.querySelector('#auto-backup')).not.toBeInTheDocument();
       expect(screen.queryByText('Automatic Backup')).toBeNull();
     });
 
-    it('is shown to an administrator', async () => {
+    it('is not in Settings for an administrator either', async () => {
       authRole.current = 'admin';
       const { container } = render(<SettingsPage />);
       await waitFor(() => {
         expect(screen.getByText('Settings')).toBeInTheDocument();
       });
 
-      await waitFor(() => {
-        expect(container.querySelector('#auto-backup')).toBeInTheDocument();
-      });
-      expect(screen.getAllByText('Automatic Backup').length).toBeGreaterThan(0);
+      expect(container.querySelector('#auto-backup')).not.toBeInTheDocument();
+      expect(screen.queryByText('Automatic Backup')).toBeNull();
     });
   });
 

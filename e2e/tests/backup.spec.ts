@@ -55,20 +55,38 @@ test.describe('Backup & restore', () => {
     expect(download.suggestedFilename()).toMatch(/monize-backup.*\.mzbe$/);
   });
 
-  test('hides automatic backup settings from a non-admin', async ({
+  test('keeps automatic backup settings out of Settings for a non-admin', async ({
     authedPage: page,
   }) => {
     await page.goto('/settings');
     await expect(page.getByText('Create Backup')).toBeVisible();
 
-    // Automatic backups are configured by an administrator and applied to
-    // everyone else; a plain user has nothing to set here.
+    // Automatic backups are a deployment concern configured on the admin-only
+    // Backups surface; a plain user's Settings has manual export/restore only,
+    // and no automatic-backup schedule to set anywhere.
     await expect(page.getByText('Automatic Backup')).toHaveCount(0);
   });
 
-  test('shows automatic backup settings to an admin', async ({ adminPage }) => {
+  test('keeps automatic backup settings out of Settings for an admin too', async ({
+    adminPage,
+  }) => {
+    // The IA split moved automatic-backup configuration onto Admin -> Backups,
+    // so even an administrator no longer finds it stacked in their own Settings.
     await adminPage.goto('/settings');
+    await expect(adminPage.getByText('Create Backup')).toBeVisible();
+    await expect(adminPage.getByText('Automatic Backup')).toHaveCount(0);
+  });
 
+  test('configures automatic backups on the admin Backups page', async ({
+    adminPage,
+  }) => {
+    await adminPage.goto('/admin/backups');
+
+    // The page must make the scope unambiguous: per-user artifacts, not a full
+    // PostgreSQL/database dump.
+    await expect(
+      adminPage.getByRole('heading', { name: 'Not a full database backup' }),
+    ).toBeVisible();
     await expect(
       adminPage.getByRole('heading', { name: 'Automatic Backup' }),
     ).toBeVisible();

@@ -12,7 +12,6 @@ import { NotificationsSection } from '@/components/settings/NotificationsSection
 import { SecuritySection } from '@/components/settings/SecuritySection';
 import { DangerZoneSection } from '@/components/settings/DangerZoneSection';
 import { BackupRestoreSection } from '@/components/settings/BackupRestoreSection';
-import { AutoBackupSection } from '@/components/settings/AutoBackupSection';
 import { ApiAccessSection } from '@/components/settings/ApiAccessSection';
 import { PayeeLookupSection } from '@/components/settings/payee-lookup/PayeeLookupSection';
 import { HelpSection } from '@/components/settings/HelpSection';
@@ -41,11 +40,10 @@ const SETTINGS_SECTION_IDS = [
   { id: 'api-access', navKey: 'apiAccess', demoVisible: false },
   { id: 'ai-settings', navKey: 'aiSettings', href: '/settings/ai', demoVisible: false },
   { id: 'payee-lookup', navKey: 'payeeLookup', demoVisible: false },
+  // Manual export/restore for the current user's own data. Automatic-backup
+  // configuration is a deployment/operator concern and lives on its own
+  // admin-only surface (Admin -> Backups, `/admin/backups`), not here.
   { id: 'backup-restore', navKey: 'backupRestore', demoVisible: false },
-  // Automatic backups decide what the server writes to its own filesystem, so
-  // only an administrator configures them. Everyone else is enrolled on the
-  // deployment defaults by the backend and never sees the section.
-  { id: 'auto-backup', navKey: 'autoBackup', demoVisible: false, adminOnly: true },
   { id: 'help', navKey: 'help', demoVisible: false },
   { id: 'tours', navKey: 'tours', href: '/settings/tours', demoVisible: true },
   { id: 'about', navKey: 'about', demoVisible: true },
@@ -169,10 +167,9 @@ function OwnerSettingsView() {
   const [smtpConfigured, setSmtpConfigured] = useState(false);
   const [force2fa, setForce2fa] = useState(false);
   const isDemoMode = useDemoStore((s) => s.isDemoMode);
-  const isAdmin = useAuthStore((s) => s.user?.role === 'admin');
 
   const allSettingsSections = useMemo<
-    readonly (SettingsSection & { demoVisible: boolean; adminOnly: boolean })[]
+    readonly (SettingsSection & { demoVisible: boolean })[]
   >(
     () =>
       SETTINGS_SECTION_IDS.map((s) => ({
@@ -181,18 +178,16 @@ function OwnerSettingsView() {
         href: 'href' in s ? s.href : undefined,
         variant: 'variant' in s ? s.variant : undefined,
         demoVisible: s.demoVisible,
-        adminOnly: 'adminOnly' in s ? s.adminOnly : false,
       })),
     [tNav],
   );
 
   const visibleSections = useMemo<readonly SettingsSection[]>(() => {
-    const sections = allSettingsSections.filter((s) => !s.adminOnly || isAdmin);
     if (isDemoMode) {
-      return sections.filter((s) => s.demoVisible);
+      return allSettingsSections.filter((s) => s.demoVisible);
     }
-    return sections;
-  }, [isDemoMode, isAdmin, allSettingsSections]);
+    return allSettingsSections;
+  }, [isDemoMode, allSettingsSections]);
 
   const sectionIds = useMemo(
     () => visibleSections.map((s) => s.id),
@@ -391,12 +386,6 @@ function OwnerSettingsView() {
             {!isDemoMode && user && (
               <div id="backup-restore" className="scroll-mt-32 lg:scroll-mt-22">
                 <BackupRestoreSection user={user} />
-              </div>
-            )}
-
-            {!isDemoMode && isAdmin && (
-              <div id="auto-backup" className="scroll-mt-32 lg:scroll-mt-22">
-                <AutoBackupSection />
               </div>
             )}
 
