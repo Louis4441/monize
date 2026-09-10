@@ -124,7 +124,12 @@ export function SecurityDetailHeader({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
           <div className="flex min-w-0 items-center gap-1">
-            <h1 className="truncate text-2xl font-bold text-gray-900 dark:text-gray-100">
+            {/* On a phone a long name wraps to as many lines as it needs
+                (`break-words`, no clamp) so the whole security is readable; the
+                desktop keeps the single-line ellipsis (`sm:truncate`). The
+                caret stays beside it either way -- same treatment as the
+                mobile-table identity cells. */}
+            <h1 className="break-words text-2xl font-bold text-gray-900 sm:truncate dark:text-gray-100">
               {security.name}
             </h1>
             {/* Jump straight to another security instead of going back to the

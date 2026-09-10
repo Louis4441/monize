@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { BellAlertIcon, BellSlashIcon } from '@heroicons/react/24/outline';
@@ -15,6 +15,26 @@ import {
 } from '@/lib/notification-reminders';
 
 const log = createLogger('RemindMeButton');
+
+/**
+ * Lets a reminder dialog tell the notification panel that owns it that a child
+ * modal is open, so the panel's click-outside handling treats interactions
+ * belonging to the dialog (its backdrop, X, Cancel) as inside its boundary
+ * rather than closing the panel behind it. The dialog portals to
+ * `document.body`, so those clicks land outside the panel's own DOM and would
+ * otherwise dismiss it.
+ *
+ * `registerOpenModal` returns its own unregister callback, so a dialog that
+ * unmounts while still open (an identity switch tearing the feed down) releases
+ * its hold too. The panel provides the registry; a `null` context means the
+ * button is rendered outside a panel and there is nothing to guard.
+ */
+export interface NotificationChildModalRegistry {
+  registerOpenModal: () => () => void;
+}
+
+export const NotificationChildModalContext =
+  createContext<NotificationChildModalRegistry | null>(null);
 
 /** The reminder id a nag row carries, or null on an ordinary notification. */
 function reminderIdOf(notification: Notification): string | null {
@@ -39,6 +59,15 @@ export function RemindMeButton({ notification }: { notification: Notification })
   // A nag row's reminder, once stopped here, is gone until the next refetch --
   // remember it locally so the control does not offer to stop it twice.
   const [stopped, setStopped] = useState(false);
+
+  // While the dialog is open, hold the notification panel open: without this,
+  // the dialog's backdrop/X/Cancel clicks (which land outside the panel because
+  // the modal portals to document.body) close the panel behind it.
+  const childModalRegistry = useContext(NotificationChildModalContext);
+  useEffect(() => {
+    if (!open || !childModalRegistry) return;
+    return childModalRegistry.registerOpenModal();
+  }, [open, childModalRegistry]);
 
   const iconButtonClass =
     'p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-40';

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
@@ -17,6 +17,10 @@ import {
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import type { Notification } from '@/types/notification';
 import { NotificationList } from './NotificationList';
+import {
+  NotificationChildModalContext,
+  type NotificationChildModalRegistry,
+} from './RemindMeButton';
 
 export function NotificationBell() {
   const actingAsUserId = useAuthStore((s) => s.actingAsUserId);
@@ -36,6 +40,24 @@ function NotificationBellContent({ canManage }: { canManage: boolean }) {
   const [collapsingIds, setCollapsingIds] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState<NotificationFilters>(NO_NOTIFICATION_FILTERS);
   const [confirmingDeleteAll, setConfirmingDeleteAll] = useState(false);
+  // A child modal opened from a row (the Remind me dialog) portals to
+  // document.body, so its own clicks land outside this panel. Count the open
+  // ones and treat the panel as owning them: while any is open, the panel's
+  // click-outside is off, so dismissing the dialog returns to the list rather
+  // than closing the panel behind it -- the same boundary the ConfirmDialog
+  // already gets through `confirmingDeleteAll`.
+  const [openChildModalCount, setOpenChildModalCount] = useState(0);
+  const registerOpenModal = useCallback<
+    NotificationChildModalRegistry['registerOpenModal']
+  >(() => {
+    setOpenChildModalCount((count) => count + 1);
+    return () => setOpenChildModalCount((count) => Math.max(0, count - 1));
+  }, []);
+  const childModalRegistry = useMemo<NotificationChildModalRegistry>(
+    () => ({ registerOpenModal }),
+    [registerOpenModal],
+  );
+  const childModalOpen = openChildModalCount > 0;
   const dropdownRef = useRef<HTMLDivElement>(null);
   // A tour step can ask for the panel to stay open so it can describe what is
   // inside; that wins over local state (and over the click-outside close), the
@@ -67,7 +89,7 @@ function NotificationBellContent({ canManage }: { canManage: boolean }) {
   // The confirm dialog portals to document.body, so its clicks land outside
   // the dropdown ref; without the gate, confirming would first close the panel.
   useClickOutside(dropdownRef, () => setIsOpen(false), {
-    enabled: !confirmingDeleteAll,
+    enabled: !confirmingDeleteAll && !childModalOpen,
   });
 
   const handleMarkRead = async (notificationId: string) => {
@@ -211,21 +233,23 @@ function NotificationBellContent({ canManage }: { canManage: boolean }) {
       </button>
 
       {panelOpen && (
-        <NotificationList
-          canManageNotifications={canManage}
-          notifications={visibleNotifications}
-          isLoading={isLoading}
-          onMarkRead={handleMarkRead}
-          onMarkAllRead={handleMarkAllRead}
-          onDismiss={handleDismiss}
-          onUndoDismiss={handleUndoDismiss}
-          dismissingIds={dismissingIds}
-          collapsingIds={collapsingIds}
-          onClose={() => setIsOpen(false)}
-          filters={filters}
-          onFiltersChange={setFilters}
-          onDeleteAll={() => setConfirmingDeleteAll(true)}
-        />
+        <NotificationChildModalContext.Provider value={childModalRegistry}>
+          <NotificationList
+            canManageNotifications={canManage}
+            notifications={visibleNotifications}
+            isLoading={isLoading}
+            onMarkRead={handleMarkRead}
+            onMarkAllRead={handleMarkAllRead}
+            onDismiss={handleDismiss}
+            onUndoDismiss={handleUndoDismiss}
+            dismissingIds={dismissingIds}
+            collapsingIds={collapsingIds}
+            onClose={() => setIsOpen(false)}
+            filters={filters}
+            onFiltersChange={setFilters}
+            onDeleteAll={() => setConfirmingDeleteAll(true)}
+          />
+        </NotificationChildModalContext.Provider>
       )}
 
       <ConfirmDialog

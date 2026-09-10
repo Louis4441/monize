@@ -152,6 +152,18 @@ describe('SecurityDetailHeader', () => {
     });
   });
 
+  it('lets a long security name wrap on mobile instead of truncating it', () => {
+    const longName =
+      'A Very Long Security Name That Would Otherwise Be Truncated Corporation Inc.';
+    renderHeader({ name: longName });
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading).toHaveTextContent(longName);
+    // Wraps unclamped on a phone; keeps the single-line ellipsis on desktop.
+    expect(heading.className).toContain('break-words');
+    expect(heading.className).not.toMatch(/(^|\s)truncate(\s|$)/);
+    expect(heading.className).toContain('sm:truncate');
+  });
+
   it('renders nothing about timing when there is no price at all', () => {
     renderHeader(NYSE_HOURS, null);
     expect(screen.getByText('No price recorded yet')).toBeInTheDocument();

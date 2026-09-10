@@ -490,6 +490,66 @@ describe('NotificationBell', () => {
     });
   });
 
+  describe('the per-row reminder dialog', () => {
+    // The Remind me dialog is a Modal that portals to document.body, so its
+    // backdrop, X and Cancel controls land outside the panel's own DOM.
+    // Dismissing the dialog must return to the notification list, never close
+    // the panel behind it. Opening it does not touch the reminders API, so the
+    // real `notification-reminders` module is left unmocked here.
+    async function openWithReminderDialog() {
+      mockGetAlerts.mockResolvedValue([makeNotification()]);
+      render(<NotificationBell />);
+      await act(async () => {});
+      fireEvent.click(screen.getByTestId('notification-badge-button'));
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('remind-me-notification-1'));
+      });
+      expect(screen.getByTestId('reminder-confirm')).toBeInTheDocument();
+    }
+
+    it('closes only the dialog, not the panel, on a backdrop click', async () => {
+      await openWithReminderDialog();
+      const backdrop = screen.getByRole('dialog').parentElement as HTMLElement;
+
+      await act(async () => {
+        fireEvent.mouseDown(backdrop);
+        fireEvent.click(backdrop);
+      });
+
+      expect(screen.queryByTestId('reminder-confirm')).not.toBeInTheDocument();
+      expect(screen.getByTestId('notification-list')).toBeInTheDocument();
+    });
+
+    it('closes only the dialog, not the panel, when Cancel is pressed', async () => {
+      await openWithReminderDialog();
+
+      await act(async () => {
+        fireEvent.mouseDown(screen.getByRole('button', { name: 'Cancel' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      });
+
+      expect(screen.queryByTestId('reminder-confirm')).not.toBeInTheDocument();
+      expect(screen.getByTestId('notification-list')).toBeInTheDocument();
+    });
+
+    it('re-arms the panel close once the dialog is gone', async () => {
+      await openWithReminderDialog();
+      const backdrop = screen.getByRole('dialog').parentElement as HTMLElement;
+      await act(async () => {
+        fireEvent.mouseDown(backdrop);
+        fireEvent.click(backdrop);
+      });
+      expect(screen.getByTestId('notification-list')).toBeInTheDocument();
+
+      // With no child modal holding it open, an ordinary outside click closes
+      // the panel again.
+      await act(async () => {
+        fireEvent.mouseDown(document.body);
+      });
+      expect(screen.queryByTestId('notification-list')).not.toBeInTheDocument();
+    });
+  });
+
   describe('a tour step that describes the panel', () => {
     // A tour cannot leave this panel open by pointing at it: the panel closes on
     // a click outside itself, so the reader's next click -- on the tour card,
