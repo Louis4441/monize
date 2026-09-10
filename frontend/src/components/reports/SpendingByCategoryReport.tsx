@@ -26,6 +26,8 @@ import { CHART_COLOURS } from '@/lib/chart-colours';
 import { chartColors } from '@/lib/chart-colors';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
+import { DonutCenterTotal } from '@/components/ui/DonutCenterTotal';
+import { ChartLegend } from '@/components/ui/ChartLegend';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
@@ -425,7 +427,7 @@ export function SpendingByCategoryReport() {
         ) : (
           <>
             {viewType === 'pie' ? (
-              <div className="h-96">
+              <div className="relative h-96">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <PieChart>
                     <Pie
@@ -446,6 +448,11 @@ export function SpendingByCategoryReport() {
                     <Tooltip content={<CustomTooltip />} />
                   </PieChart>
                 </ResponsiveContainer>
+                {/* The aggregate belongs in the donut's hole. */}
+                <DonutCenterTotal
+                  label={t('spendingByCategory.totalExpenses')}
+                  value={formatCurrency(totalExpenses)}
+                />
               </div>
             ) : (
               <div className="h-96">
@@ -469,43 +476,33 @@ export function SpendingByCategoryReport() {
               </div>
             )}
 
-            {/* Legend */}
-            <div className="mt-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {chartData.map((item, index) => {
+            {/* Legend -- one vertical column on a phone, dense grid from `sm` up. */}
+            <ChartLegend
+              className="mt-6"
+              columnsClassName="sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+              items={chartData.map((item, index) => {
                 const percentage = totalExpenses > 0 ? (item.value / totalExpenses) * 100 : 0;
-                return (
-                  <button
-                    key={index}
-                    onClick={() => handleCategoryClick(item.id)}
-                    className={`flex items-center gap-2 p-2 rounded-md text-left ${
-                      item.id ? 'hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer' : ''
-                    }`}
-                    disabled={!item.id}
-                  >
-                    <div
-                      className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: item.colour }}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                        {item.name}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {formatCurrency(item.value)} ({formatPercent(percentage, 1)})
-                      </div>
-                    </div>
-                  </button>
-                );
+                return {
+                  key: String(index),
+                  name: item.name,
+                  color: item.colour,
+                  detail: `${formatCurrency(item.value)} (${formatPercent(percentage, 1)})`,
+                  onClick: () => handleCategoryClick(item.id),
+                  disabled: !item.id,
+                };
               })}
-            </div>
+            />
 
-            {/* Total */}
-            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 text-center">
-              <div className="text-sm text-gray-500 dark:text-gray-400">{t('spendingByCategory.totalExpenses')}</div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                {formatCurrency(totalExpenses)}
+            {/* The bar view has no hole to carry the total, so it keeps a total
+                line beneath the legend; the pie view shows it in the donut centre. */}
+            {viewType === 'bar' && (
+              <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 text-center">
+                <div className="text-sm text-gray-500 dark:text-gray-400">{t('spendingByCategory.totalExpenses')}</div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {formatCurrency(totalExpenses)}
+                </div>
               </div>
-            </div>
+            )}
           </>
         )}
       </div>
