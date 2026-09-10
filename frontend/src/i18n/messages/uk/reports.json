@@ -766,7 +766,10 @@
     "colCurrentPrice": "Поточна ціна",
     "colMarketValue": "Ринкова вартість",
     "colGainLoss": "Прибуток/збиток",
-    "colReturn": "Прибутковість"
+    "colReturn": "Прибутковість",
+    "chartSubtitle": "Сукупна прибутковість кожного цінного паперу на цих рахунках за вибраний період.",
+    "chartLimitedNote": "Відображаються лише {shown} найбільших позицій за ринковою вартістю (з {total}).",
+    "rangeAll": "Усе"
   },
   "investmentTransactions": {
     "totalTransactions": "Усього операцій",

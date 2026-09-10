@@ -766,7 +766,10 @@
     "colCurrentPrice": "Preço Atual",
     "colMarketValue": "Valor de Mercado",
     "colGainLoss": "Ganho/Perda",
-    "colReturn": "Rentabilidade"
+    "colReturn": "Rentabilidade",
+    "chartSubtitle": "Rentabilidade acumulada de cada título que estas contas detêm, ao longo do período selecionado.",
+    "chartLimitedNote": "Apenas as {shown} maiores posições por valor de mercado são exibidas (de {total} mantidas).",
+    "rangeAll": "Tudo"
   },
   "investmentTransactions": {
     "totalTransactions": "Total de Transações",

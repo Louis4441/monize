@@ -766,7 +766,10 @@
     "colCurrentPrice": "Текущая цена",
     "colMarketValue": "Рыночная стоимость",
     "colGainLoss": "Прибыль/убыток",
-    "colReturn": "Доходность"
+    "colReturn": "Доходность",
+    "chartSubtitle": "Совокупная доходность каждой ценной бумаги на этих счетах за выбранный период.",
+    "chartLimitedNote": "Отображаются только {shown} крупнейших активов по рыночной стоимости (из {total}).",
+    "rangeAll": "Всё"
   },
   "investmentTransactions": {
     "totalTransactions": "Всего проводок",

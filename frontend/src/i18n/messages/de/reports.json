@@ -766,7 +766,10 @@
     "colCurrentPrice": "Aktueller Kurs",
     "colMarketValue": "Marktwert",
     "colGainLoss": "Gewinn/Verlust",
-    "colReturn": "Rendite"
+    "colReturn": "Rendite",
+    "chartSubtitle": "Kumulierte Rendite aller Wertpapiere in diesen Konten über den ausgewählten Zeitraum.",
+    "chartLimitedNote": "Es werden nur die {shown} größten Bestände nach Marktwert dargestellt (von {total} gehaltenen).",
+    "rangeAll": "Gesamt"
   },
   "investmentTransactions": {
     "totalTransactions": "Buchungen gesamt",

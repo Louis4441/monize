@@ -766,7 +766,10 @@
     "colCurrentPrice": "현재 가격",
     "colMarketValue": "시장 가치",
     "colGainLoss": "이익/손실",
-    "colReturn": "수익률"
+    "colReturn": "수익률",
+    "chartSubtitle": "선택한 기간 동안 이 계정들이 보유한 모든 증권의 누적 수익률입니다.",
+    "chartLimitedNote": "시장 가치 기준 상위 {shown}개 보유 항목만 표시됩니다(보유 {total}개 중).",
+    "rangeAll": "전체"
   },
   "investmentTransactions": {
     "totalTransactions": "총 거래",
