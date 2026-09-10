@@ -12,7 +12,7 @@ import { ExportIconButton } from '@/components/ui/ExportIconButton';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import { LoanRateEditing } from './useLoanRateEditing';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel } from '@/components/ui/Table';
 import { ScheduleTableRow } from './ScheduleTableRow';
 
 const COLLAPSED_PAST_ROWS = 5;
@@ -90,27 +90,27 @@ function TotalsRow({
         {label}
       </td>
       <td role="cell" className={`col-start-1 row-start-2 ${cell}`}>
-        <CellLabel className="sm:hidden">{t('loanDetail.schedule.colPayment')}</CellLabel>
+        <CellLabel className={CAPTION_CLASS}>{t('loanDetail.schedule.colPayment')}</CellLabel>
         {formatCurrency(totals.payment, currencyCode)}
       </td>
       <td role="cell" className={`col-start-2 row-start-2 text-orange-600 dark:text-orange-400 ${cell}`}>
-        <CellLabel className="sm:hidden">{t('loanDetail.schedule.colInterest')}</CellLabel>
+        <CellLabel className={CAPTION_CLASS}>{t('loanDetail.schedule.colInterest')}</CellLabel>
         {formatCurrency(totals.interest, currencyCode)}
       </td>
       <td role="cell" className={`col-start-1 row-start-3 text-green-600 dark:text-green-400 ${cell}`}>
-        <CellLabel className="sm:hidden">{t('loanDetail.schedule.colPrincipal')}</CellLabel>
+        <CellLabel className={CAPTION_CLASS}>{t('loanDetail.schedule.colPrincipal')}</CellLabel>
         {formatCurrency(totals.principal, currencyCode)}
       </td>
       {showExtraColumn && (
         <td role="cell" className={`col-start-2 row-start-3 text-blue-600 dark:text-blue-400 ${cell}`}>
-          <CellLabel className="sm:hidden">{t('loanDetail.schedule.colExtra')}</CellLabel>
+          <CellLabel className={CAPTION_CLASS}>{t('loanDetail.schedule.colExtra')}</CellLabel>
           {totals.extra > 0 ? formatCurrency(totals.extra, currencyCode) : '—'}
         </td>
       )}
       {/* The rate column has no total; hidden on phones so it claims no grid slot. */}
       <td role="cell" className="hidden sm:table-cell sm:px-4 sm:py-3" />
       <td role="cell" className={`col-start-2 row-start-1 ${cell}`}>
-        {balance !== undefined && <CellLabel className="sm:hidden">{t('loanDetail.schedule.colBalance')}</CellLabel>}
+        {balance !== undefined && <CellLabel className={CAPTION_CLASS}>{t('loanDetail.schedule.colBalance')}</CellLabel>}
         {balance !== undefined ? formatCurrency(balance, currencyCode) : null}
       </td>
     </tr>

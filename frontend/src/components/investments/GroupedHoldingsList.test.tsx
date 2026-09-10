@@ -93,6 +93,42 @@ describe('GroupedHoldingsList', () => {
     expect(screen.getByText('XEQT')).toBeInTheDocument();
   });
 
+  it('wraps each holding row into a labelled grid card below the mobile breakpoint', () => {
+    const holdingsByAccount = [
+      {
+        accountId: 'a1', accountName: 'RRSP', currencyCode: 'CAD',
+        totalMarketValue: 5000, totalCostBasis: 4000, totalGainLoss: 1000,
+        totalGainLossPercent: 25, cashBalance: 500, cashAccountId: 'cash1', holdings: [
+          { id: 'h1', symbol: 'XEQT', name: 'iShares Equity', quantity: 100, averageCost: 40, currentPrice: 50, costBasis: 4000, costBasisAccountCurrency: 4000, marketValue: 5000, gainLoss: 1000, gainLossPercent: 25, currencyCode: 'CAD' },
+        ],
+      },
+    ] as any[];
+
+    render(<GroupedHoldingsList holdingsByAccount={holdingsByAccount} isLoading={false} totalPortfolioValue={5500} />);
+
+    // The holding, cash and summary rows are grid cards below `sm` and ordinary
+    // table rows from `sm` up, so a phone needs no horizontal scroll.
+    const holdingRow = screen
+      .getAllByRole('row')
+      .find((row) => row.textContent?.includes('XEQT'));
+    expect(holdingRow).toBeDefined();
+    expect(holdingRow!.className).toContain('grid grid-cols-4');
+    expect(holdingRow!.className).toContain('sm:table-row');
+
+    // Every figure names its column inside the card, so a phone reader needs no
+    // header (which is hidden below `sm`).
+    for (const caption of ['Shares', 'Avg Cost', 'Price', 'Cost Basis', 'Mkt Value', 'Gain/Loss', '% Port']) {
+      expect(holdingRow!.textContent).toContain(caption);
+    }
+
+    // The cash row is a card too and carries the same captions.
+    const cashRow = screen
+      .getAllByRole('row')
+      .find((row) => row.textContent?.includes('Cash'));
+    expect(cashRow).toBeDefined();
+    expect(cashRow!.className).toContain('grid grid-cols-4');
+  });
+
   it('toggles account expansion on click', () => {
     const holdingsByAccount = [
       {

@@ -192,6 +192,38 @@ describe('SavedScenariosPanel', () => {
     expect(screen.getByText('Save current scenario')).toBeDisabled();
   });
 
+  it('wraps each scenario into a labelled grid card below the mobile breakpoint', () => {
+    renderPanel({
+      comparisons: new Map([
+        [
+          'scenario-1',
+          {
+            scenario: { payoffDate: '2040-06-15', finalPaymentAmount: 500 },
+            paymentsSaved: 24,
+            monthsSaved: 24,
+            interestSaved: 15000,
+            installmentReduction: 0,
+          } as unknown as ScenarioComparison,
+        ],
+      ]),
+    });
+
+    // The scenario row is a grid card below `sm` and the ordinary table row from
+    // `sm` up, so a phone needs no horizontal scroll. The row stays clickable.
+    const cardRow = screen
+      .getAllByRole('button', { name: /Load scenario/ })
+      .find((el) => el.tagName === 'TR');
+    expect(cardRow).toBeDefined();
+    expect(cardRow!.className).toContain('grid grid-cols-2');
+    expect(cardRow!.className).toContain('sm:table-row');
+
+    // Each figure names its column with a caption a phone reader can see once
+    // the header is hidden: one in the header plus one in the card.
+    for (const caption of ['Overpayment', 'New Payoff Date', 'Time Saved', 'Interest Saved']) {
+      expect(screen.getAllByText(caption).length).toBe(2);
+    }
+  });
+
   it('loads a scenario when its row is clicked', () => {
     const { props } = renderPanel();
 

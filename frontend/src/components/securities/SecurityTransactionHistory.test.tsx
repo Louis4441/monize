@@ -212,6 +212,34 @@ describe('SecurityTransactionHistory', () => {
     expect(onChanged).toHaveBeenCalled();
   });
 
+  it('wraps each row into a labelled grid card below the mobile breakpoint', async () => {
+    // One tree restyled by CSS: below `sm` the row is a `grid` card and every
+    // bare figure names its column with a caption; from `sm` up it is the
+    // ordinary table. jsdom applies no breakpoint, so assert the classes and
+    // the captions that ride in the markup at every width.
+    await renderHistory();
+    await waitFor(() => {
+      expect(screen.getByLabelText('Account')).toBeInTheDocument();
+    });
+
+    // Every data row carries the wrapped-card grid and restores the table row
+    // at `sm`, so a phone needs no horizontal scroll.
+    const dataRows = screen
+      .getAllByRole('row')
+      .filter((row) => row.className.includes('grid grid-cols-4'));
+    expect(dataRows).toHaveLength(historyData.transactions.length);
+    for (const row of dataRows) {
+      expect(row.className).toContain('sm:table-row');
+    }
+
+    // The per-row captions name each column a phone reader can no longer see in
+    // a header: one caption per data row, plus the desktop header cell that
+    // stays in the DOM (hidden below `sm`).
+    for (const caption of ['Quantity', 'Running Total', 'Price', 'Amount']) {
+      expect(screen.getAllByText(caption).length).toBe(historyData.transactions.length + 1);
+    }
+  });
+
   it('shows an empty state when there are no transactions', async () => {
     vi.mocked(investmentsApi.getSecurityTransactionHistory).mockResolvedValue({
       ...historyData,
