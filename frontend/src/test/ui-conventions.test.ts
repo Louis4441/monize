@@ -347,13 +347,6 @@ describe("the mobile-table chrome constants live once in Table.tsx", () => {
    */
   const INLINE_CAPTION_BASELINE: ReadonlyArray<{ file: string; reason: string }> = [
     {
-      file: "/src/components/reports/IncomeVsExpensesReport.tsx",
-      reason:
-        "Imports PHONE_HEADER_CLASS and stopped short of CAPTION_CLASS at its " +
-        "eight caption sites. Fixed by hand in the report-components change " +
-        "(A5); delete this line with it.",
-    },
-    {
       file: "/src/components/accounts/loan-detail/ScheduleTableRow.tsx",
       reason:
         "Amortization row, converted before the constants were centralized. " +

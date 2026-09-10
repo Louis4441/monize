@@ -50,9 +50,20 @@ vi.mock('@/hooks/useDateFormat', () => ({
 // The chart's month marker comes from the chart formatter, which localizes the
 // month NAME, not from `formatMonth`, which renders the user's numeric
 // month-and-year preference.
+// `useChartMonthFormat` parses the `YYYY-MM` key itself and hands this a real
+// `Date` (local midnight on the first of the month), so the stand-in records
+// the day from LOCAL getters rather than interpolating the object: a `Date`'s
+// own `toString` carries the runner's zone and offset name, which would make
+// the expectation below pass only under one `TZ`.
 vi.mock('@/hooks/useChartDateFormat', () => ({
-  useChartDateFormat: () => (date: string, pattern: string) =>
-    `chart-month:${date}:${pattern}`,
+  useChartDateFormat: () => (date: Date, pattern: string) => {
+    const day = [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, '0'),
+      String(date.getDate()).padStart(2, '0'),
+    ].join('-');
+    return `chart-month:${day}:${pattern}`;
+  },
 }));
 
 const STABLE_RANGE = { start: '2024-01-01', end: '2025-01-01' };

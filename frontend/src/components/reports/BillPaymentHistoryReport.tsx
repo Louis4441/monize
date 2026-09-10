@@ -18,7 +18,7 @@ import { parseLocalDate } from '@/lib/utils';
 import { BillPaymentHistoryResponse } from '@/types/built-in-reports';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
-import { useChartDateFormat } from '@/hooks/useChartDateFormat';
+import { useChartMonthFormat } from '@/hooks/useChartMonthFormat';
 import { useDateRange } from '@/hooks/useDateRange';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { exportToCsv } from '@/lib/csv-export';
@@ -129,7 +129,7 @@ export function BillPaymentHistoryReport() {
   const router = useRouter();
   const { formatCurrencyCompact: formatCurrency, formatCurrencyAxis } = useNumberFormat();
   const { formatDate } = useDateFormat();
-  const formatChartDate = useChartDateFormat();
+  const formatChartMonth = useChartMonthFormat();
   const chartRef = useRef<HTMLDivElement>(null);
   const { dateRange, setDateRange, resolvedRange } = useDateRange({ defaultRange: '1y', alignment: 'day' });
   const [viewType, setViewType] = useState<'overview' | 'byBill'>('overview');
@@ -149,21 +149,22 @@ export function BillPaymentHistoryReport() {
     [rangeStart, rangeEnd],
   );
 
-  // A chart's month marker is `useChartDateFormat`, not `useDateFormat`'s
+  // A chart's month marker is `useChartMonthFormat`, not `useDateFormat`'s
   // `formatMonth`. The two answer different questions: `formatMonth` renders
   // the user's month-and-year PREFERENCE (`2026-01`, `01/2026`, `Jan-2026`),
-  // which puts a numeric tick where this axis reads a month NAME, while
-  // `useChartDateFormat` localizes the name itself. It is the convention every
-  // other month axis in the app uses (`MonthlySpendingTrendWidget`,
-  // `DividendIncomeReport`). The `-01` is because `formatChartDate` parses a
-  // full date and `monthlyTotals` carries `YYYY-MM`.
+  // which puts a numeric tick where this axis reads a month NAME, while this
+  // hook localizes the name itself. It is the one month-axis formatter the
+  // other five charts on this branch use, and it owns the `YYYY-MM` parse:
+  // concatenating `-01` here would hand `Intl` an Invalid Date for a malformed
+  // key (a RangeError blanks the report subtree from inside a tick formatter)
+  // and would read month 13 as January of the next year.
   const chartData = useMemo(
     () =>
       (billData?.monthlyTotals ?? []).map((entry) => ({
         ...entry,
-        label: formatChartDate(`${entry.month}-01`, 'MMM yyyy'),
+        label: formatChartMonth(entry.month),
       })),
-    [billData, formatChartDate],
+    [billData, formatChartMonth],
   );
 
   const sortedBillPayments = useMemo(() => {
