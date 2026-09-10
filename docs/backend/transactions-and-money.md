@@ -1,6 +1,6 @@
 # Backend: transactions, exports and money
 
-Exporter labels, blank transfer payees, scheduled loan interest, category identity, the currency a value carries, fallbacks and the Money import mapping. The cross-layer money rules are in the root `CLAUDE.md` and `docs/financial-semantics.md`; this document holds the backend decisions that implement them. Read this before touching a transaction write, an export or a loan or category derivation.
+Exporter labels, blank transfer payees, scheduled loan interest, category identity, the currency a value carries, fallbacks and the Money import mapping. The cross-layer money rules are in `AGENTS.md` and `docs/financial-semantics.md`; this document holds the backend decisions that implement them. Read this before touching a transaction write, an export or a loan or category derivation.
 
 Paths are relative to `backend/src/` unless rooted. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
 

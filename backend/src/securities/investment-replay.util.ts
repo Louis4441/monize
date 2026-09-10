@@ -214,7 +214,7 @@ export function acquisitionCost(tx: {
   const price = Number(tx.price) || 0;
   // An absent rate means the trade settled in its own currency (the entity
   // default is 1). A stored zero or negative rate is absent-not-applicable
-  // (root CLAUDE.md: "Rate 1 means same currency, never no rate found"), so
+  // (`AGENTS.md`: "Rate 1 means same currency, never no rate found"), so
   // the basis is unknown rather than converted at par -- `|| 1` here would
   // bake the silent 1:1 fallback into the one door every basis goes through.
   const rate = tx.exchangeRate == null ? 1 : Number(tx.exchangeRate);

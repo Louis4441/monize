@@ -72,7 +72,7 @@ const ATTACHMENT_METADATA_SQL = `SELECT id, storage_provider, byte_size, sha256
  * The comparison itself is still `attachment-integrity.util.ts` -- the same
  * predicate the export's object reader and the restore's staging use. A second
  * copy of "does this match its metadata" written in SQL is exactly the drift
- * the root `CLAUDE.md` warns about, so the digest travels and the judgement does
+ * `AGENTS.md` warns about, so the digest travels and the judgement does
  * not.
  */
 const ATTACHMENT_BLOB_DIGEST_SQL = `SELECT ab.attachment_id,

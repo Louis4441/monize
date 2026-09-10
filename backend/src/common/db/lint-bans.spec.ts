@@ -37,6 +37,7 @@ describe("RLS lint bans are documented where contributors read", () => {
   ].map((match) => match[1]);
 
   const instructionFiles = [
+    "AGENTS.md",
     "CLAUDE.md",
     "CONTRIBUTING.md",
     "backend/CLAUDE.md",
@@ -50,7 +51,8 @@ describe("RLS lint bans are documented where contributors read", () => {
     expect(config).toContain("InjectRepository");
   });
 
-  it.each(["CLAUDE.md", "CONTRIBUTING.md"])(
+  // AGENTS.md is the canonical instruction file; the root CLAUDE.md imports it.
+  it.each(["AGENTS.md", "CONTRIBUTING.md"])(
     "%s names every call the config bans",
     (relative) => {
       const doc = fs.readFileSync(path.join(REPO_ROOT, relative), "utf8");

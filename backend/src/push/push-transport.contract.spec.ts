@@ -8,7 +8,7 @@ import { PUSH_TRANSPORTS } from "./entities/push-subscription.entity";
  * TypeScript constant the DTO validates against (`@IsIn(PUSH_TRANSPORTS)`), once
  * as the CHECK constraint the database enforces -- and a list that means
  * something is checked in both directions rather than trusted to stay aligned
- * (root CLAUDE.md, "a list of columns that means something is written once, in
+ * (`AGENTS.md`, "a list of columns that means something is written once, in
  * the place that can check it").
  *
  * The failure this prevents is quiet: a transport added to the constant but not

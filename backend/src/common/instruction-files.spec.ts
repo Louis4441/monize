@@ -9,9 +9,10 @@ import { findRepoRoot, gitListFiles, requireRepoRoot } from "./repo-tree.util";
  * 188 KB, because each rule brought the defect it came from, the reasoning and
  * the guard along with it; the fix was to make the layer files indexes over
  * `docs/frontend/` and `docs/backend/`, where a rule is read only when the work
- * touches its subject, and to give the root file the same treatment. The root
- * `CLAUDE.md` says how the files are organised; `AGENTS.md` is the tool-agnostic
- * entry point. Prose about file size is exactly the kind of rule that gets read,
+ * touches its subject, and to give the root file the same treatment.
+ * `AGENTS.md` is the canonical, tool-agnostic entry point and says how the files
+ * are organised; the root `CLAUDE.md` imports it and adds only Claude Code
+ * specifics. Prose about file size is exactly the kind of rule that gets read,
  * agreed with and violated one paragraph at a time, so this is the version the
  * machine checks:
  *
@@ -29,7 +30,12 @@ import { findRepoRoot, gitListFiles, requireRepoRoot } from "./repo-tree.util";
  */
 
 export const INSTRUCTION_FILE_MAX_BYTES = 16 * 1024;
-export const AGENTS_FILE_MAX_BYTES = 12 * 1024;
+/**
+ * Codex concatenates every AGENTS.md it finds under a combined default cap of
+ * 32 KiB (`project_doc_max_bytes`) and truncates past it, so the root file
+ * leaves room for a global or nested one.
+ */
+export const AGENTS_FILE_MAX_BYTES = 26 * 1024;
 
 /** Every file an agent reads before it starts, with the ceiling each is held to. */
 const INSTRUCTION_FILES: ReadonlyArray<readonly [string, number]> = [
@@ -50,48 +56,45 @@ const ISSUE_NUMBER = /(?:^|[^\w`/])#\d{3,}\b/;
 const REPO_ROOT = findRepoRoot(__dirname);
 const describeTree = REPO_ROOT || process.env.CI ? describe : describe.skip;
 
-describeTree(
-  "instruction files keep the shape the root CLAUDE.md describes",
-  () => {
-    const root = () => requireRepoRoot(REPO_ROOT);
-    const read = (relative: string) =>
-      readFileSync(join(root(), relative), "utf8");
-    const size = (relative: string) => statSync(join(root(), relative)).size;
+describeTree("instruction files keep the shape `AGENTS.md` describes", () => {
+  const root = () => requireRepoRoot(REPO_ROOT);
+  const read = (relative: string) =>
+    readFileSync(join(root(), relative), "utf8");
+  const size = (relative: string) => statSync(join(root(), relative)).size;
 
-    it.each(INSTRUCTION_FILES)(
-      "%s stays under its ceiling of %d bytes",
-      (relative, ceiling) => {
-        expect(size(relative)).toBeLessThanOrEqual(ceiling);
-      },
-    );
+  it.each(INSTRUCTION_FILES)(
+    "%s stays under its ceiling of %d bytes",
+    (relative, ceiling) => {
+      expect(size(relative)).toBeLessThanOrEqual(ceiling);
+    },
+  );
 
-    it.each(INDEXED_LAYERS)(
-      "every docs/%s document is reachable from its layer index",
-      (layer) => {
-        const docs = gitListFiles(root(), `-- docs/${layer}`).filter(
-          (f) => f.endsWith(".md") && basename(f) !== "README.md",
-        );
-        // A guard over an empty directory would prove nothing.
-        expect(docs.length).toBeGreaterThan(3);
-        const index = read(`${layer}/CLAUDE.md`);
-        const unreachable = docs.filter((doc) => !index.includes(`\`${doc}\``));
-        expect(unreachable).toEqual([]);
-      },
-    );
+  it.each(INDEXED_LAYERS)(
+    "every docs/%s document is reachable from its layer index",
+    (layer) => {
+      const docs = gitListFiles(root(), `-- docs/${layer}`).filter(
+        (f) => f.endsWith(".md") && basename(f) !== "README.md",
+      );
+      // A guard over an empty directory would prove nothing.
+      expect(docs.length).toBeGreaterThan(3);
+      const index = read(`${layer}/CLAUDE.md`);
+      const unreachable = docs.filter((doc) => !index.includes(`\`${doc}\``));
+      expect(unreachable).toEqual([]);
+    },
+  );
 
-    it.each(INSTRUCTION_FILES.map(([relative]) => relative))(
-      "%s carries no issue or PR number",
-      (relative) => {
-        const offending = read(relative)
-          .split("\n")
-          .map((line, i) => ({ line, n: i + 1 }))
-          .filter(({ line }) => ISSUE_NUMBER.test(line))
-          .map(({ line, n }) => `${relative}:${n}: ${line.trim()}`);
-        expect(offending).toEqual([]);
-      },
-    );
-  },
-);
+  it.each(INSTRUCTION_FILES.map(([relative]) => relative))(
+    "%s carries no issue or PR number",
+    (relative) => {
+      const offending = read(relative)
+        .split("\n")
+        .map((line, i) => ({ line, n: i + 1 }))
+        .filter(({ line }) => ISSUE_NUMBER.test(line))
+        .map(({ line, n }) => `${relative}:${n}: ${line.trim()}`);
+      expect(offending).toEqual([]);
+    },
+  );
+});
 
 describe("the issue-number marker", () => {
   it("matches a defect citation and not a colour or an anchor", () => {

@@ -300,7 +300,7 @@ closing INV-FX-001 or INV-OCCURRENCE-002 should search once more before assuming
 no test stands in the way. They are deliberately not in the table above: a
 citation that cannot be checked is the thing this document exists to discourage.
 
-Per root `CLAUDE.md`, each corrected unit test needs a production-boundary
+Per `AGENTS.md`, each corrected unit test needs a production-boundary
 companion wherever the defect depends on PostgreSQL, multiple processes,
 providers or browser state. Correcting the assertion alone leaves the class open.
 

@@ -1001,7 +1001,7 @@ restore contract, not privacy policy:
   correlatable by the creator id they share, which is the one thing the remap
   exists to prevent.
 
-## 10. Rules recorded from the root CLAUDE.md
+## 10. Rules recorded from `AGENTS.md`
 
 ### A lenient decoder is not a validator
 

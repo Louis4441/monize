@@ -571,13 +571,13 @@ confirmed by reading `main`; each is a divergence, not a style difference.
 A note on how these are meant to be closed. FIN-002 and FIN-003 are each
 scattered across several call sites, and every previous attempt fixed one site
 and left the others live. The durable form of these two rules is a scanning
-test, per root `CLAUDE.md`: one that fails on any `: 1` else-branch beside a rate
+test, per `AGENTS.md`: one that fails on any `: 1` else-branch beside a rate
 lookup, any `?? amount` beside a conversion, and any `SPLIT` case outside the
 single shared reducer. Prose has already been insufficient here more than once.
 
-## 11. Rules recorded from the root CLAUDE.md
+## 11. Rules recorded from `AGENTS.md`
 
-Each of these was a paragraph in the root `CLAUDE.md`; the one-sentence form stays there and the reasoning lives here.
+Each of these was a paragraph in `AGENTS.md`; the one-sentence form stays there and the reasoning lives here.
 
 ### The amount is half the answer; the account is the other half
 

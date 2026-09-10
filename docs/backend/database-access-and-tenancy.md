@@ -1,6 +1,6 @@
 # Backend: database access, identity and tenancy
 
-Rejection before the write, predicates written once, the role-safety classifier, whose identity a read runs under, and joint-account scope. The door itself (`withScopedDb`, the RLS contexts, the lint bans) is in the root `CLAUDE.md`; this document holds the backend rules built on it. Read this before writing a query that decides ownership, authorization or which row counts.
+Rejection before the write, predicates written once, the role-safety classifier, whose identity a read runs under, and joint-account scope. The door itself (`withScopedDb`, the RLS contexts, the lint bans) is in `AGENTS.md`; this document holds the backend rules built on it. Read this before writing a query that decides ownership, authorization or which row counts.
 
 Paths are relative to `backend/src/` unless rooted. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
 
@@ -42,7 +42,7 @@ Own-context reads resolve their scope through `TransactionsController.resolveOwn
 
 ## `withScopedDb` in detail
 
-The root `CLAUDE.md` states the door and the four identity contexts in a few lines. These are the details behind them.
+The `AGENTS.md` states the door and the four identity contexts in a few lines. These are the details behind them.
 
 // ...mutate + repo.save(row); all queries share the transaction + tenant GUC.
 });

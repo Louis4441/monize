@@ -16,11 +16,11 @@
 | `cron-and-background-work.md` | adding a `@Cron`, a reaper or a long-running job |
 | `mcp.md` | adding or changing an MCP tool, resource or prompt, or touching the MCP transport |
 
-The cross-layer contracts these documents build on stay where they are: `docs/system-invariants.md` (the index), `docs/concurrency-and-idempotency.md`, `docs/financial-semantics.md`, `docs/external-side-effects.md`, `docs/cron-jobs.md`, `docs/verification-contract.md`, `docs/backup-restore-contract.md` and `docs/row-level-security-contract.md`. The database door itself -- `withScopedDb`, the identity contexts, the lint bans -- is in the root `CLAUDE.md`.
+The cross-layer contracts these documents build on stay where they are: `docs/system-invariants.md` (the index), `docs/concurrency-and-idempotency.md`, `docs/financial-semantics.md`, `docs/external-side-effects.md`, `docs/cron-jobs.md`, `docs/verification-contract.md`, `docs/backup-restore-contract.md` and `docs/row-level-security-contract.md`. The database door itself -- `withScopedDb`, the identity contexts, the lint bans -- is in `AGENTS.md`.
 
 Two conventions these documents share:
 
 - **Paths are relative to `backend/src/`** unless rooted at the repository (`database/...`, `docs/...`, `frontend/...`).
 - **A rule that names a guard spec is enforced by that spec.** The prose explains the rule; the spec's failure message points at the offending line. Fix the code, never the grandfather list -- a grandfather list in these guards may only shrink.
 
-When a human points out a defect in code an AI wrote, the root `CLAUDE.md` says what to do: find the existing helper, add a regression test that fails on the original mistake, and write the rule down. The rule goes in the document above whose subject it belongs to, and `backend/CLAUDE.md` gets at most one line naming the thing to use.
+When a human points out a defect in code an AI wrote, `AGENTS.md` says what to do: find the existing helper, add a regression test that fails on the original mistake, and write the rule down. The rule goes in the document above whose subject it belongs to, and `backend/CLAUDE.md` gets at most one line naming the thing to use.

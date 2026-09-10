@@ -304,7 +304,7 @@ export class TransactionTransferService {
     }
 
     // Zero moves nothing on either side, so it needs no rate ("zero needs no
-    // rate", root CLAUDE.md): a zero-amount scheduled placeholder between two
+    // rate", `AGENTS.md`): a zero-amount scheduled placeholder between two
     // currencies posts as 0 -> 0, and demanding a resolvable pair here refused
     // a transfer that moves nothing. Mirrors the zero-on-both-sides return in
     // the explicit-toAmount branch above.

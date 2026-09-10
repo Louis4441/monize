@@ -28,7 +28,7 @@ export function transactionFlow(amount: number | string): ReconcileFlow {
  *
  * `decimal(20,4)` crosses the wire as a string, so every value is coerced
  * before it is scaled, and the accumulation happens in integers so summing
- * fifty rows cannot drift a cent (the root `CLAUDE.md` financial-math rule).
+ * fifty rows cannot drift a cent (`AGENTS.md` financial-math rule).
  */
 export function sumAmounts(rows: readonly Transaction[]): number {
   const scaled = rows.reduce(

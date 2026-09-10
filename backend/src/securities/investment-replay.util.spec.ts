@@ -268,7 +268,7 @@ describe("acquisitionCost", () => {
   });
 
   it("treats a stored zero or negative rate as absent, not applicable", () => {
-    // Rate 1 means same currency, never "no rate found" (root CLAUDE.md).
+    // Rate 1 means same currency, never "no rate found" (`AGENTS.md`).
     // `|| 1` coerced a stored 0 to par and applied a negative rate as-is --
     // a negative basis with inverted gains -- in the one door every basis
     // calculation now goes through.

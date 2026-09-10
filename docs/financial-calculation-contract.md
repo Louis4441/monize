@@ -10,7 +10,7 @@ This contract applies to both surfaces that expose a calculation (REST API and
 AI/MCP tools) and to every layer in between. `docs/time-series-contract.md`
 covers the time-dimension rules (historical prices, backtests, period returns);
 this document covers point-in-time calculation semantics. Rounding and
-precision rules live in the root `CLAUDE.md` (Financial Math) and are not
+precision rules live in `AGENTS.md` (Financial Math) and are not
 repeated here.
 
 ## 1. Missing values propagate; they do not disappear
@@ -411,7 +411,7 @@ These rules are worth only what the code and the documents agree on.
   claim is true when written and silently false at the first call site added
   afterwards, which is exactly when nobody re-reads the comment.
 
-## 11. Rules recorded from the root CLAUDE.md
+## 11. Rules recorded from `AGENTS.md`
 
 ### A weighting is in one currency or it is meaningless
 

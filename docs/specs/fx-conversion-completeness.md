@@ -101,7 +101,7 @@ optional.
 
 Note the last row: an empty portfolio holds zero and reports `total: 0` with no
 missing pairs -- zero is a known answer. `null` is reserved for "not known", per
-the root `CLAUDE.md` rule that the two must not be conflated.
+`AGENTS.md` rule that the two must not be conflated.
 
 ## 4a. Staging: what lands now, and what follows
 

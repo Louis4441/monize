@@ -1770,7 +1770,7 @@ describe("NetWorthService", () => {
       // An emptied account holds zero in any currency, so it needs no rate.
       // Asking for one flagged every month incomplete for as long as the empty
       // account existed -- reporting a question that was never open as one that
-      // could not be answered ("zero needs no rate", root CLAUDE.md).
+      // could not be answered ("zero needs no rate", `AGENTS.md`).
       mabRepository.count.mockResolvedValue(5);
       prefRepository.findOne.mockResolvedValue({
         defaultCurrency: "USD",

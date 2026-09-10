@@ -1,7 +1,7 @@
 # CSV Import: Investment Transactions -- Specification
 
 Status: approved for implementation. This spec precedes the implementation per
-the financial-feature rule in the root `CLAUDE.md`; the truth tables below are
+the financial-feature rule in `AGENTS.md`; the truth tables below are
 the contract the parser tests assert.
 
 ## Problem

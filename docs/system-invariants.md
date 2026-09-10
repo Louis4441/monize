@@ -3405,7 +3405,7 @@ by a lock whose purpose is not obvious from the call site.
 
 **When adding an invariant.** It belongs here if it is cross-layer. A rule that
 one service can enforce alone belongs in that service, or in a type, or in a lint
-rule -- per root `CLAUDE.md`, prefer the highest enforcement the mistake allows,
+rule -- per `AGENTS.md`, prefer the highest enforcement the mistake allows,
 and use prose only for the part that genuinely needs judgement. This document is
 prose, which makes it the weakest of the available options and the one most in
 need of the machine-checkable rules the entries above call for.

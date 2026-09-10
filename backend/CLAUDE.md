@@ -42,7 +42,7 @@ Each module holds `{feature}.module.ts`, controller, service, their specs, `enti
 ## Configuration
 
 - **Path alias:** `@/*` maps to `src/*` (tsconfig + Jest moduleNameMapper).
-- **ESLint** (`eslint.config.mjs`) bans the direct database primitives the root `CLAUDE.md` names; `WITH_CONTEXT_ALLOWLIST` and `OAUTH_PAYLOAD_ALLOWLIST` live there.
+- **ESLint** (`eslint.config.mjs`) bans the direct database primitives `AGENTS.md` names; `WITH_CONTEXT_ALLOWLIST` and `OAUTH_PAYLOAD_ALLOWLIST` live there.
 - Coverage excludes `main.ts`, modules, entities, DTOs, seed scripts and migrations.
 
 ## Rules that apply to every change
@@ -51,7 +51,7 @@ Each module holds `{feature}.module.ts`, controller, service, their specs, `enti
 
 | Need | Use | Never |
 |---|---|---|
-| Any database access | `withScopedDb` and the identity contexts in the root `CLAUDE.md` | an injected repository, a query runner, a bare `dataSource.query` |
+| Any database access | `withScopedDb` and the identity contexts in `AGENTS.md` | an injected repository, a query runner, a bare `dataSource.query` |
 | A refusal (ownership, precondition, revision) | the check inside the same transaction as the write, before it | a check after a commit that a status code then contradicts |
 | A raw `SELECT` of a DATE or numeric | `TO_CHAR(col, 'YYYY-MM-DD')` and `Number(...)` at the boundary | trusting the entity transformer or the global DATE parser |
 | An optional DTO field with a format validator | `@ValidateIf((_o, v) => v !== null && v !== "")` beside `@IsOptional()` | `@IsOptional()` alone |
@@ -96,7 +96,7 @@ Each module holds `{feature}.module.ts`, controller, service, their specs, `enti
 | Crons, reapers, background jobs | `docs/backend/cron-and-background-work.md` and `docs/cron-jobs.md` |
 | MCP server: transport, tools, confirmation | `docs/backend/mcp.md` (`src/mcp/CLAUDE.md` is its pointer) |
 
-Every AI tool is shared between the assistant and the MCP server: the logic goes on the domain service and both adapters are wired in the same PR (root `CLAUDE.md`, "Shared AI tools").
+Every AI tool is shared between the assistant and the MCP server: the logic goes on the domain service and both adapters are wired in the same PR (`docs/backend/ai-and-payees.md`, "Shared AI tools").
 
 ## Before you finish
 

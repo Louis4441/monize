@@ -1,6 +1,6 @@
 # Writing and reading the guard tests
 
-A guard test is a source scan that fails on every occurrence of a pattern the repository has decided against. The rule it holds is written in a `CLAUDE.md` or a `docs/` entry as one sentence; the guard is the version the machine checks, and its failure message names the thing to use instead. This document holds the conventions for writing one, moved out of the root `CLAUDE.md` because they matter only when a guard is being written or has fired.
+A guard test is a source scan that fails on every occurrence of a pattern the repository has decided against. The rule it holds is written in a `CLAUDE.md` or a `docs/` entry as one sentence; the guard is the version the machine checks, and its failure message names the thing to use instead. This document holds the conventions for writing one, moved out of `AGENTS.md` because they matter only when a guard is being written or has fired.
 
 ## A baseline is shrink-only
 

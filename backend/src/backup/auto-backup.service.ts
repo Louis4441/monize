@@ -257,7 +257,7 @@ export class AutoBackupService {
     // The per-user directory, by contrast, is server-computed and already
     // inside a permitted root, so creating it needs no further decision. It is
     // sharded the same way attachment bytes are (`<root>/<ab>/<cd>/<userId>`),
-    // per the repository-wide rule in the root CLAUDE.md.
+    // per the repository-wide rule in `AGENTS.md`.
     //
     // Canonicalise the FINAL path before creating anything, not only the root:
     // the sharded segments are appended lexically after the root check, so a

@@ -208,7 +208,7 @@ const BAN_WITH_CONTEXT = {
  * scoped `EntityManager` is the correct pattern everywhere in this codebase, so
  * a `no-restricted-syntax` selector for it would fire on hundreds of correct
  * call sites -- and `src/common/db/lint-bans.spec.ts` scrapes exactly that
- * selector shape out of this file and then requires `CLAUDE.md` and
+ * selector shape out of this file and then requires `AGENTS.md` and
  * `CONTRIBUTING.md` to name the banned call, which would put false guidance in
  * the instruction files. `src/oauth/oauth-payload-access.spec.ts` covers what
  * an import ban cannot: a re-export laundering the entity, or raw SQL naming

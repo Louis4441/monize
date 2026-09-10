@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
  *
  * A transaction's description is where a ticket, receipt or order page ends up,
  * and `LinkifiedText` is what makes the address in it clickable. The mistake
- * this guards is the one the root `CLAUDE.md` names -- "the fix for one surface
+ * this guards is the one `AGENTS.md` names -- "the fix for one surface
  * is not the fix": the register was linkified and the three report tables that
  * show the same field were not, so the same description was a link on one
  * screen and inert text on another.

@@ -14,7 +14,7 @@ import { findRepoRoot, gitListFiles, requireRepoRoot } from "./repo-tree.util";
 /**
  * A doc that names a file is making a claim about the source tree.
  *
- * The rule is already written down in the root `CLAUDE.md` -- rename or delete a
+ * The rule is already written down in `AGENTS.md` -- rename or delete a
  * file and grep `docs/` and every `CLAUDE.md` in the same commit -- and it was
  * still broken: the cross-owner-transfers plan pointed into
  * `backend/src/ai/query/` for a service that lives at
@@ -94,7 +94,7 @@ describe("doc path grammar", () => {
   });
 
   it("exempts a branch-qualified path explicitly, not by accident", () => {
-    // The escape hatch the root CLAUDE.md prescribes for paths in other
+    // The escape hatch `AGENTS.md` prescribes for paths in other
     // branches. It used to survive only because `:` was missing from a
     // character class; this is the deliberate version.
     expect(

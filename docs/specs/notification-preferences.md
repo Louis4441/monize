@@ -1,6 +1,6 @@
 # Notification preferences and delivery control
 
-Status: DRAFT (spec-first, per the root `CLAUDE.md` "a financial feature of any substance
+Status: DRAFT (spec-first, per `AGENTS.md` "a financial feature of any substance
 starts from a short approved spec committed before the implementation").
 Owner: notification-center. Related: discussion #1291, INV-NOTIFY-001,
 INV-PUSH-001..005.

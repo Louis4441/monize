@@ -11,7 +11,7 @@ This document defines which protocol to use when, and records which protocol
 each existing writer actually uses. Where two writers of the same value disagree,
 that is recorded as a gap rather than smoothed over -- see section 8.
 
-Related: root `CLAUDE.md` (Transactions, Database Access) states the rules for
+Related: `AGENTS.md` (Transactions, Database Access) states the rules for
 reaching the database at all; `docs/financial-calculation-contract.md` section 7
 states that a rejected command must not already have written.
 
