@@ -367,7 +367,13 @@ function ReportsContent() {
               {t(`page.categories.${cat}` as Parameters<typeof t>[0])}
             </button>
           ))}
-          <DensityToggle view="reports" size="chip" className="ml-auto justify-center" />
+          {/* Density is a desktop-only concern: the mobile tile grid ignores it
+              entirely, so the toggle is hidden there rather than silently
+              mutating the persisted desktop density from a control that does
+              nothing on screen. Gated the same way the tile grid is. */}
+          {!isMobile && (
+            <DensityToggle view="reports" size="chip" className="ml-auto justify-center" />
+          )}
         </div>
 
         {/* Reports Grid */}
@@ -411,7 +417,7 @@ function ReportsContent() {
                     tabIndex={0}
                     onClick={(e) => handleToggleFavourite(e, report)}
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggleFavourite(e as unknown as React.MouseEvent, report); } }}
-                    className="absolute top-2 right-2 p-1 rounded-full bg-white/70 dark:bg-gray-800/70 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    className="absolute top-2 right-2 p-2 rounded-full bg-white/70 dark:bg-gray-800/70 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                     title={isReportFavourite(report) ? t('page.removeFavourite') : t('page.addFavourite')}
                   >
                     <svg

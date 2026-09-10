@@ -1428,6 +1428,42 @@ describe('ReportsPage', () => {
       });
     });
 
+    it('gives the mobile tile favourite button a comfortable tap target (p-2)', async () => {
+      // The tile is the phone surface, so its star must be easy to tap: p-2, not
+      // the p-1 (~24px) target it shipped with.
+      mobileState.isMobile = true;
+      render(<ReportsPage />);
+      await waitFor(() => {
+        expect(screen.getByText('Spending by Category')).toBeInTheDocument();
+      });
+      const stars = screen.getAllByTitle('Add to favourites');
+      expect(stars.length).toBeGreaterThan(0);
+      for (const star of stars) {
+        expect(star).toHaveClass('p-2');
+        expect(star).not.toHaveClass('p-1');
+      }
+    });
+
+    it('hides the density toggle on mobile', async () => {
+      // The mobile tile grid ignores density, so a toggle here would do nothing
+      // on screen while silently mutating the persisted desktop density.
+      mobileState.isMobile = true;
+      render(<ReportsPage />);
+      await waitFor(() => {
+        expect(screen.getByText('Spending by Category')).toBeInTheDocument();
+      });
+      expect(screen.queryByTitle('Toggle row density')).not.toBeInTheDocument();
+    });
+
+    it('renders the density toggle on desktop', async () => {
+      mobileState.isMobile = false;
+      render(<ReportsPage />);
+      await waitFor(() => {
+        expect(screen.getByText('Spending by Category')).toBeInTheDocument();
+      });
+      expect(screen.getByTitle('Toggle row density')).toBeInTheDocument();
+    });
+
     it('keeps the guided-tour anchor on exactly one tile on mobile', async () => {
       mobileState.isMobile = true;
       render(<ReportsPage />);
