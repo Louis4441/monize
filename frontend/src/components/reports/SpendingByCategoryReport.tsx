@@ -29,6 +29,11 @@ import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
+import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from '@/components/ui/interactive-row';
 import { ChartTooltipPanel } from '@/components/reports/ChartTooltip';
 import { ReportError } from '@/components/reports/ReportError';
 import { exportToCsv } from '@/lib/csv-export';
@@ -39,35 +44,15 @@ type SpendingCategorySortField = 'name' | 'value' | 'percentage';
 type ChartDataItem = ChartDatum & { id: string; colour: string };
 
 /**
- * One column of the data table. The three are declared once, as a record over
- * the sort field union, and rendered by BOTH header rows -- the column header
- * row (from `sm` up) and the phone sort strip -- so the two can never list
- * different fields, and adding a member to the union fails `tsc` rather than
- * stranding a phone with no control for it. The labels double as the phone
- * captions, so a value reads under exactly the label its column header uses.
+ * One column of the data table, and the record the two header rows are built
+ * from -- the shared declarations from `ui/Table`, as eleven sibling reports
+ * use them. The alignment is narrowed to `'right'` because that is the only one
+ * this table's amount and percentage columns take. The labels double as the
+ * phone captions, so a value reads under exactly the label its column header
+ * uses.
  */
-interface SortColumn {
-  field: SpendingCategorySortField;
-  label: string;
-  /** The amount and percentage columns are right-aligned on desktop. */
-  align?: 'right';
-}
-
-/**
- * The record the two header rows are built from, keyed by sort field.
- *
- * The key is tied to the entry's own `field`, which a plain
- * `Record<SpendingCategorySortField, SortColumn>` does not do: that forces an
- * entry to EXIST for every member of the union but lets it name a different
- * one, so `value: { field: 'name', label: colAmount }` type-checks. Both header
- * rows would then render two controls keyed `name` (a duplicate React key),
- * tapping "Amount" would sort by Category, and "Amount" would be unsortable --
- * and a test comparing header LABELS cannot see any of it, because the labels
- * stay right. Here it is a compile error instead.
- */
-type SortColumnsByField = {
-  [K in SpendingCategorySortField]: SortColumn & { field: K };
-};
+type SortColumn = TableSortColumn<SpendingCategorySortField, 'right'>;
+type SortColumnsByField = TableSortColumnsByField<SpendingCategorySortField, SortColumn>;
 
 // Today's header cell, unchanged. This report's SortableHeader is not
 // upper-tracked, so the local class matches the pre-conversion markup exactly
@@ -93,13 +78,27 @@ const FIGURE_CELL =
 const ROW_GRID =
   'grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 px-4 py-3';
 
+// Where each column sits on the phone grid, written once for the data rows and
+// the totals footer: both shapes are the same three cells over the same two
+// tracks, so the footer takes a data row's placement verbatim and a reader
+// finds each figure in the same corner of both. Writing the placements out at
+// each cell instead is how a footer comes to land in different tracks from the
+// rows above it. Auto-flow would place them by DOM order and silently re-flow
+// the moment a cell became conditional; these are inert from `sm` up, where
+// each row is a table row again.
+const CELL_PLACEMENT: Record<SpendingCategorySortField, string> = {
+  name: 'col-start-1 col-span-2 row-start-1',
+  value: 'col-start-1 row-start-2',
+  percentage: 'col-start-2 row-start-2',
+};
+
 // The identity cell (the coloured dot and the category name), the same box in
 // the data rows and the footer. `min-w-0` lets the name shrink in its track;
 // the name itself wraps unclamped below `sm` (`break-words`) and takes today's
 // `break-normal` back from `sm` up. Keeps `text-sm` on phones -- a category
 // name is prose, not a figure.
 const IDENTITY_CELL =
-  'col-start-1 col-span-2 row-start-1 min-w-0 p-0 text-sm sm:table-cell sm:px-4 sm:py-3';
+  `${CELL_PLACEMENT.name} min-w-0 p-0 text-sm sm:table-cell sm:px-4 sm:py-3`;
 
 export function SpendingByCategoryReport() {
   const t = useTranslations('reports');
@@ -350,12 +349,26 @@ export function SpendingByCategoryReport() {
                 <tbody role="rowgroup" className="block divide-y divide-gray-200 dark:divide-gray-700 sm:table-row-group">
                   {sortedTableData.map((item) => {
                     const percentage = totalExpenses > 0 ? (item.value / totalExpenses) * 100 : 0;
+                    // The row is the click target where it names a category, so
+                    // it is also a KEYBOARD target there (WCAG 2.1.1) --
+                    // `tabIndex`, the focus ring and the key handler only when
+                    // the click does something, because a focus stop that does
+                    // nothing on Enter is a tab stop the reader has to escape.
+                    // The ring and the handler come from the one shared module
+                    // rather than a per-report copy.
+                    const categoryId = item.id;
                     return (
                       <tr
-                        key={item.id || item.name}
+                        key={categoryId || item.name}
                         role="row"
-                        className={`${ROW_GRID} ${item.id ? 'cursor-pointer' : ''} hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row sm:p-0`}
-                        onClick={() => item.id && handleCategoryClick(item.id)}
+                        tabIndex={categoryId ? 0 : undefined}
+                        className={`${ROW_GRID} ${categoryId ? `cursor-pointer ${INTERACTIVE_ROW_FOCUS_CLASS}` : ''} hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row sm:p-0`}
+                        onClick={() => categoryId && handleCategoryClick(categoryId)}
+                        onKeyDown={
+                          categoryId
+                            ? activateOnKey(() => handleCategoryClick(categoryId))
+                            : undefined
+                        }
                       >
                         {/* The identity. A category name is unbounded, so it
                             takes the whole of line 1 and wraps unclamped
@@ -368,7 +381,7 @@ export function SpendingByCategoryReport() {
                           </div>
                         </td>
                         {/* The amount is the headline: the left of line 2. */}
-                        <td role="cell" className={`col-start-1 row-start-2 text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                        <td role="cell" className={`${CELL_PLACEMENT.value} text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                           <CellLabel className={CAPTION_CLASS}>{columns.value.label}</CellLabel>
                           {formatCurrency(item.value)}
                         </td>
@@ -376,7 +389,7 @@ export function SpendingByCategoryReport() {
                             of. Its value is bounded (`100.0%`) but its caption is
                             not, so it takes the same track as the amount rather
                             than an `auto` one sized by the caption. */}
-                        <td role="cell" className={`col-start-2 row-start-2 text-gray-600 dark:text-gray-400 ${FIGURE_CELL}`}>
+                        <td role="cell" className={`${CELL_PLACEMENT.percentage} text-gray-600 dark:text-gray-400 ${FIGURE_CELL}`}>
                           <CellLabel className={CAPTION_CLASS}>{columns.percentage.label}</CellLabel>
                           {formatPercent(percentage, 1)}
                         </td>
@@ -396,11 +409,11 @@ export function SpendingByCategoryReport() {
                     <td role="cell" className={`${IDENTITY_CELL} font-bold text-gray-900 dark:text-gray-100`}>
                       <span className="min-w-0 break-words sm:break-normal">{t('spendingByCategory.total')}</span>
                     </td>
-                    <td role="cell" className={`col-start-1 row-start-2 font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                    <td role="cell" className={`${CELL_PLACEMENT.value} font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                       <CellLabel className={CAPTION_CLASS}>{columns.value.label}</CellLabel>
                       {formatCurrency(totalExpenses)}
                     </td>
-                    <td role="cell" className={`col-start-2 row-start-2 font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                    <td role="cell" className={`${CELL_PLACEMENT.percentage} font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                       <CellLabel className={CAPTION_CLASS}>{columns.percentage.label}</CellLabel>
                       100%
                     </td>

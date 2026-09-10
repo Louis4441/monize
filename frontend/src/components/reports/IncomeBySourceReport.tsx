@@ -26,6 +26,11 @@ import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
+import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from '@/components/ui/interactive-row';
 import { ChartTooltipPanel } from '@/components/reports/ChartTooltip';
 import { ReportError } from '@/components/reports/ReportError';
 import { CHART_COLOURS_INCOME } from '@/lib/chart-colours';
@@ -39,31 +44,13 @@ type IncomeSourceSortField = 'name' | 'value' | 'percentage';
 type ChartDataItem = ChartDatum & { id: string; colour: string };
 
 /**
- * One column of the data table. The three are declared once, as a record over
- * the sort field union, and rendered by BOTH header rows -- the column header
- * row (from `sm` up) and the phone sort strip -- so the two can never list
- * different fields, and a new union member fails `tsc` rather than stranding a
- * phone with no control for it.
+ * One column of the data table, and the record the two header rows are built
+ * from -- the shared declarations from `ui/Table`, as eleven sibling reports
+ * use them. The alignment is narrowed to `'right'` because that is the only one
+ * this table's amount and share columns take.
  */
-interface SortColumn {
-  field: IncomeSourceSortField;
-  label: string;
-  /** The amount and the share columns are right-aligned on desktop. */
-  align?: 'right';
-}
-
-/**
- * The record the two header rows are built from, each key tied to its entry's
- * own `field`. A plain `Record<IncomeSourceSortField, SortColumn>` forces an
- * entry to EXIST for every union member but lets it name a different one, so
- * `percentage: { field: 'value', label: colPercent }` would type-check: two
- * controls keyed `value` (a duplicate React key), "% of Total" sorting by
- * amount, and "% of Total" unsortable -- none of which a test comparing header
- * LABELS can see, because the labels stay right. Here it is a compile error.
- */
-type SortColumnsByField = {
-  [K in IncomeSourceSortField]: SortColumn & { field: K };
-};
+type SortColumn = TableSortColumn<IncomeSourceSortField, 'right'>;
+type SortColumnsByField = TableSortColumnsByField<IncomeSourceSortField, SortColumn>;
 
 // Today's header cell, unchanged (this report's header carries no
 // `tracking-wider`, so neither does this constant -- the `sm`-and-up output
@@ -362,12 +349,26 @@ export function IncomeBySourceReport() {
                 <tbody role="rowgroup" className="block divide-y divide-gray-200 dark:divide-gray-700 sm:table-row-group">
                   {sortedTableData.map((item) => {
                     const percentage = totalIncome > 0 ? (item.value / totalIncome) * 100 : 0;
+                    // The row is the click target where it names a category, so
+                    // it is also a KEYBOARD target there (WCAG 2.1.1) --
+                    // `tabIndex`, the focus ring and the key handler only when
+                    // the click does something, because a focus stop that does
+                    // nothing on Enter is a tab stop the reader has to escape.
+                    // The ring and the handler come from the one shared module
+                    // rather than a per-report copy.
+                    const categoryId = item.id;
                     return (
                       <tr
-                        key={item.id || item.name}
+                        key={categoryId || item.name}
                         role="row"
-                        className={`grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 ${item.id ? 'cursor-pointer' : ''} hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row sm:p-0`}
-                        onClick={() => item.id && handleCategoryClick(item.id)}
+                        tabIndex={categoryId ? 0 : undefined}
+                        className={`grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 ${categoryId ? `cursor-pointer ${INTERACTIVE_ROW_FOCUS_CLASS}` : ''} hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row sm:p-0`}
+                        onClick={() => categoryId && handleCategoryClick(categoryId)}
+                        onKeyDown={
+                          categoryId
+                            ? activateOnKey(() => handleCategoryClick(categoryId))
+                            : undefined
+                        }
                       >
                         {/* The identity; the `<tr>` around it stays the click
                             target at every width. The colour dot and the name

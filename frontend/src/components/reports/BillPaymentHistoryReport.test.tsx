@@ -227,6 +227,47 @@ describe('BillPaymentHistoryReport', () => {
     expect(mockPush).toHaveBeenCalledWith('/bills');
   });
 
+  // The row is the click target, so it has to be reachable and operable from
+  // the keyboard as well (WCAG 2.1.1). Before the fix this row was a
+  // `cursor-pointer` `<tr>` with an `onClick` and no `tabIndex` and no
+  // `onKeyDown` -- the whole suite was green over a row no keyboard user could
+  // use, so this case is what fails on that shape.
+  it('activates a bill row from the keyboard', async () => {
+    mockGetBillPaymentHistory.mockResolvedValue({
+      billPayments: [
+        {
+          scheduledTransactionId: 'st-1',
+          scheduledTransactionName: 'Rent',
+          payeeName: 'Landlord',
+          paymentCount: 12,
+          averagePayment: 1500,
+          totalPaid: 18000,
+          lastPaymentDate: '2025-01-01',
+        },
+      ],
+      monthlyTotals: [],
+      summary: { totalPaid: 18000, monthlyAverage: 1500, uniqueBills: 1, totalPayments: 12 },
+    });
+    render(<BillPaymentHistoryReport />);
+    await waitFor(() => expect(screen.getByText('By Bill')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('By Bill'));
+    await waitFor(() => expect(screen.getByText('Rent')).toBeInTheDocument());
+    const row = screen.getByText('Rent').closest('tr') as HTMLElement;
+    expect(row).toHaveAttribute('tabindex', '0');
+
+    fireEvent.keyDown(row, { key: 'Enter' });
+    expect(mockPush).toHaveBeenCalledWith('/bills');
+
+    mockPush.mockClear();
+    fireEvent.keyDown(row, { key: ' ' });
+    expect(mockPush).toHaveBeenCalledWith('/bills');
+
+    // A key the row does not claim stays the browser's.
+    mockPush.mockClear();
+    fireEvent.keyDown(row, { key: 'a' });
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
   it('exports CSV when export button is clicked', async () => {
     mockGetBillPaymentHistory.mockResolvedValue({
       billPayments: [
@@ -251,9 +292,15 @@ describe('BillPaymentHistoryReport', () => {
       expect.any(Array),
       expect.any(Array),
     );
-    expect(mockExportToCsv.mock.calls[0][2][0][5]).toBe(
-      'preferred-date:2025-01-01',
-    );
+    // A CSV is machine-read, so the date column is ISO and NOT the reader's
+    // preferred format: two readers exporting the same rows must get one file,
+    // and a localized date is ambiguous and sorts lexicographically wrong.
+    // `preferred-date:...` here would be asserting that defect. The sibling
+    // test below holds the reading surface's half of the split.
+    expect(mockExportToCsv.mock.calls[0][2][0][5]).toBe('2025-01-01');
+    // The figure columns are raw numbers, for the reason issue #1134 records.
+    expect(mockExportToCsv.mock.calls[0][2][0][3]).toBe(1500);
+    expect(mockExportToCsv.mock.calls[0][2][0][4]).toBe(18000);
   });
 
   it('exports preferred dates to PDF', async () => {

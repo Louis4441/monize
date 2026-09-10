@@ -2,6 +2,8 @@
 
 import { useCallback, useState, useMemo, useRef } from 'react';
 import { useTranslations } from 'next-intl';
+import { format } from 'date-fns';
+import { parseLocalDate } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { useRouter } from 'next/navigation';
 import {
@@ -13,6 +15,7 @@ import {
 } from 'recharts';
 import { builtInReportsApi } from '@/lib/built-in-reports';
 import {
+  RECURRING_EXPENSE_FREQUENCIES,
   RecurringExpenseItem,
   RecurringExpenseFrequency,
 } from '@/types/built-in-reports';
@@ -24,6 +27,7 @@ import { exportToCsv } from '@/lib/csv-export';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from '@/components/ui/interactive-row';
 import type {
   SortColumn as TableSortColumn,
   SortColumnsByField as TableSortColumnsByField,
@@ -58,8 +62,17 @@ interface SortColumn extends TableSortColumn<RecurringSortField> {
    * count at seven and against the `<th>` count of each header row.
    */
   csvLabel: string;
-  csvValue: (expense: RecurringExpenseItem) => string | number;
+  /**
+   * This column's exported cell, for the surface it is being written to. A CSV
+   * is read by a MACHINE and a PDF by a person, so a date is ISO in the one and
+   * the reader's own format in the other; a column whose cell does not depend
+   * on the surface simply ignores the argument.
+   */
+  csvValue: (expense: RecurringExpenseItem, surface: ExportSurface) => string | number;
 }
+
+/** Which surface an export row is being built for; see `csvValue`. */
+type ExportSurface = 'csv' | 'pdf';
 
 /**
  * The record the two header rows are built from, keyed by sort field.
@@ -78,21 +91,6 @@ type SortColumnsByField = TableSortColumnsByField<RecurringSortField, SortColumn
 // Today's header cell, unchanged.
 const HEADER_CLASS = 'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase';
 
-// The same sort controls in the phone strip: a wrapped row of compact chips.
-// Column alignment means nothing there -- the column header row is hidden and
-// each data row is a grid -- so every control is left-aligned and self-naming.
-// The border is what says "tappable": there is no hover on a touch screen, and
-// the chip's own fill is a shade off the header band it sits on (this table's
-// `<thead>` keeps its `bg-gray-50` / `dark:bg-gray-900/50`). The shared
-// `PHONE_HEADER_CLASS` keeps this strip identical to its sibling reports.
-//
-// Seven chips is the second-widest strip of the converted family: measured on
-// the Chromium replica at 320px they wrap to four lines in `en`/`pl` (148px),
-// five in `ru`/`id`/`de` (182px) and seven in the pseudo-locale (250px) above
-// the first row; at 390px, three lines in every real locale. That is a measured
-// cost, not a reason to drop a control: `reports.recurring-expenses.sort`
-// persists any of the seven, so a field with no control anywhere would leave a
-// phone POINTING at a sort with no pointer back.
 // A value cell inside a wrapped row: no padding of its own below `sm` and this
 // table's own `px-4 py-3` from `sm` up. Smaller type on phones so a
 // seven-figure compact amount still fits half the width.
@@ -155,7 +153,6 @@ const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px
 // figure) silently onto the date.
 const DATE_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
 
-/** Every caption in a wrapped cell is phone-only. */
 const FREQUENCY_BADGE_CLASS: Record<RecurringExpenseFrequency, string> = {
   WEEKLY: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
   BIWEEKLY: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
@@ -163,6 +160,50 @@ const FREQUENCY_BADGE_CLASS: Record<RecurringExpenseFrequency, string> = {
   OCCASIONAL: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400',
   IRREGULAR: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400',
 };
+
+/**
+ * Whether a frequency code is one this build knows.
+ *
+ * The payload's TYPE says it always is, and during a rolling deploy that is not
+ * true: an older backend answers with a code this build has no entry for, and
+ * the union cannot refuse a string that arrives over the wire. Both readers of
+ * a frequency go through a guard for that reason -- see `frequencyBadgeClass`
+ * and `frequencyLabel`.
+ */
+function isKnownFrequency(value: string): value is RecurringExpenseFrequency {
+  return (RECURRING_EXPENSE_FREQUENCIES as readonly string[]).includes(value);
+}
+
+/**
+ * The badge classes for a frequency code, IRREGULAR's neutral pair for one this
+ * build does not know -- `FREQUENCY_BADGE_CLASS[unknown]` is `undefined`, and
+ * an interpolated `undefined` reaches the DOM as the literal class name
+ * `undefined`, so the pill loses its fill and its text colour together.
+ */
+function frequencyBadgeClass(frequency: string): string {
+  return isKnownFrequency(frequency)
+    ? FREQUENCY_BADGE_CLASS[frequency]
+    : FREQUENCY_BADGE_CLASS.IRREGULAR;
+}
+
+/**
+ * A frequency's position in true frequency order, for SORTING.
+ *
+ * The Frequency column is ORDINAL, not nominal: sorting it on the localized
+ * label gives "Every 2 Weeks, Irregular, Monthly, Occasional, Weekly"
+ * ascending -- alphabetical, so a different order in every language and none of
+ * them the order the reader means. `RECURRING_EXPENSE_FREQUENCIES` is declared
+ * most-frequent-first for exactly this. (Contrast the Category column, whose
+ * label is NOMINAL and correctly sorts by its displayed text.)
+ *
+ * A code this build does not know sorts after every code it does, rather than
+ * taking `indexOf`'s `-1` and claiming to be more frequent than WEEKLY.
+ */
+function frequencyRank(frequency: string): number {
+  return isKnownFrequency(frequency)
+    ? RECURRING_EXPENSE_FREQUENCIES.indexOf(frequency)
+    : RECURRING_EXPENSE_FREQUENCIES.length;
+}
 
 export function RecurringExpensesReport() {
   const t = useTranslations('reports');
@@ -181,8 +222,13 @@ export function RecurringExpensesReport() {
     [minOccurrences],
   );
 
+  // A code this build does not know has no catalogue entry either, and asking
+  // for one renders the raw `reports.recurringExpenses.frequency.<code>` key
+  // path on screen. The code itself is a worse label than a translated one and
+  // a much better label than that.
   const frequencyLabel = useCallback(
-    (frequency: RecurringExpenseFrequency) => t(`recurringExpenses.frequency.${frequency}`),
+    (frequency: string) =>
+      isKnownFrequency(frequency) ? t(`recurringExpenses.frequency.${frequency}`) : frequency,
     [t],
   );
   const categoryLabel = useCallback(
@@ -203,7 +249,9 @@ export function RecurringExpensesReport() {
           comparison = compareValues(categoryLabel(a.categoryName), categoryLabel(b.categoryName));
           break;
         case 'frequency':
-          comparison = compareValues(frequencyLabel(a.frequency), frequencyLabel(b.frequency));
+          // Ordinal, so the ORDER is the frequency order and not the label's
+          // alphabet -- see `frequencyRank`.
+          comparison = compareValues(frequencyRank(a.frequency), frequencyRank(b.frequency));
           break;
         case 'count':
           comparison = compareValues(a.occurrences, b.occurrences);
@@ -221,7 +269,7 @@ export function RecurringExpensesReport() {
       return sortDirection === 'asc' ? comparison : -comparison;
     });
     return sorted;
-  }, [categoryLabel, frequencyLabel, recurringData, sortField, sortDirection]);
+  }, [categoryLabel, recurringData, sortField, sortDirection]);
 
   const chartData = useMemo(() => {
     if (!recurringData) return [];
@@ -279,7 +327,15 @@ export function RecurringExpensesReport() {
       label: t('recurringExpenses.colLastPaid'),
       align: 'right',
       csvLabel: t('recurringExpenses.csvColLastPaid'),
-      csvValue: (e) => formatDate(e.lastTransactionDate),
+      // ISO in the CSV: two readers exporting the same rows must get one file,
+      // `yyyy-MM-dd` is the form a spreadsheet sorts and every unconverted
+      // sibling export writes, and a localized date is ambiguous
+      // (`03/04/2026`) and sorts lexicographically wrong. The PDF is a reading
+      // surface and takes the reader's own format.
+      csvValue: (e, surface) =>
+        surface === 'pdf'
+          ? formatDate(e.lastTransactionDate)
+          : format(parseLocalDate(e.lastTransactionDate), 'yyyy-MM-dd'),
     },
   };
 
@@ -290,23 +346,25 @@ export function RecurringExpensesReport() {
   // in either header. The record's declaration order is the column order.
   const sortColumns: readonly SortColumn[] = Object.values(columns);
 
-  const getExportData = () => {
+  // Both exports write the same columns from the same record; only a cell whose
+  // rendering depends on its reader (a date) branches on the surface.
+  const getExportData = (surface: ExportSurface) => {
     if (!recurringData) return null;
     const headers = sortColumns.map((col) => col.csvLabel);
     // The export is the SERVER's order, as it has always been -- the table's
     // sort is a view of the same rows, not a different set of them.
-    const rows = recurringData.data.map((e) => sortColumns.map((col) => col.csvValue(e)));
+    const rows = recurringData.data.map((e) => sortColumns.map((col) => col.csvValue(e, surface)));
     return { headers, rows };
   };
 
   const handleExportCsv = () => {
-    const data = getExportData();
+    const data = getExportData('csv');
     if (!data) return;
     exportToCsv('recurring-expenses', data.headers, data.rows);
   };
 
   const handleExportPdf = async () => {
-    const expData = getExportData();
+    const expData = getExportData('pdf');
     if (!expData || !recurringData) return;
     const { exportToPdf } = await import('@/lib/pdf-export');
     await exportToPdf({
@@ -561,7 +619,27 @@ export function RecurringExpensesReport() {
             <div className="overflow-x-auto">
               <table role="table" className="block min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
                 <thead role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-header-group">
-                  {/* Phone sort strip: the same seven controls, wrapped. */}
+                  {/* Phone sort strip: the same seven controls, as a wrapped
+                      row of compact chips. Column alignment means nothing here
+                      -- the column header row is hidden and each data row is a
+                      grid -- so every control is left-aligned and self-naming.
+                      The border is what says "tappable": there is no hover on
+                      a touch screen, and the chip's own fill is a shade off the
+                      header band it sits on (this table's `<thead>` keeps its
+                      `bg-gray-50` / `dark:bg-gray-900/50`). The shared
+                      `PHONE_HEADER_CLASS` keeps this strip identical to its
+                      sibling reports.
+
+                      Seven chips is the second-widest strip of the converted
+                      family: measured on the Chromium replica at 320px they
+                      wrap to four lines in `en`/`pl` (148px), five in
+                      `ru`/`id`/`de` (182px) and seven in the pseudo-locale
+                      (250px) above the first row; at 390px, three lines in
+                      every real locale. That is a measured cost, not a reason
+                      to drop a control: `reports.recurring-expenses.sort`
+                      persists any of the seven, so a field with no control
+                      anywhere would leave a phone POINTING at a sort with no
+                      pointer back. */}
                   <tr role="row" className="flex flex-wrap gap-x-2 gap-y-1 px-4 py-2 sm:hidden">
                     {sortColumns.map((col) => (
                       <SortableHeader<RecurringSortField>
@@ -593,6 +671,13 @@ export function RecurringExpensesReport() {
                   </tr>
                 </thead>
                 <tbody role="rowgroup" className="block divide-y divide-gray-200 dark:divide-gray-700 sm:table-row-group">
+                  {/* Each row is the click target where it names a payee, so it
+                      is also a KEYBOARD target there (WCAG 2.1.1) -- `tabIndex`,
+                      the focus ring and the key handler only when the click
+                      does something, because a focus stop that does nothing on
+                      Enter is a tab stop the reader has to escape. The ring and
+                      the handler come from the one shared module rather than a
+                      per-report copy. */}
                   {sortedExpenses.map((expense, index) => (
                     <tr
                       // `key={index}` is pre-existing and stays: the payload
@@ -600,8 +685,14 @@ export function RecurringExpensesReport() {
                       // the key inside a layout change would hide both.
                       key={index}
                       role="row"
-                      className={`grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row ${expense.payeeId ? 'cursor-pointer' : ''}`}
+                      tabIndex={expense.payeeId ? 0 : undefined}
+                      className={`grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row ${expense.payeeId ? `cursor-pointer ${INTERACTIVE_ROW_FOCUS_CLASS}` : ''}`}
                       onClick={() => handlePayeeClick(expense.payeeId)}
+                      onKeyDown={
+                        expense.payeeId
+                          ? activateOnKey(() => handlePayeeClick(expense.payeeId))
+                          : undefined
+                      }
                     >
                       <td
                         role="cell"
@@ -621,7 +712,7 @@ export function RecurringExpensesReport() {
                         role="cell"
                         className="col-start-1 row-start-3 min-w-0 p-0 text-sm sm:table-cell sm:px-4 sm:py-3 sm:text-center"
                       >
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium max-sm:inline-block max-sm:max-w-full ${FREQUENCY_BADGE_CLASS[expense.frequency]}`}>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium max-sm:inline-block max-sm:max-w-full ${frequencyBadgeClass(expense.frequency)}`}>
                           {frequencyLabel(expense.frequency)}
                         </span>
                       </td>

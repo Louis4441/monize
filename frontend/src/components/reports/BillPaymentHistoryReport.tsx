@@ -12,7 +12,9 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { format } from 'date-fns';
 import { builtInReportsApi } from '@/lib/built-in-reports';
+import { parseLocalDate } from '@/lib/utils';
 import { BillPaymentHistoryResponse } from '@/types/built-in-reports';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
@@ -22,6 +24,7 @@ import { exportToCsv } from '@/lib/csv-export';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from '@/components/ui/interactive-row';
 import type {
   SortColumn as TableSortColumn,
   SortColumnsByField as TableSortColumnsByField,
@@ -59,21 +62,6 @@ type SortColumnsByField = TableSortColumnsByField<BillSortField, SortColumn>;
 // Today's header cell, unchanged.
 const HEADER_CLASS = 'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase';
 
-// The same sort controls in the phone strip: a wrapped row of compact chips.
-// Column alignment means nothing there -- the column header row is hidden and
-// each data row is a grid -- so every control is left-aligned and self-naming.
-// The border is what says "tappable": there is no hover on a touch screen, and
-// the chip's own fill is a shade off the header band it sits on (this table's
-// `<thead>` keeps its `bg-gray-50` / `dark:bg-gray-900/50`, so the strip is on
-// that band rather than on the card, as it is on the sibling tables whose card
-// has no header band). The shared `PHONE_HEADER_CLASS` keeps those controls
-// identical across the reports.
-//
-// Five chips wrap to three lines at 320px in `en`/`pl`/`ru`/`id` (114px), four
-// in `de` (148px) and five in the pseudo-locale (182px) above the first row.
-// That is a measured cost, not a reason to drop a control: `reports.bill-
-// payment-history.sort` persists any of the five, so a field with no control
-// anywhere would leave a phone POINTING at a sort with no pointer back.
 // A value cell inside a wrapped row: no padding of its own below `sm` and this
 // table's own `px-4 py-3` from `sm` up. Smaller type on phones so an
 // eight-figure compact amount still fits half the width.
@@ -124,7 +112,17 @@ const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px
 // it.
 const DATE_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
 
-/** Every caption in a wrapped cell is phone-only. */
+/**
+ * Which surface an export row is being built for.
+ *
+ * A CSV is read by a MACHINE and a PDF by a person, so a date is written
+ * differently for each: the CSV gets ISO `yyyy-MM-dd`, which a spreadsheet
+ * sorts, and the PDF gets the reader's own date format. One function builds
+ * both so the two cannot come to hold different COLUMNS; only the cell
+ * rendering branches.
+ */
+type ExportSurface = 'csv' | 'pdf';
+
 export function BillPaymentHistoryReport() {
   const t = useTranslations('reports');
   const router = useRouter();
@@ -210,28 +208,44 @@ export function BillPaymentHistoryReport() {
   // The record's declaration order is the column order.
   const sortColumns: readonly SortColumn[] = Object.values(columns);
 
-  const getExportData = () => {
+  /**
+   * The rows both exports write, in the columns both write, differing only in
+   * how a machine-read cell is rendered against a human-read one.
+   *
+   * The Last Payment column is ISO in the CSV: two readers exporting the same
+   * rows must get one file, `yyyy-MM-dd` is the form a spreadsheet sorts and
+   * every unconverted sibling export writes, and a localized date is ambiguous
+   * (`03/04/2026`) and sorts lexicographically wrong. The PDF is a reading
+   * surface and takes the reader's own format. The three figure columns are
+   * already raw numbers and stay that way -- a formatted amount is what
+   * reopened issue #1134 on the sibling report.
+   */
+  const getExportData = (surface: ExportSurface) => {
     if (!billData) return null;
     const headers = [t('billPaymentHistory.colBill'), t('billPaymentHistory.colPayee'), t('billPaymentHistory.colPayments'), t('billPaymentHistory.colAverage'), t('billPaymentHistory.colTotalPaid'), t('billPaymentHistory.colLastPayment')];
-    const rows = billData.billPayments.map((bp) => [
+    const rows: (string | number)[][] = billData.billPayments.map((bp) => [
       bp.scheduledTransactionName,
       bp.payeeName || '',
       bp.paymentCount,
       bp.averagePayment,
       bp.totalPaid,
-      bp.lastPaymentDate ? formatDate(bp.lastPaymentDate) : '',
+      bp.lastPaymentDate
+        ? surface === 'pdf'
+          ? formatDate(bp.lastPaymentDate)
+          : format(parseLocalDate(bp.lastPaymentDate), 'yyyy-MM-dd')
+        : '',
     ]);
     return { headers, rows };
   };
 
   const handleExportCsv = () => {
-    const data = getExportData();
+    const data = getExportData('csv');
     if (!data) return;
     exportToCsv('bill-payment-history', data.headers, data.rows);
   };
 
   const handleExportPdf = async () => {
-    const data = getExportData();
+    const data = getExportData('pdf');
     if (!data || !billData) return;
     const { exportToPdf } = await import('@/lib/pdf-export');
     await exportToPdf({
@@ -468,7 +482,26 @@ export function BillPaymentHistoryReport() {
           <div className="overflow-x-auto">
             <table role="table" className="block min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
               <thead role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-header-group">
-                {/* Phone sort strip: the same five controls, wrapped. */}
+                {/* Phone sort strip: the same five controls, as a wrapped row
+                    of compact chips. Column alignment means nothing here --
+                    the column header row is hidden and each data row is a grid
+                    -- so every control is left-aligned and self-naming. The
+                    border is what says "tappable": there is no hover on a
+                    touch screen, and the chip's own fill is a shade off the
+                    header band it sits on (this table's `<thead>` keeps its
+                    `bg-gray-50` / `dark:bg-gray-900/50`, so the strip is on
+                    that band rather than on the card, as it is on the sibling
+                    tables whose card has no header band). The shared
+                    `PHONE_HEADER_CLASS` keeps those controls identical across
+                    the reports.
+
+                    Five chips wrap to three lines at 320px in
+                    `en`/`pl`/`ru`/`id` (114px), four in `de` (148px) and five
+                    in the pseudo-locale (182px) above the first row. That is a
+                    measured cost, not a reason to drop a control:
+                    `reports.bill-payment-history.sort` persists any of the
+                    five, so a field with no control anywhere would leave a
+                    phone POINTING at a sort with no pointer back. */}
                 <tr role="row" className="flex flex-wrap gap-x-2 gap-y-1 px-4 py-2 sm:hidden">
                   {sortColumns.map((col) => (
                     <SortableHeader<BillSortField>
@@ -500,12 +533,19 @@ export function BillPaymentHistoryReport() {
                 </tr>
               </thead>
               <tbody role="rowgroup" className="block divide-y divide-gray-200 dark:divide-gray-700 sm:table-row-group">
+                {/* Each row is the click target at every width, so it is also a
+                    KEYBOARD target: `tabIndex` puts it in the tab order and
+                    `activateOnKey` runs the same handler on Enter and Space
+                    (WCAG 2.1.1). Both come from the one shared module rather
+                    than a per-report copy of the handler. */}
                 {sortedBillPayments.map((bp) => (
                   <tr
                     key={bp.scheduledTransactionId}
                     role="row"
-                    className="grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer sm:table-row"
+                    tabIndex={0}
+                    className={`grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer ${INTERACTIVE_ROW_FOCUS_CLASS} sm:table-row`}
                     onClick={handleBillClick}
+                    onKeyDown={activateOnKey(handleBillClick)}
                   >
                     <td
                       role="cell"

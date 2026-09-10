@@ -460,7 +460,10 @@ describe('RecurringExpensesReport (phone wrapped rows)', () => {
     // added to the table without appearing in the export (the strings stay the
     // catalogue's own `csvCol*` keys, which happen to match the headers).
     expect(headers).toEqual(EXPECTED_LABELS);
-    // The export is the SERVER's order, not the table's sort.
+    // The export is the SERVER's order, not the table's sort. The date is ISO
+    // because a CSV is machine-read: `preferred-date:...` in this position is
+    // the defect (two readers, two different ambiguous files), and the PDF
+    // assertion below holds the other half of the split.
     expect(rows[0]).toEqual([
       'Water Utility',
       'Utilities',
@@ -468,7 +471,7 @@ describe('RecurringExpensesReport (phone wrapped rows)', () => {
       6,
       50,
       300,
-      'preferred-date:2024-06-15',
+      '2024-06-15',
     ]);
     expect(rows[1][0]).toBe('Zebra Market');
   });

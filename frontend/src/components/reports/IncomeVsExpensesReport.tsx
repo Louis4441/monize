@@ -1,8 +1,12 @@
 "use client";
 
 import { useState, useMemo, useRef } from "react";
-import { CellLabel, PHONE_HEADER_CLASS } from "@/components/ui/Table";
-import type { SortColumn as TableSortColumn } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from "@/components/ui/Table";
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
+import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from '@/components/ui/interactive-row';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { useRouter } from "next/navigation";
 import {
@@ -45,12 +49,6 @@ type SortColumn = TableSortColumn<IncomeVsExpensesSortField, 'right'>;
 const HEADER_CLASS =
   'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase';
 
-// The same sort controls in the phone strip: a wrapped row of compact chips.
-// Column alignment means nothing there -- the column header row is hidden and
-// each data row is a grid -- so every control is left-aligned and self-naming.
-// The border and card background are what say "tappable": there is no hover on
-// a touch screen, and without them the strip reads as another row of the
-// captions the cells below carry.
 // A money cell inside a wrapped card: no padding of its own below `sm` (the row
 // supplies it and the grid does the spacing), the table cell's own padding from
 // `sm` up. Smaller type on phones so a six-figure amount still fits a
@@ -179,7 +177,15 @@ export function IncomeVsExpensesReport() {
   // header rows render is DERIVED from the record, never re-listed beside it:
   // a hand-written list next to an exhaustive record is not exhaustive. The
   // record's declaration order is the column order.
-  const columns: Record<IncomeVsExpensesSortField, SortColumn> = {
+  // The key is tied to the entry's own `field`, which a plain
+  // `Record<IncomeVsExpensesSortField, SortColumn>` does not do: that forces an
+  // entry to EXIST for every member of the union but lets it name a different
+  // one, so `savingsRate: { field: 'savings', ... }` would type-check. Both
+  // header rows would then render two controls keyed `savings` (a duplicate
+  // React key), tapping "Savings Rate" would sort by Savings, and "Savings
+  // Rate" would be unsortable -- none of which a test comparing header LABELS
+  // can see, because the labels stay right. Here it is a compile error.
+  const columns: TableSortColumnsByField<IncomeVsExpensesSortField, SortColumn> = {
     name: { field: 'name', label: t('incomeVsExpenses.colMonth') },
     income: { field: 'income', label: t('incomeVsExpenses.colIncome'), align: 'right' },
     expenses: { field: 'expenses', label: t('incomeVsExpenses.colExpenses'), align: 'right' },
@@ -187,6 +193,11 @@ export function IncomeVsExpensesReport() {
     savingsRate: { field: 'savingsRate', label: t('incomeVsExpenses.colSavingsRate'), align: 'right' },
   };
   const sortColumns: readonly SortColumn[] = Object.values(columns);
+
+  // The row's primary action, named once so the pointer and the keyboard cannot
+  // come to run two slightly different pushes.
+  const openMonth = (row: ChartDataItem) =>
+    router.push(`/transactions?startDate=${row.monthStart}&endDate=${row.monthEnd}`);
 
   const handleExportPdf = async () => {
     const { exportToPdf } = await import("@/lib/pdf-export");
@@ -343,7 +354,14 @@ export function IncomeVsExpensesReport() {
                   table semantics, and these put them back (inert from `sm` up). */}
               <table role="table" className="block min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
                 <thead role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-header-group">
-                  {/* Phone sort strip: the same five controls, wrapped. */}
+                  {/* Phone sort strip: the same five controls, as a wrapped
+                      row of compact chips. Column alignment means nothing here
+                      -- the column header row is hidden and each data row is a
+                      grid -- so every control is left-aligned and self-naming.
+                      The border and card background are what say "tappable":
+                      there is no hover on a touch screen, and without them the
+                      strip reads as another row of the captions the cells below
+                      carry. */}
                   <tr role="row" className="flex flex-wrap gap-x-2 gap-y-1 px-2 py-2 sm:hidden">
                     {sortColumns.map((col) => (
                       <SortableHeader<IncomeVsExpensesSortField>
@@ -379,22 +397,20 @@ export function IncomeVsExpensesReport() {
                     <tr
                       key={row.name}
                       role="row"
-                      className="grid grid-cols-3 items-start gap-x-3 gap-y-1.5 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row sm:p-0"
-                      onClick={() =>
-                        router.push(
-                          `/transactions?startDate=${row.monthStart}&endDate=${row.monthEnd}`,
-                        )
-                      }
+                      tabIndex={0}
+                      className={`grid grid-cols-3 items-start gap-x-3 gap-y-1.5 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 ${INTERACTIVE_ROW_FOCUS_CLASS} sm:table-row sm:p-0`}
+                      onClick={() => openMonth(row)}
+                      onKeyDown={activateOnKey(() => openMonth(row))}
                     >
                       <td role="cell" className="col-start-1 row-start-1 p-0 text-sm font-medium text-gray-900 dark:text-gray-100 sm:table-cell sm:px-4 sm:py-3">
                         {row.fullName}
                       </td>
                       <td role="cell" className={`col-start-3 row-start-1 text-green-600 dark:text-green-400 ${MONEY_CELL}`}>
-                        <CellLabel className="sm:hidden">{t('incomeVsExpenses.colIncome')}</CellLabel>
+                        <CellLabel className={CAPTION_CLASS}>{t('incomeVsExpenses.colIncome')}</CellLabel>
                         {formatCurrency(row.Income)}
                       </td>
                       <td role="cell" className={`col-start-3 row-start-2 text-red-600 dark:text-red-400 ${MONEY_CELL}`}>
-                        <CellLabel className="sm:hidden">{t('incomeVsExpenses.colExpenses')}</CellLabel>
+                        <CellLabel className={CAPTION_CLASS}>{t('incomeVsExpenses.colExpenses')}</CellLabel>
                         {formatCurrency(row.Expenses)}
                       </td>
                       {/* Savings takes the middle of line 1 beside the month:
@@ -402,7 +418,7 @@ export function IncomeVsExpensesReport() {
                       <td role="cell"
                         className={`col-start-2 row-start-1 font-medium ${row.Savings >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'} ${MONEY_CELL}`}
                       >
-                        <CellLabel className="sm:hidden">{t('incomeVsExpenses.colSavings')}</CellLabel>
+                        <CellLabel className={CAPTION_CLASS}>{t('incomeVsExpenses.colSavings')}</CellLabel>
                         {formatCurrency(row.Savings)}
                       </td>
                       {/* The rate spans the first two tracks so its caption --
@@ -411,7 +427,7 @@ export function IncomeVsExpensesReport() {
                       <td role="cell"
                         className={`col-start-1 col-span-2 row-start-2 font-medium ${row.SavingsRate >= 0 ? 'text-purple-600 dark:text-purple-400' : 'text-orange-600 dark:text-orange-400'} ${MONEY_CELL}`}
                       >
-                        <CellLabel className="sm:hidden">{t('incomeVsExpenses.colSavingsRate')}</CellLabel>
+                        <CellLabel className={CAPTION_CLASS}>{t('incomeVsExpenses.colSavingsRate')}</CellLabel>
                         {formatPercentTrimmed(row.SavingsRate)}
                       </td>
                     </tr>
@@ -424,23 +440,23 @@ export function IncomeVsExpensesReport() {
                   <tr role="row" className="grid grid-cols-3 items-start gap-x-3 gap-y-1.5 px-4 py-3 sm:table-row sm:p-0">
                     <td role="cell" className="col-start-1 row-start-1 p-0 text-sm font-bold text-gray-900 dark:text-gray-100 sm:table-cell sm:px-4 sm:py-3">{t('incomeVsExpenses.total')}</td>
                     <td role="cell" className={`col-start-3 row-start-1 font-bold text-green-600 dark:text-green-400 ${MONEY_CELL}`}>
-                      <CellLabel className="sm:hidden">{t('incomeVsExpenses.colIncome')}</CellLabel>
+                      <CellLabel className={CAPTION_CLASS}>{t('incomeVsExpenses.colIncome')}</CellLabel>
                       {formatCurrency(totals.totalIncome)}
                     </td>
                     <td role="cell" className={`col-start-3 row-start-2 font-bold text-red-600 dark:text-red-400 ${MONEY_CELL}`}>
-                      <CellLabel className="sm:hidden">{t('incomeVsExpenses.colExpenses')}</CellLabel>
+                      <CellLabel className={CAPTION_CLASS}>{t('incomeVsExpenses.colExpenses')}</CellLabel>
                       {formatCurrency(totals.totalExpenses)}
                     </td>
                     <td role="cell"
                       className={`col-start-2 row-start-1 font-bold ${totals.totalSavings >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'} ${MONEY_CELL}`}
                     >
-                      <CellLabel className="sm:hidden">{t('incomeVsExpenses.colSavings')}</CellLabel>
+                      <CellLabel className={CAPTION_CLASS}>{t('incomeVsExpenses.colSavings')}</CellLabel>
                       {formatCurrency(totals.totalSavings)}
                     </td>
                     <td role="cell"
                       className={`col-start-1 col-span-2 row-start-2 font-bold ${totals.savingsRate >= 0 ? 'text-purple-600 dark:text-purple-400' : 'text-orange-600 dark:text-orange-400'} ${MONEY_CELL}`}
                     >
-                      <CellLabel className="sm:hidden">{t('incomeVsExpenses.colSavingsRate')}</CellLabel>
+                      <CellLabel className={CAPTION_CLASS}>{t('incomeVsExpenses.colSavingsRate')}</CellLabel>
                       {formatPercent(totals.savingsRate, 1)}
                     </td>
                   </tr>

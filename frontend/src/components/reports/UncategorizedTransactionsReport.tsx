@@ -2,7 +2,9 @@
 
 import { useState, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
+import { format } from 'date-fns';
 import { gainLossColor } from '@/lib/format';
+import { parseLocalDate } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { useRouter } from 'next/navigation';
 import { builtInReportsApi } from '@/lib/built-in-reports';
@@ -15,6 +17,7 @@ import { exportToCsv } from '@/lib/csv-export';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from '@/components/ui/interactive-row';
 import type {
   SortColumn as TableSortColumn,
   SortColumnsByField as TableSortColumnsByField,
@@ -52,23 +55,6 @@ type SortColumnsByField = TableSortColumnsByField<SortField, SortColumn>;
 // Today's header cell, unchanged.
 const HEADER_CLASS = 'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase';
 
-// The same sort controls in the phone strip: a wrapped row of compact chips.
-// Column alignment means nothing there -- the column header row is hidden and
-// each data row is a grid -- so every control is left-aligned and self-naming.
-// The border is what says "tappable": there is no hover on a touch screen, and
-// the chip's own fill is a shade off the header band it sits on (this table's
-// `<thead>` keeps its `bg-gray-50` / `dark:bg-gray-900/50`). The shared
-// `PHONE_HEADER_CLASS` keeps this strip identical to its sibling reports.
-//
-// Four chips, one of them a COMPOUND label -- which is why a low chip count
-// says little about the strip's height here. Measured on the Chromium replica
-// at 320px: two lines (80px) in `en`/`pl`, three in `ru`/`id` (114px) and `de`
-// (130px, whose `Zahlungsempfänger / Beschreibung` is 214px on its own), four
-// in the pseudo-locale (148px); at 390px, two lines in every real locale but
-// `de`. That is a measured cost, not a reason to drop a control:
-// `reports.uncategorized-transactions.sort` persists any of the four, so a
-// field with no control anywhere would leave a phone POINTING at a sort with no
-// pointer back.
 // The amount cell inside a wrapped row: no padding of its own below `sm` and
 // this table's own `px-4 py-3` from `sm` up. Smaller type on phones so a
 // six-figure 2dp amount still fits half the width.
@@ -123,7 +109,17 @@ const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px
 // desktop is untouched.
 const DATE_CELL = 'p-0 text-xs whitespace-nowrap max-sm:text-right sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
 
-/** Every caption in a wrapped cell is phone-only. */
+/**
+ * Which surface an export row is being built for.
+ *
+ * A CSV is read by a MACHINE and a PDF by a person, so the same column is
+ * written differently for each: the CSV gets the raw amount and an ISO
+ * `yyyy-MM-dd` date, which a spreadsheet sums and sorts, and the PDF gets the
+ * reader's own number and date formats. One function builds both so the two
+ * cannot come to hold different COLUMNS; only the cell rendering branches.
+ */
+type ExportSurface = 'csv' | 'pdf';
+
 export function UncategorizedTransactionsReport() {
   const t = useTranslations('reports');
   const router = useRouter();
@@ -210,7 +206,31 @@ export function UncategorizedTransactionsReport() {
     router.push(`/transactions?${params.toString()}`);
   };
 
-  const getExportData = () => {
+  /**
+   * The rows both exports write, in the columns both write, differing only in
+   * how a machine-read cell is rendered against a human-read one.
+   *
+   * The AMOUNT column reaches the CSV as a `number` and never as a formatted
+   * string. `csv-export.ts`'s injection guard keys off the leading character
+   * and tab-prefixes any text opening with `-` that its `NUMERIC_VALUE` test
+   * cannot read as a number -- and that test admits digits, separators and
+   * currency SYMBOLS, so every currency whose narrow symbol is written in
+   * LETTERS falls outside it: `-zl 1,234.56`, `-CHF 1,234.56`,
+   * `-kr 1,234.56`, `-R$1,234.56` and pl-PL's `-1234,56 zl` are all
+   * tab-prefixed, which makes Excel store the cell as text and the column
+   * stops adding up. That is issue #1134, and a localized amount here is how
+   * it came back. `Number(...)` because a `decimal(20,4)` crosses the wire as
+   * a STRING whatever the type says, and a string never takes the guard's
+   * `typeof value === 'number'` path.
+   *
+   * The DATE column is ISO for the same reason: two readers exporting the same
+   * rows must get one file, and `yyyy-MM-dd` is the form a spreadsheet sorts
+   * and every unconverted sibling export writes. A localized date is
+   * ambiguous (`03/04/2026`) and sorts lexicographically wrong.
+   *
+   * The PDF is a reading surface and takes the reader's own formats for both.
+   */
+  const getExportData = (surface: ExportSurface) => {
     const headers = [
       t('uncategorizedTransactions.csvColDate'),
       t('uncategorizedTransactions.csvColPayee'),
@@ -218,24 +238,26 @@ export function UncategorizedTransactionsReport() {
       t('uncategorizedTransactions.csvColAccount'),
       t('uncategorizedTransactions.csvColAmount'),
     ];
-    const rows = filteredAndSortedTransactions.map((tx) => [
-      formatDate(tx.transactionDate),
+    const rows: (string | number)[][] = filteredAndSortedTransactions.map((tx) => [
+      surface === 'pdf'
+        ? formatDate(tx.transactionDate)
+        : format(parseLocalDate(tx.transactionDate), 'yyyy-MM-dd'),
       tx.payeeName || t('uncategorizedTransactions.unknownPayee'),
       tx.description || '',
       tx.accountName || t('uncategorizedTransactions.unknownAccount'),
-      formatCurrency(tx.amount, tx.currencyCode),
+      surface === 'pdf' ? formatCurrency(tx.amount, tx.currencyCode) : Number(tx.amount),
     ]);
     return { headers, rows };
   };
 
   const handleExportCsv = () => {
-    const { headers, rows } = getExportData();
+    const { headers, rows } = getExportData('csv');
     exportToCsv('uncategorized-transactions', headers, rows);
   };
 
   const handleExportPdf = async () => {
     const { exportToPdf } = await import('@/lib/pdf-export');
-    const { headers, rows } = getExportData();
+    const { headers, rows } = getExportData('pdf');
     await exportToPdf({
       title: t('uncategorizedTransactions.pdfTitle'),
       subtitle: t('uncategorizedTransactions.pdfSubtitle', { count: filteredAndSortedTransactions.length }),
@@ -476,7 +498,28 @@ export function UncategorizedTransactionsReport() {
           <div className="overflow-x-auto">
             <table role="table" className="block min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
               <thead role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-header-group">
-                {/* Phone sort strip: the same four controls, wrapped. */}
+                {/* Phone sort strip: the same four controls, as a wrapped row
+                    of compact chips. Column alignment means nothing here --
+                    the column header row is hidden and each data row is a grid
+                    -- so every control is left-aligned and self-naming. The
+                    border is what says "tappable": there is no hover on a
+                    touch screen, and the chip's own fill is a shade off the
+                    header band it sits on (this table's `<thead>` keeps its
+                    `bg-gray-50` / `dark:bg-gray-900/50`). The shared
+                    `PHONE_HEADER_CLASS` keeps this strip identical to its
+                    sibling reports.
+
+                    Four chips, one of them a COMPOUND label -- which is why a
+                    low chip count says little about the strip's height here.
+                    Measured on the Chromium replica at 320px: two lines (80px)
+                    in `en`/`pl`, three in `ru`/`id` (114px) and `de` (130px,
+                    whose `Zahlungsempfänger / Beschreibung` is 214px on its
+                    own), four in the pseudo-locale (148px); at 390px, two
+                    lines in every real locale but `de`. That is a measured
+                    cost, not a reason to drop a control:
+                    `reports.uncategorized-transactions.sort` persists any of
+                    the four, so a field with no control anywhere would leave a
+                    phone POINTING at a sort with no pointer back. */}
                 <tr role="row" className="flex flex-wrap gap-x-2 gap-y-1 px-4 py-2 sm:hidden">
                   {sortColumns.map((col) => (
                     <SortableHeader<SortField>
@@ -508,12 +551,19 @@ export function UncategorizedTransactionsReport() {
                 </tr>
               </thead>
               <tbody role="rowgroup" className="block divide-y divide-gray-200 dark:divide-gray-700 sm:table-row-group">
+                {/* Each row is the click target at every width, so it is also a
+                    KEYBOARD target: `tabIndex` puts it in the tab order and
+                    `activateOnKey` runs the same handler on Enter and Space
+                    (WCAG 2.1.1). Both come from the one shared module rather
+                    than a per-report copy of the handler. */}
                 {filteredAndSortedTransactions.slice(0, 100).map((tx) => (
                   <tr
                     key={tx.id}
                     role="row"
-                    className="grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer sm:table-row"
+                    tabIndex={0}
+                    className={`grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer ${INTERACTIVE_ROW_FOCUS_CLASS} sm:table-row`}
                     onClick={() => handleTransactionClick(tx)}
+                    onKeyDown={activateOnKey(() => handleTransactionClick(tx))}
                   >
                     <td
                       role="cell"
