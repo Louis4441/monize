@@ -20,6 +20,7 @@ vi.mock('next/navigation', () => ({
 import { useSwipeNavigation } from './useSwipeNavigation';
 import { useAuthStore } from '@/store/authStore';
 import { NAV_LINKS, AI_LINKS, TOOLS_LINKS, ADMIN_LINKS } from '@/lib/nav-links';
+import { SWIPE_PAGINATE_ATTR } from './swipe-gesture';
 import type { User } from '@/types/auth';
 
 // Swipe is scoped to the current page's drawer group, so the chain a main page
@@ -544,6 +545,42 @@ describe('useSwipeNavigation', () => {
       // Even if we tried to dispatch events, the hook would not attach listeners
       expect(result.current.isSwipePage).toBe(false);
       expect(mockPush).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('pagination zone cedes the view swipe', () => {
+    it('does not navigate when the swipe starts inside a pagination zone', () => {
+      mockPathname = '/transactions'; // a swipe page that can go both ways
+      vi.useFakeTimers();
+      renderSwipeHook();
+
+      // A register that pages itself, marked so the view swipe yields to it.
+      const zone = document.createElement('div');
+      zone.setAttribute(SWIPE_PAGINATE_ATTR, 'true');
+      contentDiv.appendChild(zone);
+
+      const start = new TouchEvent('touchstart', {
+        bubbles: true,
+        touches: [{ clientX: 300, clientY: 200, identifier: 0 } as Touch],
+        changedTouches: [{ clientX: 300, clientY: 200, identifier: 0 } as Touch],
+      });
+      Object.defineProperty(start, 'target', { value: zone });
+
+      act(() => {
+        contentDiv.dispatchEvent(start);
+        // A decisive horizontal move that would otherwise commit a view change.
+        contentDiv.dispatchEvent(createTouchEvent('touchmove', 150, 202));
+        contentDiv.dispatchEvent(createTouchEvent('touchend', 150, 202));
+      });
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      // The view swipe ceded, so no view navigation happened.
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(contentDiv.style.willChange).toBe('');
+      contentDiv.removeChild(zone);
+      vi.useRealTimers();
     });
   });
 

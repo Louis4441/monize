@@ -5,6 +5,15 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import type { DelegateSectionGrants } from '@/lib/delegation';
 import { NAV_LINKS, AI_LINKS, TOOLS_LINKS, ADMIN_LINKS } from '@/lib/nav-links';
+import {
+  DECISION_THRESHOLD,
+  COMMIT_THRESHOLD_RATIO,
+  VELOCITY_THRESHOLD,
+  SWIPE_ANIMATION_MS as ANIMATION_MS,
+  hasHorizontalScroll,
+  isModalOpen,
+  isInsidePaginationZone,
+} from './swipe-gesture';
 
 // Swipe navigation is scoped to the drawer group the current page belongs to,
 // so a swipe cycles within that group and never leaves it: the main chain
@@ -44,29 +53,6 @@ const DELEGATE_SECTION_BY_HREF: Record<string, keyof DelegateSectionGrants> = {
   '/budgets': 'budgets',
   '/reports': 'reports',
 };
-
-const DECISION_THRESHOLD = 10; // px movement before deciding horizontal vs vertical
-const COMMIT_THRESHOLD_RATIO = 0.25; // 25% of screen width to commit navigation
-const VELOCITY_THRESHOLD = 0.4; // px/ms — fast swipes commit even if short
-const ANIMATION_MS = 200;
-
-function hasHorizontalScroll(element: EventTarget | null): boolean {
-  let current = element as HTMLElement | null;
-  while (current) {
-    if (current.scrollWidth > current.clientWidth + 1) {
-      const overflow = getComputedStyle(current).overflowX;
-      if (overflow === 'auto' || overflow === 'scroll') {
-        return true;
-      }
-    }
-    current = current.parentElement;
-  }
-  return false;
-}
-
-function isModalOpen(): boolean {
-  return document.body.style.overflow === 'hidden';
-}
 
 type Phase = 'idle' | 'tracking' | 'swiping';
 
@@ -218,7 +204,14 @@ export function useSwipeNavigation(): UseSwipeNavigationReturn {
             state = { ...IDLE_STATE };
             return;
           }
-          if (isModalOpen() || hasHorizontalScroll(state.target)) {
+          // A register that pages itself owns the horizontal swipe inside it,
+          // so the view swipe cedes when the gesture starts in that zone --
+          // the same way it cedes to a horizontally scrollable region.
+          if (
+            isModalOpen() ||
+            hasHorizontalScroll(state.target) ||
+            isInsidePaginationZone(state.target)
+          ) {
             state = { ...IDLE_STATE };
             return;
           }
