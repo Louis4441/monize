@@ -574,3 +574,57 @@ and left the others live. The durable form of these two rules is a scanning
 test, per root `CLAUDE.md`: one that fails on any `: 1` else-branch beside a rate
 lookup, any `?? amount` beside a conversion, and any `SPLIT` case outside the
 single shared reducer. Prose has already been insufficient here more than once.
+
+## 11. Rules recorded from the root CLAUDE.md
+
+Each of these was a paragraph in the root `CLAUDE.md`; the one-sentence form stays there and the reasoning lives here.
+
+### The amount is half the answer; the account is the other half
+
+A scheduled investment's `accountId` is the brokerage, but the cash settles in the funding account or the brokerage's linked cash account -- so `settlementAccountId` (from `resolveSettlementAccountId`, the decision the posting makes) says whose balance the figure belongs to. An account-level projection keyed on the stored column charged the brokerage for cash it never moved *and* left the funding account's chart missing the outflow it pays: swapping only the amount would have traded one wrong number for another. Ask which account before asking how much.
+
+### Ask which occurrence, then how much -- and its direction is part of "how much"
+
+"An exchange rate is positive, so it cannot flip a sign" is true of one scalar times one rate and false of a **mixed-sign split parent**, where only the investment line re-prices: a parent stored at -200 posts +150 once that line moves. Three surfaces read the snapshot's sign, so AI/MCP called a re-priced deposit a bill, the forecast called an inflow an expense, and a SQL prefilter on `st.amount < 0` dropped the reverse case from the budget entirely. Direction comes from `EffectiveScheduledOccurrence.directionAmount` -- the occurrence's amount when known, and when it is not, the snapshot's sign **only where that sign is provable without the missing rate**: a top-level investment is one scalar times one positive rate, and a split whose lines all point the same way stays on that side of zero because an investment line's cash impact is signed by its action. A **mixed-sign** aggregate is where it is not provable and `directionAmount` is `null`: a +10 parent made of a fixed +100 beside an unpriceable BUY posts -20 at one rate and +20 at another, so both a red bill and a green deposit are inventions. `null` means unknown and travels -- AI/MCP report `kind: "unknown"` and withhold BOTH bucket totals, the reminder email draws a neutral badge, `occurrenceKind` answers `'unknown'`, and an outflow-only read KEEPS such an occurrence rather than dropping a possible payment behind a total that still looks complete. A candidate query may narrow on the stored sign only for shapes no rate can move; every FX-sensitive row stays in, and the direction is applied after pricing. `occurrence-selection.guard.spec.ts` fails a `Number(<anything>.amount)` compared against zero in any file that holds a resolved occurrence -- by shape, not by variable name, because the alias is how the last one got through.
+
+### An account, its currency, its rate and its amount are one tuple
+
+Persist all of it or none of it. Moving a transfer's destination leg to an account in another currency wrote the account, currency and new rate but left the old destination *number*, so the next recompute moved the balance with no user action behind it. Key the write on "did this edit re-price the transfer", never on which request fields happened to be present.
+
+### A presentation-only edit does not re-resolve a rate
+
+Resolve FX only when the financial structure changes: either account, the source amount, an explicit destination amount, an explicit rate. A rename or date correction is not a re-pricing; the rate a transfer settled at is a fact about the transfer (renames used to store today's rate beside an unchanged destination amount, and refused outright when the pair had no current rate).
+
+### A clamp bounds the total, not one of its parts
+
+Two children retiring one debt are clamped together. The loan final-payment fix capped the amortized principal but not the extra-principal transfer beside it, so the account crossed zero into credit and the payoff check never fired. Decide which part yields (the amortized figure is owed; the discretionary extra absorbs the shortfall) and write the yielding part back -- shrinking the parent while a child carries the unclamped number fails the split validator's exact-4dp equality.
+
+### The fix for one surface is not the fix
+
+Issue #1167 taught the cash-flow forecast to re-resolve and left the same decision duplicated in the dashboard, the budget, the reports, the exports, the AI assistant, MCP, the bill reminder, the alert and the account balance projection -- so one schedule read 1,500 CAD on five screens and 1,350 CAD on the forecast that predicts its posting (#1247). When you fix a derived-figure defect, grep every consumer of the raw field in the same commit and give them all one server-authoritative answer; `frontend/src/lib/scheduled-effective-amount.guard.test.ts` is the scan that keeps them there. INV-OCCURRENCE-003 in `docs/system-invariants.md` records the contract.
+
+### Centralizing the arithmetic is not centralizing the answer
+
+The first pass at #1247 gave every surface one resolver and left each of them to decide *which occurrence* it was pricing: the identity is a recurrence slot (`original_date`), an override can move the occurrence to another date (`override_date`), and a consumer that keys the lookup on the moved date -- as the budget alert path did -- silently reads the template for every occurrence the user changed. So the unit a surface asks for is the **occurrence**, from `ScheduledOccurrenceService` (`backend/src/scheduled-transactions/scheduled-occurrence.service.ts`) and its one expander (`backend/src/common/scheduled-occurrences.ts`): amount, currency, completeness, the date it falls on, and the account whose balance it moves. `ScheduledEffectiveAmountService` stays the arithmetic beneath it, and a schedule-level read model (`findAll`) is the only place `base` is the question. `backend/src/scheduled-transactions/occurrence-selection.guard.spec.ts` fails a second expander, a second override lookup, a stray `base` read or a new resolver call site. **Ask which occurrence before asking how much.**
+
+### VOID means no balance moved -- on every path that writes one
+
+A `VOID` row records something that did not happen, and `recalculateCurrentBalance` excludes it -- so every incremental balance update must agree, on every path (create, status-only edit, bulk void, split parent). Two rows describing one movement of money share a status, and a reversal only reverses what was actually included.
+
+The status is part of what a row is created *with*, not something applied after: when a create helper takes the parent's status, every caller passes it (three separate paths recreated a voided parent's transfer legs as ACTIVE by forgetting that argument).
+
+Where two rows can hold *different* statuses -- a cross-owner transfer, whose status is deliberately per-ledger -- inclusion is decided per row. Using one leg's `wasVoid`/`isVoid` to gate both ledgers is wrong in two of the four combinations. Four states means a four-case test matrix, not a representative one.
+
+### Editing one row must not leave the pair describing two different events
+
+A split parent and the transfer legs its children created are one movement of money, so voiding *one* leg from the target side is refused rather than applied -- refuse and point at the parent, which already has a propagation path. Only the VOID boundary is shared; reconciliation states (`PENDING`/`CLEARED`/`RECONCILED`) are genuinely per-ledger.
+
+A refusal is only worth as much as its least-guarded entry point: the same state was reachable through `bulkUpdate`. When you refuse something on one path, grep for the bulk, AI-action and MCP routes to the same write in the same commit.
+
+### A deletion reverses only what the row actually contributed
+
+A `VOID` row moved no balance, and neither did a future-dated one, so deleting either must move none. Nine hand-written reversal sites got this wrong four times (including checking VOID but forgetting the date). Call `deletionBalanceEffect` (`backend/src/common/deletion-balance.util.ts`); `deletion-balance.guard.spec.ts` fails on a new hand-rolled `-Number(row.amount)` reaching a balance update.
+
+### A balance change is not finished until its derived state is invalidated
+
+Writing the live balance and stopping leaves a stale net-worth snapshot until something unrelated touches the account. A helper that moves an account nobody upstream knows about must **return** the accounts it moved (`applyParentStatusToTransferCounterparts` returned `void`, so its callers invalidated only their own lists). Dispatch the recalculation after the commit, never from inside the transaction: a rollback must not leave a recompute queued for state that was never written.

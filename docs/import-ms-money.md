@@ -190,3 +190,7 @@ every warning -- without importing anything.
   task history.
 - `backend/src/import/mny/README.md` -- how the pipeline is layered and what it
   refuses to guess at.
+
+## A Money activity label is not always its raw `TRN.act` code
+
+Money Plus stores some "Redeem CD/Bond" rows as `act = 2` (SELL) with positive `TRN_INV.amtInt`, while older redemptions use `act = 30`. The importer normalizes SELL plus accrued interest to REDEEM, keeps the SELL row's `TRN.amt` as proceeds, and takes the gross payout from the principal-plus-interest split; do not gate accrued-interest import on raw `act = 30` alone.

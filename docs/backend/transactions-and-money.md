@@ -42,3 +42,13 @@ A lookup that fails is a fact about *that* lookup. A stale scenario id says noth
 ## Money investment mapping is finalized after both mappers run
 
 `mapInvestments` cannot know whether `mapTransactions` will preserve or collapse a cash split. Reconcile generated investment companions only after cash-source mapping: when a redemption remains embedded, its preserved sibling is the interest record, so the generated companion and mutual link must not be written as a second representation of that income.
+
+## A behavior promised "when a filter is active" keys off the filter itself, carried explicitly on the command -- never off a transport detail that sometimes coincides with it
+
+Bulk update keyed its split-line restriction off `mode === "filter"`, but hand-picked rows ship as mode `ids`, so the filter silently stopped applying. The client sends the active filter as its own field in both modes (`BulkUpdateDto.categoryFilterIds`) and the server restricts on that; regression tests assert the ids-mode payload carries it and honors it.
+
+## What a category cost is its debits NET OF its credits
+
+A refund, return, chargeback or cashback filed against an expense category is a debit that came back, so it belongs in that category's total. Every surface that reached for the gross (`WHERE amount < 0` + `SUM(ABS(...))`, `if (amount >= 0) return`, `summary.totalExpenses` alone) disagreed with the register's own balance for the same filter (issue #1125). Sum the signed amount over rows of **both** signs, per category, and decide what the row *is* from the net: `isNetSpending` and `NET_SPEND_AMOUNT` (`backend/src/built-in-reports/spending-reports.service.ts`) on the server; `netEntityTotal` (`frontend/src/components/transactions/widget-shared.ts`) for a summary scoped to one category. Never take `totalIncome` or `totalExpenses` alone as a category's headline -- those are a register's in/out split.
+
+Dropping the sign filter means income now reaches the aggregate and has to leave by a different door: a bucket whose net is not spending is not a row in a spending report -- one predicate, not a per-call-site `> 0`. Netting is **within** one category, never across two; both halves come from the same filtered aggregate. (The payee surfaces are deliberately unchanged: `PayeeInfoWidget` prints received credits as their own line beside the spend, so netting them into the headline would count them twice.)

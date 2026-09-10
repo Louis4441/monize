@@ -32,7 +32,7 @@ const SOURCE_ROOT = join(__dirname, "..");
  * Reports are deliberately NOT in scope. A report asking which rows to count
  * is asking a different question with a different answer -- several read split
  * *children* on purpose, because a parent's amount is not the cash meaning of
- * its lines (root CLAUDE.md, "A report that reads only the parent row cannot
+ * its lines (INV-REPORT-001 in docs/system-invariants.md, "A report that reads only the parent row cannot
  * exclude a line, so it excludes an amount"). That family has its own single
  * source in `common/investment-filter.util.ts` and its own guard; folding the
  * two together would make one of them wrong.

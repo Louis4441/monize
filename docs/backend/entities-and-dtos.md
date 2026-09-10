@@ -119,3 +119,17 @@ frontend's file and fails when the two disagree.
 ## A partial escape is indistinguishable from a correct one
 
 Interpolating a literal into a pattern goes through `escapeRegExp` (`src/common/escape-regexp.util.ts`) -- never a hand-written character class, and never a subset of one (`repo-paths.util.ts` escaped only dots and left `\` alone; CodeQL `js/incomplete-sanitization`, CWE-020). `escape-regexp.guard.spec.ts` scans `src/` for either shape. Where the pattern is built from a list, export the builder and test it against a prefix carrying a metacharacter (`buildPlainRootedPathPattern`) -- over real inputs the broken and correct escapes can agree exactly. Do not escape `-`: outside a class it is literal, and `\-` is a SyntaxError under the `u` flag -- so never interpolate the result *inside* a class.
+
+## A list of columns that means something is written once, in the place that can check it
+
+The columns referencing `currencies(code)` were spelled out in four places and wrong in all four. Prefer a SQL function the database evaluates (`currency_code_in_use_globally`, `currency_codes_referenced_by_user_data`, and `currency_codes_referenced_by_user` derived from the last) so the answer cannot be a tenant's view of a global question; when a caller genuinely cannot ask the database, keep one TypeScript constant checked against `database/schema.sql` in both directions. **Two callers wanting slightly different answers is not a licence to write the list twice** -- derive one from the other and let the guard test check the derivation. `backend/src/currencies/currency-references.spec.ts` is the pattern; the same applies to the restore's insertion order and deferred foreign keys (declared as data in `restore-plan.ts`, proven against the schema by `restore-plan.spec.ts`).
+
+## A driver value is not a JSON value
+
+`pg` returns `bytea` as a `Buffer` and DATE/TIMESTAMP as `Date`; `JSON.stringify` mangles a Buffer into `{"type":"Buffer","data":[...]}`. The backup export reads every bytea column through `encode(col, 'base64')`, and `backend/src/backup/export-driver-values.spec.ts` fails if a new one is added without it. Same family as the raw-select rule in `docs/backend/entities-and-dtos.md`.
+
+## `created_at` cannot order rows written in one transaction
+
+`CURRENT_TIMESTAMP` is **transaction start time** in PostgreSQL and TypeORM leans on the column default, so every row a single transaction writes (a whole `.mny` import, a whole restore) carries the same `created_at`, and any tiebreak on it falls through to the next key -- in the register, a random UUID. The stored balance survives that; the running balance beside it does not (a same-day debit ordered before the credit that funded it shows the account overdrawn).
+
+When the clock cannot separate two rows, their signs do: **credits before debits, chronologically** -- for a newest-first list the tiebreak runs *opposite* to the list direction. `applyRegisterOrder` (`backend/src/transactions/register-order.ts`) is the only place that order is written, because three of its four call sites are the queries that sum previous pages to find a page's starting running balance -- a tiebreak added to the register alone re-splits the pages under those sums.

@@ -61,3 +61,10 @@ Postgres evaluates `LIKE` case-sensitively, so `Like('%amazon%')` matched nothin
 
 **And a filtered list says how much it left out.** `getLlmPayees` returns `totalCount` (what matched) beside `payees` (what came back) and a `truncated` flag, because a capped list presented as the whole one is the same defect as a subtotal presented as a total.
 **A match key is not a display value.** Matching case-insensitively means a `LOWER(TRIM(...))` column or a lowercased map key, and that key never reaches a response: the Bill Payment History report put `payee_name_normalized` on screen, so every payee read in lowercase. Select or carry the name as the user wrote it beside the key, and return that. `tax-recurring-reports.service.spec.ts` holds the case with a mixed-case scheduled payee.
+
+## Shared AI tools (AI Assistant + MCP server)
+Every AI tool that reads or aggregates data shares one implementation between the AI Assistant (`backend/src/ai/query/tool-executor.service.ts`) and the MCP server (`backend/src/mcp/tools/*.tool.ts`). Put the shared logic on the relevant domain service (e.g. `PortfolioService.getLlmSummary`, `TransactionAnalyticsService.getTransfersByAccount`); the two tool layers are thin adapters returning the same data shape (the AI executor wraps `{ summary, sources }`; MCP just `toolResult(data)`s it). Adding a tool means wiring both layers in the same PR -- never ship to only one.
+
+## A filter narrows the list it was applied to, never a total about the window
+
+`kind: "deposit"` on the AI/MCP rollup left `bills` empty and published `totalUpcomingBills: 0` with `amountsComplete: true` over a window holding a 1,200 bill -- a confident "nothing is due" in place of an answer nobody asked for. The buckets and the unknown-amount names all come from the rollup base (every filter except `kind`); only `items` and the counts follow the caller's filter, and both tool descriptions say so. The previous pass fixed exactly this for the `unknown` bucket and left the other two on the filtered list, which is the shape to look for: when a fix moves one member of a set off a wrong source, move all of them.

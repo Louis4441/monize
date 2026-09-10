@@ -9,37 +9,37 @@ import { findRepoRoot, gitListFiles, requireRepoRoot } from "./repo-tree.util";
  * 188 KB, because each rule brought the defect it came from, the reasoning and
  * the guard along with it; the fix was to make the layer files indexes over
  * `docs/frontend/` and `docs/backend/`, where a rule is read only when the work
- * touches its subject. The root `CLAUDE.md` says how the files are organised.
- * Prose about file size is exactly the kind of rule that gets read, agreed with
- * and violated one paragraph at a time, so this is the version the machine
- * checks:
+ * touches its subject, and to give the root file the same treatment. The root
+ * `CLAUDE.md` says how the files are organised; `AGENTS.md` is the tool-agnostic
+ * entry point. Prose about file size is exactly the kind of rule that gets read,
+ * agreed with and violated one paragraph at a time, so this is the version the
+ * machine checks:
  *
- *  - a layer file stays under `LAYER_FILE_MAX_BYTES`;
- *  - the root file stays under a shrink-only ceiling -- it is over the layer
- *    limit today and still carries defect histories, and the ceiling is what
- *    stops it growing while that is paid down. Lower it as it shrinks; never
- *    raise it;
+ *  - every instruction file stays under its ceiling: `INSTRUCTION_FILE_MAX_BYTES`
+ *    for the root and layer `CLAUDE.md` files, `AGENTS_FILE_MAX_BYTES` for
+ *    `AGENTS.md`, which also carries the commands and the gate. Lower a ceiling
+ *    as a file shrinks; never raise one to admit a paragraph;
  *  - every document under `docs/frontend/` and `docs/backend/` is named in its
  *    layer index, so a rule cannot be filed where no reader is sent;
- *  - a layer index carries no issue or PR number: that is the marker of a
- *    defect history, which belongs in the `docs/<layer>/` entry.
+ *  - no instruction file carries an issue or PR number: that is the marker of a
+ *    defect history, which belongs in the `docs/` entry beside the rule.
  *
  * The inventory comes from `git ls-files`, so a new document under either
  * directory is covered once it is staged.
  */
 
-export const LAYER_FILE_MAX_BYTES = 16 * 1024;
+export const INSTRUCTION_FILE_MAX_BYTES = 16 * 1024;
+export const AGENTS_FILE_MAX_BYTES = 12 * 1024;
 
-/**
- * Shrink-only. 60,135 bytes when this guard was written; the allowance above
- * that is for wording, not for a new paragraph.
- */
-export const ROOT_FILE_CEILING_BYTES = 61 * 1024;
-
-const LAYER_FILES = [
-  "frontend/CLAUDE.md",
-  "backend/CLAUDE.md",
-  "database/CLAUDE.md",
+/** Every file an agent reads before it starts, with the ceiling each is held to. */
+const INSTRUCTION_FILES: ReadonlyArray<readonly [string, number]> = [
+  ["AGENTS.md", AGENTS_FILE_MAX_BYTES],
+  ["CLAUDE.md", INSTRUCTION_FILE_MAX_BYTES],
+  ["frontend/CLAUDE.md", INSTRUCTION_FILE_MAX_BYTES],
+  ["backend/CLAUDE.md", INSTRUCTION_FILE_MAX_BYTES],
+  ["database/CLAUDE.md", INSTRUCTION_FILE_MAX_BYTES],
+  ["e2e/CLAUDE.md", INSTRUCTION_FILE_MAX_BYTES],
+  ["backend/src/mcp/CLAUDE.md", INSTRUCTION_FILE_MAX_BYTES],
 ];
 
 /** The layers whose CLAUDE.md is an index over `docs/<layer>/`. */
@@ -58,13 +58,12 @@ describeTree(
       readFileSync(join(root(), relative), "utf8");
     const size = (relative: string) => statSync(join(root(), relative)).size;
 
-    it.each(LAYER_FILES)("%s stays under the layer ceiling", (relative) => {
-      expect(size(relative)).toBeLessThanOrEqual(LAYER_FILE_MAX_BYTES);
-    });
-
-    it("the root CLAUDE.md stays under its shrink-only ceiling", () => {
-      expect(size("CLAUDE.md")).toBeLessThanOrEqual(ROOT_FILE_CEILING_BYTES);
-    });
+    it.each(INSTRUCTION_FILES)(
+      "%s stays under its ceiling of %d bytes",
+      (relative, ceiling) => {
+        expect(size(relative)).toBeLessThanOrEqual(ceiling);
+      },
+    );
 
     it.each(INDEXED_LAYERS)(
       "every docs/%s document is reachable from its layer index",
@@ -80,14 +79,14 @@ describeTree(
       },
     );
 
-    it.each(INDEXED_LAYERS)(
-      "%s/CLAUDE.md carries no issue or PR number",
-      (layer) => {
-        const offending = read(`${layer}/CLAUDE.md`)
+    it.each(INSTRUCTION_FILES.map(([relative]) => relative))(
+      "%s carries no issue or PR number",
+      (relative) => {
+        const offending = read(relative)
           .split("\n")
           .map((line, i) => ({ line, n: i + 1 }))
           .filter(({ line }) => ISSUE_NUMBER.test(line))
-          .map(({ line, n }) => `${layer}/CLAUDE.md:${n}: ${line.trim()}`);
+          .map(({ line, n }) => `${relative}:${n}: ${line.trim()}`);
         expect(offending).toEqual([]);
       },
     );

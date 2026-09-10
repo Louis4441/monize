@@ -37,7 +37,12 @@ const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const DOCS = [
   'README.md',
   'CONTRIBUTING.md',
+  'AGENTS.md',
   'CLAUDE.md',
+  'e2e/CLAUDE.md',
+  'backend/src/mcp/CLAUDE.md',
+  'docs/guard-tests.md',
+  'docs/backend/mcp.md',
   'helm/README.md',
   'database/CLAUDE.md',
   'backend/CLAUDE.md',

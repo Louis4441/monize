@@ -410,3 +410,23 @@ These rules are worth only what the code and the documents agree on.
   `frontend/src/test/ui-conventions.test.ts` are the worked examples). Such a
   claim is true when written and silently false at the first call site added
   afterwards, which is exactly when nobody re-reads the comment.
+
+## 11. Rules recorded from the root CLAUDE.md
+
+### A weighting is in one currency or it is meaningless
+
+Summing `quantity * nativePrice` across currencies weights holdings by exchange rate as much as by size. Convert every value into one common currency before weighting (which currency does not matter; that they share one does), through the same resolver everything else uses. An unpriced holding dropped from the weights makes the priced subset stand in for the portfolio: refuse the whole statistic (`null`) rather than report a subset's.
+
+### A completeness flag nobody displays is not a completeness signal
+
+Backend, AI adapter and MCP all carried `valuationComplete` while `frontend/src/types/investment.ts` omitted it, so the one surface users read rendered a subtotal under "Total Portfolio Value". Adding metadata to a response is half the change; the consumer that branches on it is the other half -- grep the frontend types for the interface in the same commit, and relabel a partial figure rather than leaving a total's caption over it.
+
+Read the field defensively at the consumer (`=== false`, not `!`): during a rolling deploy, absent means "no information". And read the flag from the *same aggregate that produced the numbers on screen* -- a view that switches which aggregate it displays switches which completeness it trusts.
+
+### A completeness flag covers every total it is documented to cover, on every surface
+
+`fxComplete` claimed to describe all of `PortfolioSummary`'s `total*` fields while one aggregate's gaps went only to the log. Union every aggregate's gaps, and derive anything downstream (a rate, a ratio) only when its own inputs are complete. The flag must survive the trip to each consumer -- the compact LLM shape dropped it, so AI/MCP quoted a subtotal as settled; for a model, the human-readable summary line has to say so too.
+
+The converse is equally wrong: **zero needs no rate.** Asking for one made an empty foreign account take the whole portfolio's totals down to "unknown".
+
+Completeness has more than one cause: track each separately (`fxComplete`, `pricesComplete`) and give consumers one flag meaning "every component of every total is known" (`valuationComplete`). Nested totals need their own answer -- a per-account total converts into the *account's* currency, the top-level into the *user's*, two different conversion graphs, so a global flag cannot speak for a total it did not compute.

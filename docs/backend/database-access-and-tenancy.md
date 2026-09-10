@@ -39,3 +39,23 @@ Reaching for `withSystemContext` when the middle row applies is the easy wrong a
 `transaction.userId = :userId` is the wrong ownership predicate for any own-context read a delegate can reach: a jointly shared account's rows belong to the **owner**, so the grantee matches none of them and the endpoint returns a confident empty answer (the register had joint scope on day one; the summary, grouped totals and monthly totals beside it did not).
 
 Own-context reads resolve their scope through `TransactionsController.resolveOwnContextJointScope` (the accounts controller's equivalents are `jointAccountIdSetFor` for list reads and a `NotFoundException` fallback through `jointAccessFor` for `:id` reads, as on `getBalance` and `getBalanceForecast`). Filtered to exactly one joint account, the query runs as the owner so every derived value is byte-identical to the owner's own view; anything else keeps the caller's scope and widens it by the already-authorized joint ids, never by raw request input. The widened predicate is written once per service (`registerScope`, `analyticsScope`). An endpoint that deliberately stays owner-only says so where it is skipped (`tag-key-breakdown` does: tags are personal).
+
+## `withScopedDb` in detail
+
+The root `CLAUDE.md` states the door and the four identity contexts in a few lines. These are the details behind them.
+
+// ...mutate + repo.save(row); all queries share the transaction + tenant GUC.
+});
+```
+
+- Inject `DataSource`, not a repository. Get repositories from the transaction's `EntityManager` (`m.getRepository(X)`); helpers take the `EntityManager`, never a `QueryRunner`.
+- `withScopedDb` **throws** without an ambient identity context. Authenticated cookie/JWT routes have it (`RequestContextInterceptor` seeds `{ userId }`). **Everything else must seed its own** (`backend/src/common/db/with-context.ts`):
+  - `withUserContext(userId, fn)` -- cron per-user bodies, background writes, and any surface the interceptor cannot see. **Bearer-only routes count**: `/mcp` has no `AuthGuard('jwt')`, so the MCP transport seeds the bearer's user itself, per request (protocol revision 2026-07-28 has no session at all).
+  - `withSystemContext(fn)` -- genuinely cross-user work: cron fan-outs, seeders, bootstrap hooks (`onModuleInit` / `onApplicationBootstrap` have no request), admin, and anything that sweeps every user.
+  - `withDelegateContext(ownerUserId, delegateUserId, fn)` -- a delegate acting on an owner's data, where the two GUCs must **differ**. `withUserContext` collapses them onto one id, which silently returns zero rows for whichever half it is not. Used by `jwt.strategy`'s acting-context re-validation and `AccountDelegateGuard`.
+  - `withPreserveTimestamps(fn)` -- extends the ambient context (identity inherited, never granted) so the GUC-aware `updated_at` trigger keeps supplied values. Backup restore is the only caller; it replaced the restore's old `DISABLE TRIGGER` DDL, and trigger DDL must never come back (a source-scan guard in `backup.service.spec.ts` enforces this).
+- Nested `withScopedDb` calls join the ambient transaction (same connection/atomicity), so a service method calling another is safe. The exceptions are deliberate: `runOutsideActiveScopedManager` for a background timer or a progress write a concurrent reader must see.
+- A callback that returns early (before writing) commits an empty transaction -- the correct replacement for an explicit rollback, not a bug.
+- Pass an isolation level as the optional third argument only when the logic depends on it (registration uses `"SERIALIZABLE"` for the first-user-admin race). Requesting one while joining an ambient transaction throws rather than silently downgrading.
+- At `RLS_MODE=off` (the default) `withScopedDb` still wraps the transaction but skips the identity GUCs. See `docs/future-plans/row-level-security.md`.
+- **`docs/row-level-security-contract.md` is canonical** for which tables are exempt from RLS and why. There is exactly one sanctioned direct-`DataSource` exception -- `oauth_payloads`, reached by the `oidc-provider` adapter with no ambient context because the provider is mounted as raw Express middleware outside Nest's pipeline. It is not precedent for a user-owned table; `eslint.config.mjs`'s `OAUTH_PAYLOAD_ALLOWLIST` plus `backend/src/oauth/oauth-payload-access.spec.ts` fail when a second production reader appears. The exempt-table list lives once, as `RLS_EXEMPT_TABLES`.

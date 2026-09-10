@@ -361,8 +361,9 @@ differences produce failures that look like regressions and are not.
 - `scripts/verify-schema.sh` reproduces the drift job locally and needs only
   Docker.
 
-Believing an unqualified local failure means chasing a bug that does not exist;
-root `CLAUDE.md` has the longer form.
+Believing an unqualified local failure means chasing a bug that does not exist.
+A guard that walks the tree with `git ls-files` cannot see an untracked file;
+`docs/guard-tests.md` has that and the other guard-authoring rules.
 
 ## 8. Definition of done
 

@@ -80,7 +80,7 @@ describe("validateSplitAmountSum", () => {
 
     it("accepts a refund netted under a charge (audit P5-004's example)", () => {
       // P5-004 proposed refusing this; category surfaces instead read the
-      // children signed and net within the category (root CLAUDE.md, "debits
+      // children signed and net within the category (docs/backend/transactions-and-money.md, "debits
       // NET OF credits", issue #1125), so the credit child reduces what it is
       // filed under rather than fabricating income beside it.
       expect(() =>

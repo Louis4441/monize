@@ -188,6 +188,7 @@ describeTree("docs name files that exist", () => {
     const contractDocs = tracked.filter(
       (f) =>
         basename(f) === "CLAUDE.md" ||
+        basename(f) === "AGENTS.md" ||
         (/^docs\/((frontend|backend)\/)?[^/]+\.md$/.test(f) &&
           basename(f) !== "CLAUDE.md"),
     );
@@ -221,6 +222,7 @@ describeTree("docs name files that exist", () => {
     expect(contractDocs).toContain("docs/financial-calculation-contract.md");
     expect(contractDocs).toContain("docs/frontend/ui-conventions.md");
     expect(contractDocs).toContain("docs/backend/testing.md");
+    expect(contractDocs).toContain("AGENTS.md");
     expect(contractDocs.length).toBeGreaterThan(5);
     expect(planDocs.length).toBeGreaterThan(5);
     expect(index.list.length).toBeGreaterThan(500);

@@ -377,7 +377,7 @@ Status              enforced
 The statement was narrowed on purpose. "Both legs share one status" was too broad:
 a reconcile state is genuinely per-ledger (a cross-owner transfer's two ledgers
 reconcile independently), and only the VOID boundary -- where money either moved
-or did not -- is shared. See the root `CLAUDE.md`, "Editing one row must not leave
+or did not -- is shared. See `docs/financial-semantics.md` section 11, "Editing one row must not leave
 the pair describing two different events".
 
 ### INV-REDEEM-001 -- a redemption's accrued interest moves cash once

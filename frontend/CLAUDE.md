@@ -20,15 +20,13 @@ npm run i18n:check         # Verify the pseudo-locale is up to date (CI gate)
 
 ## Layout
 
-`src/` contains `app/` (App Router routes), `components/` (feature-organized React components plus shared `ui/`), `contexts/`, `hooks/`, `lib/` (axios API clients and pure utilities), `store/` (Zustand: `authStore`, `preferencesStore`, `demoStore`, `densityStore`), `types/`, `test/` (shared test infrastructure), `i18n/` and `proxy.ts`. Use the filesystem or LSP `workspaceSymbol` to discover specific files.
+`src/` is organized by feature under `app/` and `components/` (shared primitives in `components/ui/`), with `lib/` for API clients and pure utilities, `store/` for Zustand, `test/` for the shared test harness and `proxy.ts` for the Next middleware. Use the filesystem or LSP `workspaceSymbol` for anything more specific.
 
 ## Configuration
 
 - **Path alias:** `@/*` maps to `src/*` (tsconfig + Vitest resolve alias).
-- **TypeScript:** ES2017 target, strict mode, bundler module resolution, React JSX.
-- **Vitest:** jsdom environment, 30s timeout, V8 coverage; thresholds 91% lines, 90% statements, 87% functions, 85% branches.
-- **Tailwind CSS v4:** `@tailwindcss/postcss` in `postcss.config.js`, `@import "tailwindcss"` in `globals.css`; theme variables in the `@theme` block.
-- **Next.js:** standalone output (Docker), strict mode, security headers and CSP in `next.config.js` and `src/proxy.ts` (this project's `proxy.ts` is Next middleware, not the deprecated middleware pattern).
+- **Tailwind CSS v4:** utilities compile to `var(--color-*)`; theme variables live in the `globals.css` `@theme` block and colour themes in `src/app/themes.css`.
+- **Next.js:** standalone output (Docker); security headers and the CSP nonce come from `next.config.js` and `src/proxy.ts` (Next middleware, not this project's deprecated middleware pattern).
 
 ## Rules that apply to every change
 
@@ -92,9 +90,9 @@ Do not invent or duplicate financial semantics in a component. Where a figure is
 
 Run the focused test for what you changed while developing, then:
 
-1. `npm run lint`
-2. `npm run type-check`
-3. `npm run test`
-4. `npm run i18n:check`
+1. `npm run lint && npm run type-check && npm run i18n:check`
+2. `npm run test:cov` (CI runs the coverage thresholds, not a bare `npm run test`)
+3. `npm run build` (bundle size is checked on every PR)
+4. `node scripts/check-env-docs.mjs` from the repository root when a `process.env` read was added
 
 Deleting or renaming a control an E2E spec drives means grepping `e2e/` for its accessible name in the same commit -- `npm run test` never loads that suite.

@@ -99,3 +99,7 @@ Regression tests for this class need deferred promises, and must assert on what 
 ## A busy flag shared by nesting operations is a counter, not a boolean
 
 One mutation can start another ("save and carry on" runs the deferred scenario create from inside the settings save's own `onSaved`). With a single boolean the inner sets it, the outer's `finally` clears it, and the page goes live over a request still on the wire. Count the operations in flight and derive the flag (`pending > 0`); every begin needs exactly one end, on both success and failure paths.
+
+## A rate table that has not loaded is not a table with no rate in it
+
+With no rates fetched every cross-currency `convert` returns `null`, so a surface reading only the missing-pair list tells the reader to add a rate that is already there -- an instruction built from an in-flight request or a failed one. `useExchangeRates().ratesUnavailable` (loading OR failed) is checked *before* any missing pair is named, and `ratesFailed` distinguishes an outage from a table still arriving. Same rule one level up: `readBalanceForecast` carries `unavailable` beside `withheld` because "the server declined to project", "we never heard back" and "this account has nothing scheduled" are three states and only the last has a number to show -- folded together, a 500 printed the current balance under "Projected".

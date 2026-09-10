@@ -18,6 +18,7 @@ Most of this layer's hardest rules are cross-layer and live in `docs/`, indexed 
 npm run start:dev          # Dev server with HMR
 npm run build              # Production build
 npm run lint               # ESLint --fix
+npm run format             # Prettier over src/ and test/
 npm run typecheck          # tsc over src AND test (CI gate; plain `tsc --noEmit` skips test/)
 npm run test               # test:unit then test:integration -- needs PostgreSQL; takes no args
 npm run test:unit          # Unit tests only (src/**/*.spec.ts); no database needed
@@ -25,7 +26,7 @@ npm run test:integration   # test/integration/*.spec.ts against real PG, one wor
 npm run test:cov           # Coverage report (95% lines, 94% stmts, 95% funcs, 85% branches)
 npm run test:e2e           # test/*.e2e-spec.ts -- not a CI gate; three of five suites are broken (docs/backend/testing.md)
 npm run i18n:pseudo        # Regenerate the xx pseudo-locale from en
-npm run i18n:check         # Verify the pseudo-locale is up to date (CI gate)
+npm run i18n:check         # Verify the pseudo-locale is up to date (not a CI gate for this layer; run it anyway)
 npm run migration:lint     # Idempotency lint over database/migrations (CI gate)
 npm run migration:lint:test # Self-test for the migration lint
 ```
@@ -36,26 +37,13 @@ npm run migration:lint:test # Self-test for the migration lint
 
 Each feature module under `src/` follows the standard layout. Use `ls src/` or LSP `workspaceSymbol` to discover modules; the cron schedule lives in `docs/cron-jobs.md`.
 
-```
-{feature}/
-  {feature}.module.ts
-  {feature}.controller.ts
-  {feature}.service.ts
-  {feature}.controller.spec.ts
-  {feature}.service.spec.ts
-  entities/{entity}.entity.ts
-  dto/create-{entity}.dto.ts
-  dto/update-{entity}.dto.ts
-```
-
-Controllers are thin and delegate to services. Services always take `userId` as the first parameter and filter by it for multi-tenancy. An `imports` entry or constructor parameter whose class can reach the declaring file back through `import` statements is `forwardRef(() => X)`; `src/module-graph.spec.ts` names the offending edge.
+Each module holds `{feature}.module.ts`, controller, service, their specs, `entities/` and `dto/`. Controllers are thin and delegate to services. Services always take `userId` as the first parameter and filter by it for multi-tenancy. An `imports` entry or constructor parameter whose class can reach the declaring file back through `import` statements is `forwardRef(() => X)`; `src/module-graph.spec.ts` names the offending edge.
 
 ## Configuration
 
-- **Path alias:** `@/*` maps to `src/*` (tsconfig + Jest moduleNameMapper)
-- **ESLint:** Flat config (`eslint.config.mjs`) with typescript-eslint + prettier; it bans the direct database primitives the root `CLAUDE.md` names
-- **Jest:** Coverage thresholds: 95% lines, 94% statements, 95% functions, 85% branches. Excludes `main.ts`, modules, entities, DTOs, seed scripts, and migrations from coverage
-- **TypeScript:** ES2021 target, CommonJS modules, `strictNullChecks: true`, `noImplicitAny: false`
+- **Path alias:** `@/*` maps to `src/*` (tsconfig + Jest moduleNameMapper).
+- **ESLint** (`eslint.config.mjs`) bans the direct database primitives the root `CLAUDE.md` names; `WITH_CONTEXT_ALLOWLIST` and `OAUTH_PAYLOAD_ALLOWLIST` live there.
+- Coverage excludes `main.ts`, modules, entities, DTOs, seed scripts and migrations.
 
 ## Rules that apply to every change
 
@@ -79,6 +67,10 @@ Controllers are thin and delegate to services. Services always take `userId` as 
 | A text filter offered to a person or a model | `ILike` or a case-insensitive comparison | `Like` |
 | A predicate that decides which row counts | one named helper called from every site | the clauses spelled out per site |
 | A folded investment action | `applyActionToQuantity` / `acquisitionCost` | a hand-rolled replay |
+| A register or running-balance order | `applyRegisterOrder` (`src/transactions/register-order.ts`) | a hand-written `ORDER BY created_at` |
+| Excluding investment cash from a report | `investmentExclusionSql` / `applyInvestmentTransactionFilters`, `reportableTransactionAmountSql` | an account-type or sub-type predicate |
+| A SQL function called from `src/` | declared in `src/common/db/required-db-functions.ts` with its migration | a bare call the boot check does not know |
+| A number a person reads | `src/common/number-locale.util.ts` | the `en-US` helpers in `format-currency.util.ts` (machine output only) |
 
 **A cron or bootstrap body seeds its own identity** -- `withSystemContext` for the fan-out, `withUserContext(userId)` per user, `withDelegateContext` when the two ids must differ -- and a per-user loop isolates each user, pre-checks included. `docs/backend/cron-and-background-work.md`.
 
@@ -102,6 +94,7 @@ Controllers are thin and delegate to services. Services always take `userId` as 
 | Notifications, push, recipient-locale copy | `docs/backend/notifications-and-push.md` |
 | Backup and restore, automatic backups | `docs/backend/backup.md` and `docs/backup-restore-contract.md` |
 | Crons, reapers, background jobs | `docs/backend/cron-and-background-work.md` and `docs/cron-jobs.md` |
+| MCP server: transport, tools, confirmation | `docs/backend/mcp.md` (`src/mcp/CLAUDE.md` is its pointer) |
 
 Every AI tool is shared between the assistant and the MCP server: the logic goes on the domain service and both adapters are wired in the same PR (root `CLAUDE.md`, "Shared AI tools").
 
@@ -109,10 +102,10 @@ Every AI tool is shared between the assistant and the MCP server: the logic goes
 
 Run the focused spec for what you changed while developing (`npm run test:unit -- <pattern>`), then:
 
-1. `npm run lint`
-2. `npm run typecheck`
-3. `npm run test:unit` (and `npm run test:integration` when a query, a migration or an RLS context changed)
-4. `npm run i18n:check`
-5. `npm run migration:lint` when a migration changed, and update `database/schema.sql` alongside it
+1. `npm run lint && npx tsc --noEmit && npm run typecheck` (CI runs all three)
+2. `TZ=UTC npm run test:unit -- --coverage` (and `npm run build && npm run test:integration` when a query, an entity, a migration or an RLS context changed)
+3. `npm run i18n:check` after editing `en/*.json`
+4. `npm run migration:lint:test && npm run migration:lint` when a migration changed, with `database/schema.sql` updated alongside it; `npm run push:client:test && npm run push:tls:test` when the push tooling under `scripts/` changed
+5. `node scripts/check-env-docs.mjs` from the repository root when a `process.env` or `configService.get` read was added
 
 The guards that walk the tree with `git ls-files` cannot see an untracked file: stage new files (`git add -N` is enough) before running `doc-paths.spec.ts`, `source-comment-paths.spec.ts` or `jest-config.guard.spec.ts`.

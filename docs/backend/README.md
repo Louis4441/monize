@@ -14,6 +14,7 @@
 | `notifications-and-push.md` | producing a notification, touching `src/push/` or `src/notification-center/`, or composing an email or push body |
 | `backup.md` | changing anything under `src/backup/` |
 | `cron-and-background-work.md` | adding a `@Cron`, a reaper or a long-running job |
+| `mcp.md` | adding or changing an MCP tool, resource or prompt, or touching the MCP transport |
 
 The cross-layer contracts these documents build on stay where they are: `docs/system-invariants.md` (the index), `docs/concurrency-and-idempotency.md`, `docs/financial-semantics.md`, `docs/external-side-effects.md`, `docs/cron-jobs.md`, `docs/verification-contract.md`, `docs/backup-restore-contract.md` and `docs/row-level-security-contract.md`. The database door itself -- `withScopedDb`, the identity contexts, the lint bans -- is in the root `CLAUDE.md`.
 

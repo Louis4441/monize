@@ -93,3 +93,21 @@ Code scanning on this repository is CodeQL *default setup*, which runs the stand
 ## The demo login is written once
 
 `DEMO_USER_EMAIL` and `DEMO_USER_PASSWORD` live in `src/database/demo-credentials.ts`; the seed, the nightly reset, `db-demo-check` and the demo seeder import them. They are public by design (`.env.example` prints them, the login page pre-fills them), so the Bearer hard-coded-secret finding on that file is an accepted exception in `.github/workflows/ci.yml` -- one, not one per copy. `demo-credentials.spec.ts` fails a second spelling under `src/`, and the client's mirror (`frontend/src/lib/demo-credentials.ts`) is contract-tested against this file from its side.
+
+## `.dockerignore` is not `.gitignore`: a filename glob needs an explicit `
+
+/`.** A slashless pattern matches only against the path relative to the build context, so `*.spec.ts` excludes nothing under `src/`. Give every filename glob a leading globstar, including its negation (`!**/.env.example`); `frontend/src/test/dockerignore.test.ts` scans all three files and fails on a bare one.
+
+## Code and schema ship in one image; they do not arrive in one process
+
+`db-migrate` runs at container start and the server after it, so "this build calls a SQL function" and "this database has it" are separate facts; the gap surfaces as `function ... does not exist` behind a generic 500. Every SQL function `src/` calls is declared once in `backend/src/common/db/required-db-functions.ts` with the migration that creates it, and both `main.ts` and `db-migrate` refuse to serve a database missing one. `required-db-functions.spec.ts` holds the list in both directions -- crucially, a function defined in `schema.sql` and mentioned anywhere in `src/` must be registered.
+
+## Environment
+
+Key env vars (see `.env.example` for full list):
+- `JWT_SECRET` -- minimum 32 chars, enforced at startup
+- `ENCRYPTION_KEY` -- minimum 32 chars; encrypts AI provider keys, emergency-access credentials and the stored backup password. Not yet enforced at startup (a deployment without one boots and is warned on every start that a future release will require it), but nothing that needs a secret works without it. `AI_ENCRYPTION_KEY` is the former name, still read and still preferred where both are set
+- `DATABASE_*` -- PostgreSQL connection
+- `DEMO_MODE=true` -- enables demo restrictions, daily reset at 4 AM UTC
+- `LOCAL_AUTH_ENABLED` / `REGISTRATION_ENABLED` -- auth toggles
+- `OIDC_*` -- OpenID Connect provider config

@@ -217,3 +217,7 @@ Same currency is 1:1 *by definition* and stays a known conversion -- keep it dis
 **And a rate table that has not loaded is not a table missing that rate.** `useExchangeRates` starts with no rates and keeps none if the fetch fails, so every cross-currency `convert` returns `null` in both states: a surface that names the missing pair then instructs the reader to add a rate that already exists. Check `ratesUnavailable` (loading or failed) before naming any pair; `ratesFailed` tells an outage from a table still arriving. The reporting currency itself comes from `preferredCurrency` (`lib/default-currency.ts`) -- never a hand-written `|| 'CAD'`, which is how ten call sites came to disagree with each other and with the server.
 
 **Where more than one thing can withhold a figure, the reader is told about all of them.** The bills page's Monthly Net can be incomplete because a schedule could not be priced *and* because a currency has no rate; naming one makes the reader fix it and watch nothing change. Compose the causes, do not pick between them.
+
+## Withholding a figure is only honest if the reader learns why
+
+A cumulative series with one unpriceable occurrence is withheld whole -- but a blank forward line is indistinguishable from "nothing scheduled". `BalanceForecastResult.gaps` names the schedule, the currency pair and the cause, and `BalanceForecastUnavailable` renders the fix (refresh rates on Currencies; check the security's and settlement account's currency). A `null` with no explanation is a dead end, not a correction.

@@ -94,7 +94,7 @@ export function resolveUserContext(
  * A 2025-era connection has a session id and keeps using it, so relay
  * semantics there are unchanged. A 2026-07-28 request has no session, and the
  * credential is the only stable per-client fact on the wire -- so two clients
- * sharing one token share a caller key (`backend/src/mcp/CLAUDE.md`).
+ * sharing one token share a caller key (`docs/backend/mcp.md`).
  * `undefined` means "cannot prove which client", which callers must treat as a
  * direct client, never as a relay turn.
  */

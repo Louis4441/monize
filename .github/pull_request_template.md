@@ -11,6 +11,10 @@ Approved in: <!-- discussion/issue link -->
 
 <!-- What does this PR do, and why? Keep it to a single concern. -->
 
+## Invariants touched
+
+<!-- IDs from docs/system-invariants.md this change touches (e.g. INV-BALANCE-001), or "none". -->
+
 ## Checklist
 
 - [ ] An approved discussion or issue exists and is linked above.

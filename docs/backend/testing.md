@@ -72,3 +72,7 @@ Mock repositories use `Record<string, jest.Mock>`; tests use `Test.createTesting
 ## Do not trust a suite that stayed green
 
 Changing what a service computes and seeing every test pass means the change is a no-op or the suite has a hole -- `docs/financial-calculation-contract.md` sections 8.1 and 8.2. Establish which before moving on, and break each new invariant on purpose once to confirm its test actually fails.
+
+## A test that reads the wall clock is a test about today's date
+
+-- `TZ=UTC` pins the offset, not the day (auto-backup promotes artifacts on specific days of the month, so ten assertions failed on `main` with nothing changed). Pin the clock in the spec and derive the pinned value from the constants the behaviour branches on (`WEEKLY_DAYS`, `MONTHLY_DAY` are exported for this). `backend/src/backup/auto-backup.service.spec.ts` is the pattern: fake `Date` only (faking `nextTick`/`queueMicrotask` under real `fs.promises` deadlocks), install fake timers once, move the date through a single `withClockAt` helper, and let a source scan fail a second installation.
