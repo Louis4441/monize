@@ -52,13 +52,113 @@ function lineOf(source: string, index: number): number {
 }
 
 /**
- * A call to the bare `format` (date-fns) whose last argument is a quoted
- * pattern containing `MMM`. The lookbehind is what keeps `formatChartDate(...)`
- * and a `.format(...)` on an `Intl` formatter out: only an identifier that IS
- * `format` counts.
+ * Every call to the bare `format` (date-fns). The lookbehind keeps
+ * `formatChartDate(...)` and a `.format(...)` on an `Intl` formatter out: only
+ * an identifier that IS `format`, called directly, counts.
  */
-const ENGLISH_MONTH_NAME_FORMAT =
-  /(?<![A-Za-z0-9_$.])format\([^()]*(?:\([^()]*\))?[^()]*?(['"])[^'"]*MMM[^'"]*\1\s*\)/g;
+const BARE_FORMAT_CALL = /(?<![A-Za-z0-9_$.])format\(/g;
+
+/** A quoted string naming a month by NAME rather than by number. */
+const MONTH_NAME_PATTERN = /^(['"])[^'"]*MMM[^'"]*\1$/;
+
+/**
+ * The text between a call's parentheses, read by counting depth rather than by
+ * regex.
+ *
+ * A regex cannot do this correctly and the two ways it gets it wrong are both
+ * real here: a bounded wildcard runs past the closing paren and matches the
+ * NEXT call's pattern literal (`format(d, 'yyyy-MM-dd')` followed by
+ * `formatChartDate(e, 'MMM')` reads as one offender), while a paren-aware
+ * alternative misses `format(startOfMonth(new Date(x)), 'MMM')` at the second
+ * level of nesting and a pattern on its own line after a trailing comma. This
+ * reads the arguments the way the parser does, so neither happens. Returns null
+ * for an unbalanced call, which is a truncated file rather than an offender.
+ */
+function argumentsOf(source: string, openParen: number): string | null {
+  let depth = 0;
+  for (let i = openParen; i < source.length; i += 1) {
+    const quoted = skipString(source, i);
+    if (quoted !== i) {
+      i = quoted - 1;
+      continue;
+    }
+    const ch = source[i];
+    if (ch === '(') depth += 1;
+    else if (ch === ')') {
+      depth -= 1;
+      if (depth === 0) return source.slice(openParen + 1, i);
+    }
+  }
+  return null;
+}
+
+/**
+ * The index just past the string literal starting at `i`, or `i` itself when
+ * nothing starts there.
+ *
+ * Both scanners need this and the reason is the pattern itself: `'MMM d, yyyy'`
+ * contains a COMMA, so an argument splitter that does not know about strings
+ * cuts the pattern in half and reads `yyyy'` as the last argument -- which is
+ * how the first draft of this guard reported the directory clean while
+ * `DuplicateTransactionReport` held the very call it was written for. A `)` or
+ * `(` inside a literal misleads the depth count the same way.
+ */
+function skipString(source: string, i: number): number {
+  const quote = source[i];
+  if (quote !== "'" && quote !== '"' && quote !== '`') return i;
+  for (let j = i + 1; j < source.length; j += 1) {
+    if (source[j] === '\\') {
+      j += 1;
+      continue;
+    }
+    if (source[j] === quote) return j + 1;
+    // An unterminated literal (a quote inside blanked-out prose, an apostrophe)
+    // must not swallow the rest of the file.
+    if (source[j] === '\n' && quote !== '`') return i;
+  }
+  return i;
+}
+
+/**
+ * The call's last argument, which is where date-fns takes its pattern. Split at
+ * top level only, so neither a nested call's commas nor the pattern's own
+ * split it.
+ */
+function lastArgument(args: string): string {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < args.length; i += 1) {
+    const quoted = skipString(args, i);
+    if (quoted !== i) {
+      i = quoted - 1;
+      continue;
+    }
+    const ch = args[i];
+    if (ch === '(' || ch === '[' || ch === '{') depth += 1;
+    else if (ch === ')' || ch === ']' || ch === '}') depth -= 1;
+    else if (ch === ',' && depth === 0) {
+      parts.push(args.slice(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(args.slice(start));
+  // A trailing comma leaves an empty final part; the pattern is the one before.
+  const meaningful = parts.map((part) => part.trim()).filter((part) => part.length > 0);
+  return meaningful[meaningful.length - 1] ?? '';
+}
+
+/** Offsets in `content` of a date-fns `format(...)` given an English month name. */
+function englishMonthFormatCalls(content: string): number[] {
+  const found: number[] = [];
+  for (const match of content.matchAll(BARE_FORMAT_CALL)) {
+    const openParen = match.index + match[0].length - 1;
+    const args = argumentsOf(content, openParen);
+    if (args === null) continue;
+    if (MONTH_NAME_PATTERN.test(lastArgument(args))) found.push(match.index);
+  }
+  return found;
+}
 
 /** A `.toFixed(...)` whose receiver names a share count, at any precision. */
 const QUANTITY_TO_FIXED = /\b\w*(?:quantity|Quantity|shares|Shares)\w*(?:\s*\))*\s*\.toFixed\(/g;
@@ -101,8 +201,8 @@ describe("a report's date is the reader's arrangement", () => {
     for (const [path, raw] of productionSources()) {
       if (path in ENGLISH_MONTH_BASELINE) continue;
       const content = blankComments(raw);
-      for (const match of content.matchAll(ENGLISH_MONTH_NAME_FORMAT)) {
-        found.push(`${path}:${lineOf(content, match.index)}`);
+      for (const index of englishMonthFormatCalls(content)) {
+        found.push(`${path}:${lineOf(content, index)}`);
       }
     }
     return found;
@@ -119,27 +219,43 @@ describe("a report's date is the reader's arrangement", () => {
     // pass over a codebase full of offenders; without the second it would fail
     // every chart in the directory and the honest response would be to delete
     // it.
-    const offending = "const s = format(parseLocalDate(tx.transactionDate), 'MMM d, yyyy');";
-    const legitimate = "const s = formatChartDate(parsed, 'MMM d, yyyy');";
-    const machine = "const s = format(parseLocalDate(tx.transactionDate), 'yyyy-MM-dd');";
+    const cases: [string, boolean][] = [
+      // The two shapes this change removed.
+      ["const s = format(parseLocalDate(tx.transactionDate), 'MMM d, yyyy');", true],
+      ["const s = format(parseISO(summary.projectedPayoffDate), 'MMM yyyy');", true],
+      // Nested two deep, and split across lines with a trailing comma: both are
+      // ordinary formatting of this call and a regex misses them.
+      ["const s = format(startOfMonth(new Date(y, m, 1)), 'MMMM yyyy');", true],
+      ["const s = format(\n  parseLocalDate(d),\n  'MMM d, yyyy',\n);", true],
+      // The localizing chart helper takes the identical token: not an offender.
+      ["const s = formatChartDate(parsed, 'MMM d, yyyy');", false],
+      ["const s = useChartDateFormat()(parsed, 'MMM yyyy');", false],
+      // An Intl formatter's own method.
+      ["const s = monthFormatter.format(date) + 'MMM';", false],
+      // ISO patterns are machine values: a query bound, a month key, a CSV cell.
+      ["const s = format(parseLocalDate(tx.transactionDate), 'yyyy-MM-dd');", false],
+      ["const s = format(month, 'yyyy-MM');", false],
+      // A bare `format` beside a chart call must not borrow the chart's token:
+      // this is the false positive a bounded wildcard produces.
+      [
+        "const a = format(d, 'yyyy-MM-dd');\nconst b = formatChartDate(e, 'MMM');",
+        false,
+      ],
+    ];
 
-    ENGLISH_MONTH_NAME_FORMAT.lastIndex = 0;
-    expect(ENGLISH_MONTH_NAME_FORMAT.test(offending)).toBe(true);
-    ENGLISH_MONTH_NAME_FORMAT.lastIndex = 0;
-    expect(ENGLISH_MONTH_NAME_FORMAT.test(legitimate)).toBe(false);
-    ENGLISH_MONTH_NAME_FORMAT.lastIndex = 0;
-    expect(ENGLISH_MONTH_NAME_FORMAT.test(machine)).toBe(false);
+    for (const [source, expected] of cases) {
+      expect(englishMonthFormatCalls(source).length > 0, source).toBe(expected);
+    }
   });
 
   it('keeps every baselined report honest', () => {
     for (const path of Object.keys(ENGLISH_MONTH_BASELINE)) {
       expect(sources[path], `${path} is baselined but does not exist`).toBeTruthy();
       const content = blankComments(sources[path]);
-      ENGLISH_MONTH_NAME_FORMAT.lastIndex = 0;
       expect(
-        ENGLISH_MONTH_NAME_FORMAT.test(content),
+        englishMonthFormatCalls(content).length,
         `${path} no longer formats an English month name -- delete its baseline entry`,
-      ).toBe(true);
+      ).toBeGreaterThan(0);
     }
   });
 });
