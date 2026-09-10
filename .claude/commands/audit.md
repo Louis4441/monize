@@ -1562,8 +1562,6 @@ not-applicable without a reason invalidates the ledger.
 
 # Review response format
 
-Progress updates to the user are in Polish.
-
 Findings themselves are written in English.
 
 For each review round, finish with:
