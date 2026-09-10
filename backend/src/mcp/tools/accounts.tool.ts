@@ -30,6 +30,11 @@ export class McpAccountsTools {
           "they have or how much money is in one. A brokerage account's " +
           "`balance` is its market value; every other account's includes future " +
           "transactions, with the through-today figure in `currentBalance`. " +
+          "Both are also given in the user's `defaultCurrency` (the totals' " +
+          "currency) as `balanceInDefaultCurrency` and " +
+          "`currentBalanceInDefaultCurrency`, at today's `exchangeRate`: quote " +
+          "a foreign account in both currencies and never convert one " +
+          "yourself; null means no rate (`missingRatePairs`) -- say so. " +
           "Loan and mortgage rows carry their payment schedule. `totalAccounts` " +
           "counts what is left AFTER filtering.",
         inputSchema: z.object({

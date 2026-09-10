@@ -1096,6 +1096,127 @@ describe("ExchangeRateService", () => {
     });
   });
 
+  describe("convertOnDate", () => {
+    it("is 1:1 for the same currency without any lookup", async () => {
+      const result = await service.convertOnDate(
+        250,
+        "usd",
+        "USD",
+        "2026-06-08",
+      );
+
+      expect(result).toEqual({
+        amount: 250,
+        fromCurrency: "USD",
+        toCurrency: "USD",
+        date: "2026-06-08",
+        rate: 1,
+        convertedAmount: 250,
+      });
+      expect(exchangeRateRepository.findOne).not.toHaveBeenCalled();
+    });
+
+    it("applies the stored rate on or before the date and reports that date", async () => {
+      exchangeRateRepository.findOne.mockResolvedValue(mockExchangeRate);
+
+      const result = await service.convertOnDate(
+        100,
+        "USD",
+        "CAD",
+        "2026-06-08",
+      );
+
+      expect(result).toEqual({
+        amount: 100,
+        fromCurrency: "USD",
+        toCurrency: "CAD",
+        date: "2026-06-08",
+        rate: 1.365,
+        convertedAmount: 136.5,
+      });
+      const call = exchangeRateRepository.findOne.mock.calls[0][0];
+      expect(call.where.fromCurrency).toBe("USD");
+      expect(call.where.toCurrency).toBe("CAD");
+    });
+
+    it("defaults the date to today and clamps a future date to today", async () => {
+      exchangeRateRepository.findOne.mockResolvedValue(mockExchangeRate);
+
+      const defaulted = await service.convertOnDate(1, "USD", "CAD");
+      const future = await service.convertOnDate(1, "USD", "CAD", "2099-01-01");
+
+      // `todayYMD` is pinned to 2026-08-18 at the top of this file.
+      expect(defaulted?.date).toBe("2026-08-18");
+      expect(future?.date).toBe("2026-08-18");
+    });
+
+    it("rounds the converted amount to money precision, never the rate", async () => {
+      exchangeRateRepository.findOne.mockResolvedValue({
+        ...mockExchangeRate,
+        rate: 0.7325312345,
+      });
+
+      const result = await service.convertOnDate(
+        1234.56,
+        "USD",
+        "CAD",
+        "2026-06-08",
+      );
+
+      expect(result?.rate).toBe(0.7325312345);
+      expect(result?.convertedAmount).toBe(904.3538);
+    });
+
+    it("reciprocates a rate stored only in the reverse direction", async () => {
+      exchangeRateRepository.findOne.mockImplementation((options: any) =>
+        options.where.fromCurrency === "CAD" ? mockExchangeRate : null,
+      );
+      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue(null);
+
+      // Only CAD->USD is stored (at 1.365); USD->CAD is derived from it.
+      const result = await service.convertOnDate(
+        136.5,
+        "USD",
+        "CAD",
+        "2026-06-08",
+      );
+
+      expect(result?.rate).toBe(roundFxRate(1 / 1.365));
+      expect(result?.convertedAmount).toBe(100);
+    });
+
+    it("returns null -- never 1, never the input -- when no rate exists either way", async () => {
+      exchangeRateRepository.findOne.mockResolvedValue(null);
+      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue(null);
+
+      const result = await service.convertOnDate(
+        100,
+        "USD",
+        "XXX",
+        "2026-06-08",
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it("treats a zero or negative stored rate as absent", async () => {
+      exchangeRateRepository.findOne.mockResolvedValue({
+        ...mockExchangeRate,
+        rate: 0,
+      });
+      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue(null);
+
+      const result = await service.convertOnDate(
+        100,
+        "USD",
+        "CAD",
+        "2026-06-08",
+      );
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe("getLatestRates", () => {
     it("returns latest rates using distinctOn query", async () => {
       const rates = [mockExchangeRate];

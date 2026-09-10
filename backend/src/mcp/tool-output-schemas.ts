@@ -50,10 +50,19 @@ const bool = z.boolean();
  * extra entity fields and the optional/nullable columns all validate.
  */
 export const listAccountsOutput = toolOutput({
+  // Each row carries `balance`/`currentBalance` in its own `currency` AND in
+  // `defaultCurrency` (`balanceInDefaultCurrency`, `currentBalanceInDefaultCurrency`,
+  // at `exchangeRate`); the description names them, and per the note above
+  // row-level columns stay out of the schema -- three nullable numbers cost
+  // ~340 bytes of `anyOf` on every request.
   accounts: rows(),
   totalAssets: num,
   totalLiabilities: num,
   netWorth: num,
+  // The currency the three totals and every `*InDefaultCurrency` are in, and
+  // the pairs a null converted figure is missing a rate for.
+  defaultCurrency: str,
+  missingRatePairs: z.array(str),
   totalAccounts: num,
 });
 
@@ -344,6 +353,12 @@ export const calculateOutput = toolOutput({
   formattedResult: str,
   operation: str,
   label: str.optional(),
+  // `convert` branch: the pair, the rate applied and the day it is from, so a
+  // model quotes a converted figure with its currency and its rate date.
+  fromCurrency: str.optional(),
+  toCurrency: str.optional(),
+  date: str.optional(),
+  rate: num.optional(),
 });
 
 // ---------------------------------------------------------------------------

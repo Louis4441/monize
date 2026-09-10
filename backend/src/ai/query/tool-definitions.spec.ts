@@ -331,6 +331,16 @@ describe("FINANCIAL_TOOLS", () => {
     });
   });
 
+  describe("list_accounts", () => {
+    it("promises every balance in the user's default currency beside its own", () => {
+      const tool = FINANCIAL_TOOLS.find((t) => t.name === "list_accounts")!;
+      expect(tool.description).toContain("balanceInDefaultCurrency");
+      expect(tool.description).toContain("currentBalanceInDefaultCurrency");
+      expect(tool.description).toContain("missingRatePairs");
+      expect(tool.description).toContain("never convert a balance yourself");
+    });
+  });
+
   describe("calculate", () => {
     it("requires operation and values", () => {
       const tool = FINANCIAL_TOOLS.find((t) => t.name === "calculate")!;
@@ -349,7 +359,30 @@ describe("FINANCIAL_TOOLS", () => {
         "ratio",
         "sum",
         "average",
+        "convert",
       ]);
+    });
+
+    it("takes the currency pair and an optional date for convert", () => {
+      const tool = FINANCIAL_TOOLS.find((t) => t.name === "calculate")!;
+      const props = tool.inputSchema.properties as Record<
+        string,
+        Record<string, unknown>
+      >;
+      expect(props.fromCurrency.type).toBe("string");
+      expect(props.toCurrency.type).toBe("string");
+      expect(props.date.type).toBe("string");
+      expect(props.date.description).toContain("YYYY-MM-DD");
+      // The pair is only required for convert, so it is not in `required`.
+      expect(tool.inputSchema.required).toEqual(["operation", "values"]);
+      expect(tool.description).toContain("convert");
+    });
+
+    it("tells the model never to convert currencies itself", () => {
+      const tool = FINANCIAL_TOOLS.find((t) => t.name === "calculate")!;
+      expect(tool.description).toMatch(
+        /NEVER convert between currencies yourself/,
+      );
     });
 
     it("has optional label parameter", () => {

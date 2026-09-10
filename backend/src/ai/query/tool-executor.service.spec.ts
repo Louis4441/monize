@@ -9,6 +9,7 @@ import { BudgetReportsService } from "../../budgets/budget-reports.service";
 import { PortfolioService } from "../../securities/portfolio.service";
 import { SecuritiesService } from "../../securities/securities.service";
 import { BuiltInReportsService } from "../../built-in-reports/built-in-reports.service";
+import { ExchangeRateService } from "../../currencies/exchange-rate.service";
 import { InvestmentTransactionsService } from "../../securities/investment-transactions.service";
 import { ScheduledTransactionsService } from "../../scheduled-transactions/scheduled-transactions.service";
 import { TransactionsService } from "../../transactions/transactions.service";
@@ -41,6 +42,7 @@ describe("ToolExecutorService", () => {
   let transfer: Record<string, jest.Mock>;
   let splitService: Record<string, jest.Mock>;
   let builtInReports: Record<string, jest.Mock>;
+  let exchangeRates: { convertOnDate: jest.Mock };
   let attachmentPrep: Record<string, jest.Mock>;
   let attachmentStore: Record<string, jest.Mock>;
 
@@ -205,11 +207,38 @@ describe("ToolExecutorService", () => {
             balance: 5000,
             currentBalance: 5000,
             currency: "USD",
+            balanceInDefaultCurrency: 5000,
+            currentBalanceInDefaultCurrency: 5000,
+            exchangeRate: 1,
+          },
+          {
+            id: "acc-2",
+            name: "Euro Savings",
+            type: "SAVINGS",
+            balance: 1000,
+            currentBalance: 1000,
+            currency: "EUR",
+            balanceInDefaultCurrency: 1085.5,
+            currentBalanceInDefaultCurrency: 1085.5,
+            exchangeRate: 1.0855,
+          },
+          {
+            id: "acc-3",
+            name: "Yen Cash",
+            type: "CASH",
+            balance: 20000,
+            currentBalance: 20000,
+            currency: "JPY",
+            balanceInDefaultCurrency: null,
+            currentBalanceInDefaultCurrency: null,
+            exchangeRate: null,
           },
         ],
         totalAssets: 20000,
         totalLiabilities: 1200,
         netWorth: 18800,
+        defaultCurrency: "USD",
+        missingRatePairs: ["JPY->USD"],
         totalAccounts: 3,
       }),
     };
@@ -571,6 +600,16 @@ describe("ToolExecutorService", () => {
       }),
     };
 
+    exchangeRates = {
+      convertOnDate: jest.fn().mockResolvedValue({
+        amount: 1500,
+        fromCurrency: "CAD",
+        toCurrency: "USD",
+        date: "2026-09-01",
+        rate: 0.7325,
+        convertedAmount: 1098.75,
+      }),
+    };
     builtInReports = {
       getSpendingByCategory: jest
         .fn()
@@ -637,6 +676,7 @@ describe("ToolExecutorService", () => {
         { provide: TransactionSplitService, useValue: splitService },
         { provide: AiActionSigningService, useValue: signing },
         { provide: BuiltInReportsService, useValue: builtInReports },
+        { provide: ExchangeRateService, useValue: exchangeRates },
         // Real prep + builder wrapping the mocked services, so the executor's
         // name resolution, preview building, and pending-action construction
         // (and signing.sign assertions) still run end-to-end.
@@ -811,6 +851,22 @@ describe("ToolExecutorService", () => {
       });
       expect(result.sources[0].type).toBe("accounts");
       expect(result.summary).toContain("Net worth");
+    });
+
+    it("list_accounts names the currency of every figure and quotes a foreign account in both", async () => {
+      const result = await service.execute(userId, "list_accounts", {});
+
+      expect(result.summary).toContain("Net worth: 18800.00 USD");
+      expect(result.summary).toContain("Assets: 20000.00 USD");
+      expect(result.summary).toContain(
+        "Euro Savings: 1000.00 EUR = 1085.50 USD",
+      );
+      expect(result.summary).toContain(
+        "Yen Cash: 20000.00 JPY = unknown (no rate)",
+      );
+      expect(result.summary).toContain("No exchange rate for: JPY->USD");
+      // The USD account is not listed as foreign.
+      expect(result.summary).not.toContain("Checking:");
     });
 
     it("list_accounts passes status, accountTypes, accountIds, and nameQuery through", async () => {
@@ -1297,7 +1353,68 @@ describe("ToolExecutorService", () => {
 
       expect(analytics.getLlmListTransactions).not.toHaveBeenCalled();
       expect(accounts.getLlmAccounts).not.toHaveBeenCalled();
+      expect(exchangeRates.convertOnDate).not.toHaveBeenCalled();
       expect(result.sources[0].type).toBe("calculation");
+    });
+
+    it("calculate convert prices the amount through ExchangeRateService", async () => {
+      const result = await service.execute(userId, "calculate", {
+        operation: "convert",
+        values: [1500],
+        fromCurrency: "CAD",
+        toCurrency: "USD",
+        date: "2026-09-01",
+      });
+
+      expect(exchangeRates.convertOnDate).toHaveBeenCalledWith(
+        1500,
+        "CAD",
+        "USD",
+        "2026-09-01",
+      );
+      expect(result.isError).toBeUndefined();
+      expect(result.data).toEqual({
+        result: 1098.75,
+        formattedResult: "1098.75 USD",
+        operation: "convert",
+        amount: 1500,
+        fromCurrency: "CAD",
+        toCurrency: "USD",
+        date: "2026-09-01",
+        rate: 0.7325,
+      });
+      // The line a model quotes carries both sides, the rate and its date.
+      expect(result.summary).toBe(
+        "Calculated convert: 1500.00 CAD = 1098.75 USD at 0.7325 (CAD->USD, rate as of 2026-09-01)",
+      );
+      expect(result.sources[0].type).toBe("calculation");
+    });
+
+    it("calculate convert is an error when no rate exists", async () => {
+      exchangeRates.convertOnDate.mockResolvedValue(null);
+
+      const result = await service.execute(userId, "calculate", {
+        operation: "convert",
+        values: [100],
+        fromCurrency: "CAD",
+        toCurrency: "XXX",
+        date: "2026-09-01",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.summary).toContain(
+        "No exchange rate is available for CAD->XXX",
+      );
+    });
+
+    it("calculate convert without a currency pair is refused before any lookup", async () => {
+      const result = await service.execute(userId, "calculate", {
+        operation: "convert",
+        values: [100],
+      });
+
+      expect(result.isError).toBe(true);
+      expect(exchangeRates.convertOnDate).not.toHaveBeenCalled();
     });
 
     it("render_chart echoes input as sanitized chart data", async () => {

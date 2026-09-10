@@ -67,7 +67,14 @@ import {
 } from "../../attachments/attachment-tool-prep.service";
 import { RelayAttachmentStore } from "../relay/relay-attachment.store";
 import { AttachmentRefDescriptor } from "../actions/ai-action.types";
-import { executeCalculation, CalculateInput } from "./calculate-tool";
+import {
+  executeCalculation,
+  executeConversion,
+  CalculateInput,
+  ConvertInput,
+  CONVERT_OPERATION,
+} from "./calculate-tool";
+import { ExchangeRateService } from "../../currencies/exchange-rate.service";
 import { sanitizePromptValue } from "../../common/sanitization.util";
 import { formatDidYouMean } from "../../common/name-suggestions.util";
 import {
@@ -177,6 +184,10 @@ export class ToolExecutorService {
     private readonly builtInReportsService: BuiltInReportsService,
     private readonly attachmentPrepService: AttachmentToolPrepService,
     private readonly relayAttachmentStore: RelayAttachmentStore,
+    // The `calculate` tool's currency conversion. AiModule reaches
+    // CurrenciesModule through a forwardRef (`src/module-graph.spec.ts`).
+    @Inject(forwardRef(() => ExchangeRateService))
+    private readonly exchangeRateService: ExchangeRateService,
   ) {}
 
   async execute(
@@ -239,7 +250,7 @@ export class ToolExecutorService {
           result = await this.getUpcomingBills(userId, validatedInput);
           break;
         case "calculate":
-          result = this.calculate(validatedInput);
+          result = await this.calculate(validatedInput);
           break;
         case "render_chart":
           result = this.renderChart(validatedInput);
@@ -1933,9 +1944,29 @@ export class ToolExecutorService {
     const description =
       status === "open" ? descriptionBase : `${descriptionBase} (${status})`;
 
+    // Every figure in the summary names its currency, and a foreign account
+    // is quoted in both, so the model has nothing left to convert itself.
+    const foreign = data.accounts.filter(
+      (a) => a.currency !== data.defaultCurrency,
+    );
+    const foreignPart = foreign.length
+      ? ` Accounts in other currencies (own currency = ${data.defaultCurrency}): ${foreign
+          .map(
+            (a) =>
+              `${a.name}: ${a.balance.toFixed(2)} ${a.currency} = ${
+                a.balanceInDefaultCurrency === null
+                  ? "unknown (no rate)"
+                  : `${a.balanceInDefaultCurrency.toFixed(2)} ${data.defaultCurrency}`
+              }`,
+          )
+          .join("; ")}.`
+      : "";
+    const missingRatePart = data.missingRatePairs.length
+      ? ` No exchange rate for: ${data.missingRatePairs.join(", ")} (the user can add one on the Currencies page).`
+      : "";
     return {
       data,
-      summary: `${data.totalAccounts} accounts. Net worth: ${data.netWorth.toFixed(2)}, Assets: ${data.totalAssets.toFixed(2)}, Liabilities: ${data.totalLiabilities.toFixed(2)}`,
+      summary: `${data.totalAccounts} accounts. Net worth: ${data.netWorth.toFixed(2)} ${data.defaultCurrency}, Assets: ${data.totalAssets.toFixed(2)} ${data.defaultCurrency}, Liabilities: ${data.totalLiabilities.toFixed(2)} ${data.defaultCurrency}.${foreignPart}${missingRatePart}`,
       sources: [
         {
           type: "accounts",
@@ -2495,8 +2526,17 @@ export class ToolExecutorService {
     };
   }
 
-  private calculate(input: Record<string, unknown>): ToolResult {
-    const calcResult = executeCalculation(input as unknown as CalculateInput);
+  private async calculate(input: Record<string, unknown>): Promise<ToolResult> {
+    // A currency conversion is the one calculation that needs the database:
+    // the rate is the server's, on the date asked for, through the same
+    // resolver the MCP `calculate` tool uses.
+    const calcResult =
+      input.operation === CONVERT_OPERATION
+        ? await executeConversion(
+            input as unknown as ConvertInput,
+            this.exchangeRateService,
+          )
+        : executeCalculation(input as unknown as CalculateInput);
 
     if ("error" in calcResult) {
       return {
@@ -2507,9 +2547,16 @@ export class ToolExecutorService {
       };
     }
 
+    // The summary line is what a model quotes, so a conversion names both
+    // sides and the rate date on it -- a bare converted figure is exactly the
+    // number that gets read as being in the wrong currency.
+    const described =
+      calcResult.operation === CONVERT_OPERATION
+        ? `${calcResult.amount.toFixed(2)} ${calcResult.fromCurrency} = ${calcResult.formattedResult} at ${calcResult.rate} (${calcResult.fromCurrency}->${calcResult.toCurrency}, rate as of ${calcResult.date})`
+        : calcResult.formattedResult;
     return {
       data: calcResult,
-      summary: `Calculated ${calcResult.operation}: ${calcResult.formattedResult}${calcResult.label ? ` (${calcResult.label})` : ""}`,
+      summary: `Calculated ${calcResult.operation}: ${described}${calcResult.label ? ` (${calcResult.label})` : ""}`,
       sources: [
         {
           type: "calculation",

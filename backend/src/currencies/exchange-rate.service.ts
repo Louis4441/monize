@@ -18,7 +18,9 @@ import { Currency } from "./entities/currency.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { YahooFinanceService } from "../securities/yahoo-finance.service";
 import { mapWithConcurrency } from "../common/concurrency.util";
-import { roundFxRate } from "../common/fx-entry.util";
+import { roundFxRate, resolveFxRateOrNull } from "../common/fx-entry.util";
+import { roundMoney } from "../common/round.util";
+import { todayYMD } from "../common/date-utils";
 import { withScopedDb } from "../common/db/scoped-db";
 import { returnedRows } from "../common/db/query-result";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
@@ -40,6 +42,21 @@ const FX_FETCH_CONCURRENCY = 6;
  */
 function directionlessPairKey(from: string, to: string): string {
   return [from, to].sort().join("|");
+}
+
+/**
+ * One amount converted at the rate that applied on `date`. `rate` is
+ * `fromCurrency -> toCurrency` at FX precision (10dp); `convertedAmount` is
+ * money (4dp). `date` is the day whose rate was asked for, after clamping a
+ * future date to today.
+ */
+export interface DatedConversion {
+  amount: number;
+  fromCurrency: string;
+  toCurrency: string;
+  date: string;
+  rate: number;
+  convertedAmount: number;
 }
 
 export interface RateUpdateResult {
@@ -1010,6 +1027,67 @@ export class ExchangeRateService implements OnModuleInit {
     //    still resolves -- better a known rate from another day than refusing
     //    the posting outright.
     return this.getLatestRate(from, to);
+  }
+
+  /**
+   * Convert one amount between two currencies at the rate that applied on a
+   * date -- the shared implementation behind the AI Assistant's and the MCP
+   * server's `calculate` tool (`operation: "convert"`), so a model never does
+   * the conversion itself.
+   *
+   * `date` is optional and defaults to today (`todayYMD`, the caller's request
+   * timezone); a future date is clamped to today by `getRateForDate`, and the
+   * clamped date is what `date` reports back. The rate goes through
+   * `resolveFxRateOrNull`, the one market-rate ladder (stored on-or-before the
+   * date, then a provider window, then the latest stored rate of any date), so
+   * the figure matches what a transaction posted on that date would carry.
+   *
+   * Returns `null` when no usable rate exists in either direction -- never `1`,
+   * and never the input amount: `docs/specs/fx-conversion-completeness.md`.
+   * The reverse pair is tried because a rate stored one way only (older data,
+   * before both directions were persisted together) is still a rate.
+   */
+  async convertOnDate(
+    amount: number,
+    fromCurrency: string,
+    toCurrency: string,
+    date?: string,
+  ): Promise<DatedConversion | null> {
+    const from = fromCurrency.toUpperCase();
+    const to = toCurrency.toUpperCase();
+    const requested = (date ?? todayYMD()).slice(0, 10);
+    const today = todayYMD();
+    // The same clamp `getRateForDate` applies, surfaced so the caller learns
+    // which day's rate it actually received.
+    const effectiveDate = requested > today ? today : requested;
+
+    if (from === to) {
+      return {
+        amount,
+        fromCurrency: from,
+        toCurrency: to,
+        date: effectiveDate,
+        rate: 1,
+        convertedAmount: amount,
+      };
+    }
+
+    const direct = await resolveFxRateOrNull(this, from, to, effectiveDate);
+    let rate: number | null = direct;
+    if (rate === null) {
+      const reverse = await resolveFxRateOrNull(this, to, from, effectiveDate);
+      rate = reverse === null ? null : roundFxRate(1 / reverse);
+    }
+    if (rate === null) return null;
+
+    return {
+      amount,
+      fromCurrency: from,
+      toCurrency: to,
+      date: effectiveDate,
+      rate,
+      convertedAmount: roundMoney(amount * rate),
+    };
   }
 
   /**

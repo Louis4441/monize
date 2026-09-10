@@ -100,7 +100,7 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
   {
     name: "list_accounts",
     description:
-      "List the user's accounts with full details and an overall summary. Returns, for each account: id, name, type, sub-type, balance (brokerage accounts show market value; every other account shows currentBalance + future transactions), raw currentBalance, credit limit, interest rate, currency, closed status, exclude-from-net-worth flag, institution name, and account number. Also returns a summary: total assets, total liabilities, net worth (all matching the dashboard Net Worth widget), and totalAccounts (the count AFTER filtering). Use this for any question about which accounts the user has or how much money is in them, and to resolve an account name to its ID when another tool needs one. This single tool replaces the former get_accounts, get_account_balance, and get_account_balances tools.",
+      "List the user's accounts with full details and an overall summary. Returns, for each account: id, name, type, sub-type, balance (brokerage accounts show market value; every other account shows currentBalance + future transactions), raw currentBalance, credit limit, interest rate, currency, closed status, exclude-from-net-worth flag, institution name, and account number. Every account also carries balanceInDefaultCurrency and currentBalanceInDefaultCurrency -- the same figures expressed in the user's default currency (`defaultCurrency` at the top level) at today's `exchangeRate` -- so when an account's `currency` differs from `defaultCurrency`, state BOTH figures with their currency codes and never convert a balance yourself; when they are null the pair is named in `missingRatePairs` and you must say the converted value is unknown. Also returns a summary: total assets, total liabilities, net worth (all in `defaultCurrency`, matching the dashboard Net Worth widget), and totalAccounts (the count AFTER filtering). Use this for any question about which accounts the user has or how much money is in them, and to resolve an account name to its ID when another tool needs one. This single tool replaces the former get_accounts, get_account_balance, and get_account_balances tools.",
     inputSchema: {
       type: "object",
       properties: {
@@ -384,22 +384,44 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
   {
     name: "calculate",
     description:
-      "Perform accurate server-side arithmetic on numbers from previous tool results. Use this instead of doing math yourself. Supports: percentage (part/whole*100), difference (a-b), ratio (a/b), sum, and average. Always use this tool for any calculation rather than computing values yourself.",
+      "Perform accurate server-side arithmetic on numbers from previous tool results. Use this instead of doing math yourself. Supports: percentage (part/whole*100), difference (a-b), ratio (a/b), sum, average, and convert (a currency conversion at the exchange rate the server holds for a date). Always use this tool for any calculation rather than computing values yourself, and NEVER convert between currencies yourself -- use operation 'convert' with values: [amount], fromCurrency, toCurrency and an optional date (defaults to today). The result of a conversion reports the amount, both currency codes, the rate applied and the date it applied on; quote all of them.",
     inputSchema: {
       type: "object",
       properties: {
         operation: {
           type: "string",
-          enum: ["percentage", "difference", "ratio", "sum", "average"],
+          enum: [
+            "percentage",
+            "difference",
+            "ratio",
+            "sum",
+            "average",
+            "convert",
+          ],
           description:
-            "The arithmetic operation to perform. 'percentage' computes (values[0] / values[1]) * 100. 'difference' computes values[0] - values[1]. 'ratio' computes values[0] / values[1]. 'sum' adds all values. 'average' computes the arithmetic mean.",
+            "The operation to perform. 'percentage' computes (values[0] / values[1]) * 100. 'difference' computes values[0] - values[1]. 'ratio' computes values[0] / values[1]. 'sum' adds all values. 'average' computes the arithmetic mean. 'convert' converts values[0] from fromCurrency to toCurrency at the rate on `date` (today when omitted).",
         },
         values: {
           type: "array",
           items: { type: "number" },
           minItems: 1,
           description:
-            "The numbers to calculate with. For percentage, difference, and ratio: [a, b]. For sum and average: any number of values.",
+            "The numbers to calculate with. For percentage, difference, and ratio: [a, b]. For sum and average: any number of values. For convert: [amount], the amount in fromCurrency.",
+        },
+        fromCurrency: {
+          type: "string",
+          description:
+            "convert only: the 3-letter ISO 4217 code the amount is in (e.g. 'CAD').",
+        },
+        toCurrency: {
+          type: "string",
+          description:
+            "convert only: the 3-letter ISO 4217 code to convert into (e.g. 'USD').",
+        },
+        date: {
+          type: "string",
+          description:
+            "convert only: the date whose exchange rate to apply, YYYY-MM-DD. Omit for today. A future date uses today's rate.",
         },
         label: {
           type: "string",
