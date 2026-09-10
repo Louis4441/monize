@@ -3,6 +3,16 @@
 import { AccountHoldingStats } from '@/lib/monte-carlo';
 import { useTranslations } from 'next-intl';
 import type { NumberFormatters } from '@/hooks/useNumberFormat';
+import { CAPTION_CLASS, CellLabel } from '@/components/ui/Table';
+
+// A money (or percentage) cell inside a wrapped row: no padding of its own
+// below `sm` (the row supplies it and the grid does the spacing), this table's
+// own `px-3 py-1.5` from `sm` up. The text size inherits `text-xs` from the
+// table element at every width, so there is no per-cell size to preserve.
+// `whitespace-nowrap` is not phone-only: a locale grouping thousands with a
+// space could otherwise break a figure in the middle, at any width. A number
+// must not break; the caption inside takes `whitespace-normal` back (CellLabel).
+const FIGURE_CELL = 'p-0 text-right whitespace-nowrap sm:table-cell sm:px-3 sm:py-1.5';
 
 export function HoldingStatsTable({
   data,
@@ -63,42 +73,71 @@ export function HoldingStatsTable({
               {t('monteCarloHoldingStats.noHoldings')}
             </div>
           ) : (
+            // Below `sm` the table becomes a block and each row wraps into a
+            // two-track grid card so all five columns fit a phone without a
+            // horizontal scroll: line 1 is the symbol (the row identity) and the
+            // market value (the headline); line 2 is the security name, spanning
+            // both tracks; line 3 is the mean return and the volatility. Nothing
+            // is dropped -- the name that today hides below `sm` returns as the
+            // card's descriptor -- and no figure wraps (`FIGURE_CELL`). From `sm`
+            // up it is the ordinary table, each cell restoring its own
+            // `px-3 py-1.5` and the name its `truncate max-w-[200px]`, resolving
+            // identically to today. This table's header is not sortable, so below
+            // `sm` the column header row is simply block-hidden and every bare
+            // figure carries a `CellLabel` naming its column; the symbol and the
+            // name name themselves. Restyling `display` strips the implicit table
+            // semantics, so the ARIA roles are restated.
             <div className="overflow-x-auto">
-              <table className="min-w-full text-xs">
-                <thead className="bg-gray-50 dark:bg-gray-900/30 text-gray-500 dark:text-gray-400">
-                  <tr>
-                    <th className="px-3 py-1.5 text-left font-medium">{t('monteCarloHoldingStats.colSymbol')}</th>
-                    {/* Name is decorative; hide on small screens so the
-                        numeric columns fit on a phone without horizontal
-                        scroll. */}
-                    <th className="px-3 py-1.5 text-left font-medium hidden sm:table-cell">
+              <table role="table" className="block min-w-full text-xs sm:table">
+                <thead
+                  role="rowgroup"
+                  className="hidden bg-gray-50 dark:bg-gray-900/30 text-gray-500 dark:text-gray-400 sm:table-header-group"
+                >
+                  <tr role="row">
+                    <th role="columnheader" className="px-3 py-1.5 text-left font-medium">{t('monteCarloHoldingStats.colSymbol')}</th>
+                    <th role="columnheader" className="px-3 py-1.5 text-left font-medium">
                       {t('monteCarloHoldingStats.colName')}
                     </th>
-                    <th className="px-3 py-1.5 text-right font-medium">{t('monteCarloHoldingStats.colValue')}</th>
-                    <th className="px-3 py-1.5 text-right font-medium whitespace-nowrap">
+                    <th role="columnheader" className="px-3 py-1.5 text-right font-medium">{t('monteCarloHoldingStats.colValue')}</th>
+                    <th role="columnheader" className="px-3 py-1.5 text-right font-medium whitespace-nowrap">
                       {t('monteCarloHoldingStats.colMean')}
                     </th>
-                    <th className="px-3 py-1.5 text-right font-medium">
+                    <th role="columnheader" className="px-3 py-1.5 text-right font-medium">
                       {t('monteCarloHoldingStats.colVolatility')}
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody
+                  role="rowgroup"
+                  className="block divide-y divide-gray-200 dark:divide-gray-700 sm:table-row-group"
+                >
                   {acct.holdings.map((h) => (
-                    <tr key={`${acct.accountId}-${h.symbol}`}>
-                      <td className="px-3 py-1.5 font-mono text-gray-900 dark:text-gray-100 whitespace-nowrap">
+                    <tr
+                      key={`${acct.accountId}-${h.symbol}`}
+                      role="row"
+                      className="grid grid-cols-2 items-start gap-x-3 gap-y-1 px-3 py-2 sm:table-row sm:p-0"
+                    >
+                      {/* Symbol: the row identity, so it carries no caption. */}
+                      <td role="cell" className="col-start-1 row-start-1 p-0 font-mono text-gray-900 dark:text-gray-100 whitespace-nowrap sm:table-cell sm:px-3 sm:py-1.5">
                         {h.symbol}
                       </td>
-                      <td className="px-3 py-1.5 text-gray-700 dark:text-gray-300 truncate max-w-[200px] hidden sm:table-cell">
+                      {/* Name: the descriptor under the symbol identity, so no
+                          caption. It wraps on a phone and keeps its desktop
+                          `truncate max-w-[200px]` from `sm` up. */}
+                      <td role="cell" className="col-start-1 col-span-2 row-start-2 p-0 text-gray-700 dark:text-gray-300 break-words sm:table-cell sm:px-3 sm:py-1.5 sm:truncate sm:max-w-[200px] sm:break-normal">
                         {h.name}
                       </td>
-                      <td className="px-3 py-1.5 text-right text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                      {/* Market value: the headline, beside the symbol. */}
+                      <td role="cell" className={`col-start-2 row-start-1 text-gray-700 dark:text-gray-300 ${FIGURE_CELL}`}>
+                        <CellLabel className={CAPTION_CLASS}>{t('monteCarloHoldingStats.colValue')}</CellLabel>
                         {fmtValue(h.marketValue, h.currencyCode)}
                       </td>
-                      <td className="px-3 py-1.5 text-right text-gray-900 dark:text-gray-100 whitespace-nowrap">
+                      <td role="cell" className={`col-start-1 row-start-3 text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                        <CellLabel className={CAPTION_CLASS}>{t('monteCarloHoldingStats.colMean')}</CellLabel>
                         {fmtPct(h.meanReturn)}
                       </td>
-                      <td className="px-3 py-1.5 text-right text-gray-900 dark:text-gray-100 whitespace-nowrap">
+                      <td role="cell" className={`col-start-2 row-start-3 text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                        <CellLabel className={CAPTION_CLASS}>{t('monteCarloHoldingStats.colVolatility')}</CellLabel>
                         {fmtPct(h.volatility)}
                       </td>
                     </tr>
