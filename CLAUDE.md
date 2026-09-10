@@ -89,6 +89,17 @@ Before writing a UI control, a data access path, or anything a user interacts wi
 
 **A doc that names an identifier is making a claim about the source.** Renaming or deleting a field, flag or helper means grepping `docs/` and every `CLAUDE.md` in the same commit. A comment asserting that *every* call site does something is a scanning test, not a comment. For named *files* the machine checks: `backend/src/common/doc-paths.spec.ts` fails when a path (bare filenames included) in any `CLAUDE.md`, top-level `docs/*.md`, `docs/frontend/*.md` or `docs/backend/*.md` does not resolve. `docs/future-plans/` may name files that do not exist yet, but an unresolved path whose basename exists elsewhere is a moved file and fails. `docs/release-notes/` and `docs/audits/` are shipped records, out of scope. A path in another branch or repository is qualified (`branch:path/to/file.md`); a doc arguing a file is *missing* names it in plain prose, since a backticked span means "this file is here".
 
+### How the instruction files are organised, and how to use them
+
+This file and the layer files (`frontend/CLAUDE.md`, `backend/CLAUDE.md`, `database/CLAUDE.md`) are read on every task, so they hold only what nearly every task needs: commands, layout, and the rules that apply to every change, each in one or two sentences naming the thing to use and the thing not to. The frontend and backend files are **indexes**: their rules live in `docs/frontend/` and `docs/backend/`, one document per subject, each opening with what to read it before.
+
+- **Reading.** Before working in a layer, read its `CLAUDE.md`, then the rows of its "Read when the work touches it" table that match the task, and only those. A document that does not match the task is not read.
+- **Writing a rule.** A new rule is one line in the layer index's "Need / Use / Never" table, or one sentence, plus the full entry in the matching `docs/<layer>/*.md`. If the text will not fit in a sentence, it belongs in `docs/`, not here.
+- **What never goes in a `CLAUDE.md`.** The history of the defect, issue and PR numbers, the mechanism of the guard that holds the rule, edge cases, and worked examples. Those go in the `docs/<layer>/` entry, the regression test's comment, or an ADR.
+- **A rule the machine enforces needs no essay.** Where a type, a lint rule or a source-scanning test already holds a rule, the `CLAUDE.md` names the abstraction to use and nothing more; the guard's failure message says what to use instead of the pattern it rejects, so the rule is read at the moment it is broken.
+
+`backend/src/common/instruction-files.spec.ts` holds the shape: each layer file stays under its size ceiling, the root file under a shrink-only one, every `docs/frontend/*.md` and `docs/backend/*.md` is reachable from its index, and no layer index carries an issue number. This file is itself over the layer ceiling and still carries defect histories; moving them out is owed, and the shrink-only ceiling is what stops it growing meanwhile.
+
 ### The contract documents
 
 Cross-layer rules live in `docs/`. `docs/system-invariants.md` is the index: every invariant with a stable ID, the mechanism that enforces it, and an honest status of `enforced`, `partial` or `unenforced` (an `unenforced` entry describes something the system currently gets wrong -- editing the document does not close the gap).
