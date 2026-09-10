@@ -110,7 +110,9 @@ const headerClass = (col: SortColumn) =>
 // reproduces exactly: the HEADER cells are `py-2`, the BODY cells `py-2.5`.
 const cellPadding = (col: SortColumn) => (col.last ? 'sm:py-2.5' : 'sm:py-2.5 sm:pr-4');
 
-// The same sort controls in the phone strip: a wrapped row of compact chips.
+// The phone sort strip -- `PHONE_HEADER_CLASS` in `components/ui/Table.tsx`,
+// which is where that class and its own doc live. The same sort controls as
+// the column header row, as a wrapped row of compact chips.
 // Column alignment means nothing there -- the column header row is hidden and
 // each data row is a grid -- so every control is left-aligned and self-naming.
 // The border is what says "tappable" here: there is no hover on a touch screen,
@@ -127,6 +129,7 @@ const cellPadding = (col: SortColumn) => (col.last ? 'sm:py-2.5' : 'sm:py-2.5 sm
 // `SortableHeader`'s pre-existing gap for a keyboard or switch user (a `<th>`
 // with an `onClick` and no `tabIndex`, `role` or key handler), which is shared
 // by every report table and is a separate fix.
+
 // A figure cell inside a wrapped row: no padding of its own below `sm` and
 // this table's own from `sm` up, which each cell adds through `cellPadding` so
 // "which column is last" stays decided in one place. Smaller type on phones so
@@ -211,7 +214,6 @@ const FIGURE_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:t
 // the pseudo-locale's `[XX-Down-XX]`, is 84px in a 122px track at 320px.
 const WORD_CELL = 'p-0 text-right text-xs sm:table-cell sm:text-sm';
 
-/** Every caption in a wrapped cell is phone-only. */
 export function CategoryPerformanceReport() {
   const t = useTranslations('reports');
   const { formatCurrencyCompact: formatCurrency, formatPercentTrimmed } = useNumberFormat();

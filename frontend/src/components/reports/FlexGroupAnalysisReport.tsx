@@ -100,7 +100,9 @@ const headerClass = (col: SortColumn) =>
 // wrapped row supplies the vertical inset and the grid does the spacing).
 const cellPadding = (col: SortColumn) => (col.last ? 'sm:py-2' : 'sm:py-2 sm:pr-4');
 
-// The same sort controls in the phone strip: a wrapped row of compact chips.
+// The phone sort strip -- `PHONE_HEADER_CLASS` in `components/ui/Table.tsx`,
+// which is where that class and its own doc live. The same sort controls as
+// the column header row, as a wrapped row of compact chips.
 // Column alignment means nothing there -- the column header row is hidden and
 // each data row is a grid -- so every control is left-aligned and self-naming.
 // The border is what says "tappable" here: there is no hover on a touch screen,
@@ -114,6 +116,7 @@ const cellPadding = (col: SortColumn) => (col.last ? 'sm:py-2' : 'sm:py-2 sm:pr-
 // pair this report holds, exactly as the N column header rows already do on
 // desktop: sorting from any group re-sorts every group. Nothing in the strip
 // or in `SortableHeader` carries a DOM id, so N copies collide over nothing.
+
 // A money (or percent) cell inside a wrapped row: no padding of its own below
 // `sm` and this table's own from `sm` up, which each cell adds through
 // `cellPadding` so "which column is last" stays decided in one place. Smaller
@@ -192,8 +195,6 @@ const cellPadding = (col: SortColumn) => (col.last ? 'sm:py-2' : 'sm:py-2 sm:pr-
 // 96px. So no column takes a spanning track here, unlike the sibling tables
 // where a single-word `Gebudgetteerd` or `Запланировано` forced one.
 const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:text-sm';
-
-/** Every caption in a wrapped cell is phone-only. */
 
 export function FlexGroupAnalysisReport() {
   const t = useTranslations('reports');

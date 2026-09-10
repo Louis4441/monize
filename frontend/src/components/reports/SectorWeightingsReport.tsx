@@ -67,12 +67,15 @@ type SortColumnsByField = TableSortColumnsByField<SectorSortField, SortColumn>;
 const HEADER_CLASS =
   'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider';
 
-// The same sort controls in the phone strip: a wrapped row of compact chips.
+// The phone sort strip -- `PHONE_HEADER_CLASS` in `components/ui/Table.tsx`,
+// which is where that class and its own doc live. The same sort controls as
+// the column header row, as a wrapped row of compact chips.
 // Column alignment means nothing there -- the column header row is hidden and
 // each data row is a grid -- so every control is left-aligned and self-naming.
 // The border and card background are what say "tappable": there is no hover on
 // a touch screen, and without them the strip reads as another row of the
 // captions the cells below carry.
+
 // Where each column sits on the phone grid, written ONCE. The table has three
 // row shapes -- a sector row, the optional unclassified row and the totals
 // footer -- and all three place their cells from this record, so a reader
@@ -150,7 +153,6 @@ const FIGURE_CELL =
 const IDENTITY_CELL =
   `${CELL_PLACEMENT.sector} min-w-0 p-0 text-sm sm:table-cell sm:px-4 sm:py-3`;
 
-/** Every caption in a wrapped cell is phone-only. */
 function CustomTooltip({ active, payload, formatCurrencyFull, defaultCurrency, labelDirect, labelEtf, labelTotal }: {
   active?: boolean;
   payload?: Array<{ payload: { sector: string; direct: number; etf: number; total: number; percentage: number } }>;

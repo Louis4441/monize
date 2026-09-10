@@ -106,13 +106,16 @@ const headerClass = (col: SortColumn) =>
 // wrapped row supplies the vertical inset and the grid does the spacing).
 const cellPadding = (col: SortColumn) => (col.last ? 'sm:py-2' : 'sm:py-2 sm:pr-4');
 
-// The same sort controls in the phone strip: a wrapped row of compact chips.
+// The phone sort strip -- `PHONE_HEADER_CLASS` in `components/ui/Table.tsx`,
+// which is where that class and its own doc live. The same sort controls as
+// the column header row, as a wrapped row of compact chips.
 // Column alignment means nothing there -- the column header row is hidden and
 // each data row is a grid -- so every control is left-aligned and self-naming.
 // The border is what says "tappable" here: there is no hover on a touch screen,
 // and the strip sits directly on the card, whose background this already is --
 // so the border is the whole of the affordance. The shared
 // `PHONE_HEADER_CLASS` keeps this strip identical to its sibling reports.
+
 // A figure cell (`% used`, `Score impact`) inside a wrapped row: no padding of
 // its own below `sm` and this table's own from `sm` up, which each cell adds
 // through `cellPadding` so "which column is last" stays decided in one place.
@@ -159,7 +162,6 @@ const cellPadding = (col: SortColumn) => (col.last ? 'sm:py-2' : 'sm:py-2 sm:pr-
 const FIGURE_CELL =
   'p-0 text-right text-xs font-medium whitespace-nowrap sm:table-cell sm:text-sm';
 
-/** Every caption in a wrapped cell is phone-only. */
 export function BudgetHealthScoreReport() {
   const t = useTranslations('reports');
   const { formatPercentTrimmed } = useNumberFormat();
