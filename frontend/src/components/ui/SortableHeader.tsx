@@ -1,7 +1,8 @@
 'use client';
 
-import { type KeyboardEvent, ReactNode } from 'react';
+import { ReactNode } from 'react';
 import { SortIcon } from './SortIcon';
+import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from './interactive-row';
 import type { SortDirection } from '@/hooks/useSortableTable';
 
 interface SortableHeaderProps<F extends string> {
@@ -31,11 +32,6 @@ export function SortableHeader<F extends string>({
     align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : '';
   const isActive = sortField === field;
   const sort = () => onSort(field);
-  const handleKeyDown = (event: KeyboardEvent<HTMLTableCellElement>) => {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    sort();
-  };
 
   return (
     // `role="columnheader"` is the implicit role of a `<th>`, restated so it
@@ -46,8 +42,8 @@ export function SortableHeader<F extends string>({
       tabIndex={0}
       aria-sort={isActive ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
       onClick={sort}
-      onKeyDown={handleKeyDown}
-      className={`cursor-pointer transition-colors motion-reduce:transition-none hover:bg-gray-100 dark:hover:bg-gray-700 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-600 dark:focus-visible:outline-blue-400 select-none ${className}`}
+      onKeyDown={activateOnKey(sort)}
+      className={`cursor-pointer transition-colors motion-reduce:transition-none hover:bg-gray-100 dark:hover:bg-gray-700 ${INTERACTIVE_ROW_FOCUS_CLASS} select-none ${className}`}
     >
       <div className={`flex items-center ${justify}`}>
         {children}

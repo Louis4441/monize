@@ -25,6 +25,7 @@ import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMult
 import { resolvePdfColor } from '@/components/reports/resolve-pdf-color';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
+import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from '@/components/ui/interactive-row';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import type {
   SortColumn as TableSortColumn,
@@ -617,13 +618,9 @@ export function SecurityTypeAllocationReport() {
                     role="row"
                     tabIndex={0}
                     aria-expanded={expandedType === item.type}
-                    className="grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-600 dark:focus-visible:outline-blue-400 cursor-pointer sm:table-row sm:p-0"
+                    className={`grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 ${INTERACTIVE_ROW_FOCUS_CLASS} cursor-pointer sm:table-row sm:p-0`}
                     onClick={() => setExpandedType((current) => current === item.type ? null : item.type)}
-                    onKeyDown={(event) => {
-                      if (event.key !== 'Enter' && event.key !== ' ') return;
-                      event.preventDefault();
-                      setExpandedType((current) => current === item.type ? null : item.type);
-                    }}
+                    onKeyDown={activateOnKey(() => setExpandedType((current) => current === item.type ? null : item.type))}
                   >
                     {/* The identity; the `<tr>` around it stays the click target
                         at every width. A type label is bounded in practice (five

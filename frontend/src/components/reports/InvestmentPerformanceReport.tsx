@@ -21,6 +21,7 @@ import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
+import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from '@/components/ui/interactive-row';
 import {
   CAPTION_CLASS,
   CellLabel,
@@ -467,13 +468,9 @@ export function InvestmentPerformanceReport() {
                           role="row"
                           tabIndex={isExpandable ? 0 : undefined}
                           aria-expanded={isExpandable ? isExpanded : undefined}
-                          className={`grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row sm:p-0 ${isExpandable ? 'cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-600 dark:focus-visible:outline-blue-400' : ''}`}
+                          className={`grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row sm:p-0 ${isExpandable ? `cursor-pointer ${INTERACTIVE_ROW_FOCUS_CLASS}` : ''}`}
                           onClick={isExpandable ? () => setExpandedSecurityId(isExpanded ? null : holding.securityId) : undefined}
-                          onKeyDown={isExpandable ? (event) => {
-                            if (event.key !== 'Enter' && event.key !== ' ') return;
-                            event.preventDefault();
-                            setExpandedSecurityId(isExpanded ? null : holding.securityId);
-                          } : undefined}
+                          onKeyDown={isExpandable ? activateOnKey(() => setExpandedSecurityId(isExpanded ? null : holding.securityId)) : undefined}
                         >
                           <td role="cell" className={`${CELL_PLACEMENT.symbol} min-w-0 p-0 sm:table-cell sm:px-4 sm:py-3`}>
                             <div className="flex items-center gap-2">
