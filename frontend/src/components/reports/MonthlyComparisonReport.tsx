@@ -513,8 +513,11 @@ export function MonthlyComparisonReport() {
                 the change and its percentage under the two months on line 2.
                 Nothing is dropped, and no figure is truncated -- a money value
                 never wraps (`MONEY_CELL`). From `sm` up it is the ordinary table,
-                resolving identically to today (each cell restores its own
-                `sm:px-4 sm:py-3 sm:text-sm`), and the sort controls survive as
+                resolving to today's output in every respect but one (each cell
+                restores its own `sm:px-4 sm:py-3 sm:text-sm`; `MONEY_CELL`'s
+                `whitespace-nowrap` is unprefixed, so it applies at 640px+ too,
+                where the base cell carried no `white-space` class -- deliberate,
+                and the constant says why), and the sort controls survive as
                 their own phone-only header row because the column header row that
                 carries them on desktop is hidden there. Restyling `display`
                 strips the implicit table semantics below `sm`, so the roles are
@@ -713,8 +716,12 @@ export function MonthlyComparisonReport() {
                     the security name (a descriptor under its symbol) and the
                     price. Nothing is dropped, and no figure is truncated -- a
                     money value never wraps (`MONEY_CELL`). From `sm` up it is the
-                    ordinary table, resolving identically to today, and the sort
-                    controls survive as their own phone-only header row. Restyling
+                    ordinary table, resolving to today's output in every respect
+                    but one -- `MONEY_CELL`'s `whitespace-nowrap` is unprefixed,
+                    so it applies at 640px+ too, where the base cell carried no
+                    `white-space` class (deliberate; the constant says why) --
+                    and the sort controls survive as their own phone-only header
+                    row. Restyling
                     `display` strips the table semantics below `sm`, so the roles
                     are restated and every bare figure carries a `CellLabel`; the
                     symbol names itself and the name sits under it. DOM order is

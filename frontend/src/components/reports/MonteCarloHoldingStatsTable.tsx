@@ -82,7 +82,12 @@ export function HoldingStatsTable({
             // card's descriptor -- and no figure wraps (`FIGURE_CELL`). From `sm`
             // up it is the ordinary table, each cell restoring its own
             // `px-3 py-1.5` and the name its `truncate max-w-[200px]`, resolving
-            // identically to today. This table's header is not sortable, so below
+            // to today's output in every respect but one: `FIGURE_CELL`'s
+            // `whitespace-nowrap` is unprefixed, so it applies there as well,
+            // where the base cell carried no `white-space` class. That is
+            // deliberate and the constant says why (the symbol cell carries the
+            // same class inline, for the same reason).
+            // This table's header is not sortable, so below
             // `sm` the column header row is simply block-hidden and every bare
             // figure carries a `CellLabel` naming its column; the symbol and the
             // name name themselves. Restyling `display` strips the implicit table

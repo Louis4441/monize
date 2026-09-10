@@ -1239,8 +1239,14 @@ export function PortfolioValueReport() {
               identity) and the total (the headline); line 2 is holdings, cash
               and the gain/loss. Nothing is dropped, and no figure is truncated
               -- a money value never wraps (`MONEY_CELL`). From `sm` up it is the
-              ordinary table, resolving identically to today (each cell restores
-              its own `sm:px-4 sm:py-3 sm:text-sm`), and the sort controls
+              ordinary table, resolving to today's output in every respect but
+              one (each cell restores its own `sm:px-4 sm:py-3`, the four figure
+              cells `sm:text-sm` and the account cell `sm:text-base` -- that one
+              carried NO size class before the conversion, so 16px inherited is
+              what it has to hand back; `MONEY_CELL`'s `whitespace-nowrap` is
+              unprefixed, so it applies at 640px+ too, where the base cell
+              carried no `white-space` class -- deliberate, and the constant
+              says why), and the sort controls
               survive as their own phone-only header row because the column
               header row that carries them on desktop is hidden there. Restyling
               `display` strips the implicit table semantics below `sm`, so the

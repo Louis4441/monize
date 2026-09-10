@@ -1711,9 +1711,12 @@ export function DividendIncomeReport() {
               Total, spanning both tracks as the row's headline. Nothing is
               dropped, and no figure is truncated -- a money value never wraps
               (`FIGURE_CELL`). From `sm` up it is the ordinary table, resolving
-              identically to today (each cell restores its own
-              `sm:px-4 sm:py-3 sm:text-sm`; the identity cell keeps its 16px
-              symbol by carrying no `sm:text-*`), and the sort controls survive
+              to today's output in every respect but one (each cell restores its
+              own `sm:px-4 sm:py-3 sm:text-sm`; the identity cell keeps its 16px
+              symbol by carrying no `sm:text-*`; `FIGURE_CELL`'s
+              `whitespace-nowrap` is unprefixed, so it applies at 640px+ too,
+              where the base cell carried no `white-space` class -- deliberate,
+              and the constant says why), and the sort controls survive
               as their own phone-only header row because the column header row
               that carries them on desktop is hidden there. Restyling `display`
               strips the implicit table semantics below `sm`, so the roles are

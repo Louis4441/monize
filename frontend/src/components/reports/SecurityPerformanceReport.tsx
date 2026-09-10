@@ -943,8 +943,12 @@ export function SecurityPerformanceReport() {
                    line 2 is the account, the share count and the price. Nothing
                    is dropped, and no figure is truncated -- a money value never
                    wraps (`MONEY_CELL`). From `sm` up it is the ordinary table,
-                   resolving identically to today (each cell restores its own
-                   `sm:px-4 sm:py-3 sm:text-sm`), and the sort controls survive
+                   resolving to today's output in every respect but one (each
+                   cell restores its own `sm:px-4 sm:py-3 sm:text-sm`;
+                   `MONEY_CELL`'s `whitespace-nowrap` is unprefixed, so it
+                   applies at 640px+ too, where the base cell carried no
+                   `white-space` class -- deliberate, and the constant says
+                   why), and the sort controls survive
                    as their own phone-only header row because the column header
                    row that carries them on desktop is hidden there. Restyling
                    `display` strips the implicit table semantics below `sm`, so
@@ -1048,8 +1052,12 @@ export function SecurityPerformanceReport() {
                    without a horizontal scroll: line 1 is the date (identity) and
                    the amount (headline); line 2 is the account and the type pill.
                    Nothing is dropped, and the amount never wraps (`MONEY_CELL`).
-                   From `sm` up it is the ordinary table, resolving identically to
-                   today, and the sort controls survive as their own phone-only
+                   From `sm` up it is the ordinary table, resolving to today's
+                   output in every respect but one -- `MONEY_CELL`'s
+                   `whitespace-nowrap` is unprefixed, so it applies at 640px+
+                   too, where the base cell carried no `white-space` class
+                   (deliberate; the constant says why) -- and the sort controls
+                   survive as their own phone-only
                    header row. The footer wraps the same way -- "Total Dividends"
                    beside the total -- and keeps its desktop `colSpan={3}`, so its
                    cells carry `aria-colindex` (they do not map one-to-one to the

@@ -141,7 +141,10 @@ export function PerformanceSummaryTable({
     // a line, the 90th alone on the last. Nothing is dropped, and no value wraps
     // (`VALUE_CELL`). From `sm` up it is the ordinary table, each cell restoring
     // its own `px-3 py-1.5` and the table's `text-xs` inherited at every width,
-    // so it resolves identically to today at 640px+. This table's header is not
+    // so at 640px+ it resolves to today's output in every respect but one:
+    // `VALUE_CELL`'s `whitespace-nowrap` is unprefixed, so it applies there as
+    // well, where the base cell carried no `white-space` class. That is
+    // deliberate and the constant says why. This table's header is not
     // sortable, so below `sm` the column header row is simply block-hidden and
     // every bare value carries a `CellLabel` naming its column; the label names
     // itself. The 50th-percentile highlight follows its column into the card.
