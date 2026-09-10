@@ -49,13 +49,14 @@ const ILLUMINATION_KERNEL = 31;
  *
  * `255 * channel / background` amplifies noise by `255 / background`, so a dark
  * region the crop should not have contained -- a hand's shadow, the desk beside
- * a page detection missed -- turns faint sensor grain into loud colour speckle
- * (bg 22 amplifies roughly eleven times, and the three channels divide
- * independently). Real paper under a shadow does not fall this far, so clamping
- * the estimate up to this level caps the gain at about `255 / 48` without
- * touching the gradient across a genuine page. The other half of the guard is
- * order: the denoise runs BEFORE this step, so what is amplified is already
- * clean, rather than after it, where it could only chase blown-up noise.
+ * a page detection missed -- turns faint sensor grain into loud speckle (bg 22
+ * amplifies roughly eleven times). Real paper under a shadow does not fall this
+ * far, so clamping the estimate up to this level caps the gain at about
+ * `255 / 48` without touching the gradient across a genuine page. Two more
+ * guards sit beside it in `enhance`: the denoise runs BEFORE the division, so
+ * what is amplified is already clean, and the divisor is a single luminance
+ * estimate shared by all three channels, so amplified noise stays neutral
+ * instead of splitting into colour speckle.
  */
 const ILLUMINATION_MIN_BACKGROUND = 48;
 /** CLAHE parameters for local contrast, applied to lightness only. */
@@ -351,7 +352,16 @@ export function enhance(cv: OpenCv, image: RawImage): RawImage {
       cv.BORDER_DEFAULT,
     );
 
-    // 2. Illumination normalisation, per channel.
+    // 2. Illumination normalisation from a SINGLE luminance estimate.
+    //
+    // The background is estimated on grayscale and the one estimate divides all
+    // three channels, so the gain is neutral: a dark region -- a shadow on the
+    // page, the desk a failed detection left in frame -- is lifted or left in
+    // its own colour, never split into per-channel speckle. Dividing each
+    // channel by its OWN background is what turned neutral sensor grain into the
+    // rainbow noise; one shared divisor cannot.
+    const gray = scope.add(new cv.Mat());
+    cv.cvtColor(denoised, gray, cv.COLOR_RGB2GRAY);
     const kernel = scope.add(
       cv.getStructuringElement(
         cv.MORPH_RECT,
@@ -359,7 +369,7 @@ export function enhance(cv: OpenCv, image: RawImage): RawImage {
       ),
     );
     const background = scope.add(new cv.Mat());
-    cv.morphologyEx(denoised, background, cv.MORPH_CLOSE, kernel);
+    cv.morphologyEx(gray, background, cv.MORPH_CLOSE, kernel);
     // Clamp the estimate up to a floor so a genuinely dark region cannot drive
     // the gain sky-high. `cv.max` needs a Mat, not a scalar, in this build.
     const floor = scope.add(
@@ -367,20 +377,24 @@ export function enhance(cv: OpenCv, image: RawImage): RawImage {
         background.rows,
         background.cols,
         background.type(),
-        new cv.Scalar(
-          ILLUMINATION_MIN_BACKGROUND,
-          ILLUMINATION_MIN_BACKGROUND,
-          ILLUMINATION_MIN_BACKGROUND,
-        ),
+        new cv.Scalar(ILLUMINATION_MIN_BACKGROUND),
       ),
     );
     cv.max(background, floor, background);
+    // Replicate the single estimate to three channels so one gain lands on R,
+    // G and B alike.
+    const backgroundChannels = scope.add(new cv.MatVector());
+    backgroundChannels.push_back(background);
+    backgroundChannels.push_back(background);
+    backgroundChannels.push_back(background);
+    const background3 = scope.add(new cv.Mat());
+    cv.merge(backgroundChannels, background3);
     const normalised = scope.add(new cv.Mat());
     // 255 * channel / background: where the background is dark the pixel is
     // lifted by the same factor, so a shadowed corner ends up as bright as the
     // rest of the page instead of merely less dark -- but only down to the
     // floor, past which the region is not paper and lifting it only amplifies.
-    cv.divide(denoised, background, normalised, 255, cv.CV_8U);
+    cv.divide(denoised, background3, normalised, 255, cv.CV_8U);
 
     // 3. Local contrast on lightness only, so colours are not pushed around.
     const lab = scope.add(new cv.Mat());
