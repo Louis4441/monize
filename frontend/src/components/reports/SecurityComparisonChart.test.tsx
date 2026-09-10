@@ -292,7 +292,7 @@ describe('SecurityComparisonChart', () => {
   /**
    * `connectNulls` draws a straight segment through the gap, indistinguishable
    * from measured data -- and a tooltip saying "unknown" under the cursor does
-   * not undo it (`frontend/CLAUDE.md`, `docs/time-series-contract.md` rule 3).
+   * not undo it (`docs/frontend/financial-figures.md`, `docs/time-series-contract.md` rule 3).
    */
   it('never bridges a gap in a line', async () => {
     mockGetPerformanceComparison.mockResolvedValue(

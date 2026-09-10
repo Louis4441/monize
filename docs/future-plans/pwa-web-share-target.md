@@ -340,7 +340,7 @@ Changed:
   (see section 10).
 - `docs/system-invariants.md`, `docs/external-side-effects.md` (the stash is a
   client-side store; a short entry says it is not the server's and what bounds
-  it), `frontend/CLAUDE.md` (a paragraph naming `lib/share-inbox.ts` as the one
+  it), `docs/frontend/pwa-push-share.md` (a paragraph naming `lib/share-inbox.ts` as the one
   reader of the stash and `lib/share-target.ts` as the one accept list).
 
 No backend or database change. No Helm or Docker change: the manifest and the

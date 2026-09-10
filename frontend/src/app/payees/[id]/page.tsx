@@ -367,7 +367,7 @@ function PayeeDetailContent() {
         : (analytics?.categoryTotals ?? []);
     // A row whose total could not be converted is dropped rather than drawn: a
     // bar has no way to say "unknown", and a zero-width one reads as a measured
-    // zero (frontend/CLAUDE.md). Count the dropped rows so the panel marks the
+    // zero (docs/frontend/financial-figures.md). Count the dropped rows so the panel marks the
     // bars as a subtotal.
     const aggregated = aggregateGroupedTotals(source, currencyStrategy);
     const rows = aggregated

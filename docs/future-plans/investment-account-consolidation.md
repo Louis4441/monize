@@ -229,7 +229,7 @@ halves whose partner is in the filtered set disappear; orphans stay. Details:
   `useInvestmentData.ts` (filters, density, undo/redo); only the toggle is shared. Migrating the
   page onto the panel is a named follow-up.
 - Every write from the panel calls `invalidateBalanceCaches()` (the rule in
-  `frontend/CLAUDE.md`; `balance-cache.guard.test.ts` scans for it).
+  `docs/frontend/api-and-cache.md`; `balance-cache.guard.test.ts` scans for it).
 
 ### Editing the pair (the gap that stalled the community branch)
 
@@ -242,7 +242,7 @@ edited account resolves to a pair via `getInvestmentPair`:
 - A collapsed "Cash account" section holds the cash half's own fields: opening balance
   (`CurrencyInput`), account number, description. Saving issues a second `update()` to the cash
   id only when the section is dirty. The busy flag is a counter, not a boolean (nested-saves
-  rule in `frontend/CLAUDE.md`).
+  rule in `docs/frontend/api-and-cache.md`).
 - Standalone and orphan accounts get today's single-account form unchanged; the
   `createInvestmentPair` checkbox on create is untouched.
 

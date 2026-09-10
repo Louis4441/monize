@@ -39,7 +39,7 @@ interface SplitSubmitButtonProps {
  *
  * The two halves are siblings, not one nested in the other -- a control inside
  * a `<button>` truncates the click target and breaks hydration (see
- * `frontend/CLAUDE.md`). They are joined visually by squaring the facing
+ * `docs/frontend/ui-conventions.md`). They are joined visually by squaring the facing
  * corners.
  */
 export function SplitSubmitButton({

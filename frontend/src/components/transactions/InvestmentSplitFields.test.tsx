@@ -240,7 +240,7 @@ describe('InvestmentSplitFields', () => {
       // The field shows 6dp but the market rate is stored at 10dp, so blurring
       // the untouched field re-reports the 6dp rounding. That is not a user
       // override: adopting it would replace the fetched rate with a truncated
-      // one (the FX-panel bug frontend/CLAUDE.md warns about). The guard drops a
+      // one (the FX-panel bug docs/frontend/forms-and-formatting.md warns about). The guard drops a
       // re-report matching the market rate at display precision, so no onChange
       // fires from the blur alone.
       mockGetLatestRates.mockResolvedValue([

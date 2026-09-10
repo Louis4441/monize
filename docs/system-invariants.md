@@ -1411,7 +1411,7 @@ booking its interest outside the app is now under one period's interest, so
 to the stored contractual payment, and where the rate timeline records the
 payment in effect that value is authoritative even when it does not amortize
 (`INV-LOAN-HISTORY-001` covers the interest; the payment's authority ordering is
-documented in `frontend/CLAUDE.md`).
+documented in `docs/frontend/financial-figures.md`).
 
 ## Scheduled occurrences
 

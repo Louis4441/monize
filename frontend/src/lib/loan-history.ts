@@ -1440,7 +1440,7 @@ export async function fetchAllAccountTransactions(accountId: string): Promise<Tr
  * deleted (issue #1255) the same outage renders a measured **zero** instead --
  * quieter, and no less wrong, because "the ledger recorded no interest" is a
  * claim this function is not entitled to make on a failed read. The rule in
- * `frontend/CLAUDE.md` covers both: a failed lookup is not an empty dataset,
+ * `docs/frontend/api-and-cache.md` covers both: a failed lookup is not an empty dataset,
  * and rendering the failure as emptiness turns an outage into an answer.
  */
 export async function fetchLoanInterestTransactions(

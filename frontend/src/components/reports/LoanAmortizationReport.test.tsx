@@ -71,7 +71,7 @@ vi.mock('@/lib/logger', () => ({
  * The report fetches on mount -- the accounts list and, keyed off the resulting
  * selection, that loan's transactions, booked interest and rate history -- so a
  * bare `render(...)` leaves those updates landing outside `act` and the
- * assertions run against a tree React has not finished. `frontend/CLAUDE.md`:
+ * assertions run against a tree React has not finished. `docs/frontend/testing.md`:
  * give the file one helper and use it everywhere.
  */
 async function renderReport() {

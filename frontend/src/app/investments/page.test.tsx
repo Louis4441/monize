@@ -311,7 +311,7 @@ vi.mock('@/components/investments/InvestmentTransactionList', () => ({
 vi.mock('@/components/transactions/TransactionList', () => ({
   // `onRefresh` is how the real list reports a row it has already deleted (and
   // any other write it owns), so the mock's Delete button raises exactly that
-  // and nothing else -- see the delete-contract note in frontend/CLAUDE.md.
+  // and nothing else -- see the delete-contract note in docs/frontend/tables-and-registers.md.
   TransactionList: ({ transactions, onEdit, onRefresh, showToolbar, startingBalance, isSingleAccountView }: any) => (
     <div data-testid="cash-transaction-list">
       <span>{transactions.length} cash transactions</span>

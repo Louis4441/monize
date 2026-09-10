@@ -182,10 +182,14 @@ describeTree("docs name files that exist", () => {
       gitListFiles(root, "--cached --others --exclude-standard"),
     );
     const tracked = gitListFiles(root);
+    // `docs/frontend/` holds the frontend layer's rules, moved out of
+    // `frontend/CLAUDE.md` so that file could stay an index; they bind exactly
+    // as a CLAUDE.md does and are scanned at the same strength.
     const contractDocs = tracked.filter(
       (f) =>
         basename(f) === "CLAUDE.md" ||
-        (/^docs\/[^/]+\.md$/.test(f) && basename(f) !== "CLAUDE.md"),
+        (/^docs\/(frontend\/)?[^/]+\.md$/.test(f) &&
+          basename(f) !== "CLAUDE.md"),
     );
     const planDocs = tracked.filter((f) =>
       /^docs\/future-plans\/[^/]+\.md$/.test(f),
@@ -215,6 +219,7 @@ describeTree("docs name files that exist", () => {
     const { index, contractDocs, planDocs } = load();
     expect(contractDocs.some((d) => d.endsWith("/CLAUDE.md"))).toBe(true);
     expect(contractDocs).toContain("docs/financial-calculation-contract.md");
+    expect(contractDocs).toContain("docs/frontend/ui-conventions.md");
     expect(contractDocs.length).toBeGreaterThan(5);
     expect(planDocs.length).toBeGreaterThan(5);
     expect(index.list.length).toBeGreaterThan(500);

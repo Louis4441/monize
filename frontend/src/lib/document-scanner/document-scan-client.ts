@@ -14,7 +14,7 @@ import type {
  * takes seconds, a user can retake a photo or drag a corner while one is in
  * flight, and a late reply describing the PREVIOUS photo must not be shown as
  * the current one -- so every request carries an id and a reply for an id that
- * is no longer outstanding is dropped (`I6`, and `frontend/CLAUDE.md`'s rule
+ * is no longer outstanding is dropped (`I6`, and `docs/frontend/api-and-cache.md`'s rule
  * that asynchronous data belongs to the request that produced it).
  *
  * Second, failure: a worker that dies takes every pending promise with it

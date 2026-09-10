@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
  * front of a reader, which is the number and is not how anyone reads one -- and
  * because the column used to hold whatever was typed, a raw render looked
  * perfectly fine for every row written before normalization and wrong for every
- * row written after. `frontend/CLAUDE.md` states the rule; per the repo's
+ * row written after. `docs/frontend/forms-and-formatting.md` states the rule; per the repo's
  * "prefer the rule the machine can check", this scan is what keeps it, modelled
  * on `number-parse.guard.test.ts`.
  */

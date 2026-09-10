@@ -57,7 +57,7 @@ const LINKIFIED = [
  *    name;
  *  - the row is not saved yet, so the text is being approved or diagnosed
  *    rather than read back;
- *  - the text sits inside a control, where `frontend/CLAUDE.md`'s rule against
+ *  - the text sits inside a control, where `docs/frontend/ui-conventions.md`'s rule against
  *    nesting anything interactive in a `<button>` settles it.
  */
 const PLAIN: Record<string, string> = {

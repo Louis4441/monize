@@ -2,7 +2,7 @@
  * Does this device point with a finger?
  *
  * Distinct from `useIsMobile`, which asks how WIDE the window is (639px). The
- * two answer different questions and the rule (`frontend/CLAUDE.md`) is that a
+ * two answer different questions and the rule (`docs/frontend/ui-conventions.md`) is that a
  * decision about the *platform* never keys off the viewport: a narrow desktop
  * window is not a phone, and flipping platform behaviour when somebody resizes
  * a window is a bug that only ever reproduces at one width.

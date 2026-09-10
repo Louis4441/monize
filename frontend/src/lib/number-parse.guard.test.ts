@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
  * The recurring mistake this scan bans is the dot-only character-class filter --
  * `value.replace(/[^0-9.-]/g, '')` before a `parseFloat` -- which silently drops
  * a comma decimal (turning a Polish "1200,99" into 120099) and, in a dot-group
- * locale, treats the group dot as a digit. `frontend/CLAUDE.md` states the rule
+ * locale, treats the group dot as a digit. `docs/frontend/forms-and-formatting.md` states the rule
  * in prose; per the repo's "prefer the rule the machine can check", this is the
  * scan that keeps it, modelled on `scheduled-effective-amount.guard.test.ts`.
  *
