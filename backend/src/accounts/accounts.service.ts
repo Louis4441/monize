@@ -21,6 +21,9 @@ import { UpdateAccountDto } from "./dto/update-account.dto";
 import { ScheduledTransactionsService } from "../scheduled-transactions/scheduled-transactions.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { PortfolioService } from "../securities/portfolio.service";
+import { ExchangeRateService } from "../currencies/exchange-rate.service";
+import { resolveUserDefaultCurrency } from "../common/default-currency.util";
+import { memoizedRateResolver } from "../common/converting-total";
 import { LoanMortgageAccountService } from "./loan-mortgage-account.service";
 import { mortgageTermEndDate } from "./payment-frequency.util";
 import { PaymentFrequency, AmortizationResult } from "./loan-amortization.util";
@@ -48,6 +51,43 @@ import { lockAccountsForBalanceWrite } from "../common/db/locks";
 import { affectedRowCount } from "../common/db/query-result";
 import { LEDGER_MOVEMENT_PREDICATE } from "../common/ledger-balance.sql";
 
+/**
+ * One account as the AI Assistant and the MCP server describe it.
+ */
+export interface LlmAccountRow {
+  id: string;
+  name: string;
+  type: AccountType;
+  subType: string | null;
+  balance: number;
+  currentBalance: number;
+  creditLimit: number | null;
+  interestRate: number | null;
+  currency: string;
+  /**
+   * `balance` / `currentBalance` expressed in `defaultCurrency`, so a
+   * reader never converts a foreign account itself. Equal to the account's
+   * own figure (at `exchangeRate` 1) when the currencies match; `null` --
+   * with the pair named in `missingRatePairs` -- when no rate exists. A
+   * zero balance is zero in every currency and needs no rate.
+   */
+  balanceInDefaultCurrency: number | null;
+  currentBalanceInDefaultCurrency: number | null;
+  /** `currency -> defaultCurrency`, as applied; 1 for the same currency. */
+  exchangeRate: number | null;
+  isClosed: boolean;
+  excludeFromNetWorth: boolean;
+  institutionName: string | null;
+  accountNumber: string | null;
+  // Loan/mortgage fields, so an assistant can reason about a loan's
+  // schedule (null on non-debt accounts).
+  paymentAmount: number | null;
+  paymentFrequency: string | null;
+  paymentStartDate: string | null;
+  amortizationMonths: number | null;
+  originalPrincipal: number | null;
+}
+
 @Injectable()
 export class AccountsService {
   private readonly logger = new Logger(AccountsService.name);
@@ -59,6 +99,10 @@ export class AccountsService {
     private netWorthService: NetWorthService,
     @Inject(forwardRef(() => PortfolioService))
     private portfolioService: PortfolioService,
+    // AccountsModule reaches CurrenciesModule through a forwardRef, so the
+    // provider it lends is injected the same way (`src/module-graph.spec.ts`).
+    @Inject(forwardRef(() => ExchangeRateService))
+    private exchangeRateService: ExchangeRateService,
     private loanMortgageService: LoanMortgageAccountService,
     private dataSource: DataSource,
     private actionHistoryService: ActionHistoryService,
@@ -1283,31 +1327,17 @@ export class AccountsService {
       accountTypes?: AccountType[];
     },
   ): Promise<{
-    accounts: Array<{
-      id: string;
-      name: string;
-      type: AccountType;
-      subType: string | null;
-      balance: number;
-      currentBalance: number;
-      creditLimit: number | null;
-      interestRate: number | null;
-      currency: string;
-      isClosed: boolean;
-      excludeFromNetWorth: boolean;
-      institutionName: string | null;
-      accountNumber: string | null;
-      // Loan/mortgage fields, so an assistant can reason about a loan's
-      // schedule (null on non-debt accounts).
-      paymentAmount: number | null;
-      paymentFrequency: string | null;
-      paymentStartDate: string | null;
-      amortizationMonths: number | null;
-      originalPrincipal: number | null;
-    }>;
+    accounts: LlmAccountRow[];
     totalAssets: number;
     totalLiabilities: number;
     netWorth: number;
+    /**
+     * The user's reporting currency: what the three totals above and every
+     * `*InDefaultCurrency` figure are denominated in.
+     */
+    defaultCurrency: string;
+    /** `"CAD->USD"` per account currency with no rate into `defaultCurrency`. */
+    missingRatePairs: string[];
     totalAccounts: number;
   }> {
     const {
@@ -1372,21 +1402,68 @@ export class AccountsService {
       }
     }
 
-    const accountList = accounts.map((a) => {
-      const balance =
+    // A foreign account's figure is shown in both its own currency and the
+    // reader's, priced by the server: a model handed only the native figure
+    // either leaves it unconverted beside a total in another currency or
+    // converts it at a rate it invented. Today's rate through the same ladder
+    // the upcoming-bills rollup uses, one lookup per currency pair.
+    const defaultCurrency = await resolveUserDefaultCurrency(
+      this.dataSource,
+      userId,
+    );
+    const rateFor = memoizedRateResolver(
+      this.exchangeRateService,
+      defaultCurrency,
+      todayYMD(),
+    );
+    const missingPairs = new Set<string>();
+    const inDefaultCurrency = (
+      amount: number,
+      rate: number | null,
+      currency: string,
+    ): number | null => {
+      // Zero is zero at any rate, so an empty foreign account never reports
+      // itself as unconvertible.
+      if (amount === 0) return 0;
+      if (rate === null) {
+        missingPairs.add(`${currency}->${defaultCurrency}`);
+        return null;
+      }
+      return roundMoney(amount * rate);
+    };
+
+    const accountList: LlmAccountRow[] = [];
+    for (const a of accounts) {
+      const balance = roundMoney(
         a.accountSubType === AccountSubType.INVESTMENT_BROKERAGE
           ? (marketValues.get(a.id) ?? 0)
-          : Number(a.currentBalance) + Number(a.futureTransactionsSum ?? 0);
-      return {
+          : Number(a.currentBalance) + Number(a.futureTransactionsSum ?? 0),
+      );
+      const currentBalance = roundMoney(Number(a.currentBalance));
+      // Same currency is 1:1 by definition and asks the rate table nothing.
+      const exchangeRate =
+        a.currencyCode === defaultCurrency ? 1 : await rateFor(a.currencyCode);
+      accountList.push({
         id: a.id,
         name: a.name,
         type: a.accountType,
         subType: a.accountSubType ?? null,
-        balance: roundMoney(balance),
-        currentBalance: roundMoney(Number(a.currentBalance)),
+        balance,
+        currentBalance,
         creditLimit: a.creditLimit ?? null,
         interestRate: a.interestRate ?? null,
         currency: a.currencyCode,
+        balanceInDefaultCurrency: inDefaultCurrency(
+          balance,
+          exchangeRate,
+          a.currencyCode,
+        ),
+        currentBalanceInDefaultCurrency: inDefaultCurrency(
+          currentBalance,
+          exchangeRate,
+          a.currencyCode,
+        ),
+        exchangeRate,
         isClosed: a.isClosed,
         excludeFromNetWorth: a.excludeFromNetWorth,
         institutionName: a.institutionId
@@ -1402,8 +1479,8 @@ export class AccountsService {
           : null,
         amortizationMonths: a.amortizationMonths ?? null,
         originalPrincipal: a.originalPrincipal ?? null,
-      };
-    });
+      });
+    }
 
     const latest = await this.netWorthService.getLatestNetWorth(userId);
 
@@ -1412,6 +1489,8 @@ export class AccountsService {
       totalAssets: roundMoney(latest?.assets ?? 0),
       totalLiabilities: roundMoney(latest?.liabilities ?? 0),
       netWorth: roundMoney(latest?.netWorth ?? 0),
+      defaultCurrency,
+      missingRatePairs: [...missingPairs].sort(),
       totalAccounts: accountList.length,
     };
   }

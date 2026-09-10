@@ -196,9 +196,26 @@ export const getUpcomingBillsSchema = z.object({
   accountNames: z.array(z.string().max(100)).max(50).optional(),
 });
 
+/**
+ * `convert` shares the envelope with the arithmetic operations (`values[0]` is
+ * the amount) and adds the pair and the date. Presence of the pair for
+ * `convert`, and the calendar validity of `date`, are checked once in
+ * `executeConversion`, shared with the MCP `calculate` tool, so both surfaces
+ * refuse the same shapes with the same message.
+ */
 export const calculateSchema = z.object({
-  operation: z.enum(["percentage", "difference", "ratio", "sum", "average"]),
+  operation: z.enum([
+    "percentage",
+    "difference",
+    "ratio",
+    "sum",
+    "average",
+    "convert",
+  ]),
   values: z.array(numberArg()).min(1).max(100),
+  fromCurrency: z.string().max(3).optional(),
+  toCurrency: z.string().max(3).optional(),
+  date: isoDateSchema.optional(),
   label: z.string().max(200).optional(),
 });
 

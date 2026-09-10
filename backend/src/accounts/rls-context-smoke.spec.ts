@@ -13,6 +13,7 @@ import { EmailService } from "../notifications/email.service";
 import { ScheduledTransactionsService } from "../scheduled-transactions/scheduled-transactions.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { PortfolioService } from "../securities/portfolio.service";
+import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { LoanMortgageAccountService } from "./loan-mortgage-account.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
@@ -65,6 +66,7 @@ describe("accounts module RLS context smoke (real withScopedDb)", () => {
         { provide: ScheduledTransactionsService, useValue: {} },
         { provide: NetWorthService, useValue: {} },
         { provide: PortfolioService, useValue: {} },
+        { provide: ExchangeRateService, useValue: {} },
         { provide: LoanMortgageAccountService, useValue: {} },
       ],
     }).compile();
@@ -196,6 +198,7 @@ describe("accounts module RLS context smoke (real withScopedDb)", () => {
         { provide: ScheduledTransactionsService, useValue: {} },
         { provide: NetWorthService, useValue: {} },
         { provide: PortfolioService, useValue: {} },
+        { provide: ExchangeRateService, useValue: {} },
         { provide: LoanMortgageAccountService, useValue: {} },
       ],
     }).compile();

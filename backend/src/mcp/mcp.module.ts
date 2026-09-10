@@ -13,6 +13,7 @@ import { OAuthModule } from "../oauth/oauth.module";
 import { AttachmentsModule } from "../attachments/attachments.module";
 import { AiRelayModule } from "../ai/relay/ai-relay.module";
 import { AiActionBuilderModule } from "../ai/actions/ai-action-builder.module";
+import { CurrenciesModule } from "../currencies/currencies.module";
 
 import { McpServerService } from "./mcp-server.service";
 import { McpHttpController } from "./mcp-http.controller";
@@ -58,6 +59,8 @@ import { McpSpendingAnalysisPrompt } from "./prompts/spending-analysis.prompt";
     AttachmentsModule,
     AiRelayModule,
     AiActionBuilderModule,
+    // ExchangeRateService, for the `calculate` tool's currency conversion.
+    forwardRef(() => CurrenciesModule),
   ],
   providers: [
     McpServerService,

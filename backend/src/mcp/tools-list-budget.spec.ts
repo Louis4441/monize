@@ -24,8 +24,14 @@ import { McpServerService } from "./mcp-server.service";
 // to the v2 SDK, whose Standard JSON Schema emission is more compact than the
 // 1.x converter -- the definitions did not change, so the caps came down with
 // the measurement rather than banking the slack.
+//
+// Raised, as a reviewed decision: `list_accounts` now states every balance in
+// the user's default currency beside its own (and names the pairs it could
+// not price), and `calculate` gained the `convert` operation -- a currency
+// pair and a rate date on the input, the rate and its date on the output. Both
+// exist so a model never converts a currency itself, which is worth the bytes.
 const TOOL_BYTE_BUDGET: Record<string, number> = {
-  list_accounts: 2050,
+  list_accounts: 2500,
   list_transactions: 3550,
   compare_periods: 1900,
   manage_transactions: 5950,
@@ -40,14 +46,14 @@ const TOOL_BYTE_BUDGET: Record<string, number> = {
   manage_securities: 4200,
   manage_investment_transactions: 4500,
   list_upcoming_bills: 3000,
-  calculate: 1200,
+  calculate: 2000,
   get_budget_status: 2550,
   get_next_prompt: 1400,
   post_response: 1050,
   report_progress: 1250,
 };
 
-const TOTAL_BYTE_BUDGET = 50_500;
+const TOTAL_BYTE_BUDGET = 51_600;
 const INSTRUCTIONS_BYTE_BUDGET = 2_600;
 
 /**

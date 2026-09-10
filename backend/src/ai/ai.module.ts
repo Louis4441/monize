@@ -31,6 +31,7 @@ import { ScheduledTransactionsModule } from "../scheduled-transactions/scheduled
 import { BuiltInReportsModule } from "../built-in-reports/built-in-reports.module";
 import { AttachmentsModule } from "../attachments/attachments.module";
 import { AiRelayModule } from "./relay/ai-relay.module";
+import { CurrenciesModule } from "../currencies/currencies.module";
 
 @Module({
   imports: [
@@ -53,6 +54,8 @@ import { AiRelayModule } from "./relay/ai-relay.module";
     // reverse MCP relay when the user's provider list reaches an mcp_relay
     // config.
     AiRelayModule,
+    // ExchangeRateService, for the `calculate` tool's currency conversion.
+    forwardRef(() => CurrenciesModule),
   ],
   providers: [
     AiService,

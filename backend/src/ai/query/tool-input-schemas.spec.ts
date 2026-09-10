@@ -716,6 +716,36 @@ describe("tool-input-schemas", () => {
       }
     });
 
+    it("accepts a currency conversion with an optional date", () => {
+      const withDate = calculateSchema.safeParse({
+        operation: "convert",
+        values: [1500],
+        fromCurrency: "CAD",
+        toCurrency: "USD",
+        date: "2026-09-01",
+      });
+      const withoutDate = calculateSchema.safeParse({
+        operation: "convert",
+        values: ["1500"],
+        fromCurrency: "CAD",
+        toCurrency: "USD",
+      });
+      expect(withDate.success).toBe(true);
+      expect(withoutDate.success).toBe(true);
+      if (withoutDate.success) expect(withoutDate.data.values).toEqual([1500]);
+    });
+
+    it("rejects a conversion date that is not YYYY-MM-DD", () => {
+      const result = calculateSchema.safeParse({
+        operation: "convert",
+        values: [1],
+        fromCurrency: "CAD",
+        toCurrency: "USD",
+        date: "01/09/2026",
+      });
+      expect(result.success).toBe(false);
+    });
+
     it("accepts optional label", () => {
       const result = calculateSchema.safeParse({
         operation: "sum",

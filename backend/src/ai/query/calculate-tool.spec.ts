@@ -1,4 +1,14 @@
-import { executeCalculation, CalculateInput } from "./calculate-tool";
+import {
+  executeCalculation,
+  executeConversion,
+  CalculateInput,
+  DatedConverter,
+} from "./calculate-tool";
+
+jest.mock("../../common/date-utils", () => ({
+  ...jest.requireActual("../../common/date-utils"),
+  todayYMD: jest.fn(() => "2026-09-10"),
+}));
 
 describe("executeCalculation", () => {
   describe("percentage", () => {
@@ -280,6 +290,132 @@ describe("executeCalculation", () => {
       expect(result).toEqual({
         error: "Unknown operation: modulo",
       });
+    });
+  });
+});
+
+describe("executeConversion", () => {
+  let rates: { convertOnDate: jest.Mock } & DatedConverter;
+
+  beforeEach(() => {
+    rates = {
+      convertOnDate: jest.fn().mockResolvedValue({
+        amount: 1500,
+        fromCurrency: "CAD",
+        toCurrency: "USD",
+        date: "2026-09-01",
+        rate: 0.7325,
+        convertedAmount: 1098.75,
+      }),
+    };
+  });
+
+  it("prices the amount through the domain service and reports both sides", async () => {
+    const result = await executeConversion(
+      {
+        values: [1500],
+        fromCurrency: "cad",
+        toCurrency: "usd",
+        date: "2026-09-01",
+        label: "rent in USD",
+      },
+      rates,
+    );
+
+    expect(rates.convertOnDate).toHaveBeenCalledWith(
+      1500,
+      "cad",
+      "usd",
+      "2026-09-01",
+    );
+    expect(result).toEqual({
+      result: 1098.75,
+      formattedResult: "1098.75 USD",
+      operation: "convert",
+      label: "rent in USD",
+      amount: 1500,
+      fromCurrency: "CAD",
+      toCurrency: "USD",
+      date: "2026-09-01",
+      rate: 0.7325,
+    });
+  });
+
+  it("defaults the date to today", async () => {
+    await executeConversion(
+      { values: [1], fromCurrency: "CAD", toCurrency: "USD" },
+      rates,
+    );
+
+    expect(rates.convertOnDate).toHaveBeenCalledWith(
+      1,
+      "CAD",
+      "USD",
+      "2026-09-10",
+    );
+  });
+
+  it("requires exactly one value", async () => {
+    const result = await executeConversion(
+      { values: [1, 2], fromCurrency: "CAD", toCurrency: "USD" },
+      rates,
+    );
+
+    expect(result).toEqual({
+      error: "Conversion requires exactly 1 value: [amount].",
+    });
+    expect(rates.convertOnDate).not.toHaveBeenCalled();
+  });
+
+  it("requires both currency codes, three letters each", async () => {
+    const missing = await executeConversion(
+      { values: [1], toCurrency: "USD" },
+      rates,
+    );
+    const malformed = await executeConversion(
+      { values: [1], fromCurrency: "CAD", toCurrency: "US$" },
+      rates,
+    );
+
+    expect(missing).toHaveProperty(
+      "error",
+      expect.stringContaining("fromCurrency"),
+    );
+    expect(malformed).toHaveProperty(
+      "error",
+      expect.stringContaining("toCurrency"),
+    );
+    expect(rates.convertOnDate).not.toHaveBeenCalled();
+  });
+
+  it("rejects a date that is not a calendar day", async () => {
+    for (const date of ["2026-02-30", "2026-13-01", "20260101", "tomorrow"]) {
+      const result = await executeConversion(
+        { values: [1], fromCurrency: "CAD", toCurrency: "USD", date },
+        rates,
+      );
+      expect(result).toHaveProperty("error", expect.stringContaining(date));
+    }
+    expect(rates.convertOnDate).not.toHaveBeenCalled();
+  });
+
+  it("is an error, not a pass-through, when no rate exists", async () => {
+    rates.convertOnDate.mockResolvedValue(null);
+
+    const result = await executeConversion(
+      {
+        values: [100],
+        fromCurrency: "CAD",
+        toCurrency: "XXX",
+        date: "2026-09-01",
+      },
+      rates,
+    );
+
+    expect(result).toEqual({
+      error: expect.stringContaining(
+        "No exchange rate is available for CAD->XXX on 2026-09-01",
+      ),
     });
   });
 });

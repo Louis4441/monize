@@ -16,6 +16,8 @@ import { CategoriesService } from "../categories/categories.service";
 import { ScheduledTransactionsService } from "../scheduled-transactions/scheduled-transactions.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { PortfolioService } from "../securities/portfolio.service";
+import { ExchangeRateService } from "../currencies/exchange-rate.service";
+import { UserPreference } from "../users/entities/user-preference.entity";
 import { LoanMortgageAccountService } from "./loan-mortgage-account.service";
 import { LoanRateChangesService } from "../loan-rate-changes/loan-rate-changes.service";
 import { DataSource } from "typeorm";
@@ -40,6 +42,8 @@ describe("AccountsService", () => {
   let netWorthService: Record<string, jest.Mock>;
   let mockQueryRunner: Record<string, any>;
   let mockDataSource: DataSourceMock;
+  let userPreferenceRepository: Record<string, jest.Mock>;
+  let exchangeRateService: Record<string, jest.Mock>;
   let mockActionHistoryService: Record<string, jest.Mock>;
   let loanRateChangesService: Record<string, jest.Mock>;
   // loanMortgageService uses the real class with mocked repositories
@@ -142,11 +146,20 @@ describe("AccountsService", () => {
       find: jest.fn().mockResolvedValue([]),
     };
 
+    userPreferenceRepository = {
+      findOne: jest.fn().mockResolvedValue({ defaultCurrency: "USD" }),
+    };
+    exchangeRateService = {
+      getRateForDate: jest.fn().mockResolvedValue(null),
+      getLatestRate: jest.fn().mockResolvedValue(null),
+    };
+
     const { manager: txManager, dataSource } = createScopedDbMocks([
       [Account, accountsRepository],
       [Transaction, transactionRepository],
       [InvestmentTransaction, investmentTxRepository],
       [Institution, institutionsRepository],
+      [UserPreference, userPreferenceRepository],
     ]);
     mockDataSource = dataSource;
     txManager.save.mockImplementation((data) => data);
@@ -189,6 +202,7 @@ describe("AccountsService", () => {
           provide: ActionHistoryService,
           useValue: mockActionHistoryService,
         },
+        { provide: ExchangeRateService, useValue: exchangeRateService },
         LoanMortgageAccountService,
         {
           provide: LoanRateChangesService,
@@ -3315,6 +3329,143 @@ describe("AccountsService", () => {
       });
       const names = r.accounts.map((a) => a.name).sort();
       expect(names).toEqual(["Checking", "Savings"]);
+    });
+
+    describe("every balance beside its value in the user's default currency", () => {
+      const foreignAccounts = [
+        {
+          ...allAccounts[0],
+          id: "cad-1",
+          name: "CAD Chequing",
+          currencyCode: "CAD",
+          currentBalance: 1000,
+          futureTransactionsSum: 250,
+        },
+        {
+          ...allAccounts[0],
+          id: "cad-2",
+          name: "CAD Savings",
+          currencyCode: "CAD",
+          currentBalance: 40,
+          futureTransactionsSum: 0,
+        },
+        {
+          ...allAccounts[2],
+          id: "cad-brokerage",
+          name: "CAD Brokerage",
+          currencyCode: "CAD",
+          currentBalance: 0,
+        },
+        allAccounts[0],
+      ];
+
+      beforeEach(() => {
+        jest
+          .spyOn(service, "findAll")
+          .mockResolvedValue(foreignAccounts as never);
+        (
+          service["portfolioService"] as unknown as {
+            getAccountMarketValues: jest.Mock;
+          }
+        ).getAccountMarketValues = jest
+          .fn()
+          .mockResolvedValue(new Map([["cad-brokerage", 2000]]));
+      });
+
+      it("prices a foreign account at today's rate, once per currency", async () => {
+        exchangeRateService.getRateForDate.mockResolvedValue(0.73);
+
+        const r = await service.getLlmAccounts("user-1");
+
+        expect(r.defaultCurrency).toBe("USD");
+        const chequing = r.accounts.find((a) => a.id === "cad-1")!;
+        // balance = current + future, converted; currentBalance converted alone.
+        expect(chequing.balance).toBe(1250);
+        expect(chequing.balanceInDefaultCurrency).toBe(912.5);
+        expect(chequing.currentBalanceInDefaultCurrency).toBe(730);
+        expect(chequing.exchangeRate).toBe(0.73);
+        // A brokerage's balance is its market value, converted the same way.
+        const brokerage = r.accounts.find((a) => a.id === "cad-brokerage")!;
+        expect(brokerage.balanceInDefaultCurrency).toBe(1460);
+        expect(brokerage.currentBalanceInDefaultCurrency).toBe(0);
+        expect(r.missingRatePairs).toEqual([]);
+        // Three CAD accounts, one lookup: the resolver is memoized per pair.
+        expect(exchangeRateService.getRateForDate).toHaveBeenCalledTimes(1);
+        expect(exchangeRateService.getRateForDate).toHaveBeenCalledWith(
+          "CAD",
+          "USD",
+          expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        );
+      });
+
+      it("is 1:1 for an account already in the default currency, asking no rate", async () => {
+        exchangeRateService.getRateForDate.mockResolvedValue(0.73);
+
+        const r = await service.getLlmAccounts("user-1");
+
+        const usd = r.accounts.find((a) => a.id === "a1")!;
+        expect(usd.balanceInDefaultCurrency).toBe(usd.balance);
+        expect(usd.currentBalanceInDefaultCurrency).toBe(usd.currentBalance);
+        expect(usd.exchangeRate).toBe(1);
+        expect(exchangeRateService.getRateForDate).not.toHaveBeenCalledWith(
+          "USD",
+          "USD",
+          expect.anything(),
+        );
+      });
+
+      it("withholds the converted figure and names the pair when no rate exists", async () => {
+        exchangeRateService.getRateForDate.mockResolvedValue(null);
+
+        const r = await service.getLlmAccounts("user-1");
+
+        const chequing = r.accounts.find((a) => a.id === "cad-1")!;
+        expect(chequing.balance).toBe(1250);
+        expect(chequing.balanceInDefaultCurrency).toBeNull();
+        expect(chequing.currentBalanceInDefaultCurrency).toBeNull();
+        expect(chequing.exchangeRate).toBeNull();
+        expect(r.missingRatePairs).toEqual(["CAD->USD"]);
+      });
+
+      it("reports a zero foreign balance as zero, which needs no rate", async () => {
+        exchangeRateService.getRateForDate.mockResolvedValue(null);
+        jest
+          .spyOn(service, "findAll")
+          .mockResolvedValue([
+            { ...foreignAccounts[1], currentBalance: 0 },
+          ] as never);
+
+        const r = await service.getLlmAccounts("user-1");
+
+        expect(r.accounts[0].balanceInDefaultCurrency).toBe(0);
+        expect(r.accounts[0].currentBalanceInDefaultCurrency).toBe(0);
+        expect(r.missingRatePairs).toEqual([]);
+      });
+
+      it("treats a stored rate of zero as absent, never as a rate", async () => {
+        exchangeRateService.getRateForDate.mockResolvedValue(0);
+
+        const r = await service.getLlmAccounts("user-1");
+
+        expect(
+          r.accounts.find((a) => a.id === "cad-1")!.balanceInDefaultCurrency,
+        ).toBeNull();
+        expect(r.missingRatePairs).toEqual(["CAD->USD"]);
+      });
+
+      it("falls back to the one shared default currency for a user with no preference row", async () => {
+        userPreferenceRepository.findOne.mockResolvedValue(null);
+        exchangeRateService.getRateForDate.mockResolvedValue(0.73);
+
+        const r = await service.getLlmAccounts("user-1");
+
+        expect(r.defaultCurrency).toBe("USD");
+        expect(exchangeRateService.getRateForDate).toHaveBeenCalledWith(
+          "CAD",
+          "USD",
+          expect.any(String),
+        );
+      });
     });
 
     it("uses market value for brokerage accounts and currentBalance for others", async () => {
