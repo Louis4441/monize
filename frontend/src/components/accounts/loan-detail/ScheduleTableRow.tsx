@@ -1,7 +1,11 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel } from '@/components/ui/Table';
+import {
+  INTERACTIVE_ROW_FOCUS_CLASS,
+  activateOnKey,
+} from '@/components/ui/interactive-row';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { RateCell } from './RateCell';
@@ -50,6 +54,13 @@ const MONEY_CELL =
  * the balance share the first line, and payment/interest/principal (+ extra) /
  * rate fill the second. The `col-start`/`row-start` placements are inert once
  * the row is `table-row` again, so they never touch the desktop layout.
+ *
+ * A month-aggregate row is clickable in whole: the entire row (the whole card
+ * on a phone) toggles its detail, not only the caret beside the month label --
+ * a two-line card is far too large a tap target for one small chevron to own.
+ * The row carries the activation contract (`tabIndex`, `activateOnKey`, the
+ * inset focus ring, `aria-expanded`) so Enter and Space work too, and the caret
+ * and entry-count pill are inert affordances rather than a nested control.
  */
 export function ScheduleTableRow({
   row,
@@ -72,9 +83,22 @@ export function ScheduleTableRow({
   return (
     <tr
       role="row"
+      {...(monthGroup
+        ? {
+            tabIndex: 0,
+            'aria-expanded': monthGroup.expanded,
+            'aria-label': t('loanDetail.schedule.toggleMonth', {
+              month: monthGroup.label,
+            }),
+            onClick: monthGroup.onToggle,
+            onKeyDown: activateOnKey(monthGroup.onToggle),
+          }
+        : {})}
       className={`grid grid-cols-4 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row sm:p-0 ${
-        row.isProjected ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
-      } ${isChild ? 'bg-gray-50/60 dark:bg-gray-900/20' : ''}`}
+        monthGroup ? `cursor-pointer ${INTERACTIVE_ROW_FOCUS_CLASS}` : ''
+      } ${row.isProjected ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''} ${
+        isChild ? 'bg-gray-50/60 dark:bg-gray-900/20' : ''
+      }`}
     >
       <td role="cell" className="hidden px-4 py-3 text-sm text-gray-500 dark:text-gray-400 sm:table-cell">
         {isChild ? '' : row.paymentNumber}
@@ -85,19 +109,17 @@ export function ScheduleTableRow({
         }`}
       >
         {monthGroup ? (
-          <button
-            type="button"
-            onClick={monthGroup.onToggle}
-            aria-expanded={monthGroup.expanded}
-            aria-label={t('loanDetail.schedule.toggleMonth', { month: monthGroup.label })}
-            className="inline-flex items-center gap-1.5 text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400"
-          >
+          // Inert affordance: the whole row owns the click, the keyboard
+          // activation and `aria-expanded`, so this is a caret and a count, not
+          // a second control (which would double-fire and need its own
+          // stopPropagation).
+          <span className="inline-flex items-center gap-1.5 text-gray-900 dark:text-gray-100">
             <span className="text-xs text-gray-400">{monthGroup.expanded ? '▾' : '▸'}</span>
             {monthGroup.label}
             <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
               {t('loanDetail.schedule.monthEntries', { count: monthGroup.count })}
             </span>
-          </button>
+          </span>
         ) : (
           <>
             {!isChild && (
@@ -126,25 +148,25 @@ export function ScheduleTableRow({
         )}
       </td>
       <td role="cell" className={`col-start-1 row-start-2 text-gray-900 dark:text-gray-100 ${MONEY_CELL}`}>
-        <CellLabel className="sm:hidden">{t('loanDetail.schedule.colPayment')}</CellLabel>
+        <CellLabel className={CAPTION_CLASS}>{t('loanDetail.schedule.colPayment')}</CellLabel>
         {formatCurrency(row.payment, currencyCode)}
       </td>
       <td role="cell" className={`col-start-2 row-start-2 text-orange-600 dark:text-orange-400 ${MONEY_CELL}`}>
-        <CellLabel className="sm:hidden">{t('loanDetail.schedule.colInterest')}</CellLabel>
+        <CellLabel className={CAPTION_CLASS}>{t('loanDetail.schedule.colInterest')}</CellLabel>
         {formatCurrency(row.interest, currencyCode)}
       </td>
       <td role="cell" className={`col-start-3 row-start-2 text-green-600 dark:text-green-400 ${MONEY_CELL}`}>
-        <CellLabel className="sm:hidden">{t('loanDetail.schedule.colPrincipal')}</CellLabel>
+        <CellLabel className={CAPTION_CLASS}>{t('loanDetail.schedule.colPrincipal')}</CellLabel>
         {formatCurrency(row.principal, currencyCode)}
       </td>
       {showExtraColumn && (
         <td role="cell" className={`col-start-4 row-start-2 text-blue-600 dark:text-blue-400 ${MONEY_CELL}`}>
-          <CellLabel className="sm:hidden">{t('loanDetail.schedule.colExtra')}</CellLabel>
+          <CellLabel className={CAPTION_CLASS}>{t('loanDetail.schedule.colExtra')}</CellLabel>
           {row.extraPrincipal > 0 ? formatCurrency(row.extraPrincipal, currencyCode) : '—'}
         </td>
       )}
       <td role="cell" className={`${rateCellPlacement} ${MONEY_CELL}`}>
-        <CellLabel className="sm:hidden">{t('loanDetail.schedule.colRate')}</CellLabel>
+        <CellLabel className={CAPTION_CLASS}>{t('loanDetail.schedule.colRate')}</CellLabel>
         <RateCell
           annualRate={row.annualRate}
           onEdit={
@@ -160,7 +182,7 @@ export function ScheduleTableRow({
       {/* Balance takes the right half of the first line (not a quarter): it is
           the widest figure -- a six-figure balance clips in a quarter column. */}
       <td role="cell" className="col-start-3 col-span-2 row-start-1 p-0 text-sm text-right whitespace-nowrap font-medium text-gray-900 dark:text-gray-100 sm:table-cell sm:px-4 sm:py-3">
-        <CellLabel className="sm:hidden">{t('loanDetail.schedule.colBalance')}</CellLabel>
+        <CellLabel className={CAPTION_CLASS}>{t('loanDetail.schedule.colBalance')}</CellLabel>
         {formatCurrency(row.balance, currencyCode)}
       </td>
     </tr>

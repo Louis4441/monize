@@ -316,10 +316,98 @@ describe('AmortizationScheduleTable', () => {
     // Aggregate payment = 919 + 3070 = 3989 (also echoed in the totals row).
     expect(screen.getAllByText('$3989.00').length).toBeGreaterThan(0);
 
-    // Expanding reveals the two dated detail rows.
-    fireEvent.click(screen.getByRole('button', { name: /Show or hide the payments/ }));
+    // The whole aggregate row is the toggle (a row, not a small button), so the
+    // whole mobile card taps to expand -- see the tap-anywhere test below.
+    fireEvent.click(screen.getByRole('row', { name: /Show or hide the payments/ }));
     expect(screen.getByText('May 5, 2026')).toBeInTheDocument();
     expect(screen.getByText('May 29, 2026')).toBeInTheDocument();
+  });
+
+  it('expands a month group by tapping anywhere on the whole card, not only the count control', () => {
+    // On a phone the aggregate row is a two-line card; the requirement is that
+    // tapping the card (here, a money cell far from the caret/count) toggles it,
+    // not only the small "N entries" control. The row carries the click.
+    const events: LoanPaymentEvent[] = [
+      {
+        date: '2026-05-05',
+        principal: 765,
+        interest: 154,
+        balance: 142000,
+        cumulativePrincipal: 765,
+        cumulativeInterest: 154,
+        type: 'REGULAR' as const,
+        annualRate: 5.5,
+      },
+      {
+        date: '2026-05-29',
+        principal: 2534,
+        interest: 536,
+        balance: 139466,
+        cumulativePrincipal: 3299,
+        cumulativeInterest: 690,
+        type: 'OVERPAYMENT' as const,
+        annualRate: null,
+      },
+    ];
+    render(
+      <AmortizationScheduleTable historyEvents={events} projectionRows={[]} currencyCode="CAD" />,
+    );
+
+    const aggregateRow = screen.getByRole('row', { name: /Show or hide the payments/ });
+    expect(aggregateRow).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('May 5, 2026')).not.toBeInTheDocument();
+
+    // Click a money cell inside the row (the interest total), not the caret.
+    const interestCell = aggregateRow.querySelector('td.col-start-2.row-start-2');
+    expect(interestCell).not.toBeNull();
+    fireEvent.click(interestCell as Element);
+
+    expect(aggregateRow).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('May 5, 2026')).toBeInTheDocument();
+    expect(screen.getByText('May 29, 2026')).toBeInTheDocument();
+
+    // Collapses again on a second tap of the same card.
+    fireEvent.click(interestCell as Element);
+    expect(aggregateRow).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('May 5, 2026')).not.toBeInTheDocument();
+  });
+
+  it('toggles a month group from the keyboard (Enter and Space on the row)', () => {
+    const events: LoanPaymentEvent[] = [
+      {
+        date: '2026-05-05',
+        principal: 765,
+        interest: 154,
+        balance: 142000,
+        cumulativePrincipal: 765,
+        cumulativeInterest: 154,
+        type: 'REGULAR' as const,
+        annualRate: 5.5,
+      },
+      {
+        date: '2026-05-29',
+        principal: 2534,
+        interest: 536,
+        balance: 139466,
+        cumulativePrincipal: 3299,
+        cumulativeInterest: 690,
+        type: 'OVERPAYMENT' as const,
+        annualRate: null,
+      },
+    ];
+    render(
+      <AmortizationScheduleTable historyEvents={events} projectionRows={[]} currencyCode="CAD" />,
+    );
+
+    const aggregateRow = screen.getByRole('row', { name: /Show or hide the payments/ });
+    // The row is focusable (the activation contract), so Enter and Space work.
+    expect(aggregateRow).toHaveAttribute('tabindex', '0');
+
+    fireEvent.keyDown(aggregateRow, { key: 'Enter' });
+    expect(screen.getByText('May 5, 2026')).toBeInTheDocument();
+
+    fireEvent.keyDown(aggregateRow, { key: ' ' });
+    expect(screen.queryByText('May 5, 2026')).not.toBeInTheDocument();
   });
 
   it('leaves a single-entry month as a plain row (no toggle)', () => {
@@ -331,8 +419,9 @@ describe('AmortizationScheduleTable', () => {
       />,
     );
 
-    // Two distinct months, one entry each: no aggregate toggle appears.
-    expect(screen.queryByRole('button', { name: /Show or hide the payments/ })).not.toBeInTheDocument();
+    // Two distinct months, one entry each: no aggregate toggle appears (no row
+    // carries the toggle's accessible name).
+    expect(screen.queryByRole('row', { name: /Show or hide the payments/ })).not.toBeInTheDocument();
     expect(screen.getByText('Jan 15, 2025')).toBeInTheDocument();
     expect(screen.getByText('Feb 15, 2025')).toBeInTheDocument();
   });

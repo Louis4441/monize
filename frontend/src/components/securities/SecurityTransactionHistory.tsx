@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { Modal } from '@/components/ui/Modal';
+import { CAPTION_CLASS, CellLabel } from '@/components/ui/Table';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { SecurityShareAdjustmentForm } from './SecurityShareAdjustmentForm';
 import { InvestmentTransactionForm } from '@/components/investments/InvestmentTransactionForm';
@@ -23,6 +24,13 @@ import type {
 } from '@/types/investment';
 
 const logger = createLogger('SecurityTxHistory');
+
+// Shared chrome for a wrapped money/quantity cell: no padding on phones (the
+// row's grid spaces the cards), the table cell's own padding from `sm` up. The
+// figures never wrap so a locale that groups thousands with a space keeps them
+// on one line.
+const MONEY_CELL =
+  'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-3 sm:py-2 sm:text-sm';
 
 interface SecurityTransactionHistoryProps {
   security: Security;
@@ -164,56 +172,69 @@ export function SecurityTransactionHistory({
           {selectedAccountId !== 'all' ? t('transactionHistory.emptyAccount') : t('transactionHistory.emptyAll')}
         </div>
       ) : (
+        // Below `sm` the table becomes a block and each row wraps into a
+        // four-column grid card so date/amount, then action/quantity/running/
+        // price, then account/edit fit a phone without a horizontal scroll; from
+        // `sm` up it is the ordinary table. Explicit `role`s put back the table
+        // semantics that restyling `display` strips (inert from `sm` up).
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-800">
-              <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('transactionHistory.columns.date')}</th>
+          <table role="table" className="block min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
+            <thead role="rowgroup" className="block bg-gray-50 dark:bg-gray-800 sm:table-header-group">
+              <tr role="row" className="hidden sm:table-row">
+                <th role="columnheader" className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('transactionHistory.columns.date')}</th>
                 {showAccountColumn && (
-                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('transactionHistory.columns.account')}</th>
+                  <th role="columnheader" className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('transactionHistory.columns.account')}</th>
                 )}
-                <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('transactionHistory.columns.action')}</th>
-                <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('transactionHistory.columns.quantity')}</th>
-                <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('transactionHistory.columns.runningTotal')}</th>
-                <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('transactionHistory.columns.price')}</th>
-                <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('transactionHistory.columns.amount')}</th>
-                <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <th role="columnheader" className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('transactionHistory.columns.action')}</th>
+                <th role="columnheader" className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('transactionHistory.columns.quantity')}</th>
+                <th role="columnheader" className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('transactionHistory.columns.runningTotal')}</th>
+                <th role="columnheader" className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('transactionHistory.columns.price')}</th>
+                <th role="columnheader" className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('transactionHistory.columns.amount')}</th>
+                <th role="columnheader" className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   <span className="sr-only">{t('transactionHistory.columns.actionsLabel')}</span>
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
+            <tbody role="rowgroup" className="block divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900 sm:table-row-group">
               {visibleTransactions.map((tx) => {
                 const running =
                   selectedAccountId === 'all'
                     ? tx.runningQuantityAll
                     : tx.runningQuantityAccount;
                 return (
-                  <tr key={tx.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                    <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-900 dark:text-gray-100">
+                  <tr
+                    key={tx.id}
+                    role="row"
+                    className="grid grid-cols-4 items-start gap-x-3 gap-y-1.5 px-3 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 sm:table-row sm:p-0"
+                  >
+                    <td role="cell" className="col-span-2 row-start-1 p-0 text-sm whitespace-nowrap text-gray-900 dark:text-gray-100 sm:table-cell sm:px-3 sm:py-2">
                       {formatDate(tx.transactionDate)}
                     </td>
                     {showAccountColumn && (
-                      <td className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300">
+                      <td role="cell" className="col-start-1 col-span-3 row-start-3 p-0 text-sm text-gray-700 dark:text-gray-300 sm:table-cell sm:px-3 sm:py-2">
                         {tx.accountName}
                       </td>
                     )}
-                    <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700 dark:text-gray-300">
+                    <td role="cell" className="col-start-1 row-start-2 p-0 text-sm text-gray-700 dark:text-gray-300 sm:table-cell sm:whitespace-nowrap sm:px-3 sm:py-2">
                       {t(`transactionHistory.actionLabels.${tx.action}` as Parameters<typeof t>[0]) ?? tx.action}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-gray-900 dark:text-gray-100">
+                    <td role="cell" className={`col-start-2 row-start-2 text-gray-900 dark:text-gray-100 ${MONEY_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{t('transactionHistory.columns.quantity')}</CellLabel>
                       {tx.quantity === null ? '-' : formatShareQuantity(tx.quantity)}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right text-sm font-medium text-gray-900 dark:text-gray-100">
+                    <td role="cell" className={`col-start-3 row-start-2 font-medium text-gray-900 dark:text-gray-100 ${MONEY_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{t('transactionHistory.columns.runningTotal')}</CellLabel>
                       {formatShareQuantity(running)}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-gray-700 dark:text-gray-300">
+                    <td role="cell" className={`col-start-4 row-start-2 text-gray-700 dark:text-gray-300 ${MONEY_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{t('transactionHistory.columns.price')}</CellLabel>
                       {tx.price === null ? '-' : formatCurrencyPrecise(tx.price, security.currencyCode, 4)}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-gray-700 dark:text-gray-300">
+                    <td role="cell" className={`col-start-3 col-span-2 row-start-1 text-gray-700 dark:text-gray-300 ${MONEY_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{t('transactionHistory.columns.amount')}</CellLabel>
                       {formatCurrency(tx.totalAmount, security.currencyCode)}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right">
+                    <td role="cell" className="col-start-4 row-start-3 flex justify-end p-0 sm:table-cell sm:whitespace-nowrap sm:px-3 sm:py-2 sm:text-right">
                       <Button
                         variant="ghost"
                         size="sm"

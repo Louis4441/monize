@@ -8,6 +8,14 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { gainLossColor } from '@/lib/format';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
+import { CAPTION_CLASS, CellLabel } from '@/components/ui/Table';
+
+// A wrapped figure cell: no padding on phones (the card's grid spaces the
+// cells), the table cell's own padding and right alignment from `sm` up. The
+// figures never wrap, so a locale grouping thousands with a space keeps each on
+// one line; the per-row caption gives itself back `whitespace-normal`.
+const FIGURE_CELL =
+  'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
 
 interface GroupedHoldingsListProps {
   holdingsByAccount: AccountHoldings[];
@@ -230,39 +238,43 @@ export function GroupedHoldingsList({
                 </div>
               </button>
 
-              {/* Account Holdings Table */}
+              {/* Account Holdings Table. Below `sm` the table becomes a block
+                  and each row wraps into a grid card so its eight figures fit a
+                  phone without a horizontal scroll; from `sm` up it is the
+                  ordinary table. Explicit roles put back the table semantics
+                  that restyling `display` strips (inert from `sm` up). */}
               {isExpanded && (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full">
-                    <thead className="bg-gray-50 dark:bg-gray-700/50">
-                      <tr>
-                        <th className="px-2 sm:px-6 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <table role="table" className="block min-w-full sm:table">
+                    <thead role="rowgroup" className="block bg-gray-50 dark:bg-gray-700/50 sm:table-header-group">
+                      <tr role="row" className="hidden sm:table-row">
+                        <th role="columnheader" className="px-2 sm:px-6 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                           {t('groupedHoldings.symbolColumn')}
                         </th>
-                        <th className="px-1.5 sm:px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        <th role="columnheader" className="px-1.5 sm:px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                           {t('groupedHoldings.sharesColumn')}
                         </th>
-                        <th className="px-1.5 sm:px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        <th role="columnheader" className="px-1.5 sm:px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                           {t('groupedHoldings.avgCostColumn')}
                         </th>
-                        <th className="px-1.5 sm:px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        <th role="columnheader" className="px-1.5 sm:px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                           {t('groupedHoldings.priceColumn')}
                         </th>
-                        <th className="px-1.5 sm:px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        <th role="columnheader" className="px-1.5 sm:px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                           {t('groupedHoldings.costBasisColumn')}
                         </th>
-                        <th className="px-1.5 sm:px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        <th role="columnheader" className="px-1.5 sm:px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                           {t('groupedHoldings.mktValueColumn')}
                         </th>
-                        <th className="px-1.5 sm:px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        <th role="columnheader" className="px-1.5 sm:px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                           {t('groupedHoldings.gainLossColumn')}
                         </th>
-                        <th className="px-1.5 sm:px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        <th role="columnheader" className="px-1.5 sm:px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                           {t('groupedHoldings.portfolioPercentColumn')}
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
+                    <tbody role="rowgroup" className="block divide-y divide-gray-100 dark:divide-gray-700/50 sm:table-row-group">
                       {account.holdings.map((holding) => (
                         <HoldingRow
                           key={holding.id}
@@ -283,8 +295,8 @@ export function GroupedHoldingsList({
 
                       {/* Cash Row */}
                       {account.cashBalance !== 0 && (
-                        <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/20">
-                          <td className="px-2 sm:px-6 py-3 whitespace-nowrap">
+                        <tr role="row" className="grid grid-cols-4 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/20 sm:table-row sm:p-0">
+                          <td role="cell" className="col-span-2 row-start-1 p-0 whitespace-nowrap sm:table-cell sm:px-6 sm:py-3">
                             <button
                               onClick={() => account.cashAccountId && onCashClick?.(account.cashAccountId)}
                               className="flex items-center gap-2 text-left hover:underline focus:outline-none focus:underline"
@@ -299,39 +311,51 @@ export function GroupedHoldingsList({
                               </div>
                             </button>
                           </td>
-                          <td className="px-1.5 sm:px-4 py-3 whitespace-nowrap text-right text-sm text-gray-400 dark:text-gray-500">
+                          <td role="cell" className={`col-start-1 row-start-2 text-gray-400 dark:text-gray-500 ${FIGURE_CELL}`}>
+                            <CellLabel className={CAPTION_CLASS}>{t('groupedHoldings.sharesColumn')}</CellLabel>
                             -
                           </td>
-                          <td className="px-1.5 sm:px-4 py-3 whitespace-nowrap text-right text-sm text-gray-400 dark:text-gray-500">
+                          <td role="cell" className={`col-start-2 row-start-2 text-gray-400 dark:text-gray-500 ${FIGURE_CELL}`}>
+                            <CellLabel className={CAPTION_CLASS}>{t('groupedHoldings.avgCostColumn')}</CellLabel>
                             -
                           </td>
-                          <td className="px-1.5 sm:px-4 py-3 whitespace-nowrap text-right text-sm text-gray-400 dark:text-gray-500">
+                          <td role="cell" className={`col-start-3 row-start-2 text-gray-400 dark:text-gray-500 ${FIGURE_CELL}`}>
+                            <CellLabel className={CAPTION_CLASS}>{t('groupedHoldings.priceColumn')}</CellLabel>
                             -
                           </td>
-                          <td className="px-1.5 sm:px-4 py-3 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400">
+                          <td role="cell" className={`col-start-1 col-span-2 row-start-3 text-gray-500 dark:text-gray-400 ${FIGURE_CELL}`}>
+                            <CellLabel className={CAPTION_CLASS}>{t('groupedHoldings.costBasisColumn')}</CellLabel>
                             {fmtAcct(account.cashBalance)}
                           </td>
-                          <td className="px-1.5 sm:px-4 py-3 whitespace-nowrap text-right text-sm font-medium text-gray-900 dark:text-gray-100">
+                          <td role="cell" className={`col-start-3 col-span-2 row-start-1 font-medium text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                            <CellLabel className={CAPTION_CLASS}>{t('groupedHoldings.mktValueColumn')}</CellLabel>
                             {fmtAcct(account.cashBalance)}
                           </td>
-                          <td className="px-1.5 sm:px-4 py-3 whitespace-nowrap text-right">
-                            <div className="text-sm text-gray-400 dark:text-gray-500">-</div>
+                          <td role="cell" className={`col-start-3 col-span-2 row-start-3 text-gray-400 dark:text-gray-500 ${FIGURE_CELL}`}>
+                            <CellLabel className={CAPTION_CLASS}>{t('groupedHoldings.gainLossColumn')}</CellLabel>
+                            -
                           </td>
-                          <td className="px-1.5 sm:px-4 py-3 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400">
+                          <td role="cell" className={`col-start-4 row-start-2 text-gray-500 dark:text-gray-400 ${FIGURE_CELL}`}>
+                            <CellLabel className={CAPTION_CLASS}>{t('groupedHoldings.portfolioPercentColumn')}</CellLabel>
                             {getPortfolioPercent(account.cashBalance, acctDisplayCurrency || account.currencyCode)}
                           </td>
                         </tr>
                       )}
 
                       {/* Account Summary Row */}
-                      <tr className="bg-gray-50 dark:bg-gray-700/30 font-medium">
-                        <td className="px-2 sm:px-6 py-3 text-sm text-gray-700 dark:text-gray-300" colSpan={4}>
+                      <tr role="row" className="grid grid-cols-4 items-start gap-x-3 gap-y-1.5 px-4 py-3 bg-gray-50 dark:bg-gray-700/30 font-medium sm:table-row sm:p-0">
+                        {/* colSpan drives the desktop table (label spans the
+                            first four columns); the grid placement drives the
+                            phone card. */}
+                        <td role="cell" colSpan={4} className="col-span-2 row-start-1 p-0 text-sm text-gray-700 dark:text-gray-300 sm:table-cell sm:px-6 sm:py-3">
                           {t('groupedHoldings.accountTotal')}
                         </td>
-                        <td className="px-1.5 sm:px-4 py-3 text-right text-sm text-gray-900 dark:text-gray-100">
+                        <td role="cell" className={`col-start-1 col-span-2 row-start-2 text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                          <CellLabel className={CAPTION_CLASS}>{t('groupedHoldings.costBasisColumn')}</CellLabel>
                           {fmtAcct(account.totalCostBasis + account.cashBalance)}
                         </td>
-                        <td className="px-1.5 sm:px-4 py-3 text-right text-sm text-gray-900 dark:text-gray-100">
+                        <td role="cell" className={`col-start-3 col-span-2 row-start-1 text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                          <CellLabel className={CAPTION_CLASS}>{t('groupedHoldings.mktValueColumn')}</CellLabel>
                           <div>{fmtAcct(accountTotalValue)}</div>
                           {defaultApprox !== null && (
                             <div className="text-xs font-normal text-gray-400 dark:text-gray-500">
@@ -339,7 +363,8 @@ export function GroupedHoldingsList({
                             </div>
                           )}
                         </td>
-                        <td className="px-1.5 sm:px-4 py-3 text-right">
+                        <td role="cell" className={`col-start-3 col-span-2 row-start-2 ${FIGURE_CELL}`}>
+                          <CellLabel className={CAPTION_CLASS}>{t('groupedHoldings.gainLossColumn')}</CellLabel>
                           <div className={`text-sm ${getGainLossColor(account.totalGainLoss)}`}>
                             {fmtAcct(account.totalGainLoss)}
                           </div>
@@ -347,7 +372,8 @@ export function GroupedHoldingsList({
                             {formatPercent(account.totalGainLossPercent)}
                           </div>
                         </td>
-                        <td className="px-1.5 sm:px-4 py-3 text-right text-sm text-gray-500 dark:text-gray-400">
+                        <td role="cell" className={`col-start-1 col-span-2 row-start-3 text-gray-500 dark:text-gray-400 ${FIGURE_CELL}`}>
+                          <CellLabel className={CAPTION_CLASS}>{t('groupedHoldings.portfolioPercentColumn')}</CellLabel>
                           {getPortfolioPercent(accountTotalValue, acctDisplayCurrency || account.currencyCode)}
                         </td>
                       </tr>
@@ -440,8 +466,11 @@ const HoldingRow = memo(function HoldingRow({
   };
 
   return (
-    <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/20">
-      <td className="px-2 sm:px-6 py-3 whitespace-nowrap">
+    <tr
+      role="row"
+      className="grid grid-cols-4 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/20 sm:table-row sm:p-0"
+    >
+      <td role="cell" className="col-span-2 row-start-1 p-0 sm:table-cell sm:whitespace-nowrap sm:px-6 sm:py-3">
         <button
           onClick={() => onSecurityClick?.(holding.securityId)}
           className="text-left hover:underline focus:outline-none focus:underline"
@@ -450,21 +479,27 @@ const HoldingRow = memo(function HoldingRow({
           <div className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
             {holding.symbol}
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[120px] sm:max-w-[320px]">
+          {/* The name wraps unclamped on a phone (it is the row's identity) and
+              keeps its desktop clamp from `sm` up. */}
+          <div className="text-xs text-gray-500 dark:text-gray-400 break-words sm:truncate sm:max-w-[320px]">
             {holding.name}
           </div>
         </button>
       </td>
-      <td className="px-1.5 sm:px-4 py-3 whitespace-nowrap text-right text-sm text-gray-900 dark:text-gray-100">
+      <td role="cell" className={`col-start-1 row-start-2 text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+        <CellLabel className={CAPTION_CLASS}>{t('groupedHoldings.sharesColumn')}</CellLabel>
         {formatQuantity(holding.quantity)}
       </td>
-      <td className="px-1.5 sm:px-4 py-3 whitespace-nowrap text-right text-sm text-gray-900 dark:text-gray-100">
+      <td role="cell" className={`col-start-2 row-start-2 text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+        <CellLabel className={CAPTION_CLASS}>{t('groupedHoldings.avgCostColumn')}</CellLabel>
         {fmtPrice(holding.averageCost)}
       </td>
-      <td className="px-1.5 sm:px-4 py-3 whitespace-nowrap text-right text-sm text-gray-900 dark:text-gray-100">
+      <td role="cell" className={`col-start-3 row-start-2 text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+        <CellLabel className={CAPTION_CLASS}>{t('groupedHoldings.priceColumn')}</CellLabel>
         {fmtPrice(holding.currentPrice)}
       </td>
-      <td className="px-1.5 sm:px-4 py-3 whitespace-nowrap text-right text-sm text-gray-900 dark:text-gray-100">
+      <td role="cell" className={`col-start-1 col-span-2 row-start-3 text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+        <CellLabel className={CAPTION_CLASS}>{t('groupedHoldings.costBasisColumn')}</CellLabel>
         <div>{fmtVal(holding.costBasis)}</div>
         {isForeignToAccount && (
           <div className="text-xs font-normal text-gray-400 dark:text-gray-500">
@@ -472,7 +507,8 @@ const HoldingRow = memo(function HoldingRow({
           </div>
         )}
       </td>
-      <td className="px-1.5 sm:px-4 py-3 whitespace-nowrap text-right text-sm font-medium text-gray-900 dark:text-gray-100">
+      <td role="cell" className={`col-start-3 col-span-2 row-start-1 font-medium text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+        <CellLabel className={CAPTION_CLASS}>{t('groupedHoldings.mktValueColumn')}</CellLabel>
         <div>{fmtVal(holding.marketValue)}</div>
         {isForeignToAccount && (
           <div className="text-xs font-normal text-gray-400 dark:text-gray-500">
@@ -480,7 +516,8 @@ const HoldingRow = memo(function HoldingRow({
           </div>
         )}
       </td>
-      <td className="px-1.5 sm:px-4 py-3 whitespace-nowrap text-right">
+      <td role="cell" className={`col-start-3 col-span-2 row-start-3 ${FIGURE_CELL}`}>
+        <CellLabel className={CAPTION_CLASS}>{t('groupedHoldings.gainLossColumn')}</CellLabel>
         <div className={`text-sm font-medium ${getGainLossColor(holding.gainLoss)}`}>
           {fmtVal(holding.gainLoss)}
         </div>
@@ -493,7 +530,8 @@ const HoldingRow = memo(function HoldingRow({
           {formatPercent(holding.gainLossPercent)}
         </div>
       </td>
-      <td className="px-1.5 sm:px-4 py-3 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400">
+      <td role="cell" className={`col-start-4 row-start-2 text-gray-500 dark:text-gray-400 ${FIGURE_CELL}`}>
+        <CellLabel className={CAPTION_CLASS}>{t('groupedHoldings.portfolioPercentColumn')}</CellLabel>
         {getPortfolioPercent(holding.marketValue, holding.currencyCode)}
       </td>
     </tr>

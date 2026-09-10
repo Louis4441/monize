@@ -345,20 +345,7 @@ describe("the mobile-table chrome constants live once in Table.tsx", () => {
    * fixing one means DELETING its line, and the second test below fails while a
    * listed file no longer offends, so the register cannot outlive its subjects.
    */
-  const INLINE_CAPTION_BASELINE: ReadonlyArray<{ file: string; reason: string }> = [
-    {
-      file: "/src/components/accounts/loan-detail/ScheduleTableRow.tsx",
-      reason:
-        "Amortization row, converted before the constants were centralized. " +
-        "Outstanding: no change owns this file yet.",
-    },
-    {
-      file: "/src/components/accounts/loan-detail/AmortizationScheduleTable.tsx",
-      reason:
-        "The header and footer of the same table as above, same history, same " +
-        "outstanding fix.",
-    },
-  ];
+  const INLINE_CAPTION_BASELINE: ReadonlyArray<{ file: string; reason: string }> = [];
 
   const inliningFiles = () => {
     const found = new Set<string>();
