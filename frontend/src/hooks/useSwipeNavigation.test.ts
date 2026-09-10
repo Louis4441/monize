@@ -19,6 +19,18 @@ vi.mock('next/navigation', () => ({
 
 import { useSwipeNavigation } from './useSwipeNavigation';
 import { useAuthStore } from '@/store/authStore';
+import { NAV_LINKS, AI_LINKS, TOOLS_LINKS, ADMIN_LINKS } from '@/lib/nav-links';
+import type { User } from '@/types/auth';
+
+// The swipe chain the drawer offers a non-admin, non-delegate user: Dashboard,
+// the main pages, the AI pages, then the Tools pages. Derived from the nav
+// arrays so a new nav route updates this expectation in one place.
+const BASE_SWIPE_COUNT =
+  1 + NAV_LINKS.length + AI_LINKS.length + TOOLS_LINKS.length;
+
+function makeUser(role: 'admin' | 'user'): User {
+  return { id: 'u1', email: 'u@example.com', role } as User;
+}
 
 // Helper to create touch events
 function createTouchEvent(
@@ -60,6 +72,11 @@ describe('useSwipeNavigation', () => {
 
     // Clear sessionStorage
     sessionStorage.clear();
+
+    // Default identity: a signed-in non-admin, non-delegate user, so the swipe
+    // chain is the base set unless a test opts into admin/delegate.
+    useAuthStore.getState().setDelegation(null, [], null, null);
+    useAuthStore.getState().setUser(makeUser('user'));
   });
 
   afterEach(() => {
@@ -118,9 +135,39 @@ describe('useSwipeNavigation', () => {
       expect(result.current.isSwipePage).toBe(true);
     });
 
-    it('returns totalPages as 7', () => {
+    it('returns the full swipe chain (dashboard + main + AI + tools)', () => {
       const { result } = renderHook(() => useSwipeNavigation());
-      expect(result.current.totalPages).toBe(7);
+      expect(result.current.totalPages).toBe(BASE_SWIPE_COUNT);
+    });
+
+    it('treats an AI page as a swipe page', () => {
+      mockPathname = '/ai';
+      const { result } = renderHook(() => useSwipeNavigation());
+      expect(result.current.isSwipePage).toBe(true);
+      expect(result.current.currentIndex).toBeGreaterThan(0);
+    });
+
+    it('treats a Tools page as a swipe page', () => {
+      mockPathname = '/securities';
+      const { result } = renderHook(() => useSwipeNavigation());
+      expect(result.current.isSwipePage).toBe(true);
+      expect(result.current.currentIndex).toBeGreaterThan(0);
+    });
+
+    it('includes admin pages only for a non-delegate admin', () => {
+      mockPathname = '/admin/users';
+      const nonAdmin = renderHook(() => useSwipeNavigation());
+      expect(nonAdmin.result.current.isSwipePage).toBe(false);
+      // Unmount before switching identity so the Zustand write has no mounted
+      // subscriber to re-render outside act().
+      nonAdmin.unmount();
+
+      useAuthStore.getState().setUser(makeUser('admin'));
+      const admin = renderHook(() => useSwipeNavigation());
+      expect(admin.result.current.isSwipePage).toBe(true);
+      expect(admin.result.current.totalPages).toBe(
+        BASE_SWIPE_COUNT + ADMIN_LINKS.length,
+      );
     });
 
     it('returns -1 and isSwipePage false for non-swipe pages', () => {
@@ -311,7 +358,8 @@ describe('useSwipeNavigation', () => {
     });
 
     it('does not navigate right from the last page', () => {
-      mockPathname = '/reports'; // index 6, last page
+      // Last page of the base chain (last Tools entry) for a non-admin user.
+      mockPathname = TOOLS_LINKS[TOOLS_LINKS.length - 1].href;
       vi.useFakeTimers();
       renderSwipeHook();
 
@@ -614,7 +662,7 @@ describe('useSwipeNavigation', () => {
       mockPathname = '/dashboard';
       const { result } = renderHook(() => useSwipeNavigation());
       expect(result.current.isSwipePage).toBe(true);
-      expect(result.current.totalPages).toBe(7);
+      expect(result.current.totalPages).toBe(BASE_SWIPE_COUNT);
     });
   });
 });

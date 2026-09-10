@@ -157,7 +157,7 @@ function TagsContent() {
           actions={<Button onClick={openCreate}>{t('page.newButton')}</Button>}
         />
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-6">
           <SummaryCard
             label={t('page.summary.totalTags')}
             value={tags.length}

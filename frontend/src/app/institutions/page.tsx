@@ -235,7 +235,7 @@ function InstitutionsContent() {
           actions={<Button onClick={openCreate}>{t('page.newInstitution')}</Button>}
         />
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
           <SummaryCard
             label={t('page.summary.total')}
             value={institutions.length}

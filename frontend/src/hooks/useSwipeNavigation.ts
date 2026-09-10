@@ -4,16 +4,24 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import type { DelegateSectionGrants } from '@/lib/delegation';
+import { NAV_LINKS, AI_LINKS, TOOLS_LINKS, ADMIN_LINKS } from '@/lib/nav-links';
 
-const SWIPE_PAGES = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/transactions', label: 'Transactions' },
-  { href: '/bills', label: 'Bills & Deposits' },
-  { href: '/investments', label: 'Investments' },
-  { href: '/accounts', label: 'Accounts' },
-  { href: '/budgets', label: 'Budgets' },
-  { href: '/reports', label: 'Reports' },
-] as const;
+// The horizontal swipe chain follows the mobile drawer's own order: the
+// Dashboard, the main pages, the AI pages, and the Tools pages -- so a swipe
+// leaves and reaches every browsing view the drawer lists, not just the main
+// ones. Admin pages are appended only for a non-delegate admin (below).
+// Settings is deliberately excluded: it is a terminal screen, not a view the
+// user pages through. Labels are unused (the indicator draws dots), so only
+// the href and its order matter -- kept in one place with the nav arrays.
+interface SwipePage {
+  href: string;
+}
+const BASE_SWIPE_PAGES: SwipePage[] = [
+  { href: '/dashboard' },
+  ...NAV_LINKS.map((l) => ({ href: l.href })),
+  ...AI_LINKS.map((l) => ({ href: l.href })),
+  ...TOOLS_LINKS.map((l) => ({ href: l.href })),
+];
 
 // Section-gated swipe pages for a delegate. The Dashboard is always
 // reachable; the rest require the matching owner grant. Transactions is
@@ -80,15 +88,25 @@ export function useSwipeNavigation(): UseSwipeNavigationReturn {
   // owner granted them (plus the Dashboard). Non-delegates swipe all pages.
   const isDelegateView = useAuthStore((s) => !!s.actingAsUserId);
   const delegateSections = useAuthStore((s) => s.delegateSections);
+  // Admin pages join the swipe chain only for a real admin who is not acting as
+  // a delegate -- the same gate the header applies to the Admin menu.
+  const isAdmin = useAuthStore((s) => s.user?.role === 'admin');
 
   const pages = useMemo(() => {
-    if (!isDelegateView) return SWIPE_PAGES.slice();
-    return SWIPE_PAGES.filter((p) => {
+    if (!isDelegateView) {
+      return isAdmin
+        ? [...BASE_SWIPE_PAGES, ...ADMIN_LINKS.map((l) => ({ href: l.href }))]
+        : BASE_SWIPE_PAGES.slice();
+    }
+    // A delegate swipes only the Dashboard plus the main sections granted to
+    // them; AI, Tools and Admin hrefs are not delegate sections, so this filter
+    // drops them without a second list to keep in sync.
+    return BASE_SWIPE_PAGES.filter((p) => {
       if (p.href === '/dashboard') return true;
       const section = DELEGATE_SECTION_BY_HREF[p.href];
       return !!section && !!delegateSections?.[section];
     });
-  }, [isDelegateView, delegateSections]);
+  }, [isDelegateView, delegateSections, isAdmin]);
 
   const currentIndex = pages.findIndex((p) => pathname === p.href);
   // A lone page (e.g. a delegate granted no sections) has nothing to swipe
