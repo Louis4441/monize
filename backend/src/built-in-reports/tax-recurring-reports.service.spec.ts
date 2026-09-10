@@ -946,6 +946,13 @@ describe("TaxRecurringReportsService", () => {
       const feb = result.monthlyTotals.find((m) => m.month === "2025-02");
       expect(jan!.total).toBe(3000);
       expect(feb!.total).toBe(1500);
+
+      // The month travels as a key and nothing else. A server-formatted
+      // `en-US` label used to ride beside it, unread by the only consumer and
+      // English for every reader -- the next consumer to reach for the obvious
+      // field name would have shipped English months again.
+      expect(Object.keys(jan!).sort()).toEqual(["month", "total"]);
+      expect(jan).not.toHaveProperty("label");
     });
 
     it("sorts monthly totals in ascending order", async () => {

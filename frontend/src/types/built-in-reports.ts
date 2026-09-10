@@ -240,8 +240,13 @@ export interface BillPaymentItem {
 }
 
 export interface MonthlyBillTotal {
+  /**
+   * The month as structure (`YYYY-MM`), and the only form the server sends. It
+   * used to ship a `label` beside this, formatted `en-US` on the server; a
+   * month a person reads is rendered here instead, through their own date or
+   * chart formatter.
+   */
   month: string;
-  label: string;
   total: number;
 }
 

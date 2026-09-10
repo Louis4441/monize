@@ -9,8 +9,14 @@ export class BillPaymentItem {
 }
 
 export class MonthlyBillTotal {
+  /**
+   * The month as structure (`YYYY-MM`), and the only form it travels in. A
+   * `label` field beside it carried an `en-US` `Mmm YY` string, which was
+   * English in all 22 locales; the client renders this key through the user's
+   * own date preference. Do not add a display string here -- a formatted month
+   * on the wire is a month formatted for the wrong reader.
+   */
   month: string;
-  label: string;
   total: number;
 }
 
