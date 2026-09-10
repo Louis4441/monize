@@ -90,6 +90,14 @@ vi.mock('@/lib/custom-reports', () => ({
   },
 }));
 
+// Mock the mobile-breakpoint hook so a test can flip the catalogue between the
+// desktop density layouts and the compact mobile tile grid. Default false, so
+// every existing test keeps exercising the desktop branches.
+const mobileState = vi.hoisted(() => ({ isMobile: false }));
+vi.mock('@/hooks/useIsMobile', () => ({
+  useIsMobile: () => mobileState.isMobile,
+}));
+
 // Mock IconPicker
 const mockGetIconComponent = vi.fn().mockReturnValue(null);
 vi.mock('@/components/ui/IconPicker', () => ({
@@ -146,6 +154,7 @@ describe('ReportsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     currentSearchParams = new URLSearchParams();
+    mobileState.isMobile = false;
     useDensityStore.setState({ densities: { reports: 'normal' } });
     currentCategoryFilter = 'all';
     currentFavouriteReportIds = [];
@@ -1349,5 +1358,96 @@ describe('ReportsPage', () => {
       expect(screen.getByText('Spending by Category')).toBeInTheDocument();
     });
     expect(screen.queryByText('Tax Summary')).not.toBeInTheDocument();
+  });
+
+  describe('mobile compact tile grid', () => {
+    // Below the mobile breakpoint the catalogue is a compact 2-column tile grid
+    // instead of any of the three desktop density layouts. A layout change with a
+    // green suite is a finding, so these cover both directions: the mobile tiles,
+    // and proof the desktop layout is untouched when the hook reports desktop.
+
+    it('renders the catalogue as a compact 2-column tile grid on mobile', async () => {
+      mobileState.isMobile = true;
+      render(<ReportsPage />);
+      await waitFor(() => {
+        expect(screen.getByText('Spending by Category')).toBeInTheDocument();
+      });
+      // The tile lives in a 2-column grid, not one of the desktop card grids.
+      const tileButton = screen.getByText('Spending by Category').closest('button')!;
+      const grid = tileButton.parentElement!.parentElement!;
+      expect(grid).toHaveClass('grid-cols-2');
+    });
+
+    it('drops the long description on mobile', async () => {
+      mobileState.isMobile = true;
+      render(<ReportsPage />);
+      await waitFor(() => {
+        expect(screen.getByText('Spending by Category')).toBeInTheDocument();
+      });
+      // The description paragraph the desktop cards render is absent here.
+      expect(screen.queryByText(/See where your money goes/i)).not.toBeInTheDocument();
+    });
+
+    it('still shows the report name and category chip on each tile', async () => {
+      mobileState.isMobile = true;
+      render(<ReportsPage />);
+      await waitFor(() => {
+        expect(screen.getByText('Spending by Category')).toBeInTheDocument();
+      });
+      // The category chip text is present (a filter button carries it too, so
+      // getAllByText -- the tile chip is one of them).
+      expect(screen.getAllByText('Spending').length).toBeGreaterThan(1);
+    });
+
+    it('opens the report when a tile is clicked on mobile', async () => {
+      mobileState.isMobile = true;
+      render(<ReportsPage />);
+      await waitFor(() => {
+        expect(screen.getByText('Spending by Category')).toBeInTheDocument();
+      });
+      const tile = screen.getByText('Spending by Category').closest('button')!;
+      fireEvent.click(tile);
+      expect(mockPush).toHaveBeenCalledWith('/reports/spending-by-category');
+    });
+
+    it('keeps the favourite toggle working, as a sibling of the tile button', async () => {
+      mobileState.isMobile = true;
+      render(<ReportsPage />);
+      await waitFor(() => {
+        expect(screen.getByText('Spending by Category')).toBeInTheDocument();
+      });
+      const stars = screen.getAllByTitle('Add to favourites');
+      expect(stars.length).toBeGreaterThan(0);
+      // The toggle is a sibling of the tile <button>, never nested inside it.
+      expect(stars[0].closest('button')).toBeNull();
+      fireEvent.click(stars[0]);
+      // Toggling favourites must not navigate to the report.
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(mockUpdatePreferences).toHaveBeenCalledWith({
+        favouriteReportIds: ['spending-by-category'],
+      });
+    });
+
+    it('keeps the guided-tour anchor on exactly one tile on mobile', async () => {
+      mobileState.isMobile = true;
+      render(<ReportsPage />);
+      await waitFor(() => {
+        expect(screen.getByText('GEM Strategy')).toBeInTheDocument();
+      });
+      expect(
+        document.querySelectorAll('[data-tour-id="report-gem-strategy"]'),
+      ).toHaveLength(1);
+    });
+
+    it('renders the desktop card layout (with description) when not mobile', async () => {
+      // Desktop path is untouched: the normal-density card still shows the
+      // description block the mobile tile drops.
+      mobileState.isMobile = false;
+      render(<ReportsPage />);
+      await waitFor(() => {
+        expect(screen.getByText('Spending by Category')).toBeInTheDocument();
+      });
+      expect(screen.getByText(/See where your money goes/i)).toBeInTheDocument();
+    });
   });
 });
