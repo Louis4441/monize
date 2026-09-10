@@ -2,7 +2,7 @@
 
 Push subscriptions and the permission prompt, the notification badge, and the Web Share Target stash. Read this before touching `lib/push.ts`, `public/sw.js`, the share inbox or anything under `app/share`.
 
-Paths are relative to `frontend/src/` unless rooted. `frontend/CLAUDE.md` is the short index; this document is where the reasoning lives.
+Paths beginning with `src/` or `scripts/`, and layer configuration filenames, are relative to `frontend/`; other source paths (including `test/...`) are relative to `frontend/src/`. Explicit repository prefixes are preserved. `frontend/CLAUDE.md` is the short index; this document is where the reasoning lives.
 
 ## A push subscription belongs to an account; `localStorage` belongs to an origin
 

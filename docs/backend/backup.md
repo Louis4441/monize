@@ -2,7 +2,7 @@
 
 What a backup promises, the streaming export path, the restore's ordering of refusals, the facade and its components, and the operator-owned automatic backups with their encryption. `docs/backup-restore-contract.md` is the contract; read this and it before changing anything under `src/backup/`.
 
-Paths are relative to `backend/src/` unless rooted. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
+Paths beginning with `src/`, `test/` or `scripts/`, and layer configuration filenames, are relative to `backend/`; other source paths are relative to `backend/src/`. Explicit repository prefixes are preserved. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
 
 ## Backup and restore
 

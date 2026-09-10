@@ -2,7 +2,7 @@
 
 Exporter labels, blank transfer payees, scheduled loan interest, category identity, the currency a value carries, fallbacks and the Money import mapping. The cross-layer money rules are in `AGENTS.md` and `docs/financial-semantics.md`; this document holds the backend decisions that implement them. Read this before touching a transaction write, an export or a loan or category derivation.
 
-Paths are relative to `backend/src/` unless rooted. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
+Paths beginning with `src/`, `test/` or `scripts/`, and layer configuration filenames, are relative to `backend/`; other source paths are relative to `backend/src/`. Explicit repository prefixes are preserved. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
 
 ## A label the exporter writes itself must need no escaping
 

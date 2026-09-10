@@ -2,7 +2,7 @@
 
 Date and money entry, number formatting in the reader's locale, phone numbers, text caps, CSV export and the form-modal hooks. Read this before adding an input, formatting a figure a person reads, or exporting data.
 
-Paths are relative to `frontend/src/` unless rooted. `frontend/CLAUDE.md` is the short index; this document is where the reasoning lives.
+Paths beginning with `src/` or `scripts/`, and layer configuration filenames, are relative to `frontend/`; other source paths (including `test/...`) are relative to `frontend/src/`. Explicit repository prefixes are preserved. `frontend/CLAUDE.md` is the short index; this document is where the reasoning lives.
 
 ## Date entry -- `DateInput`, never a raw `<input type="date">`
 

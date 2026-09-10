@@ -2,7 +2,7 @@
 
 The two Jest configs and why they never run together, the state of the E2E suites, and what a mock, a fixture and a green run each prove. Read this before writing or changing a spec, a test helper or a Jest config.
 
-Paths are relative to `backend/src/` unless rooted. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
+Paths beginning with `src/`, `test/` or `scripts/`, and layer configuration filenames, are relative to `backend/`; other source paths are relative to `backend/src/`. Explicit repository prefixes are preserved. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
 
 ## The parallel config cannot see `test/`, and `npm test` serializes the two suites
 

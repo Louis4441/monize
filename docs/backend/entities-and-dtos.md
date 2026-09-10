@@ -2,7 +2,7 @@
 
 Column transformers and the raw-select trap, DTO validation shapes, phone-number normalization, request-array bounds, the transaction-note cap and regex escaping. Read this before adding a column, a DTO field, a raw query or a validator.
 
-Paths are relative to `backend/src/` unless rooted. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
+Paths beginning with `src/`, `test/` or `scripts/`, and layer configuration filenames, are relative to `backend/`; other source paths are relative to `backend/src/`. Explicit repository prefixes are preserved. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
 
 ## Entity Conventions
 

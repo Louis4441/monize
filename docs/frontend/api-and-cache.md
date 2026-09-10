@@ -2,7 +2,7 @@
 
 How the client talks to the backend, what it caches, and how a payload stays tied to the request that produced it. Read this before adding an API call, a cached read, a write that moves money, or any component that holds asynchronous data.
 
-Paths are relative to `frontend/src/` unless rooted. `frontend/CLAUDE.md` is the short index; this document is where the reasoning lives.
+Paths beginning with `src/` or `scripts/`, and layer configuration filenames, are relative to `frontend/`; other source paths (including `test/...`) are relative to `frontend/src/`. Explicit repository prefixes are preserved. `frontend/CLAUDE.md` is the short index; this document is where the reasoning lives.
 
 ## API Layer (`src/lib/`)
 

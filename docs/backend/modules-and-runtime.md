@@ -2,7 +2,7 @@
 
 Module wiring (require cycles, test stubs), the global providers and `main.ts` setup, environment knobs and whose resource they configure, logging shape, the OIDC provider, CodeQL and the demo login. Read this before adding a module edge, an environment variable, a log line or a boot-time hook.
 
-Paths are relative to `backend/src/` unless rooted. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
+Paths beginning with `src/`, `test/` or `scripts/`, and layer configuration filenames, are relative to `backend/`; other source paths are relative to `backend/src/`. Explicit repository prefixes are preserved. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
 
 ## An edge on a require cycle is deferred, or it is `undefined`
 
@@ -94,9 +94,9 @@ Code scanning on this repository is CodeQL *default setup*, which runs the stand
 
 `DEMO_USER_EMAIL` and `DEMO_USER_PASSWORD` live in `src/database/demo-credentials.ts`; the seed, the nightly reset, `db-demo-check` and the demo seeder import them. They are public by design (`.env.example` prints them, the login page pre-fills them), so the Bearer hard-coded-secret finding on that file is an accepted exception in `.github/workflows/ci.yml` -- one, not one per copy. `demo-credentials.spec.ts` fails a second spelling under `src/`, and the client's mirror (`frontend/src/lib/demo-credentials.ts`) is contract-tested against this file from its side.
 
-## `.dockerignore` is not `.gitignore`: a filename glob needs an explicit `
+## `.dockerignore` is not `.gitignore`: a filename glob needs an explicit `**/`
 
-/`.** A slashless pattern matches only against the path relative to the build context, so `*.spec.ts` excludes nothing under `src/`. Give every filename glob a leading globstar, including its negation (`!**/.env.example`); `frontend/src/test/dockerignore.test.ts` scans all three files and fails on a bare one.
+A slashless pattern matches only against the path relative to the build context, so `*.spec.ts` excludes nothing under `src/`. Give every filename glob a leading globstar, including its negation (`!**/.env.example`); `frontend/src/test/dockerignore.test.ts` scans all three files and fails on a bare one.
 
 ## Code and schema ship in one image; they do not arrive in one process
 

@@ -2,7 +2,7 @@
 
 The Vitest harness, act() discipline, mocks, storage isolation, and what a green run does and does not prove. Read this before writing or changing a test, a mock or a test helper.
 
-Paths are relative to `frontend/src/` unless rooted. `frontend/CLAUDE.md` is the short index; this document is where the reasoning lives.
+Paths beginning with `src/` or `scripts/`, and layer configuration filenames, are relative to `frontend/`; other source paths (including `test/...`) are relative to `frontend/src/`. Explicit repository prefixes are preserved. `frontend/CLAUDE.md` is the short index; this document is where the reasoning lives.
 
 ## React Testing (act() Pattern)
 

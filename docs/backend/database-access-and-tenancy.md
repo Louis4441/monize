@@ -2,7 +2,7 @@
 
 Rejection before the write, predicates written once, the role-safety classifier, whose identity a read runs under, and joint-account scope. The door itself (`withScopedDb`, the RLS contexts, the lint bans) is in `AGENTS.md`; this document holds the backend rules built on it. Read this before writing a query that decides ownership, authorization or which row counts.
 
-Paths are relative to `backend/src/` unless rooted. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
+Paths beginning with `src/`, `test/` or `scripts/`, and layer configuration filenames, are relative to `backend/`; other source paths are relative to `backend/src/`. Explicit repository prefixes are preserved. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
 
 ## Rejection happens before the write
 

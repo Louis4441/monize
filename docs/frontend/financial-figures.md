@@ -2,7 +2,7 @@
 
 The client-side half of the financial contracts: scheduled occurrences, portfolio baselines and ranges, loan figures and history, chart reductions, and how an unknown value is rendered. The cross-layer rules live in `docs/financial-semantics.md`, `docs/time-series-contract.md` and `docs/financial-calculation-contract.md`; this document holds the frontend-specific decisions that implement them. Read it before rendering, deriving or totalling a money figure.
 
-Paths are relative to `frontend/src/` unless rooted. `frontend/CLAUDE.md` is the short index; this document is where the reasoning lives.
+Paths beginning with `src/` or `scripts/`, and layer configuration filenames, are relative to `frontend/`; other source paths (including `test/...`) are relative to `frontend/src/`. Explicit repository prefixes are preserved. `frontend/CLAUDE.md` is the short index; this document is where the reasoning lives.
 
 ## A scheduled occurrence's amount is `nextOccurrenceEffectiveAmount`, never `nextOverride?.amount ?? amount`
 

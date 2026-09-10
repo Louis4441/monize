@@ -2,7 +2,7 @@
 
 The one transport boundary, the one writer of the notifications table, collapse keys, and copy composed outside a request. Read this before producing a notification, touching `src/push/` or `src/notification-center/`, or composing an email or push body.
 
-Paths are relative to `backend/src/` unless rooted. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
+Paths beginning with `src/`, `test/` or `scripts/`, and layer configuration filenames, are relative to `backend/`; other source paths are relative to `backend/src/`. Explicit repository prefixes are preserved. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
 
 ## A business feature asks for a notification; it never imports a transport
 

@@ -2,7 +2,7 @@
 
 The shared components and helpers that exist exactly once, and the rules for reusing them. Read this before writing a card, a dialog, a list, a picker, a switcher or any other control a user interacts with.
 
-Paths are relative to `frontend/src/` unless rooted. `frontend/CLAUDE.md` is the short index; this document is where the reasoning lives.
+Paths beginning with `src/` or `scripts/`, and layer configuration filenames, are relative to `frontend/`; other source paths (including `test/...`) are relative to `frontend/src/`. Explicit repository prefixes are preserved. `frontend/CLAUDE.md` is the short index; this document is where the reasoning lives.
 
 ## Component Patterns
 

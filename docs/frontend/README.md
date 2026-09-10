@@ -15,7 +15,7 @@
 
 Two conventions these documents share:
 
-- **Paths are relative to `frontend/src/`** unless rooted at the repository (`backend/...`, `docs/...`, `e2e/...`).
+- **Path conventions.** Paths beginning with `src/` or `scripts/`, and layer configuration filenames, are relative to `frontend/`; other source paths (including `test/...`) are relative to `frontend/src/`. Explicit repository prefixes are preserved.
 - **A rule that names a guard test is enforced by that test.** The prose explains the rule; the test's failure message points at the offending line. Fix the code, never the baseline -- a baseline in these guards is shrink-only, and converting a file means deleting its line.
 
 When a human points out a defect in code an AI wrote, `AGENTS.md` says what to do: find the existing helper, add a regression test that fails on the original mistake, and write the rule down. The rule goes in the document above whose subject it belongs to, and `frontend/CLAUDE.md` gets at most one line naming the thing to use.

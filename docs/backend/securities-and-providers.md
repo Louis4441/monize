@@ -2,7 +2,7 @@
 
 What a stored price row means, daily-series integrity, history depth, and how every outbound provider call goes through the circuit breaker and is logged once. Read this before touching `src/securities/`, a price writer or any `fetch` to a third party.
 
-Paths are relative to `backend/src/` unless rooted. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
+Paths beginning with `src/`, `test/` or `scripts/`, and layer configuration filenames, are relative to `backend/`; other source paths are relative to `backend/src/`. Explicit repository prefixes are preserved. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
 
 ## A stored price says which session it belongs to, not which minute it was fetched
 

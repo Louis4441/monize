@@ -2,7 +2,7 @@
 
 The transaction and investment registers, row density, table columns, long lists and how a wide table survives a phone. Read this before touching a table, a register, a pager or a list toolbar.
 
-Paths are relative to `frontend/src/` unless rooted. `frontend/CLAUDE.md` is the short index; this document is where the reasoning lives.
+Paths beginning with `src/` or `scripts/`, and layer configuration filenames, are relative to `frontend/`; other source paths (including `test/...`) are relative to `frontend/src/`. Explicit repository prefixes are preserved. `frontend/CLAUDE.md` is the short index; this document is where the reasoning lives.
 
 ## Two transaction lists, two opposite delete contracts -- read the tense
 

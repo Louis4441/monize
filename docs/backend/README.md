@@ -20,7 +20,7 @@ The cross-layer contracts these documents build on stay where they are: `docs/sy
 
 Two conventions these documents share:
 
-- **Paths are relative to `backend/src/`** unless rooted at the repository (`database/...`, `docs/...`, `frontend/...`).
+- **Path conventions.** Paths beginning with `src/`, `test/` or `scripts/`, and layer configuration filenames, are relative to `backend/`; other source paths are relative to `backend/src/`. Explicit repository prefixes are preserved.
 - **A rule that names a guard spec is enforced by that spec.** The prose explains the rule; the spec's failure message points at the offending line. Fix the code, never the grandfather list -- a grandfather list in these guards may only shrink.
 
 When a human points out a defect in code an AI wrote, `AGENTS.md` says what to do: find the existing helper, add a regression test that fails on the original mistake, and write the rule down. The rule goes in the document above whose subject it belongs to, and `backend/CLAUDE.md` gets at most one line naming the thing to use.

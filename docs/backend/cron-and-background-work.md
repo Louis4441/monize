@@ -2,7 +2,7 @@
 
 How a cron seeds its identity, where a cleanup somebody is blocked on belongs, and how a worker attempt is fenced so a reaper cannot double a side effect. `docs/cron-jobs.md` holds the schedule; read this before adding a `@Cron`, a reaper or a long-running job.
 
-Paths are relative to `backend/src/` unless rooted. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
+Paths beginning with `src/`, `test/` or `scripts/`, and layer configuration filenames, are relative to `backend/`; other source paths are relative to `backend/src/`. Explicit repository prefixes are preserved. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
 
 ## Cron Jobs
 

@@ -2,7 +2,7 @@
 
 The two completion paths, the continuation nudge, bulk-tool refusals, the cached brand favicon, payee contact enrichment and case-insensitive search. Read this before touching `src/ai/`, `src/payees/lookup/` or a tool description.
 
-Paths are relative to `backend/src/` unless rooted. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
+Paths beginning with `src/`, `test/` or `scripts/`, and layer configuration filenames, are relative to `backend/`; other source paths are relative to `backend/src/`. Explicit repository prefixes are preserved. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
 
 ## `complete()` is not `completeWithTools()` with the tools left off
 
