@@ -129,6 +129,14 @@ vi.mock('@/components/ui/DateRangeSelector', () => ({
 describe('InvestmentValueChart', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The chart caches its intraday response in sessionStorage; a leaked entry
+    // hydrates the next test synchronously on mount and changes what it
+    // exercises (frontend/CLAUDE.md, test isolation is every storage).
+    try {
+      window.sessionStorage.clear();
+    } catch {
+      // jsdom without sessionStorage: nothing to clear.
+    }
     // A null store is the pre-load state, where the hook takes the default.
     usePreferencesStore.setState({ preferences: null });
     dateRangeState.dateRange = '1y';
@@ -335,6 +343,84 @@ describe('InvestmentValueChart', () => {
     expect(screen.getByText('$10000.00')).toBeInTheDocument();
     // December point (8000) filtered out, so lowest is 9000
     expect(screen.getByText('$9000.00')).toBeInTheDocument();
+  });
+
+  // Range-boundary regression (issue #UI-03, part 3): the first plotted point
+  // must use the same historical valuation rules as the rest of the series. A
+  // prior-close value is a baseline for the Change stat, never a chart point, so
+  // it must not leak into the plotted series and corrupt highest/lowest/change.
+  describe('range boundary: no artificial first-point spike', () => {
+    it('3M plots the daily series verbatim, measured from its first point', async () => {
+      dateRangeState.dateRange = '3m';
+      dateRangeState.resolvedRange = { start: '2024-06-09', end: '2024-09-09' };
+      // A first point that is neither the highest nor the lowest: a prepended
+      // live/current value would show up as a new extreme.
+      vi.mocked(netWorthApi.getInvestmentsDaily).mockResolvedValue([
+        { date: '2024-06-09', value: 10000 },
+        { date: '2024-08-01', value: 12000 },
+        { date: '2024-09-09', value: 11000 },
+      ]);
+      render(<InvestmentValueChart />);
+      await screen.findByText('Portfolio Value Over Time');
+      // Highest/lowest are exactly the series' own extremes -- no extra point.
+      expect(screen.getByText('$12000.00')).toBeInTheDocument();
+      expect(screen.getByText('$10000.00')).toBeInTheDocument();
+      // 3M is not a prior-close range, so Change is measured from the first
+      // plotted point (11000 - 10000), not from any injected boundary value.
+      expect(screen.getByText('+$1000.00')).toBeInTheDocument();
+      expect(screen.getByText('+10.0%')).toBeInTheDocument();
+      // Only the chart's own daily request -- 3M looks up no prior-close baseline.
+      await waitFor(() =>
+        expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledTimes(1),
+      );
+    });
+
+    it('1W plots the intraday series and reads the prior close only as a baseline', async () => {
+      dateRangeState.dateRange = '1w';
+      dateRangeState.resolvedRange = { start: '2024-09-02', end: '2024-09-09' };
+      vi.mocked(investmentsApi.getIntradayValue).mockResolvedValue({
+        points: [
+          { timestamp: '2024-09-02T13:30:00.000Z', value: 20000 },
+          { timestamp: '2024-09-05T20:00:00.000Z', value: 21000 },
+        ],
+        interval: '15m',
+        currency: 'CAD',
+        range: '1w',
+        fetchedAt: '2024-09-09T15:00:00.000Z',
+        skippedSymbols: [],
+        failedSymbols: [],
+        fallbackToDaily: false,
+      });
+      // The prior close (19000) is what 1W measures its change against. It is a
+      // lower value than every plotted point, so if it were rendered as the
+      // first chart point the lowest card would read 19000.
+      vi.mocked(netWorthApi.getInvestmentsDaily).mockResolvedValue([
+        { date: '2024-09-01', value: 19000 },
+      ]);
+      render(<InvestmentValueChart />);
+      await screen.findByText('Portfolio Value Over Time');
+      // Highest/lowest are the intraday extremes only -- the 19000 baseline is
+      // not on the chart.
+      expect(screen.getByText('$21000.00')).toBeInTheDocument();
+      expect(screen.getByText('$20000.00')).toBeInTheDocument();
+      expect(screen.queryByText('$19000.00')).not.toBeInTheDocument();
+      // Change is measured from the prior close: 21000 - 19000 = +2000. The
+      // baseline is second-stage (it cannot fire until the first point is
+      // known), so wait for it rather than the static title.
+      await waitFor(() =>
+        expect(screen.getByText('+$2000.00')).toBeInTheDocument(),
+      );
+      // The daily endpoint is reached once, only for that baseline, and its
+      // window ends the day before the first plotted point.
+      await waitFor(() =>
+        expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledTimes(1),
+      );
+      await waitFor(() =>
+        expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledWith(
+          expect.objectContaining({ endDate: '2024-09-01' }),
+        ),
+      );
+    });
   });
 
   it('shows negative change values correctly', async () => {

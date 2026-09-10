@@ -8,10 +8,9 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend,
 } from 'recharts';
 import { investmentsApi } from '@/lib/investments';
-import { PortfolioSummary, HoldingWithMarketValue } from '@/types/investment';
+import { PortfolioSummary } from '@/types/investment';
 import { Account } from '@/types/account';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
@@ -20,6 +19,10 @@ import { gainLossColor } from '@/lib/format';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
+import { SecurityComparisonChart } from '@/components/reports/SecurityComparisonChart';
+import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
+import { useDateRange } from '@/hooks/useDateRange';
+import { CHART_RANGES } from '@/lib/security-detail';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from '@/components/ui/interactive-row';
 import {
@@ -76,6 +79,15 @@ export function InvestmentPerformanceReport() {
   const [reloadKey, setReloadKey] = useState(0);
   const [expandedSecurityId, setExpandedSecurityId] = useState<string | null>(null);
   const [viewType, setViewType] = useState<'performance' | 'allocation'>('performance');
+  // The historical performance chart's window, persisted like the other report
+  // ranges. A price chart is measured over a period the user picks, so the
+  // Performance view carries its own range selector; the Allocation view is a
+  // point-in-time snapshot and has none.
+  const { dateRange: perfRange, setDateRange: setPerfRange, resolvedRange: perfResolvedRange } =
+    useDateRange({
+      defaultRange: '1y',
+      storageKey: 'reports.investment-performance.range',
+    });
   const isSingleAccount = selectedAccountIds.length === 1;
   const { sortField, sortDirection, handleSort } = useSortableTable<HoldingsSortField>(
     'reports.investment-performance.holdings.sort',
@@ -224,24 +236,16 @@ export function InvestmentPerformanceReport() {
     }));
   }, [portfolio]);
 
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string; payload: HoldingWithMarketValue & { color: string } }> }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-          <p className="font-medium text-gray-900 dark:text-gray-100">{data.name}</p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">{data.symbol}</p>
-          <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">
-            {t('investmentPerformance.tooltipValue')} {fmtHolding(data.marketValue, data.currencyCode)}
-          </p>
-          <p className={`text-sm ${gainLossColor(data.gainLoss || 0)}`}>
-            {t('investmentPerformance.tooltipGainLoss')} {fmtHolding(data.gainLoss, data.currencyCode)} ({formatPercent(data.gainLossPercent || 0)})
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
+  // The securities to plot on the historical performance chart: every distinct
+  // security the selected accounts currently hold. `getPortfolioSummary` is
+  // already fetched with `selectedAccountIds`, so this list is the selected
+  // scope's holdings -- the account filter reaches the chart through the data,
+  // not through a second request key. Deduped so one security held in two
+  // accounts is one line, not two identical ones.
+  const performanceSecurityIds = useMemo(() => {
+    if (!portfolio) return [];
+    return [...new Set(portfolio.holdings.map((h) => h.securityId))];
+  }, [portfolio]);
 
   const handleExportPdf = async () => {
     const { exportToPdf } = await import('@/lib/pdf-export');
@@ -389,34 +393,29 @@ export function InvestmentPerformanceReport() {
       <div ref={chartRef}>
       {viewType === 'performance' ? (
         <>
-          {/* Holdings Performance Chart */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 px-2 py-4 sm:p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-              {t('investmentPerformance.holdingsByMarketValue')}
-            </h3>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                <PieChart>
-                  <Pie
-                    data={holdingsData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={120}
-                    paddingAngle={2}
-                    dataKey="marketValue"
-                    nameKey="symbol"
-                  >
-                    {holdingsData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+          {/* Historical performance: one cumulative-return line per held
+              security over the selected window. Replaces the point-in-time
+              holdings donut, which now lives under Allocation; the composition
+              question and the "how have these performed" question are answered
+              on their own tabs. The chart owns its own fetch, keyed on the held
+              securities and the window, and renders the server's percent-return
+              series with its null/exclusion handling intact. */}
+          <div className="mb-6 flex justify-end">
+            <DateRangeSelector
+              ranges={CHART_RANGES}
+              value={perfRange}
+              onChange={setPerfRange}
+              activeColour="bg-blue-600"
+              size="sm"
+            />
           </div>
+          <SecurityComparisonChart
+            securityIds={performanceSecurityIds}
+            indexCodes={[]}
+            startDate={perfResolvedRange.start}
+            endDate={perfResolvedRange.end}
+            reloadKey={reloadKey}
+          />
 
           {/* Holdings Table */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 overflow-hidden">
