@@ -766,7 +766,10 @@
     "colCurrentPrice": "वर्तमान मूल्य",
     "colMarketValue": "बाजार मूल्य",
     "colGainLoss": "लाभ/हानि",
-    "colReturn": "रिटर्न"
+    "colReturn": "रिटर्न",
+    "chartSubtitle": "चयनित अवधि के दौरान इन खातों में मौजूद प्रत्येक प्रतिभूति का संचयी रिटर्न।",
+    "chartLimitedNote": "बाजार मूल्य के अनुसार केवल {shown} सबसे बड़ी होल्डिंग दिखाई गई हैं ({total} में से)।",
+    "rangeAll": "सभी"
   },
   "investmentTransactions": {
     "totalTransactions": "कुल लेनदेन",

@@ -766,7 +766,10 @@
     "colCurrentPrice": "Harga Saat Ini",
     "colMarketValue": "Nilai Pasar",
     "colGainLoss": "Keuntungan/Kerugian",
-    "colReturn": "Imbal Hasil"
+    "colReturn": "Imbal Hasil",
+    "chartSubtitle": "Imbal hasil kumulatif dari setiap efek yang dimiliki akun-akun ini selama periode yang dipilih.",
+    "chartLimitedNote": "Hanya {shown} kepemilikan terbesar berdasarkan nilai pasar yang ditampilkan (dari {total} yang dimiliki).",
+    "rangeAll": "Semua"
   },
   "investmentTransactions": {
     "totalTransactions": "Total Transaksi",

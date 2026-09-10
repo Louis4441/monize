@@ -766,7 +766,10 @@
     "colCurrentPrice": "Prezzo attuale",
     "colMarketValue": "Valore di mercato",
     "colGainLoss": "Guadagno/Perdita",
-    "colReturn": "Rendimento"
+    "colReturn": "Rendimento",
+    "chartSubtitle": "Rendimento cumulato di ogni titolo detenuto da questi conti nel periodo selezionato.",
+    "chartLimitedNote": "Vengono rappresentate solo le {shown} maggiori posizioni per valore di mercato (su {total} detenute).",
+    "rangeAll": "Tutto"
   },
   "investmentTransactions": {
     "totalTransactions": "Transazioni totali",

@@ -766,7 +766,10 @@
     "colCurrentPrice": "当前价格",
     "colMarketValue": "市值",
     "colGainLoss": "盈亏",
-    "colReturn": "回报率"
+    "colReturn": "回报率",
+    "chartSubtitle": "所选期间内这些账户持有的每种证券的累计回报率。",
+    "chartLimitedNote": "仅显示按市值排列的{shown}大持仓（共持有{total}项）。",
+    "rangeAll": "全部"
   },
   "investmentTransactions": {
     "totalTransactions": "总交易数",

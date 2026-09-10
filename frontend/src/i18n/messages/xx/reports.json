@@ -766,7 +766,10 @@
     "colCurrentPrice": "[XX-Current Price-XX]",
     "colMarketValue": "[XX-Market Value-XX]",
     "colGainLoss": "[XX-Gain/Loss-XX]",
-    "colReturn": "[XX-Return-XX]"
+    "colReturn": "[XX-Return-XX]",
+    "chartSubtitle": "[XX-Cumulative return of every security these accounts hold, over the selected period.-XX]",
+    "chartLimitedNote": "[XX-Only the {shown} largest holdings by market value are plotted (of {total} held).-XX]",
+    "rangeAll": "[XX-All Time-XX]"
   },
   "investmentTransactions": {
     "totalTransactions": "[XX-Total Transactions-XX]",

@@ -766,7 +766,10 @@
     "colCurrentPrice": "Giá hiện tại",
     "colMarketValue": "Giá trị thị trường",
     "colGainLoss": "Lãi/Lỗ",
-    "colReturn": "Lợi nhuận"
+    "colReturn": "Lợi nhuận",
+    "chartSubtitle": "Lợi nhuận tích lũy của mọi chứng khoán mà các tài khoản này nắm giữ trong khoảng thời gian đã chọn.",
+    "chartLimitedNote": "Chỉ hiển thị {shown} vị thế lớn nhất theo giá trị thị trường (trong tổng số {total} đang nắm giữ).",
+    "rangeAll": "Tất cả"
   },
   "investmentTransactions": {
     "totalTransactions": "Tổng giao tác",

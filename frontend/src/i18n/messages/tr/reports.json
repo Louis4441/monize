@@ -766,7 +766,10 @@
     "colCurrentPrice": "Güncel Fiyat",
     "colMarketValue": "Piyasa Değeri",
     "colGainLoss": "Kazanç/Kayıp",
-    "colReturn": "Getiri"
+    "colReturn": "Getiri",
+    "chartSubtitle": "Seçilen dönemde bu hesapların elinde tuttuğu her menkul kıymetin kümülatif getirisi.",
+    "chartLimitedNote": "Piyasa değerine göre yalnızca en büyük {shown} varlık gösterilir ({total} varlıktan).",
+    "rangeAll": "Tümü"
   },
   "investmentTransactions": {
     "totalTransactions": "Toplam İşlemler",

@@ -8,10 +8,9 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend,
 } from 'recharts';
 import { investmentsApi } from '@/lib/investments';
-import { PortfolioSummary, HoldingWithMarketValue } from '@/types/investment';
+import { PortfolioSummary } from '@/types/investment';
 import { Account } from '@/types/account';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
@@ -20,6 +19,10 @@ import { gainLossColor } from '@/lib/format';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
+import { SecurityComparisonChart, SecurityComparisonChartHandle } from '@/components/reports/SecurityComparisonChart';
+import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
+import { useDateRange } from '@/hooks/useDateRange';
+import { CHART_RANGES } from '@/lib/security-detail';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from '@/components/ui/interactive-row';
 import {
@@ -58,6 +61,12 @@ const CELL_PLACEMENT: Record<HoldingsSortField, string> = {
 
 const ACCOUNTS_STORAGE_KEY = 'monize-reports-investment-performance-accounts';
 
+// The comparison endpoint caps `securityIds` at 20 (`@ArrayMaxSize(20)` on
+// `PerformanceComparisonQueryDto`): sending more returns 400 and the whole chart
+// falls into its error state. A portfolio of 21+ securities plots only its 20
+// largest holdings by market value, and a note says so.
+const PERFORMANCE_CHART_MAX_SECURITIES = 20;
+
 export function InvestmentPerformanceReport() {
   const t = useTranslations('reports');
   const mainAccountName = useMainAccountName();
@@ -69,6 +78,9 @@ export function InvestmentPerformanceReport() {
   } = useNumberFormat();
   const { defaultCurrency } = useExchangeRates();
   const chartRef = useRef<HTMLDivElement>(null);
+  // The comparison chart owns its own fetched series, colours and chart DOM, so
+  // its PDF export is delegated to this handle (matching SecurityPerformanceReport).
+  const comparisonExportRef = useRef<SecurityComparisonChartHandle>(null);
   // Persisted so the report opens on the accounts the user last chose.
   // Accounts arrive with the data below, so stale IDs are pruned there.
   const [selectedAccountIds, setSelectedAccountIds, pruneAccountFilter] =
@@ -76,6 +88,15 @@ export function InvestmentPerformanceReport() {
   const [reloadKey, setReloadKey] = useState(0);
   const [expandedSecurityId, setExpandedSecurityId] = useState<string | null>(null);
   const [viewType, setViewType] = useState<'performance' | 'allocation'>('performance');
+  // The historical performance chart's window, persisted like the other report
+  // ranges. A price chart is measured over a period the user picks, so the
+  // Performance view carries its own range selector; the Allocation view is a
+  // point-in-time snapshot and has none.
+  const { dateRange: perfRange, setDateRange: setPerfRange, resolvedRange: perfResolvedRange } =
+    useDateRange({
+      defaultRange: '1y',
+      storageKey: 'reports.investment-performance.range',
+    });
   const isSingleAccount = selectedAccountIds.length === 1;
   const { sortField, sortDirection, handleSort } = useSortableTable<HoldingsSortField>(
     'reports.investment-performance.holdings.sort',
@@ -207,15 +228,6 @@ export function InvestmentPerformanceReport() {
     return aggregated;
   }, [portfolio, sortField, sortDirection]);
 
-  const holdingsData = useMemo(() => {
-    return aggregatedHoldings
-      .filter((h) => h.marketValue && h.marketValue > 0)
-      .map((h, index) => ({
-        ...h,
-        color: CHART_COLOURS[index % CHART_COLOURS.length],
-      }));
-  }, [aggregatedHoldings]);
-
   const allocationData = useMemo(() => {
     if (!portfolio) return [];
     return portfolio.allocation.map((item, index) => ({
@@ -224,26 +236,49 @@ export function InvestmentPerformanceReport() {
     }));
   }, [portfolio]);
 
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string; payload: HoldingWithMarketValue & { color: string } }> }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-          <p className="font-medium text-gray-900 dark:text-gray-100">{data.name}</p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">{data.symbol}</p>
-          <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">
-            {t('investmentPerformance.tooltipValue')} {fmtHolding(data.marketValue, data.currencyCode)}
-          </p>
-          <p className={`text-sm ${gainLossColor(data.gainLoss || 0)}`}>
-            {t('investmentPerformance.tooltipGainLoss')} {fmtHolding(data.gainLoss, data.currencyCode)} ({formatPercent(data.gainLossPercent || 0)})
-          </p>
-        </div>
-      );
+  // Every distinct security the selected accounts currently hold. Deduped so a
+  // security held in two accounts is one line, not two identical ones, and in a
+  // stable order (holdings order) independent of the table's user-chosen sort.
+  // `getPortfolioSummary` is already fetched with `selectedAccountIds`, so this
+  // is the selected scope's holdings -- the account filter reaches the chart
+  // through the data, not a second request key.
+  const heldSecurityIds = useMemo(() => {
+    if (!portfolio) return [];
+    return [...new Set(portfolio.holdings.map((h) => h.securityId))];
+  }, [portfolio]);
+
+  // The securities actually plotted: capped at the backend's 20 so a 21+
+  // security portfolio does not 400 the whole chart. When capped, the survivors
+  // are the 20 largest holdings by market value (aggregated across accounts, so
+  // a security split over two accounts is weighed by its combined value), kept
+  // in the same stable order as `heldSecurityIds`.
+  const performanceSecurityIds = useMemo(() => {
+    if (heldSecurityIds.length <= PERFORMANCE_CHART_MAX_SECURITIES) {
+      return heldSecurityIds;
     }
-    return null;
-  };
+    const topIds = new Set(
+      [...aggregateHoldingsBySecurity(portfolio!.holdings)]
+        .sort((a, b) => (b.marketValue ?? 0) - (a.marketValue ?? 0))
+        .slice(0, PERFORMANCE_CHART_MAX_SECURITIES)
+        .map((h) => h.securityId),
+    );
+    return heldSecurityIds.filter((id) => topIds.has(id));
+  }, [heldSecurityIds, portfolio]);
+
+  // True when more securities are held than the chart can plot, so the note
+  // telling the reader only the largest are shown renders.
+  const isPerformanceChartCapped =
+    heldSecurityIds.length > performanceSecurityIds.length;
 
   const handleExportPdf = async () => {
+    // The Performance view plots percent return with the chart's own colours and
+    // series legend; only the chart handle can draw that legend correctly, so it
+    // owns the export (the report's holdings-value legend would match nothing).
+    if (viewType === 'performance') {
+      await comparisonExportRef.current?.exportPdf();
+      return;
+    }
+
     const { exportToPdf } = await import('@/lib/pdf-export');
 
     const cards = summaryValues ? [
@@ -264,9 +299,10 @@ export function InvestmentPerformanceReport() {
       h.gainLossPercent !== null ? formatPercent(h.gainLossPercent) : 'N/A',
     ]);
 
-    const legendItems = holdingsData.map((h) => ({
-      color: h.color,
-      label: `${h.symbol} - ${fmtHolding(h.marketValue, h.currencyCode)}`,
+    // The Allocation donut's legend, from the same data the donut draws.
+    const legendItems = allocationData.map((item) => ({
+      color: item.color,
+      label: `${item.name} - ${formatCurrencyFull(item.value)}`,
     }));
 
     await exportToPdf({
@@ -389,34 +425,42 @@ export function InvestmentPerformanceReport() {
       <div ref={chartRef}>
       {viewType === 'performance' ? (
         <>
-          {/* Holdings Performance Chart */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 px-2 py-4 sm:p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-              {t('investmentPerformance.holdingsByMarketValue')}
-            </h3>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                <PieChart>
-                  <Pie
-                    data={holdingsData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={120}
-                    paddingAngle={2}
-                    dataKey="marketValue"
-                    nameKey="symbol"
-                  >
-                    {holdingsData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+          {/* Historical performance: one cumulative-return line per held
+              security over the selected window. Replaces the point-in-time
+              holdings donut, which now lives under Allocation; the composition
+              question and the "how have these performed" question are answered
+              on their own tabs. The chart owns its own fetch, keyed on the held
+              securities and the window, and renders the server's percent-return
+              series with its null/exclusion handling intact. */}
+          <div className="mb-6 flex justify-end">
+            <DateRangeSelector
+              ranges={CHART_RANGES}
+              // Only `all` needs translating; 1M/3M/YTD/1Y/5Y are
+              // locale-neutral abbreviations `formatLabel` handles.
+              labels={{ all: t('investmentPerformance.rangeAll') }}
+              value={perfRange}
+              onChange={setPerfRange}
+              activeColour="bg-blue-600"
+              size="sm"
+            />
           </div>
+          <SecurityComparisonChart
+            securityIds={performanceSecurityIds}
+            indexCodes={[]}
+            startDate={perfResolvedRange.start}
+            endDate={perfResolvedRange.end}
+            subtitle={t('investmentPerformance.chartSubtitle')}
+            reloadKey={reloadKey}
+            exportRef={comparisonExportRef}
+          />
+          {isPerformanceChartCapped && (
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              {t('investmentPerformance.chartLimitedNote', {
+                shown: performanceSecurityIds.length,
+                total: heldSecurityIds.length,
+              })}
+            </p>
+          )}
 
           {/* Holdings Table */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 overflow-hidden">

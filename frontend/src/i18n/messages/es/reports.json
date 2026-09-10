@@ -766,7 +766,10 @@
     "colCurrentPrice": "Precio actual",
     "colMarketValue": "Valor de mercado",
     "colGainLoss": "Ganancia/pérdida",
-    "colReturn": "Retorno"
+    "colReturn": "Retorno",
+    "chartSubtitle": "Retorno acumulado de cada valor que poseen estas cuentas durante el período seleccionado.",
+    "chartLimitedNote": "Solo se representan las {shown} posiciones más grandes por valor de mercado (de {total} en cartera).",
+    "rangeAll": "Todo"
   },
   "investmentTransactions": {
     "totalTransactions": "Total de transacciones",

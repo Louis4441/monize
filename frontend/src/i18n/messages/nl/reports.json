@@ -766,7 +766,10 @@
     "colCurrentPrice": "Huidige koers",
     "colMarketValue": "Marktwaarde",
     "colGainLoss": "Winst/verlies",
-    "colReturn": "Rendement"
+    "colReturn": "Rendement",
+    "chartSubtitle": "Cumulatief rendement van elk effect dat deze rekeningen aanhouden, over de geselecteerde periode.",
+    "chartLimitedNote": "Alleen de {shown} grootste posities op marktwaarde worden weergegeven (van {total} aangehouden).",
+    "rangeAll": "Alles"
   },
   "investmentTransactions": {
     "totalTransactions": "Totaal transacties",

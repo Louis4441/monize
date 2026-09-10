@@ -59,6 +59,12 @@ vi.mock('@/lib/investments', () => ({
   },
 }));
 
+// The Performance view's historical chart owns its own fetch and recharts tree;
+// stub it so this suite stays about the wrapped holdings table.
+vi.mock('@/components/reports/SecurityComparisonChart', () => ({
+  SecurityComparisonChart: () => <div data-testid="performance-chart" />,
+}));
+
 const PORTFOLIO = {
   holdings: [
     {

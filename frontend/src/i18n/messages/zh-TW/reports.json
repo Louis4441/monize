@@ -766,7 +766,10 @@
     "colCurrentPrice": "目前價格",
     "colMarketValue": "市值",
     "colGainLoss": "損益",
-    "colReturn": "報酬率"
+    "colReturn": "報酬率",
+    "chartSubtitle": "所選期間內這些帳戶持有的每種證券的累計報酬率。",
+    "chartLimitedNote": "僅顯示依市值排列的前 {shown} 大持倉（共持有 {total} 項）。",
+    "rangeAll": "全部"
   },
   "investmentTransactions": {
     "totalTransactions": "總交易數",

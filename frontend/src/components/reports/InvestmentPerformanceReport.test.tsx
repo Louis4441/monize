@@ -57,6 +57,25 @@ vi.mock('@/lib/investments', () => ({
   },
 }));
 
+// The Performance view now draws the historical percent-return comparison chart
+// (one line per held security) instead of a holdings donut. It owns its own
+// fetch, so it is stubbed here; the report's job is only to feed it the held
+// securities and the window.
+const mockPerfChartProps = vi.fn();
+vi.mock('@/components/reports/SecurityComparisonChart', () => ({
+  SecurityComparisonChart: (props: any) => {
+    mockPerfChartProps(props);
+    return (
+      <div
+        data-testid="performance-chart"
+        data-security-ids={(props.securityIds ?? []).join(',')}
+        data-start={props.startDate}
+        data-end={props.endDate}
+      />
+    );
+  },
+}));
+
 vi.mock('@/lib/pdf-export', () => ({
   exportToPdf: vi.fn().mockResolvedValue(undefined),
 }));
@@ -237,6 +256,23 @@ describe('InvestmentPerformanceReport', () => {
         fireEvent.click(pdfBtn);
       });
     }
+  });
+
+  it('draws the historical performance chart for the held securities, deduped', async () => {
+    mockGetPortfolioSummary.mockResolvedValue(fullPortfolio);
+    mockGetInvestmentAccounts.mockResolvedValue([]);
+    render(<InvestmentPerformanceReport />);
+    const chart = await screen.findByTestId('performance-chart');
+    // sec-vfv is held in two accounts but is one line, not two; a zero-quantity
+    // holding (sec-xic) still has a return history worth plotting.
+    expect(chart.getAttribute('data-security-ids')).toBe('sec-vfv,sec-xic,sec-aapl');
+    // The window's start and end are handed down (default 1y range), so the
+    // chart requests the same period the report is scoped to.
+    expect(chart.getAttribute('data-start')).toBeTruthy();
+    expect(chart.getAttribute('data-end')).toBeTruthy();
+    // The point-in-time donut is gone from the Performance view; composition
+    // now lives under Allocation.
+    expect(screen.queryByTestId('pie-chart')).not.toBeInTheDocument();
   });
 
   it('handles loss case (negative totalGainLoss)', async () => {

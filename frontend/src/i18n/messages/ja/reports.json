@@ -766,7 +766,10 @@
     "colCurrentPrice": "現在価格",
     "colMarketValue": "市場価値",
     "colGainLoss": "損益",
-    "colReturn": "リターン"
+    "colReturn": "リターン",
+    "chartSubtitle": "選択した期間における、これらの口座が保有する全銘柄の累積リターン。",
+    "chartLimitedNote": "市場価値上位{shown}件の保有銘柄のみを表示しています（保有{total}件中）。",
+    "rangeAll": "全期間"
   },
   "investmentTransactions": {
     "totalTransactions": "取引合計",

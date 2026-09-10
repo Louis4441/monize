@@ -301,6 +301,24 @@ select {
   background-color: var(--color-gray-800);
 }
 
+/* Recharts gives every chart <svg> tabIndex=0 and role="application" for its
+   keyboard accessibility layer. On a touch tap or a mouse click that focuses
+   the surface, and the browser then paints its focus outline around the whole
+   chart -- an oversized rectangle framing the point the reader just touched,
+   with the tooltip, active dot and cursor inside it. That ring belongs only to
+   keyboard focus: drop it for pointer focus and keep the visible one for
+   :focus-visible, so a keyboard user still sees where they are. The recharts
+   Tooltip cursor and activeDot are unaffected -- they are drawn inside the SVG,
+   not this outline. */
+.recharts-surface:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.recharts-surface:focus-visible {
+  outline: 2px solid var(--color-blue-500);
+  outline-offset: 2px;
+}
+
 /* Date input styling - empty date inputs should match placeholder color */
 .date-empty {
   color: var(--color-gray-400) !important; /* matches placeholder */
