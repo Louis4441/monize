@@ -47,6 +47,14 @@ vi.mock('@/hooks/useDateFormat', () => ({
   }),
 }));
 
+// The chart's month marker comes from the chart formatter, which localizes the
+// month NAME, not from `formatMonth`, which renders the user's numeric
+// month-and-year preference.
+vi.mock('@/hooks/useChartDateFormat', () => ({
+  useChartDateFormat: () => (date: string, pattern: string) =>
+    `chart-month:${date}:${pattern}`,
+}));
+
 const STABLE_RANGE = { start: '2024-01-01', end: '2025-01-01' };
 vi.mock('@/hooks/useDateRange', () => ({
   useDateRange: () => ({
@@ -140,9 +148,11 @@ describe('BillPaymentHistoryReport', () => {
     });
     expect(screen.getByText('Monthly Average')).toBeInTheDocument();
     expect(screen.getByText('Bills Paid')).toBeInTheDocument();
+    // The month axis reads a month NAME through the chart formatter, never the
+    // reader's numeric month-and-year preference (`2026-01` / `01/2026`).
     expect(screen.getByTestId('bar-chart')).toHaveAttribute(
       'data-labels',
-      'preferred-month:2025-01',
+      'chart-month:2025-01-01:MMM yyyy',
     );
   });
 
