@@ -22,6 +22,8 @@
     "modifiedBadge": "{count}件変更",
     "modifiedTitle": "{count, plural, one {今後の発生#件が変更されています} other {今後の発生#件が変更されています}}",
     "modifiedAmountTitle": "次回の発生分の金額が変更されています",
+    "modifiedDateTitle": "この回の予定日を変更済み",
+    "splitBadge": "分割 ({count})",
     "autoPostBadge": "オン",
     "autoPostTitle": "期日に自動投稿",
     "inactiveSuffix": " — 非アクティブ",

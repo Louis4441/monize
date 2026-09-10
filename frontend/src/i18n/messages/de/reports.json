@@ -1229,6 +1229,14 @@
     "inLast6Months": "(in den letzten 6 Monaten)",
     "noRecurring": "Keine wiederkehrenden Ausgaben mit {count}+ Vorkommen in den letzten 6 Monaten gefunden.",
     "failedToLoad": "Wiederkehrende Ausgaben konnten nicht geladen werden.",
+    "categoryUncategorized": "Nicht kategorisiert",
+    "frequency": {
+      "WEEKLY": "Wöchentlich",
+      "BIWEEKLY": "Alle 2 Wochen",
+      "MONTHLY": "Monatlich",
+      "OCCASIONAL": "Gelegentlich",
+      "IRREGULAR": "Unregelmäßig"
+    },
     "top10ChartTitle": "Top 10 wiederkehrende Ausgaben",
     "allRecurringTitle": "Alle wiederkehrenden Ausgaben",
     "tooltipTransactions": "{count} Buchungen – {frequency}",
@@ -1405,6 +1413,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "Anteile",
     "noData": "Keine Anlagebestände gefunden. Fügen Sie Wertpapiere hinzu, um die Anlageklassenaufschlüsselung zu sehen.",
     "totalPortfolio": "Gesamtportfolio",
     "assetTypes": "Anlageklassen",

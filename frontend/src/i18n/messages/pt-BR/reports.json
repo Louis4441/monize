@@ -1229,6 +1229,14 @@
     "inLast6Months": "(nos últimos 6 meses)",
     "noRecurring": "Nenhuma despesa recorrente encontrada com {count}+ ocorrências nos últimos 6 meses.",
     "failedToLoad": "Falha ao carregar os dados de despesas recorrentes.",
+    "categoryUncategorized": "Não Categorizado",
+    "frequency": {
+      "WEEKLY": "Semanal",
+      "BIWEEKLY": "A cada 2 Semanas",
+      "MONTHLY": "Mensal",
+      "OCCASIONAL": "Ocasional",
+      "IRREGULAR": "Irregular"
+    },
     "top10ChartTitle": "Top 10 Despesas Recorrentes",
     "allRecurringTitle": "Todas as Despesas Recorrentes",
     "tooltipTransactions": "{count} transações - {frequency}",
@@ -1405,6 +1413,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "Ações",
     "noData": "Nenhuma posição de investimento encontrada. Adicione títulos para ver a análise por tipo de ativo.",
     "totalPortfolio": "Total do Portfólio",
     "assetTypes": "Tipos de Ativo",

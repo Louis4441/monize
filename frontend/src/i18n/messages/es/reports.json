@@ -1229,6 +1229,14 @@
     "inLast6Months": "(en los últimos 6 meses)",
     "noRecurring": "No se encontraron gastos recurrentes con {count}+ ocurrencias en los últimos 6 meses.",
     "failedToLoad": "Error al cargar los datos de gastos recurrentes.",
+    "categoryUncategorized": "Sin categorizar",
+    "frequency": {
+      "WEEKLY": "Semanal",
+      "BIWEEKLY": "Cada 2 semanas",
+      "MONTHLY": "Mensual",
+      "OCCASIONAL": "Ocasional",
+      "IRREGULAR": "Irregular"
+    },
     "top10ChartTitle": "Top 10 gastos recurrentes",
     "allRecurringTitle": "Todos los gastos recurrentes",
     "tooltipTransactions": "{count} transacciones - {frequency}",
@@ -1405,6 +1413,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "Acciones",
     "noData": "No se encontraron posiciones de inversión. Agrega valores para ver el desglose por tipo de activo.",
     "totalPortfolio": "Total de la cartera",
     "assetTypes": "Tipos de activos",

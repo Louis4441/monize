@@ -25,12 +25,19 @@ vi.mock('@/hooks/useNumberFormat', async () => {
   return {
   useNumberFormat: () => ({
     ...numberFormatMockDefaults(),
-    formatCurrency: (n: number) => `$${n.toFixed(2)}`,
+    formatCurrency: (n: number, currencyCode = 'CAD') =>
+      currencyCode === 'CAD' ? `$${n.toFixed(2)}` : `${currencyCode} ${n.toFixed(2)}`,
     formatCurrencyCompact: (n: number) => `$${n.toFixed(0)}`,
     defaultCurrency: "CAD",
   }),
   };
 });
+
+vi.mock('@/hooks/useDateFormat', () => ({
+  useDateFormat: () => ({
+    formatDate: (date: string) => `preferred-date:${date}`,
+  }),
+}));
 
 const stableResolvedRange = { start: "2025-01-01", end: "2025-03-31" };
 
@@ -41,14 +48,6 @@ vi.mock("@/hooks/useDateRange", () => ({
     resolvedRange: stableResolvedRange,
     isValid: true,
   }),
-}));
-
-// Spread the real module rather than replacing it: the phone captions render
-// `CellLabel`, which reads `cn` from here, and a bare factory blanks every other
-// export of the module for the whole graph under test.
-vi.mock("@/lib/utils", async (importActual) => ({
-  ...(await importActual<typeof import("@/lib/utils")>()),
-  parseLocalDate: (d: string) => new Date(d + "T00:00:00"),
 }));
 
 vi.mock("@/components/ui/DateRangeSelector", () => ({
@@ -91,6 +90,7 @@ const RESPONSE = {
       accountName: "Zeta Chequing",
       accountId: "acc-z",
       amount: -123456.78,
+      currencyCode: "CAD",
     },
     {
       id: "tx-late",
@@ -100,6 +100,7 @@ const RESPONSE = {
       accountName: "Alpha Savings",
       accountId: "acc-a",
       amount: 200,
+      currencyCode: "CAD",
     },
     {
       id: "tx-unknown",
@@ -109,6 +110,7 @@ const RESPONSE = {
       accountName: null,
       accountId: "acc-u",
       amount: -75,
+      currencyCode: "CAD",
     },
   ],
   summary: {
@@ -117,6 +119,7 @@ const RESPONSE = {
     expenseTotal: 123531.78,
     incomeCount: 1,
     incomeTotal: 200,
+    currencyCode: "CAD",
   },
 };
 
@@ -214,7 +217,7 @@ describe("UncategorizedTransactionsReport (phone wrapped rows)", () => {
     const row = txRow(container, "Corner Store")!;
     // Each caption sits immediately beside the value it names, as its own text
     // node, so a `getByText` on the value still matches the value node.
-    expect(row.textContent).toContain("DateMar 20, 2025");
+    expect(row.textContent).toContain("Datepreferred-date:2025-03-20");
     expect(row.textContent).toContain("AccountAlpha Savings");
     expect(row.textContent).toContain("Amount$200.00");
     // Scoped to the row: the income summary card above prints the same

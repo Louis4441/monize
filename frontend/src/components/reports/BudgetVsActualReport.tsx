@@ -17,13 +17,19 @@ import {
 import { budgetsApi } from '@/lib/budgets';
 import type { BudgetTrendPoint, CategoryTrendSeries } from '@/types/budget';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { useDateFormat } from '@/hooks/useDateFormat';
+import { useChartMonthFormat } from '@/hooks/useChartMonthFormat';
 import { useTranslations } from 'next-intl';
 import { useReportData } from '@/hooks/useReportData';
 import { BudgetCategoryTrend } from '@/components/budgets/BudgetCategoryTrend';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportError } from '@/components/reports/ReportError';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { chartColors } from '@/lib/chart-colors';
 
@@ -34,9 +40,7 @@ type BudgetTrendSortField = 'month' | 'budgeted' | 'actual' | 'variance' | 'perc
  * rendered by BOTH header rows -- the column header row (from `sm` up) and the
  * phone sort strip -- so the two can never list different fields.
  */
-interface SortColumn {
-  field: BudgetTrendSortField;
-  label: string;
+interface SortColumn extends TableSortColumn<BudgetTrendSortField, 'right'> {
   /**
    * This column's cell, as text. The PDF export builds its headings AND its
    * row cells from the same ordered record the table renders, so the export
@@ -45,8 +49,6 @@ interface SortColumn {
    * the new headings.
    */
   value: (point: BudgetTrendPoint) => string;
-  /** Money and percent columns are right-aligned in the column header row. */
-  align?: 'right';
   /**
    * The last column carries no right padding, exactly as it does today. This
    * flag is the ONE place that is decided: the header cell and the body cell
@@ -68,9 +70,7 @@ interface SortColumn {
  * none of which a test comparing header LABELS can see, because the labels
  * stay right. Here it is a compile error instead.
  */
-type SortColumnsByField = {
-  [K in BudgetTrendSortField]: SortColumn & { field: K };
-};
+type SortColumnsByField = TableSortColumnsByField<BudgetTrendSortField, SortColumn>;
 
 // An over-budget variance is prefixed; nothing else is. Written once because
 // the wrapped cell, the desktop cell and the PDF export all state it.
@@ -91,12 +91,8 @@ const cellPadding = (col: SortColumn) => (col.last ? 'sm:py-2' : 'sm:py-2 sm:pr-
 // each data row is a grid -- so every control is left-aligned and self-naming.
 // The border is what says "tappable" here: there is no hover on a touch screen,
 // and the strip sits directly on the card, whose background this already is --
-// so the border is the whole of the affordance. (The class is kept identical to
-// the sibling report tables that ship this strip; the copies are one of the
-// duplications the converted-table consolidation pass folds into one home.)
-const PHONE_HEADER_CLASS =
-  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
-
+// so the border is the whole of the affordance. The shared
+// `PHONE_HEADER_CLASS` keeps this strip identical to its sibling reports.
 // A money (or percent) cell inside a wrapped row: no padding of its own below
 // `sm` and this table's own from `sm` up, which each cell adds through
 // `cellPadding` so "which column is last" stays decided in one place. Smaller
@@ -114,9 +110,9 @@ const PHONE_HEADER_CLASS =
 //
 // The two money tracks are `minmax(0,1fr)` beside an `auto` identity track,
 // NOT three equal thirds, and that is what makes the figures fit. The month is
-// the only bounded thing in the row -- the server sends a three-letter English
-// month and a four-digit year (`formatPeriodMonth`) -- and its cell carries no
-// caption, so an `auto` track costs it the 61px it actually uses instead of a
+// the only bounded thing in the row -- `formatMonth` renders its canonical
+// `YYYY-MM` key in the reader's configured date format -- and its cell carries
+// no caption, so an `auto` track costs only the label it actually uses instead of a
 // third of the width, and hands the difference to the figures. The resolved
 // tracks, read off `getComputedStyle` rather than divided out: 61/93/93 at
 // 320px and 61/128/128 at 390px, against 83 and 106 on three equal thirds.
@@ -169,12 +165,15 @@ const PHONE_HEADER_CLASS =
 // 390px in pl, ru, id, de, en, the widest-per-key set or the pseudo-locale.
 const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:text-sm';
 
-/** Every caption in a wrapped cell is phone-only. */
-const CAPTION_CLASS = 'sm:hidden';
-
 export function BudgetVsActualReport() {
   const t = useTranslations('reports');
   const { formatCurrencyCompact: formatCurrency, formatPercentTrimmed } = useNumberFormat();
+  // Two month formatters, for two different surfaces: the table's and the
+  // PDF's month COLUMN follows the user's date-format preference like every
+  // other date in a table, while the two charts' month AXES localize the month
+  // name like every other chart. `useChartMonthFormat` explains the split.
+  const { formatMonth } = useDateFormat();
+  const formatChartMonth = useChartMonthFormat();
   const [selectedBudgetIdState, setSelectedBudgetId] = useState<string>('');
   const [months, setMonths] = useState(6);
   const [viewMode, setViewMode] = useState<'overview' | 'categories'>('overview');
@@ -235,7 +234,7 @@ export function BudgetVsActualReport() {
       let comparison = 0;
       switch (sortField) {
         case 'month':
-          comparison = compareValues(a.month, b.month);
+          comparison = compareValues(a.monthKey, b.monthKey);
           break;
         case 'budgeted':
           comparison = compareValues(a.budgeted, b.budgeted);
@@ -261,7 +260,7 @@ export function BudgetVsActualReport() {
     month: {
       field: 'month',
       label: t('budgetVsActual.colMonth'),
-      value: (point) => point.month,
+      value: (point) => formatMonth(point.monthKey),
     },
     budgeted: {
       field: 'budgeted',
@@ -412,14 +411,14 @@ export function BudgetVsActualReport() {
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <BarChart data={trendData}>
                     <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                    <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                    <XAxis dataKey="monthKey" tick={{ fontSize: 12 }} tickFormatter={(value: string) => formatChartMonth(value)} />
                     <YAxis tickFormatter={(v) => formatCurrency(v)} tick={{ fontSize: 12 }} />
                     <Tooltip
                       content={({ active, payload, label }) => {
                         if (!active || !payload || payload.length === 0) return null;
                         return (
                           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">{label}</p>
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">{formatChartMonth(String(label))}</p>
                             {payload.map((entry, idx) => (
                               <p key={(entry.dataKey as string) ?? entry.name ?? idx} className="text-sm" style={{ color: entry.color }}>
                                 {entry.name}: {formatCurrency(entry.value as number)}
@@ -443,7 +442,7 @@ export function BudgetVsActualReport() {
                   <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                     <LineChart data={trendData}>
                       <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                      <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                      <XAxis dataKey="monthKey" tick={{ fontSize: 12 }} tickFormatter={(value: string) => formatChartMonth(value)} />
                       <YAxis tickFormatter={(v) => formatCurrency(v)} tick={{ fontSize: 12 }} />
                       <Tooltip
                         content={({ active, payload, label }) => {
@@ -451,7 +450,7 @@ export function BudgetVsActualReport() {
                           const variance = payload[0]?.value as number;
                           return (
                             <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-                              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{label}</p>
+                              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{formatChartMonth(String(label))}</p>
                               <p className={`text-sm font-medium ${variance > 0 ? 'text-red-500' : 'text-green-500'}`}>
                                 {t('budgetVsActual.tooltipVariance')} {variance > 0 ? '+' : ''}{formatCurrency(variance)}
                               </p>
@@ -551,11 +550,11 @@ export function BudgetVsActualReport() {
                   <tbody role="rowgroup" className="block sm:table-row-group">
                     {sortedTrendData.map((point) => (
                       <tr
-                        key={point.month}
+                        key={point.monthKey}
                         role="row"
                         className="grid grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 py-2 border-b border-gray-100 dark:border-gray-700/50 sm:table-row sm:py-0"
                       >
-                        <td role="cell" className={`col-start-1 row-start-1 p-0 text-gray-900 dark:text-gray-100 sm:table-cell ${cellPadding(columns.month)}`}>{point.month}</td>
+                        <td role="cell" className={`col-start-1 row-start-1 p-0 text-gray-900 dark:text-gray-100 sm:table-cell ${cellPadding(columns.month)}`}>{formatMonth(point.monthKey)}</td>
                         <td role="cell" className={`col-start-1 col-span-2 row-start-2 text-gray-600 dark:text-gray-400 ${cellPadding(columns.budgeted)} ${MONEY_CELL}`}>
                           <CellLabel className={CAPTION_CLASS}>{columns.budgeted.label}</CellLabel>
                           {formatCurrency(point.budgeted)}

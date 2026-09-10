@@ -18,10 +18,16 @@ import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportError } from '@/components/reports/ReportError';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { useReportData } from '@/hooks/useReportData';
+import { useDateFormat } from '@/hooks/useDateFormat';
+import { useChartMonthFormat } from '@/hooks/useChartMonthFormat';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { chartColors, CHART_SERIES } from '@/lib/chart-colors';
 import { useTranslations } from 'next-intl';
 
+/**
+ * The `month` member names the COLUMN (and the key its stored sort preference
+ * lives under); the value it sorts on is the point's `monthKey`.
+ */
 type HealthHistorySortField = 'month' | 'score' | 'grade' | 'change';
 
 function getScoreColor(score: number): string {
@@ -33,6 +39,10 @@ function getScoreColor(score: number): string {
 
 export function HealthScoreHistoryReport() {
   const t = useTranslations('reports');
+  // A month column follows the user's date-format preference; a month axis
+  // localizes the month name. `useChartMonthFormat` explains the split.
+  const { formatMonth } = useDateFormat();
+  const formatChartMonth = useChartMonthFormat();
 
   const getScoreGrade = useCallback((score: number): { label: string; color: string } => {
     if (score >= 90) return { label: t('healthScoreHistory.gradeExcellent'), color: 'text-green-600 dark:text-green-400' };
@@ -99,7 +109,10 @@ export function HealthScoreHistoryReport() {
       let comparison = 0;
       switch (sortField) {
         case 'month':
-          comparison = compareValues(a.point.month, b.point.month);
+          // The KEY, not a rendered label: `YYYY-MM` sorts chronologically as
+          // a string, while the server's old `Mmm YYYY` sorted alphabetically
+          // (Apr, Aug, Dec, Feb, Jan...) and differently per language.
+          comparison = compareValues(a.point.monthKey, b.point.monthKey);
           break;
         case 'score':
           comparison = compareValues(a.point.score, b.point.score);
@@ -142,7 +155,7 @@ export function HealthScoreHistoryReport() {
           const prev = idx > 0 ? data[idx - 1].score : null;
           const change = prev !== null ? point.score - prev : null;
           return [
-            point.month,
+            formatMonth(point.monthKey),
             String(point.score),
             grade.label,
             change === null ? '--' : change > 0 ? `+${change}` : String(change),
@@ -254,7 +267,11 @@ export function HealthScoreHistoryReport() {
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <LineChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                <XAxis
+                  dataKey="monthKey"
+                  tick={{ fontSize: 12 }}
+                  tickFormatter={(value: string) => formatChartMonth(value)}
+                />
                 <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} />
                 <Tooltip
                   content={({ active, payload, label }) => {
@@ -264,7 +281,7 @@ export function HealthScoreHistoryReport() {
                     const grade = getScoreGrade(point.score);
                     return (
                       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{label}</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{formatChartMonth(String(label))}</p>
                         <p className="text-lg font-bold" style={{ color: getScoreColor(point.score) }}>
                           {point.score} - {grade.label}
                         </p>
@@ -284,7 +301,7 @@ export function HealthScoreHistoryReport() {
                     if (cx == null || cy == null || !payload) return <circle r={0} />;
                     return (
                       <circle
-                        key={payload.month}
+                        key={payload.monthKey}
                         cx={cx}
                         cy={cy}
                         r={5}
@@ -354,8 +371,8 @@ export function HealthScoreHistoryReport() {
               <tbody>
                 {sortedData.map(({ point, grade, change }) => {
                   return (
-                    <tr key={point.month} className="border-b border-gray-100 dark:border-gray-700/50">
-                      <td className="py-2 pr-4 text-gray-900 dark:text-gray-100">{point.month}</td>
+                    <tr key={point.monthKey} className="border-b border-gray-100 dark:border-gray-700/50">
+                      <td className="py-2 pr-4 text-gray-900 dark:text-gray-100">{formatMonth(point.monthKey)}</td>
                       <td className="py-2 pr-4 text-right font-medium" style={{ color: getScoreColor(point.score) }}>
                         {point.score}
                       </td>

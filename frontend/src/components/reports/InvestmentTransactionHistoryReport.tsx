@@ -7,6 +7,7 @@ import { investmentsApi } from '@/lib/investments';
 import { InvestmentTransaction, InvestmentAction } from '@/types/investment';
 import { Account } from '@/types/account';
 import { parseLocalDate } from '@/lib/utils';
+import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useDateRange } from '@/hooks/useDateRange';
@@ -20,7 +21,7 @@ import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { ReportError } from '@/components/reports/ReportError';
 import { exportToCsv } from '@/lib/csv-export';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import { PartialTotal } from '@/components/ui/PartialTotal';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
@@ -28,11 +29,9 @@ import { useTranslations } from 'next-intl';
 import { useMainAccountName } from '@/hooks/useMainAccountName';
 import {
   ACTION_COLORS,
-  CAPTION_CLASS,
   DATE_CELL,
   HEADER_CLASS,
   MONEY_CELL,
-  PHONE_HEADER_CLASS,
   type InvestmentTxSortField,
   type SortColumn,
   type SortColumnsByField,
@@ -56,7 +55,11 @@ export function InvestmentTransactionHistoryReport() {
   const t = useTranslations('reports');
   const tCommon = useTranslations('common');
   const mainAccountName = useMainAccountName();
-  const { formatCurrency: formatCurrencyFull } = useNumberFormat();
+  const { formatCurrency: formatCurrencyFull, formatShareQuantity } = useNumberFormat();
+  // The on-screen date goes through the reader's preference. The CSV's date
+  // deliberately does not (see the `date` column's `csvValue`): a machine reads
+  // that one, and ISO is what every unconverted sibling export writes.
+  const { formatDate } = useDateFormat();
   const { defaultCurrency, convertToDefault } = useExchangeRates();
   const [accounts, setAccounts] = useState<Account[]>([]);
   // Persisted so the report opens on the accounts the user last chose.
@@ -300,7 +303,15 @@ export function InvestmentTransactionHistoryReport() {
       field: 'quantity',
       label: t('investmentTransactions.colQuantity'),
       align: 'right',
-      csvValue: (tx) => (tx.quantity != null ? Math.abs(tx.quantity) : ''),
+      // Formatted for the PDF, a plain number for the CSV -- the same split the
+      // price and total entries below make, and the reason is the same: one is
+      // read by a person, the other summed by a spreadsheet.
+      csvValue: (tx, formatted) =>
+        tx.quantity != null
+          ? formatted
+            ? formatShareQuantity(Math.abs(Number(tx.quantity)))
+            : Math.abs(Number(tx.quantity))
+          : '',
     },
     price: {
       field: 'price',
@@ -316,7 +327,7 @@ export function InvestmentTransactionHistoryReport() {
       csvValue: (tx, formatted) =>
         formatted ? fmtValue(Math.abs(tx.totalAmount)) : Math.abs(tx.totalAmount),
     },
-  }), [t, actionLabels, accountNameMap, fmtValue]);
+  }), [t, actionLabels, accountNameMap, fmtValue, formatShareQuantity]);
 
   // Their order, rendered by BOTH header rows, matched by the cells' DOM order
   // and by the export's columns. DERIVED from the record rather than re-listed:
@@ -644,7 +655,7 @@ export function InvestmentTransactionHistoryReport() {
                       className={`col-start-2 row-start-4 text-gray-900 dark:text-gray-100 ${DATE_CELL}`}
                     >
                       <CellLabel className={CAPTION_CLASS}>{columns.date.label}</CellLabel>
-                      {format(parseLocalDate(tx.transactionDate), 'MMM d, yyyy')}
+                      {formatDate(tx.transactionDate)}
                     </td>
                     <td
                       role="cell"
@@ -682,7 +693,7 @@ export function InvestmentTransactionHistoryReport() {
                       className={`col-start-1 row-start-4 text-gray-900 dark:text-gray-100 ${MONEY_CELL}`}
                     >
                       <CellLabel className={CAPTION_CLASS}>{columns.quantity.label}</CellLabel>
-                      {tx.quantity != null ? Math.abs(tx.quantity).toFixed(4) : '-'}
+                      {tx.quantity != null ? formatShareQuantity(Math.abs(Number(tx.quantity))) : '-'}
                     </td>
                     <td
                       role="cell"

@@ -1229,6 +1229,14 @@
     "inLast6Months": "（過去6ヶ月間）",
     "noRecurring": "過去6ヶ月間に {count}+ 回発生した定期費用が見つかりません。",
     "failedToLoad": "定期費用データの読み込みに失敗しました。",
+    "categoryUncategorized": "未分類",
+    "frequency": {
+      "WEEKLY": "毎週",
+      "BIWEEKLY": "2週間ごと",
+      "MONTHLY": "毎月",
+      "OCCASIONAL": "時々",
+      "IRREGULAR": "不定期"
+    },
     "top10ChartTitle": "上位10定期費用",
     "allRecurringTitle": "すべての定期費用",
     "tooltipTransactions": "{count} 件の取引 - {frequency}",
@@ -1405,6 +1413,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "株数",
     "noData": "投資保有銘柄が見つかりません。資産タイプ内訳を確認するには有価証券を追加してください。",
     "totalPortfolio": "ポートフォリオ合計",
     "assetTypes": "資産タイプ",

@@ -27,12 +27,43 @@ import { CHART_COLOURS } from '@/lib/chart-colours';
 import { chartColors } from '@/lib/chart-colors';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
 
 type ComparisonSortField = 'category' | 'current' | 'previous' | 'change' | 'changePercent';
 type TopMoversSortField = 'symbol' | 'name' | 'price' | 'change' | 'changePercent';
+
+/**
+ * One sortable column of each history table. Declared once, as a record over the
+ * sort-field union, and rendered by BOTH header rows -- the column header row
+ * (from `sm` up) and the phone sort strip -- so the two can never list different
+ * fields, and adding a member to a union fails `tsc` here rather than stranding a
+ * phone with no control for it.
+ */
+type ComparisonSortColumn = TableSortColumn<ComparisonSortField, 'right'>;
+type TopMoversSortColumn = TableSortColumn<TopMoversSortField, 'right'>;
+
+// Today's header cell, unchanged: what both tables already render (no
+// `tracking-wider`). Kept local -- `PHONE_HEADER_CLASS`/`CAPTION_CLASS`/`CellLabel`
+// are shared, but a table's own header and money cells stay per-report.
+const HEADER_CLASS = 'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase';
+
+// A money (or percentage) cell inside a wrapped row: no padding of its own below
+// `sm` (the row supplies it and the grid does the spacing), this table's own
+// `px-4 py-3 text-sm` from `sm` up, smaller type on phones.
+//
+// `whitespace-nowrap` is the one property here that is NOT phone-only, and it is
+// the single respect in which the `sm`-and-up cell differs from today's: a locale
+// that groups thousands with a space (`1 234 567 zl`) could otherwise break a
+// figure in the middle at any width. A number must not break; the caption inside
+// takes `whitespace-normal` back for itself (`CellLabel`).
+const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
 
 function getDefaultMonth(): string {
   const now = new Date();
@@ -332,6 +363,31 @@ export function MonthlyComparisonReport() {
     });
   };
 
+  // The comparison table's five sortable columns, keyed by field so the record is
+  // exhaustive: adding a member to `ComparisonSortField` is a compile error here
+  // rather than a header with no control. Their declaration order is the column
+  // (and cell DOM) order, rendered by BOTH the column header row and the phone
+  // sort strip from the derived `Object.values`. The two month columns carry the
+  // locale-aware month labels the desktop header already showed.
+  const comparisonColumns: TableSortColumnsByField<ComparisonSortField, ComparisonSortColumn> = {
+    category: { field: 'category', label: t('monthlyComparison.colCategory') },
+    current: { field: 'current', label: currentMonthLabel, align: 'right' },
+    previous: { field: 'previous', label: previousMonthLabel, align: 'right' },
+    change: { field: 'change', label: t('monthlyComparison.colChange'), align: 'right' },
+    changePercent: { field: 'changePercent', label: t('monthlyComparison.colChangePercent'), align: 'right' },
+  };
+  const comparisonSortColumns: readonly ComparisonSortColumn[] = Object.values(comparisonColumns);
+
+  // The top-movers table's five sortable columns, same shape and same rule.
+  const topMoversColumns: TableSortColumnsByField<TopMoversSortField, TopMoversSortColumn> = {
+    symbol: { field: 'symbol', label: t('monthlyComparison.colSymbol') },
+    name: { field: 'name', label: t('monthlyComparison.colName') },
+    price: { field: 'price', label: t('monthlyComparison.colPrice'), align: 'right' },
+    change: { field: 'change', label: t('monthlyComparison.colChange'), align: 'right' },
+    changePercent: { field: 'changePercent', label: t('monthlyComparison.colChangePercent'), align: 'right' },
+  };
+  const topMoversSortColumns: readonly TopMoversSortColumn[] = Object.values(topMoversColumns);
+
   return (
     <div ref={chartRef} className="space-y-6">
       {/* Month Picker */}
@@ -450,79 +506,88 @@ export function MonthlyComparisonReport() {
         {/* Comparison Table */}
         {expenses.comparison.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead>
-                <tr>
-                  <SortableHeader<ComparisonSortField>
-                    field="category"
-                    sortField={comparisonSort.sortField}
-                    sortDirection={comparisonSort.sortDirection}
-                    onSort={comparisonSort.handleSort}
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('monthlyComparison.colCategory')}
-                  </SortableHeader>
-                  <SortableHeader<ComparisonSortField>
-                    field="current"
-                    sortField={comparisonSort.sortField}
-                    sortDirection={comparisonSort.sortDirection}
-                    onSort={comparisonSort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {currentMonthLabel}
-                  </SortableHeader>
-                  <SortableHeader<ComparisonSortField>
-                    field="previous"
-                    sortField={comparisonSort.sortField}
-                    sortDirection={comparisonSort.sortDirection}
-                    onSort={comparisonSort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {previousMonthLabel}
-                  </SortableHeader>
-                  <SortableHeader<ComparisonSortField>
-                    field="change"
-                    sortField={comparisonSort.sortField}
-                    sortDirection={comparisonSort.sortDirection}
-                    onSort={comparisonSort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('monthlyComparison.colChange')}
-                  </SortableHeader>
-                  <SortableHeader<ComparisonSortField>
-                    field="changePercent"
-                    sortField={comparisonSort.sortField}
-                    sortDirection={comparisonSort.sortDirection}
-                    onSort={comparisonSort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('monthlyComparison.colChangePercent')}
-                  </SortableHeader>
+            {/* Below `sm` the table becomes a block and each row wraps into a
+                three-column grid card so all five columns fit a phone without a
+                horizontal scroll, on two lines: the category (the row identity),
+                the current-month total and the previous-month total on line 1;
+                the change and its percentage under the two months on line 2.
+                Nothing is dropped, and no figure is truncated -- a money value
+                never wraps (`MONEY_CELL`). From `sm` up it is the ordinary table,
+                resolving to today's output in every respect but one (each cell
+                restores its own `sm:px-4 sm:py-3 sm:text-sm`; `MONEY_CELL`'s
+                `whitespace-nowrap` is unprefixed, so it applies at 640px+ too,
+                where the base cell carried no `white-space` class -- deliberate,
+                and the constant says why), and the sort controls survive as
+                their own phone-only header row because the column header row that
+                carries them on desktop is hidden there. Restyling `display`
+                strips the implicit table semantics below `sm`, so the roles are
+                restated and every bare figure carries a `CellLabel` naming its
+                column; the category names itself. DOM order is the desktop column
+                order, which the grid placement overrides visually on the phone. */}
+            <table role="table" className="block min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
+              <thead role="rowgroup" className="block sm:table-header-group">
+                {/* Phone sort strip: the same five controls, wrapped. */}
+                <tr role="row" className="flex flex-wrap gap-x-2 gap-y-1 pb-2 sm:hidden">
+                  {comparisonSortColumns.map((col) => (
+                    <SortableHeader<ComparisonSortField>
+                      key={col.field}
+                      field={col.field}
+                      sortField={comparisonSort.sortField}
+                      sortDirection={comparisonSort.sortDirection}
+                      onSort={comparisonSort.handleSort}
+                      className={PHONE_HEADER_CLASS}
+                    >
+                      {col.label}
+                    </SortableHeader>
+                  ))}
+                </tr>
+                <tr role="row" className="hidden sm:table-row">
+                  {comparisonSortColumns.map((col) => (
+                    <SortableHeader<ComparisonSortField>
+                      key={col.field}
+                      field={col.field}
+                      sortField={comparisonSort.sortField}
+                      sortDirection={comparisonSort.sortDirection}
+                      onSort={comparisonSort.handleSort}
+                      align={col.align}
+                      className={HEADER_CLASS}
+                    >
+                      {col.label}
+                    </SortableHeader>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody role="rowgroup" className="block divide-y divide-gray-200 dark:divide-gray-700 sm:table-row-group">
                 {sortedComparison.map((item) => (
-                  <tr key={item.categoryId || item.categoryName}>
-                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                  <tr
+                    key={item.categoryId || item.categoryName}
+                    role="row"
+                    className="grid grid-cols-3 items-start gap-x-3 gap-y-1.5 py-3 sm:table-row sm:py-0"
+                  >
+                    {/* Category: the row identity. It wraps unclamped in its own
+                        track; the colour dot never shrinks. Kept `flex` at every
+                        width (as today), so no `sm:table-cell` -- the grid
+                        placement is inert once the row is a table-row. */}
+                    <td role="cell" className="col-start-1 row-start-1 flex min-w-0 items-center gap-2 p-0 text-sm text-gray-900 dark:text-gray-100 sm:px-4 sm:py-3">
                       {item.color && (
                         <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
                       )}
-                      {item.categoryName}
+                      <span className="min-w-0 break-words sm:break-normal">{item.categoryName}</span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-gray-100">
+                    <td role="cell" className={`col-start-2 row-start-1 text-gray-900 dark:text-gray-100 ${MONEY_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{currentMonthLabel}</CellLabel>
                       {formatCurrency(item.currentTotal, currency)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-gray-100">
+                    <td role="cell" className={`col-start-3 row-start-1 text-gray-900 dark:text-gray-100 ${MONEY_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{previousMonthLabel}</CellLabel>
                       {formatCurrency(item.previousTotal, currency)}
                     </td>
-                    <td className={`px-4 py-3 text-sm text-right font-medium ${item.change <= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    <td role="cell" className={`col-start-2 row-start-2 font-medium ${item.change <= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${MONEY_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{t('monthlyComparison.colChange')}</CellLabel>
                       {item.change >= 0 ? '+' : ''}{formatCurrency(item.change, currency)}
                     </td>
-                    <td className={`px-4 py-3 text-sm text-right font-medium ${item.changePercent <= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    <td role="cell" className={`col-start-3 row-start-2 font-medium ${item.changePercent <= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${MONEY_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{t('monthlyComparison.colChangePercent')}</CellLabel>
                       {formatSignedPercent(item.changePercent, 1)}
                     </td>
                   </tr>
@@ -644,71 +709,83 @@ export function MonthlyComparisonReport() {
             <div>
               <h3 className="text-base font-medium text-gray-900 dark:text-gray-100 mb-3">{t('monthlyComparison.topMovers')}</h3>
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead>
-                    <tr>
-                      <SortableHeader<TopMoversSortField>
-                        field="symbol"
-                        sortField={topMoversSort.sortField}
-                        sortDirection={topMoversSort.sortDirection}
-                        onSort={topMoversSort.handleSort}
-                        className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                      >
-                        {t('monthlyComparison.colSymbol')}
-                      </SortableHeader>
-                      <SortableHeader<TopMoversSortField>
-                        field="name"
-                        sortField={topMoversSort.sortField}
-                        sortDirection={topMoversSort.sortDirection}
-                        onSort={topMoversSort.handleSort}
-                        className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                      >
-                        {t('monthlyComparison.colName')}
-                      </SortableHeader>
-                      <SortableHeader<TopMoversSortField>
-                        field="price"
-                        sortField={topMoversSort.sortField}
-                        sortDirection={topMoversSort.sortDirection}
-                        onSort={topMoversSort.handleSort}
-                        align="right"
-                        className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                      >
-                        {t('monthlyComparison.colPrice')}
-                      </SortableHeader>
-                      <SortableHeader<TopMoversSortField>
-                        field="change"
-                        sortField={topMoversSort.sortField}
-                        sortDirection={topMoversSort.sortDirection}
-                        onSort={topMoversSort.handleSort}
-                        align="right"
-                        className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                      >
-                        {t('monthlyComparison.colChange')}
-                      </SortableHeader>
-                      <SortableHeader<TopMoversSortField>
-                        field="changePercent"
-                        sortField={topMoversSort.sortField}
-                        sortDirection={topMoversSort.sortDirection}
-                        onSort={topMoversSort.handleSort}
-                        align="right"
-                        className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                      >
-                        {t('monthlyComparison.colChangePercent')}
-                      </SortableHeader>
+                {/* Below `sm` the table becomes a block and each row wraps into a
+                    three-column, two-line grid card so all five columns fit a
+                    phone without a horizontal scroll: line 1 is the symbol (the
+                    row identity), its change and its change percentage; line 2 is
+                    the security name (a descriptor under its symbol) and the
+                    price. Nothing is dropped, and no figure is truncated -- a
+                    money value never wraps (`MONEY_CELL`). From `sm` up it is the
+                    ordinary table, resolving to today's output in every respect
+                    but one -- `MONEY_CELL`'s `whitespace-nowrap` is unprefixed,
+                    so it applies at 640px+ too, where the base cell carried no
+                    `white-space` class (deliberate; the constant says why) --
+                    and the sort controls survive as their own phone-only header
+                    row. Restyling
+                    `display` strips the table semantics below `sm`, so the roles
+                    are restated and every bare figure carries a `CellLabel`; the
+                    symbol names itself and the name sits under it. DOM order is
+                    the desktop column order, which the grid placement overrides
+                    visually on the phone. */}
+                <table role="table" className="block min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
+                  <thead role="rowgroup" className="block sm:table-header-group">
+                    {/* Phone sort strip: the same five controls, wrapped. */}
+                    <tr role="row" className="flex flex-wrap gap-x-2 gap-y-1 pb-2 sm:hidden">
+                      {topMoversSortColumns.map((col) => (
+                        <SortableHeader<TopMoversSortField>
+                          key={col.field}
+                          field={col.field}
+                          sortField={topMoversSort.sortField}
+                          sortDirection={topMoversSort.sortDirection}
+                          onSort={topMoversSort.handleSort}
+                          className={PHONE_HEADER_CLASS}
+                        >
+                          {col.label}
+                        </SortableHeader>
+                      ))}
+                    </tr>
+                    <tr role="row" className="hidden sm:table-row">
+                      {topMoversSortColumns.map((col) => (
+                        <SortableHeader<TopMoversSortField>
+                          key={col.field}
+                          field={col.field}
+                          sortField={topMoversSort.sortField}
+                          sortDirection={topMoversSort.sortDirection}
+                          onSort={topMoversSort.handleSort}
+                          align={col.align}
+                          className={HEADER_CLASS}
+                        >
+                          {col.label}
+                        </SortableHeader>
+                      ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  <tbody role="rowgroup" className="block divide-y divide-gray-200 dark:divide-gray-700 sm:table-row-group">
                     {sortedTopMovers.map((mover) => (
-                      <tr key={mover.securityId}>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{mover.symbol}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{mover.name}</td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-gray-100">
+                      <tr
+                        key={mover.securityId}
+                        role="row"
+                        className="grid grid-cols-3 items-start gap-x-3 gap-y-1.5 py-3 sm:table-row sm:py-0"
+                      >
+                        {/* Symbol: the row identity, self-naming. */}
+                        <td role="cell" className="col-start-1 row-start-1 p-0 text-xs font-medium break-words text-gray-900 dark:text-gray-100 sm:table-cell sm:px-4 sm:py-3 sm:text-sm sm:break-normal">
+                          {mover.symbol}
+                        </td>
+                        {/* Name: a descriptor under the symbol, so no caption. */}
+                        <td role="cell" className="col-start-1 row-start-2 p-0 text-xs break-words text-gray-700 dark:text-gray-300 sm:table-cell sm:px-4 sm:py-3 sm:text-sm sm:break-normal">
+                          {mover.name}
+                        </td>
+                        <td role="cell" className={`col-start-2 row-start-2 text-gray-900 dark:text-gray-100 ${MONEY_CELL}`}>
+                          <CellLabel className={CAPTION_CLASS}>{t('monthlyComparison.colPrice')}</CellLabel>
                           {formatCurrency(mover.currentPrice, currency)}
                         </td>
-                        <td className={`px-4 py-3 text-sm text-right font-medium ${gainLossColor(mover.change)}`}>
+                        {/* Change: the headline, beside the symbol. */}
+                        <td role="cell" className={`col-start-2 row-start-1 font-medium ${gainLossColor(mover.change)} ${MONEY_CELL}`}>
+                          <CellLabel className={CAPTION_CLASS}>{t('monthlyComparison.colChange')}</CellLabel>
                           {mover.change >= 0 ? '+' : ''}{formatCurrency(mover.change, currency)}
                         </td>
-                        <td className={`px-4 py-3 text-sm text-right font-medium ${gainLossColor(mover.changePercent)}`}>
+                        <td role="cell" className={`col-start-3 row-start-1 font-medium ${gainLossColor(mover.changePercent)} ${MONEY_CELL}`}>
+                          <CellLabel className={CAPTION_CLASS}>{t('monthlyComparison.colChangePercent')}</CellLabel>
                           {formatSignedPercent(mover.changePercent, 2)}
                         </td>
                       </tr>

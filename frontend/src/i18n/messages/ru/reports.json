@@ -1229,6 +1229,14 @@
     "inLast6Months": "(за последние 6 месяцев)",
     "noRecurring": "Регулярные расходы с {count}+ вхождениями за последние 6 месяцев не найдены.",
     "failedToLoad": "Не удалось загрузить данные о регулярных расходах.",
+    "categoryUncategorized": "Без категории",
+    "frequency": {
+      "WEEKLY": "Еженедельно",
+      "BIWEEKLY": "Каждые 2 недели",
+      "MONTHLY": "Ежемесячно",
+      "OCCASIONAL": "Периодически",
+      "IRREGULAR": "Нерегулярно"
+    },
     "top10ChartTitle": "Топ 10 регулярных расходов",
     "allRecurringTitle": "Все регулярные расходы",
     "tooltipTransactions": "{count} проводок — {frequency}",
@@ -1405,6 +1413,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "Акции",
     "noData": "Инвестиционные активы не найдены. Добавьте ценные бумаги для просмотра разбивки по типам активов.",
     "totalPortfolio": "Всего портфель",
     "assetTypes": "Типы активов",

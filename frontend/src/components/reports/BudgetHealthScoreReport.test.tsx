@@ -183,4 +183,31 @@ describe('BudgetHealthScoreReport', () => {
     await waitFor(() => expect(mockExportToPdf).toHaveBeenCalled());
     expect(mockExportToPdf.mock.calls[0][0].summaryCards[0].color).toBe('#dc2626');
   });
+
+  it('sorts the Group column by the displayed label, not the raw enum', async () => {
+    mockGetAll.mockResolvedValue([makeBudget()]);
+    mockGetHealthScore.mockResolvedValue(makeScore());
+    const { container } = await renderReport();
+    await waitFor(() => expect(screen.getByText('Groceries')).toBeInTheDocument());
+
+    // Click the Group column header (any of the sort controls carrying the
+    // label sorts the same field).
+    const groupHeader = Array.from(
+      container.querySelectorAll('[role="columnheader"]'),
+    ).find((el) => el.textContent?.includes('Group')) as HTMLElement;
+    await act(async () => { fireEvent.click(groupHeader); });
+
+    // Ascending by label: Need (Groceries), Saving (Savings), Uncategorized
+    // (Misc), Want (Dining). Sorting on the raw enum instead sends the null
+    // group to the bottom (its enum is null, which sorts last), so Misc came
+    // after Dining -- the defect this asserts against.
+    const bodyText = Array.from(
+      container.querySelector('tbody')!.querySelectorAll('tr'),
+    ).map((tr) => tr.textContent ?? '');
+    const miscIdx = bodyText.findIndex((tRow) => tRow.includes('Misc'));
+    const diningIdx = bodyText.findIndex((tRow) => tRow.includes('Dining'));
+    expect(miscIdx).toBeGreaterThanOrEqual(0);
+    expect(diningIdx).toBeGreaterThanOrEqual(0);
+    expect(miscIdx).toBeLessThan(diningIdx);
+  });
 });

@@ -2,6 +2,7 @@
 
 import { ReactNode } from 'react';
 import { SortIcon } from './SortIcon';
+import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from './interactive-row';
 import type { SortDirection } from '@/hooks/useSortableTable';
 
 interface SortableHeaderProps<F extends string> {
@@ -29,14 +30,20 @@ export function SortableHeader<F extends string>({
 }: SortableHeaderProps<F>) {
   const justify =
     align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : '';
+  const isActive = sortField === field;
+  const sort = () => onSort(field);
+
   return (
     // `role="columnheader"` is the implicit role of a `<th>`, restated so it
     // survives a table restyled for phones (a `display` other than table-cell
     // drops the implicit role); inert everywhere else.
     <th
       role="columnheader"
-      onClick={() => onSort(field)}
-      className={`cursor-pointer transition-colors motion-reduce:transition-none hover:bg-gray-100 dark:hover:bg-gray-700 select-none ${className}`}
+      tabIndex={0}
+      aria-sort={isActive ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+      onClick={sort}
+      onKeyDown={activateOnKey(sort)}
+      className={`cursor-pointer transition-colors motion-reduce:transition-none hover:bg-gray-100 dark:hover:bg-gray-700 ${INTERACTIVE_ROW_FOCUS_CLASS} select-none ${className}`}
     >
       <div className={`flex items-center ${justify}`}>
         {children}

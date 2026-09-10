@@ -417,10 +417,13 @@ describe("SpendingByCategoryReport", () => {
       expect(screen.getByTestId("toggle-table")).toBeInTheDocument();
     });
     fireEvent.click(screen.getByTestId("toggle-table"));
-    // Click each sort header to exercise comparators (default desc by value).
-    const categoryHeader = screen.getByText("Category");
-    const amountHeader = screen.getByText("Amount");
-    const pctHeader = screen.getByText("% of Total");
+    // Each header label now appears in three places (the phone sort strip, the
+    // column header row and the cell captions), so address the column header
+    // row by position rather than by label.
+    const columnHeader = document.querySelectorAll("table thead tr")[1];
+    const [categoryHeader, amountHeader, pctHeader] = Array.from(
+      columnHeader.querySelectorAll("th"),
+    );
     fireEvent.click(categoryHeader); // sort by name
     fireEvent.click(categoryHeader); // toggle desc
     fireEvent.click(pctHeader);
@@ -446,5 +449,50 @@ describe("SpendingByCategoryReport", () => {
     fireEvent.click(screen.getByTestId("toggle-table"));
     // CSV button should appear; it just needs to fire without throwing.
     fireEvent.click(screen.getByTestId("export-csv"));
+  });
+
+  // A category row is the click target where it names a category, so it has to
+  // be reachable and operable from the keyboard there as well (WCAG 2.1.1).
+  // Before the fix this row was a `cursor-pointer` `<tr>` with an `onClick` and
+  // no `tabIndex` and no `onKeyDown` -- the whole suite was green over a row no
+  // keyboard user could use, so this case is what fails on that shape.
+  it("activates a category row from the keyboard, and only where it is clickable", async () => {
+    mockGetSpendingByCategory.mockResolvedValue({
+      data: [
+        { categoryId: "cat-1", categoryName: "Food", total: 300, color: "" },
+        { categoryId: "", categoryName: "Uncategorized", total: 50, color: "" },
+      ],
+      totalSpending: 350,
+    });
+    const { container } = render(<SpendingByCategoryReport />);
+    await waitFor(() => {
+      expect(screen.getByTestId("toggle-table")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("toggle-table"));
+    await waitFor(() => expect(container.querySelector("table")).toBeInTheDocument());
+
+    const rows = Array.from(container.querySelectorAll("tbody tr"));
+    const clickable = rows.find((r) => r.textContent?.includes("Food")) as HTMLElement;
+    const inert = rows.find((r) => r.textContent?.includes("Uncategorized")) as HTMLElement;
+    expect(clickable).toHaveAttribute("tabindex", "0");
+    // A row whose click does nothing is not a tab stop either: a focus stop
+    // that does nothing on Enter is one the reader has to escape.
+    expect(inert).not.toHaveAttribute("tabindex");
+
+    const expected =
+      "/transactions?categoryId=cat-1&startDate=2025-01-01&endDate=2025-03-31";
+    fireEvent.keyDown(clickable, { key: "Enter" });
+    expect(mockPush).toHaveBeenCalledWith(expected);
+
+    mockPush.mockClear();
+    fireEvent.keyDown(clickable, { key: " " });
+    expect(mockPush).toHaveBeenCalledWith(expected);
+
+    // A key the row does not claim stays the browser's, and the inert row
+    // answers no key at all.
+    mockPush.mockClear();
+    fireEvent.keyDown(clickable, { key: "a" });
+    fireEvent.keyDown(inert, { key: "Enter" });
+    expect(mockPush).not.toHaveBeenCalled();
   });
 });

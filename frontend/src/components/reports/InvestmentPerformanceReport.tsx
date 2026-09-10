@@ -21,6 +21,14 @@ import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
+import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from '@/components/ui/interactive-row';
+import {
+  CAPTION_CLASS,
+  CellLabel,
+  PHONE_HEADER_CLASS,
+  type SortColumn,
+  type SortColumnsByField,
+} from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
 import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
@@ -31,12 +39,34 @@ import { useMainAccountName } from '@/hooks/useMainAccountName';
 
 type HoldingsSortField = 'symbol' | 'quantity' | 'averageCost' | 'currentPrice' | 'marketValue' | 'gainLoss' | 'gainLossPercent';
 
+const HEADER_CLASS =
+  'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase';
+const FIGURE_CELL =
+  'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
+const CHILD_FIGURE_CELL =
+  'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-2 sm:text-sm';
+
+const CELL_PLACEMENT: Record<HoldingsSortField, string> = {
+  symbol: 'col-start-1 row-start-1',
+  quantity: 'col-start-1 row-start-2',
+  averageCost: 'col-start-2 row-start-2',
+  currentPrice: 'col-start-1 row-start-3',
+  marketValue: 'col-start-2 row-start-1',
+  gainLoss: 'col-start-2 row-start-3',
+  gainLossPercent: 'col-start-1 col-span-2 row-start-4',
+};
+
 const ACCOUNTS_STORAGE_KEY = 'monize-reports-investment-performance-accounts';
 
 export function InvestmentPerformanceReport() {
   const t = useTranslations('reports');
   const mainAccountName = useMainAccountName();
-  const { formatCurrency: formatCurrencyFull, formatSignedPercent, formatPercent: formatPlainPercent } = useNumberFormat();
+  const {
+    formatCurrency: formatCurrencyFull,
+    formatPercent: formatPlainPercent,
+    formatShareQuantity,
+    formatSignedPercent,
+  } = useNumberFormat();
   const { defaultCurrency } = useExchangeRates();
   const chartRef = useRef<HTMLDivElement>(null);
   // Persisted so the report opens on the accounts the user last chose.
@@ -51,6 +81,20 @@ export function InvestmentPerformanceReport() {
     'reports.investment-performance.holdings.sort',
     { field: 'marketValue', direction: 'desc' },
   );
+
+  const columns: SortColumnsByField<
+    HoldingsSortField,
+    SortColumn<HoldingsSortField>
+  > = {
+    symbol: { field: 'symbol', label: t('investmentPerformance.colSecurity') },
+    quantity: { field: 'quantity', label: t('investmentPerformance.colShares'), align: 'right' },
+    averageCost: { field: 'averageCost', label: t('investmentPerformance.colAvgCost'), align: 'right' },
+    currentPrice: { field: 'currentPrice', label: t('investmentPerformance.colCurrentPrice'), align: 'right' },
+    marketValue: { field: 'marketValue', label: t('investmentPerformance.colMarketValue'), align: 'right' },
+    gainLoss: { field: 'gainLoss', label: t('investmentPerformance.colGainLoss'), align: 'right' },
+    gainLossPercent: { field: 'gainLossPercent', label: t('investmentPerformance.colReturn'), align: 'right' },
+  };
+  const sortColumns = Object.values(columns);
 
   const { data: response, isLoading, error, reload } = useReportData(
     async () => {
@@ -212,7 +256,7 @@ export function InvestmentPerformanceReport() {
     const headers = [t('investmentPerformance.colSecurity'), t('investmentPerformance.colShares'), t('investmentPerformance.colAvgCost'), t('investmentPerformance.colCurrentPrice'), t('investmentPerformance.colMarketValue'), t('investmentPerformance.colGainLoss'), t('investmentPerformance.colReturn')];
     const rows = aggregatedHoldings.map((h) => [
       `${h.symbol} - ${h.name}`,
-      h.quantity.toFixed(4),
+      formatShareQuantity(h.quantity),
       fmtHolding(h.averageCost, h.currencyCode),
       fmtHolding(h.currentPrice, h.currencyCode),
       fmtHolding(h.marketValue, h.currencyCode),
@@ -382,97 +426,59 @@ export function InvestmentPerformanceReport() {
               </h3>
             </div>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-900/50">
-                  <tr>
-                    <SortableHeader<HoldingsSortField>
-                      field="symbol"
-                      sortField={sortField}
-                      sortDirection={sortDirection}
-                      onSort={handleSort}
-                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                    >
-                      {t('investmentPerformance.colSecurity')}
-                    </SortableHeader>
-                    <SortableHeader<HoldingsSortField>
-                      field="quantity"
-                      sortField={sortField}
-                      sortDirection={sortDirection}
-                      onSort={handleSort}
-                      align="right"
-                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                    >
-                      {t('investmentPerformance.colShares')}
-                    </SortableHeader>
-                    <SortableHeader<HoldingsSortField>
-                      field="averageCost"
-                      sortField={sortField}
-                      sortDirection={sortDirection}
-                      onSort={handleSort}
-                      align="right"
-                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                    >
-                      {t('investmentPerformance.colAvgCost')}
-                    </SortableHeader>
-                    <SortableHeader<HoldingsSortField>
-                      field="currentPrice"
-                      sortField={sortField}
-                      sortDirection={sortDirection}
-                      onSort={handleSort}
-                      align="right"
-                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                    >
-                      {t('investmentPerformance.colCurrentPrice')}
-                    </SortableHeader>
-                    <SortableHeader<HoldingsSortField>
-                      field="marketValue"
-                      sortField={sortField}
-                      sortDirection={sortDirection}
-                      onSort={handleSort}
-                      align="right"
-                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                    >
-                      {t('investmentPerformance.colMarketValue')}
-                    </SortableHeader>
-                    <SortableHeader<HoldingsSortField>
-                      field="gainLoss"
-                      sortField={sortField}
-                      sortDirection={sortDirection}
-                      onSort={handleSort}
-                      align="right"
-                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                    >
-                      {t('investmentPerformance.colGainLoss')}
-                    </SortableHeader>
-                    <SortableHeader<HoldingsSortField>
-                      field="gainLossPercent"
-                      sortField={sortField}
-                      sortDirection={sortDirection}
-                      onSort={handleSort}
-                      align="right"
-                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                    >
-                      {t('investmentPerformance.colReturn')}
-                    </SortableHeader>
+              <table role="table" className="block min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
+                <thead role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-header-group">
+                  <tr role="row" className="flex flex-wrap gap-x-2 gap-y-1 px-2 py-2 sm:hidden">
+                    {sortColumns.map((column) => (
+                      <SortableHeader<HoldingsSortField>
+                        key={column.field}
+                        field={column.field}
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        className={PHONE_HEADER_CLASS}
+                      >
+                        {column.label}
+                      </SortableHeader>
+                    ))}
+                  </tr>
+                  <tr role="row" className="hidden sm:table-row">
+                    {sortColumns.map((column) => (
+                      <SortableHeader<HoldingsSortField>
+                        key={column.field}
+                        field={column.field}
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        align={column.align}
+                        className={HEADER_CLASS}
+                      >
+                        {column.label}
+                      </SortableHeader>
+                    ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody role="rowgroup" className="block divide-y divide-gray-200 dark:divide-gray-700 sm:table-row-group">
                   {aggregatedHoldings.map((holding) => {
                     const isExpandable = holding.accountBreakdowns.length > 1;
                     const isExpanded = expandedSecurityId === holding.securityId;
                     return (
                       <React.Fragment key={holding.securityId}>
                         <tr
-                          className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 ${isExpandable ? 'cursor-pointer' : ''}`}
+                          role="row"
+                          tabIndex={isExpandable ? 0 : undefined}
+                          aria-expanded={isExpandable ? isExpanded : undefined}
+                          className={`grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row sm:p-0 ${isExpandable ? `cursor-pointer ${INTERACTIVE_ROW_FOCUS_CLASS}` : ''}`}
                           onClick={isExpandable ? () => setExpandedSecurityId(isExpanded ? null : holding.securityId) : undefined}
+                          onKeyDown={isExpandable ? activateOnKey(() => setExpandedSecurityId(isExpanded ? null : holding.securityId)) : undefined}
                         >
-                          <td className="px-4 py-3">
+                          <td role="cell" className={`${CELL_PLACEMENT.symbol} min-w-0 p-0 sm:table-cell sm:px-4 sm:py-3`}>
                             <div className="flex items-center gap-2">
-                              <div>
+                              <div className="min-w-0">
                                 <div className="font-medium text-gray-900 dark:text-gray-100">
                                   {holding.symbol}
                                 </div>
-                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                <div className="break-words text-sm text-gray-500 dark:text-gray-400 sm:break-normal">
                                   {holding.name}
                                   {isExpandable && (
                                     <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
@@ -483,6 +489,7 @@ export function InvestmentPerformanceReport() {
                               </div>
                               {isExpandable && (
                                 <svg
+                                  aria-hidden="true"
                                   className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                                   fill="none"
                                   viewBox="0 0 24 24"
@@ -493,46 +500,62 @@ export function InvestmentPerformanceReport() {
                               )}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-gray-100">
-                            {holding.quantity.toFixed(4)}
+                          <td role="cell" className={`${CELL_PLACEMENT.quantity} text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                            <CellLabel className={CAPTION_CLASS}>{columns.quantity.label}</CellLabel>
+                            {formatShareQuantity(holding.quantity)}
                           </td>
-                          <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-gray-100">
+                          <td role="cell" className={`${CELL_PLACEMENT.averageCost} text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                            <CellLabel className={CAPTION_CLASS}>{columns.averageCost.label}</CellLabel>
                             {fmtHolding(holding.averageCost, holding.currencyCode)}
                           </td>
-                          <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-gray-100">
+                          <td role="cell" className={`${CELL_PLACEMENT.currentPrice} text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                            <CellLabel className={CAPTION_CLASS}>{columns.currentPrice.label}</CellLabel>
                             {fmtHolding(holding.currentPrice, holding.currencyCode)}
                           </td>
-                          <td className="px-4 py-3 text-right text-sm font-medium text-gray-900 dark:text-gray-100">
+                          <td role="cell" className={`${CELL_PLACEMENT.marketValue} font-medium text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                            <CellLabel className={CAPTION_CLASS}>{columns.marketValue.label}</CellLabel>
                             {fmtHolding(holding.marketValue, holding.currencyCode)}
                           </td>
-                          <td className={`px-4 py-3 text-right text-sm ${(holding.gainLoss || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                          <td role="cell" className={`${CELL_PLACEMENT.gainLoss} ${(holding.gainLoss || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${FIGURE_CELL}`}>
+                            <CellLabel className={CAPTION_CLASS}>{columns.gainLoss.label}</CellLabel>
                             {fmtHolding(holding.gainLoss, holding.currencyCode)}
                           </td>
-                          <td className={`px-4 py-3 text-right text-sm font-medium ${(holding.gainLossPercent || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                          <td role="cell" className={`${CELL_PLACEMENT.gainLossPercent} font-medium ${(holding.gainLossPercent || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${FIGURE_CELL}`}>
+                            <CellLabel className={CAPTION_CLASS}>{columns.gainLossPercent.label}</CellLabel>
                             {holding.gainLossPercent !== null ? formatPercent(holding.gainLossPercent) : t('investmentPerformance.na')}
                           </td>
                         </tr>
                         {isExpanded && holding.accountBreakdowns.map((sub) => (
-                          <tr key={sub.id} className="bg-gray-50/70 dark:bg-gray-900/20">
-                            <td className="px-4 py-2 pl-10 text-sm text-gray-600 dark:text-gray-400">
+                          <tr
+                            key={sub.id}
+                            role="row"
+                            className="grid grid-cols-2 items-start gap-x-3 gap-y-1.5 bg-gray-50/70 px-4 py-2 dark:bg-gray-900/20 sm:table-row sm:p-0"
+                          >
+                            <td role="cell" className={`${CELL_PLACEMENT.symbol} min-w-0 p-0 text-sm text-gray-600 dark:text-gray-400 sm:table-cell sm:px-4 sm:py-2 sm:pl-10`}>
                               {accountNameById.get(sub.accountId) || t('investmentPerformance.unknownAccount')}
                             </td>
-                            <td className="px-4 py-2 text-right text-sm text-gray-600 dark:text-gray-400">
-                              {sub.quantity.toFixed(4)}
+                            <td role="cell" className={`${CELL_PLACEMENT.quantity} text-gray-600 dark:text-gray-400 ${CHILD_FIGURE_CELL}`}>
+                              <CellLabel className={CAPTION_CLASS}>{columns.quantity.label}</CellLabel>
+                              {formatShareQuantity(sub.quantity)}
                             </td>
-                            <td className="px-4 py-2 text-right text-sm text-gray-600 dark:text-gray-400">
+                            <td role="cell" className={`${CELL_PLACEMENT.averageCost} text-gray-600 dark:text-gray-400 ${CHILD_FIGURE_CELL}`}>
+                              <CellLabel className={CAPTION_CLASS}>{columns.averageCost.label}</CellLabel>
                               {fmtHolding(sub.averageCost, sub.currencyCode)}
                             </td>
-                            <td className="px-4 py-2 text-right text-sm text-gray-600 dark:text-gray-400">
+                            <td role="cell" className={`${CELL_PLACEMENT.currentPrice} text-gray-600 dark:text-gray-400 ${CHILD_FIGURE_CELL}`}>
+                              <CellLabel className={CAPTION_CLASS}>{columns.currentPrice.label}</CellLabel>
                               {fmtHolding(sub.currentPrice, sub.currencyCode)}
                             </td>
-                            <td className="px-4 py-2 text-right text-sm text-gray-600 dark:text-gray-400">
+                            <td role="cell" className={`${CELL_PLACEMENT.marketValue} text-gray-600 dark:text-gray-400 ${CHILD_FIGURE_CELL}`}>
+                              <CellLabel className={CAPTION_CLASS}>{columns.marketValue.label}</CellLabel>
                               {fmtHolding(sub.marketValue, sub.currencyCode)}
                             </td>
-                            <td className={`px-4 py-2 text-right text-sm ${(sub.gainLoss || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                            <td role="cell" className={`${CELL_PLACEMENT.gainLoss} ${(sub.gainLoss || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${CHILD_FIGURE_CELL}`}>
+                              <CellLabel className={CAPTION_CLASS}>{columns.gainLoss.label}</CellLabel>
                               {fmtHolding(sub.gainLoss, sub.currencyCode)}
                             </td>
-                            <td className={`px-4 py-2 text-right text-sm ${(sub.gainLossPercent || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                            <td role="cell" className={`${CELL_PLACEMENT.gainLossPercent} ${(sub.gainLossPercent || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${CHILD_FIGURE_CELL}`}>
+                              <CellLabel className={CAPTION_CLASS}>{columns.gainLossPercent.label}</CellLabel>
                               {sub.gainLossPercent !== null ? formatPercent(sub.gainLossPercent) : t('investmentPerformance.na')}
                             </td>
                           </tr>

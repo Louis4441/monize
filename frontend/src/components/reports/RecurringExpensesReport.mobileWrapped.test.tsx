@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@/test/render';
-import { format } from 'date-fns';
 import { RecurringExpensesReport } from './RecurringExpensesReport';
 
 /**
@@ -32,6 +31,13 @@ vi.mock('@/hooks/useNumberFormat', async () => {
   }),
   };
 });
+
+vi.mock('@/hooks/useDateFormat', () => ({
+  useDateFormat: () => ({
+    formatDate: (date: string) => `preferred-date:${date}`,
+    formatDateWithoutYear: (date: string) => `preferred-short-date:${date}`,
+  }),
+}));
 
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: any) => <div>{children}</div>,
@@ -71,11 +77,11 @@ vi.mock('@/lib/logger', () => ({
  * re-sort and leave the rows in the order they were already in.
  *
  * Their figures are the SERVER's, not invented: `averageAmount` is
- * `totalAmount / occurrences` and the frequency label is derived from the
- * occurrence count (>= 24 Weekly, >= 12 Bi-weekly, >= 5 Monthly, >= 3
- * Occasional, else Irregular) in
- * `backend/src/built-in-reports/tax-recurring-reports.service.ts`, which also
- * substitutes the literal `Uncategorized` for a row with no category.
+ * `totalAmount / occurrences` and the frequency code is derived from the
+ * occurrence count (>= 24 WEEKLY, >= 12 BIWEEKLY, >= 5 MONTHLY, >= 3
+ * OCCASIONAL, else IRREGULAR) in
+ * `backend/src/built-in-reports/tax-recurring-reports.service.ts`. The server
+ * keeps a missing category as null; the report localizes both structures.
  *
  * The second carries the absence the row has to render without navigating: no
  * payee id, which the recurring query produces for a transaction whose payee is
@@ -87,7 +93,7 @@ const RESPONSE = {
       payeeId: 'p-water',
       payeeName: 'Water Utility',
       categoryName: 'Utilities',
-      frequency: 'Monthly',
+      frequency: 'MONTHLY',
       occurrences: 6,
       averageAmount: 50,
       totalAmount: 300,
@@ -96,8 +102,8 @@ const RESPONSE = {
     {
       payeeId: null,
       payeeName: 'Zebra Market',
-      categoryName: 'Uncategorized',
-      frequency: 'Weekly',
+      categoryName: null,
+      frequency: 'WEEKLY',
       occurrences: 26,
       averageAmount: 25,
       totalAmount: 650,
@@ -126,8 +132,6 @@ const EXPECTED_LABELS = [
  * deliberately unchanged here -- this expectation follows the component so the
  * test asserts the LAYOUT (the caption beside the value) rather than the parse.
  */
-const lastPaid = (iso: string) => format(new Date(iso), 'MMM d');
-
 const stripGlyph = (text: string | null | undefined) => (text ?? '').replace(/[↑↓↕]/g, '').trim();
 
 const rowText = (row: Element | null | undefined) => row?.textContent ?? '';
@@ -210,7 +214,7 @@ describe('RecurringExpensesReport (phone wrapped rows)', () => {
     expect(rowText(row)).toContain('Count6');
     expect(rowText(row)).toContain('Avg Amount$50');
     expect(rowText(row)).toContain('6-Mo Total$300');
-    expect(rowText(row)).toContain(`Last Paid${lastPaid('2024-06-15')}`);
+    expect(rowText(row)).toContain('Last Paidpreferred-short-date:2024-06-15');
     // The value really is its own node, not part of the caption's.
     expect(screen.getByText('$300')).toBeInTheDocument();
 
@@ -456,7 +460,10 @@ describe('RecurringExpensesReport (phone wrapped rows)', () => {
     // added to the table without appearing in the export (the strings stay the
     // catalogue's own `csvCol*` keys, which happen to match the headers).
     expect(headers).toEqual(EXPECTED_LABELS);
-    // The export is the SERVER's order, not the table's sort.
+    // The export is the SERVER's order, not the table's sort. The date is ISO
+    // because a CSV is machine-read: `preferred-date:...` in this position is
+    // the defect (two readers, two different ambiguous files), and the PDF
+    // assertion below holds the other half of the split.
     expect(rows[0]).toEqual([
       'Water Utility',
       'Utilities',
@@ -464,7 +471,7 @@ describe('RecurringExpensesReport (phone wrapped rows)', () => {
       6,
       50,
       300,
-      format(new Date('2024-06-15'), 'yyyy-MM-dd'),
+      '2024-06-15',
     ]);
     expect(rows[1][0]).toBe('Zebra Market');
   });

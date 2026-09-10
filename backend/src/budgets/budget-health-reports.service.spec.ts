@@ -350,8 +350,12 @@ describe("BudgetHealthReportsService", () => {
       );
 
       expect(result).toHaveLength(2);
-      expect(result[0].month).toContain("Jan");
-      expect(result[1].month).toContain("Feb");
+      // Structure, not a label: a `Jan 2026` from the server was English on
+      // every locale and sorted alphabetically at the client. `YYYY-MM` also
+      // sorts chronologically as a string, which is what the two reports'
+      // month columns now order on.
+      expect(result[0].monthKey).toBe("2026-01");
+      expect(result[1].monthKey).toBe("2026-02");
       // First period was under, second was over -> first should be higher
       expect(result[0].score).toBeGreaterThan(result[1].score);
       expect(["Excellent", "Good", "Needs Attention", "Off Track"]).toContain(
@@ -433,6 +437,41 @@ describe("BudgetHealthReportsService", () => {
         savings: 0,
         savingsRate: 0,
       });
+    });
+
+    /**
+     * The month was a server-rendered `Mmm YYYY` label and nothing in this
+     * suite looked at it, so shipping English months to 22 locales -- and a
+     * client-side sort that put Apr before Jan -- was invisible here. These
+     * assertions are deliberately clock-free: they check the SHAPE and the
+     * consecutiveness of the keys, both of which a label fails, rather than
+     * naming today's months.
+     */
+    it("keys each month structurally and in calendar order", async () => {
+      const result = await service.getSavingsRate("user-1", "budget-1", 6);
+
+      const keys = result.map((point) => point.monthKey);
+      for (const key of keys) {
+        expect(key).toMatch(/^\d{4}-(0[1-9]|1[0-2])$/);
+      }
+
+      // `YYYY-MM` sorts chronologically as a plain string, which is what the
+      // report's month column now orders on; `Apr 2026` does not.
+      expect([...keys].sort()).toEqual(keys);
+
+      // Oldest first, one calendar month apart -- so the series really is the
+      // requested window and not six renderings of one label.
+      const asMonthNumber = (key: string) => {
+        const [year, month] = key.split("-").map(Number);
+        return year * 12 + month;
+      };
+      for (let i = 1; i < keys.length; i++) {
+        expect(asMonthNumber(keys[i]) - asMonthNumber(keys[i - 1])).toBe(1);
+      }
+
+      // The old label field is gone rather than kept as an alias: two names for
+      // one value is how a consumer goes on reading the English one.
+      expect(result[0]).not.toHaveProperty("month");
     });
   });
 });

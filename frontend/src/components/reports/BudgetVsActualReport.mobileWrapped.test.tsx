@@ -55,6 +55,9 @@ vi.mock('@/hooks/useNumberFormat', async () => {
   }),
   };
 });
+vi.mock('@/hooks/useDateFormat', () => ({
+  useDateFormat: () => ({ formatMonth: (monthKey: string) => `month:${monthKey}` }),
+}));
 
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
@@ -84,8 +87,8 @@ vi.mock('recharts', () => ({
   Tooltip: () => null,
 }));
 
-const makePoint = (month: string, budgeted: number, actual: number): BudgetTrendPoint => ({
-  month,
+const makePoint = (monthKey: string, budgeted: number, actual: number): BudgetTrendPoint => ({
+  monthKey,
   budgeted,
   actual,
   variance: actual - budgeted,
@@ -96,23 +99,12 @@ const makePoint = (month: string, budgeted: number, actual: number): BudgetTrend
 // over budget (a positive variance, red, and the `+` prefix) and one under
 // (negative, green), plus a month at exactly 100%.
 //
-// The month labels are the shape the API really sends -- a three-letter
-// English month and a four-digit year, from `formatPeriodMonth` in
-// `backend/src/budgets/budget-trend-reports.service.ts`, not an ISO
-// `YYYY-MM`. That matters here rather than being pedantry: the phone layout
-// gives the month an `auto` grid track precisely because that label is bounded
-// and short, so a fixture in another format would not exercise the assumption
-// the whole track budget rests on.
-//
-// The three are chosen so their chronological and alphabetical orders agree.
-// `compareValues` sorts this column as a STRING, which for these labels is
-// alphabetical by English month name -- a real, pre-existing defect (a
-// 12-month trend sorts Apr, Aug, Dec, Feb, ...) that this layout change
-// neither introduces nor fixes; the fixture simply does not lean on it.
+// The API sends canonical `YYYY-MM` keys. The report localizes them only when
+// it renders a label, while sorting and row identity continue to use the key.
 const POINTS: BudgetTrendPoint[] = [
-  makePoint('Jan 2025', 1234567, 1439000), // over budget
-  makePoint('Jun 2025', 123456, 98765), // under budget
-  makePoint('Nov 2025', 200000, 200000), // exactly on budget: 100%, variance 0
+  makePoint('2025-01', 1234567, 1439000), // over budget
+  makePoint('2025-06', 123456, 98765), // under budget
+  makePoint('2025-11', 200000, 200000), // exactly on budget: 100%, variance 0
 ];
 
 async function renderTable() {
@@ -142,7 +134,7 @@ describe('BudgetVsActualReport (phone wrapped summary table)', () => {
   it('captions every figure inside the row so a phone needs no column header', async () => {
     const container = await renderTable();
 
-    const row = findRow(container, 'Jan 2025');
+    const row = findRow(container, 'month:2025-01');
     expect(row).toBeDefined();
     // Each caption sits immediately beside the value it names, as its own text
     // node, so a `getByText` on the value still matches the value node.
@@ -153,7 +145,7 @@ describe('BudgetVsActualReport (phone wrapped summary table)', () => {
     // The month is the row's identity, not one of its figures, so it carries
     // no caption -- it is the first thing on the line and names itself.
     const monthCell = row?.querySelector('td');
-    expect(monthCell?.textContent).toBe('Jan 2025');
+    expect(monthCell?.textContent).toBe('month:2025-01');
     expect(monthCell?.querySelector('span')).toBeNull();
     // Captions reuse the table's own column keys: no new catalogue string.
     for (const caption of ['Month', 'Budgeted', 'Actual', 'Variance', '% Used']) {
@@ -367,7 +359,7 @@ describe('BudgetVsActualReport (phone wrapped summary table)', () => {
       Array.from(container.querySelectorAll('tbody tr')).map(
         (r) => r.querySelector('td')?.textContent,
       );
-    expect(monthOrder()).toEqual(['Jan 2025', 'Jun 2025', 'Nov 2025']);
+    expect(monthOrder()).toEqual(['month:2025-01', 'month:2025-06', 'month:2025-11']);
 
     // "Variance" in the phone strip: the fourth of the five controls in the
     // first header row. Addressed by position because the label also appears
@@ -379,7 +371,7 @@ describe('BudgetVsActualReport (phone wrapped summary table)', () => {
       fireEvent.click(phoneVariance);
     });
     // Ascending by variance puts June's -24,691 first, then November's 0.
-    expect(monthOrder()).toEqual(['Jun 2025', 'Nov 2025', 'Jan 2025']);
+    expect(monthOrder()).toEqual(['month:2025-06', 'month:2025-11', 'month:2025-01']);
   });
 
   it('keeps the sign colouring and the + prefix the column used, in the wrapped cell', async () => {
@@ -388,14 +380,14 @@ describe('BudgetVsActualReport (phone wrapped summary table)', () => {
     const varianceOf = (month: string) =>
       findRow(container, month)?.querySelector('.col-start-2.row-start-1');
     // Over budget is red and prefixed; under budget is green and is not.
-    expect(varianceOf('Jan 2025')?.className).toContain('text-red-600');
-    expect(varianceOf('Jan 2025')?.textContent).toContain('+$204433');
-    expect(varianceOf('Jun 2025')?.className).toContain('text-green-600');
-    expect(varianceOf('Jun 2025')?.textContent).toContain('$-24691');
+    expect(varianceOf('month:2025-01')?.className).toContain('text-red-600');
+    expect(varianceOf('month:2025-01')?.textContent).toContain('+$204433');
+    expect(varianceOf('month:2025-06')?.className).toContain('text-green-600');
+    expect(varianceOf('month:2025-06')?.textContent).toContain('$-24691');
     // Exactly on budget is not "over": zero takes the green branch and no
     // prefix, which is the behaviour the column has today.
-    expect(varianceOf('Nov 2025')?.className).toContain('text-green-600');
-    expect(varianceOf('Nov 2025')?.textContent).not.toContain('+');
+    expect(varianceOf('month:2025-11')?.className).toContain('text-green-600');
+    expect(varianceOf('month:2025-11')?.textContent).not.toContain('+');
   });
 
   it('exports the columns the screen shows, in the screen’s order', async () => {
@@ -421,7 +413,7 @@ describe('BudgetVsActualReport (phone wrapped summary table)', () => {
     ).map((th) => th.textContent?.replace(/[↑↓↕]/g, '').trim());
     expect(headers).toEqual(columnLabels);
 
-    const screenRow = findRow(container, 'Jan 2025')!;
+    const screenRow = findRow(container, 'month:2025-01')!;
     const screenCells = Array.from(screenRow.querySelectorAll('td')).map((td) => {
       const caption = td.querySelector('span')?.textContent ?? '';
       return (td.textContent ?? '').slice(caption.length);

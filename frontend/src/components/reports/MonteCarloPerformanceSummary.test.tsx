@@ -64,7 +64,9 @@ describe('buildPerformanceSummaryRows', () => {
 describe('PerformanceSummaryTable', () => {
   it('renders all rows including currency, percent, and ratio formats', () => {
     render(<PerformanceSummaryTable summary={summary} formatters={fmts} />);
-    expect(screen.getByText('50th Percentile')).toBeInTheDocument();
+    // '50th Percentile' now appears in the (hidden) column header AND as each
+    // row's phone caption reusing the same column key, so it is no longer unique.
+    expect(screen.getAllByText('50th Percentile').length).toBeGreaterThan(0);
     expect(screen.getAllByText('5.00%').length).toBeGreaterThan(0);
     expect(screen.getAllByText('$100000').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Maximum Drawdown').length).toBeGreaterThan(0);

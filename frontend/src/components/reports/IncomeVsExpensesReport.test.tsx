@@ -291,4 +291,35 @@ describe("IncomeVsExpensesReport", () => {
     await act(async () => { fireEvent.click(rows[0]); });
     await act(async () => { fireEvent.click(screen.getByTestId("export-csv")); });
   });
+
+  // The row is the click target, so it has to be reachable and operable from
+  // the keyboard as well (WCAG 2.1.1). Before the fix this row was a
+  // `cursor-pointer` `<tr>` with an `onClick` and no `tabIndex` and no
+  // `onKeyDown` -- the whole suite was green over a row no keyboard user could
+  // use, so this case is what fails on that shape.
+  it("activates a month row from the keyboard", async () => {
+    mockGetIncomeVsExpenses.mockResolvedValue({
+      data: [{ month: "2024-01", income: 5000, expenses: 3000, net: 2000 }],
+      totals: { income: 5000, expenses: 3000 },
+    });
+    const { container } = render(<IncomeVsExpensesReport />);
+    await waitFor(() => expect(screen.getByTestId("toggle-table")).toBeInTheDocument());
+    await act(async () => { fireEvent.click(screen.getByTestId("toggle-table")); });
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    const row = container.querySelector('tbody tr') as HTMLElement;
+    expect(row).toHaveAttribute('tabindex', '0');
+
+    const expected = "/transactions?startDate=2024-01-01&endDate=2024-01-31";
+    await act(async () => { fireEvent.keyDown(row, { key: 'Enter' }); });
+    expect(mockPush).toHaveBeenCalledWith(expected);
+
+    mockPush.mockClear();
+    await act(async () => { fireEvent.keyDown(row, { key: ' ' }); });
+    expect(mockPush).toHaveBeenCalledWith(expected);
+
+    // A key the row does not claim stays the browser's.
+    mockPush.mockClear();
+    await act(async () => { fireEvent.keyDown(row, { key: 'a' }); });
+    expect(mockPush).not.toHaveBeenCalled();
+  });
 });

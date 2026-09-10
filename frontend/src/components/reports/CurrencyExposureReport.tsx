@@ -19,7 +19,11 @@ import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 import { PartialTotal } from '@/components/ui/PartialTotal';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
@@ -63,13 +67,9 @@ const FALLBACK_COLOURS = [CHART_SERIES[8], CHART_SERIES[9]];
  * Deriving only the headings would relabel the exported columns while leaving
  * the values in the old order -- a silently mislabelled export.
  */
-interface SortColumn {
-  field: CurrencyExposureSortField;
-  label: string;
+interface SortColumn extends TableSortColumn<CurrencyExposureSortField, 'right'> {
   /** The cell's text, rendered on screen and written to the PDF. */
   value: (item: CurrencyAllocation) => string;
-  /** Money, rate, percent and count columns are right-aligned on desktop. */
-  align?: 'right';
 }
 
 /**
@@ -84,22 +84,20 @@ interface SortColumn {
  * unsortable -- and a test comparing header LABELS cannot see any of it,
  * because the labels stay right. Here it is a compile error instead.
  */
-type SortColumnsByField = {
-  [K in CurrencyExposureSortField]: SortColumn & { field: K };
-};
+type SortColumnsByField = TableSortColumnsByField<CurrencyExposureSortField, SortColumn>;
 
 // Today's header cell, unchanged.
 const HEADER_CLASS =
   'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider';
 
-// The same sort controls in the phone strip: a wrapped row of compact chips.
+// The phone sort strip -- `PHONE_HEADER_CLASS` in `components/ui/Table.tsx`,
+// which is where that class and its own doc live. The same sort controls as
+// the column header row, as a wrapped row of compact chips.
 // Column alignment means nothing there -- the column header row is hidden and
 // each data row is a grid -- so every control is left-aligned and self-naming.
 // The border and card background are what say "tappable": there is no hover on
 // a touch screen, and without them the strip reads as another row of the
 // captions the cells below carry.
-const PHONE_HEADER_CLASS =
-  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
 
 // A figure cell inside a wrapped card: no padding of its own below `sm` (the
 // row supplies it and the grid does the spacing), the table cell's own padding
@@ -151,9 +149,6 @@ const PHONE_HEADER_CLASS =
 // scroll -- and this is the only shape in which the scroll can come back.
 const FIGURE_CELL =
   'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
-
-/** Every caption in a wrapped cell is phone-only. */
-const CAPTION_CLASS = 'sm:hidden';
 
 interface CurrencyAllocation {
   currency: string;
@@ -707,7 +702,12 @@ export function CurrencyExposureReport() {
                 <td role="cell" aria-colindex={colIndexOf('rate')} className="hidden sm:table-cell" />
                 <td role="cell" aria-colindex={colIndexOf('convertedValue')} className={`col-start-3 row-start-1 font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                   <CellLabel className={CAPTION_CLASS}>{columns.convertedValue.label}</CellLabel>
-                  {formatCurrencyFull(totalPortfolioValue, defaultCurrency)}
+                  <PartialTotal
+                    total={{ value: totalPortfolioValue, missingCurrencies: exposureGaps.missingCurrencies, excludedCount: exposureGaps.excludedCount }}
+                    displayCurrency={defaultCurrency}
+                  >
+                    {formatCurrencyFull(totalPortfolioValue, defaultCurrency)}
+                  </PartialTotal>
                 </td>
                 <td role="cell" aria-colindex={colIndexOf('percentage')} className={`col-start-2 row-start-2 font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                   <CellLabel className={CAPTION_CLASS}>{columns.percentage.label}</CellLabel>

@@ -22,6 +22,8 @@
     "modifiedBadge": "{count} dimodifikasi",
     "modifiedTitle": "{count, plural, one {# kemunculan mendatang dimodifikasi} other {# kemunculan mendatang dimodifikasi}}",
     "modifiedAmountTitle": "Dimodifikasi untuk kemunculan berikutnya",
+    "modifiedDateTitle": "Tanggal diubah untuk kejadian ini",
+    "splitBadge": "Bagi ({count})",
     "autoPostBadge": "Aktif",
     "autoPostTitle": "Diposting otomatis saat jatuh tempo",
     "inactiveSuffix": " — Tidak Aktif",

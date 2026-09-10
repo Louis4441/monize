@@ -55,7 +55,7 @@ const makeSeries = (
   categoryId: id,
   categoryName: name,
   data: points.map((p, idx) => ({
-    month: `2025-0${idx + 1}`,
+    monthKey: `2025-0${idx + 1}`,
     budgeted: p.budgeted,
     actual: p.actual,
     variance: p.actual - p.budgeted,

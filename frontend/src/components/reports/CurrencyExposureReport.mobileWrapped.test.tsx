@@ -76,7 +76,7 @@ vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
 }));
 
-const holding = (id: string, currencyCode: string, marketValue: number) => ({
+const holding = (id: string, currencyCode: string, marketValue: number | null) => ({
   id,
   accountId: 'acc-1',
   securityId: `s-${id}`,
@@ -101,6 +101,9 @@ const HOLDINGS = [
   holding('h-cad-1', 'CAD', 123456.78),
   holding('h-cad-2', 'CAD', 1000),
   holding('h-jpy', 'JPY', 98765.43),
+  // This position has no value, so it contributes no row but makes every
+  // portfolio-value subtotal partial.
+  holding('h-unpriced', 'GBP', null),
 ];
 
 async function renderReport() {
@@ -261,6 +264,9 @@ describe('CurrencyExposureReport (phone wrapped table)', () => {
     expect(footRow.textContent).toContain('CAD Value');
     expect(footRow.textContent).toContain('% of Portfolio');
     expect(footRow.textContent).toContain('Holdings');
+    expect(converted.querySelector('[data-testid="partial-total"]')).toBeInTheDocument();
+    expect(converted.querySelector('[data-testid="partial-total-marker"]')).toBeInTheDocument();
+    expect(converted.textContent).toContain('partial total');
   });
 
   it('keeps each total announced against its own column, though two footer cells leave the DOM', async () => {

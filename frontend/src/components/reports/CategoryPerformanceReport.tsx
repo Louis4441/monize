@@ -9,7 +9,11 @@ import { useReportData } from '@/hooks/useReportData';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportError } from '@/components/reports/ReportError';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 import { useTranslations } from 'next-intl';
@@ -62,9 +66,7 @@ const varianceColor = (totalVariance: number) =>
  * by BOTH header rows -- the column header row (from `sm` up) and the phone
  * sort strip -- so the two can never list different fields.
  */
-interface SortColumn {
-  field: CategoryPerformanceSortField;
-  label: string;
+interface SortColumn extends TableSortColumn<CategoryPerformanceSortField> {
   /**
    * This column's cell, as text. The PDF export builds its headings AND its
    * row cells from the same ordered record the table renders, so the export
@@ -73,8 +75,6 @@ interface SortColumn {
    * the new headings.
    */
   value: (row: CategoryPerformanceRow) => string;
-  /** How the column header and its cells align from `sm` up. */
-  align?: 'right' | 'center';
   /**
    * The last column carries no right padding, exactly as it does today. This
    * flag is the ONE place that is decided: the header cell and the body cell
@@ -96,9 +96,7 @@ interface SortColumn {
  * would be unsortable -- none of which a test comparing header LABELS can see,
  * because the labels stay right. Here it is a compile error instead.
  */
-type SortColumnsByField = {
-  [K in CategoryPerformanceSortField]: SortColumn & { field: K };
-};
+type SortColumnsByField = TableSortColumnsByField<CategoryPerformanceSortField, SortColumn>;
 
 // Today's header cell, unchanged.
 const headerClass = (col: SortColumn) =>
@@ -112,14 +110,15 @@ const headerClass = (col: SortColumn) =>
 // reproduces exactly: the HEADER cells are `py-2`, the BODY cells `py-2.5`.
 const cellPadding = (col: SortColumn) => (col.last ? 'sm:py-2.5' : 'sm:py-2.5 sm:pr-4');
 
-// The same sort controls in the phone strip: a wrapped row of compact chips.
+// The phone sort strip -- `PHONE_HEADER_CLASS` in `components/ui/Table.tsx`,
+// which is where that class and its own doc live. The same sort controls as
+// the column header row, as a wrapped row of compact chips.
 // Column alignment means nothing there -- the column header row is hidden and
 // each data row is a grid -- so every control is left-aligned and self-naming.
 // The border is what says "tappable" here: there is no hover on a touch screen,
 // and the strip sits directly on the card, whose background this already is --
-// so the border is the whole of the affordance. (The class is kept identical to
-// the sibling report tables that ship this strip; the copies are one of the
-// duplications the converted-table consolidation pass folds into one home.)
+// so the border is the whole of the affordance. The shared
+// `PHONE_HEADER_CLASS` keeps this strip identical to its sibling reports.
 //
 // This is the WIDEST strip of the converted family: eight fields, against the
 // five and six the sibling reports carry. In a long-caption locale that is
@@ -130,8 +129,6 @@ const cellPadding = (col: SortColumn) => (col.last ? 'sm:py-2.5' : 'sm:py-2.5 sm
 // `SortableHeader`'s pre-existing gap for a keyboard or switch user (a `<th>`
 // with an `onClick` and no `tabIndex`, `role` or key handler), which is shared
 // by every report table and is a separate fix.
-const PHONE_HEADER_CLASS =
-  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
 
 // A figure cell inside a wrapped row: no padding of its own below `sm` and
 // this table's own from `sm` up, which each cell adds through `cellPadding` so
@@ -216,9 +213,6 @@ const FIGURE_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:t
 // now. On a phone it never has to: the widest trend string in the catalogue,
 // the pseudo-locale's `[XX-Down-XX]`, is 84px in a 122px track at 320px.
 const WORD_CELL = 'p-0 text-right text-xs sm:table-cell sm:text-sm';
-
-/** Every caption in a wrapped cell is phone-only. */
-const CAPTION_CLASS = 'sm:hidden';
 
 export function CategoryPerformanceReport() {
   const t = useTranslations('reports');

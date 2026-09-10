@@ -78,6 +78,7 @@ describe("DataQualityReportsService", () => {
         expenseTotal: 0,
         incomeCount: 0,
         incomeTotal: 0,
+        currencyCode: "USD",
       });
     });
 
@@ -124,6 +125,7 @@ describe("DataQualityReportsService", () => {
       expect(result.transactions).toHaveLength(2);
       expect(result.transactions[0].id).toBe("tx-1");
       expect(result.transactions[0].amount).toBe(-50);
+      expect(result.transactions[0].currencyCode).toBe("USD");
       expect(result.transactions[0].payeeName).toBe("Coffee Shop");
       expect(result.transactions[0].description).toBe("Morning coffee");
       expect(result.transactions[0].accountName).toBe("Checking");
@@ -134,14 +136,11 @@ describe("DataQualityReportsService", () => {
       expect(result.transactions[1].accountId).toBe("acc-2");
     });
 
-    it("calculates summary from multiple currency rows", async () => {
+    it("converts summary currency groups into one explicitly denominated total", async () => {
       currencyService.convertAmount.mockImplementation(
-        (amount: number, fromCurrency: string) => {
-          if (fromCurrency === "EUR") return amount * 1.1;
-          return amount;
-        },
+        (amount: number, fromCurrency: string) =>
+          fromCurrency === "EUR" ? amount * 1.1 : amount,
       );
-
       scopedManager.query.mockResolvedValueOnce([]);
       scopedManager.query.mockResolvedValueOnce([
         {
@@ -170,21 +169,19 @@ describe("DataQualityReportsService", () => {
 
       expect(result.summary.totalCount).toBe(8);
       expect(result.summary.expenseCount).toBe(5);
-      // 300 USD + 200 EUR * 1.1 = 300 + 220 = 520
-      expect(result.summary.expenseTotal).toBe(520);
       expect(result.summary.incomeCount).toBe(3);
-      // 1000 USD + 500 EUR * 1.1 = 1000 + 550 = 1550
+      expect(result.summary.expenseTotal).toBe(520);
       expect(result.summary.incomeTotal).toBe(1550);
+      expect(result.summary.currencyCode).toBe("USD");
     });
 
-    it("converts transaction amounts from foreign currencies", async () => {
+    it("returns a transaction amount in the report currency", async () => {
       currencyService.convertAmount.mockImplementation(
         (amount: number, fromCurrency: string) => {
           if (fromCurrency === "EUR") return amount * 1.1;
           return amount;
         },
       );
-
       scopedManager.query.mockResolvedValueOnce([
         {
           id: "tx-1",
@@ -205,8 +202,8 @@ describe("DataQualityReportsService", () => {
         "2025-12-31",
       );
 
-      // -100 EUR * 1.1 = -110 (use toBeCloseTo for floating point)
       expect(result.transactions[0].amount).toBeCloseTo(-110, 2);
+      expect(result.transactions[0].currencyCode).toBe("USD");
     });
 
     it("includes startDate filter when provided", async () => {
@@ -317,11 +314,11 @@ describe("DataQualityReportsService", () => {
       expect(result.transactions[0].transactionDate).toBe("2025-03-15");
     });
 
-    it("calls currency service with correct user id", async () => {
+    it("uses the user's default as the report currency", async () => {
       scopedManager.query.mockResolvedValueOnce([]);
       scopedManager.query.mockResolvedValueOnce([]);
 
-      await service.getUncategorizedTransactions(
+      const result = await service.getUncategorizedTransactions(
         mockUserId,
         "2025-01-01",
         "2025-12-31",
@@ -331,6 +328,7 @@ describe("DataQualityReportsService", () => {
         mockUserId,
       );
       expect(currencyService.buildRateMap).toHaveBeenCalledWith("USD");
+      expect(result.summary.currencyCode).toBe("USD");
     });
 
     it("handles both startDate and limit parameters together", async () => {

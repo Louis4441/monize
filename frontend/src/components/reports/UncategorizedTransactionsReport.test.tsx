@@ -35,12 +35,20 @@ vi.mock('@/hooks/useNumberFormat', async () => {
   return {
     useNumberFormat: () => ({
       ...numberFormatMockDefaults(),
-      formatCurrency: (n: number) => `$${n.toFixed(2)}`,
+      formatCurrency: (n: number, currencyCode = 'CAD') =>
+        currencyCode === 'CAD' ? `$${n.toFixed(2)}` : `${currencyCode} ${n.toFixed(2)}`,
       formatCurrencyCompact: (n: number) => `$${n.toFixed(0)}`,
       defaultCurrency: "CAD",
     }),
 };
 });
+
+vi.mock('@/hooks/useDateFormat', () => ({
+  useDateFormat: () => ({
+    formatDate: (date: string) => `preferred-date:${date}`,
+  }),
+}));
+
 const stableResolvedRange = { start: "2025-01-01", end: "2025-03-31" };
 
 vi.mock("@/hooks/useDateRange", () => ({
@@ -50,14 +58,6 @@ vi.mock("@/hooks/useDateRange", () => ({
     resolvedRange: stableResolvedRange,
     isValid: true,
   }),
-}));
-
-// Spread the real module rather than replacing it: the table's phone captions
-// render `CellLabel`, which reads `cn` from here, and a bare factory blanks
-// every other export of the module for the whole graph under test.
-vi.mock("@/lib/utils", async (importActual) => ({
-  ...(await importActual<typeof import("@/lib/utils")>()),
-  parseLocalDate: (d: string) => new Date(d + "T00:00:00"),
 }));
 
 vi.mock("@/components/ui/DateRangeSelector", () => ({
@@ -159,6 +159,7 @@ describe("UncategorizedTransactionsReport", () => {
       expect(screen.getByText("Unknown Store")).toBeInTheDocument();
     });
     expect(screen.getByText("Total Uncategorized")).toBeInTheDocument();
+    expect(screen.getByText("preferred-date:2025-02-15")).toBeInTheDocument();
   });
 
   it("renders summary cards", async () => {
@@ -178,6 +179,81 @@ describe("UncategorizedTransactionsReport", () => {
     });
     expect(screen.getByText("Uncategorized Expenses")).toBeInTheDocument();
     expect(screen.getByText("Uncategorized Income")).toBeInTheDocument();
+  });
+
+  it("formats rows, summary totals, CSV, and PDF in the response currency", async () => {
+    mockGetUncategorizedTransactions.mockResolvedValue({
+      transactions: [
+        {
+          id: "tx-first",
+          transactionDate: "2025-02-15",
+          payeeName: "First Store",
+          description: "",
+          accountName: "Primary Account",
+          accountId: "acc-primary",
+          amount: -50,
+          currencyCode: "EUR",
+        },
+        {
+          id: "tx-eur",
+          transactionDate: "2025-02-16",
+          payeeName: "Euro Store",
+          description: "",
+          accountName: "EUR Account",
+          accountId: "acc-eur",
+          amount: 200,
+          currencyCode: "EUR",
+        },
+      ],
+      summary: {
+        totalCount: 2,
+        expenseCount: 1,
+        expenseTotal: 50,
+        incomeCount: 1,
+        incomeTotal: 200,
+        currencyCode: "EUR",
+      },
+    });
+
+    render(<UncategorizedTransactionsReport />);
+
+    await waitFor(() => expect(screen.getByText("Euro Store")).toBeInTheDocument());
+    expect(screen.getAllByText("EUR -50.00")).toHaveLength(1);
+    expect(screen.getAllByText("EUR 200.00")).toHaveLength(2);
+    expect(screen.getByText("EUR 50.00")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("export-csv"));
+    // The CSV amount column is a DATA surface: raw numbers, never the response
+    // currency's formatted string. `csv-export.ts`'s injection guard
+    // tab-prefixes a `-`-leading value its `NUMERIC_VALUE` test cannot read as
+    // a number, and a currency written in letters (`zl`, `kr`, `CHF`, `R$`)
+    // falls outside that class -- so Excel stores the cell as text and the
+    // column stops adding up. That is issue #1134, and this expectation
+    // previously asserted the defect.
+    expect(mockExportToCsv.mock.calls[0][2].map((row: unknown[]) => row[4])).toEqual([200, -50]);
+    for (const row of mockExportToCsv.mock.calls[0][2]) {
+      expect(typeof row[4]).toBe("number");
+    }
+    // ...and the CSV date column is ISO, not the reader's preferred format.
+    expect(mockExportToCsv.mock.calls[0][2].map((row: unknown[]) => row[0])).toEqual([
+      "2025-02-16",
+      "2025-02-15",
+    ]);
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-pdf"));
+    });
+    await waitFor(() => expect(mockExportToPdf).toHaveBeenCalledTimes(1));
+    // The PDF is the READING surface, so it keeps the currency-labelled
+    // amounts and the reader's own date format.
+    expect(mockExportToPdf.mock.calls[0][0].tableData.rows.map((row: unknown[]) => row[4])).toEqual([
+      "EUR 200.00",
+      "EUR -50.00",
+    ]);
+    expect(mockExportToPdf.mock.calls[0][0].tableData.rows.map((row: unknown[]) => row[0])).toEqual([
+      "preferred-date:2025-02-16",
+      "preferred-date:2025-02-15",
+    ]);
   });
 
   it("filters transactions by expense type", async () => {
@@ -368,6 +444,54 @@ describe("UncategorizedTransactionsReport", () => {
     );
   });
 
+  // The row is the click target, so it has to be reachable and operable from
+  // the keyboard as well (WCAG 2.1.1). Before the fix this row was a
+  // `cursor-pointer` `<tr>` with an `onClick` and no `tabIndex` and no
+  // `onKeyDown` -- the whole suite was green over a row no keyboard user could
+  // use, so this case is what fails on that shape.
+  it("activates a transaction row from the keyboard", async () => {
+    mockGetUncategorizedTransactions.mockResolvedValue({
+      transactions: [
+        {
+          id: "tx-1",
+          transactionDate: "2025-02-15",
+          payeeName: "Store A",
+          description: "",
+          accountName: "Chequing",
+          accountId: "acc-1",
+          amount: -50,
+        },
+      ],
+      summary: {
+        totalCount: 1,
+        expenseCount: 1,
+        expenseTotal: 50,
+        incomeCount: 0,
+        incomeTotal: 0,
+      },
+    });
+    render(<UncategorizedTransactionsReport />);
+    await waitFor(() => {
+      expect(screen.getByText("Store A")).toBeInTheDocument();
+    });
+    const row = screen.getByText("Store A").closest("tr") as HTMLElement;
+    expect(row).toHaveAttribute("tabindex", "0");
+
+    const expected =
+      "/transactions?categoryIds=uncategorized&accountIds=acc-1&search=Store+A";
+    fireEvent.keyDown(row, { key: "Enter" });
+    expect(mockPush).toHaveBeenCalledWith(expected);
+
+    mockPush.mockClear();
+    fireEvent.keyDown(row, { key: " " });
+    expect(mockPush).toHaveBeenCalledWith(expected);
+
+    // A key the row does not claim stays the browser's.
+    mockPush.mockClear();
+    fireEvent.keyDown(row, { key: "a" });
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
   it("navigates using description when payeeName is null", async () => {
     mockGetUncategorizedTransactions.mockResolvedValue({
       transactions: [
@@ -548,6 +672,7 @@ describe("UncategorizedTransactionsReport", () => {
           accountName: "Chequing",
           accountId: "acc-1",
           amount: -50,
+          currencyCode: "EUR",
         },
       ],
       summary: {
@@ -568,6 +693,18 @@ describe("UncategorizedTransactionsReport", () => {
       expect.arrayContaining(["Date", "Payee", "Description", "Account", "Amount"]),
       expect.any(Array),
     );
+    // A CSV is machine-read, so the date is ISO and NOT the reader's preferred
+    // format: two readers exporting the same rows must get one file, and
+    // `preferred-date:...` here would mean a localized, ambiguous,
+    // lexicographically-unsortable date column.
+    expect(mockExportToCsv.mock.calls[0][2][0][0]).toBe("2025-02-15");
+    // ...and the amount is a NUMBER, not a formatted string. `csv-export.ts`'s
+    // injection guard tab-prefixes a `-`-leading value it cannot read as a
+    // number, and a currency whose narrow symbol is written in letters (`zl`,
+    // `kr`, `CHF`, `R$`) is exactly that -- which makes Excel store the cell as
+    // text and the column stop adding up (issue #1134).
+    expect(mockExportToCsv.mock.calls[0][2][0][4]).toBe(-50);
+    expect(typeof mockExportToCsv.mock.calls[0][2][0][4]).toBe("number");
   });
 
   it("exports PDF with the current transaction data", async () => {
@@ -581,6 +718,7 @@ describe("UncategorizedTransactionsReport", () => {
           accountName: null,
           accountId: "acc-1",
           amount: -50,
+          currencyCode: "EUR",
         },
       ],
       summary: {
@@ -610,6 +748,14 @@ describe("UncategorizedTransactionsReport", () => {
           rows: expect.any(Array),
         }),
       }),
+    );
+    // The other half of the CSV split: a PDF is a READING surface, so both the
+    // date and the amount carry the reader's own formats here.
+    expect(mockExportToPdf.mock.calls[0][0].tableData.rows[0][0]).toBe(
+      "preferred-date:2025-02-15",
+    );
+    expect(mockExportToPdf.mock.calls[0][0].tableData.rows[0][4]).toBe(
+      "EUR -50.00",
     );
   });
 });

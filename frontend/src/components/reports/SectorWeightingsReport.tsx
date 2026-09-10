@@ -26,7 +26,11 @@ import { MultiSelect } from '@/components/ui/MultiSelect';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
@@ -43,12 +47,7 @@ type SectorSortField = 'sector' | 'direct' | 'etf' | 'total' | 'percentage';
  * different fields, and adding a member to the union fails `tsc` rather than
  * stranding a phone with no control for it.
  */
-interface SortColumn {
-  field: SectorSortField;
-  label: string;
-  /** Money and percent columns are right-aligned on desktop. */
-  align?: 'right';
-}
+type SortColumn = TableSortColumn<SectorSortField, 'right'>;
 
 /**
  * The record the two header rows are built from, keyed by sort field.
@@ -62,22 +61,20 @@ interface SortColumn {
  * unsortable -- and a test comparing header LABELS cannot see any of it,
  * because the labels stay right. Here it is a compile error instead.
  */
-type SortColumnsByField = {
-  [K in SectorSortField]: SortColumn & { field: K };
-};
+type SortColumnsByField = TableSortColumnsByField<SectorSortField, SortColumn>;
 
 // Today's header cell, unchanged.
 const HEADER_CLASS =
   'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider';
 
-// The same sort controls in the phone strip: a wrapped row of compact chips.
+// The phone sort strip -- `PHONE_HEADER_CLASS` in `components/ui/Table.tsx`,
+// which is where that class and its own doc live. The same sort controls as
+// the column header row, as a wrapped row of compact chips.
 // Column alignment means nothing there -- the column header row is hidden and
 // each data row is a grid -- so every control is left-aligned and self-naming.
 // The border and card background are what say "tappable": there is no hover on
 // a touch screen, and without them the strip reads as another row of the
 // captions the cells below carry.
-const PHONE_HEADER_CLASS =
-  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
 
 // Where each column sits on the phone grid, written ONCE. The table has three
 // row shapes -- a sector row, the optional unclassified row and the totals
@@ -155,9 +152,6 @@ const FIGURE_CELL =
  */
 const IDENTITY_CELL =
   `${CELL_PLACEMENT.sector} min-w-0 p-0 text-sm sm:table-cell sm:px-4 sm:py-3`;
-
-/** Every caption in a wrapped cell is phone-only. */
-const CAPTION_CLASS = 'sm:hidden';
 
 function CustomTooltip({ active, payload, formatCurrencyFull, defaultCurrency, labelDirect, labelEtf, labelTotal }: {
   active?: boolean;

@@ -22,6 +22,8 @@
     "modifiedBadge": "{count} संशोधित",
     "modifiedTitle": "{count, plural, one {# आगामी घटना संशोधित} other {# आगामी घटनाएँ संशोधित}}",
     "modifiedAmountTitle": "अगली घटना के लिए संशोधित",
+    "modifiedDateTitle": "इस आवृत्ति के लिए तारीख बदली गई",
+    "splitBadge": "विभाजन ({count})",
     "autoPostBadge": "चालू",
     "autoPostTitle": "देय होने पर स्वतः पोस्ट होता है",
     "inactiveSuffix": " — निष्क्रिय",

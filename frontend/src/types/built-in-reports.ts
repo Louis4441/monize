@@ -198,6 +198,16 @@ export interface TaxSummaryResponse {
 }
 
 // Recurring expenses types
+export const RECURRING_EXPENSE_FREQUENCIES = [
+  'WEEKLY',
+  'BIWEEKLY',
+  'MONTHLY',
+  'OCCASIONAL',
+  'IRREGULAR',
+] as const;
+
+export type RecurringExpenseFrequency = (typeof RECURRING_EXPENSE_FREQUENCIES)[number];
+
 export interface RecurringExpenseItem {
   payeeName: string;
   payeeId: string | null;
@@ -205,8 +215,8 @@ export interface RecurringExpenseItem {
   totalAmount: number;
   averageAmount: number;
   lastTransactionDate: string;
-  frequency: string;
-  categoryName: string;
+  frequency: RecurringExpenseFrequency;
+  categoryName: string | null;
 }
 
 export interface RecurringExpensesResponse {
@@ -230,8 +240,13 @@ export interface BillPaymentItem {
 }
 
 export interface MonthlyBillTotal {
+  /**
+   * The month as structure (`YYYY-MM`), and the only form the server sends. It
+   * used to ship a `label` beside this, formatted `en-US` on the server; a
+   * month a person reads is rendered here instead, through their own date or
+   * chart formatter.
+   */
   month: string;
-  label: string;
   total: number;
 }
 
@@ -251,6 +266,7 @@ export interface UncategorizedTransactionItem {
   id: string;
   transactionDate: string;
   amount: number;
+  currencyCode: string;
   payeeName: string | null;
   description: string | null;
   accountName: string | null;
@@ -265,6 +281,7 @@ export interface UncategorizedTransactionsResponse {
     expenseTotal: number;
     incomeCount: number;
     incomeTotal: number;
+    currencyCode: string;
   };
 }
 

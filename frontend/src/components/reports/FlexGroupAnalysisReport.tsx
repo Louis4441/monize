@@ -21,7 +21,11 @@ import { useReportData } from '@/hooks/useReportData';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportError } from '@/components/reports/ReportError';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 import { chartColors } from '@/lib/chart-colors';
@@ -52,9 +56,7 @@ const categoryRemaining = (cat: FlexGroupCategory) => cat.budgeted - cat.spent;
  * (from `sm` up) and the phone sort strip -- so the two can never list
  * different fields.
  */
-interface SortColumn {
-  field: FlexGroupSortField;
-  label: string;
+interface SortColumn extends TableSortColumn<FlexGroupSortField, 'right'> {
   /**
    * This column's cell, as text. The PDF export builds its headings AND its
    * row cells from the same ordered record the table renders, so the export
@@ -65,8 +67,6 @@ interface SortColumn {
    * prepended to both the headings and every row, so the pairing still holds.)
    */
   value: (cat: FlexGroupCategory) => string;
-  /** The four figure columns are right-aligned in the column header row. */
-  align?: 'right';
   /**
    * The last column carries no right padding, exactly as it does today. This
    * flag is the ONE place that is decided: the header cell and the body cell
@@ -88,9 +88,7 @@ interface SortColumn {
  * which a test comparing header LABELS can see, because the labels stay right.
  * Here it is a compile error instead.
  */
-type SortColumnsByField = {
-  [K in FlexGroupSortField]: SortColumn & { field: K };
-};
+type SortColumnsByField = TableSortColumnsByField<FlexGroupSortField, SortColumn>;
 
 // Today's header cell, unchanged.
 const headerClass = (col: SortColumn) =>
@@ -102,14 +100,15 @@ const headerClass = (col: SortColumn) =>
 // wrapped row supplies the vertical inset and the grid does the spacing).
 const cellPadding = (col: SortColumn) => (col.last ? 'sm:py-2' : 'sm:py-2 sm:pr-4');
 
-// The same sort controls in the phone strip: a wrapped row of compact chips.
+// The phone sort strip -- `PHONE_HEADER_CLASS` in `components/ui/Table.tsx`,
+// which is where that class and its own doc live. The same sort controls as
+// the column header row, as a wrapped row of compact chips.
 // Column alignment means nothing there -- the column header row is hidden and
 // each data row is a grid -- so every control is left-aligned and self-naming.
 // The border is what says "tappable" here: there is no hover on a touch screen,
 // and the strip sits directly on the card, whose background this already is --
-// so the border is the whole of the affordance. (The class is kept identical to
-// the sibling report tables that ship this strip; the copies are one of the
-// duplications the converted-table consolidation pass folds into one home.)
+// so the border is the whole of the affordance. The shared
+// `PHONE_HEADER_CLASS` keeps this strip identical to its sibling reports.
 //
 // This table is drawn once per flex group, so a page with N groups shows N
 // strips -- one above each group's own rows, where a reader who has scrolled
@@ -117,8 +116,6 @@ const cellPadding = (col: SortColumn) => (col.last ? 'sm:py-2' : 'sm:py-2 sm:pr-
 // pair this report holds, exactly as the N column header rows already do on
 // desktop: sorting from any group re-sorts every group. Nothing in the strip
 // or in `SortableHeader` carries a DOM id, so N copies collide over nothing.
-const PHONE_HEADER_CLASS =
-  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
 
 // A money (or percent) cell inside a wrapped row: no padding of its own below
 // `sm` and this table's own from `sm` up, which each cell adds through
@@ -198,10 +195,6 @@ const PHONE_HEADER_CLASS =
 // 96px. So no column takes a spanning track here, unlike the sibling tables
 // where a single-word `Gebudgetteerd` or `Запланировано` forced one.
 const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:text-sm';
-
-/** Every caption in a wrapped cell is phone-only. */
-const CAPTION_CLASS = 'sm:hidden';
-
 
 export function FlexGroupAnalysisReport() {
   const t = useTranslations('reports');

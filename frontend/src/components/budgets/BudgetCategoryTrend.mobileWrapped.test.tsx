@@ -3,6 +3,10 @@ import { render, screen, fireEvent, act } from '@/test/render';
 import { BudgetCategoryTrend } from './BudgetCategoryTrend';
 import type { CategoryTrendSeries } from '@/types/budget';
 
+vi.mock('@/hooks/useDateFormat', () => ({
+  useDateFormat: () => ({ formatMonth: (monthKey: string) => monthKey }),
+}));
+
 /**
  * The phone layout of the Category Trends card's per-category averages table.
  *
@@ -57,12 +61,12 @@ const DATA: CategoryTrendSeries[] = [
   {
     categoryId: 'cat-1',
     categoryName: LONG_NAME,
-    data: [{ month: 'Jan 2026', budgeted: 1234567, actual: 1439000, variance: 204433, percentUsed: 117 }],
+    data: [{ monthKey: '2026-01', budgeted: 1234567, actual: 1439000, variance: 204433, percentUsed: 117 }],
   },
   {
     categoryId: 'cat-2',
     categoryName: UNBREAKABLE_NAME,
-    data: [{ month: 'Jan 2026', budgeted: 123456, actual: 98765, variance: -24691, percentUsed: 80 }],
+    data: [{ monthKey: '2026-01', budgeted: 123456, actual: 98765, variance: -24691, percentUsed: 80 }],
   },
   {
     // A series with no points: both averages are a known zero, not unknown.

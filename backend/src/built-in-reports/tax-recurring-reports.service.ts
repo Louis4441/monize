@@ -11,6 +11,7 @@ import {
   BillPaymentItem,
   MonthlyBillTotal,
 } from "./dto";
+import type { RecurringExpenseFrequency } from "./dto/recurring-expenses.dto";
 import { formatDateYMD } from "../common/date-utils";
 import { roundMoney, sumMoney, toMoneyNumber } from "../common/round.util";
 import {
@@ -305,11 +306,11 @@ export class TaxRecurringReportsService {
         const totalAmount = row.totalAmount;
         const occurrences = row.occurrences;
 
-        let frequency = "Irregular";
-        if (occurrences >= 24) frequency = "Weekly";
-        else if (occurrences >= 12) frequency = "Bi-weekly";
-        else if (occurrences >= 5) frequency = "Monthly";
-        else if (occurrences >= 3) frequency = "Occasional";
+        let frequency: RecurringExpenseFrequency = "IRREGULAR";
+        if (occurrences >= 24) frequency = "WEEKLY";
+        else if (occurrences >= 12) frequency = "BIWEEKLY";
+        else if (occurrences >= 5) frequency = "MONTHLY";
+        else if (occurrences >= 3) frequency = "OCCASIONAL";
 
         return {
           payeeName: row.payeeName,
@@ -319,7 +320,7 @@ export class TaxRecurringReportsService {
           averageAmount: roundMoney(totalAmount / occurrences),
           lastTransactionDate: formatDateYMD(row.lastTransactionDate),
           frequency,
-          categoryName: row.categoryName || "Uncategorized",
+          categoryName: row.categoryName,
         };
       },
     );
@@ -502,31 +503,26 @@ export class TaxRecurringReportsService {
       })
       .sort((a, b) => b.totalPaid - a.totalPaid);
 
-    const monthlyMap = new Map<string, { total: number; label: string }>();
+    // The month is carried as a key only. It used to ship a
+    // `toLocaleDateString("en-US", ...)` label beside it, which was English on
+    // every locale; the one consumer builds its own localized label from the
+    // key, so the label was dead payload waiting for the next consumer to
+    // reach for the obvious field name.
+    const monthlyMap = new Map<string, number>();
     billPaymentMap.forEach((bp) => {
       bp.payments.forEach((payment) => {
         const monthKey = payment.date.toISOString().slice(0, 7);
-        const existing = monthlyMap.get(monthKey);
-        if (existing) {
-          existing.total += payment.amount;
-        } else {
-          const d = new Date(payment.date);
-          monthlyMap.set(monthKey, {
-            total: payment.amount,
-            label: d.toLocaleDateString("en-US", {
-              month: "short",
-              year: "2-digit",
-            }),
-          });
-        }
+        monthlyMap.set(
+          monthKey,
+          (monthlyMap.get(monthKey) ?? 0) + payment.amount,
+        );
       });
     });
 
     const monthlyTotals: MonthlyBillTotal[] = Array.from(monthlyMap.entries())
-      .map(([month, data]) => ({
+      .map(([month, total]) => ({
         month,
-        label: data.label,
-        total: roundMoney(data.total),
+        total: roundMoney(total),
       }))
       .sort((a, b) => a.month.localeCompare(b.month));
 

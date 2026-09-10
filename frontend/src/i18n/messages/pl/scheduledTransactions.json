@@ -22,6 +22,8 @@
     "modifiedBadge": "{count} zmodyfikowanych",
     "modifiedTitle": "{count, plural, one {# nadchodzące wystąpienie zmodyfikowane} few {# nadchodzące wystąpienia zmodyfikowane} many {# nadchodzących wystąpień zmodyfikowanych} other {# nadchodzących wystąpień zmodyfikowanych}}",
     "modifiedAmountTitle": "Zmodyfikowane dla następnego wystąpienia",
+    "modifiedDateTitle": "Data zmieniona dla tego wystąpienia",
+    "splitBadge": "Podział ({count})",
     "autoPostBadge": "Wł.",
     "autoPostTitle": "Księguje automatycznie w terminie",
     "inactiveSuffix": " — Nieaktywne",

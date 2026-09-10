@@ -25,7 +25,12 @@ import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMult
 import { resolvePdfColor } from '@/components/reports/resolve-pdf-color';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { CellLabel } from '@/components/ui/Table';
+import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from '@/components/ui/interactive-row';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 import { PartialTotal } from '@/components/ui/PartialTotal';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
@@ -44,12 +49,7 @@ type SecurityTypeSortField = 'label' | 'totalValue' | 'percentage' | 'count';
  * different fields, and a new union member fails `tsc` rather than stranding a
  * phone with no control for it.
  */
-interface SortColumn {
-  field: SecurityTypeSortField;
-  label: string;
-  /** Money, percent and count columns are right-aligned on desktop. */
-  align?: 'right';
-}
+type SortColumn = TableSortColumn<SecurityTypeSortField, 'right'>;
 
 /**
  * The record the two header rows are built from, each key tied to its entry's
@@ -60,9 +60,7 @@ interface SortColumn {
  * share, and "Holdings" unsortable -- none of which a test comparing header
  * LABELS can see, because the labels stay right. Here it is a compile error.
  */
-type SortColumnsByField = {
-  [K in SecurityTypeSortField]: SortColumn & { field: K };
-};
+type SortColumnsByField = TableSortColumnsByField<SecurityTypeSortField, SortColumn>;
 
 // Today's header cell, unchanged.
 const HEADER_CLASS =
@@ -73,9 +71,6 @@ const HEADER_CLASS =
 // each data row is a grid -- so every control is left-aligned and self-naming.
 // The border and card background are what say "tappable": there is no hover on a
 // touch screen, and without them the strip reads as one more row of captions.
-const PHONE_HEADER_CLASS =
-  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
-
 // Where each column sits on the phone grid for an ASSET TYPE row and for the
 // totals footer, written once: those two shapes are 1x1 over the same four
 // columns, so the footer takes the type row's placement verbatim and a reader
@@ -180,24 +175,31 @@ const IDENTITY_CELL =
 const CHILD_IDENTITY_CELL =
   `${CHILD_CELL_PLACEMENT.label} min-w-0 p-0 pl-8 text-sm break-words sm:table-cell sm:px-4 sm:py-2 sm:pl-10 sm:break-normal`;
 
-/** Every caption in a wrapped cell is phone-only. */
-const CAPTION_CLASS = 'sm:hidden';
-
-const TYPE_COLOURS: Record<string, string> = {
+/**
+ * The security types this report knows: their slice colour, and -- because the
+ * key set IS the known set -- which types have a translated label.
+ *
+ * One declaration, not two. A hand-written list of the same five codes beside
+ * this record drifts the moment a sixth type is added to one of them, and each
+ * direction of that drift is a defect a reader sees: a colour with no label
+ * gives a slice captioned with the raw enum name in every locale, and a label
+ * with no colour gives a slice coloured from the fallback ramp. `keyof typeof`
+ * makes the compiler hold the two in step, and the i18n guard checks the third
+ * party to the agreement -- the `dashboard` catalog's `types.*` keys.
+ */
+const TYPE_COLOURS = {
   STOCK: CHART_SERIES[0],
   ETF: CHART_SERIES[1],
   MUTUAL_FUND: CHART_SERIES[8],
   BOND: CHART_SERIES[4],
   CASH: chartColors.axis,
-};
+} as const satisfies Record<string, string>;
 
-const TYPE_LABELS: Record<string, string> = {
-  STOCK: 'Stocks',
-  ETF: 'ETFs',
-  MUTUAL_FUND: 'Mutual Funds',
-  BOND: 'Bonds',
-  CASH: 'Cash',
-};
+type KnownSecurityType = keyof typeof TYPE_COLOURS;
+
+function isKnownSecurityType(type: string): type is KnownSecurityType {
+  return type in TYPE_COLOURS;
+}
 
 interface TypeAllocation {
   type: string;
@@ -210,7 +212,9 @@ interface TypeAllocation {
 }
 
 function getColor(type: string, index: number): string {
-  return TYPE_COLOURS[type] || chartSeriesColor(index);
+  // Through the same predicate the label uses, so a type cannot be known to one
+  // and unknown to the other.
+  return isKnownSecurityType(type) ? TYPE_COLOURS[type] : chartSeriesColor(index);
 }
 
 function CustomTooltip({ active, payload, formatCurrencyFull, getHoldingsLabel }: {
@@ -235,6 +239,7 @@ const ACCOUNTS_STORAGE_KEY = 'monize-reports-security-type-allocation-accounts';
 
 export function SecurityTypeAllocationReport() {
   const t = useTranslations('reports');
+  const tDashboard = useTranslations('dashboard');
   const tCommon = useTranslations('common');
   const { formatCurrencyCompact: formatCurrency, formatCurrency: formatCurrencyFull, formatPercent } = useNumberFormat();
   const { defaultCurrency, convertToDefault } = useExchangeRates();
@@ -302,7 +307,9 @@ export function SecurityTypeAllocationReport() {
     return Array.from(typeMap.entries())
       .map(([type, data]) => ({
         type,
-        label: TYPE_LABELS[type] || type,
+        label: isKnownSecurityType(type)
+          ? tDashboard(`securityTypeAllocation.types.${type}`)
+          : type,
         totalValue: data.totalValue,
         percentage: totalValue > 0 ? (data.totalValue / totalValue) * 100 : 0,
         count: data.holdings.length,
@@ -323,7 +330,7 @@ export function SecurityTypeAllocationReport() {
         }),
       }))
       .sort((a, b) => b.totalValue - a.totalValue);
-  }, [holdings, convertToDefault]);
+  }, [holdings, convertToDefault, tDashboard]);
 
   const totalPortfolioValue = useMemo(
     () => allocationData.reduce((sum, a) => sum + a.totalValue, 0),
@@ -622,17 +629,11 @@ export function SecurityTypeAllocationReport() {
                 <React.Fragment key={item.type}>
                   <tr
                     role="row"
-                    /* Deliberately NO `aria-expanded`, though this row is the
-                       expand control and `role="row"` would take it: a `<tr>` is
-                       not focusable and this one carries a bare `onClick` with no
-                       key handler, so the state would announce a control a
-                       keyboard cannot operate -- a stated dead end rather than
-                       the silent one there is now. The two are one repair and it
-                       is a behaviour change: make the row operable through the
-                       repo's row-click convention (`useLongPress({ onClick })`),
-                       then state the expansion. Reported, not done here. */
-                    className="grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer sm:table-row sm:p-0"
-                    onClick={() => setExpandedType(expandedType === item.type ? null : item.type)}
+                    tabIndex={0}
+                    aria-expanded={expandedType === item.type}
+                    className={`grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 ${INTERACTIVE_ROW_FOCUS_CLASS} cursor-pointer sm:table-row sm:p-0`}
+                    onClick={() => setExpandedType((current) => current === item.type ? null : item.type)}
+                    onKeyDown={activateOnKey(() => setExpandedType((current) => current === item.type ? null : item.type))}
                   >
                     {/* The identity; the `<tr>` around it stays the click target
                         at every width. A type label is bounded in practice (five
@@ -669,6 +670,7 @@ export function SecurityTypeAllocationReport() {
                         />
                         <span className="line-clamp-3 break-words sm:line-clamp-none sm:break-normal" title={item.label}>{item.label}</span>
                         <svg
+                          aria-hidden="true"
                           className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${expandedType === item.type ? 'rotate-180' : ''}`}
                           fill="none"
                           viewBox="0 0 24 24"
@@ -744,16 +746,14 @@ export function SecurityTypeAllocationReport() {
                           ? '-'
                           : formatPercent((value / totalPortfolioValue) * 100, 1)}
                       </td>
-                      {/* A caption names the COLUMN its cell is in, not the kind
-                          of the value, so this one is as true as the Holdings
-                          header above it on a desktop and no truer: the column
-                          holds a count of holdings on a type row and a count of
-                          SHARES here. That conflation is pre-existing and
-                          reported; bare, the cell would add a new one, since at
-                          `col-start-2 row-start-3` it sits directly under this
-                          row's money figure in the same track. */}
+                      {/* This cell holds a share quantity rather than the type
+                          row's count of holdings, so its phone caption names
+                          that value directly instead of borrowing the desktop
+                          column header. Bare, it would read as a second amount:
+                          at `col-start-2 row-start-3` it sits directly under the
+                          money figure in the same track. */}
                       <td role="cell" className={`${CHILD_CELL_PLACEMENT.count} text-gray-500 dark:text-gray-500 ${CHILD_FIGURE_CELL}`}>
-                        <CellLabel className={CAPTION_CLASS}>{columns.count.label}</CellLabel>
+                        <CellLabel className={CAPTION_CLASS}>{t('securityTypeAllocation.colShares')}</CellLabel>
                         {h.quantity}
                       </td>
                     </tr>

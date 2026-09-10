@@ -1229,6 +1229,14 @@
     "inLast6Months": "(negli ultimi 6 mesi)",
     "noRecurring": "Nessuna spesa ricorrente trovata con {count}+ occorrenze negli ultimi 6 mesi.",
     "failedToLoad": "Caricamento dati spese ricorrenti non riuscito.",
+    "categoryUncategorized": "Senza categoria",
+    "frequency": {
+      "WEEKLY": "Settimanale",
+      "BIWEEKLY": "Ogni 2 settimane",
+      "MONTHLY": "Mensile",
+      "OCCASIONAL": "Occasionale",
+      "IRREGULAR": "Irregolare"
+    },
     "top10ChartTitle": "Top 10 spese ricorrenti",
     "allRecurringTitle": "Tutte le spese ricorrenti",
     "tooltipTransactions": "{count} transazioni - {frequency}",
@@ -1405,6 +1413,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "Azioni",
     "noData": "Nessuna posizione in investimenti trovata. Aggiungi titoli per vedere la ripartizione per tipo di asset.",
     "totalPortfolio": "Portafoglio totale",
     "assetTypes": "Tipi di asset",

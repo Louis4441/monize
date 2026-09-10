@@ -1383,7 +1383,7 @@ describe("BuiltInReportsService", () => {
 
       expect(result.data).toHaveLength(1);
       expect(result.data[0].payeeName).toBe("Netflix");
-      expect(result.data[0].frequency).toBe("Monthly");
+      expect(result.data[0].frequency).toBe("MONTHLY");
       expect(result.data[0].totalAmount).toBe(90);
       expect(result.data[0].averageAmount).toBe(15);
       expect(result.data[0].occurrences).toBe(6);
@@ -1429,9 +1429,9 @@ describe("BuiltInReportsService", () => {
       const biweekly = result.data.find((d) => d.payeeName === "Biweekly");
       const occasional = result.data.find((d) => d.payeeName === "Occasional");
 
-      expect(weekly?.frequency).toBe("Weekly");
-      expect(biweekly?.frequency).toBe("Bi-weekly");
-      expect(occasional?.frequency).toBe("Occasional");
+      expect(weekly?.frequency).toBe("WEEKLY");
+      expect(biweekly?.frequency).toBe("BIWEEKLY");
+      expect(occasional?.frequency).toBe("OCCASIONAL");
     });
 
     it("merges multi-currency rows for the same payee", async () => {
@@ -1675,7 +1675,7 @@ describe("BuiltInReportsService", () => {
       expect(result.summary.totalCount).toBe(0);
     });
 
-    it("returns uncategorized transactions with converted amounts", async () => {
+    it("returns uncategorized transactions in the report currency", async () => {
       scopedManager.query
         .mockResolvedValueOnce([
           {
@@ -1707,13 +1707,13 @@ describe("BuiltInReportsService", () => {
       );
 
       expect(result.transactions).toHaveLength(1);
-      // EUR->USD rate 1.1, so -50 EUR = -55 USD
       expect(result.transactions[0].amount).toBeCloseTo(-55, 5);
+      expect(result.transactions[0].currencyCode).toBe("USD");
       expect(result.transactions[0].payeeName).toBe("Unknown Shop");
       expect(result.transactions[0].accountId).toBe("acc-1");
     });
 
-    it("calculates summary totals across multiple currencies", async () => {
+    it("converts summary totals across multiple currencies", async () => {
       scopedManager.query.mockResolvedValueOnce([]).mockResolvedValueOnce([
         {
           currency_code: "USD",
@@ -1741,11 +1741,10 @@ describe("BuiltInReportsService", () => {
 
       expect(result.summary.totalCount).toBe(7);
       expect(result.summary.expenseCount).toBe(4);
-      // USD: 300 + EUR: 100 * 1.1 = 410
-      expect(result.summary.expenseTotal).toBe(410);
       expect(result.summary.incomeCount).toBe(3);
-      // USD: 500 + EUR: 200 * 1.1 = 720
+      expect(result.summary.expenseTotal).toBe(410);
       expect(result.summary.incomeTotal).toBe(720);
+      expect(result.summary.currencyCode).toBe("USD");
     });
 
     it("passes limit parameter to the query", async () => {

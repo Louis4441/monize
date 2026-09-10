@@ -22,6 +22,8 @@
     "modifiedBadge": "{count} gewijzigd",
     "modifiedTitle": "{count, plural, one {# aankomende herhaling gewijzigd} other {# aankomende herhalingen gewijzigd}}",
     "modifiedAmountTitle": "Gewijzigd voor volgende herhaling",
+    "modifiedDateTitle": "Datum gewijzigd voor deze gebeurtenis",
+    "splitBadge": "Splitsing ({count})",
     "autoPostBadge": "Aan",
     "autoPostTitle": "Wordt automatisch geboekt op vervaldatum",
     "inactiveSuffix": " — Inactief",

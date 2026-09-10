@@ -22,6 +22,8 @@
     "modifiedBadge": "{count} изменено",
     "modifiedTitle": "{count, plural, one {# предстоящее вхождение изменено} other {# предстоящих вхождений изменено}}",
     "modifiedAmountTitle": "Изменено для следующего вхождения",
+    "modifiedDateTitle": "Дата изменена для этого выполнения",
+    "splitBadge": "Разбивка ({count})",
     "autoPostBadge": "Вкл.",
     "autoPostTitle": "Автоматически проводится при наступлении срока",
     "inactiveSuffix": " — Неактивна",

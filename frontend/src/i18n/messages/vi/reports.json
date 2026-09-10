@@ -1229,6 +1229,14 @@
     "inLast6Months": "(trong 6 tháng qua)",
     "noRecurring": "Không tìm thấy chi phí định kỳ nào với {count}+ lần xuất hiện trong 6 tháng qua.",
     "failedToLoad": "Không thể tải dữ liệu chi phí định kỳ.",
+    "categoryUncategorized": "Chưa phân loại",
+    "frequency": {
+      "WEEKLY": "Hàng tuần",
+      "BIWEEKLY": "Mỗi 2 tuần",
+      "MONTHLY": "Hàng tháng",
+      "OCCASIONAL": "Thỉnh thoảng",
+      "IRREGULAR": "Không thường xuyên"
+    },
     "top10ChartTitle": "Top 10 chi phí định kỳ",
     "allRecurringTitle": "Tất cả chi phí định kỳ",
     "tooltipTransactions": "{count} giao tác - {frequency}",
@@ -1405,6 +1413,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "Cổ phiếu",
     "noData": "Không tìm thấy vị thế đầu tư. Thêm chứng khoán để xem phân tích theo loại tài sản.",
     "totalPortfolio": "Tổng danh mục",
     "assetTypes": "Loại tài sản",

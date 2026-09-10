@@ -1229,6 +1229,14 @@
     "inLast6Months": "(dans les 6 derniers mois)",
     "noRecurring": "Aucune dépense récurrente trouvée avec {count}+ occurrences dans les 6 derniers mois.",
     "failedToLoad": "Impossible de charger les données des dépenses récurrentes.",
+    "categoryUncategorized": "Non catégorisé",
+    "frequency": {
+      "WEEKLY": "Hebdomadaire",
+      "BIWEEKLY": "Toutes les 2 semaines",
+      "MONTHLY": "Mensuel",
+      "OCCASIONAL": "Occasionnel",
+      "IRREGULAR": "Irrégulier"
+    },
     "top10ChartTitle": "Top 10 des dépenses récurrentes",
     "allRecurringTitle": "Toutes les dépenses récurrentes",
     "tooltipTransactions": "{count} transactions - {frequency}",
@@ -1405,6 +1413,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "Parts",
     "noData": "Aucune position d'investissement trouvée. Ajoutez des titres pour voir la ventilation par type d'actif.",
     "totalPortfolio": "Total du portefeuille",
     "assetTypes": "Types d'actifs",

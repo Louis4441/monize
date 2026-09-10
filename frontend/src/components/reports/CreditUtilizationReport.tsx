@@ -29,7 +29,11 @@ import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 import { PartialTotal } from '@/components/ui/PartialTotal';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { ReportError } from '@/components/reports/ReportError';
@@ -58,12 +62,7 @@ type CreditUtilizationSortField =
  * never list different fields, and adding a member to the union fails `tsc`
  * rather than stranding a phone with no control for it.
  */
-interface SortColumn {
-  field: CreditUtilizationSortField;
-  label: string;
-  /** Money and percent columns are right-aligned in the column header row. */
-  align?: 'right';
-}
+type SortColumn = TableSortColumn<CreditUtilizationSortField, 'right'>;
 
 /**
  * The record the two header rows are built from, keyed by sort field.
@@ -77,9 +76,7 @@ interface SortColumn {
  * and a test comparing header LABELS cannot see any of it, because the labels
  * stay right. Here it is a compile error instead.
  */
-type SortColumnsByField = {
-  [K in CreditUtilizationSortField]: SortColumn & { field: K };
-};
+type SortColumnsByField = TableSortColumnsByField<CreditUtilizationSortField, SortColumn>;
 
 // Utilization thresholds drive the bar colour: low (green), moderate (amber),
 // high (red). 30% / 75% mirror the common "keep utilization under 30%" guidance.
@@ -99,9 +96,6 @@ const HEADER_CLASS =
 // The border and card background are what say "tappable": there is no hover on
 // a touch screen, and without them the strip reads as another row of the
 // captions the cells below carry.
-const PHONE_HEADER_CLASS =
-  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
-
 // A figure cell inside a wrapped card: no padding of its own below `sm` (the
 // row supplies it and the grid does the spacing), the table cell's own padding
 // from `sm` up. Smaller type on phones. The colour stays on each cell, because
@@ -139,10 +133,6 @@ const PHONE_HEADER_CLASS =
 // a cut figure is worse than a crowded one or an honest scroll.
 const FIGURE_CELL =
   'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
-
-/** Every caption in a wrapped cell is phone-only. */
-const CAPTION_CLASS = 'sm:hidden';
-
 
 /** One slice of the total-utilization donut: drawn vs available credit. */
 interface TotalUtilizationSlice {
@@ -411,10 +401,19 @@ export function CreditUtilizationReport() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-4">
           <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{t('creditUtilization.overallUtilization')}</p>
           <p className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100">
-            {formatPercent(totals.utilizationPercent, 1)}
-            {totals.excludedCount > 0 && (
-              <span className="text-amber-600 dark:text-amber-400" aria-hidden="true"> *</span>
-            )}
+            {/* The ratio of two subtotals is a subtotal, so it wears the same
+                marker through the same component the money cards use. The hand
+                -rolled amber `*` this replaces was `aria-hidden` and had no
+                `sr-only` twin, so a screen reader was told the ratio was
+                complete -- `PartialTotal` renders the symbol, the accessible
+                suffix and the explanation together, which is why the marker is
+                not written out a second time anywhere. */}
+            <PartialTotal
+              total={{ value: totals.utilizationPercent, ...totalsMarker }}
+              displayCurrency={displayCurrency}
+            >
+              {formatPercent(totals.utilizationPercent, 1)}
+            </PartialTotal>
           </p>
         </div>
       </div>
@@ -530,8 +529,19 @@ export function CreditUtilizationReport() {
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {formatPercent(totals.utilizationPercent, 1)}
+                {/* The same ratio the summary card reports, so it carries the
+                    same marker. The overlay is `pointer-events-none` so it does
+                    not swallow the slices' own tooltips; the marker's
+                    explanation is a hover target, so this one span takes
+                    pointer events back -- it sits in the donut hole, over no
+                    slice. */}
+                <span className="pointer-events-auto text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  <PartialTotal
+                    total={{ value: totals.utilizationPercent, ...totalsMarker }}
+                    displayCurrency={displayCurrency}
+                  >
+                    {formatPercent(totals.utilizationPercent, 1)}
+                  </PartialTotal>
                 </span>
               </div>
             </div>
@@ -705,19 +715,30 @@ export function CreditUtilizationReport() {
                 </td>
                 <td role="cell" className={`col-start-1 col-span-2 row-start-2 font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                   <CellLabel className={CAPTION_CLASS}>{columns.limit.label}</CellLabel>
-                  {formatCurrency(totals.limit, displayCurrency)}
+                  <PartialTotal total={{ value: totals.limit, ...totalsMarker }} displayCurrency={displayCurrency}>
+                    {formatCurrency(totals.limit, displayCurrency)}
+                  </PartialTotal>
                 </td>
                 <td role="cell" className={`col-start-3 col-span-2 row-start-2 font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                   <CellLabel className={CAPTION_CLASS}>{columns.used.label}</CellLabel>
-                  {formatCurrency(totals.used, displayCurrency)}
+                  <PartialTotal total={{ value: totals.used, ...totalsMarker }} displayCurrency={displayCurrency}>
+                    {formatCurrency(totals.used, displayCurrency)}
+                  </PartialTotal>
                 </td>
                 <td role="cell" className={`col-start-5 col-span-2 row-start-2 font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                   <CellLabel className={CAPTION_CLASS}>{columns.available.label}</CellLabel>
-                  {formatCurrency(totals.available, displayCurrency)}
+                  <PartialTotal total={{ value: totals.available, ...totalsMarker }} displayCurrency={displayCurrency}>
+                    {formatCurrency(totals.available, displayCurrency)}
+                  </PartialTotal>
                 </td>
                 <td role="cell" className={`col-start-4 col-span-3 row-start-1 font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                   <CellLabel className={CAPTION_CLASS}>{columns.utilization.label}</CellLabel>
-                  {formatPercent(totals.utilizationPercent, 1)}
+                  <PartialTotal
+                    total={{ value: totals.utilizationPercent, ...totalsMarker }}
+                    displayCurrency={displayCurrency}
+                  >
+                    {formatPercent(totals.utilizationPercent, 1)}
+                  </PartialTotal>
                 </td>
               </tr>
             </tfoot>

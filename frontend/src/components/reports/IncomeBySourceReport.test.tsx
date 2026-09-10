@@ -422,4 +422,47 @@ describe("IncomeBySourceReport", () => {
     rows.forEach((tr) => fireEvent.click(tr));
     fireEvent.click(screen.getByTestId("export-csv"));
   });
+
+  // A source row is the click target where it names a category, so it has to be
+  // reachable and operable from the keyboard there as well (WCAG 2.1.1).
+  // Before the fix this row was a `cursor-pointer` `<tr>` with an `onClick` and
+  // no `tabIndex` and no `onKeyDown` -- the whole suite was green over a row no
+  // keyboard user could use, so this case is what fails on that shape.
+  it("activates a source row from the keyboard, and only where it is clickable", async () => {
+    mockGetIncomeBySource.mockResolvedValue({
+      data: [
+        { categoryId: "cat-1", categoryName: "Salary", total: 5000, color: "" },
+        { categoryId: "", categoryName: "Other", total: 50, color: "" },
+      ],
+      totalIncome: 5050,
+    });
+    const { container } = render(<IncomeBySourceReport />);
+    await waitFor(() => expect(screen.getByTestId("toggle-table")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("toggle-table"));
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+
+    const rows = Array.from(container.querySelectorAll('tbody tr'));
+    const clickable = rows.find((r) => r.textContent?.includes("Salary")) as HTMLElement;
+    const inert = rows.find((r) => r.textContent?.includes("Other")) as HTMLElement;
+    expect(clickable).toHaveAttribute('tabindex', '0');
+    // A row whose click does nothing is not a tab stop either: a focus stop
+    // that does nothing on Enter is one the reader has to escape.
+    expect(inert).not.toHaveAttribute('tabindex');
+
+    const expected =
+      "/transactions?categoryId=cat-1&startDate=2024-01-01&endDate=2025-01-01";
+    fireEvent.keyDown(clickable, { key: 'Enter' });
+    expect(mockPush).toHaveBeenCalledWith(expected);
+
+    mockPush.mockClear();
+    fireEvent.keyDown(clickable, { key: ' ' });
+    expect(mockPush).toHaveBeenCalledWith(expected);
+
+    // A key the row does not claim stays the browser's, and the inert row
+    // answers no key at all.
+    mockPush.mockClear();
+    fireEvent.keyDown(clickable, { key: 'a' });
+    fireEvent.keyDown(inert, { key: 'Enter' });
+    expect(mockPush).not.toHaveBeenCalled();
+  });
 });

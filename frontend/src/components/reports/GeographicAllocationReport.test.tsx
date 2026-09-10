@@ -369,22 +369,33 @@ describe('GeographicAllocationReport', () => {
       if (!__ths[__i]) break;
       await act(async () => { fireEvent.click(__ths[__i]); });
     }
-    // Switch to Exchange view by clicking the toggle button (text: Exchange).
-    const exchangeBtns = screen.queryAllByRole('button', { name: 'Exchange' });
-    if (exchangeBtns.length > 0) {
-      await act(async () => { fireEvent.click(exchangeBtns[0]); });
-      await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
-      const __exHeaderCount = container.querySelectorAll('table thead th').length;
-      for (let __i = 0; __i < __exHeaderCount; __i += 1) {
-        const __ths = container.querySelectorAll('table thead th');
-        if (!__ths[__i]) break;
-        await act(async () => { fireEvent.click(__ths[__i]); });
-      }
-      for (let __i = 0; __i < __exHeaderCount; __i += 1) {
-        const __ths = container.querySelectorAll('table thead th');
-        if (!__ths[__i]) break;
-        await act(async () => { fireEvent.click(__ths[__i]); });
-      }
+    // Switch to the exchange view. The toggle's accessible name is "By
+    // Exchange" (`geographicAllocation.viewByExchange`); this looked for
+    // "Exchange", found nothing, and the whole exchange half of the test sat
+    // behind `if (exchangeBtns.length > 0)` and never ran. So it is addressed
+    // with `getByRole` rather than `queryAllByRole` + a length test: a locator
+    // that stops matching must fail this test, not silently skip it.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'By Exchange' }));
+    });
+    // Wait for the exchange table itself, not for "a table": the region table
+    // is already on screen, so a bare `querySelector('table')` resolves
+    // immediately whether the view switched or not.
+    await waitFor(() =>
+      expect(screen.getByText('Exchange Allocation')).toBeInTheDocument(),
+    );
+    // The exchange table is a different column set, so it has its own headers.
+    const __exHeaderCount = container.querySelectorAll('table thead th').length;
+    expect(__exHeaderCount).toBeGreaterThan(0);
+    for (let __i = 0; __i < __exHeaderCount; __i += 1) {
+      const __ths = container.querySelectorAll('table thead th');
+      if (!__ths[__i]) break;
+      await act(async () => { fireEvent.click(__ths[__i]); });
+    }
+    for (let __i = 0; __i < __exHeaderCount; __i += 1) {
+      const __ths = container.querySelectorAll('table thead th');
+      if (!__ths[__i]) break;
+      await act(async () => { fireEvent.click(__ths[__i]); });
     }
   });
 

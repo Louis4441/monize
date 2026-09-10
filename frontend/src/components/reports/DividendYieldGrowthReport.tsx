@@ -26,6 +26,11 @@ import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 import { PartialTotal } from '@/components/ui/PartialTotal';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
@@ -60,6 +65,34 @@ interface FrequencyBucket {
   count: number;
   totalDividends: number;
 }
+
+/**
+ * One sortable column of the per-security yield table, keyed by its own sort
+ * field so the record is exhaustive over `YieldSortField` and each entry names
+ * the field it stands for. Both header rows -- the column header row from `sm`
+ * up and the phone sort strip below it -- render from the same record, so they
+ * can never list different fields, and a new sort field is a compile error here
+ * rather than a column stranded with no control on a phone.
+ */
+type YieldSortColumn = TableSortColumn<YieldSortField, 'right'>;
+type YieldSortColumns = TableSortColumnsByField<YieldSortField, YieldSortColumn>;
+
+// Today's header cell, unchanged.
+const HEADER_CLASS =
+  'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase';
+
+// A figure cell inside a wrapped card: no padding of its own below `sm` (the
+// row supplies it and the grid does the spacing), this table's own `px-4 py-3`
+// from `sm` up, and smaller type on phones so a figure fits a third of the
+// width. `whitespace-nowrap` is the one property here that is NOT phone-only,
+// and the single respect in which the `sm`-and-up cell differs from today's: a
+// locale that groups thousands with a space (`1 234 567 zl`) could otherwise
+// break a figure in the middle at any width. Right alignment is not a
+// containment device -- a nowrap amount longer than its track overflows the end
+// edge and reopens the wrapper's scroll -- but `overflow-hidden` here would
+// silently cut a figure, which is worse than a crowded one or an honest scroll.
+const MONEY_CELL =
+  'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
 
 const ACCOUNTS_STORAGE_KEY = 'monize-reports-dividend-yield-growth-accounts';
 
@@ -320,6 +353,21 @@ export function DividendYieldGrowthReport() {
     return sorted;
   }, [securityYields, yieldSort.sortField, yieldSort.sortDirection]);
 
+  // The five sortable columns of the per-security yield table, keyed by field
+  // so the record is exhaustive over `YieldSortField`. Both header rows render
+  // one control per column, and the declaration order is the column order.
+  const yieldColumns: YieldSortColumns = {
+    symbol: { field: 'symbol', label: t('dividendYieldGrowth.colSecurity') },
+    dividends: { field: 'dividends', label: t('dividendYieldGrowth.col12mDividends'), align: 'right' },
+    marketValue: { field: 'marketValue', label: t('dividendYieldGrowth.colMarketValue'), align: 'right' },
+    yield: { field: 'yield', label: t('dividendYieldGrowth.colYield'), align: 'right' },
+    frequency: { field: 'frequency', label: t('dividendYieldGrowth.colFrequency'), align: 'right' },
+  };
+  // Their order, rendered by BOTH header rows and matched by the cells' DOM
+  // order. Derived from the record rather than re-listed, so a field added to
+  // the union cannot compile with no sort control in either header.
+  const yieldSortColumns: readonly YieldSortColumn[] = Object.values(yieldColumns);
+
   // Year-over-year growth
   const annualData = useMemo((): AnnualDividend[] => {
     const yearMap = new Map<string, number>();
@@ -479,10 +527,14 @@ export function DividendYieldGrowthReport() {
         <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
           <div className="text-sm text-green-600 dark:text-green-400">{t('dividendYieldGrowth.portfolioYield')}</div>
           <div className="text-xl font-bold text-green-700 dark:text-green-300">
-            {formatPercent(portfolioYield, 2)}
-            {valuationGaps.excludedCount > 0 && (
-              <span className="text-amber-600 dark:text-amber-400" aria-hidden="true"> *</span>
-            )}
+            {/* The yield is the ratio of the two subtotals beside it, so it is
+                a subtotal too, and it wears the marker the same way they do.
+                The hand-rolled amber `*` this replaces was `aria-hidden` with
+                no `sr-only` twin, so the one figure a screen reader was told
+                nothing about was the derived one. */}
+            <PartialTotal total={{ value: portfolioYield, ...valuationGaps }} displayCurrency={displayCurrency}>
+              {formatPercent(portfolioYield, 2)}
+            </PartialTotal>
           </div>
         </div>
         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
@@ -564,78 +616,85 @@ export function DividendYieldGrowthReport() {
               {t('dividendYieldGrowth.perSecurityTitle')}
             </h3>
           </div>
+          {/* Below `sm` the table becomes a block and each row wraps into a
+              three-column, two-line grid so all five columns fit a phone
+              without a horizontal scroll: the security identity (spanning two
+              tracks) and the headline yield share line 1; the trailing-12-month
+              dividends, the market value and the payout frequency share line 2,
+              one track each. Each bare figure carries a `CellLabel` reusing the
+              column's existing header key, since the column header row is
+              replaced by a phone sort strip below `sm`. From `sm` up it is the
+              ordinary table -- every cell restores this table's own `px-4 py-3`
+              -- and the one deliberate difference above `sm` is
+              `whitespace-nowrap` on the figures (see `MONEY_CELL`). Restyling
+              `display` strips the implicit table semantics, so the ARIA roles
+              are restated explicitly. */}
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-900/50">
-                <tr>
-                  <SortableHeader<YieldSortField>
-                    field="symbol"
-                    sortField={yieldSort.sortField}
-                    sortDirection={yieldSort.sortDirection}
-                    onSort={yieldSort.handleSort}
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('dividendYieldGrowth.colSecurity')}
-                  </SortableHeader>
-                  <SortableHeader<YieldSortField>
-                    field="dividends"
-                    sortField={yieldSort.sortField}
-                    sortDirection={yieldSort.sortDirection}
-                    onSort={yieldSort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('dividendYieldGrowth.col12mDividends')}
-                  </SortableHeader>
-                  <SortableHeader<YieldSortField>
-                    field="marketValue"
-                    sortField={yieldSort.sortField}
-                    sortDirection={yieldSort.sortDirection}
-                    onSort={yieldSort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('dividendYieldGrowth.colMarketValue')}
-                  </SortableHeader>
-                  <SortableHeader<YieldSortField>
-                    field="yield"
-                    sortField={yieldSort.sortField}
-                    sortDirection={yieldSort.sortDirection}
-                    onSort={yieldSort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('dividendYieldGrowth.colYield')}
-                  </SortableHeader>
-                  <SortableHeader<YieldSortField>
-                    field="frequency"
-                    sortField={yieldSort.sortField}
-                    sortDirection={yieldSort.sortDirection}
-                    onSort={yieldSort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('dividendYieldGrowth.colFrequency')}
-                  </SortableHeader>
+            <table role="table" className="block min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
+              <thead role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-header-group">
+                {/* Phone sort strip: the same five controls, wrapped. */}
+                <tr role="row" className="flex flex-wrap gap-x-2 gap-y-1 px-2 py-2 sm:hidden">
+                  {yieldSortColumns.map((col) => (
+                    <SortableHeader<YieldSortField>
+                      key={col.field}
+                      field={col.field}
+                      sortField={yieldSort.sortField}
+                      sortDirection={yieldSort.sortDirection}
+                      onSort={yieldSort.handleSort}
+                      className={PHONE_HEADER_CLASS}
+                    >
+                      {col.label}
+                    </SortableHeader>
+                  ))}
+                </tr>
+                <tr role="row" className="hidden sm:table-row">
+                  {yieldSortColumns.map((col) => (
+                    <SortableHeader<YieldSortField>
+                      key={col.field}
+                      field={col.field}
+                      sortField={yieldSort.sortField}
+                      sortDirection={yieldSort.sortDirection}
+                      onSort={yieldSort.handleSort}
+                      align={col.align}
+                      className={HEADER_CLASS}
+                    >
+                      {col.label}
+                    </SortableHeader>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody role="rowgroup" className="block divide-y divide-gray-200 dark:divide-gray-700 sm:table-row-group">
                 {sortedSecurityYields.map((sy) => (
-                  <tr key={sy.symbol} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                    <td className="px-4 py-3">
+                  <tr
+                    key={sy.symbol}
+                    role="row"
+                    className="grid grid-cols-3 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row sm:p-0"
+                  >
+                    {/* The identity: symbol over name. It spans two tracks on
+                        line 1 beside the headline yield; the name wraps on a
+                        phone and hands the wrap back from `sm` up. */}
+                    <td role="cell" className="col-start-1 col-span-2 row-start-1 min-w-0 p-0 sm:table-cell sm:px-4 sm:py-3">
                       <div className="font-medium text-gray-900 dark:text-gray-100">{sy.symbol}</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">{sy.name}</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400 break-words sm:break-normal">{sy.name}</div>
                     </td>
-                    <td className="px-4 py-3 text-right text-sm text-green-600 dark:text-green-400">
+                    <td role="cell" className={`col-start-1 row-start-2 text-green-600 dark:text-green-400 ${MONEY_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{yieldColumns.dividends.label}</CellLabel>
                       {fmtValue(sy.trailing12mDividends)}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm text-gray-600 dark:text-gray-400">
+                    <td role="cell" className={`col-start-2 row-start-2 text-gray-600 dark:text-gray-400 ${MONEY_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{yieldColumns.marketValue.label}</CellLabel>
                       {fmtValue(sy.marketValue)}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {/* Yield is the headline the report is read for: the right
+                        of line 1, beside the security. */}
+                    <td role="cell" className={`col-start-3 row-start-1 font-medium text-gray-900 dark:text-gray-100 ${MONEY_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{yieldColumns.yield.label}</CellLabel>
                       {formatPercent(sy.yield, 2)}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm text-gray-500 dark:text-gray-400">
+                    {/* Frequency is a word, so it may wrap; captioned like the
+                        figures, and right-aligned to match the desktop cell. */}
+                    <td role="cell" className="col-start-3 row-start-2 p-0 text-right text-xs text-gray-500 dark:text-gray-400 sm:table-cell sm:px-4 sm:py-3 sm:text-sm">
+                      <CellLabel className={CAPTION_CLASS}>{yieldColumns.frequency.label}</CellLabel>
                       {sy.frequency}
                     </td>
                   </tr>

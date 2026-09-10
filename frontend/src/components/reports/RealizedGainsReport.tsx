@@ -31,13 +31,26 @@ import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMult
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { exportToCsv } from '@/lib/csv-export';
 import { SortableHeader } from '@/components/ui/SortableHeader';
+import {
+  CAPTION_CLASS,
+  CellLabel,
+  PHONE_HEADER_CLASS,
+  type SortColumn,
+  type SortColumnsByField,
+} from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
+import { useDateFormat } from '@/hooks/useDateFormat';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('RealizedGainsReport');
 
 type SecurityGainsSortField = 'symbol' | 'transactionCount' | 'totalProceeds' | 'totalCostBasis' | 'realizedGain';
 type SellTransactionsSortField = 'date' | 'symbol' | 'quantity' | 'price' | 'proceeds';
+
+const HEADER_CLASS =
+  'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase';
+const FIGURE_CELL =
+  'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
 
 function CustomTooltip({ active, payload, fmtValue }: {
   active?: boolean;
@@ -71,7 +84,14 @@ const ACCOUNTS_STORAGE_KEY = 'monize-reports-realized-gains-accounts';
 export function RealizedGainsReport() {
   const t = useTranslations('reports');
   const tCommon = useTranslations('common');
-  const { formatCurrency: formatCurrencyFull, formatCurrencyAxis, formatPercent } = useNumberFormat();
+  const {
+    formatCurrency: formatCurrencyFull,
+    formatCurrencyAxis,
+    formatNumber,
+    formatPercent,
+    formatShareQuantity,
+  } = useNumberFormat();
+  const { formatDate } = useDateFormat();
   const { defaultCurrency, convertToDefault } = useExchangeRates();
   const [accounts, setAccounts] = useState<Account[]>([]);
   // Persisted so the report opens on the accounts the user last chose.
@@ -90,6 +110,30 @@ export function RealizedGainsReport() {
     'reports.realized-gains.sells.sort',
     { field: 'date', direction: 'desc' },
   );
+
+  const securityGainColumns: SortColumnsByField<
+    SecurityGainsSortField,
+    SortColumn<SecurityGainsSortField>
+  > = {
+    symbol: { field: 'symbol', label: t('realizedGains.colSecurity') },
+    transactionCount: { field: 'transactionCount', label: t('realizedGains.colTrades'), align: 'right' },
+    totalProceeds: { field: 'totalProceeds', label: t('realizedGains.colProceeds'), align: 'right' },
+    totalCostBasis: { field: 'totalCostBasis', label: t('realizedGains.colCostBasis'), align: 'right' },
+    realizedGain: { field: 'realizedGain', label: t('realizedGains.colGainLoss'), align: 'right' },
+  };
+  const securityGainSortColumns = Object.values(securityGainColumns);
+
+  const sellTransactionColumns: SortColumnsByField<
+    SellTransactionsSortField,
+    SortColumn<SellTransactionsSortField>
+  > = {
+    date: { field: 'date', label: t('realizedGains.colDate') },
+    symbol: { field: 'symbol', label: t('realizedGains.colSecurity') },
+    quantity: { field: 'quantity', label: t('realizedGains.colShares'), align: 'right' },
+    price: { field: 'price', label: t('realizedGains.colPrice'), align: 'right' },
+    proceeds: { field: 'proceeds', label: t('realizedGains.colProceeds'), align: 'right' },
+  };
+  const sellTransactionSortColumns = Object.values(sellTransactionColumns);
 
   const selectedAccount = isSingleAccount
     ? accounts.find((a) => a.id === selectedAccountIds[0])
@@ -466,101 +510,91 @@ export function RealizedGainsReport() {
             </h3>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-900/50">
-                <tr>
-                  <SortableHeader<SecurityGainsSortField>
-                    field="symbol"
-                    sortField={securityGainsSort.sortField}
-                    sortDirection={securityGainsSort.sortDirection}
-                    onSort={securityGainsSort.handleSort}
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('realizedGains.colSecurity')}
-                  </SortableHeader>
-                  <SortableHeader<SecurityGainsSortField>
-                    field="transactionCount"
-                    sortField={securityGainsSort.sortField}
-                    sortDirection={securityGainsSort.sortDirection}
-                    onSort={securityGainsSort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('realizedGains.colTrades')}
-                  </SortableHeader>
-                  <SortableHeader<SecurityGainsSortField>
-                    field="totalProceeds"
-                    sortField={securityGainsSort.sortField}
-                    sortDirection={securityGainsSort.sortDirection}
-                    onSort={securityGainsSort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('realizedGains.colProceeds')}
-                  </SortableHeader>
-                  <SortableHeader<SecurityGainsSortField>
-                    field="totalCostBasis"
-                    sortField={securityGainsSort.sortField}
-                    sortDirection={securityGainsSort.sortDirection}
-                    onSort={securityGainsSort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('realizedGains.colCostBasis')}
-                  </SortableHeader>
-                  <SortableHeader<SecurityGainsSortField>
-                    field="realizedGain"
-                    sortField={securityGainsSort.sortField}
-                    sortDirection={securityGainsSort.sortDirection}
-                    onSort={securityGainsSort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('realizedGains.colGainLoss')}
-                  </SortableHeader>
+            <table role="table" className="block min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
+              <thead role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-header-group">
+                <tr role="row" className="flex flex-wrap gap-x-2 gap-y-1 px-2 py-2 sm:hidden">
+                  {securityGainSortColumns.map((column) => (
+                    <SortableHeader<SecurityGainsSortField>
+                      key={column.field}
+                      field={column.field}
+                      sortField={securityGainsSort.sortField}
+                      sortDirection={securityGainsSort.sortDirection}
+                      onSort={securityGainsSort.handleSort}
+                      className={PHONE_HEADER_CLASS}
+                    >
+                      {column.label}
+                    </SortableHeader>
+                  ))}
+                </tr>
+                <tr role="row" className="hidden sm:table-row">
+                  {securityGainSortColumns.map((column) => (
+                    <SortableHeader<SecurityGainsSortField>
+                      key={column.field}
+                      field={column.field}
+                      sortField={securityGainsSort.sortField}
+                      sortDirection={securityGainsSort.sortDirection}
+                      onSort={securityGainsSort.handleSort}
+                      align={column.align}
+                      className={HEADER_CLASS}
+                    >
+                      {column.label}
+                    </SortableHeader>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody role="rowgroup" className="block divide-y divide-gray-200 dark:divide-gray-700 sm:table-row-group">
                 {sortedSecurityGains.map((sg) => (
-                  <tr key={sg.symbol} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                    <td className="px-4 py-3">
+                  <tr
+                    key={sg.symbol}
+                    role="row"
+                    className="grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row sm:p-0"
+                  >
+                    <td role="cell" className="col-start-1 row-start-1 min-w-0 p-0 sm:table-cell sm:px-4 sm:py-3">
                       <div className="font-medium text-gray-900 dark:text-gray-100">
                         {sg.symbol}
                       </div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                      <div className="break-words text-sm text-gray-500 dark:text-gray-400 sm:break-normal">
                         {sg.name}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-gray-100">
-                      {sg.transactionCount}
+                    <td role="cell" className={`col-start-2 row-start-1 text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{securityGainColumns.transactionCount.label}</CellLabel>
+                      {formatNumber(sg.transactionCount, 0)}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-gray-100">
+                    <td role="cell" className={`col-start-1 row-start-2 text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{securityGainColumns.totalProceeds.label}</CellLabel>
                       {fmtValue(sg.totalProceeds)}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-gray-100">
+                    <td role="cell" className={`col-start-2 row-start-2 text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{securityGainColumns.totalCostBasis.label}</CellLabel>
                       {fmtValue(sg.totalCostBasis)}
                     </td>
-                    <td className={`px-4 py-3 text-right text-sm font-medium ${gainLossColor(sg.realizedGain)}`}>
+                    <td role="cell" className={`col-start-1 col-span-2 row-start-3 font-medium ${gainLossColor(sg.realizedGain)} ${FIGURE_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{securityGainColumns.realizedGain.label}</CellLabel>
                       {sg.realizedGain >= 0 ? '+' : ''}{fmtValue(sg.realizedGain)}
                     </td>
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="bg-gray-50 dark:bg-gray-900/50">
-                <tr>
-                  <td className="px-4 py-3 font-semibold text-gray-900 dark:text-gray-100">
+              <tfoot role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-footer-group">
+                <tr role="row" className="grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 sm:table-row sm:p-0">
+                  <td role="cell" className="col-start-1 row-start-1 p-0 font-semibold text-gray-900 dark:text-gray-100 sm:table-cell sm:px-4 sm:py-3">
                     {t('realizedGains.total')}
                   </td>
-                  <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    {totals.totalTransactions}
+                  <td role="cell" className={`col-start-2 row-start-1 font-semibold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                    <CellLabel className={CAPTION_CLASS}>{securityGainColumns.transactionCount.label}</CellLabel>
+                    {formatNumber(totals.totalTransactions, 0)}
                   </td>
-                  <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  <td role="cell" className={`col-start-1 row-start-2 font-semibold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                    <CellLabel className={CAPTION_CLASS}>{securityGainColumns.totalProceeds.label}</CellLabel>
                     {fmtValue(totals.totalProceeds)}
                   </td>
-                  <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  <td role="cell" className={`col-start-2 row-start-2 font-semibold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                    <CellLabel className={CAPTION_CLASS}>{securityGainColumns.totalCostBasis.label}</CellLabel>
                     {fmtValue(totals.totalCostBasis)}
                   </td>
-                  <td className={`px-4 py-3 text-right text-sm font-bold ${gainLossColor(totals.totalGain)}`}>
+                  <td role="cell" className={`col-start-1 col-span-2 row-start-3 font-bold ${gainLossColor(totals.totalGain)} ${FIGURE_CELL}`}>
+                    <CellLabel className={CAPTION_CLASS}>{securityGainColumns.realizedGain.label}</CellLabel>
                     {totals.totalGain >= 0 ? '+' : ''}{fmtValue(totals.totalGain)}
                   </td>
                 </tr>
@@ -579,77 +613,64 @@ export function RealizedGainsReport() {
             </h3>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-900/50">
-                <tr>
-                  <SortableHeader<SellTransactionsSortField>
-                    field="date"
-                    sortField={sellTransactionsSort.sortField}
-                    sortDirection={sellTransactionsSort.sortDirection}
-                    onSort={sellTransactionsSort.handleSort}
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('realizedGains.colDate')}
-                  </SortableHeader>
-                  <SortableHeader<SellTransactionsSortField>
-                    field="symbol"
-                    sortField={sellTransactionsSort.sortField}
-                    sortDirection={sellTransactionsSort.sortDirection}
-                    onSort={sellTransactionsSort.handleSort}
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('realizedGains.colSecurity')}
-                  </SortableHeader>
-                  <SortableHeader<SellTransactionsSortField>
-                    field="quantity"
-                    sortField={sellTransactionsSort.sortField}
-                    sortDirection={sellTransactionsSort.sortDirection}
-                    onSort={sellTransactionsSort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('realizedGains.colShares')}
-                  </SortableHeader>
-                  <SortableHeader<SellTransactionsSortField>
-                    field="price"
-                    sortField={sellTransactionsSort.sortField}
-                    sortDirection={sellTransactionsSort.sortDirection}
-                    onSort={sellTransactionsSort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('realizedGains.colPrice')}
-                  </SortableHeader>
-                  <SortableHeader<SellTransactionsSortField>
-                    field="proceeds"
-                    sortField={sellTransactionsSort.sortField}
-                    sortDirection={sellTransactionsSort.sortDirection}
-                    onSort={sellTransactionsSort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('realizedGains.colProceeds')}
-                  </SortableHeader>
+            <table role="table" className="block min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
+              <thead role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-header-group">
+                <tr role="row" className="flex flex-wrap gap-x-2 gap-y-1 px-2 py-2 sm:hidden">
+                  {sellTransactionSortColumns.map((column) => (
+                    <SortableHeader<SellTransactionsSortField>
+                      key={column.field}
+                      field={column.field}
+                      sortField={sellTransactionsSort.sortField}
+                      sortDirection={sellTransactionsSort.sortDirection}
+                      onSort={sellTransactionsSort.handleSort}
+                      className={PHONE_HEADER_CLASS}
+                    >
+                      {column.label}
+                    </SortableHeader>
+                  ))}
+                </tr>
+                <tr role="row" className="hidden sm:table-row">
+                  {sellTransactionSortColumns.map((column) => (
+                    <SortableHeader<SellTransactionsSortField>
+                      key={column.field}
+                      field={column.field}
+                      sortField={sellTransactionsSort.sortField}
+                      sortDirection={sellTransactionsSort.sortDirection}
+                      onSort={sellTransactionsSort.handleSort}
+                      align={column.align}
+                      className={HEADER_CLASS}
+                    >
+                      {column.label}
+                    </SortableHeader>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody role="rowgroup" className="block divide-y divide-gray-200 dark:divide-gray-700 sm:table-row-group">
                 {sortedEntries.map((entry) => (
-                  <tr key={entry.transactionId} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
-                      {format(parseLocalDate(entry.transactionDate), 'MMM d, yyyy')}
+                  <tr
+                    key={entry.transactionId}
+                    role="row"
+                    className="grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row sm:p-0"
+                  >
+                    <td role="cell" className="col-start-1 row-start-1 p-0 text-sm text-gray-900 dark:text-gray-100 sm:table-cell sm:px-4 sm:py-3">
+                      <CellLabel className={CAPTION_CLASS}>{sellTransactionColumns.date.label}</CellLabel>
+                      {formatDate(entry.transactionDate)}
                     </td>
-                    <td className="px-4 py-3">
+                    <td role="cell" className="col-start-2 row-start-1 min-w-0 p-0 sm:table-cell sm:px-4 sm:py-3">
                       <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
                         {entry.symbol || 'N/A'}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-gray-100">
-                      {entry.quantity.toFixed(4)}
+                    <td role="cell" className={`col-start-1 row-start-2 text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{sellTransactionColumns.quantity.label}</CellLabel>
+                      {formatShareQuantity(entry.quantity)}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-gray-100">
+                    <td role="cell" className={`col-start-2 row-start-2 text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{sellTransactionColumns.price.label}</CellLabel>
                       {fmtValue(entry.price)}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-medium text-gray-900 dark:text-gray-100">
+                    <td role="cell" className={`col-start-1 col-span-2 row-start-3 font-medium text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{sellTransactionColumns.proceeds.label}</CellLabel>
                       {(() => {
                         const proceeds = toDisplay(entry.proceeds, entry.accountCurrencyCode);
                         return proceeds === null

@@ -95,7 +95,7 @@ implied.
 | INV-TRANSFER-001 | A transfer's two legs share the VOID boundary and one balance decision | enforced |
 | INV-REDEEM-001 | A redemption's accrued interest moves cash once and is income once | enforced |
 | INV-RECONCILE-001 | While the strict lock is on, a reconciled transaction is not altered | enforced |
-| INV-FX-001 | An unavailable rate never becomes 1:1 | enforced |
+| INV-FX-001 | An unavailable rate never becomes 1:1 | partial |
 | INV-REPORT-001 | A report's account scope is investment linkage, not account type | enforced |
 | INV-REPORT-002 | A chart's down-sampling never reaches a count, a total or an export | enforced |
 | INV-LOAN-001 | A recurring overpayment's cadence is a calendar, not a payment interval | enforced |
@@ -478,27 +478,66 @@ Statement           A cross-currency value must never become a valid-looking 1:1
                     value, and an unconverted amount must never be returned under
                     the target currency's label.
 Source of truth     exchange_rates
-Enforcement         Consumers return null on an absent rate, and accumulate
-                    through FxAggregate. net-worth.service.ts convertCurrency
-                    returns number | null (the `result ?? amount` fallback is
-                    gone); portfolio-calculation.service.ts returns null when
-                    neither direct nor reverse rate exists (the `: 1` else-branch
-                    is gone). A scanning guard, common/fx-fallback.guard.spec.ts,
-                    bans `?? amount` beside a conversion, `rate ... : 1` / `?? 1`,
-                    and an unreviewed `1 / reverse` reciprocal, and asserts each
-                    reviewed reciprocal returns null when neither direction exists.
+Enforcement         The 1:1 half is enforced. Consumers return null on an absent
+                    rate, and accumulate through FxAggregate. net-worth.service.ts
+                    convertCurrency returns number | null (the `result ?? amount`
+                    fallback is gone); portfolio-calculation.service.ts returns
+                    null when neither direct nor reverse rate exists (the `: 1`
+                    else-branch is gone). A scanning guard,
+                    common/fx-fallback.guard.spec.ts, bans `?? amount` beside a
+                    conversion, `rate ... : 1` / `?? 1`, and an unreviewed
+                    `1 / reverse` reciprocal, and asserts each reviewed
+                    reciprocal returns null when neither direction exists.
+                    The mislabelling half is NOT enforced on the built-in report
+                    path: see Known gap below.
+Known gap           **An unconverted amount still reaches a report under the
+                    default currency's label.**
+                    built-in-reports/report-currency.service.ts convertAmount()
+                    is typed `number`, so when convertWithRateLookup returns null
+                    it logs a warning and returns the amount UNCONVERTED, and
+                    built-in-reports/data-quality-reports.service.ts then labels
+                    that figure `currencyCode: defaultCurrency` -- an unconverted
+                    amount under the target currency's label, which is the second
+                    clause of the statement above. Ten report services share that
+                    signature. The scan sees it (it is the one entry in
+                    fx-fallback.guard.spec.ts's RETURNS_ITS_INPUT_UNCONVERTED,
+                    with its reason) but does not fail it, so the gap is reviewed
+                    rather than invisible.
+                    What closes it: convertAmount returning `number | null`, each
+                    caller choosing between FxAggregate and its own withheld
+                    total, and every affected DTO carrying a completeness field
+                    a consumer branches on -- one specified change per report
+                    family, not a guard edit. Until then this entry is `partial`.
 Concurrency scope   --
 Failure response    null or an explicitly partial figure, per
-                    docs/financial-calculation-contract.md section 1.
-Required tests      Present: common/fx-fallback.guard.spec.ts (the source scan
-                    above) plus the FxAggregate accumulator (common/fx-aggregate.ts)
-                    that names each unresolvable pair rather than absorbing it.
-Status              enforced
+                    docs/financial-calculation-contract.md section 1. On the
+                    path named in Known gap above: a warning in the log and a
+                    wrong number on screen.
+Required tests      Present: common/fx-fallback.guard.spec.ts (the two source
+                    scans above) plus the FxAggregate accumulator
+                    (common/fx-aggregate.ts) that names each unresolvable pair
+                    rather than absorbing it.
+                    Owed: a unit test per report family asserting the response is
+                    withheld (not passed through) for a pair with no rate. There
+                    is none today, which is why the defect survived a guard
+                    written for it.
+Status              partial
 ```
 
 At a real rate of 1.3500, a false 100.00 CAD would understate a 135.00 CAD
 position by 35.00 and report it as measured -- which is what the null return and
-the scan now prevent.
+the scan prevent on the paths that were fixed.
+
+**Why this entry was wrong, and the shape of that mistake.** It read `enforced`
+while a reachable path violated it, and the guard it named as its mechanism was
+written from the shape of the two defects that had just been fixed (`?? amount`
+at the end of a line, `: 1` beside a rate) rather than from the rule -- so
+`if (result == null) { log(); return amount; }` was never a candidate. A guard
+written from a diff certifies the diff. Read a status of `enforced` here as a
+claim to check against the scan, and read the scan for what it actually matches.
+`docs/verification-contract.md` section 6 still describes both load-bearing FX
+scans as having landed "with the fix, so no exception list"; that is now true of
+the first scan only.
 
 ### INV-REPORT-001 -- a report's account scope is investment linkage, not account type
 

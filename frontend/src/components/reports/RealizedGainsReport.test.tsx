@@ -37,6 +37,12 @@ vi.mock('@/hooks/useDateRange', () => {
   };
 });
 
+vi.mock('@/hooks/useDateFormat', () => ({
+  useDateFormat: () => ({
+    formatDate: (value: string) => value,
+  }),
+}));
+
 vi.mock('@/lib/utils', () => ({
   parseLocalDate: (d: string) => new Date(d + 'T00:00:00'),
   cn: (...inputs: any[]) => inputs.flat(Infinity).filter(Boolean).join(' '),

@@ -14,15 +14,22 @@ import {
 } from 'recharts';
 import { format } from 'date-fns';
 import { builtInReportsApi } from '@/lib/built-in-reports';
-import { BillPaymentHistoryResponse } from '@/types/built-in-reports';
 import { parseLocalDate } from '@/lib/utils';
+import { BillPaymentHistoryResponse } from '@/types/built-in-reports';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { useDateFormat } from '@/hooks/useDateFormat';
+import { useChartMonthFormat } from '@/hooks/useChartMonthFormat';
 import { useDateRange } from '@/hooks/useDateRange';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { exportToCsv } from '@/lib/csv-export';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from '@/components/ui/interactive-row';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useTranslations } from 'next-intl';
 import { useReportData } from '@/hooks/useReportData';
@@ -37,12 +44,7 @@ type BillSortField = 'bill' | 'count' | 'average' | 'total' | 'lastPayment';
  * phone sort strip -- so the two can never list different fields, and each
  * value cell takes its phone caption from the same entry as its header.
  */
-interface SortColumn {
-  field: BillSortField;
-  label: string;
-  /** How the column header aligns from `sm` up; the cells restate it. */
-  align?: 'right' | 'center';
-}
+type SortColumn = TableSortColumn<BillSortField>;
 
 /**
  * The record the two header rows are built from, keyed by sort field.
@@ -56,31 +58,10 @@ interface SortColumn {
  * none of which a test comparing header LABELS can see, because the labels
  * stay right. Here it is a compile error instead.
  */
-type SortColumnsByField = {
-  [K in BillSortField]: SortColumn & { field: K };
-};
+type SortColumnsByField = TableSortColumnsByField<BillSortField, SortColumn>;
 
 // Today's header cell, unchanged.
 const HEADER_CLASS = 'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase';
-
-// The same sort controls in the phone strip: a wrapped row of compact chips.
-// Column alignment means nothing there -- the column header row is hidden and
-// each data row is a grid -- so every control is left-aligned and self-naming.
-// The border is what says "tappable": there is no hover on a touch screen, and
-// the chip's own fill is a shade off the header band it sits on (this table's
-// `<thead>` keeps its `bg-gray-50` / `dark:bg-gray-900/50`, so the strip is on
-// that band rather than on the card, as it is on the sibling tables whose card
-// has no header band). (The class is kept identical to those siblings; the
-// copies are one of the duplications the converted-table consolidation pass
-// folds into one home -- `components/ui/` is not this change's to edit.)
-//
-// Five chips wrap to three lines at 320px in `en`/`pl`/`ru`/`id` (114px), four
-// in `de` (148px) and five in the pseudo-locale (182px) above the first row.
-// That is a measured cost, not a reason to drop a control: `reports.bill-
-// payment-history.sort` persists any of the five, so a field with no control
-// anywhere would leave a phone POINTING at a sort with no pointer back.
-const PHONE_HEADER_CLASS =
-  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
 
 // A value cell inside a wrapped row: no padding of its own below `sm` and this
 // table's own `px-4 py-3` from `sm` up. Smaller type on phones so an
@@ -118,11 +99,11 @@ const PHONE_HEADER_CLASS =
 // being zero. The payment COUNT is bounded and trivial at 23px for `128`.
 const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
 
-// Last Payment is a WORD-shaped value, not a number: `format(..., 'MMM d,
-// yyyy')` renders `Sep 5, 2026` (72px at `text-xs`), or `-` where the bill has
-// never been paid. It resolves to the same rendering as a figure cell today --
-// including the nowrap, because a date is one label and breaking it after `Sep`
-// reads as two values -- and it is spelled out rather than aliased to
+// Last Payment is a WORD-shaped value, not a number. `useDateFormat` keeps the
+// user's full-date preference; its longest preset is the same width class as
+// the old `Sep 5, 2026` label, or `-` where the bill has never been paid. It
+// resolves to the same rendering as a figure cell today -- including the
+// nowrap, because a date is one label -- and it is spelled out rather than aliased to
 // `MONEY_CELL` deliberately: the two hold the same string for different
 // reasons, and an alias would carry a money-driven edit (dropping the nowrap
 // because a formatter stopped grouping, widening the type for a longer figure)
@@ -132,13 +113,23 @@ const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px
 // it.
 const DATE_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
 
-/** Every caption in a wrapped cell is phone-only. */
-const CAPTION_CLASS = 'sm:hidden';
+/**
+ * Which surface an export row is being built for.
+ *
+ * A CSV is read by a MACHINE and a PDF by a person, so a date is written
+ * differently for each: the CSV gets ISO `yyyy-MM-dd`, which a spreadsheet
+ * sorts, and the PDF gets the reader's own date format. One function builds
+ * both so the two cannot come to hold different COLUMNS; only the cell
+ * rendering branches.
+ */
+type ExportSurface = 'csv' | 'pdf';
 
 export function BillPaymentHistoryReport() {
   const t = useTranslations('reports');
   const router = useRouter();
   const { formatCurrencyCompact: formatCurrency, formatCurrencyAxis } = useNumberFormat();
+  const { formatDate } = useDateFormat();
+  const formatChartMonth = useChartMonthFormat();
   const chartRef = useRef<HTMLDivElement>(null);
   const { dateRange, setDateRange, resolvedRange } = useDateRange({ defaultRange: '1y', alignment: 'day' });
   const [viewType, setViewType] = useState<'overview' | 'byBill'>('overview');
@@ -156,6 +147,24 @@ export function BillPaymentHistoryReport() {
         endDate: rangeEnd,
       }),
     [rangeStart, rangeEnd],
+  );
+
+  // A chart's month marker is `useChartMonthFormat`, not `useDateFormat`'s
+  // `formatMonth`. The two answer different questions: `formatMonth` renders
+  // the user's month-and-year PREFERENCE (`2026-01`, `01/2026`, `Jan-2026`),
+  // which puts a numeric tick where this axis reads a month NAME, while this
+  // hook localizes the name itself. It is the one month-axis formatter the
+  // other five charts on this branch use, and it owns the `YYYY-MM` parse:
+  // concatenating `-01` here would hand `Intl` an Invalid Date for a malformed
+  // key (a RangeError blanks the report subtree from inside a tick formatter)
+  // and would read month 13 as January of the next year.
+  const chartData = useMemo(
+    () =>
+      (billData?.monthlyTotals ?? []).map((entry) => ({
+        ...entry,
+        label: formatChartMonth(entry.month),
+      })),
+    [billData, formatChartMonth],
   );
 
   const sortedBillPayments = useMemo(() => {
@@ -210,28 +219,44 @@ export function BillPaymentHistoryReport() {
   // The record's declaration order is the column order.
   const sortColumns: readonly SortColumn[] = Object.values(columns);
 
-  const getExportData = () => {
+  /**
+   * The rows both exports write, in the columns both write, differing only in
+   * how a machine-read cell is rendered against a human-read one.
+   *
+   * The Last Payment column is ISO in the CSV: two readers exporting the same
+   * rows must get one file, `yyyy-MM-dd` is the form a spreadsheet sorts and
+   * every unconverted sibling export writes, and a localized date is ambiguous
+   * (`03/04/2026`) and sorts lexicographically wrong. The PDF is a reading
+   * surface and takes the reader's own format. The three figure columns are
+   * already raw numbers and stay that way -- a formatted amount is what
+   * reopened issue #1134 on the sibling report.
+   */
+  const getExportData = (surface: ExportSurface) => {
     if (!billData) return null;
     const headers = [t('billPaymentHistory.colBill'), t('billPaymentHistory.colPayee'), t('billPaymentHistory.colPayments'), t('billPaymentHistory.colAverage'), t('billPaymentHistory.colTotalPaid'), t('billPaymentHistory.colLastPayment')];
-    const rows = billData.billPayments.map((bp) => [
+    const rows: (string | number)[][] = billData.billPayments.map((bp) => [
       bp.scheduledTransactionName,
       bp.payeeName || '',
       bp.paymentCount,
       bp.averagePayment,
       bp.totalPaid,
-      bp.lastPaymentDate ? format(parseLocalDate(bp.lastPaymentDate), 'yyyy-MM-dd') : '',
+      bp.lastPaymentDate
+        ? surface === 'pdf'
+          ? formatDate(bp.lastPaymentDate)
+          : format(parseLocalDate(bp.lastPaymentDate), 'yyyy-MM-dd')
+        : '',
     ]);
     return { headers, rows };
   };
 
   const handleExportCsv = () => {
-    const data = getExportData();
+    const data = getExportData('csv');
     if (!data) return;
     exportToCsv('bill-payment-history', data.headers, data.rows);
   };
 
   const handleExportPdf = async () => {
-    const data = getExportData();
+    const data = getExportData('pdf');
     if (!data || !billData) return;
     const { exportToPdf } = await import('@/lib/pdf-export');
     await exportToPdf({
@@ -367,7 +392,7 @@ export function BillPaymentHistoryReport() {
           </h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-              <BarChart data={billData.monthlyTotals}>
+              <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                 <YAxis tickFormatter={formatCurrencyAxis} />
@@ -468,7 +493,26 @@ export function BillPaymentHistoryReport() {
           <div className="overflow-x-auto">
             <table role="table" className="block min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
               <thead role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-header-group">
-                {/* Phone sort strip: the same five controls, wrapped. */}
+                {/* Phone sort strip: the same five controls, as a wrapped row
+                    of compact chips. Column alignment means nothing here --
+                    the column header row is hidden and each data row is a grid
+                    -- so every control is left-aligned and self-naming. The
+                    border is what says "tappable": there is no hover on a
+                    touch screen, and the chip's own fill is a shade off the
+                    header band it sits on (this table's `<thead>` keeps its
+                    `bg-gray-50` / `dark:bg-gray-900/50`, so the strip is on
+                    that band rather than on the card, as it is on the sibling
+                    tables whose card has no header band). The shared
+                    `PHONE_HEADER_CLASS` keeps those controls identical across
+                    the reports.
+
+                    Five chips wrap to three lines at 320px in
+                    `en`/`pl`/`ru`/`id` (114px), four in `de` (148px) and five
+                    in the pseudo-locale (182px) above the first row. That is a
+                    measured cost, not a reason to drop a control:
+                    `reports.bill-payment-history.sort` persists any of the
+                    five, so a field with no control anywhere would leave a
+                    phone POINTING at a sort with no pointer back. */}
                 <tr role="row" className="flex flex-wrap gap-x-2 gap-y-1 px-4 py-2 sm:hidden">
                   {sortColumns.map((col) => (
                     <SortableHeader<BillSortField>
@@ -500,12 +544,19 @@ export function BillPaymentHistoryReport() {
                 </tr>
               </thead>
               <tbody role="rowgroup" className="block divide-y divide-gray-200 dark:divide-gray-700 sm:table-row-group">
+                {/* Each row is the click target at every width, so it is also a
+                    KEYBOARD target: `tabIndex` puts it in the tab order and
+                    `activateOnKey` runs the same handler on Enter and Space
+                    (WCAG 2.1.1). Both come from the one shared module rather
+                    than a per-report copy of the handler. */}
                 {sortedBillPayments.map((bp) => (
                   <tr
                     key={bp.scheduledTransactionId}
                     role="row"
-                    className="grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer sm:table-row"
+                    tabIndex={0}
+                    className={`grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer ${INTERACTIVE_ROW_FOCUS_CLASS} sm:table-row`}
                     onClick={handleBillClick}
+                    onKeyDown={activateOnKey(handleBillClick)}
                   >
                     <td
                       role="cell"
@@ -550,7 +601,7 @@ export function BillPaymentHistoryReport() {
                     >
                       <CellLabel className={CAPTION_CLASS}>{columns.lastPayment.label}</CellLabel>
                       {bp.lastPaymentDate
-                        ? format(parseLocalDate(bp.lastPaymentDate), 'MMM d, yyyy')
+                        ? formatDate(bp.lastPaymentDate)
                         : '-'}
                     </td>
                   </tr>

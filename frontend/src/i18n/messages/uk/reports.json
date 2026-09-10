@@ -1229,6 +1229,14 @@
     "inLast6Months": "(за останні 6 місяців)",
     "noRecurring": "Регулярних витрат з {count}+ повтореннями за останні 6 місяців не знайдено.",
     "failedToLoad": "Не вдалося завантажити дані про регулярні витрати.",
+    "categoryUncategorized": "Некатегоризовані",
+    "frequency": {
+      "WEEKLY": "Щотижня",
+      "BIWEEKLY": "Кожні 2 тижні",
+      "MONTHLY": "Щомісяця",
+      "OCCASIONAL": "Час від часу",
+      "IRREGULAR": "Нерегулярно"
+    },
     "top10ChartTitle": "Топ 10 регулярних витрат",
     "allRecurringTitle": "Усі регулярні витрати",
     "tooltipTransactions": "{count} операцій — {frequency}",
@@ -1405,6 +1413,7 @@
     }
   },
   "securityTypeAllocation": {
+    "colShares": "Акції",
     "noData": "Інвестиційних позицій не знайдено. Додайте цінні папери, щоб побачити розбивку за типами активів.",
     "totalPortfolio": "Усього портфеля",
     "assetTypes": "Типи активів",

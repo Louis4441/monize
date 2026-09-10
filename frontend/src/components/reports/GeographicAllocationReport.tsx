@@ -23,6 +23,11 @@ import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 import { PartialTotal } from '@/components/ui/PartialTotal';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
@@ -52,6 +57,138 @@ interface CountryRow {
   marketValue: number;
   percentage: number;
   color: string;
+}
+
+// One column of a data table, declared once as a record over its sort-field
+// union and rendered by BOTH header rows -- the column header row (from `sm` up)
+// and the phone sort strip -- so the two can never list different fields, and a
+// new union member fails `tsc` rather than stranding a phone with no control for
+// it. The `SortColumnsByField` alias ties each key to its entry's own `field`,
+// so `count: { field: 'percentage', ... }` is a compile error rather than a
+// duplicate React key a label-comparing test cannot see. One record per view,
+// because the three views carry different sort fields.
+type RegionSortColumn = TableSortColumn<GeoRegionSortField, 'right'>;
+type RegionColumns = TableSortColumnsByField<GeoRegionSortField, RegionSortColumn>;
+type ExchangeSortColumn = TableSortColumn<GeoExchangeSortField, 'right'>;
+type ExchangeColumns = TableSortColumnsByField<GeoExchangeSortField, ExchangeSortColumn>;
+type CountrySortColumn = TableSortColumn<GeoCountrySortField, 'right'>;
+type CountryColumns = TableSortColumnsByField<GeoCountrySortField, CountrySortColumn>;
+
+// Today's header cell, unchanged (previously inlined at every column header).
+const HEADER_CLASS =
+  'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider';
+
+// Where each column sits on a phone card, written once per view. Auto-flow would
+// place cells by DOM order and silently re-flow the moment a column set changed
+// between views, so every cell states its own column and line; the placements
+// are inert from `sm` up, where every row is an ordinary table row again.
+//
+// All three grids are two columns. A REGION row is two lines -- the region and
+// its market value (the figure the row is read for) on line 1, the share and
+// the holdings count on line 2 -- laid out exactly as the Security Type report's
+// four-column card. A COUNTRY row gives its unbounded identity the whole of line
+// 1 (only three columns, so there is room) and drops its two figures to line 2.
+// An EXCHANGE row is three lines: the exchange and its market value on line 1,
+// the exchange's country as a descriptor under the identity beside the share on
+// line 2, and the holdings count on line 3.
+const REGION_PLACEMENT: Record<GeoRegionSortField, string> = {
+  region: 'col-start-1 row-start-1',
+  marketValue: 'col-start-2 row-start-1',
+  percentage: 'col-start-1 row-start-2',
+  count: 'col-start-2 row-start-2',
+};
+const COUNTRY_PLACEMENT: Record<GeoCountrySortField, string> = {
+  country: 'col-start-1 col-span-2 row-start-1',
+  marketValue: 'col-start-1 row-start-2',
+  percentage: 'col-start-2 row-start-2',
+};
+const EXCHANGE_PLACEMENT: Record<GeoExchangeSortField, string> = {
+  exchange: 'col-start-1 row-start-1',
+  marketValue: 'col-start-2 row-start-1',
+  country: 'col-start-1 row-start-2',
+  percentage: 'col-start-2 row-start-2',
+  count: 'col-start-2 row-start-3',
+};
+
+// The phone card's row grid, shared by all three views' body and footer rows so
+// a placement above means the same track in each. Inert from `sm` up.
+const ROW_GRID = 'grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3';
+
+// A figure cell inside a wrapped card: no padding of its own below `sm` (the row
+// supplies it and the grid does the spacing), the table cell's own padding from
+// `sm` up, smaller type on phones. Every original cell here is `text-sm`, so
+// `sm:text-sm` reproduces the desktop cell exactly. `whitespace-nowrap` is the
+// one property that is NOT phone-only and the single respect in which the
+// `sm`-and-up cell differs from today's: a locale grouping thousands with a
+// space could otherwise break a figure in the middle of a number, at any width.
+const FIGURE_CELL =
+  'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
+
+// A left-aligned text cell (the exchange's country descriptor): reproduces the
+// desktop `px-4 py-3 text-sm` from `sm` up, wraps unclamped below it in its
+// `minmax(0,1fr)` track so a long country name cannot set the table's width.
+const TEXT_CELL =
+  'min-w-0 p-0 text-xs break-words sm:table-cell sm:px-4 sm:py-3 sm:text-sm sm:break-normal';
+
+// The identity cell of a data row and of the totals footer, sharing this box in
+// every view: the one cell that keeps `text-sm` on phones (a name is prose, and
+// the figures' `text-xs` would cost the clamp a character a line). Its placement
+// is prepended per view, because the identity column differs between them.
+const IDENTITY_CELL = 'min-w-0 p-0 text-sm sm:table-cell sm:px-4 sm:py-3';
+
+// The two header rows every view draws: a phone-only sort strip of compact chips
+// (the column header row is hidden below `sm`, so its controls must return
+// somewhere a phone can reach) and the ordinary column header row from `sm` up.
+// Both are rendered from ONE `columns` list, so they cannot list different
+// fields. Generic over the view's sort field, so a control cannot address a
+// column the rows do not render.
+function SortHeaderRows<F extends string>({
+  columns,
+  sortField,
+  sortDirection,
+  onSort,
+}: {
+  columns: readonly TableSortColumn<F, 'right'>[];
+  sortField: F;
+  sortDirection: 'asc' | 'desc';
+  onSort: (field: F) => void;
+}) {
+  return (
+    <>
+      {/* Phone sort strip: the same controls, wrapped and self-naming. The
+          border and card background are what say "tappable" -- there is no hover
+          on a touch screen. */}
+      <tr role="row" className="flex flex-wrap gap-x-2 gap-y-1 px-2 py-2 sm:hidden">
+        {columns.map((col) => (
+          <SortableHeader<F>
+            key={col.field}
+            field={col.field}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={onSort}
+            className={PHONE_HEADER_CLASS}
+          >
+            {col.label}
+          </SortableHeader>
+        ))}
+      </tr>
+      <tr role="row" className="hidden sm:table-row">
+        {columns.map((col) => (
+          <SortableHeader<F>
+            key={col.field}
+            field={col.field}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={onSort}
+            align={col.align}
+            className={HEADER_CLASS}
+          >
+            {col.label}
+          </SortableHeader>
+        ))}
+      </tr>
+    </>
+  );
 }
 
 function CustomTooltip({ active, payload, formatCurrencyFull, holdingLabel }: {
@@ -247,6 +384,35 @@ export function GeographicAllocationReport() {
     });
     return sorted;
   }, [countryData, countrySort.sortField, countrySort.sortDirection]);
+
+  // Exhaustive over each view's sort-field union, so a new field is a compile
+  // error rather than a column with no control in either header. Declaration
+  // order IS the column (and DOM) order, and it is today's; these labels are
+  // also the phone captions, so a value reads under exactly its column header.
+  const regionColumns: RegionColumns = {
+    region: { field: 'region', label: t('geographicAllocation.colRegion') },
+    count: { field: 'count', label: t('geographicAllocation.colHoldings'), align: 'right' },
+    marketValue: { field: 'marketValue', label: t('geographicAllocation.colMarketValue'), align: 'right' },
+    percentage: { field: 'percentage', label: t('geographicAllocation.colPortfolioPct'), align: 'right' },
+  };
+  const exchangeColumns: ExchangeColumns = {
+    exchange: { field: 'exchange', label: t('geographicAllocation.colExchange') },
+    country: { field: 'country', label: t('geographicAllocation.colCountry') },
+    count: { field: 'count', label: t('geographicAllocation.colHoldings'), align: 'right' },
+    marketValue: { field: 'marketValue', label: t('geographicAllocation.colMarketValue'), align: 'right' },
+    percentage: { field: 'percentage', label: t('geographicAllocation.colPortfolioPct'), align: 'right' },
+  };
+  const countryColumns: CountryColumns = {
+    country: { field: 'country', label: t('geographicAllocation.colCountry') },
+    marketValue: { field: 'marketValue', label: t('geographicAllocation.colMarketValue'), align: 'right' },
+    percentage: { field: 'percentage', label: t('geographicAllocation.colPortfolioPct'), align: 'right' },
+  };
+  // The column order, rendered by both header rows and matched by the cells' DOM
+  // order. DERIVED from each record rather than re-listed: a hand-written list
+  // beside an exhaustive record is not itself exhaustive.
+  const regionSortColumns: readonly RegionSortColumn[] = Object.values(regionColumns);
+  const exchangeSortColumns: readonly ExchangeSortColumn[] = Object.values(exchangeColumns);
+  const countrySortColumns: readonly CountrySortColumn[] = Object.values(countryColumns);
 
   const handleExportPdf = async () => {
     if (viewType === 'country') {
@@ -542,74 +708,183 @@ export function GeographicAllocationReport() {
         </div>
       )}
 
-      {/* Data Table */}
+      {/* Data Table
+
+          Below `sm` each table becomes a block and every row wraps into a grid
+          card so all its columns fit a phone without a horizontal scroll --
+          `REGION_PLACEMENT`, `EXCHANGE_PLACEMENT` and `COUNTRY_PLACEMENT` hold
+          where each column lands. Nothing is dropped: every row carries all its
+          columns at every width, from `sm` up it is the ordinary table, and the
+          sort controls survive as a phone-only header strip because the column
+          header row that carries them on desktop is hidden there.
+
+          Two properties of restyling one tree, both deliberate. Changing the
+          `display` drops the implicit table semantics below `sm`, so the
+          explicit ARIA roles put them back. And the DOM keeps the desktop column
+          order while the grid paints the cells out of that order, so a
+          screen-reader user hears the column order rather than the painted one
+          (the WCAG 1.3.2 tension mechanism A carries); the `CellLabel` captions
+          limit the cost, since every value names its own column. */}
       {viewType === 'country' ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-900/50">
-                <tr>
-                  <SortableHeader<GeoCountrySortField>
-                    field="country"
-                    sortField={countrySort.sortField}
-                    sortDirection={countrySort.sortDirection}
-                    onSort={countrySort.handleSort}
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                  >
-                    {t('geographicAllocation.colCountry')}
-                  </SortableHeader>
-                  <SortableHeader<GeoCountrySortField>
-                    field="marketValue"
-                    sortField={countrySort.sortField}
-                    sortDirection={countrySort.sortDirection}
-                    onSort={countrySort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                  >
-                    {t('geographicAllocation.colMarketValue')}
-                  </SortableHeader>
-                  <SortableHeader<GeoCountrySortField>
-                    field="percentage"
-                    sortField={countrySort.sortField}
-                    sortDirection={countrySort.sortDirection}
-                    onSort={countrySort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                  >
-                    {t('geographicAllocation.colPortfolioPct')}
-                  </SortableHeader>
-                </tr>
+            <table role="table" className="block min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
+              <thead role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-header-group">
+                <SortHeaderRows
+                  columns={countrySortColumns}
+                  sortField={countrySort.sortField}
+                  sortDirection={countrySort.sortDirection}
+                  onSort={countrySort.handleSort}
+                />
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody role="rowgroup" className="block divide-y divide-gray-200 dark:divide-gray-700 sm:table-row-group">
                 {sortedCountryData.map((item) => (
-                  <tr key={item.country} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+                  <tr
+                    key={item.country}
+                    role="row"
+                    className={`${ROW_GRID} hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row sm:p-0`}
+                  >
+                    {/* The country identity spans the whole of line 1, so unlike
+                        the region/exchange identities -- which share their line
+                        with the market value and clamp for containment and row
+                        height -- it wraps UNCLAMPED: a full-width `min-w-0` track
+                        contains an unbreakable token through `break-words` alone,
+                        the same treatment the Security Type report gives its
+                        full-line holding identity. */}
+                    <td role="cell" className={`${COUNTRY_PLACEMENT.country} ${IDENTITY_CELL} break-words sm:break-normal font-medium text-gray-900 dark:text-gray-100`}>
                       <div className="flex items-center gap-2">
                         <div
                           className="w-3 h-3 rounded-full flex-shrink-0"
                           style={{ backgroundColor: item.color }}
                         />
-                        {item.country}
+                        <span title={item.country}>{item.country}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-gray-100">
+                    <td role="cell" className={`${COUNTRY_PLACEMENT.marketValue} font-medium text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{countryColumns.marketValue.label}</CellLabel>
                       {formatCurrencyFull(item.marketValue, defaultCurrency)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-600 dark:text-gray-400">
+                    <td role="cell" className={`${COUNTRY_PLACEMENT.percentage} text-gray-600 dark:text-gray-400 ${FIGURE_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{countryColumns.percentage.label}</CellLabel>
                       {formatPercent(item.percentage, 1)}
                     </td>
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="bg-gray-50 dark:bg-gray-900/50">
-                <tr>
-                  <td className="px-4 py-3 text-sm font-bold text-gray-900 dark:text-gray-100">
-                    {t('geographicAllocation.total')}
+              <tfoot role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-footer-group">
+                {/* Every column has a total, so no footer cell hides below `sm`
+                    and none owes an `aria-colindex`. */}
+                <tr role="row" className={`${ROW_GRID} sm:table-row sm:p-0`}>
+                  <td role="cell" className={`${COUNTRY_PLACEMENT.country} ${IDENTITY_CELL} break-words sm:break-normal font-bold text-gray-900 dark:text-gray-100`}>
+                    <span title={t('geographicAllocation.total')}>
+                      {t('geographicAllocation.total')}
+                    </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-right font-bold text-gray-900 dark:text-gray-100">
+                  <td role="cell" className={`${COUNTRY_PLACEMENT.marketValue} font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                    <CellLabel className={CAPTION_CLASS}>{countryColumns.marketValue.label}</CellLabel>
+                    {/* NOT `totalValue`, and so NOT wrapped in `PartialTotal`
+                        like the region and exchange footers below. This figure
+                        is `countryResp.totalPortfolioValue`: the country view
+                        is a server-side look-through aggregate (ETFs split
+                        across their manual country weightings), computed from
+                        different inputs than the client-side conversion that
+                        produces `missingCurrencies` / `excludedCount`. Marking
+                        it with those would attach one aggregate's gaps to
+                        another aggregate's number -- the mistake root
+                        `CLAUDE.md` names as reading a completeness flag from
+                        somewhere other than the aggregate that produced the
+                        figure on screen.
+                        `CountryWeightingResult` reports no completeness of its
+                        own, so whether THIS total is whole is currently
+                        unknown to this component. Closing that needs an
+                        `fxComplete`/`pricesComplete` pair on
+                        `sector-weighting.service.ts`'s look-through result and
+                        its frontend type, which is a change to files this
+                        report does not own. Do not "finish" this by reaching
+                        for the client-side marker. */}
                     {formatCurrencyFull(countryTotalValue, defaultCurrency)}
                   </td>
-                  <td className="px-4 py-3 text-sm text-right font-bold text-gray-900 dark:text-gray-100">
+                  <td role="cell" className={`${COUNTRY_PLACEMENT.percentage} font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                    <CellLabel className={CAPTION_CLASS}>{countryColumns.percentage.label}</CellLabel>
+                    100%
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      ) : viewType === 'region' ? (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table role="table" className="block min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
+              <thead role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-header-group">
+                <SortHeaderRows
+                  columns={regionSortColumns}
+                  sortField={regionSort.sortField}
+                  sortDirection={regionSort.sortDirection}
+                  onSort={regionSort.handleSort}
+                />
+              </thead>
+              <tbody role="rowgroup" className="block divide-y divide-gray-200 dark:divide-gray-700 sm:table-row-group">
+                {sortedRegionData.map((item) => (
+                  <tr
+                    key={item.region}
+                    role="row"
+                    className={`${ROW_GRID} hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row sm:p-0`}
+                  >
+                    {/* DOM order stays the desktop column order (region, count,
+                        market value, share); the grid only repositions. */}
+                    <td role="cell" className={`${REGION_PLACEMENT.region} ${IDENTITY_CELL} font-medium text-gray-900 dark:text-gray-100`}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: item.color }}
+                        />
+                        <span className="line-clamp-3 break-words sm:line-clamp-none sm:break-normal" title={item.region}>{item.region}</span>
+                      </div>
+                    </td>
+                    <td role="cell" className={`${REGION_PLACEMENT.count} text-gray-600 dark:text-gray-400 ${FIGURE_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{regionColumns.count.label}</CellLabel>
+                      {item.count}
+                    </td>
+                    <td role="cell" className={`${REGION_PLACEMENT.marketValue} font-medium text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{regionColumns.marketValue.label}</CellLabel>
+                      {formatCurrencyFull(item.marketValue, defaultCurrency)}
+                    </td>
+                    <td role="cell" className={`${REGION_PLACEMENT.percentage} text-gray-600 dark:text-gray-400 ${FIGURE_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{regionColumns.percentage.label}</CellLabel>
+                      {formatPercent(item.percentage, 1)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-footer-group">
+                <tr role="row" className={`${ROW_GRID} sm:table-row sm:p-0`}>
+                  <td role="cell" className={`${REGION_PLACEMENT.region} ${IDENTITY_CELL} font-bold text-gray-900 dark:text-gray-100`}>
+                    <span className="line-clamp-3 break-words sm:line-clamp-none sm:break-normal" title={t('geographicAllocation.total')}>
+                      {t('geographicAllocation.total')}
+                    </span>
+                  </td>
+                  <td role="cell" className={`${REGION_PLACEMENT.count} font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                    <CellLabel className={CAPTION_CLASS}>{regionColumns.count.label}</CellLabel>
+                    {holdings.length}
+                  </td>
+                  <td role="cell" className={`${REGION_PLACEMENT.marketValue} font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                    <CellLabel className={CAPTION_CLASS}>{regionColumns.marketValue.label}</CellLabel>
+                    {/* The same `totalValue` the summary card marks, under a
+                        header reading "Total": an unpriced or unconvertible
+                        holding is left out of it, so it wears the marker here
+                        too rather than reading 20,000 directly below a card
+                        reading 20,000 with an asterisk. */}
+                    <PartialTotal
+                      total={{ value: totalValue, missingCurrencies, excludedCount }}
+                      displayCurrency={defaultCurrency}
+                    >
+                      {formatCurrencyFull(totalValue, defaultCurrency)}
+                    </PartialTotal>
+                  </td>
+                  <td role="cell" className={`${REGION_PLACEMENT.percentage} font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                    <CellLabel className={CAPTION_CLASS}>{regionColumns.percentage.label}</CellLabel>
                     100%
                   </td>
                 </tr>
@@ -618,184 +893,93 @@ export function GeographicAllocationReport() {
           </div>
         </div>
       ) : (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-900/50">
-              <tr>
-                {viewType === 'region' ? (
-                  <SortableHeader<GeoRegionSortField>
-                    field="region"
-                    sortField={regionSort.sortField}
-                    sortDirection={regionSort.sortDirection}
-                    onSort={regionSort.handleSort}
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table role="table" className="block min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
+              <thead role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-header-group">
+                <SortHeaderRows
+                  columns={exchangeSortColumns}
+                  sortField={exchangeSort.sortField}
+                  sortDirection={exchangeSort.sortDirection}
+                  onSort={exchangeSort.handleSort}
+                />
+              </thead>
+              <tbody role="rowgroup" className="block divide-y divide-gray-200 dark:divide-gray-700 sm:table-row-group">
+                {sortedExchangeData.map((item, idx) => (
+                  <tr
+                    key={item.exchange}
+                    role="row"
+                    className={`${ROW_GRID} hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row sm:p-0`}
                   >
-                    {t('geographicAllocation.colRegion')}
-                  </SortableHeader>
-                ) : (
-                  <SortableHeader<GeoExchangeSortField>
-                    field="exchange"
-                    sortField={exchangeSort.sortField}
-                    sortDirection={exchangeSort.sortDirection}
-                    onSort={exchangeSort.handleSort}
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                  >
-                    {t('geographicAllocation.colExchange')}
-                  </SortableHeader>
-                )}
-                {viewType === 'exchange' && (
-                  <SortableHeader<GeoExchangeSortField>
-                    field="country"
-                    sortField={exchangeSort.sortField}
-                    sortDirection={exchangeSort.sortDirection}
-                    onSort={exchangeSort.handleSort}
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                  >
-                    {t('geographicAllocation.colCountry')}
-                  </SortableHeader>
-                )}
-                {viewType === 'region' ? (
-                  <SortableHeader<GeoRegionSortField>
-                    field="count"
-                    sortField={regionSort.sortField}
-                    sortDirection={regionSort.sortDirection}
-                    onSort={regionSort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                  >
-                    {t('geographicAllocation.colHoldings')}
-                  </SortableHeader>
-                ) : (
-                  <SortableHeader<GeoExchangeSortField>
-                    field="count"
-                    sortField={exchangeSort.sortField}
-                    sortDirection={exchangeSort.sortDirection}
-                    onSort={exchangeSort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                  >
-                    {t('geographicAllocation.colHoldings')}
-                  </SortableHeader>
-                )}
-                {viewType === 'region' ? (
-                  <SortableHeader<GeoRegionSortField>
-                    field="marketValue"
-                    sortField={regionSort.sortField}
-                    sortDirection={regionSort.sortDirection}
-                    onSort={regionSort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                  >
-                    {t('geographicAllocation.colMarketValue')}
-                  </SortableHeader>
-                ) : (
-                  <SortableHeader<GeoExchangeSortField>
-                    field="marketValue"
-                    sortField={exchangeSort.sortField}
-                    sortDirection={exchangeSort.sortDirection}
-                    onSort={exchangeSort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                  >
-                    {t('geographicAllocation.colMarketValue')}
-                  </SortableHeader>
-                )}
-                {viewType === 'region' ? (
-                  <SortableHeader<GeoRegionSortField>
-                    field="percentage"
-                    sortField={regionSort.sortField}
-                    sortDirection={regionSort.sortDirection}
-                    onSort={regionSort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                  >
-                    {t('geographicAllocation.colPortfolioPct')}
-                  </SortableHeader>
-                ) : (
-                  <SortableHeader<GeoExchangeSortField>
-                    field="percentage"
-                    sortField={exchangeSort.sortField}
-                    sortDirection={exchangeSort.sortDirection}
-                    onSort={exchangeSort.handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                  >
-                    {t('geographicAllocation.colPortfolioPct')}
-                  </SortableHeader>
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {viewType === 'region'
-                ? sortedRegionData.map((item) => (
-                    <tr key={item.region} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-3 h-3 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: item.color }}
-                          />
-                          {item.region}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-600 dark:text-gray-400">
-                        {item.count}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-gray-100">
-                        {formatCurrencyFull(item.marketValue, defaultCurrency)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-600 dark:text-gray-400">
-                        {formatPercent(item.percentage, 1)}
-                      </td>
-                    </tr>
-                  ))
-                : sortedExchangeData.map((item, idx) => (
-                    <tr key={item.exchange} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-3 h-3 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: COUNTRY_COLOURS[idx % COUNTRY_COLOURS.length] }}
-                          />
-                          {item.exchange}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                        {item.country}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-600 dark:text-gray-400">
-                        {item.count}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-gray-100">
-                        {formatCurrencyFull(item.marketValue, defaultCurrency)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-600 dark:text-gray-400">
-                        {formatPercent(item.percentage, 1)}
-                      </td>
-                    </tr>
-                  ))}
-            </tbody>
-            <tfoot className="bg-gray-50 dark:bg-gray-900/50">
-              <tr>
-                <td className="px-4 py-3 text-sm font-bold text-gray-900 dark:text-gray-100">
-                  {t('geographicAllocation.total')}
-                </td>
-                {viewType === 'exchange' && <td />}
-                <td className="px-4 py-3 text-sm text-right font-bold text-gray-900 dark:text-gray-100">
-                  {holdings.length}
-                </td>
-                <td className="px-4 py-3 text-sm text-right font-bold text-gray-900 dark:text-gray-100">
-                  {formatCurrencyFull(totalValue, defaultCurrency)}
-                </td>
-                <td className="px-4 py-3 text-sm text-right font-bold text-gray-900 dark:text-gray-100">
-                  100%
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+                    {/* DOM order stays the desktop column order (exchange,
+                        country, count, market value, share); the grid only
+                        repositions. The country sits under the exchange
+                        identity as a descriptor and so carries no caption. */}
+                    <td role="cell" className={`${EXCHANGE_PLACEMENT.exchange} ${IDENTITY_CELL} font-medium text-gray-900 dark:text-gray-100`}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: COUNTRY_COLOURS[idx % COUNTRY_COLOURS.length] }}
+                        />
+                        <span className="line-clamp-3 break-words sm:line-clamp-none sm:break-normal" title={item.exchange}>{item.exchange}</span>
+                      </div>
+                    </td>
+                    <td role="cell" className={`${EXCHANGE_PLACEMENT.country} ${TEXT_CELL} text-gray-600 dark:text-gray-400`}>
+                      {item.country}
+                    </td>
+                    <td role="cell" className={`${EXCHANGE_PLACEMENT.count} text-gray-600 dark:text-gray-400 ${FIGURE_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{exchangeColumns.count.label}</CellLabel>
+                      {item.count}
+                    </td>
+                    <td role="cell" className={`${EXCHANGE_PLACEMENT.marketValue} font-medium text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{exchangeColumns.marketValue.label}</CellLabel>
+                      {formatCurrencyFull(item.marketValue, defaultCurrency)}
+                    </td>
+                    <td role="cell" className={`${EXCHANGE_PLACEMENT.percentage} text-gray-600 dark:text-gray-400 ${FIGURE_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{exchangeColumns.percentage.label}</CellLabel>
+                      {formatPercent(item.percentage, 1)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-footer-group">
+                {/* The country column has no total, so the footer keeps the same
+                    empty spacer the desktop table does -- placed on the phone
+                    grid, unpadded, and inert at `sm` up so it is byte-identical
+                    to today's bare `<td/>` there. It is never hidden below `sm`,
+                    so it owes no `aria-colindex`. */}
+                <tr role="row" className={`${ROW_GRID} sm:table-row sm:p-0`}>
+                  <td role="cell" className={`${EXCHANGE_PLACEMENT.exchange} ${IDENTITY_CELL} font-bold text-gray-900 dark:text-gray-100`}>
+                    <span className="line-clamp-3 break-words sm:line-clamp-none sm:break-normal" title={t('geographicAllocation.total')}>
+                      {t('geographicAllocation.total')}
+                    </span>
+                  </td>
+                  <td role="cell" className={`${EXCHANGE_PLACEMENT.country} p-0 sm:table-cell`} />
+                  <td role="cell" className={`${EXCHANGE_PLACEMENT.count} font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                    <CellLabel className={CAPTION_CLASS}>{exchangeColumns.count.label}</CellLabel>
+                    {holdings.length}
+                  </td>
+                  <td role="cell" className={`${EXCHANGE_PLACEMENT.marketValue} font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                    <CellLabel className={CAPTION_CLASS}>{exchangeColumns.marketValue.label}</CellLabel>
+                    {/* `totalValue` again, so the same marker again -- the two
+                        footers and the card report one figure and must agree
+                        about whether it is whole. */}
+                    <PartialTotal
+                      total={{ value: totalValue, missingCurrencies, excludedCount }}
+                      displayCurrency={defaultCurrency}
+                    >
+                      {formatCurrencyFull(totalValue, defaultCurrency)}
+                    </PartialTotal>
+                  </td>
+                  <td role="cell" className={`${EXCHANGE_PLACEMENT.percentage} font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
+                    <CellLabel className={CAPTION_CLASS}>{exchangeColumns.percentage.label}</CellLabel>
+                    100%
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </div>
-      </div>
       )}
     </div>
   );

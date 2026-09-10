@@ -3,7 +3,7 @@ import { DataSource } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { Budget } from "./entities/budget.entity";
 import { BudgetPeriod, PeriodStatus } from "./entities/budget-period.entity";
-import { getMonthEndYMD } from "../common/date-utils";
+import { formatMonthKey, getMonthEndYMD } from "../common/date-utils";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
 import { BudgetsService } from "./budgets.service";
@@ -18,21 +18,6 @@ import {
   PARENT_TRANSFER_AMOUNT,
   SPLIT_TRANSFER_AMOUNT,
 } from "./budget-spending.util";
-
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 
 @Injectable()
 export class BudgetTrendReportsService {
@@ -64,7 +49,7 @@ export class BudgetTrendReportsService {
         budgeted > 0 ? roundToDecimals((actual / budgeted) * 100, 2) : 0;
 
       return {
-        month: this.formatPeriodMonth(period.periodStart),
+        monthKey: this.formatPeriodMonthKey(period.periodStart),
         budgeted: roundMoney(budgeted),
         actual: roundMoney(actual),
         variance: roundMoney(variance),
@@ -88,7 +73,7 @@ export class BudgetTrendReportsService {
           : 0;
 
       result.push({
-        month: this.formatPeriodMonth(currentPeriod.periodStart),
+        monthKey: this.formatPeriodMonthKey(currentPeriod.periodStart),
         budgeted: roundMoney(budgeted),
         actual: roundMoney(currentActuals),
         variance: roundMoney(variance),
@@ -129,7 +114,7 @@ export class BudgetTrendReportsService {
     const seriesMap = new Map<string, CategoryTrendSeries>();
 
     for (const period of periods) {
-      const periodMonth = this.formatPeriodMonth(period.periodStart);
+      const periodMonthKey = this.formatPeriodMonthKey(period.periodStart);
       const cats = period.periodCategories || [];
 
       for (const pc of cats) {
@@ -181,7 +166,7 @@ export class BudgetTrendReportsService {
           budgeted > 0 ? roundToDecimals((actual / budgeted) * 100, 2) : 0;
 
         seriesMap.get(catId)!.data.push({
-          month: periodMonth,
+          monthKey: periodMonthKey,
           budgeted: roundMoney(budgeted),
           actual: roundMoney(actual),
           variance: roundMoney(variance),
@@ -470,8 +455,7 @@ export class BudgetTrendReportsService {
         const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
         const year = d.getFullYear();
         const month = d.getMonth();
-        const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
-        const monthLabel = `${MONTH_NAMES[month].substring(0, 3)} ${year}`;
+        const monthKey = formatMonthKey(year, month + 1);
 
         const budgeted = Number(bc.amount) || 0;
         const actual = actualMap.get(catId)?.get(monthKey) || 0;
@@ -480,7 +464,7 @@ export class BudgetTrendReportsService {
           budgeted > 0 ? roundToDecimals((actual / budgeted) * 100, 2) : 0;
 
         data.push({
-          month: monthLabel,
+          monthKey,
           budgeted: roundMoney(budgeted),
           actual: roundMoney(actual),
           variance: roundMoney(variance),
@@ -660,8 +644,7 @@ export class BudgetTrendReportsService {
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
       const year = d.getFullYear();
       const month = d.getMonth();
-      const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
-      const monthLabel = `${MONTH_NAMES[month].substring(0, 3)} ${year}`;
+      const monthKey = formatMonthKey(year, month + 1);
 
       const actual = actualByMonth.get(monthKey) || 0;
       const variance = actual - totalBudgeted;
@@ -671,7 +654,7 @@ export class BudgetTrendReportsService {
           : 0;
 
       result.push({
-        month: monthLabel,
+        monthKey,
         budgeted: roundMoney(totalBudgeted),
         actual: roundMoney(actual),
         variance: roundMoney(variance),
@@ -682,10 +665,10 @@ export class BudgetTrendReportsService {
     return result;
   }
 
-  private formatPeriodMonth(periodStart: string): string {
+  private formatPeriodMonthKey(periodStart: string): string {
     const parts = periodStart.split("-");
     const year = parseInt(parts[0], 10);
     const month = parseInt(parts[1], 10);
-    return `${MONTH_NAMES[month - 1].substring(0, 3)} ${year}`;
+    return formatMonthKey(year, month);
   }
 }

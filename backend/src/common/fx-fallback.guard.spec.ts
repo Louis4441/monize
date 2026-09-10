@@ -63,6 +63,98 @@ describe("currency conversion has no silent identity fallback", () => {
     expect(offenders).toEqual([]);
   });
 
+  /**
+   * The rule is "a conversion with no rate returns null", and `?? amount` is
+   * only one way to break it. The scan above was written from the shape of the
+   * two fixed defects, so it matches a fallback that ends a line -- and an
+   * `if (result == null) { log(); return amount; }` block, which returns the
+   * unconverted amount just as surely, passed straight through it.
+   *
+   * So this scan is written from the rule instead: a statement handing back the
+   * function's own input, inside a null-check of a conversion result, is the
+   * violation whatever punctuation it wears.
+   *
+   * Each entry names a call site that DOES this today, with the reason it is
+   * still here. An allowlist is a worse mechanism than no violations, and it is
+   * a much better one than a scan that cannot see them: the entry is what makes
+   * the gap reviewable, and INV-FX-001 in `docs/system-invariants.md` is
+   * `partial` rather than `enforced` for exactly as long as this list is not
+   * empty.
+   */
+  const RETURNS_ITS_INPUT_UNCONVERTED: ReadonlyArray<{
+    file: string;
+    reason: string;
+  }> = [
+    {
+      file: "built-in-reports/report-currency.service.ts",
+      reason:
+        "convertAmount() logs a warning and returns the unconverted amount " +
+        "when no rate exists, and data-quality-reports.service.ts then labels " +
+        "that figure `currencyCode: defaultCurrency` -- an unconverted amount " +
+        "under the target currency's name, which is the second half of " +
+        "INV-FX-001. It is not fixed here because the signature is `number`, " +
+        "shared by ten report services: closing it means each of them " +
+        "deciding its own missing-data policy and carrying a completeness " +
+        "field on its DTO, which is a specified change of its own rather than " +
+        "a guard's business. Removing this entry is what closes INV-FX-001.",
+    },
+  ];
+
+  it("never returns its own input from a conversion's null branch", () => {
+    // A bare `return amount;` / `return value;` -- no `??`, no `||`, so the
+    // scan above cannot see it.
+    const RETURNS_INPUT =
+      /^\s*return\s+(?:amount|rawValue|value|input)\s*;\s*$/;
+    // The branch it sits in has to be about a conversion that came back empty.
+    const CONVERSION = /convert|Convert|\brate\b|Rate/;
+    const ABSENT_RESULT =
+      /(?:==|===)\s*null|(?:==|===)\s*undefined|!\s*(?:result|converted|convertedAmount)\b/;
+
+    const allowed = new Set(RETURNS_ITS_INPUT_UNCONVERTED.map((e) => e.file));
+    const offenders: string[] = [];
+    const allowedHits: string[] = [];
+
+    for (const file of files) {
+      const rel = relative(SRC_ROOT, file).split("\\").join("/");
+      const lines = readFileSync(file, "utf8").split("\n");
+      for (const [index, line] of lines.entries()) {
+        if (!RETURNS_INPUT.test(line)) continue;
+        const context = lines.slice(Math.max(0, index - 8), index + 1).join("\n");
+        if (!CONVERSION.test(context) || !ABSENT_RESULT.test(context)) continue;
+        (allowed.has(rel) ? allowedHits : offenders).push(`${rel}:${index + 1}`);
+      }
+    }
+
+    expect(offenders).toEqual([]);
+    // The allowlist is shrink-only: an entry whose call site has been fixed (or
+    // moved) has to go, or the next one hides behind it.
+    expect(allowedHits.map((hit) => hit.split(":")[0])).toEqual(
+      RETURNS_ITS_INPUT_UNCONVERTED.map((entry) => entry.file),
+    );
+  });
+
+  it("recognises the returned-input shape it bans", () => {
+    // Both directions, so neither half can quietly stop working: the block the
+    // scan exists for is caught, and a conversion that correctly returns null
+    // is not.
+    const RETURNS_INPUT =
+      /^\s*return\s+(?:amount|rawValue|value|input)\s*;\s*$/;
+    const caught = [
+      "    const result = convertWithRateLookup(amount, from, to, getRate);",
+      "    if (result == null) {",
+      "      this.logger.warn(`no rate for ${from} -> ${to}`);",
+      "      return amount;",
+    ];
+    const clean = [
+      "    const result = convertWithRateLookup(amount, from, to, getRate);",
+      "    if (result == null) return null;",
+      "    return result;",
+    ];
+
+    expect(caught.some((line) => RETURNS_INPUT.test(line))).toBe(true);
+    expect(clean.some((line) => RETURNS_INPUT.test(line))).toBe(false);
+  });
+
   it("never defaults a missing exchange rate to 1", () => {
     const offenders: string[] = [];
 

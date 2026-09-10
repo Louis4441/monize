@@ -310,6 +310,301 @@ describe("a scrollbar you need is not hidden", () => {
   });
 });
 
+describe("the mobile-table chrome constants live once in Table.tsx", () => {
+  /**
+   * `PHONE_HEADER_CLASS` (the phone sort strip's control) and `CAPTION_CLASS`
+   * (the phone-only cell caption) are one class list each, worn by two dozen
+   * wrapped tables, so they are exported from `components/ui/Table.tsx` and
+   * imported.
+   *
+   * The reason is REACH, not repair. All fourteen of the local declarations
+   * this replaced were byte-identical on `origin/main`: nothing had drifted.
+   * What one home buys is that the next change to the caption's breakpoint or
+   * the strip's padding lands in every table at once, instead of in whichever
+   * files somebody remembered -- twenty-odd call sites is well past the number
+   * a person edits reliably. (An earlier version of this comment justified the
+   * scan with three copies that had already drifted by a lost tracking token.
+   * That never happened, and a future reader must not reason from it. The
+   * constant that genuinely differs per report is `HEADER_CLASS`, whose
+   * `tracking-wider` this guard deliberately does not police, because those
+   * track budgets are a per-report decision.)
+   *
+   * Two shapes break the rule and both are scanned, because closing one leaves
+   * the other doing the same damage: re-declaring the constant locally, and
+   * inlining its VALUE at a call site. `<CellLabel className="sm:hidden">` IS
+   * `CAPTION_CLASS`, spelled out and importing nothing, so a change to the
+   * constant skips it in silence.
+   */
+  const LOCAL_DECL = /\bconst\s+(PHONE_HEADER_CLASS|CAPTION_CLASS)\s*=/;
+  const HOME = "/src/components/ui/Table.tsx";
+  /** `CAPTION_CLASS`'s value written out on a `CellLabel` instead of imported. */
+  const INLINE_CAPTION = /<CellLabel[^>]*className=\{?["'`][^"'`]*\bsm:hidden\b/;
+
+  /**
+   * Call sites that still inline it, with the reason each is here. Shrink-only:
+   * fixing one means DELETING its line, and the second test below fails while a
+   * listed file no longer offends, so the register cannot outlive its subjects.
+   */
+  const INLINE_CAPTION_BASELINE: ReadonlyArray<{ file: string; reason: string }> = [
+    {
+      file: "/src/components/accounts/loan-detail/ScheduleTableRow.tsx",
+      reason:
+        "Amortization row, converted before the constants were centralized. " +
+        "Outstanding: no change owns this file yet.",
+    },
+    {
+      file: "/src/components/accounts/loan-detail/AmortizationScheduleTable.tsx",
+      reason:
+        "The header and footer of the same table as above, same history, same " +
+        "outstanding fix.",
+    },
+  ];
+
+  const inliningFiles = () => {
+    const found = new Set<string>();
+    for (const [path, content] of productionSources()) {
+      if (path === HOME) continue;
+      for (const line of withoutComments(content).split("\n")) {
+        if (INLINE_CAPTION.test(line)) found.add(path);
+      }
+    }
+    return found;
+  };
+
+  it("no file re-declares the shared chrome classes locally", () => {
+    const offenders: string[] = [];
+    for (const [path, content] of productionSources()) {
+      if (path === HOME) continue;
+      withoutComments(content)
+        .split("\n")
+        .forEach((line, i) => {
+          const match = line.match(LOCAL_DECL);
+          if (match) offenders.push(`${path}:${i + 1} re-declares ${match[1]}`);
+        });
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("no new call site inlines the caption class instead of importing it", () => {
+    const allowed = new Set(INLINE_CAPTION_BASELINE.map((entry) => entry.file));
+    const offenders: string[] = [];
+    for (const [path, content] of productionSources()) {
+      if (path === HOME || allowed.has(path)) continue;
+      withoutComments(content)
+        .split("\n")
+        .forEach((line, i) => {
+          if (INLINE_CAPTION.test(line)) {
+            offenders.push(`${path}:${i + 1} inlines CAPTION_CLASS`);
+          }
+        });
+    }
+
+    expect(
+      offenders,
+      'Pass CAPTION_CLASS from @/components/ui/Table, not the literal "sm:hidden".',
+    ).toEqual([]);
+  });
+
+  it("keeps the inline-caption baseline shrink-only", () => {
+    const offending = inliningFiles();
+    expect(
+      INLINE_CAPTION_BASELINE.map((entry) => entry.file).filter(
+        (file) => !offending.has(file),
+      ),
+      "This file no longer inlines the caption class -- delete its baseline line.",
+    ).toEqual([]);
+  });
+
+  it("reads an inlined caption in markup but not one named in a comment", () => {
+    // Both directions: the shape the scan exists for is caught, and this
+    // block's own prose -- which has to name `className="sm:hidden"` to explain
+    // itself -- is not a violation.
+    expect(INLINE_CAPTION.test('<CellLabel className="sm:hidden">Total</CellLabel>')).toBe(
+      true,
+    );
+    expect(INLINE_CAPTION.test("<CellLabel className={CAPTION_CLASS}>Total</CellLabel>")).toBe(
+      false,
+    );
+    expect(
+      INLINE_CAPTION.test(
+        withoutComments('// never write <CellLabel className="sm:hidden">'),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("a phone-wrapped cell restores the desktop font size it had", () => {
+  /**
+   * A cell converted for the phone card zeroes its padding at base and hands it
+   * back at `sm` (`p-0 ... sm:px-4 sm:py-3`), and the claim that comes with that
+   * is "from `sm` up this resolves identically to today". The font size is part
+   * of the claim, and it is one token wide: `PortfolioValueReport`'s account
+   * cell shipped `sm:text-sm` where the unwrapped cell had carried no size class
+   * at all, so an inherited 16px became 14px on every desktop. It was corrected
+   * by hand to `sm:text-base` and the suite never noticed either state -- of the
+   * 27 `*.mobileWrapped` specs only seven assert any `sm:text-*`.
+   *
+   * The class string cannot tell you WHICH size is right: that is a fact about
+   * the table before the conversion, and it differs. Every wrapped table in the
+   * tree gave its cells `text-sm` (so `text-xs` on the phone restores
+   * `sm:text-sm`), and exactly one cell inherited the page's 16px instead. So
+   * the convention is what is scanned, and the exception is declared below with
+   * the reason it is one -- which is what fails when that cell's `sm:text-base`
+   * turns back into `sm:text-sm`.
+   *
+   * What this scan CANNOT see, so nobody over-trusts it:
+   *
+   *  - A size set once on the `<table>` and inherited by every cell. The three
+   *    MonteCarlo tables legitimately do that (`text-xs` on the table element),
+   *    and their cells name no size for this to read.
+   *  - A size composed on another line -- through a module constant like
+   *    `MONEY_CELL` or a helper like `cellPadding(columns.x)`. Matching is per
+   *    line, so a base size in one place and its `sm:` restoration in another
+   *    are invisible as a pair. (A constant that declares both on its own
+   *    declaration line, as most do, IS covered.)
+   *  - Whether the restored size is what the reader actually gets. jsdom
+   *    applies no Tailwind stylesheet, so no test here can assert a computed
+   *    font size; this is a claim about the class list.
+   */
+  const PADDING_RESTORED = /\bsm:p[xy]?-/;
+  const BASE_TEXT = /(?:^|[\s"'`])text-(xs|sm|base|lg|xl)\b/g;
+  const SM_TEXT = /\bsm:text-(xs|sm|base|lg|xl)\b/g;
+  /** What a wrapped cell restores unless its table says otherwise. */
+  const CONVENTION = "text-sm";
+
+  /**
+   * The cells whose desktop size is NOT the convention, each with the fact about
+   * the pre-conversion table that decides it. Adding an entry is a decision:
+   * check what the unwrapped cell rendered at before writing one.
+   */
+  const INHERITED_DESKTOP_SIZE: ReadonlyArray<{
+    file: string;
+    restores: string;
+    count: number;
+    reason: string;
+  }> = [
+    {
+      file: "/src/components/reports/PortfolioValueReport.tsx",
+      restores: "text-base",
+      count: 1,
+      reason:
+        "The breakdown's account cell was `px-4 py-3 font-medium ...` with no " +
+        "size class, so it inherited 16px while the four figure cells beside " +
+        "it were `text-sm`. `text-base` is that inherited size written down; " +
+        "`sm:text-sm` shrinks the row identity on every desktop.",
+    },
+  ];
+
+  /** `{ file -> { restoredSize -> [line, ...] } }` for every shrink-and-restore cell. */
+  function restorations(): Map<string, Map<string, number[]>> {
+    const found = new Map<string, Map<string, number[]>>();
+    for (const [path, content] of productionSources()) {
+      withoutComments(content)
+        .split("\n")
+        .forEach((line, i) => {
+          if (!PADDING_RESTORED.test(line)) return;
+          BASE_TEXT.lastIndex = 0;
+          SM_TEXT.lastIndex = 0;
+          const base = new Set(
+            [...line.matchAll(BASE_TEXT)].map((m) => `text-${m[1]}`),
+          );
+          const restored = [...line.matchAll(SM_TEXT)].map((m) => `text-${m[1]}`);
+          // No base size, or no `sm:` size, is not a restoration: the cell's
+          // size does not change across the breakpoint and this rule has
+          // nothing to say about it.
+          for (const size of restored) {
+            if (base.size === 0 || base.has(size)) continue;
+            const perFile = found.get(path) ?? new Map<string, number[]>();
+            perFile.set(size, [...(perFile.get(size) ?? []), i + 1]);
+            found.set(path, perFile);
+          }
+        });
+    }
+    return found;
+  }
+
+  it("finds the wrapped cells, so the checks below are not vacuous", () => {
+    // Two dozen tables were converted; were the class shape to change, every
+    // check here would pass over an empty set.
+    const total = [...restorations().values()].flatMap((sizes) =>
+      [...sizes.values()].flat(),
+    ).length;
+    expect(total).toBeGreaterThan(20);
+  });
+
+  it("restores the convention everywhere it is not declared otherwise", () => {
+    const declared = new Map(
+      INHERITED_DESKTOP_SIZE.map((entry) => [entry.file, entry.restores]),
+    );
+    const offenders: string[] = [];
+    for (const [path, sizes] of restorations()) {
+      for (const [size, lines] of sizes) {
+        if (size === CONVENTION || declared.get(path) === size) continue;
+        for (const line of lines) {
+          offenders.push(`${path}:${line} restores sm:${size}`);
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      `A phone-shrunk cell restores sm:${CONVENTION} unless its unwrapped table ` +
+        "gave it another size -- if it did, add it to INHERITED_DESKTOP_SIZE " +
+        "with that fact as the reason.",
+    ).toEqual([]);
+  });
+
+  it("keeps every declared exception present, at its own size", () => {
+    // The half that catches the regression: the account cell going back to
+    // `sm:text-sm` leaves this expecting one `text-base` site and finding none.
+    // Both directions, because a stale entry is a rule protecting nothing.
+    const found = restorations();
+    const actual = INHERITED_DESKTOP_SIZE.map((entry) => ({
+      file: entry.file,
+      restores: entry.restores,
+      count: (found.get(entry.file)?.get(entry.restores) ?? []).length,
+    }));
+
+    expect(
+      actual,
+      "A declared exception must still be in the source at the size it declares.",
+    ).toEqual(
+      INHERITED_DESKTOP_SIZE.map((entry) => ({
+        file: entry.file,
+        restores: entry.restores,
+        count: entry.count,
+      })),
+    );
+  });
+
+  it("reads a restoration, and reads no restoration where the size is unchanged", () => {
+    const restored = (line: string) => {
+      BASE_TEXT.lastIndex = 0;
+      SM_TEXT.lastIndex = 0;
+      const base = new Set(
+        [...line.matchAll(BASE_TEXT)].map((m) => `text-${m[1]}`),
+      );
+      return [...line.matchAll(SM_TEXT)]
+        .map((m) => `text-${m[1]}`)
+        .filter((size) => base.size > 0 && !base.has(size));
+    };
+
+    // The corrected cell, and the mutation this guard exists to fail.
+    expect(
+      restored('className="p-0 text-xs break-words sm:px-4 sm:py-3 sm:text-base"'),
+    ).toEqual(["text-base"]);
+    expect(
+      restored('className="p-0 text-xs break-words sm:px-4 sm:py-3 sm:text-sm"'),
+    ).toEqual(["text-sm"]);
+    // A cell that keeps one size at every width restores nothing...
+    expect(restored('className="p-0 text-sm sm:px-4 sm:py-3 sm:text-sm"')).toEqual([]);
+    // ...and neither does one that names no size of its own.
+    expect(restored('className="min-w-0 p-0 sm:px-4 sm:py-3 sm:break-normal"')).toEqual([]);
+    // `sm:text-sm` must not be read as a base size by the base matcher.
+    expect(restored('className="p-0 sm:px-4 sm:text-sm"')).toEqual([]);
+  });
+});
+
 describe("chart colours come from the theme tokens", () => {
   /**
    * `src/lib/chart-colors.ts` exposes `var(--chart-*)` strings so a chart

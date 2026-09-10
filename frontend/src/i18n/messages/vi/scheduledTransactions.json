@@ -22,6 +22,8 @@
     "modifiedBadge": "{count} đã sửa",
     "modifiedTitle": "{count, plural, one {# lần xuất hiện sắp tới đã được sửa} other {# lần xuất hiện sắp tới đã được sửa}}",
     "modifiedAmountTitle": "Đã sửa cho lần xuất hiện tiếp theo",
+    "modifiedDateTitle": "Ngày đã được thay đổi cho lần này",
+    "splitBadge": "Phần chia ({count})",
     "autoPostBadge": "Bật",
     "autoPostTitle": "Tự động đăng khi đến hạn",
     "inactiveSuffix": " — Không hoạt động",

@@ -10,7 +10,7 @@ import {
 } from "./budget-date.utils";
 
 export interface BudgetTrendPoint {
-  month: string;
+  monthKey: string;
   budgeted: number;
   actual: number;
   variance: number;
@@ -18,7 +18,7 @@ export interface BudgetTrendPoint {
 }
 
 export interface CategoryTrendPoint {
-  month: string;
+  monthKey: string;
   categoryId: string;
   categoryName: string;
   budgeted: number;
@@ -31,7 +31,7 @@ export interface CategoryTrendSeries {
   categoryId: string;
   categoryName: string;
   data: Array<{
-    month: string;
+    monthKey: string;
     budgeted: number;
     actual: number;
     variance: number;
@@ -86,7 +86,13 @@ export interface FlexGroupStatusResult {
 }
 
 export interface SavingsRatePoint {
-  month: string;
+  /**
+   * The month as structure (`YYYY-MM`), not as a label. A server-formatted
+   * `Mmm YYYY` shipped English to every locale and, being a label, sorted
+   * alphabetically at the client -- Apr, Aug, Dec, Feb... The client renders
+   * this through its own date preference and orders on the key.
+   */
+  monthKey: string;
   income: number;
   expenses: number;
   savings: number;
@@ -94,7 +100,8 @@ export interface SavingsRatePoint {
 }
 
 export interface HealthScoreHistoryPoint {
-  month: string;
+  /** `YYYY-MM` -- see `SavingsRatePoint.monthKey`. */
+  monthKey: string;
   score: number;
   label: string;
 }

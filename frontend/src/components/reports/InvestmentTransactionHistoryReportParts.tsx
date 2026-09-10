@@ -7,6 +7,10 @@
  * baselines are keyed per file.
  */
 import { InvestmentAction, InvestmentTransaction } from '@/types/investment';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 
 export type InvestmentTxSortField = 'date' | 'action' | 'security' | 'account' | 'quantity' | 'price' | 'total';
 
@@ -17,11 +21,7 @@ export type InvestmentTxSortField = 'date' | 'action' | 'security' | 'account' |
  * value cell takes its phone caption from the same entry as its header, and the
  * CSV / PDF export builds its headings from that same ordered record.
  */
-export interface SortColumn {
-  field: InvestmentTxSortField;
-  label: string;
-  /** How the column header aligns from `sm` up; the cells restate it. */
-  align?: 'right' | 'center';
+export interface SortColumn extends TableSortColumn<InvestmentTxSortField> {
   /**
    * The tier this column belongs to, spelled for BOTH of its halves here so
    * they cannot drift -- a header that returns at one breakpoint over values
@@ -61,9 +61,7 @@ export interface SortColumn {
  * comparing header LABELS can see, because the labels stay right. Here it is a
  * compile error instead.
  */
-export type SortColumnsByField = {
-  [K in InvestmentTxSortField]: SortColumn & { field: K };
-};
+export type SortColumnsByField = TableSortColumnsByField<InvestmentTxSortField, SortColumn>;
 
 // Today's header cell, unchanged.
 export const HEADER_CLASS = 'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase';
@@ -73,10 +71,9 @@ export const HEADER_CLASS = 'px-4 py-3 text-xs font-medium text-gray-500 dark:te
 // each data row is a grid -- so every control is left-aligned and self-naming.
 // The border is what says "tappable": there is no hover on a touch screen, and
 // the chip's own fill is a shade off the header band it sits on (this table's
-// `<thead>` keeps its `bg-gray-50` / `dark:bg-gray-900/50`). The class is kept
-// identical to the sibling report tables that ship this strip; the copies are
-// one of the duplications the converted-table consolidation pass folds into one
-// home -- `components/ui/` is not this change's to edit.
+// `<thead>` keeps its `bg-gray-50` / `dark:bg-gray-900/50`). The shared
+// `PHONE_HEADER_CLASS` in `components/ui/Table.tsx` keeps this strip identical
+// to its sibling reports.
 //
 // Seven chips. Measured on the Chromium replica at 320px they wrap to four
 // lines in `en`/`pl`/`de`, five in `ru`/`id` and seven in the pseudo-locale
@@ -86,9 +83,6 @@ export const HEADER_CLASS = 'px-4 py-3 text-xs font-medium text-gray-500 dark:te
 // with no control anywhere would leave a phone POINTING at a sort with no
 // pointer back -- and Account is exactly that field today, offered by a column
 // header that no phone and no tablet can see.
-export const PHONE_HEADER_CLASS =
-  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
-
 // A figure cell inside a wrapped row: no padding of its own below `sm` and this
 // table's own `px-4 py-3` from `sm` up. Smaller type on phones so a seven-figure
 // 2dp amount still fits half the width.
@@ -125,7 +119,13 @@ export const PHONE_HEADER_CLASS =
 // to spare) and eight is the first past it (measured: the wrapper goes 294/288).
 // In the ordinary single-code form eight figures (116px) is still inside the
 // track. At 390px (157px tracks) nine figures fit inside the track itself.
-// Quantity is `toFixed(4)`: `12345.6789` is 73px, `1234567.8912` 88px.
+// Quantity was measured as a `toFixed(4)` string: `12345.6789` is 73px,
+// `1234567.8912` 88px. It now renders through `formatShareQuantity` (up to 8dp,
+// trailing zeros trimmed, the reader's own decimal mark and grouping), so the
+// ordinary case is SHORTER than what was measured -- `50.0000` became `50` --
+// and the long case is a residual position rather than a large count. The 8dp
+// form has not been re-measured; it is the one to measure again if this
+// column's track budget is ever revisited.
 //
 // THREE tracks were rejected on the same measurement: a third of the same box is
 // 77px at 320px, which even a six-figure 125px amount overflows by 48px -- past
@@ -134,8 +134,12 @@ export const PHONE_HEADER_CLASS =
 // what this box can hold.
 export const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
 
-// The date is a fixed-shape label, not a number: `format(..., 'MMM d, yyyy')`
-// renders `Dec 25, 2025` (80px at `text-xs`). It keeps the `whitespace-nowrap`
+// The date is a fixed-shape label, not a number. It was measured as the
+// hardcoded English `Dec 25, 2025` (80px at `text-xs`); it now renders through
+// `useDateFormat().formatDate`, and every arrangement that seam can produce is
+// at most eleven glyphs (`25-Dec-2025`, and the numeric patterns ten), because
+// its `browser` branch asks Intl for a 2-digit month rather than a name -- so
+// the column is never wider than what was measured. It keeps the `whitespace-nowrap`
 // it wears today, because a date is one label and breaking it after `Dec` reads
 // as two values, and it is spelled out rather than aliased to `MONEY_CELL`
 // deliberately: the two hold nearly the same string for different reasons, and
@@ -145,9 +149,6 @@ export const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cel
 // the phone's right alignment inside the right-hand track is scoped `max-sm:`
 // and the desktop is untouched.
 export const DATE_CELL = 'p-0 text-xs whitespace-nowrap max-sm:text-right sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
-
-/** Every caption in a wrapped cell is phone-only. */
-export const CAPTION_CLASS = 'sm:hidden';
 
 export const ACTION_COLORS: Record<InvestmentAction, string> = {
   BUY: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',

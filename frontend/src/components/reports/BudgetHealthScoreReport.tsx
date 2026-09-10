@@ -1,13 +1,17 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { budgetsApi } from '@/lib/budgets';
 import { BudgetHealthGauge } from '@/components/budgets/BudgetHealthGauge';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportError } from '@/components/reports/ReportError';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { CellLabel } from '@/components/ui/Table';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 import { useTranslations } from 'next-intl';
 import { useReportData } from '@/hooks/useReportData';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
@@ -46,9 +50,7 @@ type CategoryImpactSortField = 'category' | 'group' | 'percentUsed' | 'impact';
  * and rendered by BOTH header rows -- the column header row (from `sm` up) and
  * the phone sort strip -- so the two can never list different fields.
  */
-interface SortColumn {
-  field: CategoryImpactSortField;
-  label: string;
+interface SortColumn extends TableSortColumn<CategoryImpactSortField, 'right'> {
   /**
    * This column's cell, as text -- rendered by the `<td>` AND by the PDF
    * export, which also takes its headings from this record. So the export
@@ -64,8 +66,6 @@ interface SortColumn {
    * (the group pill), never a second derivation of the value.
    */
   value: (cat: HealthScoreCategoryDetail) => string;
-  /** The two figure columns are right-aligned in the column header row. */
-  align?: 'right';
   /** The two text columns state today's explicit left alignment. */
   headerAlign?: 'left';
   /**
@@ -89,9 +89,7 @@ interface SortColumn {
  * column would be unsortable -- none of which a test comparing header LABELS
  * can see, because the labels stay right. Here it is a compile error instead.
  */
-type SortColumnsByField = {
-  [K in CategoryImpactSortField]: SortColumn & { field: K };
-};
+type SortColumnsByField = TableSortColumnsByField<CategoryImpactSortField, SortColumn>;
 
 // Today's header cell, unchanged: the two text columns are explicitly
 // left-aligned and the last column drops its right padding.
@@ -108,16 +106,15 @@ const headerClass = (col: SortColumn) =>
 // wrapped row supplies the vertical inset and the grid does the spacing).
 const cellPadding = (col: SortColumn) => (col.last ? 'sm:py-2' : 'sm:py-2 sm:pr-4');
 
-// The same sort controls in the phone strip: a wrapped row of compact chips.
+// The phone sort strip -- `PHONE_HEADER_CLASS` in `components/ui/Table.tsx`,
+// which is where that class and its own doc live. The same sort controls as
+// the column header row, as a wrapped row of compact chips.
 // Column alignment means nothing there -- the column header row is hidden and
 // each data row is a grid -- so every control is left-aligned and self-naming.
 // The border is what says "tappable" here: there is no hover on a touch screen,
 // and the strip sits directly on the card, whose background this already is --
-// so the border is the whole of the affordance. (The class is kept identical to
-// the sibling report tables that ship this strip; the copies are one of the
-// duplications the converted-table consolidation pass folds into one home.)
-const PHONE_HEADER_CLASS =
-  'rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 uppercase';
+// so the border is the whole of the affordance. The shared
+// `PHONE_HEADER_CLASS` keeps this strip identical to its sibling reports.
 
 // A figure cell (`% used`, `Score impact`) inside a wrapped row: no padding of
 // its own below `sm` and this table's own from `sm` up, which each cell adds
@@ -165,20 +162,17 @@ const PHONE_HEADER_CLASS =
 const FIGURE_CELL =
   'p-0 text-right text-xs font-medium whitespace-nowrap sm:table-cell sm:text-sm';
 
-/** Every caption in a wrapped cell is phone-only. */
-const CAPTION_CLASS = 'sm:hidden';
-
 export function BudgetHealthScoreReport() {
   const t = useTranslations('reports');
   const { formatPercentTrimmed } = useNumberFormat();
   const chartRef = useRef<HTMLDivElement>(null);
 
-  const getGroupLabel = (group: string | null): string => {
+  const getGroupLabel = useCallback((group: string | null): string => {
     if (group === 'NEED') return t('budgetHealthScore.groupNeed');
     if (group === 'WANT') return t('budgetHealthScore.groupWant');
     if (group === 'SAVING') return t('budgetHealthScore.groupSaving');
     return t('budgetHealthScore.groupUncategorized');
-  };
+  }, [t]);
   const [selectedBudgetIdState, setSelectedBudgetId] = useState<string>('');
   const { sortField, sortDirection, handleSort } = useSortableTable<CategoryImpactSortField>(
     'reports.budget-health-score.categoryImpact.sort',
@@ -231,7 +225,12 @@ export function BudgetHealthScoreReport() {
           comparison = compareValues(a.categoryName, b.categoryName);
           break;
         case 'group':
-          comparison = compareValues(a.categoryGroup, b.categoryGroup);
+          // Sort by the label the row DISPLAYS, not the raw enum: the enum is
+          // English (`NEED`/`WANT`/`SAVING`), so ordering on it puts a
+          // localized reader's rows in an order unrelated to what they see, and
+          // a null group sorts as an empty string rather than beside its
+          // "Uncategorized" label.
+          comparison = compareValues(getGroupLabel(a.categoryGroup), getGroupLabel(b.categoryGroup));
           break;
         case 'percentUsed':
           comparison = compareValues(a.percentUsed, b.percentUsed);
@@ -243,7 +242,7 @@ export function BudgetHealthScoreReport() {
       return sortDirection === 'asc' ? comparison : -comparison;
     });
     return sorted;
-  }, [healthScore, sortField, sortDirection]);
+  }, [healthScore, sortField, sortDirection, getGroupLabel]);
 
   // The four sortable columns, keyed by field so the record is exhaustive and
   // each entry must name its own key (see `SortColumnsByField`).

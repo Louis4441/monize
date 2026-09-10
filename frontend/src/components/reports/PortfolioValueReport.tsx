@@ -36,6 +36,11 @@ import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
+import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
+import type {
+  SortColumn as TableSortColumn,
+  SortColumnsByField as TableSortColumnsByField,
+} from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { exportToCsv } from '@/lib/csv-export';
 import { createLogger } from '@/lib/logger';
@@ -43,6 +48,15 @@ import { EmptyState } from '@/components/ui/EmptyState';
 
 type PortfolioBreakdownSortField = 'account' | 'holdings' | 'cash' | 'total' | 'gainLoss';
 type PortfolioChartSortField = 'name' | 'value';
+
+/**
+ * One sortable column of the Portfolio Breakdown table. Declared once as a
+ * record over the sort-field union and rendered by BOTH header rows -- the
+ * column header row (from `sm` up) and the phone sort strip -- so the two can
+ * never list different fields, and adding a member to the union fails `tsc`
+ * here rather than stranding a phone with no control for it.
+ */
+type PortfolioBreakdownSortColumn = TableSortColumn<PortfolioBreakdownSortField, 'right'>;
 
 // Normalized per-security breakdown ready to render. Point `name` is already
 // the display label (daily/monthly date or intraday time), so the chart, table
@@ -81,6 +95,24 @@ const logger = createLogger('PortfolioValueReport');
 const DAILY_RANGES = new Set(['1w', '1m', '3m', 'ytd', '1y']);
 const RANGE_STORAGE_KEY = 'monize-reports-portfolio-value-range';
 const ACCOUNTS_STORAGE_KEY = 'monize-reports-portfolio-value-accounts';
+
+// Today's header cell for the Portfolio Breakdown table, unchanged (no
+// `tracking-wider`, matching what this table renders). Kept local --
+// `PHONE_HEADER_CLASS`/`CAPTION_CLASS`/`CellLabel` are the shared chrome, but a
+// table's own header and money cells stay per-report because their track
+// budgets differ.
+const HEADER_CLASS = 'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase';
+
+// A money cell inside a wrapped breakdown row: no padding of its own below `sm`
+// (the row's grid supplies it), this table's own `px-4 py-3 text-sm` from `sm`
+// up, smaller type on phones. Colour and weight stay on each cell.
+//
+// `whitespace-nowrap` is the one property here that is NOT phone-only, and it is
+// the single respect in which the `sm`-and-up cell differs from today's: a
+// locale that groups thousands with a space (`1 234 567 zl`) could otherwise
+// break a figure in the middle at any width. A number must not break; the
+// caption inside takes `whitespace-normal` back for itself (`CellLabel`).
+const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
 
 function CustomTooltip({ active, payload, fmtFull, portfolioLabel }: {
   active?: boolean;
@@ -692,6 +724,20 @@ export function PortfolioValueReport() {
   );
   const showFlags = summary.highest !== summary.lowest;
 
+  // The Portfolio Breakdown table's five sortable columns, keyed by field so the
+  // record is exhaustive: adding a member to `PortfolioBreakdownSortField` is a
+  // compile error here rather than a header with no control. Their declaration
+  // order is the column (and cell DOM) order, rendered by BOTH the column header
+  // row and the phone sort strip from the derived `Object.values`.
+  const breakdownColumns: TableSortColumnsByField<PortfolioBreakdownSortField, PortfolioBreakdownSortColumn> = {
+    account: { field: 'account', label: t('portfolioValue.colAccount') },
+    holdings: { field: 'holdings', label: t('portfolioValue.colHoldings'), align: 'right' },
+    cash: { field: 'cash', label: t('portfolioValue.colCash'), align: 'right' },
+    total: { field: 'total', label: t('portfolioValue.colTotal'), align: 'right' },
+    gainLoss: { field: 'gainLoss', label: t('portfolioValue.colGainLoss'), align: 'right' },
+  };
+  const breakdownSortColumns: readonly PortfolioBreakdownSortColumn[] = Object.values(breakdownColumns);
+
   const handleExportPdf = async () => {
     const { exportToPdf } = await import('@/lib/pdf-export');
     const accountLabel = selectedAccount
@@ -1187,77 +1233,85 @@ export function PortfolioValueReport() {
               {t('portfolioValue.breakdownTitle')}
             </h3>
           </div>
+          {/* Below `sm` the table becomes a block and each row wraps into a
+              three-column, two-line grid card so all five columns fit a phone
+              without a horizontal scroll: line 1 is the account (the row
+              identity) and the total (the headline); line 2 is holdings, cash
+              and the gain/loss. Nothing is dropped, and no figure is truncated
+              -- a money value never wraps (`MONEY_CELL`). From `sm` up it is the
+              ordinary table, resolving to today's output in every respect but
+              one (each cell restores its own `sm:px-4 sm:py-3`, the four figure
+              cells `sm:text-sm` and the account cell `sm:text-base` -- that one
+              carried NO size class before the conversion, so 16px inherited is
+              what it has to hand back; `MONEY_CELL`'s `whitespace-nowrap` is
+              unprefixed, so it applies at 640px+ too, where the base cell
+              carried no `white-space` class -- deliberate, and the constant
+              says why), and the sort controls
+              survive as their own phone-only header row because the column
+              header row that carries them on desktop is hidden there. Restyling
+              `display` strips the implicit table semantics below `sm`, so the
+              roles are restated and every bare figure carries a `CellLabel`
+              naming its column; the account name names itself. */}
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-900/50">
-                <tr>
-                  <SortableHeader<PortfolioBreakdownSortField>
-                    field="account"
-                    sortField={sortField}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('portfolioValue.colAccount')}
-                  </SortableHeader>
-                  <SortableHeader<PortfolioBreakdownSortField>
-                    field="holdings"
-                    sortField={sortField}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('portfolioValue.colHoldings')}
-                  </SortableHeader>
-                  <SortableHeader<PortfolioBreakdownSortField>
-                    field="cash"
-                    sortField={sortField}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('portfolioValue.colCash')}
-                  </SortableHeader>
-                  <SortableHeader<PortfolioBreakdownSortField>
-                    field="total"
-                    sortField={sortField}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('portfolioValue.colTotal')}
-                  </SortableHeader>
-                  <SortableHeader<PortfolioBreakdownSortField>
-                    field="gainLoss"
-                    sortField={sortField}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                    align="right"
-                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                  >
-                    {t('portfolioValue.colGainLoss')}
-                  </SortableHeader>
+            <table role="table" className="block min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
+              <thead role="rowgroup" className="block bg-gray-50 dark:bg-gray-900/50 sm:table-header-group">
+                {/* Phone sort strip: the same five controls, wrapped. */}
+                <tr role="row" className="flex flex-wrap gap-x-2 gap-y-1 px-2 py-2 sm:hidden">
+                  {breakdownSortColumns.map((col) => (
+                    <SortableHeader<PortfolioBreakdownSortField>
+                      key={col.field}
+                      field={col.field}
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      className={PHONE_HEADER_CLASS}
+                    >
+                      {col.label}
+                    </SortableHeader>
+                  ))}
+                </tr>
+                <tr role="row" className="hidden sm:table-row">
+                  {breakdownSortColumns.map((col) => (
+                    <SortableHeader<PortfolioBreakdownSortField>
+                      key={col.field}
+                      field={col.field}
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align={col.align}
+                      className={HEADER_CLASS}
+                    >
+                      {col.label}
+                    </SortableHeader>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody role="rowgroup" className="block divide-y divide-gray-200 dark:divide-gray-700 sm:table-row-group">
                 {sortedBreakdown.map((acct) => (
-                  <tr key={acct.accountId} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
+                  <tr
+                    key={acct.accountId}
+                    role="row"
+                    className="grid grid-cols-3 items-start gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:table-row sm:p-0"
+                  >
+                    {/* Account: the row identity. The name wraps unclamped. */}
+                    <td role="cell" className="col-start-1 row-start-1 p-0 text-xs break-words font-medium text-gray-900 dark:text-gray-100 sm:table-cell sm:px-4 sm:py-3 sm:text-base sm:break-normal">
                       {acct.accountName}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-gray-100">
+                    <td role="cell" className={`col-start-1 row-start-2 text-gray-900 dark:text-gray-100 ${MONEY_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{breakdownColumns.holdings.label}</CellLabel>
                       {fmtFull(acct.totalMarketValue)}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-gray-100">
+                    <td role="cell" className={`col-start-2 row-start-2 text-gray-900 dark:text-gray-100 ${MONEY_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{breakdownColumns.cash.label}</CellLabel>
                       {fmtFull(acct.cashBalance)}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {/* Total: the headline figure, beside the account. */}
+                    <td role="cell" className={`col-start-3 row-start-1 font-medium text-gray-900 dark:text-gray-100 ${MONEY_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{breakdownColumns.total.label}</CellLabel>
                       {fmtFull(acct.totalMarketValue + acct.cashBalance)}
                     </td>
-                    <td className={`px-4 py-3 text-right text-sm font-medium ${gainLossColor(acct.totalGainLoss)}`}>
+                    <td role="cell" className={`col-start-3 row-start-2 font-medium ${gainLossColor(acct.totalGainLoss)} ${MONEY_CELL}`}>
+                      <CellLabel className={CAPTION_CLASS}>{breakdownColumns.gainLoss.label}</CellLabel>
                       {acct.totalGainLoss >= 0 ? '+' : ''}{fmtFull(acct.totalGainLoss)}
                     </td>
                   </tr>
