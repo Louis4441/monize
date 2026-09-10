@@ -86,6 +86,26 @@ function meanIntensity(
   return total / count;
 }
 
+/**
+ * Mean per-pixel colour spread (max channel minus min), over the whole image.
+ *
+ * A grey document has almost none; the illumination division, applied to each
+ * channel on its own, is what turns neutral sensor grain in a dark region into
+ * coloured speckle, so this is the number that catches the speckle returning.
+ */
+function meanChroma(image: RawImage): number {
+  let total = 0;
+  let count = 0;
+  for (let i = 0; i < image.data.length; i += 4) {
+    const r = image.data[i];
+    const g = image.data[i + 1];
+    const b = image.data[i + 2];
+    total += Math.max(r, g, b) - Math.min(r, g, b);
+    count++;
+  }
+  return total / count;
+}
+
 describe('detectDocument', () => {
   it('finds the planted corners of a skewed page', () => {
     const image = syntheticDocument();
@@ -251,6 +271,30 @@ describe('enhance', () => {
     const result = enhance(cv, image);
     expect(result.width).toBe(300);
     expect(result.height).toBe(260);
+  });
+
+  // The failure the screenshots showed: detection defaulted to the whole frame,
+  // so the warp caught the desk and the hand's shadow, and the illumination
+  // division amplified their sensor grain -- per channel, so grey noise came out
+  // as loud colour speckle. Denoising before the division and flooring the
+  // background estimate keeps a dark region quiet. With neither guard this dark
+  // noisy field enhances to a mean chroma near 49; both together hold it near
+  // 12, so the bound is deliberately well below the broken value and above the
+  // fixed one. A noise-free fixture cannot see this regression, which is why one
+  // that carries real per-channel grain has to.
+  it('does not amplify dark-region sensor noise into colour speckle', () => {
+    const noisyDarkField = syntheticDocument({
+      width: 320,
+      height: 260,
+      text: false,
+      paper: 25,
+      background: 25,
+      noise: 6,
+    });
+
+    const result = enhance(cv, noisyDarkField);
+
+    expect(meanChroma(result)).toBeLessThan(25);
   });
 
   // The preview the user approves is the file that gets stored, so the same

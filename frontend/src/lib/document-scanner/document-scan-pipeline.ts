@@ -44,6 +44,20 @@ const POLY_EPSILON_RATIO = 0.02;
 
 /** Kernel of the morphological close that estimates the page's illumination. */
 const ILLUMINATION_KERNEL = 31;
+/**
+ * Floor under the illumination estimate before the division.
+ *
+ * `255 * channel / background` amplifies noise by `255 / background`, so a dark
+ * region the crop should not have contained -- a hand's shadow, the desk beside
+ * a page detection missed -- turns faint sensor grain into loud colour speckle
+ * (bg 22 amplifies roughly eleven times, and the three channels divide
+ * independently). Real paper under a shadow does not fall this far, so clamping
+ * the estimate up to this level caps the gain at about `255 / 48` without
+ * touching the gradient across a genuine page. The other half of the guard is
+ * order: the denoise runs BEFORE this step, so what is amplified is already
+ * clean, rather than after it, where it could only chase blown-up noise.
+ */
+const ILLUMINATION_MIN_BACKGROUND = 48;
 /** CLAHE parameters for local contrast, applied to lightness only. */
 const CLAHE_CLIP_LIMIT = 2.0;
 const CLAHE_TILE = 8;
@@ -304,13 +318,19 @@ export function warpToQuad(cv: OpenCv, image: RawImage, quad: Quad): RawImage {
 }
 
 /**
- * Even out the lighting, lift local contrast, then denoise and sharpen.
+ * Denoise, even out the lighting, lift local contrast, then sharpen.
  *
  * The illumination estimate is a large morphological close, which keeps only
  * what varies slowly across the page -- the shadow of the hand holding the
  * phone, the falloff of a desk lamp. Dividing it out removes the gradient
  * without touching the glyphs, which is what makes the result read as a scan
  * rather than a brightened photo.
+ *
+ * Two things keep that division from amplifying sensor noise into colour
+ * speckle where the crop caught something darker than paper: the denoise runs
+ * first, so the pixels it multiplies are already clean, and the estimate is
+ * floored (`ILLUMINATION_MIN_BACKGROUND`), so no region can drive the gain
+ * arbitrarily high.
  */
 export function enhance(cv: OpenCv, image: RawImage): RawImage {
   return withScope((scope) => {
@@ -318,7 +338,20 @@ export function enhance(cv: OpenCv, image: RawImage): RawImage {
     const rgb = scope.add(new cv.Mat());
     cv.cvtColor(source, rgb, cv.COLOR_RGBA2RGB);
 
-    // 1. Illumination normalisation, per channel.
+    // 1. Denoise FIRST, keeping edges. The illumination division below
+    // multiplies whatever reaches it, so it has to reach it clean: denoising
+    // afterwards can only smooth noise the division has already amplified.
+    const denoised = scope.add(new cv.Mat());
+    cv.bilateralFilter(
+      rgb,
+      denoised,
+      DENOISE_DIAMETER,
+      DENOISE_SIGMA_COLOR,
+      DENOISE_SIGMA_SPACE,
+      cv.BORDER_DEFAULT,
+    );
+
+    // 2. Illumination normalisation, per channel.
     const kernel = scope.add(
       cv.getStructuringElement(
         cv.MORPH_RECT,
@@ -326,14 +359,30 @@ export function enhance(cv: OpenCv, image: RawImage): RawImage {
       ),
     );
     const background = scope.add(new cv.Mat());
-    cv.morphologyEx(rgb, background, cv.MORPH_CLOSE, kernel);
+    cv.morphologyEx(denoised, background, cv.MORPH_CLOSE, kernel);
+    // Clamp the estimate up to a floor so a genuinely dark region cannot drive
+    // the gain sky-high. `cv.max` needs a Mat, not a scalar, in this build.
+    const floor = scope.add(
+      new cv.Mat(
+        background.rows,
+        background.cols,
+        background.type(),
+        new cv.Scalar(
+          ILLUMINATION_MIN_BACKGROUND,
+          ILLUMINATION_MIN_BACKGROUND,
+          ILLUMINATION_MIN_BACKGROUND,
+        ),
+      ),
+    );
+    cv.max(background, floor, background);
     const normalised = scope.add(new cv.Mat());
     // 255 * channel / background: where the background is dark the pixel is
     // lifted by the same factor, so a shadowed corner ends up as bright as the
-    // rest of the page instead of merely less dark.
-    cv.divide(rgb, background, normalised, 255, cv.CV_8U);
+    // rest of the page instead of merely less dark -- but only down to the
+    // floor, past which the region is not paper and lifting it only amplifies.
+    cv.divide(denoised, background, normalised, 255, cv.CV_8U);
 
-    // 2. Local contrast on lightness only, so colours are not pushed around.
+    // 3. Local contrast on lightness only, so colours are not pushed around.
     const lab = scope.add(new cv.Mat());
     cv.cvtColor(normalised, lab, cv.COLOR_RGB2Lab);
     const channels = scope.add(new cv.MatVector());
@@ -349,21 +398,10 @@ export function enhance(cv: OpenCv, image: RawImage): RawImage {
     const contrasted = scope.add(new cv.Mat());
     cv.cvtColor(merged, contrasted, cv.COLOR_Lab2RGB);
 
-    // 3. Denoise, keeping edges.
-    const denoised = scope.add(new cv.Mat());
-    cv.bilateralFilter(
-      contrasted,
-      denoised,
-      DENOISE_DIAMETER,
-      DENOISE_SIGMA_COLOR,
-      DENOISE_SIGMA_SPACE,
-      cv.BORDER_DEFAULT,
-    );
-
     // 4. Unsharp mask: the image plus its own high frequencies.
     const blurred = scope.add(new cv.Mat());
     cv.GaussianBlur(
-      denoised,
+      contrasted,
       blurred,
       new cv.Size(0, 0),
       SHARPEN_SIGMA,
@@ -372,7 +410,7 @@ export function enhance(cv: OpenCv, image: RawImage): RawImage {
     );
     const sharpened = scope.add(new cv.Mat());
     cv.addWeighted(
-      denoised,
+      contrasted,
       1 + SHARPEN_AMOUNT,
       blurred,
       -SHARPEN_AMOUNT,

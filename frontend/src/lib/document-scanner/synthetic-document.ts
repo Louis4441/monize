@@ -30,7 +30,34 @@ export interface SyntheticOptions {
    * 0 is even lighting.
    */
   shadow?: number;
+  /**
+   * Peak per-channel sensor noise, in levels out of 255. Each channel of each
+   * pixel is jittered independently, as a real sensor does, so a step that
+   * treats the channels separately turns grey grain into colour speckle. 0 is a
+   * noise-free fixture, which every geometry test wants and which is why no
+   * enhancement test caught the dark-region amplification until now.
+   */
+  noise?: number;
 }
+
+/**
+ * A small deterministic generator, so a noisy fixture is still the same bytes
+ * every run: the enhancement's determinism (I3) is tested on these pictures, and
+ * `Math.random()` would make "the same input twice" untestable.
+ */
+function mulberry32(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Fixed seed for the noise stream: reproducibility over unpredictability. */
+const NOISE_SEED = 0x5f3759df;
 
 /** A skewed page, off-centre and rotated, as a hand-held photo gives. */
 export const DEFAULT_QUAD: Quad = [
@@ -69,9 +96,12 @@ export function syntheticDocument(options: SyntheticOptions = {}): RawImage {
     text = true,
     blurRadius = 0,
     shadow = 0,
+    noise = 0,
   } = options;
 
   const data = new Uint8ClampedArray(width * height * 4);
+  const random = mulberry32(NOISE_SEED);
+  const jitter = () => (noise > 0 ? Math.round((random() * 2 - 1) * noise) : 0);
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -104,9 +134,11 @@ export function syntheticDocument(options: SyntheticOptions = {}): RawImage {
       }
 
       const offset = (y * width + x) * 4;
-      data[offset] = value;
-      data[offset + 1] = value;
-      data[offset + 2] = value;
+      // Each channel is jittered on its own draw, so grey grain in the source
+      // is genuine three-channel noise the way a sensor makes it.
+      data[offset] = value + jitter();
+      data[offset + 1] = value + jitter();
+      data[offset + 2] = value + jitter();
       data[offset + 3] = 255;
     }
   }
