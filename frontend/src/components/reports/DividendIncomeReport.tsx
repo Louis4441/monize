@@ -396,6 +396,20 @@ export function DividendIncomeReport() {
   const addOrUnknown = (a: number | null, b: number | null): number | null =>
     a === null || b === null ? null : a + b;
 
+  /**
+   * The one place this report decides unknown-versus-zero, so a cell renders
+   * `{fmtValue(x)}` and never a branch of its own.
+   *
+   * `null` is "the server could not work this out" and draws the em dash; every
+   * other number, `0` included, is a measured figure and is formatted. The
+   * tables used to ask `x !== 0 ? fmtValue(x) : '-'`, which had it exactly
+   * backwards for a real zero: an account that opened the month at nothing, or
+   * a day that paid no dividend, is a KNOWN 0.00 and was drawn as the unknown
+   * marker -- so a start value nobody could compute and a start value of zero
+   * read the same, in the report whose whole subject is which of those it is.
+   * The test is `null`, never `!== 0`, `> 0` or truthiness (`Number(null)` is
+   * `0`, which is how the two get folded together).
+   */
   const fmtValue = useCallback((value: number | null): string => {
     if (value === null) return '\u2014';
     if (isForeign) {
@@ -1317,6 +1331,17 @@ export function DividendIncomeReport() {
         </div>
       ) : viewType === 'monthly' ? (
         /* Monthly Table */
+        /* Deliberately NOT phone-wrapped, and this is the reason: the column
+           count is decided at runtime. `visibleSeries` toggles the dividends,
+           interest and capital-gains columns independently, so the row is
+           anywhere from four to seven cells wide -- and the phone card is a
+           `grid grid-cols-N` with per-cell `col-start`/`row-start`, which is a
+           fixed N by construction. Converting it means either a class computed
+           from the toggles (four grids to measure, and Tailwind emits only the
+           classes it can see in the source) or a wrapper that re-derives the
+           placements per combination. Neither is a conversion; both are a
+           different component. Until then the phone gets the horizontal scroll,
+           which is honest. Same for the daily table below. */
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -1417,19 +1442,19 @@ export function DividendIncomeReport() {
                         {row.label}
                       </td>
                       <td className="px-4 py-3 text-right text-sm text-gray-700 dark:text-gray-300">
-                        {row.startValue !== 0 ? fmtValue(row.startValue) : '-'}
+                        {fmtValue(row.startValue)}
                       </td>
                       <td className="px-4 py-3 text-right text-sm text-gray-700 dark:text-gray-300">
-                        {row.endValue !== 0 ? fmtValue(row.endValue) : '-'}
+                        {fmtValue(row.endValue)}
                       </td>
                       {visibleSeries.dividends && (
                         <td className="px-4 py-3 text-right text-sm text-green-600 dark:text-green-400">
-                          {row.dividends !== 0 ? fmtValue(row.dividends) : '-'}
+                          {fmtValue(row.dividends)}
                         </td>
                       )}
                       {visibleSeries.interest && (
                         <td className="px-4 py-3 text-right text-sm text-blue-600 dark:text-blue-400">
-                          {row.interest !== 0 ? fmtValue(row.interest) : '-'}
+                          {fmtValue(row.interest)}
                         </td>
                       )}
                       {visibleSeries.capitalGains && (
@@ -1440,7 +1465,7 @@ export function DividendIncomeReport() {
                               : 'text-purple-600 dark:text-purple-400'
                           }`}
                         >
-                          {row.capitalGains !== 0 ? fmtValue(row.capitalGains) : '-'}
+                          {fmtValue(row.capitalGains)}
                         </td>
                       )}
                       <td
@@ -1450,7 +1475,7 @@ export function DividendIncomeReport() {
                             : 'text-gray-900 dark:text-gray-100'
                         }`}
                       >
-                        {rowTotal !== 0 ? fmtValue(rowTotal) : '-'}
+                        {fmtValue(rowTotal)}
                       </td>
                     </tr>
                   );
@@ -1521,6 +1546,8 @@ export function DividendIncomeReport() {
         </div>
       ) : viewType === 'daily' ? (
         /* Daily Table */
+        /* Not phone-wrapped either, for the same runtime-variable column count
+           as the monthly table above. */
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -1626,19 +1653,19 @@ export function DividendIncomeReport() {
                           {row.label}
                         </td>
                         <td className="px-4 py-3 text-right text-sm text-gray-700 dark:text-gray-300">
-                          {row.startValue !== 0 ? fmtValue(row.startValue) : '-'}
+                          {fmtValue(row.startValue)}
                         </td>
                         <td className="px-4 py-3 text-right text-sm text-gray-700 dark:text-gray-300">
-                          {row.endValue !== 0 ? fmtValue(row.endValue) : '-'}
+                          {fmtValue(row.endValue)}
                         </td>
                         {visibleSeries.dividends && (
                           <td className="px-4 py-3 text-right text-sm text-green-600 dark:text-green-400">
-                            {row.dividends !== 0 ? fmtValue(row.dividends) : '-'}
+                            {fmtValue(row.dividends)}
                           </td>
                         )}
                         {visibleSeries.interest && (
                           <td className="px-4 py-3 text-right text-sm text-blue-600 dark:text-blue-400">
-                            {row.interest !== 0 ? fmtValue(row.interest) : '-'}
+                            {fmtValue(row.interest)}
                           </td>
                         )}
                         {visibleSeries.capitalGains && (
@@ -1649,7 +1676,7 @@ export function DividendIncomeReport() {
                                 : 'text-purple-600 dark:text-purple-400'
                             }`}
                           >
-                            {row.capitalGains !== 0 ? fmtValue(row.capitalGains) : '-'}
+                            {fmtValue(row.capitalGains)}
                           </td>
                         )}
                         <td
@@ -1659,7 +1686,7 @@ export function DividendIncomeReport() {
                               : 'text-gray-900 dark:text-gray-100'
                           }`}
                         >
-                          {rowTotal !== 0 ? fmtValue(rowTotal) : '-'}
+                          {fmtValue(rowTotal)}
                         </td>
                       </tr>
                     );
@@ -1767,7 +1794,7 @@ export function DividendIncomeReport() {
                       } ${FIGURE_CELL}`}
                     >
                       <CellLabel className={CAPTION_CLASS}>{securityColumns.capitalGains.label}</CellLabel>
-                      {security.capitalGains !== 0 ? fmtValue(security.capitalGains) : '-'}
+                      {fmtValue(security.capitalGains)}
                     </td>
                     <td
                       role="cell"

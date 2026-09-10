@@ -457,6 +457,95 @@ describe('DividendIncomeReport', () => {
     expect(screen.getByText('$1650.00')).toBeInTheDocument();
   });
 
+  // A measured zero and an unknown are different facts, and this report's whole
+  // subject is which of the two a period holds. Both directions get a case: the
+  // tables asked `startValue !== 0 ? fmtValue(...) : '-'`, so a month that
+  // genuinely opened at nothing rendered the unknown marker, and no assertion
+  // anywhere would have noticed. `row.startValue` is `number | null`, so the
+  // only correct test is against `null`.
+  // The table lists every month in the range, so the row has to be addressed by
+  // its label -- reading `tbody tr:first-child` picks up an empty month, whose
+  // zeros are real and would make either assertion below pass for the wrong
+  // reason.
+  async function monthlyTableCells(monthLabel: string): Promise<HTMLElement[]> {
+    render(<DividendIncomeReport />);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Table' })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Table' }));
+    await screen.findByText('Monthly Gains, Dividends & Interest');
+    const row = [
+      ...screen.getAllByRole('table')[0].querySelectorAll('tbody tr'),
+    ].find((tr) => tr.querySelector('td')?.textContent?.trim() === monthLabel);
+    if (!row) throw new Error(`The monthly table has no ${monthLabel} row`);
+    return [...row.querySelectorAll('td')] as HTMLElement[];
+  }
+
+  const capitalGainEntry = (overrides: Record<string, unknown>) => ({
+    month: '2024-06',
+    accountId: 'acc-1',
+    accountName: 'TFSA',
+    accountCurrencyCode: 'CAD',
+    securityId: 'sec-a',
+    symbol: 'AAA',
+    securityName: 'Alpha',
+    securityCurrencyCode: 'CAD',
+    startQuantity: 0,
+    endQuantity: 10,
+    startValue: 0,
+    endValue: 0,
+    buys: 0,
+    sells: 0,
+    realizedGain: 0,
+    unrealizedGain: 0,
+    totalCapitalGain: 0,
+    ...overrides,
+  });
+
+  it('renders a start value of zero as a formatted zero, not as the unknown marker', async () => {
+    // Bought during the month: the position was worth exactly nothing at the
+    // start, which is a figure, and 0 is what it should read.
+    mockGetTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
+    mockGetInvestmentAccounts.mockResolvedValue([
+      { id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' },
+    ]);
+    mockGetCapitalGains.mockResolvedValue([
+      capitalGainEntry({ startValue: 0, endValue: 1200, unrealizedGain: 200, totalCapitalGain: 200 }),
+    ]);
+
+    const cells = await monthlyTableCells('Jun 2024');
+
+    // [month, start, end, dividends, interest, capital gains, total]
+    expect(cells[1]).toHaveTextContent('$0.00');
+    expect(cells[1].textContent).not.toContain('-');
+    expect(cells[1].textContent).not.toContain('—');
+    expect(cells[2]).toHaveTextContent('$1200.00');
+  });
+
+  it('renders an unknown start value as the unknown marker, not as a zero', async () => {
+    // No rate between the security's currency and the account's, so the server
+    // could not value the position at all.
+    mockGetTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
+    mockGetInvestmentAccounts.mockResolvedValue([
+      { id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' },
+    ]);
+    mockGetCapitalGains.mockResolvedValue([
+      capitalGainEntry({
+        securityCurrencyCode: 'EUR',
+        startValue: null,
+        endValue: null,
+        unrealizedGain: null,
+        totalCapitalGain: null,
+      }),
+    ]);
+
+    const cells = await monthlyTableCells('Jun 2024');
+
+    expect(cells[1].textContent).toBe('—');
+    expect(cells[2].textContent).toBe('—');
+    expect(cells[1].textContent).not.toContain('$');
+  });
+
   it('switches the monthly view from chart to table on demand', async () => {
     mockGetTransactions.mockResolvedValue({
       data: [
@@ -1614,7 +1703,11 @@ describe('DividendIncomeReport', () => {
     });
   });
 
-  it('shows dash for zero values in monthly table rows', async () => {
+  // Was 'shows dash for zero values in monthly table rows', and it asserted the
+  // defect: a month with no activity holds zeros the server computed, and they
+  // are figures. (Its second assertion was `dashCells.some(() => true)`, which
+  // is true of any non-empty array, so it added nothing either way.)
+  it('renders an inactive month as zeros, with no cell reading as unknown', async () => {
     mockGetTransactions.mockResolvedValue({
       data: [
         {
@@ -1644,11 +1737,20 @@ describe('DividendIncomeReport', () => {
     await waitFor(() => {
       expect(screen.getByText('Month')).toBeInTheDocument();
     });
-    // Rows with zero Interest and Capital Gains should show '-'
-    const dashCells = screen.getAllByText('-');
-    expect(dashCells.length).toBeGreaterThan(0);
-    // Start Value and End Value are zero (no capital gain entries) so also '-'
-    expect(dashCells.some(() => true)).toBe(true);
+    // May 2024 held nothing and earned nothing: every figure in the row is a
+    // known zero, and none of them is unknown.
+    const quiet = [
+      ...screen.getAllByRole('table')[0].querySelectorAll('tbody tr'),
+    ].find((tr) => tr.querySelector('td')?.textContent?.trim() === 'May 2024');
+    expect(quiet).toBeDefined();
+    const figures = [...quiet!.querySelectorAll('td')].slice(1);
+    expect(figures.length).toBeGreaterThan(0);
+    for (const cell of figures) {
+      expect(cell.textContent).toBe('$0.00');
+    }
+    // And no cell anywhere in the table claims a figure is unknown.
+    expect(screen.queryAllByText('-')).toHaveLength(0);
+    expect(screen.queryAllByText('—')).toHaveLength(0);
   });
 
   it('shows negative monthly total with red styling', async () => {
