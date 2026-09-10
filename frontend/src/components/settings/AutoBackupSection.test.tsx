@@ -25,6 +25,11 @@ vi.mock('@/store/preferencesStore', () => ({
   ),
 }));
 
+const mockUseDemoMode = vi.fn(() => false);
+vi.mock('@/hooks/useDemoMode', () => ({
+  useDemoMode: () => mockUseDemoMode(),
+}));
+
 import { backupApi } from '@/lib/backupApi';
 import toast from 'react-hot-toast';
 
@@ -57,6 +62,7 @@ async function renderAutoBackupSection() {
 describe('AutoBackupSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseDemoMode.mockReturnValue(false);
     (
       backupApi.getAutoBackupCapability as ReturnType<typeof vi.fn>
     ).mockResolvedValue({
@@ -771,6 +777,70 @@ describe('AutoBackupSection', () => {
         expect(backupApi.getAutoBackupCapability).toHaveBeenCalledTimes(2);
       });
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
+  });
+
+  /**
+   * The four mutating AutoBackupController endpoints (validate-folder,
+   * browse-folders, run-auto-backup, PATCH auto-backup-settings) are
+   * @DemoRestricted, so in demo mode the controls that reach them can only ever
+   * error. Disable them (with the enable toggle) rather than hide them -- a
+   * control the user is looking at is disabled, not removed.
+   */
+  describe('in demo mode', () => {
+    it('disables Save, Validate, Run and Browse and the enable toggle', async () => {
+      mockUseDemoMode.mockReturnValue(true);
+      (
+        backupApi.getAutoBackupSettings as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({
+        ...defaultSettings,
+        enabled: true,
+        folderPath: '/data/backups',
+      });
+
+      await renderAutoBackupSection();
+
+      expect(screen.getByRole('switch')).toBeDisabled();
+      expect(screen.getByText('Browse...').closest('button')).toBeDisabled();
+      expect(screen.getByText('Validate').closest('button')).toBeDisabled();
+      expect(screen.getByText('Save Settings').closest('button')).toBeDisabled();
+      expect(
+        screen.getByRole('button', { name: 'Run Backup Now' }),
+      ).toBeDisabled();
+      expect(
+        screen.getByText(/read-only in demo mode/i),
+      ).toBeInTheDocument();
+    });
+
+    it('leaves the controls enabled when not in demo mode', async () => {
+      // A dirty form so Save's own precondition does not stand in for the demo
+      // gate, a configured folder so Run and Validate are live.
+      (
+        backupApi.getAutoBackupSettings as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({
+        ...defaultSettings,
+        enabled: true,
+        folderPath: '/data/backups',
+      });
+
+      await renderAutoBackupSection();
+
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Backup Folder'), {
+          target: { value: '/data/backups/new' },
+        });
+      });
+
+      expect(screen.getByRole('switch')).not.toBeDisabled();
+      expect(screen.getByText('Browse...').closest('button')).not.toBeDisabled();
+      expect(screen.getByText('Validate').closest('button')).not.toBeDisabled();
+      expect(
+        screen.getByText('Save Settings').closest('button'),
+      ).not.toBeDisabled();
+      expect(
+        screen.getByRole('button', { name: 'Run Backup Now' }),
+      ).not.toBeDisabled();
+      expect(screen.queryByText(/read-only in demo mode/i)).not.toBeInTheDocument();
     });
   });
 });

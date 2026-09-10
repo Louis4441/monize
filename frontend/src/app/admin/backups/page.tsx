@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { AutoBackupSection } from '@/components/settings/AutoBackupSection';
 import { useAuthStore } from '@/store/authStore';
+import { useDemoMode } from '@/hooks/useDemoMode';
 
 export default function AdminBackupsPage() {
   return (
@@ -40,6 +41,7 @@ function AdminBackupsContent() {
   const router = useRouter();
   const currentUser = useAuthStore((s) => s.user);
   const isAdmin = currentUser?.role === 'admin';
+  const isDemoMode = useDemoMode();
 
   useEffect(() => {
     if (currentUser && currentUser.role !== 'admin') {
@@ -56,6 +58,17 @@ function AdminBackupsContent() {
       <main className="max-w-4xl mx-auto px-4 pt-6 pb-8 sm:px-6 lg:px-12">
         <PageHeader title={t('title')} subtitle={t('subtitle')} />
 
+        {isDemoMode && (
+          <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-6 mb-6">
+            <h2 className="text-lg font-semibold text-amber-800 dark:text-amber-200 mb-2">
+              {t('demoRestricted.heading')}
+            </h2>
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              {t('demoRestricted.body')}
+            </p>
+          </div>
+        )}
+
         {/* The one thing this page must make unambiguous: what an automatic
             backup is and, more importantly, what it is not. */}
         <Card as="section" padding="md" className="mb-6" aria-labelledby="admin-backups-scope-heading">
@@ -69,7 +82,13 @@ function AdminBackupsContent() {
             {t('scope.perUser')}
           </p>
           <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+            {t('scope.adminPolicyScope')}
+          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
             {t('scope.notFullDatabase')}
+          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+            {t('scope.notSameAsManualExport')}
           </p>
           <p className="text-sm text-gray-600 dark:text-gray-300">
             {t('scope.disasterRecovery')}

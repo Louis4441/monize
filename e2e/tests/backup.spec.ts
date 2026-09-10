@@ -90,5 +90,58 @@ test.describe('Backup & restore', () => {
     await expect(
       adminPage.getByRole('heading', { name: 'Automatic Backup' }),
     ).toBeVisible();
+
+    // The automatic-backup flow lives here now, so its controls do too.
+    const folder = adminPage.getByLabel('Backup Folder');
+    const validate = adminPage.getByRole('button', { name: 'Validate' });
+    const save = adminPage.getByRole('button', { name: 'Save Settings' });
+    await expect(folder).toBeVisible();
+    await expect(adminPage.getByRole('switch')).toBeVisible();
+    await expect(
+      adminPage.getByRole('button', { name: 'Browse...' }),
+    ).toBeVisible();
+    await expect(save).toBeVisible();
+
+    // Validate is disabled until a folder path is entered; typing one enables
+    // it. `/data/backups` is the default allowed root, so it is a legal path to
+    // store even before storage is proven writable.
+    await expect(validate).toBeDisabled();
+    await folder.fill('/data/backups');
+    await expect(validate).toBeEnabled();
+
+    // Exercise Save. A disabled schedule with a folder set does not need
+    // writable storage, so the PATCH round-trips and the server then reports a
+    // folder is configured -- which is exactly what makes Run Backup Now appear.
+    await expect(save).toBeEnabled();
+    await save.click();
+    await expect(
+      adminPage.getByRole('button', { name: 'Run Backup Now' }),
+    ).toBeVisible();
+  });
+
+  test('disables the automatic-backup controls in demo mode', async ({
+    adminPage,
+  }) => {
+    // The four mutating AutoBackupController endpoints are @DemoRestricted, so
+    // the controls that reach them are disabled (not hidden) for a demo admin,
+    // with the amber demo banner explaining why. This body only runs against a
+    // deployment started with DEMO_MODE=true.
+    test.skip(
+      process.env.DEMO_MODE !== 'true',
+      'requires a DEMO_MODE=true deployment',
+    );
+
+    await adminPage.goto('/admin/backups');
+
+    await expect(
+      adminPage.getByRole('heading', { name: 'Restricted in Demo Mode' }),
+    ).toBeVisible();
+    await expect(adminPage.getByRole('switch')).toBeDisabled();
+    await expect(
+      adminPage.getByRole('button', { name: 'Browse...' }),
+    ).toBeDisabled();
+    await expect(
+      adminPage.getByRole('button', { name: 'Save Settings' }),
+    ).toBeDisabled();
   });
 });

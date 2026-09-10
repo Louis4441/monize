@@ -17,6 +17,7 @@ import {
 } from '@/types/auth';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
+import { useDemoMode } from '@/hooks/useDemoMode';
 
 const FREQUENCY_OPTIONS = [
   { value: 'every6hours', labelKey: 'frequencyOptions.every6hours' },
@@ -40,6 +41,7 @@ function formatDateTime(
 export function AutoBackupSection() {
   const t = useTranslations('settings.autoBackup');
   const tCommon = useTranslations('common');
+  const isDemoMode = useDemoMode();
   const preferences = usePreferencesStore((s) => s.preferences);
   const userTimezone = resolveTimezone(preferences?.timezone);
   const dateFormat = preferences?.dateFormat || 'browser';
@@ -265,6 +267,12 @@ export function AutoBackupSection() {
         {t('adminManagedNote')}
       </p>
 
+      {isDemoMode && (
+        <p className="text-sm text-amber-700 dark:text-amber-300 mb-6" role="note">
+          {t('demoDisabledNote')}
+        </p>
+      )}
+
       {storageUnavailable && (
         <div
           className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
@@ -282,7 +290,7 @@ export function AutoBackupSection() {
         <label className="flex items-center gap-3 cursor-pointer">
           <ToggleSwitch
             checked={enabled}
-            disabled={cannotArm}
+            disabled={cannotArm || isDemoMode}
             onChange={(v) => {
               setEnabled(v);
               markDirty();
@@ -321,13 +329,14 @@ export function AutoBackupSection() {
             <Button
               variant="outline"
               onClick={handleOpenBrowse}
+              disabled={isDemoMode}
             >
               {t('browseButton')}
             </Button>
             <Button
               variant="outline"
               onClick={handleValidateFolder}
-              disabled={isValidating || !folderPath.trim()}
+              disabled={isValidating || !folderPath.trim() || isDemoMode}
             >
               {isValidating ? t('validatingButton') : t('validateButton')}
             </Button>
@@ -572,7 +581,7 @@ export function AutoBackupSection() {
       <div className="flex gap-2">
         <Button
           onClick={handleSave}
-          disabled={isSaving || !isDirty || saveBlockedByCapability}
+          disabled={isSaving || !isDirty || saveBlockedByCapability || isDemoMode}
         >
           {isSaving ? t('savingButton') : t('saveButton')}
         </Button>
@@ -581,8 +590,9 @@ export function AutoBackupSection() {
             variant="outline"
             onClick={handleRunNow}
             // Nowhere to write means a run can only produce a failure the banner
-            // has already explained.
-            disabled={isRunning || capabilityBlocksArming}
+            // has already explained. In demo mode the mutating endpoints are
+            // @DemoRestricted, so the run would only ever error.
+            disabled={isRunning || capabilityBlocksArming || isDemoMode}
           >
             {isRunning ? t('runningButton') : t('runNowButton')}
           </Button>

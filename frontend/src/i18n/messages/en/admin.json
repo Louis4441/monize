@@ -172,12 +172,18 @@
   },
   "backupsPage": {
     "title": "Backups",
-    "subtitle": "Automatic, scheduled backups for every account on this deployment.",
+    "subtitle": "Scheduled, compressed per-user backup files written to a folder on the server.",
     "scope": {
       "heading": "Not a full database backup",
-      "perUser": "Automatic backup writes a separate backup file for each user account on this deployment — the same per-account export a person can download from Settings, taken on a schedule and kept on the server.",
+      "perUser": "Automatic backup writes, on a schedule, a compressed backup file of each user's own financial records to a folder on the server, keeping a number of them according to the retention policy.",
+      "adminPolicyScope": "The schedule, folder, and retention configured here currently govern the administrator's own automatic backups. Other accounts are backed up automatically on fixed deployment defaults, and a single per-deployment policy is not yet configurable here.",
       "notFullDatabase": "It is not a full PostgreSQL or database dump. It does not capture the database schema, another deployment's data, application configuration, or anything outside a user's own financial records.",
+      "notSameAsManualExport": "It is related to, but not the same on-disk format as, the manual export in Settings -> Backup & Restore.",
       "disasterRecovery": "For disaster recovery of the whole instance, back up the PostgreSQL database and the attachment storage separately using your infrastructure's own tools."
+    },
+    "demoRestricted": {
+      "heading": "Restricted in Demo Mode",
+      "body": "Automatic-backup configuration is disabled in demo mode."
     }
   }
 }

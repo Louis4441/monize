@@ -813,10 +813,14 @@ this one, and it is what would replace a measured multiple with a bound.
 concern, not an account preference, so its configuration surface is admin-only:
 **Admin → Backups** (`frontend/src/app/admin/backups/page.tsx`, route
 `/admin/backups`), reading and writing the admin-restricted `AutoBackupController`
-endpoints. That page states plainly what an automatic backup is — a **separate
-per-user backup file** for every account, the same per-account export a person can
-download themselves, taken on a schedule — and what it is **not**: a full
-PostgreSQL/database dump. It does not capture the schema, another deployment's
+endpoints. That page states plainly what an automatic backup is — a **compressed
+per-user backup file** of a user's own financial records, written to a server
+folder on a schedule and pruned by retention — and what it is **not**: a full
+PostgreSQL/database dump. The schedule, folder and retention configured there
+currently govern the *administrator's own* automatic backups (see the Known gap
+below); other accounts run on hardcoded deployment defaults. It is related to,
+but not the same on-disk format as, the manual per-account export a person can
+download themselves. It does not capture the schema, another deployment's
 data, or server configuration; whole-instance disaster recovery is a separate
 backup of PostgreSQL and the attachment storage. A person's own manual
 export/restore stays in **Settings → Backup & Restore**

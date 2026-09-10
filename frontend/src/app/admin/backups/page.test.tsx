@@ -59,6 +59,11 @@ vi.mock('@/lib/errors', () => ({
   getErrorMessage: vi.fn((_error: unknown, fallback: string) => fallback),
 }));
 
+const mockUseDemoMode = vi.fn(() => false);
+vi.mock('@/hooks/useDemoMode', () => ({
+  useDemoMode: () => mockUseDemoMode(),
+}));
+
 // AutoBackupSection self-fetches on mount; give it settled, empty answers so
 // the admin page renders without touching the network.
 vi.mock('@/lib/backupApi', () => ({
@@ -96,6 +101,7 @@ describe('AdminBackupsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     currentRole = 'admin';
+    mockUseDemoMode.mockReturnValue(false);
   });
 
   it('shows the page and the "not a full database backup" explanation to an admin', async () => {
@@ -113,6 +119,29 @@ describe('AdminBackupsPage', () => {
       screen.getByText('Automatic Backup', { selector: 'h2' }),
     ).toBeInTheDocument();
     expect(mockRouterPush).not.toHaveBeenCalled();
+  });
+
+  it('renders the demo banner in demo mode', async () => {
+    mockUseDemoMode.mockReturnValue(true);
+    render(<AdminBackupsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Restricted in Demo Mode')).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(/Automatic-backup configuration is disabled in demo mode/i),
+    ).toBeInTheDocument();
+    // The scope card still renders alongside the banner.
+    expect(screen.getByText('Not a full database backup')).toBeInTheDocument();
+  });
+
+  it('does not render the demo banner outside demo mode', async () => {
+    render(<AdminBackupsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Not a full database backup')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Restricted in Demo Mode')).toBeNull();
   });
 
   it('redirects a non-admin away and renders nothing', async () => {
