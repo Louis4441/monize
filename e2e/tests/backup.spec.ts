@@ -102,9 +102,14 @@ test.describe('Backup & restore', () => {
     ).toBeVisible();
     await expect(save).toBeVisible();
 
-    // Validate is disabled until a folder path is entered; typing one enables
-    // it. `/data/backups` is the default allowed root, so it is a legal path to
-    // store even before storage is proven writable.
+    // The folder is pre-populated with the deployment default (`getSettings`
+    // reports the resolved root even for an admin with no saved row), so
+    // Validate is enabled from the start -- there is a legal path to probe even
+    // before storage is proven writable. A non-empty path is the whole of the
+    // gate: clearing the field disables Validate, and refilling it re-enables it.
+    await expect(folder).not.toHaveValue('');
+    await expect(validate).toBeEnabled();
+    await folder.fill('');
     await expect(validate).toBeDisabled();
     await folder.fill('/data/backups');
     await expect(validate).toBeEnabled();
