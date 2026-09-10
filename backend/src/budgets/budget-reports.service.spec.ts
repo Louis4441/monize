@@ -1250,7 +1250,7 @@ describe("BudgetReportsService", () => {
       );
 
       expect(result).toHaveLength(1);
-      expect(result[0].month).toBe("Jan 2026");
+      expect(result[0].monthKey).toBe("2026-01");
       expect(result[0].score).toBeGreaterThanOrEqual(0);
       expect(result[0].score).toBeLessThanOrEqual(100);
       expect(result[0].label).toBeDefined();
@@ -1688,8 +1688,8 @@ describe("BudgetReportsService", () => {
       );
 
       expect(result).toHaveLength(2);
-      expect(result[0].month).toBe("Dec 2025");
-      expect(result[1].month).toBe("Jun 2026");
+      expect(result[0].monthKey).toBe("2025-12");
+      expect(result[1].monthKey).toBe("2026-06");
     });
 
     it("should return correct labels for different score ranges", async () => {
@@ -1833,8 +1833,8 @@ describe("BudgetReportsService", () => {
       );
 
       expect(result).toHaveLength(2);
-      expect(result[0].month).toBe("Jan 2026");
-      expect(result[1].month).toBe("Feb 2026");
+      expect(result[0].monthKey).toBe("2026-01");
+      expect(result[1].monthKey).toBe("2026-02");
       // First period under budget, second over budget
       expect(result[0].score).toBeGreaterThan(result[1].score);
     });
