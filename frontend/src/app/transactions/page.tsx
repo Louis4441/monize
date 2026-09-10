@@ -52,6 +52,8 @@ import { useDateFormat } from '@/hooks/useDateFormat';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useFormModal } from '@/hooks/useFormModal';
+import { useSwipeToPaginate } from '@/hooks/useSwipeToPaginate';
+import { SWIPE_PAGINATE_ATTR } from '@/hooks/swipe-gesture';
 import { AccountFormModal } from '@/components/accounts/AccountFormModal';
 import { AccountInfoWidget } from '@/components/transactions/AccountInfoWidget';
 import { PayeeInfoWidget } from '@/components/transactions/PayeeInfoWidget';
@@ -168,6 +170,16 @@ function TransactionsContent() {
 
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [startingBalance, setStartingBalance] = useState<number | undefined>();
+
+  // A horizontal finger swipe on the register turns its page in place, so a
+  // long list can be paged without scrolling to the pager. The zone owns the
+  // horizontal swipe only when there is more than one page; a single-page
+  // register yields it back to view navigation (SwipeShell).
+  const { swipeRef, paginates } = useSwipeToPaginate({
+    page: filters.currentPage,
+    totalPages: pagination?.totalPages ?? 1,
+    onPageChange: filters.goToPage,
+  });
 
   // Bumped after every transaction reload so the entity info widgets (which
   // fetch their own summaries) refetch in lockstep with the chart and list,
@@ -1355,6 +1367,7 @@ function TransactionsContent() {
 
         {/* Transactions List */}
         <div className={`${CARD_CLASS} overflow-hidden`}>
+          <div ref={swipeRef} {...(paginates ? { [SWIPE_PAGINATE_ATTR]: 'true' } : {})}>
           {isLoading && transactions.length === 0 ? (
             <LoadingSpinner text={t('page.loading')} />
           ) : (
@@ -1397,6 +1410,7 @@ function TransactionsContent() {
               highlightTransactionId={filters.highlightTransactionId}
             />
           )}
+          </div>
         </div>
 
         {/* Pagination, repeated below the rows */}

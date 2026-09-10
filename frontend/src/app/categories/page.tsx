@@ -174,7 +174,7 @@ function CategoriesContent() {
           actions={<Button onClick={openCreate}>{t('page.newButton')}</Button>}
         />
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
           <SummaryCard
             label={t('page.summaryTotal')}
             value={categories.length}

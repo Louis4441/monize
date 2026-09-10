@@ -777,7 +777,7 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
     <div>
       {/* Filter Bar */}
       <div className="px-3 sm:px-6 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-        <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
             {/* Status segmented control and Net Worth filter */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">

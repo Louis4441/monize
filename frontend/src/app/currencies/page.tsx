@@ -242,7 +242,7 @@ function CurrenciesContent() {
         />
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-6">
           <SummaryCard label={t('page.summary.totalCurrencies')} value={allCurrencies.length} icon={SummaryIcons.barChart} />
           <SummaryCard label={t('page.summary.active')} value={activeCount} icon={SummaryIcons.checkCircle} valueColor="green" />
           <SummaryCard label={t('page.summary.inactive')} value={inactiveCount} icon={SummaryIcons.ban} />

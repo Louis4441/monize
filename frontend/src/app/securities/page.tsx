@@ -352,7 +352,7 @@ function SecuritiesContent() {
           actions={<Button onClick={handleCreateNew}>{t('page.newSecurity')}</Button>}
         />
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
           <SummaryCard label={t('summary.totalSecurities')} value={allSecurities.length} icon={SummaryIcons.barChart} />
           <SummaryCard label={t('summary.types')} value={distinctTypes} icon={SummaryIcons.tag} />
           <SummaryCard label={t('summary.exchanges')} value={distinctExchanges} icon={SummaryIcons.list} />
