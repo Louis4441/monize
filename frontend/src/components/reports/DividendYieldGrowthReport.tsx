@@ -527,10 +527,14 @@ export function DividendYieldGrowthReport() {
         <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
           <div className="text-sm text-green-600 dark:text-green-400">{t('dividendYieldGrowth.portfolioYield')}</div>
           <div className="text-xl font-bold text-green-700 dark:text-green-300">
-            {formatPercent(portfolioYield, 2)}
-            {valuationGaps.excludedCount > 0 && (
-              <span className="text-amber-600 dark:text-amber-400" aria-hidden="true"> *</span>
-            )}
+            {/* The yield is the ratio of the two subtotals beside it, so it is
+                a subtotal too, and it wears the marker the same way they do.
+                The hand-rolled amber `*` this replaces was `aria-hidden` with
+                no `sr-only` twin, so the one figure a screen reader was told
+                nothing about was the derived one. */}
+            <PartialTotal total={{ value: portfolioYield, ...valuationGaps }} displayCurrency={displayCurrency}>
+              {formatPercent(portfolioYield, 2)}
+            </PartialTotal>
           </div>
         </div>
         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">

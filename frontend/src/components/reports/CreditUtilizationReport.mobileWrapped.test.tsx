@@ -260,12 +260,48 @@ describe('CreditUtilizationReport (phone wrapped table)', () => {
     expect(footRow.textContent).toContain('Credit Limit');
     expect(footRow.textContent).toContain('Utilization');
     // CHF could not be converted, so each money subtotal in the footer must
-    // carry the same visible and accessible partial marker as the summary.
-    for (const cell of [limit, used, available]) {
+    // carry the same visible and accessible partial marker as the summary --
+    // and so must the utilisation cell beside them, which is the RATIO of two
+    // of those subtotals and therefore describes only the accounts that
+    // converted (`lib/credit-utilization.ts` states that contract). A bare
+    // ratio under a header reading "Total" was the defect: it reported an
+    // improved figure that the excluded card would have worsened.
+    for (const cell of [limit, used, available, utilization]) {
       expect(cell.querySelector('[data-testid="partial-total"]')).toBeInTheDocument();
       expect(cell.querySelector('[data-testid="partial-total-marker"]')).toBeInTheDocument();
       expect(cell.textContent).toContain('partial total');
     }
+  });
+
+  it('marks the utilisation ratio partial on the summary card and the donut', async () => {
+    const container = await renderReport();
+
+    // The three surfaces print one figure -- 10.4% of the two convertible
+    // cards' limits -- and it excludes the CHF card, so all three carry the
+    // marker. The card's own marker used to be a hand-rolled `aria-hidden`
+    // asterisk with no `sr-only` twin, which is why the accessible suffix is
+    // asserted and not just the symbol: it is the half a sighted review of the
+    // screen cannot notice missing.
+    const markers = Array.from(
+      container.querySelectorAll('[data-testid="partial-total"]'),
+    ).filter((node) => /%/.test(node.textContent ?? ''));
+
+    // The summary card, the donut centre and the table footer.
+    expect(markers).toHaveLength(3);
+    for (const marker of markers) {
+      expect(marker.querySelector('[data-testid="partial-total-marker"]')).toHaveAttribute(
+        'aria-hidden',
+        'true',
+      );
+      expect(marker.textContent).toContain('partial total');
+    }
+
+    // The donut centre sits in an overlay the chart needs to stay
+    // click-through, so the marker's explanation would be unreachable by mouse
+    // unless that one figure takes pointer events back.
+    const donutFigure = container.querySelector('.pointer-events-none .pointer-events-auto');
+    expect(donutFigure).not.toBeNull();
+    expect(donutFigure!.querySelector('[data-testid="partial-total"]')).toBeInTheDocument();
   });
 
   it('keeps the account name shrinkable and readable in full', async () => {

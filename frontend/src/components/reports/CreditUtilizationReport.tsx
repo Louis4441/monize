@@ -403,10 +403,19 @@ export function CreditUtilizationReport() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-4">
           <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{t('creditUtilization.overallUtilization')}</p>
           <p className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100">
-            {formatPercent(totals.utilizationPercent, 1)}
-            {totals.excludedCount > 0 && (
-              <span className="text-amber-600 dark:text-amber-400" aria-hidden="true"> *</span>
-            )}
+            {/* The ratio of two subtotals is a subtotal, so it wears the same
+                marker through the same component the money cards use. The hand
+                -rolled amber `*` this replaces was `aria-hidden` and had no
+                `sr-only` twin, so a screen reader was told the ratio was
+                complete -- `PartialTotal` renders the symbol, the accessible
+                suffix and the explanation together, which is why the marker is
+                not written out a second time anywhere. */}
+            <PartialTotal
+              total={{ value: totals.utilizationPercent, ...totalsMarker }}
+              displayCurrency={displayCurrency}
+            >
+              {formatPercent(totals.utilizationPercent, 1)}
+            </PartialTotal>
           </p>
         </div>
       </div>
@@ -522,8 +531,19 @@ export function CreditUtilizationReport() {
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {formatPercent(totals.utilizationPercent, 1)}
+                {/* The same ratio the summary card reports, so it carries the
+                    same marker. The overlay is `pointer-events-none` so it does
+                    not swallow the slices' own tooltips; the marker's
+                    explanation is a hover target, so this one span takes
+                    pointer events back -- it sits in the donut hole, over no
+                    slice. */}
+                <span className="pointer-events-auto text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  <PartialTotal
+                    total={{ value: totals.utilizationPercent, ...totalsMarker }}
+                    displayCurrency={displayCurrency}
+                  >
+                    {formatPercent(totals.utilizationPercent, 1)}
+                  </PartialTotal>
                 </span>
               </div>
             </div>
@@ -715,7 +735,12 @@ export function CreditUtilizationReport() {
                 </td>
                 <td role="cell" className={`col-start-4 col-span-3 row-start-1 font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                   <CellLabel className={CAPTION_CLASS}>{columns.utilization.label}</CellLabel>
-                  {formatPercent(totals.utilizationPercent, 1)}
+                  <PartialTotal
+                    total={{ value: totals.utilizationPercent, ...totalsMarker }}
+                    displayCurrency={displayCurrency}
+                  >
+                    {formatPercent(totals.utilizationPercent, 1)}
+                  </PartialTotal>
                 </td>
               </tr>
             </tfoot>

@@ -782,6 +782,26 @@ export function GeographicAllocationReport() {
                   </td>
                   <td role="cell" className={`${COUNTRY_PLACEMENT.marketValue} font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                     <CellLabel className={CAPTION_CLASS}>{countryColumns.marketValue.label}</CellLabel>
+                    {/* NOT `totalValue`, and so NOT wrapped in `PartialTotal`
+                        like the region and exchange footers below. This figure
+                        is `countryResp.totalPortfolioValue`: the country view
+                        is a server-side look-through aggregate (ETFs split
+                        across their manual country weightings), computed from
+                        different inputs than the client-side conversion that
+                        produces `missingCurrencies` / `excludedCount`. Marking
+                        it with those would attach one aggregate's gaps to
+                        another aggregate's number -- the mistake root
+                        `CLAUDE.md` names as reading a completeness flag from
+                        somewhere other than the aggregate that produced the
+                        figure on screen.
+                        `CountryWeightingResult` reports no completeness of its
+                        own, so whether THIS total is whole is currently
+                        unknown to this component. Closing that needs an
+                        `fxComplete`/`pricesComplete` pair on
+                        `sector-weighting.service.ts`'s look-through result and
+                        its frontend type, which is a change to files this
+                        report does not own. Do not "finish" this by reaching
+                        for the client-side marker. */}
                     {formatCurrencyFull(countryTotalValue, defaultCurrency)}
                   </td>
                   <td role="cell" className={`${COUNTRY_PLACEMENT.percentage} font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
@@ -851,7 +871,17 @@ export function GeographicAllocationReport() {
                   </td>
                   <td role="cell" className={`${REGION_PLACEMENT.marketValue} font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                     <CellLabel className={CAPTION_CLASS}>{regionColumns.marketValue.label}</CellLabel>
-                    {formatCurrencyFull(totalValue, defaultCurrency)}
+                    {/* The same `totalValue` the summary card marks, under a
+                        header reading "Total": an unpriced or unconvertible
+                        holding is left out of it, so it wears the marker here
+                        too rather than reading 20,000 directly below a card
+                        reading 20,000 with an asterisk. */}
+                    <PartialTotal
+                      total={{ value: totalValue, missingCurrencies, excludedCount }}
+                      displayCurrency={defaultCurrency}
+                    >
+                      {formatCurrencyFull(totalValue, defaultCurrency)}
+                    </PartialTotal>
                   </td>
                   <td role="cell" className={`${REGION_PLACEMENT.percentage} font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                     <CellLabel className={CAPTION_CLASS}>{regionColumns.percentage.label}</CellLabel>
@@ -931,7 +961,15 @@ export function GeographicAllocationReport() {
                   </td>
                   <td role="cell" className={`${EXCHANGE_PLACEMENT.marketValue} font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                     <CellLabel className={CAPTION_CLASS}>{exchangeColumns.marketValue.label}</CellLabel>
-                    {formatCurrencyFull(totalValue, defaultCurrency)}
+                    {/* `totalValue` again, so the same marker again -- the two
+                        footers and the card report one figure and must agree
+                        about whether it is whole. */}
+                    <PartialTotal
+                      total={{ value: totalValue, missingCurrencies, excludedCount }}
+                      displayCurrency={defaultCurrency}
+                    >
+                      {formatCurrencyFull(totalValue, defaultCurrency)}
+                    </PartialTotal>
                   </td>
                   <td role="cell" className={`${EXCHANGE_PLACEMENT.percentage} font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                     <CellLabel className={CAPTION_CLASS}>{exchangeColumns.percentage.label}</CellLabel>
