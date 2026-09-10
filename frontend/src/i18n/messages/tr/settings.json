@@ -595,7 +595,7 @@
   "autoBackup": {
     "heading": "Otomatik Yedekleme",
     "description": "Verilerinizi bir programa göre otomatik olarak bir klasöre yedekleyin. Monize Docker'da çalıştığından, bir ana klasörü kapsayıcıya birim olarak eşlemeniz gerekir (örn., -v /host/backups:/data/backups).",
-    "adminManagedNote": "Bu ayarları yalnızca yöneticiler değiştirebilir. Diğer tüm kullanıcılar aynı zamanlama ve saklama ilkesiyle, her biri kendi klasörüne otomatik olarak yedeklenir.",
+    "adminManagedNote": "Bu ayarları yalnızca yöneticiler değiştirebilir ve bunlar şu anda yöneticinin kendi otomatik yedeklerini yönetir. Diğer tüm kullanıcılar sabit dağıtım varsayılanlarıyla, her biri kendi klasörüne otomatik olarak yedeklenir.",
     "loadingText": "Yükleniyor...",
     "enableLabel": "Otomatik yedeklemeyi etkinleştir",
     "backupFolderLabel": "Yedekleme Klasörü",
@@ -659,7 +659,8 @@
       "title": "Bu kurulumda yedek deposu yok",
       "body": "Otomatik yedekler {folderPath} konumuna yazılacaktı, ancak bu kurulum oraya yazamıyor. Bir zamanlamanın çalışabilmesi için yöneticinin oraya depolama bağlaması gerekir."
     },
-    "never": "Hiçbir zaman"
+    "never": "Hiçbir zaman",
+    "demoDisabledNote": "Bu denetimler demo modunda salt okunurdur."
   },
   "backupRestore": {
     "heading": "Yedekleme ve Geri Yükleme",
@@ -840,7 +841,6 @@
     "apiAccess": "API Erişimi",
     "aiSettings": "AI Ayarları",
     "backupRestore": "Yedekleme ve Geri Yükleme",
-    "autoBackup": "Otomatik Yedekleme",
     "help": "Yardım ve Destek",
     "dangerZone": "Tehlikeli Alan",
     "about": "Hakkında",

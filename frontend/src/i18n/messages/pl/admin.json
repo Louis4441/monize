@@ -169,5 +169,21 @@
       "rotated": "{count, plural, =0 {Wymieniono parę kluczy} one {Wymieniono parę kluczy; 1 urządzenie musi zarejestrować się ponownie} few {Wymieniono parę kluczy; # urządzenia muszą zarejestrować się ponownie} many {Wymieniono parę kluczy; # urządzeń musi zarejestrować się ponownie} other {Wymieniono parę kluczy; # urządzenia musi zarejestrować się ponownie}}",
       "rotateFailed": "Nie udało się wymienić pary kluczy"
     }
+  },
+  "backupsPage": {
+    "title": "Kopie zapasowe",
+    "subtitle": "Zaplanowane, skompresowane pliki kopii zapasowych dla poszczególnych użytkowników, zapisywane do folderu na serwerze.",
+    "scope": {
+      "heading": "To nie jest pełna kopia zapasowa bazy danych",
+      "perUser": "Automatyczna kopia zapasowa zapisuje według harmonogramu skompresowany plik kopii z własnymi danymi finansowymi każdego użytkownika do folderu na serwerze i przechowuje pewną ich liczbę zgodnie z zasadami przechowywania.",
+      "adminPolicyScope": "Skonfigurowane tutaj harmonogram, folder i przechowywanie regulują obecnie tylko automatyczne kopie zapasowe samego administratora. Pozostałe konta są archiwizowane automatycznie według stałych wartości domyślnych wdrożenia, a pojedynczych zasad dla całego wdrożenia nie można jeszcze skonfigurować w tym miejscu.",
+      "notFullDatabase": "To nie jest pełny zrzut bazy PostgreSQL ani bazy danych. Nie obejmuje schematu bazy danych, danych innego wdrożenia, konfiguracji aplikacji ani niczego poza własnymi danymi finansowymi użytkownika.",
+      "notSameAsManualExport": "Jest powiązany z ręcznym eksportem w Ustawienia -> Kopia zapasowa i przywracanie, ale ma inny format na dysku.",
+      "disasterRecovery": "Na potrzeby odtwarzania awaryjnego całej instancji wykonaj osobną kopię zapasową bazy danych PostgreSQL i magazynu załączników za pomocą własnych narzędzi swojej infrastruktury."
+    },
+    "demoRestricted": {
+      "heading": "Ograniczone w trybie demonstracyjnym",
+      "body": "Konfiguracja automatycznej kopii zapasowej jest wyłączona w trybie demonstracyjnym."
+    }
   }
 }

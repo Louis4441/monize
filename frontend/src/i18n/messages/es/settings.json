@@ -595,7 +595,7 @@
   "autoBackup": {
     "heading": "Copia de seguridad automática",
     "description": "Realiza copias de seguridad automáticas de tus datos en una carpeta según un horario. Dado que Monize se ejecuta en Docker, debes mapear una carpeta del host al contenedor como volumen (p. ej., -v /host/backups:/data/backups).",
-    "adminManagedNote": "Solo los administradores pueden cambiar esta configuración. El resto de los usuarios se respaldan automáticamente con la misma programación y política de retención, cada uno en su propia carpeta.",
+    "adminManagedNote": "Solo los administradores pueden cambiar esta configuración, que actualmente rige las copias de seguridad automáticas del propio administrador. El resto de los usuarios se respaldan automáticamente con valores predeterminados fijos de la implementación, cada uno en su propia carpeta.",
     "loadingText": "Cargando...",
     "enableLabel": "Habilitar copias de seguridad automáticas",
     "backupFolderLabel": "Carpeta de copia de seguridad",
@@ -659,7 +659,8 @@
       "title": "Esta instalación no tiene almacenamiento para copias de seguridad",
       "body": "Las copias automáticas se escribirían en {folderPath}, donde esta instalación no puede escribir. Un administrador debe montar almacenamiento allí antes de que se pueda ejecutar una programación."
     },
-    "never": "Nunca"
+    "never": "Nunca",
+    "demoDisabledNote": "Estos controles son de solo lectura en el modo de demostración."
   },
   "backupRestore": {
     "heading": "Copia de seguridad y restauración",
@@ -840,7 +841,6 @@
     "apiAccess": "Acceso a la API",
     "aiSettings": "Configuración de IA",
     "backupRestore": "Copia de seguridad y restauración",
-    "autoBackup": "Copia de seguridad automática",
     "help": "Ayuda y soporte",
     "dangerZone": "Zona de peligro",
     "about": "Acerca de",

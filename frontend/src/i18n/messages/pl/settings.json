@@ -595,7 +595,7 @@
   "autoBackup": {
     "heading": "Automatyczna kopia zapasowa",
     "description": "Automatycznie twórz kopie zapasowe danych do folderu według harmonogramu. Ponieważ Monize działa w Dockerze, musisz zamapować folder hosta do kontenera jako wolumin (np. -v /host/backups:/data/backups).",
-    "adminManagedNote": "Tylko administratorzy mogą zmieniać te ustawienia. Wszyscy pozostali użytkownicy są archiwizowani automatycznie według tego samego harmonogramu i zasad przechowywania, każdy do własnego folderu.",
+    "adminManagedNote": "Tylko administratorzy mogą zmieniać te ustawienia i regulują one obecnie automatyczne kopie zapasowe samego administratora. Wszyscy pozostali użytkownicy są archiwizowani automatycznie według stałych wartości domyślnych wdrożenia, każdy do własnego folderu.",
     "loadingText": "Wczytywanie...",
     "enableLabel": "Włącz automatyczne kopie zapasowe",
     "backupFolderLabel": "Folder kopii zapasowych",
@@ -659,7 +659,8 @@
       "title": "Ta instalacja nie ma magazynu kopii zapasowych",
       "body": "Automatyczne kopie zapasowe byłyby zapisywane w {folderPath}, gdzie ta instalacja nie może pisać. Administrator musi zamontować tam magazyn, zanim harmonogram będzie mógł działać."
     },
-    "never": "Nigdy"
+    "never": "Nigdy",
+    "demoDisabledNote": "W trybie demonstracyjnym te elementy sterujące są tylko do odczytu."
   },
   "backupRestore": {
     "heading": "Kopia zapasowa i przywracanie",
@@ -840,7 +841,6 @@
     "apiAccess": "Dostęp do API",
     "aiSettings": "Ustawienia AI",
     "backupRestore": "Kopia zapasowa i przywracanie",
-    "autoBackup": "Automatyczna kopia zapasowa",
     "help": "Pomoc i wsparcie",
     "dangerZone": "Strefa zagrożenia",
     "about": "O programie",

@@ -169,5 +169,21 @@
       "rotated": "{count, plural, =0 {Đã xoay cặp khóa} other {Đã xoay cặp khóa; # thiết bị phải đăng ký lại}}",
       "rotateFailed": "Không xoay được cặp khóa"
     }
+  },
+  "backupsPage": {
+    "title": "Sao lưu",
+    "subtitle": "Các tệp sao lưu theo từng người dùng, được nén và theo lịch, ghi vào một thư mục trên máy chủ.",
+    "scope": {
+      "heading": "Không phải bản sao lưu toàn bộ cơ sở dữ liệu",
+      "perUser": "Sao lưu tự động ghi, theo một lịch trình, một tệp sao lưu đã nén chứa hồ sơ tài chính của riêng mỗi người dùng vào một thư mục trên máy chủ, và giữ lại một số lượng nhất định theo chính sách lưu giữ.",
+      "adminPolicyScope": "Lịch trình, thư mục và việc lưu giữ được cấu hình tại đây hiện chỉ điều chỉnh các bản sao lưu tự động của chính quản trị viên. Các tài khoản khác được sao lưu tự động theo các giá trị mặc định cố định của lần triển khai, và một chính sách chung cho mỗi lần triển khai vẫn chưa thể cấu hình tại đây.",
+      "notFullDatabase": "Đây không phải là bản kết xuất PostgreSQL hay cơ sở dữ liệu đầy đủ. Nó không thu thập lược đồ cơ sở dữ liệu, dữ liệu của lần triển khai khác, cấu hình ứng dụng, hay bất kỳ thứ gì ngoài hồ sơ tài chính của riêng người dùng.",
+      "notSameAsManualExport": "Nó liên quan đến việc xuất thủ công trong Cài đặt -> Sao lưu & khôi phục, nhưng không cùng định dạng trên đĩa.",
+      "disasterRecovery": "Để khôi phục sau thảm họa cho toàn bộ phiên bản, hãy sao lưu cơ sở dữ liệu PostgreSQL và bộ lưu trữ tệp đính kèm riêng biệt bằng các công cụ riêng của hạ tầng của bạn."
+    },
+    "demoRestricted": {
+      "heading": "Bị hạn chế trong Chế độ Demo",
+      "body": "Cấu hình sao lưu tự động bị tắt trong chế độ demo."
+    }
   }
 }

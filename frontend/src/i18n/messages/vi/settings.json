@@ -595,7 +595,7 @@
   "autoBackup": {
     "heading": "Sao lưu tự động",
     "description": "Tự động sao lưu dữ liệu của bạn vào một thư mục theo lịch. Vì Monize chạy trong Docker, bạn phải ánh xạ một thư mục máy chủ vào container dưới dạng volume (VD: -v /host/backups:/data/backups).",
-    "adminManagedNote": "Chỉ quản trị viên mới có thể thay đổi các cài đặt này. Tất cả người dùng khác được sao lưu tự động theo cùng lịch trình và chính sách lưu giữ, mỗi người vào một thư mục riêng.",
+    "adminManagedNote": "Chỉ quản trị viên mới có thể thay đổi các cài đặt này, và chúng hiện điều chỉnh các bản sao lưu tự động của chính quản trị viên. Tất cả người dùng khác được sao lưu tự động theo các giá trị mặc định cố định của lần triển khai, mỗi người vào một thư mục riêng.",
     "loadingText": "Đang tải...",
     "enableLabel": "Bật sao lưu tự động",
     "backupFolderLabel": "Thư mục sao lưu",
@@ -659,7 +659,8 @@
       "title": "Bản triển khai này không có bộ lưu trữ sao lưu",
       "body": "Bản sao lưu tự động sẽ được ghi vào {folderPath}, nơi bản triển khai này không thể ghi. Quản trị viên cần gắn bộ lưu trữ ở đó trước khi lịch trình có thể chạy."
     },
-    "never": "Không bao giờ"
+    "never": "Không bao giờ",
+    "demoDisabledNote": "Các điều khiển này ở chế độ chỉ đọc trong chế độ demo."
   },
   "backupRestore": {
     "heading": "Sao lưu & Khôi phục",
@@ -840,7 +841,6 @@
     "apiAccess": "Truy cập API",
     "aiSettings": "Cài đặt AI",
     "backupRestore": "Sao lưu & Khôi phục",
-    "autoBackup": "Sao lưu tự động",
     "help": "Trợ giúp & Hỗ trợ",
     "dangerZone": "Khu vực nguy hiểm",
     "about": "Giới thiệu",

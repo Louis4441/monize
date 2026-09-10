@@ -595,7 +595,7 @@
   "autoBackup": {
     "heading": "Backup automatico",
     "description": "Esegui automaticamente il backup dei tuoi dati in una cartella secondo una pianificazione. Poiché Monize gira in Docker, devi mappare una cartella dell'host nel container come volume (es. -v /host/backups:/data/backups).",
-    "adminManagedNote": "Solo gli amministratori possono modificare queste impostazioni. Tutti gli altri utenti vengono salvati automaticamente con la stessa pianificazione e politica di conservazione, ciascuno in una cartella propria.",
+    "adminManagedNote": "Solo gli amministratori possono modificare queste impostazioni, che attualmente regolano i backup automatici dell'amministratore stesso. Tutti gli altri utenti vengono salvati automaticamente con valori predefiniti fissi del deployment, ciascuno in una cartella propria.",
     "loadingText": "Caricamento...",
     "enableLabel": "Attiva backup automatici",
     "backupFolderLabel": "Cartella di backup",
@@ -659,7 +659,8 @@
       "title": "Questa installazione non ha spazio di archiviazione per i backup",
       "body": "I backup automatici verrebbero scritti in {folderPath}, dove questa installazione non può scrivere. Un amministratore deve montare uno spazio di archiviazione lì prima che una pianificazione possa essere eseguita."
     },
-    "never": "Mai"
+    "never": "Mai",
+    "demoDisabledNote": "Questi controlli sono di sola lettura in modalità demo."
   },
   "backupRestore": {
     "heading": "Backup e ripristino",
@@ -840,7 +841,6 @@
     "apiAccess": "Accesso API",
     "aiSettings": "Impostazioni AI",
     "backupRestore": "Backup e ripristino",
-    "autoBackup": "Backup automatico",
     "help": "Guida e supporto",
     "dangerZone": "Zona pericolosa",
     "about": "Informazioni",

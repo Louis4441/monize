@@ -169,5 +169,21 @@
       "rotated": "{count, plural, =0 {Pasangan kunci dirotasi} other {Pasangan kunci dirotasi; # perangkat harus mendaftar ulang}}",
       "rotateFailed": "Tidak dapat merotasi pasangan kunci"
     }
+  },
+  "backupsPage": {
+    "title": "Cadangan",
+    "subtitle": "Berkas cadangan per-pengguna yang terjadwal dan terkompresi, ditulis ke sebuah folder di server.",
+    "scope": {
+      "heading": "Bukan cadangan basis data penuh",
+      "perUser": "Pencadangan otomatis menulis, sesuai jadwal, sebuah berkas cadangan terkompresi berisi catatan keuangan milik setiap pengguna ke sebuah folder di server, dan menyimpan sejumlah di antaranya sesuai kebijakan retensi.",
+      "adminPolicyScope": "Jadwal, folder, dan retensi yang dikonfigurasi di sini saat ini hanya mengatur pencadangan otomatis milik administrator sendiri. Akun lain dicadangkan secara otomatis dengan nilai bawaan penyebaran yang tetap, dan satu kebijakan per-penyebaran belum dapat dikonfigurasi di sini.",
+      "notFullDatabase": "Ini bukan dump PostgreSQL atau basis data secara penuh. Ini tidak mencakup skema basis data, data penyebaran lain, konfigurasi aplikasi, atau apa pun di luar catatan keuangan milik pengguna sendiri.",
+      "notSameAsManualExport": "Ini terkait dengan ekspor manual di Pengaturan -> Cadangkan & Pulihkan, tetapi formatnya di disk tidak sama.",
+      "disasterRecovery": "Untuk pemulihan bencana seluruh instans, cadangkan basis data PostgreSQL dan penyimpanan lampiran secara terpisah menggunakan perkakas milik infrastruktur Anda sendiri."
+    },
+    "demoRestricted": {
+      "heading": "Dibatasi dalam Mode Demo",
+      "body": "Konfigurasi pencadangan otomatis dinonaktifkan dalam mode demo."
+    }
   }
 }

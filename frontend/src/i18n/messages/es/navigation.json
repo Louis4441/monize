@@ -32,5 +32,6 @@
     "label": "Buscar transacciones",
     "open": "Abrir búsqueda",
     "submit": "Buscar"
-  }
+  },
+  "backups": "Copias de seguridad"
 }

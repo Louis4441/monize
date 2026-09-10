@@ -169,5 +169,21 @@
       "rotated": "{count, plural, =0 {Anahtar çifti değiştirildi} one {Anahtar çifti değiştirildi; 1 cihazın yeniden kaydolması gerekiyor} other {Anahtar çifti değiştirildi; # cihazın yeniden kaydolması gerekiyor}}",
       "rotateFailed": "Anahtar çifti değiştirilemedi"
     }
+  },
+  "backupsPage": {
+    "title": "Yedekler",
+    "subtitle": "Sunucudaki bir klasöre yazılan, zamanlanmış ve sıkıştırılmış, kullanıcı başına yedek dosyaları.",
+    "scope": {
+      "heading": "Tam bir veritabanı yedeği değildir",
+      "perUser": "Otomatik yedekleme, bir zamanlamaya göre, her kullanıcının kendi finansal kayıtlarının sıkıştırılmış bir yedek dosyasını sunucudaki bir klasöre yazar ve saklama ilkesine göre bunlardan belirli bir sayıda tutar.",
+      "adminPolicyScope": "Burada yapılandırılan zamanlama, klasör ve saklama şu anda yalnızca yöneticinin kendi otomatik yedeklerini yönetir. Diğer hesaplar sabit dağıtım varsayılanlarıyla otomatik olarak yedeklenir ve dağıtım başına tek bir ilke henüz burada yapılandırılamaz.",
+      "notFullDatabase": "Tam bir PostgreSQL veya veritabanı dökümü değildir. Veritabanı şemasını, başka bir dağıtımın verilerini, uygulama yapılandırmasını veya kullanıcının kendi finansal kayıtları dışındaki hiçbir şeyi içermez.",
+      "notSameAsManualExport": "Ayarlar -> Yedekleme ve Geri Yükleme bölümündeki manuel dışa aktarmayla ilişkilidir, ancak diskteki biçimi aynı değildir.",
+      "disasterRecovery": "Tüm örneğin olağanüstü durum kurtarması için PostgreSQL veritabanını ve ek depolamasını altyapınızın kendi araçlarını kullanarak ayrı ayrı yedekleyin."
+    },
+    "demoRestricted": {
+      "heading": "Demo Modunda Kısıtlı",
+      "body": "Otomatik yedekleme yapılandırması demo modunda devre dışıdır."
+    }
   }
 }

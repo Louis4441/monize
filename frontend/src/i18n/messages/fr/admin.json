@@ -169,5 +169,21 @@
       "rotated": "{count, plural, =0 {Paire de clés renouvelée} one {Paire de clés renouvelée ; 1 appareil doit se réenregistrer} other {Paire de clés renouvelée ; # appareils doivent se réenregistrer}}",
       "rotateFailed": "Impossible de renouveler la paire de clés"
     }
+  },
+  "backupsPage": {
+    "title": "Sauvegardes",
+    "subtitle": "Fichiers de sauvegarde par utilisateur, compressés et planifiés, écrits dans un dossier sur le serveur.",
+    "scope": {
+      "heading": "Pas une sauvegarde complète de la base de données",
+      "perUser": "La sauvegarde automatique écrit, selon une planification, un fichier de sauvegarde compressé des données financières de chaque utilisateur dans un dossier sur le serveur, et en conserve un certain nombre selon la politique de rétention.",
+      "adminPolicyScope": "La planification, le dossier et la rétention configurés ici ne régissent actuellement que les sauvegardes automatiques de l'administrateur lui-même. Les autres comptes sont sauvegardés automatiquement selon des valeurs par défaut fixes du déploiement, et une politique unique par déploiement n'est pas encore configurable ici.",
+      "notFullDatabase": "Il ne s'agit pas d'un vidage complet de PostgreSQL ni de la base de données. Il ne capture pas le schéma de la base de données, les données d'un autre déploiement, la configuration de l'application, ni quoi que ce soit en dehors des données financières de l'utilisateur.",
+      "notSameAsManualExport": "Elle est liée à l'exportation manuelle de Paramètres -> Sauvegarde et restauration, mais n'a pas le même format sur disque.",
+      "disasterRecovery": "Pour la reprise après sinistre de l'ensemble de l'instance, sauvegardez la base de données PostgreSQL et le stockage des pièces jointes séparément à l'aide des outils propres à votre infrastructure."
+    },
+    "demoRestricted": {
+      "heading": "Restreint en mode démo",
+      "body": "La configuration de la sauvegarde automatique est désactivée en mode démo."
+    }
   }
 }

@@ -169,5 +169,21 @@
       "rotated": "{count, plural, =0 {Coppia di chiavi ruotata} one {Coppia di chiavi ruotata; 1 dispositivo deve registrarsi di nuovo} other {Coppia di chiavi ruotata; # dispositivi devono registrarsi di nuovo}}",
       "rotateFailed": "Impossibile ruotare la coppia di chiavi"
     }
+  },
+  "backupsPage": {
+    "title": "Backup",
+    "subtitle": "File di backup per utente, pianificati e compressi, scritti in una cartella sul server.",
+    "scope": {
+      "heading": "Non è un backup completo del database",
+      "perUser": "Il backup automatico scrive, secondo una pianificazione, un file di backup compresso dei dati finanziari di ciascun utente in una cartella sul server, conservandone un certo numero in base alla politica di conservazione.",
+      "adminPolicyScope": "La pianificazione, la cartella e la conservazione configurate qui attualmente regolano solo i backup automatici dell'amministratore stesso. Gli altri account vengono salvati automaticamente con valori predefiniti fissi del deployment, e una singola politica per deployment non è ancora configurabile qui.",
+      "notFullDatabase": "Non è un dump completo di PostgreSQL né del database. Non acquisisce lo schema del database, i dati di un altro deployment, la configurazione dell'applicazione o qualsiasi cosa al di fuori dei dati finanziari dell'utente.",
+      "notSameAsManualExport": "È collegato all'esportazione manuale in Impostazioni -> Backup e ripristino, ma non ha lo stesso formato su disco.",
+      "disasterRecovery": "Per il ripristino di emergenza dell'intera istanza, esegui il backup del database PostgreSQL e dell'archivio degli allegati separatamente utilizzando gli strumenti della tua infrastruttura."
+    },
+    "demoRestricted": {
+      "heading": "Limitato in modalità demo",
+      "body": "La configurazione del backup automatico è disattivata in modalità demo."
+    }
   }
 }

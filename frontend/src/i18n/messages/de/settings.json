@@ -595,7 +595,7 @@
   "autoBackup": {
     "heading": "Automatisches Backup",
     "description": "Sichern Sie Ihre Daten automatisch nach einem Zeitplan in einem Ordner. Da Monize in Docker läuft, müssen Sie einen Host-Ordner als Volume in den Container einbinden (z. B. -v /host/backups:/data/backups).",
-    "adminManagedNote": "Nur Administratoren können diese Einstellungen ändern. Alle anderen Benutzer werden automatisch nach demselben Zeitplan und derselben Aufbewahrungsrichtlinie gesichert, jeweils in einem eigenen Ordner.",
+    "adminManagedNote": "Nur Administratoren können diese Einstellungen ändern, und sie gelten derzeit für die automatischen Sicherungen des Administrators selbst. Alle anderen Benutzer werden automatisch mit festen Bereitstellungsvorgaben gesichert, jeweils in einem eigenen Ordner.",
     "loadingText": "Wird geladen...",
     "enableLabel": "Automatische Backups aktivieren",
     "backupFolderLabel": "Backup-Ordner",
@@ -659,7 +659,8 @@
       "title": "Diese Installation hat keinen Backup-Speicher",
       "body": "Automatische Backups würden nach {folderPath} geschrieben, wohin diese Installation nicht schreiben kann. Ein Administrator muss dort Speicher einbinden, bevor ein Zeitplan laufen kann."
     },
-    "never": "Nie"
+    "never": "Nie",
+    "demoDisabledNote": "Diese Steuerelemente sind im Demomodus schreibgeschützt."
   },
   "backupRestore": {
     "heading": "Backup & Wiederherstellung",
@@ -840,7 +841,6 @@
     "apiAccess": "API-Zugang",
     "aiSettings": "KI-Einstellungen",
     "backupRestore": "Backup & Wiederherstellung",
-    "autoBackup": "Automatisches Backup",
     "help": "Hilfe & Support",
     "dangerZone": "Gefahrenbereich",
     "about": "Über",

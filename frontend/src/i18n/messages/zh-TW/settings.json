@@ -595,7 +595,7 @@
   "autoBackup": {
     "heading": "自動備份",
     "description": "依排程自動將您的資料備份至資料夾。由於 Monize 在 Docker 中運行，您必須將主機資料夾映射至容器作為磁碟區（例如：-v /host/backups:/data/backups）。",
-    "adminManagedNote": "只有管理員可以變更這些設定。其他所有使用者都會依照相同的排程與保留原則自動備份到各自的資料夾中。",
+    "adminManagedNote": "只有管理員可以變更這些設定，且目前僅適用於管理員自己的自動備份。其他所有使用者都會依照固定的部署預設值自動備份到各自的資料夾中。",
     "loadingText": "載入中...",
     "enableLabel": "啟用自動備份",
     "backupFolderLabel": "備份資料夾",
@@ -659,7 +659,8 @@
       "title": "此部署沒有備份儲存空間",
       "body": "自動備份將寫入 {folderPath}，但此部署無法寫入該位置。管理員需要先在該位置掛載儲存空間，排程才能執行。"
     },
-    "never": "從未"
+    "never": "從未",
+    "demoDisabledNote": "在示範模式下，這些控制項為唯讀。"
   },
   "backupRestore": {
     "heading": "備份與還原",
@@ -840,7 +841,6 @@
     "apiAccess": "API 存取",
     "aiSettings": "AI 設定",
     "backupRestore": "備份與還原",
-    "autoBackup": "自動備份",
     "help": "說明與支援",
     "dangerZone": "危險區域",
     "about": "關於",

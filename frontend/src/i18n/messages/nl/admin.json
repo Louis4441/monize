@@ -169,5 +169,21 @@
       "rotated": "{count, plural, =0 {Sleutelpaar vervangen} one {Sleutelpaar vervangen; 1 apparaat moet zich opnieuw registreren} other {Sleutelpaar vervangen; # apparaten moeten zich opnieuw registreren}}",
       "rotateFailed": "Kon het sleutelpaar niet vervangen"
     }
+  },
+  "backupsPage": {
+    "title": "Back-ups",
+    "subtitle": "Geplande, gecomprimeerde back-upbestanden per gebruiker, geschreven naar een map op de server.",
+    "scope": {
+      "heading": "Geen volledige databaseback-up",
+      "perUser": "De automatische back-up schrijft volgens een schema een gecomprimeerd back-upbestand van de eigen financiële gegevens van elke gebruiker naar een map op de server en bewaart er een aantal volgens het bewaarbeleid.",
+      "adminPolicyScope": "Het hier geconfigureerde schema, de map en de bewaring gelden momenteel alleen voor de automatische back-ups van de beheerder zelf. Andere accounts worden automatisch geback-upt met vaste implementatiestandaarden, en één beleid per implementatie is hier nog niet configureerbaar.",
+      "notFullDatabase": "Het is geen volledige PostgreSQL- of databasedump. Het legt niet het databaseschema, de gegevens van een andere implementatie, de applicatieconfiguratie of iets buiten de eigen financiële gegevens van een gebruiker vast.",
+      "notSameAsManualExport": "Het is gerelateerd aan de handmatige export in Instellingen -> Back-up & herstel, maar heeft niet hetzelfde bestandsformaat.",
+      "disasterRecovery": "Voor noodherstel van de hele instantie maakt u de PostgreSQL-database en de bijlageopslag afzonderlijk een back-up met de eigen hulpmiddelen van uw infrastructuur."
+    },
+    "demoRestricted": {
+      "heading": "Beperkt in demomodus",
+      "body": "De configuratie van de automatische back-up is uitgeschakeld in de demomodus."
+    }
   }
 }

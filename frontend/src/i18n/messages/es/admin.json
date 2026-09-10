@@ -169,5 +169,21 @@
       "rotated": "{count, plural, =0 {Par de claves rotado} one {Par de claves rotado; 1 dispositivo debe registrarse de nuevo} other {Par de claves rotado; # dispositivos deben registrarse de nuevo}}",
       "rotateFailed": "No se pudo rotar el par de claves"
     }
+  },
+  "backupsPage": {
+    "title": "Copias de seguridad",
+    "subtitle": "Archivos de copia de seguridad por usuario, comprimidos y programados, escritos en una carpeta del servidor.",
+    "scope": {
+      "heading": "No es una copia de seguridad completa de la base de datos",
+      "perUser": "La copia de seguridad automática escribe, según una programación, un archivo comprimido con los registros financieros de cada usuario en una carpeta del servidor, y conserva una cantidad de ellos según la política de retención.",
+      "adminPolicyScope": "La programación, la carpeta y la retención configuradas aquí rigen actualmente solo las copias de seguridad automáticas del propio administrador. Las demás cuentas se respaldan automáticamente con valores predeterminados fijos de la implementación, y todavía no se puede configurar aquí una única política por implementación.",
+      "notFullDatabase": "No es un volcado completo de PostgreSQL ni de la base de datos. No incluye el esquema de la base de datos, los datos de otra implementación, la configuración de la aplicación ni nada fuera de los registros financieros del propio usuario.",
+      "notSameAsManualExport": "Está relacionado con la exportación manual de Configuración -> Copia de seguridad y restauración, pero no tiene el mismo formato en disco.",
+      "disasterRecovery": "Para la recuperación ante desastres de toda la instancia, respalde la base de datos PostgreSQL y el almacenamiento de adjuntos por separado con las herramientas propias de su infraestructura."
+    },
+    "demoRestricted": {
+      "heading": "Restringido en el modo de demostración",
+      "body": "La configuración de la copia de seguridad automática está deshabilitada en el modo de demostración."
+    }
   }
 }
