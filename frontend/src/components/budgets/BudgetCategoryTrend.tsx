@@ -14,7 +14,7 @@ import {
 import { chartSeriesColor } from '@/lib/chart-colors';
 import { CAPTION_CLASS, CellLabel } from '@/components/ui/Table';
 import type { CategoryTrendSeries } from '@/types/budget';
-import { useDateFormat } from '@/hooks/useDateFormat';
+import { useChartMonthFormat } from '@/hooks/useChartMonthFormat';
 
 interface BudgetCategoryTrendProps {
   data: CategoryTrendSeries[];
@@ -53,13 +53,12 @@ const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:te
 const CELL_PADDING = 'sm:py-2 sm:pr-4';
 const LAST_CELL_PADDING = 'sm:py-2';
 
-/** Every caption in a wrapped cell is phone-only. */
 function CategoryTrendTooltip({
   active,
   payload,
   label,
   formatCurrency,
-  formatMonth,
+  formatChartMonth,
 }: {
   active?: boolean;
   payload?: Array<{
@@ -70,14 +69,14 @@ function CategoryTrendTooltip({
   }>;
   label?: string;
   formatCurrency: (amount: number) => string;
-  formatMonth: (monthKey: string) => string;
+  formatChartMonth: (monthKey: string) => string;
 }) {
   if (!active || !payload || payload.length === 0) return null;
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3 max-w-xs">
       <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-        {formatMonth(String(label))}
+        {formatChartMonth(String(label))}
       </p>
       {payload.map((entry) => (
         <div
@@ -99,7 +98,10 @@ export function BudgetCategoryTrend({
   formatCurrency,
 }: BudgetCategoryTrendProps) {
   const t = useTranslations('budgets');
-  const { formatMonth } = useDateFormat();
+  // A month marker on a CHART localizes the month name (`Jan 2026`), as every
+  // other chart here does; the date-format preference would give a numeric
+  // `01/2026` tick, which is a table column's answer, not an axis's.
+  const formatChartMonth = useChartMonthFormat();
   // The four column labels, read once. Both the column header row (from `sm`
   // up) and the per-cell captions that replace it on a phone come from here,
   // so a caption cannot go on naming a column the header has renamed.
@@ -201,7 +203,7 @@ export function BudgetCategoryTrend({
               dataKey="monthKey"
               tick={{ fontSize: 12 }}
               className="text-gray-500"
-              tickFormatter={formatMonth}
+              tickFormatter={(value: string) => formatChartMonth(value)}
             />
             <YAxis
               tick={{ fontSize: 12 }}
@@ -212,7 +214,7 @@ export function BudgetCategoryTrend({
               content={
                 <CategoryTrendTooltip
                   formatCurrency={formatCurrency}
-                  formatMonth={formatMonth}
+                  formatChartMonth={formatChartMonth}
                 />
               }
             />

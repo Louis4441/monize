@@ -9,28 +9,13 @@ import { BudgetPeriod, PeriodStatus } from "./entities/budget-period.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
 import { BudgetsService } from "./budgets.service";
-import { getMonthEndYMD } from "../common/date-utils";
+import { formatMonthKey, getMonthEndYMD } from "../common/date-utils";
 import {
   HealthScoreResult,
   HealthScoreHistoryPoint,
   SavingsRatePoint,
 } from "./budget-reports.service";
 import { roundMoney, roundToDecimals } from "../common/round.util";
-
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 
 @Injectable()
 export class BudgetHealthReportsService {
@@ -208,7 +193,7 @@ export class BudgetHealthReportsService {
       const score = Math.min(100, Math.max(0, Math.round(rawScore)));
 
       result.push({
-        month: this.formatPeriodMonth(period.periodStart),
+        monthKey: this.formatPeriodMonthKey(period.periodStart),
         score,
         label: this.getScoreLabel(score),
       });
@@ -439,8 +424,7 @@ export class BudgetHealthReportsService {
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
       const year = d.getFullYear();
       const month = d.getMonth();
-      const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
-      const monthLabel = `${MONTH_NAMES[month].substring(0, 3)} ${year}`;
+      const monthKey = formatMonthKey(year, month + 1);
 
       const income = incomeByMonth.get(monthKey) || 0;
       const expenses = expenseByMonth.get(monthKey) || 0;
@@ -449,7 +433,7 @@ export class BudgetHealthReportsService {
         income > 0 ? roundToDecimals((savings / income) * 100, 2) : 0;
 
       result.push({
-        month: monthLabel,
+        monthKey,
         income: roundMoney(income),
         expenses: roundMoney(expenses),
         savings: roundMoney(savings),
@@ -546,10 +530,10 @@ export class BudgetHealthReportsService {
     return "Off Track";
   }
 
-  private formatPeriodMonth(periodStart: string): string {
+  private formatPeriodMonthKey(periodStart: string): string {
     const parts = periodStart.split("-");
     const year = parseInt(parts[0], 10);
     const month = parseInt(parts[1], 10);
-    return `${MONTH_NAMES[month - 1].substring(0, 3)} ${year}`;
+    return formatMonthKey(year, month);
   }
 }

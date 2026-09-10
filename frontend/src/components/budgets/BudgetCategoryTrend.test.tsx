@@ -3,8 +3,10 @@ import { render, screen, fireEvent } from '@/test/render';
 import { BudgetCategoryTrend } from './BudgetCategoryTrend';
 import type { CategoryTrendSeries } from '@/types/budget';
 
-vi.mock('@/hooks/useDateFormat', () => ({
-  useDateFormat: () => ({ formatMonth: (monthKey: string) => `localized:${monthKey}` }),
+// A chart's month markers go through the chart month formatter, which
+// localizes the month NAME rather than following the date-format preference.
+vi.mock('@/hooks/useChartMonthFormat', () => ({
+  useChartMonthFormat: () => (monthKey: string) => `chartMonth:${monthKey}`,
 }));
 
 // Mock recharts
@@ -77,8 +79,8 @@ describe('BudgetCategoryTrend', () => {
     render(<BudgetCategoryTrend data={mockData} formatCurrency={mockFormat} />);
     expect(screen.getByTestId('category-trend-chart')).toBeInTheDocument();
     expect(screen.getByTestId('line-chart')).toBeInTheDocument();
-    expect(screen.getByTestId('x-axis')).toHaveTextContent('monthKey:localized:2026-01');
-    expect(screen.getByTestId('tooltip')).toHaveTextContent('localized:2026-02');
+    expect(screen.getByTestId('x-axis')).toHaveTextContent('monthKey:chartMonth:2026-01');
+    expect(screen.getByTestId('tooltip')).toHaveTextContent('chartMonth:2026-02');
   });
 
   it('groups and orders chart points by the structural month key', () => {

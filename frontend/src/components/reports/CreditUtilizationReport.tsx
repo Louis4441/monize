@@ -134,8 +134,6 @@ const HEADER_CLASS =
 const FIGURE_CELL =
   'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
 
-/** Every caption in a wrapped cell is phone-only. */
-
 /** One slice of the total-utilization donut: drawn vs available credit. */
 interface TotalUtilizationSlice {
   key: 'used' | 'available';

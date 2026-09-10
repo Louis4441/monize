@@ -66,6 +66,16 @@ vi.mock('@/lib/pdf-export', () => ({
   exportToPdf: vi.fn(),
 }));
 
+// The month column renders through the user's date preference; the label keeps
+// the key in it so a row is still addressable by month here.
+vi.mock('@/hooks/useDateFormat', () => ({
+  useDateFormat: () => ({ formatMonth: (monthKey: string) => `month:${monthKey}` }),
+}));
+
+vi.mock('@/hooks/useChartMonthFormat', () => ({
+  useChartMonthFormat: () => (monthKey: string) => `chart:${monthKey}`,
+}));
+
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: any) => <div>{children}</div>,
   LineChart: ({ children }: any) => <div data-testid="line-chart">{children}</div>,
@@ -79,11 +89,11 @@ vi.mock('recharts', () => ({
 }));
 
 const makePoint = (
-  month: string,
+  monthKey: string,
   income: number,
   expenses: number,
 ): SavingsRatePoint => ({
-  month,
+  monthKey,
   income,
   expenses,
   savings: income - expenses,
@@ -136,7 +146,9 @@ describe('SavingsRateReport (phone wrapped table)', () => {
     // The month is the row's identity, not one of its figures, so it carries
     // no caption -- it is the first thing on the line and names itself.
     const monthCell = row?.querySelector('td');
-    expect(monthCell?.textContent).toBe('2025-01');
+    // Rendered through the date preference, not printed as the raw key the
+    // server now sends.
+    expect(monthCell?.textContent).toBe('month:2025-01');
     expect(monthCell?.querySelector('span')).toBeNull();
     // Captions reuse the table's own column keys: no new catalogue string.
     for (const caption of ['Month', 'Income', 'Expenses', 'Savings', 'Rate']) {
@@ -320,7 +332,7 @@ describe('SavingsRateReport (phone wrapped table)', () => {
       Array.from(container.querySelectorAll('tbody tr')).map(
         (r) => r.querySelector('td')?.textContent,
       );
-    expect(monthOrder()).toEqual(['2025-01', '2025-02', '2025-03']);
+    expect(monthOrder()).toEqual(['month:2025-01', 'month:2025-02', 'month:2025-03']);
 
     // "Savings" in the phone strip: the fourth of the five controls in the
     // first header row. Addressed by position because the label also appears
@@ -332,7 +344,7 @@ describe('SavingsRateReport (phone wrapped table)', () => {
       fireEvent.click(phoneSavings);
     });
     // Ascending by savings puts February's -$1,337,800 first.
-    expect(monthOrder()).toEqual(['2025-02', '2025-03', '2025-01']);
+    expect(monthOrder()).toEqual(['month:2025-02', 'month:2025-03', 'month:2025-01']);
   });
 
   it('keeps both sign colourings the columns use, in the wrapped cells', async () => {

@@ -402,7 +402,14 @@ export interface CategoryBudgetStatus {
 
 // Savings Rate report types
 export interface SavingsRatePoint {
-  month: string;
+  /**
+   * The month as structure (`YYYY-MM`), the way `BudgetTrendPoint` carries it.
+   * Render it through `useDateFormat().formatMonth` (a table column) or
+   * `useChartMonthFormat()` (a chart axis) and sort on this value: the server
+   * used to send a `Mmm YYYY` label, which was English everywhere and sorted
+   * alphabetically.
+   */
+  monthKey: string;
   income: number;
   expenses: number;
   savings: number;
@@ -411,7 +418,8 @@ export interface SavingsRatePoint {
 
 // Health Score History report types
 export interface HealthScoreHistoryPoint {
-  month: string;
+  /** `YYYY-MM` -- see `SavingsRatePoint.monthKey`. */
+  monthKey: string;
   score: number;
   label: string;
 }

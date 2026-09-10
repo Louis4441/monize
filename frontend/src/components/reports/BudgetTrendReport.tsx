@@ -15,6 +15,7 @@ import {
 import { budgetsApi } from '@/lib/budgets';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
+import { useChartMonthFormat } from '@/hooks/useChartMonthFormat';
 import { useTranslations } from 'next-intl';
 import { useReportData } from '@/hooks/useReportData';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
@@ -26,7 +27,12 @@ import { resolvePdfColor } from '@/components/reports/resolve-pdf-color';
 export function BudgetTrendReport() {
   const t = useTranslations('reports');
   const { formatCurrencyCompact: formatCurrency, formatPercentTrimmed } = useNumberFormat();
+  // Two month formatters, for two different surfaces: the PDF's month COLUMN
+  // follows the user's date-format preference like every other date in a table,
+  // while the chart's month AXIS localizes the month name like every other
+  // chart. `useChartMonthFormat` explains why swapping them is a defect.
   const { formatMonth } = useDateFormat();
+  const formatChartMonth = useChartMonthFormat();
   const chartRef = useRef<HTMLDivElement>(null);
   const [selectedBudgetIdState, setSelectedBudgetId] = useState<string>('');
   const [months, setMonths] = useState(12);
@@ -156,14 +162,14 @@ export function BudgetTrendReport() {
               <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <LineChart data={trendData}>
                   <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                  <XAxis dataKey="monthKey" tick={{ fontSize: 12 }} tickFormatter={formatMonth} />
+                  <XAxis dataKey="monthKey" tick={{ fontSize: 12 }} tickFormatter={(value: string) => formatChartMonth(value)} />
                   <YAxis tickFormatter={(v) => formatCurrency(v)} tick={{ fontSize: 12 }} />
                   <Tooltip
                     content={({ active, payload, label }) => {
                       if (!active || !payload || payload.length === 0) return null;
                       return (
                         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">{formatMonth(String(label))}</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">{formatChartMonth(String(label))}</p>
                           {payload.map((entry) => (
                             <p key={entry.dataKey as string} className="text-sm" style={{ color: entry.color }}>
                               {entry.name}: {formatCurrency(entry.value as number)}

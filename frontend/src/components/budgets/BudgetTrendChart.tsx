@@ -12,7 +12,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { chartColors } from '@/lib/chart-colors';
-import { useDateFormat } from '@/hooks/useDateFormat';
+import { useChartMonthFormat } from '@/hooks/useChartMonthFormat';
 import type { BudgetTrendPoint } from '@/types/budget';
 
 interface BudgetTrendChartProps {
@@ -27,7 +27,7 @@ function CustomTooltip({
   formatCurrency,
   budgetedLabel,
   actualLabel,
-  formatMonth,
+  formatChartMonth,
 }: {
   active?: boolean;
   payload?: Array<{ value: number; dataKey: string; color: string }>;
@@ -35,14 +35,14 @@ function CustomTooltip({
   formatCurrency: (amount: number) => string;
   budgetedLabel: string;
   actualLabel: string;
-  formatMonth: (monthKey: string) => string;
+  formatChartMonth: (monthKey: string) => string;
 }) {
   if (!active || !payload || payload.length === 0) return null;
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
       <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
-        {formatMonth(String(label))}
+        {formatChartMonth(String(label))}
       </p>
       {payload.map((entry) => (
         <p
@@ -63,7 +63,11 @@ export function BudgetTrendChart({
   formatCurrency,
 }: BudgetTrendChartProps) {
   const t = useTranslations('budgets');
-  const { formatMonth } = useDateFormat();
+  // A month marker on a CHART localizes the month name (`Jan 2026`), the way
+  // every other chart in the app does. `useDateFormat().formatMonth` follows
+  // the date-format preference instead, which renders most preferences as a
+  // numeric `01/2026` -- right for a table's month column, wrong for an axis.
+  const formatChartMonth = useChartMonthFormat();
   const budgetedLabel = t('trendChart.budgeted');
   const actualLabel = t('trendChart.actual');
 
@@ -93,7 +97,7 @@ export function BudgetTrendChart({
               dataKey="monthKey"
               tick={{ fontSize: 12 }}
               className="text-gray-500"
-              tickFormatter={formatMonth}
+              tickFormatter={(value: string) => formatChartMonth(value)}
             />
             <YAxis
               tick={{ fontSize: 12 }}
@@ -104,7 +108,7 @@ export function BudgetTrendChart({
               content={
                 <CustomTooltip
                   formatCurrency={formatCurrency}
-                  formatMonth={formatMonth}
+                  formatChartMonth={formatChartMonth}
                   budgetedLabel={budgetedLabel}
                   actualLabel={actualLabel}
                 />

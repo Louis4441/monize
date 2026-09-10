@@ -35,6 +35,14 @@ vi.mock('@/hooks/useDateFormat', () => ({
       `localized:${monthKey}`,
   }),
 }));
+// A chart's month markers go through their own formatter, which localizes the
+// month NAME; `formatMonth` above follows the date-format preference and is a
+// table column's answer. The two mocks are deliberately distinguishable, so a
+// surface reaching for the wrong one is visible here.
+vi.mock('@/hooks/useChartMonthFormat', () => ({
+  useChartMonthFormat: () => (monthKey: string) => `chartMonth:${monthKey}`,
+}));
+
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
 }));
@@ -158,7 +166,17 @@ describe('BudgetVsActualReport', () => {
     });
     expect(screen.getAllByText('Alpha month').length).toBeGreaterThan(0);
     expect(screen.queryByText('2025-01')).not.toBeInTheDocument();
-    expect(screen.getAllByTestId('x-axis-monthKey')).toHaveLength(2);
+    // Both month AXES (the bar chart and the variance line) render through the
+    // chart formatter, while the table column above renders through the date
+    // preference. Asserting only the axis COUNT is what let a change of
+    // formatter pass unnoticed.
+    const axes = screen.getAllByTestId('x-axis-monthKey');
+    expect(axes).toHaveLength(2);
+    for (const axis of axes) {
+      expect(axis).toHaveTextContent('chartMonth:2025-02');
+    }
+    // The chart tooltips name their month the same way their ticks do.
+    expect(screen.getAllByText('chartMonth:2025-01').length).toBeGreaterThan(0);
     const renderedMonths = Array.from(document.querySelectorAll('tbody tr')).map(
       (row) => row.querySelector('td')?.textContent,
     );

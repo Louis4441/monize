@@ -26,8 +26,14 @@ vi.mock('@/hooks/useNumberFormat', async () => {
     }),
   };
 });
+// Two month surfaces, two formatters: the PDF's month column follows the
+// user's date-format preference, the chart's axis localizes the month name.
 vi.mock('@/hooks/useDateFormat', () => ({
   useDateFormat: () => ({ formatMonth: (monthKey: string) => `localized:${monthKey}` }),
+}));
+
+vi.mock('@/hooks/useChartMonthFormat', () => ({
+  useChartMonthFormat: () => (monthKey: string) => `chartMonth:${monthKey}`,
 }));
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
@@ -136,7 +142,9 @@ describe('BudgetTrendReport', () => {
     await waitFor(() => {
       expect(screen.getByText('Improving')).toBeInTheDocument();
     });
-    expect(screen.getByTestId('x-axis-monthKey')).toHaveTextContent('localized:2025-02');
+    // The AXIS uses the chart formatter, while the PDF table below still uses
+    // the date preference -- two surfaces, deliberately not one formatter.
+    expect(screen.getByTestId('x-axis-monthKey')).toHaveTextContent('chartMonth:2025-02');
     expect(screen.getByText('Avg Budgeted')).toBeInTheDocument();
   });
 

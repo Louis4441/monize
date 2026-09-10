@@ -18,6 +18,7 @@ import { budgetsApi } from '@/lib/budgets';
 import type { BudgetTrendPoint, CategoryTrendSeries } from '@/types/budget';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
+import { useChartMonthFormat } from '@/hooks/useChartMonthFormat';
 import { useTranslations } from 'next-intl';
 import { useReportData } from '@/hooks/useReportData';
 import { BudgetCategoryTrend } from '@/components/budgets/BudgetCategoryTrend';
@@ -164,11 +165,15 @@ const cellPadding = (col: SortColumn) => (col.last ? 'sm:py-2' : 'sm:py-2 sm:pr-
 // 390px in pl, ru, id, de, en, the widest-per-key set or the pseudo-locale.
 const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:text-sm';
 
-/** Every caption in a wrapped cell is phone-only. */
 export function BudgetVsActualReport() {
   const t = useTranslations('reports');
   const { formatCurrencyCompact: formatCurrency, formatPercentTrimmed } = useNumberFormat();
+  // Two month formatters, for two different surfaces: the table's and the
+  // PDF's month COLUMN follows the user's date-format preference like every
+  // other date in a table, while the two charts' month AXES localize the month
+  // name like every other chart. `useChartMonthFormat` explains the split.
   const { formatMonth } = useDateFormat();
+  const formatChartMonth = useChartMonthFormat();
   const [selectedBudgetIdState, setSelectedBudgetId] = useState<string>('');
   const [months, setMonths] = useState(6);
   const [viewMode, setViewMode] = useState<'overview' | 'categories'>('overview');
@@ -406,14 +411,14 @@ export function BudgetVsActualReport() {
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <BarChart data={trendData}>
                     <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                    <XAxis dataKey="monthKey" tick={{ fontSize: 12 }} tickFormatter={formatMonth} />
+                    <XAxis dataKey="monthKey" tick={{ fontSize: 12 }} tickFormatter={(value: string) => formatChartMonth(value)} />
                     <YAxis tickFormatter={(v) => formatCurrency(v)} tick={{ fontSize: 12 }} />
                     <Tooltip
                       content={({ active, payload, label }) => {
                         if (!active || !payload || payload.length === 0) return null;
                         return (
                           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">{formatMonth(String(label))}</p>
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">{formatChartMonth(String(label))}</p>
                             {payload.map((entry, idx) => (
                               <p key={(entry.dataKey as string) ?? entry.name ?? idx} className="text-sm" style={{ color: entry.color }}>
                                 {entry.name}: {formatCurrency(entry.value as number)}
@@ -437,7 +442,7 @@ export function BudgetVsActualReport() {
                   <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                     <LineChart data={trendData}>
                       <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                      <XAxis dataKey="monthKey" tick={{ fontSize: 12 }} tickFormatter={formatMonth} />
+                      <XAxis dataKey="monthKey" tick={{ fontSize: 12 }} tickFormatter={(value: string) => formatChartMonth(value)} />
                       <YAxis tickFormatter={(v) => formatCurrency(v)} tick={{ fontSize: 12 }} />
                       <Tooltip
                         content={({ active, payload, label }) => {
@@ -445,7 +450,7 @@ export function BudgetVsActualReport() {
                           const variance = payload[0]?.value as number;
                           return (
                             <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-                              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{formatMonth(String(label))}</p>
+                              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{formatChartMonth(String(label))}</p>
                               <p className={`text-sm font-medium ${variance > 0 ? 'text-red-500' : 'text-green-500'}`}>
                                 {t('budgetVsActual.tooltipVariance')} {variance > 0 ? '+' : ''}{formatCurrency(variance)}
                               </p>

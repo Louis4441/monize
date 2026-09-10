@@ -2,8 +2,11 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@/test/render';
 import { BudgetTrendChart } from './BudgetTrendChart';
 
-vi.mock('@/hooks/useDateFormat', () => ({
-  useDateFormat: () => ({ formatMonth: (monthKey: string) => `localized:${monthKey}` }),
+// A chart's month markers go through the chart month formatter, which
+// localizes the month NAME; the date-format preference (`useDateFormat`) would
+// give a numeric `01/2026` tick, which is a table column's answer.
+vi.mock('@/hooks/useChartMonthFormat', () => ({
+  useChartMonthFormat: () => (monthKey: string) => `chartMonth:${monthKey}`,
 }));
 
 // Mock recharts to avoid rendering actual SVGs in tests
@@ -32,7 +35,7 @@ vi.mock('recharts', () => ({
             payload={payload}
             label="2025-09"
             formatCurrency={content.props?.formatCurrency}
-            formatMonth={content.props?.formatMonth}
+            formatChartMonth={content.props?.formatChartMonth}
             budgetedLabel={content.props?.budgetedLabel}
             actualLabel={content.props?.actualLabel}
           />
@@ -71,7 +74,7 @@ describe('BudgetTrendChart', () => {
     expect(screen.getByTestId('line-chart')).toBeInTheDocument();
     expect(screen.getByTestId('line-Budgeted')).toBeInTheDocument();
     expect(screen.getByTestId('line-Actual')).toBeInTheDocument();
-    expect(screen.getByTestId('x-axis')).toHaveTextContent('monthKey:localized:2025-09');
+    expect(screen.getByTestId('x-axis')).toHaveTextContent('monthKey:chartMonth:2025-09');
   });
 
   it('shows empty state when no data', () => {
@@ -94,7 +97,7 @@ describe('BudgetTrendChart', () => {
     // Tooltip mock renders content component with active=true and payload
     expect(screen.getByTestId('tooltip')).toBeInTheDocument();
     // The tooltip should localize the structural key and format the values.
-    expect(screen.getByText('localized:2025-09')).toBeInTheDocument();
+    expect(screen.getByText('chartMonth:2025-09')).toBeInTheDocument();
     expect(screen.getByText(/Budgeted.*\$5000\.00/)).toBeInTheDocument();
     expect(screen.getByText(/Actual.*\$4800\.00/)).toBeInTheDocument();
   });
