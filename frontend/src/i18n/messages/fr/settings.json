@@ -595,7 +595,7 @@
   "autoBackup": {
     "heading": "Sauvegarde automatique",
     "description": "Sauvegardez automatiquement vos données dans un dossier selon un calendrier. Comme Monize fonctionne dans Docker, vous devez mapper un dossier hôte dans le conteneur en tant que volume (ex. : -v /host/backups:/data/backups).",
-    "adminManagedNote": "Seuls les administrateurs peuvent modifier ces paramètres. Tous les autres utilisateurs sont sauvegardés automatiquement selon la même planification et la même politique de rétention, chacun dans son propre dossier.",
+    "adminManagedNote": "Seuls les administrateurs peuvent modifier ces paramètres, et ils régissent actuellement les sauvegardes automatiques de l'administrateur lui-même. Tous les autres utilisateurs sont sauvegardés automatiquement selon des valeurs par défaut fixes du déploiement, chacun dans son propre dossier.",
     "loadingText": "Chargement...",
     "enableLabel": "Activer les sauvegardes automatiques",
     "backupFolderLabel": "Dossier de sauvegarde",
@@ -659,7 +659,8 @@
       "title": "Cette installation n'a aucun stockage de sauvegarde",
       "body": "Les sauvegardes automatiques seraient écrites dans {folderPath}, où cette installation ne peut pas écrire. Un administrateur doit y monter un stockage avant qu'une planification puisse s'exécuter."
     },
-    "never": "Jamais"
+    "never": "Jamais",
+    "demoDisabledNote": "Ces commandes sont en lecture seule en mode démo."
   },
   "backupRestore": {
     "heading": "Sauvegarde et restauration",
@@ -840,7 +841,6 @@
     "apiAccess": "Accès API",
     "aiSettings": "Paramètres IA",
     "backupRestore": "Sauvegarde et restauration",
-    "autoBackup": "Sauvegarde automatique",
     "help": "Aide et support",
     "dangerZone": "Zone dangereuse",
     "about": "À propos",

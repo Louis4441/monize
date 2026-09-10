@@ -595,7 +595,7 @@
   "autoBackup": {
     "heading": "自动备份",
     "description": "按计划自动将数据备份到文件夹。由于 Monize 在 Docker 中运行，您必须将主机文件夹作为卷映射到容器中（例如：-v /host/backups:/data/backups）。",
-    "adminManagedNote": "只有管理员可以更改这些设置。其他所有用户都会按照相同的计划和保留策略自动备份到各自的文件夹中。",
+    "adminManagedNote": "只有管理员可以更改这些设置，并且它们目前仅适用于管理员自己的自动备份。其他所有用户都会按照固定的部署默认值自动备份到各自的文件夹中。",
     "loadingText": "加载中...",
     "enableLabel": "启用自动备份",
     "backupFolderLabel": "备份文件夹",
@@ -659,7 +659,8 @@
       "title": "此部署没有备份存储",
       "body": "自动备份将写入 {folderPath}，但此部署无法向该位置写入。管理员需要先在该位置挂载存储，计划任务才能运行。"
     },
-    "never": "从未"
+    "never": "从未",
+    "demoDisabledNote": "在演示模式下，这些控件为只读。"
   },
   "backupRestore": {
     "heading": "备份与恢复",
@@ -840,7 +841,6 @@
     "apiAccess": "API 访问",
     "aiSettings": "AI 设置",
     "backupRestore": "备份与恢复",
-    "autoBackup": "自动备份",
     "help": "帮助与支持",
     "dangerZone": "危险区域",
     "about": "关于",

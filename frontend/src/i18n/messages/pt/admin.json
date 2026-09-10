@@ -169,5 +169,21 @@
       "rotated": "{count, plural, =0 {Par de chaves rodado} one {Par de chaves rodado; 1 dispositivo tem de se registar novamente} other {Par de chaves rodado; # dispositivos têm de se registar novamente}}",
       "rotateFailed": "Não foi possível rodar o par de chaves"
     }
+  },
+  "backupsPage": {
+    "title": "Cópias de segurança",
+    "subtitle": "Ficheiros de cópia de segurança por utilizador, agendados e comprimidos, escritos numa pasta no servidor.",
+    "scope": {
+      "heading": "Não é uma cópia de segurança completa da base de dados",
+      "perUser": "A cópia de segurança automática escreve, de acordo com um agendamento, um ficheiro de cópia comprimido com os registos financeiros de cada utilizador numa pasta no servidor, mantendo um certo número deles de acordo com a política de retenção.",
+      "adminPolicyScope": "O agendamento, a pasta e a retenção configurados aqui regem atualmente apenas as cópias de segurança automáticas do próprio administrador. As restantes contas são copiadas automaticamente com predefinições fixas da implementação, e ainda não é possível configurar aqui uma única política por implementação.",
+      "notFullDatabase": "Não é um despejo completo do PostgreSQL nem da base de dados. Não capta o esquema da base de dados, os dados de outra implementação, a configuração da aplicação, nem nada fora dos registos financeiros do próprio utilizador.",
+      "notSameAsManualExport": "Está relacionado com a exportação manual em Definições -> Cópia de segurança e restauro, mas não tem o mesmo formato em disco.",
+      "disasterRecovery": "Para a recuperação após desastre de toda a instância, faça uma cópia de segurança da base de dados PostgreSQL e do armazenamento de anexos separadamente, utilizando as próprias ferramentas da sua infraestrutura."
+    },
+    "demoRestricted": {
+      "heading": "Restrito no modo de demonstração",
+      "body": "A configuração da cópia de segurança automática está desativada no modo de demonstração."
+    }
   }
 }

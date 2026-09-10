@@ -55,22 +55,98 @@ test.describe('Backup & restore', () => {
     expect(download.suggestedFilename()).toMatch(/monize-backup.*\.mzbe$/);
   });
 
-  test('hides automatic backup settings from a non-admin', async ({
+  test('keeps automatic backup settings out of Settings for a non-admin', async ({
     authedPage: page,
   }) => {
     await page.goto('/settings');
     await expect(page.getByText('Create Backup')).toBeVisible();
 
-    // Automatic backups are configured by an administrator and applied to
-    // everyone else; a plain user has nothing to set here.
+    // Automatic backups are a deployment concern configured on the admin-only
+    // Backups surface; a plain user's Settings has manual export/restore only,
+    // and no automatic-backup schedule to set anywhere.
     await expect(page.getByText('Automatic Backup')).toHaveCount(0);
   });
 
-  test('shows automatic backup settings to an admin', async ({ adminPage }) => {
+  test('keeps automatic backup settings out of Settings for an admin too', async ({
+    adminPage,
+  }) => {
+    // The IA split moved automatic-backup configuration onto Admin -> Backups,
+    // so even an administrator no longer finds it stacked in their own Settings.
     await adminPage.goto('/settings');
+    await expect(adminPage.getByText('Create Backup')).toBeVisible();
+    await expect(adminPage.getByText('Automatic Backup')).toHaveCount(0);
+  });
 
+  test('configures automatic backups on the admin Backups page', async ({
+    adminPage,
+  }) => {
+    await adminPage.goto('/admin/backups');
+
+    // The page must make the scope unambiguous: per-user artifacts, not a full
+    // PostgreSQL/database dump.
+    await expect(
+      adminPage.getByRole('heading', { name: 'Not a full database backup' }),
+    ).toBeVisible();
     await expect(
       adminPage.getByRole('heading', { name: 'Automatic Backup' }),
     ).toBeVisible();
+
+    // The automatic-backup flow lives here now, so its controls do too.
+    const folder = adminPage.getByLabel('Backup Folder');
+    const validate = adminPage.getByRole('button', { name: 'Validate' });
+    const save = adminPage.getByRole('button', { name: 'Save Settings' });
+    await expect(folder).toBeVisible();
+    await expect(adminPage.getByRole('switch')).toBeVisible();
+    await expect(
+      adminPage.getByRole('button', { name: 'Browse...' }),
+    ).toBeVisible();
+    await expect(save).toBeVisible();
+
+    // The folder is pre-populated with the deployment default (`getSettings`
+    // reports the resolved root even for an admin with no saved row), so
+    // Validate is enabled from the start -- there is a legal path to probe even
+    // before storage is proven writable. A non-empty path is the whole of the
+    // gate: clearing the field disables Validate, and refilling it re-enables it.
+    await expect(folder).not.toHaveValue('');
+    await expect(validate).toBeEnabled();
+    await folder.fill('');
+    await expect(validate).toBeDisabled();
+    await folder.fill('/data/backups');
+    await expect(validate).toBeEnabled();
+
+    // Exercise Save. A disabled schedule with a folder set does not need
+    // writable storage, so the PATCH round-trips and the server then reports a
+    // folder is configured -- which is exactly what makes Run Backup Now appear.
+    await expect(save).toBeEnabled();
+    await save.click();
+    await expect(
+      adminPage.getByRole('button', { name: 'Run Backup Now' }),
+    ).toBeVisible();
+  });
+
+  test('disables the automatic-backup controls in demo mode', async ({
+    adminPage,
+  }) => {
+    // The four mutating AutoBackupController endpoints are @DemoRestricted, so
+    // the controls that reach them are disabled (not hidden) for a demo admin,
+    // with the amber demo banner explaining why. This body only runs against a
+    // deployment started with DEMO_MODE=true.
+    test.skip(
+      process.env.DEMO_MODE !== 'true',
+      'requires a DEMO_MODE=true deployment',
+    );
+
+    await adminPage.goto('/admin/backups');
+
+    await expect(
+      adminPage.getByRole('heading', { name: 'Restricted in Demo Mode' }),
+    ).toBeVisible();
+    await expect(adminPage.getByRole('switch')).toBeDisabled();
+    await expect(
+      adminPage.getByRole('button', { name: 'Browse...' }),
+    ).toBeDisabled();
+    await expect(
+      adminPage.getByRole('button', { name: 'Save Settings' }),
+    ).toBeDisabled();
   });
 });

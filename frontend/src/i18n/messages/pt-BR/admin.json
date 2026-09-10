@@ -169,5 +169,21 @@
       "rotated": "{count, plural, =0 {Par de chaves girado} one {Par de chaves girado; 1 dispositivo precisa se registrar novamente} other {Par de chaves girado; # dispositivos precisam se registrar novamente}}",
       "rotateFailed": "Não foi possível girar o par de chaves"
     }
+  },
+  "backupsPage": {
+    "title": "Backups",
+    "subtitle": "Arquivos de backup por usuário, agendados e compactados, gravados em uma pasta no servidor.",
+    "scope": {
+      "heading": "Não é um backup completo do banco de dados",
+      "perUser": "O backup automático grava, de acordo com um agendamento, um arquivo de backup compactado com os registros financeiros de cada usuário em uma pasta no servidor, mantendo um determinado número deles de acordo com a política de retenção.",
+      "adminPolicyScope": "O agendamento, a pasta e a retenção configurados aqui atualmente regem apenas os backups automáticos do próprio administrador. As outras contas são copiadas automaticamente com padrões fixos da implantação, e ainda não é possível configurar aqui uma única política por implantação.",
+      "notFullDatabase": "Não é um dump completo do PostgreSQL nem do banco de dados. Não captura o esquema do banco de dados, os dados de outra implantação, a configuração do aplicativo, nem nada fora dos registros financeiros do próprio usuário.",
+      "notSameAsManualExport": "Está relacionado à exportação manual em Configurações -> Backup e restauração, mas não tem o mesmo formato em disco.",
+      "disasterRecovery": "Para a recuperação de desastres de toda a instância, faça backup do banco de dados PostgreSQL e do armazenamento de anexos separadamente usando as próprias ferramentas da sua infraestrutura."
+    },
+    "demoRestricted": {
+      "heading": "Restrito no modo de demonstração",
+      "body": "A configuração do backup automático está desativada no modo de demonstração."
+    }
   }
 }

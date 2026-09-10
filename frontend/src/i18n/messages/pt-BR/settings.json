@@ -595,7 +595,7 @@
   "autoBackup": {
     "heading": "Backup Automático",
     "description": "Faça backups automáticos dos seus dados para uma pasta, de acordo com um agendamento. Como o Monize roda no Docker, você precisa mapear uma pasta do host para o contêiner como volume (ex.: -v /host/backups:/data/backups).",
-    "adminManagedNote": "Apenas administradores podem alterar essas configurações. Todos os outros usuários são copiados automaticamente com o mesmo agendamento e política de retenção, cada um em sua própria pasta.",
+    "adminManagedNote": "Apenas administradores podem alterar essas configurações, e elas atualmente regem os backups automáticos do próprio administrador. Todos os outros usuários são copiados automaticamente com padrões fixos da implantação, cada um em sua própria pasta.",
     "loadingText": "Carregando...",
     "enableLabel": "Ativar backups automáticos",
     "backupFolderLabel": "Pasta de Backup",
@@ -659,7 +659,8 @@
       "title": "Esta instalação não tem armazenamento para backups",
       "body": "Os backups automáticos seriam gravados em {folderPath}, onde esta instalação não consegue gravar. Um administrador precisa montar armazenamento nesse local antes que um agendamento possa ser executado."
     },
-    "never": "Nunca"
+    "never": "Nunca",
+    "demoDisabledNote": "Esses controles são somente leitura no modo de demonstração."
   },
   "backupRestore": {
     "heading": "Backup e Restauração",
@@ -840,7 +841,6 @@
     "apiAccess": "Acesso à API",
     "aiSettings": "Configurações de IA",
     "backupRestore": "Backup e Restauração",
-    "autoBackup": "Backup Automático",
     "help": "Ajuda e Suporte",
     "dangerZone": "Zona de Perigo",
     "about": "Sobre",

@@ -595,7 +595,7 @@
   "autoBackup": {
     "heading": "Cópia de Segurança Automática",
     "description": "Faça cópias de segurança automáticas dos seus dados para uma pasta, de acordo com um agendamento. Como o Monize corre em Docker, tem de mapear uma pasta do anfitrião para o contentor como volume (ex.: -v /host/backups:/data/backups).",
-    "adminManagedNote": "Apenas administradores podem alterar estas definições. Todos os outros utilizadores são copiados automaticamente com o mesmo agendamento e política de retenção, cada um para a sua própria pasta.",
+    "adminManagedNote": "Apenas administradores podem alterar estas definições, e estas regem atualmente as cópias de segurança automáticas do próprio administrador. Todos os outros utilizadores são copiados automaticamente com predefinições fixas da implementação, cada um para a sua própria pasta.",
     "loadingText": "A carregar...",
     "enableLabel": "Ativar cópias de segurança automáticas",
     "backupFolderLabel": "Pasta de Cópias de Segurança",
@@ -659,7 +659,8 @@
       "title": "Esta instalação não tem armazenamento para backups",
       "body": "As cópias automáticas seriam escritas em {folderPath}, onde esta instalação não consegue escrever. Um administrador tem de montar armazenamento nesse local antes de um agendamento poder ser executado."
     },
-    "never": "Nunca"
+    "never": "Nunca",
+    "demoDisabledNote": "Estes controlos são só de leitura no modo de demonstração."
   },
   "backupRestore": {
     "heading": "Cópia de Segurança e Restauro",
@@ -840,7 +841,6 @@
     "apiAccess": "Acesso à API",
     "aiSettings": "Definições de IA",
     "backupRestore": "Cópia de Segurança e Restauro",
-    "autoBackup": "Cópia de Segurança Automática",
     "help": "Ajuda e Suporte",
     "dangerZone": "Zona de Perigo",
     "about": "Sobre",

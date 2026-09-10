@@ -595,7 +595,8 @@
   "autoBackup": {
     "heading": "[XX-Automatic Backup-XX]",
     "description": "[XX-Automatically back up your data to a folder on a schedule. Since Monize runs in Docker, you must map a host folder into the container as a volume (e.g., -v /host/backups:/data/backups).-XX]",
-    "adminManagedNote": "[XX-Only administrators can change these settings. Every other user is backed up automatically on the same schedule and retention policy, into a folder of their own.-XX]",
+    "adminManagedNote": "[XX-Only administrators can change these settings, and they currently govern the administrator's own automatic backups. Every other user is backed up automatically on fixed deployment defaults, into a folder of their own.-XX]",
+    "demoDisabledNote": "[XX-These controls are read-only in demo mode.-XX]",
     "loadingText": "[XX-Loading...-XX]",
     "enableLabel": "[XX-Enable automatic backups-XX]",
     "backupFolderLabel": "[XX-Backup Folder-XX]",
@@ -840,7 +841,6 @@
     "apiAccess": "[XX-API Access-XX]",
     "aiSettings": "[XX-AI Settings-XX]",
     "backupRestore": "[XX-Backup & Restore-XX]",
-    "autoBackup": "[XX-Automatic Backup-XX]",
     "help": "[XX-Help & Support-XX]",
     "dangerZone": "[XX-Danger Zone-XX]",
     "about": "[XX-About-XX]",
