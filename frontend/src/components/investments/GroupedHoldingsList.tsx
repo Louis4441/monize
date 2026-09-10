@@ -15,7 +15,7 @@ import { CAPTION_CLASS, CellLabel } from '@/components/ui/Table';
 // figures never wrap, so a locale grouping thousands with a space keeps each on
 // one line; the per-row caption gives itself back `whitespace-normal`.
 const FIGURE_CELL =
-  'p-0 text-right text-sm whitespace-nowrap sm:table-cell sm:px-4 sm:py-3';
+  'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
 
 interface GroupedHoldingsListProps {
   holdingsByAccount: AccountHoldings[];

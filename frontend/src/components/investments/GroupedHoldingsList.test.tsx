@@ -129,6 +129,36 @@ describe('GroupedHoldingsList', () => {
     expect(cashRow!.className).toContain('grid grid-cols-4');
   });
 
+  it('shrinks figure cells to text-xs on a phone and restores text-sm from sm up', () => {
+    // A phone card packs up to four figures on one line, so FIGURE_CELL renders
+    // `text-xs` below `sm` to avoid reopening horizontal scroll -- while the
+    // `sm`+ resolved size stays `text-sm` (`sm:text-sm`), identical to the base
+    // table.
+    const holdingsByAccount = [
+      {
+        accountId: 'a1', accountName: 'RRSP', currencyCode: 'CAD',
+        totalMarketValue: 5000, totalCostBasis: 4000, totalGainLoss: 1000,
+        totalGainLossPercent: 25, cashBalance: 500, cashAccountId: 'cash1', holdings: [
+          { id: 'h1', symbol: 'XEQT', name: 'iShares Equity', quantity: 100, averageCost: 40, currentPrice: 50, costBasis: 4000, costBasisAccountCurrency: 4000, marketValue: 5000, gainLoss: 1000, gainLossPercent: 25, currencyCode: 'CAD' },
+        ],
+      },
+    ] as any[];
+
+    render(<GroupedHoldingsList holdingsByAccount={holdingsByAccount} isLoading={false} totalPortfolioValue={5500} />);
+
+    const figureCells = screen
+      .getAllByRole('cell')
+      .filter((c) => c.className.includes('sm:text-sm'));
+    expect(figureCells.length).toBeGreaterThan(0);
+    for (const cell of figureCells) {
+      const classes = cell.className.split(/\s+/);
+      expect(classes).toContain('text-xs');
+      expect(classes).toContain('sm:text-sm');
+      // Desktop size is unchanged: no bare `text-sm`, only the `sm:` variant.
+      expect(classes).not.toContain('text-sm');
+    }
+  });
+
   it('toggles account expansion on click', () => {
     const holdingsByAccount = [
       {

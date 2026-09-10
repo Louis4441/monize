@@ -30,7 +30,7 @@ const logger = createLogger('SecurityTxHistory');
 // figures never wrap so a locale that groups thousands with a space keeps them
 // on one line.
 const MONEY_CELL =
-  'p-0 text-right text-sm whitespace-nowrap sm:table-cell sm:px-3 sm:py-2';
+  'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-3 sm:py-2 sm:text-sm';
 
 interface SecurityTransactionHistoryProps {
   security: Security;
@@ -218,11 +218,11 @@ export function SecurityTransactionHistory({
                     <td role="cell" className="col-start-1 row-start-2 p-0 text-sm text-gray-700 dark:text-gray-300 sm:table-cell sm:whitespace-nowrap sm:px-3 sm:py-2">
                       {t(`transactionHistory.actionLabels.${tx.action}` as Parameters<typeof t>[0]) ?? tx.action}
                     </td>
-                    <td role="cell" className={`col-start-2 row-start-2 ${MONEY_CELL}`}>
+                    <td role="cell" className={`col-start-2 row-start-2 text-gray-900 dark:text-gray-100 ${MONEY_CELL}`}>
                       <CellLabel className={CAPTION_CLASS}>{t('transactionHistory.columns.quantity')}</CellLabel>
                       {tx.quantity === null ? '-' : formatShareQuantity(tx.quantity)}
                     </td>
-                    <td role="cell" className={`col-start-3 row-start-2 font-medium ${MONEY_CELL}`}>
+                    <td role="cell" className={`col-start-3 row-start-2 font-medium text-gray-900 dark:text-gray-100 ${MONEY_CELL}`}>
                       <CellLabel className={CAPTION_CLASS}>{t('transactionHistory.columns.runningTotal')}</CellLabel>
                       {formatShareQuantity(running)}
                     </td>
@@ -230,7 +230,7 @@ export function SecurityTransactionHistory({
                       <CellLabel className={CAPTION_CLASS}>{t('transactionHistory.columns.price')}</CellLabel>
                       {tx.price === null ? '-' : formatCurrencyPrecise(tx.price, security.currencyCode, 4)}
                     </td>
-                    <td role="cell" className={`col-start-3 col-span-2 row-start-1 text-gray-900 dark:text-gray-100 ${MONEY_CELL}`}>
+                    <td role="cell" className={`col-start-3 col-span-2 row-start-1 text-gray-700 dark:text-gray-300 ${MONEY_CELL}`}>
                       <CellLabel className={CAPTION_CLASS}>{t('transactionHistory.columns.amount')}</CellLabel>
                       {formatCurrency(tx.totalAmount, security.currencyCode)}
                     </td>

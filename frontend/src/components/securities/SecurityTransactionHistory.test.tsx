@@ -240,6 +240,46 @@ describe('SecurityTransactionHistory', () => {
     }
   });
 
+  it('keeps the Amount cell in the base desktop colour and shrinks figures to text-xs on a phone', async () => {
+    // The `sm`+ resolved output must stay byte-identical to the pre-card table:
+    // the Amount cell wears the muted `text-gray-700` the base table used (it
+    // was briefly bumped to `text-gray-900`), and every figure cell renders
+    // `text-xs` on the phone but `sm:text-sm` from `sm` up, so a quarter-width
+    // card row cannot reopen horizontal scroll while the desktop size is unchanged.
+    await renderHistory();
+    await waitFor(() => {
+      expect(screen.getByLabelText('Account')).toBeInTheDocument();
+    });
+
+    const cells = screen.getAllByRole('cell');
+
+    // The Amount cell is the only one at col-start-3 / col-span-2 / row-start-1.
+    const amountCells = cells.filter(
+      (c) =>
+        c.className.includes('col-start-3') &&
+        c.className.includes('col-span-2') &&
+        c.className.includes('row-start-1'),
+    );
+    expect(amountCells).toHaveLength(historyData.transactions.length);
+    for (const cell of amountCells) {
+      const classes = cell.className.split(/\s+/);
+      expect(classes).toContain('text-gray-700');
+      expect(classes).toContain('dark:text-gray-300');
+      expect(classes).not.toContain('text-gray-900');
+    }
+
+    // Every figure cell (MONEY_CELL) shrinks on the phone and restores at `sm`.
+    const figureCells = cells.filter((c) => c.className.includes('sm:text-sm'));
+    expect(figureCells.length).toBeGreaterThan(0);
+    for (const cell of figureCells) {
+      const classes = cell.className.split(/\s+/);
+      expect(classes).toContain('text-xs');
+      expect(classes).toContain('sm:text-sm');
+      // Desktop size is unchanged: no bare `text-sm`, only the `sm:` variant.
+      expect(classes).not.toContain('text-sm');
+    }
+  });
+
   it('shows an empty state when there are no transactions', async () => {
     vi.mocked(investmentsApi.getSecurityTransactionHistory).mockResolvedValue({
       ...historyData,
