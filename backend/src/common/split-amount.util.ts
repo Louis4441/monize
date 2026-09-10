@@ -69,7 +69,7 @@ export function validateSplitAmountSum(
   //
   // - The reporting distortion P5-004 described ("income that never arrived")
   //   is resolved where it belongs: category surfaces read the children
-  //   *signed* and net within the category (root CLAUDE.md, "What a category
+  //   *signed* and net within the category (docs/backend/transactions-and-money.md, "What a category
   //   cost is its debits NET OF its credits" -- issue #1125), so a credit
   //   child reduces the category it is filed under instead of fabricating
   //   income beside it.

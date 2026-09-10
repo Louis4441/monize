@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, it, expect } from "vitest";
 
 /**
- * Guard tests for the UI conventions in `frontend/CLAUDE.md`.
+ * Guard tests for the UI conventions in `docs/frontend/ui-conventions.md`.
  *
  * These exist because a documented rule is only as good as its enforcement. Each
  * one was added after an agent reached for the generic solution, a human spotted
@@ -897,7 +897,7 @@ describe("an unknown value is not drawn as measured data", () => {
    * `connectNulls` draws a straight segment across a gap. It is
    * indistinguishable from measured data, and a tooltip saying "unknown" under
    * the cursor does not undo it -- so the server's careful `null` is thrown away
-   * in the last hundred pixels (`frontend/CLAUDE.md`,
+   * in the last hundred pixels (`docs/frontend/financial-figures.md`,
    * `docs/time-series-contract.md` rule 3).
    *
    * The rule is `connectNulls={false}`. This scan is what tells you which files

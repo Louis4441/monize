@@ -21,7 +21,7 @@ import { isTouchDevice } from '@/lib/touch-device';
  * does not use.
  *
  * The predicate is the POINTER, not the viewport (`isTouchDevice`, and
- * `frontend/CLAUDE.md`'s rule). `capture` does not merely restyle anything: on
+ * `docs/frontend/ui-conventions.md`'s rule). `capture` does not merely restyle anything: on
  * a browser that honours it the OS file picker is replaced by the camera, so
  * keying it off a 639px width would take the "choose an existing photo" path
  * away from anyone with a narrow desktop window, and give it back when they

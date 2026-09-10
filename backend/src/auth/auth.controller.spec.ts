@@ -693,7 +693,7 @@ describe("AuthController", () => {
     // The P2-003 blocker existed because /auth/profile and /users/me answered
     // the same acting-context question with different field sets. This is not
     // an HTTP-level test (the repo's e2e infrastructure is documented broken
-    // in backend/CLAUDE.md and nothing in CI runs it); it drives both real
+    // in docs/backend/testing.md and nothing in CI runs it); it drives both real
     // controller methods with the same request shape and the same owner row,
     // which pins the parity the two routes' serialization can drift on.
     it("removes the same fields from /auth/profile and /users/me while acting", async () => {

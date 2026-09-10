@@ -300,7 +300,7 @@ closing INV-FX-001 or INV-OCCURRENCE-002 should search once more before assuming
 no test stands in the way. They are deliberately not in the table above: a
 citation that cannot be checked is the thing this document exists to discourage.
 
-Per root `CLAUDE.md`, each corrected unit test needs a production-boundary
+Per `AGENTS.md`, each corrected unit test needs a production-boundary
 companion wherever the defect depends on PostgreSQL, multiple processes,
 providers or browser state. Correcting the assertion alone leaves the class open.
 
@@ -361,8 +361,9 @@ differences produce failures that look like regressions and are not.
 - `scripts/verify-schema.sh` reproduces the drift job locally and needs only
   Docker.
 
-Believing an unqualified local failure means chasing a bug that does not exist;
-root `CLAUDE.md` has the longer form.
+Believing an unqualified local failure means chasing a bug that does not exist.
+A guard that walks the tree with `git ls-files` cannot see an untracked file;
+`docs/guard-tests.md` has that and the other guard-authoring rules.
 
 ## 8. Definition of done
 

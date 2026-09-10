@@ -17,7 +17,7 @@ import { findRepoRoot, gitListFiles, requireRepoRoot } from "./repo-tree.util";
  * roughly ten suites failing nondeterministically per run.
  *
  * The rule was written down (`integration-setup.ts` says to keep
- * `maxWorkers: 1` in `test/jest-e2e.json`, and `backend/CLAUDE.md` documents
+ * `maxWorkers: 1` in `test/jest-e2e.json`, and `docs/backend/testing.md` documents
  * the split) and was violated anyway: the root config in `package.json` used
  * `rootDir: "."` with `testRegex: ".*\\.spec\\.ts$"`, so a bare `jest` -- what
  * `npm test`, `test:watch` and `test:debug` all ran -- swept `src/` and

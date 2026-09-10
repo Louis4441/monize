@@ -87,7 +87,7 @@ export class UserMaintenanceService {
    * well-formed and is being declined because of the account's current state,
    * and retrying once the other operation finishes will work. It happens before
    * `fn` does anything, so a refused maintenance operation has written nothing --
-   * the rule in the root `CLAUDE.md`.
+   * the rule in `AGENTS.md`.
    */
   async withMaintenanceLease<T>(
     userId: string,

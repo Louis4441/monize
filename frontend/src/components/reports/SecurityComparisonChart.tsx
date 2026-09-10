@@ -164,7 +164,7 @@ export function SecurityComparisonChart({
 
   // Everything that changes the *meaning* of the response is in the key, so a
   // payload can never be mistaken for the answer to a different selection
-  // (`frontend/CLAUDE.md`, asynchronous data).
+  // (`docs/frontend/api-and-cache.md`, asynchronous data).
   const requestKey = [
     [...securityIds].sort().join(','),
     [...indexCodes].sort().join(','),

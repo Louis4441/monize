@@ -22,7 +22,7 @@ afterEach(async () => {
   // Row density is one store for every view, so clearing its localStorage
   // entry is not enough -- the module-level state outlives it. Reset after `cleanup()`,
   // never before: writing to a store while the tree is still mounted
-  // re-renders it outside act() (see frontend/CLAUDE.md).
+  // re-renders it outside act() (see docs/frontend/testing.md).
   //
   // Imported here rather than at the top of this file, and that is not a
   // style choice. `createJSONStorage(() => localStorage)` resolves the storage

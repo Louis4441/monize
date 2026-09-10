@@ -160,8 +160,10 @@ Document contradictions between:
 
 Do not assume a test is authoritative when it contradicts a documented invariant.
 
-> **Monize.** No `AGENTS.md` exists today — check rather than assume. The `CLAUDE.md` files are
-> the root, `backend/`, `frontend/`, `database/` and `backend/src/mcp/`. `docs/system-invariants.md`
+> **Monize.** `AGENTS.md` is the tool-agnostic entry point (commands, gate, workflow, no-go
+> areas). The `CLAUDE.md` files are the root, `backend/`, `frontend/`, `database/`, `e2e/` and
+> `backend/src/mcp/`; the backend and frontend ones are indexes over `docs/backend/` and
+> `docs/frontend/`. `docs/system-invariants.md`
 > is the invariant index (each entry carries `enforced` / `partial` / `unenforced`; an `unenforced`
 > entry describes something the system currently gets wrong). The contract set is
 > `docs/financial-calculation-contract.md`, `docs/financial-semantics.md`,

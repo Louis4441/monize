@@ -148,7 +148,7 @@ describe("common/db/locks", () => {
     it("selects the date as text, not as a Date", async () => {
       // A raw select bypasses the entity transformer, so a DATE column comes back
       // as a JS Date parsed in UTC -- and reading it can shift the day. See the
-      // raw-select rule in backend/CLAUDE.md.
+      // raw-select rule in docs/backend/entities-and-dtos.md.
       await lockTransactionRow(asManager(), "tx-1", "user-1");
 
       expect(manager.query.mock.calls[0][0]).toContain(

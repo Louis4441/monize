@@ -378,8 +378,8 @@ export class NotificationDispatchService {
    * message. Two reasons, either sufficient. The row's copy is composed by its
    * producer in English -- a budget alert names the category and the amounts --
    * and a Web Push body is rendered outside any request, so it follows the
-   * email rule: `emailTranslator` against `user_preferences.language` (backend
-   * CLAUDE.md, "Copy composed outside a request"). And the wire is encrypted end
+   * email rule: `emailTranslator` against `user_preferences.language` (`docs/backend/notifications-and-push.md`,
+   * "Copy composed outside a request"). And the wire is encrypted end
    * to end (RFC 8291) but the lock screen is not, so the screen shows the
    * category and nothing of the money; the in-app row, one tap away through
    * `target`, carries the detail. The English fallbacks live in

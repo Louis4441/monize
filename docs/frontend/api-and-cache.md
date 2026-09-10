@@ -1,0 +1,105 @@
+# Frontend: API layer, caching and asynchronous data
+
+How the client talks to the backend, what it caches, and how a payload stays tied to the request that produced it. Read this before adding an API call, a cached read, a write that moves money, or any component that holds asynchronous data.
+
+Paths beginning with `src/` or `scripts/`, and layer configuration filenames, are relative to `frontend/`; other source paths (including `test/...`) are relative to `frontend/src/`. Explicit repository prefixes are preserved. `frontend/CLAUDE.md` is the short index; this document is where the reasoning lives.
+
+## API Layer (`src/lib/`)
+
+**Central client** (`api.ts`): Axios instance with `baseURL: /api/v1`, `withCredentials: true`, 10s timeout.
+
+**Interceptors (non-obvious behavior):**
+- **Request:** Reads `csrf_token` cookie, injects `X-CSRF-Token` header
+- **Response (403 CSRF):** Transparent refresh via `/auth/csrf-refresh`, retries request
+- **Response (401):** Token refresh via `/auth/refresh`, queues concurrent requests during refresh
+- **Fallback:** On refresh failure, logs out and redirects to `/login`
+
+Feature API modules (one per feature, typed axios wrappers) live alongside `api.ts`.
+
+## A paged endpoint is never asked for more rows than it accepts
+
+`API_MAX_PAGE_LIMIT` (`lib/api-page-limits.ts`) is the ceiling both paged list endpoints enforce, and neither clamps: `GET /transactions` and `GET /investment-transactions` answer **400** to a larger `limit`. These calls sit behind `.catch()`es that degrade to an empty list, so the rejection reaches the user as a figure that is quietly zero (`limit: 500` on the recurring-charges panel is issue #1229; the same literal reported every year's dividends as $0.00).
+
+Lowering the literal to the cap is **not** the fix -- that trades a visible zero for a plausible undercount. Either walk the pages (`transactionsApi.getAllPages`, `investmentsApi.getAllTransactionPages`, both defaulting their page size to the constant) or narrow the query server-side until one page is genuinely enough. Prefer narrowing to walking: a page walk that pulls a year of rows to distil a handful of ids is a side panel paying for a report.
+
+`src/test/api-page-limits.test.ts` scans for call sites above the cap and checks the constant against **both** backend sources. Its known-violation register tracks defects with the change that fixes them, and fails once a violation is gone, so a stale entry cannot outlive its fix.
+
+## A filter the server can apply is not a list the client enumerates
+
+`transactionsApi.getRecurringCharges` takes an `accountId`; it used to take only `payeeIds`, so the panel sent back a payee-id list whose size grew with the account (~250 payees exceeded proxy request-line limits; ~430 exceeded Node's header budget) and the failure arrived as "no recurring charges". The tell is a client that fetches rows **only to extract ids from them** -- that is an account-shaped question asked in the shape of an id list. Send the narrow thing the server can filter on; an array parameter is for a bounded set the caller genuinely holds.
+
+Two obligations come with moving a filter server-side: the endpoint must **authorize** what it now accepts (an `accountId` is a new door, so it goes through the same own/joint resolution the register uses, `resolveOwnContextJointScope`, and a joint account's detection runs as its owner), and the *meaning* usually sharpens (detection scoped to an account measures cadence from that account's own rows). Say which you intended, and test it.
+
+## A write that moves money calls `invalidateBalanceCaches()`
+
+`accountsApi.getAll`, `investmentsApi.getPortfolioSummary` and the budget progress views are cached in `apiCache.ts`, and the backend computes all three live from transaction rows -- a write that does not drop those entries leaves stale figures that even navigation cannot fix (the refetch on mount is served from the same cache). Call `invalidateBalanceCaches()` after any write that adds, removes, re-dates, re-prices or voids a transaction. "Goes through `transactionsApi`" is not the test: posting a scheduled transaction, editing splits (a split can carry a `transferAccountId`), an investment trade hitting its INVESTMENT_CASH account, and QIF/OFX/CSV/MNY imports all write transaction rows from their own modules. `src/lib/balance-cache.guard.test.ts` scans for the omission.
+
+**The prefix list inside the helper is the other half of the rule.** It covers `accounts:`, `investments:` and `budgets:` -- three views of the same rows. Adding a cached family that reads transaction rows means adding its prefix in `invalidateBalanceCaches` in the same change; `apiCache.test.ts` pins the set. Pinning alone is not enough (that is what was green while `budgets:` was missing), so `cache-prefix-classification.guard.test.ts` scans `src/` for every prefix any cache call uses and requires each to be classified as transaction-derived (dropped) or reference data (kept); a prefix in neither list fails, and so does a listed prefix nothing uses.
+
+Where the write can touch anything -- undo/redo, an AI assistant action, a backup restore -- use `clearAllCache()`; no prefix is narrow enough. This matters most for `notifyUndoRedo`/`notifyAiAction`: a refetch served from a stale cache makes the whole signal a no-op.
+
+## Proxy (`src/proxy.ts`)
+
+This is Next.js middleware (NOT the deprecated middleware pattern from this project's conventions). It handles:
+
+- **API routing:** `/api/*` proxied to `INTERNAL_API_URL` (default `http://localhost:3001`)
+- **CSP nonce:** Per-request nonce generated in `x-nonce` header, used by Next.js for inline scripts
+- **Auth redirects:** Unauthenticated requests to protected routes redirect to `/login`
+- **Security headers:** CSP with `strict-dynamic`, nonce-based script-src
+- **Public paths:** `/login`, `/register`, `/auth/callback`, `/forgot-password`, `/reset-password` (no auth required)
+- **MCP traffic at the bare origin:** a request to `/` carrying `Authorization: Bearer`, `Mcp-Method`, `Mcp-Name`, `Mcp-Session-Id`, `MCP-Protocol-Version` or an event-stream `Accept` is forwarded to the backend's MCP endpoint. **The app shell must never answer an MCP request**: a bearer-only probe used to fall through to it and be answered 307 to `/login` then 200, which a security scan reads as the server accepting an invalid token, while `/api/v1/mcp` had been refusing it with a 401 all along. None of those signals is something a page load sends -- this app authenticates with cookies and never sends an `Authorization` header.
+
+## `accountsApi.getAll()` is not "the user's accounts"
+
+In own context the endpoint returns a **union**: accounts the caller owns, plus accounts another owner shared with them jointly, told apart by `account.isJoint` (true means the row belongs to someone else; `ownerLabel` names the owner). Any screen treating the list as "mine" is wrong for whichever half it forgot.
+
+Filter to `!a.isJoint` before offering an account as something to **give away, delegate, or otherwise re-share** -- a delegate must not pass on the access they were given. The Edit Access modal (`components/settings/DelegateAccessModal.tsx`) derives `grantableAccounts` and uses it for the grouping, the empty state, the baseline diff and the save payload -- not just the rows it draws. The server refuses a non-owned account too (`setGrants` -> 403), so every toggle on an unfiltered list is one whose save cannot succeed. The converse is not true: an account the caller owns and has shared *out* carries `jointGranteeCount` and stays assignable.
+
+## On a joint row, *every* picker reads the owner's list -- and creation is off
+
+A joint row may only carry the owner's reference ids, so `TransactionForm` derives `effectiveCategories` / `effectivePayees` from the grant-gated reference-data endpoint, and **everything** downstream reads those, not the caller's own `categories`: the option list, the income/expense sign lookups, and the split editor (three sites still read `categories` and each failed quietly -- a pick in `SplitEditor` wrote one of the caller's ids onto the owner's row). Split mode being blocked on the *mode button* is not the same as unreachable: opening a split row that already lives there puts the form straight into it.
+
+Creation gets a blunter answer: **do not offer it.** `categoriesApi.create` writes to the caller's ledger, so "+ Create" on a joint account made the category in the wrong place. Until an owner-scoped create exists, withhold the creator (`jointSafeCategoryCreator`) rather than gate the button on a `categoriesCanCreate` flag the code cannot honour -- withholding is also what makes the rule hold everywhere at once, since the Category field, the transfer form's, and every split line take the same optional prop.
+
+## Asynchronous data carries the request that produced it
+
+**Asynchronous data is not only a payload. It is the payload plus the complete request key that produced it.** A component holding `data` without knowing which request answered cannot tell "the report you are looking at" from "the report you were looking at a moment ago", and every action it offers is aimed at whichever of the two it happens to read.
+
+The request key is every selector that changes the *meaning* of the response, not merely its freshness: the scenario or strategy id, the account id, the date range, the reporting currency, the active filters, the locale where the server localizes output, and the revision where one exists. If changing it would make the same payload mean something else, it is part of the key.
+
+**Stale data may stay on screen; it may not stay actionable.** Keeping the previous view during a load is often the better read. It is allowed while all of the following hold: it is visually marked as stale or loading; editable controls are disabled; mutations are disabled; no action can submit an id taken from the stale payload under the new selection; assistive technology is told the same thing the pixels say (`aria-busy`). Clearing the screen is not required. Non-actionable is.
+
+**A mutation captures an immutable origin key when it starts**, and its response is adopted only when `mutationOriginKey === currentRequestKey` *and* the entity the response describes is the one the mutation targeted. Derive that origin from the data the component was rendering, not from current React state read after the request began -- state has already moved by the time the response lands.
+
+**A failed lookup is not an empty dataset.** A failed accounts request is not `accounts = []`, and a failed report is not a report of zeros -- rendering the failure as emptiness turns an outage into a plausible answer and leaves the save button live over prerequisites that never loaded. Five states stay distinguishable: loaded-and-empty, loading, failed, stale-previous, and current. Where a prerequisite failed, use the shared retryable error presentation, keep the stored ids, and disable the actions that depend on it.
+
+**The `catch` belongs where the decision is, and a fetch helper is not that place.** `fetchLoanInterestTransactions` returned `[]` from a `catch`, which made a transient 500 indistinguishable from "this loan books no separate interest" -- and every one of its five callers already had the error state it should have reached (`useLoanProjection` reports the projection unknown, the account page has an outer boundary, two reports run on `useReportData`). The helper was starving all of them. The consequence was not a visible blank: with the interest list empty, `deriveLoanPaymentHistory` reads `hasSeparateInterest` as false and every row falls to the ANALYTIC estimate, so a loan that books interest separately renders a full history of invented interest that looks exactly like a real one. A swallowed failure is worst where the fallback is *plausible*. `LoanAmortizationReport` was the one caller that also caught it itself and cleared both arrays; it goes through `useReportData` now like every other loader on that surface.
+
+**A surface that swallows a failure also hides the tests that depend on it.** Five fixtures in `LoanAmortizationReport.test.tsx` omitted `pagination.hasMore`, so `fetchAllAccountTransactions` threw on the first page and the report rendered its error screen -- and every one of those tests was green, because each asserted something that did not need the history. Making the failure visible turned four of them red at once, and a fifth test (`handles loadTransactions error gracefully`) turned out to be *asserting* the silence: it expected the report chrome to render on a failed history load. So the removed `catch` is itself the guard a source scan could not be; a repo-wide "fixture carries its pagination" scan reports 261 candidate blocks, nearly all legitimate.
+
+**A dirty keyed form is data.** Changing the request key while a form has unsaved edits calls for a confirmation, a preserved draft, or an explicit save/discard flow; silently unmounting it is data loss. A form rendered for scenario A must also stop being editable once scenario B is the current selection -- two obligations, and meeting the second by discarding the first is not meeting both.
+
+**A background load finishing is not the user acting.** State a page throws away when the user changes a filter -- a selection, a draft, a scroll position -- keys off the criteria the *user* chose, never off a derived object the page recomputes as data lands. The transactions page's `bulkUpdateFilters` falls back to every visible account when no account filter is set, so it changes the moment the accounts request answers; `useTransactionSelection` compared that object and silently cleared a selection the user had already made (CI run #2873 saw it as a bulk-update banner that never appeared). Pass the user's own criteria as the reset key and keep the resolved scope for the server payload -- derived from the one object, so the two lists cannot drift. The row set carries the same distinction: the first page of rows arriving is a load finishing, not a page change.
+
+**A `useMemo` that sorts copies first.** `Array.prototype.sort` reorders in place, so a display memo sorting a shared memoized array reorders what every other consumer reads, and the value then depends on which memo happened to run first -- `accountFilterOptions` sorting `filteredAccounts` decided the bulk-update account scope's order as a side effect of rendering a dropdown. Write `[...xs].sort(...)`, always.
+
+Regression tests for this class need deferred promises, and must assert on what the user *can do*, not only on what is rendered (`docs/testing-contract.md` carries the wider adversarial list):
+
+| Case | Assertion |
+| --- | --- |
+| A starts, B starts, B resolves, A resolves late | the display is still B |
+| A shown, B selected and loading | A's form cannot submit |
+| Save for A starts, user selects B, A resolves | A's response is discarded and does not retire B's request |
+| A shown, B selected, B fails | the failure is shown; A is not presented as B |
+| Form dirty, user selects B | confirmation is asked for, or the draft survives |
+| Save on the default selection, nothing else happens | the response is adopted |
+
+**Both sides of that comparison must come from the same place.** The origin key a mutation captures and the key the loader is holding have to be produced by one expression -- take the origin from what the loader actually stamped (`dataKey` on `useReportData`), never rebuild it from the rendered payload's fields. The GEM report built its page key from a `strategyId` *state* unset until the user picks from a switcher, and the save's origin from `data.strategy.id`, always a real id: they could never match on the ordinary path, so every save was discarded with no refetch behind it. A key comparison that silently drops the common case looks exactly like one that works.
+
+## A busy flag shared by nesting operations is a counter, not a boolean
+
+One mutation can start another ("save and carry on" runs the deferred scenario create from inside the settings save's own `onSaved`). With a single boolean the inner sets it, the outer's `finally` clears it, and the page goes live over a request still on the wire. Count the operations in flight and derive the flag (`pending > 0`); every begin needs exactly one end, on both success and failure paths.
+
+## A rate table that has not loaded is not a table with no rate in it
+
+With no rates fetched every cross-currency `convert` returns `null`, so a surface reading only the missing-pair list tells the reader to add a rate that is already there -- an instruction built from an in-flight request or a failed one. `useExchangeRates().ratesUnavailable` (loading OR failed) is checked *before* any missing pair is named, and `ratesFailed` distinguishes an outage from a table still arriving. Same rule one level up: `readBalanceForecast` carries `unavailable` beside `withheld` because "the server declined to project", "we never heard back" and "this account has nothing scheduled" are three states and only the last has a number to show -- folded together, a 500 printed the current balance under "Projected".

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 /**
- * Guard test for the balance-cache rule in `frontend/CLAUDE.md`.
+ * Guard test for the balance-cache rule in `docs/frontend/api-and-cache.md`.
  *
  * `accountsApi.getAll` caches for two minutes, so any write that moves money
  * has to call `invalidateBalanceCaches()` (or `clearAllCache()`) before it

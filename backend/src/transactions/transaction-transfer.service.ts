@@ -304,7 +304,7 @@ export class TransactionTransferService {
     }
 
     // Zero moves nothing on either side, so it needs no rate ("zero needs no
-    // rate", root CLAUDE.md): a zero-amount scheduled placeholder between two
+    // rate", `AGENTS.md`): a zero-amount scheduled placeholder between two
     // currencies posts as 0 -> 0, and demanding a resolvable pair here refused
     // a transfer that moves nothing. Mirrors the zero-on-both-sides return in
     // the explicit-toAmount branch above.
@@ -507,7 +507,7 @@ export class TransactionTransferService {
    * foreign account's owner is the decision input -- and a system-identity
    * `withScopedDb` cannot join a user-identity transaction: it throws
    * `IDENTITY_MISMATCH_MESSAGE` rather than silently running under the outer
-   * GUCs. Deciding first is also the rule in backend/CLAUDE.md ("Decide
+   * GUCs. Deciding first is also the rule in docs/backend/database-access-and-tenancy.md ("Decide
    * authorization first, under scoped(), and let only the minimum out").
    *
    * Everything here is a read or a pure computation, so it is safe to run

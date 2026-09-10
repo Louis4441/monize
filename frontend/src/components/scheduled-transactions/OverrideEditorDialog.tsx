@@ -89,7 +89,7 @@ export function OverrideEditorDialog({
   // True only once a price request completes and returns no usable close -- the
   // one state that means "this security genuinely has no price history", kept
   // apart from marketPrice == null (also the loading window and a failed lookup).
-  // A failed lookup is not an empty dataset (frontend/CLAUDE.md).
+  // A failed lookup is not an empty dataset (docs/frontend/api-and-cache.md).
   const [priceHistoryEmpty, setPriceHistoryEmpty] = useState(false);
   // True when the occurrence already has a price on file -- from this override
   // or from the schedule it belongs to. Such a price is an instruction the user

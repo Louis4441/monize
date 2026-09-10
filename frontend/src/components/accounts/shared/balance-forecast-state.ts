@@ -39,7 +39,7 @@ export interface BalanceForecastState {
    * `withheld: false`, a 500 on `GET /accounts/:id/balance-forecast` made
    * `projectedBalanceFrom` fall back to the account's CURRENT balance and print
    * it under "Projected" with no notice -- an outage rendered as a measured
-   * answer. `frontend/CLAUDE.md`: five states stay distinguishable, and failed is
+   * answer. `docs/frontend/api-and-cache.md`: five states stay distinguishable, and failed is
    * one of them.
    */
   unavailable: boolean;

@@ -23,7 +23,7 @@ Write an ADR when a decision:
   sites.
 
 Do not write one for a decision a type, a lint rule or a test already enforces
-and explains. Per root `CLAUDE.md`, prefer the highest enforcement the mistake
+and explains. Per `AGENTS.md`, prefer the highest enforcement the mistake
 allows; an ADR is prose, so it is for the part that genuinely needs judgement --
 the reasoning behind the rule the machine checks.
 

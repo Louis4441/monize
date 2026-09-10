@@ -1000,3 +1000,13 @@ restore contract, not privacy policy:
   user's real UUID. Two support files from two users of one instance would then be
   correlatable by the creator id they share, which is the one thing the remap
   exists to prevent.
+
+## 10. Rules recorded from `AGENTS.md`
+
+### A lenient decoder is not a validator
+
+`Buffer.from(value, "base64")` silently discards characters outside the alphabet instead of failing -- on `x-export-password` that encrypts a backup under a password nobody knows and reports success. Anywhere a decode result is used as a credential or a key, assert the round trip.
+
+### A count of things you did not do never goes in the total of things you did
+
+`restored` is summed by the client, so deliberately skipped attachments are a sibling field (`skippedAttachments`, omitted when zero) -- "a subtotal is not a total", applied to counts. And the user has to be *told*: a success dialogue silent about files that did not come back is worse than the number being in the wrong place.

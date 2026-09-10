@@ -31,7 +31,7 @@ import {
  * SQL naming the table directly, which involves no import at all.
  *
  * The inventory comes from `git ls-files`, not a hardcoded file list, so a file
- * split or rename cannot disarm it -- the failure mode `backend/CLAUDE.md`
+ * split or rename cannot disarm it -- the failure mode `docs/backend/backup.md`
  * describes, where four guards went on passing while scanning code that had
  * moved out from under them.
  *

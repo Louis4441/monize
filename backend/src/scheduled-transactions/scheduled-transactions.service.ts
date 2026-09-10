@@ -2932,7 +2932,7 @@ export class ScheduledTransactionsService {
     // it throws `IDENTITY_MISMATCH_MESSAGE` rather than quietly running under
     // the outer GUCs. Calling `createTransfer` inside the block below therefore
     // failed every scheduled transfer post, cron and manual alike. Preparing
-    // first is also the standing rule (backend/CLAUDE.md: "Decide authorization
+    // first is also the standing rule (docs/backend/database-access-and-tenancy.md: "Decide authorization
     // first"), and it puts the transfer's reads in the same place as the FX
     // lookup -- above the transaction, with everything else that reaches
     // outside it.

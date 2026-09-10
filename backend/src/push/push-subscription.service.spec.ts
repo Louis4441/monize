@@ -435,7 +435,7 @@ describe("PushSubscriptionService", () => {
     // committing in the window between the two left a row whose 409 says it was
     // never written: `disableStaleSubscriptions` cannot retire a row that does
     // not exist yet, so the device was listed as live under a key nothing can be
-    // delivered under. `backend/CLAUDE.md`, "Rejection happens before the write".
+    // delivered under. `docs/backend/database-access-and-tenancy.md`, "Rejection happens before the write".
     it.each([
       [
         "the channel state",

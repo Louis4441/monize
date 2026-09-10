@@ -2267,7 +2267,7 @@ describe("YahooFinanceService", () => {
      * object once however many layers hand it on -- so a mock that rejects with
      * the same instance every time reports five failures as one and the breaker
      * never opens. `A mock must return what the real collaborator returns`
-     * (backend/CLAUDE.md).
+     * (docs/backend/testing.md).
      */
     const rejectEveryFetch = (make: () => Error) => {
       global.fetch = jest.fn(() => Promise.reject(make()));

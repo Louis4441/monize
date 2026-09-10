@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
  * Guard tests for the E2E specs in `e2e/tests`, which live outside `src/` and
  * so outside every other scan in this directory. Same shape as
  * `ui-conventions.test.ts`: a mechanical mistake a reviewer caught once, turned
- * into a rule the machine checks. The rule is in `frontend/CLAUDE.md`.
+ * into a rule the machine checks. The rule is in `docs/frontend/testing.md`.
  */
 const E2E_TESTS_DIR = resolve(__dirname, "../../../e2e/tests");
 const E2E_PUSH_DIR = resolve(__dirname, "../../../e2e/push");

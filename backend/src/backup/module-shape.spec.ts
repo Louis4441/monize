@@ -13,7 +13,7 @@ import { join, relative } from "path";
  * crosses the ceiling, and a facade that starts making decisions again.
  */
 
-/** Repository ceiling from the root `CLAUDE.md`: 200-400 typical, 800 max. */
+/** Repository ceiling from `AGENTS.md`: 200-400 typical, 800 max. */
 const MAX_LINES = 800;
 
 /**

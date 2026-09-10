@@ -234,7 +234,7 @@ genuinely enforced, by the mechanism above rather than the comment -- and it
 remains the catalog's cautionary tale that a status copied from a comment is not a
 verified status. `docs/concurrency-and-idempotency.md` CONC-007 is the rule that a
 named mechanism has to cover the scope claimed; the "Deciding a worker is dead"
-section of `backend/CLAUDE.md` has the fence in full.
+section of `docs/backend/cron-and-background-work.md` has the fence in full.
 
 ### INV-IMPORT-003 -- a category collision does not abort an import
 
@@ -377,7 +377,7 @@ Status              enforced
 The statement was narrowed on purpose. "Both legs share one status" was too broad:
 a reconcile state is genuinely per-ledger (a cross-owner transfer's two ledgers
 reconcile independently), and only the VOID boundary -- where money either moved
-or did not -- is shared. See `backend/CLAUDE.md`, "Editing one row must not leave
+or did not -- is shared. See `docs/financial-semantics.md` section 11, "Editing one row must not leave
 the pair describing two different events".
 
 ### INV-REDEEM-001 -- a redemption's accrued interest moves cash once
@@ -1450,7 +1450,7 @@ booking its interest outside the app is now under one period's interest, so
 to the stored contractual payment, and where the rate timeline records the
 payment in effect that value is authoritative even when it does not amortize
 (`INV-LOAN-HISTORY-001` covers the interest; the payment's authority ordering is
-documented in `frontend/CLAUDE.md`).
+documented in `docs/frontend/financial-figures.md`).
 
 ## Scheduled occurrences
 
@@ -3444,7 +3444,7 @@ by a lock whose purpose is not obvious from the call site.
 
 **When adding an invariant.** It belongs here if it is cross-layer. A rule that
 one service can enforce alone belongs in that service, or in a type, or in a lint
-rule -- per root `CLAUDE.md`, prefer the highest enforcement the mistake allows,
+rule -- per `AGENTS.md`, prefer the highest enforcement the mistake allows,
 and use prose only for the part that genuinely needs judgement. This document is
 prose, which makes it the weakest of the available options and the one most in
 need of the machine-checkable rules the entries above call for.

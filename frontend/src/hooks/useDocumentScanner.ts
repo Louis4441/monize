@@ -87,7 +87,7 @@ export function useDocumentScanner(
    * refine loop below runs across awaits, and reading the image and the attempt
    * from separate refs let it take a photo from one attempt and stamp the
    * result with another -- a warp of the discarded photo, presented as the
-   * current one (`I6`, and `frontend/CLAUDE.md`'s rule that asynchronous data
+   * current one (`I6`, and `docs/frontend/api-and-cache.md`'s rule that asynchronous data
    * belongs to the request that produced it).
    */
   const sourceRef = useRef<{ attempt: number; image: RawImage } | null>(null);

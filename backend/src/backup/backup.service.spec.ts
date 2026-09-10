@@ -161,7 +161,7 @@ describe("BackupService", () => {
   let mockQueryRunner: Record<string, jest.Mock>;
   // Typed rather than Record<string, jest.Mock>: this is one of our own
   // interfaces, so tsc should reject a return shape the real provider cannot
-  // produce (backend/CLAUDE.md, "a mock must return what the real collaborator
+  // produce (docs/backend/testing.md, "a mock must return what the real collaborator
   // returns").
   let attachmentStorage: jest.Mocked<AttachmentStorageProvider>;
   let attachmentStorageName: string;

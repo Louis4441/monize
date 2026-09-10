@@ -109,7 +109,7 @@ export interface BackupCompletenessReport {
  * a rename cannot lose.
  *
  * `null` is "this file predates the field", not "complete" and not "partial" --
- * see the missing-data rule in the root `CLAUDE.md`. Every count has to be a
+ * see the missing-data rule in `AGENTS.md`. Every count has to be a
  * finite number and the flag a boolean, or the claim is malformed and is treated
  * as absent rather than half-read.
  */

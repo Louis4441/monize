@@ -221,3 +221,13 @@ If Docker is unavailable, the equivalent by hand against any throwaway Postgres:
 apply `database/schema.sql`, then apply every file in
 `database/migrations/` in order, then apply them all again — the second pass must
 be silent.
+
+## Why the prefix is a timestamp, and why the old files keep their numbers
+
+Recorded here from `database/CLAUDE.md`, which keeps the rule and not the history.
+
+The `NNN_` prefixes were a counter two branches could both read, and prefixes collided eight times (`022`, `068`, `075`, `116`, `117`, `124`, then `165` and `166` within nine hours of each other; issue #1277). Two authors cannot generate the same UTC second, so a timestamp needs no coordination and no check, and `scripts/check-migration-prefixes.mjs` refuses a new `NNN_` file.
+
+The historical files are never renumbered because `schema_migrations` keys on the filename, so a renamed migration re-runs on every deployed database; `166_heal_loan_schedule_end_dates.sql` is a registered one-shot data repair whose second pass would retire a schedule one payment early. The two forms coexist and apply order is numeric on the prefix (`backend/src/common/db/migration-filename.ts`). A string sort agrees only by the coincidence that historical prefixes begin with 0 or 1 and timestamps with 2; the runner does not rely on it, and `migration-filename.spec.ts` fails on a bare `.sort()` over a migrations listing. Apply order being authoring order rather than merge order was equally true of the counter (it is exactly how the `165`/`166` pairs arose); the timestamp only makes it visible.
+
+Two more worked examples the layer file used to carry: the RLS exempt-table list was once kept in five places and had drifted, which is why `RLS_EXEMPT_TABLES` is now the single copy checked against `schema.sql`; and `136_currency_global_liveness.sql` is the case for permitting `PUBLIC` in a migration, because revoking the implicit `EXECUTE` anywhere but the transaction that created a `SECURITY DEFINER` function leaves a window in which any role can execute it. The support-backup rule that a URL beside a masked name re-identifies the thing the mask hides is why `payees.website`, `securities.website` and `securities.msn_instrument_id` are all dropped.

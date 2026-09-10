@@ -79,7 +79,7 @@ describe("ProviderOutageAlertService", () => {
       // which is exactly the defect that reached a real database, where every
       // field of that "row" was undefined and the send threw with the claim
       // already committed. `A mock must return what the real collaborator
-      // returns` (backend/CLAUDE.md).
+      // returns` (docs/backend/testing.md).
       if (text.includes("SET outage_notified_at = CURRENT_TIMESTAMP")) {
         return Promise.resolve(updateResult(data.outageClaim ?? []));
       }

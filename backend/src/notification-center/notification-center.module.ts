@@ -25,7 +25,7 @@ import { NotificationReminderController } from "./notification-reminder.controll
  * Not to be confused with `NotificationsModule` (`src/notifications/`), which is
  * the delivery side -- SMTP, the email templates, the provider-outage watcher. A
  * business feature asks this module for a notification and never imports a
- * transport; see `backend/CLAUDE.md`.
+ * transport; see `docs/backend/notifications-and-push.md`.
  */
 @Module({
   imports: [

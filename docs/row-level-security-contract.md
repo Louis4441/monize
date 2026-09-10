@@ -232,7 +232,7 @@ One ban that is deliberately absent: there is no `no-restricted-syntax` selector
 on `getRepository`. `m.getRepository(X)` off a scoped `EntityManager` is the
 correct pattern throughout this codebase, so such a selector would fire on
 hundreds of correct call sites -- and `lint-bans.spec.ts` scrapes selector shapes
-out of the config and requires the root `CLAUDE.md` and `CONTRIBUTING.md` to name
+out of the config and requires `AGENTS.md` and `CONTRIBUTING.md` to name
 each banned call, which would put actively false guidance in the instruction
 files. The restriction is on the import, where it can be stated truthfully.
 

@@ -222,7 +222,7 @@ new-cash via the transaction form), and pagination. `InvestmentDetailView.tsx` m
 place of the recent-transactions list -- pair passes both ids, standalone/orphan-brokerage pass
 self as the cash id. Every write path calls `invalidateBalanceCaches()`.
 
-**Accept:** tests (act-wrapped render helper per `frontend/CLAUDE.md`): the cash tab requests
+**Accept:** tests (act-wrapped render helper per `docs/frontend/testing.md`): the cash tab requests
 exactly the cash id (**regression -- fails if brokerage rows leak into the cash register**);
 standalone scopes both tabs to itself; a create in either tab invalidates the balance caches
 (extend the `balance-cache.guard.test.ts` scan if it enumerates files).

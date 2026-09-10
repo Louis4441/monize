@@ -124,7 +124,7 @@ idempotent repeat; a mutation response landing after the selection changed.
 
 The last two rows connect to the rules they exist for: rejection ordering in
 `docs/financial-calculation-contract.md` section 7, and request-key ownership
-in `frontend/CLAUDE.md`.
+in `docs/frontend/api-and-cache.md`.
 
 ## Strings and optional fields
 

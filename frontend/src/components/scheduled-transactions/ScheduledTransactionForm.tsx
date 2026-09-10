@@ -198,7 +198,7 @@ export function ScheduledTransactionForm({
   // True only once a price request completes and returns no usable close -- the
   // one state that means "this security genuinely has no price history". Kept
   // apart from marketPrice == null, which is also the loading window and a failed
-  // lookup: a failed lookup is not an empty dataset (frontend/CLAUDE.md).
+  // lookup: a failed lookup is not an empty dataset (docs/frontend/api-and-cache.md).
   const [priceHistoryEmpty, setPriceHistoryEmpty] = useState(false);
   const [investmentTotalValue, setInvestmentTotalValue] = useState<number | ''>(() => {
     const q = scheduledTransaction?.investmentQuantity;
