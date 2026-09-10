@@ -22,11 +22,11 @@ import { useAuthStore } from '@/store/authStore';
 import { NAV_LINKS, AI_LINKS, TOOLS_LINKS, ADMIN_LINKS } from '@/lib/nav-links';
 import type { User } from '@/types/auth';
 
-// The swipe chain the drawer offers a non-admin, non-delegate user: Dashboard,
-// the main pages, the AI pages, then the Tools pages. Derived from the nav
-// arrays so a new nav route updates this expectation in one place.
-const BASE_SWIPE_COUNT =
-  1 + NAV_LINKS.length + AI_LINKS.length + TOOLS_LINKS.length;
+// Swipe is scoped to the current page's drawer group, so the chain a main page
+// offers is the main chain alone: Dashboard plus the main pages. The AI, Tools
+// and Admin groups are their own chains. Derived from the nav arrays so a new
+// route updates the expectation in one place.
+const MAIN_CHAIN_COUNT = 1 + NAV_LINKS.length;
 
 function makeUser(role: 'admin' | 'user'): User {
   return { id: 'u1', email: 'u@example.com', role } as User;
@@ -135,26 +135,36 @@ describe('useSwipeNavigation', () => {
       expect(result.current.isSwipePage).toBe(true);
     });
 
-    it('returns the full swipe chain (dashboard + main + AI + tools)', () => {
+    it('returns the main chain (dashboard + main pages)', () => {
       const { result } = renderHook(() => useSwipeNavigation());
-      expect(result.current.totalPages).toBe(BASE_SWIPE_COUNT);
+      expect(result.current.totalPages).toBe(MAIN_CHAIN_COUNT);
     });
 
-    it('treats an AI page as a swipe page', () => {
+    it('scopes an AI page to the AI chain only', () => {
       mockPathname = '/ai';
       const { result } = renderHook(() => useSwipeNavigation());
       expect(result.current.isSwipePage).toBe(true);
-      expect(result.current.currentIndex).toBeGreaterThan(0);
+      // The AI chain is exactly the AI pages -- not the main or tools ones.
+      expect(result.current.totalPages).toBe(AI_LINKS.length);
     });
 
-    it('treats a Tools page as a swipe page', () => {
+    it('scopes a Tools page to the Tools chain only', () => {
       mockPathname = '/securities';
       const { result } = renderHook(() => useSwipeNavigation());
       expect(result.current.isSwipePage).toBe(true);
-      expect(result.current.currentIndex).toBeGreaterThan(0);
+      expect(result.current.totalPages).toBe(TOOLS_LINKS.length);
     });
 
-    it('includes admin pages only for a non-delegate admin', () => {
+    it('does not cross from the last main page into the AI chain', () => {
+      // The last main page's swipe chain stays the main chain, so its right
+      // edge has nowhere to go -- it never reaches the AI group.
+      mockPathname = NAV_LINKS[NAV_LINKS.length - 1].href;
+      const { result } = renderHook(() => useSwipeNavigation());
+      expect(result.current.totalPages).toBe(MAIN_CHAIN_COUNT);
+      expect(result.current.currentIndex).toBe(MAIN_CHAIN_COUNT - 1);
+    });
+
+    it('includes the admin chain only for a non-delegate admin', () => {
       mockPathname = '/admin/users';
       const nonAdmin = renderHook(() => useSwipeNavigation());
       expect(nonAdmin.result.current.isSwipePage).toBe(false);
@@ -165,9 +175,8 @@ describe('useSwipeNavigation', () => {
       useAuthStore.getState().setUser(makeUser('admin'));
       const admin = renderHook(() => useSwipeNavigation());
       expect(admin.result.current.isSwipePage).toBe(true);
-      expect(admin.result.current.totalPages).toBe(
-        BASE_SWIPE_COUNT + ADMIN_LINKS.length,
-      );
+      // The admin chain is exactly the admin pages, scoped to that group.
+      expect(admin.result.current.totalPages).toBe(ADMIN_LINKS.length);
     });
 
     it('returns -1 and isSwipePage false for non-swipe pages', () => {
@@ -662,7 +671,7 @@ describe('useSwipeNavigation', () => {
       mockPathname = '/dashboard';
       const { result } = renderHook(() => useSwipeNavigation());
       expect(result.current.isSwipePage).toBe(true);
-      expect(result.current.totalPages).toBe(BASE_SWIPE_COUNT);
+      expect(result.current.totalPages).toBe(MAIN_CHAIN_COUNT);
     });
   });
 });

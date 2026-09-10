@@ -6,22 +6,30 @@ import { useAuthStore } from '@/store/authStore';
 import type { DelegateSectionGrants } from '@/lib/delegation';
 import { NAV_LINKS, AI_LINKS, TOOLS_LINKS, ADMIN_LINKS } from '@/lib/nav-links';
 
-// The horizontal swipe chain follows the mobile drawer's own order: the
-// Dashboard, the main pages, the AI pages, and the Tools pages -- so a swipe
-// leaves and reaches every browsing view the drawer lists, not just the main
-// ones. Admin pages are appended only for a non-delegate admin (below).
-// Settings is deliberately excluded: it is a terminal screen, not a view the
-// user pages through. Labels are unused (the indicator draws dots), so only
+// Swipe navigation is scoped to the drawer group the current page belongs to,
+// so a swipe cycles within that group and never leaves it: the main chain
+// (Dashboard plus the main pages), the AI chain, the Tools chain, and the
+// Admin chain. Each chain follows the drawer's own order. Settings is
+// deliberately excluded from every chain: it is a terminal screen, not a view
+// the user pages through. Labels are unused (the indicator draws dots), so only
 // the href and its order matter -- kept in one place with the nav arrays.
 interface SwipePage {
   href: string;
 }
-const BASE_SWIPE_PAGES: SwipePage[] = [
+const MAIN_CHAIN: SwipePage[] = [
   { href: '/dashboard' },
   ...NAV_LINKS.map((l) => ({ href: l.href })),
-  ...AI_LINKS.map((l) => ({ href: l.href })),
-  ...TOOLS_LINKS.map((l) => ({ href: l.href })),
 ];
+const AI_CHAIN: SwipePage[] = AI_LINKS.map((l) => ({ href: l.href }));
+const TOOLS_CHAIN: SwipePage[] = TOOLS_LINKS.map((l) => ({ href: l.href }));
+const ADMIN_CHAIN: SwipePage[] = ADMIN_LINKS.map((l) => ({ href: l.href }));
+
+// The chain that contains the current path, or an empty chain when the path
+// belongs to none of them (e.g. Settings). A page reachable from no chain is
+// not a swipe page.
+function chainFor(pathname: string, chains: SwipePage[][]): SwipePage[] {
+  return chains.find((chain) => chain.some((p) => p.href === pathname)) ?? [];
+}
 
 // Section-gated swipe pages for a delegate. The Dashboard is always
 // reachable; the rest require the matching owner grant. Transactions is
@@ -93,20 +101,24 @@ export function useSwipeNavigation(): UseSwipeNavigationReturn {
   const isAdmin = useAuthStore((s) => s.user?.role === 'admin');
 
   const pages = useMemo(() => {
-    if (!isDelegateView) {
-      return isAdmin
-        ? [...BASE_SWIPE_PAGES, ...ADMIN_LINKS.map((l) => ({ href: l.href }))]
-        : BASE_SWIPE_PAGES.slice();
+    if (isDelegateView) {
+      // A delegate swipes only the Dashboard plus the main sections granted to
+      // them; AI, Tools and Admin are not delegate sections, so a delegate has
+      // only the (filtered) main chain to page through.
+      const mainForDelegate = MAIN_CHAIN.filter((p) => {
+        if (p.href === '/dashboard') return true;
+        const section = DELEGATE_SECTION_BY_HREF[p.href];
+        return !!section && !!delegateSections?.[section];
+      });
+      return chainFor(pathname, [mainForDelegate]);
     }
-    // A delegate swipes only the Dashboard plus the main sections granted to
-    // them; AI, Tools and Admin hrefs are not delegate sections, so this filter
-    // drops them without a second list to keep in sync.
-    return BASE_SWIPE_PAGES.filter((p) => {
-      if (p.href === '/dashboard') return true;
-      const section = DELEGATE_SECTION_BY_HREF[p.href];
-      return !!section && !!delegateSections?.[section];
-    });
-  }, [isDelegateView, delegateSections, isAdmin]);
+    // The Admin chain joins the set only for a real admin who is not acting as
+    // a delegate -- the same gate the header applies to the Admin menu.
+    const chains = isAdmin
+      ? [MAIN_CHAIN, AI_CHAIN, TOOLS_CHAIN, ADMIN_CHAIN]
+      : [MAIN_CHAIN, AI_CHAIN, TOOLS_CHAIN];
+    return chainFor(pathname, chains);
+  }, [isDelegateView, delegateSections, isAdmin, pathname]);
 
   const currentIndex = pages.findIndex((p) => pathname === p.href);
   // A lone page (e.g. a delegate granted no sections) has nothing to swipe
