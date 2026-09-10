@@ -33,7 +33,7 @@ Please don't open a large or shared-area PR cold. Unsolicited large PRs may be a
 
 ## Project conventions
 
-These are enforced in review and, where possible, in CI. Detailed, layer-specific guidance lives in `CLAUDE.md`, `backend/CLAUDE.md`, `frontend/CLAUDE.md`, and `database/CLAUDE.md`; the frontend's rules are indexed there and written out under `docs/frontend/`.
+These are enforced in review and, where possible, in CI. Detailed, layer-specific guidance lives in `CLAUDE.md`, `backend/CLAUDE.md`, `frontend/CLAUDE.md`, and `database/CLAUDE.md`; the frontend's and backend's rules are indexed there and written out under `docs/frontend/` and `docs/backend/`.
 
 ### Code organization
 

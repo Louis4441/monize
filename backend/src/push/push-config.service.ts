@@ -211,7 +211,7 @@ export class PushConfigService implements OnApplicationBootstrap {
    * Runs under whatever identity the caller already has: `push_instance_config`
    * is RLS-exempt, so a tenant transaction reads it exactly as a system one
    * would, and seeding a bypass here would widen the fence on a request path
-   * for nothing (`backend/CLAUDE.md`, "a read about somebody else"). The two
+   * for nothing (`docs/backend/database-access-and-tenancy.md`, "a read about somebody else"). The two
    * callers that genuinely have no ambient identity -- the bootstrap hook, and
    * the deployment-wide device counts -- seed their own.
    */

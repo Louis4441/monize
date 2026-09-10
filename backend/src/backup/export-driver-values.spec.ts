@@ -22,7 +22,7 @@ import { RESTORE_PLAN } from "./restore-plan";
  * Timestamps and DATEs are the same shape of hazard with a subtler outcome: a
  * `Date` serialises to an ISO instant, and for a DATE column that can shift the
  * day when it is parsed back in a negative-offset zone. `main.ts` installs a
- * global DATE-as-string parser, but `backend/CLAUDE.md` is explicit that it must
+ * global DATE-as-string parser, but `docs/backend/entities-and-dtos.md` is explicit that it must
  * not be relied on, since it is absent in any process that does not boot the app.
  * That is left as-is here (it needs a driver-level fix, not an export-level one)
  * and is asserted only to the extent that DATE columns are never bytea.

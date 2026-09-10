@@ -5,7 +5,7 @@ import { basename, join } from "path";
 import { findRepoRoot, gitListFiles, requireRepoRoot } from "./repo-tree.util";
 
 /**
- * `docs/cron-jobs.md` is where `backend/CLAUDE.md` sends anyone asking what runs
+ * `docs/cron-jobs.md` is where `backend/CLAUDE.md` and `docs/backend/cron-and-background-work.md` send anyone asking what runs
  * on a schedule. It was missing six of them -- including `auto-backup.service`,
  * the subject of the very audit phase that led here -- and listed one
  * (`auth.service`) whose `@Cron` had moved to `token.service`.

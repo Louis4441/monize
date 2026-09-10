@@ -99,7 +99,7 @@ export const MAX_USER_AGENT_LENGTH = 255;
  * `sendTest` fans out over every live row, so without a bound one account's
  * request costs whatever that account chose to make it cost -- the same reason
  * every request-supplied array in this codebase declares an upper size
- * (`backend/CLAUDE.md`). Twenty is far past a person's real device count and
+ * (`docs/backend/entities-and-dtos.md`). Twenty is far past a person's real device count and
  * far short of a useful lever.
  */
 export const MAX_LIVE_DEVICES_PER_USER = 20;
@@ -194,7 +194,7 @@ export class PushSubscriptionService {
       // row whose 409 says it was never written: `disableStaleSubscriptions`
       // cannot see a row that does not exist yet, so the device was listed as
       // live under a superseded key and only its first delivery retired it.
-      // `backend/CLAUDE.md`, "Rejection happens before the write". It reads
+      // `docs/backend/database-access-and-tenancy.md`, "Rejection happens before the write". It reads
       // through its own `withScopedDb`, which JOINS this one -- same
       // connection, same atomicity -- rather than opening a second transaction.
       const config = await this.pushConfig.getPublicConfig();

@@ -52,7 +52,7 @@ export class PerformanceComparisonQueryDto {
    * `@ValidateIf` rather than `@IsOptional` alone: a range control the user
    * left on a preset sends `startDate=""`, and `@IsOptional` waives validation
    * for `undefined` and `null` only -- so the format check would run on the
-   * empty string and reject the whole request (`backend/CLAUDE.md`, DTO
+   * empty string and reject the whole request (`docs/backend/entities-and-dtos.md`, DTO
    * conventions).
    */
   @ApiPropertyOptional({ description: "Window start (YYYY-MM-DD)" })

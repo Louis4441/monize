@@ -22,7 +22,7 @@ export class PasswordBreachService {
         // below it. CodeQL default setup does not run the alert-suppression
         // query, so the open alert has to be dismissed as a false positive on
         // the Security tab; the annotation is placed where it takes effect the day
-        // that query runs (backend/CLAUDE.md, CodeQL suppressions).
+        // that query runs (docs/backend/modules-and-runtime.md, CodeQL suppressions).
         // codeql[js/insufficient-password-hash]
         .update(password)
         .digest("hex")

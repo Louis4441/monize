@@ -2,7 +2,7 @@
 
 Personal finance management app (Microsoft Money replacement). NestJS backend, Next.js frontend, PostgreSQL database, all running in Docker/Kubernetes
 
-See `backend/CLAUDE.md`, `frontend/CLAUDE.md`, and `database/CLAUDE.md` for layer-specific details (commands, structure, conventions). The frontend's `CLAUDE.md` is an index; its rules live in `docs/frontend/` and are read when the work touches their subject.
+See `backend/CLAUDE.md`, `frontend/CLAUDE.md`, and `database/CLAUDE.md` for layer-specific details (commands, structure, conventions). The frontend's and backend's `CLAUDE.md` are indexes; their rules live in `docs/frontend/` and `docs/backend/` and are read when the work touches their subject.
 
 ## Tech Stack
 
@@ -57,7 +57,7 @@ Before writing a UI control, a data access path, or anything a user interacts wi
 
 1. Find how the codebase already solves that problem and switch to it -- there is usually an existing helper or hook, and not using it was the actual mistake.
 2. Add a regression test that fails on the original mistake, not merely one that covers the fix. Where the mistake is mechanical, prefer a guard test that scans the source and fails for *any* occurrence -- `frontend/src/test/ui-conventions.test.ts` and `frontend/src/lib/tours/anchors.uniqueness.test.ts` are the pattern.
-3. Write the rule down here or in the layer's `CLAUDE.md`, in one or two sentences, naming the thing to use and the thing not to. The frontend keeps its `CLAUDE.md` as an index: the sentence goes in the matching `docs/frontend/*.md`, and the index gains at most one line.
+3. Write the rule down here or in the layer's `CLAUDE.md`, in one or two sentences, naming the thing to use and the thing not to. The frontend and the backend keep their `CLAUDE.md` as an index: the sentence goes in the matching `docs/frontend/*.md` or `docs/backend/*.md`, and the index gains at most one line.
 
 **Prefer the rule the machine can check.** Ranked by how well they hold: a type the compiler enforces, a lint rule, a test that scans the source, a paragraph in a `CLAUDE.md`. A rule in prose gets read, agreed with, and violated anyway; reach for the highest form the mistake allows.
 
@@ -77,7 +77,7 @@ Before writing a UI control, a data access path, or anything a user interacts wi
 
 **A lenient decoder is not a validator.** `Buffer.from(value, "base64")` silently discards characters outside the alphabet instead of failing -- on `x-export-password` that encrypts a backup under a password nobody knows and reports success. Anywhere a decode result is used as a credential or a key, assert the round trip.
 
-**A driver value is not a JSON value.** `pg` returns `bytea` as a `Buffer` and DATE/TIMESTAMP as `Date`; `JSON.stringify` mangles a Buffer into `{"type":"Buffer","data":[...]}`. The backup export reads every bytea column through `encode(col, 'base64')`, and `backend/src/backup/export-driver-values.spec.ts` fails if a new one is added without it. Same family as the raw-select rule in `backend/CLAUDE.md`.
+**A driver value is not a JSON value.** `pg` returns `bytea` as a `Buffer` and DATE/TIMESTAMP as `Date`; `JSON.stringify` mangles a Buffer into `{"type":"Buffer","data":[...]}`. The backup export reads every bytea column through `encode(col, 'base64')`, and `backend/src/backup/export-driver-values.spec.ts` fails if a new one is added without it. Same family as the raw-select rule in `docs/backend/entities-and-dtos.md`.
 
 **A column list in the export is a claim that it is the whole table.** A table whose export names its columns (because one of them is `bytea`, so `SELECT *` cannot be used) stops describing the table the moment a migration adds a column: the backup omits it, and a restore -- which deletes the user's rows and reinserts from the archive -- writes NULL over it, reporting success. `payees.address`/`email`/`phone` shipped that way. `backend/src/backup/export-driver-values.spec.ts` now checks every explicit list against `database/schema.sql` as well as the bytea encoding; a column that genuinely must not be exported belongs there with its reason.
 
@@ -87,7 +87,7 @@ Before writing a UI control, a data access path, or anything a user interacts wi
 
 **Code and schema ship in one image; they do not arrive in one process.** `db-migrate` runs at container start and the server after it, so "this build calls a SQL function" and "this database has it" are separate facts; the gap surfaces as `function ... does not exist` behind a generic 500. Every SQL function `src/` calls is declared once in `backend/src/common/db/required-db-functions.ts` with the migration that creates it, and both `main.ts` and `db-migrate` refuse to serve a database missing one. `required-db-functions.spec.ts` holds the list in both directions -- crucially, a function defined in `schema.sql` and mentioned anywhere in `src/` must be registered.
 
-**A doc that names an identifier is making a claim about the source.** Renaming or deleting a field, flag or helper means grepping `docs/` and every `CLAUDE.md` in the same commit. A comment asserting that *every* call site does something is a scanning test, not a comment. For named *files* the machine checks: `backend/src/common/doc-paths.spec.ts` fails when a path (bare filenames included) in any `CLAUDE.md`, top-level `docs/*.md` or `docs/frontend/*.md` does not resolve. `docs/future-plans/` may name files that do not exist yet, but an unresolved path whose basename exists elsewhere is a moved file and fails. `docs/release-notes/` and `docs/audits/` are shipped records, out of scope. A path in another branch or repository is qualified (`branch:path/to/file.md`); a doc arguing a file is *missing* names it in plain prose, since a backticked span means "this file is here".
+**A doc that names an identifier is making a claim about the source.** Renaming or deleting a field, flag or helper means grepping `docs/` and every `CLAUDE.md` in the same commit. A comment asserting that *every* call site does something is a scanning test, not a comment. For named *files* the machine checks: `backend/src/common/doc-paths.spec.ts` fails when a path (bare filenames included) in any `CLAUDE.md`, top-level `docs/*.md`, `docs/frontend/*.md` or `docs/backend/*.md` does not resolve. `docs/future-plans/` may name files that do not exist yet, but an unresolved path whose basename exists elsewhere is a moved file and fails. `docs/release-notes/` and `docs/audits/` are shipped records, out of scope. A path in another branch or repository is qualified (`branch:path/to/file.md`); a doc arguing a file is *missing* names it in plain prose, since a backticked span means "this file is here".
 
 ### The contract documents
 

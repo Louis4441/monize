@@ -43,8 +43,19 @@ const DOCS = [
   'backend/CLAUDE.md',
   'frontend/CLAUDE.md',
   'CONTAINER_BUILD.md',
-  // The frontend layer's rules, moved out of frontend/CLAUDE.md so it could
-  // stay an index; they carry the same commands and tables it used to.
+  // Each layer's rules, moved out of its CLAUDE.md so that file could stay an
+  // index; they carry the same commands and tables it used to.
+  'docs/backend/README.md',
+  'docs/backend/testing.md',
+  'docs/backend/modules-and-runtime.md',
+  'docs/backend/entities-and-dtos.md',
+  'docs/backend/database-access-and-tenancy.md',
+  'docs/backend/transactions-and-money.md',
+  'docs/backend/securities-and-providers.md',
+  'docs/backend/ai-and-payees.md',
+  'docs/backend/notifications-and-push.md',
+  'docs/backend/backup.md',
+  'docs/backend/cron-and-background-work.md',
   'docs/frontend/README.md',
   'docs/frontend/api-and-cache.md',
   'docs/frontend/ui-conventions.md',

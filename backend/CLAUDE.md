@@ -1,14 +1,16 @@
 # Backend Directory
 
-NestJS API server. All commands run from this directory.
+NestJS API server (TypeORM, PostgreSQL, class-validator, nestjs-i18n, Jest). All commands run from this directory.
 
-Most of this layer's hardest rules are cross-layer and live in `docs/`, indexed by [`docs/system-invariants.md`](../docs/system-invariants.md) -- which also records, per invariant, whether the code currently upholds it. Before changing a balance, a holding, a transfer, a scheduled occurrence, a cron, a token, or anything that writes outside PostgreSQL, read the relevant one and name its ID in the PR:
+This file is an index. The rules themselves live in `docs/backend/` (start at `docs/backend/README.md`) and are read when the work touches their subject. Most of them are also enforced by a source-scanning spec whose failure message names the thing to use, so a rule is met by fixing the code, never by widening a guard's grandfather list.
 
-- [`docs/concurrency-and-idempotency.md`](../docs/concurrency-and-idempotency.md) -- `withScopedDb` gives atomicity and identity, **not** protection against a concurrent writer of the same row. Which mechanism to use, lock ordering, and what a retry means before commit, after commit, and when the result is unknown.
-- [`docs/financial-semantics.md`](../docs/financial-semantics.md) -- signs, transfer legs, FX rate direction and precision, split and commission arithmetic.
-- [`docs/external-side-effects.md`](../docs/external-side-effects.md) -- attachments, backups, email, providers: anything a transaction cannot roll back.
-- [`docs/cron-jobs.md`](../docs/cron-jobs.md) -- every `@Cron` with what stops a second replica repeating its effect. A new cron fills in that column.
-- [`docs/verification-contract.md`](../docs/verification-contract.md) -- a mock proves the call, not the property; which claims need a real two-connection test.
+Most of this layer's hardest rules are cross-layer and live in `docs/`, indexed by `docs/system-invariants.md`, which also records, per invariant, whether the code currently upholds it. Before changing a balance, a holding, a transfer, a scheduled occurrence, a cron, a token, or anything that writes outside PostgreSQL, read the relevant one and name its ID in the PR:
+
+- `docs/concurrency-and-idempotency.md` -- `withScopedDb` gives atomicity and identity, **not** protection against a concurrent writer of the same row. Which mechanism to use, lock ordering, and what a retry means before commit, after commit, and when the result is unknown.
+- `docs/financial-semantics.md` -- signs, transfer legs, FX rate direction and precision, split and commission arithmetic.
+- `docs/external-side-effects.md` -- attachments, backups, email, providers: anything a transaction cannot roll back.
+- `docs/cron-jobs.md` -- every `@Cron` with what stops a second replica repeating its effect. A new cron fills in that column.
+- `docs/verification-contract.md` -- a mock proves the call, not the property; which claims need a real two-connection test.
 
 ## Commands
 
@@ -21,62 +23,14 @@ npm run test               # test:unit then test:integration -- needs PostgreSQL
 npm run test:unit          # Unit tests only (src/**/*.spec.ts); no database needed
 npm run test:integration   # test/integration/*.spec.ts against real PG, one worker
 npm run test:cov           # Coverage report (95% lines, 94% stmts, 95% funcs, 85% branches)
-npm run test:e2e           # E2E tests (test/**/*.spec.ts, 30s timeout, sequential)
+npm run test:e2e           # test/*.e2e-spec.ts -- not a CI gate; three of five suites are broken (docs/backend/testing.md)
 npm run i18n:pseudo        # Regenerate the xx pseudo-locale from en
 npm run i18n:check         # Verify the pseudo-locale is up to date (CI gate)
 npm run migration:lint     # Idempotency lint over database/migrations (CI gate)
 npm run migration:lint:test # Self-test for the migration lint
 ```
 
-### The parallel config cannot see `test/`, and `npm test` serializes the two suites
-
-`test/integration/*` rebuilds the schema of the one shared `monize_test`
-database (`synchronize` + `dropSchema`), so two Jest workers running any two of
-those suites race each other -- `pg_type_typname_nsp_index` conflicts, or a
-"connection terminated" reported by whichever spec was innocent. The root Jest
-config in `package.json` therefore pins `roots: ["<rootDir>/src"]`: a bare
-`jest` (and `test:watch`, `test:debug`) discovers unit specs only. Integration
-specs are owned by `test/jest-e2e.json`, which pins `maxWorkers: 1`, and
-`npm test` runs `test:unit` then `test:integration` (through
-`backend/scripts/test-chain.mjs`) so the default command runs everything without ever
-running the two in parallel. That makes `npm test` require a reachable
-PostgreSQL (`pretest:integration` creates `monize_test` if it is missing);
-`npm run test:unit` is the offline path.
-`src/common/jest-config.guard.spec.ts` fails if any of those facts stops being
-true.
-
-**`npm test` takes no Jest arguments, and says so rather than ignoring them.**
-npm appends `npm test -- <args>` to the *end* of the script, so in a chained
-command they become the next `npm run`'s flags: npm swallows them, Jest never
-sees them, and the filtered run silently becomes a full one. Filtered runs go
-through `npm run test:unit -- <args>` or `npm run test:integration -- <args>`.
-
-**Discovery lives in a config, not in a script.** `--testPathPatterns` and `-t`
-may narrow what a config found; `--roots`, `--rootDir`, `--testRegex`,
-`--testMatch`, `--testPathIgnorePatterns`, `--projects` and `--preset` redefine
-it, and the guard rejects any script that passes one -- `jest --roots ./src
-./test` would sweep the database-backed suites back into the parallel run with
-every config in the repository still correct.
-
-**The serialization is not a preference, and it stays until the suites stop
-sharing a database.** A `dropSchema: true` suite is safe to run beside another
-only when each worker owns its own database or schema; until that exists, one
-worker is the mechanism, and `--runInBand` at a call site is not a substitute
-for the config pinning it.
-
-### `test/*.e2e-spec.ts` is not a gate, and three of the five suites are broken
-
-CI runs `test:unit` and `test:integration` (filtered to `test/integration/*.spec.ts`). Nothing runs `test:e2e`, and separate rot accumulated behind a since-fixed compile error (`npm run typecheck` now closes the compile half in CI):
-
-| Suite | State | Why |
-|---|---|---|
-| `test/payee-detail.e2e-spec.ts` | passes (9 tests) | fine; this is the spec that caught the raw-select transformer class of bug |
-| `test/category-detail.e2e-spec.ts` | passes (9 tests) | fine; same shape as the payee one |
-| `test/payees.e2e-spec.ts` | fails | calls services directly, so no request scope; never converted for RLS (`withScopedDb` throws without ambient context) |
-| `test/auth.e2e-spec.ts` | fails | `AuthController` gained a `TokenService` dependency its test module does not provide |
-| `test/transactions.e2e-spec.ts` | fails | `DelegateTransferMaskInterceptor` gained a `CrossOwnerAccessService` dependency its test module does not provide |
-
-Repair them or delete them -- what they must not stay is present, cited, and dead. Do not add `test:e2e` to CI until the three are fixed; it will be red.
+`npm test` takes no Jest arguments; a filtered run goes through `npm run test:unit -- <pattern>` or `npm run test:integration -- <pattern>`. The database-backed suites never run in parallel with anything, including each other; `docs/backend/testing.md` says why and `src/common/jest-config.guard.spec.ts` holds it.
 
 ## Module Structure
 
@@ -94,559 +48,71 @@ Each feature module under `src/` follows the standard layout. Use `ls src/` or L
   dto/update-{entity}.dto.ts
 ```
 
-Controllers are thin and delegate to services. Services always take `userId` as the first parameter and filter by it for multi-tenancy.
-
-### An edge on a require cycle is deferred, or it is `undefined`
-
-Module and service files are CommonJS, so a circular `import` hands the second
-file a half-filled `exports`: the `@Module({ imports: [...] })` array holds an
-`undefined`, or a constructor's reflected parameter type does, and Nest refuses
-to build the application -- "Nest cannot create the NetWorthModule instance...
-index [1] ... is undefined", or "can't resolve dependencies of the
-ScheduledTransactionsService (AccountsService, TransactionsService, ?, ...)".
-
-**Whether it bites depends on which file `require` reached first**, so the same
-code boots from one entry point and dies from another: `AppModule` from the
-compiled server entry point, `TransactionsModule` from an integration
-`RootTestModule`,
-whichever module a spec happens to import. Issue #1247 shipped green through
-`npm run test:unit` and took out the integration suite, all four E2E shards and
-Lighthouse.
-
-The rule is exact and it is checked: an `imports` entry, or a constructor
-parameter, whose class can reach the declaring file back through `import`
-statements must be `forwardRef(() => X)` / `@Inject(forwardRef(() => X))`.
-`src/module-graph.spec.ts` proves it two ways -- statically over every load order
-at once (naming the offending edge), then at runtime from every module file in
-turn, walking `imports` and every provider's `design:paramtypes` as Nest reads
-them. Reordering imports is not a fix; defer the edge.
-
-### A stub standing in for a real module inherits its export list
-
-`test/helpers/integration-setup.ts` replaces `ScheduledTransactionsModule` with
-a stub, so that stub's `exports` are a claim about the real module. It derives
-them from `Reflect.getMetadata("exports", ScheduledTransactionsModule)` rather
-than restating them: a hand-written copy keeps compiling until a consumer of the
-newly added export appears, and then eighteen suites fail somewhere else
-entirely ("argument ScheduledOccurrenceService at index [5] is available in the
-NotificationsModule module").
+Controllers are thin and delegate to services. Services always take `userId` as the first parameter and filter by it for multi-tenancy. An `imports` entry or constructor parameter whose class can reach the declaring file back through `import` statements is `forwardRef(() => X)`; `src/module-graph.spec.ts` names the offending edge.
 
 ## Configuration
 
 - **Path alias:** `@/*` maps to `src/*` (tsconfig + Jest moduleNameMapper)
-- **ESLint:** Flat config (`eslint.config.mjs`) with typescript-eslint + prettier
-- **Jest:** Coverage thresholds: 95% lines, 94% statements, 95% functions, 85% branches. Excludes `main.ts`, modules, entities, DTOs, seed scripts, and migrations from coverage.
+- **ESLint:** Flat config (`eslint.config.mjs`) with typescript-eslint + prettier; it bans the direct database primitives the root `CLAUDE.md` names
+- **Jest:** Coverage thresholds: 95% lines, 94% statements, 95% functions, 85% branches. Excludes `main.ts`, modules, entities, DTOs, seed scripts, and migrations from coverage
 - **TypeScript:** ES2021 target, CommonJS modules, `strictNullChecks: true`, `noImplicitAny: false`
 
-## Global Providers (app.module.ts)
+## Rules that apply to every change
 
-Registered globally via `APP_FILTER`, `APP_GUARD`, `APP_INTERCEPTOR`:
+**Find how the codebase already does it and do it the same way.** Each of these exists once; the generic version looks fine in isolation and wrong in place. The guard spec beside each rule in `docs/backend/` fails on most of the hand-rolled versions.
 
-| Provider | Purpose |
-|----------|---------|
-| `GlobalExceptionFilter` | Catches all exceptions; handles HttpException and TypeORM QueryFailedError |
-| `ThrottlerGuard` | Rate limiting (100 requests/minute) |
-| `CsrfGuard` | CSRF double-submit cookie validation |
-| `MustChangePasswordGuard` | Blocks access until password change (admin-reset users) |
-| `DemoModeGuard` | Restricts write operations in demo mode |
-| `CsrfRefreshInterceptor` | Refreshes CSRF token cookie on responses |
-| `ClassSerializerInterceptor` | Applies `@Exclude()` / `@Expose()` from class-transformer |
-
-Also configured: `ConfigModule` (global), `TypeOrmModule` (async, PostgreSQL), `ThrottlerModule`, `ScheduleModule`.
-
-## main.ts Setup
-
-- **API prefix:** `api/v1`
-- **Body limit:** 10mb (for large QIF file imports)
-- **Swagger:** Enabled at `/api/docs` in non-production only
-- **DATE column parser:** `pg.types.setTypeParser(1082, val => val)` -- returns DATE columns as strings to prevent timezone-related date shifting
-- **Validation pipe:** Global with `whitelist: true`, `forbidNonWhitelisted: true`, `transform: true`
-- **Security:** Helmet (CSP, HSTS, frame-deny), CORS (credentials, configurable origins)
-- **Cookie parser:** Required for OIDC state/nonce and auth tokens
-- **Trust proxy:** Level 1 (Docker/nginx real client IP)
-
-## Entity Conventions
-
-**DATE columns** must use a string transformer to avoid timezone issues -- without this, PostgreSQL returns a `Date` parsed in UTC and reading `.toISOString()` can shift the day:
-
-```typescript
-@Column({
-  type: 'date',
-  name: 'transaction_date',
-  transformer: {
-    from: (value: string | Date): string => {
-      if (!value) return value as string;
-      if (typeof value === 'string') return value;
-      return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
-    },
-    to: (value: string | Date): string | Date => value,
-  },
-})
-transactionDate: string;
-```
-
-**Decimal columns** use a `numericTransformer` to convert PostgreSQL's string representation to `number`. **Timestamps** are `@CreateDateColumn({ name: 'created_at' })` and `@UpdateDateColumn({ name: 'updated_at' })`.
-
-**Raw selects bypass both transformers.** `getRawOne`/`getRawMany` return driver values: a DATE comes back as a JS `Date` and a numeric as a string, regardless of the entity transformer. Select a DATE as text in SQL (`TO_CHAR(col, 'YYYY-MM-DD')`) and pass a numeric through `Number()` before it reaches a DTO that declares `string`/`number`. `main.ts` installs a global DATE string parser, which hides the DATE half in the running server but not in tests, jobs, or any other process -- so do not rely on it. `payee-detail.service.ts` is the worked example; `test/payee-detail.e2e-spec.ts` caught it, because a unit spec with mocked query builders cannot.
-
-**A hand-written column name is checked by nobody -- so a scan checks it.** A mocked `manager.query` records the string and resolves, making every raw statement's column names untested by construction (`AutoBackupService` wrote `RETURNING id` against a table whose primary key is `user_id`, the spec pinned the wrong string with `toContain`, and no user's automatic backup ran). `src/common/db/raw-sql-columns.spec.ts` checks every `RETURNING` list, `INSERT` column list and `UPDATE ... SET` target in `src/` against `database/schema.sql`. Assert the *column*, not the substring.
-
-**A per-user loop in a cron isolates each user, including the steps before the work starts.** Wrap the entire per-user body in the `try` -- an error while deciding whether to run (a pre-check, the claim's own `UPDATE`) must not leave the handler and skip every remaining user. Record the failure on the row so the last-run status tells the truth, and record it through a path that cannot itself throw.
-
-## DTO Conventions
-
-### An optional field with a format validator needs `@ValidateIf`, not just `@IsOptional`
-
-`@IsOptional()` waives validation for `undefined` and `null` only. A text input the user left alone arrives as `""` (react-hook-form sends it), so an `@IsUrl` / `@IsEmail` beside `@IsOptional()` still rejects it -- and because validation fails per *request*, one blank optional field breaks every save from that form. Add `@ValidateIf((_o, value) => value !== null && value !== "")` for a nullable column so a blank clears it. `src/common/optional-format-dto.spec.ts` sweeps every URL- and email-validated DTO property; a NOT NULL field belongs on its exemption list with a reason. This class of bug is invisible to unit tests (hand-built payloads); it surfaces in E2E or production.
-
-### A phone number is normalized by the service, not by a decorator
-
-`payees.phone` is stored in one form for every country -- E.164 with an
-optional RFC 3966 extension suffix (`+12064488762`, `+442079460958;ext=12`) --
-and rendered through `formatPhoneForDisplay`. Both live in
-`src/common/phone-number.util.ts`, over `libphonenumber-js/max`; `min` reduces
-`isValid()` to a length check, so the browser would accept numbers the server
-then had to accept too.
-
-The check is **not** a DTO decorator, because placing a number written without a
-country code needs the caller's region and class-validator cannot see it. The
-region comes from preferences the user has already set (`number_format`, then
-`language`), and `null` -- no region derivable -- makes a bare national number a
-*question* (`phoneNeedsCountryCode`) rather than a rejection: telling somebody
-their perfectly correct number is invalid sends them to check digits that are
-right. Three writers exist and all three go through
-`PayeesService.previewContactFields`: the preview an AI or MCP card is built
-from, the create, and the update. A preview that did not normalize would show
-one value on the card and store another.
-
-Two rules the tests hold. **A resent value is not an edit** -- the form sends
-every field on every save, and rows written before this existed are not
-backfilled, so validating a value merely *present* in the payload would make
-such a payee impossible to edit at all. Only a value that actually moved is
-normalized. And **the lookup normalizes before any caller sees a suggestion**
-(`PayeeContactLookupService.vetCandidate`), which is what makes the background
-enrichment `UPDATE` safe: it writes a model's answer straight into the column
-with no DTO anywhere in its path. `phone-normalization.guard.spec.ts` fails on a
-file that both writes a phone and reaches the database without going through a
-door, and `common/phone-number-cases.json` is the truth table this layer and the
-frontend both assert, so the two can never disagree about which numbers are
-accepted.
-
-**A region is a fact about the reader, not evidence about a third party.**
-`number_format` says where *this user* dials from, which is exactly what places
-a number *they* typed -- and is unrelated to where a payee's office is. So the
-contact lookup normalizes a model's suggestion with **no** region
-(`vetCandidate` passes `null`) and drops one that carries no country code, which
-is what the prompt asks the model for. Read in the reader's region, a Mexico
-City `55 1234 5678` is a valid `+15512345678` in New Jersey -- a different
-number that dials, written into the column by the background enrichment with
-nobody in the loop, under a name the user trusts. An empty field they can fill
-beats a confident wrong number. The rule splits by *who supplied the value*, not
-by which function normalizes it: user-typed gets the region, model-supplied does
-not.
-
-**A stored form is not an answer.** `getLlmPayees` renders `phone` through
-`formatPhoneForDisplay` before the row reaches a model, the same decision the AI
-executor's `contactSummary` and the MCP contact card make about a preview -- a
-model quotes these rows back to the reader, and bare E.164 in the assistant
-beside grouped digits on the payee page is one number printed two ways.
-
-### A request-supplied array declares an upper bound
-
-Every `@IsArray()` DTO property carries `@ArrayMaxSize(n)` -- an unbounded array turns per-element work downstream into a denial-of-service lever (CodeQL `js/loop-bound-injection`, CWE-834). `src/common/array-bound-dto.spec.ts` sweeps validator metadata; its grandfather list may only shrink. Relatedly, never use a request value's `.length` as a loop bound inside a `withScopedDb` callback (CodeQL cannot track the outer guard through the closure): iterate `for (const [i, v] of xs.entries())`.
-
-### The note on a transaction has one length -- `TRANSACTION_NOTE_MAX_LENGTH`
-
-A transaction's `description` and a split's `memo` are one field to the person
-typing in them, so they share one cap (`src/common/transaction-note.ts`) across
-all twenty-three places that write one: fifteen DTO fields plus the AI query
-schemas and the MCP tools, which write the same field with no DTO in the path.
-Splitting the number is how a split memo comes to be rejected at a length its
-parent's description accepts, with nothing on screen saying why.
-
-The columns are all `TEXT`, so the cap is a product decision about how much a
-person should type, not a storage limit -- it went 500 to 750 when descriptions
-started rendering their web addresses as links, since a ticket URL plus a note
-does not fit in 500. Raising it needs no migration, and
-`transaction-note.contract.spec.ts` proves that by checking those columns are
-still unbounded.
-
-**The frontend has the same number**, in `frontend/src/lib/transaction-note.ts`:
-without it a form accepts a save the server rejects, which is what the main
-transaction form did -- a bare 400 with nothing pointing at the field, while the
-one form that did cap reported it properly. The contract spec reads the
-frontend's file and fails when the two disagree.
-
-## `complete()` is not `completeWithTools()` with the tools left off
-
-Both take `AiCompletionRequest`, but `complete()` maps messages through `toSimpleMessages`, which **filters `role: "tool"` out entirely** -- summarising a tool-use conversation through it sends a transcript stripped of every tool result and returns a confident summary of nothing.
-
-A tool-free turn over a tool-use transcript goes through `completeWithTools`/`streamWithTools` with an empty tool list, and every provider builds the field with `toolsField` (`src/ai/providers/tools-field.util.ts`) so it is **omitted** rather than sent as `[]` (OpenAI rejects `tools: []`). `tools-field.util.spec.ts` scans every `*.provider.ts` for a bare `tools:` key; per-provider specs assert the request body both ways. The one caller is `AiQueryService.streamFinalSynthesis`, the pass that turns an unfinished investigation into an answer.
-
-## A turn that ends on a promise is not an answer
-
-Nothing runs between turns, so a tool-free turn saying "One moment, I'm gathering..." ends the query (the loop exits on `stopReason !== "tool_use"`) and reads as a hang. The loop therefore does not treat every tool-free turn as an answer: `isDeferredContinuation` (`src/ai/query/continuation.ts`) recognises the promise, and the loop replies with `CONTINUATION_NUDGE` in the user's place for at most `MAX_CONTINUATION_NUDGES` passes, then breaks to the tool-free synthesis pass with `cutoff = "stalled"`. The stalled text stays in the thinking buffer and never becomes the answer bubble.
-
-Detector shape (both asymmetries are in its spec): a wait request ("one moment") is decisive; a bare work announcement is not, and an offer ("let me know", a trailing `?`) wins over it; only the tail of the message is examined. A false positive costs one extra pass; a false negative is the hang. The strongest signal needs no prose judgement: `promisesPendingAction` pairs a promise of confirmation cards against `proposingToolResults === 0` -- prefer pairing a text claim against state the loop already tracks over adding another regex phrase. `QUERY_SYSTEM_PROMPT` asks for the same thing, but a prompt rule is not a guarantee.
-
-**A stall is often a dead end the model found and could not name.** Both reported stalls were a request the tools could not express (recategorizing one line in 17 split transactions, with one proposing call allowed per query). Batch rows now carry `splits` (`BatchUpdateTransactionRow.splits`, applied in `executeBatchRow` inside the same `UpdateTransactionDto` as the scalar fields, per invariant I1); the individual-card path passes `result.splits` through. Two rules the tests hold: a row that resends no splits must carry none (an empty set would rewrite the lines it was asked to leave), and a row's preview shows its lines instead of a category name. The general point: when you add a limit, put it in the tool description in the same commit.
-
-**A filtered read is not a complete read, and only one of its two readers can tell.** `applyCategoryFilters` hydrates only the split lines matching the filter -- right for the register, wrong for anything that sends the lines back, because `manage_transactions` replaces a split set with exactly what it is given. The LLM path reloads the full set per split parent (`loadCompleteSplits`). Before reusing a list query in a tool, ask what its `where` does to the collections it hydrates: a filter on a joined child table silently truncates the parent's children.
-
-**A refusal the caller cannot act on is a refusal that ends the task.** Every bulk tool path computes a per-row reason; `describeSkippedRows` (`common/bulk-create.types.ts`) is the only way those messages are built (identical reasons collapse with a count; distinct ones list up to three). `bulk-skip-reporting.spec.ts` scans all four tool sources and fails on a "None of ... could be prepared" message that does not carry its reasons -- a generic message that *guesses* sends the reader away from the fix. Individual-card paths that count skips collect reasons too.
-
-## A numeric env knob is declared as data, next to its documentation
-
-Coerce every numeric environment variable through `resolvePositiveInt` (`src/common/env-number.util.ts`), never a bare `Number(...)` -- it separates *absent* from *invalid* so a typo is logged rather than silently running on the default. Where a feature has more than one knob, declare the set as one table of `{ envVar, default, description }` and resolve in a loop (`src/ai/query/query-budgets.ts` is the pattern). `query-budgets.spec.ts` checks `.env.example` in both directions: every declared budget documented with its current default, and no `AI_QUERY_*` line documenting a variable the code does not read.
-
-## An environment variable configures the deployment's own resource, not somebody else's
-
-The AI provider has two owners. `AI_DEFAULT_*` builds the **centrally managed** provider (the operator's, used when a user has configured none, editable nowhere in the UI); everything else in `ai_provider_configs` is a row a *user* created and can edit. So `AI_QUERY_*` sizes the central provider only; a user's provider carries the same five budgets as nullable columns, set in Settings -> AI, defaulting to the built-in numbers -- never to the environment. `resolveQueryBudgetsForConfig` is the single place that decision is made; `AiService.resolveToolUseProvider` hands the caller the configuration alongside the provider, and the transient system-default config is marked `isSystemDefault`.
-
-Before adding an env var for anything a user can also configure, ask which resource it describes -- an operator's ceiling says nothing about a model somebody else is paying for, and the reverse mistake (a per-user knob for the operator's resource) hands out their budget. `query-budgets.spec.ts` holds the split from both sides; a stored value outside the declared range falls back to the documented default rather than being clamped. The bounds live in the same spec table as the defaults, so the DTO (`QueryBudgetFieldsDto`), the migration and the frontend form derive from one place; the form's copy is checked by `frontend/src/lib/ai-query-budgets.contract.test.ts`.
-
-## A label the exporter writes itself must need no escaping
-
-The CSV formula-injection guard in `account-export.service.ts` exists for user-controlled text; when one of the exporter's *own* strings trips it (`-- Split --` got an apostrophe prefix on every split parent row), rename the label so it opens with a character no spreadsheet evaluates (`CSV_SPLIT_CATEGORY_LABEL` is `(Split)`) -- do not exempt the literal. Assert the *field*, not the line (`toContain` is satisfied by the neutralized cell), and keep the document-level check: export an all-ordinary-text fixture and assert no cell carries the guard's prefix.
-
-A transfer's label is `csvTransferLabel` in the same file, and it names the direction as well as the counterpart (`Transfer To Savings`); a split line is asked with its own amount, not the parent's. Its twin is `transferCsvLabel` in `frontend/src/lib/transfer-label.ts`; the QIF export keeps Quicken's `L[Account]` form deliberately.
-
-## A blank transfer payee is stored blank and resolved at read time
-
-A transfer created without a payee persists `payee_name` as NULL (issue #1214); the display label is resolved per read from the linked leg's account -- its CURRENT name, in the reader's language. The English form for machine-facing surfaces (CSV/QIF export, AI/MCP rows, custom reports) lives only in `src/transactions/transfer-payee-label.util.ts`, and `transfer-payee-stamp.guard.spec.ts` fails on a `Transfer to/from ${...}` template anywhere else in `src/`. Migration 161 blanked the legacy-stamped rows; `updateTransfer` heals a surviving stamp to NULL and never regenerates it. A read surface joining `linkedTransaction.account` for this must mask or restrict cross-owner counterparts the reader cannot read (the account export masks; the custom report query restricts the join to same-owner legs).
-
-The guard also asks what a value *is* rather than what it starts with, matching its twin in `frontend/src/lib/csv-export.ts`: a value a spreadsheet reads as a number is data, and prefixing one stops the column adding up (issue #1134) -- amounts bypass `escapeCsv`, so the rule covers text columns that can still hold a number (a cheque number written `-123`).
-
-## A partial escape is indistinguishable from a correct one
-
-Interpolating a literal into a pattern goes through `escapeRegExp` (`src/common/escape-regexp.util.ts`) -- never a hand-written character class, and never a subset of one (`repo-paths.util.ts` escaped only dots and left `\` alone; CodeQL `js/incomplete-sanitization`, CWE-020). `escape-regexp.guard.spec.ts` scans `src/` for either shape. Where the pattern is built from a list, export the builder and test it against a prefix carrying a metacharacter (`buildPlainRootedPathPattern`) -- over real inputs the broken and correct escapes can agree exactly. Do not escape `-`: outside a class it is literal, and `\-` is a SyntaxError under the `u` flag -- so never interpolate the result *inside* a class.
-
-## CodeQL runs as default setup, and a suppression annotation closes nothing there
-
-Code scanning on this repository is CodeQL *default setup*, which runs the standard code-scanning suite and never the alert-suppression query -- so a `codeql` bracket annotation in the source does not close an alert on the Security tab. Two of them sat in `password-breach.service.ts` and its spec for months, above the wrong line as well, while the `js/insufficient-password-hash` alerts they named stayed open. An accepted false positive (SHA-1 is what the HIBP k-anonymity protocol hashes with; `fingerprintPublicKey` in `push-config.service.ts` hashes a *public* key, which is not a password hash) is **dismissed on the Security tab, with its reason**, by someone with security-events write. Touching the flagged line in a PR re-reports the alert as new in that PR and fails its CodeQL check, so a false positive is dismissed first and its file left alone. Prefer a test fixture that carries a known hash over one that recomputes it: the spec now holds SHA-1("password123") as a constant, which proves the protocol against an independent value and gives CodeQL nothing to report. The annotation still goes in, on the line directly above the reported location -- the only line CodeQL's suppression library lets it cover, and for `js/insufficient-password-hash` that is the `.update(...)` call, not the `createHash` statement -- so it takes effect the day the suppression query is added to the analysis. `src/common/codeql-suppression.guard.spec.ts` fails an annotation that follows code on its line, names no query id, sits above a blank or a comment, or sits above the wrong line for a query it knows.
-
-## A cached brand favicon is four columns, one fetcher, and one export rule
-
-Institutions and payees resolve a website's favicon server-side and cache the bytes so the browser never contacts a third party. Shared code lives in `src/common/favicon/`: `FaviconService` (the gstatic fetch, with timeout, size cap and image-only content-type check) and `brandLogoColumns` (the four columns `logo_data`, `logo_content_type`, `has_logo`, `logo_fetched_at`). A third entity imports `FaviconModule`, not a copy. Four shared rules, each with a test:
-
-- **The fetch stays outside the transaction** -- best-effort, never fails the create/update, never holds a connection on a slow host.
-- **Re-resolve only when the address actually changed.** The form resends the current website on every save, and a failed re-fetch would clear a good icon. Clearing the address clears the icon.
-- **The flag and the bytes move together.** `has_logo` answers every list read (the bytes are `select: false`, leaving only through `GET /:id/logo`, which 404s so the client draws its own badge); `logo_fetched_at` stamps the *attempt*.
-- **A bytea column breaks `SELECT *`.** The export query must list columns and wrap the bytes in `encode(logo_data, 'base64')` (`export-driver-values.spec.ts` catches the omission). The support backup drops the bytes and forces `has_logo` false, because a brand icon re-identifies a masked payee.
-
-## Contact enrichment: the background path fills gaps, the user confirms the rest
-
-A payee's website, address, email and phone can be looked up from one of two sources (`src/payees/lookup/`, opt-in via `user_preferences.payee_contact_lookup_enabled`): **Google Places** where it is configured, and the user's **AI provider** otherwise. Every adapter -- Anthropic and OpenAI with their server-side web search, Ollama from model knowledge, the MCP relay through the user's own agent -- answers through `AiService.completeWithWebSearch`, which reports whether a search actually ran; `sanitizeContactSuggestion` applies the DTO's shape rules to every answer and, for an unverified source (`ai-knowledge`, `ai-relay`), keeps address and phone only at high confidence. `PayeeContactLookupService.lookup` is the one door and never throws: `disabled`, `no_provider`, `failed` (with the relay's own message as `detail`) and `none` are four outcomes a caller has to tell the user apart, and a failure is never shown as "nothing found" -- `none` means the source answered and had nothing (a parsed `{"matches": []}`), while an unreadable answer (an empty turn, an output truncated at the token cap, prose from a relay agent) is `failed`, because `none` is the reason that stamps `contact_lookup_at` and retires the automatic lookup for that payee.
-
-Seven rules, each with a test in `payee-contact-enrichment.service.spec.ts`, `contact-suggestion.sanitize.spec.ts`, `payees.controller.spec.ts` and `payees.service.spec.ts`:
-
-- **A lookup never overwrites a value the user entered** (INV-PAYEE-001). The only write a *lookup* makes is `ENRICHMENT_UPDATE_SQL`, on the background path after a name-only create: every contact column is `COALESCE(column, $n)`, `contact_lookup_source` moves only when this statement set a field, and `contact_lookup_at IS NULL` makes it run at most once per payee, on any replica.
-- **The detail screen's button proposes; the user's confirmation writes.** `POST /payees/:id/lookup-contact` (`PayeesService.lookupContactForPayee`) reads the row for its ownership check and its context, returns the candidates and touches nothing. `ContactLookupDialog` shows each field as an add or a replace beside the value it would replace, and the confirmation goes through `PATCH /payees/:id` -- an ordinary payee edit, which is what makes replacing a stored value legitimate there when the lookup itself may not. There is deliberately no COALESCE re-run any more; `PayeeContactEnrichmentService` serves the background path alone.
-- **What the user already holds is context, and a fuller answer for it is an offer.** Every lookup carries `PayeeLookupContext` (`lookup/lookup-context.ts`: website, address, email, phone and notes, sanitized and capped) so the model answers for the right organisation and the right branch of it -- an address reading "Toronto" is a *constraint*, not an answer to preserve. `sanitizeContactSuggestion` therefore classifies each field three ways against that context: a fill (nothing was there), a **refinement** (something was, and this is fuller -- named in `PayeeContactSuggestion.refined`), or an echo (the same fact, dropped so it cannot be reported as found). Notes are context only; no lookup writes them.
-- **A name can mean more than one business, so the answer is a list.** `sanitizeContactSuggestions` reads `{ matches: [...] }` (a bare object is still one match), caps it at `MAX_CONTACT_LOOKUP_MATCHES`, and **drops an alternate the user could not tell apart** -- no `label`, or a label already used -- because a picker whose rows read alike is worse than no picker. `ContactLookupOutcome`'s `ok` arm is a non-empty tuple, so a surface with nobody to ask (background enrichment, the AI/MCP create preview) reads `suggestions[0]` and only a surface with a user offers the rest.
-- **A client that will ask the user takes the lookup off the server.** `POST /payees` accepts `deferContactLookup`, which the controller reads as an *option* and never lets reach the row: it says the caller runs the lookup itself and shows the answer for confirmation (the transaction page's payee quick-create does, through `usePayeeContactLookup` and `ContactLookupDialog`). Without it the same payee is looked up twice -- two paid calls -- and the background write stores values while the user is still reading the dialogue offering them.
-- **A lookup never fails a create, and it runs after the commit.** `PayeesService.create` dispatches the background enrichment only when the row carries no contact detail, the preview did not already look up, and `getActiveScopedManager()` is undefined -- "the callback resolved" only means "committed" when nobody upstream opened a transaction we joined, and a dispatch inside one would look for a row nobody else can see. The dispatch runs under `withUserContext` on the request's tail and logs its failure.
-- **The preview looks up so the card and the commit agree.** A single AI/MCP `create_payee` preview with no contact details runs the lookup (`previewCreate(..., { lookupContact: true })`) and hands its stamp down the descriptor to `create(..., { contactLookup })`, which stores that provenance instead of looking up again. Batch rows are enriched after they commit instead -- 25 model calls inside one chat turn is the wrong latency budget -- and both tool descriptions say so.
-
-- **The user picks the ORDER, and the second source answers for exactly one class of reason.** `RoutingPayeeContactLookupProvider` is the only implementation bound to `PAYEE_CONTACT_LOOKUP_PROVIDER`; it asks `PayeeLookupSettingsService.resolveRouting` for whose key pays AND which source goes first, in one read (the operator's `GOOGLE_PLACES_API_KEY` wins over a user's own -- the env-var rule, and the deployment has already paid for it), claims a slot against that key's monthly cap (INV-PAYEE-002), and calls Places. `preferredSource` defaults to `google-places`; `ai` is offered because Google holds no email address. `ai_provider_config_id` (migration 190) pins WHICH provider answers: the assistant falls through every active provider in priority order, which is right for a chat turn and wrong for a lookup billed per call, so a pin that resolves to nothing -- the provider was deactivated, which the `ON DELETE SET NULL` foreign key cannot see -- reports `no_provider` rather than spending a model the user did not choose. `AiService.getActiveConfigs(userId, onlyConfigId)` narrows the list, and returns EMPTY for an unmatched pin (never the full list, and never the centrally managed provider, which is the deployment's and carries no pin). The id is verified against the caller's own configs inside the transaction that stores it. The other source is reached **only when the first cannot answer for a configuration or budget reason** -- no AI provider configured, or the cap spent -- because the cap is a budget the user chose and stopping outright would turn their own limit into a broken feature. A Places *failure* -- rejected key, API not enabled, open breaker -- is reported as `failed` carrying Google's own message, never absorbed into an AI bill the user never sees; and when the cap is spent with no AI provider behind it, the reason is `quota_exceeded`, not `no_provider`, because the two name different repairs. The field mask asks for `internationalPhoneNumber` and never `nationalPhoneNumber`: a suggested number is normalized with no region, so one without a country code is dropped on arrival every time.
-
-  **A secret is only as private as the error messages it can appear in.** The Google Places key is encrypted at rest and never returned to the client -- and `fetch` refuses a header value holding a control character while QUOTING that value in the `TypeError` it throws, so a key carrying one travelled verbatim into the application log (via `ProviderHealthService.logFailure`) and into the Test button's error text. Both doors now ask `isSendableApiKey` (`src/payees/lookup/google-places/google-places-key.ts`): the DTOs refuse to store such a key, and `GooglePlacesClient` refuses to send one stored before that validator existed or supplied through `GOOGLE_PLACES_API_KEY`, which no DTO ever sees. The refusal is raised BEFORE the breaker is consulted -- nothing was asked of Google, so it is neither an outcome nor a probe worth holding -- and names the problem, never the key. The general rule: before putting a user-supplied value in a header, a URL or an exception message, ask what the platform does with a value it rejects.
-
-  **Each source carries its own switch, and off means NOT REACHED.** `google_places_enabled` (migration 188) and `ai_enabled` (migration 191) are symmetric: a source switched off is not asked first, and is not the fallback when the other cannot answer. Anything less would defeat the one thing a switch is for -- that the source stops costing the user money -- and it is why the router models the AI switch as a distinct `DISABLED` sentinel rather than reusing `ai_provider_config_id`'s `null`, which already means "no pin, ask every active provider" and is the exact opposite. With Places off and AI off, `getStatus` answers `available: false` (a *configured* AI provider is not a *usable* one), so the settings screen renders the automatic-lookup toggle off and disabled rather than offering a lookup nothing can answer; the router reports `no_provider` when nothing is reachable at all and `quota_exceeded` when Places was reachable and its cap is spent, because those are two different repairs.
-
-  **The user's own counter travels with a backup; the deployment's does not.** `payee_lookup_usage` is exported and restored so a month's spend survives a move to another machine -- the Google key is the same key and the free allowance is counted against it, not against the server. It is the one entry in `PRESERVED_ON_RESTORE` (`src/backup/restore-plan.ts`): the restore does NOT clear it first, so the insert's `ON CONFLICT DO NOTHING` gives the archive's count to a machine that has no row and leaves a live count alone. A restore therefore cannot lower one and hand back quota Google has already billed for, and the only way an archive's count can legitimately be the higher of the two is that the live one was lost -- which is precisely the case with no row to conflict with. `google_places_instance_usage` stays out of the export entirely: it has no `user_id`, it counts a key that comes from deployment configuration a backup does not carry either, and every user on the instance spends it, so a per-user archive writing it would overwrite a counter other users are still spending.
-
-  The cap is counted in **Pacific** calendar months (`GOOGLE_PLACES_QUOTA_TIMEZONE`), not UTC, because that is when Google's free allowance resets -- a counter that rolled over first would hand back a cap the allowance behind it had not released, and every request in that window is billed. The reset needs no job: `month` is half of `payee_lookup_usage`'s primary key, so a new month simply addresses a row that does not exist yet. And a request Google **answered with a refusal** was never served and never billed, so the Test button hands its slot back (`PayeeLookupQuotaService.release`); a transport failure does not, because nobody answered and under-counting is the direction that costs money. A server sends no `Referer` of its own, so an HTTP-referrer restriction rejected every lookup with "Requests from referer <empty> are blocked"; the client now sends `PUBLIC_APP_URL`'s origin as `Referer` (Node permits the header browsers forbid), which makes such a key work. **It buys availability, not security**: a referrer restriction protects a key that is public -- shipped in browser JS, where the browser sets the header -- and this key never leaves the server, so anything holding it can send that header too. Only an IP restriction constrains a server-side key; the header is sent because a deployment with no stable egress address cannot use one. `testKey` names the exact referrer it sent, since a restriction written `*.example.com/*` does not match a bare `example.com`, and says so differently when `PUBLIC_APP_URL` is unset -- two different repairs behind one Google message.
-
-## A business feature asks for a notification; it never imports a transport
-
-`WebPushSender` (`src/push/web-push-sender.service.ts`) is the only file in
-`src/` that imports `web-push` or calls `sendNotification`, and
-`push-secret.guard.spec.ts` fails on a second one. Budgets, bills, backups and
-imports call the notification layer and let it decide the wire -- which is how
-UnifiedPush arrived (`docs/specs/notification-preferences.md` section 15) without
-any of them changing: a UnifiedPush subscription is a Web Push subscription
-whose endpoint is a distributor, tagged `transport = 'unifiedpush'` and gated by
-its own matrix channel, delivered by the same sender (discussion #1291,
-"delivery isolation"). The VAPID private key follows from the
-same boundary: it is read only by `PushConfigService`, handed only to the sender,
-and no response shape in `src/push/` declares a private field. See INV-PUSH-001
-through INV-PUSH-005.
-
-Two consequences that are easy to get backwards. **A push endpoint is a URL the
-server will make an outbound request to**, so it is validated with
-`IsPushEndpoint`, which reuses the AI provider's safety check and adds an https
-floor -- never a bare `@IsUrl()`. That check resolves the host, and
-`dns.resolve4`/`resolve6` carry no timeout of their own, so the lookup is bounded
-INSIDE the check itself (`resolveBothFamilies` in
-`src/ai/validators/safe-url.validator.ts`) and every caller is covered without
-asking: the AI provider `baseUrl` validators and the startup check reach it
-through plain `validateUrlIsSafe`, and a resolver that never answers would hold
-whichever request asked -- a save, or a subscribe an authenticated caller may
-issue twenty times a minute. A timeout answers **false**, and specifically not
-"resolved to nothing": an empty answer is allowed (a name that resolves nowhere
-fails on its own), so a stall borrowing that answer would be an open door.
-`validateUrlIsSafeWithin` bounds the *whole* check and exists for the push
-sender, whose documented request worst case (`PUSH_TEST_WORST_CASE_MS`) has to
-name a budget it owns.
-
-And **a subscription belongs to a browser profile, not to a session**: the
-unique index is on `endpoint_hash` alone, so one endpoint has one owner -- and
-the second account subscribing in the same browser is *refused*, never allowed
-to take the row over. An endpoint is a string the caller supplied; deleting
-somebody else's row on the strength of it is a cross-tenant write no ownership
-check covers. The client answers the 409 by
-unsubscribing and subscribing again for a fresh endpoint, and logout releases
-the endpoint the same way (`releaseLocalPushSubscription`).
-
-## The notifications table has one writer
-
-`NotificationService.create` (`src/notification-center/notification.service.ts`)
-is the only producer write door. Backup restore preserves archive IDs and
-timestamps through its own insert, using the same `notification-bounds.ts`
-helpers via `boundRestoredNotification`. For producer writes,
-`notification-write-door.spec.ts` fails on a second door. A producer decides
-*what* to say; the row's shape is not its decision. There were three writers
-with three opinions -- a raw `INSERT` for budget alerts with its own conflict
-target and no title bound, an entity `save` for bill reminders with no conflict
-handling at all, and a second raw `INSERT` for system alerts with its own
-truncation helpers -- so every rule the row must obey held on one path and not
-the others.
-
-Two consequences worth knowing before you add a producer. The insert is
-`ON CONFLICT DO NOTHING` with **no conflict target**, which covers both unique
-indexes at once (the fingerprint for a budget notification, the dedupe key for a
-system one) -- a producer does not know which applies to it, and does not have
-to; `null` back means somebody else holds this notification, so it is not yours
-to email about, and that is the normal case rather than an error. And **reads
-are deliberately not centralized**: a producer's own de-duplication query is
-about its candidates, not about the reader's list.
-
-`category` is derived (`notificationCategoryOf`), never stored -- see migration
-179's header for why, and `notification-category.spec.ts` asserts the column's
-absence against `schema.sql`.
-
-**What a push notification COLLAPSES onto is the producer's decision, and the
-type is not the subject.** The browser replaces a shown notification whose `tag`
-matches, so `PushPayload.collapseKey` is a required field: `null` means "this
-type is one subject" (a test send, "email delivery is failing"), and a value
-names the subject. Deliberately not derived from `target` -- the bill producer
-sends every reminder to `/bills`, because there is no per-bill page, so a tag
-built from the route collapsed exactly the case it had to separate: two bills due
-on the same day, one of them shown and the other silently replaced. It carries an
-id, never a name or an amount: the payload is encrypted to the device, but a
-collapse key is metadata. The dispatch derives it in this order: a producer's
-`NotifyOptions.collapseKey` (the admin fan-out passes its `emailDedupeKey`, so
-sixty rows about one full disk are one notification on the phone), then the
-reminder id of a re-emitted nag (`rem:<id>` -- its per-fire dedupe key differs
-every fire), then the row's dedupe key, then its id.
-
-The HTTP surface lives in its own module (`notification-api.module.ts`) because
-it is the one part that needs a producer: bill reminders are materialized when
-the list is read. Put that edge on `NotificationCenterModule` and every producer
-of a notification lands on a require cycle with budgets.
-
-## Copy composed outside a request is rendered in the recipient's locale
-
-`emailTranslator(i18n, lang)` with `resolveUserEmailLocale` is not email-only
-despite the names: a Web Push body is composed on the server, in a cron or a
-background write with no request locale to inherit, so it resolves the
-recipient's stored `user_preferences.language` exactly as an email does. Reuse
-those two; a second locale resolver is how the answers drift.
-
-Notification email bodies and dynamic subjects go through `notificationEmailCopy`
-(`src/notifications/notification-email-copy.ts`) at delivery time, including
-immediate dispatch, admin alerts and budget digests. Supply the snapshot's currency
-in `data`; missing facts on legacy rows retain the stored copy rather than inventing
-amounts or currency. HTML templates escape the composed strings once.
-
-## A case-sensitive `LIKE` is not a search
-
-Postgres evaluates `LIKE` case-sensitively, so `Like('%amazon%')` matched nothing while `Like('%Amazon%')` matched -- and the tool built on it looked as though it only accepted exact names (its own description had promised a "case-insensitive substring match" for as long as it had been wrong). Where a filter is offered to a person or a model, match case-insensitively: `ILike`, or a comparison the code performs itself. `PayeesService.getLlmPayees` is the worked example, and its spec asserts that a lowercase query and an uppercase one return the same rows.
-
-**And a filtered list says how much it left out.** `getLlmPayees` returns `totalCount` (what matched) beside `payees` (what came back) and a `truncated` flag, because a capped list presented as the whole one is the same defect as a subtotal presented as a total.
-**A match key is not a display value.** Matching case-insensitively means a `LOWER(TRIM(...))` column or a lowercased map key, and that key never reaches a response: the Bill Payment History report put `payee_name_normalized` on screen, so every payee read in lowercase. Select or carry the name as the user wrote it beside the key, and return that. `tax-recurring-reports.service.spec.ts` holds the case with a mixed-case scheduled payee.
-
-## Rejection happens before the write
-
-A check capable of refusing a command belongs inside the transaction that performs it, and under the same lock where concurrency is in play. A service that mutates, commits, and returns a success-shaped value for a caller to reject afterwards has already done the thing the `409` says it did not do.
-
-Give the operation the caller's precondition as a parameter -- the expected owner, scenario or revision -- and let it refuse before writing. Return the refusal distinguishably: "no such row", "not yours" and "done" are three answers, and folding two into `null` makes the caller guess. Tests assert the rejected response **and** the stored state; see `docs/financial-calculation-contract.md` section 7.
-
-## Scheduled loan interest prices a dated ledger balance, at the moment it is consumed
-
-A scheduled loan installment's interest is `roundMoney(debt * periodicRate)` where **both inputs are dated at that installment's due date**: debt is opening balance plus every non-void, top-level transaction through it (via the shared `LEDGER_MOVEMENT_PREDICATE`, which every balance reader composes so they cannot disagree about which rows count), and the rate is the latest `loan_rate_changes` row effective by then -- never `accounts.interest_rate` alone, which a recorded rate change deliberately does not write, so pricing at it charges a rate nobody pays (`effectiveAnnualRateOn`, truth table shared with the frontend) -- never a value advanced from the previously stored split (money already rounded to 4dp, so the recurrence compounds the discarded fraction) and never `accounts.current_balance` (a through-today read model that excludes future-dated rows). And the stored P/I split is a *template*, not an executable instruction: a principal movement committed between occurrences leaves it stale with no mutation path recalculating it, so the posting path re-resolves the allocation at the consumption boundary (`resolvePostingAllocation`, inside the posting transaction, under the parent lock) and the amortization report anchors its projection on the same due-date-bounded debt (`getLoanProjectionAnchor`). One pricing path -- `ScheduledTransactionLoanService.resolveInstallment` -- serves all three, because each one answered differently is a reported drift. `docs/specs/scheduled-loan-installment-pricing.md` is the spec; INV-LOAN-006 (issue #1253).
-
-## A category's leaf name is not its identity
-
-"Cell Phone" under **Bills** and under **Business** is an ordinary chart of accounts, so a bare leaf name identifies nothing. Both halves go through `categories/category-name.util.ts`:
-
-- **Emitting**: `qualifiedCategoryName` / `loadQualifiedCategoryNames` produce `"Business: Cell Phone"`. Analytics groups on `SPLIT_CATEGORY_ID` and resolves the label from the map -- there is deliberately no category-*name* SQL fragment left, and `transaction-split-query.util.spec.ts` fails if one reappears.
-- **Accepting**: `resolveCategoryNamePaths` matches a name the model sends back, separator- and spacing-insensitive, and **refuses an ambiguous one** with the qualified candidates rather than picking a winner.
-
-The test that matters is the round trip: every name we emit must resolve back to the category we emitted it for (`category-name.util.spec.ts`) -- four hand-rolled resolvers had drifted apart, and one rejected the exact spelling every tool description tells the model to type, falling through to a last-segment fallback that silently read the *other* "Cell Phone".
-
-Also: `Uncategorized` (the user filed it nowhere) and `Unknown category` (we could not resolve the name of the category they did file it under) are different facts with different constants. Do not fold the second into the first.
-
-## The demo login is written once
-
-`DEMO_USER_EMAIL` and `DEMO_USER_PASSWORD` live in `src/database/demo-credentials.ts`; the seed, the nightly reset, `db-demo-check` and the demo seeder import them. They are public by design (`.env.example` prints them, the login page pre-fills them), so the Bearer hard-coded-secret finding on that file is an accepted exception in `.github/workflows/ci.yml` -- one, not one per copy. `demo-credentials.spec.ts` fails a second spelling under `src/`, and the client's mirror (`frontend/src/lib/demo-credentials.ts`) is contract-tested against this file from its side.
-
-## A predicate that decides which row counts is written once
-
-When "is this row the one we mean" takes more than one clause (current algorithm version *and* matching configuration fingerprint), name it and call it. Spelled out per site it drifts invisibly: the GEM signal service wrote it four times and the fourth checked only the date, so a superseded row could be stored as the next period's predecessor. Same for the `where` that reads such a row back: a unique key that grew a column selects more than one row under the old `where` -- grep for reads of a unique key in the migration that widens it.
-
-## One classifier decides whether a database role is safe
-
-`common/db/runtime-role-check.ts` owns "may this role serve enforced traffic": one facts query template, one violation list, one verdict. Every surface asks through its exports -- `main.ts` about its own connection (`assertRuntimeRoleSafe`), `db-init` about the configured role by name (`assertRuntimeRoleSafeByName`). Do not write a second role-safety query (a hand-written copy in `app-role.ts` once blessed a role the runtime check then rejected, PR #1076). `runtime-role-check.spec.ts` pins the two exported queries to one template and the two asserts to one verdict per input.
-
-## A read about somebody else needs somebody else's identity
-
-`users_self` exposes exactly two rows to a session: `app_current_user_id()` and `app_real_user_id()`. **Any query keyed on another person -- by id, or worse, by email -- returns zero rows from the caller's own scope** under `RLS_MODE=enforce`, without raising or logging, and "no rows" looks like "no such user". (`AuthService` finds a login by email only because it runs pre-identity, under a bypass; `DelegationService.delegateEmailExists` ran the identical `where` under `scoped()` and told owners an account that demonstrably logs in did not exist.)
-
-Before writing a query, ask whose row it is. There are three answers, not two:
-
-| Whose row | Use | Why |
+| Need | Use | Never |
 |---|---|---|
-| The caller's | `scoped()` / `withScopedDb` | The policy is the point. |
-| An owner's, read by their delegate | `withDelegateContext(owner, delegate)` | `current = owner, real = delegate` is the identity the policies were written for. **No bypass** -- `app.real_user_id` stays true about who is authenticated. |
-| A delegate's, read by their owner (or any genuine cross-user sweep) | `withSystemContext` | There is no policy arm for it. Decide authorization *first*, under `scoped()`, and let only the minimum out. |
-
-Reaching for `withSystemContext` when the middle row applies is the easy wrong answer: it works, so nothing complains, and the bypass fence widens by one.
-
-`src/delegation/rls-context-smoke.spec.ts` is the guard, and its shape is worth copying: per-service specs mock `withScopedDb` away and are structurally incapable of seeing this class of bug, so that suite runs the **real** `withScopedDb` at `RLS_MODE=enforce`, records the ambient context at each repository call, and asserts the ordered sequence of identities plus the emitted `set_config` statements. Asserting the order is what proves the fence: the authorization read must appear under the caller's own identity *before* any bypass opens.
-
-## A joint account is only shared where somebody remembered to share it
-
-`transaction.userId = :userId` is the wrong ownership predicate for any own-context read a delegate can reach: a jointly shared account's rows belong to the **owner**, so the grantee matches none of them and the endpoint returns a confident empty answer (the register had joint scope on day one; the summary, grouped totals and monthly totals beside it did not).
-
-Own-context reads resolve their scope through `TransactionsController.resolveOwnContextJointScope` (the accounts controller's equivalents are `jointAccountIdSetFor` for list reads and a `NotFoundException` fallback through `jointAccessFor` for `:id` reads, as on `getBalance` and `getBalanceForecast`). Filtered to exactly one joint account, the query runs as the owner so every derived value is byte-identical to the owner's own view; anything else keeps the caller's scope and widens it by the already-authorized joint ids, never by raw request input. The widened predicate is written once per service (`registerScope`, `analyticsScope`). An endpoint that deliberately stays owner-only says so where it is skipped (`tag-key-breakdown` does: tags are personal).
-
-## A stored price says which session it belongs to, not which minute it was fetched
-
-`security_prices` holds one row per trading day, and that row is the **session**: official close, full-day volume, high/low, adjusted close. A live quote (`regularMarketPrice`) is a true statement about 14:42 and a false one about the day -- and the frontend auto-refreshes quotes through the session (`usePriceRefresh`), so a row for today exists long before the day is over. Three rules, each with a test:
-
-- **"Has a price for today" is not "the day is settled".** Ask whether the *session* has ended -- `isSessionSettled` (`providers/settled-bar.util.ts`), on the market's own clock in the market's own zone, from the stored `market_timezone` / `market_close_time`. Never from the presence of a row or the server's clock.
-- **The closing job settles the day from the daily bar, after the quote refresh.** `settleDailyBars` re-reads a bounded recent window and upserts the bars whose sessions have ended, so a missed run or provider outage repairs itself. The quote is what a still-open market can offer; the bar is what the finished session did, and the bar wins.
-- **A calculated column needs a writer on the recurring path.** `adjusted_close` was populated only by the on-demand backfill, and because `loadPriceSeries` picks one basis per series and keeps only adjusted rows, that silently truncated every return series at the last backfill date. The quote path fills `adjusted_close` with the close it is writing -- definitional for the newest session (adjustment factor 1), but only where the series already carries an adjusted close; both conditions live in the `CASE ... EXISTS` inside the statement (an MSN-priced series given exactly one adjusted close flips `bool_or(...)` and collapses to that row).
-
-A daily bar is not a quote, so settling clears `quoted_at`; and a `source = 'manual'` row is a user correction no provider write may overwrite -- the quote path and `bulkUpsertPrices` both carry `WHERE security_prices.source IS DISTINCT FROM 'manual'`, and the quote path treats the refusal as a successful no-op that reads back the winning row. The honest cost: a manual row on a provider-priced security has no adjusted close, so that day stays out of the adjusted series.
-
-Related: **a bar's timestamp is the instant its session opened, so the day it belongs to is the exchange's calendar day.** `barDate` reads it in `meta.exchangeTimezoneName`, falling back to UTC; `setHours(0,0,0,0)` made `price_date` a function of the container's timezone.
-
-## A payload coarser than daily is a different series, not a sparse one
-
-A provider asked for a long range may answer weekly or monthly bars; written into a daily table they overwrite the real daily rows on those dates, and under the one-basis-per-series rule monthly rows carrying adjusted closes made `loadPriceSeries` *drop every daily row around them*. `assertDailySeries` (`providers/daily-spacing.util.ts`) is the one test, and it runs inside `bulkUpsertPrices` -- not in its four callers, because a guard one caller forgets is not a guard (each caller already reports a failed security, so the throw surfaces as "this one did not update"). The threshold, the median (never the mean -- one long exchange closure must not make a daily series look weekly) and the minimum sample size live there too; `daily-spacing.util.spec.ts` fails on a second copy of any of them under `securities/`.
-
-## History depth is a request, not a property of the holding
-
-`backfillSecurityHoldingPeriod` clips its write to the first transaction date -- right for position valuation, wrong for backtests, the GEM report and performance comparison, which need prices from before the user bought. Both backfill endpoints take `range` (`BackfillPricesQueryDto`); supplying it means fetch that range **and** store all of it, omitting it keeps the clipped default. When adding a caller, decide which question it asks -- "what is this position worth over the time I held it" or "what did this instrument do" -- rather than reaching for `max`; the clip exists so an untouched catalogue does not accumulate decades of prices nobody reads.
-
-## A money value carries the currency it was calculated into
-
-Not the currency of the account it is filed under. `InvestmentTransaction.exchangeRate` converts a trade into the *settlement* account's currency (the funding account when named, else the brokerage's linked cash account), so a PLN brokerage funded from EUR holds a EUR cost basis. The amount and its currency travel together (`ReplayedLot.currencyCode`), and a consumer compares that field against what it is reporting in. A mismatch is **unknown**, not a conversion -- today's rate answers today's question, not the acquisition's -- and two acquisitions settled in different currencies cannot be summed at all.
-
-## A fallback answers only the question it was asked
-
-A lookup that fails is a fact about *that* lookup. A stale scenario id says nothing about the user's other scenarios, so an empty report hardcoding `strategies: []` made a second claim without looking -- and took away the switcher that was the only route back. Fall back to the default rather than to nothing, and fill the surrounding fields from a real read. And a retry has to change something: recursing with the same id after establishing the id is gone is a comment claiming a recovery that cannot happen.
-
-## Backup and restore
-
-`docs/backup-restore-contract.md` is the contract: what a backup promises, what it deliberately does not, and the known gaps. Read it before changing anything under `src/backup/`. Three things a test enforces:
-
-- **A new foreign key between two backed-up tables** must keep `src/backup/restore-plan.spec.ts` green (it parses every FK out of `database/schema.sql` and fails on ordering/self-reference problems).
-- **A new column referencing `currencies(code)`** must keep `src/currencies/currency-references.spec.ts` green -- both SQL functions and the TypeScript constant.
-- **A new table** must be exported or listed in `INTENTIONALLY_EXCLUDED_TABLES` with a reason, and classified in the support backup rules.
-
-**A file's name is its identity, so anything that decides whether it may be deleted has to be in the name.** An automatic backup that could not include every attachment is published as `monize-backup-partial-<date>` in its own retention tier, and the name is chosen *after* the export from what the export found -- `writeFileAtomic` replaces a final name by design, so a partial artifact written under the `daily-` name had already destroyed that day's complete copy before any status column could say so. State beside the file cannot govern a decision the write has already made; the durable copy of the fact goes *inside* the document (`completeness` in the envelope).
-
-**Nothing in the export path may hold a whole table, a whole artifact, or a whole attachment set.** Rows come through the cursor in `src/backup/export-cursor.ts`, the document is serialised a row at a time under the chunk budget in `export-json-stream.ts`, and an object store is opened one object at a time. A `manager.query` for an export table, a `JSON.stringify` over an array of rows, or an array of base64 built before serialising are each the same defect (issue #1070). The guards in `src/backup/export-streaming.spec.ts` assert the ordering (batched fetches, loads interleaved with writes, reads that stop when the client does) rather than the memory.
-
-**`verifyAuthentication` is the one refusal deliberately not first.** An OIDC restore is authorized by a single-use `OidcReauthService` artifact, and the round trip that mints one loses the user's file selection -- so the restore validates everything free (decrypt, decompress, envelope) *before* spending it. It still precedes every write. Do not reorder it forward, and do not reorder it backward past a `DELETE FROM`; section 5 of the contract has the reasoning, and `backup.service.spec.ts` pins both edges.
-
-**A value encrypted with server configuration cannot travel in a document.** `ai_provider_configs.api_key_enc` is ciphertext under `ENCRYPTION_KEY`, which is not in the backup and must not be. Exported verbatim it restored onto any other instance *populated and unreadable* -- every "is a key configured?" check said yes and only the AI calls failed. The key is decrypted on the way out and re-encrypted on the way in (`ai-provider-key-transport.ts`), both directions in one file because the field name and fallbacks are one contract. The cost -- the artifact holds the credential in plaintext -- is stated in `docs/backup-restore-contract.md` §1, logged by the export, and why the support backup drops the table. Anything else stored under server-side configuration gets the same treatment, or is excluded.
-
-### `BackupService` is a facade; put new code in the component that owns it
-
-Issue #1092 split the 2,600-line original into `BackupExportService`, `BackupRestoreService`, `BackupAttachmentTransferService` and `BackupRestoreDatabaseService`, with the file format in `backup-format.ts` and the table list in `export-table-queries.ts`. Section 0 of the contract says which owns what. `BackupService` is one delegation per method and holds no `DataSource` and no storage provider; `src/backup/module-shape.spec.ts` fails on the dependency as well as the line count, and its grandfather list may only shrink.
-
-**A source-scanning guard names a file, so a split disarms it silently.** Four guards pointed at `backup.service.ts` and would have gone on passing while scanning code that had moved out from under them. A scan whose subject is "wherever this appears" walks the directory (`backupModuleSources()` in `backup.service.spec.ts` is the pattern); one that must name a file throws when its marker is missing rather than returning an empty match set. Grep `readFileSync(` under the module you are splitting before you split it.
-
-## Testing Conventions
-
-Mock repositories use `Record<string, jest.Mock>`; tests use `Test.createTestingModule` with mocks injected via `getRepositoryToken()`. E2E tests live in `test/` with helpers under `test/helpers/` (`auth-helper.ts`, `test-database.ts`, `test-factories.ts`).
-
-### A mock must return what the real collaborator returns
-
-`Record<string, jest.Mock>` is fine for a repository, whose surface the driver defines. For **one of our own services**, type the double -- `jest.Mocked<TheService>`, or a `Partial<jest.Mocked<T>>` cast once -- so `tsc` rejects a return shape the real method cannot produce. Untyped, a mock quietly becomes fiction, and the branch that reads that fiction is green and unreachable:
-
-- **A shape the driver never returns.** A TypeORM insert result mocked as `{ generatedMaps: [] }` made an entire lost-the-race path testable, tested and dead.
-- **A signature that moved.** A method growing from `Promise<boolean>` to `Promise<string | null>` leaves `mockResolvedValue(true)` behind it -- still truthy, still passing. When you change a return type, grep its mocks in the same commit.
-
-### Fixtures are claims about production data
-
-`docs/testing-contract.md` is the shared list of adversarial inputs to choose from. A fixture is evidence only if the code that writes the real data could have written it -- check the producer's sampling, nullability, and format guarantees before adding one. `docs/financial-calculation-contract.md` section 8.3 has the full rule.
-
-### Do not trust a suite that stayed green
-
-Changing what a service computes and seeing every test pass means the change is a no-op or the suite has a hole -- `docs/financial-calculation-contract.md` sections 8.1 and 8.2. Establish which before moving on, and break each new invariant on purpose once to confirm its test actually fails.
-
-## Internationalization (i18n)
-
-Server-rendered strings (exception messages, email copy) are localized via `nestjs-i18n`. Wrap exception messages in `tr(key, fallback, args)` (`src/i18n/translate.ts`), which resolves against the request locale and returns the English `fallback` outside an HTTP context. Render anything addressed to a person and composed outside a request -- emails, and a Web Push body -- with `emailTranslator(i18n, recipientLang)` (`src/i18n/email-translator.ts`) so copy matches the recipient's stored locale. Catalogs live in `src/i18n/locales/{locale}/*.json`; the authoritative locale list is `SUPPORTED_LOCALE_CODES` in `src/i18n/config.ts` (root `CLAUDE.md` enumerates them) -- keep in sync with the frontend's. The `en-*` entries are lean regional variants (`LOCALE_BASES`), falling back to `en` per key. Adding or changing a string means updating every locale (`src/i18n/locales.parity.spec.ts` fails otherwise), then `npm run i18n:pseudo`. Full flow: `src/i18n/README.md`.
-
-## Every line in the log has the same shape
-
-`[Nest] pid - date LEVEL [Context] message`, produced by the NestJS `Logger` -- including the lines written before the app exists: `db-init`, `db-migrate`, `db-demo-check` and the seeders each construct `new Logger("<Context>")`. Backend `src/` bans `console` outright (`no-console` in `eslint.config.mjs`); the only exception is `oauth/oidc-provider-log-bridge.ts`, which must hold the real console methods to forward non-provider output. `docker-entrypoint.sh` prints nothing itself -- each step logs for itself. `src/startup-logging.spec.ts` scans for both mistakes and for `console` in any pre-boot script.
-
-## An outbound provider is called through a breaker, and a failed call is logged once, with its cause
-
-`fetch` rejects with `TypeError: fetch failed` for DNS, TLS, a refused connection, a proxy hangup and an `AbortSignal.timeout` alike, and puts the discriminating detail in `error.cause`. Logging `error.message` -- or worse `error.stack`, whose frames are all undici's -- produced issue #1265: thousands of identical lines, no cause in any of them, an unusable UI, and a container restarting into the same storm because the start-up market-index warm-up ignored its own cooldown.
-
-So: **`describeFetchFailure`** (`common/http/fetch-failure.util.ts`) turns a caught error into one bounded line naming the cause chain and the socket fields; **`ProviderHealthService`** (`provider-health/`) owns the per-provider circuit breaker, the rate-limited failure log (`logFailure` -- silent for a call the breaker refused, and it reports what it suppressed), and the durable `provider_health` row the alert cron reads. Call `assertAvailable` (throws) or `tryRequest` (returns `"refused"`) **before** any queue or semaphore, `recordSuccess` on any response (a 404 proves the host answered), `recordFailure` on a rejection, and `logFailure` in the catch -- which counts as well as prints, because a request can fail *after* its headers arrived (a stalled body) and those never reach the fetch helper's own catch. One throw counts once however many doors see it. Both gates report which kind of admission they granted, and only a `"probe"` holder owns the exclusive half-open slot -- a straggler that releases one it never held frees somebody else's probe. A probe holder owes an outcome -- `recordSuccess`, `recordFailure`, or `releaseProbe` when the attempt never reached the provider's own host (the Yahoo crumb handshake gives up at the cookie step, whose hosts are not the API host: counting *that* as an answer kept the failure run oscillating and the breaker never opened). A probe that reports nothing holds the slot for two minutes, during which every call to that provider is refused with the provider healthy. `wouldRefuse` is the read-only predicate for deciding whether to *skip work*, never a gate. Where a `null` is cached as "no such thing", have the code that *made the call* report whether anyone answered (`fillPriceWindow`/`fillRateWindow` return `{ stored, answered }`) rather than interrogating the breakers afterwards -- it knows which providers it reached, where a breaker check is either too narrow (one provider, while the fill falls back to another) or too broad (any provider down anywhere disables the cache for everyone). Where the caller genuinely cannot report it, check that the provider actually answered -- a null from a refusal *or from a transport failure below the threshold* means "we did not get an answer", and caching it turns a two-minute outage into a day of poisoned lookups. And nothing here restricts Nest's log levels, so suppressing a line means not printing it at all: a `debug` line per refused call is the same flood one level quieter. Never log a provider failure from a `catch` yourself, and never pass `error.stack` as the diagnostic: `provider-health/provider-call.guard.spec.ts` fails on either, and on a new client under `src/securities/` or `src/payees/lookup/google-places/` that reaches `fetch` without the breaker. The email side -- one alert per outage episode, a 15-minute minimum and a 6-hour floor, all three claimed in SQL -- is `docs/specs/provider-outage-alerts.md`.
-
-Two asymmetries are load-bearing. The breaker lives in **process memory** because it describes what this replica's own sockets did; only the episode start and the notification markers are shared, because only those must outlive a restart. And a **start-up** warm-up honours per-item fetch cooldowns while a **cron** ignores them: a schedule is the operator's request, a restart loop is not.
-
-## OAuth / OIDC provider
-
-**A page whose form submission must redirect off-origin needs its own CSP.** Helmet's app-wide `form-action 'self'` is enforced by Chrome against every redirect hop after a form submit, so the OAuth consent POST's final cross-origin hop to the client's `redirect_uri` was silently cancelled -- server logs `authorization.success`, browser parked on the consent form. The interaction controller sets a per-page `form-action 'self' https:` (`setInteractionPageHeaders`); the redirect_uri is per-client and dynamic, so it cannot be enumerated. Do not loosen the global Helmet `form-action` -- only this page needs it.
-
-`node-oidc-provider` prints `oidc-provider NOTICE:`/`WARNING:` lines with bare `console.info`/`console.warn` and exposes no logger hook, so `oauth/oidc-provider-log-bridge.ts` -- installed at the top of `main.ts` -- re-routes exactly those lines to a `[OidcProvider]` logger. That fixes only the formatting: every such notice means a config option was left at its default, so fix the config. In particular, `ttl` needs an explicit number for every artifact the provider can issue (`AccessToken`, `AuthorizationCode`, `IdToken`, `RefreshToken`, `Grant`, `Interaction`, `Session`); the guard in `src/oauth/oauth-provider.service.spec.ts` fails when one is missing.
-
-## Money investment mapping is finalized after both mappers run
-
-`mapInvestments` cannot know whether `mapTransactions` will preserve or collapse a cash split. Reconcile generated investment companions only after cash-source mapping: when a redemption remains embedded, its preserved sibling is the interest record, so the generated companion and mutual link must not be written as a second representation of that income.
-
-## Automatic backups are an operator setting, not a user preference
-
-Auto-backup endpoints live on `AutoBackupController`, whose class-level `@Roles("admin")` is the whole access rule -- a new endpoint there is admin-only automatically. Manual export/restore (caller's own data) stays on `BackupController` for everyone.
-
-`AutoBackupService.enrollManagedUsers` runs at the top of the hourly cron and enrolls every other user on the deployment defaults -- without it a non-admin would silently have no backups. It reconciles rather than seeds: drifted rows are written back to the defaults, unchanged ones are not written, and `lastBackup*`/`nextBackupAt` are left alone so enrollment never re-triggers a backup.
-
-Backups are encrypted with the user's own password. Local-auth accounts have it captured at the moment they type it (`rememberLoginPassword` from registration, login and change-password), or from Settings by confirming that same password (`enableWithLoginPassword`) -- the capture at sign-in never fires for a session older than the deploy that shipped it, and that session can outlive the backups it silently leaves in plaintext (issue #1269). OIDC accounts set a dedicated one in Settings (`setBackupPasswordForOidcUser`) or go unencrypted; `getStatus().manageable` gates that UI section, and the dedicated-password methods refuse a local-auth caller. A stored copy is checked against the account's current password hash before use (`resolveBackupPassword`) -- three outcomes, not two: nothing stored (write plaintext), usable password (encrypt), stored-but-undecryptable (refuse -- silently downgrading previous encrypted backups is worse than failing).
-
-**A feature that is on by default cannot hang off optional configuration.** The stored password was encrypted with `AI_ENCRYPTION_KEY`, which was optional -- commented out in `.env.example`, documented as being for cloud AI providers, and passed as `${AI_ENCRYPTION_KEY:-}` by the compose files -- so on a deployment that configured no AI provider the capture returned early and every automatic backup was written in plaintext, with no log line, no status field and nothing on the Settings page (issue #1269). The key is now `ENCRYPTION_KEY`, and `AI_ENCRYPTION_KEY` is still read -- and still wins where both are set -- so an existing deployment upgrades without re-keying a column. It is **announced before it is enforced**: `logEncryptionKeyStatus` warns on every boot that a deployment without a key writes plaintext backups and that a future release will refuse to start, which is the migration a hard requirement would have skipped (an upgrade that boots is not an outage). Flipping the unkeyed branch to a throw is the whole of that later change. One key, one `EncryptionService` (`common/encryption/`), for every secret this deployment stores: provider keys, emergency-access credentials, the backup password. Two rules come out of the defect, and both have tests: a plaintext automatic backup is **logged** on every write (`auto-backup.service.ts`), and "this server cannot encrypt" is a distinct field in `getStatus` from "this user has not enabled it", because they have different fixes. A service spec whose encryption double answers `isConfigured() === true` is structurally blind to this class of bug -- `backup-encryption.service.spec.ts` therefore ends with a block that builds the **real** service, once per live variable name.
-
-## Cron Jobs
-
-Cron jobs use `@Cron()` from `@nestjs/schedule` and run **in the API process** (`ScheduleModule.forRoot()` in `app.module.ts`; on k8s with multiple replicas, every replica fires every cron). Full schedule: `docs/cron-jobs.md`, or grep `@Cron(`.
-
-Every `@Cron` handler is an out-of-request entry point, so its body must seed its own RLS context (tasks C2-C4): the cross-user fan-out under `withSystemContext`, each per-user body under `withUserContext(userId)`. A handler that reaches the DB with no ambient context throws in every `RLS_MODE`, including `off` -- the per-module `rls-context-smoke.spec.ts` specs are the pattern for proving a cron runs clean.
-
-### Cleanup somebody is blocked on belongs on the request path
-
-Before choosing an interval, ask what the stale row *does* while it sits there. Only untidy: a schedule is the whole answer. But if it **refuses the user's next request** (a slot, a lock, a uniqueness guard), the interval is a lockout the user cannot end. Run the cleanup inside the transaction of the request about to be refused, scoped to that caller, and leave the cron as a cross-user backstop. `MnyImportJobService` is the worked example: `reapStaleJobsForUser` runs in `create` and the poll's `findOne`, so a dead import clears within one 1.5s poll, and `reapStaleJobs` dropped to hourly.
-
-Two things that path must get right, both tested: the staleness predicate is **one exported constant** used by the reap and negated by the advisory pre-check (an advisory check that still counts what the reap would clear reinstates the lockout through the back door); and a per-user cleanup whose predicate is a disjunction needs its own parentheses inside `user_id = $n AND (...)` -- assert the composed clause, not an `"AND ("` prefix.
-
-### Deciding a worker is dead does not stop it -- revoke, do not merely record
-
-A reaper's conclusion can be wrong in the direction that costs money: a merely *blocked* worker gets written off, wakes up, and finishes -- and if the reap also advertised a retry, the file lands twice. So an attempt gets an identity, not just a status: `import_jobs.attempt_token` is minted by `claim()`, required by every write that worker makes, and set to NULL by both reaps. The worker's commit checkpoint (`markDataCommitted`) is a fenced compare-and-set on that token and the **last statement of the transaction that wrote the rows**, so a zero-row result throws and rolls all of them back -- one statement later would be a check after the commit (see "Rejection happens before the write").
-
-Three parts, each a separate way to get it wrong:
-
-- **A status check is not a fence.** `WHERE status = 'running'` passes for a job reaped and re-claimed by a different attempt. Compare the token.
-- **A fence the other binary does not know about is not a fence.** During a rolling deployment the previous release's checkpoint names no token, so the rule lives in the database: migration 145's `BEFORE UPDATE` trigger refuses a false -> true `data_committed` on a non-`running` job, from either binary. Deliberately not "and has a token": an old worker's normal state is `running` with a NULL token.
-- **Terminal states are monotonic.** `complete()` and `fail()` are compare-and-set on `(status, attempt_token)` and return whether they took; the caller must read that boolean (logging "completed" after a refusal contradicts the reaper's line, with the false one more visible).
-
-The integration suite installs the trigger via `findTriggerMigrations()` in `test/helpers/rls-setup.ts` -- `synchronize` creates no triggers, so without that step a mixed-version test reports the fence as working while nothing enforces it.
+| Any database access | `withScopedDb` and the identity contexts in the root `CLAUDE.md` | an injected repository, a query runner, a bare `dataSource.query` |
+| A refusal (ownership, precondition, revision) | the check inside the same transaction as the write, before it | a check after a commit that a status code then contradicts |
+| A raw `SELECT` of a DATE or numeric | `TO_CHAR(col, 'YYYY-MM-DD')` and `Number(...)` at the boundary | trusting the entity transformer or the global DATE parser |
+| An optional DTO field with a format validator | `@ValidateIf((_o, v) => v !== null && v !== "")` beside `@IsOptional()` | `@IsOptional()` alone |
+| A request-supplied array | `@ArrayMaxSize(n)`; iterate with `entries()` | an unbounded array, `.length` as a loop bound in a scoped callback |
+| A user-facing exception message | `tr(key, fallback, args)` | a hardcoded string |
+| Copy composed outside a request (email, push body) | `emailTranslator(i18n, recipientLang)` | the request locale or English |
+| A notification | `NotificationService.create` | a second `INSERT` into `notifications` |
+| Sending a push | ask the notification layer | importing `web-push` outside `WebPushSender` |
+| A numeric environment variable | `resolvePositiveInt`, declared in a table beside its documentation | a bare `Number(process.env.X)` |
+| A log line, including pre-boot scripts | NestJS `Logger` | `console.*` |
+| A third-party `fetch` | `ProviderHealthService` gates and `describeFetchFailure` | a bare `fetch` or logging `error.stack` from a `catch` |
+| A literal inside a regular expression | `escapeRegExp` | a hand-written character class |
+| A text filter offered to a person or a model | `ILike` or a case-insensitive comparison | `Like` |
+| A predicate that decides which row counts | one named helper called from every site | the clauses spelled out per site |
+| A folded investment action | `applyActionToQuantity` / `acquisitionCost` | a hand-rolled replay |
+
+**A cron or bootstrap body seeds its own identity** -- `withSystemContext` for the fan-out, `withUserContext(userId)` per user, `withDelegateContext` when the two ids must differ -- and a per-user loop isolates each user, pre-checks included. `docs/backend/cron-and-background-work.md`.
+
+**A read about somebody else needs somebody else's identity.** Under RLS a query keyed on another person returns zero rows from the caller's scope with no error. Decide whose row it is before writing the query; `docs/backend/database-access-and-tenancy.md` has the three answers.
+
+**A mock returns what the real collaborator returns**, typed so `tsc` rejects a shape the real method cannot produce; a fixture is evidence only if the producer could have written it; and a suite that stays green through a behaviour change is a finding, not a pass. `docs/backend/testing.md`.
+
+**Every user-facing string is translated** (`nestjs-i18n`). Exception messages go through `tr(...)` (`src/i18n/translate.ts`); anything composed outside a request goes through `emailTranslator` (`src/i18n/email-translator.ts`). Catalogs in `src/i18n/locales/{locale}/*.json`; the locale list is `SUPPORTED_LOCALE_CODES` in `src/i18n/config.ts`, kept in sync with the frontend's. Develop English-first and run `npm run i18n:pseudo`; translate every other locale as the final commit on the PR (`src/i18n/locales.parity.spec.ts`). Full flow: `src/i18n/README.md`.
+
+## Read when the work touches it
+
+| Work | Read |
+|---|---|
+| Specs, mocks, fixtures, Jest configs, the E2E suites | `docs/backend/testing.md` |
+| Module edges, global providers, `main.ts`, env vars, logging, OIDC, CodeQL | `docs/backend/modules-and-runtime.md` |
+| Entities, DTOs, raw SQL, phone numbers, text caps, regex escaping | `docs/backend/entities-and-dtos.md` |
+| Ownership, identity, joint accounts, refusals, predicates | `docs/backend/database-access-and-tenancy.md` and `docs/row-level-security-contract.md` |
+| Transaction writes, exports, loans, categories, currency of a value, Money import | `docs/backend/transactions-and-money.md`, then `docs/financial-semantics.md` |
+| Prices, securities, outbound providers and the breaker | `docs/backend/securities-and-providers.md` |
+| AI assistant, tools, payee lookup and enrichment, search | `docs/backend/ai-and-payees.md` |
+| Notifications, push, recipient-locale copy | `docs/backend/notifications-and-push.md` |
+| Backup and restore, automatic backups | `docs/backend/backup.md` and `docs/backup-restore-contract.md` |
+| Crons, reapers, background jobs | `docs/backend/cron-and-background-work.md` and `docs/cron-jobs.md` |
+
+Every AI tool is shared between the assistant and the MCP server: the logic goes on the domain service and both adapters are wired in the same PR (root `CLAUDE.md`, "Shared AI tools").
+
+## Before you finish
+
+Run the focused spec for what you changed while developing (`npm run test:unit -- <pattern>`), then:
+
+1. `npm run lint`
+2. `npm run typecheck`
+3. `npm run test:unit` (and `npm run test:integration` when a query, a migration or an RLS context changed)
+4. `npm run i18n:check`
+5. `npm run migration:lint` when a migration changed, and update `database/schema.sql` alongside it
+
+The guards that walk the tree with `git ls-files` cannot see an untracked file: stage new files (`git add -N` is enough) before running `doc-paths.spec.ts`, `source-comment-paths.spec.ts` or `jest-config.guard.spec.ts`.

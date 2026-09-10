@@ -234,7 +234,7 @@ genuinely enforced, by the mechanism above rather than the comment -- and it
 remains the catalog's cautionary tale that a status copied from a comment is not a
 verified status. `docs/concurrency-and-idempotency.md` CONC-007 is the rule that a
 named mechanism has to cover the scope claimed; the "Deciding a worker is dead"
-section of `backend/CLAUDE.md` has the fence in full.
+section of `docs/backend/cron-and-background-work.md` has the fence in full.
 
 ### INV-IMPORT-003 -- a category collision does not abort an import
 
@@ -377,7 +377,7 @@ Status              enforced
 The statement was narrowed on purpose. "Both legs share one status" was too broad:
 a reconcile state is genuinely per-ledger (a cross-owner transfer's two ledgers
 reconcile independently), and only the VOID boundary -- where money either moved
-or did not -- is shared. See `backend/CLAUDE.md`, "Editing one row must not leave
+or did not -- is shared. See the root `CLAUDE.md`, "Editing one row must not leave
 the pair describing two different events".
 
 ### INV-REDEEM-001 -- a redemption's accrued interest moves cash once

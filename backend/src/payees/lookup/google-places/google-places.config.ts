@@ -7,7 +7,7 @@ import { GOOGLE_PLACES_CAP } from "./google-places-cap";
  *
  * This is the deployment's resource, so it is configured the way every other
  * deployment resource is -- environment variables, editable nowhere in the UI
- * -- and it follows the rule in `backend/CLAUDE.md`: an environment variable
+ * -- and it follows the rule in `docs/backend/modules-and-runtime.md`: an environment variable
  * configures the deployment's own resource, never somebody else's. Where the
  * operator has set a key, every user's lookups spend it and the operator's cap
  * is the only one that applies; a user's own key and cap live on

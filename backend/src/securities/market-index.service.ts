@@ -373,7 +373,7 @@ export class MarketIndexService implements OnApplicationBootstrap {
    * same instant.
    *
    * Cross-user work with no request behind it, so it seeds its own system
-   * context (`backend/CLAUDE.md`, cron section).
+   * context (`docs/backend/cron-and-background-work.md`).
    */
   @Cron("10 17 * * 1-5", { timeZone: "America/New_York" })
   async scheduledRefresh(): Promise<void> {

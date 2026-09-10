@@ -1,6 +1,6 @@
 # Notification preferences and delivery control
 
-Status: DRAFT (spec-first, per `backend/CLAUDE.md` "a feature of any substance
+Status: DRAFT (spec-first, per the root `CLAUDE.md` "a financial feature of any substance
 starts from a short approved spec committed before the implementation").
 Owner: notification-center. Related: discussion #1291, INV-NOTIFY-001,
 INV-PUSH-001..005.
@@ -1035,7 +1035,7 @@ a browser vendor's push service, and (b) a per-subscription `transport` tag so a
 per-user `unifiedpush` channel toggle can gate it independently of web push.
 
 Because the wire protocol is identical, **`WebPushSender` is reused unchanged**
--- delivery isolation (INV-PUSH, `backend/CLAUDE.md`) holds: it stays the one
+-- delivery isolation (INV-PUSH, `docs/backend/notifications-and-push.md`) holds: it stays the one
 file in `src/` importing `web-push`, and a business feature still asks the
 notification layer for a notification, never a transport. There is no second
 sender, no ntfy-native JSON publish, and no new outbound-request shape: the

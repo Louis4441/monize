@@ -124,7 +124,7 @@ export interface PayeeLookupStatus {
  * user ends up configuring a key that nothing reads.
  *
  * The operator's key WINS. It is the deployment's own resource (the env-var
- * rule in `backend/CLAUDE.md`), it is already paid for, and offering a user a
+ * rule in `docs/backend/modules-and-runtime.md`), it is already paid for, and offering a user a
  * key field beside it would invite them to pay twice for the same lookup. In
  * that mode the per-user key and cap are refused rather than ignored, so a
  * client cannot store a setting that will never apply.

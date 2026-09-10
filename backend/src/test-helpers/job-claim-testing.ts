@@ -8,7 +8,7 @@ import { UserMaintenanceService } from "../common/jobs/user-maintenance.service"
  * `Record<string, jest.Mock>` on purpose: this is one of our own services, so
  * `tsc` should reject a return shape the real method cannot produce. An untyped
  * double here would let a spec assert against fiction -- see the mock rule in
- * `backend/CLAUDE.md`.
+ * `docs/backend/testing.md`.
  *
  * Winning by default keeps the existing behaviour of every cron spec written
  * before the claim existed. A spec that wants the *loser* path -- the one that
