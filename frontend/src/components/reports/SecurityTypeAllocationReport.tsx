@@ -175,19 +175,30 @@ const IDENTITY_CELL =
 const CHILD_IDENTITY_CELL =
   `${CHILD_CELL_PLACEMENT.label} min-w-0 p-0 pl-8 text-sm break-words sm:table-cell sm:px-4 sm:py-2 sm:pl-10 sm:break-normal`;
 
-/** Every caption in a wrapped cell is phone-only. */
-const TYPE_COLOURS: Record<string, string> = {
+/**
+ * The security types this report knows: their slice colour, and -- because the
+ * key set IS the known set -- which types have a translated label.
+ *
+ * One declaration, not two. A hand-written list of the same five codes beside
+ * this record drifts the moment a sixth type is added to one of them, and each
+ * direction of that drift is a defect a reader sees: a colour with no label
+ * gives a slice captioned with the raw enum name in every locale, and a label
+ * with no colour gives a slice coloured from the fallback ramp. `keyof typeof`
+ * makes the compiler hold the two in step, and the i18n guard checks the third
+ * party to the agreement -- the `dashboard` catalog's `types.*` keys.
+ */
+const TYPE_COLOURS = {
   STOCK: CHART_SERIES[0],
   ETF: CHART_SERIES[1],
   MUTUAL_FUND: CHART_SERIES[8],
   BOND: CHART_SERIES[4],
   CASH: chartColors.axis,
-};
+} as const satisfies Record<string, string>;
 
-const KNOWN_SECURITY_TYPES = ['STOCK', 'ETF', 'MUTUAL_FUND', 'BOND', 'CASH'] as const;
+type KnownSecurityType = keyof typeof TYPE_COLOURS;
 
-function isKnownSecurityType(type: string): type is (typeof KNOWN_SECURITY_TYPES)[number] {
-  return (KNOWN_SECURITY_TYPES as readonly string[]).includes(type);
+function isKnownSecurityType(type: string): type is KnownSecurityType {
+  return type in TYPE_COLOURS;
 }
 
 interface TypeAllocation {
@@ -201,7 +212,9 @@ interface TypeAllocation {
 }
 
 function getColor(type: string, index: number): string {
-  return TYPE_COLOURS[type] || chartSeriesColor(index);
+  // Through the same predicate the label uses, so a type cannot be known to one
+  // and unknown to the other.
+  return isKnownSecurityType(type) ? TYPE_COLOURS[type] : chartSeriesColor(index);
 }
 
 function CustomTooltip({ active, payload, formatCurrencyFull, getHoldingsLabel }: {

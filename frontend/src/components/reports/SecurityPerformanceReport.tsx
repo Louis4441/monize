@@ -3,7 +3,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { useMainAccountName } from '@/hooks/useMainAccountName';
-import { gainLossColor } from '@/lib/format';
+import { gainLossColor, sumMoney } from '@/lib/format';
 import { baseInvestmentAction } from '@/lib/investment-actions';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { useReportData } from '@/hooks/useReportData';
@@ -18,13 +18,14 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import { format, differenceInDays } from 'date-fns';
+import { differenceInDays } from 'date-fns';
 import { chartColors } from '@/lib/chart-colors';
 import { investmentsApi } from '@/lib/investments';
 import { Security, SecurityPrice, InvestmentTransaction, HoldingWithMarketValue } from '@/types/investment';
 import { Account } from '@/types/account';
 import { parseLocalDate, type ChartDatePattern } from '@/lib/utils';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
+import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
@@ -98,13 +99,46 @@ interface PriceChartPoint {
   sellMarker?: number;
 }
 
+/**
+ * The dividend total, for the table footer and the PDF export alike.
+ *
+ * It accumulated with `sum + Math.abs(tx.totalAmount)` -- the expression root
+ * `CLAUDE.md` gives as the WRONG example -- so the footer disagreed with the
+ * sum of the figures printed above it in the last decimal place (five
+ * plausible dividend amounts reach `389.46000000000004`). `sumMoney`
+ * accumulates in integer ten-thousandths, the scale the amounts are stored at:
+ * the same helper the other client-side money totals use, mirroring the
+ * server's own.
+ *
+ * `Number(...)` is explicit rather than incidental. A `decimal(20,4)` crosses
+ * the wire as a STRING however `InvestmentTransaction` declares it; the old
+ * expression coerced it only because `Math.abs` does, so a later edit taking
+ * the abs off for a signed total would have started concatenating strings.
+ *
+ * Every row is a known amount here (`totalAmount` is non-nullable on a dividend
+ * row), so this is a total and not a subtotal.
+ */
+function sumDividends(rows: InvestmentTransaction[]): number {
+  return sumMoney(rows.map((tx) => Math.abs(Number(tx.totalAmount))));
+}
+
 export function SecurityPerformanceReport() {
   const t = useTranslations('reports');
   const tc = useTranslations('common');
   const ti = useTranslations('marketIndexes');
   const formatChartDate = useChartDateFormat();
+  // Both history tables print a calendar date and a share count, so both go
+  // through the preference seams -- `formatDate` for the date's arrangement and
+  // separators, `formatShareQuantity` for the count's decimal mark and its 8dp
+  // (a residual position is what that column exists to expose).
+  const { formatDate } = useDateFormat();
   const mainAccountName = useMainAccountName();
-  const { formatCurrency: formatCurrencyFull, formatCurrencyAxis, formatSignedPercent } = useNumberFormat();
+  const {
+    formatCurrency: formatCurrencyFull,
+    formatCurrencyAxis,
+    formatSignedPercent,
+    formatShareQuantity,
+  } = useNumberFormat();
   const { defaultCurrency } = useExchangeRates();
   const chartRef = useRef<HTMLDivElement>(null);
   // Export handle for the comparison chart, which owns its own data and DOM.
@@ -527,16 +561,19 @@ export function SecurityPerformanceReport() {
           t('securityPerformance.pdfColTotal'),
         ],
         rows: tradeTx.map((tx) => [
-          format(parseLocalDate(tx.transactionDate), 'MMM d, yyyy'),
+          formatDate(tx.transactionDate),
           accountNameById.get(tx.accountId) || '-',
           tx.action,
-          tx.quantity != null ? String(tx.quantity) : '-',
+          // The PDF is a reading surface, so its share count is formatted like
+          // the table's -- `String(tx.quantity)` printed the raw `"10.0000"` the
+          // wire carries, in nobody's number locale.
+          tx.quantity != null ? formatShareQuantity(Number(tx.quantity)) : '-',
           tx.price != null ? formatCurrencyFull(tx.price, displayCurrency) : '-',
           formatCurrencyFull(Math.abs(tx.totalAmount), displayCurrency),
         ]),
       };
     } else {
-      const totalDividends = dividendTx.reduce((sum, tx) => sum + Math.abs(tx.totalAmount), 0);
+      const totalDividends = sumDividends(dividendTx);
       tableData = {
         headers: [
           t('securityPerformance.pdfColDateTx'),
@@ -545,7 +582,7 @@ export function SecurityPerformanceReport() {
           t('securityPerformance.colAmount'),
         ],
         rows: dividendTx.map((tx) => [
-          format(parseLocalDate(tx.transactionDate), 'MMM d, yyyy'),
+          formatDate(tx.transactionDate),
           accountNameById.get(tx.accountId) || '-',
           tx.action,
           formatCurrencyFull(Math.abs(tx.totalAmount), displayCurrency),
@@ -957,7 +994,7 @@ export function SecurityPerformanceReport() {
                         >
                           {/* Date: the row identity. A formatted date never wraps. */}
                           <td role="cell" className="col-start-1 row-start-1 p-0 text-xs whitespace-nowrap text-gray-900 dark:text-gray-100 sm:table-cell sm:px-4 sm:py-3 sm:text-sm">
-                            {format(parseLocalDate(tx.transactionDate), 'MMM d, yyyy')}
+                            {formatDate(tx.transactionDate)}
                           </td>
                           <td role="cell" className="col-start-1 row-start-2 p-0 text-xs break-words text-gray-600 dark:text-gray-400 sm:table-cell sm:px-4 sm:py-3 sm:text-sm sm:break-normal">
                             <CellLabel className={CAPTION_CLASS}>{tradeColumns.account.label}</CellLabel>
@@ -977,7 +1014,7 @@ export function SecurityPerformanceReport() {
                           </td>
                           <td role="cell" className={`col-start-2 row-start-2 text-gray-600 dark:text-gray-400 ${MONEY_CELL}`}>
                             <CellLabel className={CAPTION_CLASS}>{tradeColumns.shares.label}</CellLabel>
-                            {tx.quantity ?? '-'}
+                            {tx.quantity != null ? formatShareQuantity(Number(tx.quantity)) : '-'}
                           </td>
                           <td role="cell" className={`col-start-3 row-start-2 text-gray-600 dark:text-gray-400 ${MONEY_CELL}`}>
                             <CellLabel className={CAPTION_CLASS}>{tradeColumns.price.label}</CellLabel>
@@ -1060,7 +1097,7 @@ export function SecurityPerformanceReport() {
                         >
                           {/* Date: the row identity. A formatted date never wraps. */}
                           <td role="cell" className="col-start-1 row-start-1 p-0 text-xs whitespace-nowrap text-gray-900 dark:text-gray-100 sm:table-cell sm:px-4 sm:py-3 sm:text-sm">
-                            {format(parseLocalDate(tx.transactionDate), 'MMM d, yyyy')}
+                            {formatDate(tx.transactionDate)}
                           </td>
                           <td role="cell" className="col-start-1 row-start-2 p-0 text-xs break-words text-gray-600 dark:text-gray-400 sm:table-cell sm:px-4 sm:py-3 sm:text-sm sm:break-normal">
                             <CellLabel className={CAPTION_CLASS}>{dividendColumns.account.label}</CellLabel>
@@ -1084,16 +1121,21 @@ export function SecurityPerformanceReport() {
                       {/* "Total Dividends" stands in for the identity; the total
                           sits beside it. The label keeps its desktop `colSpan={3}`,
                           so both cells state `aria-colindex`. The total names
-                          itself from that label, so it carries no caption. */}
+                          itself from that label, so it carries no caption.
+
+                          `aria-colspan` restates that `colSpan` for the same
+                          reason `role="cell"` restates the implicit role: below
+                          `sm` the `display` is no longer `table-cell`, and the
+                          span an assistive technology reads from the table's own
+                          layout goes with it. The table declares no
+                          `aria-colcount` -- neither does any converted sibling,
+                          and one here alone would be a convention of one file. */}
                       <tr role="row" className="grid grid-cols-2 items-start gap-x-3 gap-y-1.5 px-4 py-3 sm:table-row sm:p-0">
-                        <td role="cell" aria-colindex={1} colSpan={3} className="col-start-1 row-start-1 p-0 text-sm font-bold text-gray-900 dark:text-gray-100 sm:table-cell sm:px-4 sm:py-3">
+                        <td role="cell" aria-colindex={1} aria-colspan={3} colSpan={3} className="col-start-1 row-start-1 p-0 text-sm font-bold text-gray-900 dark:text-gray-100 sm:table-cell sm:px-4 sm:py-3">
                           {t('securityPerformance.totalDividends')}
                         </td>
                         <td role="cell" aria-colindex={4} className={`col-start-2 row-start-1 font-bold text-green-600 dark:text-green-400 ${MONEY_CELL}`}>
-                          {formatCurrencyFull(
-                            dividendTx.reduce((sum, tx) => sum + Math.abs(tx.totalAmount), 0),
-                            displayCurrency,
-                          )}
+                          {formatCurrencyFull(sumDividends(dividendTx), displayCurrency)}
                         </td>
                       </tr>
                     </tfoot>

@@ -50,6 +50,17 @@ vi.mock('@/hooks/useNumberFormat', async () => {
   };
 });
 
+// The date arrangement and the share count are both the reader's preference,
+// so the row must go through those two seams rather than through date-fns'
+// English and `toFixed`. Each stand-in names itself, so an assertion reads as
+// "the preference decided this".
+vi.mock('@/hooks/useDateFormat', () => ({
+  useDateFormat: () => ({
+    formatDate: (date: string) => `preferred-date:${date}`,
+    formatMonth: (month: string) => `preferred-month:${month}`,
+  }),
+}));
+
 vi.mock("@/hooks/useExchangeRates", () => ({
   useExchangeRates: () => ({
     convertToDefault: (amount: number, _currency: string) => amount,
@@ -95,6 +106,10 @@ vi.mock("@/lib/logger", () => ({
 const mockExportToCsv = vi.fn();
 vi.mock("@/lib/csv-export", () => ({
   exportToCsv: (...args: any[]) => mockExportToCsv(...args),
+}));
+
+vi.mock("@/lib/pdf-export", () => ({
+  exportToPdf: vi.fn().mockResolvedValue(undefined),
 }));
 
 /**
@@ -332,9 +347,12 @@ describe("InvestmentTransactionHistoryReport (phone wrapped rows)", () => {
     const row = txRow(container, "VWCE.DE")!;
     // Each caption sits immediately beside the value it names, as its own text
     // node, so a `getByText` on the value still matches the value node.
-    expect(row.textContent).toContain("DateJan 5, 2025");
+    expect(row.textContent).toContain("Datepreferred-date:2025-01-05");
     expect(row.textContent).toContain("AccountZeta Brokerage");
-    expect(row.textContent).toContain("Quantity50.0000");
+    // Eight decimals through `formatShareQuantity`, trailing zeros trimmed: the
+    // raw `"50.0000"` the wire carries is not a figure in anybody's number
+    // locale, and a residual position must survive the formatting.
+    expect(row.textContent).toContain("Quantity50");
     expect(row.textContent).toContain("Price$100.00");
     expect(row.textContent).toContain("Total$5000.00");
     // Scoped to the row: the summary cards above print the same figures.
@@ -597,6 +615,36 @@ describe("InvestmentTransactionHistoryReport (phone wrapped rows)", () => {
     const bare = rows.find((r: unknown[]) => r[COL.security] === "-")!;
     expect(bare[COL.quantity]).toBe("");
     expect(bare[COL.price]).toBe("");
+  });
+
+  it("formats the quantity for the PDF and leaves the CSV a number", async () => {
+    // Two surfaces, one record, two answers. The PDF is read by a person, so
+    // its share count goes through the number locale like the price and the
+    // total beside it; the CSV is summed by a spreadsheet, so it stays a
+    // number -- a formatted string there is the defect that stops an amount
+    // column adding up (issue #1134's family). The suite had no case for the
+    // formatted half at all, which is why this one is here.
+    const { exportToPdf } = await import("@/lib/pdf-export");
+    const container = await renderTable();
+
+    fireEvent.click(within(container).getByTitle("Export report"));
+    await act(async () => {
+      fireEvent.click(within(container).getByText("PDF"));
+    });
+
+    const call = vi.mocked(exportToPdf).mock.calls.at(-1)![0] as {
+      tableData?: { rows: (string | number)[][] };
+    };
+    const pdfFirst = call.tableData!.rows[0];
+    expect(pdfFirst[COL.quantity]).toBe("30");
+    expect(typeof pdfFirst[COL.quantity]).toBe("string");
+
+    fireEvent.click(within(container).getByTitle("Export report"));
+    await act(async () => {
+      fireEvent.click(within(container).getByText("CSV"));
+    });
+    const [, , csvRows] = mockExportToCsv.mock.calls.at(-1)!;
+    expect(csvRows[0][COL.quantity]).toBe(30);
   });
 
   it("renders an unnamed account as a dash rather than an empty captioned cell", async () => {

@@ -53,12 +53,45 @@ vi.mock('@/hooks/useNumberFormat', async () => {
     useNumberFormat: () => ({
       ...numberFormatMockDefaults(),
       formatSignedPercent: (n: number, decimals = 2) => `${n >= 0 ? '+' : ''}${n.toFixed(decimals)}%`,
-      formatCurrency: (n: number) => `$${n.toFixed(2)}`,
+      /**
+       * `$1500.00` for any figure money can hold, and the raw value for one it
+       * cannot.
+       *
+       * A plain `toFixed(2)` rounds IEEE-754 accumulation drift away, so a
+       * footer summed with `+` and a footer summed in integer ten-thousandths
+       * render the same string and no assertion can tell them apart. Money is
+       * `decimal(20,4)`: a figure that survives a round trip through that scale
+       * formats as usual, and one that does not is printed as it arrived, so a
+       * drifted total is visible in the DOM. The real hook is an `Intl`
+       * formatter with a fixed fraction count -- it would round the drift away
+       * on screen too, which is exactly why the drift needs a test rather than
+       * a reader.
+       */
+      formatCurrency: (n: number) =>
+        `$${Math.round(n * 10_000) / 10_000 === n ? n.toFixed(2) : String(n)}`,
       formatCurrencyCompact: (n: number) => `$${n.toFixed(0)}`,
       formatCurrencyAxis: (n: number) => `$${n}`,
+      /**
+       * A share count that names its seam, so an assertion says "the number
+       * locale decided this" rather than "the value happened to stringify that
+       * way". The shared default is `String(value)`, which a raw
+       * `{tx.quantity}` matches exactly -- so a cell that never reached this
+       * formatter would have passed.
+       */
+      formatShareQuantity: (value: number | null | undefined) => `shares:${value}`,
     }),
   };
 });
+
+// The date arrangement is the reader's preference, so the tables must go
+// through this seam rather than through date-fns' English. The stand-in names
+// itself so an assertion reads as "the preference decided this".
+vi.mock('@/hooks/useDateFormat', () => ({
+  useDateFormat: () => ({
+    formatDate: (date: string) => `preferred-date:${date}`,
+    formatMonth: (month: string) => `preferred-month:${month}`,
+  }),
+}));
 
 vi.mock('@/hooks/useExchangeRates', () => ({
   useExchangeRates: () => ({
@@ -141,11 +174,14 @@ async function selectSecurity(optionLabel: string) {
   });
 }
 
-async function renderAt(view: 'Transactions' | 'Dividends') {
+async function renderAt(
+  view: 'Transactions' | 'Dividends',
+  transactions: unknown[] = TRANSACTIONS,
+) {
   mockGetSecurities.mockResolvedValue(mockSecurities);
   mockGetPortfolioSummary.mockResolvedValue({ holdings: mockHoldings });
   mockGetSecurityPrices.mockResolvedValue([]);
-  mockGetTransactions.mockResolvedValue({ data: TRANSACTIONS, pagination: { hasMore: false } });
+  mockGetTransactions.mockResolvedValue({ data: transactions, pagination: { hasMore: false } });
   mockGetInvestmentAccounts.mockResolvedValue([{ id: 'acc-1', name: 'Brokerage 1', currencyCode: 'USD' }]);
   mockGetMarketIndexes.mockResolvedValue([]);
 
@@ -241,13 +277,13 @@ describe('SecurityPerformanceReport transactions table (phone wrapped)', () => {
     // Each caption sits beside the value it names, as its own text node, so a
     // value lookup still matches the value node.
     expect(buyRow.textContent).toContain('Account' + 'Brokerage 1');
-    expect(buyRow.textContent).toContain('Shares' + '10');
+    expect(buyRow.textContent).toContain('Shares' + 'shares:10');
     expect(buyRow.textContent).toContain('Price' + '$150.00');
     expect(buyRow.textContent).toContain('Total' + '$1500.00');
     // The date is the identity and the action is a self-describing pill, so
     // neither carries a caption.
     const date = buyRow.querySelector('.col-start-1.row-start-1')!;
-    expect(date.textContent).toBe('Jun 15, 2024');
+    expect(date.textContent).toBe('preferred-date:2024-06-15');
     expect(date.querySelector('span')).toBeNull();
     const action = buyRow.querySelector('.col-start-2.row-start-1')!;
     // The pill itself is the only span in the action cell; there is no caption.
@@ -320,7 +356,7 @@ describe('SecurityPerformanceReport transactions table (phone wrapped)', () => {
         (r) => r.querySelector('.col-start-1.row-start-1')?.textContent,
       );
     // Default sort is date descending: June leads March.
-    expect(dateOrder()).toEqual(['Jun 15, 2024', 'Mar 10, 2024']);
+    expect(dateOrder()).toEqual(['preferred-date:2024-06-15', 'preferred-date:2024-03-10']);
 
     // "Total" in the phone strip is the sixth of the six controls in the first
     // header row. Addressed by position because the label also appears in the
@@ -330,7 +366,7 @@ describe('SecurityPerformanceReport transactions table (phone wrapped)', () => {
       fireEvent.click(phoneTotal);
     });
     // Ascending by total puts the $900 SELL (March) first.
-    expect(dateOrder()).toEqual(['Mar 10, 2024', 'Jun 15, 2024']);
+    expect(dateOrder()).toEqual(['preferred-date:2024-03-10', 'preferred-date:2024-06-15']);
   });
 
   it('leaves the rows inert: the card is a layout, not a new affordance', async () => {
@@ -386,7 +422,7 @@ describe('SecurityPerformanceReport dividends table (phone wrapped)', () => {
     expect(row.textContent).toContain('Account' + 'Brokerage 1');
     expect(row.textContent).toContain('Amount' + '$50.00');
     const date = row.querySelector('.col-start-1.row-start-1')!;
-    expect(date.textContent).toBe('May 1, 2024');
+    expect(date.textContent).toBe('preferred-date:2024-05-01');
     expect(date.querySelector('span')).toBeNull();
     const type = row.querySelector('.col-start-2.row-start-2')!;
     expect(type.querySelectorAll('span')).toHaveLength(1);
@@ -429,6 +465,9 @@ describe('SecurityPerformanceReport dividends table (phone wrapped)', () => {
     // each states its column index.
     expect(label.getAttribute('colspan')).toBe('3');
     expect(label.getAttribute('aria-colindex')).toBe('1');
+    // The span is restated for the same reason the role is: below `sm` the cell
+    // is not a `table-cell`, so the span carried by the table layout is gone.
+    expect(label.getAttribute('aria-colspan')).toBe('3');
     expect(placement(label)).toBe('c1/r1');
     expect(label.textContent).toBe('Total Dividends');
     // The total sits beside the label; it names itself from that label, so it
@@ -440,5 +479,142 @@ describe('SecurityPerformanceReport dividends table (phone wrapped)', () => {
     expect(total.className).toContain('text-right');
     // 50 + 30.
     expect(total.textContent).toBe('$80.00');
+  });
+});
+
+/**
+ * The dividend total is money, and money is summed in integer ten-thousandths.
+ *
+ * Both the footer and the PDF export accumulated it with
+ * `dividendTx.reduce((sum, tx) => sum + Math.abs(tx.totalAmount), 0)` -- the
+ * expression root `CLAUDE.md` gives as its WRONG example -- so the footer
+ * disagreed with the sum of the figures printed above it. These fixtures are
+ * chosen for that: added left to right in IEEE-754 they give
+ * 389.46000000000004, and in `decimal(20,4)` they give exactly 389.46.
+ */
+const DRIFTING_DIVIDENDS = [136.4, 111.26, 110.66, 1.05, 30.09];
+
+/** The rows those amounts arrive as, newest first so the table's sort is stable. */
+function driftingDividendRows(amount: (value: number) => number | string) {
+  return DRIFTING_DIVIDENDS.map((value, index) => ({
+    id: `dd${index}`,
+    // Distinct days, descending, so the default sort does not have to tie-break.
+    transactionDate: `2024-05-${String(20 - index).padStart(2, '0')}`,
+    action: 'DIVIDEND',
+    quantity: null,
+    price: null,
+    totalAmount: amount(value),
+    securityId: 's-1',
+    security: { symbol: 'AAPL', name: 'Apple Inc.' },
+    accountId: 'acc-1',
+  }));
+}
+
+describe('SecurityPerformanceReport share counts', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders the count through the number locale, not as the wire string', async () => {
+    // `quantity` is declared `number` and a `decimal(20,4)` column crosses the
+    // wire as `"10.0000"`. The cell was `{tx.quantity ?? '-'}`, so that string
+    // reached the screen verbatim -- a `.` decimal and four trailing zeros in
+    // every locale. A residual position is the other half: `0.30000000000000004`
+    // printed all seventeen digits.
+    const container = await renderAt('Transactions', [
+      {
+        ...TRANSACTIONS[0],
+        quantity: '10.0000',
+      },
+      {
+        ...TRANSACTIONS[1],
+        quantity: 0.30000000000000004,
+      },
+    ]);
+
+    const shares = Array.from(container.querySelectorAll('tbody tr')).map(
+      (row) => row.querySelector('.col-start-2.row-start-2')?.textContent,
+    );
+    // The stand-in names the seam, so this fails both on the raw render and on
+    // any cell that stops going through the formatter.
+    expect(shares).toEqual(['Sharesshares:10', 'Sharesshares:0.30000000000000004']);
+  });
+
+  it('still renders a dash for an absent count rather than a zero', async () => {
+    // `formatShareQuantity` answers "0" for nullish -- correct for a holdings
+    // column, wrong for a trade that records no share movement, where the
+    // figure is not known rather than zero.
+    const container = await renderAt('Transactions', [
+      { ...TRANSACTIONS[0], quantity: null },
+    ]);
+
+    const shares = container.querySelector('tbody tr .col-start-2.row-start-2')!;
+    expect(shares.textContent).toBe('Shares-');
+  });
+});
+
+describe('SecurityPerformanceReport dividend total', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('sums to the exact 4dp figure rather than a float-accumulated one', async () => {
+    const container = await renderAt('Dividends', driftingDividendRows((v) => v));
+
+    const total = Array.from(container.querySelectorAll('tfoot td'))[1];
+    // Left-to-right float addition renders `$389.46000000000004` here; the
+    // mocked formatter prints a value money cannot hold rather than rounding it
+    // away, so this assertion fails on the original expression.
+    expect(total.textContent).toBe('$389.46');
+  });
+
+  it('agrees with the sum of the amounts printed in the rows', async () => {
+    const container = await renderAt('Dividends', driftingDividendRows((v) => v));
+
+    const rowAmounts = Array.from(container.querySelectorAll('tbody tr')).map((row) => {
+      const cell = row.querySelector('.col-start-2.row-start-1')!;
+      return Number(cell.textContent!.replace(/^Amount\$/, ''));
+    });
+    expect(rowAmounts).toHaveLength(DRIFTING_DIVIDENDS.length);
+
+    // The claim the footer makes is "this is what the rows above add up to", so
+    // the figures on screen are what it is compared against -- summed here in
+    // ten-thousandths, because a float sum of them is the defect.
+    const expected =
+      rowAmounts.reduce((units, value) => units + Math.round(value * 10_000), 0) / 10_000;
+    const total = Array.from(container.querySelectorAll('tfoot td'))[1];
+    expect(total.textContent).toBe(`$${expected}`);
+  });
+
+  it('coerces the string a decimal(20,4) column arrives as', async () => {
+    // `totalAmount` is declared `number` and crosses the wire as `"136.4000"`.
+    // The old expression survived that by accident (`Math.abs` coerces); the
+    // sum is explicit about it now, so dropping the `Math.abs` for a signed
+    // total cannot silently start concatenating strings.
+    const container = await renderAt(
+      'Dividends',
+      driftingDividendRows((v) => v.toFixed(4)),
+    );
+
+    const total = Array.from(container.querySelectorAll('tfoot td'))[1];
+    expect(total.textContent).toBe('$389.46');
+  });
+
+  it('gives the PDF export the same total as the footer', async () => {
+    const { exportToPdf } = await import('@/lib/pdf-export');
+    const container = await renderAt('Dividends', driftingDividendRows((v) => v));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('export-pdf'));
+    });
+
+    const call = vi.mocked(exportToPdf).mock.calls.at(-1)![0] as {
+      tableData?: { totalRow?: (string | number)[] };
+    };
+    const footer = Array.from(container.querySelectorAll('tfoot td'))[1].textContent;
+    // One sum, two surfaces: the export used to compute its own copy of the
+    // same reduce, so the two could drift apart independently.
+    expect(call.tableData?.totalRow?.at(-1)).toBe(footer);
+    expect(call.tableData?.totalRow?.at(-1)).toBe('$389.46');
   });
 });

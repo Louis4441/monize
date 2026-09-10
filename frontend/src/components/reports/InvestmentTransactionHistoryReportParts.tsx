@@ -119,7 +119,13 @@ export const HEADER_CLASS = 'px-4 py-3 text-xs font-medium text-gray-500 dark:te
 // to spare) and eight is the first past it (measured: the wrapper goes 294/288).
 // In the ordinary single-code form eight figures (116px) is still inside the
 // track. At 390px (157px tracks) nine figures fit inside the track itself.
-// Quantity is `toFixed(4)`: `12345.6789` is 73px, `1234567.8912` 88px.
+// Quantity was measured as a `toFixed(4)` string: `12345.6789` is 73px,
+// `1234567.8912` 88px. It now renders through `formatShareQuantity` (up to 8dp,
+// trailing zeros trimmed, the reader's own decimal mark and grouping), so the
+// ordinary case is SHORTER than what was measured -- `50.0000` became `50` --
+// and the long case is a residual position rather than a large count. The 8dp
+// form has not been re-measured; it is the one to measure again if this
+// column's track budget is ever revisited.
 //
 // THREE tracks were rejected on the same measurement: a third of the same box is
 // 77px at 320px, which even a six-figure 125px amount overflows by 48px -- past
@@ -128,8 +134,12 @@ export const HEADER_CLASS = 'px-4 py-3 text-xs font-medium text-gray-500 dark:te
 // what this box can hold.
 export const MONEY_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm';
 
-// The date is a fixed-shape label, not a number: `format(..., 'MMM d, yyyy')`
-// renders `Dec 25, 2025` (80px at `text-xs`). It keeps the `whitespace-nowrap`
+// The date is a fixed-shape label, not a number. It was measured as the
+// hardcoded English `Dec 25, 2025` (80px at `text-xs`); it now renders through
+// `useDateFormat().formatDate`, and every arrangement that seam can produce is
+// at most eleven glyphs (`25-Dec-2025`, and the numeric patterns ten), because
+// its `browser` branch asks Intl for a 2-digit month rather than a name -- so
+// the column is never wider than what was measured. It keeps the `whitespace-nowrap`
 // it wears today, because a date is one label and breaking it after `Dec` reads
 // as two values, and it is spelled out rather than aliased to `MONEY_CELL`
 // deliberately: the two hold nearly the same string for different reasons, and
