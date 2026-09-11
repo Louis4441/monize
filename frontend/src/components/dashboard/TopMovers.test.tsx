@@ -119,18 +119,22 @@ describe('TopMovers', () => {
     );
   });
 
-  it('shows maximum of 5 movers', () => {
+  it('shows the five biggest movers, not the first five it was handed', () => {
+    // Daily changes of -8, -6, -4, -2, 0, 2, 4, 6: the five largest moves in
+    // either direction are SYM0, SYM1, SYM7, SYM2 and SYM6. SYM4 did not move
+    // and is nobody's top mover, whatever position it arrived in.
     const movers = Array.from({ length: 8 }, (_, i) => ({
       securityId: `${i}`, symbol: `SYM${i}`, name: `Company ${i}`,
-      currentPrice: 100 + i, dailyChange: i - 4, dailyChangePercent: (i - 4) * 0.5,
+      currentPrice: 100 + i, dailyChange: (i - 4) * 2, dailyChangePercent: (i - 4) * 0.5,
       currencyCode: 'USD',
     })) as any[];
 
     render(<TopMovers movers={movers} isLoading={false} hasInvestmentAccounts={true} />);
-    // Should only show first 5
+
+    expect(screen.getAllByRole('button', { name: /Price history for/ })).toHaveLength(5);
     expect(screen.getByText('SYM0')).toBeInTheDocument();
-    expect(screen.getByText('SYM4')).toBeInTheDocument();
-    expect(screen.queryByText('SYM5')).not.toBeInTheDocument();
+    expect(screen.getByText('SYM7')).toBeInTheDocument();
+    expect(screen.queryByText('SYM4')).not.toBeInTheDocument();
   });
 
   it('renders the All/Gainers/Losers filter selector', () => {
@@ -244,9 +248,12 @@ describe('TopMovers', () => {
   });
 
   it('re-ranks the list when the rank-by toggle changes, and remembers it', () => {
+    // In the order the server sends: biggest percentage move first. Both
+    // settings therefore have to reorder, so neither can look right by
+    // accidentally inheriting the incoming order.
     const movers = [
-      { securityId: '1', symbol: 'BIG', name: 'Big', currentPrice: 900, dailyChange: 400, dailyChangePercent: 0.5, currencyCode: 'USD' },
       { securityId: '2', symbol: 'SMALL', name: 'Small', currentPrice: 20, dailyChange: 8, dailyChangePercent: 40, currencyCode: 'USD' },
+      { securityId: '1', symbol: 'BIG', name: 'Big', currentPrice: 900, dailyChange: 400, dailyChangePercent: 0.5, currencyCode: 'USD' },
     ] as any[];
 
     const { unmount } = render(
@@ -289,14 +296,19 @@ describe('rankMovers', () => {
   const mover = (symbol: string, dailyChange: number, dailyChangePercent: number) =>
     ({ securityId: symbol, symbol, name: symbol, currentPrice: 100, dailyChange, dailyChangePercent, currencyCode: 'USD' }) as any;
 
-  // Arrives in the server's order: descending absolute daily change in money.
+  /**
+   * In the order the server sends: descending absolute daily change PERCENT.
+   * The fixture is deliberately not in money order -- a branch that passed the
+   * incoming order through showed the percent ranking under the Amount heading,
+   * and a fixture already sorted by money could not tell the two apart.
+   */
   const movers = [
-    mover('BIG', 400, 0.5),
-    mover('MID', -120, -6),
     mover('SMALL', 8, 40),
+    mover('MID', -120, -6),
+    mover('BIG', 400, 0.5),
   ];
 
-  it('keeps the money order for all + amount', () => {
+  it('ranks by the size of the money move for all + amount', () => {
     expect(rankMovers(movers, 'all', 'amount').map((m) => m.symbol)).toEqual([
       'BIG',
       'MID',

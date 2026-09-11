@@ -48,13 +48,19 @@ const MOVER_METRICS = ['amount', 'percent'] as const;
  * Rank movers for a filter and a metric, and take the top five.
  *
  * The two questions are separate: the filter says which direction counts, the
- * metric says what "biggest" measures. A holding worth thousands moves the most
- * money on a small percentage, and a small holding moves the most percent on
- * very little -- so the widget ranks by whichever the user asked about rather
- * than reporting one under the other's heading.
+ * metric says what "biggest" measures. A holding priced in the hundreds moves
+ * the most money on a small percentage, and a cheap one moves the most percent
+ * on very little -- so the widget both **orders and selects** by whichever the
+ * user asked about. Selecting by one and ordering by the other would put a
+ * holding on screen for a reason the column beside it does not show.
  *
- * The server pre-sorts by absolute daily change in money, which is exactly the
- * all + amount answer; every other combination is re-sorted here.
+ * Every branch ranks explicitly. The list arrives sorted by absolute daily
+ * change *percent*, so a branch that passed the server's order through was
+ * showing the percent ranking under the Amount heading -- which is the whole of
+ * what the Amount control appeared to do, namely nothing.
+ *
+ * The amount is the per-share change printed on the row, so the order is the
+ * order of the numbers on screen.
  */
 export function rankMovers(
   movers: TopMover[],
@@ -65,18 +71,19 @@ export function rankMovers(
   const magnitude = (m: TopMover) =>
     metric === 'amount' ? m.dailyChange : m.dailyChangePercent;
   if (filter === 'gainers') {
-    return movers
+    return [...movers]
       .filter((m) => m.dailyChange > 0)
       .sort((a, b) => magnitude(b) - magnitude(a))
       .slice(0, limit);
   }
   if (filter === 'losers') {
-    return movers
+    return [...movers]
       .filter((m) => m.dailyChange < 0)
       .sort((a, b) => magnitude(a) - magnitude(b))
       .slice(0, limit);
   }
-  if (metric === 'amount') return movers.slice(0, limit);
+  // Either direction counts, so the biggest mover is the largest move in either
+  // direction: rank on the size of the change, not its signed value.
   return [...movers]
     .sort((a, b) => Math.abs(magnitude(b)) - Math.abs(magnitude(a)))
     .slice(0, limit);
