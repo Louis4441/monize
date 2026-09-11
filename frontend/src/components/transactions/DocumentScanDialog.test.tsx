@@ -223,7 +223,7 @@ describe('DocumentScanDialog', () => {
     // than imperfect, so none of them may take an action away.
     it.each([
       ['blurry', /blurred/i],
-      ['edgesOutsideFrame', /outside the photo/i],
+      ['edgesOutsideFrame', /reaches the edge of the photo/i],
       ['lowResolution', /quite small/i],
     ])('shows %s without blocking acceptance', async (warning, copy) => {
       worker.result = scanResult({

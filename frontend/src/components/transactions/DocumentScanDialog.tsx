@@ -430,6 +430,23 @@ export function DocumentScanDialog({
               </div>
             </div>
 
+            {/* Quality warnings sit directly under the preview, on both views,
+                so a document running off the frame is seen on the default
+                Enhanced card and not buried below the finish controls. */}
+            {scanner.result && !scanner.result.documentFound && (
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                {t('scan.noDocumentFound')}
+              </p>
+            )}
+
+            {warnings.length > 0 && (
+              <ul className="space-y-1 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
+                {warnings.map((warning) => (
+                  <li key={warning}>{t(`scan.warnings.${warning}`)}</li>
+                ))}
+              </ul>
+            )}
+
             {/* The finish and the two repairs, on the scan alone: the photo is
                 stored exactly as the device produced it (`I2`), so nothing
                 here is offered beside it. */}
@@ -502,20 +519,6 @@ export function DocumentScanDialog({
               <p className="text-center text-xs text-gray-500 dark:text-gray-400">
                 {t('scan.adjustHint')}
               </p>
-            )}
-
-            {scanner.result && !scanner.result.documentFound && (
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                {t('scan.noDocumentFound')}
-              </p>
-            )}
-
-            {warnings.length > 0 && (
-              <ul className="space-y-1 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
-                {warnings.map((warning) => (
-                  <li key={warning}>{t(`scan.warnings.${warning}`)}</li>
-                ))}
-              </ul>
             )}
 
             {originalTooLarge && (
