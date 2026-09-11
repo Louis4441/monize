@@ -734,7 +734,8 @@
         "encryptedNeedsPassword": "Bu yedekleme şifrelenmiş. Oluşturulduğu şifreyi \"Yedekleme şifresi\" alanına girin ve tekrar deneyin.",
         "failed": "Yedekleme geri yüklenemedi",
         "reauthRedirect": "Kimliğinizi doğrulamak için sizi kimlik sağlayıcınıza yönlendiriyoruz. Döndüğünüzde yedek dosyasını yeniden seçin."
-      }
+      },
+      "selectedFile": "Seçilen: {filename}"
     },
     "restoreResult": {
       "title": "Geri Yükleme Tamamlandı",
@@ -743,6 +744,24 @@
       "doneButton": "Tamam",
       "skippedAttachments": "{count, plural, other {# ek geri yüklenmedi}}: yedek bunlar için kullanılabilir bayt içermiyordu — dışa aktarma sırasında eksiktiler veya sağlama toplamından geçemediler, ya da dosya kendi kendine yeten yedeklerden öncesine ait. Ek depolaması düzeldiğinde yeni bir yedek alın.",
       "unusableAiProviderKeys": "{count, plural, other {# AI sağlayıcısı kullanılabilir API anahtarı olmadan geri yüklendi}}: bu yedek, sağlayıcı anahtarları yedeğe eklenmeden önce oluşturulmuştu; bu yüzden kayıtlı anahtar dosyayı üreten sunucuya ait ya da bu sunucuda anahtarı saklayacak bir şifreleme anahtarı tanımlı değil. Ayarlar → AI Sağlayıcıları bölümünü açıp API anahtarını yeniden girin."
+    },
+    "storedBackups": {
+      "heading": "Otomatik Yedekler",
+      "description": "Bu sunucunun kendi zamanlamasına göre sizin için oluşturduğu yedekler. Kendi kopyanızı saklamak için birini indirin veya aşağıdaki formla birinden geri yükleyin.",
+      "loading": "Yedekler yükleniyor...",
+      "loadFailed": "Sunucuda saklanan yedekler yüklenemedi",
+      "retryButton": "Yeniden Dene",
+      "empty": "Bu sunucu sizin için henüz otomatik yedek tutmuyor.",
+      "columns": {
+        "filename": "Dosya",
+        "modified": "Değiştirilme Tarihi",
+        "size": "Boyut",
+        "actions": "İşlemler"
+      },
+      "downloadButton": "İndir",
+      "restoreButton": "Geri Yükle",
+      "workingButton": "İşleniyor...",
+      "downloadFailed": "Yedek indirilemedi"
     }
   },
   "sharedAccess": {

@@ -208,7 +208,8 @@
     "restoreQueueFull": "已有太多還原作業在等待此部署的還原處理能力。請稍後再試。",
     "restoreQueueWaitTimeout": "等待還原處理能力逾時：另一個還原作業仍在進行。請稍後再試。",
     "restoreTicketUnavailable": "此部署無法授權還原上傳。",
-    "invalidNotificationFields": "備份中的通知無效：標題必須是文字；目標和去重鍵必須是文字或 null"
+    "invalidNotificationFields": "備份中的通知無效：標題必須是文字；目標和去重鍵必須是文字或 null",
+    "storedBackupNotFound": "找不到備份檔案"
   },
   "budgets": {
     "notFound": "找不到 ID 為 {{ id }} 的預算",

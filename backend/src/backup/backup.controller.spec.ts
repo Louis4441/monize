@@ -14,12 +14,26 @@ import { RESTORE_RETRY_AFTER_SECONDS } from "./restore-queue-config";
 import { BackupService } from "./backup.service";
 import { BackupEncryptionService } from "./backup-encryption.service";
 import { SupportBackupService } from "./support-backup/support-backup.service";
+import { AutoBackupService } from "./auto-backup.service";
+import { createReadStream } from "fs";
+import { pipeline } from "stream/promises";
+
+// The download hands a file handle to a socket; what this suite asserts is the
+// headers it sets and the handle it hands over, not the kernel copy.
+jest.mock("fs", () => ({
+  ...jest.requireActual("fs"),
+  createReadStream: jest.fn(() => ({ handle: true })),
+}));
+jest.mock("stream/promises", () => ({
+  pipeline: jest.fn().mockResolvedValue(undefined),
+}));
 
 describe("BackupController", () => {
   let controller: BackupController;
   let mockBackupService: Record<string, jest.Mock>;
   let mockBackupEncryption: Record<string, jest.Mock>;
   let mockSupportBackup: Record<string, jest.Mock>;
+  let mockAutoBackup: Record<string, jest.Mock>;
 
   const userId = "test-user-id";
   const mockReq = {
@@ -46,6 +60,11 @@ describe("BackupController", () => {
       preview: jest.fn(),
     };
 
+    mockAutoBackup = {
+      listStoredBackups: jest.fn(),
+      openStoredBackup: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [BackupController],
       providers: [
@@ -60,6 +79,10 @@ describe("BackupController", () => {
         {
           provide: SupportBackupService,
           useValue: mockSupportBackup,
+        },
+        {
+          provide: AutoBackupService,
+          useValue: mockAutoBackup,
         },
       ],
     }).compile();
@@ -600,6 +623,58 @@ describe("BackupController", () => {
       expect(mockBackupEncryption.disableForOidcUser).toHaveBeenCalledWith(
         userId,
       );
+    });
+  });
+
+  describe("stored backups", () => {
+    it("lists the caller's own stored backups", async () => {
+      const report = { enabled: true, backups: [] };
+      mockAutoBackup.listStoredBackups.mockResolvedValue(report);
+
+      await expect(
+        controller.listStoredBackups({ user: { id: userId } }),
+      ).resolves.toBe(report);
+      // The caller's id from the JWT, never one from the request: this route is
+      // open to every signed-in account.
+      expect(mockAutoBackup.listStoredBackups).toHaveBeenCalledWith(userId);
+    });
+
+    it.each([
+      ["monize-backup-daily-2026-04-15.json.gz", "application/gzip"],
+      ["monize-backup-daily-2026-04-15.mzbe", "application/octet-stream"],
+    ])("streams %s as %s", async (filename, contentType) => {
+      mockAutoBackup.openStoredBackup.mockResolvedValue({
+        path: `/data/backups/${filename}`,
+        size: 1234,
+        filename,
+      });
+      const mockRes = { setHeader: jest.fn() };
+
+      await controller.downloadStoredBackup(
+        { user: { id: userId } },
+        filename,
+        mockRes as never,
+      );
+
+      expect(mockAutoBackup.openStoredBackup).toHaveBeenCalledWith(
+        userId,
+        filename,
+      );
+      expect(mockRes.setHeader).toHaveBeenCalledWith(
+        "Content-Type",
+        contentType,
+      );
+      expect(mockRes.setHeader).toHaveBeenCalledWith("Content-Length", "1234");
+      expect(mockRes.setHeader).toHaveBeenCalledWith(
+        "Content-Disposition",
+        `attachment; filename="${filename}"`,
+      );
+      // The server's own name for the artifact, so the copy on the user's disk
+      // still says which recovery point it is.
+      expect(createReadStream).toHaveBeenCalledWith(
+        `/data/backups/${filename}`,
+      );
+      expect(pipeline).toHaveBeenCalledWith({ handle: true }, mockRes);
     });
   });
 });

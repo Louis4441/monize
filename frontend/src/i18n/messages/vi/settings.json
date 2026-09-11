@@ -734,7 +734,8 @@
         "encryptedNeedsPassword": "Sao lưu này được mã hóa. Nhập mật khẩu đã được tạo cùng với nó vào trường \"Mật khẩu sao lưu\", sau đó thử lại.",
         "failed": "Không thể khôi phục sao lưu",
         "reauthRedirect": "Bạn sẽ được chuyển đến nhà cung cấp danh tính để xác nhận đúng là bạn. Khi trở lại, hãy chọn lại tệp sao lưu."
-      }
+      },
+      "selectedFile": "Đã chọn: {filename}"
     },
     "restoreResult": {
       "title": "Khôi phục hoàn tất",
@@ -743,6 +744,24 @@
       "doneButton": "Xong",
       "skippedAttachments": "{count, plural, other {# tệp đính kèm không được phục hồi}}: bản sao lưu không mang theo byte dùng được cho chúng — khi xuất, chúng bị thiếu hoặc không qua được kiểm tra tổng, hoặc tệp có trước các bản sao lưu tự chứa. Hãy xuất bản sao lưu mới khi bộ lưu trữ tệp đính kèm đã ổn.",
       "unusableAiProviderKeys": "{count, plural, other {# nhà cung cấp AI đã được khôi phục mà không có khóa API dùng được}}: bản sao lưu này được tạo trước khi khóa của nhà cung cấp đi kèm trong đó, nên khóa đã lưu thuộc về máy chủ tạo ra tệp, hoặc máy chủ này chưa cấu hình khóa mã hóa để lưu khóa đó. Hãy mở Cài đặt → Nhà cung cấp AI và nhập lại khóa API."
+    },
+    "storedBackups": {
+      "heading": "Sao lưu tự động",
+      "description": "Các bản sao lưu máy chủ này tạo cho bạn theo lịch riêng của nó. Tải một bản về để giữ bản sao của riêng bạn, hoặc khôi phục từ nó bằng biểu mẫu bên dưới.",
+      "loading": "Đang tải các bản sao lưu...",
+      "loadFailed": "Không tải được các bản sao lưu lưu trên máy chủ",
+      "retryButton": "Thử lại",
+      "empty": "Máy chủ này chưa giữ bản sao lưu tự động nào của bạn.",
+      "columns": {
+        "filename": "Tệp",
+        "modified": "Ngày sửa đổi",
+        "size": "Kích thước",
+        "actions": "Thao tác"
+      },
+      "downloadButton": "Tải xuống",
+      "restoreButton": "Khôi phục",
+      "workingButton": "Đang xử lý...",
+      "downloadFailed": "Không tải xuống được bản sao lưu"
     }
   },
   "sharedAccess": {

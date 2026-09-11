@@ -208,7 +208,8 @@
     "restoreQueueFull": "Bu kurulumun geri yükleme kapasitesi için zaten çok fazla geri yükleme bekliyor. Birazdan yeniden deneyin.",
     "restoreQueueWaitTimeout": "Geri yükleme kapasitesi beklenirken zaman aşımı: başka bir geri yükleme hâlâ sürüyor. Birazdan yeniden deneyin.",
     "restoreTicketUnavailable": "Bu kurulum geri yükleme yüklemelerini yetkilendiremiyor.",
-    "invalidNotificationFields": "Yedekte geçersiz bildirim: başlık metin olmalıdır; hedef ve tekilleştirme anahtarı metin veya null olmalıdır"
+    "invalidNotificationFields": "Yedekte geçersiz bildirim: başlık metin olmalıdır; hedef ve tekilleştirme anahtarı metin veya null olmalıdır",
+    "storedBackupNotFound": "Yedek dosyası bulunamadı"
   },
   "budgets": {
     "notFound": "{{ id }} kimliğine sahip bütçe bulunamadı",

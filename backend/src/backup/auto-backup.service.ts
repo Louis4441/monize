@@ -3,6 +3,7 @@ import {
   Logger,
   BadRequestException,
   ConflictException,
+  NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
@@ -49,9 +50,14 @@ import {
   UpdateAutoBackupSettingsDto,
   AutoBackupFrequency,
 } from "./dto/update-auto-backup-settings.dto";
+import {
+  BACKUP_FILE_PREFIX,
+  BackupTier,
+  classifyBackupFileName,
+  isEncryptedBackupFileName,
+  PARTIAL_TIER_NAME,
+} from "./backup-file-names";
 import { tr } from "../i18n/translate";
-
-const BACKUP_FILE_PREFIX = "monize-backup-";
 
 /**
  * Role that may see and change automatic backup settings. Everyone else is
@@ -66,51 +72,6 @@ const BACKUP_ADMIN_ROLE = "admin";
  * there (see .env.example and the docker-compose files).
  */
 export const DEFAULT_BACKUP_CONTAINER_DIR = "/data/backups";
-
-// File extensions: .json.gz for unencrypted, .mzbe for encrypted Monize backups.
-// Retention enforcement matches both so we can clean up legacy and encrypted
-// files uniformly.
-const DAILY_FILE_PATTERN =
-  /^monize-backup-daily-(\d{4}-\d{2}-\d{2})\.(json\.gz|mzbe)$/;
-const WEEKLY_FILE_PATTERN =
-  /^monize-backup-weekly-(\d{4}-\d{2}-\d{2})\.(json\.gz|mzbe)$/;
-const MONTHLY_FILE_PATTERN =
-  /^monize-backup-monthly-(\d{2}-\d{2})\.(json\.gz|mzbe)$/;
-/**
- * An artifact that could not include every attachment it names. Its own tier,
- * and deliberately not `daily-` -- see `PARTIAL_TIER_NAME`.
- */
-const PARTIAL_FILE_PATTERN =
-  /^monize-backup-partial-(\d{4}-\d{2}-\d{2})\.(json\.gz|mzbe)$/;
-
-/**
- * The tier name a partial artifact is published under (F3RB-001, issue #1069).
- *
- * A partial artifact used to be written under the ordinary `daily-<date>` name
- * and only afterwards *recorded* as partial, in the settings row. Two things
- * followed, and both cost recovery points a configured policy promised:
- *
- * - the write replaced that day's complete artifact before anything looked at
- *   completeness, so a healthy 02:00 backup was destroyed by an 08:00 run that
- *   could not read one attachment (and `Run Backup Now` did the same); and
- * - every later retention pass matched it against `DAILY_FILE_PATTERN` and
- *   counted it as a complete daily, so `retentionDaily = 3` could keep two
- *   partials and delete three complete artifacts.
- *
- * Completeness is therefore part of the artifact's identity, not a note beside
- * it: a partial gets its own name, its own retention tier, and (inside the
- * document, where a rename cannot lose it) its own `completeness` envelope
- * field. Nothing named `daily-`, `weekly-` or `monthly-` is written by a run
- * that knows the artifact is incomplete.
- *
- * **Artifacts written before this change are unaffected and stay `daily-`.** A
- * pre-existing ordinary-named partial is indistinguishable from a complete one
- * -- its completeness was never in the file, and for an encrypted artifact it
- * could not be read back without the user's password -- so it keeps being
- * counted as a complete daily. That is the compatibility position: the fix stops
- * new losses rather than reclassifying history it cannot inspect.
- */
-const PARTIAL_TIER_NAME = "partial";
 
 /**
  * Which path produced a backup run, because the admin alerts belong to only
@@ -158,7 +119,38 @@ const FREQUENCY_HOURS: Record<AutoBackupFrequency, number> = {
   weekly: 168,
 };
 
-type BackupTier = "daily" | "weekly" | "monthly" | "partial";
+/**
+ * One stored automatic backup, as its owner sees it on the Settings page.
+ *
+ * `modifiedAt` is the file's mtime rather than the date in its name: the name
+ * says which recovery point the artifact is (and which retention tier it is
+ * kept under), the mtime says when these bytes were written, and a promoted
+ * weekly or monthly copy has the two disagree. What a reader is choosing
+ * between here is files, so the file's own timestamp is the honest column.
+ */
+export interface StoredBackup {
+  filename: string;
+  /** Last modification time of the file on the server, ISO-8601. */
+  modifiedAt: string;
+  /** Size in bytes. */
+  size: number;
+  /** True for an encrypted Monize envelope, which needs its password to restore. */
+  encrypted: boolean;
+}
+
+/**
+ * What the owner of a backup folder is told about it.
+ *
+ * `enabled` is this user's own schedule, which is what decides whether the
+ * Settings screen offers the section at all: a deployment that has not armed
+ * automatic backups has nothing to say there. It travels with the listing
+ * rather than on the settings endpoint because that one is admin-only, and the
+ * people who most need this answer are exactly the ones who cannot read it.
+ */
+export interface StoredBackupsReport {
+  enabled: boolean;
+  backups: StoredBackup[];
+}
 
 interface BackupFile {
   name: string;
@@ -168,16 +160,6 @@ interface BackupFile {
   legacy: boolean;
   date: Date;
   tier: BackupTier;
-}
-
-function parseDateString(ds: string): Date | null {
-  const date = new Date(ds + "T00:00:00Z");
-  return isNaN(date.getTime()) ? null : date;
-}
-
-function parseYearMonthString(ym: string): Date | null {
-  const date = new Date(`20${ym}-01T00:00:00Z`);
-  return isNaN(date.getTime()) ? null : date;
 }
 
 /**
@@ -271,6 +253,151 @@ export class AutoBackupService {
     );
     await this.assertFolderWritable(folder, { createIfMissing: true });
     return folder;
+  }
+
+  /**
+   * The directory this user's backups are in, for a caller that only reads.
+   *
+   * `resolveUserFolder` is the write path: it creates the per-user directory
+   * and probes the root for writability, so a deployment whose storage has gone
+   * read-only refuses there. That is right for a backup about to be written and
+   * wrong for reading the backups already on disk -- which is exactly the
+   * moment somebody needs to find them. This runs the same containment checks
+   * (canonical, inside a permitted root, server-computed per-user segment) and
+   * creates nothing.
+   */
+  private async resolveUserFolderForRead(
+    userId: string,
+    folderPath: string | null | undefined,
+  ): Promise<string> {
+    const root = await this.assertAllowedRoot(
+      this.resolveFolderPath(folderPath),
+    );
+    return this.assertAllowedRoot(this.userFolderPath(root, userId));
+  }
+
+  /**
+   * The automatic backups this deployment is holding for one user.
+   *
+   * Only the caller's own sharded folder is read. The flat base folder a
+   * version before per-user folders wrote into is deliberately skipped: those
+   * filenames carry no user id, so nothing there can be attributed to anybody,
+   * and offering one for download would hand a user another user's ledger.
+   * Retention still sweeps them (`enforceRetention`), which is where that
+   * shared history ages out.
+   *
+   * A folder that does not exist yet is an empty list, not an error: a user
+   * enrolled on the deployment defaults has one only after their first run.
+   */
+  async listStoredBackups(userId: string): Promise<StoredBackupsReport> {
+    const settings = await this.scoped(AutoBackupSettings, (repo) =>
+      repo.findOne({ where: { userId } }),
+    );
+    const enabled = settings?.enabled === true;
+    const folder = await this.resolveUserFolderForRead(
+      userId,
+      settings?.folderPath,
+    );
+
+    let entries: string[];
+    try {
+      entries = await fs.readdir(folder);
+    } catch {
+      return { enabled, backups: [] };
+    }
+
+    const backups: StoredBackup[] = [];
+    for (const name of entries) {
+      if (isTempBackupName(name)) continue;
+      if (!classifyBackupFileName(name)) continue;
+      try {
+        const stat = await fs.stat(this.safePath(folder, name));
+        if (!stat.isFile()) continue;
+        backups.push({
+          filename: name,
+          modifiedAt: stat.mtime.toISOString(),
+          size: stat.size,
+          encrypted: isEncryptedBackupFileName(name),
+        });
+      } catch {
+        // Retention can delete a file between the listing and the stat. A row
+        // for a file that is already gone is worse than one fewer row: every
+        // action offered on it would fail.
+        continue;
+      }
+    }
+    // Newest first: the artifact somebody reaches for in a crisis is the last
+    // one written.
+    backups.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
+    return { enabled, backups };
+  }
+
+  /**
+   * Locate one of this user's stored backups so the caller can stream it.
+   *
+   * Three checks, each of which would be enough on its own and none of which is
+   * therefore load-bearing alone. The name is accepted only when
+   * `classifyBackupFileName` recognises it -- the patterns admit a fixed
+   * prefix, a tier, a date and one of two extensions, and nothing with a
+   * separator in it. **The path that is opened is the directory entry's, never
+   * the caller's string**: the requested name is compared against this user's
+   * own folder listing and the matching entry is what gets joined, so the value
+   * reaching the filesystem is one this deployment wrote rather than one a
+   * request carried in (the same CWE-22 boundary `validateFolderPath` states
+   * for operator-supplied paths, and what lets a SAST tool see it). The join is
+   * still containment-checked (`safePath`), because a validated name and an
+   * unvalidated join is how a check becomes decorative.
+   *
+   * An unrecognised name and an absent file answer the same 404 on purpose: the
+   * difference between "no such artifact" and "not a name we write" tells a
+   * caller nothing they may act on.
+   */
+  async openStoredBackup(
+    userId: string,
+    filename: string,
+  ): Promise<{ path: string; size: number; filename: string }> {
+    if (!classifyBackupFileName(filename)) {
+      throw new NotFoundException(
+        tr("errors.backup.storedBackupNotFound", "Backup file not found"),
+      );
+    }
+    const settings = await this.scoped(AutoBackupSettings, (repo) =>
+      repo.findOne({ where: { userId } }),
+    );
+    const folder = await this.resolveUserFolderForRead(
+      userId,
+      settings?.folderPath,
+    );
+
+    let entries: string[];
+    try {
+      entries = await fs.readdir(folder);
+    } catch {
+      // No folder yet is the same answer as no such artifact: a user enrolled
+      // on the deployment defaults has one only after their first run.
+      throw new NotFoundException(
+        tr("errors.backup.storedBackupNotFound", "Backup file not found"),
+      );
+    }
+    // The requested name is only ever compared here; `entry` is the server's
+    // own string from `readdir`, and it is `entry` that is joined and opened.
+    const entry = entries.find((name) => name === filename);
+    if (entry === undefined) {
+      throw new NotFoundException(
+        tr("errors.backup.storedBackupNotFound", "Backup file not found"),
+      );
+    }
+
+    const path = this.safePath(folder, entry);
+    try {
+      const stat = await fs.stat(path);
+      if (!stat.isFile()) throw new Error("not a file");
+      return { path, size: stat.size, filename: entry };
+    } catch {
+      throw new NotFoundException(
+        tr("errors.backup.storedBackupNotFound", "Backup file not found"),
+      );
+    }
   }
 
   /**
@@ -1413,41 +1540,17 @@ export class AutoBackupService {
 
     const files: BackupFile[] = [];
     for (const name of entries) {
-      // A partial write is not a backup. The temp names cannot match the
-      // patterns below anyway (they are dot-prefixed), but skipping them here
-      // states the rule where retention is decided rather than leaving it to a
-      // regex coincidence.
+      // A partial write is not a backup. The temp names cannot be classified
+      // anyway (they are dot-prefixed), but skipping them here states the rule
+      // where retention is decided rather than leaving it to a regex
+      // coincidence.
       if (isTempBackupName(name)) continue;
-      const dailyMatch = DAILY_FILE_PATTERN.exec(name);
-      if (dailyMatch) {
-        const date = parseDateString(dailyMatch[1]);
-        if (date) files.push({ name, dir, legacy, date, tier: "daily" });
-        continue;
-      }
-      const weeklyMatch = WEEKLY_FILE_PATTERN.exec(name);
-      if (weeklyMatch) {
-        const date = parseDateString(weeklyMatch[1]);
-        if (date) files.push({ name, dir, legacy, date, tier: "weekly" });
-        continue;
-      }
-      const monthlyMatch = MONTHLY_FILE_PATTERN.exec(name);
-      if (monthlyMatch) {
-        const date = parseYearMonthString(monthlyMatch[1]);
-        if (date) files.push({ name, dir, legacy, date, tier: "monthly" });
-        continue;
-      }
-      // Its own tier, so it can never occupy a complete artifact's retention
-      // slot. Classified from the name alone, which is why the name carries it:
-      // a rescan after a restart -- or on another machine entirely -- has no
-      // settings row to consult, and an encrypted artifact's envelope is inside
-      // the ciphertext.
-      const partialMatch = PARTIAL_FILE_PATTERN.exec(name);
-      if (partialMatch) {
-        const date = parseDateString(partialMatch[1]);
-        if (date) {
-          files.push({ name, dir, legacy, date, tier: PARTIAL_TIER_NAME });
-        }
-        continue;
+      // Tier and date come out of the name, never out of the mtime or a
+      // settings row -- `backup-file-names.ts` says why, and the owner-facing
+      // listing asks it the same way.
+      const classified = classifyBackupFileName(name);
+      if (classified) {
+        files.push({ name, dir, legacy, ...classified });
       }
     }
     return files;

@@ -734,7 +734,8 @@
         "encryptedNeedsPassword": "Questo backup è cifrato. Inserisci la password con cui è stato creato nel campo \"Password backup\" e riprova.",
         "failed": "Impossibile ripristinare il backup",
         "reauthRedirect": "Ti portiamo al tuo provider di identità per confermare la tua identità. Al ritorno, seleziona di nuovo il file di backup."
-      }
+      },
+      "selectedFile": "Selezionato: {filename}"
     },
     "restoreResult": {
       "title": "Ripristino completato",
@@ -743,6 +744,24 @@
       "doneButton": "Fatto",
       "skippedAttachments": "{count, plural, one {# allegato non è stato ripristinato} other {# allegati non sono stati ripristinati}}: il backup non conteneva byte utilizzabili per essi — erano assenti o non hanno superato il checksum al momento dell'esportazione, oppure il file precede i backup autonomi. Esporta un nuovo backup quando l'archivio degli allegati è integro.",
       "unusableAiProviderKeys": "{count, plural, one {# provider AI è stato ripristinato senza una chiave API utilizzabile} other {# provider AI sono stati ripristinati senza chiavi API utilizzabili}}: il backup è stato creato prima che le chiavi dei provider viaggiassero al suo interno, quindi la chiave memorizzata appartiene al server che ha prodotto il file, oppure questo server non ha una chiave di cifratura configurata per conservarla. Apri Impostazioni → Provider AI e inserisci di nuovo la chiave API."
+    },
+    "storedBackups": {
+      "heading": "Backup automatici",
+      "description": "Backup creati per te da questo server secondo la sua pianificazione. Scaricane uno per conservare una copia tua, oppure ripristinane uno con il modulo qui sotto.",
+      "loading": "Caricamento dei backup...",
+      "loadFailed": "Impossibile caricare i backup archiviati sul server",
+      "retryButton": "Riprova",
+      "empty": "Questo server non conserva ancora alcun backup automatico per te.",
+      "columns": {
+        "filename": "File",
+        "modified": "Data di modifica",
+        "size": "Dimensione",
+        "actions": "Azioni"
+      },
+      "downloadButton": "Scarica",
+      "restoreButton": "Ripristina",
+      "workingButton": "Elaborazione...",
+      "downloadFailed": "Impossibile scaricare il backup"
     }
   },
   "sharedAccess": {

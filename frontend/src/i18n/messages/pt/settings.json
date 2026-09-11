@@ -734,7 +734,8 @@
         "encryptedNeedsPassword": "Esta cópia de segurança está encriptada. Introduza a palavra-passe com que foi criada no campo \"Palavra-passe da cópia de segurança\" e tente novamente.",
         "failed": "Falha ao restaurar a cópia de segurança",
         "reauthRedirect": "Vamos levá-lo ao seu provedor de identidade para confirmar que é você. Ao regressar, escolha novamente o ficheiro da cópia de segurança."
-      }
+      },
+      "selectedFile": "Selecionado: {filename}"
     },
     "restoreResult": {
       "title": "Restauro Concluído",
@@ -743,6 +744,24 @@
       "doneButton": "Concluído",
       "skippedAttachments": "{count, plural, one {# anexo não foi restaurado} other {# anexos não foram restaurados}}: o backup não continha bytes utilizáveis para eles — faltavam ou falharam a soma de verificação na exportação, ou o ficheiro é anterior aos backups autossuficientes. Exporte um backup novo quando o armazenamento de anexos estiver saudável.",
       "unusableAiProviderKeys": "{count, plural, one {# fornecedor de IA foi restaurado sem uma chave de API utilizável} other {# fornecedores de IA foram restaurados sem chaves de API utilizáveis}}: a cópia de segurança foi criada antes de as chaves dos fornecedores seguirem nela, por isso a chave guardada pertence ao servidor que gerou o ficheiro, ou este servidor não tem qualquer chave de cifra configurada para a guardar. Abra Definições → Fornecedores de IA e introduza novamente a chave de API."
+    },
+    "storedBackups": {
+      "heading": "Cópias de segurança automáticas",
+      "description": "Cópias de segurança que este servidor criou para si segundo o seu próprio agendamento. Transfira uma para guardar a sua própria cópia ou restaure a partir de uma com o formulário abaixo.",
+      "loading": "A carregar cópias de segurança...",
+      "loadFailed": "Não foi possível carregar as cópias de segurança guardadas no servidor",
+      "retryButton": "Tentar novamente",
+      "empty": "Este servidor ainda não guarda nenhuma cópia de segurança automática sua.",
+      "columns": {
+        "filename": "Ficheiro",
+        "modified": "Data de modificação",
+        "size": "Tamanho",
+        "actions": "Ações"
+      },
+      "downloadButton": "Transferir",
+      "restoreButton": "Restaurar",
+      "workingButton": "A processar...",
+      "downloadFailed": "Não foi possível transferir a cópia de segurança"
     }
   },
   "sharedAccess": {

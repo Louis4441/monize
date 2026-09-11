@@ -208,7 +208,8 @@
     "restoreQueueFull": "Er wachten al te veel herstelbewerkingen op de herstelcapaciteit van deze installatie. Probeer het over een moment opnieuw.",
     "restoreQueueWaitTimeout": "Time-out bij het wachten op herstelcapaciteit: een andere herstelbewerking is nog bezig. Probeer het over een moment opnieuw.",
     "restoreTicketUnavailable": "Deze installatie kan herstel-uploads niet autoriseren.",
-    "invalidNotificationFields": "Ongeldige melding in de back-up: de titel moet tekst zijn; het doel en de deduplicatiesleutel moeten tekst of null zijn"
+    "invalidNotificationFields": "Ongeldige melding in de back-up: de titel moet tekst zijn; het doel en de deduplicatiesleutel moeten tekst of null zijn",
+    "storedBackupNotFound": "Back-upbestand niet gevonden"
   },
   "budgets": {
     "notFound": "Budget met ID {{ id }} niet gevonden",
