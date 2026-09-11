@@ -272,7 +272,7 @@ describe("BuiltInReportsService", () => {
       expect(result.data[0].total).toBe(110);
     });
 
-    it("sorts results by total descending and limits to top 15", async () => {
+    it("sorts results by total descending and returns every category", async () => {
       const rawResults = Array.from({ length: 20 }, (_, i) => ({
         category_id: `cat-gen-${i}`,
         currency_code: "USD",
@@ -301,7 +301,8 @@ describe("BuiltInReportsService", () => {
         "2025-12-31",
       );
 
-      expect(result.data).toHaveLength(15);
+      // Every category, not a top-N: the caller decides how many to draw.
+      expect(result.data).toHaveLength(20);
       expect(result.data[0].total).toBeGreaterThanOrEqual(result.data[1].total);
     });
 
@@ -2039,8 +2040,9 @@ describe("BuiltInReportsService", () => {
       expect(result.data[0].total).toBe(100);
     });
 
-    it("returns original amount when no conversion rate is found", async () => {
-      // JPY has no rate in our mock rates
+    it("excludes the row and says so when no conversion rate is found", async () => {
+      // JPY has no rate in our mock rates. The report used to add the raw yen
+      // to a dollar total, which is a wrong number rather than a missing one.
       scopedManager.query.mockResolvedValue([
         { category_id: "cat-parent", currency_code: "JPY", total: "1000.00" },
       ]);
@@ -2052,8 +2054,11 @@ describe("BuiltInReportsService", () => {
         "2025-12-31",
       );
 
-      // No JPY->USD or USD->JPY rate, returns original amount
-      expect(result.data[0].total).toBe(1000);
+      expect(result.data).toEqual([]);
+      expect(result.totalSpending).toBeNull();
+      expect(result.knownSpending).toBe(0);
+      expect(result.missingCurrencies).toEqual(["JPY"]);
+      expect(result.excludedCount).toBe(1);
     });
 
     it("does not convert when currency matches default", async () => {

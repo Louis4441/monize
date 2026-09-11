@@ -167,6 +167,95 @@ describe("SpendingReportsService", () => {
       expect(result.totalSpending).toBe(200);
     });
 
+    it("withholds the total and names the currency when a rate is missing", async () => {
+      // JPY has no rate into USD in the fixture. The honest answer is neither
+      // the smaller number presented as a total nor the raw yen added to
+      // dollars, which is what the report did before.
+      scopedManager.query.mockResolvedValue([
+        { category_id: "cat-parent", currency_code: "USD", total: "100.00" },
+        { category_id: "cat-parent", currency_code: "JPY", total: "50000.00" },
+      ]);
+      categoriesRepository.find.mockResolvedValue([mockParentCategory]);
+
+      const result = await service.getSpendingByCategory(
+        mockUserId,
+        "2025-01-01",
+        "2025-12-31",
+      );
+
+      expect(result.totalSpending).toBeNull();
+      expect(result.knownSpending).toBe(100);
+      expect(result.data[0].total).toBe(100);
+      expect(result.missingCurrencies).toEqual(["JPY"]);
+      expect(result.excludedCount).toBe(1);
+      expect(result.currency).toBe("USD");
+    });
+
+    it("reports a complete total when every row converted", async () => {
+      scopedManager.query.mockResolvedValue([
+        { category_id: "cat-parent", currency_code: "USD", total: "100.00" },
+        { category_id: "cat-parent", currency_code: "EUR", total: "100.00" },
+      ]);
+      categoriesRepository.find.mockResolvedValue([mockParentCategory]);
+
+      const result = await service.getSpendingByCategory(
+        mockUserId,
+        "2025-01-01",
+        "2025-12-31",
+      );
+
+      expect(result.totalSpending).toBe(210);
+      expect(result.knownSpending).toBe(210);
+      expect(result.missingCurrencies).toEqual([]);
+      expect(result.excludedCount).toBe(0);
+    });
+
+    it("restricts the window to the requested accounts", async () => {
+      scopedManager.query.mockResolvedValue([]);
+      categoriesRepository.find.mockResolvedValue([]);
+
+      await service.getSpendingByCategory(
+        mockUserId,
+        "2025-01-01",
+        "2025-12-31",
+        { accountIds: ["acct-1", "acct-2"] },
+      );
+
+      const [sql, params] = scopedManager.query.mock.calls[0];
+      expect(sql).toContain("t.account_id = ANY($4::uuid[])");
+      expect(params[3]).toEqual(["acct-1", "acct-2"]);
+    });
+
+    it("numbers the account parameter around an absent start date", async () => {
+      // The filter is appended after the optional start date, so its position
+      // is not a constant. A hardcoded $4 here silently filtered on the date.
+      scopedManager.query.mockResolvedValue([]);
+      categoriesRepository.find.mockResolvedValue([]);
+
+      await service.getSpendingByCategory(mockUserId, undefined, "2025-12-31", {
+        accountIds: ["acct-1"],
+      });
+
+      const [sql, params] = scopedManager.query.mock.calls[0];
+      expect(sql).toContain("t.account_id = ANY($3::uuid[])");
+      expect(params[2]).toEqual(["acct-1"]);
+    });
+
+    it("adds no account filter for an empty selection", async () => {
+      scopedManager.query.mockResolvedValue([]);
+      categoriesRepository.find.mockResolvedValue([]);
+
+      await service.getSpendingByCategory(
+        mockUserId,
+        "2025-01-01",
+        "2025-12-31",
+        { accountIds: [] },
+      );
+
+      const [sql] = scopedManager.query.mock.calls[0];
+      expect(sql).not.toContain("account_id = ANY");
+    });
+
     it("handles uncategorized transactions (null category_id)", async () => {
       scopedManager.query.mockResolvedValue([
         { category_id: null, currency_code: "USD", total: "75.50" },
@@ -217,7 +306,7 @@ describe("SpendingReportsService", () => {
       expect(result.data[0].total).toBe(110);
     });
 
-    it("sorts results by total descending and limits to top 15", async () => {
+    it("sorts results by total descending and returns every category", async () => {
       const rawResults = Array.from({ length: 20 }, (_, i) => ({
         category_id: `cat-gen-${i}`,
         currency_code: "USD",
@@ -246,8 +335,14 @@ describe("SpendingReportsService", () => {
         "2025-12-31",
       );
 
-      expect(result.data).toHaveLength(15);
+      // Every category, not a top-N. Truncating here made `totalSpending` the
+      // sum of the largest fifteen under a name that says "total"; the caller
+      // decides how many to draw and can still say what it merged.
+      expect(result.data).toHaveLength(20);
       expect(result.data[0].total).toBeGreaterThanOrEqual(result.data[1].total);
+      expect(result.totalSpending).toBe(
+        result.data.reduce((sum, item) => sum + item.total, 0),
+      );
     });
 
     it("uses default currency USD when user preference not found", async () => {
@@ -480,7 +575,7 @@ describe("SpendingReportsService", () => {
           mockUserId,
           "2025-01-01",
           "2025-12-31",
-          false,
+          { rollupToParent: false },
         );
 
         expect(result.data).toHaveLength(2);
@@ -504,7 +599,7 @@ describe("SpendingReportsService", () => {
           mockUserId,
           "2025-01-01",
           "2025-12-31",
-          false,
+          { rollupToParent: false },
         );
 
         expect(result.data).toHaveLength(1);
@@ -524,7 +619,7 @@ describe("SpendingReportsService", () => {
           mockUserId,
           "2025-01-01",
           "2025-12-31",
-          false,
+          { rollupToParent: false },
         );
 
         expect(result.data[0].color).toBe("#33FF57");
@@ -544,7 +639,7 @@ describe("SpendingReportsService", () => {
           mockUserId,
           "2025-01-01",
           "2025-12-31",
-          false,
+          { rollupToParent: false },
         );
 
         expect(result.data).toHaveLength(1);

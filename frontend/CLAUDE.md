@@ -53,6 +53,7 @@ npm run i18n:check         # Verify the pseudo-locale is up to date (CI gate)
 | Chart colour | `chartColors` tokens (`lib/chart-colors.ts`) | a hex literal in a `fill`, `stroke` or `stopColor` |
 | Widget title that opens the fuller view | `titleHref` on `WidgetCard`, `href` on `WidgetHeading` | a button or link hand-rolled around the heading |
 | Month grid of scheduled occurrences | `buildScheduledCalendarDays` + `ScheduledCalendarGrid` | a second month grid |
+| A dashboard widget's breakdown of the ledger | the report's own endpoint through `builtInReportsApi` | summing transactions in the widget |
 | Report refresh / export buttons | `ReportToolbarActions`, last child of the toolbar row | rendering `ExportDropdown` or `RefreshPricesButton` in a report |
 | Toolbar row on a phone | `flex-wrap`, `w-full sm:w-auto`, `sm:ml-auto`, a button's height from `items-stretch` + `LabelSpacer` | an unwrapped row, a bare `ml-auto`, a hand-matched padding |
 

@@ -55,6 +55,31 @@ describe("BuiltInReportsController", () => {
         "user-1",
         "2024-01-01",
         "2024-12-31",
+        { rollupToParent: undefined, accountIds: undefined },
+      );
+    });
+
+    it("passes the account filter and rollup choice through", async () => {
+      // Both are the dashboard widget's settings, answered by the report rather
+      // than re-applied to its result.
+      const query = {
+        startDate: "2024-01-01",
+        endDate: "2024-12-31",
+        accountIds: ["acct-1"],
+        rollupToParent: true,
+      };
+      mockService.getSpendingByCategory.mockResolvedValue({
+        data: [],
+        totalSpending: 0,
+      });
+
+      await controller.getSpendingByCategory(mockReq, query as any);
+
+      expect(mockService.getSpendingByCategory).toHaveBeenCalledWith(
+        "user-1",
+        "2024-01-01",
+        "2024-12-31",
+        { rollupToParent: true, accountIds: ["acct-1"] },
       );
     });
   });

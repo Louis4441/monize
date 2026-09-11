@@ -42,11 +42,13 @@ export class BuiltInReportsService {
     userId: string,
     startDate: string | undefined,
     endDate: string,
+    options?: { rollupToParent?: boolean; accountIds?: string[] },
   ): Promise<SpendingByCategoryResponse> {
     return this.spendingReports.getSpendingByCategory(
       userId,
       startDate,
       endDate,
+      options,
     );
   }
 

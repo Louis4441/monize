@@ -3,7 +3,6 @@
 import { ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { Account } from '@/types/account';
-import { Category } from '@/types/category';
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
 import { TopMover, FavouriteSecurityQuote } from '@/types/investment';
 import { MonthlyNetWorth } from '@/types/net-worth';
@@ -80,7 +79,6 @@ export type WidgetIconType = 'bar' | 'line' | 'pie' | 'table' | 'list';
 /** Everything the dashboard page loads, handed to each widget's render. */
 export interface DashboardWidgetContext {
   accounts: Account[];
-  categories: Category[];
   scheduledTransactions: ScheduledTransaction[];
   topMovers: TopMover[];
   favouriteSecurities: FavouriteSecurityQuote[];
@@ -211,11 +209,7 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
     iconType: 'pie',
     defaultEnabled: true,
     render: (ctx) => (
-      <ExpensesPieChart
-        accounts={ctx.accounts}
-        categories={ctx.categories}
-        isLoading={ctx.isLoading}
-      />
+      <ExpensesPieChart accounts={ctx.accounts} isLoading={ctx.isLoading} />
     ),
   },
   {

@@ -360,13 +360,13 @@ describe("MonthlyComparisonService", () => {
         mockUserId,
         "2026-01-01",
         "2026-01-31",
-        false,
+        { rollupToParent: false },
       );
       expect(mockSpendingReports.getSpendingByCategory).toHaveBeenCalledWith(
         mockUserId,
         "2025-12-01",
         "2025-12-31",
-        false,
+        { rollupToParent: false },
       );
     });
 

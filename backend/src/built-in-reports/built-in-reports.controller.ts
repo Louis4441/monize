@@ -9,6 +9,7 @@ import {
 import { BuiltInReportsService } from "./built-in-reports.service";
 import {
   ReportQueryDto,
+  SpendingByCategoryQueryDto,
   SpendingByCategoryResponse,
   SpendingByPayeeResponse,
   IncomeBySourceResponse,
@@ -41,12 +42,13 @@ export class BuiltInReportsController {
   @ApiResponse({ status: 200, type: SpendingByCategoryResponse })
   getSpendingByCategory(
     @Request() req,
-    @Query() query: ReportQueryDto,
+    @Query() query: SpendingByCategoryQueryDto,
   ): Promise<SpendingByCategoryResponse> {
     return this.reportsService.getSpendingByCategory(
       req.user.id,
       query.startDate,
       query.endDate,
+      { rollupToParent: query.rollupToParent, accountIds: query.accountIds },
     );
   }
 

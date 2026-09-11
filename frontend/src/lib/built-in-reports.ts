@@ -15,16 +15,27 @@ import {
   UncategorizedTransactionsResponse,
   DuplicateTransactionsResponse,
   MonthlyCategoryBreakdownResponse,
+  SpendingByCategoryParams,
 } from '@/types/built-in-reports';
 import { MonthlyComparisonResponse } from '@/types/monthly-comparison';
 
 export const builtInReportsApi = {
   getSpendingByCategory: async (
-    params: ReportQueryParams,
+    params: SpendingByCategoryParams,
   ): Promise<SpendingByCategoryResponse> => {
+    const { accountIds, ...rest } = params;
     const response = await apiClient.get<SpendingByCategoryResponse>(
       '/built-in-reports/spending-by-category',
-      { params },
+      {
+        // The server takes the account filter as one comma-separated value;
+        // an empty selection means "every account", so it is left off entirely.
+        params: {
+          ...rest,
+          ...(accountIds && accountIds.length > 0
+            ? { accountIds: accountIds.join(',') }
+            : {}),
+        },
+      },
     );
     return response.data;
   },

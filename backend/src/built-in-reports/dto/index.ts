@@ -1,5 +1,6 @@
 export * from "./report-query.dto";
 export * from "./spending-by-category.dto";
+export * from "./spending-by-category-query.dto";
 export * from "./spending-by-payee.dto";
 export * from "./income-by-source.dto";
 export * from "./monthly-spending-trend.dto";

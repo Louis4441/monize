@@ -2,12 +2,39 @@ export interface CategorySpendingItem {
   categoryId: string | null;
   categoryName: string;
   color: string | null;
+  /**
+   * Spending in this category, in the response's `currency`. Rows that could
+   * not be converted are in none of the figures, so when `missingCurrencies` is
+   * non-empty this is the part that converted.
+   */
   total: number;
 }
 
 export interface SpendingByCategoryResponse {
+  /** Every net-spent category, largest first. The caller decides how many to draw. */
   data: CategorySpendingItem[];
-  totalSpending: number;
+  /**
+   * Total spent, or `null` when a row could not be converted -- a missing rate
+   * makes the total unknowable, never smaller. Render `knownSpending` through
+   * `PartialTotal` in that case, never this under a caption saying "Total".
+   */
+  totalSpending: number | null;
+  /** Sum of `data`; equals `totalSpending` when nothing was excluded. */
+  knownSpending: number;
+  /** Reporting currency every figure is expressed in. */
+  currency: string;
+  /** Source currencies with no rate into `currency`. Empty when complete. */
+  missingCurrencies: string[];
+  /** How many aggregate rows were left out, by any cause. */
+  excludedCount: number;
+}
+
+/** Query parameters the Spending by Category report accepts beyond the window. */
+export interface SpendingByCategoryParams extends ReportQueryParams {
+  /** Restrict to these accounts; omit or leave empty for every account. */
+  accountIds?: string[];
+  /** Count a subcategory against its top-level ancestor. Defaults to true. */
+  rollupToParent?: boolean;
 }
 
 export interface PayeeSpendingItem {

@@ -65,6 +65,29 @@ export class ReportCurrencyService {
     return rateMap;
   }
 
+  /**
+   * Convert, or answer `null` when there is no rate.
+   *
+   * The honest half of the pair below. A caller that can carry "unknown"
+   * through to what it reports -- excluding the row and naming the currency --
+   * uses this; `convertAmount` returns the amount unconverted, which silently
+   * adds foreign units to a home-currency total and is why Spending by Category
+   * stopped using it.
+   */
+  tryConvertAmount(
+    amount: number,
+    fromCurrency: string,
+    defaultCurrency: string,
+    rateMap: RateMap,
+  ): number | null {
+    return convertWithRateLookup(
+      amount,
+      fromCurrency,
+      defaultCurrency,
+      (f, t) => rateMap.get(`${f}->${t}`),
+    );
+  }
+
   convertAmount(
     amount: number,
     fromCurrency: string,

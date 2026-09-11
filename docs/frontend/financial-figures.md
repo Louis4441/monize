@@ -40,6 +40,29 @@ Three surfaces fill these fields -- the two dialogs and `ScheduledTransactionFor
 
 `ScheduledTransactionForm` adds two invariants because its `Total Value` is a shown figure that submit recomputes: **the displayed total and the persisted amount must never disagree** -- every field that moves the economic total (price, quantity, **commission, and the BUY/SELL action whose sign flips the fee**) recomputes the shown total through the same fold, and an async close arriving mid-entry preserves a typed total and re-derives the quantity. And **a market price belongs to one security**: changing the selected security clears the auto-filled price and the seen-market-price latch. Gate the "Latest:" placeholder on a positive `roundedMarketPrice`, never a bare `marketPrice != null`, so it never renders "Latest: NaN".
 
+## A widget shows the report's answer, not its own
+
+A dashboard widget and the report it sits beside answer the same question, so
+the widget asks the report's endpoint. Expenses by Category summed paged
+transactions in the browser under its own rules -- no VOID check, no
+asset-category exclusion, investment rows judged by the account TYPE
+(INV-REPORT-001's exact failure) -- and disagreed with Spending by Category
+about the same period, invisibly to every guard that holds those rules, since
+they all scan the server.
+
+The widget's own settings go INTO the request rather than onto the answer:
+`accountIds` and `rollupToParent` are query parameters, because an account
+filter re-applied on the client is a second definition of which rows count and a
+rollup re-derived there a second definition of which category a spend belongs
+to. `ui-conventions.test.ts` holds the rule with a shrink-only baseline of the
+widgets that still aggregate the ledger themselves.
+
+The server answers the whole breakdown, not a top-N -- the widget keeps eleven
+slices and folds the tail into Other, and needs the tail to open Other -- and it
+withholds `totalSpending` when a row could not be converted, sending
+`knownSpending`, `missingCurrencies` and `excludedCount` beside it so both
+surfaces mark the same subtotal through `PartialTotal`.
+
 ## A short-range portfolio change is measured from the prior close
 
 On `1d`, `1w` and `mtd` the Change and Change % measure from the close of the last trading day *before* the window -- the convention every quote source reports against. The longer ranges measure from their first point (their window opens on a day whose first point already is that day's close). Which ranges are which lives in `PRIOR_CLOSE_BASELINE_RANGES`.

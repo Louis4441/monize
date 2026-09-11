@@ -85,13 +85,13 @@ export class MonthlyComparisonService {
         userId,
         currentStart,
         currentEnd,
-        false,
+        { rollupToParent: false },
       ),
       this.spendingReports.getSpendingByCategory(
         userId,
         previousStart,
         previousEnd,
-        false,
+        { rollupToParent: false },
       ),
       this.netWorthService.getMonthlyNetWorth(userId, historyStart, currentEnd),
       this.portfolioService.getMonthOverMonthMovers(

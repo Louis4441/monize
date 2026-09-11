@@ -10,6 +10,7 @@ import {
   RawMonthlyCategoryAggregate,
 } from "./report-currency.service";
 import { roundMoney, sumMoney, toMoneyNumber } from "../common/round.util";
+import { FxAggregate } from "../common/fx-aggregate";
 import {
   SpendingByCategoryResponse,
   CategorySpendingItem,
@@ -80,12 +81,33 @@ export class SpendingReportsService {
     private currencyService: ReportCurrencyService,
   ) {}
 
+  /**
+   * Spending by category over a window: the one answer both the Spending by
+   * Category report and the dashboard's Expenses by Category widget draw.
+   *
+   * The widget used to compute its own breakdown from paged transactions in the
+   * browser, and disagreed with this report about the same period: it read no
+   * VOID status, applied no asset-category exclusion, and decided what was an
+   * investment from the account type rather than from the row (INV-REPORT-001).
+   * Every filter that decides which rows count therefore lives here, in the
+   * query, and both surfaces read the result.
+   *
+   * `options.accountIds` restricts the window to those accounts;
+   * `options.rollupToParent` (default true) counts a subcategory's spend against
+   * its top-level ancestor. Both exist because the widget offers them -- a
+   * setting the client answers for itself is a second implementation waiting to
+   * drift.
+   */
   async getSpendingByCategory(
     userId: string,
     startDate: string | undefined,
     endDate: string,
-    rollupToParent: boolean = true,
+    options: {
+      rollupToParent?: boolean;
+      accountIds?: string[];
+    } = {},
   ): Promise<SpendingByCategoryResponse> {
+    const { rollupToParent = true, accountIds } = options;
     const defaultCurrency =
       await this.currencyService.getDefaultCurrency(userId);
     const rateMap = await this.currencyService.buildRateMap(defaultCurrency);
@@ -114,11 +136,19 @@ export class SpendingReportsService {
         )
     `;
 
-    const params: (string | undefined)[] = [userId, endDate];
+    const params: (string | string[] | undefined)[] = [userId, endDate];
 
     if (startDate) {
-      query += ` AND t.transaction_date >= $3`;
+      query += ` AND t.transaction_date >= $${params.length + 1}`;
       params.push(startDate);
+    }
+
+    // An empty array would match nothing, which is not what "no filter" means,
+    // so an empty selection is treated as absent the way every other report
+    // filter is.
+    if (accountIds && accountIds.length > 0) {
+      query += ` AND t.account_id = ANY($${params.length + 1}::uuid[])`;
+      params.push(accountIds);
     }
 
     query += ` GROUP BY COALESCE(ts.category_id, t.category_id), t.currency_code`;
@@ -137,91 +167,99 @@ export class SpendingReportsService {
 
     const parentTotals = new Map<
       string,
-      { total: number; category: Category | null }
+      { agg: FxAggregate; category: Category | null }
     >();
+    /**
+     * Source currencies with no rate into the reporting currency, and how many
+     * aggregate rows that cost us.
+     *
+     * An excluded row is not a smaller number: it could have changed which
+     * categories appear at all, since a category is kept or dropped on whether
+     * it nets to spending. So a single exclusion anywhere withholds the report's
+     * total rather than only the affected category's.
+     */
+    const missingCurrencies = new Set<string>();
+    let excludedCount = 0;
+
+    const bucketFor = (key: string, category: Category | null) => {
+      const existing = parentTotals.get(key);
+      if (existing) return existing;
+      const created = { agg: new FxAggregate(), category };
+      parentTotals.set(key, created);
+      return created;
+    };
 
     for (const row of rawResults) {
-      const total = this.currencyService.convertAmount(
+      // A missing rate is unknown, never the unconverted figure: adding foreign
+      // units to a home-currency total is the defect `convertAmount` still
+      // carries for the reports that have nowhere to report a gap.
+      const converted = this.currencyService.tryConvertAmount(
         toMoneyNumber(row.total),
         row.currency_code,
         defaultCurrency,
         rateMap,
       );
+      if (converted === null) {
+        missingCurrencies.add(row.currency_code);
+        excludedCount += 1;
+        continue;
+      }
+
       const categoryId = row.category_id;
+      const category = categoryId ? categoryMap.get(categoryId) : undefined;
 
-      if (!categoryId) {
-        const existing = parentTotals.get("uncategorized");
-        if (existing) {
-          existing.total += total;
-        } else {
-          parentTotals.set("uncategorized", { total, category: null });
-        }
-        continue;
-      }
-
-      const category = categoryMap.get(categoryId);
+      // No category, or one this user cannot see: uncategorized either way.
       if (!category) {
-        const existing = parentTotals.get("uncategorized");
-        if (existing) {
-          existing.total += total;
-        } else {
-          parentTotals.set("uncategorized", { total, category: null });
-        }
+        bucketFor("uncategorized", null).agg.addConverted(converted);
         continue;
       }
+
+      const parentCategory = category.parentId
+        ? categoryMap.get(category.parentId)
+        : null;
 
       if (rollupToParent) {
-        const parentCategory = category.parentId
-          ? categoryMap.get(category.parentId)
-          : null;
         const displayCategory = parentCategory || category;
-        const displayId = displayCategory.id;
-
-        const existing = parentTotals.get(displayId);
-        if (existing) {
-          existing.total += total;
-        } else {
-          parentTotals.set(displayId, { total, category: displayCategory });
-        }
-      } else {
-        // Keep subcategory detail — format name as "Parent: Child"
-        const parentCategory = category.parentId
-          ? categoryMap.get(category.parentId)
-          : null;
-        const displayName = parentCategory
-          ? `${parentCategory.name}: ${category.name}`
-          : category.name;
-
-        const existing = parentTotals.get(category.id);
-        if (existing) {
-          existing.total += total;
-        } else {
-          parentTotals.set(category.id, {
-            total,
-            category: { ...category, name: displayName } as Category,
-          });
-        }
+        bucketFor(displayCategory.id, displayCategory).agg.addConverted(
+          converted,
+        );
+        continue;
       }
+
+      // Keep subcategory detail -- format name as "Parent: Child"
+      const displayName = parentCategory
+        ? `${parentCategory.name}: ${category.name}`
+        : category.name;
+      bucketFor(category.id, {
+        ...category,
+        name: displayName,
+      } as Category).agg.addConverted(converted);
     }
 
     const data: CategorySpendingItem[] = Array.from(parentTotals.entries())
-      .map(([id, { total, category }]) => ({
+      .map(([id, { agg, category }]) => ({
         categoryId: id === "uncategorized" ? null : id,
         categoryName: category?.name || "Uncategorized",
         color: category?.color || null,
-        total: roundMoney(total),
+        total: roundMoney(agg.knownSubtotal),
       }))
       // Netting happens before this filter, so a category is judged on what it
       // cost after its refunds -- not on whether it happened to hold a debit.
       .filter((item) => isNetSpending(item.total))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 15);
+      .sort((a, b) => b.total - a.total);
 
-    const totalSpending = sumMoney(data.map((item) => item.total));
+    // Every category, not a top-N: the caller decides how many to draw and can
+    // still say what it merged. Truncating here made `totalSpending` the sum of
+    // the largest fifteen under a name that says "total".
+    const knownSpending = roundMoney(sumMoney(data.map((item) => item.total)));
 
     return {
       data,
-      totalSpending: roundMoney(totalSpending),
+      totalSpending: excludedCount === 0 ? knownSpending : null,
+      knownSpending,
+      currency: defaultCurrency,
+      missingCurrencies: [...missingCurrencies].sort(),
+      excludedCount,
     };
   }
 

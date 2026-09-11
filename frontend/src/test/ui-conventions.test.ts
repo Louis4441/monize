@@ -2939,3 +2939,58 @@ describe("a report's export and refresh are one actions row", () => {
     ).toBe(false);
   });
 });
+
+/**
+ * A dashboard widget shows the same figures a report does, so it asks the
+ * report rather than aggregating the ledger beside it.
+ *
+ * Expenses by Category summed paged transactions in the browser under its own
+ * rules: no VOID check, no asset-category exclusion, and investment rows decided
+ * by the account TYPE, which is INV-REPORT-001's exact failure. It disagreed
+ * with the Spending by Category report about the same period, and every guard
+ * that holds those rules scans the server, where the widget's arithmetic was
+ * not. The server-side answer is now the only one.
+ */
+describe("a dashboard widget reads a report rather than re-deriving it", () => {
+  /**
+   * Widgets that still aggregate the transaction ledger themselves, each one a
+   * breakdown that can drift from the report it sits beside. SHRINK-ONLY: the
+   * fix is to read the report's endpoint, never to add a name here.
+   */
+  const BASELINE: ReadonlyArray<string> = [
+    "/src/components/dashboard/IncomeExpensesBarChart.tsx",
+  ];
+  const READS_LEDGER = /from\s+["']@\/lib\/transactions["']/;
+
+  function widgetsAggregatingTheLedger(): string[] {
+    return productionSources()
+      .filter(([path]) => path.startsWith("/src/components/dashboard/"))
+      .filter(([, source]) => READS_LEDGER.test(withoutComments(source)))
+      .map(([path]) => path);
+  }
+
+  it("has no widget aggregating transactions outside the recorded baseline", () => {
+    const allowed = new Set(BASELINE);
+    expect(
+      widgetsAggregatingTheLedger().filter((path) => !allowed.has(path)),
+    ).toEqual([]);
+  });
+
+  it("keeps the baseline shrink-only", () => {
+    const offending = new Set(widgetsAggregatingTheLedger());
+    expect(BASELINE.filter((file) => !offending.has(file))).toEqual([]);
+  });
+
+  it("catches the import it bans, and reads a mention of it as prose", () => {
+    expect(
+      READS_LEDGER.test(
+        withoutComments("import { transactionsApi } from '@/lib/transactions';"),
+      ),
+    ).toBe(true);
+    expect(
+      READS_LEDGER.test(
+        withoutComments("// it used to import from '@/lib/transactions'"),
+      ),
+    ).toBe(false);
+  });
+});
