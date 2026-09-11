@@ -212,7 +212,7 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
   if (isLoading) {
     return (
       <div className={`${CARD_CLASS} p-3 sm:p-6 lg:self-start`}>
-        <WidgetHeading id="upcoming-bills" onClick={() => router.push('/bills')} className="mb-4">
+        <WidgetHeading id="upcoming-bills" href="/bills" className="mb-4">
           {sectionTitle}
         </WidgetHeading>
         <div className="animate-pulse space-y-3">
@@ -227,7 +227,7 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
   if (upcomingItems.length === 0) {
     return (
       <div className={`${CARD_CLASS} p-3 sm:p-6 lg:self-start`}>
-        <WidgetHeading id="upcoming-bills" onClick={() => router.push('/bills')} className="mb-4">
+        <WidgetHeading id="upcoming-bills" href="/bills" className="mb-4">
           {sectionTitle}
         </WidgetHeading>
         <p className="text-gray-500 dark:text-gray-400 text-sm">
@@ -249,7 +249,7 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
   return (
     <div className={`${CARD_CLASS} p-3 sm:p-6 lg:self-start`}>
       <div className="flex items-center justify-between mb-4">
-        <WidgetHeading id="upcoming-bills" onClick={() => router.push('/bills')}>
+        <WidgetHeading id="upcoming-bills" href="/bills">
           {sectionTitle}
         </WidgetHeading>
         <span className="hidden sm:inline text-sm text-gray-500 dark:text-gray-400">{t('upcomingBills.perReminderSettings')}</span>

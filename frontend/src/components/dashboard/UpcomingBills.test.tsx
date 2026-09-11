@@ -217,10 +217,11 @@ describe('UpcomingBills', () => {
     expect(screen.getByText('No overdue or upcoming bills, deposits, or transfers within their reminder windows.')).toBeInTheDocument();
   });
 
-  it('navigates to bills page on title click', () => {
+  it('links the title to the bills page', () => {
     render(<UpcomingBills accounts={[]} scheduledTransactions={[]} isLoading={false} maxItems={defaultMaxItems} />);
-    fireEvent.click(screen.getByText('Upcoming Bills & Deposits'));
-    expect(mockPush).toHaveBeenCalledWith('/bills');
+    expect(
+      screen.getByRole('link', { name: 'Upcoming Bills & Deposits' }),
+    ).toHaveAttribute('href', '/bills');
   });
 
   it('navigates to bills page on View all bills link click', () => {

@@ -267,6 +267,7 @@ export function ExpensesPieChart({
   return (
     <WidgetCard
       title={t('expensesPieChart.title')}
+      titleHref="/reports/spending-by-category"
       widgetId={WIDGET_ID}
       configTitle={t('expensesPieChart.title')}
       configControls={configControls}

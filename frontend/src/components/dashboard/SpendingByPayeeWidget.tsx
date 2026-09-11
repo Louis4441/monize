@@ -95,6 +95,7 @@ export function SpendingByPayeeWidget({ isLoading }: SpendingByPayeeWidgetProps)
   return (
     <WidgetCard
       title={t('spendingByPayee.title')}
+      titleHref="/reports/spending-by-payee"
       widgetId={WIDGET_ID}
       headerRight={
         <span className="text-sm text-gray-500 dark:text-gray-400">

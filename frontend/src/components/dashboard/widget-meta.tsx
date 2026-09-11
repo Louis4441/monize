@@ -1,6 +1,7 @@
 'use client';
 
 import type { ComponentType, ReactNode, SVGProps } from 'react';
+import Link from 'next/link';
 import {
   ArrowPathIcon,
   ArrowTrendingUpIcon,
@@ -83,18 +84,52 @@ export function WidgetIconPuck({ id }: { id: DashboardWidgetId }) {
 const TITLE_CLASS = 'text-lg font-semibold text-gray-900 dark:text-gray-100';
 
 /**
+ * A widget's heading text, as a link to the fuller view of the same figures
+ * when `href` is given and a plain heading when it is not.
+ *
+ * One mechanism for every widget: `WidgetHeading` (the core widgets, which draw
+ * their own card header) and `WidgetCard` (the report-derived ones) both render
+ * the title through this, so the target is named as a route in the widget and
+ * the affordance is written once.
+ */
+export function WidgetTitle({
+  href,
+  className = '',
+  children,
+}: {
+  /** Route the title navigates to. Omit for a widget with no fuller view. */
+  href?: string;
+  /** Extra classes on the heading element. */
+  className?: string;
+  children: ReactNode;
+}) {
+  const headingClass = `${TITLE_CLASS} truncate ${className}`.trimEnd();
+  if (!href) return <h3 className={headingClass}>{children}</h3>;
+  return (
+    <h3 className={headingClass}>
+      <Link
+        href={href}
+        className="rounded-sm hover:text-blue-600 dark:hover:text-blue-400 transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      >
+        {children}
+      </Link>
+    </h3>
+  );
+}
+
+/**
  * Icon puck + title for the widgets that draw their own card header (the
- * core widgets predating `WidgetCard`). With `onClick` the title is the
- * usual navigate-button; without, a plain heading.
+ * core widgets predating `WidgetCard`). With `href` the title links to the
+ * fuller view; without, it is a plain heading.
  */
 export function WidgetHeading({
   id,
-  onClick,
+  href,
   className = '',
   children,
 }: {
   id: DashboardWidgetId;
-  onClick?: () => void;
+  href?: string;
   /** Extra classes on the wrapper (e.g. `mb-4` where the heading stands alone). */
   className?: string;
   children: ReactNode;
@@ -102,16 +137,7 @@ export function WidgetHeading({
   return (
     <div className={`flex min-w-0 items-center gap-2.5 ${className}`}>
       <WidgetIconPuck id={id} />
-      {onClick ? (
-        <button
-          onClick={onClick}
-          className={`${TITLE_CLASS} truncate text-left hover:text-blue-600 dark:hover:text-blue-400 transition-colors`}
-        >
-          {children}
-        </button>
-      ) : (
-        <h3 className={`${TITLE_CLASS} truncate`}>{children}</h3>
-      )}
+      <WidgetTitle href={href}>{children}</WidgetTitle>
     </div>
   );
 }

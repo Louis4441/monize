@@ -166,6 +166,8 @@
     "description": "[XX-Description-XX]",
     "descriptionPlaceholder": "[XX-Add an optional description-XX]",
     "rangeLabels": {
+      "1w": "[XX-1W-XX]",
+      "mtd": "[XX-MTD-XX]",
       "1m": "[XX-1M-XX]",
       "3m": "[XX-3M-XX]",
       "6m": "[XX-6M-XX]",

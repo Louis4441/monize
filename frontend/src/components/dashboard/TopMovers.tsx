@@ -111,7 +111,7 @@ export function TopMovers({ movers, isLoading, hasInvestmentAccounts, onRefresh,
     return (
       <div className={`${CARD_CLASS} p-3 sm:p-6 lg:min-h-[500px]`}>
         <div className="flex items-center justify-between mb-4">
-          <WidgetHeading id="top-movers" onClick={() => router.push('/investments')}>
+          <WidgetHeading id="top-movers" href="/investments">
             {t('topMovers.title')}
           </WidgetHeading>
           <div className="flex items-center gap-2">
@@ -132,7 +132,7 @@ export function TopMovers({ movers, isLoading, hasInvestmentAccounts, onRefresh,
     return (
       <div className={`${CARD_CLASS} p-3 sm:p-6 lg:min-h-[500px]`}>
         <div className="flex items-center justify-between mb-4">
-          <WidgetHeading id="top-movers" onClick={() => router.push('/investments')}>
+          <WidgetHeading id="top-movers" href="/investments">
             {t('topMovers.title')}
           </WidgetHeading>
           <RefreshButton onRefresh={onRefresh} isRefreshing={isRefreshing} refreshTitle={t('topMovers.refreshPrices')} />
@@ -159,7 +159,7 @@ export function TopMovers({ movers, isLoading, hasInvestmentAccounts, onRefresh,
   return (
     <div className={`${CARD_CLASS} p-3 sm:p-6 lg:min-h-[500px]`}>
       <div className="flex items-center justify-between mb-4">
-        <WidgetHeading id="top-movers" onClick={() => router.push('/investments')}>
+        <WidgetHeading id="top-movers" href="/investments">
           {t('topMovers.title')}
         </WidgetHeading>
         <div className="flex items-center gap-2">

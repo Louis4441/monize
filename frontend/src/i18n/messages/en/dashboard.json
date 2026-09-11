@@ -166,6 +166,8 @@
     "description": "Description",
     "descriptionPlaceholder": "Add an optional description",
     "rangeLabels": {
+      "1w": "1W",
+      "mtd": "MTD",
       "1m": "1M",
       "3m": "3M",
       "6m": "6M",

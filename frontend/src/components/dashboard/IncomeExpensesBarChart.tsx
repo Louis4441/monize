@@ -288,6 +288,7 @@ export function IncomeExpensesBarChart({
   return (
     <WidgetCard
       title={t('incomeExpenses.title')}
+      titleHref="/reports/income-vs-expenses"
       widgetId={WIDGET_ID}
       configTitle={t('incomeExpenses.title')}
       configControls={configControls}

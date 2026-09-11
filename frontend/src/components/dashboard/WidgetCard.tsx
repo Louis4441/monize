@@ -6,7 +6,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Cog6ToothIcon } from '@heroicons/react/24/outline';
-import { WidgetIconPuck } from './widget-meta';
+import { WidgetIconPuck, WidgetTitle } from './widget-meta';
 import type { DashboardWidgetId } from './widget-registry';
 import { useWidgetConfig } from '@/hooks/useWidgetConfig';
 import {
@@ -21,6 +21,11 @@ const IDENTITY_DEFAULTS: WidgetIdentityConfig = {};
 interface WidgetCardProps {
   /** Widget heading (the built-in, translated title). */
   title: string;
+  /**
+   * Route the title links to: the report or section showing the same figures in
+   * full. Omit for a widget with no fuller view.
+   */
+  titleHref?: string;
   /**
    * Widget id. When provided, the settings gear also lets the user set a custom
    * display name (overriding {@link title}) and an optional description, stored
@@ -54,6 +59,7 @@ interface WidgetCardProps {
  */
 export function WidgetCard({
   title,
+  titleHref,
   widgetId,
   headerRight,
   configControls,
@@ -83,9 +89,7 @@ export function WidgetCard({
         <div className="flex min-w-0 items-start gap-2.5">
           {widgetId && <WidgetIconPuck id={widgetId as DashboardWidgetId} />}
           <div className="min-w-0">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">
-              {displayTitle}
-            </h3>
+            <WidgetTitle href={titleHref}>{displayTitle}</WidgetTitle>
             {description && (
               <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
                 {description}

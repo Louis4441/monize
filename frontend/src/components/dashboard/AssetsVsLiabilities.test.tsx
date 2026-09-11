@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@/test/render';
+import { render, screen } from '@/test/render';
 import { AssetsVsLiabilities } from './AssetsVsLiabilities';
 import { MonthlyNetWorth } from '@/types/net-worth';
 
@@ -81,9 +81,11 @@ describe('AssetsVsLiabilities', () => {
     expect(netEl.className).toContain('text-red');
   });
 
-  it('navigates to the net worth report on title click', () => {
+  it('links the title to the net worth report', () => {
     render(<AssetsVsLiabilities data={months} isLoading={false} />);
-    fireEvent.click(screen.getByText('Assets vs Liabilities'));
-    expect(mockPush).toHaveBeenCalledWith('/reports/net-worth');
+    expect(screen.getByRole('link', { name: 'Assets vs Liabilities' })).toHaveAttribute(
+      'href',
+      '/reports/net-worth',
+    );
   });
 });

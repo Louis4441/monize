@@ -124,6 +124,7 @@ export function SecurityTypeAllocationWidget({
   return (
     <WidgetCard
       title={t('securityTypeAllocation.title')}
+      titleHref="/investments"
       widgetId={WIDGET_ID}
       configControls={configControls}
       configTitle={t('securityTypeAllocation.title')}

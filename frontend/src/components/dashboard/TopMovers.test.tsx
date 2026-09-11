@@ -111,10 +111,12 @@ describe('TopMovers', () => {
     expect(mockPush).toHaveBeenCalledWith('/investments');
   });
 
-  it('navigates to investments on title click', () => {
+  it('links the title to investments', () => {
     render(<TopMovers movers={[]} isLoading={false} hasInvestmentAccounts={true} />);
-    fireEvent.click(screen.getByText('Top Movers'));
-    expect(mockPush).toHaveBeenCalledWith('/investments');
+    expect(screen.getByRole('link', { name: 'Top Movers' })).toHaveAttribute(
+      'href',
+      '/investments',
+    );
   });
 
   it('shows maximum of 5 movers', () => {

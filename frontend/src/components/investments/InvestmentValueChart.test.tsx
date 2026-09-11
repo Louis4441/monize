@@ -990,14 +990,18 @@ describe('InvestmentValueChart', () => {
     expect(screen.getByText('$15000.00 USD')).toBeInTheDocument();
   });
 
-  it('shows changePercent as 0 when initial value is zero', async () => {
+  it('reports no changePercent when the baseline value is zero', async () => {
+    // A move away from nothing has no percentage: 0% would say the portfolio
+    // held its ground, which is the opposite of what an empty baseline means.
+    // The money change is still known and still zero.
     vi.mocked(netWorthApi.getInvestmentsDaily).mockResolvedValue([
       { date: '2023-06-01', value: 0 },
       { date: '2024-01-01', value: 0 },
     ]);
     render(<InvestmentValueChart />);
     await screen.findByText('Portfolio Value Over Time');
-    expect(screen.getByText('+0.0%')).toBeInTheDocument();
+    expect(screen.queryByText('+0.0%')).toBeNull();
+    expect(screen.getAllByText('N/A').length).toBeGreaterThan(0);
   });
 
   it('shows empty chart message with skipped symbols in intradayUnavailable state', async () => {

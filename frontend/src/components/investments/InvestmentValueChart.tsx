@@ -39,7 +39,7 @@ import {
   renderChartFlagDot,
   ChartFlagShadowFilter,
 } from './portfolio-chart-utils';
-import { isoDatePart, priorCloseChange } from './portfolio-change-baseline';
+import { isoDatePart, portfolioSeriesChange } from './portfolio-change-baseline';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { preferredCurrency } from '@/lib/default-currency';
 
@@ -382,27 +382,16 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
       };
     }
     const values = chartPoints.map((p) => p.Value);
-    const highest = Math.max(...values);
-    const lowest = Math.min(...values);
-    const current = chartPoints[chartPoints.length - 1]?.Value || 0;
-    if (usesPriorClose) {
-      // A baseline that has not loaded (or could not be established) leaves
-      // the change unknown -- never the first point's change wearing the
-      // prior close's label.
-      return {
-        highest,
-        lowest,
-        ...priorCloseChange(current, priorClose?.value ?? null),
-      };
-    }
-    const initial = chartPoints[0]?.Value || 0;
-    const change = current - initial;
-    const changePercent = initial !== 0 ? (change / Math.abs(initial)) * 100 : 0;
     return {
-      highest,
-      lowest,
-      change: change as number | null,
-      changePercent: changePercent as number | null,
+      highest: Math.max(...values),
+      lowest: Math.min(...values),
+      // A baseline that has not loaded (or could not be established) leaves the
+      // change unknown -- never the first point's change wearing the prior
+      // close's label.
+      ...portfolioSeriesChange(values, {
+        usesPriorClose,
+        priorCloseValue: priorClose?.value ?? null,
+      }),
     };
   }, [chartPoints, usesPriorClose, priorClose]);
 

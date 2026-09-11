@@ -6,11 +6,27 @@
  */
 
 /** Range presets offered by the transaction-based spending/income widgets. */
-export const SPENDING_RANGES = ['1m', '3m', '6m', '1y', 'ytd'] as const;
+export const SPENDING_RANGES = ['mtd', '1m', '3m', '6m', '1y', 'ytd'] as const;
 /** Range presets for month-trend widgets. */
-export const TREND_RANGES = ['6m', '1y', '2y'] as const;
-/** Range presets for the portfolio value widget. */
-export const PORTFOLIO_RANGES = ['3m', '6m', '1y', '2y', '5y', 'all'] as const;
+export const TREND_RANGES = ['6m', 'ytd', '1y', '2y'] as const;
+/**
+ * Range presets for the portfolio value widget. 1W and MTD are measured from
+ * the prior close (`PRIOR_CLOSE_BASELINE_RANGES`), which the daily series this
+ * widget draws supports; 1D is absent because a single session has no daily
+ * points to draw, and only the intraday chart on the Investments page can show
+ * it.
+ */
+export const PORTFOLIO_RANGES = [
+  '1w',
+  'mtd',
+  '3m',
+  '6m',
+  'ytd',
+  '1y',
+  '2y',
+  '5y',
+  'all',
+] as const;
 /** Range presets for the weekend/weekday widget. */
 export const WEEKEND_RANGES = ['1m', '3m', '6m', '1y'] as const;
 
