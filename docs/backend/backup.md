@@ -30,6 +30,20 @@ Issue #1092 split the 2,600-line original into `BackupExportService`, `BackupRes
 
 Auto-backup endpoints live on `AutoBackupController`, whose class-level `@Roles("admin")` is the whole access rule -- a new endpoint there is admin-only automatically. Manual export/restore (caller's own data) stays on `BackupController` for everyone.
 
+**The files are the user's even though the schedule is not.** `listStoredBackups`
+and `openStoredBackup` live on `AutoBackupService` (it owns the folder layout and
+the naming) but are reached through `BackupController`, which has no role guard --
+a user who cannot see the settings still has to be able to take and restore the
+artifacts those settings produced for them. Only the caller's own sharded folder
+is enumerated: the flat base folder a pre-per-user version wrote into carries no
+owner in its filenames, so nothing there can be attributed to anybody and
+offering one for download would hand a user another user's ledger. A name is
+served only when `classifyBackupFileName` (`backup-file-names.ts`) recognises it,
+and the join is still containment-checked, because a validated name with an
+unvalidated join is a decorative check. The listing carries the caller's own
+`enabled` flag: the settings endpoint that would otherwise answer "is anything
+backing me up?" is admin-only, and the Settings section hides itself on it.
+
 `AutoBackupService.enrollManagedUsers` runs at the top of the hourly cron and enrolls every other user on the deployment defaults -- without it a non-admin would silently have no backups. It reconciles rather than seeds: drifted rows are written back to the defaults, unchanged ones are not written, and `lastBackup*`/`nextBackupAt` are left alone so enrollment never re-triggers a backup.
 
 Backups are encrypted with the user's own password. Local-auth accounts have it captured at the moment they type it (`rememberLoginPassword` from registration, login and change-password), or from Settings by confirming that same password (`enableWithLoginPassword`) -- the capture at sign-in never fires for a session older than the deploy that shipped it, and that session can outlive the backups it silently leaves in plaintext (issue #1269). OIDC accounts set a dedicated one in Settings (`setBackupPasswordForOidcUser`) or go unencrypted; `getStatus().manageable` gates that UI section, and the dedicated-password methods refuse a local-auth caller. A stored copy is checked against the account's current password hash before use (`resolveBackupPassword`) -- three outcomes, not two: nothing stored (write plaintext), usable password (encrypt), stored-but-undecryptable (refuse -- silently downgrading previous encrypted backups is worse than failing).

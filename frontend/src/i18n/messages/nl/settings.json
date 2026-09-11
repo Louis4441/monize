@@ -734,7 +734,8 @@
         "encryptedNeedsPassword": "Deze back-up is versleuteld. Voer het wachtwoord waarmee deze is aangemaakt in het veld \"Back-upwachtwoord\" in en probeer het opnieuw.",
         "failed": "Terugzetten van back-up mislukt",
         "reauthRedirect": "Je gaat naar je identiteitsprovider om te bevestigen dat jij het bent. Kies het back-upbestand opnieuw wanneer je terugkomt."
-      }
+      },
+      "selectedFile": "Geselecteerd: {filename}"
     },
     "restoreResult": {
       "title": "Herstel voltooid",
@@ -743,6 +744,24 @@
       "doneButton": "Gereed",
       "skippedAttachments": "{count, plural, one {# bijlage is niet teruggezet} other {# bijlagen zijn niet teruggezet}}: de back-up bevatte er geen bruikbare bytes voor — ze ontbraken of kwamen niet door hun checksum bij het exporteren, of het bestand is van vóór zelfstandige back-ups. Maak een nieuwe back-up zodra de bijlageopslag in orde is.",
       "unusableAiProviderKeys": "{count, plural, one {# AI-provider is teruggezet zonder bruikbare API-sleutel} other {# AI-providers zijn teruggezet zonder bruikbare API-sleutels}}: de back-up is gemaakt voordat providersleutels erin werden meegenomen, dus de opgeslagen sleutel hoort bij de server die het bestand maakte, of deze server heeft geen versleutelingssleutel ingesteld om er een op te slaan. Open Instellingen → AI-providers en voer de API-sleutel opnieuw in."
+    },
+    "storedBackups": {
+      "heading": "Automatische back-ups",
+      "description": "Back-ups die deze server volgens zijn eigen schema voor u heeft gemaakt. Download er een om zelf een kopie te bewaren, of herstel er een mee via het formulier hieronder.",
+      "loading": "Back-ups laden...",
+      "loadFailed": "De op de server opgeslagen back-ups konden niet worden geladen",
+      "retryButton": "Opnieuw proberen",
+      "empty": "Deze server bewaart nog geen automatische back-ups voor u.",
+      "columns": {
+        "filename": "Bestand",
+        "modified": "Gewijzigd op",
+        "size": "Grootte",
+        "actions": "Acties"
+      },
+      "downloadButton": "Downloaden",
+      "restoreButton": "Herstellen",
+      "workingButton": "Bezig...",
+      "downloadFailed": "De back-up kon niet worden gedownload"
     }
   },
   "sharedAccess": {

@@ -1,7 +1,12 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { DataSource } from "typeorm";
 import { ConfigService } from "@nestjs/config";
-import { BadRequestException, ConflictException, Logger } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
 import {
   promises as fs,
   mkdtempSync,
@@ -1066,6 +1071,173 @@ describe("AutoBackupService", () => {
         }
       },
     );
+  });
+
+  describe("stored backups", () => {
+    /** Write `name` into a user's own sharded folder with a fixed size. */
+    async function seed(
+      name: string,
+      id: string = userId,
+      contents = "artifact",
+    ): Promise<void> {
+      await fs.mkdir(folderFor(id), { recursive: true });
+      await fs.writeFile(join(folderFor(id), name), contents);
+    }
+
+    it("lists this user's artifacts newest first, with size and mtime", async () => {
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true }),
+      );
+      await seed("monize-backup-daily-2026-04-14.json.gz", userId, "older");
+      await seed("monize-backup-daily-2026-04-15.mzbe", userId, "newer-file");
+      await fs.utimes(
+        join(folderFor(), "monize-backup-daily-2026-04-14.json.gz"),
+        new Date("2026-04-14T02:00:00Z"),
+        new Date("2026-04-14T02:00:00Z"),
+      );
+      await fs.utimes(
+        join(folderFor(), "monize-backup-daily-2026-04-15.mzbe"),
+        new Date("2026-04-15T02:00:00Z"),
+        new Date("2026-04-15T02:00:00Z"),
+      );
+
+      const result = await service.listStoredBackups(userId);
+
+      expect(result.enabled).toBe(true);
+      expect(result.backups).toEqual([
+        {
+          filename: "monize-backup-daily-2026-04-15.mzbe",
+          modifiedAt: "2026-04-15T02:00:00.000Z",
+          size: "newer-file".length,
+          encrypted: true,
+        },
+        {
+          filename: "monize-backup-daily-2026-04-14.json.gz",
+          modifiedAt: "2026-04-14T02:00:00.000Z",
+          size: "older".length,
+          encrypted: false,
+        },
+      ]);
+    });
+
+    it("reports the schedule as off when the user's row is disabled", async () => {
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: false }),
+      );
+
+      // The settings endpoint that carries this is admin-only, so a
+      // non-administrator has no other way to learn whether anything is backing
+      // their data up -- and the Settings screen hides the section on it.
+      await expect(service.listStoredBackups(userId)).resolves.toEqual({
+        enabled: false,
+        backups: [],
+      });
+    });
+
+    it("returns an empty list when the user has no folder yet", async () => {
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true }),
+      );
+
+      // A user enrolled on the deployment defaults has a folder only after
+      // their first run; that is an empty list, not an error.
+      await expect(service.listStoredBackups(userId)).resolves.toEqual({
+        enabled: true,
+        backups: [],
+      });
+    });
+
+    it("never lists another user's artifacts or the legacy flat folder", async () => {
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true }),
+      );
+      await seed("monize-backup-daily-2026-04-15.json.gz", otherUserId);
+      // Written by a version before per-user folders: the name carries no user
+      // id, so nothing there can be attributed to anybody.
+      await fs.writeFile(
+        join(root, "monize-backup-daily-2026-04-13.json.gz"),
+        "legacy",
+      );
+      await seed("monize-backup-weekly-2026-04-14.json.gz");
+
+      const result = await service.listStoredBackups(userId);
+
+      expect(result.backups.map((b) => b.filename)).toEqual([
+        "monize-backup-weekly-2026-04-14.json.gz",
+      ]);
+    });
+
+    it("skips directory entries that are not artifacts this module wrote", async () => {
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true }),
+      );
+      await seed("monize-backup-daily-2026-04-15.json.gz");
+      await seed(".monize-backup-daily-2026-04-15.json.gz.tmp-abc");
+      await seed("notes.txt");
+      await fs.mkdir(join(folderFor(), "monize-backup-daily-2026-04-12.mzbe"));
+
+      const result = await service.listStoredBackups(userId);
+
+      expect(result.backups.map((b) => b.filename)).toEqual([
+        "monize-backup-daily-2026-04-15.json.gz",
+      ]);
+    });
+
+    it("opens one artifact by name", async () => {
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true }),
+      );
+      await seed("monize-backup-monthly-26-04.json.gz", userId, "bytes");
+
+      await expect(
+        service.openStoredBackup(userId, "monize-backup-monthly-26-04.json.gz"),
+      ).resolves.toEqual({
+        path: join(folderFor(), "monize-backup-monthly-26-04.json.gz"),
+        size: "bytes".length,
+        filename: "monize-backup-monthly-26-04.json.gz",
+      });
+    });
+
+    it.each([
+      ["../../../etc/passwd", "a traversal"],
+      [
+        "monize-backup-daily-2026-04-15.json.gz/../../secret",
+        "a nested escape",
+      ],
+      ["notes.txt", "a name this module does not write"],
+      [".monize-backup-daily-2026-04-15.json.gz.tmp-abc", "a partial write"],
+      [
+        "monize-backup-daily-2026-04-16.json.gz",
+        "an artifact that is not there",
+      ],
+    ])("refuses %s (%s)", async (filename) => {
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true }),
+      );
+      await seed("monize-backup-daily-2026-04-15.json.gz");
+
+      // An unrecognised name and an absent file answer alike on purpose: the
+      // difference tells a caller nothing they may act on.
+      await expect(service.openStoredBackup(userId, filename)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it("does not reach another user's folder through their own filename", async () => {
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true }),
+      );
+      await seed("monize-backup-daily-2026-04-15.json.gz", otherUserId);
+
+      // The folder is server-computed from the caller's id; the name decides
+      // nothing about whose directory is opened.
+      await expect(
+        service.openStoredBackup(
+          userId,
+          "monize-backup-daily-2026-04-15.json.gz",
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
   });
 
   describe("browseFolders", () => {

@@ -16,6 +16,8 @@ vi.mock('@/lib/backupApi', () => ({
     enableWithLoginPassword: vi.fn(),
     setBackupPassword: vi.fn(),
     disableEncryption: vi.fn(),
+    listStoredBackups: vi.fn(),
+    downloadStoredBackup: vi.fn(),
   },
   BACKUP_PASSWORD_REQUIRED_CODE: 'BACKUP_PASSWORD_REQUIRED',
   // Mirror the real magic-byte sniffing so the restore form shows the
@@ -91,6 +93,13 @@ describe('BackupRestoreSection', () => {
       manageable: false,
       method: 'login-password',
       available: true,
+    });
+    // No automatic-backup schedule and nothing on disk: the stored-backups
+    // subsection renders nothing, which is the state every test below that is
+    // not about it expects.
+    (backupApi.listStoredBackups as ReturnType<typeof vi.fn>).mockResolvedValue({
+      enabled: false,
+      backups: [],
     });
   });
 
@@ -1073,6 +1082,90 @@ describe('BackupRestoreSection', () => {
           backupPassword: 'backup-pw',
         }),
       );
+    });
+  });
+
+  describe('restoring from the automatic backups on the server', () => {
+    const storedBackup = {
+      filename: 'monize-backup-daily-2026-04-15.mzbe',
+      modifiedAt: '2026-04-15T02:00:00.000Z',
+      size: 2048,
+      encrypted: true,
+    };
+
+    async function openServerList() {
+      (backupApi.listStoredBackups as ReturnType<typeof vi.fn>).mockResolvedValue({
+        enabled: true,
+        backups: [storedBackup],
+      });
+      await renderSection(localUser);
+      await act(async () => {
+        fireEvent.click(screen.getByText('Automatic Backups'));
+      });
+    }
+
+    beforeEach(async () => {
+      await openServerList();
+    });
+
+    it('hands the downloaded artifact to the one restore workflow', async () => {
+      // The bytes carry the encrypted-envelope magic, so the form must ask for
+      // the backup password exactly as it would for a file picked from disk --
+      // that is the whole claim: nothing downstream can tell where the file
+      // came from.
+      (backupApi.downloadStoredBackup as ReturnType<typeof vi.fn>).mockResolvedValue(
+        new File(
+          [new Uint8Array([0x4d, 0x5a, 0x42, 0x45])],
+          storedBackup.filename,
+        ),
+      );
+      const restoreMock = backupApi.restoreBackup as ReturnType<typeof vi.fn>;
+      restoreMock.mockResolvedValue({ message: 'ok', restored: {} });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
+      });
+
+      expect(backupApi.downloadStoredBackup).toHaveBeenCalledWith(
+        storedBackup.filename,
+      );
+      // The restore form is open, names the artifact, and is asking for the
+      // encrypted backup's own password.
+      expect(
+        screen.getByText(`Selected: ${storedBackup.filename}`),
+      ).toBeInTheDocument();
+      const backupPw = screen.getByPlaceholderText('Backup password');
+
+      fireEvent.change(screen.getByPlaceholderText('Enter your password'), {
+        target: { value: 'account-pw' },
+      });
+      fireEvent.change(backupPw, { target: { value: 'backup-pw' } });
+      await act(async () => {
+        fireEvent.click(screen.getByText('Confirm Restore'));
+      });
+
+      expect(restoreMock).toHaveBeenCalledWith({
+        file: expect.objectContaining({ name: storedBackup.filename }),
+        password: 'account-pw',
+        backupPassword: 'backup-pw',
+      });
+      // The same summary dialogue a file restore ends in.
+      expect(screen.getByText('Restore Complete')).toBeInTheDocument();
+    });
+
+    it('does not open the restore form when the download fails', async () => {
+      (backupApi.downloadStoredBackup as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('gone'),
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
+      });
+
+      expect(toast.error).toHaveBeenCalled();
+      // Nothing was selected, so the destructive form stays shut.
+      expect(screen.queryByText('Confirm Restore')).toBeNull();
+      expect(backupApi.restoreBackup).not.toHaveBeenCalled();
     });
   });
 

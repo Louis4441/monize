@@ -208,7 +208,8 @@
     "restoreQueueFull": "Zbyt wiele przywracań już czeka na moc przywracania tego wdrożenia. Spróbuj ponownie za chwilę.",
     "restoreQueueWaitTimeout": "Upłynął limit czasu oczekiwania na moc przywracania: inne przywracanie nadal trwa. Spróbuj ponownie za chwilę.",
     "restoreTicketUnavailable": "To wdrożenie nie może autoryzować przesyłania kopii do przywrócenia.",
-    "invalidNotificationFields": "Nieprawidłowe powiadomienie w kopii zapasowej: tytuł musi być tekstem, a cel i klucz deduplikacji tekstem lub wartością null"
+    "invalidNotificationFields": "Nieprawidłowe powiadomienie w kopii zapasowej: tytuł musi być tekstem, a cel i klucz deduplikacji tekstem lub wartością null",
+    "storedBackupNotFound": "Nie znaleziono pliku kopii zapasowej"
   },
   "budgets": {
     "notFound": "Nie znaleziono budżetu o ID {{ id }}",

@@ -22,6 +22,7 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { downloadBlob } from '@/lib/download';
 import { User } from '@/types/auth';
 import { takeOidcReauthArtifact } from '@/lib/stepUpToken';
+import { StoredBackupsSubsection } from './StoredBackupsSubsection';
 
 
 function isBackupPasswordRequired(error: unknown): boolean {
@@ -60,6 +61,7 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
   const [restoreBackupPassword, setRestoreBackupPassword] = useState('');
   const [restoreResult, setRestoreResult] = useState<RestoreResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const restoreSectionRef = useRef<HTMLDivElement>(null);
 
   // The password modal, shared by both accounts: an OIDC account chooses a
   // dedicated backup password here, a local account confirms the login password
@@ -223,6 +225,30 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
     setRestoreFileEncrypted(file ? await isEncryptedBackupFile(file) : false);
   };
 
+  /**
+   * A backup taken from the server's own list, handed to the restore form as if
+   * the user had picked it from disk.
+   *
+   * The point is that nothing downstream can tell the difference: the same
+   * encryption sniff, the same warning, the same account-password or OIDC
+   * confirmation, the same upload and the same summary dialogue. A second
+   * restore path beside this one would be a second place for the refusals that
+   * make a restore safe to go missing from.
+   */
+  const handleStoredBackupSelected = async (file: File) => {
+    setRestoreFile(file);
+    setRestorePassword('');
+    setRestoreBackupPassword('');
+    setRestoreFileEncrypted(await isEncryptedBackupFile(file));
+    // The picker and the server list are two doors onto one field. Clearing the
+    // input stops the form from naming a file it is no longer going to send.
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    setShowRestore(true);
+    restoreSectionRef.current?.scrollIntoView({ block: 'nearest' });
+  };
+
   const runRestore = async () => {
     if (!restoreFile) {
       toast.error(t('restore.toasts.pleaseSelectFile'));
@@ -382,8 +408,10 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
         </Button>
       </div>
 
+      <StoredBackupsSubsection onRestore={handleStoredBackupSelected} />
+
       {/* Restore Section */}
-      <div>
+      <div ref={restoreSectionRef}>
         <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
           {t('restore.heading')}
         </h3>
@@ -436,6 +464,14 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
                   hover:file:bg-blue-100 dark:hover:file:bg-blue-900/50
                   file:cursor-pointer cursor-pointer"
               />
+              {/* The input names only a file the picker put there, so a backup
+                  taken from the server's list would otherwise be about to be
+                  restored with nothing on screen saying which one. */}
+              {restoreFile && (
+                <p className="mt-2 text-sm text-gray-700 dark:text-gray-300 break-all">
+                  {t('restore.selectedFile', { filename: restoreFile.name })}
+                </p>
+              )}
             </div>
 
             {restoreFileEncrypted && (

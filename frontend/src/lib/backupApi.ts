@@ -153,6 +153,37 @@ async function normalizeBlobError(error: unknown): Promise<never> {
   throw error;
 }
 
+/**
+ * One automatic backup the server is holding for this user.
+ *
+ * `modifiedAt` is the file's own modification time on the server rather than
+ * the date inside its name: the name says which recovery point the artifact is
+ * and which retention tier keeps it, and a promoted weekly or monthly copy has
+ * the two disagree. What the reader is choosing between is files.
+ */
+export interface StoredBackup {
+  filename: string;
+  /** ISO-8601 modification time of the file on the server. */
+  modifiedAt: string;
+  /** Size in bytes. */
+  size: number;
+  /** True for an encrypted Monize envelope, which needs its password to restore. */
+  encrypted: boolean;
+}
+
+/**
+ * The listing, plus whether this user's automatic-backup schedule is armed.
+ *
+ * The schedule itself is configured on an admin-only endpoint, so a
+ * non-administrator cannot read it -- and they are exactly the people who need
+ * to know whether anything is backing their data up. The answer travels with
+ * the files it explains.
+ */
+export interface StoredBackupsReport {
+  enabled: boolean;
+  backups: StoredBackup[];
+}
+
 export interface BackupEncryptionStatus {
   enabled: boolean;
   /**
@@ -353,6 +384,41 @@ export const backupApi = {
     // still true.
     clearAllCache();
     return response.data;
+  },
+
+  /**
+   * The automatic backups the server is holding for this user, newest first.
+   *
+   * Open to every signed-in account even though the schedule behind it is
+   * admin-only: the files are the caller's own data, and a user who cannot
+   * change the policy still has to be able to take and restore what it produced
+   * for them.
+   */
+  listStoredBackups: async (): Promise<StoredBackupsReport> => {
+    const response = await apiClient.get<StoredBackupsReport>(
+      '/backup/stored-backups',
+    );
+    return response.data;
+  },
+
+  /**
+   * One stored backup's bytes, as the file the server has on disk.
+   *
+   * Returned as a `File` rather than a `Blob` so it can go straight into
+   * `restoreBackup`, which reads the extension to decide whether the body is
+   * already compressed or an encrypted envelope -- the same decision it makes
+   * for a file the user picked themselves.
+   */
+  downloadStoredBackup: async (filename: string): Promise<File> => {
+    try {
+      const response = await apiClient.get(
+        `/backup/stored-backups/${encodeURIComponent(filename)}`,
+        { responseType: 'blob', timeout: 120000 },
+      );
+      return new File([response.data], filename);
+    } catch (error) {
+      return normalizeBlobError(error);
+    }
   },
 
   getEncryptionStatus: async (): Promise<BackupEncryptionStatus> => {

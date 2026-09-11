@@ -734,7 +734,8 @@
         "encryptedNeedsPassword": "Esta copia de seguridad está cifrada. Ingresa la contraseña con la que fue creada en el campo \"Contraseña de copia de seguridad\" y vuelve a intentarlo.",
         "failed": "Error al restaurar la copia de seguridad",
         "reauthRedirect": "Te llevamos a tu proveedor de identidad para confirmar que eres tú. Vuelve a elegir el archivo de copia de seguridad cuando regreses."
-      }
+      },
+      "selectedFile": "Seleccionado: {filename}"
     },
     "restoreResult": {
       "title": "Restauración completa",
@@ -743,6 +744,24 @@
       "doneButton": "Listo",
       "skippedAttachments": "{count, plural, one {# archivo adjunto no se restauró} other {# archivos adjuntos no se restauraron}}: la copia no contenía bytes utilizables para ellos — faltaban o no pasaron su suma de comprobación al exportarla, o el fichero es anterior a las copias autocontenidas. Exporte una copia nueva cuando el almacenamiento de adjuntos esté correcto.",
       "unusableAiProviderKeys": "{count, plural, one {Se restauró # proveedor de IA sin una clave de API utilizable} other {Se restauraron # proveedores de IA sin claves de API utilizables}}: la copia de seguridad se creó antes de que las claves de proveedor viajaran en ella, así que la clave guardada pertenece al servidor que generó el archivo, o este servidor no tiene configurada ninguna clave de cifrado con la que almacenarla. Abre Ajustes → Proveedores de IA e introduce de nuevo la clave de API."
+    },
+    "storedBackups": {
+      "heading": "Copias de seguridad automáticas",
+      "description": "Copias de seguridad que este servidor creó para ti según su propia programación. Descarga una para conservar tu propia copia o restaura desde una con el formulario de abajo.",
+      "loading": "Cargando copias de seguridad...",
+      "loadFailed": "No se pudieron cargar las copias de seguridad almacenadas en el servidor",
+      "retryButton": "Reintentar",
+      "empty": "Este servidor todavía no guarda ninguna copia de seguridad automática tuya.",
+      "columns": {
+        "filename": "Archivo",
+        "modified": "Fecha de modificación",
+        "size": "Tamaño",
+        "actions": "Acciones"
+      },
+      "downloadButton": "Descargar",
+      "restoreButton": "Restaurar",
+      "workingButton": "Procesando...",
+      "downloadFailed": "No se pudo descargar la copia de seguridad"
     }
   },
   "sharedAccess": {

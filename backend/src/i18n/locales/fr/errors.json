@@ -208,7 +208,8 @@
     "restoreQueueFull": "Trop de restaurations attendent déjà la capacité de restauration de ce déploiement. Réessayez dans un instant.",
     "restoreQueueWaitTimeout": "Délai dépassé en attendant la capacité de restauration : une autre restauration est encore en cours. Réessayez dans un instant.",
     "restoreTicketUnavailable": "Ce déploiement ne peut pas autoriser les téléversements de restauration.",
-    "invalidNotificationFields": "Notification de sauvegarde non valide : le titre doit être du texte ; la cible et la clé de déduplication doivent être du texte ou null"
+    "invalidNotificationFields": "Notification de sauvegarde non valide : le titre doit être du texte ; la cible et la clé de déduplication doivent être du texte ou null",
+    "storedBackupNotFound": "Fichier de sauvegarde introuvable"
   },
   "budgets": {
     "notFound": "Budget avec l'ID {{ id }} introuvable",

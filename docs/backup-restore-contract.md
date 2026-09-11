@@ -828,6 +828,24 @@ export/restore stays in **Settings → Backup & Restore**
 and touching only their own data. The two were previously stacked in one Settings
 screen, which made a deployment policy look like a personal preference.
 
+**Configuring the schedule is an operator's; the artifacts it produces are the
+user's.** Settings → Backup & Restore therefore carries a folded **Automatic
+Backups** listing
+(`frontend/src/components/settings/StoredBackupsSubsection.tsx`) of the files
+this server is holding for the signed-in account, with a download and a restore
+per file. It reads `GET /backup/stored-backups` and
+`GET /backup/stored-backups/:filename` on the *unrestricted* `BackupController`,
+not on `AutoBackupController`: a user who may not change the policy still has to
+be able to take and restore what it produced for them. Three things bound it —
+only the caller's own server-computed folder is enumerated (never the legacy flat
+root, whose filenames carry no owner), only names `classifyBackupFileName`
+recognises are served, and the listing reports the caller's own `enabled` so the
+section is absent on a deployment that runs no automatic backups. Restoring from
+that list **downloads the artifact and hands it to the existing restore form**,
+so the encryption sniff, the warning, the account-password or OIDC confirmation
+and the summary dialogue are the same ones a file picked from disk goes through;
+there is no second restore path to keep in step.
+
 **Known gap — the stored policy is per-user, not instance-level.** The admin's
 `updateSettings` writes the administrator's *own* `auto_backup_settings` row
 (keyed by `req.user.id`), so the schedule, folder and retention chosen on Admin →

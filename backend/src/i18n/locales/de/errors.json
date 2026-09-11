@@ -208,7 +208,8 @@
     "restoreQueueFull": "Zu viele Wiederherstellungen warten bereits auf die Wiederherstellungskapazität dieser Instanz. Versuchen Sie es in einem Moment erneut.",
     "restoreQueueWaitTimeout": "Zeitüberschreitung beim Warten auf Wiederherstellungskapazität: Eine andere Wiederherstellung läuft noch. Versuchen Sie es in einem Moment erneut.",
     "restoreTicketUnavailable": "Diese Instanz kann Wiederherstellungs-Uploads nicht autorisieren.",
-    "invalidNotificationFields": "Ungültige Benachrichtigung in der Sicherung: Der Titel muss Text sein; Ziel und Deduplizierungsschlüssel müssen Text oder null sein"
+    "invalidNotificationFields": "Ungültige Benachrichtigung in der Sicherung: Der Titel muss Text sein; Ziel und Deduplizierungsschlüssel müssen Text oder null sein",
+    "storedBackupNotFound": "Sicherungsdatei nicht gefunden"
   },
   "budgets": {
     "notFound": "Budget mit ID {{ id }} nicht gefunden",

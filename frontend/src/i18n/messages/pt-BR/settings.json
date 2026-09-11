@@ -734,7 +734,8 @@
         "encryptedNeedsPassword": "Este backup está criptografado. Digite a senha com que foi criado no campo \"Senha do backup\" e tente novamente.",
         "failed": "Falha ao restaurar o backup",
         "reauthRedirect": "Vamos levar você ao seu provedor de identidade para confirmar que é você. Ao voltar, escolha o arquivo de backup novamente."
-      }
+      },
+      "selectedFile": "Selecionado: {filename}"
     },
     "restoreResult": {
       "title": "Restauração Concluída",
@@ -743,6 +744,24 @@
       "doneButton": "Concluído",
       "skippedAttachments": "{count, plural, one {# anexo não foi restaurado} other {# anexos não foram restaurados}}: o backup não continha bytes utilizáveis para eles — estavam ausentes ou falharam na soma de verificação na exportação, ou o arquivo é anterior aos backups autossuficientes. Exporte um backup novo quando o armazenamento de anexos estiver saudável.",
       "unusableAiProviderKeys": "{count, plural, one {# provedor de IA foi restaurado sem uma chave de API utilizável} other {# provedores de IA foram restaurados sem chaves de API utilizáveis}}: o backup foi criado antes de as chaves dos provedores viajarem nele, então a chave armazenada pertence ao servidor que gerou o arquivo, ou este servidor não tem nenhuma chave de criptografia configurada para guardá-la. Abra Configurações → Provedores de IA e digite a chave de API novamente."
+    },
+    "storedBackups": {
+      "heading": "Backups automáticos",
+      "description": "Backups que este servidor criou para você de acordo com a própria programação. Baixe um para guardar sua cópia ou restaure a partir de um usando o formulário abaixo.",
+      "loading": "Carregando backups...",
+      "loadFailed": "Não foi possível carregar os backups armazenados no servidor",
+      "retryButton": "Tentar novamente",
+      "empty": "Este servidor ainda não guarda nenhum backup automático seu.",
+      "columns": {
+        "filename": "Arquivo",
+        "modified": "Data de modificação",
+        "size": "Tamanho",
+        "actions": "Ações"
+      },
+      "downloadButton": "Baixar",
+      "restoreButton": "Restaurar",
+      "workingButton": "Processando...",
+      "downloadFailed": "Não foi possível baixar o backup"
     }
   },
   "sharedAccess": {

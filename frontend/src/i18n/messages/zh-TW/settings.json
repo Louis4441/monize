@@ -734,7 +734,8 @@
         "encryptedNeedsPassword": "此備份已加密。請在「備份密碼」欄位輸入建立時使用的密碼後再試。",
         "failed": "還原備份失敗",
         "reauthRedirect": "正在前往身分提供者以確認你的身分。返回後請重新選擇備份檔案。"
-      }
+      },
+      "selectedFile": "已選取：{filename}"
     },
     "restoreResult": {
       "title": "還原完成",
@@ -743,6 +744,24 @@
       "doneButton": "完成",
       "skippedAttachments": "{count, plural, other {# 個附件未被還原}}：備份中沒有可用的位元組——匯出時它們缺失或未通過總和檢查，或該檔案早於自包含備份。請在附件儲存恢復正常後重新匯出備份。",
       "unusableAiProviderKeys": "{count, plural, other {# 個 AI 提供者在還原後沒有可用的 API 金鑰}}：此備份建立於提供者金鑰隨備份一同保存之前，因此儲存的金鑰屬於產生該檔案的伺服器，或者本伺服器沒有設定用來保存金鑰的加密金鑰。請開啟「設定 → AI 提供者」並重新輸入 API 金鑰。"
+    },
+    "storedBackups": {
+      "heading": "自動備份",
+      "description": "此伺服器依其自身排程為你建立的備份。下載一份自行保存，或使用下方表單從中還原。",
+      "loading": "正在載入備份...",
+      "loadFailed": "無法載入伺服器上儲存的備份",
+      "retryButton": "重試",
+      "empty": "此伺服器尚未為你保存任何自動備份。",
+      "columns": {
+        "filename": "檔案",
+        "modified": "修改日期",
+        "size": "大小",
+        "actions": "操作"
+      },
+      "downloadButton": "下載",
+      "restoreButton": "還原",
+      "workingButton": "處理中...",
+      "downloadFailed": "無法下載該備份"
     }
   },
   "sharedAccess": {
