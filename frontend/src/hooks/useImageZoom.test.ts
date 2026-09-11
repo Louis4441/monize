@@ -89,25 +89,30 @@ describe('useImageZoom', () => {
   it('pans only while magnified, and never past the edge', () => {
     const { result } = setup();
 
-    // At 1x a drag does nothing: the offset stays put so an overlay owns it.
+    // At 1x a one-finger drag does nothing: the offset stays put so an overlay
+    // owns it. Released after, so the finger does not linger into the next part.
     act(() =>
-      result.current.containerProps.onPointerDown(makeEvent({ clientX: 100, clientY: 50 })),
+      result.current.containerProps.onPointerDown(makeEvent({ pointerId: 1, clientX: 100, clientY: 50 })),
     );
     act(() =>
-      result.current.containerProps.onPointerMove(makeEvent({ clientX: 40, clientY: 50 })),
+      result.current.containerProps.onPointerMove(makeEvent({ pointerId: 1, clientX: 40, clientY: 50 })),
     );
     expect(result.current.contentStyle.transform).toContain('translate(0px, 0px)');
+    act(() =>
+      result.current.containerProps.onPointerUp(makeEvent({ pointerId: 1, clientX: 40, clientY: 50 })),
+    );
 
-    // Magnify, then drag: the image pans, clamped so it still covers the frame.
+    // Magnify, then drag from a point well clear of the first (so it is not read
+    // as a double tap): the image pans, clamped so it still covers the frame.
     for (let i = 0; i < 6; i++) {
-      act(() => result.current.containerProps.onWheel(makeEvent({ deltaY: -1, clientX: 100, clientY: 50 })));
+      act(() => result.current.containerProps.onWheel(makeEvent({ deltaY: -1, clientX: 10, clientY: 10 })));
     }
     const scale = result.current.scale;
     act(() =>
-      result.current.containerProps.onPointerDown(makeEvent({ clientX: 100, clientY: 50, pointerId: 2 })),
+      result.current.containerProps.onPointerDown(makeEvent({ pointerId: 2, clientX: 10, clientY: 90 })),
     );
     act(() =>
-      result.current.containerProps.onPointerMove(makeEvent({ clientX: 300, clientY: 50, pointerId: 2 })),
+      result.current.containerProps.onPointerMove(makeEvent({ pointerId: 2, clientX: 300, clientY: 90 })),
     );
     // Dragging right cannot pull the left edge past 0.
     const match = /translate\((-?\d+(?:\.\d+)?)px, (-?\d+(?:\.\d+)?)px\)/.exec(
@@ -116,5 +121,35 @@ describe('useImageZoom', () => {
     const x = Number(match![1]);
     expect(x).toBeLessThanOrEqual(0);
     expect(x).toBeGreaterThanOrEqual(WIDTH - scale * WIDTH);
+  });
+
+  it('magnifies on a two-finger pinch that spreads', () => {
+    const { result } = setup();
+
+    // Two fingers down, 20px apart: the pinch begins without moving anything.
+    act(() => {
+      result.current.containerProps.onPointerDown(
+        makeEvent({ pointerId: 1, clientX: 90, clientY: 50 }),
+      );
+      result.current.containerProps.onPointerDown(
+        makeEvent({ pointerId: 2, clientX: 110, clientY: 50 }),
+      );
+    });
+    expect(result.current.scale).toBe(1);
+
+    // Spread to 60px apart -- a factor of three.
+    act(() =>
+      result.current.containerProps.onPointerMove(
+        makeEvent({ pointerId: 2, clientX: 150, clientY: 50 }),
+      ),
+    );
+    expect(result.current.scale).toBeGreaterThan(1);
+
+    // Lifting a finger ends the pinch; the magnification stays.
+    act(() => {
+      result.current.containerProps.onPointerUp(makeEvent({ pointerId: 2, clientX: 150, clientY: 50 }));
+      result.current.containerProps.onPointerUp(makeEvent({ pointerId: 1, clientX: 90, clientY: 50 }));
+    });
+    expect(result.current.zoomed).toBe(true);
   });
 });

@@ -15,18 +15,19 @@ import type { CSSProperties, PointerEvent, WheelEvent } from 'react';
  * always clamped so the magnified image still covers the frame -- a pan can
  * never expose a strip of background, which reads as the picture having slipped.
  *
- * Interactions are the three every phone gallery uses: double tap (or double
- * click) toggles magnification at the point touched, a drag pans while
- * magnified, and the wheel zooms on a desktop. A single-pointer drag does
- * nothing at 1x, so a caller drawing its own handles over the image keeps them.
+ * Gestures are the ones a phone gallery uses: a two-finger pinch zooms and pans
+ * at once, a double tap (or double click) toggles magnification at the point
+ * touched, a one-finger drag pans while magnified, and the wheel zooms on a
+ * desktop. A single-pointer drag does nothing at 1x, so a caller drawing its
+ * own handles over the image keeps them.
  */
 
-/** How far a double tap magnifies, and the ceiling a wheel can reach. */
+/** How far a double tap magnifies, and the ceiling a pinch or wheel can reach. */
 const DOUBLE_TAP_SCALE = 2.5;
 const MAX_SCALE = 4;
 /** One wheel notch. */
 const WHEEL_STEP = 1.15;
-/** Two taps closer together than this in time, and nearer than the slop, double. */
+/** Two taps closer than this in time, and nearer than the slop, are a double. */
 const DOUBLE_TAP_MS = 300;
 const DOUBLE_TAP_SLOP = 24;
 
@@ -92,6 +93,26 @@ function zoomToPoint(
   };
 }
 
+interface PinchAnchor {
+  dist: number;
+  midX: number;
+  midY: number;
+}
+
+/** Distance and frame-relative midpoint of the two live pointers. */
+function pinchOf(
+  points: { x: number; y: number }[],
+  left: number,
+  top: number,
+): PinchAnchor {
+  const [a, b] = points;
+  return {
+    dist: Math.hypot(a.x - b.x, a.y - b.y),
+    midX: (a.x + b.x) / 2 - left,
+    midY: (a.y + b.y) / 2 - top,
+  };
+}
+
 /** `width` and `height` are the frame's size in CSS pixels. */
 export function useImageZoom(width: number, height: number): ImageZoom {
   const [transform, setTransform] = useState<Transform>(IDENTITY);
@@ -106,6 +127,10 @@ export function useImageZoom(width: number, height: number): ImageZoom {
 
   const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
   const panRef = useRef<{ x: number; y: number } | null>(null);
+  // Every pointer currently down on the frame, in client coordinates, so two of
+  // them can be read together as a pinch.
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const pinchRef = useRef<PinchAnchor | null>(null);
 
   const reset = useCallback(() => setTransform(IDENTITY), []);
 
@@ -128,6 +153,23 @@ export function useImageZoom(width: number, height: number): ImageZoom {
 
   const onPointerDown = useCallback(
     (event: PointerEvent) => {
+      const pointers = pointersRef.current;
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+      // Second finger down: a pinch. Capture both so their moves arrive here
+      // even if one began on an overlay handle, and drop any tap or pan guess.
+      if (pointers.size === 2) {
+        lastTapRef.current = null;
+        panRef.current = null;
+        const rect = event.currentTarget.getBoundingClientRect();
+        pinchRef.current = pinchOf([...pointers.values()], rect.left, rect.top);
+        for (const id of pointers.keys()) {
+          event.currentTarget.setPointerCapture(id);
+        }
+        return;
+      }
+      if (pointers.size !== 1) return;
+
       const { px, py } = pointInFrame(event);
       const last = lastTapRef.current;
       const now = Date.now();
@@ -139,7 +181,6 @@ export function useImageZoom(width: number, height: number): ImageZoom {
 
       if (isDoubleTap) {
         lastTapRef.current = null;
-        // Toggle: magnify at the point, or return to 1x if already magnified.
         setTransform((current) =>
           current.scale > 1
             ? IDENTITY
@@ -149,8 +190,8 @@ export function useImageZoom(width: number, height: number): ImageZoom {
       }
       lastTapRef.current = { time: now, x: px, y: py };
 
-      // Only a magnified image pans; at 1x the drag belongs to whatever the
-      // caller draws over the image (the corner handles).
+      // Only a magnified image pans on one finger; at 1x the drag belongs to
+      // whatever the caller draws over the image (the corner handles).
       if (zoomedRef.current) {
         panRef.current = { x: event.clientX, y: event.clientY };
         event.currentTarget.setPointerCapture(event.pointerId);
@@ -161,6 +202,41 @@ export function useImageZoom(width: number, height: number): ImageZoom {
 
   const onPointerMove = useCallback(
     (event: PointerEvent) => {
+      const pointers = pointersRef.current;
+      if (pointers.has(event.pointerId)) {
+        pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      }
+
+      // A pinch drives both scale and position from the two fingers together.
+      const anchor = pinchRef.current;
+      if (anchor && pointers.size >= 2) {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const next = pinchOf([...pointers.values()], rect.left, rect.top);
+        if (anchor.dist > 0) {
+          const factor = next.dist / anchor.dist;
+          const dx = next.midX - anchor.midX;
+          const dy = next.midY - anchor.midY;
+          setTransform((current) => {
+            const zoomed = zoomToPoint(
+              current,
+              current.scale * factor,
+              next.midX,
+              next.midY,
+              width,
+              height,
+            );
+            // The pinch also slides under the fingers.
+            return {
+              scale: zoomed.scale,
+              x: clampOffset(zoomed.x + dx, zoomed.scale, width),
+              y: clampOffset(zoomed.y + dy, zoomed.scale, height),
+            };
+          });
+        }
+        pinchRef.current = next;
+        return;
+      }
+
       const pan = panRef.current;
       if (!pan) return;
       const dx = event.clientX - pan.x;
@@ -175,12 +251,16 @@ export function useImageZoom(width: number, height: number): ImageZoom {
     [width, height],
   );
 
-  const endPan = useCallback((event: PointerEvent) => {
-    if (!panRef.current) return;
-    panRef.current = null;
+  const endPointer = useCallback((event: PointerEvent) => {
+    const pointers = pointersRef.current;
+    pointers.delete(event.pointerId);
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    // A pinch needs two fingers; with fewer, it is over. The remaining finger
+    // does not silently become a pan.
+    if (pointers.size < 2) pinchRef.current = null;
+    if (pointers.size === 0) panRef.current = null;
   }, []);
 
   const contentStyle = useMemo<CSSProperties>(
@@ -210,8 +290,8 @@ export function useImageZoom(width: number, height: number): ImageZoom {
     containerProps: {
       onPointerDown,
       onPointerMove,
-      onPointerUp: endPan,
-      onPointerCancel: endPan,
+      onPointerUp: endPointer,
+      onPointerCancel: endPointer,
       onWheel,
       style: containerStyle,
     },
