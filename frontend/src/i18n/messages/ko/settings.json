@@ -748,6 +748,7 @@
     "storedBackups": {
       "heading": "자동 백업",
       "description": "이 서버가 자체 일정에 따라 만든 백업입니다. 사본을 보관하려면 내려받고, 복원하려면 아래 양식을 사용하세요.",
+      "adminScheduleNote": "자동 백업 설정은 <link>관리자 → 백업</link>에 있습니다.",
       "loading": "백업을 불러오는 중...",
       "loadFailed": "서버에 저장된 백업을 불러오지 못했습니다",
       "retryButton": "다시 시도",

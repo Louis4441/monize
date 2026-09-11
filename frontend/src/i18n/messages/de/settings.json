@@ -748,6 +748,7 @@
     "storedBackups": {
       "heading": "Automatische Sicherungen",
       "description": "Sicherungen, die dieser Server nach seinem eigenen Zeitplan für Sie erstellt hat. Laden Sie eine herunter, um eine eigene Kopie zu behalten, oder stellen Sie mit dem Formular unten daraus wieder her.",
+      "adminScheduleNote": "Die Einstellungen für automatische Sicherungen finden Sie unter <link>Admin → Sicherungen</link>.",
       "loading": "Sicherungen werden geladen...",
       "loadFailed": "Die auf dem Server gespeicherten Sicherungen konnten nicht geladen werden",
       "retryButton": "Erneut versuchen",

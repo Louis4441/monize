@@ -748,6 +748,7 @@
     "storedBackups": {
       "heading": "Kopie automatyczne",
       "description": "Kopie zapasowe utworzone dla Ciebie przez ten serwer według jego własnego harmonogramu. Pobierz jedną, aby mieć własny egzemplarz, albo przywróć z niej dane za pomocą formularza poniżej.",
+      "adminScheduleNote": "Ustawienia automatycznych kopii zapasowych znajdziesz w <link>Administrator → Kopie zapasowe</link>.",
       "loading": "Wczytywanie kopii zapasowych...",
       "loadFailed": "Nie udało się wczytać kopii zapasowych przechowywanych na serwerze",
       "retryButton": "Spróbuj ponownie",
