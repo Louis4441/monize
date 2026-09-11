@@ -21,8 +21,22 @@ vi.mock('@/hooks/useNumberFormat', async () => {
     }),
   };
 });
-vi.mock('@/lib/utils', () => ({
+vi.mock('@/lib/utils', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/utils')>()),
   parseLocalDate: (d: string) => new Date(d + 'T00:00:00'),
+}));
+// Cross-device widget settings; each test sets the scope/view it needs.
+const { widgetConfig, mockUpdateConfig } = vi.hoisted(() => ({
+  widgetConfig: {
+    current: {
+      scope: 'dueSoon' as 'dueSoon' | 'all',
+      view: 'list' as 'list' | 'calendar',
+    },
+  },
+  mockUpdateConfig: vi.fn(),
+}));
+vi.mock('@/hooks/useWidgetConfig', () => ({
+  useWidgetConfig: () => ({ config: widgetConfig.current, updateConfig: mockUpdateConfig }),
 }));
 
 function futureDateStr(daysAhead: number): string {
@@ -48,6 +62,8 @@ const BELOW_ZERO_TITLE = dashboardMessages.upcomingBills.negativeBalanceWarning;
 describe('UpcomingBills', () => {
   beforeEach(() => {
     mockPush.mockClear();
+    mockUpdateConfig.mockClear();
+    widgetConfig.current = { scope: 'dueSoon', view: 'list' };
   });
 
   it('renders loading state with title and pulse skeleton', () => {
@@ -215,6 +231,53 @@ describe('UpcomingBills', () => {
 
     render(<UpcomingBills accounts={[]} scheduledTransactions={transactions} isLoading={false} maxItems={defaultMaxItems} />);
     expect(screen.getByText('No overdue or upcoming bills, deposits, or transfers within their reminder windows.')).toBeInTheDocument();
+  });
+
+  it('shows a schedule beyond its reminder window under All upcoming', () => {
+    // The reminder window says when to be nudged, not what exists. Under All
+    // upcoming, a bill six months out is still a bill six months out.
+    widgetConfig.current = { scope: 'all', view: 'list' };
+    const transactions = [
+      { id: '1', name: 'Far Future Bill', amount: -50, currencyCode: 'CAD', nextDueDate: futureDateStr(180), isActive: true, autoPost: true, reminderDaysBefore: 3 },
+    ] as any[];
+
+    render(<UpcomingBills accounts={[]} scheduledTransactions={transactions} isLoading={false} maxItems={defaultMaxItems} />);
+    expect(screen.getByText('Far Future Bill')).toBeInTheDocument();
+  });
+
+  it('still leaves an inactive schedule out under All upcoming', () => {
+    widgetConfig.current = { scope: 'all', view: 'list' };
+    const transactions = [
+      { id: '1', name: 'Cancelled Bill', amount: -50, currencyCode: 'CAD', nextDueDate: futureDateStr(5), isActive: false, autoPost: true },
+    ] as any[];
+
+    render(<UpcomingBills accounts={[]} scheduledTransactions={transactions} isLoading={false} maxItems={defaultMaxItems} />);
+    expect(
+      screen.getByText('No active bills, deposits, or transfers scheduled.'),
+    ).toBeInTheDocument();
+  });
+
+  it('switches the scope and the view through the header controls', () => {
+    render(<UpcomingBills accounts={[]} scheduledTransactions={[]} isLoading={false} maxItems={defaultMaxItems} />);
+    fireEvent.click(screen.getByRole('button', { name: 'All upcoming' }));
+    expect(mockUpdateConfig).toHaveBeenCalledWith({ scope: 'all' });
+    fireEvent.click(screen.getByRole('button', { name: 'Calendar' }));
+    expect(mockUpdateConfig).toHaveBeenCalledWith({ view: 'calendar' });
+  });
+
+  it('lays the same occurrences out on a month grid in the calendar view', () => {
+    widgetConfig.current = { scope: 'all', view: 'calendar' };
+    const dueDate = futureDateStr(2);
+    const transactions = [
+      { id: 'st-1', name: 'Rent', amount: -1200, currencyCode: 'CAD', nextDueDate: dueDate, frequency: 'MONTHLY', isActive: true, autoPost: false, futureOverrides: [] },
+    ] as any[];
+
+    render(<UpcomingBills accounts={[]} scheduledTransactions={transactions} isLoading={false} maxItems={defaultMaxItems} />);
+
+    // The chip carries the schedule and posts it, the same as a list row.
+    const chip = screen.getAllByRole('button', { name: 'Rent' })[0];
+    fireEvent.click(chip);
+    expect(mockPush).toHaveBeenCalledWith('/bills?postBillId=st-1');
   });
 
   it('links the title to the bills page', () => {

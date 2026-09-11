@@ -1673,8 +1673,10 @@ describe('BillsPage', () => {
       await waitFor(() => expect(screen.getByTestId('scheduled-transaction-list')).toBeInTheDocument());
       fireEvent.click(screen.getByText('Calendar'));
       await waitFor(() => {
-        const bill = screen.getByText('Salary');
-        expect(bill.closest('div')).toHaveClass('bg-green-100');
+        // The chip is the control itself, so its own classes carry the colour.
+        expect(screen.getByRole('button', { name: 'Salary' })).toHaveClass(
+          'bg-green-100',
+        );
       });
     });
   });

@@ -95,6 +95,18 @@ export interface GeographicConfig {
   view: 'region' | 'exchange' | 'country';
 }
 
+/**
+ * Upcoming Bills settings.
+ *
+ * `scope` is which occurrences the widget lists: `dueSoon` keeps the reminder
+ * window each schedule carries, `all` shows every active schedule's next
+ * occurrence however far off it is. `view` picks the list or the month grid.
+ */
+export interface UpcomingBillsConfig {
+  scope: 'dueSoon' | 'all';
+  view: 'list' | 'calendar';
+}
+
 export interface RecurringConfig {
   minOccurrences: number;
 }
@@ -136,6 +148,13 @@ export const SECURITY_TYPE_ALLOCATION_DEFAULT: SecurityTypeAllocationConfig = {
 export const GEOGRAPHIC_ALLOCATION_DEFAULT: GeographicConfig = {
   accountIds: [],
   view: 'region',
+};
+
+// The historical behaviour: only what is overdue or inside its reminder window,
+// as a list.
+export const UPCOMING_BILLS_DEFAULT: UpcomingBillsConfig = {
+  scope: 'dueSoon',
+  view: 'list',
 };
 
 export const RECURRING_EXPENSES_DEFAULT: RecurringConfig = { minOccurrences: 3 };

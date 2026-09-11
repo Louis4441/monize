@@ -21,7 +21,6 @@
   "upcomingBills": {
     "title": "Upcoming Bills & Deposits",
     "empty": "No overdue or upcoming bills, deposits, or transfers within their reminder windows.",
-    "perReminderSettings": "Per reminder settings",
     "postTransaction": "Post this transaction",
     "manual": "Manual",
     "manualTitle": "Requires manual posting",
@@ -38,7 +37,16 @@
       "transfer": "Transfer",
       "reminder": "Reminder",
       "unknown": "Unknown"
-    }
+    },
+    "scope": {
+      "dueSoon": "Due soon",
+      "all": "All upcoming"
+    },
+    "viewList": "List",
+    "viewCalendar": "Calendar",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "emptyAll": "No active bills, deposits, or transfers scheduled."
   },
   "gettingStarted": {
     "title": "Getting Started",

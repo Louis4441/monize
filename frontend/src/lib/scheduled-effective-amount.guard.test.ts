@@ -96,8 +96,8 @@ const CLIENT_EXPANDERS = new Map([
     'the cash-flow forecast, which already resolves each occurrence against futureOverrides and the effective-amount contract; it is the surface the others were wrong against',
   ],
   [
-    '/src/app/bills/page.tsx',
-    'the bills calendar, which draws names on dates and prints no amount per occurrence',
+    '/src/lib/scheduled-calendar.ts',
+    'the shared month grid behind the bills calendar and the Upcoming Bills widget, which draws names on dates and prints no amount per occurrence',
   ],
   [
     '/src/lib/loan-overpayments.ts',
