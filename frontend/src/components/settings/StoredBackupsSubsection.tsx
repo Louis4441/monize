@@ -4,12 +4,20 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
-import { Td, Th, TABLE_BODY_CLASS, TABLE_CLASS } from '@/components/ui/Table';
+import {
+  CAPTION_CLASS,
+  CellLabel,
+  Td,
+  Th,
+  TABLE_BODY_CLASS,
+  TABLE_CLASS,
+} from '@/components/ui/Table';
 import { backupApi, StoredBackup, StoredBackupsReport } from '@/lib/backupApi';
 import { getErrorMessage } from '@/lib/errors';
 import { downloadBlob } from '@/lib/download';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import {
+  cn,
   formatDatetimeLocal,
   isoToDatetimeLocal,
   resolveTimezone,
@@ -196,32 +204,77 @@ export function StoredBackupsSubsection({
           )}
 
           {!isLoading && !loadError && backups.length > 0 && (
+            // Below `sm` the table becomes a block and each row wraps into a
+            // three-line grid card: the filename on a line of its own, the
+            // modification time on the next, and the size beside the row's two
+            // stacked buttons on the last. From `sm` up it is the ordinary
+            // table, resolved exactly as it was before the wrap. Explicit
+            // `role`s put back the table semantics that restyling `display`
+            // strips (inert from `sm` up).
+            //
+            // Only the size shares a line with the buttons, and that is the
+            // measurement this layout is built on: the button column is as wide
+            // as its longest label, which is a translation (`Herunterladen`,
+            // `Working...`), so the cell beside it has to be the one figure that
+            // cannot be crowded. A datetime there overflowed 320px in a locale
+            // with a long label, reopening the sideways scroll the card closes.
             <div className="overflow-x-auto">
-              <table className={TABLE_CLASS}>
-                <thead>
-                  <tr>
-                    <Th>{t('columns.filename')}</Th>
-                    <Th>{t('columns.modified')}</Th>
-                    <Th align="right">{t('columns.size')}</Th>
-                    <Th align="right">
+              <table role="table" className={cn(TABLE_CLASS, 'block sm:table')}>
+                <thead role="rowgroup" className="block sm:table-header-group">
+                  <tr role="row" className="hidden sm:table-row">
+                    <Th role="columnheader">{t('columns.filename')}</Th>
+                    <Th role="columnheader">{t('columns.modified')}</Th>
+                    <Th role="columnheader" align="right">
+                      {t('columns.size')}
+                    </Th>
+                    <Th role="columnheader" align="right">
                       <span className="sr-only">{t('columns.actions')}</span>
                     </Th>
                   </tr>
                 </thead>
-                <tbody className={TABLE_BODY_CLASS}>
+                <tbody
+                  role="rowgroup"
+                  className={cn(TABLE_BODY_CLASS, 'block sm:table-row-group')}
+                >
                   {backups.map((backup) => (
-                    <tr key={backup.filename}>
-                      <Td className="break-all font-mono text-xs">
+                    <tr
+                      key={backup.filename}
+                      role="row"
+                      className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1.5 px-4 py-3 sm:table-row sm:p-0"
+                    >
+                      <Td
+                        role="cell"
+                        className="col-span-2 row-start-1 p-0 break-all font-mono text-xs sm:table-cell sm:px-4 sm:py-3"
+                      >
                         {backup.filename}
                       </Td>
-                      <Td className="whitespace-nowrap">
+                      <Td
+                        role="cell"
+                        className="col-span-2 row-start-2 p-0 text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-sm"
+                      >
+                        <CellLabel className={CAPTION_CLASS}>
+                          {t('columns.modified')}
+                        </CellLabel>
                         {formatModified(backup.modifiedAt)}
                       </Td>
-                      <Td align="right" className="whitespace-nowrap">
+                      <Td
+                        role="cell"
+                        className="col-start-1 row-start-3 p-0 text-left text-xs whitespace-nowrap sm:table-cell sm:px-4 sm:py-3 sm:text-right sm:text-sm"
+                      >
+                        <CellLabel className={CAPTION_CLASS}>
+                          {t('columns.size')}
+                        </CellLabel>
                         {formatBytes(backup.size)}
                       </Td>
-                      <Td align="right">
-                        <div className="flex justify-end gap-2">
+                      <Td
+                        role="cell"
+                        className="col-start-2 row-start-3 p-0 sm:table-cell sm:px-4 sm:py-3 sm:text-right"
+                      >
+                        {/* Stacked on a phone, so the widest label rather than
+                            the pair of them decides how much width the buttons
+                            take from the figure beside them; side by side from
+                            `sm`, as the table always drew them. */}
+                        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                           <Button
                             variant="outline"
                             size="sm"
