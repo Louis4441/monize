@@ -21,7 +21,6 @@
   "upcomingBills": {
     "title": "Bevorstehende Rechnungen und Einzahlungen",
     "empty": "Keine überfälligen oder bevorstehenden Rechnungen, Einzahlungen oder Überweisungen innerhalb der Erinnerungsfenster.",
-    "perReminderSettings": "Gemäß Erinnerungseinstellungen",
     "postTransaction": "Diese Buchung ausführen",
     "manual": "Manuell",
     "manualTitle": "Erfordert manuelle Buchung",
@@ -38,7 +37,16 @@
       "transfer": "Überweisung",
       "reminder": "Erinnerung",
       "unknown": "Unbekannt"
-    }
+    },
+    "scope": {
+      "dueSoon": "Bald fällig",
+      "all": "Alle anstehenden"
+    },
+    "viewList": "Liste",
+    "viewCalendar": "Kalender",
+    "previousMonth": "Vorheriger Monat",
+    "nextMonth": "Nächster Monat",
+    "emptyAll": "Keine aktiven Rechnungen, Einzahlungen oder Überweisungen geplant."
   },
   "gettingStarted": {
     "title": "Erste Schritte",
@@ -94,7 +102,13 @@
     "filter": {
       "all": "Alle",
       "gainers": "Gewinner",
-      "losers": "Verlierer"
+      "losers": "Verlierer",
+      "label": "Richtung"
+    },
+    "metric": {
+      "label": "Sortieren nach",
+      "amount": "Betrag",
+      "percent": "Prozent"
     }
   },
   "favouriteSecurities": {
@@ -125,7 +139,10 @@
     "empty": "Keine Ausgabendaten für diesen Zeitraum.",
     "total": "Gesamt",
     "uncategorized": "Nicht kategorisiert",
-    "other": "Sonstiges"
+    "other": "Sonstiges",
+    "insideOther": "{count, plural, one {# Kategorie unter Sonstige} other {# Kategorien unter Sonstige}}",
+    "topLevelOnly": "Oberkategorien",
+    "topLevelOnlyHint": "Unterkategorien der Oberkategorie zurechnen"
   },
   "incomeExpenses": {
     "title": "Einnahmen vs. Ausgaben",
@@ -173,7 +190,9 @@
       "2y": "2Y",
       "5y": "5Y",
       "ytd": "YTD",
-      "all": "Alle"
+      "all": "Alle",
+      "1w": "1W",
+      "mtd": "MTD"
     }
   },
   "portfolioValue": {
@@ -225,14 +244,19 @@
       "MUTUAL_FUND": "Investmentfonds",
       "BOND": "Anleihen",
       "CASH": "Bargeld"
-    }
+    },
+    "viewType": "Wertpapierart",
+    "viewAssetClass": "Anlageklasse",
+    "otherAssetClasses": "Sonstige",
+    "emptyAssetClass": "Noch keine Aufschlüsselung nach Anlageklassen verfügbar."
   },
   "geographicAllocation": {
     "title": "Geografische Allokation",
     "empty": "Keine Bestände vorhanden.",
     "viewRegion": "Region",
     "viewExchange": "Börse",
-    "viewCountry": "Land"
+    "viewCountry": "Land",
+    "listingBasisNote": "Gruppiert nach dem Börsenplatz jeder Position. Wechseln Sie zu Land, um in Fonds hineinzuschauen."
   },
   "recurringExpenses": {
     "title": "Top wiederkehrende Ausgaben",

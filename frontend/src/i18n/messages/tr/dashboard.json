@@ -21,7 +21,6 @@
   "upcomingBills": {
     "title": "Yaklaşan Faturalar ve Ödemeler",
     "empty": "Hatırlatma pencereleri içinde vadesi geçmiş veya yaklaşan fatura, ödeme ya da transfer yok.",
-    "perReminderSettings": "Hatırlatma ayarlarına göre",
     "postTransaction": "Bu işlemi kaydet",
     "manual": "Manuel",
     "manualTitle": "Manuel kayıt gerektirir",
@@ -38,7 +37,16 @@
       "transfer": "Transfer",
       "reminder": "Hatırlatma",
       "unknown": "Bilinmiyor"
-    }
+    },
+    "scope": {
+      "dueSoon": "Yakında ödenecek",
+      "all": "Yaklaşan tümü"
+    },
+    "viewList": "Liste",
+    "viewCalendar": "Takvim",
+    "previousMonth": "Önceki ay",
+    "nextMonth": "Sonraki ay",
+    "emptyAll": "Planlanmış etkin fatura, para yatırma veya transfer yok."
   },
   "gettingStarted": {
     "title": "Başlarken",
@@ -94,7 +102,13 @@
     "filter": {
       "all": "Tümü",
       "gainers": "Kazananlar",
-      "losers": "Kaybedenler"
+      "losers": "Kaybedenler",
+      "label": "Yön"
+    },
+    "metric": {
+      "label": "Sıralama ölçütü",
+      "amount": "Tutar",
+      "percent": "Yüzde"
     }
   },
   "favouriteSecurities": {
@@ -125,7 +139,10 @@
     "empty": "Bu dönem için gider verisi yok.",
     "total": "Toplam",
     "uncategorized": "Kategorisiz",
-    "other": "Diğer"
+    "other": "Diğer",
+    "insideOther": "{count, plural, other {Diğer içinde # kategori}}",
+    "topLevelOnly": "Üst düzey kategoriler",
+    "topLevelOnlyHint": "Alt kategorileri üst kategorisinde say"
   },
   "incomeExpenses": {
     "title": "Gelir ve Giderler",
@@ -173,7 +190,9 @@
       "2y": "2Y",
       "5y": "5Y",
       "ytd": "YTD",
-      "all": "Tümü"
+      "all": "Tümü",
+      "1w": "1H",
+      "mtd": "AYB"
     }
   },
   "portfolioValue": {
@@ -225,14 +244,19 @@
       "MUTUAL_FUND": "Yatırım Fonları",
       "BOND": "Tahviller",
       "CASH": "Nakit"
-    }
+    },
+    "viewType": "Menkul kıymet türü",
+    "viewAssetClass": "Varlık sınıfı",
+    "otherAssetClasses": "Diğer",
+    "emptyAssetClass": "Henüz varlık sınıfı dökümü yok."
   },
   "geographicAllocation": {
     "title": "Coğrafi Dağılım",
     "empty": "Gösterilecek varlık yok.",
     "viewRegion": "Bölge",
     "viewExchange": "Borsa",
-    "viewCountry": "Ülke"
+    "viewCountry": "Ülke",
+    "listingBasisNote": "Her varlığın işlem gördüğü borsaya göre gruplanır. Fonların içini görmek için Ülke'ye geçin."
   },
   "recurringExpenses": {
     "title": "En Yüksek Tekrarlayan Giderler",

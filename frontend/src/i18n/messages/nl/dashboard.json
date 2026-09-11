@@ -21,7 +21,6 @@
   "upcomingBills": {
     "title": "Aankomende facturen en stortingen",
     "empty": "Geen achterstallige of aankomende facturen, stortingen of overboekingen binnen de herinneringsvensters.",
-    "perReminderSettings": "Per herinneringsinstellingen",
     "postTransaction": "Deze transactie boeken",
     "manual": "Handmatig",
     "manualTitle": "Vereist handmatige boeking",
@@ -38,7 +37,16 @@
       "transfer": "Overboeking",
       "reminder": "Herinnering",
       "unknown": "Onbekend"
-    }
+    },
+    "scope": {
+      "dueSoon": "Binnenkort verschuldigd",
+      "all": "Alle aankomende"
+    },
+    "viewList": "Lijst",
+    "viewCalendar": "Kalender",
+    "previousMonth": "Vorige maand",
+    "nextMonth": "Volgende maand",
+    "emptyAll": "Geen actieve rekeningen, stortingen of overboekingen gepland."
   },
   "gettingStarted": {
     "title": "Aan de slag",
@@ -94,7 +102,13 @@
     "filter": {
       "all": "Alle",
       "gainers": "Stijgers",
-      "losers": "Dalers"
+      "losers": "Dalers",
+      "label": "Richting"
+    },
+    "metric": {
+      "label": "Sorteren op",
+      "amount": "Bedrag",
+      "percent": "Percentage"
     }
   },
   "favouriteSecurities": {
@@ -125,7 +139,10 @@
     "empty": "Geen uitgavengegevens voor deze periode.",
     "total": "Totaal",
     "uncategorized": "Niet gecategoriseerd",
-    "other": "Overig"
+    "other": "Overig",
+    "insideOther": "{count, plural, one {# categorie in Overig} other {# categorieën in Overig}}",
+    "topLevelOnly": "Hoofdcategorieën",
+    "topLevelOnlyHint": "Subcategorieën bij hun hoofdcategorie tellen"
   },
   "incomeExpenses": {
     "title": "Inkomsten versus uitgaven",
@@ -173,7 +190,9 @@
       "2y": "2Y",
       "5y": "5Y",
       "ytd": "YTD",
-      "all": "Alle"
+      "all": "Alle",
+      "1w": "1W",
+      "mtd": "MTD"
     }
   },
   "portfolioValue": {
@@ -225,14 +244,19 @@
       "MUTUAL_FUND": "Beleggingsfondsen",
       "BOND": "Obligaties",
       "CASH": "Contanten"
-    }
+    },
+    "viewType": "Effectentype",
+    "viewAssetClass": "Beleggingscategorie",
+    "otherAssetClasses": "Overig",
+    "emptyAssetClass": "Nog geen uitsplitsing naar beleggingscategorie beschikbaar."
   },
   "geographicAllocation": {
     "title": "Geografische allocatie",
     "empty": "Geen posities om te tonen.",
     "viewRegion": "Regio",
     "viewExchange": "Beurs",
-    "viewCountry": "Land"
+    "viewCountry": "Land",
+    "listingBasisNote": "Gegroepeerd op de beurs waar elke positie genoteerd staat. Schakel over naar Land om in fondsen te kijken."
   },
   "recurringExpenses": {
     "title": "Grootste terugkerende uitgaven",
