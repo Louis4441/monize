@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, PointerEvent, WheelEvent } from 'react';
+import type { CSSProperties, PointerEvent } from 'react';
 
 /**
  * Pan and zoom for a fixed-size preview, so fine print can be checked before a
@@ -44,15 +44,17 @@ export interface ImageZoom {
   scale: number;
   /** Whether the image is magnified, so a caller can suspend its own gestures. */
   zoomed: boolean;
-  /** Return to 1x. Call it when the shown image is replaced. */
+  /** Return to 1x and forget any gesture in progress. Call it when the shown
+   *  image is replaced. */
   reset: () => void;
-  /** Spread on the fixed-size frame: the gesture handlers and clipping. */
+  /** Ref for the fixed-size frame: binds the non-passive wheel listener. */
+  containerRef: (node: HTMLElement | null) => void;
+  /** Spread on the fixed-size frame: the pointer handlers and clipping. */
   containerProps: {
     onPointerDown: (event: PointerEvent) => void;
     onPointerMove: (event: PointerEvent) => void;
     onPointerUp: (event: PointerEvent) => void;
     onPointerCancel: (event: PointerEvent) => void;
-    onWheel: (event: WheelEvent) => void;
     style: CSSProperties;
   };
   /** Spread on the element holding the image (and any overlay): the transform. */
@@ -132,21 +134,44 @@ export function useImageZoom(width: number, height: number): ImageZoom {
   const pointersRef = useRef(new Map<number, { x: number; y: number }>());
   const pinchRef = useRef<PinchAnchor | null>(null);
 
-  const reset = useCallback(() => setTransform(IDENTITY), []);
+  const reset = useCallback(() => {
+    // Forget any half-finished gesture too, so a pinch or pan interrupted by the
+    // dialog closing cannot leak a stale pointer into the next scan.
+    pointersRef.current.clear();
+    pinchRef.current = null;
+    panRef.current = null;
+    lastTapRef.current = null;
+    setTransform(IDENTITY);
+  }, []);
 
-  const pointInFrame = (event: PointerEvent | WheelEvent) => {
+  const pointInFrame = (event: PointerEvent) => {
     const rect = event.currentTarget.getBoundingClientRect();
     return { px: event.clientX - rect.left, py: event.clientY - rect.top };
   };
 
-  const onWheel = useCallback(
-    (event: WheelEvent) => {
-      event.preventDefault();
-      const { px, py } = pointInFrame(event);
-      const factor = event.deltaY < 0 ? WHEEL_STEP : 1 / WHEEL_STEP;
-      setTransform((current) =>
-        zoomToPoint(current, current.scale * factor, px, py, width, height),
-      );
+  // The wheel listener is native and non-passive. React registers wheel as a
+  // passive root listener, so preventDefault in a synthetic onWheel is ignored
+  // and the page scrolls while zooming; binding it ourselves lets the zoom
+  // suppress the scroll (the same reason useSwipeNavigation binds touchmove).
+  const wheelCleanupRef = useRef<(() => void) | null>(null);
+  const containerRef = useCallback(
+    (node: HTMLElement | null) => {
+      wheelCleanupRef.current?.();
+      wheelCleanupRef.current = null;
+      if (!node) return;
+      const handler = (event: WheelEvent) => {
+        event.preventDefault();
+        const rect = node.getBoundingClientRect();
+        const px = event.clientX - rect.left;
+        const py = event.clientY - rect.top;
+        const factor = event.deltaY < 0 ? WHEEL_STEP : 1 / WHEEL_STEP;
+        setTransform((current) =>
+          zoomToPoint(current, current.scale * factor, px, py, width, height),
+        );
+      };
+      node.addEventListener('wheel', handler, { passive: false });
+      wheelCleanupRef.current = () =>
+        node.removeEventListener('wheel', handler);
     },
     [width, height],
   );
@@ -274,10 +299,11 @@ export function useImageZoom(width: number, height: number): ImageZoom {
 
   const containerStyle = useMemo<CSSProperties>(
     () => ({
-      // Clip only while magnified. At 1x an overlay may extend past the image
-      // on purpose -- the corner handles' targets do -- and must stay visible.
+      // Clip and swallow touch scrolling only while magnified. At 1x an overlay
+      // may extend past the image on purpose (the corner handles' targets do),
+      // and a swipe over the preview should still scroll a tall dialog.
       overflow: transform.scale > 1 ? 'hidden' : 'visible',
-      touchAction: 'none',
+      touchAction: transform.scale > 1 ? 'none' : undefined,
       cursor: transform.scale > 1 ? 'grab' : undefined,
     }),
     [transform.scale],
@@ -287,12 +313,12 @@ export function useImageZoom(width: number, height: number): ImageZoom {
     scale: transform.scale,
     zoomed: transform.scale > 1,
     reset,
+    containerRef,
     containerProps: {
       onPointerDown,
       onPointerMove,
       onPointerUp: endPointer,
       onPointerCancel: endPointer,
-      onWheel,
       style: containerStyle,
     },
     contentStyle,

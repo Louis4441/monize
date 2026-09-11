@@ -1,25 +1,19 @@
 import { describe, it, expect, vi } from 'vitest';
 import { act, renderHook } from '@/test/render';
 
-import { useImageZoom } from './useImageZoom';
+import { useImageZoom, type ImageZoom } from './useImageZoom';
 
 const WIDTH = 200;
 const HEIGHT = 100;
 
-/** A pointer/wheel event whose frame sits at the viewport origin. */
+/** A pointer event whose frame sits at the viewport origin. */
 function makeEvent(
-  overrides: Partial<{
-    clientX: number;
-    clientY: number;
-    deltaY: number;
-    pointerId: number;
-  }> = {},
+  overrides: Partial<{ clientX: number; clientY: number; pointerId: number }> = {},
 ) {
   const capture = { held: new Set<number>() };
   return {
     clientX: overrides.clientX ?? 0,
     clientY: overrides.clientY ?? 0,
-    deltaY: overrides.deltaY ?? 0,
     pointerId: overrides.pointerId ?? 1,
     preventDefault: vi.fn(),
     currentTarget: {
@@ -29,6 +23,24 @@ function makeEvent(
       hasPointerCapture: (id: number) => capture.held.has(id),
     },
   } as never;
+}
+
+/** Bind the container ref to a real element whose frame sits at the origin. */
+function attachFrame(current: ImageZoom): HTMLElement {
+  const el = document.createElement('div');
+  el.getBoundingClientRect = () =>
+    ({ left: 0, top: 0, width: WIDTH, height: HEIGHT }) as DOMRect;
+  act(() => current.containerRef(el));
+  return el;
+}
+
+/** Dispatch a native, non-passive wheel notch on the bound element. */
+function wheel(el: HTMLElement, deltaY: number, clientX = 0, clientY = 0) {
+  act(() => {
+    el.dispatchEvent(
+      new WheelEvent('wheel', { deltaY, clientX, clientY, cancelable: true, bubbles: true }),
+    );
+  });
 }
 
 function setup() {
@@ -45,19 +57,27 @@ describe('useImageZoom', () => {
 
   it('magnifies on a wheel up and shrinks back to 1x on wheel down', () => {
     const { result } = setup();
+    const el = attachFrame(result.current);
 
-    act(() => result.current.containerProps.onWheel(makeEvent({ deltaY: -1 })));
+    wheel(el, -1);
     expect(result.current.scale).toBeGreaterThan(1);
     expect(result.current.zoomed).toBe(true);
 
     // Enough wheel-down snaps back to exactly 1x with the transform reset.
-    for (let i = 0; i < 10; i++) {
-      act(() => result.current.containerProps.onWheel(makeEvent({ deltaY: 1 })));
-    }
+    for (let i = 0; i < 10; i++) wheel(el, 1);
     expect(result.current.scale).toBe(1);
     expect(result.current.contentStyle.transform).toBe(
       'translate(0px, 0px) scale(1)',
     );
+  });
+
+  it('binds the wheel listener as non-passive so it can suppress the scroll', () => {
+    const { result } = setup();
+    const el = attachFrame(result.current);
+    const event = new WheelEvent('wheel', { deltaY: -1, cancelable: true, bubbles: true });
+    act(() => el.dispatchEvent(event));
+    // preventDefault took effect -- a passive listener could not have cancelled.
+    expect(event.defaultPrevented).toBe(true);
   });
 
   it('toggles magnification on a double tap and back again', () => {
@@ -78,7 +98,8 @@ describe('useImageZoom', () => {
 
   it('reset returns to 1x', () => {
     const { result } = setup();
-    act(() => result.current.containerProps.onWheel(makeEvent({ deltaY: -1 })));
+    const el = attachFrame(result.current);
+    wheel(el, -1);
     expect(result.current.zoomed).toBe(true);
 
     act(() => result.current.reset());
@@ -88,6 +109,7 @@ describe('useImageZoom', () => {
 
   it('pans only while magnified, and never past the edge', () => {
     const { result } = setup();
+    const el = attachFrame(result.current);
 
     // At 1x a one-finger drag does nothing: the offset stays put so an overlay
     // owns it. Released after, so the finger does not linger into the next part.
@@ -104,9 +126,7 @@ describe('useImageZoom', () => {
 
     // Magnify, then drag from a point well clear of the first (so it is not read
     // as a double tap): the image pans, clamped so it still covers the frame.
-    for (let i = 0; i < 6; i++) {
-      act(() => result.current.containerProps.onWheel(makeEvent({ deltaY: -1, clientX: 10, clientY: 10 })));
-    }
+    for (let i = 0; i < 6; i++) wheel(el, -1, 10, 10);
     const scale = result.current.scale;
     act(() =>
       result.current.containerProps.onPointerDown(makeEvent({ pointerId: 2, clientX: 10, clientY: 90 })),

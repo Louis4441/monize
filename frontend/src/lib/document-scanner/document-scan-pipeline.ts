@@ -57,12 +57,12 @@ const POLY_EPSILON_RATIO = 0.02;
 const SATURATION_MAX = 65;
 /** Kernel that closes the gaps text and specular glare leave in the page mask. */
 const SATURATION_KERNEL = 25;
-/** The page must cover at least this share of the frame to be the document. */
-const SATURATION_MIN_COVER = 0.2;
 /**
- * ...and no more than this. A frame that is low-saturation edge to edge -- a
- * grey test fixture, a blank wall -- has no surround to tell the page from, so a
- * near-total cover is "no document found", not "the document fills the frame".
+ * The most of the frame the page may cover. A frame that is low-saturation edge
+ * to edge -- a grey test fixture, a blank wall -- has no surround to tell the
+ * page from, so a near-total cover is "no document found", not "the document
+ * fills the frame". The lower bound reuses `MIN_DOCUMENT_AREA_RATIO`, the same
+ * "smallest share that is a document" the edge detector applies.
  */
 const SATURATION_MAX_COVER = 0.97;
 
@@ -366,7 +366,9 @@ export function detectByLowSaturation(cv: OpenCv, image: RawImage): Quad | null 
     }
     if (!best) return null;
     const cover = best.area / frameArea;
-    if (cover < SATURATION_MIN_COVER || cover > SATURATION_MAX_COVER) return null;
+    if (cover < MIN_DOCUMENT_AREA_RATIO || cover > SATURATION_MAX_COVER) {
+      return null;
+    }
 
     // The page is rarely a clean quadrilateral in the mask -- glare and the
     // shadow bite into it -- so its minimal enclosing rectangle is a steadier

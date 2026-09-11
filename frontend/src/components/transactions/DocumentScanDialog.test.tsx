@@ -651,9 +651,12 @@ describe('DocumentScanDialog', () => {
       // Only the brightness and contrast ranges are sliders here: the corner
       // handles (also role slider) are drawn on the Original view, not this one.
       const [brightness, contrast] = screen.getAllByRole('slider');
+      // The offsets persist when the gesture settles (blur/pointer-up), not on
+      // every tick, so the store is checked after the drag ends.
       await act(async () => {
         fireEvent.change(brightness, { target: { value: '25' } });
         fireEvent.change(contrast, { target: { value: '-15' } });
+        fireEvent.blur(contrast);
       });
       expect(useScanSettingsStore.getState().adjustments).toEqual({
         brightness: 25,

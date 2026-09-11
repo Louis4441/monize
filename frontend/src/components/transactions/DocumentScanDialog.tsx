@@ -231,12 +231,17 @@ export function DocumentScanDialog({
 
   const handleAdjustment = useCallback(
     (field: keyof ImageAdjustments, value: number) => {
-      const next = { ...adjustments, [field]: value };
-      setAdjustments(next);
-      rememberAdjustments(next);
+      // Live update only. Persistence is deferred to the end of the gesture so
+      // a slider does not serialize the store to localStorage on every tick.
+      setAdjustments((current) => ({ ...current, [field]: value }));
     },
-    [adjustments, rememberAdjustments],
+    [],
   );
+
+  // Store the offsets once the drag or keypress settles, not per tick.
+  const rememberAdjustmentsNow = useCallback(() => {
+    rememberAdjustments(adjustments);
+  }, [adjustments, rememberAdjustments]);
 
   const handleResetAdjustments = useCallback(() => {
     setAdjustments(NEUTRAL_ADJUSTMENTS);
@@ -385,6 +390,7 @@ export function DocumentScanDialog({
 
             <div className="flex justify-center">
               <div
+                ref={zoom.containerRef}
                 className="relative rounded-md"
                 style={{
                   width: display.width,
@@ -395,7 +401,6 @@ export function DocumentScanDialog({
                 onPointerMove={zoom.containerProps.onPointerMove}
                 onPointerUp={zoom.containerProps.onPointerUp}
                 onPointerCancel={zoom.containerProps.onPointerCancel}
-                onWheel={zoom.containerProps.onWheel}
               >
                 {/* The canvas and its overlay are magnified together, so the
                     corners keep tracking the paper when the image is zoomed. */}
@@ -486,6 +491,10 @@ export function DocumentScanDialog({
                       onChange={(event) =>
                         handleAdjustment(field, Number(event.target.value))
                       }
+                      // Persist when the drag or keypress settles, not per tick.
+                      onPointerUp={rememberAdjustmentsNow}
+                      onKeyUp={rememberAdjustmentsNow}
+                      onBlur={rememberAdjustmentsNow}
                       className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-200 accent-blue-600 dark:bg-gray-600"
                     />
                   </div>
