@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
+import { mapWithConcurrency } from "../common/concurrency.util";
 
 import { withSystemContext } from "../common/db/with-context";
 import { SeedService } from "./seed.service";
@@ -17,6 +18,13 @@ import {
 } from "./demo-seed-data/securities";
 import { demoReports } from "./demo-seed-data/reports";
 import { demoPreferences } from "./demo-seed-data/preferences";
+
+/**
+ * Favicon fetches in flight while seeding payees. Bounded rather than one
+ * `Promise.all` over every payee: the resolver is a third party and a demo
+ * seed should not arrive as a burst of forty simultaneous requests.
+ */
+const PAYEE_LOGO_CONCURRENCY = 6;
 
 @Injectable()
 export class DemoSeedService {
@@ -451,6 +459,18 @@ export class DemoSeedService {
     return accountMap;
   }
 
+  /**
+   * Seed the demo payees, their contact details and their brand icons.
+   *
+   * Contact details are written as the user's own: `contact_lookup_at` and
+   * `contact_lookup_source` stay NULL, so the demo shows what a filled-in
+   * payee looks like rather than one the lookup answered for, and the
+   * background enrichment is still free to run on a payee that has none.
+   *
+   * Logos are fetched best-effort and bounded, like the institutions above:
+   * an unreachable favicon resolver leaves the payee on its letter badge,
+   * which is what a real create does too.
+   */
   private async seedPayees(
     userId: string,
     categoryMap: Map<string, string>,
@@ -459,15 +479,43 @@ export class DemoSeedService {
 
     const payeeMap = new Map<string, string>();
 
-    for (const payee of demoPayees) {
+    const logos = await mapWithConcurrency(
+      demoPayees,
+      PAYEE_LOGO_CONCURRENCY,
+      (payee) =>
+        payee.website
+          ? this.logoService.fetchFavicon(payee.website).catch(() => null)
+          : Promise.resolve(null),
+    );
+
+    for (let i = 0; i < demoPayees.length; i++) {
+      const payee = demoPayees[i];
+      const logo = logos[i];
       const categoryId = categoryMap.get(payee.categoryPath) || null;
       const result = await withScopedDb(this.dataSource, (manager) =>
         manager.query(
-          `INSERT INTO payees (user_id, name, default_category_id)
-         VALUES ($1, $2, $3)
+          `INSERT INTO payees (
+           user_id, name, default_category_id, website, address, phone,
+           logo_data, logo_content_type, has_logo, logo_fetched_at
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          ON CONFLICT (user_id, name) DO NOTHING
          RETURNING id`,
-          [userId, payee.name, categoryId],
+          [
+            userId,
+            payee.name,
+            categoryId,
+            payee.website ?? null,
+            payee.address ?? null,
+            payee.phone ?? null,
+            logo ? logo.data : null,
+            logo ? logo.contentType : null,
+            logo ? true : false,
+            // The column records the last attempt, so a website whose favicon
+            // did not resolve is stamped and a payee with no website stays
+            // null -- what `brandLogoColumns` writes on a real create.
+            payee.website ? new Date().toISOString() : null,
+          ],
         ),
       );
       if (result.length > 0) {
