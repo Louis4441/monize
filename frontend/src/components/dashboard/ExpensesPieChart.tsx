@@ -12,6 +12,7 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { PartialTotal } from '@/components/ui/PartialTotal';
 import { DonutCenterTotal } from '@/components/ui/DonutCenterTotal';
+import { HOVER_ROW_ON_CARD } from '@/components/ui/Card';
 import { ChartLegend } from '@/components/ui/ChartLegend';
 import { useReportData } from '@/hooks/useReportData';
 import { useWidgetConfig } from '@/hooks/useWidgetConfig';
@@ -433,7 +434,7 @@ export function ExpensesPieChart({
                       type="button"
                       onClick={() => handleCategoryClick(item.id)}
                       disabled={!item.id}
-                      className="flex w-full items-center gap-2 rounded-sm px-1 py-0.5 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-default disabled:hover:bg-transparent"
+                      className={`flex w-full items-center gap-2 rounded-sm px-1 py-0.5 text-sm text-left ${HOVER_ROW_ON_CARD} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-default disabled:hover:bg-transparent dark:disabled:hover:bg-transparent`}
                     >
                       <span
                         aria-hidden

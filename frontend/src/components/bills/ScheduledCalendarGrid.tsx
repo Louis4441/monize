@@ -66,7 +66,7 @@ export function ScheduledCalendarGrid({
             }`}
           >
             <div
-              className={`text-xs sm:text-sm font-medium mb-1 w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded-full ${
+              className={`text-sm font-medium mb-1 w-7 h-7 flex items-center justify-center rounded-full ${
                 day.isToday
                   ? 'bg-blue-600 text-white'
                   : day.isCurrentMonth
