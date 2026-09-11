@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@/test/render';
 import { StoredBackupsSubsection } from './StoredBackupsSubsection';
+import { useAuthStore } from '@/store/authStore';
+import type { User } from '@/types/auth';
 
 vi.mock('@/lib/backupApi', () => ({
   backupApi: {
@@ -40,6 +42,9 @@ const daily = {
   encrypted: false,
 };
 
+const adminUser = { id: 'u1', role: 'admin', authProvider: 'local' } as User;
+const regularUser = { id: 'u2', role: 'user', authProvider: 'local' } as User;
+
 const listMock = backupApi.listStoredBackups as ReturnType<typeof vi.fn>;
 const downloadMock = backupApi.downloadStoredBackup as ReturnType<typeof vi.fn>;
 
@@ -74,6 +79,7 @@ function isFolded(): boolean {
 describe('StoredBackupsSubsection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useAuthStore.setState({ user: regularUser, isAuthenticated: true });
     HTMLAnchorElement.prototype.click = vi.fn();
     global.URL.createObjectURL = vi.fn().mockReturnValue('blob:mock');
     global.URL.revokeObjectURL = vi.fn();
@@ -166,6 +172,33 @@ describe('StoredBackupsSubsection', () => {
     for (const caption of ['Date Modified', 'Size']) {
       expect(screen.getAllByText(caption)).toHaveLength(2);
     }
+  });
+
+  it('points an administrator at the page that holds the schedule', async () => {
+    listMock.mockResolvedValue({ enabled: true, backups: [daily] });
+    useAuthStore.setState({ user: adminUser, isAuthenticated: true });
+
+    await renderSubsection();
+    await expand();
+
+    const link = screen.getByRole('link', { name: 'Admin → Backups' });
+    expect(link).toHaveAttribute('href', '/admin/backups');
+  });
+
+  it('withholds the schedule link from a reader who cannot open it', async () => {
+    listMock.mockResolvedValue({ enabled: true, backups: [daily] });
+
+    await renderSubsection();
+    await expand();
+
+    // `/admin/backups` refuses a non-administrator, so offering the route here
+    // would only ever send this reader to a page that turns them away.
+    expect(
+      screen.queryByRole('link', { name: 'Admin → Backups' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Automatic backup settings are in/),
+    ).not.toBeInTheDocument();
   });
 
   it('says so when the server is holding nothing yet', async () => {

@@ -748,6 +748,7 @@
     "storedBackups": {
       "heading": "Sao lưu tự động",
       "description": "Các bản sao lưu máy chủ này tạo cho bạn theo lịch riêng của nó. Tải một bản về để giữ bản sao của riêng bạn, hoặc khôi phục từ nó bằng biểu mẫu bên dưới.",
+      "adminScheduleNote": "Cài đặt sao lưu tự động nằm trong <link>Quản trị → Sao lưu</link>.",
       "loading": "Đang tải các bản sao lưu...",
       "loadFailed": "Không tải được các bản sao lưu lưu trên máy chủ",
       "retryButton": "Thử lại",

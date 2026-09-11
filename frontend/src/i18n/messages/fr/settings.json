@@ -748,6 +748,7 @@
     "storedBackups": {
       "heading": "Sauvegardes automatiques",
       "description": "Sauvegardes créées pour vous par ce serveur selon sa propre planification. Téléchargez-en une pour en conserver votre propre copie, ou restaurez-en une avec le formulaire ci-dessous.",
+      "adminScheduleNote": "Les paramètres de sauvegarde automatique se trouvent dans <link>Administration → Sauvegardes</link>.",
       "loading": "Chargement des sauvegardes...",
       "loadFailed": "Impossible de charger les sauvegardes stockées sur le serveur",
       "retryButton": "Réessayer",

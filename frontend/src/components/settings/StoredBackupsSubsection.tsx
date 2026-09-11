@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
@@ -22,6 +23,7 @@ import {
   isoToDatetimeLocal,
   resolveTimezone,
 } from '@/lib/utils';
+import { useAuthStore } from '@/store/authStore';
 import { usePreferencesStore } from '@/store/preferencesStore';
 
 interface StoredBackupsSubsectionProps {
@@ -58,6 +60,10 @@ export function StoredBackupsSubsection({
 }: StoredBackupsSubsectionProps) {
   const t = useTranslations('settings.backupRestore.storedBackups');
   const { formatBytes } = useNumberFormat();
+  // The schedule behind these artifacts is configured on an admin-only page, so
+  // only an administrator is pointed at it: for everyone else the link is a
+  // route they would be refused at.
+  const isAdmin = useAuthStore((s) => s.user?.role === 'admin');
   const preferences = usePreferencesStore((s) => s.preferences);
   const timezone = resolveTimezone(preferences?.timezone);
   const dateFormat = preferences?.dateFormat || 'browser';
@@ -178,6 +184,21 @@ export function StoredBackupsSubsection({
         <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
           {t('description')}
         </p>
+
+        {isAdmin && (
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            {t.rich('adminScheduleNote', {
+              link: (chunks) => (
+                <Link
+                  href="/admin/backups"
+                  className="underline hover:no-underline"
+                >
+                  {chunks}
+                </Link>
+              ),
+            })}
+          </p>
+        )}
 
         <div className="mt-4">
           {isLoading && (

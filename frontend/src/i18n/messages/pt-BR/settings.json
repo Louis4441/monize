@@ -748,6 +748,7 @@
     "storedBackups": {
       "heading": "Backups automáticos",
       "description": "Backups que este servidor criou para você de acordo com a própria programação. Baixe um para guardar sua cópia ou restaure a partir de um usando o formulário abaixo.",
+      "adminScheduleNote": "As configurações de backup automático estão em <link>Admin → Backups</link>.",
       "loading": "Carregando backups...",
       "loadFailed": "Não foi possível carregar os backups armazenados no servidor",
       "retryButton": "Tentar novamente",
