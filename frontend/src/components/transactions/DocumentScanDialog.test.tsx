@@ -385,6 +385,57 @@ describe('DocumentScanDialog', () => {
     });
   });
 
+  describe('magnifying', () => {
+    async function ready() {
+      await open();
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: 'Use enhanced' }),
+        ).toBeEnabled(),
+      );
+    }
+
+    it('magnifies the preview on a wheel', async () => {
+      await ready();
+      const content = screen.getByRole('img', {
+        name: 'Enhanced scan preview',
+      }).parentElement as HTMLElement;
+      const frame = content.parentElement as HTMLElement;
+      expect(content.style.transform).toBe('translate(0px, 0px) scale(1)');
+
+      await act(async () => {
+        fireEvent.wheel(frame, { deltaY: -1, clientX: 0, clientY: 0 });
+      });
+      expect(content.style.transform).not.toBe('translate(0px, 0px) scale(1)');
+    });
+
+    // A magnified image pans on a drag, so the corner handles stand down rather
+    // than fight the pan for the same pointer.
+    it('stands the corner handles down while magnified', async () => {
+      await ready();
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Original' }));
+      });
+      const handle = screen.getByLabelText('Top-left corner');
+      expect(handle).toHaveAttribute('tabindex', '0');
+
+      const content = screen.getByRole('img', {
+        name: 'Original photo preview',
+      }).parentElement as HTMLElement;
+      await act(async () => {
+        fireEvent.wheel(content.parentElement as HTMLElement, {
+          deltaY: -1,
+          clientX: 0,
+          clientY: 0,
+        });
+      });
+      expect(screen.getByLabelText('Top-left corner')).toHaveAttribute(
+        'tabindex',
+        '-1',
+      );
+    });
+  });
+
   describe('rotating', () => {
     // The original is stored byte-for-byte as the device produced it (`I2`),
     // so only the scan turns. Offering Rotate beside the photo would promise
@@ -405,8 +456,10 @@ describe('DocumentScanDialog', () => {
         ).toBeEnabled(),
       );
       const preview = () =>
+        // The canvas sits in the zoom transform wrapper; the sized frame that
+        // swaps dimensions on a turn is its grandparent.
         screen.getByRole('img', { name: 'Enhanced scan preview' })
-          .parentElement as HTMLElement;
+          .parentElement?.parentElement as HTMLElement;
       const landscape = preview().style.width;
 
       await act(async () => {
@@ -469,8 +522,10 @@ describe('DocumentScanDialog', () => {
       );
 
       const canvas = () =>
+        // The canvas sits in the zoom transform wrapper; the sized frame that
+        // swaps dimensions on a turn is its grandparent.
         screen.getByRole('img', { name: 'Enhanced scan preview' })
-          .parentElement as HTMLElement;
+          .parentElement?.parentElement as HTMLElement;
       const landscape = canvas().style.width;
 
       await act(async () => {

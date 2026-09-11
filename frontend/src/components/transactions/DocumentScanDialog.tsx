@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { Button } from '@/components/ui/Button';
@@ -8,6 +8,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useDocumentScanner } from '@/hooks/useDocumentScanner';
+import { useImageZoom } from '@/hooks/useImageZoom';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import {
   encodeScan,
@@ -191,6 +192,21 @@ export function DocumentScanDialog({
     [shown],
   );
 
+  const zoom = useImageZoom(display.width, display.height);
+  // Reset magnification whenever the shown image changes for a reason other than
+  // a brightness or finish tweak: a new photo, the Original/Enhanced toggle, or
+  // a rotation. Tracked across renders rather than in an effect (the codebase's
+  // set-state-in-effect rule), and guarded so it runs only on an actual change.
+  const zoomDepsRef = useRef({ source, mode, rotation });
+  if (
+    zoomDepsRef.current.source !== source ||
+    zoomDepsRef.current.mode !== mode ||
+    zoomDepsRef.current.rotation !== rotation
+  ) {
+    zoomDepsRef.current = { source, mode, rotation };
+    zoom.reset();
+  }
+
   const originalTooLarge = !!file && file.size > MAX_ATTACHMENT_BYTES;
 
   const handleCornerCommit = useCallback(
@@ -369,33 +385,48 @@ export function DocumentScanDialog({
 
             <div className="flex justify-center">
               <div
-                className="relative"
-                style={{ width: display.width, height: display.height }}
+                className="relative rounded-md"
+                style={{
+                  width: display.width,
+                  height: display.height,
+                  ...zoom.containerProps.style,
+                }}
+                onPointerDown={zoom.containerProps.onPointerDown}
+                onPointerMove={zoom.containerProps.onPointerMove}
+                onPointerUp={zoom.containerProps.onPointerUp}
+                onPointerCancel={zoom.containerProps.onPointerCancel}
+                onWheel={zoom.containerProps.onWheel}
               >
-                <canvas
-                  ref={paint}
-                  className="h-full w-full rounded-md bg-gray-100 object-contain dark:bg-gray-800"
-                  aria-label={
-                    mode === 'enhanced'
-                      ? t('scan.previewEnhancedAlt')
-                      : t('scan.previewOriginalAlt')
-                  }
-                  role="img"
-                />
-                {/* The corners belong to the photo, so they are only drawn
-                    over it -- placed over the enhanced image they would point
-                    at coordinates that no longer exist. */}
-                {mode === 'original' && quad && source && (
-                  <DocumentCornerHandles
-                    quad={quad}
-                    imageWidth={source.width}
-                    imageHeight={source.height}
-                    displayWidth={display.width}
-                    displayHeight={display.height}
-                    onChange={setQuad}
-                    onCommit={handleCornerCommit}
+                {/* The canvas and its overlay are magnified together, so the
+                    corners keep tracking the paper when the image is zoomed. */}
+                <div className="absolute inset-0" style={zoom.contentStyle}>
+                  <canvas
+                    ref={paint}
+                    className="h-full w-full rounded-md bg-gray-100 object-contain dark:bg-gray-800"
+                    aria-label={
+                      mode === 'enhanced'
+                        ? t('scan.previewEnhancedAlt')
+                        : t('scan.previewOriginalAlt')
+                    }
+                    role="img"
                   />
-                )}
+                  {/* The corners belong to the photo, so they are only drawn
+                      over it -- placed over the enhanced image they would point
+                      at coordinates that no longer exist. While the image is
+                      magnified the drag pans instead, so the handles are idle. */}
+                  {mode === 'original' && quad && source && (
+                    <DocumentCornerHandles
+                      quad={quad}
+                      imageWidth={source.width}
+                      imageHeight={source.height}
+                      displayWidth={display.width}
+                      displayHeight={display.height}
+                      onChange={setQuad}
+                      onCommit={handleCornerCommit}
+                      disabled={zoom.zoomed}
+                    />
+                  )}
+                </div>
               </div>
             </div>
 
