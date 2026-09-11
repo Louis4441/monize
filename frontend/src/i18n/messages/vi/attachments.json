@@ -55,7 +55,7 @@
     "originalTooLarge": "Ảnh gốc lớn hơn {max} nên chỉ bản quét đã cải thiện được đính kèm.",
     "warnings": {
       "blurry": "Ảnh có vẻ bị nhòe. Chụp lại sẽ cho bản quét sắc nét hơn.",
-      "edgesOutsideFrame": "Một phần tài liệu có thể nằm ngoài khung ảnh. Hãy chụp lại với toàn bộ trang trong khung.",
+      "edgesOutsideFrame": "Tài liệu chạm đến mép ảnh nên một cạnh có thể bị cắt mất. Hãy chụp lại và chừa lề xung quanh toàn bộ trang, sao cho không cạnh nào chạm vào viền ảnh.",
       "lowResolution": "Bản quét khá nhỏ, chữ nhỏ có thể khó đọc."
     },
     "corners": {

@@ -55,7 +55,7 @@
     "originalTooLarge": "La foto original supera {max}, así que solo se adjuntará el escaneo mejorado.",
     "warnings": {
       "blurry": "La foto parece borrosa. Repetirla dará un escaneo más nítido.",
-      "edgesOutsideFrame": "Puede que parte del documento quede fuera de la foto. Repítala con toda la página encuadrada.",
+      "edgesOutsideFrame": "El documento llega al borde de la foto, por lo que un lado puede quedar cortado. Vuelve a hacer la foto dejando un margen alrededor de toda la página, sin que ningún lado toque el borde.",
       "lowResolution": "El escaneo es bastante pequeño, la letra pequeña puede costar de leer."
     },
     "corners": {

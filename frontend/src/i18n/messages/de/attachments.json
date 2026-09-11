@@ -55,7 +55,7 @@
     "originalTooLarge": "Das Originalfoto ist größer als {max}, daher wird nur der aufbereitete Scan angehängt.",
     "warnings": {
       "blurry": "Das Foto wirkt unscharf. Eine neue Aufnahme ergibt einen schärferen Scan.",
-      "edgesOutsideFrame": "Ein Teil des Dokuments liegt möglicherweise außerhalb des Fotos. Nehmen Sie es mit der ganzen Seite im Bild neu auf.",
+      "edgesOutsideFrame": "Das Dokument reicht bis an den Rand des Fotos, daher könnte eine Seite abgeschnitten sein. Nimm es erneut auf und lass rund um die ganze Seite einen Rand, sodass keine Seite den Bildrand berührt.",
       "lowResolution": "Der Scan ist recht klein, kleine Schrift kann schwer lesbar sein."
     },
     "corners": {

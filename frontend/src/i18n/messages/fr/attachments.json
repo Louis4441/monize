@@ -55,7 +55,7 @@
     "originalTooLarge": "La photo d’origine dépasse {max}, seul le scan amélioré sera joint.",
     "warnings": {
       "blurry": "La photo semble floue. La reprendre donnera un scan plus net.",
-      "edgesOutsideFrame": "Une partie du document est peut-être hors du cadre. Reprenez la photo avec toute la page visible.",
+      "edgesOutsideFrame": "Le document touche le bord de la photo, un côté risque donc d’être coupé. Reprends la photo en laissant une marge autour de toute la page, sans qu’aucun côté ne touche le bord.",
       "lowResolution": "Le scan est assez petit, les petits caractères peuvent être difficiles à lire."
     },
     "corners": {
