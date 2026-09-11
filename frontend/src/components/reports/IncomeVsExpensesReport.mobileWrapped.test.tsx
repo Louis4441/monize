@@ -95,10 +95,10 @@ vi.mock("@/lib/logger", () => ({
 // savings (and rate) are negative, so the sign colouring is exercised too.
 const RESPONSE = {
   data: [
-    { month: "2024-01", income: 125400, expenses: 98750, net: 26650 },
-    { month: "2024-02", income: 101200, expenses: 143900, net: -42700 },
+    { period: "2024-01", periodStart: "2024-01-01", periodEnd: "2024-01-31", income: 125400, expenses: 98750, net: 26650 },
+    { period: "2024-02", periodStart: "2024-02-01", periodEnd: "2024-02-29", income: 101200, expenses: 143900, net: -42700 },
   ],
-  totals: { income: 226600, expenses: 242650 },
+  totals: { income: 226600, expenses: 242650, net: -16050, knownIncome: 226600, knownExpenses: 242650, knownNet: -16050 },
 };
 
 async function renderTableView() {

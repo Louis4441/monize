@@ -2954,12 +2954,11 @@ describe("a report's export and refresh are one actions row", () => {
 describe("a dashboard widget reads a report rather than re-deriving it", () => {
   /**
    * Widgets that still aggregate the transaction ledger themselves, each one a
-   * breakdown that can drift from the report it sits beside. SHRINK-ONLY: the
-   * fix is to read the report's endpoint, never to add a name here.
+   * breakdown that can drift from the report it sits beside. Empty, and
+   * SHRINK-ONLY: the fix is to read the report's endpoint, never to add a name
+   * here.
    */
-  const BASELINE: ReadonlyArray<string> = [
-    "/src/components/dashboard/IncomeExpensesBarChart.tsx",
-  ];
+  const BASELINE: ReadonlyArray<string> = [];
   const READS_LEDGER = /from\s+["']@\/lib\/transactions["']/;
 
   function widgetsAggregatingTheLedger(): string[] {
@@ -2979,6 +2978,15 @@ describe("a dashboard widget reads a report rather than re-deriving it", () => {
   it("keeps the baseline shrink-only", () => {
     const offending = new Set(widgetsAggregatingTheLedger());
     expect(BASELINE.filter((file) => !offending.has(file))).toEqual([]);
+  });
+
+  it("still reads the widgets, so an empty baseline is not an empty scan", () => {
+    // With nothing left on the baseline the rule passes trivially if the sweep
+    // finds no files at all, so the sweep itself is checked.
+    const widgets = productionSources().filter(([path]) =>
+      path.startsWith("/src/components/dashboard/"),
+    );
+    expect(widgets.length).toBeGreaterThan(15);
   });
 
   it("catches the import it bans, and reads a mention of it as prose", () => {

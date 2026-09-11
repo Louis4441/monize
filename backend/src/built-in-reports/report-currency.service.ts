@@ -26,6 +26,14 @@ export interface RawMonthlyAggregate {
   expenses: string;
 }
 
+/** One income/expense bucket, keyed by the date the bucket opens. */
+export interface RawPeriodAggregate {
+  period_start: string;
+  currency_code: string;
+  income: string;
+  expenses: string;
+}
+
 export interface RawMonthlyCategoryAggregate {
   month: string;
   category_id: string | null;

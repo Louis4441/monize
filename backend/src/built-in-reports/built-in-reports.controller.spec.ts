@@ -139,6 +139,27 @@ describe("BuiltInReportsController", () => {
   });
 
   describe("getIncomeVsExpenses()", () => {
+    it("passes the account filter and the bucket width through", async () => {
+      // Both are the dashboard widget's settings, answered by the report rather
+      // than applied to its result.
+      mockService.getIncomeVsExpenses.mockResolvedValue({ data: [] });
+
+      await controller.getIncomeVsExpenses(mockReq, {
+        startDate: "2024-01-01",
+        endDate: "2024-12-31",
+        accountIds: ["acct-1"],
+        bucket: "week",
+        weekStartsOn: 0,
+      } as any);
+
+      expect(mockService.getIncomeVsExpenses).toHaveBeenCalledWith(
+        "user-1",
+        "2024-01-01",
+        "2024-12-31",
+        { accountIds: ["acct-1"], bucket: "week", weekStartsOn: 0 },
+      );
+    });
+
     it("delegates to service with userId, startDate, and endDate", async () => {
       const query = { startDate: "2024-01-01", endDate: "2024-12-31" };
       const expected = { months: [] };
@@ -154,6 +175,7 @@ describe("BuiltInReportsController", () => {
         "user-1",
         "2024-01-01",
         "2024-12-31",
+        { accountIds: undefined, bucket: undefined, weekStartsOn: undefined },
       );
     });
   });

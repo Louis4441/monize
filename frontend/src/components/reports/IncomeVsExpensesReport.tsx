@@ -20,9 +20,9 @@ import {
   Legend,
   ReferenceLine,
 } from "recharts";
-import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
+import { parseISO } from "date-fns";
 import { builtInReportsApi } from "@/lib/built-in-reports";
-import { MonthlyIncomeExpenseItem } from "@/types/built-in-reports";
+import { IncomeExpensePeriodItem } from "@/types/built-in-reports";
 import { useNumberFormat } from "@/hooks/useNumberFormat";
 import { useDateRange } from "@/hooks/useDateRange";
 import { useReportData } from "@/hooks/useReportData";
@@ -37,6 +37,8 @@ import { exportToCsv } from "@/lib/csv-export";
 import { chartColors } from "@/lib/chart-colors";
 import { useChartDateFormat } from "@/hooks/useChartDateFormat";
 import { useTranslations } from 'next-intl';
+import { useExchangeRates } from "@/hooks/useExchangeRates";
+import { PartialTotal } from "@/components/ui/PartialTotal";
 type IncomeVsExpensesSortField = 'name' | 'income' | 'expenses' | 'savings' | 'savingsRate';
 
 /**
@@ -84,6 +86,7 @@ export function IncomeVsExpensesReport() {
   const chartRef = useRef<HTMLDivElement>(null);
   const { formatCurrencyCompact: formatCurrency, formatCurrencyAxis, formatPercent, formatPercentTrimmed } =
     useNumberFormat();
+  const { defaultCurrency } = useExchangeRates();
   const [viewType, setViewType] = useState<'bar' | 'table'>('bar');
   const {
     dateRange,
@@ -119,32 +122,50 @@ export function IncomeVsExpensesReport() {
   // showing data from the wrong year on multi-year ranges.
   const chartData = useMemo<ChartDataItem[]>(
     () =>
-      (response?.data ?? []).map((item: MonthlyIncomeExpenseItem) => {
-        const monthDate = parseISO(item.month + "-01");
+      (response?.data ?? []).map((item: IncomeExpensePeriodItem) => {
         const savings = item.income - item.expenses;
         const savingsRate =
           item.income > 0 ? Math.round((savings / item.income) * 100) : 0;
         return {
-          name: item.month,
-          fullName: formatChartDate(monthDate, "MMM yyyy"),
+          name: item.period,
+          fullName: formatChartDate(parseISO(item.periodStart), "MMM yyyy"),
           Income: Math.round(item.income),
           Expenses: Math.round(item.expenses),
           Savings: Math.round(savings),
           SavingsRate: savingsRate,
-          monthStart: format(startOfMonth(monthDate), "yyyy-MM-dd"),
-          monthEnd: format(endOfMonth(monthDate), "yyyy-MM-dd"),
+          // The dates the bar covers come from the server, which decided the
+          // bucket; deriving them again here is a second definition of it.
+          monthStart: item.periodStart,
+          monthEnd: item.periodEnd,
         };
       }),
     [response, formatChartDate],
   );
 
+  /**
+   * The window's figures, and whether they are the whole story.
+   *
+   * The server withholds each total when a row could not be converted and sends
+   * the part that did convert beside it, so what is shown is the subtotal and
+   * the marker says so. Sharing one `ConvertedTotal` across all four keeps them
+   * from disagreeing about their own completeness.
+   */
   const totals = useMemo(() => {
-    const totalIncome = response?.totals.income ?? 0;
-    const totalExpenses = response?.totals.expenses ?? 0;
+    const totalIncome = response?.totals.knownIncome ?? 0;
+    const totalExpenses = response?.totals.knownExpenses ?? 0;
     const totalSavings = totalIncome - totalExpenses;
     const savingsRate = totalIncome > 0 ? (totalSavings / totalIncome) * 100 : 0;
     return { totalIncome, totalExpenses, totalSavings, savingsRate };
   }, [response]);
+
+  const completeness = useMemo(
+    () => ({
+      missingCurrencies: response?.missingCurrencies ?? [],
+      excludedCount: response?.excludedCount ?? 0,
+    }),
+    [response],
+  );
+  const reportingCurrency = response?.currency ?? defaultCurrency;
 
   const sortedTableData = useMemo(() => {
     const sorted = [...chartData];
@@ -441,17 +462,23 @@ export function IncomeVsExpensesReport() {
                     <td role="cell" className="col-start-1 row-start-1 p-0 text-sm font-bold text-gray-900 dark:text-gray-100 sm:table-cell sm:px-4 sm:py-3">{t('incomeVsExpenses.total')}</td>
                     <td role="cell" className={`col-start-3 row-start-1 font-bold text-green-600 dark:text-green-400 ${MONEY_CELL}`}>
                       <CellLabel className={CAPTION_CLASS}>{t('incomeVsExpenses.colIncome')}</CellLabel>
-                      {formatCurrency(totals.totalIncome)}
+                      <PartialTotal total={{ value: totals.totalIncome, ...completeness }} displayCurrency={reportingCurrency}>
+                        {formatCurrency(totals.totalIncome)}
+                      </PartialTotal>
                     </td>
                     <td role="cell" className={`col-start-3 row-start-2 font-bold text-red-600 dark:text-red-400 ${MONEY_CELL}`}>
                       <CellLabel className={CAPTION_CLASS}>{t('incomeVsExpenses.colExpenses')}</CellLabel>
-                      {formatCurrency(totals.totalExpenses)}
+                      <PartialTotal total={{ value: totals.totalExpenses, ...completeness }} displayCurrency={reportingCurrency}>
+                        {formatCurrency(totals.totalExpenses)}
+                      </PartialTotal>
                     </td>
                     <td role="cell"
                       className={`col-start-2 row-start-1 font-bold ${totals.totalSavings >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'} ${MONEY_CELL}`}
                     >
                       <CellLabel className={CAPTION_CLASS}>{t('incomeVsExpenses.colSavings')}</CellLabel>
-                      {formatCurrency(totals.totalSavings)}
+                      <PartialTotal total={{ value: totals.totalSavings, ...completeness }} displayCurrency={reportingCurrency}>
+                        {formatCurrency(totals.totalSavings)}
+                      </PartialTotal>
                     </td>
                     <td role="cell"
                       className={`col-start-1 col-span-2 row-start-2 font-bold ${totals.savingsRate >= 0 ? 'text-purple-600 dark:text-purple-400' : 'text-orange-600 dark:text-orange-400'} ${MONEY_CELL}`}
@@ -523,7 +550,9 @@ export function IncomeVsExpensesReport() {
                   {t('incomeVsExpenses.totalIncome')}
                 </div>
                 <div className="text-xl font-bold text-green-700 dark:text-green-300">
-                  {formatCurrency(totals.totalIncome)}
+                  <PartialTotal total={{ value: totals.totalIncome, ...completeness }} displayCurrency={reportingCurrency}>
+                    {formatCurrency(totals.totalIncome)}
+                  </PartialTotal>
                 </div>
               </div>
               <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 text-center">
@@ -531,7 +560,9 @@ export function IncomeVsExpensesReport() {
                   {t('incomeVsExpenses.totalExpenses')}
                 </div>
                 <div className="text-xl font-bold text-red-700 dark:text-red-300">
-                  {formatCurrency(totals.totalExpenses)}
+                  <PartialTotal total={{ value: totals.totalExpenses, ...completeness }} displayCurrency={reportingCurrency}>
+                    {formatCurrency(totals.totalExpenses)}
+                  </PartialTotal>
                 </div>
               </div>
               <div
@@ -557,7 +588,9 @@ export function IncomeVsExpensesReport() {
                       : "text-orange-700 dark:text-orange-300"
                   }`}
                 >
-                  {formatCurrency(totals.totalSavings)}
+                  <PartialTotal total={{ value: totals.totalSavings, ...completeness }} displayCurrency={reportingCurrency}>
+                    {formatCurrency(totals.totalSavings)}
+                  </PartialTotal>
                 </div>
               </div>
               <div

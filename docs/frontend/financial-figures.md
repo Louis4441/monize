@@ -54,14 +54,24 @@ The widget's own settings go INTO the request rather than onto the answer:
 `accountIds` and `rollupToParent` are query parameters, because an account
 filter re-applied on the client is a second definition of which rows count and a
 rollup re-derived there a second definition of which category a spend belongs
-to. `ui-conventions.test.ts` holds the rule with a shrink-only baseline of the
-widgets that still aggregate the ledger themselves.
+to. Income vs Expenses is the same story: it classified income against expense
+itself, from the account TYPE and a bare sign fallback, and bucketed the rows
+beside the classification -- so the bucket width and the user's first day of the
+week are parameters of the request too, since which transaction belongs to which
+bar is half of deciding what the bar says. `ui-conventions.test.ts` holds the
+rule on a shrink-only baseline that is now empty, and checks its own sweep so an
+empty baseline cannot pass on an empty scan.
 
 The server answers the whole breakdown, not a top-N -- the widget keeps eleven
 slices and folds the tail into Other, and needs the tail to open Other -- and it
 withholds `totalSpending` when a row could not be converted, sending
 `knownSpending`, `missingCurrencies` and `excludedCount` beside it so both
-surfaces mark the same subtotal through `PartialTotal`.
+surfaces mark the same subtotal through `PartialTotal`. Income vs Expenses
+withholds all three of its totals the same way, and returns every bucket in the
+window including the empty ones: a week nothing happened in earned and spent
+zero, which is a bar of height zero rather than a gap the chart closes up. Each
+bucket carries `periodStart` and `periodEnd`, so a drill-down uses the dates the
+server bucketed by rather than re-deriving them.
 
 ## A short-range portfolio change is measured from the prior close
 

@@ -101,10 +101,11 @@ export class MonthlyComparisonService {
       ),
     ]);
 
-    // Extract single-month income/expenses from the responses
-    const curData = currentIncExp.data.find((d) => d.month === month);
+    // Extract single-month income/expenses from the responses. The bucket key
+    // for a month IS `YYYY-MM`, which is what this comparison asks for.
+    const curData = currentIncExp.data.find((d) => d.period === month);
     const prevData = previousIncExp.data.find(
-      (d) => d.month === previousMonthStr,
+      (d) => d.period === previousMonthStr,
     );
 
     const currentIncome = curData?.income ?? 0;

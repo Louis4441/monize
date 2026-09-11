@@ -14,7 +14,7 @@ import {
   Legend,
 } from 'recharts';
 import { builtInReportsApi } from '@/lib/built-in-reports';
-import { MonthlyIncomeExpenseItem } from '@/types/built-in-reports';
+import { IncomeExpensePeriodItem } from '@/types/built-in-reports';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useReportData } from '@/hooks/useReportData';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
@@ -61,9 +61,9 @@ export function MonthlySpendingTrendWidget({ isLoading }: MonthlySpendingTrendWi
 
   const chartData = useMemo(
     () =>
-      (response?.data ?? []).map((item: MonthlyIncomeExpenseItem) => ({
-        name: item.month,
-        fullName: formatChartDate(parseISO(item.month + '-01'), 'MMM yyyy'),
+      (response?.data ?? []).map((item: IncomeExpensePeriodItem) => ({
+        name: item.period,
+        fullName: formatChartDate(parseISO(item.periodStart), 'MMM yyyy'),
         Expenses: Math.round(item.expenses),
         Income: Math.round(item.income),
       })),

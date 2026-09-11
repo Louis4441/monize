@@ -14,10 +14,10 @@ import {
   Legend,
   ReferenceLine,
 } from "recharts";
-import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
+import { parseISO } from "date-fns";
 import { builtInReportsApi } from "@/lib/built-in-reports";
 import {
-  MonthlyIncomeExpenseItem,
+  IncomeExpensePeriodItem,
   CategorySpendingItem,
   IncomeSourceItem,
 } from "@/types/built-in-reports";
@@ -84,16 +84,16 @@ export function CashFlowReport() {
   // from the wrong year on multi-year ranges.
   const monthlyData = useMemo<ChartDataItem[]>(
     () =>
-      (response?.cashFlowResponse.data ?? []).map((item: MonthlyIncomeExpenseItem) => {
-        const monthDate = parseISO(item.month + "-01");
+      (response?.cashFlowResponse.data ?? []).map((item: IncomeExpensePeriodItem) => {
         return {
-          name: item.month,
-          fullName: formatChartDate(monthDate, "MMM yyyy"),
+          name: item.period,
+          fullName: formatChartDate(parseISO(item.periodStart), "MMM yyyy"),
           Income: Math.round(item.income),
           Expenses: Math.round(item.expenses),
           Net: Math.round(item.net),
-          monthStart: format(startOfMonth(monthDate), "yyyy-MM-dd"),
-          monthEnd: format(endOfMonth(monthDate), "yyyy-MM-dd"),
+          // The dates the bucket covers come from the server that chose it.
+          monthStart: item.periodStart,
+          monthEnd: item.periodEnd,
         };
       }),
     [response, formatChartDate],

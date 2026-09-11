@@ -584,72 +584,67 @@ describe("BuiltInReportsService", () => {
   // getIncomeVsExpenses
   // ---------------------------------------------------------------------------
   describe("getIncomeVsExpenses", () => {
-    it("returns empty data when no transactions exist", async () => {
+    const row = (
+      periodStart: string,
+      income: string,
+      expenses: string,
+      currency = "USD",
+    ) => ({
+      period_start: periodStart,
+      currency_code: currency,
+      income,
+      expenses,
+    });
+
+    it("draws a zero bar for a month nothing happened in", async () => {
       scopedManager.query.mockResolvedValue([]);
 
       const result = await service.getIncomeVsExpenses(
         mockUserId,
         "2025-01-01",
-        "2025-12-31",
+        "2025-02-28",
       );
 
-      expect(result.data).toEqual([]);
-      expect(result.totals).toEqual({ income: 0, expenses: 0, net: 0 });
+      expect(result.data.map((d) => d.period)).toEqual(["2025-01", "2025-02"]);
+      expect(result.totals).toMatchObject({ income: 0, expenses: 0, net: 0 });
     });
 
-    it("calculates monthly income, expenses, and net correctly", async () => {
+    it("calculates income, expenses and net per bucket", async () => {
       scopedManager.query.mockResolvedValue([
-        {
-          month: "2025-01",
-          currency_code: "USD",
-          income: "5000.00",
-          expenses: "3000.00",
-        },
-        {
-          month: "2025-02",
-          currency_code: "USD",
-          income: "5000.00",
-          expenses: "3500.00",
-        },
+        row("2025-01-01", "5000.00", "3000.00"),
+        row("2025-02-01", "5000.00", "3500.00"),
       ]);
 
       const result = await service.getIncomeVsExpenses(
         mockUserId,
         "2025-01-01",
-        "2025-12-31",
+        "2025-02-28",
       );
 
       expect(result.data).toHaveLength(2);
-      expect(result.data[0].month).toBe("2025-01");
-      expect(result.data[0].income).toBe(5000);
-      expect(result.data[0].expenses).toBe(3000);
-      expect(result.data[0].net).toBe(2000);
-
-      expect(result.totals.income).toBe(10000);
-      expect(result.totals.expenses).toBe(6500);
-      expect(result.totals.net).toBe(3500);
+      expect(result.data[0]).toMatchObject({
+        period: "2025-01",
+        income: 5000,
+        expenses: 3000,
+        net: 2000,
+      });
+      expect(result.totals).toMatchObject({
+        income: 10000,
+        expenses: 6500,
+        net: 3500,
+      });
     });
 
-    it("merges multiple currency rows for the same month", async () => {
+    it("merges multiple currency rows for the same bucket", async () => {
       scopedManager.query.mockResolvedValue([
-        {
-          month: "2025-01",
-          currency_code: "USD",
-          income: "3000.00",
-          expenses: "1000.00",
-        },
-        {
-          month: "2025-01",
-          currency_code: "EUR",
-          income: "1000.00",
-          expenses: "500.00",
-        },
+        row("2025-01-01", "3000.00", "1000.00"),
+        row("2025-01-01", "1000.00", "500.00", "EUR"),
       ]);
 
       const result = await service.getIncomeVsExpenses(
         mockUserId,
         "2025-01-01",
-        "2025-12-31",
+        "2025-01-31",
       );
 
       expect(result.data).toHaveLength(1);
@@ -660,37 +655,24 @@ describe("BuiltInReportsService", () => {
       expect(result.data[0].net).toBe(2550);
     });
 
-    it("sorts months in ascending order", async () => {
+    it("returns the buckets in ascending order", async () => {
       scopedManager.query.mockResolvedValue([
-        {
-          month: "2025-03",
-          currency_code: "USD",
-          income: "100.00",
-          expenses: "50.00",
-        },
-        {
-          month: "2025-01",
-          currency_code: "USD",
-          income: "200.00",
-          expenses: "100.00",
-        },
-        {
-          month: "2025-02",
-          currency_code: "USD",
-          income: "150.00",
-          expenses: "75.00",
-        },
+        row("2025-03-01", "100.00", "50.00"),
+        row("2025-01-01", "200.00", "100.00"),
+        row("2025-02-01", "150.00", "75.00"),
       ]);
 
       const result = await service.getIncomeVsExpenses(
         mockUserId,
         "2025-01-01",
-        "2025-12-31",
+        "2025-03-31",
       );
 
-      expect(result.data[0].month).toBe("2025-01");
-      expect(result.data[1].month).toBe("2025-02");
-      expect(result.data[2].month).toBe("2025-03");
+      expect(result.data.map((d) => d.period)).toEqual([
+        "2025-01",
+        "2025-02",
+        "2025-03",
+      ]);
     });
   });
 

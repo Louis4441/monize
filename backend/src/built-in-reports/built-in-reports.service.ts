@@ -7,6 +7,10 @@ import { TaxRecurringReportsService } from "./tax-recurring-reports.service";
 import { DataQualityReportsService } from "./data-quality-reports.service";
 import { MonthlyComparisonService } from "./monthly-comparison.service";
 import { MonthlyCategoryBreakdownService } from "./monthly-category-breakdown.service";
+import type {
+  IncomeExpenseBucket,
+  WeekStartsOn,
+} from "./income-expense-buckets";
 import {
   SpendingByCategoryResponse,
   SpendingByPayeeResponse,
@@ -84,8 +88,18 @@ export class BuiltInReportsService {
     userId: string,
     startDate: string | undefined,
     endDate: string,
+    options?: {
+      accountIds?: string[];
+      bucket?: IncomeExpenseBucket;
+      weekStartsOn?: WeekStartsOn;
+    },
   ): Promise<IncomeVsExpensesResponse> {
-    return this.incomeReports.getIncomeVsExpenses(userId, startDate, endDate);
+    return this.incomeReports.getIncomeVsExpenses(
+      userId,
+      startDate,
+      endDate,
+      options,
+    );
   }
 
   getYearOverYear(
