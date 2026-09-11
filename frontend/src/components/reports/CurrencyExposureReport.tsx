@@ -15,9 +15,8 @@ import { HoldingWithMarketValue } from '@/types/investment';
 import { Account } from '@/types/account';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
-import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import type {
@@ -438,10 +437,10 @@ export function CurrencyExposureReport() {
               className="w-full sm:w-48"
             />
           </div>
-          <div className="flex flex-wrap gap-2 items-center">
-            <RefreshPricesButton onRefreshComplete={reload} />
-            <ExportDropdown onExportPdf={handleExportPdf} className="whitespace-nowrap" />
-          </div>
+          <ReportToolbarActions
+            onRefreshComplete={reload}
+            onExportPdf={handleExportPdf}
+          />
         </div>
       </div>
 

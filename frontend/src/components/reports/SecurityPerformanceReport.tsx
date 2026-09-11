@@ -28,8 +28,7 @@ import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
-import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import type {
@@ -665,9 +664,15 @@ export function SecurityPerformanceReport() {
                 </button>
               </>
             )}
-            <RefreshPricesButton onRefreshComplete={() => { reloadBase(); reloadDetail(); setAllRefreshKey((k) => k + 1); }} />
-            {(isSingle || isComparison) && <ExportDropdown onExportPdf={handleExportPdf} />}
           </div>
+          {/* The export is disabled rather than absent until a security is
+              picked: a button that appears on selection moves the row under
+              the reader's thumb on a phone. */}
+          <ReportToolbarActions
+            onRefreshComplete={() => { reloadBase(); reloadDetail(); setAllRefreshKey((k) => k + 1); }}
+            onExportPdf={handleExportPdf}
+            disabled={!isSingle && !isComparison}
+          />
         </div>
 
         {/*

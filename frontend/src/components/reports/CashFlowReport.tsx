@@ -26,7 +26,7 @@ import { useChartDateFormat } from "@/hooks/useChartDateFormat";
 import { useDateRange } from "@/hooks/useDateRange";
 import { useReportData } from "@/hooks/useReportData";
 import { DateRangeSelector } from "@/components/ui/DateRangeSelector";
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ChartTooltip } from "@/components/reports/ChartTooltip";
 import { ReportError } from "@/components/reports/ReportError";
 import { chartColors } from "@/lib/chart-colors";
@@ -267,7 +267,7 @@ export function CashFlowReport() {
             customEndDate={endDate}
             onCustomEndDateChange={setEndDate}
           />
-          <ExportDropdown onExportPdf={handleExportPdf} />
+          <ReportToolbarActions onExportPdf={handleExportPdf} />
         </div>
       </div>
 

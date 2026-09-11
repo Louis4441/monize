@@ -28,9 +28,8 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useDateRange } from '@/hooks/useDateRange';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { MultiSelect } from '@/components/ui/MultiSelect';
-import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import {
   CAPTION_CLASS,
@@ -1183,17 +1182,12 @@ export function DividendIncomeReport() {
             >
               {t('dividendIncome.viewBySecurity')}
             </button>
-            <RefreshPricesButton onRefreshComplete={reloadAll} />
-            {/* Both widths: this export is the CSV+PDF variant (a wrapper the
-                container class sizes) on a table view and the PDF-only variant
-                (no wrapper, the button itself) everywhere else. */}
-            <ExportDropdown
-              onExportPdf={handleExportPdf}
-              onExportCsv={isTableView ? handleExportCsv : undefined}
-              containerClassName="w-full sm:w-auto"
-              className="w-full justify-center whitespace-nowrap sm:w-auto"
-            />
           </div>
+          <ReportToolbarActions
+            onRefreshComplete={reloadAll}
+            onExportPdf={handleExportPdf}
+            onExportCsv={isTableView ? handleExportCsv : undefined}
+          />
         </div>
         {/* Monthly/Daily view sub-controls: chart/table switch + series toggles */}
         {(viewType === 'monthly' || viewType === 'daily') && (

@@ -14,10 +14,9 @@ import { useDateRange } from '@/hooks/useDateRange';
 import { useReportData } from '@/hooks/useReportData';
 import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
-import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { ReportError } from '@/components/reports/ReportError';
 import { exportToCsv } from '@/lib/csv-export';
 import { SortableHeader } from '@/components/ui/SortableHeader';
@@ -453,20 +452,12 @@ export function InvestmentTransactionHistoryReport() {
             value={dateRange}
             onChange={setDateRange}
           />
-          {/* A two-column grid on a phone so the pair fills its own line and
-              neither button is left hanging past the card; the grid stretches
-              each child, which an `inline-block` export wrapper would not do
-              for itself. */}
-          <div className="grid w-full grid-cols-2 gap-2 sm:ml-auto sm:flex sm:w-auto sm:shrink-0 sm:items-center">
-            <RefreshPricesButton onRefreshComplete={reload} className="w-full sm:w-auto" />
-            <ExportDropdown
-              onExportCsv={handleExportCsv}
-              onExportPdf={handleExportPdf}
-              disabled={filteredTransactions.length === 0}
-              containerClassName="w-full sm:w-auto"
-              className="w-full justify-center sm:w-auto"
-            />
-          </div>
+          <ReportToolbarActions
+            onRefreshComplete={reload}
+            onExportCsv={handleExportCsv}
+            onExportPdf={handleExportPdf}
+            disabled={filteredTransactions.length === 0}
+          />
         </div>
       </div>
 

@@ -21,10 +21,9 @@ import { Security } from '@/types/investment';
 import { Account } from '@/types/account';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
-import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import type {
@@ -391,10 +390,10 @@ export function SectorWeightingsReport() {
               </button>
             )}
           </div>
-          <div className="flex flex-wrap gap-2 items-center">
-            <RefreshPricesButton onRefreshComplete={loadWeightings} />
-            <ExportDropdown onExportPdf={handleExportPdf} className="whitespace-nowrap" />
-          </div>
+          <ReportToolbarActions
+            onRefreshComplete={loadWeightings}
+            onExportPdf={handleExportPdf}
+          />
         </div>
       </div>
 

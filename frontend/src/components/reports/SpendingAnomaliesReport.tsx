@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { builtInReportsApi } from '@/lib/built-in-reports';
 import { SpendingAnomaly } from '@/types/built-in-reports';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
 
@@ -179,12 +179,7 @@ export function SpendingAnomaliesReport() {
             <option value={2.5}>{t('spendingAnomalies.sensitivityLow')}</option>
             <option value={3}>{t('spendingAnomalies.sensitivityVeryLow')}</option>
           </select>
-          <div className="w-full self-stretch sm:ml-auto sm:w-auto sm:shrink-0">
-            <ExportDropdown
-              onExportPdf={handleExportPdf}
-              className="h-full w-full justify-center whitespace-nowrap sm:w-auto"
-            />
-          </div>
+          <ReportToolbarActions onExportPdf={handleExportPdf} />
         </div>
       </div>
 

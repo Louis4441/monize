@@ -21,7 +21,7 @@ import { chartColors, CHART_SERIES } from '@/lib/chart-colors';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateRange } from '@/hooks/useDateRange';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
 import { resolvePdfColor } from '@/components/reports/resolve-pdf-color';
@@ -255,8 +255,8 @@ export function WeekendVsWeekdayReport() {
             >
               {t('weekendVsWeekday.viewByCategory')}
             </button>
-            <ExportDropdown onExportPdf={handleExportPdf} className="whitespace-nowrap" />
           </div>
+          <ReportToolbarActions onExportPdf={handleExportPdf} />
         </div>
       </div>
 

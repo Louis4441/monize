@@ -22,8 +22,8 @@ import { useChartDateFormat } from "@/hooks/useChartDateFormat";
 import { useSortableTable, compareValues } from "@/hooks/useSortableTable";
 import { chartColors, chartSeriesColor } from "@/lib/chart-colors";
 import { resolvePdfColor } from "@/components/reports/resolve-pdf-color";
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ChartViewToggle } from "@/components/ui/ChartViewToggle";
-import { ExportDropdown } from "@/components/ui/ExportDropdown";
 import { SortableHeader } from "@/components/ui/SortableHeader";
 import { exportToCsv } from "@/lib/csv-export";
 import { useReportData } from "@/hooks/useReportData";
@@ -281,22 +281,22 @@ export function YearOverYearReport() {
               </button>
             ))}
           </div>
-          {/* `ml-auto` from `sm` up only. On a phone the three groups wrap
-              onto three lines, and pushing the last one to the right edge left
-              it hanging under two left-aligned rows; on one line it is still
-              the trailing group. */}
+          {/* `ml-auto` from `sm` up only. On a phone the groups wrap onto
+              lines of their own, and pushing this one to the right edge left it
+              hanging under two left-aligned rows; on one line it is still the
+              trailing group. */}
           <div className="flex items-center gap-3 sm:ml-auto">
             <ChartViewToggle
               value={viewType}
               onChange={(v) => setViewType(v as 'bar' | 'table')}
               options={['bar', 'table']}
             />
-            <ExportDropdown
-              onExportPdf={handleExportPdf}
-              onExportCsv={handleExportCsv}
-              disabled={chartData.length === 0}
-            />
           </div>
+          <ReportToolbarActions
+            onExportPdf={handleExportPdf}
+            onExportCsv={handleExportCsv}
+            disabled={chartData.length === 0}
+          />
         </div>
       </div>
 

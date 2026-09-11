@@ -21,7 +21,10 @@ vi.mock('@/hooks/useNumberFormat', async () => {
     }),
   };
 });
-vi.mock('@/lib/utils', () => ({
+// Partial mock: the report's date parsing is pinned here, but `cn` and the
+// rest of the module are the real ones -- the components in this tree use them.
+vi.mock('@/lib/utils', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/utils')>()),
   parseLocalDate: (d: string) => new Date(d + 'T00:00:00'),
 }));
 

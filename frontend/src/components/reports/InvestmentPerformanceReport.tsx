@@ -16,9 +16,8 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { CHART_COLOURS } from '@/lib/chart-colours';
 import { gainLossColor } from '@/lib/format';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
-import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SecurityComparisonChart, SecurityComparisonChartHandle } from '@/components/reports/SecurityComparisonChart';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { useDateRange } from '@/hooks/useDateRange';
@@ -416,7 +415,6 @@ export function InvestmentPerformanceReport() {
             >
               {t('investmentPerformance.viewAllocation')}
             </button>
-            <RefreshPricesButton onRefreshComplete={() => setReloadKey((k) => k + 1)} />
           </div>
         </div>
         {/* The chart's window and the export belong to the toolbar, not to the
@@ -439,12 +437,9 @@ export function InvestmentPerformanceReport() {
               size="sm"
             />
           )}
-          {/* PDF only, so the button IS the box this row lays out: it takes
-              the width here, not a wrapper. `whitespace-nowrap` keeps the
-              label on one line at any width. */}
-          <ExportDropdown
+          <ReportToolbarActions
+            onRefreshComplete={() => setReloadKey((k) => k + 1)}
             onExportPdf={handleExportPdf}
-            className="w-full justify-center whitespace-nowrap sm:ml-auto sm:w-auto"
           />
         </div>
       </div>

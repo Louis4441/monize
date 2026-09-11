@@ -24,7 +24,7 @@ import {
   occurrenceKind,
 } from '@/lib/scheduled-kind';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { exportToCsv } from '@/lib/csv-export';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
@@ -421,13 +421,12 @@ export function UpcomingBillsReport() {
                 {t('upcomingBills.listView')}
               </button>
             </div>
-            <ExportDropdown
-              onExportCsv={handleExportCsv}
-              onExportPdf={handleExportPdf}
-              disabled={upcomingBills.length === 0}
-              className="whitespace-nowrap"
-            />
           </div>
+          <ReportToolbarActions
+            onExportCsv={handleExportCsv}
+            onExportPdf={handleExportPdf}
+            disabled={upcomingBills.length === 0}
+          />
         </div>
       </div>
 

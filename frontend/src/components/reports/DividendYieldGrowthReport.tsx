@@ -22,9 +22,8 @@ import { parseLocalDate } from '@/lib/utils';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { gainLossColor } from '@/lib/format';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
-import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import type {
@@ -600,12 +599,10 @@ export function DividendYieldGrowthReport() {
               {t('dividendYieldGrowth.viewFrequency')}
             </button>
           </div>
-          {/* `ml-auto` from `sm` up only: on a phone this is a row of its own
-              and belongs at the left edge like the rows above it. */}
-          <div className="flex flex-wrap gap-2 items-center sm:ml-auto">
-            <RefreshPricesButton onRefreshComplete={reload} />
-            <ExportDropdown onExportPdf={handleExportPdf} className="whitespace-nowrap" />
-          </div>
+          <ReportToolbarActions
+            onRefreshComplete={reload}
+            onExportPdf={handleExportPdf}
+          />
         </div>
       </div>
 

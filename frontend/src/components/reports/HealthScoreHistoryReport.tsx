@@ -14,7 +14,7 @@ import {
 } from 'recharts';
 import { budgetsApi } from '@/lib/budgets';
 import type { HealthScoreHistoryPoint } from '@/types/budget';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ReportError } from '@/components/reports/ReportError';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { useReportData } from '@/hooks/useReportData';
@@ -223,9 +223,7 @@ export function HealthScoreHistoryReport() {
             <option value={12}>{t('healthScoreHistory.months12')}</option>
             <option value={24}>{t('healthScoreHistory.months24')}</option>
           </select>
-          <div className="ml-auto">
-            <ExportDropdown onExportPdf={handleExportPdf} />
-          </div>
+          <ReportToolbarActions onExportPdf={handleExportPdf} />
         </div>
       </div>
 

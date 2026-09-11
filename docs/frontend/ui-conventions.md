@@ -276,21 +276,31 @@ human reading the app on a phone rather than by a test:
   app. Below the cap the control is still as wide as its longest option; above
   it the trigger shrinks and the selected label truncates.
 
-Two sizing notes for the controls themselves:
+**The refresh and export buttons are `ReportToolbarActions`, never laid out by
+the report.** Render it as the LAST child of the toolbar's wrapping row and give
+it the handlers; it is a full-width row below every selector on a phone (two
+equal halves when the report also refreshes prices) and the toolbar's trailing
+group from `sm` up. Every report wrote that layout for itself once, and a dozen
+wrote it wrong. `ui-conventions.test.ts` fails a report that renders
+`ExportDropdown` itself, or `RefreshPricesButton` beside one.
+
+What the shared row encodes, for the two places that still compose by hand:
 
 - **The export's box is not always its button.** `ExportDropdown` renders a
   bare button in its PDF-only form and a `relative inline-block` wrapper around
-  it when a CSV handler is passed. A caller sizing the export for a phone
-  (`w-full sm:w-auto`) sizes the wrapper through `containerClassName` and the
-  button through `className`; where the variant depends on state (a table view
-  that gains a CSV export), pass both. `whitespace-nowrap` on the button keeps
-  the label on one line.
+  it when a CSV handler is passed. Sizing the export for a phone
+  (`w-full sm:w-auto`) means sizing the wrapper through `containerClassName`
+  and the button through `className`; where the variant depends on state (a
+  table view that gains a CSV export), pass both. A grid cell stretches that
+  wrapper where a flex row would not, which is why the actions row is a grid.
+  `whitespace-nowrap` on the button keeps the label on one line.
 - **A button beside a field is the height of the field.** A `py-1.5` button
   against a `py-2` picker reads as a mistake. Put the row in `items-stretch`
   (or give the export's box `self-stretch`) and pass `h-full`; where the field
   carries a label above it, reserve the label's own space over the button with
   `LabelSpacer` (`components/ui/LabelSpacer.tsx`) so what stretches is exactly
-  the input's height. Never match the padding by hand -- the figure drifts the
+  the input's height, and hide that spacer below `sm`, where the button has no
+  field beside it. Never match the padding by hand -- the figure drifts the
   next time either control's type scale changes.
 
 `ChartLegend` is the same trade-off answered per caller: it is one column on a

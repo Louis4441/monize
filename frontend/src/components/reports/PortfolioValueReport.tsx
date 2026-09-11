@@ -32,9 +32,8 @@ import { usePortfolioChangeBaseline } from '@/hooks/usePortfolioChangeBaseline';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
-import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import type {
@@ -926,15 +925,13 @@ export function PortfolioValueReport() {
               options={['area', 'table']}
               activeColour="bg-emerald-600"
             />
-            <RefreshPricesButton onRefreshComplete={() => setReloadKey((k) => k + 1)} />
-            <ExportDropdown
-              onExportPdf={handleExportPdf}
-              onExportCsv={handleExportCsv}
-              disabled={chartPoints.length === 0}
-              containerClassName="w-full sm:w-auto"
-              className="w-full justify-center whitespace-nowrap sm:w-auto"
-            />
           </div>
+          <ReportToolbarActions
+            onRefreshComplete={() => setReloadKey((k) => k + 1)}
+            onExportPdf={handleExportPdf}
+            onExportCsv={handleExportCsv}
+            disabled={chartPoints.length === 0}
+          />
         </div>
       </div>
 

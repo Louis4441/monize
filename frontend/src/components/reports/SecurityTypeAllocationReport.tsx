@@ -20,10 +20,9 @@ import { HoldingWithMarketValue } from '@/types/investment';
 import { Account } from '@/types/account';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { resolvePdfColor } from '@/components/reports/resolve-pdf-color';
-import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from '@/components/ui/interactive-row';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
@@ -484,10 +483,10 @@ export function SecurityTypeAllocationReport() {
               className="w-full sm:w-48"
             />
           </div>
-          <div className="flex flex-wrap gap-2 items-center">
-            <RefreshPricesButton onRefreshComplete={loadData} />
-            <ExportDropdown onExportPdf={handleExportPdf} className="whitespace-nowrap" />
-          </div>
+          <ReportToolbarActions
+            onRefreshComplete={loadData}
+            onExportPdf={handleExportPdf}
+          />
         </div>
       </div>
 

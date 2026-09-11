@@ -315,13 +315,21 @@ export function InvestmentReportViewer({ reportId }: InvestmentReportViewerProps
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <RefreshPricesButton onRefreshComplete={executeReport} />
+          {/* The pair spans its own row below the fields on a phone, the way
+              `ReportToolbarActions` lays out every other report's. This one
+              writes it out because its export is a plain CSV button, not the
+              `ExportDropdown` that row renders. */}
+          <div className="grid w-full grid-cols-2 gap-2 sm:ml-auto sm:flex sm:w-auto sm:items-center sm:gap-3">
+            <RefreshPricesButton
+              onRefreshComplete={executeReport}
+              className="h-full w-full sm:w-auto"
+            />
             <Button
               variant="outline"
               size="sm"
               onClick={handleExportCsv}
               disabled={!result || result.rowCount === 0}
+              className="h-full w-full whitespace-nowrap sm:w-auto"
             >
               {t('investmentReportViewer.exportCsv')}
             </Button>

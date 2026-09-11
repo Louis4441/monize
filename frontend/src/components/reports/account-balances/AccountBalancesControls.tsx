@@ -5,7 +5,7 @@ import { DateInput } from '@/components/ui/DateInput';
 import { Select } from '@/components/ui/Select';
 import { MultiSelect, type MultiSelectOption } from '@/components/ui/MultiSelect';
 import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { LabelSpacer } from '@/components/ui/LabelSpacer';
 import {
   GROUP_BY_OPTIONS,
@@ -147,24 +147,28 @@ export function AccountBalancesControls({
           </div>
         </div>
         {/* The view toggle and the export button are controls on a row of
-            labelled fields, so they take the fields' height the same way the
-            sort-direction button does: the label's space is reserved above
-            them, and what is left is stretched into. They were previously a
-            hand-rolled pair of icon buttons centred against the row, which
-            stood short of every field beside them -- `ChartViewToggle` is the
-            component 19 other surfaces use for exactly this. */}
+            labelled fields, so from `sm` up they take the fields' height the
+            same way the sort-direction button does: the label's space is
+            reserved above them, and what is left is stretched into. They were
+            previously a hand-rolled pair of icon buttons centred against the
+            row, which stood short of every field beside them --
+            `ChartViewToggle` is the component 19 other surfaces use for exactly
+            this. On a phone there is no field beside them, so the reserved
+            space goes and the export takes a line of its own. */}
         <div className="flex flex-col">
-          <LabelSpacer />
-          <div className="flex flex-1 items-stretch gap-2">
+          <div className="hidden sm:block">
+            <LabelSpacer />
+          </div>
+          <div className="flex flex-1 flex-wrap items-stretch gap-2">
             <ChartViewToggle
               value={viewMode === 'chart' ? 'pie' : 'table'}
               onChange={(view) => onViewModeChange(view === 'pie' ? 'chart' : 'table')}
               options={['table', 'pie']}
             />
-            <ExportDropdown
+            <ReportToolbarActions
               onExportPdf={onExportPdf}
               onExportCsv={onExportCsv}
-              className="h-full"
+              className="sm:ml-0"
             />
           </div>
         </div>

@@ -24,7 +24,7 @@ import { useDateFormat } from '@/hooks/useDateFormat';
 import { chartSeriesColor } from '@/lib/chart-colors';
 import { resolvePdfColor } from '@/components/reports/resolve-pdf-color';
 import { exportToCsv } from '@/lib/csv-export';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from '@/components/ui/interactive-row';
@@ -491,11 +491,9 @@ export function RecurringExpensesReport() {
               {t('recurringExpenses.inLast6Months')}
             </span>
           </div>
-          <ExportDropdown
+          <ReportToolbarActions
             onExportCsv={handleExportCsv}
             onExportPdf={handleExportPdf}
-            containerClassName="w-full self-stretch sm:ml-auto sm:w-auto sm:shrink-0"
-            className="h-full w-full justify-center whitespace-nowrap sm:w-auto"
           />
         </div>
       </div>
