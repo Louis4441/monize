@@ -508,6 +508,19 @@ Known gap           **An unconverted amount still reaches a report under the
                     total, and every affected DTO carrying a completeness field
                     a consumer branches on -- one specified change per report
                     family, not a guard edit. Until then this entry is `partial`.
+                    Two families are done, by that route rather than around it:
+                    Spending by Category and Income vs Expenses take the nullable
+                    `tryConvertAmount` beside convertAmount, exclude a row they
+                    cannot convert, accumulate through FxAggregate, and answer
+                    with `currency`, `missingCurrencies` and `excludedCount`
+                    beside a total that is null when anything was left out. The
+                    report and the dashboard widget drawing each of them mark the
+                    same subtotal through PartialTotal. The remaining callers of
+                    convertAmount are Income by Source, Spending by Payee,
+                    Monthly Spending Trend, Monthly Category Breakdown, and the
+                    anomaly, comparison, tax/recurring and data-quality families;
+                    data-quality is the one that also mislabels, and is where the
+                    second clause of the statement still fails.
 Concurrency scope   --
 Failure response    null or an explicitly partial figure, per
                     docs/financial-calculation-contract.md section 1. On the
