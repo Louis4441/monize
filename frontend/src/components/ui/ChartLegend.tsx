@@ -24,23 +24,40 @@ export interface ChartLegendItem {
 interface ChartLegendProps {
   items: readonly ChartLegendItem[];
   /**
-   * Column classes applied from `sm` up. Mobile is ALWAYS a single vertical
-   * column -- the point of this component -- so a caller only says how the
-   * legend widens on larger screens. Default: two from `sm`, three from `lg`.
+   * Column classes applied from `sm` up. A caller only says how the legend
+   * widens on larger screens; the phone layout is `phoneColumns`. Default: two
+   * from `sm`, three from `lg`.
    */
   columnsClassName?: string;
+  /**
+   * How many columns the legend has on a phone. One by default, which is what
+   * a legend of long names needs. Pass `2` where the names are short enough to
+   * read at half width -- a category legend of twenty rows is a long scroll in
+   * one column -- and check the longest name at 320px: each row truncates
+   * rather than wrapping, so an over-narrow column silently hides the end of a
+   * name.
+   */
+  phoneColumns?: 1 | 2;
   className?: string;
 }
 
 const DEFAULT_COLUMNS = 'sm:grid-cols-2 lg:grid-cols-3';
 
+/** The phone column count, as the class it compiles to. */
+const PHONE_COLUMNS: Record<1 | 2, string> = {
+  1: 'grid-cols-1',
+  2: 'grid-cols-2',
+};
+
 /**
- * The legend beside a categorical chart (a pie, a donut), rendered VERTICALLY on
- * a phone and in compact multiple columns from `sm` up.
+ * The legend beside a categorical chart (a pie, a donut), rendered in one
+ * vertical column on a phone by default and in compact multiple columns from
+ * `sm` up.
  *
- * A two- or three-column legend on a 320px screen wraps every name onto its own
- * cramped half-width; one column per row gives each name the whole width and
- * reads straight down beside the chart. From `sm` the caller's
+ * A three-column legend on a 320px screen wraps every name onto its own cramped
+ * third-width; one column per row gives each name the whole width and reads
+ * straight down beside the chart. A legend whose names are short can say
+ * `phoneColumns={2}` and halve the scroll instead. From `sm` the caller's
  * `columnsClassName` restores the dense desktop grid.
  *
  * A row with an `onClick` is a button (with a `focus-visible` ring and a
@@ -53,11 +70,12 @@ const DEFAULT_COLUMNS = 'sm:grid-cols-2 lg:grid-cols-3';
 export function ChartLegend({
   items,
   columnsClassName = DEFAULT_COLUMNS,
+  phoneColumns = 1,
   className,
 }: ChartLegendProps) {
   return (
     <ul
-      className={`grid grid-cols-1 gap-x-3 gap-y-1 ${columnsClassName} ${className ?? ''}`}
+      className={`grid ${PHONE_COLUMNS[phoneColumns]} gap-x-3 gap-y-1 ${columnsClassName} ${className ?? ''}`}
     >
       {items.map((item) => {
         const inner = (

@@ -1148,7 +1148,11 @@ export function DividendIncomeReport() {
             value={dateRange}
             onChange={setDateRange}
           />
-          <div className="ml-auto shrink-0 flex gap-2 items-center">
+          {/* Five controls do not fit a phone on one unwrapped line: the group
+              wrapped nothing and the export was pushed past the right edge of
+              the card. It wraps here, and the export takes a line of its own
+              below the view buttons, its label on one line. */}
+          <div className="flex w-full flex-wrap gap-2 items-center sm:ml-auto sm:w-auto sm:shrink-0">
             <button
               onClick={() => setViewType('monthly')}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
@@ -1180,9 +1184,14 @@ export function DividendIncomeReport() {
               {t('dividendIncome.viewBySecurity')}
             </button>
             <RefreshPricesButton onRefreshComplete={reloadAll} />
+            {/* Both widths: this export is the CSV+PDF variant (a wrapper the
+                container class sizes) on a table view and the PDF-only variant
+                (no wrapper, the button itself) everywhere else. */}
             <ExportDropdown
               onExportPdf={handleExportPdf}
               onExportCsv={isTableView ? handleExportCsv : undefined}
+              containerClassName="w-full sm:w-auto"
+              className="w-full justify-center whitespace-nowrap sm:w-auto"
             />
           </div>
         </div>

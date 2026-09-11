@@ -569,7 +569,12 @@ export function DividendYieldGrowthReport() {
             value={selectedAccountIds}
             onChange={setSelectedAccountIds}
           />
-          <div className="flex gap-2 items-center">
+          {/* `items-stretch`, not `items-center`: squeezed onto a phone these
+              three labels wrap onto a different number of lines each, and a
+              one-word button (Frequency) stood shorter than the two beside it.
+              They wrap onto their own lines here, all the height of the
+              tallest on the line. */}
+          <div className="flex flex-wrap gap-2 items-stretch">
             <button
               onClick={() => setViewType('yield')}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
@@ -595,9 +600,11 @@ export function DividendYieldGrowthReport() {
               {t('dividendYieldGrowth.viewFrequency')}
             </button>
           </div>
-          <div className="ml-auto flex gap-2 items-center">
+          {/* `ml-auto` from `sm` up only: on a phone this is a row of its own
+              and belongs at the left edge like the rows above it. */}
+          <div className="flex flex-wrap gap-2 items-center sm:ml-auto">
             <RefreshPricesButton onRefreshComplete={reload} />
-            <ExportDropdown onExportPdf={handleExportPdf} />
+            <ExportDropdown onExportPdf={handleExportPdf} className="whitespace-nowrap" />
           </div>
         </div>
       </div>

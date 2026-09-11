@@ -169,7 +169,9 @@ export function DuplicateTransactionReport() {
             value={dateRange}
             onChange={setDateRange}
           />
-          <div className="flex items-center gap-3">
+          {/* `items-stretch`, so the export is the height of the sensitivity
+              picker beside it rather than the height of its own text. */}
+          <div className="flex flex-wrap items-stretch gap-3">
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600 dark:text-gray-400">{t('duplicateTransactions.sensitivityLabel')}</span>
               <select
@@ -182,7 +184,12 @@ export function DuplicateTransactionReport() {
                 <option value="low">{t('duplicateTransactions.sensitivityLow')}</option>
               </select>
             </div>
-            <ExportDropdown onExportCsv={handleExportCsv} onExportPdf={handleExportPdf} disabled={duplicateGroups.length === 0} />
+            <ExportDropdown
+              onExportCsv={handleExportCsv}
+              onExportPdf={handleExportPdf}
+              disabled={duplicateGroups.length === 0}
+              className="h-full whitespace-nowrap"
+            />
           </div>
         </div>
       </div>

@@ -330,7 +330,11 @@ export function NetWorthReport() {
             customEndDate={endDate}
             onCustomEndDateChange={setEndDate}
           />
-          <div className="flex items-center gap-3">
+          {/* The row did not wrap, so the export sat past the right edge of a
+              phone. It takes the full width below `sm`, which puts it on a
+              line of its own under the view toggle and the recalculate
+              button, and goes back beside them from `sm` up. */}
+          <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
             <ChartViewToggle
               value={chartType}
               onChange={(v) => setChartType(v as 'line' | 'bar' | 'stacked' | 'table')}
@@ -343,7 +347,13 @@ export function NetWorthReport() {
             >
               {isRecalculating ? t('netWorth.recalculating') : t('netWorth.recalculate')}
             </button>
-            <ExportDropdown onExportPdf={handleExportPdf} onExportCsv={handleExportCsv} disabled={chartData.length === 0} />
+            <ExportDropdown
+              onExportPdf={handleExportPdf}
+              onExportCsv={handleExportCsv}
+              disabled={chartData.length === 0}
+              containerClassName="w-full sm:w-auto"
+              className="w-full justify-center sm:w-auto"
+            />
           </div>
         </div>
       </div>

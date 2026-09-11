@@ -59,4 +59,40 @@ describe('ExportDropdown', () => {
     );
     expect(screen.getByTitle('Export report')).toBeDisabled();
   });
+
+  /**
+   * The CSV+PDF variant lays out as its positioning wrapper, which is
+   * `inline-block` and therefore as wide as the button's text whatever the
+   * button is told. A toolbar giving the export its own full line on a phone
+   * has to be able to size that box, or the line stays button-wide.
+   */
+  it('applies containerClassName to the wrapper the toolbar lays out', () => {
+    const { container } = render(
+      <ExportDropdown
+        onExportCsv={vi.fn()}
+        onExportPdf={vi.fn()}
+        containerClassName="w-full sm:w-auto"
+        className="w-full justify-center"
+      />,
+    );
+
+    const wrapper = container.firstElementChild!;
+    expect(wrapper.className).toContain('relative');
+    expect(wrapper.className).toContain('w-full');
+    expect(wrapper.className).toContain('sm:w-auto');
+    expect(screen.getByTitle('Export report').className).toContain('w-full');
+  });
+
+  it('sizes the PDF-only variant through className, having no wrapper', () => {
+    const { container } = render(
+      <ExportDropdown onExportPdf={vi.fn()} className="w-full whitespace-nowrap" />,
+    );
+
+    // The button IS the box here, so a caller sizes it directly; a
+    // containerClassName would have nowhere to land.
+    const root = container.firstElementChild!;
+    expect(root.tagName).toBe('BUTTON');
+    expect(root.className).toContain('w-full');
+    expect(root.className).toContain('whitespace-nowrap');
+  });
 });

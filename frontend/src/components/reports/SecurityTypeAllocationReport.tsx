@@ -473,17 +473,20 @@ export function SecurityTypeAllocationReport() {
       {/* Account Filter */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
         <div className="flex flex-wrap gap-3 items-center justify-between">
-          <div className="flex flex-wrap gap-3 items-center">
+          {/* Full width on a phone, the toolbar's fixed width from `sm` up:
+              at `w-48` an account name has nowhere to go. */}
+          <div className="flex w-full flex-wrap gap-3 items-center sm:w-auto">
             <ReportAccountMultiSelect
               accounts={accounts}
               value={selectedAccountIds}
               onChange={setSelectedAccountIds}
               mode="portfolio"
+              className="w-full sm:w-48"
             />
           </div>
-          <div className="flex gap-2 items-center">
+          <div className="flex flex-wrap gap-2 items-center">
             <RefreshPricesButton onRefreshComplete={loadData} />
-            <ExportDropdown onExportPdf={handleExportPdf} />
+            <ExportDropdown onExportPdf={handleExportPdf} className="whitespace-nowrap" />
           </div>
         </div>
       </div>

@@ -342,13 +342,17 @@ export function ForeignCurrencyFeesReport() {
       {/* Controls */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
         <div className="flex flex-wrap gap-3 items-center">
+          {/* Both pickers take the card's width on a phone -- side by side
+              they are wider than the screen -- and their toolbar widths from
+              `sm` up. */}
           <ReportAccountMultiSelect
             accounts={accounts}
             value={selectedAccountIds}
             onChange={handleAccountChange}
             filter={hasFxFee}
+            className="w-full sm:w-48"
           />
-          <div className="w-52 max-w-full">
+          <div className="w-full max-w-full sm:w-52">
             <MultiSelect
               ariaLabel={t('currencyFilter.label')}
               options={currencyOptions}

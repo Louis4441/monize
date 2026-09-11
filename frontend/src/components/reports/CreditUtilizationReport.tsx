@@ -359,14 +359,18 @@ export function CreditUtilizationReport() {
     <div className="space-y-6">
       {/* Account Filter */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
-        <div className="flex flex-wrap gap-3 items-center justify-between">
+        {/* `items-stretch`, so the export is the height of the picker beside
+            it rather than the height of its own text: the two are one row of
+            controls, and a short button against a full-height field reads as a
+            mistake. On a phone each takes its own line and its own height. */}
+        <div className="flex flex-wrap gap-3 items-stretch justify-between">
           <ReportAccountMultiSelect
             accounts={creditAccounts}
             value={selectedAccountIds}
             onChange={setSelectedAccountIds}
             filter={() => true}
           />
-          <ExportDropdown onExportPdf={handleExportPdf} />
+          <ExportDropdown onExportPdf={handleExportPdf} className="h-full" />
         </div>
       </div>
 

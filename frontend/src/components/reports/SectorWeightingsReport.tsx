@@ -354,17 +354,22 @@ export function SectorWeightingsReport() {
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
         <div className="flex flex-wrap gap-3 items-center justify-between">
-          <div className="flex flex-wrap gap-3 items-center">
+          {/* Each picker takes the full width of the card on a phone -- at
+              `w-48` a pair of them is wider than the screen and an account or
+              security name has nowhere to go -- and returns to the fixed
+              toolbar width from `sm` up. */}
+          <div className="flex w-full flex-wrap gap-3 items-center sm:w-auto">
             {/* Account Filter */}
             <ReportAccountMultiSelect
               accounts={accounts}
               value={selectedAccountIds}
               onChange={setSelectedAccountIds}
               mode="portfolio"
+              className="w-full sm:w-48"
             />
 
             {/* Security Filter */}
-            <div className="w-48">
+            <div className="w-full sm:w-48">
               <MultiSelect
                 ariaLabel={t('sectorWeightings.filterBySecurityLabel')}
                 placeholder={t('sectorWeightings.allSecuritiesPlaceholder')}
@@ -386,9 +391,9 @@ export function SectorWeightingsReport() {
               </button>
             )}
           </div>
-          <div className="flex gap-2 items-center">
+          <div className="flex flex-wrap gap-2 items-center">
             <RefreshPricesButton onRefreshComplete={loadWeightings} />
-            <ExportDropdown onExportPdf={handleExportPdf} />
+            <ExportDropdown onExportPdf={handleExportPdf} className="whitespace-nowrap" />
           </div>
         </div>
       </div>

@@ -51,6 +51,7 @@ npm run i18n:check         # Verify the pseudo-locale is up to date (CI gate)
 | CSV | `exportToCsv` / `exportCsvSections` (`lib/csv-export.ts`) | a second `text/csv` Blob |
 | Random id | `crypto.randomUUID()` | `Math.random()` |
 | Chart colour | `chartColors` tokens (`lib/chart-colors.ts`) | a hex literal in a `fill`, `stroke` or `stopColor` |
+| Toolbar row on a phone | `flex-wrap`, `w-full sm:w-auto`, `sm:ml-auto`, a button's height from `items-stretch` + `LabelSpacer` | an unwrapped row, a bare `ml-auto`, a hand-matched padding |
 
 **A write that moves money calls `invalidateBalanceCaches()`** (or `clearAllCache()` where the write can touch anything). `src/lib/balance-cache.guard.test.ts` scans for the omission.
 
@@ -69,7 +70,7 @@ npm run i18n:check         # Verify the pseudo-locale is up to date (CI gate)
 | Work | Read |
 |---|---|
 | API calls, caching, asynchronous state, ownership of joint accounts | `docs/frontend/api-and-cache.md` |
-| Cards, dialogs, pickers, switchers, rows, links, attachments, tours, settings screens | `docs/frontend/ui-conventions.md` |
+| Cards, dialogs, pickers, switchers, rows, links, attachments, tours, settings screens, report toolbars | `docs/frontend/ui-conventions.md` |
 | Inputs, number and date formatting, phone numbers, text caps, CSV, form modals | `docs/frontend/forms-and-formatting.md` |
 | Tables, registers, density, pagination, phones | `docs/frontend/tables-and-registers.md` |
 | Money figures: scheduled occurrences, loans, portfolio ranges, chart reductions, unknown values | `docs/frontend/financial-figures.md`, then `docs/financial-semantics.md`, `docs/time-series-contract.md`, `docs/system-invariants.md` |

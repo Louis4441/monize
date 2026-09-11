@@ -281,7 +281,11 @@ export function YearOverYearReport() {
               </button>
             ))}
           </div>
-          <div className="ml-auto flex items-center gap-3">
+          {/* `ml-auto` from `sm` up only. On a phone the three groups wrap
+              onto three lines, and pushing the last one to the right edge left
+              it hanging under two left-aligned rows; on one line it is still
+              the trailing group. */}
+          <div className="flex items-center gap-3 sm:ml-auto">
             <ChartViewToggle
               value={viewType}
               onChange={(v) => setViewType(v as 'bar' | 'table')}

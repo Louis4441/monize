@@ -467,27 +467,36 @@ export function RecurringExpensesReport() {
 
       {/* Controls */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
-        <div className="flex items-center gap-3">
-          <label className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-            {t('recurringExpenses.minOccurrencesLabel')}
-          </label>
-          <select
-            value={minOccurrences}
-            onChange={(e) => setMinOccurrences(Number(e.target.value))}
-            className="w-16 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 text-sm"
-          >
-            <option value={2}>2+</option>
-            <option value={3}>3+</option>
-            <option value={4}>4+</option>
-            <option value={5}>5+</option>
-            <option value={6}>6+</option>
-          </select>
-          <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-            {t('recurringExpenses.inLast6Months')}
-          </span>
-          <div className="ml-auto shrink-0">
-            <ExportDropdown onExportCsv={handleExportCsv} onExportPdf={handleExportPdf} />
+        {/* The threshold sentence and the export were one unwrapped row: on a
+            phone the two labels either side of the picker squeezed it and the
+            export was pushed past the right edge of the card. The sentence
+            takes a row of its own below `sm`, the export the row under it. */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:gap-3">
+            <label className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+              {t('recurringExpenses.minOccurrencesLabel')}
+            </label>
+            <select
+              value={minOccurrences}
+              onChange={(e) => setMinOccurrences(Number(e.target.value))}
+              className="w-16 shrink-0 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 text-sm"
+            >
+              <option value={2}>2+</option>
+              <option value={3}>3+</option>
+              <option value={4}>4+</option>
+              <option value={5}>5+</option>
+              <option value={6}>6+</option>
+            </select>
+            <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+              {t('recurringExpenses.inLast6Months')}
+            </span>
           </div>
+          <ExportDropdown
+            onExportCsv={handleExportCsv}
+            onExportPdf={handleExportPdf}
+            containerClassName="w-full self-stretch sm:ml-auto sm:w-auto sm:shrink-0"
+            className="h-full w-full justify-center whitespace-nowrap sm:w-auto"
+          />
         </div>
       </div>
 

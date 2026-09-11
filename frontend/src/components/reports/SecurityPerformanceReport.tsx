@@ -608,11 +608,14 @@ export function SecurityPerformanceReport() {
           error states belong to the body below, not to the whole report. */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4 space-y-4">
         <div className="flex flex-wrap gap-4 items-center justify-between">
-          <div className="flex flex-wrap gap-2 items-center">
-            {/* Sized to their longest option, not to the current selection:
-                these two sit in the toolbar, and a control that stretches on
-                every pick drags the range selector around under the cursor. */}
-            <div className="min-w-[250px]">
+          <div className="flex w-full flex-wrap gap-2 items-center sm:w-auto">
+            {/* From `sm` up, sized to their longest option rather than to the
+                current selection: these two sit in the toolbar, and a control
+                that stretches on every pick drags the range selector around
+                under the cursor. On a phone there is no room for that -- the
+                longest security name is wider than the screen -- so each takes
+                the full line and the selected name truncates. */}
+            <div className="w-full sm:w-auto sm:min-w-[250px]">
               <MultiSelect
                 ariaLabel={t('securityPerformance.selectSecuritiesPlaceholder')}
                 options={securityOptions}
@@ -622,7 +625,7 @@ export function SecurityPerformanceReport() {
                 sizeToLongestOption
               />
             </div>
-            <div className="min-w-[250px]">
+            <div className="w-full sm:w-auto sm:min-w-[250px]">
               <MultiSelect
                 ariaLabel={t('securityPerformance.selectIndexesPlaceholder')}
                 options={indexOptions}
@@ -633,7 +636,7 @@ export function SecurityPerformanceReport() {
               />
             </div>
           </div>
-          <div className="flex gap-2 items-center">
+          <div className="flex flex-wrap gap-2 items-center">
             {isSingle && (
               <>
                 <button

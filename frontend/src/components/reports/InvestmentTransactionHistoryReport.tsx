@@ -425,14 +425,19 @@ export function InvestmentTransactionHistoryReport() {
 
       {/* Controls */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
+        {/* One control per line on a phone, the desktop row from `sm` up. The
+            two pickers are `w-48` each: side by side they are wider than a
+            phone, and the pair was pushed off the right of the screen rather
+            than wrapped, because the box holding them did not wrap. */}
         <div className="flex flex-wrap gap-3 items-center">
-          <div className="flex gap-3 items-center">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
             <ReportAccountMultiSelect
               accounts={accounts}
               value={selectedAccountIds}
               onChange={setSelectedAccountIds}
+              className="w-full sm:w-48"
             />
-            <div className="w-48">
+            <div className="w-full sm:w-48">
               <MultiSelect
                 ariaLabel={t('investmentTransactions.filterByAction')}
                 placeholder={t('investmentTransactions.allActionsPlaceholder')}
@@ -448,9 +453,19 @@ export function InvestmentTransactionHistoryReport() {
             value={dateRange}
             onChange={setDateRange}
           />
-          <div className="ml-auto shrink-0 flex gap-2 items-center">
-            <RefreshPricesButton onRefreshComplete={reload} />
-            <ExportDropdown onExportCsv={handleExportCsv} onExportPdf={handleExportPdf} disabled={filteredTransactions.length === 0} />
+          {/* A two-column grid on a phone so the pair fills its own line and
+              neither button is left hanging past the card; the grid stretches
+              each child, which an `inline-block` export wrapper would not do
+              for itself. */}
+          <div className="grid w-full grid-cols-2 gap-2 sm:ml-auto sm:flex sm:w-auto sm:shrink-0 sm:items-center">
+            <RefreshPricesButton onRefreshComplete={reload} className="w-full sm:w-auto" />
+            <ExportDropdown
+              onExportCsv={handleExportCsv}
+              onExportPdf={handleExportPdf}
+              disabled={filteredTransactions.length === 0}
+              containerClassName="w-full sm:w-auto"
+              className="w-full justify-center sm:w-auto"
+            />
           </div>
         </div>
       </div>

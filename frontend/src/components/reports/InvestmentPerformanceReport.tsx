@@ -395,7 +395,7 @@ export function InvestmentPerformanceReport() {
               onChange={setSelectedAccountIds}
             />
           </div>
-          <div className="flex gap-2 items-center">
+          <div className="flex flex-wrap gap-2 items-center">
             <button
               onClick={() => setViewType('performance')}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
@@ -417,8 +417,35 @@ export function InvestmentPerformanceReport() {
               {t('investmentPerformance.viewAllocation')}
             </button>
             <RefreshPricesButton onRefreshComplete={() => setReloadKey((k) => k + 1)} />
-            <ExportDropdown onExportPdf={handleExportPdf} />
           </div>
+        </div>
+        {/* The chart's window and the export belong to the toolbar, not to the
+            chart: the range selector used to sit loose above the chart, outside
+            the card every other control is in, and the export shared a row it
+            was pushed off the right of on a phone. Stacked below `sm`, so the
+            export is a full-width line under the window it exports; one row
+            from `sm` up, export at the trailing edge whether or not the
+            allocation view has hidden the window. */}
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          {viewType === 'performance' && (
+            <DateRangeSelector
+              ranges={CHART_RANGES}
+              // Only `all` needs translating; 1M/3M/YTD/1Y/5Y are
+              // locale-neutral abbreviations `formatLabel` handles.
+              labels={{ all: t('investmentPerformance.rangeAll') }}
+              value={perfRange}
+              onChange={setPerfRange}
+              activeColour="bg-blue-600"
+              size="sm"
+            />
+          )}
+          {/* PDF only, so the button IS the box this row lays out: it takes
+              the width here, not a wrapper. `whitespace-nowrap` keeps the
+              label on one line at any width. */}
+          <ExportDropdown
+            onExportPdf={handleExportPdf}
+            className="w-full justify-center whitespace-nowrap sm:ml-auto sm:w-auto"
+          />
         </div>
       </div>
 
@@ -432,18 +459,6 @@ export function InvestmentPerformanceReport() {
               on their own tabs. The chart owns its own fetch, keyed on the held
               securities and the window, and renders the server's percent-return
               series with its null/exclusion handling intact. */}
-          <div className="mb-6 flex justify-end">
-            <DateRangeSelector
-              ranges={CHART_RANGES}
-              // Only `all` needs translating; 1M/3M/YTD/1Y/5Y are
-              // locale-neutral abbreviations `formatLabel` handles.
-              labels={{ all: t('investmentPerformance.rangeAll') }}
-              value={perfRange}
-              onChange={setPerfRange}
-              activeColour="bg-blue-600"
-              size="sm"
-            />
-          </div>
           <SecurityComparisonChart
             securityIds={performanceSecurityIds}
             indexCodes={[]}

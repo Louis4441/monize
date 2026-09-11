@@ -18,6 +18,15 @@ interface ExportDropdownProps {
    * the same.
    */
   className?: string;
+  /**
+   * Extra classes for the positioning wrapper the CSV+PDF variant renders --
+   * the box a toolbar lays out, which is `inline-block` and therefore as wide
+   * as the button's text whatever the button itself is told. A toolbar giving
+   * the export its own full line on a phone (`w-full sm:w-auto`) has to size
+   * this, not only the trigger. Ignored by the PDF-only variant, which has no
+   * wrapper: there the button IS the box, so `className` sizes it.
+   */
+  containerClassName?: string;
 }
 
 export function ExportDropdown({
@@ -25,6 +34,7 @@ export function ExportDropdown({
   onExportPdf,
   disabled,
   className,
+  containerClassName,
 }: ExportDropdownProps) {
   const t = useTranslations('common');
   const [isOpen, setIsOpen] = useState(false);
@@ -74,7 +84,7 @@ export function ExportDropdown({
   }
 
   return (
-    <div ref={dropdownRef} className="relative inline-block">
+    <div ref={dropdownRef} className={cn('relative inline-block', containerClassName)}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={disabled || isExporting}

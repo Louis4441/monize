@@ -476,9 +476,12 @@ export function SpendingByCategoryReport() {
               </div>
             )}
 
-            {/* Legend -- one vertical column on a phone, dense grid from `sm` up. */}
+            {/* Legend -- two columns on a phone (category names are short and
+                a full-width column of them is a long scroll past the chart),
+                denser still from `sm` up. */}
             <ChartLegend
               className="mt-6"
+              phoneColumns={2}
               columnsClassName="sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
               items={chartData.map((item, index) => {
                 const percentage = totalExpenses > 0 ? (item.value / totalExpenses) * 100 : 0;

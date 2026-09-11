@@ -161,7 +161,11 @@ export function SpendingAnomaliesReport() {
 
       {/* Controls */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
-        <div className="flex items-center gap-3">
+        {/* The export is the height of the sensitivity picker beside it, not
+            of its own text: `self-stretch` on the box it sits in and `h-full`
+            on the button, so the two read as one row of controls. On a phone
+            the row wraps and the export takes a line of its own. */}
+        <div className="flex flex-wrap items-center gap-3">
           <label className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
             {t('spendingAnomalies.sensitivityLabel')}
           </label>
@@ -175,8 +179,11 @@ export function SpendingAnomaliesReport() {
             <option value={2.5}>{t('spendingAnomalies.sensitivityLow')}</option>
             <option value={3}>{t('spendingAnomalies.sensitivityVeryLow')}</option>
           </select>
-          <div className="ml-auto shrink-0">
-            <ExportDropdown onExportPdf={handleExportPdf} />
+          <div className="w-full self-stretch sm:ml-auto sm:w-auto sm:shrink-0">
+            <ExportDropdown
+              onExportPdf={handleExportPdf}
+              className="h-full w-full justify-center whitespace-nowrap sm:w-auto"
+            />
           </div>
         </div>
       </div>

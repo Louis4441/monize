@@ -22,6 +22,7 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useFinancialToday } from '@/hooks/useFinancialToday';
 import { exportToCsv } from '@/lib/csv-export';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { LabelSpacer } from '@/components/ui/LabelSpacer';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
@@ -479,8 +480,20 @@ export function LoanAmortizationReport() {
                 ))}
             </select>
           </div>
-          <div className="ml-auto">
-            <ExportDropdown onExportCsv={handleExportCsv} onExportPdf={handleExportPdf} />
+          {/* The export stands beside a labelled field, so it is the height of
+              the FIELD, not of the field plus its label: reserve the label's
+              own space above it and stretch into what is left, rather than
+              matching the select's padding with a figure that drifts the next
+              time either control's type scale changes. */}
+          <div className="ml-auto flex flex-col">
+            <LabelSpacer />
+            <div className="flex flex-1 items-stretch">
+              <ExportDropdown
+                onExportCsv={handleExportCsv}
+                onExportPdf={handleExportPdf}
+                className="h-full"
+              />
+            </div>
           </div>
         </div>
       </div>

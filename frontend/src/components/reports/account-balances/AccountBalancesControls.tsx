@@ -6,6 +6,7 @@ import { Select } from '@/components/ui/Select';
 import { MultiSelect, type MultiSelectOption } from '@/components/ui/MultiSelect';
 import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { LabelSpacer } from '@/components/ui/LabelSpacer';
 import {
   GROUP_BY_OPTIONS,
   SORT_BY_OPTIONS,
@@ -40,25 +41,6 @@ interface Props {
 }
 
 const SCOPES: BalanceScope[] = ['all', 'assets', 'liabilities'];
-
-/**
- * The space a `Select` gives its label, reserved above a control that has none.
- *
- * A button standing beside a labelled field is the height of the *field*, not
- * of the field plus its label. Reserving the label's own space above it means
- * what is left to stretch into is exactly the input's height, with no magic
- * number that a font or padding change would silently invalidate --
- * `self-stretch` alone measures from the top of the label and stands a label
- * taller. Both the sort-direction toggle and the view/export group need it, so
- * the rule lives in one place rather than being written out twice.
- */
-function LabelSpacer() {
-  return (
-    <span aria-hidden="true" className="mb-1 block text-sm font-medium">
-      {'\u00a0'}
-    </span>
-  );
-}
 
 /**
  * The report's toolbar: the date the balances are measured at, what is
