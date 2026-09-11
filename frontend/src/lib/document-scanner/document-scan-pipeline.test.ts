@@ -4,6 +4,7 @@ import { loadEngine, type OpenCv } from './opencv-engine';
 import {
   applyStyle,
   desaturate,
+  detectByLowSaturation,
   detectDocument,
   enhance,
   limitSize,
@@ -39,6 +40,18 @@ beforeAll(async () => {
 
 /** How far a detected corner may sit from the planted one, in pixels. */
 const CORNER_TOLERANCE = 12;
+
+/**
+ * An upright rectangular page, for the saturation detector. Axis-aligned on
+ * purpose: its minimal enclosing rectangle is itself, so the detected corners
+ * can be checked against the planted ones directly.
+ */
+const SATURATION_PAGE_QUAD: Quad = [
+  { x: 120, y: 100 },
+  { x: 600, y: 100 },
+  { x: 600, y: 620 },
+  { x: 120, y: 620 },
+];
 
 function expectNearQuad(found: Quad, expected: Quad): void {
   for (let i = 0; i < 4; i++) {
@@ -82,6 +95,26 @@ function meanIntensity(
       total += image.data[(y * image.width + x) * 4];
       count++;
     }
+  }
+  return total / count;
+}
+
+/**
+ * Mean per-pixel colour spread (max channel minus min), over the whole image.
+ *
+ * A grey document has almost none; the illumination division, applied to each
+ * channel on its own, is what turns neutral sensor grain in a dark region into
+ * coloured speckle, so this is the number that catches the speckle returning.
+ */
+function meanChroma(image: RawImage): number {
+  let total = 0;
+  let count = 0;
+  for (let i = 0; i < image.data.length; i += 4) {
+    const r = image.data[i];
+    const g = image.data[i + 1];
+    const b = image.data[i + 2];
+    total += Math.max(r, g, b) - Math.min(r, g, b);
+    count++;
   }
   return total / count;
 }
@@ -150,6 +183,64 @@ describe('detectDocument', () => {
     });
 
     expect(detectDocument(cv, image).found).toBe(false);
+  });
+
+  // The photo that made this necessary: a grey page whose border carries no
+  // brightness edge (a shadow ate it, or the desk is nearly as bright as the
+  // paper). Canny finds no quadrilateral, so detection falls through to the
+  // saturation route. The surround here is a saturated colour at the SAME
+  // luminance as the page, so there is no edge for Canny at all -- only hue
+  // separates them.
+  it('finds a page by saturation when no brightness edge exists', () => {
+    const image = syntheticDocument({
+      quad: SATURATION_PAGE_QUAD,
+      text: false,
+      paper: 200,
+      backgroundColor: [255, 190, 150],
+    });
+
+    const { quad, found } = detectDocument(cv, image);
+
+    expect(found).toBe(true);
+    expectNearQuad(quad, SATURATION_PAGE_QUAD);
+  });
+
+  // The control for the case above: same geometry and same luminance, but the
+  // surround is grey too, so nothing -- edge or hue -- separates the page from
+  // its background and detection correctly reports nothing found. Without this
+  // the test above could pass on a detector that simply always finds a page.
+  it('reports nothing when neither an edge nor a hue separates the page', () => {
+    const image = syntheticDocument({
+      quad: SATURATION_PAGE_QUAD,
+      text: false,
+      paper: 200,
+      background: 200,
+    });
+
+    expect(detectDocument(cv, image).found).toBe(false);
+  });
+});
+
+describe('detectByLowSaturation', () => {
+  it('returns the page as the low-saturation region on a colour surround', () => {
+    const image = syntheticDocument({
+      quad: SATURATION_PAGE_QUAD,
+      text: false,
+      paper: 200,
+      backgroundColor: [255, 190, 150],
+    });
+
+    const quad = detectByLowSaturation(cv, image);
+
+    expect(quad).not.toBeNull();
+    expectNearQuad(quad as Quad, SATURATION_PAGE_QUAD);
+  });
+
+  // A frame that is grey edge to edge has no surround to tell a page from, so
+  // the near-total low-saturation cover is rejected rather than returned as a
+  // page filling the frame.
+  it('returns null when the whole frame is low-saturation', () => {
+    expect(detectByLowSaturation(cv, blankFrame(400, 400))).toBeNull();
   });
 });
 
@@ -251,6 +342,30 @@ describe('enhance', () => {
     const result = enhance(cv, image);
     expect(result.width).toBe(300);
     expect(result.height).toBe(260);
+  });
+
+  // The failure the screenshots showed: detection defaulted to the whole frame,
+  // so the warp caught the desk and the hand's shadow, and the illumination
+  // division amplified their sensor grain -- per channel, so grey noise came out
+  // as loud colour speckle. Denoising before the division and flooring the
+  // background estimate keeps a dark region quiet. With neither guard this dark
+  // noisy field enhances to a mean chroma near 49; both together hold it near
+  // 12, so the bound is deliberately well below the broken value and above the
+  // fixed one. A noise-free fixture cannot see this regression, which is why one
+  // that carries real per-channel grain has to.
+  it('does not amplify dark-region sensor noise into colour speckle', () => {
+    const noisyDarkField = syntheticDocument({
+      width: 320,
+      height: 260,
+      text: false,
+      paper: 25,
+      background: 25,
+      noise: 6,
+    });
+
+    const result = enhance(cv, noisyDarkField);
+
+    expect(meanChroma(result)).toBeLessThan(25);
   });
 
   // The preview the user approves is the file that gets stored, so the same

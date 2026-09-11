@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { Button } from '@/components/ui/Button';
@@ -8,6 +8,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { useDocumentScanner } from '@/hooks/useDocumentScanner';
+import { useImageZoom } from '@/hooks/useImageZoom';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import {
   encodeScan,
@@ -23,7 +24,6 @@ import {
   type ImageAdjustments,
 } from '@/lib/document-scanner/adjust-image';
 import {
-  DEFAULT_SCAN_STYLE,
   SCAN_STYLES,
   type Quad,
   type QualityWarning,
@@ -34,6 +34,7 @@ import {
   rotateImage,
   type QuarterTurns,
 } from '@/lib/document-scanner/rotate-image';
+import { useScanSettingsStore } from '@/store/scanSettingsStore';
 import { MAX_ATTACHMENT_BYTES } from '@/types/attachment';
 import { DocumentCornerHandles } from './DocumentCornerHandles';
 
@@ -121,12 +122,21 @@ export function DocumentScanDialog({
   const scanner = useDocumentScanner(createWorker);
   const { scan, refine, reset } = scanner;
 
+  // The finish and the two slider offsets are remembered across scans, so a new
+  // document opens the way the last one was left (INV note: the corners and the
+  // rotation are per photo and deliberately are not).
+  const rememberStyle = useScanSettingsStore((s) => s.setStyle);
+  const rememberAdjustments = useScanSettingsStore((s) => s.setAdjustments);
+
   const [mode, setMode] = useState<PreviewMode>('enhanced');
   const [rotation, setRotation] = useState<QuarterTurns>(0);
   const [quad, setQuad] = useState<Quad | null>(null);
-  const [style, setStyle] = useState<ScanStyle>(DEFAULT_SCAN_STYLE);
-  const [adjustments, setAdjustments] =
-    useState<ImageAdjustments>(NEUTRAL_ADJUSTMENTS);
+  const [style, setStyle] = useState<ScanStyle>(
+    () => useScanSettingsStore.getState().style,
+  );
+  const [adjustments, setAdjustments] = useState<ImageAdjustments>(
+    () => useScanSettingsStore.getState().adjustments,
+  );
   const [busy, setBusy] = useState(false);
 
   // Scan whatever file the parent hands over, and forget the previous result
@@ -136,12 +146,15 @@ export function DocumentScanDialog({
       reset();
       return;
     }
+    // Read the remembered values once, at open, without subscribing: a change
+    // the user makes to the finish mid-session must not re-open and re-scan.
+    const remembered = useScanSettingsStore.getState();
     setMode('enhanced');
     setRotation(0);
     setQuad(null);
-    setStyle(DEFAULT_SCAN_STYLE);
-    setAdjustments(NEUTRAL_ADJUSTMENTS);
-    void scan(file);
+    setStyle(remembered.style);
+    setAdjustments(remembered.adjustments);
+    void scan(file, remembered.style);
   }, [isOpen, file, scan, reset]);
 
   // Adopt the detected corners once, so dragging starts from the detection
@@ -179,6 +192,21 @@ export function DocumentScanDialog({
     [shown],
   );
 
+  const zoom = useImageZoom(display.width, display.height);
+  // Reset magnification whenever the shown image changes for a reason other than
+  // a brightness or finish tweak: a new photo, the Original/Enhanced toggle, or
+  // a rotation. Tracked across renders rather than in an effect (the codebase's
+  // set-state-in-effect rule), and guarded so it runs only on an actual change.
+  const zoomDepsRef = useRef({ source, mode, rotation });
+  if (
+    zoomDepsRef.current.source !== source ||
+    zoomDepsRef.current.mode !== mode ||
+    zoomDepsRef.current.rotation !== rotation
+  ) {
+    zoomDepsRef.current = { source, mode, rotation };
+    zoom.reset();
+  }
+
   const originalTooLarge = !!file && file.size > MAX_ATTACHMENT_BYTES;
 
   const handleCornerCommit = useCallback(
@@ -194,22 +222,31 @@ export function DocumentScanDialog({
   const handleStyleChange = useCallback(
     (next: ScanStyle) => {
       setStyle(next);
+      rememberStyle(next);
       const corners = quad ?? scanner.result?.quad;
       if (corners) void refine({ quad: corners, style: next });
     },
-    [quad, refine, scanner.result],
+    [quad, refine, rememberStyle, scanner.result],
   );
 
   const handleAdjustment = useCallback(
     (field: keyof ImageAdjustments, value: number) => {
+      // Live update only. Persistence is deferred to the end of the gesture so
+      // a slider does not serialize the store to localStorage on every tick.
       setAdjustments((current) => ({ ...current, [field]: value }));
     },
     [],
   );
 
+  // Store the offsets once the drag or keypress settles, not per tick.
+  const rememberAdjustmentsNow = useCallback(() => {
+    rememberAdjustments(adjustments);
+  }, [adjustments, rememberAdjustments]);
+
   const handleResetAdjustments = useCallback(() => {
     setAdjustments(NEUTRAL_ADJUSTMENTS);
-  }, []);
+    rememberAdjustments(NEUTRAL_ADJUSTMENTS);
+  }, [rememberAdjustments]);
 
   // No scan, no worker, no round trip: the turn applies to pixels that already
   // exist, so the preview follows the click.
@@ -353,35 +390,67 @@ export function DocumentScanDialog({
 
             <div className="flex justify-center">
               <div
-                className="relative"
-                style={{ width: display.width, height: display.height }}
+                ref={zoom.containerRef}
+                className="relative rounded-md"
+                style={{
+                  width: display.width,
+                  height: display.height,
+                  ...zoom.containerProps.style,
+                }}
+                onPointerDown={zoom.containerProps.onPointerDown}
+                onPointerMove={zoom.containerProps.onPointerMove}
+                onPointerUp={zoom.containerProps.onPointerUp}
+                onPointerCancel={zoom.containerProps.onPointerCancel}
               >
-                <canvas
-                  ref={paint}
-                  className="h-full w-full rounded-md bg-gray-100 object-contain dark:bg-gray-800"
-                  aria-label={
-                    mode === 'enhanced'
-                      ? t('scan.previewEnhancedAlt')
-                      : t('scan.previewOriginalAlt')
-                  }
-                  role="img"
-                />
-                {/* The corners belong to the photo, so they are only drawn
-                    over it -- placed over the enhanced image they would point
-                    at coordinates that no longer exist. */}
-                {mode === 'original' && quad && source && (
-                  <DocumentCornerHandles
-                    quad={quad}
-                    imageWidth={source.width}
-                    imageHeight={source.height}
-                    displayWidth={display.width}
-                    displayHeight={display.height}
-                    onChange={setQuad}
-                    onCommit={handleCornerCommit}
+                {/* The canvas and its overlay are magnified together, so the
+                    corners keep tracking the paper when the image is zoomed. */}
+                <div className="absolute inset-0" style={zoom.contentStyle}>
+                  <canvas
+                    ref={paint}
+                    className="h-full w-full rounded-md bg-gray-100 object-contain dark:bg-gray-800"
+                    aria-label={
+                      mode === 'enhanced'
+                        ? t('scan.previewEnhancedAlt')
+                        : t('scan.previewOriginalAlt')
+                    }
+                    role="img"
                   />
-                )}
+                  {/* The corners belong to the photo, so they are only drawn
+                      over it -- placed over the enhanced image they would point
+                      at coordinates that no longer exist. While the image is
+                      magnified the drag pans instead, so the handles are idle. */}
+                  {mode === 'original' && quad && source && (
+                    <DocumentCornerHandles
+                      quad={quad}
+                      imageWidth={source.width}
+                      imageHeight={source.height}
+                      displayWidth={display.width}
+                      displayHeight={display.height}
+                      onChange={setQuad}
+                      onCommit={handleCornerCommit}
+                      disabled={zoom.zoomed}
+                    />
+                  )}
+                </div>
               </div>
             </div>
+
+            {/* Quality warnings sit directly under the preview, on both views,
+                so a document running off the frame is seen on the default
+                Enhanced card and not buried below the finish controls. */}
+            {scanner.result && !scanner.result.documentFound && (
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                {t('scan.noDocumentFound')}
+              </p>
+            )}
+
+            {warnings.length > 0 && (
+              <ul className="space-y-1 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
+                {warnings.map((warning) => (
+                  <li key={warning}>{t(`scan.warnings.${warning}`)}</li>
+                ))}
+              </ul>
+            )}
 
             {/* The finish and the two repairs, on the scan alone: the photo is
                 stored exactly as the device produced it (`I2`), so nothing
@@ -422,6 +491,10 @@ export function DocumentScanDialog({
                       onChange={(event) =>
                         handleAdjustment(field, Number(event.target.value))
                       }
+                      // Persist when the drag or keypress settles, not per tick.
+                      onPointerUp={rememberAdjustmentsNow}
+                      onKeyUp={rememberAdjustmentsNow}
+                      onBlur={rememberAdjustmentsNow}
                       className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-200 accent-blue-600 dark:bg-gray-600"
                     />
                   </div>
@@ -455,20 +528,6 @@ export function DocumentScanDialog({
               <p className="text-center text-xs text-gray-500 dark:text-gray-400">
                 {t('scan.adjustHint')}
               </p>
-            )}
-
-            {scanner.result && !scanner.result.documentFound && (
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                {t('scan.noDocumentFound')}
-              </p>
-            )}
-
-            {warnings.length > 0 && (
-              <ul className="space-y-1 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
-                {warnings.map((warning) => (
-                  <li key={warning}>{t(`scan.warnings.${warning}`)}</li>
-                ))}
-              </ul>
             )}
 
             {originalTooLarge && (

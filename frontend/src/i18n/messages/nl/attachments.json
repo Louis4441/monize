@@ -55,7 +55,7 @@
     "originalTooLarge": "De originele foto is groter dan {max}, dus alleen de verbeterde scan wordt bijgevoegd.",
     "warnings": {
       "blurry": "De foto lijkt onscherp. Opnieuw maken geeft een scherpere scan.",
-      "edgesOutsideFrame": "Een deel van het document valt mogelijk buiten de foto. Maak de foto opnieuw met de hele pagina in beeld.",
+      "edgesOutsideFrame": "Het document raakt de rand van de foto, dus een zijde kan zijn afgesneden. Maak de foto opnieuw met een marge rondom de hele pagina, zodat geen enkele zijde de rand raakt.",
       "lowResolution": "De scan is vrij klein, kleine letters kunnen lastig te lezen zijn."
     },
     "corners": {

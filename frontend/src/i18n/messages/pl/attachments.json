@@ -55,7 +55,7 @@
     "originalTooLarge": "Oryginalne zdjęcie przekracza {max}, więc dołączony zostanie tylko poprawiony skan.",
     "warnings": {
       "blurry": "Zdjęcie wygląda na poruszone. Ponowne wykonanie da ostrzejszy skan.",
-      "edgesOutsideFrame": "Część dokumentu może znajdować się poza kadrem. Zrób zdjęcie ponownie, obejmując całą stronę.",
+      "edgesOutsideFrame": "Dokument dotyka krawędzi zdjęcia. Zrób zdjęcie ponownie tak, aby wokół całej strony był margines. Żaden bok nie może dotykać krawędzi.",
       "lowResolution": "Skan jest dość mały, drobny druk może być trudny do odczytania."
     },
     "corners": {

@@ -3,6 +3,7 @@ import {
   DETECT_MAX_EDGE,
   MIN_DOCUMENT_AREA_RATIO,
   OUTPUT_MAX_EDGE,
+  clampToFrame,
   fitScale,
   fullFrameQuad,
   isConvexQuad,
@@ -42,8 +43,46 @@ const EDGE_DILATE_KERNEL = 3;
 /** How closely a contour must match a quadrilateral, as a share of perimeter. */
 const POLY_EPSILON_RATIO = 0.02;
 
+/**
+ * Saturation fallback, used only when the edge detector finds no quadrilateral.
+ *
+ * A grey page on a wooden desk has almost no brightness edge where its border
+ * meets the wood, and a hand's shadow breaks whatever edge is left, so Canny
+ * returns arcs that approximate to nothing. But paper is grey wherever the
+ * light is even or not, and wood is not, so the page is the largest LOW-
+ * SATURATION region regardless of the shadow. This is a fallback, not a
+ * replacement: the edge detector still runs first, and this only decides the
+ * case it would otherwise hand back as "whole frame, nothing found".
+ */
+const SATURATION_MAX = 65;
+/** Kernel that closes the gaps text and specular glare leave in the page mask. */
+const SATURATION_KERNEL = 25;
+/**
+ * The most of the frame the page may cover. A frame that is low-saturation edge
+ * to edge -- a grey test fixture, a blank wall -- has no surround to tell the
+ * page from, so a near-total cover is "no document found", not "the document
+ * fills the frame". The lower bound reuses `MIN_DOCUMENT_AREA_RATIO`, the same
+ * "smallest share that is a document" the edge detector applies.
+ */
+const SATURATION_MAX_COVER = 0.97;
+
 /** Kernel of the morphological close that estimates the page's illumination. */
 const ILLUMINATION_KERNEL = 31;
+/**
+ * Floor under the illumination estimate before the division.
+ *
+ * `255 * channel / background` amplifies noise by `255 / background`, so a dark
+ * region the crop should not have contained -- a hand's shadow, the desk beside
+ * a page detection missed -- turns faint sensor grain into loud speckle (bg 22
+ * amplifies roughly eleven times). Real paper under a shadow does not fall this
+ * far, so clamping the estimate up to this level caps the gain at about
+ * `255 / 48` without touching the gradient across a genuine page. Two more
+ * guards sit beside it in `enhance`: the denoise runs BEFORE the division, so
+ * what is amplified is already clean, and the divisor is a single luminance
+ * estimate shared by all three channels, so amplified noise stays neutral
+ * instead of splitting into colour speckle.
+ */
+const ILLUMINATION_MIN_BACKGROUND = 48;
 /** CLAHE parameters for local contrast, applied to lightness only. */
 const CLAHE_CLIP_LIMIT = 2.0;
 const CLAHE_TILE = 8;
@@ -239,12 +278,108 @@ export function detectDocument(
     }
 
     if (!best) {
-      // No candidate is not a failure: the rest of the pipeline still runs, on
-      // the whole frame, so the user gets a lighting-corrected photo and a quad
-      // they can drag rather than an error.
+      // Nothing edge-shaped. Before falling back to the whole frame, try the
+      // saturation route: a grey page on wood has no reliable brightness edge
+      // but is the largest low-saturation region, shadow or no shadow.
+      const bySaturation = detectByLowSaturation(cv, image);
+      if (bySaturation) return { quad: bySaturation, found: true };
+      // Still nothing: the rest of the pipeline runs on the whole frame, so the
+      // user gets a lighting-corrected photo and a quad they can drag.
       return { quad: fullFrameQuad(image.width, image.height), found: false };
     }
     return { quad: scaleQuad(best.quad, 1 / scale), found: true };
+  });
+}
+
+/**
+ * Find the page as the largest low-saturation region.
+ *
+ * The fallback `detectDocument` reaches for when no quadrilateral edge survives.
+ * Paper is grey -- low saturation -- under a shadow as much as in full light,
+ * and a wooden desk, a coloured folder or a patterned cloth is not, so the page
+ * is the largest low-saturation blob even where its border carries no brightness
+ * edge for Canny to find.
+ *
+ * Returns `null` -- "still no document" -- when the low-saturation region is too
+ * small to be a page, or so large it fills the frame: a frame that is grey edge
+ * to edge (a blank wall, a grey test fixture) has no surround to tell the page
+ * from. Corners come back in FULL-image coordinates, like every detector here.
+ */
+export function detectByLowSaturation(cv: OpenCv, image: RawImage): Quad | null {
+  return withScope((scope) => {
+    const source = scope.add(toMat(cv, image));
+    const scale = fitScale(image.width, image.height, DETECT_MAX_EDGE);
+    const working = scope.add(new cv.Mat());
+    if (scale < 1) {
+      cv.resize(
+        source,
+        working,
+        new cv.Size(
+          Math.max(1, Math.round(image.width * scale)),
+          Math.max(1, Math.round(image.height * scale)),
+        ),
+        0,
+        0,
+        cv.INTER_AREA,
+      );
+    } else {
+      source.copyTo(working);
+    }
+
+    const rgb = scope.add(new cv.Mat());
+    cv.cvtColor(working, rgb, cv.COLOR_RGBA2RGB);
+    const hsv = scope.add(new cv.Mat());
+    cv.cvtColor(rgb, hsv, cv.COLOR_RGB2HSV);
+    const channels = scope.add(new cv.MatVector());
+    cv.split(hsv, channels);
+    const saturation = scope.add(channels.get(1));
+
+    const mask = scope.add(new cv.Mat());
+    // Below the threshold is "grey enough to be paper".
+    cv.threshold(saturation, mask, SATURATION_MAX, 255, cv.THRESH_BINARY_INV);
+    const kernel = scope.add(
+      cv.getStructuringElement(
+        cv.MORPH_RECT,
+        new cv.Size(SATURATION_KERNEL, SATURATION_KERNEL),
+      ),
+    );
+    // Close first to bridge the text and glare inside the page, then open to
+    // drop the stray low-saturation flecks the surround leaves behind.
+    cv.morphologyEx(mask, mask, cv.MORPH_CLOSE, kernel);
+    cv.morphologyEx(mask, mask, cv.MORPH_OPEN, kernel);
+
+    const contours = scope.add(new cv.MatVector());
+    const hierarchy = scope.add(new cv.Mat());
+    cv.findContours(
+      mask,
+      contours,
+      hierarchy,
+      cv.RETR_EXTERNAL,
+      cv.CHAIN_APPROX_SIMPLE,
+    );
+
+    const frameArea = working.cols * working.rows;
+    let best: { index: number; area: number } | null = null;
+    for (let i = 0; i < contours.size(); i++) {
+      const area = cv.contourArea(contours.get(i));
+      if (!best || area > best.area) best = { index: i, area };
+    }
+    if (!best) return null;
+    const cover = best.area / frameArea;
+    if (cover < MIN_DOCUMENT_AREA_RATIO || cover > SATURATION_MAX_COVER) {
+      return null;
+    }
+
+    // The page is rarely a clean quadrilateral in the mask -- glare and the
+    // shadow bite into it -- so its minimal enclosing rectangle is a steadier
+    // read of the four corners than an `approxPolyDP` of the ragged contour.
+    const rect = cv.minAreaRect(contours.get(best.index));
+    const box = cv.RotatedRect.points(rect) as Point[];
+    const corners = box.map((p) =>
+      clampToFrame({ x: p.x / scale, y: p.y / scale }, image.width, image.height),
+    );
+    const quad = orderCorners(corners);
+    return isConvexQuad(quad) ? quad : null;
   });
 }
 
@@ -304,13 +439,19 @@ export function warpToQuad(cv: OpenCv, image: RawImage, quad: Quad): RawImage {
 }
 
 /**
- * Even out the lighting, lift local contrast, then denoise and sharpen.
+ * Denoise, even out the lighting, lift local contrast, then sharpen.
  *
  * The illumination estimate is a large morphological close, which keeps only
  * what varies slowly across the page -- the shadow of the hand holding the
  * phone, the falloff of a desk lamp. Dividing it out removes the gradient
  * without touching the glyphs, which is what makes the result read as a scan
  * rather than a brightened photo.
+ *
+ * Two things keep that division from amplifying sensor noise into colour
+ * speckle where the crop caught something darker than paper: the denoise runs
+ * first, so the pixels it multiplies are already clean, and the estimate is
+ * floored (`ILLUMINATION_MIN_BACKGROUND`), so no region can drive the gain
+ * arbitrarily high.
  */
 export function enhance(cv: OpenCv, image: RawImage): RawImage {
   return withScope((scope) => {
@@ -318,7 +459,29 @@ export function enhance(cv: OpenCv, image: RawImage): RawImage {
     const rgb = scope.add(new cv.Mat());
     cv.cvtColor(source, rgb, cv.COLOR_RGBA2RGB);
 
-    // 1. Illumination normalisation, per channel.
+    // 1. Denoise FIRST, keeping edges. The illumination division below
+    // multiplies whatever reaches it, so it has to reach it clean: denoising
+    // afterwards can only smooth noise the division has already amplified.
+    const denoised = scope.add(new cv.Mat());
+    cv.bilateralFilter(
+      rgb,
+      denoised,
+      DENOISE_DIAMETER,
+      DENOISE_SIGMA_COLOR,
+      DENOISE_SIGMA_SPACE,
+      cv.BORDER_DEFAULT,
+    );
+
+    // 2. Illumination normalisation from a SINGLE luminance estimate.
+    //
+    // The background is estimated on grayscale and the one estimate divides all
+    // three channels, so the gain is neutral: a dark region -- a shadow on the
+    // page, the desk a failed detection left in frame -- is lifted or left in
+    // its own colour, never split into per-channel speckle. Dividing each
+    // channel by its OWN background is what turned neutral sensor grain into the
+    // rainbow noise; one shared divisor cannot.
+    const gray = scope.add(new cv.Mat());
+    cv.cvtColor(denoised, gray, cv.COLOR_RGB2GRAY);
     const kernel = scope.add(
       cv.getStructuringElement(
         cv.MORPH_RECT,
@@ -326,14 +489,34 @@ export function enhance(cv: OpenCv, image: RawImage): RawImage {
       ),
     );
     const background = scope.add(new cv.Mat());
-    cv.morphologyEx(rgb, background, cv.MORPH_CLOSE, kernel);
+    cv.morphologyEx(gray, background, cv.MORPH_CLOSE, kernel);
+    // Clamp the estimate up to a floor so a genuinely dark region cannot drive
+    // the gain sky-high. `cv.max` needs a Mat, not a scalar, in this build.
+    const floor = scope.add(
+      new cv.Mat(
+        background.rows,
+        background.cols,
+        background.type(),
+        new cv.Scalar(ILLUMINATION_MIN_BACKGROUND),
+      ),
+    );
+    cv.max(background, floor, background);
+    // Replicate the single estimate to three channels so one gain lands on R,
+    // G and B alike.
+    const backgroundChannels = scope.add(new cv.MatVector());
+    backgroundChannels.push_back(background);
+    backgroundChannels.push_back(background);
+    backgroundChannels.push_back(background);
+    const background3 = scope.add(new cv.Mat());
+    cv.merge(backgroundChannels, background3);
     const normalised = scope.add(new cv.Mat());
     // 255 * channel / background: where the background is dark the pixel is
     // lifted by the same factor, so a shadowed corner ends up as bright as the
-    // rest of the page instead of merely less dark.
-    cv.divide(rgb, background, normalised, 255, cv.CV_8U);
+    // rest of the page instead of merely less dark -- but only down to the
+    // floor, past which the region is not paper and lifting it only amplifies.
+    cv.divide(denoised, background3, normalised, 255, cv.CV_8U);
 
-    // 2. Local contrast on lightness only, so colours are not pushed around.
+    // 3. Local contrast on lightness only, so colours are not pushed around.
     const lab = scope.add(new cv.Mat());
     cv.cvtColor(normalised, lab, cv.COLOR_RGB2Lab);
     const channels = scope.add(new cv.MatVector());
@@ -349,21 +532,10 @@ export function enhance(cv: OpenCv, image: RawImage): RawImage {
     const contrasted = scope.add(new cv.Mat());
     cv.cvtColor(merged, contrasted, cv.COLOR_Lab2RGB);
 
-    // 3. Denoise, keeping edges.
-    const denoised = scope.add(new cv.Mat());
-    cv.bilateralFilter(
-      contrasted,
-      denoised,
-      DENOISE_DIAMETER,
-      DENOISE_SIGMA_COLOR,
-      DENOISE_SIGMA_SPACE,
-      cv.BORDER_DEFAULT,
-    );
-
     // 4. Unsharp mask: the image plus its own high frequencies.
     const blurred = scope.add(new cv.Mat());
     cv.GaussianBlur(
-      denoised,
+      contrasted,
       blurred,
       new cv.Size(0, 0),
       SHARPEN_SIGMA,
@@ -372,7 +544,7 @@ export function enhance(cv: OpenCv, image: RawImage): RawImage {
     );
     const sharpened = scope.add(new cv.Mat());
     cv.addWeighted(
-      denoised,
+      contrasted,
       1 + SHARPEN_AMOUNT,
       blurred,
       -SHARPEN_AMOUNT,

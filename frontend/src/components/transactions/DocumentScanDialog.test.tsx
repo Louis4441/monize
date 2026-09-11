@@ -10,6 +10,9 @@ import type {
   ScannerResponse,
 } from '@/lib/document-scanner/document-scan.types';
 import { MAX_ATTACHMENT_BYTES } from '@/types/attachment';
+import { useScanSettingsStore } from '@/store/scanSettingsStore';
+import { NEUTRAL_ADJUSTMENTS } from '@/lib/document-scanner/adjust-image';
+import { DEFAULT_SCAN_STYLE } from '@/lib/document-scanner/document-scan.types';
 
 /**
  * The review step, where the user decides what to keep.
@@ -100,6 +103,13 @@ describe('DocumentScanDialog', () => {
   let worker: AutoWorker;
 
   beforeEach(() => {
+    // The finish and slider offsets are remembered in a persisted store; reset
+    // it so one test's chosen finish does not open the next test's dialog.
+    window.localStorage.clear();
+    useScanSettingsStore.setState({
+      style: DEFAULT_SCAN_STYLE,
+      adjustments: NEUTRAL_ADJUSTMENTS,
+    });
     worker = new AutoWorker();
     // jsdom has no 2d context and logs an unimplemented-method error for every
     // attempt. The painter already tolerates a missing context; stubbing it
@@ -213,7 +223,7 @@ describe('DocumentScanDialog', () => {
     // than imperfect, so none of them may take an action away.
     it.each([
       ['blurry', /blurred/i],
-      ['edgesOutsideFrame', /outside the photo/i],
+      ['edgesOutsideFrame', /reaches the edge of the photo/i],
       ['lowResolution', /quite small/i],
     ])('shows %s without blocking acceptance', async (warning, copy) => {
       worker.result = scanResult({
@@ -375,6 +385,57 @@ describe('DocumentScanDialog', () => {
     });
   });
 
+  describe('magnifying', () => {
+    async function ready() {
+      await open();
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: 'Use enhanced' }),
+        ).toBeEnabled(),
+      );
+    }
+
+    it('magnifies the preview on a wheel', async () => {
+      await ready();
+      const content = screen.getByRole('img', {
+        name: 'Enhanced scan preview',
+      }).parentElement as HTMLElement;
+      const frame = content.parentElement as HTMLElement;
+      expect(content.style.transform).toBe('translate(0px, 0px) scale(1)');
+
+      await act(async () => {
+        fireEvent.wheel(frame, { deltaY: -1, clientX: 0, clientY: 0 });
+      });
+      expect(content.style.transform).not.toBe('translate(0px, 0px) scale(1)');
+    });
+
+    // A magnified image pans on a drag, so the corner handles stand down rather
+    // than fight the pan for the same pointer.
+    it('stands the corner handles down while magnified', async () => {
+      await ready();
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Original' }));
+      });
+      const handle = screen.getByLabelText('Top-left corner');
+      expect(handle).toHaveAttribute('tabindex', '0');
+
+      const content = screen.getByRole('img', {
+        name: 'Original photo preview',
+      }).parentElement as HTMLElement;
+      await act(async () => {
+        fireEvent.wheel(content.parentElement as HTMLElement, {
+          deltaY: -1,
+          clientX: 0,
+          clientY: 0,
+        });
+      });
+      expect(screen.getByLabelText('Top-left corner')).toHaveAttribute(
+        'tabindex',
+        '-1',
+      );
+    });
+  });
+
   describe('rotating', () => {
     // The original is stored byte-for-byte as the device produced it (`I2`),
     // so only the scan turns. Offering Rotate beside the photo would promise
@@ -395,8 +456,10 @@ describe('DocumentScanDialog', () => {
         ).toBeEnabled(),
       );
       const preview = () =>
+        // The canvas sits in the zoom transform wrapper; the sized frame that
+        // swaps dimensions on a turn is its grandparent.
         screen.getByRole('img', { name: 'Enhanced scan preview' })
-          .parentElement as HTMLElement;
+          .parentElement?.parentElement as HTMLElement;
       const landscape = preview().style.width;
 
       await act(async () => {
@@ -459,8 +522,10 @@ describe('DocumentScanDialog', () => {
       );
 
       const canvas = () =>
+        // The canvas sits in the zoom transform wrapper; the sized frame that
+        // swaps dimensions on a turn is its grandparent.
         screen.getByRole('img', { name: 'Enhanced scan preview' })
-          .parentElement as HTMLElement;
+          .parentElement?.parentElement as HTMLElement;
       const landscape = canvas().style.width;
 
       await act(async () => {
@@ -569,6 +634,52 @@ describe('DocumentScanDialog', () => {
         });
       });
       expect(screen.getByText(/exactly as photographed/)).toBeInTheDocument();
+    });
+
+    it('remembers the chosen finish for the next document', async () => {
+      await ready();
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Finish'), {
+          target: { value: 'blackAndWhite' },
+        });
+      });
+      expect(useScanSettingsStore.getState().style).toBe('blackAndWhite');
+    });
+
+    it('remembers the slider offsets for the next document', async () => {
+      await ready();
+      // Only the brightness and contrast ranges are sliders here: the corner
+      // handles (also role slider) are drawn on the Original view, not this one.
+      const [brightness, contrast] = screen.getAllByRole('slider');
+      // The offsets persist when the gesture settles (blur/pointer-up), not on
+      // every tick, so the store is checked after the drag ends.
+      await act(async () => {
+        fireEvent.change(brightness, { target: { value: '25' } });
+        fireEvent.change(contrast, { target: { value: '-15' } });
+        fireEvent.blur(contrast);
+      });
+      expect(useScanSettingsStore.getState().adjustments).toEqual({
+        brightness: 25,
+        contrast: -15,
+      });
+    });
+
+    it('opens a new document in the remembered finish', async () => {
+      useScanSettingsStore.setState({
+        style: 'blackAndWhite',
+        adjustments: NEUTRAL_ADJUSTMENTS,
+      });
+      await ready();
+
+      expect((screen.getByLabelText('Finish') as HTMLSelectElement).value).toBe(
+        'blackAndWhite',
+      );
+      // The very first scan is produced in the remembered finish, not the
+      // default colour, so the preview never flashes the wrong one.
+      expect(worker.sent[0]).toMatchObject({
+        kind: 'scan',
+        style: 'blackAndWhite',
+      });
     });
 
     it('carries the chosen finish into a later corner move', async () => {

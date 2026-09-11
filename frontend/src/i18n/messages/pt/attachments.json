@@ -55,7 +55,7 @@
     "originalTooLarge": "A fotografia original excede {max}, pelo que só a digitalização melhorada será anexada.",
     "warnings": {
       "blurry": "A fotografia parece desfocada. Repeti-la dará uma digitalização mais nítida.",
-      "edgesOutsideFrame": "Parte do documento pode estar fora da fotografia. Repita-a com a página toda enquadrada.",
+      "edgesOutsideFrame": "O documento chega à borda da foto, por isso um lado pode ficar cortado. Tira a foto novamente deixando uma margem à volta de toda a página, sem que nenhum lado toque na borda.",
       "lowResolution": "A digitalização é bastante pequena, letras pequenas podem ser difíceis de ler."
     },
     "corners": {

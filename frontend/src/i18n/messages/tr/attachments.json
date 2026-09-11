@@ -55,7 +55,7 @@
     "originalTooLarge": "Orijinal fotoğraf {max} sınırını aşıyor, bu nedenle yalnızca iyileştirilmiş tarama eklenecek.",
     "warnings": {
       "blurry": "Fotoğraf bulanık görünüyor. Yeniden çekmek daha net bir tarama verir.",
-      "edgesOutsideFrame": "Belgenin bir kısmı kare dışında kalmış olabilir. Sayfanın tamamı görünecek şekilde yeniden çekin.",
+      "edgesOutsideFrame": "Belge fotoğrafın kenarına ulaşıyor, bu yüzden bir kenarı kesilmiş olabilir. Sayfanın tamamının çevresinde boşluk bırakarak, hiçbir kenar sınıra değmeyecek şekilde tekrar çekin.",
       "lowResolution": "Tarama oldukça küçük, küçük yazıları okumak zor olabilir."
     },
     "corners": {

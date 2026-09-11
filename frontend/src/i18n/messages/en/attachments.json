@@ -55,7 +55,7 @@
     "originalTooLarge": "The original photo is larger than {max}, so only the enhanced scan will be attached.",
     "warnings": {
       "blurry": "The photo looks blurred. Retaking it will give a sharper scan.",
-      "edgesOutsideFrame": "Part of the document may be outside the photo. Retake it with the whole page in frame.",
+      "edgesOutsideFrame": "The document reaches the edge of the photo, so a side may be cut off. Retake it with a margin around the whole page, with no side touching the border.",
       "lowResolution": "The scan is quite small, so fine print may be hard to read."
     },
     "corners": {

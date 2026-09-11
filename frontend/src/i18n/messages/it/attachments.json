@@ -55,7 +55,7 @@
     "originalTooLarge": "La foto originale supera {max}, quindi verrà allegata solo la scansione migliorata.",
     "warnings": {
       "blurry": "La foto sembra mossa. Riscattarla darà una scansione più nitida.",
-      "edgesOutsideFrame": "Parte del documento potrebbe essere fuori dalla foto. Riscattala inquadrando l’intera pagina.",
+      "edgesOutsideFrame": "Il documento arriva al bordo della foto, quindi un lato potrebbe risultare tagliato. Riscatta la foto lasciando un margine intorno all’intera pagina, senza che nessun lato tocchi il bordo.",
       "lowResolution": "La scansione è piuttosto piccola, il testo minuto potrebbe risultare difficile da leggere."
     },
     "corners": {
