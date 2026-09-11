@@ -21,7 +21,6 @@
   "upcomingBills": {
     "title": "即將到期帳單與存款",
     "empty": "在提醒期間內沒有逾期或即將到期的帳單、存款或轉帳。",
-    "perReminderSettings": "依提醒設定",
     "postTransaction": "過帳此交易",
     "manual": "手動",
     "manualTitle": "需要手動過帳",
@@ -38,7 +37,16 @@
       "transfer": "轉帳",
       "reminder": "提醒",
       "unknown": "未知"
-    }
+    },
+    "scope": {
+      "dueSoon": "即將到期",
+      "all": "全部即將到來"
+    },
+    "viewList": "清單",
+    "viewCalendar": "日曆",
+    "previousMonth": "上個月",
+    "nextMonth": "下個月",
+    "emptyAll": "沒有已排程的有效帳單、存入或轉帳。"
   },
   "gettingStarted": {
     "title": "快速入門",
@@ -94,7 +102,13 @@
     "filter": {
       "all": "全部",
       "gainers": "上漲",
-      "losers": "下跌"
+      "losers": "下跌",
+      "label": "方向"
+    },
+    "metric": {
+      "label": "排序依據",
+      "amount": "金額",
+      "percent": "百分比"
     }
   },
   "favouriteSecurities": {
@@ -125,7 +139,10 @@
     "empty": "此期間無支出資料。",
     "total": "總計",
     "uncategorized": "未分類",
-    "other": "其他"
+    "other": "其他",
+    "insideOther": "{count, plural, other {其他中有 # 個類別}}",
+    "topLevelOnly": "頂層類別",
+    "topLevelOnlyHint": "將子類別計入其父類別"
   },
   "incomeExpenses": {
     "title": "收入與支出",
@@ -173,7 +190,9 @@
       "2y": "2Y",
       "5y": "5Y",
       "ytd": "YTD",
-      "all": "全部"
+      "all": "全部",
+      "1w": "1週",
+      "mtd": "本月至今"
     }
   },
   "portfolioValue": {
@@ -225,14 +244,19 @@
       "MUTUAL_FUND": "共同基金",
       "BOND": "債券",
       "CASH": "現金"
-    }
+    },
+    "viewType": "證券類型",
+    "viewAssetClass": "資產類別",
+    "otherAssetClasses": "其他",
+    "emptyAssetClass": "尚無資產類別明細。"
   },
   "geographicAllocation": {
     "title": "地區配置",
     "empty": "無持倉可顯示。",
     "viewRegion": "地區",
     "viewExchange": "交易所",
-    "viewCountry": "國家/地區"
+    "viewCountry": "國家/地區",
+    "listingBasisNote": "依每項持股的上市地分組。切換至國家可查看基金內部組成。"
   },
   "recurringExpenses": {
     "title": "主要固定支出",

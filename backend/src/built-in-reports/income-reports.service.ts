@@ -5,15 +5,23 @@ import { Category } from "../categories/entities/category.entity";
 import {
   ReportCurrencyService,
   RawCategoryAggregate,
-  RawMonthlyAggregate,
+  RawPeriodAggregate,
 } from "./report-currency.service";
 import { roundMoney, sumMoney, toMoneyNumber } from "../common/round.util";
 import {
   IncomeBySourceResponse,
   IncomeSourceItem,
+  IncomeExpensePeriodItem,
   IncomeVsExpensesResponse,
-  MonthlyIncomeExpenseItem,
 } from "./dto";
+import {
+  bucketStartSql,
+  enumerateIncomeExpensePeriods,
+  periodKeyForStart,
+  weekTruncOffsetDays,
+  type IncomeExpenseBucket,
+  type WeekStartsOn,
+} from "./income-expense-buckets";
 import { investmentExclusionSql } from "../common/investment-filter.util";
 
 /**
@@ -146,18 +154,58 @@ export class IncomeReportsService {
     };
   }
 
+  /**
+   * Income against expenses over a window, bucketed by month or by week.
+   *
+   * The one answer the Income vs Expenses report and the dashboard widget both
+   * draw. The widget used to bucket and classify paged transactions in the
+   * browser, and disagreed with this report about the same period: it read no
+   * VOID status, applied no asset-category exclusion, kept a split's transfer
+   * line, and decided what was an investment from the account TYPE rather than
+   * from the row (INV-REPORT-001). Every rule that decides which rows count and
+   * which side they fall on therefore lives here, in the query.
+   *
+   * `options.accountIds` restricts the window; `options.bucket` and
+   * `options.weekStartsOn` set how wide a bar is. Both exist because the widget
+   * offers them -- a caller that re-buckets the answer is deciding which
+   * transaction belongs to which bar, which is half of deciding what the bar
+   * says.
+   */
   async getIncomeVsExpenses(
     userId: string,
     startDate: string | undefined,
     endDate: string,
+    options: {
+      accountIds?: string[];
+      bucket?: IncomeExpenseBucket;
+      weekStartsOn?: WeekStartsOn;
+    } = {},
   ): Promise<IncomeVsExpensesResponse> {
+    const { accountIds, bucket = "month", weekStartsOn = 1 } = options;
     const defaultCurrency =
       await this.currencyService.getDefaultCurrency(userId);
     const rateMap = await this.currencyService.buildRateMap(defaultCurrency);
 
+    // The week-start offset is a parameter so the grouping expression stays a
+    // constant string: see `weekTruncOffsetDays` for what it shifts. It is bound
+    // only when a week bucket actually references it -- PostgreSQL infers a
+    // parameter's type from where it appears, so an unused $3 is
+    // "could not determine data type of parameter $3" rather than a harmless
+    // extra.
+    const params: (string | string[] | number | undefined)[] = [
+      userId,
+      endDate,
+    ];
+    if (bucket === "week") params.push(weekTruncOffsetDays(weekStartsOn));
+    const bucketStart = bucketStartSql(
+      bucket,
+      "t.transaction_date",
+      `$${params.length}`,
+    );
+
     let query = `
       SELECT
-        TO_CHAR(t.transaction_date, 'YYYY-MM') as month,
+        ${bucketStart} as period_start,
         t.currency_code,
         SUM(CASE
           WHEN c.is_income = true THEN COALESCE(ts.amount, t.amount)
@@ -190,68 +238,111 @@ export class IncomeReportsService {
         )
     `;
 
-    const params: (string | undefined)[] = [userId, endDate];
-
     if (startDate) {
-      query += ` AND t.transaction_date >= $3`;
+      query += ` AND t.transaction_date >= $${params.length + 1}`;
       params.push(startDate);
     }
 
+    // An empty array would match nothing, which is not what "no filter" means.
+    if (accountIds && accountIds.length > 0) {
+      query += ` AND t.account_id = ANY($${params.length + 1}::uuid[])`;
+      params.push(accountIds);
+    }
+
     query += `
-      GROUP BY TO_CHAR(t.transaction_date, 'YYYY-MM'), t.currency_code
-      ORDER BY month
+      GROUP BY ${bucketStart}, t.currency_code
+      ORDER BY period_start
     `;
 
-    const rawResults: RawMonthlyAggregate[] = await withScopedDb(
+    const rawResults: RawPeriodAggregate[] = await withScopedDb(
       this.dataSource,
       (m) => m.query(query, params),
     );
 
-    const monthlyMap = new Map<string, { income: number; expenses: number }>();
+    const byPeriod = new Map<string, { income: number; expenses: number }>();
+    /**
+     * Currencies with no rate into the reporting currency, and how many
+     * aggregate rows that cost.
+     *
+     * An excluded row is not a smaller number: the bar it belonged to is
+     * missing part of its height and the window's totals are unknowable, so the
+     * gap is reported rather than absorbed. `convertAmount` returned the amount
+     * UNCONVERTED here, adding foreign units straight into a home-currency bar.
+     */
+    const missingCurrencies = new Set<string>();
+    let excludedCount = 0;
+
     for (const row of rawResults) {
-      const income = this.currencyService.convertAmount(
+      const income = this.currencyService.tryConvertAmount(
         toMoneyNumber(row.income),
         row.currency_code,
         defaultCurrency,
         rateMap,
       );
-      const expenses = this.currencyService.convertAmount(
+      const expenses = this.currencyService.tryConvertAmount(
         toMoneyNumber(row.expenses),
         row.currency_code,
         defaultCurrency,
         rateMap,
       );
-      const existing = monthlyMap.get(row.month);
+      // One rate serves both halves of the row, so they fail together.
+      if (income === null || expenses === null) {
+        missingCurrencies.add(row.currency_code);
+        excludedCount += 1;
+        continue;
+      }
+      const key = periodKeyForStart(row.period_start, bucket);
+      const existing = byPeriod.get(key);
       if (existing) {
         existing.income += income;
         existing.expenses += expenses;
       } else {
-        monthlyMap.set(row.month, { income, expenses });
+        byPeriod.set(key, { income, expenses });
       }
     }
 
-    const data: MonthlyIncomeExpenseItem[] = Array.from(monthlyMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, { income, expenses }]) => ({
-        month,
-        income: roundMoney(income),
-        expenses: roundMoney(expenses),
-        net: roundMoney(income - expenses),
-      }));
+    // Every bucket in the window, including the empty ones: a week nothing
+    // happened in earned and spent zero, which is a bar of height zero rather
+    // than a gap the chart closes up. Without a start date there is no window to
+    // enumerate, so the answer is the buckets that had rows.
+    const periods = startDate
+      ? enumerateIncomeExpensePeriods(startDate, endDate, bucket, weekStartsOn)
+      : [...byPeriod.keys()].sort().map((period) => ({
+          period,
+          periodStart: bucket === "month" ? `${period}-01` : period,
+          periodEnd: bucket === "month" ? `${period}-01` : period,
+        }));
 
-    const totals = {
-      income: sumMoney(data.map((item) => item.income)),
-      expenses: sumMoney(data.map((item) => item.expenses)),
-      net: sumMoney(data.map((item) => item.net)),
-    };
+    const data: IncomeExpensePeriodItem[] = periods.map((period) => {
+      const found = byPeriod.get(period.period) ?? { income: 0, expenses: 0 };
+      return {
+        ...period,
+        income: roundMoney(found.income),
+        expenses: roundMoney(found.expenses),
+        net: roundMoney(found.income - found.expenses),
+      };
+    });
+
+    const knownIncome = roundMoney(sumMoney(data.map((item) => item.income)));
+    const knownExpenses = roundMoney(
+      sumMoney(data.map((item) => item.expenses)),
+    );
+    const knownNet = roundMoney(sumMoney(data.map((item) => item.net)));
+    const complete = excludedCount === 0;
 
     return {
       data,
       totals: {
-        income: roundMoney(totals.income),
-        expenses: roundMoney(totals.expenses),
-        net: roundMoney(totals.net),
+        income: complete ? knownIncome : null,
+        expenses: complete ? knownExpenses : null,
+        net: complete ? knownNet : null,
+        knownIncome,
+        knownExpenses,
+        knownNet,
       },
+      currency: defaultCurrency,
+      missingCurrencies: [...missingCurrencies].sort(),
+      excludedCount,
     };
   }
 }

@@ -12,6 +12,10 @@ import {
 } from '@/types/investment';
 import { investmentsApi } from '@/lib/investments';
 import { CHART_SERIES, chartColors } from '@/lib/chart-colors';
+import {
+  collapseLookThrough,
+  type LookThroughResult,
+} from '@/lib/look-through-allocation';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { ChartLegend } from '@/components/ui/ChartLegend';
@@ -28,57 +32,28 @@ const EMPTY_LOOK_THROUGH = {
 };
 
 /**
- * Collapse a look-through result (countries or asset classes) into pie slices:
- * the ten largest buckets kept individually, everything else (buckets ranked
- * 11+ plus the backend's unclassified remainder) merged into a single "Other"
- * slice. Colours come from the themed categorical palette since the backend
- * does not assign per-bucket colours.
+ * A look-through result as pie slices. `collapseLookThrough` decides which
+ * buckets stay individual and what merges into Other; colours come from the
+ * themed categorical palette, since the backend assigns none.
  */
 function buildLookThroughAllocation(
-  result: {
-    items: { name: string; totalValue: number; percentage: number }[];
-    totalPortfolioValue: number;
-    unclassifiedValue: number;
-  },
+  result: LookThroughResult,
   otherLabel: string,
   sliceType: AllocationItem['type'],
 ): AssetAllocation {
-  const TOP_N = 10;
-  const total = result.totalPortfolioValue;
-  // Backend already sorts by value descending, but sort defensively.
-  const sorted = [...result.items].sort((a, b) => b.totalValue - a.totalValue);
-  const top = sorted.slice(0, TOP_N);
-  const rest = sorted.slice(TOP_N);
-
-  const pct = (value: number) => (total > 0 ? (value / total) * 100 : 0);
-
-  const allocation: AllocationItem[] = top.map((item, index) => ({
-    name: item.name,
+  const allocation: AllocationItem[] = collapseLookThrough(
+    result,
+    otherLabel,
+  ).map((slice, index) => ({
+    name: slice.name,
     symbol: null,
-    type: sliceType,
-    value: item.totalValue,
-    percentage: item.percentage,
-    color: CHART_SERIES[index % CHART_SERIES.length],
+    type: slice.isOther ? 'other' : sliceType,
+    value: slice.value,
+    percentage: slice.percentage,
+    color: slice.isOther ? chartColors.axis : CHART_SERIES[index % CHART_SERIES.length],
   }));
 
-  // Integer-cents math to avoid floating-point accumulation drift.
-  const otherCents = rest.reduce(
-    (sum, item) => sum + Math.round(item.totalValue * 10000),
-    Math.round(result.unclassifiedValue * 10000),
-  );
-  const otherValue = otherCents / 10000;
-  if (otherValue > 0.0001) {
-    allocation.push({
-      name: otherLabel,
-      symbol: null,
-      type: 'other',
-      value: otherValue,
-      percentage: pct(otherValue),
-      color: chartColors.axis,
-    });
-  }
-
-  return { allocation, totalValue: total };
+  return { allocation, totalValue: result.totalPortfolioValue };
 }
 
 /** Country look-through -> pie slices. */

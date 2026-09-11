@@ -40,6 +40,39 @@ Three surfaces fill these fields -- the two dialogs and `ScheduledTransactionFor
 
 `ScheduledTransactionForm` adds two invariants because its `Total Value` is a shown figure that submit recomputes: **the displayed total and the persisted amount must never disagree** -- every field that moves the economic total (price, quantity, **commission, and the BUY/SELL action whose sign flips the fee**) recomputes the shown total through the same fold, and an async close arriving mid-entry preserves a typed total and re-derives the quantity. And **a market price belongs to one security**: changing the selected security clears the auto-filled price and the seen-market-price latch. Gate the "Latest:" placeholder on a positive `roundedMarketPrice`, never a bare `marketPrice != null`, so it never renders "Latest: NaN".
 
+## A widget shows the report's answer, not its own
+
+A dashboard widget and the report it sits beside answer the same question, so
+the widget asks the report's endpoint. Expenses by Category summed paged
+transactions in the browser under its own rules -- no VOID check, no
+asset-category exclusion, investment rows judged by the account TYPE
+(INV-REPORT-001's exact failure) -- and disagreed with Spending by Category
+about the same period, invisibly to every guard that holds those rules, since
+they all scan the server.
+
+The widget's own settings go INTO the request rather than onto the answer:
+`accountIds` and `rollupToParent` are query parameters, because an account
+filter re-applied on the client is a second definition of which rows count and a
+rollup re-derived there a second definition of which category a spend belongs
+to. Income vs Expenses is the same story: it classified income against expense
+itself, from the account TYPE and a bare sign fallback, and bucketed the rows
+beside the classification -- so the bucket width and the user's first day of the
+week are parameters of the request too, since which transaction belongs to which
+bar is half of deciding what the bar says. `ui-conventions.test.ts` holds the
+rule on a shrink-only baseline that is now empty, and checks its own sweep so an
+empty baseline cannot pass on an empty scan.
+
+The server answers the whole breakdown, not a top-N -- the widget keeps eleven
+slices and folds the tail into Other, and needs the tail to open Other -- and it
+withholds `totalSpending` when a row could not be converted, sending
+`knownSpending`, `missingCurrencies` and `excludedCount` beside it so both
+surfaces mark the same subtotal through `PartialTotal`. Income vs Expenses
+withholds all three of its totals the same way, and returns every bucket in the
+window including the empty ones: a week nothing happened in earned and spent
+zero, which is a bar of height zero rather than a gap the chart closes up. Each
+bucket carries `periodStart` and `periodEnd`, so a drill-down uses the dates the
+server bucketed by rather than re-deriving them.
+
 ## A short-range portfolio change is measured from the prior close
 
 On `1d`, `1w` and `mtd` the Change and Change % measure from the close of the last trading day *before* the window -- the convention every quote source reports against. The longer ranges measure from their first point (their window opens on a day whose first point already is that day's close). Which ranges are which lives in `PRIOR_CLOSE_BASELINE_RANGES`.
@@ -47,6 +80,8 @@ On `1d`, `1w` and `mtd` the Change and Change % measure from the close of the la
 This was briefly a user preference (migration 152, dropped by 153); it was removed because the prior close is the right answer rather than a taste. `usesPriorCloseBaseline` takes the range and nothing else -- if you find yourself adding a second argument, first ask whether the alternative is actually defensible.
 
 Both halves come from **one hook**, `hooks/usePortfolioChangeBaseline.ts` (`usesPriorClose` and the `priorClose` together); the arithmetic and range set live once in `components/investments/portfolio-change-baseline.ts`. Deciding *whether* a prior close applies in one place and reading the close in another is the specific bug the single hook prevents. The baseline is looked up for the **first point on screen**, never the requested window start (on a weekend the 1D chart shows the last session). A baseline that has not loaded makes the change **unknown** -- both cards read N/A, never the first-point change.
+
+The change itself is `portfolioSeriesChange(values, { usesPriorClose, priorCloseValue })`, read by the Investments chart and the Portfolio Value widget alike, so no surface can report a different move for the same window. A **baseline of zero has no percentage**: the money change is still known, the percentage is `null`, and 0% -- which would say the portfolio held its ground -- is never shown.
 
 ## The window a price chart requests is not the period its range names
 

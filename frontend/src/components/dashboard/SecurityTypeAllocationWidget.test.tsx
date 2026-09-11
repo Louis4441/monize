@@ -10,7 +10,10 @@ vi.mock('recharts', async () => (await import('@/test/recharts-mock')).rechartsM
 // Stable config reference across renders (mirrors the real memoized hook), so
 // useReportData's [config.accountIds] dependency does not change every render.
 const { widgetCfg } = vi.hoisted(() => ({
-  widgetCfg: { config: { accountIds: [] as string[] }, updateConfig: () => {} },
+  widgetCfg: {
+    config: { accountIds: [] as string[], view: 'type' as 'type' | 'assetClass' },
+    updateConfig: () => {},
+  },
 }));
 vi.mock('@/hooks/useWidgetConfig', () => ({
   useWidgetConfig: () => widgetCfg,
@@ -25,8 +28,12 @@ vi.mock('@/hooks/useNumberFormat', async () => {
 }));
 
 const getPortfolioSummary = vi.fn();
+const getAssetClassWeightings = vi.fn();
 vi.mock('@/lib/investments', () => ({
-  investmentsApi: { getPortfolioSummary: (...a: unknown[]) => getPortfolioSummary(...a) },
+  investmentsApi: {
+    getPortfolioSummary: (...a: unknown[]) => getPortfolioSummary(...a),
+    getAssetClassWeightings: (...a: unknown[]) => getAssetClassWeightings(...a),
+  },
 }));
 
 const holding = (securityId: string, securityType: string, marketValue: number): HoldingWithMarketValue =>
@@ -52,7 +59,11 @@ async function renderWidget() {
 }
 
 describe('SecurityTypeAllocationWidget', () => {
-  beforeEach(() => getPortfolioSummary.mockReset());
+  beforeEach(() => {
+    getPortfolioSummary.mockReset();
+    getAssetClassWeightings.mockReset();
+    widgetCfg.config = { accountIds: [], view: 'type' };
+  });
 
   it('groups holdings by security type', async () => {
     getPortfolioSummary.mockResolvedValue({
@@ -70,5 +81,49 @@ describe('SecurityTypeAllocationWidget', () => {
     getPortfolioSummary.mockResolvedValue({ holdings: [], holdingsByAccount: [] });
     await renderWidget();
     expect(screen.getByText('No holdings to show.')).toBeInTheDocument();
+  });
+
+  it('leaves the look-through request unmade while the type view is showing', async () => {
+    getPortfolioSummary.mockResolvedValue({ holdings: [holding('s1', 'STOCK', 700)], holdingsByAccount: [] });
+    await renderWidget();
+    expect(getAssetClassWeightings).not.toHaveBeenCalled();
+  });
+
+  it('shows the look-through asset classes in the asset class view', async () => {
+    widgetCfg.config = { accountIds: [], view: 'assetClass' };
+    getPortfolioSummary.mockResolvedValue({ holdings: [], holdingsByAccount: [] });
+    getAssetClassWeightings.mockResolvedValue({
+      items: [
+        { assetClass: 'Equity', directValue: 600, etfValue: 100, totalValue: 700, percentage: 70 },
+        { assetClass: 'Fixed Income', directValue: 0, etfValue: 200, totalValue: 200, percentage: 20 },
+      ],
+      totalPortfolioValue: 1000,
+      totalDirectValue: 600,
+      totalEtfValue: 300,
+      unclassifiedValue: 100,
+    });
+    await renderWidget();
+    // A fund's holdings are placed by what is inside it, not filed whole under
+    // ETF, and the value the backend could not classify is its own slice.
+    expect(screen.getByText('Equity')).toBeInTheDocument();
+    expect(screen.getByText('Fixed Income')).toBeInTheDocument();
+    expect(screen.getByText('Other')).toBeInTheDocument();
+    expect(screen.queryByText('Stocks')).not.toBeInTheDocument();
+  });
+
+  it('says so when the look-through breakdown has nothing to place', async () => {
+    widgetCfg.config = { accountIds: [], view: 'assetClass' };
+    getPortfolioSummary.mockResolvedValue({ holdings: [], holdingsByAccount: [] });
+    getAssetClassWeightings.mockResolvedValue({
+      items: [],
+      totalPortfolioValue: 0,
+      totalDirectValue: 0,
+      totalEtfValue: 0,
+      unclassifiedValue: 0,
+    });
+    await renderWidget();
+    expect(
+      screen.getByText('No asset class breakdown available yet.'),
+    ).toBeInTheDocument();
   });
 });

@@ -384,7 +384,14 @@ describe("built-in reports and investment cash accounts (integration)", () => {
       expect(cashFlow.totals.expenses).toBe(0);
       expect(cashFlow.totals.net).toBe(1000);
       expect(cashFlow.data).toEqual([
-        { month: MONTH, income: 1000, expenses: 0, net: 1000 },
+        {
+          period: MONTH,
+          periodStart: `${MONTH}-01`,
+          periodEnd: `${MONTH}-31`,
+          income: 1000,
+          expenses: 0,
+          net: 1000,
+        },
       ]);
     });
 

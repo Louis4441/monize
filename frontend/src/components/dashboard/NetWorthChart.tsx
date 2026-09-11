@@ -142,7 +142,7 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
   if (isLoading) {
     return (
       <div className={`${CARD_CLASS} p-3 sm:p-6 lg:min-h-[500px]`}>
-        <WidgetHeading id="net-worth" onClick={() => router.push('/reports/net-worth')} className="mb-4">
+        <WidgetHeading id="net-worth" href="/reports/net-worth" className="mb-4">
           {t('netWorth.title')}
         </WidgetHeading>
         <div className="animate-pulse space-y-3">
@@ -156,7 +156,7 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
   if (chartData.length === 0) {
     return (
       <div className={`${CARD_CLASS} p-3 sm:p-6 lg:min-h-[500px]`}>
-        <WidgetHeading id="net-worth" onClick={() => router.push('/reports/net-worth')} className="mb-4">
+        <WidgetHeading id="net-worth" href="/reports/net-worth" className="mb-4">
           {t('netWorth.title')}
         </WidgetHeading>
         <p className="text-gray-500 dark:text-gray-400 text-sm">
@@ -171,7 +171,7 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
   return (
     <div className={`${CARD_CLASS} p-3 sm:p-6 lg:min-h-[500px] flex flex-col h-full`}>
       <div className="flex items-center justify-between mb-1">
-        <WidgetHeading id="net-worth" onClick={() => router.push('/reports/net-worth')}>
+        <WidgetHeading id="net-worth" href="/reports/net-worth">
           {t('netWorth.title')}
         </WidgetHeading>
         <div className="flex items-center gap-2">

@@ -27,12 +27,12 @@ const mockUserId = "user-1";
 const mockMonth = "2026-01";
 
 const mockIncomeVsExpensesCurrentResponse = {
-  data: [{ month: "2026-01", income: 5000, expenses: 3000, net: 2000 }],
+  data: [{ period: "2026-01", income: 5000, expenses: 3000, net: 2000 }],
   totals: { income: 5000, expenses: 3000, net: 2000 },
 };
 
 const mockIncomeVsExpensesPreviousResponse = {
-  data: [{ month: "2025-12", income: 4500, expenses: 3500, net: 1000 }],
+  data: [{ period: "2025-12", income: 4500, expenses: 3500, net: 1000 }],
   totals: { income: 4500, expenses: 3500, net: 1000 },
 };
 
@@ -360,13 +360,13 @@ describe("MonthlyComparisonService", () => {
         mockUserId,
         "2026-01-01",
         "2026-01-31",
-        false,
+        { rollupToParent: false },
       );
       expect(mockSpendingReports.getSpendingByCategory).toHaveBeenCalledWith(
         mockUserId,
         "2025-12-01",
         "2025-12-31",
-        false,
+        { rollupToParent: false },
       );
     });
 
@@ -395,11 +395,11 @@ describe("MonthlyComparisonService", () => {
     it("handles zero values without division errors", async () => {
       mockIncomeReports.getIncomeVsExpenses
         .mockResolvedValueOnce({
-          data: [{ month: "2026-01", income: 0, expenses: 0, net: 0 }],
+          data: [{ period: "2026-01", income: 0, expenses: 0, net: 0 }],
           totals: { income: 0, expenses: 0, net: 0 },
         })
         .mockResolvedValueOnce({
-          data: [{ month: "2025-12", income: 0, expenses: 0, net: 0 }],
+          data: [{ period: "2025-12", income: 0, expenses: 0, net: 0 }],
           totals: { income: 0, expenses: 0, net: 0 },
         });
       mockSpendingReports.getSpendingByCategory
@@ -524,11 +524,11 @@ describe("MonthlyComparisonService", () => {
     it("percent change returns 100 when previous is 0 and current is non-zero", async () => {
       mockIncomeReports.getIncomeVsExpenses
         .mockResolvedValueOnce({
-          data: [{ month: "2026-01", income: 1000, expenses: 0, net: 1000 }],
+          data: [{ period: "2026-01", income: 1000, expenses: 0, net: 1000 }],
           totals: { income: 1000, expenses: 0, net: 1000 },
         })
         .mockResolvedValueOnce({
-          data: [{ month: "2025-12", income: 0, expenses: 0, net: 0 }],
+          data: [{ period: "2025-12", income: 0, expenses: 0, net: 0 }],
           totals: { income: 0, expenses: 0, net: 0 },
         });
       mockSpendingReports.getSpendingByCategory

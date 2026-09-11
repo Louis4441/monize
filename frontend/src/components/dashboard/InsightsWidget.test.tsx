@@ -55,15 +55,15 @@ describe('InsightsWidget', () => {
     expect(screen.queryByText('Insight 4')).not.toBeInTheDocument();
     expect(screen.getByText('3 active')).toBeInTheDocument();
 
-    await act(async () => {
-      fireEvent.click(screen.getByText('Spending Insights'));
-    });
-    expect(pushMock).toHaveBeenCalledWith('/insights');
+    expect(screen.getByRole('link', { name: 'Spending Insights' })).toHaveAttribute(
+      'href',
+      '/insights',
+    );
 
     await act(async () => {
       fireEvent.click(screen.getByText('View all insights'));
     });
-    expect(pushMock).toHaveBeenCalledTimes(2);
+    expect(pushMock).toHaveBeenCalledWith('/insights');
   });
 
   it('renders empty state when no insights', async () => {

@@ -27,6 +27,24 @@ describe('WidgetCard', () => {
     expect(screen.getByText('body content')).toBeInTheDocument();
   });
 
+  it('links the title to the fuller view when given one', () => {
+    render(
+      <WidgetCard title="My Widget" titleHref="/reports/my-widget">
+        body
+      </WidgetCard>,
+    );
+    expect(screen.getByRole('link', { name: 'My Widget' })).toHaveAttribute(
+      'href',
+      '/reports/my-widget',
+    );
+  });
+
+  it('leaves the title a plain heading without a destination', () => {
+    render(<WidgetCard title="My Widget">body</WidgetCard>);
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.getByRole('heading', { name: 'My Widget' })).toBeInTheDocument();
+  });
+
   it('omits the settings gear when there are no config controls or widget id', () => {
     render(<WidgetCard title="My Widget">body</WidgetCard>);
     expect(screen.queryByLabelText(/Configure/)).not.toBeInTheDocument();

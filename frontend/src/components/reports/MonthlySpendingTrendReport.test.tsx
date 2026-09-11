@@ -119,8 +119,8 @@ describe("MonthlySpendingTrendReport", () => {
   it("renders chart and summary with sample data", async () => {
     mockGetIncomeVsExpenses.mockResolvedValue({
       data: [
-        { month: "2024-01", income: 5000, expenses: 3000, net: 2000 },
-        { month: "2024-02", income: 5200, expenses: 3500, net: 1700 },
+        { period: "2024-01", periodStart: "2024-01-01", periodEnd: "2024-01-31", income: 5000, expenses: 3000, net: 2000 },
+        { period: "2024-02", periodStart: "2024-02-01", periodEnd: "2024-02-29", income: 5200, expenses: 3500, net: 1700 },
       ],
     });
     render(<MonthlySpendingTrendReport />);
@@ -142,7 +142,7 @@ describe("MonthlySpendingTrendReport", () => {
 
   it("renders line chart when data present", async () => {
     mockGetIncomeVsExpenses.mockResolvedValue({
-      data: [{ month: "2024-01", income: 5000, expenses: 3000, net: 2000 }],
+      data: [{ period: "2024-01", periodStart: "2024-01-01", periodEnd: "2024-01-31", income: 5000, expenses: 3000, net: 2000 }],
     });
     render(<MonthlySpendingTrendReport />);
     await waitFor(() => {
@@ -161,7 +161,7 @@ describe("MonthlySpendingTrendReport", () => {
 
   it("navigates to transactions page with date range on chart click", async () => {
     mockGetIncomeVsExpenses.mockResolvedValue({
-      data: [{ month: "2024-01", income: 5000, expenses: 3000, net: 2000 }],
+      data: [{ period: "2024-01", periodStart: "2024-01-01", periodEnd: "2024-01-31", income: 5000, expenses: 3000, net: 2000 }],
     });
     render(<MonthlySpendingTrendReport />);
     await waitFor(() => {
@@ -176,9 +176,9 @@ describe("MonthlySpendingTrendReport", () => {
   it("renders sortable table view, sorts each column, navigates and exports CSV", async () => {
     mockGetIncomeVsExpenses.mockResolvedValue({
       data: [
-        { month: "2024-02", income: 5200, expenses: 3500, net: 1700 },
-        { month: "2024-01", income: 5000, expenses: 3000, net: 2000 },
-        { month: "2024-03", income: 1000, expenses: 2000, net: -1000 },
+        { period: "2024-02", periodStart: "2024-02-01", periodEnd: "2024-02-29", income: 5200, expenses: 3500, net: 1700 },
+        { period: "2024-01", periodStart: "2024-01-01", periodEnd: "2024-01-31", income: 5000, expenses: 3000, net: 2000 },
+        { period: "2024-03", periodStart: "2024-03-01", periodEnd: "2024-03-31", income: 1000, expenses: 2000, net: -1000 },
       ],
     });
     const { container } = render(<MonthlySpendingTrendReport />);

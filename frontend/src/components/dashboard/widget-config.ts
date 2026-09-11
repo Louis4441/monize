@@ -6,11 +6,27 @@
  */
 
 /** Range presets offered by the transaction-based spending/income widgets. */
-export const SPENDING_RANGES = ['1m', '3m', '6m', '1y', 'ytd'] as const;
+export const SPENDING_RANGES = ['mtd', '1m', '3m', '6m', '1y', 'ytd'] as const;
 /** Range presets for month-trend widgets. */
-export const TREND_RANGES = ['6m', '1y', '2y'] as const;
-/** Range presets for the portfolio value widget. */
-export const PORTFOLIO_RANGES = ['3m', '6m', '1y', '2y', '5y', 'all'] as const;
+export const TREND_RANGES = ['6m', 'ytd', '1y', '2y'] as const;
+/**
+ * Range presets for the portfolio value widget. 1W and MTD are measured from
+ * the prior close (`PRIOR_CLOSE_BASELINE_RANGES`), which the daily series this
+ * widget draws supports; 1D is absent because a single session has no daily
+ * points to draw, and only the intraday chart on the Investments page can show
+ * it.
+ */
+export const PORTFOLIO_RANGES = [
+  '1w',
+  'mtd',
+  '3m',
+  '6m',
+  'ytd',
+  '1y',
+  '2y',
+  '5y',
+  'all',
+] as const;
 /** Range presets for the weekend/weekday widget. */
 export const WEEKEND_RANGES = ['1m', '3m', '6m', '1y'] as const;
 
@@ -54,9 +70,41 @@ export interface RangeAccountsConfig {
   accountIds: string[];
 }
 
+/**
+ * Expenses by Category adds a rollup choice: with `topLevelOnly` a subcategory's
+ * spend is counted against its top-level ancestor, so the chart answers "which
+ * part of my budget" rather than listing every leaf.
+ */
+export interface ExpensesPieConfig extends RangeAccountsConfig {
+  topLevelOnly: boolean;
+}
+
+/**
+ * Security Type Allocation view. `type` places each holding by its own security
+ * type, from the portfolio summary; `assetClass` asks the backend for the
+ * look-through breakdown, which sees inside a fund rather than filing the whole
+ * of it under ETF.
+ */
+export interface SecurityTypeAllocationConfig {
+  accountIds: string[];
+  view: 'type' | 'assetClass';
+}
+
 export interface GeographicConfig {
   accountIds: string[];
   view: 'region' | 'exchange' | 'country';
+}
+
+/**
+ * Upcoming Bills settings.
+ *
+ * `scope` is which occurrences the widget lists: `dueSoon` keeps the reminder
+ * window each schedule carries, `all` shows every active schedule's next
+ * occurrence however far off it is. `view` picks the list or the month grid.
+ */
+export interface UpcomingBillsConfig {
+  scope: 'dueSoon' | 'all';
+  view: 'list' | 'calendar';
 }
 
 export interface RecurringConfig {
@@ -92,13 +140,21 @@ export const CREDIT_UTILIZATION_TOTAL_DEFAULT: AccountsConfig = {
 
 export const SECTOR_WEIGHTINGS_DEFAULT: AccountsConfig = { accountIds: [] };
 
-export const SECURITY_TYPE_ALLOCATION_DEFAULT: AccountsConfig = {
+export const SECURITY_TYPE_ALLOCATION_DEFAULT: SecurityTypeAllocationConfig = {
   accountIds: [],
+  view: 'type',
 };
 
 export const GEOGRAPHIC_ALLOCATION_DEFAULT: GeographicConfig = {
   accountIds: [],
   view: 'region',
+};
+
+// The historical behaviour: only what is overdue or inside its reminder window,
+// as a list.
+export const UPCOMING_BILLS_DEFAULT: UpcomingBillsConfig = {
+  scope: 'dueSoon',
+  view: 'list',
 };
 
 export const RECURRING_EXPENSES_DEFAULT: RecurringConfig = { minOccurrences: 3 };
@@ -110,9 +166,10 @@ export const WEEKEND_WEEKDAY_DEFAULT: WeekendConfig = {
 
 // The two default summary charts default to their historical windows: the pie
 // showed the past 30 days, the income/expenses bars the recent weeks.
-export const EXPENSES_PIE_DEFAULT: RangeAccountsConfig = {
+export const EXPENSES_PIE_DEFAULT: ExpensesPieConfig = {
   range: '1m',
   accountIds: [],
+  topLevelOnly: false,
 };
 
 export const INCOME_EXPENSES_DEFAULT: RangeAccountsConfig = {

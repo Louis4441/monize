@@ -96,7 +96,7 @@ export function FavouriteSecurities({ securities, isLoading, onRefresh, isRefres
   return (
     <div className={`${CARD_CLASS} p-3 sm:p-6 lg:min-h-[500px]`}>
       <div className="flex items-center justify-between mb-4">
-        <WidgetHeading id="favourite-securities" onClick={() => router.push('/securities')}>
+        <WidgetHeading id="favourite-securities" href="/securities">
           {t('favouriteSecurities.title')}
         </WidgetHeading>
         <div className="flex items-center gap-2">

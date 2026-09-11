@@ -15,14 +15,12 @@ import {
   resolveDashboardWidgets,
 } from '@/components/dashboard/widget-registry';
 import { accountsApi } from '@/lib/accounts';
-import { categoriesApi } from '@/lib/categories';
 import { scheduledTransactionsApi } from '@/lib/scheduled-transactions';
 import { investmentsApi } from '@/lib/investments';
 import { netWorthApi } from '@/lib/net-worth';
 import { invalidateCache } from '@/lib/apiCache';
 import { Account } from '@/types/account';
 import { countLogicalAccounts } from '@/lib/account-utils';
-import { Category } from '@/types/category';
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
 import { TopMover, PortfolioSummary, FavouriteSecurityQuote } from '@/types/investment';
 import { MonthlyNetWorth } from '@/types/net-worth';
@@ -59,7 +57,6 @@ function DashboardContent() {
   const dashboardWidgets = usePreferencesStore((s) => s.preferences?.dashboardWidgets);
 
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [scheduledTransactions, setScheduledTransactions] = useState<ScheduledTransaction[]>([]);
   const [topMovers, setTopMovers] = useState<TopMover[]>([]);
   const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary | null>(null);
@@ -145,9 +142,8 @@ function DashboardContent() {
 
       const twelveMonthsAgo = format(subMonths(new Date(), 12), 'yyyy-MM-dd');
 
-      const [accountsData, categoriesData, scheduledData, netWorth, favouriteSecs, securitiesList] = await Promise.all([
+      const [accountsData, scheduledData, netWorth, favouriteSecs, securitiesList] = await Promise.all([
         accountsApi.getAll(),
-        categoriesApi.getAll(),
         scheduledTransactionsApi.getAll(),
         netWorthApi.getMonthly({ startDate: twelveMonthsAgo, endDate: today }).catch(() => [] as MonthlyNetWorth[]),
         investmentsApi.getFavouriteSecurities().catch(() => [] as FavouriteSecurityQuote[]),
@@ -155,7 +151,6 @@ function DashboardContent() {
       ]);
 
       setAccounts(accountsData);
-      setCategories(categoriesData);
       setScheduledTransactions(scheduledData);
       setNetWorthData(netWorth);
       setFavouriteSecurities(favouriteSecs);
@@ -204,7 +199,6 @@ function DashboardContent() {
 
   const widgetContext: DashboardWidgetContext = {
     accounts,
-    categories,
     scheduledTransactions,
     topMovers,
     favouriteSecurities,

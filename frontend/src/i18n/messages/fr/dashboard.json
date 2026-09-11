@@ -21,7 +21,6 @@
   "upcomingBills": {
     "title": "Factures et dépôts à venir",
     "empty": "Aucune facture, aucun dépôt ou virement en retard ou à venir dans les fenêtres de rappel.",
-    "perReminderSettings": "Selon les paramètres de rappel",
     "postTransaction": "Enregistrer cette transaction",
     "manual": "Manuel",
     "manualTitle": "Nécessite un enregistrement manuel",
@@ -38,7 +37,16 @@
       "transfer": "Virement",
       "reminder": "Rappel",
       "unknown": "Inconnu"
-    }
+    },
+    "scope": {
+      "dueSoon": "Bientôt dus",
+      "all": "Tous à venir"
+    },
+    "viewList": "Liste",
+    "viewCalendar": "Calendrier",
+    "previousMonth": "Mois précédent",
+    "nextMonth": "Mois suivant",
+    "emptyAll": "Aucune facture, aucun dépôt ni virement actif planifié."
   },
   "gettingStarted": {
     "title": "Démarrage",
@@ -94,7 +102,13 @@
     "filter": {
       "all": "Tous",
       "gainers": "Gagnants",
-      "losers": "Perdants"
+      "losers": "Perdants",
+      "label": "Sens"
+    },
+    "metric": {
+      "label": "Classer par",
+      "amount": "Montant",
+      "percent": "Pourcentage"
     }
   },
   "favouriteSecurities": {
@@ -125,7 +139,10 @@
     "empty": "Aucune donnée de dépenses pour cette période.",
     "total": "Total",
     "uncategorized": "Non catégorisé",
-    "other": "Autre"
+    "other": "Autre",
+    "insideOther": "{count, plural, one {# catégorie dans Autres} other {# catégories dans Autres}}",
+    "topLevelOnly": "Catégories de premier niveau",
+    "topLevelOnlyHint": "Compter les sous-catégories dans leur catégorie parente"
   },
   "incomeExpenses": {
     "title": "Revenus et dépenses",
@@ -173,7 +190,9 @@
       "2y": "2Y",
       "5y": "5Y",
       "ytd": "YTD",
-      "all": "Tout"
+      "all": "Tout",
+      "1w": "1S",
+      "mtd": "MTD"
     }
   },
   "portfolioValue": {
@@ -225,14 +244,19 @@
       "MUTUAL_FUND": "Fonds communs de placement",
       "BOND": "Obligations",
       "CASH": "Liquidités"
-    }
+    },
+    "viewType": "Type de titre",
+    "viewAssetClass": "Classe d'actifs",
+    "otherAssetClasses": "Autres",
+    "emptyAssetClass": "Aucune répartition par classe d'actifs disponible pour l'instant."
   },
   "geographicAllocation": {
     "title": "Répartition géographique",
     "empty": "Aucune position à afficher.",
     "viewRegion": "Région",
     "viewExchange": "Bourse",
-    "viewCountry": "Pays"
+    "viewCountry": "Pays",
+    "listingBasisNote": "Regroupé selon la place de cotation de chaque position. Passez à Pays pour voir à l'intérieur des fonds."
   },
   "recurringExpenses": {
     "title": "Principales dépenses récurrentes",

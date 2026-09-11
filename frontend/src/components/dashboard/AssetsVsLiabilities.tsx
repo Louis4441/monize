@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { chartColors } from '@/lib/chart-colors';
@@ -47,7 +46,6 @@ function AssetsTooltip({
 
 export function AssetsVsLiabilities({ data, isLoading }: AssetsVsLiabilitiesProps) {
   const t = useTranslations('dashboard');
-  const router = useRouter();
   const { formatCurrencyCompact: formatCurrency } = useNumberFormat();
 
   // The net-worth series carries assets and liabilities per month; the pie
@@ -94,7 +92,7 @@ export function AssetsVsLiabilities({ data, isLoading }: AssetsVsLiabilitiesProp
   return (
     <div className={`${CARD_CLASS} p-3 sm:p-6 lg:min-h-[500px] flex flex-col h-full`}>
       <div className="flex items-center justify-between mb-1">
-        <WidgetHeading id="assets-liabilities" onClick={() => router.push('/reports/net-worth')}>
+        <WidgetHeading id="assets-liabilities" href="/reports/net-worth">
           {t('assetsVsLiabilities.title')}
         </WidgetHeading>
         <span className="text-sm text-gray-500 dark:text-gray-400">{t('assetsVsLiabilities.current')}</span>

@@ -23,7 +23,13 @@ import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import { useWidgetConfig } from '@/hooks/useWidgetConfig';
 import { resolveRangePreset } from '@/lib/date-range';
 import { usePortfolioRangeWindow } from '@/hooks/usePortfolioRangeWindow';
+import { usePortfolioChangeBaseline } from '@/hooks/usePortfolioChangeBaseline';
+import {
+  isoDatePart,
+  portfolioSeriesChange,
+} from '@/components/investments/portfolio-change-baseline';
 import { chartColors } from '@/lib/chart-colors';
+import { gainLossColor } from '@/lib/format';
 import { ChartTooltipPanel } from '@/components/reports/ChartTooltip';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
@@ -37,8 +43,9 @@ import {
 const WIDGET_ID = 'portfolio-value';
 
 // Short ranges render at daily resolution; longer ones use monthly snapshots so
-// the series stays readable without thousands of points.
-const DAILY_RANGES = new Set(['3m', '6m']);
+// the series stays readable without thousands of points. 1W, MTD and YTD are
+// windows a month of monthly snapshots would draw as one or two points.
+const DAILY_RANGES = new Set(['1w', 'mtd', '3m', '6m', 'ytd']);
 
 interface PortfolioValueWidgetProps {
   accounts: Account[];
@@ -47,7 +54,7 @@ interface PortfolioValueWidgetProps {
 
 export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidgetProps) {
   const t = useTranslations('dashboard');
-  const { formatCurrency, formatCurrencyAxis } = useNumberFormat();
+  const { formatCurrency, formatCurrencyAxis, formatSignedPercent } = useNumberFormat();
   const { defaultCurrency } = useExchangeRates();
   const formatChartDate = useChartDateFormat();
   const { config, updateConfig } = useWidgetConfig<PortfolioValueConfig>(
@@ -137,6 +144,27 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
 
   const totalPortfolioValue = summary?.totalPortfolioValue ?? null;
 
+  // 1W and MTD report their move against the close of the trading day before
+  // the window, the way every quote source does; the longer ranges measure from
+  // the first point drawn. Both rules live in `portfolio-change-baseline.ts`,
+  // shared with the Investments chart so the two cannot disagree about the same
+  // window.
+  const { usesPriorClose, priorClose } = usePortfolioChangeBaseline({
+    range: config.range,
+    firstPointDate: isoDatePart(chartData[0]?.date),
+    accountIds: accountIdsCsv,
+    displayCurrency: defaultCurrency,
+  });
+
+  const { change, changePercent } = useMemo(
+    () =>
+      portfolioSeriesChange(
+        chartData.map((point) => point.value),
+        { usesPriorClose, priorCloseValue: priorClose?.value ?? null },
+      ),
+    [chartData, usesPriorClose, priorClose],
+  );
+
   const configControls = (
     <>
       <WidgetConfigRow label={t('widgets.timeframe')}>
@@ -164,6 +192,7 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
   return (
     <WidgetCard
       title={t('portfolioValue.title')}
+      titleHref="/reports/portfolio-value"
       widgetId={WIDGET_ID}
       headerRight={
         <div className="flex items-center gap-2">
@@ -175,6 +204,21 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
           <span className="text-sm text-gray-500 dark:text-gray-400">
             {t(`widgets.rangeLabels.${config.range}` as Parameters<typeof t>[0])}
           </span>
+          {/* The move over the window, in money and as a share of where it
+              started. An unknown baseline shows nothing at all rather than a
+              change of zero, which would read as a flat market. */}
+          {!loading && change !== null && (
+            <span
+              className={`text-sm font-medium ${gainLossColor(change)}`}
+              data-testid="portfolio-period-change"
+            >
+              {change >= 0 ? '+' : ''}
+              {formatCurrency(change, defaultCurrency)}
+              {changePercent !== null && (
+                <span className="ml-1">({formatSignedPercent(changePercent, 1)})</span>
+              )}
+            </span>
+          )}
           <button
             type="button"
             onClick={handleRefresh}

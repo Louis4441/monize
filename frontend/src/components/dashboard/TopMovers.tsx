@@ -11,17 +11,82 @@ import { CARD_CLASS } from '@/components/ui/Card';
 import { preferredCurrency } from '@/lib/default-currency';
 
 type MoverFilter = 'all' | 'gainers' | 'losers';
+/** Whether a "biggest" mover is the largest move in money or in percent. */
+type MoverMetric = 'amount' | 'percent';
 
 const FILTER_STORAGE_KEY = 'dashboard.topMovers.filter';
+const METRIC_STORAGE_KEY = 'dashboard.topMovers.metric';
 
-function getStoredFilter(): MoverFilter {
-  if (typeof window === 'undefined') return 'all';
+/** Read a stored choice, falling back to `fallback` for anything unrecognised. */
+function readStoredChoice<T extends string>(
+  key: string,
+  allowed: readonly T[],
+  fallback: T,
+): T {
+  if (typeof window === 'undefined') return fallback;
   try {
-    const stored = localStorage.getItem(FILTER_STORAGE_KEY);
-    return stored === 'gainers' || stored === 'losers' || stored === 'all' ? stored : 'all';
+    const stored = localStorage.getItem(key);
+    return allowed.includes(stored as T) ? (stored as T) : fallback;
   } catch {
-    return 'all';
+    return fallback;
   }
+}
+
+/** Persist a choice. Best-effort: blocked or full storage is not an error here. */
+function writeStoredChoice(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Ignore storage failures (e.g. disabled/blocked storage).
+  }
+}
+
+const MOVER_FILTERS = ['all', 'gainers', 'losers'] as const;
+const MOVER_METRICS = ['amount', 'percent'] as const;
+
+/**
+ * Rank movers for a filter and a metric, and take the top five.
+ *
+ * The two questions are separate: the filter says which direction counts, the
+ * metric says what "biggest" measures. A holding priced in the hundreds moves
+ * the most money on a small percentage, and a cheap one moves the most percent
+ * on very little -- so the widget both **orders and selects** by whichever the
+ * user asked about. Selecting by one and ordering by the other would put a
+ * holding on screen for a reason the column beside it does not show.
+ *
+ * Every branch ranks explicitly. The list arrives sorted by absolute daily
+ * change *percent*, so a branch that passed the server's order through was
+ * showing the percent ranking under the Amount heading -- which is the whole of
+ * what the Amount control appeared to do, namely nothing.
+ *
+ * The amount is the per-share change printed on the row, so the order is the
+ * order of the numbers on screen.
+ */
+export function rankMovers(
+  movers: TopMover[],
+  filter: MoverFilter,
+  metric: MoverMetric,
+  limit = 5,
+): TopMover[] {
+  const magnitude = (m: TopMover) =>
+    metric === 'amount' ? m.dailyChange : m.dailyChangePercent;
+  if (filter === 'gainers') {
+    return [...movers]
+      .filter((m) => m.dailyChange > 0)
+      .sort((a, b) => magnitude(b) - magnitude(a))
+      .slice(0, limit);
+  }
+  if (filter === 'losers') {
+    return [...movers]
+      .filter((m) => m.dailyChange < 0)
+      .sort((a, b) => magnitude(a) - magnitude(b))
+      .slice(0, limit);
+  }
+  // Either direction counts, so the biggest mover is the largest move in either
+  // direction: rank on the size of the change, not its signed value.
+  return [...movers]
+    .sort((a, b) => Math.abs(magnitude(b)) - Math.abs(magnitude(a)))
+    .slice(0, limit);
 }
 
 interface TopMoversProps {
@@ -32,27 +97,34 @@ interface TopMoversProps {
   isRefreshing?: boolean;
 }
 
-function MoverFilterControl({
-  filter,
+/** A segmented button group of mutually exclusive choices. */
+function MoverSegmentedControl<T extends string>({
+  value,
+  options,
+  groupLabel,
   onChange,
 }: {
-  filter: MoverFilter;
-  onChange: (filter: MoverFilter) => void;
+  value: T;
+  options: { value: T; label: string }[];
+  groupLabel: string;
+  onChange: (value: T) => void;
 }) {
-  const t = useTranslations('dashboard');
-  const options: { value: MoverFilter; label: string; rounded: string }[] = [
-    { value: 'all', label: t('topMovers.filter.all'), rounded: 'rounded-l-md border' },
-    { value: 'gainers', label: t('topMovers.filter.gainers'), rounded: 'border-t border-b' },
-    { value: 'losers', label: t('topMovers.filter.losers'), rounded: 'rounded-r-md border' },
-  ];
+  const rounding = (index: number) =>
+    index === 0
+      ? 'rounded-l-md border'
+      : index === options.length - 1
+        ? 'rounded-r-md border'
+        : 'border-t border-b';
   return (
-    <div className="inline-flex rounded-md shadow-sm">
-      {options.map((option) => (
+    <div className="inline-flex rounded-md shadow-sm" role="group" aria-label={groupLabel}>
+      {options.map((option, index) => (
         <button
           key={option.value}
+          type="button"
+          aria-pressed={value === option.value}
           onClick={() => onChange(option.value)}
-          className={`px-3 py-1.5 text-sm font-medium ${option.rounded} ${
-            filter === option.value
+          className={`px-3 py-1.5 text-sm font-medium ${rounding(index)} ${
+            value === option.value
               ? 'bg-blue-600 text-white border-blue-600'
               : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
           }`}
@@ -97,21 +169,36 @@ export function TopMovers({ movers, isLoading, hasInvestmentAccounts, onRefresh,
   const defaultCurrency = preferredCurrency(
     usePreferencesStore((s) => s.preferences?.defaultCurrency),
   );
-  const [filter, setFilter] = useState<MoverFilter>(getStoredFilter);
+  const [filter, setFilter] = useState<MoverFilter>(() =>
+    readStoredChoice(FILTER_STORAGE_KEY, MOVER_FILTERS, 'all'),
+  );
+  const [metric, setMetric] = useState<MoverMetric>(() =>
+    readStoredChoice(METRIC_STORAGE_KEY, MOVER_METRICS, 'amount'),
+  );
 
   useEffect(() => {
-    try {
-      localStorage.setItem(FILTER_STORAGE_KEY, filter);
-    } catch {
-      // Ignore storage failures (e.g. disabled/blocked storage); persistence is best-effort.
-    }
+    writeStoredChoice(FILTER_STORAGE_KEY, filter);
   }, [filter]);
+
+  useEffect(() => {
+    writeStoredChoice(METRIC_STORAGE_KEY, metric);
+  }, [metric]);
+
+  const filterOptions: { value: MoverFilter; label: string }[] = [
+    { value: 'all', label: t('topMovers.filter.all') },
+    { value: 'gainers', label: t('topMovers.filter.gainers') },
+    { value: 'losers', label: t('topMovers.filter.losers') },
+  ];
+  const metricOptions: { value: MoverMetric; label: string }[] = [
+    { value: 'amount', label: t('topMovers.metric.amount') },
+    { value: 'percent', label: t('topMovers.metric.percent') },
+  ];
 
   if (isLoading) {
     return (
       <div className={`${CARD_CLASS} p-3 sm:p-6 lg:min-h-[500px]`}>
         <div className="flex items-center justify-between mb-4">
-          <WidgetHeading id="top-movers" onClick={() => router.push('/investments')}>
+          <WidgetHeading id="top-movers" href="/investments">
             {t('topMovers.title')}
           </WidgetHeading>
           <div className="flex items-center gap-2">
@@ -132,7 +219,7 @@ export function TopMovers({ movers, isLoading, hasInvestmentAccounts, onRefresh,
     return (
       <div className={`${CARD_CLASS} p-3 sm:p-6 lg:min-h-[500px]`}>
         <div className="flex items-center justify-between mb-4">
-          <WidgetHeading id="top-movers" onClick={() => router.push('/investments')}>
+          <WidgetHeading id="top-movers" href="/investments">
             {t('topMovers.title')}
           </WidgetHeading>
           <RefreshButton onRefresh={onRefresh} isRefreshing={isRefreshing} refreshTitle={t('topMovers.refreshPrices')} />
@@ -146,20 +233,12 @@ export function TopMovers({ movers, isLoading, hasInvestmentAccounts, onRefresh,
     );
   }
 
-  // Apply filter, then show top 5. Movers arrive pre-sorted by absolute daily
-  // change, so 'all' keeps that order; gainers/losers re-sort directionally.
-  const filteredMovers =
-    filter === 'gainers'
-      ? movers.filter((m) => m.dailyChange > 0).sort((a, b) => b.dailyChangePercent - a.dailyChangePercent)
-      : filter === 'losers'
-        ? movers.filter((m) => m.dailyChange < 0).sort((a, b) => a.dailyChangePercent - b.dailyChangePercent)
-        : movers;
-  const topMovers = filteredMovers.slice(0, 5);
+  const topMovers = rankMovers(movers, filter, metric);
 
   return (
     <div className={`${CARD_CLASS} p-3 sm:p-6 lg:min-h-[500px]`}>
       <div className="flex items-center justify-between mb-4">
-        <WidgetHeading id="top-movers" onClick={() => router.push('/investments')}>
+        <WidgetHeading id="top-movers" href="/investments">
           {t('topMovers.title')}
         </WidgetHeading>
         <div className="flex items-center gap-2">
@@ -167,8 +246,19 @@ export function TopMovers({ movers, isLoading, hasInvestmentAccounts, onRefresh,
           <span className="text-sm text-gray-500 dark:text-gray-400">{t('topMovers.dailyChange')}</span>
         </div>
       </div>
-      <div className="mb-4">
-        <MoverFilterControl filter={filter} onChange={setFilter} />
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <MoverSegmentedControl
+          value={filter}
+          options={filterOptions}
+          groupLabel={t('topMovers.filter.label')}
+          onChange={setFilter}
+        />
+        <MoverSegmentedControl
+          value={metric}
+          options={metricOptions}
+          groupLabel={t('topMovers.metric.label')}
+          onChange={setMetric}
+        />
       </div>
       {topMovers.length === 0 ? (
         <p className="text-gray-500 dark:text-gray-400 text-sm">

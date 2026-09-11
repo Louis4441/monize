@@ -13,9 +13,14 @@ import { useWidgetConfig } from '@/hooks/useWidgetConfig';
 import { chartColors, CHART_SERIES, chartSeriesColor } from '@/lib/chart-colors';
 import { aggregateHoldingsBySecurity } from '@/lib/aggregate-holdings';
 import { ChartTooltipPanel } from '@/components/reports/ChartTooltip';
+import { collapseLookThrough } from '@/lib/look-through-allocation';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { WidgetCard, WidgetConfigRow, WidgetMessage } from './WidgetCard';
-import { SECURITY_TYPE_ALLOCATION_DEFAULT, AccountsConfig } from './widget-config';
+import { WidgetSegmentedControl } from './WidgetSegmentedControl';
+import {
+  SECURITY_TYPE_ALLOCATION_DEFAULT,
+  SecurityTypeAllocationConfig,
+} from './widget-config';
 
 const WIDGET_ID = 'security-type-allocation';
 
@@ -47,7 +52,7 @@ export function SecurityTypeAllocationWidget({
   const t = useTranslations('dashboard');
   const { formatCurrency, formatPercent } = useNumberFormat();
   const { convertToDefault } = useExchangeRates();
-  const { config, updateConfig } = useWidgetConfig<AccountsConfig>(
+  const { config, updateConfig } = useWidgetConfig<SecurityTypeAllocationConfig>(
     WIDGET_ID,
     SECURITY_TYPE_ALLOCATION_DEFAULT,
   );
@@ -77,7 +82,42 @@ export function SecurityTypeAllocationWidget({
     [summary],
   );
 
-  const allocationData = useMemo<TypeAllocation[]>(() => {
+  // The look-through breakdown, which sees inside a fund rather than filing all
+  // of it under ETF. Fetched only while that view is active, so the ordinary
+  // security-type view costs no extra request.
+  const { data: assetClasses, isLoading: assetClassLoading } = useReportData(
+    () =>
+      config.view === 'assetClass'
+        ? investmentsApi.getAssetClassWeightings(
+            config.accountIds.length > 0 ? config.accountIds : undefined,
+          )
+        : Promise.resolve(null),
+    [config.accountIds, config.view],
+  );
+
+  const assetClassData = useMemo<TypeAllocation[]>(() => {
+    if (!assetClasses) return [];
+    return collapseLookThrough(
+      {
+        items: assetClasses.items.map((item) => ({
+          name: item.assetClass,
+          totalValue: item.totalValue,
+          percentage: item.percentage,
+        })),
+        totalPortfolioValue: assetClasses.totalPortfolioValue,
+        unclassifiedValue: assetClasses.unclassifiedValue,
+      },
+      t('securityTypeAllocation.otherAssetClasses'),
+    ).map((slice, index) => ({
+      type: slice.name,
+      label: slice.name,
+      totalValue: slice.value,
+      percentage: slice.percentage,
+      color: slice.isOther ? chartColors.axis : chartSeriesColor(index),
+    }));
+  }, [assetClasses, t]);
+
+  const typeData = useMemo<TypeAllocation[]>(() => {
     const aggregated = aggregateHoldingsBySecurity(holdings);
     const typeMap = new Map<string, number>();
     aggregated.forEach((h) => {
@@ -107,23 +147,39 @@ export function SecurityTypeAllocationWidget({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [holdings, convertToDefault, t]);
 
+  const allocationData = config.view === 'assetClass' ? assetClassData : typeData;
+
   const configControls = (
-    <WidgetConfigRow label={t('widgets.accounts')}>
-      <ReportAccountMultiSelect
-        accounts={investmentAccounts}
-        value={config.accountIds}
-        onChange={(accountIds) => updateConfig({ accountIds })}
-        mode="portfolio"
-        className="w-full"
-      />
-    </WidgetConfigRow>
+    <>
+      <WidgetConfigRow label={t('widgets.accounts')}>
+        <ReportAccountMultiSelect
+          accounts={investmentAccounts}
+          value={config.accountIds}
+          onChange={(accountIds) => updateConfig({ accountIds })}
+          mode="portfolio"
+          className="w-full"
+        />
+      </WidgetConfigRow>
+      <WidgetConfigRow label={t('widgets.view')}>
+        <WidgetSegmentedControl
+          value={config.view}
+          onChange={(view) => updateConfig({ view })}
+          options={[
+            { value: 'type', label: t('securityTypeAllocation.viewType') },
+            { value: 'assetClass', label: t('securityTypeAllocation.viewAssetClass') },
+          ]}
+        />
+      </WidgetConfigRow>
+    </>
   );
 
-  const loading = isLoading || dataLoading;
+  const loading =
+    isLoading || (config.view === 'assetClass' ? assetClassLoading : dataLoading);
 
   return (
     <WidgetCard
       title={t('securityTypeAllocation.title')}
+      titleHref="/investments"
       widgetId={WIDGET_ID}
       configControls={configControls}
       configTitle={t('securityTypeAllocation.title')}
@@ -131,7 +187,11 @@ export function SecurityTypeAllocationWidget({
       {loading ? (
         <div className="flex-1 min-h-[260px] animate-pulse rounded-md bg-gray-100 dark:bg-gray-700/50" />
       ) : allocationData.length === 0 ? (
-        <WidgetMessage>{t('securityTypeAllocation.empty')}</WidgetMessage>
+        <WidgetMessage>
+          {config.view === 'assetClass'
+            ? t('securityTypeAllocation.emptyAssetClass')
+            : t('securityTypeAllocation.empty')}
+        </WidgetMessage>
       ) : (
         <>
           <div className="flex-1 min-h-[240px]">

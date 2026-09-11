@@ -157,15 +157,17 @@ describe('NetWorthChart', () => {
     expect(changeEl.className).toContain('text-red');
   });
 
-  it('navigates to net worth report on title click', () => {
+  it('links the title to the net worth report', () => {
     const data = [
       { month: '2024-01-01', netWorth: 10000 },
       { month: '2024-06-01', netWorth: 15000 },
     ] as any[];
 
     render(<NetWorthChart data={data} isLoading={false} />);
-    fireEvent.click(screen.getByText('Net Worth'));
-    expect(mockPush).toHaveBeenCalledWith('/reports/net-worth');
+    expect(screen.getByRole('link', { name: 'Net Worth' })).toHaveAttribute(
+      'href',
+      '/reports/net-worth',
+    );
   });
 
   it('navigates to report on View full report click', () => {
@@ -179,16 +181,20 @@ describe('NetWorthChart', () => {
     expect(mockPush).toHaveBeenCalledWith('/reports/net-worth');
   });
 
-  it('navigates to report on loading state title click', () => {
+  it('links the title to the report in the loading state', () => {
     render(<NetWorthChart data={[]} isLoading={true} />);
-    fireEvent.click(screen.getByText('Net Worth'));
-    expect(mockPush).toHaveBeenCalledWith('/reports/net-worth');
+    expect(screen.getByRole('link', { name: 'Net Worth' })).toHaveAttribute(
+      'href',
+      '/reports/net-worth',
+    );
   });
 
-  it('navigates to report on empty state title click', () => {
+  it('links the title to the report in the empty state', () => {
     render(<NetWorthChart data={[]} isLoading={false} />);
-    fireEvent.click(screen.getByText('Net Worth'));
-    expect(mockPush).toHaveBeenCalledWith('/reports/net-worth');
+    expect(screen.getByRole('link', { name: 'Net Worth' })).toHaveAttribute(
+      'href',
+      '/reports/net-worth',
+    );
   });
 
   it('shows negative net worth with red styling', () => {

@@ -37,8 +37,8 @@ describe('MonthlySpendingTrendWidget', () => {
 
   it('renders the chart for the configured month range', async () => {
     getIncomeVsExpenses.mockResolvedValue({
-      data: [{ month: '2026-01', income: 5000, expenses: 3000, net: 2000 }],
-      totals: { income: 5000, expenses: 3000, net: 2000 },
+      data: [{ period: '2026-01', periodStart: '2026-01-01', periodEnd: '2026-01-31', income: 5000, expenses: 3000, net: 2000 }],
+      totals: { income: 5000, expenses: 3000, net: 2000, knownIncome: 5000, knownExpenses: 3000, knownNet: 2000 },
     });
     await renderWidget();
     expect(screen.getByText('Monthly Spending Trend')).toBeInTheDocument();
@@ -48,7 +48,7 @@ describe('MonthlySpendingTrendWidget', () => {
   });
 
   it('shows the empty state with no data', async () => {
-    getIncomeVsExpenses.mockResolvedValue({ data: [], totals: { income: 0, expenses: 0, net: 0 } });
+    getIncomeVsExpenses.mockResolvedValue({ data: [], totals: { income: 0, expenses: 0, net: 0, knownIncome: 0, knownExpenses: 0, knownNet: 0 } });
     await renderWidget();
     expect(screen.getByText('No data for this period.')).toBeInTheDocument();
   });

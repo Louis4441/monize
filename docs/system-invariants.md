@@ -508,6 +508,19 @@ Known gap           **An unconverted amount still reaches a report under the
                     total, and every affected DTO carrying a completeness field
                     a consumer branches on -- one specified change per report
                     family, not a guard edit. Until then this entry is `partial`.
+                    Two families are done, by that route rather than around it:
+                    Spending by Category and Income vs Expenses take the nullable
+                    `tryConvertAmount` beside convertAmount, exclude a row they
+                    cannot convert, accumulate through FxAggregate, and answer
+                    with `currency`, `missingCurrencies` and `excludedCount`
+                    beside a total that is null when anything was left out. The
+                    report and the dashboard widget drawing each of them mark the
+                    same subtotal through PartialTotal. The remaining callers of
+                    convertAmount are Income by Source, Spending by Payee,
+                    Monthly Spending Trend, Monthly Category Breakdown, and the
+                    anomaly, comparison, tax/recurring and data-quality families;
+                    data-quality is the one that also mislabels, and is where the
+                    second clause of the statement still fails.
 Concurrency scope   --
 Failure response    null or an explicitly partial figure, per
                     docs/financial-calculation-contract.md section 1. On the
@@ -593,7 +606,16 @@ Enforcement         One predicate, in backend/src/common/investment-filter.util.
                     bulk-update filter (transaction-bulk-update.service.ts) --
                     the last one a write path, where the old predicate let a
                     "select all uncategorized" sweep reach the cash legs a trade
-                    owns. Two scans in
+                    owns.
+                    A scan of the server says nothing about a client that
+                    aggregates the ledger itself: the Expenses by Category
+                    widget built its own breakdown from paged transactions and
+                    decided what was an investment from the account type, which
+                    is this invariant's exact failure and invisible to every
+                    guard above. It reads the Spending by Category report now,
+                    and frontend/src/test/ui-conventions.test.ts holds that no
+                    dashboard widget re-derives a ledger breakdown from
+                    transactions. Two scans in
                     backend/src/common/investment-filter.guard.spec.ts: no
                     account-type exclusion anywhere in src/, and every
                     built-in-report query that is not transfer-only carries the

@@ -107,6 +107,47 @@ describe('PortfolioValueWidget', () => {
     expect(triggerManualRefresh).toHaveBeenCalledWith(undefined);
   });
 
+  it('shows the move over the window in money and percent', async () => {
+    getInvestmentsMonthly.mockResolvedValue([
+      { month: '2026-05', value: 8000 },
+      { month: '2026-06', value: 10000 },
+    ]);
+    await renderWidget();
+    // 1Y measures from the first point drawn, so 8000 -> 10000 is +2000 (+25%).
+    expect(screen.getByTestId('portfolio-period-change')).toHaveTextContent(
+      '+$2000(+25.0%)',
+    );
+  });
+
+  it('shows no period change while the series is empty', async () => {
+    // An unknown baseline is not a flat market: nothing is printed rather than
+    // a change of zero.
+    getInvestmentsMonthly.mockResolvedValue([]);
+    await renderWidget();
+    expect(screen.queryByTestId('portfolio-period-change')).toBeNull();
+  });
+
+  it('measures the MTD change from the close before the window', async () => {
+    configState.current = { range: 'mtd', accountIds: [] };
+    getInvestmentsDaily.mockImplementation((params: { endDate?: string }) =>
+      // The baseline lookup asks for the days before the window; the chart's own
+      // request carries the window itself.
+      Promise.resolve(
+        params.endDate === '2026-06-30'
+          ? [{ date: '2026-06-30', value: 9000 }]
+          : [
+              { date: '2026-07-01', value: 9500 },
+              { date: '2026-07-02', value: 9900 },
+            ],
+      ),
+    );
+    await renderWidget();
+    // 9900 against the 30 June close of 9000, not against the 1 July point.
+    expect(screen.getByTestId('portfolio-period-change')).toHaveTextContent(
+      '+$900(+10.0%)',
+    );
+  });
+
   it('scopes the refresh to the shown holdings when an account filter is active', async () => {
     configState.current = { range: '1y', accountIds: ['i1'] };
     getInvestmentsMonthly.mockResolvedValue([{ month: '2026-06', value: 10000 }]);

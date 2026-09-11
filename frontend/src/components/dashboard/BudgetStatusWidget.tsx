@@ -48,7 +48,7 @@ export function BudgetStatusWidget({ isLoading: parentLoading }: BudgetStatusWid
   if (isLoading || parentLoading) {
     return (
       <div className={`${CARD_CLASS} p-3 sm:p-6 lg:min-h-[390px]`}>
-        <WidgetHeading id="budget-status" onClick={() => router.push('/budgets')} className="mb-4">
+        <WidgetHeading id="budget-status" href="/budgets" className="mb-4">
           {sectionTitle}
         </WidgetHeading>
         <div className="animate-pulse space-y-3">
@@ -63,7 +63,7 @@ export function BudgetStatusWidget({ isLoading: parentLoading }: BudgetStatusWid
   if (hasError || !summary) {
     return (
       <div className={`${CARD_CLASS} p-3 sm:p-6 lg:min-h-[390px]`}>
-        <WidgetHeading id="budget-status" onClick={() => router.push('/budgets')} className="mb-4">
+        <WidgetHeading id="budget-status" href="/budgets" className="mb-4">
           {sectionTitle}
         </WidgetHeading>
         <p className="text-gray-500 dark:text-gray-400 text-sm">
@@ -82,7 +82,7 @@ export function BudgetStatusWidget({ isLoading: parentLoading }: BudgetStatusWid
   return (
     <div className={`${CARD_CLASS} p-3 sm:p-6 lg:min-h-[390px]`}>
       <div className="flex items-center justify-between mb-3">
-        <WidgetHeading id="budget-status" onClick={() => router.push(`/budgets/${summary.budgetId}`)}>
+        <WidgetHeading id="budget-status" href={`/budgets/${summary.budgetId}`}>
           {sectionTitle}
         </WidgetHeading>
         <span className="text-xs text-gray-500 dark:text-gray-400">

@@ -5,20 +5,11 @@ import { useTranslations } from 'next-intl';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import toast from 'react-hot-toast';
-import {
-  format,
-  startOfMonth,
-  endOfMonth,
-  eachDayOfInterval,
-  isSameMonth,
-  isToday as checkIsToday,
-  addMonths,
-  subMonths,
-  getDay,
-} from 'date-fns';
+import { format, addMonths, subMonths } from 'date-fns';
 import { Button } from '@/components/ui/Button';
 import { ScheduledTransactionForm } from '@/components/scheduled-transactions/ScheduledTransactionForm';
 import { CashFlowForecastChart } from '@/components/bills/CashFlowForecastChart';
+import { ScheduledCalendarGrid } from '@/components/bills/ScheduledCalendarGrid';
 import { ScheduledTransactionList } from '@/components/scheduled-transactions/ScheduledTransactionList';
 import { BillsFilterPanel } from '@/components/scheduled-transactions/BillsFilterPanel';
 import { OverrideEditorDialog } from '@/components/scheduled-transactions/OverrideEditorDialog';
@@ -45,9 +36,10 @@ import {
   deriveAccountsFromScheduledTransactions,
 } from '@/lib/bills-filters';
 import { parseLocalDate } from '@/lib/utils';
-import { SCHEDULED_KIND_CHIP_CLASSES, occurrenceKind } from '@/lib/scheduled-kind';
+import { buildScheduledCalendarDays } from '@/lib/scheduled-calendar';
+import { occurrenceKind } from '@/lib/scheduled-kind';
 import { scheduleEffectiveAmount } from '@/lib/scheduled-effective-amount';
-import { advanceByFrequency, isOneTime, monthlyEquivalent } from '@/lib/frequency';
+import { monthlyEquivalent } from '@/lib/frequency';
 import type { FutureTransaction } from '@/lib/forecast';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
@@ -654,77 +646,10 @@ function BillsContent() {
     return t('page.summaryNetUnpriceable');
   }, [summary, ratesUnavailable, t]);
 
-  // Generate upcoming occurrences for calendar view
-  const getNextOccurrences = (st: ScheduledTransaction, _monthsAhead: number = 3): Date[] => {
-    if (!st.nextDueDate) return [];
-    const occurrences: Date[] = [];
-    const startDate = subMonths(startOfMonth(calendarMonth), 1);
-    const endDate = addMonths(endOfMonth(calendarMonth), 1);
-    let nextDate = parseLocalDate(st.nextDueDate);
-
-    // Build override lookup map: originalDate -> overrideDate
-    const overrideMap = new Map<string, string>();
-    if (st.futureOverrides) {
-      for (const o of st.futureOverrides) {
-        overrideMap.set(o.originalDate.split('T')[0], o.overrideDate.split('T')[0]);
-      }
-    }
-    // Fallback to nextOverride if futureOverrides is not populated
-    if (st.nextOverride?.overrideDate && !overrideMap.has(st.nextDueDate)) {
-      overrideMap.set(st.nextDueDate, st.nextOverride.overrideDate);
-    }
-
-    let count = 0;
-
-    while (nextDate <= endDate && count < 100) {
-      const dateKey = format(nextDate, 'yyyy-MM-dd');
-      const overrideDateStr = overrideMap.get(dateKey);
-      const effectiveDate = overrideDateStr && overrideDateStr !== dateKey
-        ? parseLocalDate(overrideDateStr)
-        : nextDate;
-
-      if (effectiveDate >= startDate && effectiveDate <= endDate) {
-        occurrences.push(new Date(effectiveDate));
-      }
-      if (isOneTime(st.frequency)) return occurrences;
-      nextDate = advanceByFrequency(nextDate, st.frequency);
-      count++;
-    }
-    return occurrences;
-  };
-
-  const calendarDays = useMemo(() => {
-    const monthStart = startOfMonth(calendarMonth);
-    const monthEnd = endOfMonth(calendarMonth);
-    const calStart = new Date(monthStart);
-    calStart.setDate(calStart.getDate() - getDay(monthStart));
-    const calEnd = new Date(monthEnd);
-    calEnd.setDate(calEnd.getDate() + (6 - getDay(monthEnd)));
-
-    const days = eachDayOfInterval({ start: calStart, end: calEnd });
-    const billsByDate = new Map<string, ScheduledTransaction[]>();
-
-    // Every active schedule is on the calendar, whatever its kind: transfers and
-    // zero-amount reminders have due dates like anything else, and leaving them
-    // off makes a schedule the list shows simply vanish (issue #1124).
-    const active = scheduledTransactions.filter((st) => st.isActive);
-    active.forEach((st) => {
-      getNextOccurrences(st).forEach((date) => {
-        const key = format(date, 'yyyy-MM-dd');
-        const existing = billsByDate.get(key) || [];
-        existing.push(st);
-        billsByDate.set(key, existing);
-      });
-    });
-
-    return days.map((date) => ({
-      date,
-      isCurrentMonth: isSameMonth(date, calendarMonth),
-      isToday: checkIsToday(date),
-      bills: billsByDate.get(format(date, 'yyyy-MM-dd')) || [],
-    }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calendarMonth, scheduledTransactions]);
+  const calendarDays = useMemo(
+    () => buildScheduledCalendarDays(scheduledTransactions, calendarMonth),
+    [calendarMonth, scheduledTransactions],
+  );
 
   return (
     <PageLayout>
@@ -928,58 +853,7 @@ function BillsContent() {
         ) : (
           /* Calendar View */
           <div className="bg-white dark:bg-gray-800 shadow dark:shadow-gray-700/50 rounded-lg overflow-hidden">
-            <div className="grid grid-cols-7">
-              {(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const).map((day) => (
-                <div
-                  key={day}
-                  className="px-2 py-3 text-center text-sm font-medium text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700"
-                >
-                  {t(`calendar.days.${day}`)}
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7">
-              {calendarDays.map((day, index) => (
-                <div
-                  key={index}
-                  className={`min-h-[100px] p-1 border-b border-r border-gray-200 dark:border-gray-700 ${
-                    !day.isCurrentMonth
-                      ? 'bg-gray-50 dark:bg-gray-900/50'
-                      : 'bg-white dark:bg-gray-800'
-                  }`}
-                >
-                  <div
-                    className={`text-sm font-medium mb-1 w-7 h-7 flex items-center justify-center rounded-full ${
-                      day.isToday
-                        ? 'bg-blue-600 text-white'
-                        : day.isCurrentMonth
-                        ? 'text-gray-900 dark:text-gray-100'
-                        : 'text-gray-400 dark:text-gray-600'
-                    }`}
-                  >
-                    {format(day.date, 'd')}
-                  </div>
-                  <div className="space-y-0.5">
-                    {day.bills.slice(0, 3).map((bill, billIndex) => (
-                      <div
-                        key={billIndex}
-                        onClick={() => handleEdit(bill)}
-                        className={`px-1 py-0.5 text-xs rounded truncate cursor-pointer ${
-                          SCHEDULED_KIND_CHIP_CLASSES[billKind(bill)]
-                        } hover:opacity-80`}
-                      >
-                        {bill.name}
-                      </div>
-                    ))}
-                    {day.bills.length > 3 && (
-                      <div className="text-xs text-gray-500 dark:text-gray-400 px-1">
-                        {t('calendar.more', { count: day.bills.length - 3 })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <ScheduledCalendarGrid days={calendarDays} onSelect={handleEdit} />
           </div>
         )}
       </main>
