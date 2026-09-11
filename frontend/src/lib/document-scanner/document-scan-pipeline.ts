@@ -3,6 +3,7 @@ import {
   DETECT_MAX_EDGE,
   MIN_DOCUMENT_AREA_RATIO,
   OUTPUT_MAX_EDGE,
+  clampToFrame,
   fitScale,
   fullFrameQuad,
   isConvexQuad,
@@ -41,6 +42,29 @@ const CANNY_HIGH_RATIO = 1.33;
 const EDGE_DILATE_KERNEL = 3;
 /** How closely a contour must match a quadrilateral, as a share of perimeter. */
 const POLY_EPSILON_RATIO = 0.02;
+
+/**
+ * Saturation fallback, used only when the edge detector finds no quadrilateral.
+ *
+ * A grey page on a wooden desk has almost no brightness edge where its border
+ * meets the wood, and a hand's shadow breaks whatever edge is left, so Canny
+ * returns arcs that approximate to nothing. But paper is grey wherever the
+ * light is even or not, and wood is not, so the page is the largest LOW-
+ * SATURATION region regardless of the shadow. This is a fallback, not a
+ * replacement: the edge detector still runs first, and this only decides the
+ * case it would otherwise hand back as "whole frame, nothing found".
+ */
+const SATURATION_MAX = 65;
+/** Kernel that closes the gaps text and specular glare leave in the page mask. */
+const SATURATION_KERNEL = 25;
+/** The page must cover at least this share of the frame to be the document. */
+const SATURATION_MIN_COVER = 0.2;
+/**
+ * ...and no more than this. A frame that is low-saturation edge to edge -- a
+ * grey test fixture, a blank wall -- has no surround to tell the page from, so a
+ * near-total cover is "no document found", not "the document fills the frame".
+ */
+const SATURATION_MAX_COVER = 0.97;
 
 /** Kernel of the morphological close that estimates the page's illumination. */
 const ILLUMINATION_KERNEL = 31;
@@ -254,12 +278,106 @@ export function detectDocument(
     }
 
     if (!best) {
-      // No candidate is not a failure: the rest of the pipeline still runs, on
-      // the whole frame, so the user gets a lighting-corrected photo and a quad
-      // they can drag rather than an error.
+      // Nothing edge-shaped. Before falling back to the whole frame, try the
+      // saturation route: a grey page on wood has no reliable brightness edge
+      // but is the largest low-saturation region, shadow or no shadow.
+      const bySaturation = detectByLowSaturation(cv, image);
+      if (bySaturation) return { quad: bySaturation, found: true };
+      // Still nothing: the rest of the pipeline runs on the whole frame, so the
+      // user gets a lighting-corrected photo and a quad they can drag.
       return { quad: fullFrameQuad(image.width, image.height), found: false };
     }
     return { quad: scaleQuad(best.quad, 1 / scale), found: true };
+  });
+}
+
+/**
+ * Find the page as the largest low-saturation region.
+ *
+ * The fallback `detectDocument` reaches for when no quadrilateral edge survives.
+ * Paper is grey -- low saturation -- under a shadow as much as in full light,
+ * and a wooden desk, a coloured folder or a patterned cloth is not, so the page
+ * is the largest low-saturation blob even where its border carries no brightness
+ * edge for Canny to find.
+ *
+ * Returns `null` -- "still no document" -- when the low-saturation region is too
+ * small to be a page, or so large it fills the frame: a frame that is grey edge
+ * to edge (a blank wall, a grey test fixture) has no surround to tell the page
+ * from. Corners come back in FULL-image coordinates, like every detector here.
+ */
+export function detectByLowSaturation(cv: OpenCv, image: RawImage): Quad | null {
+  return withScope((scope) => {
+    const source = scope.add(toMat(cv, image));
+    const scale = fitScale(image.width, image.height, DETECT_MAX_EDGE);
+    const working = scope.add(new cv.Mat());
+    if (scale < 1) {
+      cv.resize(
+        source,
+        working,
+        new cv.Size(
+          Math.max(1, Math.round(image.width * scale)),
+          Math.max(1, Math.round(image.height * scale)),
+        ),
+        0,
+        0,
+        cv.INTER_AREA,
+      );
+    } else {
+      source.copyTo(working);
+    }
+
+    const rgb = scope.add(new cv.Mat());
+    cv.cvtColor(working, rgb, cv.COLOR_RGBA2RGB);
+    const hsv = scope.add(new cv.Mat());
+    cv.cvtColor(rgb, hsv, cv.COLOR_RGB2HSV);
+    const channels = scope.add(new cv.MatVector());
+    cv.split(hsv, channels);
+    const saturation = scope.add(channels.get(1));
+
+    const mask = scope.add(new cv.Mat());
+    // Below the threshold is "grey enough to be paper".
+    cv.threshold(saturation, mask, SATURATION_MAX, 255, cv.THRESH_BINARY_INV);
+    const kernel = scope.add(
+      cv.getStructuringElement(
+        cv.MORPH_RECT,
+        new cv.Size(SATURATION_KERNEL, SATURATION_KERNEL),
+      ),
+    );
+    // Close first to bridge the text and glare inside the page, then open to
+    // drop the stray low-saturation flecks the surround leaves behind.
+    cv.morphologyEx(mask, mask, cv.MORPH_CLOSE, kernel);
+    cv.morphologyEx(mask, mask, cv.MORPH_OPEN, kernel);
+
+    const contours = scope.add(new cv.MatVector());
+    const hierarchy = scope.add(new cv.Mat());
+    cv.findContours(
+      mask,
+      contours,
+      hierarchy,
+      cv.RETR_EXTERNAL,
+      cv.CHAIN_APPROX_SIMPLE,
+    );
+
+    const frameArea = working.cols * working.rows;
+    let best: { index: number; area: number } | null = null;
+    for (let i = 0; i < contours.size(); i++) {
+      const area = cv.contourArea(contours.get(i));
+      if (!best || area > best.area) best = { index: i, area };
+    }
+    if (!best) return null;
+    const cover = best.area / frameArea;
+    if (cover < SATURATION_MIN_COVER || cover > SATURATION_MAX_COVER) return null;
+
+    // The page is rarely a clean quadrilateral in the mask -- glare and the
+    // shadow bite into it -- so its minimal enclosing rectangle is a steadier
+    // read of the four corners than an `approxPolyDP` of the ragged contour.
+    const rect = cv.minAreaRect(contours.get(best.index));
+    const box = cv.RotatedRect.points(rect) as Point[];
+    const corners = box.map((p) =>
+      clampToFrame({ x: p.x / scale, y: p.y / scale }, image.width, image.height),
+    );
+    const quad = orderCorners(corners);
+    return isConvexQuad(quad) ? quad : null;
   });
 }
 

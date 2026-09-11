@@ -38,6 +38,14 @@ export interface SyntheticOptions {
    * enhancement test caught the dark-region amplification until now.
    */
   noise?: number;
+  /**
+   * Colour of the surface behind the page, as `[r, g, b]`. Grey by default
+   * (`background`). A saturated colour here makes a fixture where the page and
+   * its surround differ in HUE rather than only brightness -- the case a
+   * luminance-edge detector misses and a saturation detector catches, as a grey
+   * page on a wooden table does.
+   */
+  backgroundColor?: [number, number, number];
 }
 
 /**
@@ -97,6 +105,7 @@ export function syntheticDocument(options: SyntheticOptions = {}): RawImage {
     blurRadius = 0,
     shadow = 0,
     noise = 0,
+    backgroundColor,
   } = options;
 
   const data = new Uint8ClampedArray(width * height * 4);
@@ -134,11 +143,14 @@ export function syntheticDocument(options: SyntheticOptions = {}): RawImage {
       }
 
       const offset = (y * width + x) * 4;
+      // Outside the page a colour surround overrides the grey value, so hue can
+      // differ from the page even where brightness does not.
+      const tint = !inside && backgroundColor ? backgroundColor : null;
       // Each channel is jittered on its own draw, so grey grain in the source
       // is genuine three-channel noise the way a sensor makes it.
-      data[offset] = value + jitter();
-      data[offset + 1] = value + jitter();
-      data[offset + 2] = value + jitter();
+      data[offset] = (tint ? tint[0] : value) + jitter();
+      data[offset + 1] = (tint ? tint[1] : value) + jitter();
+      data[offset + 2] = (tint ? tint[2] : value) + jitter();
       data[offset + 3] = 255;
     }
   }

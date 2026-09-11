@@ -4,6 +4,7 @@ import { loadEngine, type OpenCv } from './opencv-engine';
 import {
   applyStyle,
   desaturate,
+  detectByLowSaturation,
   detectDocument,
   enhance,
   limitSize,
@@ -39,6 +40,18 @@ beforeAll(async () => {
 
 /** How far a detected corner may sit from the planted one, in pixels. */
 const CORNER_TOLERANCE = 12;
+
+/**
+ * An upright rectangular page, for the saturation detector. Axis-aligned on
+ * purpose: its minimal enclosing rectangle is itself, so the detected corners
+ * can be checked against the planted ones directly.
+ */
+const SATURATION_PAGE_QUAD: Quad = [
+  { x: 120, y: 100 },
+  { x: 600, y: 100 },
+  { x: 600, y: 620 },
+  { x: 120, y: 620 },
+];
 
 function expectNearQuad(found: Quad, expected: Quad): void {
   for (let i = 0; i < 4; i++) {
@@ -170,6 +183,64 @@ describe('detectDocument', () => {
     });
 
     expect(detectDocument(cv, image).found).toBe(false);
+  });
+
+  // The photo that made this necessary: a grey page whose border carries no
+  // brightness edge (a shadow ate it, or the desk is nearly as bright as the
+  // paper). Canny finds no quadrilateral, so detection falls through to the
+  // saturation route. The surround here is a saturated colour at the SAME
+  // luminance as the page, so there is no edge for Canny at all -- only hue
+  // separates them.
+  it('finds a page by saturation when no brightness edge exists', () => {
+    const image = syntheticDocument({
+      quad: SATURATION_PAGE_QUAD,
+      text: false,
+      paper: 200,
+      backgroundColor: [255, 190, 150],
+    });
+
+    const { quad, found } = detectDocument(cv, image);
+
+    expect(found).toBe(true);
+    expectNearQuad(quad, SATURATION_PAGE_QUAD);
+  });
+
+  // The control for the case above: same geometry and same luminance, but the
+  // surround is grey too, so nothing -- edge or hue -- separates the page from
+  // its background and detection correctly reports nothing found. Without this
+  // the test above could pass on a detector that simply always finds a page.
+  it('reports nothing when neither an edge nor a hue separates the page', () => {
+    const image = syntheticDocument({
+      quad: SATURATION_PAGE_QUAD,
+      text: false,
+      paper: 200,
+      background: 200,
+    });
+
+    expect(detectDocument(cv, image).found).toBe(false);
+  });
+});
+
+describe('detectByLowSaturation', () => {
+  it('returns the page as the low-saturation region on a colour surround', () => {
+    const image = syntheticDocument({
+      quad: SATURATION_PAGE_QUAD,
+      text: false,
+      paper: 200,
+      backgroundColor: [255, 190, 150],
+    });
+
+    const quad = detectByLowSaturation(cv, image);
+
+    expect(quad).not.toBeNull();
+    expectNearQuad(quad as Quad, SATURATION_PAGE_QUAD);
+  });
+
+  // A frame that is grey edge to edge has no surround to tell a page from, so
+  // the near-total low-saturation cover is rejected rather than returned as a
+  // page filling the frame.
+  it('returns null when the whole frame is low-saturation', () => {
+    expect(detectByLowSaturation(cv, blankFrame(400, 400))).toBeNull();
   });
 });
 
