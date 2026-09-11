@@ -38,15 +38,19 @@ Every task is safe to merge in any order that respects its dependencies: the end
 | F3 | Transactions page: Balances layer + banner | F2, B1 | inert | [ ] |
 | F4 | Investments page: calendar wiring, Transactions and Values layers, `InvestmentTransactionForm.defaultDate` | F1, B2 | inert | [ ] |
 | F5 | Investments page: Daily change layer + `DailyMovementDialog` | F4, B3 | inert | [ ] |
-| F6 | Phone layout, keyboard navigation and screen-reader pass across both calendars | F3, F5 | inert | [ ] |
+| B4 | `calendar_day_notes` migration + schema, entity, module, three routes, backup coverage, mirrored length constant | S1 | inert* | [ ] |
+| F7 | Day notes in the day panel and the cell, on both calendars | F2, F4, B4 | inert | [ ] |
+| F6 | Phone layout, keyboard navigation and screen-reader pass across both calendars | F3, F5, F7 | inert | [ ] |
 | Q1 | `calendar.guard.test.ts` + the `ui-conventions.test.ts` month-grid block | F1 | none | [ ] |
-| Q2 | Backend integration suite `calendar-read-models.integration.spec.ts` | B1, B3 | none | [ ] |
-| Q3 | Playwright `tests/calendar.spec.ts` | F3, F5 | none | [ ] |
+| Q2 | Backend integration suites `calendar-read-models.integration.spec.ts` and `calendar-day-notes.integration.spec.ts` | B1, B3, B4 | none | [ ] |
+| Q3 | Playwright `tests/calendar.spec.ts` | F3, F5, F7 | none | [ ] |
 | Q4 | Full-locale i18n pass (acceptance, final commit) | all above | none | [ ] |
 | M1 | Migrate `app/bills/page.tsx` and `UpcomingBillsReport.tsx` onto `MonthGrid`; shrink the baseline | F1, Q1 | neutral | [ ] (optional, separate proposal) |
 | R1 | Report: `investments-daily.value` should be `null` on an unpriced day (design 6.2) | B2 | none | [ ] (report only; not built here) |
 
-**Why F1 and the B tasks have no dependency on each other:** the grid, the toggle and the store are layout and preference; the read models are pure additions. They can be built in parallel sessions and meet at F3/F5.
+*B4 is inert at `RLS_MODE=off`/`shadow` and under enforcement alike: it creates an empty table with its policy, and nothing reads or writes it until F7. The migration itself is live on deploy, which is why it is its own task and its own PR.
+
+**Why F1 and the B tasks have no dependency on each other:** the grid, the toggle and the store are layout and preference; the read models and the notes table are pure additions. They can be built in parallel sessions and meet at F3/F5/F7.
 
 ---
 
@@ -91,6 +95,28 @@ Additive only: `value` is not changed (design 6.2). A held position whose `posit
 Implement design section 6.3. The trading-day query generalises `getFirstPricedDay`'s subquery to a date set; do not add a second replay: the detail endpoint reads quantities through the same `applyActionToQuantity` replay and closes through `positionCloseAsOf` (INV-HOLDING-002).
 
 **Acceptance:** `decide` table test covers every row of truth table B; the service spec reproduces examples 3, 4, 5 and 6; the detail spec reproduces table D including `remainder` reconciling and `change: null` on a missing rate; `portfolio-movement-alert.service.spec.ts` passes untouched after the extraction (neutral). Nothing calls the client functions yet (inert).
+
+### B4 -- Day notes: table, module, routes, backup
+
+**Files:** `database/migrations/<UTC timestamp>_calendar_day_notes.sql` (new; take the prefix from `date -u +%Y%m%d%H%M%S`, never a sequential number), `database/schema.sql`, `backend/src/calendar/calendar.module.ts`, `backend/src/calendar/entities/calendar-day-note.entity.ts`, `backend/src/calendar/calendar-day-notes.controller.ts` + `.spec.ts`, `backend/src/calendar/calendar-day-notes.service.ts` + `.spec.ts`, `backend/src/calendar/dto/day-notes-query.dto.ts`, `backend/src/calendar/dto/upsert-day-note.dto.ts` + `.spec.ts`, `backend/src/common/calendar-day-note.ts` (new; `CALENDAR_DAY_NOTE_MAX_LENGTH = 2000`), `backend/src/common/calendar-day-note.contract.spec.ts` (new), `frontend/src/lib/calendar-day-note.ts` (new; the mirror), `backend/src/app.module.ts` (import the module), `backend/src/backup/export-table-queries.ts`, `backend/src/backup/restore-plan.ts`, `backend/src/backup/support-backup/support-backup-rules.ts`, `frontend/src/lib/calendar-day-notes.ts` (new client: `list`, `upsert`, `remove`, cache prefix `calendar:day-notes:`), `frontend/src/lib/cache-prefix-classification.guard.test.ts` (classify the prefix), `frontend/src/types/calendar.ts` (new; `DayNote`), `docs/backend/transactions-and-money.md` or `docs/backend/modules-and-runtime.md` (the module entry), `docs/row-level-security-contract.md` (nothing: a Direct-bucket table needs no entry; say so in the PR).
+
+Implement design section 6.4 exactly: the policy and `ENABLE ROW LEVEL SECURITY` in the same migration file; the upsert as one `INSERT ... ON CONFLICT ... DO UPDATE` inside `withScopedDb` with `userId` from the JWT; `:date` validated by a pipe on `isCalendarDate`; the DTO trimmed and bounded; routes under `AuthGuard('jwt')` and **not** `@AllowDelegate`. No `with-context` import is needed.
+
+Definition of done adds the database gate: `npm run migration:lint`, `scripts/verify-schema.sh`, `node scripts/check-migration-prefixes.mjs`, and `npm run build && npm run test:integration` (the RLS enforcement suite must place the table in the Direct bucket unaided; the support-backup golden test must pass with the new rule).
+
+**Acceptance:** the specs in the design's test matrix rows for the service, the DTO and the contract; the enforcement suite green with no map entry; a backup export and restore round trip in the integration suite carries a note. Nothing calls the client yet (inert).
+
+### F7 -- Day notes in the calendar
+
+**Files:** `frontend/src/hooks/useCalendarDayNotes.ts` + `.test.ts` (new), `frontend/src/components/calendar/CalendarDayNote.tsx` + `.test.tsx` (new: the read view, the editor, Save / Cancel / Delete), `frontend/src/components/calendar/CalendarDayCell.tsx`, `CalendarDayPanel.tsx`, `CalendarBanner.tsx`, `TransactionsCalendarView.tsx`, `InvestmentCalendarView.tsx` + tests, `frontend/src/i18n/messages/en/calendar.json` (`notes.*`), `docs/frontend/forms-and-formatting.md` (one paragraph under the note-cap entry naming the second constant).
+
+- The list is fetched once per grid range through `useCalendarDayNotes`, keyed by range, with the five states; it is not keyed by account scope or filters (a note belongs to the day).
+- The cell shows the glyph and the first line (glyph only on a phone); the panel shows the body through `LinkifiedText` with Edit and Delete for the owner, "Add a note" when none, and nothing at all in an acting-delegate session (the same acting-context check the pages already use to hide owner-only controls).
+- The textarea carries `maxLength={CALENDAR_DAY_NOTE_MAX_LENGTH}`; Save is explicit; a blank body disables Save rather than sending it; Delete asks through `ConfirmDialog`.
+- The edit captures its date on open (I12): the response is adopted only while the panel shows that date; changing the day or the month with a dirty draft asks for confirmation; a failed save keeps the draft and shows the error beside the form.
+- The client drops its own `calendar:day-notes:` entries after a write and refetches the range; it calls nothing balance-related.
+
+**Acceptance:** truth table E row by row; the origin-date matrix; a `<script>` body renders as text; both calendars show the same note for the same date in one test that mounts each. Table mode unchanged (inert).
 
 ### F2 -- Transactions page: calendar wiring and Transactions layer
 
@@ -147,9 +173,11 @@ Per design I1 and I6 and section 11: no `.reduce(`/`+=` over an amount, balance,
 
 ### Q2 -- Backend integration suite
 
-**Files:** `backend/test/integration/calendar-read-models.integration.spec.ts` (new).
+**Files:** `backend/test/integration/calendar-read-models.integration.spec.ts` (new), `backend/test/integration/calendar-day-notes.integration.spec.ts` (new).
 
-The three endpoints under RLS enforcement: an owner sees their scope; a delegate with the investments section sees the owner's investment scope and nothing else; a joint grantee sees the shared account's balances; a foreign account id in `accountIds` returns nothing and leaks nothing (404-vs-empty per the existing `daily-balances` behaviour).
+The three read models under RLS enforcement: an owner sees their scope; a delegate with the investments section sees the owner's investment scope and nothing else; a joint grantee sees the shared account's balances; a foreign account id in `accountIds` returns nothing and leaks nothing (404-vs-empty per the existing `daily-balances` behaviour).
+
+The notes routes under enforcement: an owner reads, upserts twice (the second is an update, one row), and deletes; a delegate acting for the owner gets 403 on all three; two users hold a note on the same date without conflict; the table survives a backup export and restore.
 
 **Acceptance:** `npm run build && npm run test:integration` green, one worker.
 
@@ -157,7 +185,7 @@ The three endpoints under RLS enforcement: an owner sees their scope; a delegate
 
 **Files:** `e2e/tests/calendar.spec.ts` (new), `e2e/helpers/factories.ts` (only if a factory is missing).
 
-The journeys in design section 11's e2e row, seeded through the factories, one fresh user per test, persistence proved by reload. Selectors by role and label; a Saturday cell located by its `aria-label`.
+The journeys in design section 11's e2e row, seeded through the factories, one fresh user per test, persistence proved by reload. Selectors by role and label; a Saturday cell located by its `aria-label`. The notes journey drives the UI only (add, reload, edit, delete, reload); no factory is needed because the note is what the test is proving.
 
 **Acceptance:** `npm test -- tests/calendar.spec.ts` green locally against `docker-compose.e2e.yml`.
 

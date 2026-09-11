@@ -34,6 +34,10 @@ has agreed it.
   provenance; clicking a real transaction opens the same edit modal the
   register uses; clicking an occurrence goes to Bills & Deposits with that
   schedule highlighted; a day offers "New transaction on this day".
+- **A note on any day.** One free-text note per user per date, written and
+  read from the day panel on either calendar, shown as a marker and its first
+  line in the cell. It is the calendar's only write path, and it moves no
+  money (section 6.4).
 
 ## 2. What exists, and what this composes
 
@@ -118,6 +122,16 @@ from one of three new read models built out of those endpoints' services.
 11. **The two legacy month grids migrate to `MonthGrid` afterwards, as their own
     PRs** (task M1). Until then a shrink-only baseline in `ui-conventions.test.ts`
     names the two files.
+12. **A day note is one row per user per date, owner-only, plain text.** The
+    same note appears on both calendars because it belongs to the day, not to
+    a page or an account. It is bounded at `CALENDAR_DAY_NOTE_MAX_LENGTH`
+    (2000 characters), mirrored in both layers the way
+    `TRANSACTION_NOTE_MAX_LENGTH` is, so the textarea stops the user at the
+    cap instead of the save reporting it. A delegate acting for an owner sees
+    no note and no note affordance: a note is personal, and the route is not
+    `@AllowDelegate`. Saving is an explicit Save (this is a form, not a
+    settings screen); clearing is Delete. The note is rendered through
+    `LinkifiedText`, never as HTML.
 
 ## 4. Definitions
 
@@ -156,8 +170,10 @@ from one of three new read models built out of those endpoints' services.
 | I6 | **Colour comes from the existing mappings** (decision 4). | `ui-conventions.test.ts` already fails a second type-to-pill mapping; `calendar.guard.test.ts` fails a `text-green-`/`text-red-` literal outside `gainLossColor`/`balanceColor` and a `bg-*-100` literal outside the two chip maps under `components/calendar/`. |
 | I7 | **A layer's data belongs to its request key**: month, scope, the filter signature, the display currency. A stale month may stay on screen while the next loads, marked `aria-busy` and non-actionable; a failed fetch renders the retryable error state, never an empty month. | `useCalendarMonthData` stamps `dataKey`; tests follow the deferred-promise matrix in `docs/frontend/api-and-cache.md`. |
 | I8 | **A write from the calendar invalidates what the register's writes invalidate.** The calendar opens the pages' existing modals and handlers; the three new client caches use the `accounts:` and `investments:` prefixes so `invalidateBalanceCaches()` drops them. | `balance-cache.guard.test.ts`, `cache-prefix-classification.guard.test.ts`. INV-CACHE-001. |
-| I9 | **The calendar adds no write path and changes no register contract.** Table mode is byte-identical after every task. | Each task's acceptance re-runs the register suites untouched. |
+| I9 | **The calendar adds no money-moving write path and changes no register contract.** Its one write is the day note (section 6.4), which touches one table nothing financial reads. Table mode is byte-identical after every task. | Each task's acceptance re-runs the register suites untouched; `balance-cache.guard.test.ts` has nothing to say about the note client because it moves nothing. |
 | I10 | **The three new read models are `withScopedDb` reads** with `userId` from the JWT, `@AllowDelegate` + the same joint-account widening `daily-balances` uses, DTO-bounded dates (`IsCalendarDate`) and a range cap of `CALENDAR_RANGE_MAX_DAYS = 93`. | DTO specs; `docs/backend/database-access-and-tenancy.md`. |
+| I11 | **A day note is written once, whole, by its owner.** The upsert is a single `INSERT ... ON CONFLICT (user_id, note_date) DO UPDATE` under `withScopedDb` with `userId` from the JWT, so two saves of the same day cannot interleave and a save never reads first; the body is bounded by the DTO and the mirrored constant; the table carries the direct RLS policy in its own migration. | `UNIQUE (user_id, note_date)`; `calendar-day-note.contract.spec.ts` (the two layers' constants agree); the RLS enforcement suite; the DTO spec. |
+| I12 | **A note belongs to the date it was opened for.** An edit captures its date when editing starts; the response is adopted only while the panel still shows that date; a dirty note survives a month change behind a confirmation. | Component tests follow the keyed-form matrix in `docs/frontend/api-and-cache.md`. |
 
 ## 6. Data contracts (new and changed)
 
@@ -296,6 +312,71 @@ Service `DailyMovementService` (`backend/src/securities/daily-movement.service.t
 - Both are `@AllowDelegate` + `@DelegateRequiresSection("investments")` like
   the net-worth investment routes.
 
+### 6.4 Day notes (new table and endpoints)
+
+Table `calendar_day_notes`, created by a timestamped migration
+(`YYYYMMDDHHMMSS_calendar_day_notes.sql`, per `database/CLAUDE.md`) that also
+ships the policy and enables row-level security, with `database/schema.sql`
+updated in the same commit:
+
+```sql
+CREATE TABLE IF NOT EXISTS calendar_day_notes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    note_date DATE NOT NULL,
+    body TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_calendar_day_notes_user_date UNIQUE (user_id, note_date),
+    CONSTRAINT ck_calendar_day_notes_body_length CHECK (char_length(body) BETWEEN 1 AND 2000)
+);
+CREATE INDEX IF NOT EXISTS idx_calendar_day_notes_user_date ON calendar_day_notes(user_id, note_date);
+ALTER TABLE calendar_day_notes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS calendar_day_notes_isolation ON calendar_day_notes;
+CREATE POLICY calendar_day_notes_isolation ON calendar_day_notes
+  USING (user_id = (SELECT app_current_user_id()) OR (SELECT app_bypass_rls()));
+```
+
+The **Direct** bucket, owner only: no delegate arm (decision 12), so the
+enforcement suite's uniform-policy check covers it with no map entry. The
+`CHECK` is the same number as the mirrored constant; the contract spec pins
+all three.
+
+Backup: an export query (`SELECT * FROM calendar_day_notes WHERE user_id = $1
+ORDER BY note_date`) in `backend/src/backup/export-table-queries.ts`, a
+`restore-plan.ts` entry (`scopeToUser: true`, after `users`), and a
+`support-backup-rules.ts` allowlist with `body: drop` and everything else
+`keep`; the support-backup golden test fails until that decision is made.
+
+Module `backend/src/calendar/` (`calendar.module.ts`,
+`entities/calendar-day-note.entity.ts`, `calendar-day-notes.controller.ts`,
+`calendar-day-notes.service.ts`, `dto/day-notes-query.dto.ts`,
+`dto/upsert-day-note.dto.ts`), the constant in
+`backend/src/common/calendar-day-note.ts` mirrored by
+`frontend/src/lib/calendar-day-note.ts` and held equal by
+`backend/src/common/calendar-day-note.contract.spec.ts`.
+
+```typescript
+// GET /calendar/day-notes?startDate&endDate   (<= 93 days; AuthGuard('jwt'), not @AllowDelegate)
+interface DayNote { date: string; body: string; updatedAt: string }
+// -> DayNote[] ordered by date
+
+// PUT /calendar/day-notes/:date   body { body: string }  (1..CALENDAR_DAY_NOTE_MAX_LENGTH after trim)
+// -> DayNote. One statement: INSERT ... ON CONFLICT (user_id, note_date) DO UPDATE SET body, updated_at.
+// A blank body is a 400, never a delete.
+
+// DELETE /calendar/day-notes/:date -> 204; deleting a day with no note is 204 too (idempotent).
+```
+
+`:date` is validated as a calendar date by a param pipe built on
+`isCalendarDate` (`backend/src/common/validators/is-calendar-date.validator.ts`);
+`ParseUUIDPipe` does not apply because the key is the date. The DTO runs with
+`whitelist` + `forbidNonWhitelisted`; `body` is `@IsString() @MaxLength(...)`
+and trimmed. `userId` comes from the JWT on every route. The client keeps the
+list under `calendar:day-notes:<start>:<end>` (classified in
+`cache-prefix-classification.guard.test.ts` as not balance-derived) and drops
+it on its own writes.
+
 ## 7. Truth tables
 
 ### A. Balance cell (Transactions page), day `d`
@@ -356,6 +437,18 @@ decided in the one file the guard already watches.
 | yes | zero | any | no row |
 | no | any | any | no row |
 | yes, but no previous accepted close | any | any | no row; the position's whole value sits in `remainder` |
+
+### E. Day note, day `d`
+
+| Session | Note on `d` | Cell | Day panel |
+|---|---|---|---|
+| owner | exists | note glyph and the first line, truncated; on a phone the glyph only | body through `LinkifiedText`; Edit; Delete |
+| owner | none | nothing | "Add a note" |
+| owner, editing `d`, month or day changed | any | | confirmation; the draft survives a cancel |
+| owner, Save for `d` in flight, panel now shows `d2` | any | | response for `d` discarded; the list refetched; `d2`'s form untouched |
+| owner, Save fails | any | unchanged | the error beside the form; the draft kept |
+| delegate acting for the owner | any | nothing | no note section at all |
+| list request failed | | notes absent, marked as failed in the banner | other layers untouched |
 
 ## 8. Numerical examples
 
@@ -494,7 +587,10 @@ All money at 4dp internally, printed at 2dp; percentages at 2dp.
 | backend unit | `external-flow.util.spec.ts` | the extraction keeps `PortfolioMovementAlertService`'s spec green untouched; a dividend leg and a within-scope transfer are internal; a VOID row is nothing |
 | backend unit | `net-worth.service.spec.ts` (extended) | `pricesComplete` false and `unpricedSecurityIds` named when a held position has no close; `value` unchanged (additive) |
 | backend integration | `calendar-read-models.integration.spec.ts` | the three endpoints under RLS enforcement for an owner, a delegate with the investments section, and a joint grantee; a foreign account id returns nothing |
-| e2e | `tests/calendar.spec.ts` | seed an account, a past transaction, a scheduled bill and a future-dated row through the factories; toggle to Calendar; the chips appear on their dates; the balance cell for a past day matches the register's running balance; a future day reads "projected"; click a day, open the transaction, edit, reload, the change persists; toggle back to Table. Investments: seed a pair, a security with two closes, a BUY; the change cell shows on the second close's date and the popup lists the security; a Saturday cell is blank |
+| backend unit | `calendar-day-notes.service.spec.ts`, `upsert-day-note.dto.spec.ts`, `calendar-day-note.contract.spec.ts` | upsert is one statement (the manager receives no SELECT); a blank body and a 2001-character body are 400; `2100-02-29` is 400 through the pipe; delete is idempotent; the constant, the DTO bound and the `CHECK` agree |
+| backend integration | `calendar-day-notes.integration.spec.ts` | under enforcement an owner reads and writes their own note; a delegate acting for the owner gets 403 on every route; two users can hold a note on the same date; the support-backup golden test and a backup round trip carry the table |
+| frontend unit | `CalendarDayNote.test.tsx`, `useCalendarDayNotes.test.ts` | truth table E row by row; the textarea carries `maxLength`; the origin-date matrix from `docs/frontend/api-and-cache.md`; the note renders through `LinkifiedText` and a `<script>` body renders as text |
+| e2e | `tests/calendar.spec.ts` | seed an account, a past transaction, a scheduled bill and a future-dated row through the factories; toggle to Calendar; the chips appear on their dates; the balance cell for a past day matches the register's running balance; a future day reads "projected"; click a day, open the transaction, edit, reload, the change persists; toggle back to Table. Investments: seed a pair, a security with two closes, a BUY; the change cell shows on the second close's date and the popup lists the security; a Saturday cell is blank. Notes: add a note on a day, reload, it is on the cell and in the panel of both calendars; edit it; delete it; reload, it is gone |
 
 A green suite after a behaviour change is a finding: each task's acceptance
 names the test that turned red first.
@@ -510,6 +606,10 @@ names the test that turned red first.
 - Making `investments-daily`'s `value` `null` on an unpriced day is reported,
   not done (section 6.2).
 - The two legacy grids migrate in M1, each its own PR.
+- Day notes are plain text, one per date, owner-only: no rich text, no
+  attachments, no per-account notes, no sharing with a delegate, no search,
+  no appearance in the register or the dashboard, and no AI-assistant or MCP
+  tool. Each of those is its own proposal.
 
 ## 13. Critical files
 
@@ -527,7 +627,13 @@ Backend: `backend/src/accounts/accounts.controller.ts`,
 `backend/src/common/investment-filter.util.ts`,
 `backend/src/common/fx-aggregate.ts`,
 `backend/src/common/validators/is-calendar-date.validator.ts`,
-`backend/src/scheduled-transactions/scheduled-occurrence.service.ts`.
+`backend/src/scheduled-transactions/scheduled-occurrence.service.ts`,
+`backend/src/common/transaction-note.ts` and
+`backend/src/common/transaction-note.contract.spec.ts` (the mirrored-constant
+pattern the note length copies), `backend/src/backup/export-table-queries.ts`,
+`backend/src/backup/restore-plan.ts`,
+`backend/src/backup/support-backup/support-backup-rules.ts`,
+`database/schema.sql`.
 
 Frontend: `frontend/src/app/transactions/page.tsx`,
 `frontend/src/app/investments/page.tsx`,
@@ -548,7 +654,9 @@ Frontend: `frontend/src/app/transactions/page.tsx`,
 `frontend/src/components/ui/CalendarPopover.tsx`,
 `frontend/src/app/bills/page.tsx`,
 `frontend/src/components/reports/UpcomingBillsReport.tsx`,
-`frontend/src/test/ui-conventions.test.ts`, `frontend/src/i18n/messages.ts`.
+`frontend/src/test/ui-conventions.test.ts`, `frontend/src/i18n/messages.ts`,
+`frontend/src/lib/transaction-note.ts`,
+`frontend/src/components/ui/LinkifiedText.tsx`.
 
 Docs to touch with the tasks: `frontend/CLAUDE.md` (one row: a month grid is
 `MonthGrid`), `docs/frontend/ui-conventions.md` (the entry),
