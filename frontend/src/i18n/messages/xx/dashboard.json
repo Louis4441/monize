@@ -233,7 +233,11 @@
       "MUTUAL_FUND": "[XX-Mutual Funds-XX]",
       "BOND": "[XX-Bonds-XX]",
       "CASH": "[XX-Cash-XX]"
-    }
+    },
+    "viewType": "[XX-Security type-XX]",
+    "viewAssetClass": "[XX-Asset class-XX]",
+    "otherAssetClasses": "[XX-Other-XX]",
+    "emptyAssetClass": "[XX-No asset class breakdown available yet.-XX]"
   },
   "geographicAllocation": {
     "title": "[XX-Geographic Allocation-XX]",

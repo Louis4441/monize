@@ -233,7 +233,11 @@
       "MUTUAL_FUND": "Mutual Funds",
       "BOND": "Bonds",
       "CASH": "Cash"
-    }
+    },
+    "viewType": "Security type",
+    "viewAssetClass": "Asset class",
+    "otherAssetClasses": "Other",
+    "emptyAssetClass": "No asset class breakdown available yet."
   },
   "geographicAllocation": {
     "title": "Geographic Allocation",

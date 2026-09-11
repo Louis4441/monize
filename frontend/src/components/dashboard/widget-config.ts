@@ -70,6 +70,17 @@ export interface RangeAccountsConfig {
   accountIds: string[];
 }
 
+/**
+ * Security Type Allocation view. `type` places each holding by its own security
+ * type, from the portfolio summary; `assetClass` asks the backend for the
+ * look-through breakdown, which sees inside a fund rather than filing the whole
+ * of it under ETF.
+ */
+export interface SecurityTypeAllocationConfig {
+  accountIds: string[];
+  view: 'type' | 'assetClass';
+}
+
 export interface GeographicConfig {
   accountIds: string[];
   view: 'region' | 'exchange' | 'country';
@@ -108,8 +119,9 @@ export const CREDIT_UTILIZATION_TOTAL_DEFAULT: AccountsConfig = {
 
 export const SECTOR_WEIGHTINGS_DEFAULT: AccountsConfig = { accountIds: [] };
 
-export const SECURITY_TYPE_ALLOCATION_DEFAULT: AccountsConfig = {
+export const SECURITY_TYPE_ALLOCATION_DEFAULT: SecurityTypeAllocationConfig = {
   accountIds: [],
+  view: 'type',
 };
 
 export const GEOGRAPHIC_ALLOCATION_DEFAULT: GeographicConfig = {
