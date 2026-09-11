@@ -186,3 +186,29 @@ export function priorCloseChange(
     changePercent: baseline === 0 ? null : (change / Math.abs(baseline)) * 100,
   };
 }
+
+/**
+ * How much a portfolio value series moved over the window it draws, and that
+ * move as a percentage of where it started.
+ *
+ * One answer for every surface that prints a period change, so the dashboard
+ * widget and the Investments chart cannot report different moves for the same
+ * window. Which baseline applies is a property of the range:
+ * `usesPriorCloseBaseline` ranges measure from the close before the window,
+ * every other range from the series' own first point.
+ *
+ * Both halves are null when the baseline is unknown -- an empty series, or a
+ * prior close that has not loaded or could not be established. An unknown
+ * baseline is never the first point's change wearing the prior close's label.
+ */
+export function portfolioSeriesChange(
+  values: readonly number[],
+  options: { usesPriorClose: boolean; priorCloseValue: number | null },
+): { change: number | null; changePercent: number | null } {
+  if (values.length === 0) return { change: null, changePercent: null };
+  const current = values[values.length - 1];
+  return priorCloseChange(
+    current,
+    options.usesPriorClose ? options.priorCloseValue : values[0],
+  );
+}

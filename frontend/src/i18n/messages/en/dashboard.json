@@ -21,7 +21,6 @@
   "upcomingBills": {
     "title": "Upcoming Bills & Deposits",
     "empty": "No overdue or upcoming bills, deposits, or transfers within their reminder windows.",
-    "perReminderSettings": "Per reminder settings",
     "postTransaction": "Post this transaction",
     "manual": "Manual",
     "manualTitle": "Requires manual posting",
@@ -38,7 +37,16 @@
       "transfer": "Transfer",
       "reminder": "Reminder",
       "unknown": "Unknown"
-    }
+    },
+    "scope": {
+      "dueSoon": "Due soon",
+      "all": "All upcoming"
+    },
+    "viewList": "List",
+    "viewCalendar": "Calendar",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "emptyAll": "No active bills, deposits, or transfers scheduled."
   },
   "gettingStarted": {
     "title": "Getting Started",
@@ -94,7 +102,13 @@
     "filter": {
       "all": "All",
       "gainers": "Gainers",
-      "losers": "Losers"
+      "losers": "Losers",
+      "label": "Direction"
+    },
+    "metric": {
+      "label": "Rank by",
+      "amount": "Amount",
+      "percent": "Percent"
     }
   },
   "favouriteSecurities": {
@@ -125,7 +139,10 @@
     "empty": "No expense data for this period.",
     "total": "Total",
     "uncategorized": "Uncategorized",
-    "other": "Other"
+    "other": "Other",
+    "insideOther": "{count, plural, one {# category in Other} other {# categories in Other}}",
+    "topLevelOnly": "Top level categories",
+    "topLevelOnlyHint": "Count subcategories against their parent"
   },
   "incomeExpenses": {
     "title": "Income vs Expenses",
@@ -166,6 +183,8 @@
     "description": "Description",
     "descriptionPlaceholder": "Add an optional description",
     "rangeLabels": {
+      "1w": "1W",
+      "mtd": "MTD",
       "1m": "1M",
       "3m": "3M",
       "6m": "6M",
@@ -225,14 +244,19 @@
       "MUTUAL_FUND": "Mutual Funds",
       "BOND": "Bonds",
       "CASH": "Cash"
-    }
+    },
+    "viewType": "Security type",
+    "viewAssetClass": "Asset class",
+    "otherAssetClasses": "Other",
+    "emptyAssetClass": "No asset class breakdown available yet."
   },
   "geographicAllocation": {
     "title": "Geographic Allocation",
     "empty": "No holdings to show.",
     "viewRegion": "Region",
     "viewExchange": "Exchange",
-    "viewCountry": "Country"
+    "viewCountry": "Country",
+    "listingBasisNote": "Grouped by where each holding is listed. Switch to Country to see inside funds."
   },
   "recurringExpenses": {
     "title": "Top Recurring Expenses",

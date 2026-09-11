@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent, act } from "@/test/render";
 import { SpendingByCategoryReport } from "./SpendingByCategoryReport";
+import type { SpendingByCategoryResponse } from '@/types/built-in-reports';
 
 const mockPush = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -107,6 +108,24 @@ vi.mock("@/lib/logger", () => ({
   }),
 }));
 
+/**
+ * A report answer with nothing left out: `knownSpending` equals the total and
+ * no currency was dropped, so every figure is complete.
+ */
+function completeReport(
+  data: SpendingByCategoryResponse['data'],
+  totalSpending: number,
+): SpendingByCategoryResponse {
+  return {
+    data,
+    totalSpending,
+    knownSpending: totalSpending,
+    currency: 'CAD',
+    missingCurrencies: [],
+    excludedCount: 0,
+  };
+}
+
 describe("SpendingByCategoryReport", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -126,6 +145,10 @@ describe("SpendingByCategoryReport", () => {
     mockGetSpendingByCategory.mockResolvedValue({
       data: [],
       totalSpending: 0,
+      knownSpending: 0,
+      currency: 'CAD',
+      missingCurrencies: [],
+      excludedCount: 0,
     });
     render(<SpendingByCategoryReport />);
     await waitFor(() => {
@@ -152,6 +175,10 @@ describe("SpendingByCategoryReport", () => {
         },
       ],
       totalSpending: 700,
+      knownSpending: 700,
+      currency: 'CAD',
+      missingCurrencies: [],
+      excludedCount: 0,
     });
     render(<SpendingByCategoryReport />);
     await waitFor(() => {
@@ -168,6 +195,10 @@ describe("SpendingByCategoryReport", () => {
         { categoryId: "cat-1", categoryName: "Food", total: 100, color: "" },
       ],
       totalSpending: 100,
+      knownSpending: 100,
+      currency: 'CAD',
+      missingCurrencies: [],
+      excludedCount: 0,
     });
     render(<SpendingByCategoryReport />);
     await waitFor(() => {
@@ -188,6 +219,10 @@ describe("SpendingByCategoryReport", () => {
         { categoryId: "cat-2", categoryName: "Rent", total: 700, color: "" },
       ],
       totalSpending: 1000,
+      knownSpending: 1000,
+      currency: 'CAD',
+      missingCurrencies: [],
+      excludedCount: 0,
     });
     render(<SpendingByCategoryReport />);
     await waitFor(() => {
@@ -210,6 +245,10 @@ describe("SpendingByCategoryReport", () => {
         },
       ],
       totalSpending: 100,
+      knownSpending: 100,
+      currency: 'CAD',
+      missingCurrencies: [],
+      excludedCount: 0,
     });
     render(<SpendingByCategoryReport />);
     await waitFor(() => {
@@ -242,6 +281,10 @@ describe("SpendingByCategoryReport", () => {
         },
       ],
       totalSpending: 500,
+      knownSpending: 500,
+      currency: 'CAD',
+      missingCurrencies: [],
+      excludedCount: 0,
     });
     render(<SpendingByCategoryReport />);
     await waitFor(() => {
@@ -259,6 +302,10 @@ describe("SpendingByCategoryReport", () => {
         { categoryId: "", categoryName: "Uncategorized2", total: 50, color: "" },
       ],
       totalSpending: 50,
+      knownSpending: 50,
+      currency: 'CAD',
+      missingCurrencies: [],
+      excludedCount: 0,
     });
     render(<SpendingByCategoryReport />);
     await waitFor(() => {
@@ -275,6 +322,10 @@ describe("SpendingByCategoryReport", () => {
         { categoryId: "cat-1", categoryName: "Food", total: 300, color: "" },
       ],
       totalSpending: 300,
+      knownSpending: 300,
+      currency: 'CAD',
+      missingCurrencies: [],
+      excludedCount: 0,
     });
     render(<SpendingByCategoryReport />);
     await waitFor(() => {
@@ -296,6 +347,10 @@ describe("SpendingByCategoryReport", () => {
         { categoryId: "cat-1", categoryName: "Food", total: 300, color: "" },
       ],
       totalSpending: 300,
+      knownSpending: 300,
+      currency: 'CAD',
+      missingCurrencies: [],
+      excludedCount: 0,
     });
     render(<SpendingByCategoryReport />);
     await waitFor(() => {
@@ -319,6 +374,10 @@ describe("SpendingByCategoryReport", () => {
         { categoryId: "cat-2", categoryName: "Rent", total: 700, color: "" },
       ],
       totalSpending: 1000,
+      knownSpending: 1000,
+      currency: 'CAD',
+      missingCurrencies: [],
+      excludedCount: 0,
     });
     render(<SpendingByCategoryReport />);
     await waitFor(() => {
@@ -340,7 +399,7 @@ describe("SpendingByCategoryReport", () => {
 
   it("calls exportToPdf with undefined chartLegend when chart data is empty", async () => {
     mockExportToPdf.mockResolvedValue(undefined);
-    mockGetSpendingByCategory.mockResolvedValue({ data: [], totalSpending: 0 });
+    mockGetSpendingByCategory.mockResolvedValue(completeReport([], 0));
     render(<SpendingByCategoryReport />);
     await waitFor(() => {
       expect(
@@ -367,6 +426,10 @@ describe("SpendingByCategoryReport", () => {
         { categoryId: "cat-1", categoryName: "Food", total: 0, color: "" },
       ],
       totalSpending: 0,
+      knownSpending: 0,
+      currency: 'CAD',
+      missingCurrencies: [],
+      excludedCount: 0,
     });
     render(<SpendingByCategoryReport />);
     await waitFor(() => {
@@ -378,7 +441,7 @@ describe("SpendingByCategoryReport", () => {
 
   it("does not load data when isValid is false", async () => {
     mockIsValid = false;
-    mockGetSpendingByCategory.mockResolvedValue({ data: [], totalSpending: 0 });
+    mockGetSpendingByCategory.mockResolvedValue(completeReport([], 0));
     render(<SpendingByCategoryReport />);
     // loadData is gated on isValid, so the API should not be called
     expect(mockGetSpendingByCategory).not.toHaveBeenCalled();
@@ -394,6 +457,10 @@ describe("SpendingByCategoryReport", () => {
         { categoryId: "c2", categoryName: "B", total: 0, color: "" },
       ],
       totalSpending: 0,
+      knownSpending: 0,
+      currency: 'CAD',
+      missingCurrencies: [],
+      excludedCount: 0,
     });
     const { container } = render(<SpendingByCategoryReport />);
     await waitFor(() => expect(screen.getByTestId("toggle-table")).toBeInTheDocument());
@@ -411,6 +478,10 @@ describe("SpendingByCategoryReport", () => {
         { categoryId: "", categoryName: "Uncategorized", total: 50, color: "" },
       ],
       totalSpending: 1050,
+      knownSpending: 1050,
+      currency: 'CAD',
+      missingCurrencies: [],
+      excludedCount: 0,
     });
     render(<SpendingByCategoryReport />);
     await waitFor(() => {
@@ -441,6 +512,10 @@ describe("SpendingByCategoryReport", () => {
         { categoryId: "cat-1", categoryName: "Food", total: 300, color: "" },
       ],
       totalSpending: 300,
+      knownSpending: 300,
+      currency: 'CAD',
+      missingCurrencies: [],
+      excludedCount: 0,
     });
     render(<SpendingByCategoryReport />);
     await waitFor(() => {
@@ -463,6 +538,10 @@ describe("SpendingByCategoryReport", () => {
         { categoryId: "", categoryName: "Uncategorized", total: 50, color: "" },
       ],
       totalSpending: 350,
+      knownSpending: 350,
+      currency: 'CAD',
+      missingCurrencies: [],
+      excludedCount: 0,
     });
     const { container } = render(<SpendingByCategoryReport />);
     await waitFor(() => {
@@ -494,5 +573,40 @@ describe("SpendingByCategoryReport", () => {
     fireEvent.keyDown(clickable, { key: "a" });
     fireEvent.keyDown(inert, { key: "Enter" });
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('marks the total a subtotal when the server left a row out', async () => {
+    // The server withholds `totalSpending` when a row could not be converted.
+    // What is shown is the part that did convert, marked -- never the smaller
+    // figure presented as the whole.
+    mockGetSpendingByCategory.mockResolvedValue({
+      data: [{ categoryId: 'c1', categoryName: 'Food', color: null, total: 100 }],
+      totalSpending: null,
+      knownSpending: 100,
+      currency: 'CAD',
+      missingCurrencies: ['JPY'],
+      excludedCount: 1,
+    } satisfies SpendingByCategoryResponse);
+
+    await act(async () => {
+      render(<SpendingByCategoryReport />);
+    });
+
+    expect(await screen.findByTestId('partial-total')).toBeInTheDocument();
+  });
+
+  it('leaves a complete total unmarked', async () => {
+    mockGetSpendingByCategory.mockResolvedValue(
+      completeReport(
+        [{ categoryId: 'c1', categoryName: 'Food', color: null, total: 100 }],
+        100,
+      ),
+    );
+
+    await act(async () => {
+      render(<SpendingByCategoryReport />);
+    });
+
+    expect(screen.queryByTestId('partial-total')).toBeNull();
   });
 });

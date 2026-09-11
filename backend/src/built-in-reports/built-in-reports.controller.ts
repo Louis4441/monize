@@ -7,8 +7,11 @@ import {
   ApiBearerAuth,
 } from "@nestjs/swagger";
 import { BuiltInReportsService } from "./built-in-reports.service";
+import type { WeekStartsOn } from "./income-expense-buckets";
 import {
+  IncomeVsExpensesQueryDto,
   ReportQueryDto,
+  SpendingByCategoryQueryDto,
   SpendingByCategoryResponse,
   SpendingByPayeeResponse,
   IncomeBySourceResponse,
@@ -41,12 +44,13 @@ export class BuiltInReportsController {
   @ApiResponse({ status: 200, type: SpendingByCategoryResponse })
   getSpendingByCategory(
     @Request() req,
-    @Query() query: ReportQueryDto,
+    @Query() query: SpendingByCategoryQueryDto,
   ): Promise<SpendingByCategoryResponse> {
     return this.reportsService.getSpendingByCategory(
       req.user.id,
       query.startDate,
       query.endDate,
+      { rollupToParent: query.rollupToParent, accountIds: query.accountIds },
     );
   }
 
@@ -93,16 +97,23 @@ export class BuiltInReportsController {
   }
 
   @Get("income-vs-expenses")
-  @ApiOperation({ summary: "Get monthly income vs expenses comparison" })
+  @ApiOperation({
+    summary: "Get income vs expenses, bucketed by month or week",
+  })
   @ApiResponse({ status: 200, type: IncomeVsExpensesResponse })
   getIncomeVsExpenses(
     @Request() req,
-    @Query() query: ReportQueryDto,
+    @Query() query: IncomeVsExpensesQueryDto,
   ): Promise<IncomeVsExpensesResponse> {
     return this.reportsService.getIncomeVsExpenses(
       req.user.id,
       query.startDate,
       query.endDate,
+      {
+        accountIds: query.accountIds,
+        bucket: query.bucket,
+        weekStartsOn: query.weekStartsOn as WeekStartsOn | undefined,
+      },
     );
   }
 

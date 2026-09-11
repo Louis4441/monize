@@ -21,7 +21,6 @@
   "upcomingBills": {
     "title": "今後の請求書・入金",
     "empty": "リマインダー期間内に期限超過または予定されている請求書、入金、振替はありません。",
-    "perReminderSettings": "リマインダー設定に従う",
     "postTransaction": "この取引を計上する",
     "manual": "手動",
     "manualTitle": "手動での計上が必要です",
@@ -38,7 +37,16 @@
       "transfer": "振替",
       "reminder": "リマインダー",
       "unknown": "不明"
-    }
+    },
+    "scope": {
+      "dueSoon": "期日が近い",
+      "all": "今後すべて"
+    },
+    "viewList": "リスト",
+    "viewCalendar": "カレンダー",
+    "previousMonth": "前の月",
+    "nextMonth": "次の月",
+    "emptyAll": "予定されている有効な請求、入金、振替はありません。"
   },
   "gettingStarted": {
     "title": "はじめに",
@@ -94,7 +102,13 @@
     "filter": {
       "all": "すべて",
       "gainers": "値上がり",
-      "losers": "値下がり"
+      "losers": "値下がり",
+      "label": "方向"
+    },
+    "metric": {
+      "label": "並べ替え",
+      "amount": "金額",
+      "percent": "変化率"
     }
   },
   "favouriteSecurities": {
@@ -125,7 +139,10 @@
     "empty": "この期間の支出データがありません。",
     "total": "合計",
     "uncategorized": "未分類",
-    "other": "その他"
+    "other": "その他",
+    "insideOther": "{count, plural, other {その他に# カテゴリ}}",
+    "topLevelOnly": "最上位カテゴリ",
+    "topLevelOnlyHint": "サブカテゴリを親カテゴリに集計します"
   },
   "incomeExpenses": {
     "title": "収入 対 支出",
@@ -173,7 +190,9 @@
       "2y": "2Y",
       "5y": "5Y",
       "ytd": "YTD",
-      "all": "すべて"
+      "all": "すべて",
+      "1w": "1週",
+      "mtd": "月初来"
     }
   },
   "portfolioValue": {
@@ -225,14 +244,19 @@
       "MUTUAL_FUND": "投資信託",
       "BOND": "債券",
       "CASH": "現金"
-    }
+    },
+    "viewType": "証券種別",
+    "viewAssetClass": "資産クラス",
+    "otherAssetClasses": "その他",
+    "emptyAssetClass": "資産クラスの内訳はまだありません。"
   },
   "geographicAllocation": {
     "title": "地域配分",
     "empty": "表示する保有銘柄がありません。",
     "viewRegion": "地域",
     "viewExchange": "取引所",
-    "viewCountry": "国"
+    "viewCountry": "国",
+    "listingBasisNote": "各保有銘柄の上場市場でグループ化しています。ファンドの中身を見るには国に切り替えてください。"
   },
   "recurringExpenses": {
     "title": "上位定期費用",

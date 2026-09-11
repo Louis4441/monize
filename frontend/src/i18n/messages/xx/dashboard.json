@@ -21,7 +21,6 @@
   "upcomingBills": {
     "title": "[XX-Upcoming Bills & Deposits-XX]",
     "empty": "[XX-No overdue or upcoming bills, deposits, or transfers within their reminder windows.-XX]",
-    "perReminderSettings": "[XX-Per reminder settings-XX]",
     "postTransaction": "[XX-Post this transaction-XX]",
     "manual": "[XX-Manual-XX]",
     "manualTitle": "[XX-Requires manual posting-XX]",
@@ -38,7 +37,16 @@
       "transfer": "[XX-Transfer-XX]",
       "reminder": "[XX-Reminder-XX]",
       "unknown": "[XX-Unknown-XX]"
-    }
+    },
+    "scope": {
+      "dueSoon": "[XX-Due soon-XX]",
+      "all": "[XX-All upcoming-XX]"
+    },
+    "viewList": "[XX-List-XX]",
+    "viewCalendar": "[XX-Calendar-XX]",
+    "previousMonth": "[XX-Previous month-XX]",
+    "nextMonth": "[XX-Next month-XX]",
+    "emptyAll": "[XX-No active bills, deposits, or transfers scheduled.-XX]"
   },
   "gettingStarted": {
     "title": "[XX-Getting Started-XX]",
@@ -94,7 +102,13 @@
     "filter": {
       "all": "[XX-All-XX]",
       "gainers": "[XX-Gainers-XX]",
-      "losers": "[XX-Losers-XX]"
+      "losers": "[XX-Losers-XX]",
+      "label": "[XX-Direction-XX]"
+    },
+    "metric": {
+      "label": "[XX-Rank by-XX]",
+      "amount": "[XX-Amount-XX]",
+      "percent": "[XX-Percent-XX]"
     }
   },
   "favouriteSecurities": {
@@ -125,7 +139,10 @@
     "empty": "[XX-No expense data for this period.-XX]",
     "total": "[XX-Total-XX]",
     "uncategorized": "[XX-Uncategorized-XX]",
-    "other": "[XX-Other-XX]"
+    "other": "[XX-Other-XX]",
+    "insideOther": "[XX-{count, plural, one {# category in Other} other {# categories in Other}}-XX]",
+    "topLevelOnly": "[XX-Top level categories-XX]",
+    "topLevelOnlyHint": "[XX-Count subcategories against their parent-XX]"
   },
   "incomeExpenses": {
     "title": "[XX-Income vs Expenses-XX]",
@@ -166,6 +183,8 @@
     "description": "[XX-Description-XX]",
     "descriptionPlaceholder": "[XX-Add an optional description-XX]",
     "rangeLabels": {
+      "1w": "[XX-1W-XX]",
+      "mtd": "[XX-MTD-XX]",
       "1m": "[XX-1M-XX]",
       "3m": "[XX-3M-XX]",
       "6m": "[XX-6M-XX]",
@@ -225,14 +244,19 @@
       "MUTUAL_FUND": "[XX-Mutual Funds-XX]",
       "BOND": "[XX-Bonds-XX]",
       "CASH": "[XX-Cash-XX]"
-    }
+    },
+    "viewType": "[XX-Security type-XX]",
+    "viewAssetClass": "[XX-Asset class-XX]",
+    "otherAssetClasses": "[XX-Other-XX]",
+    "emptyAssetClass": "[XX-No asset class breakdown available yet.-XX]"
   },
   "geographicAllocation": {
     "title": "[XX-Geographic Allocation-XX]",
     "empty": "[XX-No holdings to show.-XX]",
     "viewRegion": "[XX-Region-XX]",
     "viewExchange": "[XX-Exchange-XX]",
-    "viewCountry": "[XX-Country-XX]"
+    "viewCountry": "[XX-Country-XX]",
+    "listingBasisNote": "[XX-Grouped by where each holding is listed. Switch to Country to see inside funds.-XX]"
   },
   "recurringExpenses": {
     "title": "[XX-Top Recurring Expenses-XX]",

@@ -21,7 +21,6 @@
   "upcomingBills": {
     "title": "Nadchodzące rachunki i wpłaty",
     "empty": "Brak zaległych lub nadchodzących rachunków, wpłat czy przelewów w ich oknach przypomnień.",
-    "perReminderSettings": "Według ustawień przypomnień",
     "postTransaction": "Zaksięguj tę transakcję",
     "manual": "Ręczne",
     "manualTitle": "Wymaga ręcznego zaksięgowania",
@@ -38,7 +37,16 @@
       "transfer": "Przelew",
       "reminder": "Przypomnienie",
       "unknown": "Nieznany"
-    }
+    },
+    "scope": {
+      "dueSoon": "Wkrótce wymagalne",
+      "all": "Wszystkie nadchodzące"
+    },
+    "viewList": "Lista",
+    "viewCalendar": "Kalendarz",
+    "previousMonth": "Poprzedni miesiąc",
+    "nextMonth": "Następny miesiąc",
+    "emptyAll": "Brak zaplanowanych aktywnych rachunków, wpłat lub przelewów."
   },
   "gettingStarted": {
     "title": "Pierwsze kroki",
@@ -94,7 +102,13 @@
     "filter": {
       "all": "Wszystkie",
       "gainers": "Wzrosty",
-      "losers": "Spadki"
+      "losers": "Spadki",
+      "label": "Kierunek"
+    },
+    "metric": {
+      "label": "Sortuj według",
+      "amount": "Kwota",
+      "percent": "Procent"
     }
   },
   "favouriteSecurities": {
@@ -125,7 +139,10 @@
     "empty": "Brak danych o wydatkach dla tego okresu.",
     "total": "Suma",
     "uncategorized": "Bez kategorii",
-    "other": "Inne"
+    "other": "Inne",
+    "insideOther": "{count, plural, one {# kategoria w Inne} few {# kategorie w Inne} many {# kategorii w Inne} other {# kategorii w Inne}}",
+    "topLevelOnly": "Kategorie nadrzędne",
+    "topLevelOnlyHint": "Licz podkategorie w kategorii nadrzędnej"
   },
   "incomeExpenses": {
     "title": "Przychody a wydatki",
@@ -173,7 +190,9 @@
       "2y": "2Y",
       "5y": "5Y",
       "ytd": "YTD",
-      "all": "Wszystkie"
+      "all": "Wszystkie",
+      "1w": "1T",
+      "mtd": "MTD"
     }
   },
   "portfolioValue": {
@@ -225,14 +244,19 @@
       "MUTUAL_FUND": "Fundusze inwestycyjne",
       "BOND": "Obligacje",
       "CASH": "Gotówka"
-    }
+    },
+    "viewType": "Typ papieru",
+    "viewAssetClass": "Klasa aktywów",
+    "otherAssetClasses": "Inne",
+    "emptyAssetClass": "Brak dostępnego podziału na klasy aktywów."
   },
   "geographicAllocation": {
     "title": "Alokacja geograficzna",
     "empty": "Brak pozycji do wyświetlenia.",
     "viewRegion": "Region",
     "viewExchange": "Giełda",
-    "viewCountry": "Kraj"
+    "viewCountry": "Kraj",
+    "listingBasisNote": "Pogrupowane według giełdy notowania każdej pozycji. Przełącz na Kraj, aby zajrzeć do wnętrza funduszy."
   },
   "recurringExpenses": {
     "title": "Największe wydatki cykliczne",

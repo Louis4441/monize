@@ -127,6 +127,7 @@ export function IncomeBySourceWidget({ isLoading }: IncomeBySourceWidgetProps) {
   return (
     <WidgetCard
       title={t('incomeBySource.title')}
+      titleHref="/reports/income-by-source"
       widgetId={WIDGET_ID}
       headerRight={
         <span className="text-sm text-gray-500 dark:text-gray-400">

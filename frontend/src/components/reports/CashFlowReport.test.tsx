@@ -103,8 +103,8 @@ describe("CashFlowReport", () => {
 
   it("renders summary cards and chart with data", async () => {
     mockGetCashFlow.mockResolvedValue({
-      data: [{ month: "2024-07", income: 5000, expenses: 3000, net: 2000 }],
-      totals: { income: 5000, expenses: 3000, net: 2000 },
+      data: [{ period: "2024-07", periodStart: "2024-07-01", periodEnd: "2024-07-31", income: 5000, expenses: 3000, net: 2000 }],
+      totals: { income: 5000, expenses: 3000, net: 2000, knownIncome: 5000, knownExpenses: 3000, knownNet: 2000 },
     });
     mockGetIncomeBySource.mockResolvedValue({
       data: [{ categoryId: "c-1", categoryName: "Salary", total: 5000 }],
@@ -126,7 +126,7 @@ describe("CashFlowReport", () => {
   it("renders inflow and outflow breakdown tables", async () => {
     mockGetCashFlow.mockResolvedValue({
       data: [],
-      totals: { income: 5000, expenses: 3000, net: 2000 },
+      totals: { income: 5000, expenses: 3000, net: 2000, knownIncome: 5000, knownExpenses: 3000, knownNet: 2000 },
     });
     mockGetIncomeBySource.mockResolvedValue({
       data: [{ categoryId: "c-1", categoryName: "Salary", total: 5000 }],
@@ -147,8 +147,8 @@ describe("CashFlowReport", () => {
 
   it("renders negative cash flow with orange styling", async () => {
     mockGetCashFlow.mockResolvedValue({
-      data: [{ month: "2024-07", income: 2000, expenses: 3000, net: -1000 }],
-      totals: { income: 2000, expenses: 3000, net: -1000 },
+      data: [{ period: "2024-07", periodStart: "2024-07-01", periodEnd: "2024-07-31", income: 2000, expenses: 3000, net: -1000 }],
+      totals: { income: 2000, expenses: 3000, net: -1000, knownIncome: 2000, knownExpenses: 3000, knownNet: -1000 },
     });
     mockGetIncomeBySource.mockResolvedValue({ data: [], totalIncome: 0 });
     mockGetSpendingByCategory.mockResolvedValue({ data: [], totalSpending: 0 });
@@ -161,7 +161,7 @@ describe("CashFlowReport", () => {
   it("renders empty income and expense tables", async () => {
     mockGetCashFlow.mockResolvedValue({
       data: [],
-      totals: { income: 0, expenses: 0, net: 0 },
+      totals: { income: 0, expenses: 0, net: 0, knownIncome: 0, knownExpenses: 0, knownNet: 0 },
     });
     mockGetIncomeBySource.mockResolvedValue({ data: [], totalIncome: 0 });
     mockGetSpendingByCategory.mockResolvedValue({ data: [], totalSpending: 0 });
@@ -185,8 +185,8 @@ describe("CashFlowReport", () => {
 
   it("navigates to transactions page with date range on chart bar click", async () => {
     mockGetCashFlow.mockResolvedValue({
-      data: [{ month: "2024-07", income: 5000, expenses: 3000, net: 2000 }],
-      totals: { income: 5000, expenses: 3000, net: 2000 },
+      data: [{ period: "2024-07", periodStart: "2024-07-01", periodEnd: "2024-07-31", income: 5000, expenses: 3000, net: 2000 }],
+      totals: { income: 5000, expenses: 3000, net: 2000, knownIncome: 5000, knownExpenses: 3000, knownNet: 2000 },
     });
     mockGetIncomeBySource.mockResolvedValue({ data: [], totalIncome: 0 });
     mockGetSpendingByCategory.mockResolvedValue({ data: [], totalSpending: 0 });
@@ -203,7 +203,7 @@ describe("CashFlowReport", () => {
   it("navigates to transactions page with category and date range on category click", async () => {
     mockGetCashFlow.mockResolvedValue({
       data: [],
-      totals: { income: 5000, expenses: 3000, net: 2000 },
+      totals: { income: 5000, expenses: 3000, net: 2000, knownIncome: 5000, knownExpenses: 3000, knownNet: 2000 },
     });
     mockGetIncomeBySource.mockResolvedValue({
       data: [
@@ -240,7 +240,7 @@ describe("CashFlowReport", () => {
   it("navigates on outflow category click", async () => {
     mockGetCashFlow.mockResolvedValue({
       data: [],
-      totals: { income: 0, expenses: 2000, net: -2000 },
+      totals: { income: 0, expenses: 2000, net: -2000, knownIncome: 0, knownExpenses: 2000, knownNet: -2000 },
     });
     mockGetIncomeBySource.mockResolvedValue({ data: [], totalIncome: 0 });
     mockGetSpendingByCategory.mockResolvedValue({
@@ -266,8 +266,8 @@ describe("CashFlowReport", () => {
 
   it("does not navigate on chart click when activeLabel is undefined", async () => {
     mockGetCashFlow.mockResolvedValue({
-      data: [{ month: "2024-07", income: 5000, expenses: 3000, net: 2000 }],
-      totals: { income: 5000, expenses: 3000, net: 2000 },
+      data: [{ period: "2024-07", periodStart: "2024-07-01", periodEnd: "2024-07-31", income: 5000, expenses: 3000, net: 2000 }],
+      totals: { income: 5000, expenses: 3000, net: 2000, knownIncome: 5000, knownExpenses: 3000, knownNet: 2000 },
     });
     mockGetIncomeBySource.mockResolvedValue({ data: [], totalIncome: 0 });
     mockGetSpendingByCategory.mockResolvedValue({ data: [], totalSpending: 0 });
@@ -284,7 +284,7 @@ describe("CashFlowReport", () => {
   it("does not navigate when category click has null categoryId", async () => {
     mockGetCashFlow.mockResolvedValue({
       data: [],
-      totals: { income: 5000, expenses: 0, net: 5000 },
+      totals: { income: 5000, expenses: 0, net: 5000, knownIncome: 5000, knownExpenses: 0, knownNet: 5000 },
     });
     mockGetIncomeBySource.mockResolvedValue({
       data: [
@@ -309,7 +309,7 @@ describe("CashFlowReport", () => {
   it("renders positive net cash flow with blue styling", async () => {
     mockGetCashFlow.mockResolvedValue({
       data: [],
-      totals: { income: 5000, expenses: 3000, net: 2000 },
+      totals: { income: 5000, expenses: 3000, net: 2000, knownIncome: 5000, knownExpenses: 3000, knownNet: 2000 },
     });
     mockGetIncomeBySource.mockResolvedValue({ data: [], totalIncome: 0 });
     mockGetSpendingByCategory.mockResolvedValue({ data: [], totalSpending: 0 });
@@ -324,7 +324,7 @@ describe("CashFlowReport", () => {
   it("renders income items without categoryId (no cursor pointer class)", async () => {
     mockGetCashFlow.mockResolvedValue({
       data: [],
-      totals: { income: 1000, expenses: 0, net: 1000 },
+      totals: { income: 1000, expenses: 0, net: 1000, knownIncome: 1000, knownExpenses: 0, knownNet: 1000 },
     });
     mockGetIncomeBySource.mockResolvedValue({
       data: [{ categoryId: null, categoryName: "Other Income", total: 1000 }],
@@ -340,7 +340,7 @@ describe("CashFlowReport", () => {
   it("renders expense items without categoryId (no cursor pointer class)", async () => {
     mockGetCashFlow.mockResolvedValue({
       data: [],
-      totals: { income: 0, expenses: 500, net: -500 },
+      totals: { income: 0, expenses: 500, net: -500, knownIncome: 0, knownExpenses: 500, knownNet: -500 },
     });
     mockGetIncomeBySource.mockResolvedValue({ data: [], totalIncome: 0 });
     mockGetSpendingByCategory.mockResolvedValue({

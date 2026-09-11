@@ -21,7 +21,6 @@
   "upcomingBills": {
     "title": "Hóa đơn & Tiền gửi sắp tới",
     "empty": "Không có hóa đơn, tiền gửi hay chuyển khoản nào quá hạn hoặc sắp tới trong khung nhắc nhở.",
-    "perReminderSettings": "Theo cài đặt nhắc nhở",
     "postTransaction": "Đăng giao dịch này",
     "manual": "Thủ công",
     "manualTitle": "Yêu cầu đăng thủ công",
@@ -38,7 +37,16 @@
       "transfer": "Chuyển khoản",
       "reminder": "Nhắc nhở",
       "unknown": "Không rõ"
-    }
+    },
+    "scope": {
+      "dueSoon": "Sắp đến hạn",
+      "all": "Tất cả sắp tới"
+    },
+    "viewList": "Danh sách",
+    "viewCalendar": "Lịch",
+    "previousMonth": "Tháng trước",
+    "nextMonth": "Tháng sau",
+    "emptyAll": "Không có hóa đơn, khoản nạp hoặc chuyển khoản đang hoạt động nào được lên lịch."
   },
   "gettingStarted": {
     "title": "Bắt đầu",
@@ -94,7 +102,13 @@
     "filter": {
       "all": "Tất cả",
       "gainers": "Tăng",
-      "losers": "Giảm"
+      "losers": "Giảm",
+      "label": "Hướng"
+    },
+    "metric": {
+      "label": "Xếp hạng theo",
+      "amount": "Số tiền",
+      "percent": "Phần trăm"
     }
   },
   "favouriteSecurities": {
@@ -125,7 +139,10 @@
     "empty": "Không có dữ liệu chi tiêu trong kỳ này.",
     "total": "Tổng cộng",
     "uncategorized": "Chưa phân loại",
-    "other": "Khác"
+    "other": "Khác",
+    "insideOther": "{count, plural, other {# danh mục trong Khác}}",
+    "topLevelOnly": "Danh mục cấp cao nhất",
+    "topLevelOnlyHint": "Tính danh mục con vào danh mục cha"
   },
   "incomeExpenses": {
     "title": "Thu nhập và Chi tiêu",
@@ -173,7 +190,9 @@
       "2y": "2Y",
       "5y": "5Y",
       "ytd": "YTD",
-      "all": "Tất cả"
+      "all": "Tất cả",
+      "1w": "1T",
+      "mtd": "MTD"
     }
   },
   "portfolioValue": {
@@ -225,14 +244,19 @@
       "MUTUAL_FUND": "Quỹ tương hỗ",
       "BOND": "Trái phiếu",
       "CASH": "Tiền mặt"
-    }
+    },
+    "viewType": "Loại chứng khoán",
+    "viewAssetClass": "Loại tài sản",
+    "otherAssetClasses": "Khác",
+    "emptyAssetClass": "Chưa có phân tích theo loại tài sản."
   },
   "geographicAllocation": {
     "title": "Phân bổ theo địa lý",
     "empty": "Không có vị thế để hiển thị.",
     "viewRegion": "Khu vực",
     "viewExchange": "Sàn giao dịch",
-    "viewCountry": "Quốc gia"
+    "viewCountry": "Quốc gia",
+    "listingBasisNote": "Nhóm theo nơi niêm yết của từng khoản nắm giữ. Chuyển sang Quốc gia để xem bên trong các quỹ."
   },
   "recurringExpenses": {
     "title": "Chi phí định kỳ hàng đầu",

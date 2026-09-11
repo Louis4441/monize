@@ -47,7 +47,7 @@ export function InsightsWidget({ isLoading: parentLoading }: InsightsWidgetProps
   if (isLoading || parentLoading) {
     return (
       <div className={`${CARD_CLASS} p-3 sm:p-6 lg:min-h-[390px]`}>
-        <WidgetHeading id="insights" onClick={() => router.push('/insights')} className="mb-4">
+        <WidgetHeading id="insights" href="/insights" className="mb-4">
           {sectionTitle}
         </WidgetHeading>
         <div className="animate-pulse space-y-3">
@@ -62,7 +62,7 @@ export function InsightsWidget({ isLoading: parentLoading }: InsightsWidgetProps
   if (insights.length === 0) {
     return (
       <div className={`${CARD_CLASS} p-3 sm:p-6 lg:min-h-[390px]`}>
-        <WidgetHeading id="insights" onClick={() => router.push('/insights')} className="mb-4">
+        <WidgetHeading id="insights" href="/insights" className="mb-4">
           {sectionTitle}
         </WidgetHeading>
         <p className="text-gray-500 dark:text-gray-400 text-sm">
@@ -81,7 +81,7 @@ export function InsightsWidget({ isLoading: parentLoading }: InsightsWidgetProps
   return (
     <div className={`${CARD_CLASS} p-3 sm:p-6 lg:min-h-[390px]`}>
       <div className="flex items-center justify-between mb-4">
-        <WidgetHeading id="insights" onClick={() => router.push('/insights')}>
+        <WidgetHeading id="insights" href="/insights">
           {sectionTitle}
         </WidgetHeading>
         <span className="text-sm text-gray-500 dark:text-gray-400">

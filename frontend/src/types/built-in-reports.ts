@@ -2,12 +2,39 @@ export interface CategorySpendingItem {
   categoryId: string | null;
   categoryName: string;
   color: string | null;
+  /**
+   * Spending in this category, in the response's `currency`. Rows that could
+   * not be converted are in none of the figures, so when `missingCurrencies` is
+   * non-empty this is the part that converted.
+   */
   total: number;
 }
 
 export interface SpendingByCategoryResponse {
+  /** Every net-spent category, largest first. The caller decides how many to draw. */
   data: CategorySpendingItem[];
-  totalSpending: number;
+  /**
+   * Total spent, or `null` when a row could not be converted -- a missing rate
+   * makes the total unknowable, never smaller. Render `knownSpending` through
+   * `PartialTotal` in that case, never this under a caption saying "Total".
+   */
+  totalSpending: number | null;
+  /** Sum of `data`; equals `totalSpending` when nothing was excluded. */
+  knownSpending: number;
+  /** Reporting currency every figure is expressed in. */
+  currency: string;
+  /** Source currencies with no rate into `currency`. Empty when complete. */
+  missingCurrencies: string[];
+  /** How many aggregate rows were left out, by any cause. */
+  excludedCount: number;
+}
+
+/** Query parameters the Spending by Category report accepts beyond the window. */
+export interface SpendingByCategoryParams extends ReportQueryParams {
+  /** Restrict to these accounts; omit or leave empty for every account. */
+  accountIds?: string[];
+  /** Count a subcategory against its top-level ancestor. Defaults to true. */
+  rollupToParent?: boolean;
 }
 
 export interface PayeeSpendingItem {
@@ -57,15 +84,59 @@ export interface MonthlyIncomeExpenseItem {
   net: number;
 }
 
-export interface IncomeExpenseTotals {
+/** One bar of Income vs Expenses: a month or a week, with the dates it covers. */
+export interface IncomeExpensePeriodItem {
+  /** `YYYY-MM` for a month bucket, the week's first day for a week bucket. */
+  period: string;
+  /** First day the bar covers, inclusive. */
+  periodStart: string;
+  /** Last day the bar covers, inclusive. A drill-down uses the pair as-is. */
+  periodEnd: string;
+  /**
+   * Money in over the period, in the response's `currency`. Rows that could not
+   * be converted are in none of the figures, so when `missingCurrencies` is
+   * non-empty this is the part that converted.
+   */
   income: number;
   expenses: number;
   net: number;
 }
 
+export interface IncomeExpenseTotals {
+  /**
+   * Total over the window, or `null` when a row could not be converted -- a
+   * missing rate makes the total unknowable, never smaller. Render the `known*`
+   * figure through `PartialTotal` in that case.
+   */
+  income: number | null;
+  expenses: number | null;
+  net: number | null;
+  /** The part that did convert; equals the field above when nothing was excluded. */
+  knownIncome: number;
+  knownExpenses: number;
+  knownNet: number;
+}
+
 export interface IncomeVsExpensesResponse {
-  data: MonthlyIncomeExpenseItem[];
+  /** Every bucket in the window, in order, including the empty ones. */
+  data: IncomeExpensePeriodItem[];
   totals: IncomeExpenseTotals;
+  /** Reporting currency every figure is expressed in. */
+  currency: string;
+  /** Source currencies with no rate into `currency`. Empty when complete. */
+  missingCurrencies: string[];
+  /** How many aggregate rows were left out, by any cause. */
+  excludedCount: number;
+}
+
+/** Query parameters Income vs Expenses accepts beyond the window. */
+export interface IncomeVsExpensesParams extends ReportQueryParams {
+  /** Restrict to these accounts; omit or leave empty for every account. */
+  accountIds?: string[];
+  /** Width of one bar. Defaults to month. */
+  bucket?: 'month' | 'week';
+  /** Day a week bucket starts on, 0 = Sunday through 6 = Saturday. */
+  weekStartsOn?: number;
 }
 
 export interface ReportQueryParams {

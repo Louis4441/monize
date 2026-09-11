@@ -364,215 +364,264 @@ describe("IncomeReportsService", () => {
   // getIncomeVsExpenses
   // ---------------------------------------------------------------------------
   describe("getIncomeVsExpenses", () => {
-    it("returns empty data when no transactions exist", async () => {
+    const row = (
+      periodStart: string,
+      income: string,
+      expenses: string,
+      currency = "USD",
+    ) => ({
+      period_start: periodStart,
+      currency_code: currency,
+      income,
+      expenses,
+    });
+
+    it("returns a bar per month in the window when nothing happened", async () => {
+      // A month with no rows earned and spent zero. That is a bar of height
+      // zero, not a gap the chart closes up, so the window is enumerated and
+      // the query's rows are placed into it.
       scopedManager.query.mockResolvedValue([]);
 
       const result = await service.getIncomeVsExpenses(
         mockUserId,
         "2025-01-01",
-        "2025-12-31",
+        "2025-03-31",
       );
 
-      expect(result.data).toEqual([]);
-      expect(result.totals).toEqual({ income: 0, expenses: 0, net: 0 });
+      expect(result.data.map((d) => d.period)).toEqual([
+        "2025-01",
+        "2025-02",
+        "2025-03",
+      ]);
+      expect(result.data.every((d) => d.income === 0 && d.expenses === 0)).toBe(
+        true,
+      );
+      expect(result.totals).toMatchObject({ income: 0, expenses: 0, net: 0 });
     });
 
-    it("calculates monthly income, expenses, and net correctly", async () => {
+    it("calculates income, expenses and net per bucket", async () => {
       scopedManager.query.mockResolvedValue([
-        {
-          month: "2025-01",
-          currency_code: "USD",
-          income: "5000.00",
-          expenses: "3000.00",
-        },
-        {
-          month: "2025-02",
-          currency_code: "USD",
-          income: "5000.00",
-          expenses: "3500.00",
-        },
+        row("2025-01-01", "5000.00", "3000.00"),
+        row("2025-02-01", "5000.00", "3500.00"),
       ]);
 
       const result = await service.getIncomeVsExpenses(
         mockUserId,
         "2025-01-01",
-        "2025-12-31",
+        "2025-02-28",
       );
 
       expect(result.data).toHaveLength(2);
-      expect(result.data[0].month).toBe("2025-01");
-      expect(result.data[0].income).toBe(5000);
-      expect(result.data[0].expenses).toBe(3000);
-      expect(result.data[0].net).toBe(2000);
-
-      expect(result.totals.income).toBe(10000);
-      expect(result.totals.expenses).toBe(6500);
-      expect(result.totals.net).toBe(3500);
+      expect(result.data[0]).toMatchObject({
+        period: "2025-01",
+        periodStart: "2025-01-01",
+        periodEnd: "2025-01-31",
+        income: 5000,
+        expenses: 3000,
+        net: 2000,
+      });
+      expect(result.totals).toMatchObject({
+        income: 10000,
+        expenses: 6500,
+        net: 3500,
+        knownIncome: 10000,
+      });
+      expect(result.currency).toBe("USD");
+      expect(result.missingCurrencies).toEqual([]);
     });
 
-    it("merges multiple currency rows for the same month", async () => {
+    it("carries the dates a bar covers, so a drill-down needs no arithmetic", async () => {
+      scopedManager.query.mockResolvedValue([]);
+
+      const result = await service.getIncomeVsExpenses(
+        mockUserId,
+        "2025-02-01",
+        "2025-02-28",
+      );
+
+      expect(result.data[0].periodStart).toBe("2025-02-01");
+      expect(result.data[0].periodEnd).toBe("2025-02-28");
+    });
+
+    it("merges multiple currency rows for the same bucket", async () => {
+      // EUR->USD is 1.1 in the fixture rates.
       scopedManager.query.mockResolvedValue([
-        {
-          month: "2025-01",
-          currency_code: "USD",
-          income: "3000.00",
-          expenses: "1000.00",
-        },
-        {
-          month: "2025-01",
-          currency_code: "EUR",
-          income: "1000.00",
-          expenses: "500.00",
-        },
+        row("2025-01-01", "1000.00", "500.00"),
+        row("2025-01-01", "1000.00", "500.00", "EUR"),
       ]);
 
       const result = await service.getIncomeVsExpenses(
         mockUserId,
         "2025-01-01",
-        "2025-12-31",
+        "2025-01-31",
       );
 
       expect(result.data).toHaveLength(1);
-      // USD: 3000 income, 1000 expenses
-      // EUR: 1000 * 1.1 = 1100 income, 500 * 1.1 = 550 expenses
-      expect(result.data[0].income).toBe(4100);
-      expect(result.data[0].expenses).toBe(1550);
-      expect(result.data[0].net).toBe(2550);
+      expect(result.data[0].income).toBe(2100);
+      expect(result.data[0].expenses).toBe(1050);
     });
 
-    it("sorts months in ascending order", async () => {
+    it("withholds the totals and names the currency when a rate is missing", async () => {
+      // JPY has no rate in the fixture. The report used to add raw yen to a
+      // dollar bar, which is a wrong number rather than a missing one.
       scopedManager.query.mockResolvedValue([
-        {
-          month: "2025-03",
-          currency_code: "USD",
-          income: "100.00",
-          expenses: "50.00",
-        },
-        {
-          month: "2025-01",
-          currency_code: "USD",
-          income: "200.00",
-          expenses: "100.00",
-        },
-        {
-          month: "2025-02",
-          currency_code: "USD",
-          income: "150.00",
-          expenses: "75.00",
-        },
+        row("2025-01-01", "1000.00", "500.00"),
+        row("2025-01-01", "300000.00", "100000.00", "JPY"),
       ]);
 
       const result = await service.getIncomeVsExpenses(
         mockUserId,
         "2025-01-01",
-        "2025-12-31",
+        "2025-01-31",
       );
 
-      expect(result.data[0].month).toBe("2025-01");
-      expect(result.data[1].month).toBe("2025-02");
-      expect(result.data[2].month).toBe("2025-03");
+      expect(result.totals.income).toBeNull();
+      expect(result.totals.expenses).toBeNull();
+      expect(result.totals.net).toBeNull();
+      expect(result.totals.knownIncome).toBe(1000);
+      expect(result.totals.knownExpenses).toBe(500);
+      expect(result.totals.knownNet).toBe(500);
+      expect(result.data[0].income).toBe(1000);
+      expect(result.missingCurrencies).toEqual(["JPY"]);
+      expect(result.excludedCount).toBe(1);
     });
 
     it("handles negative net (expenses exceed income)", async () => {
       scopedManager.query.mockResolvedValue([
-        {
-          month: "2025-01",
-          currency_code: "USD",
-          income: "2000.00",
-          expenses: "5000.00",
-        },
+        row("2025-01-01", "1000.00", "1500.00"),
       ]);
 
       const result = await service.getIncomeVsExpenses(
         mockUserId,
         "2025-01-01",
-        "2025-12-31",
+        "2025-01-31",
       );
 
-      expect(result.data[0].net).toBe(-3000);
-      expect(result.totals.net).toBe(-3000);
-    });
-
-    it("rounds all monetary values to 2 decimal places", async () => {
-      scopedManager.query.mockResolvedValue([
-        {
-          month: "2025-01",
-          currency_code: "USD",
-          income: "100.555",
-          expenses: "50.444",
-        },
-      ]);
-
-      const result = await service.getIncomeVsExpenses(
-        mockUserId,
-        "2025-01-01",
-        "2025-12-31",
-      );
-
-      expect(result.data[0].income).toBe(100.555);
-      expect(result.data[0].expenses).toBe(50.444);
-    });
-
-    it("passes startDate parameter when provided", async () => {
-      scopedManager.query.mockResolvedValue([]);
-
-      await service.getIncomeVsExpenses(mockUserId, "2025-06-01", "2025-12-31");
-
-      const queryCall = scopedManager.query.mock.calls[0];
-      expect(queryCall[1]).toEqual([mockUserId, "2025-12-31", "2025-06-01"]);
-    });
-
-    it("omits startDate filter when undefined", async () => {
-      scopedManager.query.mockResolvedValue([]);
-
-      await service.getIncomeVsExpenses(mockUserId, undefined, "2025-12-31");
-
-      const queryCall = scopedManager.query.mock.calls[0];
-      expect(queryCall[1]).toEqual([mockUserId, "2025-12-31"]);
-    });
-
-    it("uses categories JOIN with is_income in the SQL query", async () => {
-      scopedManager.query.mockResolvedValue([]);
-
-      await service.getIncomeVsExpenses(mockUserId, "2025-01-01", "2025-12-31");
-
-      const sql = scopedManager.query.mock.calls[0][0];
-      expect(sql).toContain("LEFT JOIN categories c");
-      expect(sql).toContain("c.is_income");
-    });
-
-    it("filters out the asset value change category in the SQL query", async () => {
-      scopedManager.query.mockResolvedValue([]);
-
-      await service.getIncomeVsExpenses(mockUserId, "2025-01-01", "2025-12-31");
-
-      const sql = scopedManager.query.mock.calls[0][0];
-      expect(sql).toContain("NOT EXISTS");
-      expect(sql).toContain("asset_category_id");
-      expect(sql).toMatch(
-        /ax\.asset_category_id\s*=\s*COALESCE\(ts\.category_id,\s*t\.category_id\)/,
-      );
-    });
-
-    it("handles month with zero income correctly", async () => {
-      scopedManager.query.mockResolvedValue([
-        {
-          month: "2025-01",
-          currency_code: "USD",
-          income: "0",
-          expenses: "500.00",
-        },
-      ]);
-
-      const result = await service.getIncomeVsExpenses(
-        mockUserId,
-        "2025-01-01",
-        "2025-12-31",
-      );
-
-      expect(result.data[0].income).toBe(0);
-      expect(result.data[0].expenses).toBe(500);
       expect(result.data[0].net).toBe(-500);
+      expect(result.totals.net).toBe(-500);
+    });
+
+    it("rounds every monetary value to money precision", async () => {
+      // Money is decimal(20,4), so `roundMoney` keeps four places, not two.
+      scopedManager.query.mockResolvedValue([
+        row("2025-01-01", "1000.55555", "500.44444"),
+      ]);
+
+      const result = await service.getIncomeVsExpenses(
+        mockUserId,
+        "2025-01-01",
+        "2025-01-31",
+      );
+
+      expect(result.data[0].income).toBe(1000.5556);
+      expect(result.data[0].expenses).toBe(500.4444);
+    });
+
+    it("passes startDate as a parameter when provided", async () => {
+      scopedManager.query.mockResolvedValue([]);
+
+      await service.getIncomeVsExpenses(mockUserId, "2025-06-01", "2025-06-30");
+
+      const [sql, params] = scopedManager.query.mock.calls[0];
+      expect(sql).toContain("t.transaction_date >= $3");
+      expect(params[2]).toBe("2025-06-01");
+    });
+
+    it("omits the startDate filter when it is undefined", async () => {
+      scopedManager.query.mockResolvedValue([
+        row("2025-01-01", "100.00", "0.00"),
+      ]);
+
+      const result = await service.getIncomeVsExpenses(
+        mockUserId,
+        undefined,
+        "2025-12-31",
+      );
+
+      const [sql] = scopedManager.query.mock.calls[0];
+      expect(sql).not.toContain("transaction_date >=");
+      // With no window there is nothing to enumerate, so the answer is the
+      // buckets that actually had rows.
+      expect(result.data.map((d) => d.period)).toEqual(["2025-01"]);
+    });
+
+    it("restricts the window to the requested accounts", async () => {
+      scopedManager.query.mockResolvedValue([]);
+
+      await service.getIncomeVsExpenses(
+        mockUserId,
+        "2025-01-01",
+        "2025-01-31",
+        {
+          accountIds: ["acct-1", "acct-2"],
+        },
+      );
+
+      const [sql, params] = scopedManager.query.mock.calls[0];
+      expect(sql).toContain("t.account_id = ANY($4::uuid[])");
+      expect(params[3]).toEqual(["acct-1", "acct-2"]);
+    });
+
+    it("adds no account filter for an empty selection", async () => {
+      scopedManager.query.mockResolvedValue([]);
+
+      await service.getIncomeVsExpenses(
+        mockUserId,
+        "2025-01-01",
+        "2025-01-31",
+        {
+          accountIds: [],
+        },
+      );
+
+      expect(scopedManager.query.mock.calls[0][0]).not.toContain(
+        "account_id = ANY",
+      );
+    });
+
+    it("buckets by week when asked, honouring the user's first day", async () => {
+      // 2025-01-06 is a Monday. Asking for weeks starting Sunday shifts the
+      // grouping, and the enumeration has to agree with it.
+      scopedManager.query.mockResolvedValue([
+        row("2025-01-05", "700.00", "200.00"),
+      ]);
+
+      const result = await service.getIncomeVsExpenses(
+        mockUserId,
+        "2025-01-05",
+        "2025-01-18",
+        { bucket: "week", weekStartsOn: 0 },
+      );
+
+      expect(result.data.map((d) => d.period)).toEqual([
+        "2025-01-05",
+        "2025-01-12",
+      ]);
+      expect(result.data[0]).toMatchObject({
+        periodStart: "2025-01-05",
+        periodEnd: "2025-01-11",
+        income: 700,
+      });
+      // Sunday start: the offset that lands it on a Monday before truncation.
+      const [sql, params] = scopedManager.query.mock.calls[0];
+      expect(sql).toContain("date_trunc('week'");
+      expect(params[2]).toBe(1);
+      expect(sql).toContain("make_interval(days => $3::int)");
+    });
+
+    it("groups by month with no week shifting when the bucket is a month", async () => {
+      scopedManager.query.mockResolvedValue([]);
+
+      await service.getIncomeVsExpenses(mockUserId, "2025-01-01", "2025-01-31");
+
+      const [sql, params] = scopedManager.query.mock.calls[0];
+      expect(sql).toContain("date_trunc('month'");
+      expect(sql).not.toContain("date_trunc('week'");
+      // The week offset is not bound at all: PostgreSQL infers a parameter's
+      // type from where it appears, so an unused one is a query that will not
+      // even plan ("could not determine data type of parameter $3").
+      expect(params).toEqual([mockUserId, "2025-01-31", "2025-01-01"]);
+      expect(sql).not.toContain("make_interval");
     });
   });
 });

@@ -97,7 +97,7 @@ export function FavouriteReportsWidget({ isLoading: parentLoading }: FavouriteRe
   }, [favouriteReportIds, managedFavourites]);
 
   const sectionTitle = (
-    <WidgetHeading id="favourite-reports" onClick={() => router.push('/reports')} className="mb-4">
+    <WidgetHeading id="favourite-reports" href="/reports" className="mb-4">
       {t('favouriteReports.title')}
     </WidgetHeading>
   );

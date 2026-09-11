@@ -18,13 +18,19 @@ describe('widget-meta', () => {
     expect(puck.querySelector('svg')).toBeTruthy();
   });
 
-  it('renders the heading as a button when clickable and a heading otherwise', () => {
+  it('links the heading to the fuller view when given one, and not otherwise', () => {
     const { getByRole, rerender, queryByRole } = render(
-      <WidgetHeading id="net-worth" onClick={() => {}}>Net Worth</WidgetHeading>,
+      <WidgetHeading id="net-worth" href="/reports/net-worth">Net Worth</WidgetHeading>,
     );
-    expect(getByRole('button', { name: 'Net Worth' })).toBeInTheDocument();
+    // The heading stays a heading either way: the link sits inside it, so the
+    // document outline does not change when a widget gains a destination.
+    expect(getByRole('heading', { name: 'Net Worth' })).toBeInTheDocument();
+    expect(getByRole('link', { name: 'Net Worth' })).toHaveAttribute(
+      'href',
+      '/reports/net-worth',
+    );
     rerender(<WidgetHeading id="net-worth">Net Worth</WidgetHeading>);
-    expect(queryByRole('button')).toBeNull();
+    expect(queryByRole('link')).toBeNull();
     expect(getByRole('heading', { name: 'Net Worth' })).toBeInTheDocument();
   });
 });

@@ -21,7 +21,6 @@
   "upcomingBills": {
     "title": "예정된 청구서 및 입금",
     "empty": "연체되거나 예정된 청구서, 입금 또는 이체가 알림 기간 내에 없습니다.",
-    "perReminderSettings": "알림 설정에 따름",
     "postTransaction": "이 거래 등록",
     "manual": "수동",
     "manualTitle": "수동 등록 필요",
@@ -38,7 +37,16 @@
       "transfer": "이체",
       "reminder": "알림",
       "unknown": "알 수 없음"
-    }
+    },
+    "scope": {
+      "dueSoon": "곧 만기",
+      "all": "예정 전체"
+    },
+    "viewList": "목록",
+    "viewCalendar": "달력",
+    "previousMonth": "이전 달",
+    "nextMonth": "다음 달",
+    "emptyAll": "예약된 활성 청구, 입금 또는 이체가 없습니다."
   },
   "gettingStarted": {
     "title": "시작하기",
@@ -94,7 +102,13 @@
     "filter": {
       "all": "전체",
       "gainers": "상승 종목",
-      "losers": "하락 종목"
+      "losers": "하락 종목",
+      "label": "방향"
+    },
+    "metric": {
+      "label": "정렬 기준",
+      "amount": "금액",
+      "percent": "비율"
     }
   },
   "favouriteSecurities": {
@@ -125,7 +139,10 @@
     "empty": "해당 기간의 지출 데이터가 없습니다.",
     "total": "합계",
     "uncategorized": "미분류",
-    "other": "기타"
+    "other": "기타",
+    "insideOther": "{count, plural, other {기타에 # 카테고리}}",
+    "topLevelOnly": "최상위 카테고리",
+    "topLevelOnlyHint": "하위 카테고리를 상위 카테고리에 합산합니다"
   },
   "incomeExpenses": {
     "title": "수입 대 지출",
@@ -173,7 +190,9 @@
       "2y": "2Y",
       "5y": "5Y",
       "ytd": "YTD",
-      "all": "전체"
+      "all": "전체",
+      "1w": "1주",
+      "mtd": "월초 이후"
     }
   },
   "portfolioValue": {
@@ -225,14 +244,19 @@
       "MUTUAL_FUND": "뮤추얼 펀드",
       "BOND": "채권",
       "CASH": "현금"
-    }
+    },
+    "viewType": "증권 유형",
+    "viewAssetClass": "자산군",
+    "otherAssetClasses": "기타",
+    "emptyAssetClass": "아직 자산군 분석을 사용할 수 없습니다."
   },
   "geographicAllocation": {
     "title": "지역별 배분",
     "empty": "표시할 보유 항목이 없습니다.",
     "viewRegion": "지역",
     "viewExchange": "거래소",
-    "viewCountry": "국가"
+    "viewCountry": "국가",
+    "listingBasisNote": "각 보유 종목이 상장된 시장 기준입니다. 펀드 내부를 보려면 국가로 전환하세요."
   },
   "recurringExpenses": {
     "title": "주요 반복 지출",

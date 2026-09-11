@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@/test/render';
 import { SpendingByCategoryReport } from './SpendingByCategoryReport';
+import type { SpendingByCategoryResponse } from '@/types/built-in-reports';
 
 /**
  * The phone layout of the Spending by Category data table.
@@ -106,7 +107,7 @@ const DATA = [
 ];
 
 async function renderReport() {
-  mockGetSpendingByCategory.mockResolvedValue({ data: DATA, totalSpending: 1000 });
+  mockGetSpendingByCategory.mockResolvedValue(completeReport(DATA, 1000));
   let container!: HTMLElement;
   await act(async () => {
     ({ container } = render(<SpendingByCategoryReport />));
@@ -132,6 +133,24 @@ const placement = (cell: Element) => {
   const line = /\brow-start-(\d)\b/.exec(cell.className)?.[1];
   return `c${col}/r${line}`;
 };
+
+/**
+ * A report answer with nothing left out: `knownSpending` equals the total and
+ * no currency was dropped, so every figure is complete.
+ */
+function completeReport(
+  data: SpendingByCategoryResponse['data'],
+  totalSpending: number,
+): SpendingByCategoryResponse {
+  return {
+    data,
+    totalSpending,
+    knownSpending: totalSpending,
+    currency: 'CAD',
+    missingCurrencies: [],
+    excludedCount: 0,
+  };
+}
 
 describe('SpendingByCategoryReport (phone wrapped table)', () => {
   beforeEach(() => {

@@ -138,10 +138,12 @@ describe('FavouriteSecurities', () => {
     expect(screen.queryByTitle('Refresh prices')).not.toBeInTheDocument();
   });
 
-  it('navigates to securities from the title and footer link', () => {
+  it('reaches securities from the title link and the footer button', () => {
     render(<FavouriteSecurities securities={[quote()]} isLoading={false} />);
-    fireEvent.click(screen.getByText('Favourite Securities'));
-    expect(mockPush).toHaveBeenCalledWith('/securities');
+    expect(screen.getByRole('link', { name: 'Favourite Securities' })).toHaveAttribute(
+      'href',
+      '/securities',
+    );
     fireEvent.click(screen.getByText('Manage securities'));
     expect(mockPush).toHaveBeenCalledWith('/securities');
   });

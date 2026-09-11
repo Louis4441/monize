@@ -21,7 +21,6 @@
   "upcomingBills": {
     "title": "Tagihan & Setoran Mendatang",
     "empty": "Tidak ada tagihan, setoran, atau transfer yang lewat jatuh tempo atau mendatang dalam jendela pengingat mereka.",
-    "perReminderSettings": "Per pengaturan pengingat",
     "postTransaction": "Posting transaksi ini",
     "manual": "Manual",
     "manualTitle": "Membutuhkan posting manual",
@@ -38,7 +37,16 @@
       "transfer": "Transfer",
       "reminder": "Pengingat",
       "unknown": "Tidak diketahui"
-    }
+    },
+    "scope": {
+      "dueSoon": "Segera jatuh tempo",
+      "all": "Semua mendatang"
+    },
+    "viewList": "Daftar",
+    "viewCalendar": "Kalender",
+    "previousMonth": "Bulan sebelumnya",
+    "nextMonth": "Bulan berikutnya",
+    "emptyAll": "Tidak ada tagihan, setoran, atau transfer aktif yang dijadwalkan."
   },
   "gettingStarted": {
     "title": "Memulai",
@@ -94,7 +102,13 @@
     "filter": {
       "all": "Semua",
       "gainers": "Naik",
-      "losers": "Turun"
+      "losers": "Turun",
+      "label": "Arah"
+    },
+    "metric": {
+      "label": "Urutkan menurut",
+      "amount": "Jumlah",
+      "percent": "Persen"
     }
   },
   "favouriteSecurities": {
@@ -125,7 +139,10 @@
     "empty": "Tidak ada data pengeluaran untuk periode ini.",
     "total": "Total",
     "uncategorized": "Tidak berkategori",
-    "other": "Lainnya"
+    "other": "Lainnya",
+    "insideOther": "{count, plural, other {# kategori dalam Lainnya}}",
+    "topLevelOnly": "Kategori tingkat atas",
+    "topLevelOnlyHint": "Hitung subkategori pada induknya"
   },
   "incomeExpenses": {
     "title": "Pendapatan vs Pengeluaran",
@@ -173,7 +190,9 @@
       "2y": "2Y",
       "5y": "5Y",
       "ytd": "YTD",
-      "all": "Semua"
+      "all": "Semua",
+      "1w": "1M",
+      "mtd": "MTD"
     }
   },
   "portfolioValue": {
@@ -225,14 +244,19 @@
       "MUTUAL_FUND": "Reksadana",
       "BOND": "Obligasi",
       "CASH": "Tunai"
-    }
+    },
+    "viewType": "Jenis efek",
+    "viewAssetClass": "Kelas aset",
+    "otherAssetClasses": "Lainnya",
+    "emptyAssetClass": "Belum ada rincian kelas aset yang tersedia."
   },
   "geographicAllocation": {
     "title": "Alokasi Geografis",
     "empty": "Tidak ada kepemilikan untuk ditampilkan.",
     "viewRegion": "Wilayah",
     "viewExchange": "Bursa",
-    "viewCountry": "Negara"
+    "viewCountry": "Negara",
+    "listingBasisNote": "Dikelompokkan menurut bursa tempat setiap kepemilikan tercatat. Beralih ke Negara untuk melihat isi dana."
   },
   "recurringExpenses": {
     "title": "Pengeluaran Berulang Teratas",

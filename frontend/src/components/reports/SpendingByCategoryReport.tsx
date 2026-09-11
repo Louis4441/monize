@@ -19,6 +19,7 @@ import {
 import { builtInReportsApi } from '@/lib/built-in-reports';
 import { CategorySpendingItem } from '@/types/built-in-reports';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useDateRange } from '@/hooks/useDateRange';
 import { useReportData } from '@/hooks/useReportData';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
@@ -28,6 +29,8 @@ import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
 import { DonutCenterTotal } from '@/components/ui/DonutCenterTotal';
 import { ChartLegend } from '@/components/ui/ChartLegend';
+import { PartialTotal } from '@/components/ui/PartialTotal';
+import type { ConvertedTotal } from '@/lib/currency-total';
 import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
@@ -107,6 +110,7 @@ export function SpendingByCategoryReport() {
   const router = useRouter();
   const chartRef = useRef<HTMLDivElement>(null);
   const { formatCurrencyCompact: formatCurrency, formatPercent } = useNumberFormat();
+  const { defaultCurrency } = useExchangeRates();
   const [viewType, setViewType] = useState<'pie' | 'bar' | 'table'>('pie');
   const { dateRange, setDateRange, startDate, setStartDate, endDate, setEndDate, resolvedRange, isValid } =
     useDateRange({ defaultRange: '3m' });
@@ -146,7 +150,21 @@ export function SpendingByCategoryReport() {
     });
   }, [response]);
 
-  const totalExpenses = response?.totalSpending ?? 0;
+  // The server withholds `totalSpending` when a row could not be converted, so
+  // what is shown is the part that did convert, marked as a subtotal. It is also
+  // the denominator: percentages are shares of what is on screen, and dividing
+  // by a total that includes rows no slice represents would leave them summing
+  // to less than 100% with nothing saying why.
+  const spendingTotal: ConvertedTotal = useMemo(
+    () => ({
+      value: response?.knownSpending ?? 0,
+      missingCurrencies: response?.missingCurrencies ?? [],
+      excludedCount: response?.excludedCount ?? 0,
+    }),
+    [response],
+  );
+  const totalExpenses = spendingTotal.value;
+  const reportingCurrency = response?.currency ?? defaultCurrency;
 
   const sortedTableData = useMemo(() => {
     const sorted = [...chartData];
@@ -413,7 +431,9 @@ export function SpendingByCategoryReport() {
                     </td>
                     <td role="cell" className={`${CELL_PLACEMENT.value} font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                       <CellLabel className={CAPTION_CLASS}>{columns.value.label}</CellLabel>
-                      {formatCurrency(totalExpenses)}
+                      <PartialTotal total={spendingTotal} displayCurrency={reportingCurrency}>
+                        {formatCurrency(totalExpenses)}
+                      </PartialTotal>
                     </td>
                     <td role="cell" className={`${CELL_PLACEMENT.percentage} font-bold text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                       <CellLabel className={CAPTION_CLASS}>{columns.percentage.label}</CellLabel>
@@ -451,7 +471,11 @@ export function SpendingByCategoryReport() {
                 {/* The aggregate belongs in the donut's hole. */}
                 <DonutCenterTotal
                   label={t('spendingByCategory.totalExpenses')}
-                  value={formatCurrency(totalExpenses)}
+                  value={
+                    <PartialTotal total={spendingTotal} displayCurrency={reportingCurrency}>
+                      {formatCurrency(totalExpenses)}
+                    </PartialTotal>
+                  }
                 />
               </div>
             ) : (
@@ -502,7 +526,9 @@ export function SpendingByCategoryReport() {
               <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 text-center">
                 <div className="text-sm text-gray-500 dark:text-gray-400">{t('spendingByCategory.totalExpenses')}</div>
                 <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {formatCurrency(totalExpenses)}
+                  <PartialTotal total={spendingTotal} displayCurrency={reportingCurrency}>
+                    {formatCurrency(totalExpenses)}
+                  </PartialTotal>
                 </div>
               </div>
             )}
