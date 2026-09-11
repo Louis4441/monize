@@ -23,7 +23,6 @@ import {
   type ImageAdjustments,
 } from '@/lib/document-scanner/adjust-image';
 import {
-  DEFAULT_SCAN_STYLE,
   SCAN_STYLES,
   type Quad,
   type QualityWarning,
@@ -34,6 +33,7 @@ import {
   rotateImage,
   type QuarterTurns,
 } from '@/lib/document-scanner/rotate-image';
+import { useScanSettingsStore } from '@/store/scanSettingsStore';
 import { MAX_ATTACHMENT_BYTES } from '@/types/attachment';
 import { DocumentCornerHandles } from './DocumentCornerHandles';
 
@@ -121,12 +121,21 @@ export function DocumentScanDialog({
   const scanner = useDocumentScanner(createWorker);
   const { scan, refine, reset } = scanner;
 
+  // The finish and the two slider offsets are remembered across scans, so a new
+  // document opens the way the last one was left (INV note: the corners and the
+  // rotation are per photo and deliberately are not).
+  const rememberStyle = useScanSettingsStore((s) => s.setStyle);
+  const rememberAdjustments = useScanSettingsStore((s) => s.setAdjustments);
+
   const [mode, setMode] = useState<PreviewMode>('enhanced');
   const [rotation, setRotation] = useState<QuarterTurns>(0);
   const [quad, setQuad] = useState<Quad | null>(null);
-  const [style, setStyle] = useState<ScanStyle>(DEFAULT_SCAN_STYLE);
-  const [adjustments, setAdjustments] =
-    useState<ImageAdjustments>(NEUTRAL_ADJUSTMENTS);
+  const [style, setStyle] = useState<ScanStyle>(
+    () => useScanSettingsStore.getState().style,
+  );
+  const [adjustments, setAdjustments] = useState<ImageAdjustments>(
+    () => useScanSettingsStore.getState().adjustments,
+  );
   const [busy, setBusy] = useState(false);
 
   // Scan whatever file the parent hands over, and forget the previous result
@@ -136,12 +145,15 @@ export function DocumentScanDialog({
       reset();
       return;
     }
+    // Read the remembered values once, at open, without subscribing: a change
+    // the user makes to the finish mid-session must not re-open and re-scan.
+    const remembered = useScanSettingsStore.getState();
     setMode('enhanced');
     setRotation(0);
     setQuad(null);
-    setStyle(DEFAULT_SCAN_STYLE);
-    setAdjustments(NEUTRAL_ADJUSTMENTS);
-    void scan(file);
+    setStyle(remembered.style);
+    setAdjustments(remembered.adjustments);
+    void scan(file, remembered.style);
   }, [isOpen, file, scan, reset]);
 
   // Adopt the detected corners once, so dragging starts from the detection
@@ -194,22 +206,26 @@ export function DocumentScanDialog({
   const handleStyleChange = useCallback(
     (next: ScanStyle) => {
       setStyle(next);
+      rememberStyle(next);
       const corners = quad ?? scanner.result?.quad;
       if (corners) void refine({ quad: corners, style: next });
     },
-    [quad, refine, scanner.result],
+    [quad, refine, rememberStyle, scanner.result],
   );
 
   const handleAdjustment = useCallback(
     (field: keyof ImageAdjustments, value: number) => {
-      setAdjustments((current) => ({ ...current, [field]: value }));
+      const next = { ...adjustments, [field]: value };
+      setAdjustments(next);
+      rememberAdjustments(next);
     },
-    [],
+    [adjustments, rememberAdjustments],
   );
 
   const handleResetAdjustments = useCallback(() => {
     setAdjustments(NEUTRAL_ADJUSTMENTS);
-  }, []);
+    rememberAdjustments(NEUTRAL_ADJUSTMENTS);
+  }, [rememberAdjustments]);
 
   // No scan, no worker, no round trip: the turn applies to pixels that already
   // exist, so the preview follows the click.

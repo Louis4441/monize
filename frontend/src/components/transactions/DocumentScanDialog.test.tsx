@@ -10,6 +10,9 @@ import type {
   ScannerResponse,
 } from '@/lib/document-scanner/document-scan.types';
 import { MAX_ATTACHMENT_BYTES } from '@/types/attachment';
+import { useScanSettingsStore } from '@/store/scanSettingsStore';
+import { NEUTRAL_ADJUSTMENTS } from '@/lib/document-scanner/adjust-image';
+import { DEFAULT_SCAN_STYLE } from '@/lib/document-scanner/document-scan.types';
 
 /**
  * The review step, where the user decides what to keep.
@@ -100,6 +103,13 @@ describe('DocumentScanDialog', () => {
   let worker: AutoWorker;
 
   beforeEach(() => {
+    // The finish and slider offsets are remembered in a persisted store; reset
+    // it so one test's chosen finish does not open the next test's dialog.
+    window.localStorage.clear();
+    useScanSettingsStore.setState({
+      style: DEFAULT_SCAN_STYLE,
+      adjustments: NEUTRAL_ADJUSTMENTS,
+    });
     worker = new AutoWorker();
     // jsdom has no 2d context and logs an unimplemented-method error for every
     // attempt. The painter already tolerates a missing context; stubbing it
@@ -569,6 +579,49 @@ describe('DocumentScanDialog', () => {
         });
       });
       expect(screen.getByText(/exactly as photographed/)).toBeInTheDocument();
+    });
+
+    it('remembers the chosen finish for the next document', async () => {
+      await ready();
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Finish'), {
+          target: { value: 'blackAndWhite' },
+        });
+      });
+      expect(useScanSettingsStore.getState().style).toBe('blackAndWhite');
+    });
+
+    it('remembers the slider offsets for the next document', async () => {
+      await ready();
+      // Only the brightness and contrast ranges are sliders here: the corner
+      // handles (also role slider) are drawn on the Original view, not this one.
+      const [brightness, contrast] = screen.getAllByRole('slider');
+      await act(async () => {
+        fireEvent.change(brightness, { target: { value: '25' } });
+        fireEvent.change(contrast, { target: { value: '-15' } });
+      });
+      expect(useScanSettingsStore.getState().adjustments).toEqual({
+        brightness: 25,
+        contrast: -15,
+      });
+    });
+
+    it('opens a new document in the remembered finish', async () => {
+      useScanSettingsStore.setState({
+        style: 'blackAndWhite',
+        adjustments: NEUTRAL_ADJUSTMENTS,
+      });
+      await ready();
+
+      expect((screen.getByLabelText('Finish') as HTMLSelectElement).value).toBe(
+        'blackAndWhite',
+      );
+      // The very first scan is produced in the remembered finish, not the
+      // default colour, so the preview never flashes the wrong one.
+      expect(worker.sent[0]).toMatchObject({
+        kind: 'scan',
+        style: 'blackAndWhite',
+      });
     });
 
     it('carries the chosen finish into a later corner move', async () => {

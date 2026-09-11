@@ -60,8 +60,8 @@ export interface ScanRecipe {
 }
 
 export interface UseDocumentScanner extends DocumentScannerState {
-  /** Decode a picked file and scan it. */
-  scan(file: File): Promise<void>;
+  /** Decode a picked file and scan it, in the given finish (default `colour`). */
+  scan(file: File, style?: ScanStyle): Promise<void>;
   /** Produce the document again for corners or a finish the user changed. */
   refine(recipe: ScanRecipe): Promise<void>;
   /** Forget the current photo and result, leaving the worker alive. */
@@ -148,7 +148,7 @@ export function useDocumentScanner(
   );
 
   const scan = useCallback(
-    async (file: File): Promise<void> => {
+    async (file: File, style: ScanStyle = DEFAULT_SCAN_STYLE): Promise<void> => {
       const attempt = ++attemptRef.current;
       // A new photo abandons any adjustment queued for the previous one.
       pendingRecipeRef.current = null;
@@ -164,7 +164,7 @@ export function useDocumentScanner(
         const image = await decodeImageFile(file);
         if (attempt !== attemptRef.current) return;
         sourceRef.current = { attempt, image };
-        const result = await client().scan(image, DEFAULT_SCAN_STYLE);
+        const result = await client().scan(image, style);
         if (attempt === attemptRef.current) resultRef.current = result;
         commit(attempt, {
           status: 'ready',
