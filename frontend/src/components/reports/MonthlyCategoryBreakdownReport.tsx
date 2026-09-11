@@ -1129,11 +1129,14 @@ export function MonthlyCategoryBreakdownReport() {
               />
               <span>{t('monthlyCategoryBreakdown.showDeviations')}</span>
             </div>
+            {/* CSV only, so this is not `ReportToolbarActions` (which renders
+                the PDF-capable `ExportDropdown`); it follows the same phone
+                rule by hand -- a line of its own, spanning the row. */}
             <button
               type="button"
               onClick={handleExportCsv}
               disabled={!hasData}
-              className="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full justify-center whitespace-nowrap px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />

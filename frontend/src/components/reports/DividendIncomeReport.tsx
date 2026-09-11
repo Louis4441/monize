@@ -1147,10 +1147,9 @@ export function DividendIncomeReport() {
             value={dateRange}
             onChange={setDateRange}
           />
-          {/* Five controls do not fit a phone on one unwrapped line: the group
-              wrapped nothing and the export was pushed past the right edge of
-              the card. It wraps here, and the export takes a line of its own
-              below the view buttons, its label on one line. */}
+          {/* The three view buttons wrap onto their own line on a phone: this
+              group used to hold the refresh and the export too, unwrapped, and
+              the export was pushed past the right edge of the card. */}
           <div className="flex w-full flex-wrap gap-2 items-center sm:ml-auto sm:w-auto sm:shrink-0">
             <button
               onClick={() => setViewType('monthly')}
@@ -1183,93 +1182,99 @@ export function DividendIncomeReport() {
               {t('dividendIncome.viewBySecurity')}
             </button>
           </div>
+        </div>
+        {/* The chart/table switch and the series toggles are selectors too, so
+            the actions row sits BELOW them rather than in the row above: on a
+            phone the refresh and the export are the last thing in the card.
+            The row is always rendered, because the actions are -- the
+            sub-controls inside it belong to the monthly and daily views. */}
+        <div className="mt-3 flex flex-wrap gap-4 items-center">
+          {(viewType === 'monthly' || viewType === 'daily') && (
+            <>
+              <div
+                className="inline-flex rounded-md border border-gray-200 dark:border-gray-600 overflow-hidden text-sm"
+                role="group"
+                aria-label="Monthly display mode"
+              >
+                <button
+                  onClick={() => setMonthlyDisplay('chart')}
+                  className={`px-3 py-1 font-medium transition-colors ${
+                    monthlyDisplay === 'chart'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                  }`}
+                >
+                  {t('dividendIncome.displayChart')}
+                </button>
+                <button
+                  onClick={() => setMonthlyDisplay('table')}
+                  className={`px-3 py-1 font-medium transition-colors ${
+                    monthlyDisplay === 'table'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                  }`}
+                >
+                  {t('dividendIncome.displayTable')}
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  {t('dividendIncome.showLabel')}
+                </span>
+                {(Object.keys(SERIES_COLORS) as SeriesKey[]).map((key) => {
+                  const active = visibleSeries[key];
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => toggleSeries(key)}
+                      aria-pressed={active}
+                      className={`px-3 py-1 text-sm font-medium rounded-md border transition-colors ${
+                        active
+                          ? 'text-white border-transparent'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-600'
+                      }`}
+                      style={
+                        active
+                          ? { backgroundColor: SERIES_COLORS[key].positive }
+                          : undefined
+                      }
+                    >
+                      {seriesLabels[key]}
+                    </button>
+                  );
+                })}
+              </div>
+              {viewType === 'daily' && (
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={hideInactiveDays}
+                  onClick={() => setHideInactiveDays((v) => !v)}
+                  className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 sm:ml-auto"
+                >
+                  <span
+                    className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${
+                      hideInactiveDays ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                        hideInactiveDays ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </span>
+                  {t('dividendIncome.hideInactiveDays')}
+                </button>
+              )}
+            </>
+          )}
           <ReportToolbarActions
             onRefreshComplete={reloadAll}
             onExportPdf={handleExportPdf}
             onExportCsv={isTableView ? handleExportCsv : undefined}
           />
         </div>
-        {/* Monthly/Daily view sub-controls: chart/table switch + series toggles */}
-        {(viewType === 'monthly' || viewType === 'daily') && (
-          <div className="flex flex-wrap gap-4 mt-3 items-center">
-            <div
-              className="inline-flex rounded-md border border-gray-200 dark:border-gray-600 overflow-hidden text-sm"
-              role="group"
-              aria-label="Monthly display mode"
-            >
-              <button
-                onClick={() => setMonthlyDisplay('chart')}
-                className={`px-3 py-1 font-medium transition-colors ${
-                  monthlyDisplay === 'chart'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                {t('dividendIncome.displayChart')}
-              </button>
-              <button
-                onClick={() => setMonthlyDisplay('table')}
-                className={`px-3 py-1 font-medium transition-colors ${
-                  monthlyDisplay === 'table'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                {t('dividendIncome.displayTable')}
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2 items-center">
-              <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                {t('dividendIncome.showLabel')}
-              </span>
-              {(Object.keys(SERIES_COLORS) as SeriesKey[]).map((key) => {
-                const active = visibleSeries[key];
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => toggleSeries(key)}
-                    aria-pressed={active}
-                    className={`px-3 py-1 text-sm font-medium rounded-md border transition-colors ${
-                      active
-                        ? 'text-white border-transparent'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-600'
-                    }`}
-                    style={
-                      active
-                        ? { backgroundColor: SERIES_COLORS[key].positive }
-                        : undefined
-                    }
-                  >
-                    {seriesLabels[key]}
-                  </button>
-                );
-              })}
-            </div>
-            {viewType === 'daily' && (
-              <button
-                type="button"
-                role="switch"
-                aria-checked={hideInactiveDays}
-                onClick={() => setHideInactiveDays((v) => !v)}
-                className="ml-auto flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400"
-              >
-                <span
-                  className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${
-                    hideInactiveDays ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
-                      hideInactiveDays ? 'translate-x-4' : 'translate-x-0'
-                    }`}
-                  />
-                </span>
-                {t('dividendIncome.hideInactiveDays')}
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
       {filteredTransactions.length === 0 && filteredCapitalGains.length === 0 && filteredDailyCapitalGains.length === 0 ? (

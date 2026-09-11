@@ -71,6 +71,9 @@ function renderView(account: Account) {
       rateChanges={[]}
       onScenariosChanged={vi.fn()}
       onRateChangesChanged={vi.fn()}
+      // The container owns the export button and takes the handler through
+      // this ref; the view itself renders none.
+      exportPdfRef={{ current: null }}
     />,
   );
 }

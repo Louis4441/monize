@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
@@ -12,6 +12,7 @@ import { fetchAllAccountTransactions, fetchLoanInterestTransactions } from '@/li
 import { useReportData } from '@/hooks/useReportData';
 import { usePersistedAccountId } from '@/hooks/usePersistedAccountFilter';
 import { ReportError } from '@/components/reports/ReportError';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { LoanDetailView } from '@/components/accounts/loan-detail/LoanDetailView';
 import { LineOfCreditView } from '@/components/accounts/loan-detail/LineOfCreditView';
 import type { AccountType } from '@/types/account';
@@ -32,6 +33,13 @@ const ACCOUNT_STORAGE_KEY = 'monize-reports-loan-overpayment-simulator-account';
 export function LoanOverpaymentSimulatorReport() {
   const t = useTranslations('reports');
   const router = useRouter();
+  /**
+   * The loan view publishes its PDF export here instead of drawing its own
+   * button below the card, the way the account detail header already takes it.
+   * That puts the export in this report's control card, under the account it
+   * exports -- on a phone it was a stray button floating outside the card.
+   */
+  const exportPdfRef = useRef<(() => Promise<void>) | null>(null);
 
   const {
     data: accountsData,
@@ -88,6 +96,9 @@ export function LoanOverpaymentSimulatorReport() {
     },
     [selectedAccountId, selectedAccount, isRevolving],
   );
+
+  /** The amortizing loan body is up: the only state with a PDF to export. */
+  const showsLoanDetail = Boolean(selectedAccount) && !isRevolving && !dataLoading;
 
   const transactions = accountData?.transactions ?? [];
   const interestTransactions = accountData?.interestTransactions ?? [];
@@ -152,10 +163,19 @@ export function LoanOverpaymentSimulatorReport() {
             <Button
               variant="outline"
               onClick={() => router.push(`/transactions?accountId=${selectedAccount.id}`)}
+              className="w-full whitespace-nowrap sm:w-auto"
             >
               {t('loanOverpayment.viewTransactions')}
             </Button>
           )}
+          {/* Disabled rather than absent while the loan view is not up (no
+              account, a line of credit, or still loading): there is nothing to
+              export yet, and a button that comes and goes moves the row. */}
+          <ReportToolbarActions
+            onExportPdf={() => { void exportPdfRef.current?.(); }}
+            disabled={!showsLoanDetail}
+            className="sm:self-auto"
+          />
         </div>
       </div>
 
@@ -167,7 +187,7 @@ export function LoanOverpaymentSimulatorReport() {
         </div>
       )}
 
-      {selectedAccount && !isRevolving && !dataLoading && (
+      {showsLoanDetail && selectedAccount && (
         <LoanDetailView
           account={selectedAccount}
           transactions={transactions}
@@ -176,6 +196,7 @@ export function LoanOverpaymentSimulatorReport() {
           rateChanges={rateChanges}
           onScenariosChanged={reloadAccountData}
           onRateChangesChanged={reload}
+          exportPdfRef={exportPdfRef}
         />
       )}
     </div>

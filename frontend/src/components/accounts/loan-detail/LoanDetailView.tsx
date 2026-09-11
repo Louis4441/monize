@@ -21,7 +21,6 @@ import {
   type ScenarioOutcome,
 } from '@/components/accounts/loan-detail/ScenarioComparisonChart';
 import { createScenarioLabels } from '@/components/accounts/loan-detail/loan-scenario-labels';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { sanitizeFilename } from '@/lib/export-filename';
 import { buildScheduleDisplayRows, type DisplayRow } from '@/lib/loan-schedule-rows';
 import type { CellValue, PdfTableSection } from '@/lib/pdf-export';
@@ -73,12 +72,13 @@ interface LoanDetailViewProps {
   onScenariosChanged: () => void;
   onRateChangesChanged: () => void;
   /**
-   * When provided, the loan's PDF export handler is published here (so a parent
-   * -- e.g. the account detail header -- can trigger it) and the inline export
-   * button is not rendered. Left unset on the reports surface, which keeps the
-   * inline button.
+   * The loan's PDF export handler is published here for the container to
+   * trigger -- the account detail header renders it beside View Transactions,
+   * the overpayment simulator report in its account-selector card. This view
+   * draws no export button of its own: a loose button above the summary cards
+   * sat outside the card every other control was in, worst on a phone.
    */
-  exportPdfRef?: MutableRefObject<(() => Promise<void>) | null>;
+  exportPdfRef: MutableRefObject<(() => Promise<void>) | null>;
 }
 
 /**
@@ -339,20 +339,14 @@ export function LoanDetailView({
     });
   };
 
-  // Published to the parent (account header) so it can render the export button
-  // on the same row as View Transactions; when set, the inline button below is
-  // suppressed. Assigned during render (not in an effect) so the latest closure
-  // -- with the current scenarios/schedule -- is always what fires on click.
-  if (exportPdfRef) exportPdfRef.current = handleExportPdf;
+  // Published to the container so it can render the export button in its own
+  // control row. Assigned during render (not in an effect) so the latest
+  // closure -- with the current scenarios/schedule -- is always what fires on
+  // click.
+  exportPdfRef.current = handleExportPdf;
 
   return (
     <div className="space-y-6" ref={viewRef}>
-      {!exportPdfRef && (
-        <div className="flex justify-end">
-          <ExportDropdown onExportPdf={handleExportPdf} />
-        </div>
-      )}
-
       <LoanSummaryCards
         account={account}
         startingBalance={history.startingBalance}
