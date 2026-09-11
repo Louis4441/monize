@@ -16,9 +16,8 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { CHART_COLOURS } from '@/lib/chart-colours';
 import { gainLossColor } from '@/lib/format';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
-import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SecurityComparisonChart, SecurityComparisonChartHandle } from '@/components/reports/SecurityComparisonChart';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { useDateRange } from '@/hooks/useDateRange';
@@ -395,7 +394,7 @@ export function InvestmentPerformanceReport() {
               onChange={setSelectedAccountIds}
             />
           </div>
-          <div className="flex gap-2 items-center">
+          <div className="flex flex-wrap gap-2 items-center">
             <button
               onClick={() => setViewType('performance')}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
@@ -416,9 +415,32 @@ export function InvestmentPerformanceReport() {
             >
               {t('investmentPerformance.viewAllocation')}
             </button>
-            <RefreshPricesButton onRefreshComplete={() => setReloadKey((k) => k + 1)} />
-            <ExportDropdown onExportPdf={handleExportPdf} />
           </div>
+        </div>
+        {/* The chart's window and the export belong to the toolbar, not to the
+            chart: the range selector used to sit loose above the chart, outside
+            the card every other control is in, and the export shared a row it
+            was pushed off the right of on a phone. Stacked below `sm`, so the
+            export is a full-width line under the window it exports; one row
+            from `sm` up, export at the trailing edge whether or not the
+            allocation view has hidden the window. */}
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          {viewType === 'performance' && (
+            <DateRangeSelector
+              ranges={CHART_RANGES}
+              // Only `all` needs translating; 1M/3M/YTD/1Y/5Y are
+              // locale-neutral abbreviations `formatLabel` handles.
+              labels={{ all: t('investmentPerformance.rangeAll') }}
+              value={perfRange}
+              onChange={setPerfRange}
+              activeColour="bg-blue-600"
+              size="sm"
+            />
+          )}
+          <ReportToolbarActions
+            onRefreshComplete={() => setReloadKey((k) => k + 1)}
+            onExportPdf={handleExportPdf}
+          />
         </div>
       </div>
 
@@ -432,18 +454,6 @@ export function InvestmentPerformanceReport() {
               on their own tabs. The chart owns its own fetch, keyed on the held
               securities and the window, and renders the server's percent-return
               series with its null/exclusion handling intact. */}
-          <div className="mb-6 flex justify-end">
-            <DateRangeSelector
-              ranges={CHART_RANGES}
-              // Only `all` needs translating; 1M/3M/YTD/1Y/5Y are
-              // locale-neutral abbreviations `formatLabel` handles.
-              labels={{ all: t('investmentPerformance.rangeAll') }}
-              value={perfRange}
-              onChange={setPerfRange}
-              activeColour="bg-blue-600"
-              size="sm"
-            />
-          </div>
           <SecurityComparisonChart
             securityIds={performanceSecurityIds}
             indexCodes={[]}

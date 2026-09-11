@@ -722,7 +722,6 @@
     "labelAsOfDate": "Peildatum",
     "currencyLabel": "Valuta",
     "currencyNative": "Eigen",
-    "exportCsv": "Exporteren als CSV",
     "generating": "Rapport genereren...",
     "updating": "Bijwerken...",
     "resetToLatest": "Terugzetten naar laatste marktdag",
@@ -1079,7 +1078,6 @@
     "transferTo": "Naar",
     "overallTotal": "Totaal-generaal",
     "includeCurrentMonth": "Huidige maand opnemen",
-    "exportCsv": "CSV exporteren",
     "csvParentColumn": "Hoofdcategorie"
   },
   "monthlyComparison": {

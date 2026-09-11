@@ -722,7 +722,6 @@
     "labelAsOfDate": "Tính đến ngày",
     "currencyLabel": "Tiền tệ",
     "currencyNative": "Nguyên bản",
-    "exportCsv": "Xuất CSV",
     "generating": "Đang tạo báo cáo...",
     "updating": "Đang cập nhật...",
     "resetToLatest": "Đặt lại về ngày thị trường gần nhất",
@@ -1079,7 +1078,6 @@
     "transferTo": "Đến",
     "overallTotal": "Tổng tổng cộng",
     "includeCurrentMonth": "Bao gồm tháng hiện tại",
-    "exportCsv": "Xuất CSV",
     "csvParentColumn": "Danh mục cha"
   },
   "monthlyComparison": {

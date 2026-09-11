@@ -21,7 +21,8 @@ import {
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useFinancialToday } from '@/hooks/useFinancialToday';
 import { exportToCsv } from '@/lib/csv-export';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
+import { LabelSpacer } from '@/components/ui/LabelSpacer';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
@@ -479,8 +480,23 @@ export function LoanAmortizationReport() {
                 ))}
             </select>
           </div>
-          <div className="ml-auto">
-            <ExportDropdown onExportCsv={handleExportCsv} onExportPdf={handleExportPdf} />
+          {/* The export stands beside a LABELLED field, so from `sm` up it is
+              the height of the field, not of the field plus its label: reserve
+              the label's own space above it and let the actions row stretch
+              into what is left, rather than matching the select's padding with
+              a figure that drifts the next time either control's type scale
+              changes. Below `sm` the spacer collapses with the row. */}
+          <div className="flex w-full flex-col sm:ml-auto sm:w-auto">
+            {/* The reserved label space is the desktop's alone: on a phone the
+                export is a row of its own and has no field beside it. */}
+            <div className="hidden sm:block">
+              <LabelSpacer />
+            </div>
+            <ReportToolbarActions
+              onExportCsv={handleExportCsv}
+              onExportPdf={handleExportPdf}
+              className="sm:flex-1"
+            />
           </div>
         </div>
       </div>

@@ -29,7 +29,7 @@ import { useReportData } from "@/hooks/useReportData";
 import { useSortableTable, compareValues } from "@/hooks/useSortableTable";
 import { DateRangeSelector } from "@/components/ui/DateRangeSelector";
 import { ChartViewToggle } from "@/components/ui/ChartViewToggle";
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { ChartTooltip } from "@/components/reports/ChartTooltip";
 import { ReportError } from "@/components/reports/ReportError";
@@ -305,12 +305,12 @@ export function IncomeVsExpensesReport() {
               onChange={(v) => setViewType(v as 'bar' | 'table')}
               options={['bar', 'table']}
             />
-            <ExportDropdown
-              onExportPdf={handleExportPdf}
-              onExportCsv={handleExportCsv}
-              disabled={chartData.length === 0}
-            />
           </div>
+          <ReportToolbarActions
+            onExportPdf={handleExportPdf}
+            onExportCsv={handleExportCsv}
+            disabled={chartData.length === 0}
+          />
         </div>
       </div>
 

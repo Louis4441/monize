@@ -32,9 +32,8 @@ import { usePortfolioChangeBaseline } from '@/hooks/usePortfolioChangeBaseline';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
-import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import type {
@@ -878,11 +877,14 @@ export function PortfolioValueReport() {
       {/* Controls */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
         <div className="flex flex-wrap gap-4 items-center justify-between">
-          <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex w-full flex-wrap gap-2 items-center sm:w-auto">
+            {/* Full width on a phone: at `w-48` the picker and the ten range
+                buttons beside it are wider than the screen. */}
             <ReportAccountMultiSelect
               accounts={accounts}
               value={selectedAccountIds}
               onChange={setSelectedAccountIds}
+              className="w-full sm:w-48"
             />
             <DateRangeSelector
               ranges={['1d', '1w', 'mtd', '1m', '3m', 'ytd', '1y', '2y', '5y', 'all']}
@@ -891,7 +893,9 @@ export function PortfolioValueReport() {
               activeColour="bg-emerald-600"
             />
           </div>
-          <div className="flex items-center gap-3">
+          {/* Four controls: they wrap on a phone rather than carrying the
+              export off the right of the card. */}
+          <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
             {/* Total vs. per-security stacked view, available on every range. */}
             <div className="inline-flex rounded-md overflow-hidden border border-gray-200 dark:border-gray-600">
               {(['total', 'securities'] as const).map((mode) => {
@@ -921,13 +925,13 @@ export function PortfolioValueReport() {
               options={['area', 'table']}
               activeColour="bg-emerald-600"
             />
-            <RefreshPricesButton onRefreshComplete={() => setReloadKey((k) => k + 1)} />
-            <ExportDropdown
-              onExportPdf={handleExportPdf}
-              onExportCsv={handleExportCsv}
-              disabled={chartPoints.length === 0}
-            />
           </div>
+          <ReportToolbarActions
+            onRefreshComplete={() => setReloadKey((k) => k + 1)}
+            onExportPdf={handleExportPdf}
+            onExportCsv={handleExportCsv}
+            disabled={chartPoints.length === 0}
+          />
         </div>
       </div>
 

@@ -42,7 +42,7 @@ import {
 } from './MonteCarloPerformanceSummary';
 import { HoldingStatsTable } from './MonteCarloHoldingStatsTable';
 import { CsvSection, exportCsvSections } from '@/lib/csv-export';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { NumericInput } from '@/components/ui/NumericInput';
 import { CurrencyInput } from '@/components/ui/CurrencyInput';
@@ -1151,11 +1151,11 @@ export function MonteCarloReport() {
                       </button>
                     ))}
                   </div>
-                  <ExportDropdown
-                    onExportCsv={handleExportCsv}
-                    onExportPdf={handleExportPdf}
-                  />
                 </div>
+                <ReportToolbarActions
+                  onExportCsv={handleExportCsv}
+                  onExportPdf={handleExportPdf}
+                />
               </div>
 
               {/* Chart stays mounted whether or not it's the visible view, so

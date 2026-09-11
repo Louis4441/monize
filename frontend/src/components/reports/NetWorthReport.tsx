@@ -29,7 +29,7 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { exportToCsv } from '@/lib/csv-export';
 import { useReportData } from '@/hooks/useReportData';
@@ -330,7 +330,11 @@ export function NetWorthReport() {
             customEndDate={endDate}
             onCustomEndDateChange={setEndDate}
           />
-          <div className="flex items-center gap-3">
+          {/* The row did not wrap, so the export sat past the right edge of a
+              phone. It takes the full width below `sm`, which puts it on a
+              line of its own under the view toggle and the recalculate
+              button, and goes back beside them from `sm` up. */}
+          <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
             <ChartViewToggle
               value={chartType}
               onChange={(v) => setChartType(v as 'line' | 'bar' | 'stacked' | 'table')}
@@ -343,8 +347,12 @@ export function NetWorthReport() {
             >
               {isRecalculating ? t('netWorth.recalculating') : t('netWorth.recalculate')}
             </button>
-            <ExportDropdown onExportPdf={handleExportPdf} onExportCsv={handleExportCsv} disabled={chartData.length === 0} />
           </div>
+          <ReportToolbarActions
+            onExportPdf={handleExportPdf}
+            onExportCsv={handleExportCsv}
+            disabled={chartData.length === 0}
+          />
         </div>
       </div>
 

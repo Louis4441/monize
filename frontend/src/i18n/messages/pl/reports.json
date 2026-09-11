@@ -722,7 +722,6 @@
     "labelAsOfDate": "Na dzień",
     "currencyLabel": "Waluta",
     "currencyNative": "Natywna",
-    "exportCsv": "Eksportuj CSV",
     "generating": "Generowanie raportu...",
     "updating": "Aktualizowanie...",
     "resetToLatest": "Resetuj do ostatniego dnia rynkowego",
@@ -1079,7 +1078,6 @@
     "transferTo": "Do",
     "overallTotal": "Suma całkowita",
     "includeCurrentMonth": "Uwzględnij bieżący miesiąc",
-    "exportCsv": "Eksportuj CSV",
     "csvParentColumn": "Kategoria nadrzędna"
   },
   "monthlyComparison": {

@@ -19,9 +19,8 @@ import { HoldingWithMarketValue, Security } from '@/types/investment';
 import { Account } from '@/types/account';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
-import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import type {
@@ -527,15 +526,19 @@ export function GeographicAllocationReport() {
       {/* Filters & View Toggle */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
         <div className="flex flex-wrap gap-3 items-center justify-between">
-          <div className="flex flex-wrap gap-3 items-center">
+          {/* Full width on a phone, the toolbar's fixed width from `sm` up. */}
+          <div className="flex w-full flex-wrap gap-3 items-center sm:w-auto">
             <ReportAccountMultiSelect
               accounts={accounts}
               value={selectedAccountIds}
               onChange={setSelectedAccountIds}
               mode="portfolio"
+              className="w-full sm:w-48"
             />
           </div>
-          <div className="flex items-center gap-2">
+          {/* Five controls: they wrap on a phone rather than carrying the
+              export off the right of the card. */}
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             <button
               onClick={() => setViewType('region')}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
@@ -566,14 +569,14 @@ export function GeographicAllocationReport() {
             >
               {t('geographicAllocation.viewByCountry')}
             </button>
-            <RefreshPricesButton
-              onRefreshComplete={() => {
-                reload();
-                reloadCountry();
-              }}
-            />
-            <ExportDropdown onExportPdf={handleExportPdf} />
           </div>
+          <ReportToolbarActions
+            onRefreshComplete={() => {
+              reload();
+              reloadCountry();
+            }}
+            onExportPdf={handleExportPdf}
+          />
         </div>
       </div>
 

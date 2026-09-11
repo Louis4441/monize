@@ -37,7 +37,7 @@ import {
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useReportData } from '@/hooks/useReportData';
 import { usePersistedAccountId } from '@/hooks/usePersistedAccountFilter';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ReportError } from '@/components/reports/ReportError';
 import { chartColors } from '@/lib/chart-colors';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
@@ -680,8 +680,8 @@ export function DebtPayoffTimelineReport() {
             >
               {t('debtPayoff.viewPrincipalVsInterest')}
             </button>
-            <ExportDropdown onExportPdf={handleExportPdf} />
           </div>
+          <ReportToolbarActions onExportPdf={handleExportPdf} />
         </div>
       </div>
 

@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { builtInReportsApi } from '@/lib/built-in-reports';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { exportToCsv } from '@/lib/csv-export';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
 
@@ -88,7 +88,7 @@ export function TaxSummaryReport() {
     <div className="space-y-6">
       {/* Year Selector */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
               {t('taxSummary.taxYear')}
@@ -103,7 +103,7 @@ export function TaxSummaryReport() {
               ))}
             </select>
           </div>
-          <ExportDropdown onExportCsv={handleExportCsv} onExportPdf={handleExportPdf} />
+          <ReportToolbarActions onExportCsv={handleExportCsv} onExportPdf={handleExportPdf} />
         </div>
       </div>
 

@@ -27,7 +27,7 @@ import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useReportData } from '@/hooks/useReportData';
 import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import type {
@@ -359,14 +359,14 @@ export function CreditUtilizationReport() {
     <div className="space-y-6">
       {/* Account Filter */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
-        <div className="flex flex-wrap gap-3 items-center justify-between">
+        <div className="flex flex-wrap gap-3 items-stretch justify-between">
           <ReportAccountMultiSelect
             accounts={creditAccounts}
             value={selectedAccountIds}
             onChange={setSelectedAccountIds}
             filter={() => true}
           />
-          <ExportDropdown onExportPdf={handleExportPdf} />
+          <ReportToolbarActions onExportPdf={handleExportPdf} />
         </div>
       </div>
 

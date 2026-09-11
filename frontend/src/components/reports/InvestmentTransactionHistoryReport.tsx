@@ -14,10 +14,9 @@ import { useDateRange } from '@/hooks/useDateRange';
 import { useReportData } from '@/hooks/useReportData';
 import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
-import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { ReportError } from '@/components/reports/ReportError';
 import { exportToCsv } from '@/lib/csv-export';
 import { SortableHeader } from '@/components/ui/SortableHeader';
@@ -425,14 +424,19 @@ export function InvestmentTransactionHistoryReport() {
 
       {/* Controls */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
+        {/* One control per line on a phone, the desktop row from `sm` up. The
+            two pickers are `w-48` each: side by side they are wider than a
+            phone, and the pair was pushed off the right of the screen rather
+            than wrapped, because the box holding them did not wrap. */}
         <div className="flex flex-wrap gap-3 items-center">
-          <div className="flex gap-3 items-center">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
             <ReportAccountMultiSelect
               accounts={accounts}
               value={selectedAccountIds}
               onChange={setSelectedAccountIds}
+              className="w-full sm:w-48"
             />
-            <div className="w-48">
+            <div className="w-full sm:w-48">
               <MultiSelect
                 ariaLabel={t('investmentTransactions.filterByAction')}
                 placeholder={t('investmentTransactions.allActionsPlaceholder')}
@@ -448,10 +452,12 @@ export function InvestmentTransactionHistoryReport() {
             value={dateRange}
             onChange={setDateRange}
           />
-          <div className="ml-auto shrink-0 flex gap-2 items-center">
-            <RefreshPricesButton onRefreshComplete={reload} />
-            <ExportDropdown onExportCsv={handleExportCsv} onExportPdf={handleExportPdf} disabled={filteredTransactions.length === 0} />
-          </div>
+          <ReportToolbarActions
+            onRefreshComplete={reload}
+            onExportCsv={handleExportCsv}
+            onExportPdf={handleExportPdf}
+            disabled={filteredTransactions.length === 0}
+          />
         </div>
       </div>
 

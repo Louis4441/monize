@@ -26,9 +26,8 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useDateRange } from '@/hooks/useDateRange';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
-import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { exportToCsv } from '@/lib/csv-export';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import {
@@ -425,18 +424,22 @@ export function RealizedGainsReport() {
       {/* Controls */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
         <div className="flex flex-wrap gap-3 items-center">
+          {/* Full width on a phone, the toolbar's fixed width from `sm` up. */}
           <ReportAccountMultiSelect
             accounts={accounts}
             value={selectedAccountIds}
             onChange={setSelectedAccountIds}
+            className="w-full sm:w-48"
           />
           <DateRangeSelector
             ranges={['6m', '1y', '2y', 'all']}
             value={dateRange}
             onChange={setDateRange}
           />
-          <div className="ml-auto shrink-0 flex gap-2 items-center">
-            <RefreshPricesButton onRefreshComplete={reload} />
+          {/* `ml-auto` only from `sm` up: on a phone every group is a row of
+              its own, and pushing this one right left it hanging under two
+              left-aligned rows. */}
+          <div className="flex flex-wrap gap-2 items-center sm:ml-auto sm:shrink-0">
             <button
               onClick={() => setViewType('chart')}
               title={t('realizedGains.viewChart')}
@@ -463,8 +466,13 @@ export function RealizedGainsReport() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18M3 6h18M3 18h18" />
               </svg>
             </button>
-            <ExportDropdown onExportCsv={handleExportCsv} onExportPdf={handleExportPdf} disabled={entries.length === 0} />
           </div>
+          <ReportToolbarActions
+            onRefreshComplete={reload}
+            onExportCsv={handleExportCsv}
+            onExportPdf={handleExportPdf}
+            disabled={entries.length === 0}
+          />
         </div>
       </div>
 

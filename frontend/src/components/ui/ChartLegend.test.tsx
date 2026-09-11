@@ -30,6 +30,21 @@ describe('ChartLegend', () => {
     }
   });
 
+  /**
+   * Two columns on a phone is opt-in, per legend. A legend of short names (a
+   * category legend of twenty rows) reads better halved than as a long scroll
+   * past the chart; the default stays one column, because a name that has to
+   * truncate loses its end silently.
+   */
+  it('gives a phone two columns when the caller asks for them', () => {
+    const { container } = render(<ChartLegend items={ITEMS} phoneColumns={2} />);
+    const list = container.querySelector('ul')!;
+    expect(list.className).toContain('grid-cols-2');
+    expect(list.className).not.toContain('grid-cols-1');
+    // The larger breakpoints are still the caller's to set.
+    expect(list.className).toContain('sm:grid-cols-2');
+  });
+
   it('honours a caller-supplied column layout, still vertical on mobile', () => {
     const { container } = render(
       <ChartLegend items={ITEMS} columnsClassName="sm:grid-cols-2 md:grid-cols-4" />,

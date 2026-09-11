@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useRef } from 'react';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { budgetsApi } from '@/lib/budgets';
 import { BudgetHealthGauge } from '@/components/budgets/BudgetHealthGauge';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ReportError } from '@/components/reports/ReportError';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
@@ -367,7 +367,7 @@ export function BudgetHealthScoreReport() {
               </option>
             ))}
           </select>
-          <ExportDropdown onExportPdf={handleExportPdf} />
+          <ReportToolbarActions onExportPdf={handleExportPdf} />
         </div>
       </div>
 

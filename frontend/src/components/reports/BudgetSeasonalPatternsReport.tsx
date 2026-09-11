@@ -16,7 +16,7 @@ import { budgetsApi } from '@/lib/budgets';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useTranslations } from 'next-intl';
 import { useReportData } from '@/hooks/useReportData';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ReportError } from '@/components/reports/ReportError';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
@@ -190,7 +190,7 @@ export function BudgetSeasonalPatternsReport() {
               </select>
             )}
           </div>
-          <ExportDropdown onExportPdf={handleExportPdf} />
+          <ReportToolbarActions onExportPdf={handleExportPdf} />
         </div>
       </div>
 

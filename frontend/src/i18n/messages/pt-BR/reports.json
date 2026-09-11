@@ -722,7 +722,6 @@
     "labelAsOfDate": "Com referência à data",
     "currencyLabel": "Moeda",
     "currencyNative": "Nativa",
-    "exportCsv": "Exportar CSV",
     "generating": "Gerando relatório...",
     "updating": "Atualizando...",
     "resetToLatest": "Redefinir para o último dia de mercado",
@@ -1079,7 +1078,6 @@
     "transferTo": "Para",
     "overallTotal": "Total geral",
     "includeCurrentMonth": "Incluir mês atual",
-    "exportCsv": "Exportar CSV",
     "csvParentColumn": "Categoria principal"
   },
   "monthlyComparison": {

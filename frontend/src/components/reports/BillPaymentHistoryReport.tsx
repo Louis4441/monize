@@ -22,7 +22,7 @@ import { useChartMonthFormat } from '@/hooks/useChartMonthFormat';
 import { useDateRange } from '@/hooks/useDateRange';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { exportToCsv } from '@/lib/csv-export';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from '@/components/ui/interactive-row';
@@ -373,8 +373,8 @@ export function BillPaymentHistoryReport() {
             >
               {t('billPaymentHistory.byBill')}
             </button>
-            <ExportDropdown onExportCsv={handleExportCsv} onExportPdf={handleExportPdf} />
           </div>
+          <ReportToolbarActions onExportCsv={handleExportCsv} onExportPdf={handleExportPdf} />
         </div>
       </div>
 

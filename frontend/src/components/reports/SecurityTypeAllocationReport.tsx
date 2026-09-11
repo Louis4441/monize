@@ -20,10 +20,9 @@ import { HoldingWithMarketValue } from '@/types/investment';
 import { Account } from '@/types/account';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { resolvePdfColor } from '@/components/reports/resolve-pdf-color';
-import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from '@/components/ui/interactive-row';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
@@ -473,18 +472,21 @@ export function SecurityTypeAllocationReport() {
       {/* Account Filter */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
         <div className="flex flex-wrap gap-3 items-center justify-between">
-          <div className="flex flex-wrap gap-3 items-center">
+          {/* Full width on a phone, the toolbar's fixed width from `sm` up:
+              at `w-48` an account name has nowhere to go. */}
+          <div className="flex w-full flex-wrap gap-3 items-center sm:w-auto">
             <ReportAccountMultiSelect
               accounts={accounts}
               value={selectedAccountIds}
               onChange={setSelectedAccountIds}
               mode="portfolio"
+              className="w-full sm:w-48"
             />
           </div>
-          <div className="flex gap-2 items-center">
-            <RefreshPricesButton onRefreshComplete={loadData} />
-            <ExportDropdown onExportPdf={handleExportPdf} />
-          </div>
+          <ReportToolbarActions
+            onRefreshComplete={loadData}
+            onExportPdf={handleExportPdf}
+          />
         </div>
       </div>
 

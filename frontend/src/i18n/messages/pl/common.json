@@ -60,6 +60,7 @@
   },
   "exportDropdown": {
     "export": "Eksportuj",
+    "exportCsv": "Eksportuj CSV",
     "exporting": "Eksportowanie...",
     "exportPdf": "Eksportuj PDF",
     "exportReport": "Eksportuj raport",

@@ -21,7 +21,7 @@ import { useDateFormat } from '@/hooks/useDateFormat';
 import { CHART_COLOURS } from '@/lib/chart-colours';
 import { chartColors } from '@/lib/chart-colors';
 import { exportToCsv } from '@/lib/csv-export';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { LinkifiedText } from '@/components/ui/LinkifiedText';
 
 // Default columns if none specified
@@ -141,8 +141,8 @@ export function ReportChart({ viewType, data, groupBy, onDataPointClick, tableCo
   const isTimeBased = groupBy === GroupByType.MONTH || groupBy === GroupByType.WEEK || groupBy === GroupByType.DAY;
 
   const exportBar = (
-    <div className="flex justify-end px-4 py-2">
-      <ExportDropdown onExportCsv={handleExportCsv} onExportPdf={handleExportPdf} />
+    <div className="flex px-4 py-2">
+      <ReportToolbarActions onExportCsv={handleExportCsv} onExportPdf={handleExportPdf} />
     </div>
   );
 

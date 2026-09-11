@@ -722,7 +722,6 @@
     "labelAsOfDate": "[XX-As of date-XX]",
     "currencyLabel": "[XX-Currency-XX]",
     "currencyNative": "[XX-Native-XX]",
-    "exportCsv": "[XX-Export CSV-XX]",
     "generating": "[XX-Generating report...-XX]",
     "updating": "[XX-Updating...-XX]",
     "resetToLatest": "[XX-Reset to latest market day-XX]",
@@ -1079,7 +1078,6 @@
     "transferTo": "[XX-To-XX]",
     "overallTotal": "[XX-Overall total-XX]",
     "includeCurrentMonth": "[XX-Include current month-XX]",
-    "exportCsv": "[XX-Export CSV-XX]",
     "csvParentColumn": "[XX-Parent category-XX]"
   },
   "monthlyComparison": {

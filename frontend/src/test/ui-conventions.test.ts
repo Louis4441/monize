@@ -2881,3 +2881,61 @@ describe("a random value comes from the Web Crypto API", () => {
     expect(WEAK_RANDOM.test(withoutComments("// not Math.random"))).toBe(false);
   });
 });
+
+describe("a report's export and refresh are one actions row", () => {
+  /**
+   * Every report toolbar laid its trailing buttons out for itself, and a dozen
+   * of them got it wrong the same way: an unwrapped row carried the export off
+   * the right of a phone. `ReportToolbarActions` is the one answer -- a
+   * full-width row below every selector on a phone, two equal halves when the
+   * report also refreshes prices, the toolbar's trailing group from `sm` up.
+   * A report that renders `ExportDropdown` or `RefreshPricesButton` itself is
+   * writing that layout a second time. `ExportDropdown` draws all three shapes
+   * -- CSV and PDF, PDF alone, CSV alone -- so a report exporting one format is
+   * not a reason to hand-roll a button either.
+   *
+   * The rule is about REPORTS. `components/ui/ExportDropdown.tsx` is the button
+   * itself, `RefreshPricesButton.tsx` wraps the refresh hook for callers
+   * outside this tree (an account detail header), and `ReportToolbarActions`
+   * composes both -- those three are the mechanism, not instances of it.
+   */
+  const ACTIONS_OWNER = "/src/components/reports/ReportToolbarActions.tsx";
+  const MECHANISM = new Set([
+    ACTIONS_OWNER,
+    "/src/components/ui/ExportDropdown.tsx",
+    "/src/components/reports/RefreshPricesButton.tsx",
+  ]);
+  const RENDERS_ACTION = /<(ExportDropdown|RefreshPricesButton)\b/;
+
+  function reportsRenderingTheirOwn(): string[] {
+    return productionSources()
+      .filter(([path]) => path.startsWith("/src/components/reports/"))
+      .filter(([path]) => !MECHANISM.has(path))
+      .filter(([, source]) => RENDERS_ACTION.test(withoutComments(source)))
+      .map(([path]) => path);
+  }
+
+  it("has no report laying out its own export or refresh button", () => {
+    expect(reportsRenderingTheirOwn()).toEqual([]);
+  });
+
+  it("still finds the shared row in use, so the rule cannot pass by accident", () => {
+    const users = productionSources().filter(([path, source]) =>
+      path.startsWith("/src/components/reports/") &&
+      path !== ACTIONS_OWNER &&
+      /<ReportToolbarActions\b/.test(withoutComments(source)),
+    );
+    expect(users.length).toBeGreaterThan(20);
+  });
+
+  it("catches the pattern it bans", () => {
+    expect(RENDERS_ACTION.test(withoutComments("<ExportDropdown onExportPdf={x} />"))).toBe(
+      true,
+    );
+    expect(RENDERS_ACTION.test(withoutComments("<RefreshPricesButton />"))).toBe(true);
+    // ...and reads its own explanation as prose, not as a violation.
+    expect(
+      RENDERS_ACTION.test(withoutComments("// wired to the <ExportDropdown /> above")),
+    ).toBe(false);
+  });
+});

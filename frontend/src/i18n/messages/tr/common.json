@@ -60,6 +60,7 @@
   },
   "exportDropdown": {
     "export": "Dışa Aktar",
+    "exportCsv": "CSV Dışa Aktar",
     "exporting": "Dışa aktarılıyor...",
     "exportPdf": "PDF Olarak Dışa Aktar",
     "exportReport": "Raporu dışa aktar",

@@ -60,6 +60,7 @@
   },
   "exportDropdown": {
     "export": "निर्यात",
+    "exportCsv": "CSV निर्यात करें",
     "exporting": "निर्यात हो रहा है...",
     "exportPdf": "PDF निर्यात करें",
     "exportReport": "रिपोर्ट निर्यात करें",

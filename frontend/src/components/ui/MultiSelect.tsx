@@ -331,13 +331,26 @@ export function MultiSelect({
              browser still measures it in the real font, but it cannot be
              found by text queries, duplicate what screen readers announce, or
              be caught by the user's find-in-page. pr-7 stands in for the
-             chevron and its gap. */
+             chevron and its gap.
+
+             Each copy is capped at `100vw - 12rem`, which is the sizer's whole
+             safety net: the copies never wrap, so an unbounded one makes the
+             trigger's *minimum* width the longest label and no ancestor can
+             shrink it -- a security named beyond the width of a phone pushed
+             the control, and the toolbar around it, off the right of the
+             screen. The cap is a definite length, so it clamps that intrinsic
+             contribution; 12rem clears the widest page and card padding this
+             app puts around a toolbar (lg:px-12 plus p-4), so the trigger
+             stays inside the viewport at every breakpoint. Below the cap
+             nothing changes -- the control is still as wide as its longest
+             option -- and above it the trigger shrinks and the selected label
+             truncates, which is what the visible row is already built for. */
           <div aria-hidden="true" data-testid="multiselect-sizer" className="h-0 overflow-hidden">
             {sizerLabels.map(sizerLabel => (
               <div
                 key={sizerLabel}
                 data-sizer={sizerLabel}
-                className="invisible whitespace-nowrap pr-7 after:content-[attr(data-sizer)]"
+                className="invisible max-w-[calc(100vw-12rem)] whitespace-nowrap pr-7 after:content-[attr(data-sizer)]"
               />
             ))}
           </div>

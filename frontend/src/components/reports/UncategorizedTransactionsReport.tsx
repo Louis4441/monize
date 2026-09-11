@@ -14,7 +14,7 @@ import { useDateFormat } from '@/hooks/useDateFormat';
 import { useDateRange } from '@/hooks/useDateRange';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { exportToCsv } from '@/lib/csv-export';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from '@/components/ui/interactive-row';
@@ -386,7 +386,7 @@ export function UncategorizedTransactionsReport() {
         </div>
       ) : (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 {t('uncategorizedTransactions.tableTitle')}
@@ -395,7 +395,7 @@ export function UncategorizedTransactionsReport() {
                 {t('uncategorizedTransactions.tableSubtitle')}
               </p>
             </div>
-            <ExportDropdown onExportCsv={handleExportCsv} onExportPdf={handleExportPdf} />
+            <ReportToolbarActions onExportCsv={handleExportCsv} onExportPdf={handleExportPdf} />
           </div>
           {/* Below `sm` the table becomes a block and each row wraps into a
               two-column grid of EQUAL `minmax(0,1fr)` tracks (for the reason

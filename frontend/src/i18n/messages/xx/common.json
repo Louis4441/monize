@@ -60,6 +60,7 @@
   },
   "exportDropdown": {
     "export": "[XX-Export-XX]",
+    "exportCsv": "[XX-Export CSV-XX]",
     "exporting": "[XX-Exporting...-XX]",
     "exportPdf": "[XX-Export PDF-XX]",
     "exportReport": "[XX-Export report-XX]",

@@ -722,7 +722,6 @@
     "labelAsOfDate": "Per tanggal",
     "currencyLabel": "Mata Uang",
     "currencyNative": "Asli",
-    "exportCsv": "Ekspor CSV",
     "generating": "Membuat laporan...",
     "updating": "Memperbarui...",
     "resetToLatest": "Atur ulang ke hari pasar terbaru",
@@ -1079,7 +1078,6 @@
     "transferTo": "Ke",
     "overallTotal": "Total keseluruhan",
     "includeCurrentMonth": "Sertakan bulan saat ini",
-    "exportCsv": "Ekspor CSV",
     "csvParentColumn": "Kategori induk"
   },
   "monthlyComparison": {

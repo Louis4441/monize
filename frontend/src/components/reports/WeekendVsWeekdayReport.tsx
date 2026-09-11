@@ -21,7 +21,7 @@ import { chartColors, CHART_SERIES } from '@/lib/chart-colors';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateRange } from '@/hooks/useDateRange';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
 import { resolvePdfColor } from '@/components/reports/resolve-pdf-color';
@@ -219,7 +219,12 @@ export function WeekendVsWeekdayReport() {
             value={dateRange}
             onChange={setDateRange}
           />
-          <div className="flex gap-2 items-center">
+          {/* `items-stretch`, not `items-center`: squeezed onto a phone these
+              labels wrap onto a different number of lines each, and the
+              one-word button (Overview) stood shorter than the two beside it.
+              They wrap onto their own lines here, all the height of the
+              tallest on the line. */}
+          <div className="flex flex-wrap gap-2 items-stretch">
             <button
               onClick={() => setViewType('comparison')}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
@@ -250,8 +255,8 @@ export function WeekendVsWeekdayReport() {
             >
               {t('weekendVsWeekday.viewByCategory')}
             </button>
-            <ExportDropdown onExportPdf={handleExportPdf} />
           </div>
+          <ReportToolbarActions onExportPdf={handleExportPdf} />
         </div>
       </div>
 

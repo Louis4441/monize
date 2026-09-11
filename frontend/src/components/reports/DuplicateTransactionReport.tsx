@@ -11,7 +11,7 @@ import { parseLocalDate } from '@/lib/utils';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateRange } from '@/hooks/useDateRange';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { exportToCsv } from '@/lib/csv-export';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
@@ -169,7 +169,7 @@ export function DuplicateTransactionReport() {
             value={dateRange}
             onChange={setDateRange}
           />
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-stretch gap-3">
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600 dark:text-gray-400">{t('duplicateTransactions.sensitivityLabel')}</span>
               <select
@@ -182,8 +182,12 @@ export function DuplicateTransactionReport() {
                 <option value="low">{t('duplicateTransactions.sensitivityLow')}</option>
               </select>
             </div>
-            <ExportDropdown onExportCsv={handleExportCsv} onExportPdf={handleExportPdf} disabled={duplicateGroups.length === 0} />
           </div>
+          <ReportToolbarActions
+            onExportCsv={handleExportCsv}
+            onExportPdf={handleExportPdf}
+            disabled={duplicateGroups.length === 0}
+          />
         </div>
       </div>
 

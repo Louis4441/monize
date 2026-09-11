@@ -21,10 +21,9 @@ import { Security } from '@/types/investment';
 import { Account } from '@/types/account';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
-import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import type {
@@ -354,17 +353,22 @@ export function SectorWeightingsReport() {
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
         <div className="flex flex-wrap gap-3 items-center justify-between">
-          <div className="flex flex-wrap gap-3 items-center">
+          {/* Each picker takes the full width of the card on a phone -- at
+              `w-48` a pair of them is wider than the screen and an account or
+              security name has nowhere to go -- and returns to the fixed
+              toolbar width from `sm` up. */}
+          <div className="flex w-full flex-wrap gap-3 items-center sm:w-auto">
             {/* Account Filter */}
             <ReportAccountMultiSelect
               accounts={accounts}
               value={selectedAccountIds}
               onChange={setSelectedAccountIds}
               mode="portfolio"
+              className="w-full sm:w-48"
             />
 
             {/* Security Filter */}
-            <div className="w-48">
+            <div className="w-full sm:w-48">
               <MultiSelect
                 ariaLabel={t('sectorWeightings.filterBySecurityLabel')}
                 placeholder={t('sectorWeightings.allSecuritiesPlaceholder')}
@@ -386,10 +390,10 @@ export function SectorWeightingsReport() {
               </button>
             )}
           </div>
-          <div className="flex gap-2 items-center">
-            <RefreshPricesButton onRefreshComplete={loadWeightings} />
-            <ExportDropdown onExportPdf={handleExportPdf} />
-          </div>
+          <ReportToolbarActions
+            onRefreshComplete={loadWeightings}
+            onExportPdf={handleExportPdf}
+          />
         </div>
       </div>
 

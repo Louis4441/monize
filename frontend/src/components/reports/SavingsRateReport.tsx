@@ -21,7 +21,7 @@ import type { Budget, SavingsRatePoint } from '@/types/budget';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useChartMonthFormat } from '@/hooks/useChartMonthFormat';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import type {
@@ -321,9 +321,7 @@ export function SavingsRateReport() {
               <option value={50}>50%</option>
             </select>
           </div>
-          <div className="ml-auto">
-            <ExportDropdown onExportPdf={handleExportPdf} />
-          </div>
+          <ReportToolbarActions onExportPdf={handleExportPdf} />
         </div>
       </div>
 

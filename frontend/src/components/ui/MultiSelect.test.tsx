@@ -594,6 +594,42 @@ describe('MultiSelect', () => {
       expect(labels).toContain('The longest index name in the whole catalog');
     });
 
+    /**
+     * The sizer's copies never wrap, so an uncapped one makes the trigger's
+     * MINIMUM width the longest label: no ancestor can shrink the control, and
+     * a security whose name is wider than a phone carried the report's whole
+     * toolbar off the right of the screen. The cap is a definite length, so it
+     * clamps that intrinsic contribution; a percentage would not, because the
+     * width it resolves against is the one being computed.
+     */
+    it('caps each sizer copy against the viewport so the trigger can still shrink', () => {
+      render(
+        <MultiSelect
+          options={[
+            {
+              value: 'a',
+              label:
+                'VERYLONGSYMBOL - A security whose name is wider than any phone screen',
+            },
+          ]}
+          value={[]}
+          onChange={onChange}
+          sizeToLongestOption
+        />,
+      );
+
+      const copies = [
+        ...screen.getByTestId('multiselect-sizer').querySelectorAll('[data-sizer]'),
+      ];
+      expect(copies.length).toBeGreaterThan(0);
+      for (const copy of copies) {
+        expect(copy.className).toContain('max-w-[calc(100vw-12rem)]');
+        // The cap only works while the copy refuses to wrap -- a wrapping copy
+        // would size the trigger to a word instead of to the label.
+        expect(copy.className).toContain('whitespace-nowrap');
+      }
+    });
+
     it('renders no sizer by default, leaving other call sites untouched', () => {
       render(<MultiSelect options={flatOptions} value={[]} onChange={onChange} />);
       expect(screen.queryByTestId('multiselect-sizer')).not.toBeInTheDocument();

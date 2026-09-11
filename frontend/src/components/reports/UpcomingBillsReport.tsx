@@ -24,7 +24,7 @@ import {
   occurrenceKind,
 } from '@/lib/scheduled-kind';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { exportToCsv } from '@/lib/csv-export';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
@@ -367,7 +367,10 @@ export function UpcomingBillsReport() {
 
       {/* Controls */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
-        <div className="flex items-center justify-between">
+        {/* The month stepper alone fills a phone, so the view switch and the
+            export take a line of their own below it rather than being pushed
+            off the right of the card. One row from `sm` up. */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
@@ -395,7 +398,7 @@ export function UpcomingBillsReport() {
               {t('upcomingBills.todayButton')}
             </button>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
             <div className="flex gap-2">
               <button
                 onClick={() => setViewType('calendar')}
@@ -418,8 +421,12 @@ export function UpcomingBillsReport() {
                 {t('upcomingBills.listView')}
               </button>
             </div>
-            <ExportDropdown onExportCsv={handleExportCsv} onExportPdf={handleExportPdf} disabled={upcomingBills.length === 0} />
           </div>
+          <ReportToolbarActions
+            onExportCsv={handleExportCsv}
+            onExportPdf={handleExportPdf}
+            disabled={upcomingBills.length === 0}
+          />
         </div>
       </div>
 

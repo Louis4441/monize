@@ -18,7 +18,7 @@ import { budgetsApi } from '@/lib/budgets';
 import type { Budget, FlexGroupCategory, FlexGroupStatus } from '@/types/budget';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useReportData } from '@/hooks/useReportData';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ReportError } from '@/components/reports/ReportError';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
@@ -396,7 +396,7 @@ export function FlexGroupAnalysisReport() {
               <option key={b.id} value={b.id}>{b.name}</option>
             ))}
           </select>
-          <ExportDropdown onExportPdf={handleExportPdf} />
+          <ReportToolbarActions onExportPdf={handleExportPdf} />
         </div>
       </div>
 

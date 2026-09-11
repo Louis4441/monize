@@ -22,9 +22,8 @@ import { parseLocalDate } from '@/lib/utils';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { gainLossColor } from '@/lib/format';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
-import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import type {
@@ -569,7 +568,12 @@ export function DividendYieldGrowthReport() {
             value={selectedAccountIds}
             onChange={setSelectedAccountIds}
           />
-          <div className="flex gap-2 items-center">
+          {/* `items-stretch`, not `items-center`: squeezed onto a phone these
+              three labels wrap onto a different number of lines each, and a
+              one-word button (Frequency) stood shorter than the two beside it.
+              They wrap onto their own lines here, all the height of the
+              tallest on the line. */}
+          <div className="flex flex-wrap gap-2 items-stretch">
             <button
               onClick={() => setViewType('yield')}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
@@ -595,10 +599,10 @@ export function DividendYieldGrowthReport() {
               {t('dividendYieldGrowth.viewFrequency')}
             </button>
           </div>
-          <div className="ml-auto flex gap-2 items-center">
-            <RefreshPricesButton onRefreshComplete={reload} />
-            <ExportDropdown onExportPdf={handleExportPdf} />
-          </div>
+          <ReportToolbarActions
+            onRefreshComplete={reload}
+            onExportPdf={handleExportPdf}
+          />
         </div>
       </div>
 

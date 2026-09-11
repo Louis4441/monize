@@ -249,6 +249,69 @@ Two hooks, because two different prerequisites. A control whose one possible out
 
 The hook answers `configured: false` until the status settles **and** for a status read that failed -- deliberately, because "we could not ask" is not "there is a provider", and it is also what keeps a control from flashing in and vanishing. Read the cached `aiApi.getStatus` through the hook rather than fetching status again: one request serves every mounted surface, and a provider added or removed in Settings drops that cache.
 
+## A report toolbar wraps, and nothing in it sizes itself past the screen
+
+A report's controls sit in one card above the figures, and on a phone that card
+is about 311px wide (`px-4` on the page, `p-4` on the card, at 375px). Three
+mistakes put a control off the right of it, and all three were reported by a
+human reading the app on a phone rather than by a test:
+
+- **A row that does not wrap.** `flex gap-2 items-center` holding a picker, a
+  view switch and an export has no way to fold, so the last control leaves the
+  card. Every toolbar row is `flex-wrap`, and a group that deserves its own line
+  on a phone takes `w-full sm:w-auto` rather than relying on the wrap landing
+  where you hoped.
+- **`ml-auto` on a wrapped row.** Pushing the trailing group right is correct on
+  one line and ragged on three: the group lands alone against the right edge
+  under two left-aligned rows. Write it `sm:ml-auto`.
+- **An intrinsic width no ancestor can shrink.** A flex item cannot go below its
+  content's min-content width, so anything inside a control that refuses to wrap
+  sets a floor for the whole toolbar. `MultiSelect`'s `sizeToLongestOption`
+  sizer is the case: invisible `whitespace-nowrap` copies of the longest option
+  labels give the trigger its width, and an uncapped copy made the *minimum*
+  width of the Security Performance picker the longest security name -- wider
+  than the screen. Each copy is capped with `max-w-[calc(100vw-12rem)]`, a
+  definite length (a percentage would resolve against the width being computed
+  and clamp nothing), and 12rem clears the widest page and card padding in the
+  app. Below the cap the control is still as wide as its longest option; above
+  it the trigger shrinks and the selected label truncates.
+
+**The refresh and export buttons are `ReportToolbarActions`, never laid out by
+the report.** Render it as the LAST child of the toolbar's wrapping row and give
+it the handlers; it is a full-width row below every selector on a phone (two
+equal halves when the report also refreshes prices) and the toolbar's trailing
+group from `sm` up. Every report wrote that layout for itself once, and a dozen
+wrote it wrong. `ui-conventions.test.ts` fails a report that renders
+`ExportDropdown` or `RefreshPricesButton` itself -- exporting a single format
+is not a reason to hand-roll a button, because the row takes CSV alone too.
+
+What the shared row encodes, for the two places that still compose by hand:
+
+- **The export's box is not always its button.** `ExportDropdown` draws three
+  shapes from the handlers it is given: a dropdown for CSV and PDF together,
+  and a single button for either alone (a view that is a matrix of figures
+  exports CSV and nothing else; its type refuses both handlers missing). The
+  dropdown wraps its button in a `relative inline-block` box, the single-button
+  forms are the box. So sizing the export for a phone (`w-full sm:w-auto`)
+  means sizing the wrapper through `containerClassName` and the button through
+  `className`; where the shape depends on state (a table view that gains a CSV
+  export), pass both. A grid cell stretches that wrapper where a flex row would
+  not, which is why the actions row is a grid. `whitespace-nowrap` on the
+  button keeps the label on one line.
+- **A button beside a field is the height of the field.** A `py-1.5` button
+  against a `py-2` picker reads as a mistake. Put the row in `items-stretch`
+  (or give the export's box `self-stretch`) and pass `h-full`; where the field
+  carries a label above it, reserve the label's own space over the button with
+  `LabelSpacer` (`components/ui/LabelSpacer.tsx`) so what stretches is exactly
+  the input's height, and hide that spacer below `sm`, where the button has no
+  field beside it. Never match the padding by hand -- the figure drifts the
+  next time either control's type scale changes.
+
+`ChartLegend` is the same trade-off answered per caller: it is one column on a
+phone by default, and `phoneColumns={2}` halves the scroll for a legend of short
+names (the spending-by-category legend). A name that has to truncate at half
+width loses its end silently, so check the longest one before asking for two.
+
 ## A `<details>` disclosure is controlled, because jsdom half-implements it
 
 `<details>`/`<summary>` is the disclosure this codebase uses (`PushDiagnostics`, and the foldable Browser push block beside it): native keyboard operation, and the expanded state announced without an `aria-expanded` of our own. But React does not manage `open` the way it manages an input's `value` -- it writes the attribute and stops -- so a component that renders anything off "is this open" must hold that in state, pass `open={state}`, and move it itself. **`onToggle` cannot be the only mover**: jsdom flips `open` on a summary click and fires no `toggle` event at all, so the behaviour is untestable through it and a browser that misses the event leaves the summary describing the wrong state. Handle the summary's `onClick`, `preventDefault()` to cancel the element's own activation behaviour, and toggle state there (Enter and Space on a focused summary dispatch a click, so the keyboard comes with it); keep `onToggle` wired for the toggles no click produces, such as Chrome expanding a `<details>` to reveal a find-in-page match.

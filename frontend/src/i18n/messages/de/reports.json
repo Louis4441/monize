@@ -722,7 +722,6 @@
     "labelAsOfDate": "Stichtag",
     "currencyLabel": "Währung",
     "currencyNative": "Nativ",
-    "exportCsv": "CSV exportieren",
     "generating": "Bericht wird erstellt...",
     "updating": "Wird aktualisiert...",
     "resetToLatest": "Auf letzten Handelstag zurücksetzen",
@@ -1079,7 +1078,6 @@
     "transferTo": "Nach",
     "overallTotal": "Gesamtsumme",
     "includeCurrentMonth": "Laufenden Monat einbeziehen",
-    "exportCsv": "CSV exportieren",
     "csvParentColumn": "Übergeordnete Kategorie"
   },
   "monthlyComparison": {

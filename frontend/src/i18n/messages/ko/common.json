@@ -60,6 +60,7 @@
   },
   "exportDropdown": {
     "export": "내보내기",
+    "exportCsv": "CSV 내보내기",
     "exporting": "내보내는 중...",
     "exportPdf": "PDF 내보내기",
     "exportReport": "보고서 내보내기",

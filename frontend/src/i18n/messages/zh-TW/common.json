@@ -60,6 +60,7 @@
   },
   "exportDropdown": {
     "export": "匯出",
+    "exportCsv": "匯出 CSV",
     "exporting": "匯出中...",
     "exportPdf": "匯出 PDF",
     "exportReport": "匯出報告",

@@ -722,7 +722,6 @@
     "labelAsOfDate": "Станом на дату",
     "currencyLabel": "Валюта",
     "currencyNative": "Рідна",
-    "exportCsv": "Експорт CSV",
     "generating": "Генерація звіту...",
     "updating": "Оновлення...",
     "resetToLatest": "Скинути до останнього торгового дня",
@@ -1079,7 +1078,6 @@
     "transferTo": "До",
     "overallTotal": "Загальний підсумок",
     "includeCurrentMonth": "Включати поточний місяць",
-    "exportCsv": "Експорт CSV",
     "csvParentColumn": "Батьківська категорія"
   },
   "monthlyComparison": {

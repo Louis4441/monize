@@ -18,7 +18,7 @@ import { useDateFormat } from '@/hooks/useDateFormat';
 import { useChartMonthFormat } from '@/hooks/useChartMonthFormat';
 import { useTranslations } from 'next-intl';
 import { useReportData } from '@/hooks/useReportData';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ReportError } from '@/components/reports/ReportError';
 import { chartColors } from '@/lib/chart-colors';
 import { resolvePdfColor } from '@/components/reports/resolve-pdf-color';
@@ -144,9 +144,7 @@ export function BudgetTrendReport() {
             <option value={12}>{t('budgetTrend.months12')}</option>
             <option value={24}>{t('budgetTrend.months24')}</option>
           </select>
-          <div className="ml-auto">
-            <ExportDropdown onExportPdf={handleExportPdf} />
-          </div>
+          <ReportToolbarActions onExportPdf={handleExportPdf} />
         </div>
       </div>
 
