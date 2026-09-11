@@ -67,6 +67,18 @@ describe('ReportToolbarActions', () => {
     expect(screen.getByTitle('Export report')).toBeInTheDocument();
   });
 
+  it('takes a CSV-only report, whose view has no picture to export', () => {
+    const { container } = render(<ReportToolbarActions onExportCsv={vi.fn()} />);
+
+    // Same row, same phone rule: one button spanning it.
+    expect(row(container).className).toContain('grid-cols-1');
+    expect(row(container).className).toContain('w-full');
+    const button = screen.getByTitle('Export CSV');
+    expect(button.className).toContain('w-full');
+    expect(button.className).toContain('whitespace-nowrap');
+    expect(screen.queryByTitle('Export PDF')).not.toBeInTheDocument();
+  });
+
   it('lets a caller opt out of stretching on a taller toolbar line', () => {
     const { container } = render(
       <ReportToolbarActions onExportPdf={vi.fn()} className="sm:self-auto" />,

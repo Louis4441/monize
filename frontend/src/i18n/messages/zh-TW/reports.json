@@ -722,7 +722,6 @@
     "labelAsOfDate": "截至日期",
     "currencyLabel": "貨幣",
     "currencyNative": "原幣",
-    "exportCsv": "匯出 CSV",
     "generating": "產生報表中...",
     "updating": "更新中...",
     "resetToLatest": "重置為最新市場日",
@@ -1079,7 +1078,6 @@
     "transferTo": "至",
     "overallTotal": "整體總計",
     "includeCurrentMonth": "包含當月",
-    "exportCsv": "匯出 CSV",
     "csvParentColumn": "上層類別"
   },
   "monthlyComparison": {

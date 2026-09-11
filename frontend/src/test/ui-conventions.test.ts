@@ -2890,7 +2890,9 @@ describe("a report's export and refresh are one actions row", () => {
    * full-width row below every selector on a phone, two equal halves when the
    * report also refreshes prices, the toolbar's trailing group from `sm` up.
    * A report that renders `ExportDropdown` or `RefreshPricesButton` itself is
-   * writing that layout a second time.
+   * writing that layout a second time. `ExportDropdown` draws all three shapes
+   * -- CSV and PDF, PDF alone, CSV alone -- so a report exporting one format is
+   * not a reason to hand-roll a button either.
    *
    * The rule is about REPORTS. `components/ui/ExportDropdown.tsx` is the button
    * itself, `RefreshPricesButton.tsx` wraps the refresh hook for callers
@@ -2903,25 +2905,13 @@ describe("a report's export and refresh are one actions row", () => {
     "/src/components/ui/ExportDropdown.tsx",
     "/src/components/reports/RefreshPricesButton.tsx",
   ]);
-  const RENDERS_EXPORT = /<ExportDropdown\b/;
-  const RENDERS_REFRESH = /<RefreshPricesButton\b/;
+  const RENDERS_ACTION = /<(ExportDropdown|RefreshPricesButton)\b/;
 
-  /**
-   * A refresh button is only half a layout: it is banned in a report that also
-   * has an export, because there the pair is what the shared row arranges. A
-   * report with no export at all (the custom investment report viewer, whose
-   * export is a plain CSV button) has nothing to pair it with, so it lays its
-   * own out -- and there is no second way to get that wrong.
-   */
   function reportsRenderingTheirOwn(): string[] {
     return productionSources()
       .filter(([path]) => path.startsWith("/src/components/reports/"))
       .filter(([path]) => !MECHANISM.has(path))
-      .filter(([, source]) => {
-        const code = withoutComments(source);
-        if (RENDERS_EXPORT.test(code)) return true;
-        return RENDERS_REFRESH.test(code) && /<ReportToolbarActions\b/.test(code);
-      })
+      .filter(([, source]) => RENDERS_ACTION.test(withoutComments(source)))
       .map(([path]) => path);
   }
 
@@ -2939,13 +2929,13 @@ describe("a report's export and refresh are one actions row", () => {
   });
 
   it("catches the pattern it bans", () => {
-    expect(RENDERS_EXPORT.test(withoutComments("<ExportDropdown onExportPdf={x} />"))).toBe(
+    expect(RENDERS_ACTION.test(withoutComments("<ExportDropdown onExportPdf={x} />"))).toBe(
       true,
     );
-    expect(RENDERS_REFRESH.test(withoutComments("<RefreshPricesButton />"))).toBe(true);
+    expect(RENDERS_ACTION.test(withoutComments("<RefreshPricesButton />"))).toBe(true);
     // ...and reads its own explanation as prose, not as a violation.
     expect(
-      RENDERS_EXPORT.test(withoutComments("// wired to the <ExportDropdown /> above")),
+      RENDERS_ACTION.test(withoutComments("// wired to the <ExportDropdown /> above")),
     ).toBe(false);
   });
 });

@@ -722,7 +722,6 @@
     "labelAsOfDate": "基準日",
     "currencyLabel": "通貨",
     "currencyNative": "現地通貨",
-    "exportCsv": "CSVエクスポート",
     "generating": "レポートを生成中...",
     "updating": "更新中...",
     "resetToLatest": "最新の市場日にリセット",
@@ -1079,7 +1078,6 @@
     "transferTo": "へ",
     "overallTotal": "全体合計",
     "includeCurrentMonth": "今月を含める",
-    "exportCsv": "CSVエクスポート",
     "csvParentColumn": "親カテゴリ"
   },
   "monthlyComparison": {

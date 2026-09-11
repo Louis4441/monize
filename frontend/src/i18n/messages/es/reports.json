@@ -722,7 +722,6 @@
     "labelAsOfDate": "Con fecha de",
     "currencyLabel": "Divisa",
     "currencyNative": "Nativa",
-    "exportCsv": "Exportar CSV",
     "generating": "Generando informe...",
     "updating": "Actualizando...",
     "resetToLatest": "Restablecer al último día de mercado",
@@ -1079,7 +1078,6 @@
     "transferTo": "A",
     "overallTotal": "Total general",
     "includeCurrentMonth": "Incluir mes actual",
-    "exportCsv": "Exportar CSV",
     "csvParentColumn": "Categoría principal"
   },
   "monthlyComparison": {

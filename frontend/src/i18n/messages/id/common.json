@@ -60,6 +60,7 @@
   },
   "exportDropdown": {
     "export": "Ekspor",
+    "exportCsv": "Ekspor CSV",
     "exporting": "Mengekspor...",
     "exportPdf": "Ekspor PDF",
     "exportReport": "Ekspor laporan",

@@ -6,9 +6,7 @@ import toast from 'react-hot-toast';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import { cn } from '@/lib/utils';
 
-interface ExportDropdownProps {
-  onExportCsv?: () => void;
-  onExportPdf: () => void;
+interface ExportDropdownBaseProps {
   disabled?: boolean;
   /**
    * Extra classes for the trigger button, for a caller that has to size it --
@@ -23,11 +21,23 @@ interface ExportDropdownProps {
    * the box a toolbar lays out, which is `inline-block` and therefore as wide
    * as the button's text whatever the button itself is told. A toolbar giving
    * the export its own full line on a phone (`w-full sm:w-auto`) has to size
-   * this, not only the trigger. Ignored by the PDF-only variant, which has no
-   * wrapper: there the button IS the box, so `className` sizes it.
+   * this, not only the trigger. Ignored by the single-format variants, which
+   * have no wrapper: there the button IS the box, so `className` sizes it.
    */
   containerClassName?: string;
 }
+
+/**
+ * At least one format, in one of three shapes: both (a dropdown), PDF alone or
+ * CSV alone (a single button each). A component with neither handler would
+ * render a button that exports nothing, so the union refuses it at the type
+ * level rather than at runtime.
+ */
+type ExportDropdownProps = ExportDropdownBaseProps &
+  (
+    | { onExportPdf: () => void; onExportCsv?: () => void }
+    | { onExportPdf?: undefined; onExportCsv: () => void }
+  );
 
 export function ExportDropdown({
   onExportCsv,
@@ -52,6 +62,7 @@ export function ExportDropdown({
 
   const handleExportPdf = async () => {
     close();
+    if (!onExportPdf) return;
     setIsExporting(true);
     try {
       await onExportPdf();
@@ -62,6 +73,35 @@ export function ExportDropdown({
       setIsExporting(false);
     }
   };
+
+  /**
+   * CSV-only mode: one button, the same shape the PDF-only one has.
+   *
+   * A report whose current view has nothing to draw (a matrix of figures, a
+   * custom report's rows) exports CSV and nothing else, and used to hand-roll
+   * this button -- a third copy of the styling, and one that missed the phone
+   * layout `ReportToolbarActions` gives the other two. Writing to a file is
+   * synchronous here, so there is no `isExporting` state to show: the PDF path
+   * has one because it renders the DOM to an image first.
+   */
+  if (!onExportPdf) {
+    return (
+      <button
+        onClick={handleExportCsv}
+        disabled={disabled}
+        className={cn(
+          'px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed',
+          className,
+        )}
+        title={t('exportDropdown.exportCsv')}
+      >
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        </svg>
+        {t('exportDropdown.exportCsv')}
+      </button>
+    );
+  }
 
   // PDF-only mode: render a single button instead of a dropdown
   if (!onExportCsv) {

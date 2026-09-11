@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { DateInput } from '@/components/ui/DateInput';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
+import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { investmentReportsApi } from '@/lib/investment-reports';
 import { accountsApi } from '@/lib/accounts';
 import { Account } from '@/types/account';
@@ -315,25 +315,14 @@ export function InvestmentReportViewer({ reportId }: InvestmentReportViewerProps
               </div>
             </div>
           </div>
-          {/* The pair spans its own row below the fields on a phone, the way
-              `ReportToolbarActions` lays out every other report's. This one
-              writes it out because its export is a plain CSV button, not the
-              `ExportDropdown` that row renders. */}
-          <div className="grid w-full grid-cols-2 gap-2 sm:ml-auto sm:flex sm:w-auto sm:items-center sm:gap-3">
-            <RefreshPricesButton
-              onRefreshComplete={executeReport}
-              className="h-full w-full sm:w-auto"
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportCsv}
-              disabled={!result || result.rowCount === 0}
-              className="h-full w-full whitespace-nowrap sm:w-auto"
-            >
-              {t('investmentReportViewer.exportCsv')}
-            </Button>
-          </div>
+          {/* CSV only: a custom report is rows, and the viewer draws no chart
+              to put in a PDF. */}
+          <ReportToolbarActions
+            onRefreshComplete={executeReport}
+            onExportCsv={handleExportCsv}
+            disabled={!result || result.rowCount === 0}
+            className="sm:self-auto"
+          />
         </div>
         <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
           {asOfOverride ? (

@@ -282,18 +282,22 @@ it the handlers; it is a full-width row below every selector on a phone (two
 equal halves when the report also refreshes prices) and the toolbar's trailing
 group from `sm` up. Every report wrote that layout for itself once, and a dozen
 wrote it wrong. `ui-conventions.test.ts` fails a report that renders
-`ExportDropdown` itself, or `RefreshPricesButton` beside one.
+`ExportDropdown` or `RefreshPricesButton` itself -- exporting a single format
+is not a reason to hand-roll a button, because the row takes CSV alone too.
 
 What the shared row encodes, for the two places that still compose by hand:
 
-- **The export's box is not always its button.** `ExportDropdown` renders a
-  bare button in its PDF-only form and a `relative inline-block` wrapper around
-  it when a CSV handler is passed. Sizing the export for a phone
-  (`w-full sm:w-auto`) means sizing the wrapper through `containerClassName`
-  and the button through `className`; where the variant depends on state (a
-  table view that gains a CSV export), pass both. A grid cell stretches that
-  wrapper where a flex row would not, which is why the actions row is a grid.
-  `whitespace-nowrap` on the button keeps the label on one line.
+- **The export's box is not always its button.** `ExportDropdown` draws three
+  shapes from the handlers it is given: a dropdown for CSV and PDF together,
+  and a single button for either alone (a view that is a matrix of figures
+  exports CSV and nothing else; its type refuses both handlers missing). The
+  dropdown wraps its button in a `relative inline-block` box, the single-button
+  forms are the box. So sizing the export for a phone (`w-full sm:w-auto`)
+  means sizing the wrapper through `containerClassName` and the button through
+  `className`; where the shape depends on state (a table view that gains a CSV
+  export), pass both. A grid cell stretches that wrapper where a flex row would
+  not, which is why the actions row is a grid. `whitespace-nowrap` on the
+  button keeps the label on one line.
 - **A button beside a field is the height of the field.** A `py-1.5` button
   against a `py-2` picker reads as a mistake. Put the row in `items-stretch`
   (or give the export's box `self-stretch`) and pass `h-full`; where the field

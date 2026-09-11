@@ -60,6 +60,7 @@
   },
   "exportDropdown": {
     "export": "Xuất",
+    "exportCsv": "Xuất CSV",
     "exporting": "Đang xuất...",
     "exportPdf": "Xuất PDF",
     "exportReport": "Xuất báo cáo",

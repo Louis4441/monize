@@ -722,7 +722,6 @@
     "labelAsOfDate": "İtibariyle tarih",
     "currencyLabel": "Para Birimi",
     "currencyNative": "Yerel",
-    "exportCsv": "CSV Dışa Aktar",
     "generating": "Rapor oluşturuluyor...",
     "updating": "Güncelleniyor...",
     "resetToLatest": "Son piyasa gününe sıfırla",
@@ -1079,7 +1078,6 @@
     "transferTo": "Alıcı",
     "overallTotal": "Genel toplam",
     "includeCurrentMonth": "Mevcut ayı dahil et",
-    "exportCsv": "CSV Dışa Aktar",
     "csvParentColumn": "Ana kategori"
   },
   "monthlyComparison": {

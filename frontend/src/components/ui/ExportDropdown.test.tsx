@@ -83,6 +83,42 @@ describe('ExportDropdown', () => {
     expect(screen.getByTitle('Export report').className).toContain('w-full');
   });
 
+  /**
+   * A report whose view is a matrix of figures (the monthly category
+   * breakdown) or a custom report's rows has nothing to render as a picture,
+   * so it exports CSV and nothing else. Both used to hand-roll this button --
+   * a third copy of the styling, and one that missed the phone layout.
+   */
+  describe('CSV-only variant', () => {
+    it('renders one CSV button, not a dropdown', () => {
+      const onExportCsv = vi.fn();
+      render(<ExportDropdown onExportCsv={onExportCsv} />);
+
+      const button = screen.getByTitle('Export CSV');
+      expect(button.tagName).toBe('BUTTON');
+      // No menu to open: the PDF entry that would need one is not offered.
+      expect(screen.queryByText('PDF')).not.toBeInTheDocument();
+
+      fireEvent.click(button);
+      expect(onExportCsv).toHaveBeenCalledTimes(1);
+    });
+
+    it('disables that button like the others', () => {
+      render(<ExportDropdown onExportCsv={vi.fn()} disabled />);
+      expect(screen.getByTitle('Export CSV')).toBeDisabled();
+    });
+
+    it('is the box its toolbar lays out, sized through className', () => {
+      const { container } = render(
+        <ExportDropdown onExportCsv={vi.fn()} className="w-full whitespace-nowrap" />,
+      );
+      const root = container.firstElementChild!;
+      expect(root.tagName).toBe('BUTTON');
+      expect(root.className).toContain('w-full');
+      expect(root.className).toContain('whitespace-nowrap');
+    });
+  });
+
   it('sizes the PDF-only variant through className, having no wrapper', () => {
     const { container } = render(
       <ExportDropdown onExportPdf={vi.fn()} className="w-full whitespace-nowrap" />,

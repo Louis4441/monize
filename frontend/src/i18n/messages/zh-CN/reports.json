@@ -722,7 +722,6 @@
     "labelAsOfDate": "截至日期",
     "currencyLabel": "货币",
     "currencyNative": "本币",
-    "exportCsv": "导出 CSV",
     "generating": "正在生成报告...",
     "updating": "更新中...",
     "resetToLatest": "重置为最新交易日",
@@ -1079,7 +1078,6 @@
     "transferTo": "转入至",
     "overallTotal": "总计",
     "includeCurrentMonth": "包含当月",
-    "exportCsv": "导出 CSV",
     "csvParentColumn": "父分类"
   },
   "monthlyComparison": {

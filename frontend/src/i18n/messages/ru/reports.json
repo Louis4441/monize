@@ -722,7 +722,6 @@
     "labelAsOfDate": "По состоянию на",
     "currencyLabel": "Валюта",
     "currencyNative": "Родная",
-    "exportCsv": "Экспорт CSV",
     "generating": "Создание отчёта...",
     "updating": "Обновление...",
     "resetToLatest": "Сбросить до последнего рыночного дня",
@@ -1079,7 +1078,6 @@
     "transferTo": "В",
     "overallTotal": "Общий итог",
     "includeCurrentMonth": "Включить текущий месяц",
-    "exportCsv": "Экспорт CSV",
     "csvParentColumn": "Родительская категория"
   },
   "monthlyComparison": {

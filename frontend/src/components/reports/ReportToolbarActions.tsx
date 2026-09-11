@@ -4,21 +4,29 @@ import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { cn } from '@/lib/utils';
 
-interface ReportToolbarActionsProps {
+interface ReportToolbarActionsBaseProps {
   /**
    * Present only on a report whose figures depend on security prices: it
    * renders the price-refresh button beside the export. Omit it and the export
    * takes the whole row.
    */
   onRefreshComplete?: (lastUpdated?: string) => void | Promise<void>;
-  onExportPdf: () => void;
-  /** Omit where the current view has nothing tabular to write. */
-  onExportCsv?: () => void;
   /** Disables the export (an empty report has nothing to export). */
   disabled?: boolean;
   /** Extra classes for the row, for a caller that has to opt out of a default. */
   className?: string;
 }
+
+/**
+ * The formats, in the three shapes `ExportDropdown` draws: both, PDF alone, or
+ * CSV alone (a report whose view is a matrix of figures with nothing to render
+ * as a picture). At least one is required -- the row exists to export.
+ */
+type ReportToolbarActionsProps = ReportToolbarActionsBaseProps &
+  (
+    | { onExportPdf: () => void; onExportCsv?: () => void }
+    | { onExportPdf?: undefined; onExportCsv: () => void }
+  );
 
 /**
  * The trailing actions of a report's toolbar: refresh (where the report has
@@ -47,10 +55,11 @@ interface ReportToolbarActionsProps {
  */
 export function ReportToolbarActions({
   onRefreshComplete,
-  onExportPdf,
-  onExportCsv,
   disabled,
   className,
+  // The two handlers travel together as one value: destructured apart, the
+  // union widens to two optional props and the export no longer type-checks.
+  ...formats
 }: ReportToolbarActionsProps) {
   const hasRefresh = onRefreshComplete !== undefined;
 
@@ -70,8 +79,7 @@ export function ReportToolbarActions({
         />
       )}
       <ExportDropdown
-        onExportPdf={onExportPdf}
-        onExportCsv={onExportCsv}
+        {...formats}
         disabled={disabled}
         containerClassName="w-full sm:w-auto"
         className="h-full w-full justify-center whitespace-nowrap sm:w-auto"
