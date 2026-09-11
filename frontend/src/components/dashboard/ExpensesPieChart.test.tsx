@@ -16,10 +16,15 @@ vi.mock('@/lib/transactions', () => ({
 
 // Fixed config so the widget renders deterministically; WidgetCard reads the
 // same hook for its identity overrides (none here).
-const mockUpdateConfig = vi.fn();
+const { widgetConfig, mockUpdateConfig } = vi.hoisted(() => ({
+  widgetConfig: {
+    current: { range: '1m', accountIds: [] as string[], topLevelOnly: false },
+  },
+  mockUpdateConfig: vi.fn(),
+}));
 vi.mock('@/hooks/useWidgetConfig', () => ({
   useWidgetConfig: () => ({
-    config: { range: '1m', accountIds: [] },
+    config: widgetConfig.current,
     updateConfig: mockUpdateConfig,
   }),
 }));
@@ -75,6 +80,8 @@ describe('ExpensesPieChart', () => {
   beforeEach(() => {
     mockPush.mockClear();
     mockGetAllPages.mockReset();
+    mockUpdateConfig.mockClear();
+    widgetConfig.current = { range: '1m', accountIds: [], topLevelOnly: false };
   });
 
   it('renders loading state with title and pulse animation', async () => {
@@ -359,5 +366,101 @@ describe('ExpensesPieChart', () => {
       expect(legendButtons.some((b) => b.textContent?.includes('Food'))).toBe(true);
       expect(legendButtons.some((b) => b.textContent?.includes('Uncategorized'))).toBe(true);
     });
+  });
+
+  // The chart keeps eleven slices; a twelfth category and beyond merge into
+  // Other, which the user can open rather than being told nothing about it.
+  const overflowTransactions = (count: number) =>
+    Array.from({ length: count }, (_, i) => ({
+      id: `t${i}`,
+      // Descending so the ordering is unambiguous: the largest keep their slice.
+      amount: -(count - i) * 10,
+      currencyCode: 'CAD',
+      categoryId: `c${i}`,
+      category: { id: `c${i}`, name: `Cat ${i}`, color: '#111111' },
+    }));
+
+  it('opens Other into the categories it merged, and closes it again', async () => {
+    await renderChart(overflowTransactions(14));
+
+    expect(screen.getByText('Other')).toBeInTheDocument();
+    // The tail is not on screen until Other is opened.
+    expect(screen.queryByText('Cat 13')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('pie-slice-Other'));
+
+    expect(screen.getByText('3 categories in Other')).toBeInTheDocument();
+    expect(screen.getByText('Cat 11')).toBeInTheDocument();
+    expect(screen.getByText('Cat 12')).toBeInTheDocument();
+    expect(screen.getByText('Cat 13')).toBeInTheDocument();
+    // The chart itself still shows eleven categories plus Other; opening the
+    // tail does not turn it into twenty slivers.
+    expect(screen.getByTestId('pie-slice-Cat 0')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('pie-slice-Other'));
+    expect(screen.queryByText('Cat 13')).not.toBeInTheDocument();
+  });
+
+  it('opens the transactions for a category listed inside Other', async () => {
+    await renderChart(overflowTransactions(14));
+    fireEvent.click(screen.getByTestId('pie-slice-Other'));
+    fireEvent.click(screen.getByText('Cat 12'));
+
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.stringContaining('categoryIds=c12'),
+    );
+  });
+
+  it('closes Other when the categories inside it change', async () => {
+    const { rerender } = await renderChart(overflowTransactions(14));
+    fireEvent.click(screen.getByTestId('pie-slice-Other'));
+    expect(screen.getByText('Cat 13')).toBeInTheDocument();
+
+    // A different timeframe asks a different question, so the panel the user
+    // opened over the old tail does not stay open over a new one.
+    widgetConfig.current = { range: '3m', accountIds: [], topLevelOnly: false };
+    mockGetAllPages.mockResolvedValue(overflowTransactions(13));
+    await act(async () => {
+      rerender(<ExpensesPieChart accounts={[]} categories={[]} isLoading={false} />);
+    });
+    await waitFor(() => {
+      expect(screen.queryByText('Cat 12')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('Other')).toBeInTheDocument();
+  });
+
+  it('counts a subcategory against its top-level ancestor when rolled up', async () => {
+    widgetConfig.current = { range: '1m', accountIds: [], topLevelOnly: true };
+    const categories = [
+      { id: 'food', name: 'Food', parentId: null, color: '#111111' },
+      { id: 'groceries', name: 'Groceries', parentId: 'food', color: '#222222' },
+      { id: 'dining', name: 'Dining', parentId: 'groceries', color: '#333333' },
+    ];
+    await renderChart(
+      [
+        { id: 't1', amount: -60, currencyCode: 'CAD', categoryId: 'groceries', category: categories[1] },
+        // Two levels down: the walk goes all the way to the root, not one step.
+        { id: 't2', amount: -40, currencyCode: 'CAD', categoryId: 'dining', category: categories[2] },
+      ],
+      categories,
+    );
+
+    expect(screen.getByTestId('pie-slice-Food')).toBeInTheDocument();
+    expect(screen.queryByTestId('pie-slice-Groceries')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('pie-slice-Dining')).not.toBeInTheDocument();
+    expect(screen.getByText('$100.00')).toBeInTheDocument();
+  });
+
+  it('keeps subcategories apart when the rollup is off', async () => {
+    const categories = [
+      { id: 'food', name: 'Food', parentId: null, color: '#111111' },
+      { id: 'groceries', name: 'Groceries', parentId: 'food', color: '#222222' },
+    ];
+    await renderChart(
+      [{ id: 't1', amount: -60, currencyCode: 'CAD', categoryId: 'groceries', category: categories[1] }],
+      categories,
+    );
+    expect(screen.getByTestId('pie-slice-Groceries')).toBeInTheDocument();
+    expect(screen.queryByTestId('pie-slice-Food')).not.toBeInTheDocument();
   });
 });

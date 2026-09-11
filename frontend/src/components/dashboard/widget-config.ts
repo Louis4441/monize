@@ -71,6 +71,15 @@ export interface RangeAccountsConfig {
 }
 
 /**
+ * Expenses by Category adds a rollup choice: with `topLevelOnly` a subcategory's
+ * spend is counted against its top-level ancestor, so the chart answers "which
+ * part of my budget" rather than listing every leaf.
+ */
+export interface ExpensesPieConfig extends RangeAccountsConfig {
+  topLevelOnly: boolean;
+}
+
+/**
  * Security Type Allocation view. `type` places each holding by its own security
  * type, from the portfolio summary; `assetClass` asks the backend for the
  * look-through breakdown, which sees inside a fund rather than filing the whole
@@ -138,9 +147,10 @@ export const WEEKEND_WEEKDAY_DEFAULT: WeekendConfig = {
 
 // The two default summary charts default to their historical windows: the pie
 // showed the past 30 days, the income/expenses bars the recent weeks.
-export const EXPENSES_PIE_DEFAULT: RangeAccountsConfig = {
+export const EXPENSES_PIE_DEFAULT: ExpensesPieConfig = {
   range: '1m',
   accountIds: [],
+  topLevelOnly: false,
 };
 
 export const INCOME_EXPENSES_DEFAULT: RangeAccountsConfig = {

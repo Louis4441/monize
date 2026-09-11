@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { chartColors } from '@/lib/chart-colors';
@@ -18,15 +18,39 @@ import { useWidgetConfig } from '@/hooks/useWidgetConfig';
 import { resolveRangePreset } from '@/lib/date-range';
 import { CHART_COLOURS } from '@/lib/chart-colours';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { WidgetCard, WidgetConfigRow, WidgetMessage } from './WidgetCard';
 import {
   EXPENSES_PIE_DEFAULT,
   SPENDING_RANGES,
-  RangeAccountsConfig,
+  ExpensesPieConfig,
 } from './widget-config';
 
 const WIDGET_ID = 'expenses-pie';
+/** How many categories keep a slice of their own before the rest become Other. */
+const MAX_SLICES = 11;
+
+/**
+ * The top-level ancestor of a category, walking `parentId` up the tree.
+ *
+ * Returns the id itself for a category that is already top-level or whose
+ * parent is not in the list. The walk is bounded by the number of categories,
+ * so a cycle written by a bad import cannot hang the dashboard.
+ */
+function topLevelCategoryId(
+  categoryId: string,
+  byId: Map<string, Category>,
+): string {
+  let current = byId.get(categoryId);
+  let steps = byId.size;
+  while (current?.parentId && steps-- > 0) {
+    const parent = byId.get(current.parentId);
+    if (!parent) break;
+    current = parent;
+  }
+  return current?.id ?? categoryId;
+}
 
 const nonInvestmentAccounts = (a: Account) => a.accountType !== 'INVESTMENT';
 
@@ -45,10 +69,14 @@ export function ExpensesPieChart({
   const router = useRouter();
   const { formatCurrencyCompact: formatCurrency, formatPercent } = useNumberFormat();
   const { convertToDefault, defaultCurrency } = useExchangeRates();
-  const { config, updateConfig } = useWidgetConfig<RangeAccountsConfig>(
+  const { config, updateConfig } = useWidgetConfig<ExpensesPieConfig>(
     WIDGET_ID,
     EXPENSES_PIE_DEFAULT,
   );
+  // Whether the Other slice is opened into the categories inside it. A view
+  // state, not a setting: it belongs to this glance at the chart, so it is not
+  // persisted and it closes whenever the data behind it changes.
+  const [otherExpanded, setOtherExpanded] = useState(false);
 
   const { start, end } = useMemo(() => resolveRangePreset(config.range), [config.range]);
   const accountIdsKey = config.accountIds.join(',');
@@ -75,6 +103,22 @@ export function ExpensesPieChart({
 
     // Build category lookup
     const categoryLookup = new Map(categories.map((c) => [c.id, c]));
+
+    // Which category a spend is filed under. With the rollup on, a subcategory
+    // counts against its top-level ancestor, so the chart answers "which part
+    // of my budget" rather than listing every leaf. The transactions list
+    // expands a category filter to its descendants, so a rolled-up slice still
+    // opens every transaction behind it.
+    const bucketFor = (
+      categoryId: string,
+      fallback: Category,
+    ): { id: string; category: Category } => {
+      if (!config.topLevelOnly) {
+        return { id: categoryId, category: categoryLookup.get(categoryId) ?? fallback };
+      }
+      const rootId = topLevelCategoryId(categoryId, categoryLookup);
+      return { id: rootId, category: categoryLookup.get(rootId) ?? fallback };
+    };
 
     (transactions ?? []).forEach((tx) => {
       // Skip transfers and investment account transactions
@@ -133,13 +177,13 @@ export function ExpensesPieChart({
           }
           const splitAmount = -convertedSplit;
           if (split.categoryId && split.category) {
-            const cat = categoryLookup.get(split.categoryId) || split.category;
-            const existing = categoryMap.get(split.categoryId);
+            const { id, category: cat } = bucketFor(split.categoryId, split.category);
+            const existing = categoryMap.get(id);
             if (existing) {
               existing.value += splitAmount;
             } else {
-              categoryMap.set(split.categoryId, {
-                id: split.categoryId,
+              categoryMap.set(id, {
+                id,
                 name: cat.name,
                 value: splitAmount,
                 colour: cat.effectiveColor ?? cat.color ?? '',
@@ -151,13 +195,13 @@ export function ExpensesPieChart({
         });
       } else if (tx.categoryId && tx.category) {
         // Regular transaction with category
-        const cat = categoryLookup.get(tx.categoryId) || tx.category;
-        const existing = categoryMap.get(tx.categoryId);
+        const { id, category: cat } = bucketFor(tx.categoryId, tx.category);
+        const existing = categoryMap.get(id);
         if (existing) {
           existing.value += expenseAmount;
         } else {
-          categoryMap.set(tx.categoryId, {
-            id: tx.categoryId,
+          categoryMap.set(id, {
+            id,
             name: cat.name,
             value: expenseAmount,
             colour: cat.effectiveColor ?? cat.color ?? '',
@@ -186,34 +230,49 @@ export function ExpensesPieChart({
       .filter((entry) => entry.value > 0)
       .sort((a, b) => b.value - a.value);
 
-    const MAX_SLICES = 11;
-    let data: typeof sorted;
-
-    if (sorted.length > MAX_SLICES) {
-      const top = sorted.slice(0, MAX_SLICES);
-      const otherTotal = sorted.slice(MAX_SLICES).reduce((sum, item) => sum + item.value, 0);
-      data = [
-        ...top,
-        { id: '', name: t('expensesPieChart.other'), value: otherTotal, colour: chartColors.neutral },
-      ];
-    } else {
-      data = sorted;
-    }
+    const top = sorted.slice(0, MAX_SLICES);
+    const inOther = sorted.slice(MAX_SLICES);
+    const otherTotal = inOther.reduce((sum, item) => sum + item.value, 0);
+    const data =
+      inOther.length > 0
+        ? [
+            ...top,
+            {
+              id: '',
+              name: t('expensesPieChart.other'),
+              value: otherTotal,
+              colour: chartColors.neutral,
+            },
+          ]
+        : top;
 
     // Assign colours to categories without one
     let colourIndex = 0;
-    data.forEach((item) => {
+    [...data, ...inOther].forEach((item) => {
       if (!item.colour) {
         item.colour = CHART_COLOURS[colourIndex % CHART_COLOURS.length];
         colourIndex++;
       }
     });
 
-    return { data, missingCurrencies: [...missingCurrencies], excludedCount };
-  }, [transactions, categories, convertToDefault, t]);
+    return { data, inOther, missingCurrencies: [...missingCurrencies], excludedCount };
+  }, [transactions, categories, convertToDefault, config.topLevelOnly, t]);
 
   const chartData = breakdown.data;
   const totalExpenses = chartData.reduce((sum, item) => sum + item.value, 0);
+  // The categories merged into Other, listed only while the user has opened it.
+  const otherCategories = breakdown.inOther;
+  // Close the disclosure when the categories inside Other are no longer the ones
+  // the user opened -- a different timeframe, account filter or rollup answers a
+  // different question. Keyed on the identities themselves rather than on the
+  // memo's object, which is a fresh reference whenever its inputs re-resolve.
+  // The "info from a previous render" pattern, not a setState in an effect.
+  const otherKey = otherCategories.map((item) => item.id || item.name).join('|');
+  const [openedFor, setOpenedFor] = useState(otherKey);
+  if (openedFor !== otherKey) {
+    setOpenedFor(otherKey);
+    if (otherExpanded) setOtherExpanded(false);
+  }
 
   const handleCategoryClick = (categoryId: string) => {
     if (categoryId) {
@@ -222,6 +281,13 @@ export function ExpensesPieChart({
       params.set('endDate', end);
       router.push(`/transactions?${params.toString()}`);
     }
+  };
+
+  // A slice with an id opens its transactions; Other has none, and opens into
+  // the categories it merged instead of going nowhere.
+  const handleSliceClick = (categoryId: string) => {
+    if (categoryId) return handleCategoryClick(categoryId);
+    if (otherCategories.length > 0) setOtherExpanded((open) => !open);
   };
 
   const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: { id: string; name: string; value: number; colour: string } }> }) => {
@@ -258,6 +324,18 @@ export function ExpensesPieChart({
           filter={nonInvestmentAccounts}
           className="w-full"
         />
+      </WidgetConfigRow>
+      <WidgetConfigRow label={t('expensesPieChart.topLevelOnly')}>
+        <div className="flex items-center gap-2">
+          <ToggleSwitch
+            checked={config.topLevelOnly}
+            onChange={(topLevelOnly) => updateConfig({ topLevelOnly })}
+            label={t('expensesPieChart.topLevelOnly')}
+          />
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            {t('expensesPieChart.topLevelOnlyHint')}
+          </span>
+        </div>
       </WidgetConfigRow>
     </>
   );
@@ -297,7 +375,7 @@ export function ExpensesPieChart({
                   paddingAngle={2}
                   dataKey="value"
                   cursor="pointer"
-                  onClick={(data) => data.id && handleCategoryClick(data.id)}
+                  onClick={(data) => handleSliceClick(String(data.id ?? ''))}
                 >
                   {chartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.colour} />
@@ -333,10 +411,47 @@ export function ExpensesPieChart({
               key: String(index),
               name: item.name,
               color: item.colour,
-              onClick: () => handleCategoryClick(item.id),
-              disabled: !item.id,
+              onClick: () => handleSliceClick(item.id),
+              // Other is only inert while it merged nothing; with categories
+              // inside it, it opens them.
+              disabled: !item.id && otherCategories.length === 0,
             }))}
           />
+          {otherExpanded && otherCategories.length > 0 && (
+            // What Other merged, at the same precision as the slices above it.
+            // The chart keeps eleven slices whatever happens here: turning a
+            // long tail into twenty slivers would make the chart unreadable and
+            // answer a different question from the one the user asked.
+            <div className="mt-3 border-t border-gray-200 dark:border-gray-700 pt-3">
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                {t('expensesPieChart.insideOther', { count: otherCategories.length })}
+              </p>
+              <ul className="space-y-1">
+                {otherCategories.map((item) => (
+                  <li key={item.id || item.name}>
+                    <button
+                      type="button"
+                      onClick={() => handleCategoryClick(item.id)}
+                      disabled={!item.id}
+                      className="flex w-full items-center gap-2 rounded-sm px-1 py-0.5 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-default disabled:hover:bg-transparent"
+                    >
+                      <span
+                        aria-hidden
+                        className="h-2.5 w-2.5 flex-shrink-0 rounded-sm"
+                        style={{ backgroundColor: item.colour }}
+                      />
+                      <span className="truncate text-gray-600 dark:text-gray-300">
+                        {item.name}
+                      </span>
+                      <span className="ml-auto flex-shrink-0 text-gray-900 dark:text-gray-100">
+                        {formatCurrency(item.value)}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </>
       )}
     </WidgetCard>
