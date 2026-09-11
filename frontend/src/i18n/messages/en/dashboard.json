@@ -94,7 +94,13 @@
     "filter": {
       "all": "All",
       "gainers": "Gainers",
-      "losers": "Losers"
+      "losers": "Losers",
+      "label": "Direction"
+    },
+    "metric": {
+      "label": "Rank by",
+      "amount": "Amount",
+      "percent": "Percent"
     }
   },
   "favouriteSecurities": {
