@@ -37,8 +37,10 @@ function withoutComments(source: string): string {
 
 /**
  * A phone value being put somewhere, in each dialect this codebase uses: an
- * object literal, an assignment, and raw SQL. Deliberately by shape rather than
- * by file, because the point is to catch the writer nobody has thought of yet.
+ * object literal, an assignment, and raw SQL -- both the `UPDATE` that names
+ * the column and the `INSERT` that names it in a column list. Deliberately by
+ * shape rather than by file, because the point is to catch the writer nobody
+ * has thought of yet.
  */
 const PHONE_WRITES: ReadonlyArray<{ what: string; pattern: RegExp }> = [
   { what: "an entity or update field", pattern: /\bphone:\s*(?!undefined\b)/ },
@@ -46,6 +48,14 @@ const PHONE_WRITES: ReadonlyArray<{ what: string; pattern: RegExp }> = [
   {
     what: "raw SQL setting phone",
     pattern: /\bSET\b[\s\S]{0,200}?\bphone\s*=/i,
+  },
+  {
+    // `[^)]` keeps the match inside the column list: an INSERT that does not
+    // name the column, followed anywhere later in the file by the word, is not
+    // a write. A row of placeholders says nothing about which column each one
+    // fills, so the column list is the only place an INSERT declares itself.
+    what: "raw SQL inserting a phone column",
+    pattern: /\bINSERT\s+INTO\s+\w+\s*\([^)]{0,400}\bphone\b/i,
   },
 ];
 
@@ -82,14 +92,18 @@ const NORMALIZING_DOORS: Record<string, string> = {
 
 /**
  * Files that carry a phone value past a database call without deciding its
- * format -- a read model, or an adapter over a service that normalizes. Each is
- * listed with the reason, because ending up here should be a decision.
+ * format -- a read model, an adapter over a service that normalizes, or a
+ * writer of a fixed constant whose format another spec pins. Each is listed
+ * with the reason, because ending up here should be a decision, and the reason
+ * has to name what decides the format instead of this file.
  */
 const PASSES_THROUGH: Record<string, string> = {
   "ai/actions/ai-actions.service.ts":
     "builds a CreatePayeeDto/UpdatePayeeDto and calls PayeesService, which normalizes; it holds no Payee repository",
   "mcp/tools/payees.tool.ts":
     "builds tool rows and calls PayeesService, which normalizes; it holds no Payee repository",
+  "database/demo-seed.service.ts":
+    "writes the fixed demo payee numbers from demo-seed-data/payees.ts, whose spec asserts each one already equals its own normalized stored form",
 };
 
 function sourceFiles(): string[] {
@@ -171,6 +185,26 @@ describe("a payee phone is stored in one form", () => {
     const sql = `await m.query("UPDATE payees SET phone = $1 WHERE id = $2");`;
     expect(PHONE_WRITES.some(({ pattern }) => pattern.test(sql))).toBe(true);
     expect(PERSISTS.test(sql)).toBe(true);
+
+    // An INSERT names the column in its list rather than beside its value, so
+    // the UPDATE pattern above reads straight past it -- which is how a seeder
+    // came to write this column without going through a door.
+    const insert = `await m.query(\`INSERT INTO payees (
+        user_id, name, website, address, phone
+      ) VALUES ($1, $2, $3, $4, $5)\`);`;
+    expect(PHONE_WRITES.some(({ pattern }) => pattern.test(insert))).toBe(true);
+    expect(PERSISTS.test(insert)).toBe(true);
+  });
+
+  it("does not read an INSERT that leaves the column alone as a write", () => {
+    // The word appearing later in the file -- another statement, a variable, a
+    // returned column -- is not this INSERT naming the column.
+    const insert = `await m.query(\`INSERT INTO payees (user_id, name) VALUES ($1, $2)\`);
+      const phone = row.phone;`;
+    const inserts = PHONE_WRITES.find(({ what }) =>
+      what.includes("inserting"),
+    ) as { pattern: RegExp };
+    expect(inserts.pattern.test(insert)).toBe(false);
   });
 
   it("does not read a declaration as a write", () => {

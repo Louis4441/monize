@@ -67,9 +67,10 @@ normalized. And **the lookup normalizes before any caller sees a suggestion**
 enrichment `UPDATE` safe: it writes a model's answer straight into the column
 with no DTO anywhere in its path. `phone-normalization.guard.spec.ts` fails on a
 file that both writes a phone and reaches the database without going through a
-door, and `common/phone-number-cases.json` is the truth table this layer and the
-frontend both assert, so the two can never disagree about which numbers are
-accepted.
+door -- an object field, an assignment, an `UPDATE` naming the column or an
+`INSERT` listing it -- and `common/phone-number-cases.json` is the truth table
+this layer and the frontend both assert, so the two can never disagree about
+which numbers are accepted.
 
 **A region is a fact about the reader, not evidence about a third party.**
 `number_format` says where *this user* dials from, which is exactly what places

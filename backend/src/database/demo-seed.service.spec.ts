@@ -5,7 +5,7 @@ import { SeedService } from "./seed.service";
 import { FaviconService } from "../common/favicon/favicon.service";
 import { demoAccounts } from "./demo-seed-data/accounts";
 import { demoInstitutions } from "./demo-seed-data/institutions";
-import { demoPayees } from "./demo-seed-data/payees";
+import { demoPayees, DemoPayee } from "./demo-seed-data/payees";
 import { demoScheduledTransactions } from "./demo-seed-data/scheduled";
 import { demoSecurities } from "./demo-seed-data/securities";
 import { demoReports } from "./demo-seed-data/reports";
@@ -256,6 +256,77 @@ describe("DemoSeedService", () => {
 
       // demoPayees + Transfer payee
       expect(payeeCalls.length).toBe(demoPayees.length + 1);
+    });
+
+    it("writes each payee's website, address and phone", async () => {
+      await service.seedDemoData("user-123");
+
+      const sample = demoPayees.find((payee) => payee.website) as DemoPayee;
+      const insert = dataSource.query.mock.calls.find(
+        (call: [string, unknown[]]) =>
+          call[0].includes("INSERT INTO payees") && call[1][1] === sample.name,
+      );
+
+      expect(insert[0]).toContain("website");
+      expect(insert[1]).toEqual(
+        expect.arrayContaining([sample.website, sample.address, sample.phone]),
+      );
+    });
+
+    it("leaves the contact details of a payee that has none null", async () => {
+      await service.seedDemoData("user-123");
+
+      // A person or a private client carries no website, and a made-up one
+      // would render a broken icon and a link to nowhere.
+      const bare = demoPayees.find((payee) => !payee.website) as DemoPayee;
+      const insert = dataSource.query.mock.calls.find(
+        (call: [string, unknown[]]) =>
+          call[0].includes("INSERT INTO payees") && call[1][1] === bare.name,
+      );
+
+      expect(insert[1][3]).toBeNull();
+    });
+
+    it("caches a fetched brand logo on the payee", async () => {
+      logoService.fetchFavicon.mockResolvedValue({
+        data: Buffer.from("icon"),
+        contentType: "image/png",
+      });
+
+      await service.seedDemoData("user-123");
+
+      const withSite = demoPayees.filter((payee) => payee.website);
+      for (const payee of withSite) {
+        expect(logoService.fetchFavicon).toHaveBeenCalledWith(payee.website);
+      }
+
+      const sample = withSite[0];
+      const insert = dataSource.query.mock.calls.find(
+        (call: [string, unknown[]]) =>
+          call[0].includes("INSERT INTO payees") && call[1][1] === sample.name,
+      );
+      expect(insert[1]).toEqual(
+        expect.arrayContaining([Buffer.from("icon"), "image/png", true]),
+      );
+    });
+
+    it("seeds a payee whose favicon cannot be fetched with no logo", async () => {
+      // The favicon resolver is a third party; an unreachable one leaves the
+      // payee on its letter badge rather than failing the seed.
+      logoService.fetchFavicon.mockRejectedValue(new Error("offline"));
+
+      await service.seedDemoData("user-123");
+
+      const sample = demoPayees.find((payee) => payee.website) as DemoPayee;
+      const insert = dataSource.query.mock.calls.find(
+        (call: [string, unknown[]]) =>
+          call[0].includes("INSERT INTO payees") && call[1][1] === sample.name,
+      );
+      expect(insert[1][6]).toBeNull();
+      expect(insert[1][8]).toBe(false);
+      // The attempt is still stamped: the column records when the favicon was
+      // last looked for, and null there would mean it never was.
+      expect(insert[1][9]).toEqual(expect.any(String));
     });
 
     it("seeds transactions including regular, splits, and transfers", async () => {
