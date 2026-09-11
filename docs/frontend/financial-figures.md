@@ -48,6 +48,8 @@ This was briefly a user preference (migration 152, dropped by 153); it was remov
 
 Both halves come from **one hook**, `hooks/usePortfolioChangeBaseline.ts` (`usesPriorClose` and the `priorClose` together); the arithmetic and range set live once in `components/investments/portfolio-change-baseline.ts`. Deciding *whether* a prior close applies in one place and reading the close in another is the specific bug the single hook prevents. The baseline is looked up for the **first point on screen**, never the requested window start (on a weekend the 1D chart shows the last session). A baseline that has not loaded makes the change **unknown** -- both cards read N/A, never the first-point change.
 
+The change itself is `portfolioSeriesChange(values, { usesPriorClose, priorCloseValue })`, read by the Investments chart and the Portfolio Value widget alike, so no surface can report a different move for the same window. A **baseline of zero has no percentage**: the money change is still known, the percentage is `null`, and 0% -- which would say the portfolio held its ground -- is never shown.
+
 ## The window a price chart requests is not the period its range names
 
 `resolveRangePreset` answers "what period is the user asking about", and ten reports depend on that answer. A *price* chart asks a narrower question -- **which close is the series measured from** -- so it has its own function: `components/investments/portfolio-range-window.ts` holds the table (`PORTFOLIO_WINDOW_STARTS`), and the Portfolio Value report, the Investments chart and the dashboard widget resolve through `usePortfolioRangeWindow`. Do not reach for `resolveRangePreset` in a fourth portfolio surface, and do not "fix" a range by editing the shared resolver.

@@ -90,7 +90,15 @@ An `unobtrusive` anchorless step parks its card in the bottom-**right** corner, 
 
 ## A dashboard widget header carries its icon from `widget-meta.tsx`
 
-`WIDGET_ICONS` gives every registered widget a distinct Heroicon (`widget-meta.test.tsx` enforces coverage), rendered as the tinted `WidgetIconPuck` -- blue ramp only, so themes re-tint it. Widgets on `WidgetCard` get it from their `widgetId`; a widget drawing its own header uses `WidgetHeading`, which also owns the title-button markup.
+`WIDGET_ICONS` gives every registered widget a distinct Heroicon (`widget-meta.test.tsx` enforces coverage), rendered as the tinted `WidgetIconPuck` -- blue ramp only, so themes re-tint it. Widgets on `WidgetCard` get it from their `widgetId`; a widget drawing its own header uses `WidgetHeading`.
+
+A widget's title is a link to the fuller view of the same figures, named as a route: `titleHref` on `WidgetCard`, `href` on `WidgetHeading`. Both render it through `WidgetTitle`, the one place that decides what a title looks like and how it behaves; a widget with no fuller view passes neither and gets a plain heading.
+
+## A month of scheduled occurrences is drawn once
+
+`lib/scheduled-calendar.ts` decides what falls on which day (`occurrencesInWindow` applies each override, so a moved occurrence appears on the day it was moved to and not the day it was generated for; the scan reaches a month past the grid so an occurrence moved *into* view is still found), and `components/bills/ScheduledCalendarGrid.tsx` draws it. The Bills & Deposits page and the Upcoming Bills widget both read them, differing only in `maxChipsPerDay` and the cell height. Chip colour is `SCHEDULED_KIND_CHIP_CLASSES[occurrenceKind(...)]` -- classified from the occurrence, never from the schedule's stored sign.
+
+The grid prints names on dates and no amount per occurrence, which is why `scheduled-calendar.ts` is on the client-expansion exemption list in `scheduled-effective-amount.guard.test.ts`. Anything that wants a per-occurrence *amount* asks the server (`GET /scheduled-transactions/occurrences`) instead.
 
 ## The device can override a stored preference, and the predicate is never the viewport
 
