@@ -255,7 +255,8 @@
     "empty": "No holdings to show.",
     "viewRegion": "Region",
     "viewExchange": "Exchange",
-    "viewCountry": "Country"
+    "viewCountry": "Country",
+    "listingBasisNote": "Grouped by where each holding is listed. Switch to Country to see inside funds."
   },
   "recurringExpenses": {
     "title": "Top Recurring Expenses",

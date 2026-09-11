@@ -143,4 +143,35 @@ describe('GeographicAllocationWidget', () => {
     expect(screen.getByText('United States')).toBeInTheDocument();
     expect(screen.queryByText(/partial total/i)).not.toBeInTheDocument();
   });
+
+  // Region and exchange classify a holding by where it is listed, so a globally
+  // diversified fund bought on the NYSE counts as North America. The chart says
+  // so rather than being left to read as economic exposure.
+  const LISTING_NOTE =
+    'Grouped by where each holding is listed. Switch to Country to see inside funds.';
+
+  const oneUsHolding = () => {
+    getPortfolioSummary.mockResolvedValue({ holdings: [holding('s1', 1000)] });
+    getSecurities.mockResolvedValue([security('s1', 'NYSE')]);
+    getCountryWeightings.mockResolvedValue({
+      items: [{ country: 'United States', totalValue: 1000, percentage: 100 }],
+      totalPortfolioValue: 1000,
+      totalDirectValue: 1000,
+      totalEtfValue: 0,
+      unclassifiedValue: 0,
+    });
+  };
+
+  it('says the region view groups by listing', async () => {
+    oneUsHolding();
+    await renderWidget();
+    expect(screen.getByText(LISTING_NOTE)).toBeInTheDocument();
+  });
+
+  it('leaves the caveat off the country view, which is the look-through', async () => {
+    oneUsHolding();
+    configState.current = { accountIds: [], view: 'country' };
+    await renderWidget();
+    expect(screen.queryByText(LISTING_NOTE)).toBeNull();
+  });
 });

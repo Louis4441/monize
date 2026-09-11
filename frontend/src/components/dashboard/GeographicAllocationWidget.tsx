@@ -268,6 +268,15 @@ export function GeographicAllocationWidget({
           </div>
         </>
       )}
+      {!loading && !isEmpty && config.view !== 'country' && (
+        // Region and exchange both classify a holding by where it is listed, so
+        // a globally diversified fund bought on the NYSE counts as North
+        // America. Say so, and name the view that looks inside it, rather than
+        // leaving the chart to be read as economic exposure.
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          {t('geographicAllocation.listingBasisNote')}
+        </p>
+      )}
       {!loading && !isEmpty && partialNote && (
         // Some holdings converted and some did not: the shares above are of the
         // convertible subset, so mark them a subtotal rather than 100%.
