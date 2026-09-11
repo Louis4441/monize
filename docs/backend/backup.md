@@ -39,8 +39,11 @@ is enumerated: the flat base folder a pre-per-user version wrote into carries no
 owner in its filenames, so nothing there can be attributed to anybody and
 offering one for download would hand a user another user's ledger. A name is
 served only when `classifyBackupFileName` (`backup-file-names.ts`) recognises it,
-and the join is still containment-checked, because a validated name with an
-unvalidated join is a decorative check. The listing carries the caller's own
+and the path that is opened is the directory entry's rather than the caller's
+string -- the requested name is compared against the folder's own listing and
+the matching entry is what gets joined -- with the join still
+containment-checked, because a validated name with an unvalidated join is a
+decorative check. The listing carries the caller's own
 `enabled` flag: the settings endpoint that would otherwise answer "is anything
 backing me up?" is admin-only, and the Settings section hides itself on it.
 

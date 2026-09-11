@@ -335,12 +335,18 @@ export class AutoBackupService {
   /**
    * Locate one of this user's stored backups so the caller can stream it.
    *
-   * The name is accepted only when `classifyBackupFileName` recognises it,
-   * which is what keeps this from being an arbitrary-file read: the patterns
-   * admit a fixed prefix, a tier, a date and one of two extensions, and nothing
-   * with a separator in it. The join is still containment-checked
-   * (`safePath`), because a validated name and an unvalidated join is how a
-   * check becomes decorative.
+   * Three checks, each of which would be enough on its own and none of which is
+   * therefore load-bearing alone. The name is accepted only when
+   * `classifyBackupFileName` recognises it -- the patterns admit a fixed
+   * prefix, a tier, a date and one of two extensions, and nothing with a
+   * separator in it. **The path that is opened is the directory entry's, never
+   * the caller's string**: the requested name is compared against this user's
+   * own folder listing and the matching entry is what gets joined, so the value
+   * reaching the filesystem is one this deployment wrote rather than one a
+   * request carried in (the same CWE-22 boundary `validateFolderPath` states
+   * for operator-supplied paths, and what lets a SAST tool see it). The join is
+   * still containment-checked (`safePath`), because a validated name and an
+   * unvalidated join is how a check becomes decorative.
    *
    * An unrecognised name and an absent file answer the same 404 on purpose: the
    * difference between "no such artifact" and "not a name we write" tells a
@@ -362,11 +368,31 @@ export class AutoBackupService {
       userId,
       settings?.folderPath,
     );
-    const path = this.safePath(folder, filename);
+
+    let entries: string[];
+    try {
+      entries = await fs.readdir(folder);
+    } catch {
+      // No folder yet is the same answer as no such artifact: a user enrolled
+      // on the deployment defaults has one only after their first run.
+      throw new NotFoundException(
+        tr("errors.backup.storedBackupNotFound", "Backup file not found"),
+      );
+    }
+    // The requested name is only ever compared here; `entry` is the server's
+    // own string from `readdir`, and it is `entry` that is joined and opened.
+    const entry = entries.find((name) => name === filename);
+    if (entry === undefined) {
+      throw new NotFoundException(
+        tr("errors.backup.storedBackupNotFound", "Backup file not found"),
+      );
+    }
+
+    const path = this.safePath(folder, entry);
     try {
       const stat = await fs.stat(path);
       if (!stat.isFile()) throw new Error("not a file");
-      return { path, size: stat.size, filename };
+      return { path, size: stat.size, filename: entry };
     } catch {
       throw new NotFoundException(
         tr("errors.backup.storedBackupNotFound", "Backup file not found"),

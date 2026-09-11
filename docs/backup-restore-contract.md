@@ -840,7 +840,12 @@ be able to take and restore what it produced for them. Three things bound it —
 only the caller's own server-computed folder is enumerated (never the legacy flat
 root, whose filenames carry no owner), only names `classifyBackupFileName`
 recognises are served, and the listing reports the caller's own `enabled` so the
-section is absent on a deployment that runs no automatic backups. Restoring from
+section is absent on a deployment that runs no automatic backups. A download
+opens the **directory entry**, never the name the request carried: the requested
+name is compared against that folder's own listing and the matching entry is
+what is joined and streamed, so the string reaching the filesystem is one this
+deployment wrote. `safePath` still containment-checks the join, because a
+validated name with an unvalidated join is a decorative check. Restoring from
 that list **downloads the artifact and hands it to the existing restore form**,
 so the encryption sniff, the warning, the account-password or OIDC confirmation
 and the summary dialogue are the same ones a file picked from disk goes through;

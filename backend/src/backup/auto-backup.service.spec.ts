@@ -1223,6 +1223,28 @@ describe("AutoBackupService", () => {
       );
     });
 
+    it("opens the directory entry rather than the name the request carried", async () => {
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true }),
+      );
+      await seed("monize-backup-daily-2026-04-15.json.gz", userId, "bytes");
+      // The listing is what decides: a file on disk that this user's folder
+      // does not enumerate is not served, because the string that reaches the
+      // filesystem is the entry `readdir` returned and not the one the caller
+      // typed. Statting the caller's own string instead would open it.
+      const readdir = jest.spyOn(fs, "readdir").mockResolvedValue([] as never);
+
+      await expect(
+        service.openStoredBackup(
+          userId,
+          "monize-backup-daily-2026-04-15.json.gz",
+        ),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(readdir).toHaveBeenCalled();
+      readdir.mockRestore();
+    });
+
     it("does not reach another user's folder through their own filename", async () => {
       mockSettingsRepo.findOne.mockResolvedValue(
         createSettings({ enabled: true }),
