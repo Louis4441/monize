@@ -15,6 +15,11 @@ matrix, and it is committed before any implementation. Per `CONTRIBUTING.md`
 it is also the proposal: nothing in the task list starts until a Discussion
 has agreed it.
 
+The two choices the proposal asked the maintainer to confirm explicitly are
+settled, and the answer to both is the one this document already argued for:
+the app's own palette colours the chips (decision 4), and the daily change is
+the movement net of external flows (decision 8). Neither alternative is open.
+
 ## 1. Goal
 
 - A **Table / Calendar** toggle on both pages. Table is what exists today and
@@ -80,7 +85,8 @@ from one of three new read models built out of those endpoints' services.
 3. **Scope is the page's account filter.** Transactions page: the filter's
    accounts, or every active account when none is chosen. Investments page:
    the selected investment accounts (with their linked cash sleeves), or all.
-4. **Colour is the app's own palette, not Quicken's three families.** A real
+4. **Colour is the app's own palette, not Quicken's three families.** Confirmed
+   by the maintainer. A real
    transaction's chip takes `ACCOUNT_TYPE_META[account.accountType].pillClass`,
    the same colour the account list already shows for that type. A scheduled
    occurrence's chip takes `SCHEDULED_KIND_CHIP_CLASSES[occurrenceKind(...)]`,
@@ -103,7 +109,8 @@ from one of three new read models built out of those endpoints' services.
 7. **An investment value is never projected.** The Values layer stops at today.
    A market value has no honest forward series, and projecting the cash sleeve
    alone would put a subtotal under the value's caption.
-8. **The daily change is the movement net of external flows**, exactly the
+8. **The daily change is the movement net of external flows** (confirmed by the
+   maintainer), exactly the
    measure `docs/specs/portfolio-movement-notifications.md` adopted and for the
    same reason: a price-only measure shows an ex-dividend drop as a loss the
    user did not take, and a deposit day as a gain the market did not produce.

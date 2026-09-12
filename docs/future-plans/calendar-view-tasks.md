@@ -29,7 +29,7 @@ Every task is safe to merge in any order that respects its dependencies: the end
 
 | ID | Task | Depends on | Deploy impact | Status |
 |----|------|-----------|---------------|--------|
-| S1 | Discussion agreeing `calendar-view.md`; label `approved-to-build` | -- | none | [ ] |
+| S1 | Discussion agreeing `calendar-view.md`; label `approved-to-build` | -- | none | [x] |
 | F1 | `lib/calendar-month.ts`, `MonthGrid`, `ViewModeToggle`, `viewModeStore` (+ guard entries) | S1 | inert | [x] |
 | B1 | `rate-index.util.ts` extraction + `GET /accounts/daily-balance-totals` | S1 | inert (extraction neutral) | [ ] |
 | B2 | `investments-daily`: `pricesComplete` / `unpricedSecurityIds` (additive) + client type | S1 | neutral | [ ] |
@@ -59,6 +59,8 @@ Every task is safe to merge in any order that respects its dependencies: the end
 ### S1 -- Proposal
 
 Open a Discussion linking `calendar-view.md`, summarising decisions 1-11 and the three endpoints, and asking the maintainer to confirm two choices explicitly: the app-palette colouring (decision 4, not Quicken's three families) and the net-of-flows daily change (decision 8, not price-only). Record the answers as edits to the design before F1 starts.
+
+Both are confirmed: app-palette chip colouring, and the daily change net of external flows. The design records the answers beside each decision.
 
 ### F1 -- Grid, toggle, store
 
