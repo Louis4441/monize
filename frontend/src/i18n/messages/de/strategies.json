@@ -358,7 +358,9 @@
       "NO_POSITION": "Die Strategiekonten halten keine Instrumente.",
       "FIRST_RUN": "Diese Strategie wurde noch nicht ausgewertet – das erste Signal erscheint nach der nächsten geplanten Auswertung.",
       "STALE_PRICES": "Einige der Kurse hinter diesem Bericht sind nicht aktuell, das Signal kann sich nach einer Aktualisierung ändern. Am ältesten oder ganz fehlend sind:",
-      "CALCULATION_FAILED": "Das Signal konnte aus den verfügbaren Daten nicht berechnet werden."
+      "CALCULATION_FAILED": "Das Signal konnte aus den verfügbaren Daten nicht berechnet werden.",
+      "SHORT_HISTORY": "Nicht genug Kurshistorie, um die aktuelle Periode zu berechnen. Diese Rollen benötigen Kurse zurück bis {from}:",
+      "shortHistoryFix": "Öffnen Sie jedes dieser Instrumente und verwenden Sie „Ein weiteres Jahr Kurshistorie hinzufügen“, und öffnen Sie diesen Bericht dann erneut."
     },
     "footer": {
       "pastResults": "Vergangene Ergebnisse sind keine Garantie für künftige Renditen.",

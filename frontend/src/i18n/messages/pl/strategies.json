@@ -358,7 +358,9 @@
       "NO_POSITION": "Konta strategii nie posiadają żadnych instrumentów.",
       "FIRST_RUN": "Ta strategia nie została jeszcze oceniona – pierwszy sygnał pojawi się po najbliższej zaplanowanej ocenie.",
       "STALE_PRICES": "Część cen stojących za tym raportem nie jest aktualna, więc sygnał może się zmienić po ich odświeżeniu. Najstarsze lub całkowicie brakujące dotyczą:",
-      "CALCULATION_FAILED": "Nie udało się obliczyć sygnału z dostępnych danych."
+      "CALCULATION_FAILED": "Nie udało się obliczyć sygnału z dostępnych danych.",
+      "SHORT_HISTORY": "Za mało historii cen, aby policzyć bieżący okres. Te role potrzebują cen od {from}:",
+      "shortHistoryFix": "Otwórz każdy z tych instrumentów i użyj przycisku „Dodaj kolejny rok historii cen”, a następnie otwórz raport ponownie."
     },
     "footer": {
       "pastResults": "Wyniki historyczne nie gwarantują przyszłych zwrotów.",

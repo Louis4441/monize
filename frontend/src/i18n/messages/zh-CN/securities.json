@@ -248,7 +248,9 @@
     },
     "collapseAll": "全部折叠",
     "expandAll": "全部展开",
-    "groupCount": "{count} 条价格"
+    "groupCount": "{count} 条价格",
+    "addYearButton": "再添加一年历史",
+    "addYearTitle": "从数据提供方再获取一年历史价格"
   },
   "transactionHistory": {
     "accountLabel": "账户",

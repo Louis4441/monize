@@ -248,7 +248,9 @@
     },
     "collapseAll": "Tutup semua",
     "expandAll": "Buka semua",
-    "groupCount": "{count} harga"
+    "groupCount": "{count} harga",
+    "addYearButton": "Tambah Satu Tahun Riwayat Lagi",
+    "addYearTitle": "Ambil satu tahun harga historis lagi dari penyedia"
   },
   "transactionHistory": {
     "accountLabel": "Akun",

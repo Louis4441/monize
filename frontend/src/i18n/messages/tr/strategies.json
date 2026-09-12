@@ -358,7 +358,9 @@
       "NO_POSITION": "Strateji hesapları hiçbir enstrüman tutmuyor.",
       "FIRST_RUN": "Bu strateji henüz değerlendirilmedi – ilk sinyal, planlanan sonraki değerlendirmeden sonra görünecek.",
       "STALE_PRICES": "Bu raporun dayandığı fiyatların bir kısmı güncel değil; yenilendiklerinde sinyal değişebilir. En eskiler ya da tamamen eksik olanlar:",
-      "CALCULATION_FAILED": "Sinyal, mevcut verilerle hesaplanamadı."
+      "CALCULATION_FAILED": "Sinyal, mevcut verilerle hesaplanamadı.",
+      "SHORT_HISTORY": "Mevcut dönemi hesaplamak için yeterli fiyat geçmişi yok. Bu roller {from} tarihine kadar fiyat gerektiriyor:",
+      "shortHistoryFix": "Bu araçların her birini açıp “Bir yıl daha fiyat geçmişi ekle” seçeneğini kullanın, ardından bu raporu yeniden açın."
     },
     "footer": {
       "pastResults": "Geçmiş sonuçlar gelecekteki getirileri garanti etmez.",

@@ -358,7 +358,9 @@
       "NO_POSITION": "策略账户中没有任何标的。",
       "FIRST_RUN": "该策略尚未评估 — 第一个信号将在下次计划评估后出现。",
       "STALE_PRICES": "本报告依据的部分价格并非最新，刷新后信号可能改变。最旧的或完全缺失的是：",
-      "CALCULATION_FAILED": "无法根据现有数据计算信号。"
+      "CALCULATION_FAILED": "无法根据现有数据计算信号。",
+      "SHORT_HISTORY": "价格历史不足，无法计算当前周期。这些角色需要回溯到 {from} 的价格：",
+      "shortHistoryFix": "打开每个此类工具并使用“再添加一年价格历史”，然后重新打开此报告。"
     },
     "footer": {
       "pastResults": "过往表现不保证未来回报。",

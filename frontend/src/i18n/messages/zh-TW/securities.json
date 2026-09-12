@@ -248,7 +248,9 @@
     },
     "collapseAll": "全部收合",
     "expandAll": "全部展開",
-    "groupCount": "{count} 筆價格"
+    "groupCount": "{count} 筆價格",
+    "addYearButton": "再新增一年歷史",
+    "addYearTitle": "向資料提供者再取得一年歷史價格"
   },
   "transactionHistory": {
     "accountLabel": "科目",

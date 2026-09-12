@@ -579,6 +579,7 @@ export function GemStrategyReport() {
       <GemWarningsBanner
         warnings={data.warnings}
         lookbackMonths={strategy.lookbackMonths}
+        assets={assets}
       />
 
       {tab === "overview" && (

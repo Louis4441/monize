@@ -193,7 +193,15 @@ explicit unknown marker for it -- never a zero.
 
 Warnings the report can carry: `UNMAPPED_ROLE`, `INCOMPLETE_HISTORY`,
 `LEGACY_PERIODS`, `NO_ACCOUNT`, `NO_POSITION`, `FIRST_RUN`, `STALE_PRICES`,
-`CALCULATION_FAILED`.
+`SHORT_HISTORY`, `CALCULATION_FAILED`. `SHORT_HISTORY` is the specific,
+actionable form of a missing signal: when a required leg (the US equity leg,
+the benchmark, or any assigned equity market while RISK-ON) has no close at or
+before the current period's momentum-window start, it carries the `roles` and a
+`requiredFrom` date so the report can name which instrument to extend and from
+when. It is emitted in place of the generic `CALCULATION_FAILED`/`FIRST_RUN`
+whenever the cause can be pinned to named instruments; the fix is to fetch more
+price history for them (the security page's "add another year" control) or to
+assign an instrument with a longer history.
 
 ### No AI-assistant or MCP tool, on purpose
 

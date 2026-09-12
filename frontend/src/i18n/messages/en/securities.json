@@ -248,7 +248,9 @@
     },
     "groupCount": "{count} price(s)",
     "expandAll": "Expand all",
-    "collapseAll": "Collapse all"
+    "collapseAll": "Collapse all",
+    "addYearButton": "Add Another Year of History",
+    "addYearTitle": "Fetch one more year of historical prices from the provider"
   },
   "transactionHistory": {
     "accountLabel": "Account",

@@ -248,7 +248,9 @@
     },
     "collapseAll": "모두 접기",
     "expandAll": "모두 펼치기",
-    "groupCount": "가격 {count}건"
+    "groupCount": "가격 {count}건",
+    "addYearButton": "이력 1년 더 추가",
+    "addYearTitle": "공급자로부터 과거 가격을 1년 더 가져옵니다"
   },
   "transactionHistory": {
     "accountLabel": "계정",

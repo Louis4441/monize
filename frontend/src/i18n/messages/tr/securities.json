@@ -248,7 +248,9 @@
     },
     "collapseAll": "Tümünü daralt",
     "expandAll": "Tümünü genişlet",
-    "groupCount": "{count} fiyat"
+    "groupCount": "{count} fiyat",
+    "addYearButton": "Bir Yıl Daha Geçmiş Ekle",
+    "addYearTitle": "Sağlayıcıdan bir yıl daha geçmiş fiyat verisi al"
   },
   "transactionHistory": {
     "accountLabel": "Hesap",

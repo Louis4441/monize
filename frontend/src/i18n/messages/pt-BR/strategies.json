@@ -358,7 +358,9 @@
       "NO_POSITION": "As contas da estratégia não têm nenhum instrumento.",
       "FIRST_RUN": "Esta estratégia ainda não foi avaliada – o primeiro sinal aparece após a próxima avaliação agendada.",
       "STALE_PRICES": "Alguns dos preços por trás deste relatório não estão atualizados, então o sinal pode mudar depois de atualizá-los. Os mais antigos, ou totalmente ausentes, são para:",
-      "CALCULATION_FAILED": "Não foi possível calcular o sinal com os dados disponíveis."
+      "CALCULATION_FAILED": "Não foi possível calcular o sinal com os dados disponíveis.",
+      "SHORT_HISTORY": "Histórico de preços insuficiente para avaliar o período atual. Estas funções precisam de preços desde {from}:",
+      "shortHistoryFix": "Abra cada um destes instrumentos e use “Adicionar mais um ano de histórico de preços” e depois reabra este relatório."
     },
     "footer": {
       "pastResults": "Resultados passados não garantem retornos futuros.",

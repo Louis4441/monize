@@ -358,7 +358,9 @@
       "NO_POSITION": "Rekening strategi tidak memiliki instrumen apa pun.",
       "FIRST_RUN": "Strategi ini belum dievaluasi – sinyal pertama muncul setelah evaluasi terjadwal berikutnya.",
       "STALE_PRICES": "Sebagian harga di balik laporan ini tidak terkini, jadi sinyalnya bisa berubah setelah diperbarui. Yang paling lama, atau sama sekali tidak ada, adalah untuk:",
-      "CALCULATION_FAILED": "Sinyal tidak dapat dihitung dari data yang tersedia."
+      "CALCULATION_FAILED": "Sinyal tidak dapat dihitung dari data yang tersedia.",
+      "SHORT_HISTORY": "Riwayat harga tidak cukup untuk mengevaluasi periode saat ini. Peran ini memerlukan harga hingga {from}:",
+      "shortHistoryFix": "Buka setiap instrumen ini dan gunakan “Tambah satu tahun riwayat harga lagi”, lalu buka kembali laporan ini."
     },
     "footer": {
       "pastResults": "Hasil masa lalu tidak menjamin imbal hasil di masa depan.",

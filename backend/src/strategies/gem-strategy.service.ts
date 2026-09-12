@@ -29,6 +29,7 @@ import { GemStrategy } from "./entities/gem-strategy.entity";
 import { UpdateGemStrategyDto } from "./dto/update-gem-strategy.dto";
 import {
   addMonthsUtc,
+  benchmarkRoleFor,
   cadenceMonths,
   historyAction,
   parseYmd,
@@ -685,11 +686,60 @@ export class GemStrategyService {
     });
     const next = this.nextEvaluation(strategy, asOf);
 
+    // When there is no current signal, work out whether a required leg's price
+    // history is simply too short to reach the momentum window's start -- the
+    // one cause of a missing signal we can name a security and a date for, and
+    // the one the user can fix themselves by fetching more history. The absolute
+    // test needs the US equity leg and the benchmark; a RISK-ON result needs
+    // every assigned equity market too, so any of those coming up short leaves
+    // the period unevaluated. Only computed on the no-signal path so the happy
+    // path pays for no extra query.
+    let shortRoles: GemAssetRole[] = [];
+    let shortHistoryFrom: string | null = null;
+    if (!current) {
+      shortHistoryFrom = addMonthsUtc(
+        parseYmd(periodFor(asOf, strategy.cadence).evaluatedOn),
+        -strategy.lookbackMonths,
+      )
+        .toISOString()
+        .slice(0, 10);
+      const requiredRoles = [
+        ...GEM_EQUITY_ROLES.filter((role) => securityByRole.has(role)),
+        benchmarkRoleFor([...securityByRole.keys()]),
+      ];
+      const requiredIds = [
+        ...new Set(
+          requiredRoles
+            .map((role) => securityByRole.get(role))
+            .filter((id): id is string => !!id),
+        ),
+      ];
+      const earliestBySecurity =
+        await this.priceService.earliestPriceDates(requiredIds);
+      shortRoles = requiredRoles.filter((role) => {
+        const id = securityByRole.get(role);
+        if (!id) return false;
+        const earliest = earliestBySecurity.get(id);
+        // No price at or before the window start (a string date compare is a
+        // valid ISO ordering): the trailing return has no base to measure from.
+        return !earliest || earliest > (shortHistoryFrom as string);
+      });
+    }
+
     const warnings: GemWarning[] = [];
     if (unmappedRoles.length > 0) {
       warnings.push({ code: "UNMAPPED_ROLE", roles: unmappedRoles });
     }
-    if (signals.length === 0 && legacyPeriods === 0) {
+    if (!current && shortRoles.length > 0) {
+      // A named, fixable cause for the missing signal: these legs need prices
+      // back to `shortHistoryFrom`. Preferred over the generic warnings below,
+      // which stay for a missing signal we cannot pin to an instrument.
+      warnings.push({
+        code: "SHORT_HISTORY",
+        roles: shortRoles,
+        requiredFrom: shortHistoryFrom ?? undefined,
+      });
+    } else if (signals.length === 0 && legacyPeriods === 0) {
       warnings.push({ code: "FIRST_RUN" });
     } else if (!current) {
       // History exists but the period governing today could not be evaluated --

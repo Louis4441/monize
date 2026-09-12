@@ -358,7 +358,9 @@
       "NO_POSITION": "De strategierekeningen bezitten geen instrumenten.",
       "FIRST_RUN": "Deze strategie is nog niet geëvalueerd – het eerste signaal verschijnt na de volgende geplande evaluatie.",
       "STALE_PRICES": "Sommige koersen achter dit rapport zijn niet actueel; het signaal kan veranderen zodra ze zijn ververst. Het oudst, of helemaal ontbrekend, zijn:",
-      "CALCULATION_FAILED": "Het signaal kon niet uit de beschikbare gegevens worden berekend."
+      "CALCULATION_FAILED": "Het signaal kon niet uit de beschikbare gegevens worden berekend.",
+      "SHORT_HISTORY": "Onvoldoende koershistorie om de huidige periode te berekenen. Deze rollen hebben koersen nodig tot {from}:",
+      "shortHistoryFix": "Open elk van deze instrumenten en gebruik ‘Nog een jaar koershistorie toevoegen’, en open dit rapport daarna opnieuw."
     },
     "footer": {
       "pastResults": "Resultaten uit het verleden bieden geen garantie voor de toekomst.",

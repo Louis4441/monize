@@ -248,7 +248,9 @@
     },
     "collapseAll": "Tout replier",
     "expandAll": "Tout déplier",
-    "groupCount": "{count} cours"
+    "groupCount": "{count} cours",
+    "addYearButton": "Ajouter une année d’historique",
+    "addYearTitle": "Récupérer une année de prix historiques supplémentaire auprès du fournisseur"
   },
   "transactionHistory": {
     "accountLabel": "Compte",

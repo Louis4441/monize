@@ -248,7 +248,9 @@
     },
     "collapseAll": "सब समेटें",
     "expandAll": "सब खोलें",
-    "groupCount": "{count} भाव"
+    "groupCount": "{count} भाव",
+    "addYearButton": "एक और वर्ष का इतिहास जोड़ें",
+    "addYearTitle": "प्रदाता से एक और वर्ष का ऐतिहासिक मूल्य प्राप्त करें"
   },
   "transactionHistory": {
     "accountLabel": "खाता",
