@@ -76,6 +76,15 @@ interface TransactionFilterPanelProps {
   onClearFilters: () => void;
   bulkSelectMode?: boolean;
   onToggleBulkSelectMode?: () => void;
+  /**
+   * Withhold the time-period and date fields, and the chip that summarises
+   * them.
+   *
+   * Calendar mode's date filter is the month on screen (design decision 2), so
+   * offering a second one would let the two disagree with no way to tell which
+   * the rows answered. Every other filter still reaches the request.
+   */
+  hideDateRange?: boolean;
 }
 
 export function TransactionFilterPanel({
@@ -134,6 +143,7 @@ export function TransactionFilterPanel({
   onClearFilters,
   bulkSelectMode,
   onToggleBulkSelectMode,
+  hideDateRange = false,
 }: TransactionFilterPanelProps) {
   const t = useTranslations('transactions');
 
@@ -368,7 +378,7 @@ export function TransactionFilterPanel({
                 </span>
               ))}
               {/* Date range chip - Amber */}
-              {(filterStartDate || filterEndDate) && (
+              {!hideDateRange && (filterStartDate || filterEndDate) && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 whitespace-nowrap">
                   {filterStartDate && filterEndDate
                     ? `${formatDate(filterStartDate)} - ${formatDate(filterEndDate)}`
@@ -630,13 +640,21 @@ export function TransactionFilterPanel({
                   given to Time Period), the narrow controls 20 (1fr), and
                   Search 60 (3fr). The Currency column is dropped when it isn't
                   shown. */}
+              {/* Written out rather than composed: Tailwind emits a utility
+                  only for a class it can find as a literal in the source. */}
               <div
                 className={`grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 ${
-                  hasCurrencyFilter
-                    ? 'lg:grid-cols-[34fr_27fr_27fr_20fr_20fr_20fr_20fr_60fr]'
-                    : 'lg:grid-cols-[34fr_27fr_27fr_20fr_20fr_20fr_60fr]'
+                  hideDateRange
+                    ? hasCurrencyFilter
+                      ? 'lg:grid-cols-[20fr_20fr_20fr_20fr_60fr]'
+                      : 'lg:grid-cols-[20fr_20fr_20fr_60fr]'
+                    : hasCurrencyFilter
+                      ? 'lg:grid-cols-[34fr_27fr_27fr_20fr_20fr_20fr_20fr_60fr]'
+                      : 'lg:grid-cols-[34fr_27fr_27fr_20fr_20fr_20fr_60fr]'
                 }`}
               >
+                {!hideDateRange && (
+                  <>
                 <Select
                   label={t('filter.fields.timePeriod')}
                   options={TIME_PERIOD_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
@@ -685,6 +703,8 @@ export function TransactionFilterPanel({
                     }
                   }}
                 />
+                  </>
+                )}
 
                 <CurrencyInput
                   label={t('filter.fields.amountFrom')}

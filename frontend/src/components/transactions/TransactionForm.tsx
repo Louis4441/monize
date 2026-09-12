@@ -138,6 +138,15 @@ interface TransactionFormProps {
   duplicateFrom?: Transaction;
   defaultAccountId?: string;
   defaultCategoryId?: string;
+  /**
+   * The date a new entry opens on, `YYYY-MM-DD`.
+   *
+   * Read only in create mode, and only when set: the calendar's "New
+   * transaction on this day" means the day the reader clicked, which is not
+   * the date the last entry was filed under. An edit keeps the row's own date,
+   * and a form opened anywhere else keeps the remembered one.
+   */
+  defaultDate?: string;
   onSuccess?: () => void;
   onCancel?: () => void;
   onDirtyChange?: (isDirty: boolean) => void;
@@ -167,7 +176,7 @@ interface TransactionFormFieldsProps extends TransactionFormProps {
 // Transaction mode type
 type TransactionMode = 'normal' | 'split' | 'transfer';
 
-function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, defaultCategoryId, onSuccess, onCancel, onDirtyChange, submitRef, onCreateAnother, initialStagedFiles }: TransactionFormFieldsProps) {
+function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, defaultCategoryId, defaultDate, onSuccess, onCancel, onDirtyChange, submitRef, onCreateAnother, initialStagedFiles }: TransactionFormFieldsProps) {
   const t = useTranslations('transactions');
   const { defaultCurrency, formatCurrency, formatNumber } = useNumberFormat();
   const showCreatedAt = usePreferencesStore((s) => s.preferences?.showCreatedAt ?? false);
@@ -358,7 +367,7 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
       : {
           accountId: defaultAccountId || '',
           categoryId: defaultCategoryId || '',
-          transactionDate: getRememberedTransactionDate(LAST_TRANSACTION_DATE_KEY),
+          transactionDate: defaultDate || getRememberedTransactionDate(LAST_TRANSACTION_DATE_KEY),
           currencyCode: defaultCurrency,
           status: TransactionStatus.UNRECONCILED,
         },

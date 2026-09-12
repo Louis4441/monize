@@ -6,5 +6,38 @@
   },
   "grid": {
     "label": "Miesiąc"
+  },
+  "toolbar": {
+    "layers": "Warstwy"
+  },
+  "layers": {
+    "transactions": "Transakcje",
+    "balances": "Salda",
+    "values": "Wartości",
+    "dailyChange": "Zmiana dzienna"
+  },
+  "legend": {
+    "label": "Legenda",
+    "scheduled": "Zaplanowane"
+  },
+  "chip": {
+    "noPayee": "Brak odbiorcy",
+    "overdue": "Zaległe",
+    "scheduled": "Zaplanowane"
+  },
+  "day": {
+    "moreChips": "+{count} więcej",
+    "newTransaction": "Nowa transakcja w tym dniu",
+    "noItems": "Nic w tym dniu.",
+    "scheduledHint": "Zaplanowane. Otwórz Rachunki i wpłaty, aby to zmienić."
+  },
+  "banner": {
+    "title": "Niektóre kwoty nie są pokazane",
+    "rowCap": "Ten miesiąc zawiera {count} transakcji, więcej niż {limit}, które kalendarz może pokazać. Zawęź filtry, aby je zobaczyć.",
+    "scheduledUnavailable": "Nie udalo sie zaladowac zaplanowanych pozycji na ten miesiac. Pokazane wiersze sa kompletne; brakuje zaplanowanych.",
+    "scheduledTruncated": "Niektore zaplanowane pozycje nie sa pokazywane tak daleko w przod. Przejdz blizej dzisiaj, aby zobaczyc wszystkie."
+  },
+  "errors": {
+    "monthFailed": "Nie udało się wczytać tego miesiąca."
   }
 }

@@ -6,5 +6,38 @@
   },
   "grid": {
     "label": "月份"
+  },
+  "toolbar": {
+    "layers": "圖層"
+  },
+  "layers": {
+    "transactions": "交易",
+    "balances": "餘額",
+    "values": "市值",
+    "dailyChange": "當日變動"
+  },
+  "legend": {
+    "label": "圖例",
+    "scheduled": "已排程"
+  },
+  "chip": {
+    "noPayee": "無收款人",
+    "overdue": "已逾期",
+    "scheduled": "已排程"
+  },
+  "day": {
+    "moreChips": "另有 {count} 項",
+    "newTransaction": "在這一天新增交易",
+    "noItems": "這一天沒有任何內容。",
+    "scheduledHint": "已排程。請開啟帳單與存款進行修改。"
+  },
+  "banner": {
+    "title": "部分數字未顯示",
+    "rowCap": "本月有 {count} 筆交易，超過日曆可顯示的 {limit} 筆。請縮小篩選範圍以檢視。",
+    "scheduledUnavailable": "無法載入本月的排程項目。顯示的項目是完整的，但缺少排程項目。",
+    "scheduledTruncated": "這麼遠的未來不會顯示部分排程項目。請靠近今天以查看全部。"
+  },
+  "errors": {
+    "monthFailed": "無法載入本月。"
   }
 }

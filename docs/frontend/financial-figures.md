@@ -20,6 +20,20 @@ Paths beginning with `src/` or `scripts/`, and layer configuration filenames, ar
 
 `lib/scheduled-effective-amount.guard.test.ts` scans `src/` for the `override.amount ?? …amount` fingerprint, for a client-side recurrence expansion outside those exemptions, and for the report actually calling `getOccurrences` -- import presence is not proof, since the report imported this helper throughout the period it was applying one amount to every occurrence. `PostTransactionDialog` is the one fallback exemption: it seeds the POST form's editable field, which is the write path. Issue #1247, INV-OCCURRENCE-003.
 
+## The calendar prints figures; it never works one out
+
+Every number a month grid shows is one the server already decided: a row's own `amount` and `currencyCode` from `GET /transactions`, an occurrence's from `GET /scheduled-transactions/occurrences`. `components/calendar/` adds nothing up -- no day total, no per-account subtotal, no conversion. A day holding a CAD row beside a USD one shows two chips, not one sum, because a sum would need a rate the grid has no business fetching and no honest way to withhold at chip size.
+
+**Colour comes from the mappings that already own the question.** A real row's chip is `ACCOUNT_TYPE_META[accountType].pillClass`, the colour its account already wears in the account list; an occurrence's is `SCHEDULED_KIND_CHIP_CLASSES[occurrenceKind(occurrence, schedule)]`, drawn with a dashed border and a clock so a pending item cannot be read as a posted one. A third mapping invented for the calendar would be a second answer to "what colour is a chequing account", and would disagree with the first the day either changed.
+
+**Which occurrences a filtered calendar shows is `occurrenceTouchesAccounts`** (`lib/scheduled-effective-amount.ts`), which asks `occurrenceSettlementAccountId` and the transfer counterparty. Reading the occurrence's own `accountId` would leave a scheduled investment purchase off the calendar of the chequing account it drains, and draw it on the brokerage whose cash never moves -- INV-OCCURRENCE-003, in the shape of a filter rather than a figure. An occurrence whose settlement account the client cannot identify is in no scope at all rather than charged to the brokerage.
+
+**`grid` days are strings and `today` is an argument.** `lib/calendar-month.ts` never builds a `Date`, and `classifyCalendarDay(date, today)` has no default for `today` -- which day is "today" is the server's answer wherever a figure's caption depends on it, and a helper that could reach for the browser clock eventually does. `useFinancialToday()` decides only which month opens and whether a real row is dimmed as future-dated.
+
+**A month that cannot be drawn says so.** Past `CALENDAR_MAX_ROWS` the layer is withheld with a banner naming the count and pointing at the filters, rather than drawn as a wall of chips the reader cannot read; a failed request renders the retryable error over the layer and never an empty month.
+
+**The scheduled half fails on its own terms.** The occurrence endpoint bounds two things the toolbar does not: `maxPerSchedule` (`CALENDAR_MAX_PER_SCHEDULE`, sent explicitly so the request and the truncation check share one number) caps each schedule from its next occurrence, so a daily schedule stops arriving a few months out; and `through` is refused beyond `OCCURRENCE_HORIZON_MAX_DAYS`, which the next-month button reaches. Neither withholds the month: the register's rows are the calendar's substance, so the occurrence request is caught on its own and its absence becomes a named banner cause (`banner.scheduledUnavailable`, `banner.scheduledTruncated`). Silence here would read as "nothing is due", which is the one answer the calendar does not have.
+
 ## A scheduled transaction has four kinds, not two -- `scheduledKind`
 
 `amount < 0` / `> 0` answers half the question: a **transfer** between own accounts is neither bill nor deposit, and exactly **zero** is a deliberate placeholder for an amount unknown until it arrives. A sign ternary paints the zero green, and a `!st.isTransfer` filter deleted a scheduled transfer from both calendars (issue #1124).

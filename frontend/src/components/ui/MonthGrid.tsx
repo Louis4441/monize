@@ -91,6 +91,15 @@ export function MonthGrid({
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>, index: number) => {
+      // A control inside the cell owns the keys pressed on it. A keydown is
+      // dispatched at the focused element, so anything but the cell itself is
+      // a chip, a link or a field with its own answer -- and claiming the key
+      // would not merely add the day's action to the chip's, it would replace
+      // it: the `preventDefault` below cancels the default that activates a
+      // button or follows a link. The click handler has always deferred to
+      // inner controls; this is the same rule for the keyboard.
+      if (event.target !== event.currentTarget) return;
+
       const move = KEY_STEPS[event.key];
       if (move !== undefined) {
         const next = days[index + move];
