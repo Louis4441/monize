@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@/test/render';
 import { MonthlyCategoryBreakdownReport } from './MonthlyCategoryBreakdownReport';
 
@@ -798,6 +798,188 @@ describe('MonthlyCategoryBreakdownReport', () => {
         expect(row?.className).toContain('group');
         expect(row?.className).toContain('hover:bg-gray-100');
       });
+    });
+  });
+
+  // A month-columnar report cannot fit a phone, and the sticky category column
+  // is the width the months are missing. Dragging it sideways slides it out of
+  // view and moves its right edge by the same amount, so the months take
+  // exactly the width the names give up.
+  describe('phone: collapsing the category column', () => {
+    const PHONE_QUERY = '(max-width: 639px)';
+    const FULL_WIDTH = 116;
+    const MAX_OFFSET = FULL_WIDTH - 28; // never past the grabbable stub
+
+    const setPhone = (isPhone: boolean) => {
+      vi.mocked(window.matchMedia).mockImplementation(
+        (query: string) =>
+          ({
+            matches: isPhone && query === PHONE_QUERY,
+            media: query,
+            onchange: null,
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+            dispatchEvent: vi.fn(),
+          }) as unknown as MediaQueryList,
+      );
+    };
+
+    afterEach(() => {
+      unmountPrevious = null;
+      setPhone(false);
+    });
+
+    // jsdom ships no PointerEvent, so the gesture is replayed with MouseEvents
+    // carrying the pointer type names React dispatches on.
+    const pointer = (type: string, target: Element, clientX: number) => {
+      const event = new MouseEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        clientX,
+      });
+      Object.defineProperty(event, 'pointerId', { value: 1 });
+      target.dispatchEvent(event);
+    };
+
+    const scroller = (container: HTMLElement) =>
+      container.querySelector('.overflow-x-auto') as HTMLElement;
+
+    let unmountPrevious: (() => void) | null = null;
+    const renderPhoneReport = async () => {
+      // Leaving an earlier render mounted would let `getByText` resolve against
+      // it, so a remount test would assert on the wrong tree.
+      unmountPrevious?.();
+      setPhone(true);
+      mockGetMonthlyCategoryBreakdown.mockResolvedValue(sampleResponse);
+      const { container, unmount } = render(<MonthlyCategoryBreakdownReport />);
+      unmountPrevious = unmount;
+      await waitFor(() => {
+        expect(screen.getByText('Groceries')).toBeInTheDocument();
+      });
+      return container;
+    };
+
+    const drag = async (container: HTMLElement, from: number, to: number) => {
+      const cell = screen.getByText('Groceries').closest('td') as HTMLElement;
+      await act(async () => {
+        pointer('pointerdown', cell, from);
+        pointer('pointermove', cell, to);
+        pointer('pointerup', cell, to);
+      });
+    };
+
+    it('narrows the column by exactly what it slides out of view', async () => {
+      const container = await renderPhoneReport();
+      const el = scroller(container);
+      expect(el.style.getPropertyValue('--mcb-name-off')).toBe('0px');
+
+      await drag(container, 100, 60); // dragged 40px to the left
+
+      expect(el.style.getPropertyValue('--mcb-name-off')).toBe('40px');
+      expect(el.style.getPropertyValue('--mcb-name-w')).toBe(
+        `${FULL_WIDTH - 40}px`,
+      );
+      // The wrap width never moves, so the names do not reflow mid-drag.
+      expect(el.style.getPropertyValue('--mcb-name-full')).toBe(
+        `${FULL_WIDTH}px`,
+      );
+    });
+
+    it('stops at a grabbable stub instead of collapsing to nothing', async () => {
+      const container = await renderPhoneReport();
+
+      await drag(container, 300, 0); // far past the full width
+
+      expect(scroller(container).style.getPropertyValue('--mcb-name-off')).toBe(
+        `${MAX_OFFSET}px`,
+      );
+    });
+
+    it('remembers the offset across a remount', async () => {
+      const container = await renderPhoneReport();
+      await drag(container, 100, 70);
+      expect(
+        JSON.parse(
+          window.localStorage.getItem(
+            'monize-reports-monthly-category-breakdown-name-offset',
+          ) as string,
+        ),
+      ).toBe(30);
+
+      const second = await renderPhoneReport();
+      expect(scroller(second).style.getPropertyValue('--mcb-name-off')).toBe(
+        '30px',
+      );
+    });
+
+    it('still drills down on a tap that never became a drag', async () => {
+      await renderPhoneReport();
+      const name = screen.getByText('Groceries');
+      const cell = name.closest('td') as HTMLElement;
+
+      await act(async () => {
+        pointer('pointerdown', cell, 100);
+        pointer('pointermove', cell, 102); // under the 4px threshold
+        pointer('pointerup', cell, 102);
+        fireEvent.click(name);
+      });
+
+      expect(mockPush).toHaveBeenCalled();
+    });
+
+    it('does not drill down on the click that ends a drag', async () => {
+      const container = await renderPhoneReport();
+      const name = screen.getByText('Groceries');
+
+      await drag(container, 100, 40);
+      await act(async () => {
+        fireEvent.click(name);
+      });
+      expect(mockPush).not.toHaveBeenCalled();
+
+      // The suppression is spent on that one click, not latched.
+      await act(async () => {
+        fireEvent.click(name);
+      });
+      expect(mockPush).toHaveBeenCalled();
+    });
+
+    it('does not swallow a later click when the drag produced none', async () => {
+      const container = await renderPhoneReport();
+      const cell = screen.getByText('Groceries').closest('td') as HTMLElement;
+
+      // A drag released outside the cell arms the suppression but never spends
+      // it, because no click follows; the next gesture must still work.
+      await act(async () => {
+        pointer('pointerdown', cell, 100);
+        pointer('pointermove', cell, 40);
+        pointer('pointerup', scroller(container), 40);
+      });
+      expect(mockPush).not.toHaveBeenCalled();
+
+      await act(async () => {
+        pointer('pointerdown', cell, 100);
+        pointer('pointerup', cell, 100);
+        fireEvent.click(screen.getByText('Groceries'));
+      });
+      expect(mockPush).toHaveBeenCalled();
+    });
+
+    it('leaves the column alone above the phone breakpoint', async () => {
+      setPhone(false);
+      mockGetMonthlyCategoryBreakdown.mockResolvedValue(sampleResponse);
+      const { container } = render(<MonthlyCategoryBreakdownReport />);
+      await waitFor(() => {
+        expect(screen.getByText('Groceries')).toBeInTheDocument();
+      });
+
+      await drag(container, 100, 20);
+
+      expect(scroller(container).style.getPropertyValue('--mcb-name-off')).toBe(
+        '0px',
+      );
     });
   });
 });

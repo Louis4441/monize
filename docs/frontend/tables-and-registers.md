@@ -92,3 +92,15 @@ Below `sm` a table that cannot fit five or more columns does not scroll sideways
 - **Money never truncates or wraps, so the tracks are sized by measurement**: a hand-CSS replica at 320 and 390 with the real page and card insets, the widest cell that wears the class (the bold footer total in the ISO-code currency fallback), and the `overflow-x-auto` wrapper's `scrollWidth === clientWidth` (the table's own is not the check, and `document.scrollWidth` hides it). The line count is `ceil(cells / tracks)`; 2dp money is two per line, the compact formatter three. `whitespace-nowrap` is for numbers and formatted dates; a translated word keeps wrapping.
 - **The identity wraps unclamped** in a `min-w-0` `minmax(0,1fr)` track with `break-words sm:break-normal`; a clamp cuts a trailing marker before the tail of the name, and no width assertion sees it. `auto` tracks are sized by their caption, not their value; a bounded caption-less identity (a month) is the one thing that takes `auto`.
 - **A footer that hides cells below `sm` states `aria-colindex`** on every cell; a footer with 1x1 cells over the same columns owes none.
+
+## A matrix whose columns are the data collapses its label column instead
+
+A month-columnar report (`MonthlyCategoryBreakdownReport`) is the one shape neither mechanism above fits: every column is a figure the reader is comparing, so a card per row throws away the comparison the report exists for, and no column is secondary enough to drop below `sm`. What it can give up is the *label* column. On a phone the category column is dragged sideways: the names slide out of view to the left and the column's right edge moves by the same amount, so the months take exactly the width the names release. Both halves are one number, the `--mcb-name-off` custom property, and the wrap width (`--mcb-name-full`) is held fixed so the names never reflow under the finger and the rows keep their height.
+
+Three things this costs, each of which has bitten a draft of it:
+
+- **The width has to come from a clipping block inside the cell.** An auto-layout table ignores `width` and `max-width` on a `<td>` and sizes the column from its content, so a fixed-width name simply holds the column open; a `w-[var(--mcb-name-w)] overflow-hidden` block contributes its own width and nothing of what it clips. The cell's padding moves inside that block with it, or the padding alone holds the collapsed column open.
+- **The column stops at a grabbable stub, never at zero.** A column collapsed to nothing leaves the reader no way to pull the names back.
+- **A drag must not also fire the name's drill-down**, and the suppression is armed on release and spent on the next click -- so it is also cleared when the next gesture starts, or a drag whose click never arrived swallows an unrelated one later.
+
+Above `sm` every rule reverts and the column is the plain sticky column it has always been, so this never changes the desktop table. `useIsMobile` selects it, which is legitimate here for the same reason the register's card layout may use it: both layouts show the same figures, and nothing is reachable in one and not the other.
