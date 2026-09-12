@@ -201,6 +201,10 @@ export function buildExportTableQueries(
       sql: "SELECT * FROM user_currency_preferences WHERE user_id = $1",
     },
     {
+      key: "calendar_day_notes",
+      sql: "SELECT * FROM calendar_day_notes WHERE user_id = $1 ORDER BY note_date",
+    },
+    {
       key: "categories",
       sql: "SELECT * FROM categories WHERE user_id = $1 ORDER BY parent_id NULLS FIRST, name",
     },

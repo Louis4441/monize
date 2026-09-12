@@ -80,6 +80,12 @@ export const RESTORE_PLAN: ReadonlyArray<RestoreStep> = [
     countKey: "userCurrencyPreferences",
     scopeToUser: true,
   },
+  // No foreign key but `users`, so it can restore as early as its owner exists.
+  {
+    table: "calendar_day_notes",
+    countKey: "calendarDayNotes",
+    scopeToUser: true,
+  },
   { table: "categories", countKey: "categories", scopeToUser: true },
   { table: "payees", countKey: "payees", scopeToUser: true },
   { table: "payee_aliases", countKey: "payeeAliases", scopeToUser: true },

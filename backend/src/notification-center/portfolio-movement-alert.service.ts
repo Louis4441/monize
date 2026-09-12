@@ -6,10 +6,7 @@ import { withScopedDb } from "../common/db/scoped-db";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
 import { returnedRows } from "../common/db/query-result";
-import {
-  investmentLinkedSplitExclusion,
-  investmentLinkedTransactionExclusion,
-} from "../common/investment-filter.util";
+import { loadExternalFlowSubtotals } from "../securities/external-flow.util";
 import { todayYMD } from "../common/date-utils";
 import { preferredCurrency } from "../common/default-currency.util";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
@@ -231,37 +228,14 @@ export class PortfolioMovementAlertService {
    * The net cash that crossed the investment-account boundary from outside since
    * `sinceDate` (exclusive) through `today` (inclusive), in `reportingCurrency`.
    *
-   * Included: ordinary deposits/withdrawals and transfers whose counterparty is
-   * NOT an investment account. Excluded (internal): investment-linked cash legs
-   * (BUY/SELL/DIVIDEND), transfers whose counterparty is also an investment
-   * account, and VOID or future-dated rows. The investment-leg exclusion is the
-   * shared predicate from `investment-filter.util.ts`
-   * (`investmentLinkedTransactionExclusion` for a top-level row,
-   * `investmentLinkedSplitExclusion` for an embedded split line) rather than a
-   * hand-rolled one -- INV-PORTMOVE-006 requires it, and a hand-rolled copy had
-   * joined `investment_transactions.transaction_split_id` (a `transaction_splits`
-   * FK) against `transactions.id`, a table mismatch that made the split
-   * exclusion a silent no-op. Grouped by account currency and converted through
-   * the shared rate service; a currency with no rate makes the flow incomplete
-   * (the movement is then withheld).
-   *
-   * TWO KNOWN COARSE CASES (INV-PORTMOVE, tracked in the spec's open items),
-   * both narrowing rather than corrupting the common path:
-   *  - A split parent that mixes an embedded investment line with an ordinary
-   *    external cash line is excluded WHOLE (it sums `t.amount`, so it cannot
-   *    keep one line and drop another). The line-granular form -- summing only
-   *    the ordinary external children, `reportableTransactionAmount`'s dialect --
-   *    is a spec-guided follow-up, because the flow's transfer policy (a transfer
-   *    OUT of the set counts) differs from that helper's (it drops all transfers).
-   *  - A BUY/SELL funded from an account OUTSIDE the investment set (an explicit
-   *    `fundingAccountId` on an ordinary account) moves value into the set with
-   *    no cash leg in the set, so this flow cannot see it and the purchase reads
-   *    as a market move. The spec treats BUY/SELL as internal; widening that is a
-   *    maintainer decision, not a coded defect.
-   *
-   * NOTE: verified by unit tests only at the fold layer; the SQL classification
-   * needs the integration environment (a real database with the investment
-   * account pair and an embedded-investment split) to confirm end to end.
+   * Which rows count is `loadExternalFlowSubtotals`
+   * (`securities/external-flow.util.ts`), shared with the calendar's daily
+   * change layer so the two surfaces cannot measure different things under one
+   * name; its doc comment carries the classification and the two coarse cases
+   * (INV-PORTMOVE-006). What is this caller's own is the rate: each currency is
+   * resolved once, at TODAY's rate, through the shared rate service, and a
+   * currency with no rate makes the flow incomplete -- which withholds the
+   * movement rather than shrinking it (INV-PORTMOVE-002).
    */
   private async externalFlow(
     userId: string,
@@ -269,42 +243,15 @@ export class PortfolioMovementAlertService {
     today: string,
     reportingCurrency: string,
   ): Promise<{ complete: boolean; value: number }> {
-    const subtotals = await withScopedDb(this.dataSource, async (manager) =>
-      returnedRows<{ currency: string; total: string }>(
-        await manager.query(
-          `SELECT t.currency_code AS currency, SUM(t.amount) AS total
-             FROM transactions t
-             JOIN accounts a ON a.id = t.account_id
-            WHERE t.user_id = $1
-              AND a.account_type = 'INVESTMENT'
-              AND t.parent_transaction_id IS NULL
-              AND t.transaction_date > $2
-              AND t.transaction_date <= $3
-              AND t.status IS DISTINCT FROM 'VOID'
-              AND ${investmentLinkedTransactionExclusion("t")}
-              AND NOT EXISTS (
-                SELECT 1 FROM transaction_splits s
-                 WHERE s.transaction_id = t.id
-                   AND NOT (${investmentLinkedSplitExclusion("s")})
-              )
-              AND NOT (
-                t.is_transfer = true
-                AND EXISTS (
-                  SELECT 1 FROM transactions lt
-                   JOIN accounts la ON la.id = lt.account_id
-                   WHERE lt.id = t.linked_transaction_id
-                     AND la.account_type = 'INVESTMENT'
-                )
-              )
-            GROUP BY t.currency_code`,
-          [userId, sinceDate, today],
-        ),
-      ),
+    const subtotals = await loadExternalFlowSubtotals(
+      (sql, params) =>
+        withScopedDb(this.dataSource, (m) => m.query(sql, params)),
+      { userId, afterDate: sinceDate, throughDate: today },
     );
 
     const flowRows: FlowSubtotal[] = subtotals.map((row) => ({
       currency: row.currency,
-      amount: Number(row.total),
+      amount: row.amount,
     }));
 
     // Resolve each currency's rate into the reporting currency, once.

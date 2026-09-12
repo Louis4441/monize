@@ -239,6 +239,7 @@
     "splitAmountMismatch": "分割金額總計（{{ roundedSum }}）必須等於交易金額（{{ roundedAmount }}）",
     "currencyCodeMustBeString": "貨幣代碼必須是字串",
     "currencyCodeInvalid": "貨幣代碼必須恰好是 3 個字母（例如 USD、CAD）",
+    "calendarDateInvalid": "日期必須是 YYYY-MM-DD 格式的真實日曆日期",
     "csrfMissing": "缺少 CSRF 令牌",
     "csrfInvalid": "無效的 CSRF 令牌",
     "demoModeRestricted": "此操作在示範模式下不可用。",

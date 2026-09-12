@@ -239,6 +239,7 @@
     "splitAmountMismatch": "La somme des fractions ({{ roundedSum }}) doit être égale au montant de la transaction ({{ roundedAmount }})",
     "currencyCodeMustBeString": "Le code de devise doit être une chaîne de caractères",
     "currencyCodeInvalid": "Le code de devise doit comporter exactement 3 lettres (ex. USD, CAD)",
+    "calendarDateInvalid": "La date doit être une date de calendrier réelle au format AAAA-MM-JJ",
     "csrfMissing": "Jeton CSRF manquant",
     "csrfInvalid": "Jeton CSRF invalide",
     "demoModeRestricted": "Cette action n'est pas disponible en mode démo.",

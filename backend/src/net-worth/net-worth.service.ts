@@ -28,9 +28,17 @@ import {
 } from "../securities/investment-replay.util";
 import { Security } from "../securities/entities/security.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
-import { convertWithRateLookup } from "../common/currency-conversion.util";
+import {
+  RateIndex,
+  buildRateIndex,
+  convertAtDate,
+} from "../common/time-series/rate-index.util";
 import { FxAggregate } from "../common/fx-aggregate";
 import { applyActionToQuantity } from "../securities/investment-replay.util";
+import {
+  UNFILTERED_INVESTMENT_SCOPE_SQL,
+  resolveInvestmentScopeAccountIds,
+} from "../securities/investment-scope.util";
 import { formatDateYMDLocal } from "../common/date-utils";
 import { positionCloseAsOf, PricePoint } from "./position-price.util";
 import { preferredCurrency } from "../common/default-currency.util";
@@ -46,8 +54,6 @@ const LIABILITY_TYPES: AccountType[] = [
   AccountType.LINE_OF_CREDIT,
 ];
 
-type RateIndex = Map<string, Array<{ date: string; rate: number }>>;
-
 /**
  * Joint accounts to include in a grantee's net worth (joint-accounts spec,
  * N1). Built by the HTTP controller from the caller's active joint grants
@@ -60,6 +66,44 @@ type RateIndex = Map<string, Array<{ date: string; rate: number }>>;
  */
 export interface JointNetWorthScope {
   accounts: Array<{ accountId: string; ownerUserId: string }>;
+}
+
+/**
+ * One day of `GET /net-worth/investments-daily`: the scope's market value plus
+ * cash at the close of that calendar day, in the reporting currency.
+ *
+ * Two completeness bits, for two different repairs. `fxComplete` says every
+ * component converted; `pricesComplete` says every position the scope held that
+ * day had an accepted close on or before it. A day can be short of either, and
+ * the reader who has to fix it needs to know which -- a missing rate is fixed in
+ * Currencies, a missing price by entering one for the security.
+ *
+ * `value` is NOT withheld when `pricesComplete` is false. It is a subtotal on
+ * such a day, which `docs/financial-calculation-contract.md` section 1 says a
+ * field named like a total should not carry; making it null is a behaviour
+ * change to four charts and is reported as its own proposal (task R1 of the
+ * calendar-view plan). Until then a consumer that displays this value MUST read
+ * the flags: `pricesComplete === false` withholds, and absent means an older
+ * backend said nothing rather than that the day was complete.
+ */
+export interface DailyInvestmentValue {
+  date: string;
+  /**
+   * The scope's value at that close. A subtotal when either completeness bit is
+   * false -- read them before printing it under a total's caption.
+   */
+  value: number;
+  /** False when a component could not be converted; see missingRatePairs. */
+  fxComplete: boolean;
+  /** "USD->EUR" for each pair with no available rate. */
+  missingRatePairs: string[];
+  /**
+   * False when a position held at the close of this day had no accepted price
+   * on or before it, so its market value is unknown rather than zero.
+   */
+  pricesComplete: boolean;
+  /** The securities behind `pricesComplete: false`, so a reader can price them. */
+  unpricedSecurityIds: string[];
 }
 
 export type InvestmentBreakdownGranularity = "daily" | "monthly";
@@ -774,23 +818,14 @@ export class NetWorthService {
     const params: any[] = [userId, start, end];
 
     if (accountIds && accountIds.length > 0) {
-      // Resolve the requested accounts plus their linked pairs in one query
-      // (an account, anything linked to it, and the account it links to)
-      // instead of one round-trip per id.
-      const resolved: { id: string }[] = await this.scopedQuery(
-        `SELECT id FROM accounts
-         WHERE user_id = $2
-           AND (
-             id = ANY($1)
-             OR linked_account_id = ANY($1)
-             OR id IN (
-               SELECT linked_account_id FROM accounts
-               WHERE id = ANY($1) AND user_id = $2
-             )
-           )`,
-        [accountIds, userId],
+      // The brokerage and its cash sleeve are one portfolio; the widening rule
+      // is `resolveInvestmentScopeAccountIds`, shared with every other surface
+      // that takes this filter.
+      const idArray = await resolveInvestmentScopeAccountIds(
+        (sql, params) => this.scopedQuery(sql, params as any[]),
+        userId,
+        accountIds,
       );
-      const idArray = [...new Set(resolved.map((a) => a.id))];
       if (idArray.length === 0) {
         // No matching accounts found — return empty result
         return [];
@@ -800,7 +835,7 @@ export class NetWorthService {
       accountFilter = `AND a.id IN (${placeholders})`;
       params.push(...idArray);
     } else {
-      accountFilter = `AND (a.account_sub_type IN ('INVESTMENT_CASH', 'INVESTMENT_BROKERAGE') OR (a.account_type = 'INVESTMENT' AND a.account_sub_type IS NULL))`;
+      accountFilter = `AND ${UNFILTERED_INVESTMENT_SCOPE_SQL}`;
     }
 
     const snapshots: any[] = await this.scopedQuery(
@@ -1102,16 +1137,7 @@ export class NetWorthService {
     endDate?: string,
     accountIds?: string[],
     displayCurrency?: string,
-  ): Promise<
-    {
-      date: string;
-      value: number;
-      /** False when a component could not be converted; see missingRatePairs. */
-      fxComplete: boolean;
-      /** "USD->EUR" for each pair with no available rate. */
-      missingRatePairs: string[];
-    }[]
-  > {
+  ): Promise<DailyInvestmentValue[]> {
     const pref = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(UserPreference).findOne({ where: { userId } }),
     );
@@ -1123,28 +1149,19 @@ export class NetWorthService {
     const acctParams: any[] = [userId];
 
     if (accountIds && accountIds.length > 0) {
-      // Resolve the requested accounts plus their linked pairs in one query
-      // instead of one round-trip per id.
-      const resolved: { id: string }[] = await this.scopedQuery(
-        `SELECT id FROM accounts
-         WHERE user_id = $2
-           AND (
-             id = ANY($1)
-             OR linked_account_id = ANY($1)
-             OR id IN (
-               SELECT linked_account_id FROM accounts
-               WHERE id = ANY($1) AND user_id = $2
-             )
-           )`,
-        [accountIds, userId],
+      // The brokerage and its cash sleeve are one portfolio; see
+      // `resolveInvestmentScopeAccountIds`.
+      const idArray = await resolveInvestmentScopeAccountIds(
+        (sql, params) => this.scopedQuery(sql, params as any[]),
+        userId,
+        accountIds,
       );
-      const idArray = [...new Set(resolved.map((a) => a.id))];
       if (idArray.length === 0) return [];
       const placeholders = idArray.map((_, i) => `$${i + 2}`).join(", ");
       accountFilter = `AND a.id IN (${placeholders})`;
       acctParams.push(...idArray);
     } else {
-      accountFilter = `AND (a.account_sub_type IN ('INVESTMENT_CASH', 'INVESTMENT_BROKERAGE') OR (a.account_type = 'INVESTMENT' AND a.account_sub_type IS NULL))`;
+      accountFilter = `AND ${UNFILTERED_INVESTMENT_SCOPE_SQL}`;
     }
 
     // Get investment accounts in scope
@@ -1307,14 +1324,7 @@ export class NetWorthService {
     const holdingsByAccount = new Map<string, Map<string, number>>();
     let txIdx = 0;
 
-    const result: {
-      date: string;
-      value: number;
-      /** False when a component could not be converted; see missingRatePairs. */
-      fxComplete: boolean;
-      /** "USD->EUR" for each pair with no available rate. */
-      missingRatePairs: string[];
-    }[] = [];
+    const result: DailyInvestmentValue[] = [];
 
     for (const dateStr of dates) {
       // Process investment transactions up to this date
@@ -1345,6 +1355,10 @@ export class NetWorthService {
       // native currency, so we must convert each holding individually rather
       // than treating the total as being in the account's currency.
       const dayValue = new FxAggregate();
+      // Positions the scope held at this close that nothing could price. The
+      // walk below skips them, so without this set `value` would be a subtotal
+      // with nothing beside it to say so.
+      const unpricedSecurityIds = new Set<string>();
 
       for (const [, acctHoldings] of holdingsByAccount) {
         for (const [secId, qty] of acctHoldings) {
@@ -1379,6 +1393,13 @@ export class NetWorthService {
               secCurrency,
               defaultCurrency,
             );
+          } else {
+            // A held position with no accepted close on or before this day. Its
+            // market value is UNKNOWN, not zero: skipping it silently is what
+            // made `value` a subtotal wearing a total's name. `value` is left
+            // as it was (additive change, design 6.2); the flag is what a
+            // consumer reads before printing it.
+            unpricedSecurityIds.add(secId);
           }
         }
       }
@@ -1405,6 +1426,8 @@ export class NetWorthService {
         value: Math.round(dayValue.knownSubtotal),
         fxComplete: dayValue.isComplete,
         missingRatePairs: dayValue.missingPairs,
+        pricesComplete: unpricedSecurityIds.size === 0,
+        unpricedSecurityIds: [...unpricedSecurityIds].sort(),
       });
     }
 
@@ -1707,26 +1730,17 @@ export class NetWorthService {
     const acctParams: any[] = [userId];
 
     if (accountIds && accountIds.length > 0) {
-      const resolved: { id: string }[] = await this.scopedQuery(
-        `SELECT id FROM accounts
-         WHERE user_id = $2
-           AND (
-             id = ANY($1)
-             OR linked_account_id = ANY($1)
-             OR id IN (
-               SELECT linked_account_id FROM accounts
-               WHERE id = ANY($1) AND user_id = $2
-             )
-           )`,
-        [accountIds, userId],
+      const idArray = await resolveInvestmentScopeAccountIds(
+        (sql, params) => this.scopedQuery(sql, params as any[]),
+        userId,
+        accountIds,
       );
-      const idArray = [...new Set(resolved.map((a) => a.id))];
       if (idArray.length === 0) return [];
       const placeholders = idArray.map((_, i) => `$${i + 2}`).join(", ");
       accountFilter = `AND a.id IN (${placeholders})`;
       acctParams.push(...idArray);
     } else {
-      accountFilter = `AND (a.account_sub_type IN ('INVESTMENT_CASH', 'INVESTMENT_BROKERAGE') OR (a.account_type = 'INVESTMENT' AND a.account_sub_type IS NULL))`;
+      accountFilter = `AND ${UNFILTERED_INVESTMENT_SCOPE_SQL}`;
     }
 
     return this.scopedQuery(
@@ -2457,7 +2471,15 @@ export class NetWorthService {
    * are merged chronologically, so an accepted price always wins on its date
    * while legacy history still values dates the store does not reach.
    */
-  private async loadValuationSeries(
+  /**
+   * The two price sources `positionCloseAsOf` merges, loaded for a window.
+   *
+   * Public because `DailyMovementService` values the same positions on the same
+   * days and must read the same observations: a second loader would be a second
+   * answer to "what priced this holding", which is the disagreement
+   * INV-HOLDING-002 exists to prevent.
+   */
+  async loadValuationSeries(
     securityIds: string[],
     start: string,
     end: string,
@@ -2472,37 +2494,19 @@ export class NetWorthService {
     return { stored, txFallback };
   }
 
-  private async buildRateIndex(
+  private buildRateIndex(
     currencies: Set<string>,
     defaultCurrency: string,
     startDate: string,
     endDate: string,
   ): Promise<RateIndex> {
-    if (currencies.size === 0) return new Map();
-
-    const currArr = Array.from(currencies);
-    const rates: any[] = await this.scopedQuery(
-      `SELECT from_currency, to_currency, rate, rate_date
-       FROM exchange_rates
-       WHERE ((from_currency = ANY($1::TEXT[]) AND to_currency = $2)
-           OR (from_currency = $2 AND to_currency = ANY($1::TEXT[])))
-         AND rate_date >= ($3::DATE - INTERVAL '90 days')
-         AND rate_date <= ($4::DATE + INTERVAL '31 days')
-       ORDER BY rate_date`,
-      [currArr, defaultCurrency, startDate, endDate],
+    return buildRateIndex(
+      (sql, params) => this.scopedQuery(sql, params as any[]),
+      currencies,
+      defaultCurrency,
+      startDate,
+      endDate,
     );
-
-    const index: RateIndex = new Map();
-    for (const r of rates) {
-      const key = `${r.from_currency}->${r.to_currency}`;
-      if (!index.has(key)) index.set(key, []);
-      index.get(key)!.push({
-        date: this.toDateString(r.rate_date),
-        rate: Number(r.rate),
-      });
-    }
-
-    return index;
   }
 
   /**
@@ -2511,10 +2515,12 @@ export class NetWorthService {
    *
    * `null`, not the amount unchanged: this used to end in `result ?? amount`,
    * which reported 1,000 USD as 1,000 EUR and left a consumer unable to tell
-   * that from a genuine 1:1 pair (audit P5-009). The direct/inverse decision
-   * lives in the shared `convertWithRateLookup` so reports and net worth cannot
-   * diverge on how a pair resolves. Callers accumulate through `FxAggregate`;
-   * see `docs/specs/fx-conversion-completeness.md`.
+   * that from a genuine 1:1 pair (audit P5-009). The direct/inverse decision,
+   * the as-of walk and the look-ahead fallback live in
+   * `common/time-series/rate-index.util.ts`, so this service and
+   * `DailyBalanceTotalsService` cannot diverge on how a pair resolves. Callers
+   * accumulate through `FxAggregate`; see
+   * `docs/specs/fx-conversion-completeness.md`.
    */
   private convertCurrency(
     amount: number,
@@ -2523,64 +2529,7 @@ export class NetWorthService {
     monthEnd: string,
     rateIndex: RateIndex,
   ): number | null {
-    // Zero converts to zero at any rate, so it needs none (and records no
-    // gap): an emptied account in a currency with no stored rates is a settled
-    // zero, not an unknowable value, and flagging it incomplete would report a
-    // question that was never open as one that could not be answered.
-    if (amount === 0) return 0;
-
-    const converted = convertWithRateLookup(amount, from, to, (f, t) => {
-      const rates = rateIndex.get(`${f}->${t}`);
-      return rates
-        ? this.findBestRate(rates, `${f}->${t}`, monthEnd)
-        : undefined;
-    });
-    if (converted === null) {
-      this.logger.warn(
-        `No exchange rate available for ${from}->${to} on or around ${monthEnd}; the affected total is reported as unknown rather than converted 1:1`,
-      );
-    }
-    return converted;
-  }
-
-  /**
-   * Rate arrays whose look-ahead fallback has already been logged. Keyed by the
-   * per-request array object in the RateIndex, so each pair warns once per
-   * computation instead of once per chart point.
-   */
-  private readonly lookAheadWarned = new WeakSet<
-    Array<{ date: string; rate: number }>
-  >();
-
-  private findBestRate(
-    rates: Array<{ date: string; rate: number }>,
-    pair: string,
-    beforeOrOn: string,
-  ): number | undefined {
-    let best: number | undefined;
-    for (const r of rates) {
-      if (r.date <= beforeOrOn) best = r.rate;
-      else break;
-    }
-    // No rate on or before this date: fall back to the earliest one there is.
-    //
-    // This is look-ahead -- valuing a point with a rate from its future -- and
-    // the time-series contract forbids it in general. It is kept deliberately
-    // (DR-02 in the audit): a chart point that predates the rate history is
-    // more useful approximated than absent. What is NOT acceptable is it being
-    // invisible, so it is logged below; changing the fallback itself is a
-    // product decision recorded in docs/specs/fx-conversion-completeness.md
-    // section 6.
-    if (best === undefined && rates.length > 0) {
-      if (!this.lookAheadWarned.has(rates)) {
-        this.lookAheadWarned.add(rates);
-        this.logger.warn(
-          `Valuation on or before ${beforeOrOn} predates the stored ${pair} rate history; using the earliest stored rate (look-ahead, DR-02)`,
-        );
-      }
-      best = rates[0].rate;
-    }
-    return best;
+    return convertAtDate(amount, from, to, monthEnd, rateIndex, this.logger);
   }
 
   private resolveStartDate(account: Account, earliest: any): string {

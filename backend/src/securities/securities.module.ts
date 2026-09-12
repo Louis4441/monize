@@ -21,6 +21,7 @@ import { QuoteProviderRegistry } from "./providers/quote-provider.registry";
 import { HoldingsService } from "./holdings.service";
 import { InvestmentTransactionsService } from "./investment-transactions.service";
 import { PortfolioService } from "./portfolio.service";
+import { DailyMovementService } from "./daily-movement.service";
 import { PortfolioCalculationService } from "./portfolio-calculation.service";
 import { SecurityDetailService } from "./security-detail.service";
 import { SecurityDocumentsService } from "./security-documents.service";
@@ -78,6 +79,7 @@ import { ProviderHealthModule } from "../provider-health/provider-health.module"
     InvestmentTransactionsService,
     PortfolioCalculationService,
     PortfolioService,
+    DailyMovementService,
     SecurityDetailService,
     SecurityDocumentsService,
     SecurityNewsService,

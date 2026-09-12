@@ -19,6 +19,11 @@ import { PortfolioService } from "./portfolio.service";
 import { SectorWeightingService } from "./sector-weighting.service";
 import { IntradayValueQueryDto } from "./dto/intraday-value.dto";
 import {
+  DailyMovementDetailQueryDto,
+  DailyMovementsQueryDto,
+} from "./dto/daily-movements-query.dto";
+import { DailyMovementService } from "./daily-movement.service";
+import {
   AllowDelegate,
   DelegateRequiresSection,
 } from "../delegation/decorators/delegate-access.decorator";
@@ -41,6 +46,7 @@ export class PortfolioController {
     private readonly portfolioService: PortfolioService,
     private readonly sectorWeightingService: SectorWeightingService,
     private readonly delegationService: DelegationService,
+    private readonly dailyMovementService: DailyMovementService,
   ) {}
 
   /**
@@ -419,6 +425,61 @@ export class PortfolioController {
       req.user.id,
       await this.scopeIds(req, aIds),
       sIds,
+    );
+  }
+
+  /**
+   * Declared before `daily-movements` would be able to swallow it is not a
+   * concern here (neither takes a path parameter), but the detail route is
+   * nested under the month route's path, so it is declared first.
+   */
+  @Get("daily-movements/detail")
+  @AllowDelegate()
+  @DelegateRequiresSection("investments")
+  @ApiOperation({
+    summary: "Break one day's portfolio movement down by security",
+    description:
+      "The securities that rose and fell on the day, the count that did not " +
+      "move, and the remainder the per-security closes do not explain (a " +
+      "dividend, a position first priced that day, cash interest).",
+  })
+  @ApiResponse({ status: 200, description: "Day breakdown computed" })
+  @ApiResponse({ status: 401, description: "Unauthorized" })
+  async getDailyMovementDetail(
+    @Request() req,
+    @Query() query: DailyMovementDetailQueryDto,
+  ) {
+    return this.dailyMovementService.getDailyMovementDetail(
+      req.user.id,
+      query.date,
+      await this.scopeIds(req, query.accountIds),
+      query.displayCurrency,
+    );
+  }
+
+  @Get("daily-movements")
+  @AllowDelegate()
+  @DelegateRequiresSection("investments")
+  @ApiOperation({
+    summary: "Get the portfolio's market movement for each day of a range",
+    description:
+      "MV(d) - MV(d-1) - the day's external cash flow, so a deposit is not a " +
+      "gain and a dividend is not a loss. Days after the server's today are " +
+      "not evaluated; a day with no close for any held security is blank " +
+      "rather than zero.",
+  })
+  @ApiResponse({ status: 200, description: "Daily movements computed" })
+  @ApiResponse({ status: 401, description: "Unauthorized" })
+  async getDailyMovements(
+    @Request() req,
+    @Query() query: DailyMovementsQueryDto,
+  ) {
+    return this.dailyMovementService.getDailyMovements(
+      req.user.id,
+      query.startDate,
+      query.endDate,
+      await this.scopeIds(req, query.accountIds),
+      query.displayCurrency,
     );
   }
 }

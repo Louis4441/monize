@@ -16,6 +16,7 @@ import {
   SetupLoanPaymentsData,
   SetupLoanPaymentsResponse,
   AccountBalancesAsOfResponse,
+  DailyBalanceTotalsResponse,
 } from '@/types/account';
 import { StatementCycle, InterestPaid } from '@/types/credit-card-detail';
 import { BalanceForecast } from '@/types/banking-detail';
@@ -212,6 +213,33 @@ export const accountsApi = {
         return response.data;
       },
       30_000, // 30 sec
+    );
+  },
+
+  // The scope's end-of-day TOTAL per calendar day, in one currency: actual
+  // through the server's today, projected after it (the calendar's Balances
+  // layer). Distinct from getDailyBalances, which is per account, in each
+  // account's own currency, and history only.
+  //
+  // Under the `accounts:` prefix on purpose: a transaction write moves these
+  // figures, and that prefix is what invalidateBalanceCaches() drops.
+  getDailyBalanceTotals: async (params: {
+    startDate: string;
+    endDate: string;
+    accountIds?: string;
+    displayCurrency?: string;
+  }): Promise<DailyBalanceTotalsResponse> => {
+    const cacheKey = `accounts:daily-balance-totals:${params.startDate}:${params.endDate}:${params.accountIds ?? ''}:${params.displayCurrency ?? ''}`;
+    return dedupe(
+      cacheKey,
+      async () => {
+        const response = await apiClient.get<DailyBalanceTotalsResponse>(
+          '/accounts/daily-balance-totals',
+          { params },
+        );
+        return response.data;
+      },
+      30_000, // 30 sec -- these move with every transaction write
     );
   },
 

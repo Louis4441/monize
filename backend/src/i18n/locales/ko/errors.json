@@ -239,6 +239,7 @@
     "splitAmountMismatch": "분할 금액({{ roundedSum }})은 거래 금액({{ roundedAmount }})과 같아야 합니다",
     "currencyCodeMustBeString": "통화 코드는 문자열이어야 합니다",
     "currencyCodeInvalid": "통화 코드는 정확히 3자여야 합니다 (예: USD, CAD)",
+    "calendarDateInvalid": "날짜는 YYYY-MM-DD 형식의 실제 달력 날짜여야 합니다",
     "csrfMissing": "CSRF 토큰이 없습니다",
     "csrfInvalid": "유효하지 않은 CSRF 토큰입니다",
     "demoModeRestricted": "이 작업은 데모 모드에서 사용할 수 없습니다.",

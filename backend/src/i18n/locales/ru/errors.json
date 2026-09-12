@@ -239,6 +239,7 @@
     "splitAmountMismatch": "Сумма частей ({{ roundedSum }}) должна равняться сумме проводки ({{ roundedAmount }})",
     "currencyCodeMustBeString": "Код валюты должен быть строкой",
     "currencyCodeInvalid": "Код валюты должен состоять ровно из 3 букв (например, USD, CAD)",
+    "calendarDateInvalid": "Дата должна быть реальной календарной датой в формате ГГГГ-ММ-ДД",
     "csrfMissing": "Отсутствует токен CSRF",
     "csrfInvalid": "Недопустимый токен CSRF",
     "demoModeRestricted": "Это действие недоступно в демо-режиме.",

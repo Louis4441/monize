@@ -249,6 +249,7 @@
     "splitAmountMismatch": "Split amounts ({{ roundedSum }}) must equal transaction amount ({{ roundedAmount }})",
     "currencyCodeMustBeString": "Currency code must be a string",
     "currencyCodeInvalid": "Currency code must be exactly 3 letters (e.g., USD, CAD)",
+    "calendarDateInvalid": "date must be a real YYYY-MM-DD calendar date",
     "csrfMissing": "Missing CSRF token",
     "csrfInvalid": "Invalid CSRF token",
     "demoModeRestricted": "This action is not available in demo mode.",

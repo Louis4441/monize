@@ -239,6 +239,7 @@
     "splitAmountMismatch": "Tổng số tiền chia ({{ roundedSum }}) phải bằng số tiền giao tác ({{ roundedAmount }})",
     "currencyCodeMustBeString": "Mã tiền tệ phải là chuỗi",
     "currencyCodeInvalid": "Mã tiền tệ phải chính xác 3 chữ cái (ví dụ: USD, CAD)",
+    "calendarDateInvalid": "Ngày phải là một ngày lịch có thật theo định dạng YYYY-MM-DD",
     "csrfMissing": "Thiếu mã thông báo CSRF",
     "csrfInvalid": "Mã thông báo CSRF không hợp lệ",
     "demoModeRestricted": "Hành động này không khả dụng trong chế độ trình diễn.",

@@ -10,6 +10,8 @@ export type BackfillRange = '1y' | '2y' | '5y' | '10y' | 'ytd' | 'max';
 import {
   PortfolioSummary,
   AssetAllocation,
+  DailyMovementsResponse,
+  DailyMovementDetailResponse,
   InvestmentTransaction,
   CreateInvestmentTransactionData,
   Holding,
@@ -36,6 +38,7 @@ import {
 } from '@/types/investment';
 import { IntradayBreakdown } from '@/types/net-worth';
 import {
+  dedupe,
   getCached,
   setCache,
   invalidateBalanceCaches,
@@ -275,6 +278,50 @@ export const investmentsApi = {
    * a whole register client-side; use this when the filtered set can still run
    * past one page.
    */
+  // The portfolio's market movement per calendar day, net of the reader's own
+  // contributions, for the calendar's Daily change layer. Under the
+  // `investments:` prefix so a write drops it with everything else derived from
+  // the ledger.
+  getDailyMovements: async (params: {
+    startDate: string;
+    endDate: string;
+    accountIds?: string;
+    displayCurrency?: string;
+  }): Promise<DailyMovementsResponse> => {
+    const cacheKey = `investments:daily-movements:${params.startDate}:${params.endDate}:${params.accountIds ?? ''}:${params.displayCurrency ?? ''}`;
+    return dedupe(
+      cacheKey,
+      async () => {
+        const response = await apiClient.get<DailyMovementsResponse>(
+          '/portfolio/daily-movements',
+          { params },
+        );
+        return response.data;
+      },
+      30_000,
+    );
+  },
+
+  // One day of that layer, broken down by security.
+  getDailyMovementDetail: async (params: {
+    date: string;
+    accountIds?: string;
+    displayCurrency?: string;
+  }): Promise<DailyMovementDetailResponse> => {
+    const cacheKey = `investments:daily-movements:detail:${params.date}:${params.accountIds ?? ''}:${params.displayCurrency ?? ''}`;
+    return dedupe(
+      cacheKey,
+      async () => {
+        const response = await apiClient.get<DailyMovementDetailResponse>(
+          '/portfolio/daily-movements/detail',
+          { params },
+        );
+        return response.data;
+      },
+      30_000,
+    );
+  },
+
   getAllTransactionPages: async (
     params?: {
       accountIds?: string;

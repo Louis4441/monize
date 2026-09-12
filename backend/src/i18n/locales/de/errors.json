@@ -239,6 +239,7 @@
     "splitAmountMismatch": "Buchungsteilbeträge ({{ roundedSum }}) müssen dem Buchungsbetrag ({{ roundedAmount }}) entsprechen",
     "currencyCodeMustBeString": "Währungscode muss eine Zeichenfolge sein",
     "currencyCodeInvalid": "Währungscode muss genau 3 Buchstaben haben (z. B. USD, EUR)",
+    "calendarDateInvalid": "Das Datum muss ein echtes Kalenderdatum im Format JJJJ-MM-TT sein",
     "csrfMissing": "CSRF-Token fehlt",
     "csrfInvalid": "Ungültiger CSRF-Token",
     "demoModeRestricted": "Diese Aktion ist im Demo-Modus nicht verfügbar.",

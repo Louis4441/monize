@@ -239,6 +239,7 @@
     "splitAmountMismatch": "分割金額（{{ roundedSum }}）は取引金額（{{ roundedAmount }}）と一致しなければなりません",
     "currencyCodeMustBeString": "通貨コードは文字列でなければなりません",
     "currencyCodeInvalid": "通貨コードは正確に3文字（例：USD、CAD）でなければなりません",
+    "calendarDateInvalid": "日付は YYYY-MM-DD 形式の実在するカレンダー日付でなければなりません",
     "csrfMissing": "CSRFトークンがありません",
     "csrfInvalid": "無効なCSRFトークンです",
     "demoModeRestricted": "このアクションはデモモードでは使用できません。",
