@@ -6,5 +6,36 @@
   },
   "grid": {
     "label": "Month"
+  },
+  "toolbar": {
+    "layers": "Layers"
+  },
+  "layers": {
+    "transactions": "Transactions",
+    "balances": "Balances",
+    "values": "Values",
+    "dailyChange": "Daily change"
+  },
+  "legend": {
+    "label": "Legend",
+    "scheduled": "Scheduled"
+  },
+  "chip": {
+    "noPayee": "No payee",
+    "overdue": "Overdue",
+    "scheduled": "Scheduled"
+  },
+  "day": {
+    "moreChips": "+{count} more",
+    "newTransaction": "New transaction on this day",
+    "noItems": "Nothing on this day.",
+    "scheduledHint": "Scheduled. Open Bills & Deposits to change it."
+  },
+  "banner": {
+    "title": "Some figures are not shown",
+    "rowCap": "This month holds {count} transactions, more than the {limit} a calendar can show. Narrow the filters to see them."
+  },
+  "errors": {
+    "monthFailed": "This month could not be loaded."
   }
 }

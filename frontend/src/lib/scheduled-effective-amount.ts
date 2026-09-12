@@ -158,6 +158,46 @@ export function occurrenceSettlementAccountId(
 }
 
 /**
+ * The accounts one occurrence's money moves through: the account it settles in,
+ * and the counterparty of a transfer.
+ *
+ * The settlement account is `occurrenceSettlementAccountId`, never the
+ * occurrence's own `accountId`. For a scheduled investment those two differ:
+ * `accountId` is the brokerage, and the cash leaves the funding account or the
+ * brokerage's linked cash account. A calendar filtered to a chequing account
+ * that read `accountId` would leave out a purchase draining it, and would draw
+ * that purchase on a brokerage whose cash never moves (INV-OCCURRENCE-003).
+ *
+ * An investment schedule whose settlement account cannot be identified from
+ * what the client holds touches no account this function can name, so it is in
+ * no scope -- rather than being charged to the brokerage, which is the defect
+ * above wearing a fallback.
+ */
+export function occurrenceAccountIds(
+  occurrence: { transferAccountId: string | null },
+  schedule: ScheduledTransaction,
+  accountsById: ReadonlyMap<string, { linkedAccountId?: string | null }>,
+): string[] {
+  const settlement = occurrenceSettlementAccountId(schedule, accountsById);
+  const ids: string[] = [];
+  if (settlement) ids.push(settlement);
+  if (occurrence.transferAccountId) ids.push(occurrence.transferAccountId);
+  return ids;
+}
+
+/** Whether any account this occurrence moves money through is in `scope`. */
+export function occurrenceTouchesAccounts(
+  occurrence: { transferAccountId: string | null },
+  schedule: ScheduledTransaction,
+  accountsById: ReadonlyMap<string, { linkedAccountId?: string | null }>,
+  scope: ReadonlySet<string>,
+): boolean {
+  return occurrenceAccountIds(occurrence, schedule, accountsById).some((id) =>
+    scope.has(id),
+  );
+}
+
+/**
  * The date the schedule's *next* occurrence actually falls on.
  *
  * `nextDueDate` is the recurrence slot; an override addressed to that slot can

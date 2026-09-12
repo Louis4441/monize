@@ -6,5 +6,36 @@
   },
   "grid": {
     "label": "Tháng"
+  },
+  "toolbar": {
+    "layers": "Lớp"
+  },
+  "layers": {
+    "transactions": "Giao dịch",
+    "balances": "Số dư",
+    "values": "Giá trị",
+    "dailyChange": "Thay đổi hằng ngày"
+  },
+  "legend": {
+    "label": "Chú giải",
+    "scheduled": "Đã lên lịch"
+  },
+  "chip": {
+    "noPayee": "Không có người nhận",
+    "overdue": "Quá hạn",
+    "scheduled": "Đã lên lịch"
+  },
+  "day": {
+    "moreChips": "+{count} nữa",
+    "newTransaction": "Giao dịch mới trong ngày này",
+    "noItems": "Không có gì trong ngày này.",
+    "scheduledHint": "Đã lên lịch. Mở Hóa đơn và tiền gửi để thay đổi."
+  },
+  "banner": {
+    "title": "Một số con số không được hiển thị",
+    "rowCap": "Tháng này có {count} giao dịch, nhiều hơn {limit} mà lịch có thể hiển thị. Hãy thu hẹp bộ lọc để xem."
+  },
+  "errors": {
+    "monthFailed": "Không thể tải tháng này."
   }
 }

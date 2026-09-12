@@ -6,5 +6,36 @@
   },
   "grid": {
     "label": "Mes"
+  },
+  "toolbar": {
+    "layers": "Capas"
+  },
+  "layers": {
+    "transactions": "Transacciones",
+    "balances": "Saldos",
+    "values": "Valores",
+    "dailyChange": "Cambio diario"
+  },
+  "legend": {
+    "label": "Leyenda",
+    "scheduled": "Programado"
+  },
+  "chip": {
+    "noPayee": "Sin beneficiario",
+    "overdue": "Vencido",
+    "scheduled": "Programado"
+  },
+  "day": {
+    "moreChips": "+{count} más",
+    "newTransaction": "Nueva transacción en este día",
+    "noItems": "Nada en este día.",
+    "scheduledHint": "Programado. Abre Facturas y depósitos para cambiarlo."
+  },
+  "banner": {
+    "title": "Algunas cifras no se muestran",
+    "rowCap": "Este mes contiene {count} transacciones, más de las {limit} que puede mostrar un calendario. Acota los filtros para verlas."
+  },
+  "errors": {
+    "monthFailed": "No se pudo cargar este mes."
   }
 }

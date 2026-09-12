@@ -6,5 +6,36 @@
   },
   "grid": {
     "label": "Ay"
+  },
+  "toolbar": {
+    "layers": "Katmanlar"
+  },
+  "layers": {
+    "transactions": "İşlemler",
+    "balances": "Bakiyeler",
+    "values": "Değerler",
+    "dailyChange": "Günlük değişim"
+  },
+  "legend": {
+    "label": "Gösterge",
+    "scheduled": "Planlanmış"
+  },
+  "chip": {
+    "noPayee": "Alacaklı yok",
+    "overdue": "Gecikmiş",
+    "scheduled": "Planlanmış"
+  },
+  "day": {
+    "moreChips": "+{count} daha",
+    "newTransaction": "Bu güne yeni işlem",
+    "noItems": "Bu günde bir şey yok.",
+    "scheduledHint": "Planlanmış. Değiştirmek için Faturalar ve Yatırımlar'ı açın."
+  },
+  "banner": {
+    "title": "Bazı tutarlar gösterilmiyor",
+    "rowCap": "Bu ay {count} işlem içeriyor, bir takvimin gösterebileceği {limit} işlemden fazla. Görmek için filtreleri daraltın."
+  },
+  "errors": {
+    "monthFailed": "Bu ay yüklenemedi."
   }
 }

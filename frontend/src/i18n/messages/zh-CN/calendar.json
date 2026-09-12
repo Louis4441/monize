@@ -6,5 +6,36 @@
   },
   "grid": {
     "label": "月份"
+  },
+  "toolbar": {
+    "layers": "图层"
+  },
+  "layers": {
+    "transactions": "交易",
+    "balances": "余额",
+    "values": "市值",
+    "dailyChange": "当日变动"
+  },
+  "legend": {
+    "label": "图例",
+    "scheduled": "已排期"
+  },
+  "chip": {
+    "noPayee": "无收款人",
+    "overdue": "已逾期",
+    "scheduled": "已排期"
+  },
+  "day": {
+    "moreChips": "另有 {count} 项",
+    "newTransaction": "在这一天新建交易",
+    "noItems": "这一天没有任何内容。",
+    "scheduledHint": "已排期。请打开账单与存款进行修改。"
+  },
+  "banner": {
+    "title": "部分数字未显示",
+    "rowCap": "本月有 {count} 笔交易，超过日历可显示的 {limit} 笔。请缩小筛选范围以查看。"
+  },
+  "errors": {
+    "monthFailed": "无法加载本月。"
   }
 }

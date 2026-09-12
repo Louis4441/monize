@@ -25,6 +25,9 @@ const ChartLoadingPlaceholder = () => (
   <div className={`${CARD_CLASS} p-3 sm:p-6 mb-6 min-h-[420px]`} />
 );
 const BalanceHistoryChart = dynamic(() => import('@/components/transactions/BalanceHistoryChart').then(m => m.BalanceHistoryChart), { ssr: false, loading: ChartLoadingPlaceholder });
+// Calendar mode's whole tree, loaded only once a reader switches to it, so the
+// register keeps the bundle it had.
+const TransactionsCalendarView = dynamic(() => import('@/components/calendar/TransactionsCalendarView').then(m => m.TransactionsCalendarView), { ssr: false });
 const CategoryPayeeBarChart = dynamic(() => import('@/components/transactions/CategoryPayeeBarChart').then(m => m.CategoryPayeeBarChart), { ssr: false, loading: ChartLoadingPlaceholder });
 const AccountBalancesBarChart = dynamic(() => import('@/components/transactions/AccountBalancesBarChart').then(m => m.AccountBalancesBarChart), { ssr: false, loading: ChartLoadingPlaceholder });
 import { transferCsvLabel, transferPayeeCsvLabel } from '@/lib/transfer-label';
@@ -75,6 +78,9 @@ import { PAGE_SIZE } from '@/lib/constants';
 import { budgetsApi } from '@/lib/budgets';
 import { CategoryBudgetStatus } from '@/types/budget';
 import { preferredCurrency } from '@/lib/default-currency';
+import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
+import { useViewMode } from '@/store/viewModeStore';
+import { useFinancialToday } from '@/hooks/useFinancialToday';
 
 const logger = createLogger('Transactions');
 
@@ -131,6 +137,12 @@ function TransactionsContent() {
   const [monthlyTotals, setMonthlyTotals] = useState<MonthlyTotal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { showForm, editingItem: editingTransaction, openCreate, openEdit, close, modalProps, setFormDirty, unsavedChangesDialog, formSubmitRef } = useFormModal<Transaction>();
+  const { view, setView } = useViewMode('transactions');
+  const financialToday = useFinancialToday();
+  // The day a create was started from, when the calendar's "New transaction on
+  // this day" started it. Undefined everywhere else, so the register's New
+  // button keeps the remembered date it has always opened on.
+  const [createOnDate, setCreateOnDate] = useState<string | undefined>(undefined);
   // Separate modal instances for editing the account/category behind a
   // single-entity filter, reusing the same forms as their own pages.
   const accountModal = useFormModal<Account>();
@@ -167,6 +179,52 @@ function TransactionsContent() {
     if (filters.filteredAccounts.length > 0) return filters.filteredAccounts.map(a => a.id);
     return undefined;
   }, [filters.filterAccountIds, filters.filteredAccounts]);
+
+  /**
+   * What the calendar asks the register for: every filter the page holds
+   * except the date range, which in calendar mode is the month on screen
+   * (design decision 2). Derived from the same filter state the table's own
+   * request reads, so the two cannot drift.
+   */
+  const calendarFilters = useMemo(
+    () => ({
+      accountIds: accountIdsForQuery,
+      categoryIds: filters.filterCategoryIds.length > 0 ? filters.filterCategoryIds : undefined,
+      payeeIds: filters.filterPayeeIds.length > 0 ? filters.filterPayeeIds : undefined,
+      tagIds: filters.filterTagIds.length > 0 ? filters.filterTagIds : undefined,
+      search: filters.filterSearch || undefined,
+      amountFrom: filters.filterAmountFrom ? parseFloat(filters.filterAmountFrom) : undefined,
+      amountTo: filters.filterAmountTo ? parseFloat(filters.filterAmountTo) : undefined,
+      statuses: filters.filterStatuses.length > 0 ? filters.filterStatuses : undefined,
+      originalCurrencyCodes:
+        filters.filterOriginalCurrencyCodes.length > 0
+          ? filters.filterOriginalCurrencyCodes
+          : undefined,
+      tagKey: filters.filterTagKey || undefined,
+      tagKeyOp: filters.filterTagKeyOp,
+      tagKeyValue: filters.filterTagKeyValue || undefined,
+      hasAttachments:
+        filters.filterHasAttachments === ''
+          ? undefined
+          : filters.filterHasAttachments === 'yes',
+    }),
+    [
+      accountIdsForQuery,
+      filters.filterCategoryIds,
+      filters.filterPayeeIds,
+      filters.filterTagIds,
+      filters.filterSearch,
+      filters.filterAmountFrom,
+      filters.filterAmountTo,
+      filters.filterStatuses,
+      filters.filterOriginalCurrencyCodes,
+      filters.filterTagKey,
+      filters.filterTagKeyOp,
+      filters.filterTagKeyValue,
+      filters.filterHasAttachments,
+    ],
+  );
+
 
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [startingBalance, setStartingBalance] = useState<number | undefined>();
@@ -416,7 +474,15 @@ function TransactionsContent() {
     return () => window.removeEventListener('popstate', origHandler);
   }, []);
 
-  const handleCreateNew = () => openCreate();
+  const handleCreateNew = () => {
+    setCreateOnDate(undefined);
+    openCreate();
+  };
+
+  const handleCreateOnDay = (date: string) => {
+    setCreateOnDate(date);
+    openCreate();
+  };
 
   const handleEdit = async (transaction: Transaction) => {
     if (transaction.linkedInvestmentTransactionId) {
@@ -992,12 +1058,15 @@ function TransactionsContent() {
           subtitle={t('page.subtitle')}
           helpUrl="https://github.com/kenlasko/monize/wiki/Transactions"
           actions={
-            <Button
-              {...tourAnchor(TOUR_ANCHORS.transactionsNewButton)}
-              onClick={handleCreateNew}
-            >
-              {t('page.newButton')}
-            </Button>
+            <div className="flex items-center gap-2">
+              <ViewModeToggle value={view} onChange={setView} />
+              <Button
+                {...tourAnchor(TOUR_ANCHORS.transactionsNewButton)}
+                onClick={handleCreateNew}
+              >
+                {t('page.newButton')}
+              </Button>
+            </div>
           }
         />
         {(() => {
@@ -1197,9 +1266,10 @@ function TransactionsContent() {
             {editingTransaction ? t('page.editModal.editTitle') : duplicatingFrom ? t('page.editModal.duplicateTitle') : t('page.editModal.newTitle')}
           </h2>
           <TransactionForm
-            key={`${editingTransaction?.id || 'new'}-${duplicatingFrom?.id || ''}-${filters.filterAccountIds.join(',')}-${formKey}`}
+            key={`${editingTransaction?.id || 'new'}-${duplicatingFrom?.id || ''}-${filters.filterAccountIds.join(',')}-${createOnDate || ''}-${formKey}`}
             transaction={editingTransaction}
             duplicateFrom={duplicatingFrom}
+            defaultDate={createOnDate}
             defaultAccountId={filters.filterAccountIds.length === 1 ? filters.filterAccountIds[0] : undefined}
             defaultCategoryId={(() => {
               if (filters.filterAccountIds.length !== 1) return undefined;
@@ -1305,6 +1375,7 @@ function TransactionsContent() {
             setBulkSelectMode(!bulkSelectMode);
           }}
           onClearFilters={filters.clearFilters}
+          hideDateRange={view === 'calendar'}
         />
 
         {/* Spending broken down by the selected KEY:VALUE tag key. */}
@@ -1365,6 +1436,25 @@ function TransactionsContent() {
           variant="danger"
         />
 
+        {/* The register, or the month calendar standing in for it. Everything
+            above this point is the same either way. */}
+        {view === 'calendar' ? (
+          <TransactionsCalendarView
+            accounts={accounts}
+            scheduledTransactions={scheduledTransactions}
+            filters={calendarFilters}
+            scopeAccountIds={accountIdsForQuery ?? []}
+            weekStartsOn={weekStartsOn}
+            today={financialToday}
+            categoryColorMap={filters.categoryColorMap}
+            categoryIconMap={filters.categoryIconMap}
+            categoryLabelMap={filters.categoryLabelMap}
+            onEditTransaction={handleEdit}
+            onCreateOnDay={handleCreateOnDay}
+            refreshKey={reloadKey}
+          />
+        ) : (
+          <>
         {/* Transactions List */}
         <div className={`${CARD_CLASS} overflow-hidden`}>
           <div ref={swipeRef} {...(paginates ? { [SWIPE_PAGINATE_ATTR]: 'true' } : {})}>
@@ -1423,6 +1513,8 @@ function TransactionsContent() {
           itemName={t('list.itemNamePlural')}
           totalLabel={t('page.totalCount', { count: pagination?.total ?? 0 })}
         />
+          </>
+        )}
       </main>
     </PageLayout>
   );

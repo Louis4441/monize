@@ -6,5 +6,36 @@
   },
   "grid": {
     "label": "Mês"
+  },
+  "toolbar": {
+    "layers": "Camadas"
+  },
+  "layers": {
+    "transactions": "Transações",
+    "balances": "Saldos",
+    "values": "Valores",
+    "dailyChange": "Variação diária"
+  },
+  "legend": {
+    "label": "Legenda",
+    "scheduled": "Agendado"
+  },
+  "chip": {
+    "noPayee": "Sem beneficiário",
+    "overdue": "Em atraso",
+    "scheduled": "Agendado"
+  },
+  "day": {
+    "moreChips": "+{count} mais",
+    "newTransaction": "Nova transação neste dia",
+    "noItems": "Nada neste dia.",
+    "scheduledHint": "Agendado. Abra Contas e depósitos para o alterar."
+  },
+  "banner": {
+    "title": "Alguns valores não são mostrados",
+    "rowCap": "Este mês contém {count} transações, mais do que as {limit} que um calendário pode mostrar. Restrinja os filtros para as ver."
+  },
+  "errors": {
+    "monthFailed": "Não foi possível carregar este mês."
   }
 }

@@ -6,5 +6,36 @@
   },
   "grid": {
     "label": "Maand"
+  },
+  "toolbar": {
+    "layers": "Lagen"
+  },
+  "layers": {
+    "transactions": "Transacties",
+    "balances": "Saldi",
+    "values": "Waarden",
+    "dailyChange": "Dagelijkse verandering"
+  },
+  "legend": {
+    "label": "Legenda",
+    "scheduled": "Gepland"
+  },
+  "chip": {
+    "noPayee": "Geen begunstigde",
+    "overdue": "Achterstallig",
+    "scheduled": "Gepland"
+  },
+  "day": {
+    "moreChips": "+{count} meer",
+    "newTransaction": "Nieuwe transactie op deze dag",
+    "noItems": "Niets op deze dag.",
+    "scheduledHint": "Gepland. Open Rekeningen & stortingen om het te wijzigen."
+  },
+  "banner": {
+    "title": "Sommige bedragen worden niet getoond",
+    "rowCap": "Deze maand bevat {count} transacties, meer dan de {limit} die een kalender kan tonen. Beperk de filters om ze te zien."
+  },
+  "errors": {
+    "monthFailed": "Deze maand kon niet worden geladen."
   }
 }
