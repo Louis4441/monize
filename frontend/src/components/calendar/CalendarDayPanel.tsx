@@ -118,19 +118,23 @@ export function CalendarDayPanel({
       className={asDialog ? 'p-1' : `${CARD_CLASS} p-4`}
       aria-label={formatDate(date)}
     >
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-          {formatDate(date)}
-        </h3>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label={common('close')}
-          className={`p-1 rounded text-gray-500 dark:text-gray-400 ${HOVER_ROW_ON_CARD} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
-        >
-          <XMarkIcon className="w-4 h-4" />
-        </button>
-      </div>
+      {/* As a dialog the day is named by `Modal`'s own title, which draws the
+          heading and the close button; the card beside the grid draws its own. */}
+      {!asDialog && (
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            {formatDate(date)}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={common('close')}
+            className={`p-1 rounded text-gray-500 dark:text-gray-400 ${HOVER_ROW_ON_CARD} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
+          >
+            <XMarkIcon className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {balance && (
         <CalendarDayBalanceSection balance={balance} hasOccurrences={occurrences.length > 0} />
@@ -270,7 +274,7 @@ export function CalendarDayPanel({
   if (!asDialog) return body;
 
   return (
-    <Modal isOpen onClose={onClose} maxWidth="lg" padding="md">
+    <Modal isOpen onClose={onClose} maxWidth="lg" padding="md" title={formatDate(date)}>
       {body}
     </Modal>
   );

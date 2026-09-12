@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { Modal } from '@/components/ui/Modal';
+import { TABLE_BODY_CLASS } from '@/components/ui/Table';
 import { ReportError } from '@/components/reports/ReportError';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
@@ -174,7 +175,7 @@ function MoveSection({
       <h4 className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
         {title}
       </h4>
-      <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+      <ul className={TABLE_BODY_CLASS}>
         {rows.map((row) => (
           <li key={row.securityId} className="flex items-baseline justify-between gap-3 py-1.5">
             <span className="min-w-0">
