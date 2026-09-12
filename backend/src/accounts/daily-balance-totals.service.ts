@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { DataSource } from "typeorm";
 
 import { withScopedDb } from "../common/db/scoped-db";
+import { mapWithConcurrency } from "../common/concurrency.util";
 import { FxAggregate } from "../common/fx-aggregate";
 import { addDaysYMD, todayYMD } from "../common/date-utils";
 import { preferredCurrency } from "../common/default-currency.util";
@@ -68,6 +69,18 @@ export interface DailyBalanceTotalsResponse {
   /** Empty scope: no account matched, so there is nothing to total. */
   scopeEmpty: boolean;
 }
+
+/**
+ * How many accounts are forecast at once.
+ *
+ * `getBalanceForecast` is four round trips in four transactions for an account
+ * with no schedules and six for one with them, so a twenty-account month walked
+ * serially was a hundred round trips on a request the calendar fires on every
+ * month change. Bounded rather than `Promise.all`: each call opens its own
+ * scoped transaction, and the pool is shared with every other request on this
+ * replica.
+ */
+const FORECAST_CONCURRENCY = 5;
 
 /** One scoped account, as both halves of the answer need it. */
 interface ScopedAccount {
@@ -368,20 +381,31 @@ export class DailyBalanceTotalsService {
     const unforecastableAccountIds: string[] = [];
     let complete = true;
 
+    // A joint account's forecast reads schedules that belong to its owner's
+    // identity, which this request does not carry. Named, not guessed at.
+    const owned = scope.filter((account) => account.owned);
     for (const account of scope) {
-      // A joint account's forecast reads schedules that belong to its owner's
-      // identity, which this request does not carry. Named, not guessed at.
       if (!account.owned) {
         unforecastableAccountIds.push(account.id);
         complete = false;
-        continue;
       }
+    }
 
-      const forecast = await this.balanceForecastService.getBalanceForecast(
-        userId,
-        account.id,
-        horizonDays,
-      );
+    const forecasts = await mapWithConcurrency(
+      owned,
+      FORECAST_CONCURRENCY,
+      (account) =>
+        this.balanceForecastService.getBalanceForecast(
+          userId,
+          account.id,
+          horizonDays,
+        ),
+    );
+
+    // Merged in `owned` order, which is `resolveScope`'s `ORDER BY id`, so the
+    // gap list a caller sees does not depend on which forecast finished first.
+    owned.forEach((account, index) => {
+      const forecast = forecasts[index];
       if (!forecast.complete) {
         complete = false;
         for (const gap of forecast.gaps) {
@@ -393,11 +417,11 @@ export class DailyBalanceTotalsService {
             gaps.push(gap);
           }
         }
-        continue;
+        return;
       }
 
       byAccount.set(account.id, forwardFill(forecast.points, projectedDates));
-    }
+    });
 
     return { byAccount, complete, gaps, unforecastableAccountIds };
   }

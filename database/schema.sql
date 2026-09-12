@@ -2476,7 +2476,9 @@ CREATE INDEX idx_push_subscriptions_user_live ON push_subscriptions(user_id) WHE
 --
 -- UNIQUE (user_id, note_date) is what makes the write a single statement: the
 -- upsert is INSERT ... ON CONFLICT DO UPDATE, so two saves of the same day
--- cannot interleave and a save never has to read first. The CHECK is the same
+-- cannot interleave and a save never has to read first. It is also the only
+-- index the table needs: the constraint already builds a btree on exactly
+-- (user_id, note_date). The CHECK is the same
 -- number as CALENDAR_DAY_NOTE_MAX_LENGTH on both layers;
 -- backend/src/common/calendar-day-note.contract.spec.ts fails when the three
 -- disagree.
@@ -2492,8 +2494,6 @@ CREATE TABLE calendar_day_notes (
     CONSTRAINT uq_calendar_day_notes_user_date UNIQUE (user_id, note_date),
     CONSTRAINT ck_calendar_day_notes_body_length CHECK (char_length(body) BETWEEN 1 AND 2000)
 );
-
-CREATE INDEX idx_calendar_day_notes_user_date ON calendar_day_notes(user_id, note_date);
 
 -- ===========================================================================
 -- Row-Level Security policies

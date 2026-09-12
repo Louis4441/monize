@@ -467,4 +467,65 @@ describe("DailyBalanceTotalsService", () => {
       ]);
     });
   });
+
+  describe("the projection fan-out", () => {
+    /**
+     * One forecast is four to six round trips in its own transaction, so the
+     * shape of this loop is the shape of the request's cost. Two properties
+     * hold it: every owned account is asked exactly once (a joint account not
+     * at all), and the calls overlap instead of queueing behind each other --
+     * but only up to a bound, because an unbounded fan-out trades a slow
+     * request for a drained connection pool.
+     */
+    const TWELVE = Array.from({ length: 12 }, (_, i) => `a-${i}`);
+
+    it("asks each owned account once, and never a joint one", async () => {
+      accountRows = [
+        ...TWELVE.map((id) => account(id, "CAD")),
+        account("joint-1", "CAD", false),
+      ];
+      forecastService.getBalanceForecast.mockImplementation(
+        async (_userId: string, accountId: string) =>
+          completeForecast(accountId, "CAD", [{ date: TODAY, balance: 100 }]),
+      );
+
+      const res = await service.getDailyBalanceTotals(
+        "user-1",
+        TODAY,
+        "2026-06-18",
+      );
+
+      expect(forecastService.getBalanceForecast).toHaveBeenCalledTimes(12);
+      const asked = forecastService.getBalanceForecast.mock.calls.map(
+        (c) => c[1],
+      );
+      expect([...asked].sort()).toEqual([...TWELVE].sort());
+      expect(asked).not.toContain("joint-1");
+      expect(res.forecast.unforecastableAccountIds).toEqual(["joint-1"]);
+    });
+
+    it("overlaps the forecasts, bounded, instead of running them one at a time", async () => {
+      accountRows = TWELVE.map((id) => account(id, "CAD"));
+
+      let inFlight = 0;
+      let peak = 0;
+      forecastService.getBalanceForecast.mockImplementation(
+        async (_userId: string, accountId: string) => {
+          inFlight++;
+          peak = Math.max(peak, inFlight);
+          await new Promise((resolve) => setImmediate(resolve));
+          inFlight--;
+          return completeForecast(accountId, "CAD", [
+            { date: TODAY, balance: 100 },
+          ]);
+        },
+      );
+
+      await service.getDailyBalanceTotals("user-1", TODAY, "2026-06-18");
+
+      // Serial would peak at 1; unbounded would peak at 12.
+      expect(peak).toBeGreaterThan(1);
+      expect(peak).toBeLessThanOrEqual(5);
+    });
+  });
 });

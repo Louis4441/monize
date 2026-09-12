@@ -340,12 +340,20 @@ CREATE TABLE IF NOT EXISTS calendar_day_notes (
     CONSTRAINT uq_calendar_day_notes_user_date UNIQUE (user_id, note_date),
     CONSTRAINT ck_calendar_day_notes_body_length CHECK (char_length(body) BETWEEN 1 AND 2000)
 );
-CREATE INDEX IF NOT EXISTS idx_calendar_day_notes_user_date ON calendar_day_notes(user_id, note_date);
 ALTER TABLE calendar_day_notes ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS calendar_day_notes_isolation ON calendar_day_notes;
 CREATE POLICY calendar_day_notes_isolation ON calendar_day_notes
-  USING (user_id = (SELECT app_current_user_id()) OR (SELECT app_bypass_rls()));
+  USING (user_id = (SELECT app_current_user_id()) OR (SELECT app_bypass_rls()))
+  WITH CHECK (user_id = (SELECT app_current_user_id()) OR (SELECT app_bypass_rls()));
 ```
+
+Two corrections to the sketch above, both made when B4 shipped. The policy
+needs **both** arms: `USING` alone filters reads while permitting a write of a
+row owned by anyone, which is what `scripts/verify-schema.sh` caught against
+`schema.sql`'s uniform loop. And there is **no separate index**: the unique
+constraint already builds a btree on exactly `(user_id, note_date)`, which is
+the only predicate this table is ever read by, so a second one would be an
+extra write per save buying nothing.
 
 The **Direct** bucket, owner only: no delegate arm (decision 12), so the
 enforcement suite's uniform-policy check covers it with no map entry. The
@@ -355,8 +363,11 @@ all three.
 Backup: an export query (`SELECT * FROM calendar_day_notes WHERE user_id = $1
 ORDER BY note_date`) in `backend/src/backup/export-table-queries.ts`, a
 `restore-plan.ts` entry (`scopeToUser: true`, after `users`), and a
-`support-backup-rules.ts` allowlist with `body: drop` and everything else
-`keep`; the support-backup golden test fails until that decision is made.
+`support-backup-rules.ts` allowlist with everything `keep` except `body`; the
+support-backup golden test fails until that decision is made. `body` is
+`konst("***")` rather than `drop`: the column is NOT NULL with a minimum-length
+`CHECK`, and a support backup restores through the same path as any other, so a
+null there is a row no restore can insert.
 
 Module `backend/src/calendar/` (`calendar.module.ts`,
 `entities/calendar-day-note.entity.ts`, `calendar-day-notes.controller.ts`,
