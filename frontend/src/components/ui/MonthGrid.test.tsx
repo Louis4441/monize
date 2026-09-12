@@ -179,6 +179,41 @@ describe('MonthGrid', () => {
       expect(onSelectDay).toHaveBeenCalledWith('2026-06-15');
     });
 
+    it('leaves a key pressed on a control inside a cell to that control', () => {
+      // The click handler has always deferred to a chip inside the cell. The
+      // keyboard is the other half of the same rule: Enter on a chip activates
+      // the chip, and the grid claiming it means the day panel opens while the
+      // chip's own action is cancelled by the preventDefault that claimed it.
+      const onSelectDay = vi.fn();
+      renderGrid({
+        onSelectDay,
+        renderDay: (day) => (
+          <button type="button">chip {day.date}</button>
+        ),
+      });
+
+      const chip = screen.getByRole('button', { name: 'chip 2026-06-10' });
+      fireEvent.keyDown(chip, { key: 'Enter' });
+      fireEvent.keyDown(chip, { key: ' ' });
+
+      expect(onSelectDay).not.toHaveBeenCalled();
+    });
+
+    it('does not steal an arrow key from a control inside a cell', () => {
+      renderGrid({
+        renderDay: (day) => <button type="button">chip {day.date}</button>,
+      });
+
+      const before = screen.getByLabelText('06/15/2026');
+      expect(before).toHaveAttribute('tabindex', '0');
+
+      fireEvent.keyDown(screen.getByRole('button', { name: 'chip 2026-06-10' }), {
+        key: 'ArrowRight',
+      });
+
+      expect(before).toHaveAttribute('tabindex', '0');
+    });
+
     it('moves the tab stop back into the grid when the month changes', () => {
       const { rerender } = renderGrid();
       fireEvent.keyDown(screen.getByLabelText('06/15/2026'), { key: 'ArrowRight' });
