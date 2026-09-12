@@ -1,22 +1,28 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@/test/render';
+import { render, renderInLocale, screen, fireEvent, within } from '@/test/render';
 import { MonthGrid, type MonthGridDay } from './MonthGrid';
 import { monthGridDays } from '@/lib/calendar-month';
 import commonNs from '@/i18n/messages/en/common.json';
+import ptCommonNs from '@/i18n/messages/pt/common.json';
+import ptCalendarNs from '@/i18n/messages/pt/calendar.json';
 
 const MONTH = '2026-06';
 const TODAY = '2026-06-15';
 
-function renderGrid(overrides: Partial<React.ComponentProps<typeof MonthGrid>> = {}) {
-  return render(
+function grid(overrides: Partial<React.ComponentProps<typeof MonthGrid>> = {}) {
+  return (
     <MonthGrid
       month={MONTH}
       weekStartsOn={0}
       today={TODAY}
       renderDay={(day: MonthGridDay) => <span>{day.date.slice(-2)}</span>}
       {...overrides}
-    />,
+    />
   );
+}
+
+function renderGrid(overrides: Partial<React.ComponentProps<typeof MonthGrid>> = {}) {
+  return render(grid(overrides));
 }
 
 function cells() {
@@ -35,6 +41,23 @@ describe('MonthGrid', () => {
     const headers = screen.getAllByRole('columnheader').map((h) => h.textContent);
     expect(headers).toEqual(['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']);
     expect(commonNs.weekdaysMin).toEqual(['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']);
+  });
+
+  it('keeps seven columns under a locale whose abbreviations repeat', () => {
+    // pt writes quarta and quinta alike ("qu"), and segunda and sexta alike
+    // ("se"). Keyed by label, the second of each pair collides with the first,
+    // and moving the week start reconciles the row into nine headers in the
+    // wrong order -- weekday names sitting over days they do not name.
+    expect(ptCommonNs.weekdaysMin).toEqual(['do', 'se', 'te', 'qu', 'qu', 'se', 'sá']);
+
+    const { rerender } = renderInLocale(grid({ weekStartsOn: 0 }), {
+      locale: 'pt',
+      messages: { common: ptCommonNs, calendar: ptCalendarNs },
+    });
+    rerender(grid({ weekStartsOn: 1 }));
+
+    const headers = screen.getAllByRole('columnheader').map((h) => h.textContent);
+    expect(headers).toEqual(['se', 'te', 'qu', 'qu', 'se', 'sá', 'do']);
   });
 
   it('starts the first row on the reader week start', () => {

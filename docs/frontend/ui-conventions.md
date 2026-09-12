@@ -106,6 +106,8 @@ The grid prints names on dates and no amount per occurrence, which is why `sched
 
 `lib/calendar-month.ts` decides which days a month's grid holds (`monthGridDays`), rotates the labels (`rotateWeekdayLabels`), steps the month (`shiftMonth`) and classifies a day against a `today` it is *given* (`classifyCalendarDay`, which has no default: actual-versus-projected is the server's day, not the browser's). Every function takes and returns `YYYY-MM-DD` or `YYYY-MM` and does integer arithmetic on the parts. Nothing builds a `Date`: a `Date` from a calendar date is an instant in the browser's zone, so `new Date('2026-03-01')` is the last day of February west of UTC and the grid loses or repeats a day at the boundary.
 
+A weekday header is keyed by its **column**, never by its label. Portuguese abbreviates quarta and quinta alike (`qu`) and segunda and sexta alike (`se`), so a key taken from the label collides with its own sibling and moving the week start reconciles seven headers into nine, in the wrong order.
+
 The grid is whole weeks covering the month, so it is 35 or 42 days -- and 28 for a non-leap February whose 1st falls on the week start, where four whole weeks already cover it.
 
 `components/bills/ScheduledCalendarGrid.tsx` is the one remaining second grid; it migrates onto `MonthGrid` in its own PR, and until then it is named here rather than silently tolerated. A third month grid is a review failure: the calendar's own guard suite is what will make it a test failure.
