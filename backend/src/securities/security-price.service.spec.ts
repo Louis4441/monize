@@ -2263,16 +2263,14 @@ describe("SecurityPriceService", () => {
         new Date("2023-06-01T00:00:00Z").getTime() / 1000,
       );
       const recent = Math.floor(Date.now() / 1000) - DAY;
-      global.fetch = jest
-        .fn()
-        .mockResolvedValue(
-          createMockFetchResponse(
-            makeYahooHistoricalResponse({
-              timestamps: [beforePurchase, afterPurchase, recent],
-              closes: [50, 60, 70],
-            }),
-          ),
-        ) as jest.Mock;
+      global.fetch = jest.fn().mockResolvedValue(
+        createMockFetchResponse(
+          makeYahooHistoricalResponse({
+            timestamps: [beforePurchase, afterPurchase, recent],
+            closes: [50, 60, 70],
+          }),
+        ),
+      ) as jest.Mock;
 
       const result = await service.backfillSecurityHoldingPeriod(
         TEST_USER_ID,
