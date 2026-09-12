@@ -41,7 +41,7 @@ Every task is safe to merge in any order that respects its dependencies: the end
 | B4 | `calendar_day_notes` migration + schema, entity, module, three routes, backup coverage, mirrored length constant | S1 | inert* | [x] #1368 |
 | F7 | Day notes in the day panel and the cell, on both calendars | F2, F4, B4 | inert | [x] |
 | F6 | Phone layout, keyboard navigation and screen-reader pass across both calendars | F3, F5, F7 | inert | [x] |
-| Q1 | `calendar.guard.test.ts` + the `ui-conventions.test.ts` month-grid block | F1 | none | [ ] |
+| Q1 | `calendar.guard.test.ts` + the `ui-conventions.test.ts` month-grid block | F1 | none | [x] |
 | Q2 | Backend integration suites `calendar-read-models.integration.spec.ts` and `calendar-day-notes.integration.spec.ts` | B1, B3, B4 | none | [ ] |
 | Q3 | Playwright `tests/calendar.spec.ts` | F3, F5, F7 | none | [ ] |
 | Q4 | Full-locale i18n pass (acceptance, final commit) | all above | none | [ ] |
