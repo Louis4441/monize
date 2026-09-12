@@ -346,6 +346,17 @@ additive form the net-worth reducers once used gave 92. This invariant is separa
 from INV-HOLDING-001 on purpose -- that one is about concurrency, this one about
 two implementations of the same rule.
 
+Replaying the same count everywhere still leaves the question of whether the count
+could be **priced**. `getDailyInvestments` values each day at the latest accepted
+close on or before it (`positionCloseAsOf`) and skips a held position that has
+none, so `value` was a subtotal with nothing beside it to say so. Each point now
+carries `pricesComplete` and `unpricedSecurityIds` naming the securities behind a
+false one, which is what lets a consumer withhold the figure and tell the reader
+which security to price. `value` itself is unchanged -- making it `null` on such a
+day is the contract's real answer and a behaviour change to four charts, reported
+as its own proposal. Every consumer reads the flag as `pricesComplete === false`:
+absent means an older backend said nothing, not that the day was complete.
+
 ### INV-TRANSFER-001 -- both legs, one decision
 
 ```text

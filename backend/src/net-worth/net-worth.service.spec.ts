@@ -2793,6 +2793,10 @@ describe("NetWorthService", () => {
         value: 1000,
         fxComplete: true,
         missingRatePairs: [],
+        // Every held position had a close on this day, so the value is a total
+        // rather than a subtotal.
+        pricesComplete: true,
+        unpricedSecurityIds: [],
       });
       expect(result[1]).toMatchObject({ date: "2025-03-02", value: 1020 });
       expect(result[2]).toMatchObject({ date: "2025-03-03", value: 1010 });
@@ -2834,6 +2838,153 @@ describe("NetWorthService", () => {
       expect(result).toHaveLength(2);
       expect(result[0]).toMatchObject({ date: "2025-03-01", value: 5000 });
       expect(result[1]).toMatchObject({ date: "2025-03-02", value: 5100 });
+    });
+
+    it("names an unpriced holding and leaves value as it was (design 6.2)", async () => {
+      prefRepository.findOne.mockResolvedValue({
+        defaultCurrency: "USD",
+      });
+
+      // accounts query: one brokerage
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "brok-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_BROKERAGE",
+          currency_code: "USD",
+          opening_balance: 0,
+        },
+      ]);
+
+      // Two holdings: a priced one and a GIC nobody has ever priced.
+      reportQuery.mockResolvedValueOnce([
+        {
+          account_id: "brok-1",
+          security_id: "sec-priced",
+          action: "BUY",
+          quantity: "10",
+          transaction_date: "2025-02-01",
+        },
+        {
+          account_id: "brok-1",
+          security_id: "sec-gic",
+          action: "BUY",
+          quantity: "1",
+          transaction_date: "2025-02-01",
+        },
+      ]);
+
+      securityRepository.findByIds.mockResolvedValue([
+        { id: "sec-priced", skipPriceUpdates: false, currencyCode: "USD" },
+        { id: "sec-gic", skipPriceUpdates: false, currencyCode: "USD" },
+      ]);
+
+      // Stored closes: the GIC has none at all.
+      reportQuery.mockResolvedValueOnce([
+        {
+          security_id: "sec-priced",
+          price_date: "2025-03-01",
+          close_price: "100.00",
+        },
+      ]);
+      // loadTxPriceSeries fallback (no legacy transaction prices)
+      reportQuery.mockResolvedValueOnce([]);
+
+      const result = await service.getDailyInvestments(
+        "user-1",
+        "2025-03-01",
+        "2025-03-01",
+      );
+
+      expect(result).toHaveLength(1);
+      // Additive: the unpriced holding is still skipped and `value` is what it
+      // always was -- a subtotal. The flag is what makes that visible; making
+      // `value` null is task R1, reported rather than done here.
+      expect(result[0].value).toBe(1000);
+      expect(result[0].pricesComplete).toBe(false);
+      expect(result[0].unpricedSecurityIds).toEqual(["sec-gic"]);
+      // A missing price is not a missing rate: two causes, two repairs.
+      expect(result[0].fxComplete).toBe(true);
+      expect(result[0].missingRatePairs).toEqual([]);
+    });
+
+    it("reports prices complete for a scope holding only cash", async () => {
+      prefRepository.findOne.mockResolvedValue({
+        defaultCurrency: "USD",
+      });
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "cash-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_CASH",
+          currency_code: "USD",
+          opening_balance: 5000,
+        },
+      ]);
+      securityRepository.findByIds.mockResolvedValue([]);
+      reportQuery.mockResolvedValueOnce([
+        { date: "2025-03-01", balance: "5000", account_id: "cash-1" },
+      ]);
+
+      const result = await service.getDailyInvestments(
+        "user-1",
+        "2025-03-01",
+        "2025-03-01",
+      );
+
+      // Cash needs no price, so a cash-only day is complete, not unknown.
+      expect(result[0].pricesComplete).toBe(true);
+      expect(result[0].unpricedSecurityIds).toEqual([]);
+    });
+
+    it("reports a holding sold to zero as priced, because it is no longer held", async () => {
+      prefRepository.findOne.mockResolvedValue({
+        defaultCurrency: "USD",
+      });
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "brok-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_BROKERAGE",
+          currency_code: "USD",
+          opening_balance: 0,
+        },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        {
+          account_id: "brok-1",
+          security_id: "sec-gone",
+          action: "BUY",
+          quantity: "5",
+          transaction_date: "2025-02-01",
+        },
+        {
+          account_id: "brok-1",
+          security_id: "sec-gone",
+          action: "SELL",
+          quantity: "5",
+          transaction_date: "2025-02-02",
+        },
+      ]);
+      securityRepository.findByIds.mockResolvedValue([
+        { id: "sec-gone", skipPriceUpdates: false, currencyCode: "USD" },
+      ]);
+      // No price rows at all -- which would matter only if the position were
+      // still held.
+      reportQuery.mockResolvedValueOnce([]);
+      reportQuery.mockResolvedValueOnce([]);
+
+      const result = await service.getDailyInvestments(
+        "user-1",
+        "2025-03-01",
+        "2025-03-01",
+      );
+
+      expect(result[0].value).toBe(0);
+      expect(result[0].pricesComplete).toBe(true);
+      expect(result[0].unpricedSecurityIds).toEqual([]);
     });
 
     it("resolves linked account pairs when accountIds provided", async () => {

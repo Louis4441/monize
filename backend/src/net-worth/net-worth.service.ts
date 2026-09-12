@@ -64,6 +64,44 @@ export interface JointNetWorthScope {
   accounts: Array<{ accountId: string; ownerUserId: string }>;
 }
 
+/**
+ * One day of `GET /net-worth/investments-daily`: the scope's market value plus
+ * cash at the close of that calendar day, in the reporting currency.
+ *
+ * Two completeness bits, for two different repairs. `fxComplete` says every
+ * component converted; `pricesComplete` says every position the scope held that
+ * day had an accepted close on or before it. A day can be short of either, and
+ * the reader who has to fix it needs to know which -- a missing rate is fixed in
+ * Currencies, a missing price by entering one for the security.
+ *
+ * `value` is NOT withheld when `pricesComplete` is false. It is a subtotal on
+ * such a day, which `docs/financial-calculation-contract.md` section 1 says a
+ * field named like a total should not carry; making it null is a behaviour
+ * change to four charts and is reported as its own proposal (task R1 of the
+ * calendar-view plan). Until then a consumer that displays this value MUST read
+ * the flags: `pricesComplete === false` withholds, and absent means an older
+ * backend said nothing rather than that the day was complete.
+ */
+export interface DailyInvestmentValue {
+  date: string;
+  /**
+   * The scope's value at that close. A subtotal when either completeness bit is
+   * false -- read them before printing it under a total's caption.
+   */
+  value: number;
+  /** False when a component could not be converted; see missingRatePairs. */
+  fxComplete: boolean;
+  /** "USD->EUR" for each pair with no available rate. */
+  missingRatePairs: string[];
+  /**
+   * False when a position held at the close of this day had no accepted price
+   * on or before it, so its market value is unknown rather than zero.
+   */
+  pricesComplete: boolean;
+  /** The securities behind `pricesComplete: false`, so a reader can price them. */
+  unpricedSecurityIds: string[];
+}
+
 export type InvestmentBreakdownGranularity = "daily" | "monthly";
 
 /**
@@ -1104,16 +1142,7 @@ export class NetWorthService {
     endDate?: string,
     accountIds?: string[],
     displayCurrency?: string,
-  ): Promise<
-    {
-      date: string;
-      value: number;
-      /** False when a component could not be converted; see missingRatePairs. */
-      fxComplete: boolean;
-      /** "USD->EUR" for each pair with no available rate. */
-      missingRatePairs: string[];
-    }[]
-  > {
+  ): Promise<DailyInvestmentValue[]> {
     const pref = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(UserPreference).findOne({ where: { userId } }),
     );
@@ -1309,14 +1338,7 @@ export class NetWorthService {
     const holdingsByAccount = new Map<string, Map<string, number>>();
     let txIdx = 0;
 
-    const result: {
-      date: string;
-      value: number;
-      /** False when a component could not be converted; see missingRatePairs. */
-      fxComplete: boolean;
-      /** "USD->EUR" for each pair with no available rate. */
-      missingRatePairs: string[];
-    }[] = [];
+    const result: DailyInvestmentValue[] = [];
 
     for (const dateStr of dates) {
       // Process investment transactions up to this date
@@ -1347,6 +1369,10 @@ export class NetWorthService {
       // native currency, so we must convert each holding individually rather
       // than treating the total as being in the account's currency.
       const dayValue = new FxAggregate();
+      // Positions the scope held at this close that nothing could price. The
+      // walk below skips them, so without this set `value` would be a subtotal
+      // with nothing beside it to say so.
+      const unpricedSecurityIds = new Set<string>();
 
       for (const [, acctHoldings] of holdingsByAccount) {
         for (const [secId, qty] of acctHoldings) {
@@ -1381,6 +1407,13 @@ export class NetWorthService {
               secCurrency,
               defaultCurrency,
             );
+          } else {
+            // A held position with no accepted close on or before this day. Its
+            // market value is UNKNOWN, not zero: skipping it silently is what
+            // made `value` a subtotal wearing a total's name. `value` is left
+            // as it was (additive change, design 6.2); the flag is what a
+            // consumer reads before printing it.
+            unpricedSecurityIds.add(secId);
           }
         }
       }
@@ -1407,6 +1440,8 @@ export class NetWorthService {
         value: Math.round(dayValue.knownSubtotal),
         fxComplete: dayValue.isComplete,
         missingRatePairs: dayValue.missingPairs,
+        pricesComplete: unpricedSecurityIds.size === 0,
+        unpricedSecurityIds: [...unpricedSecurityIds].sort(),
       });
     }
 
