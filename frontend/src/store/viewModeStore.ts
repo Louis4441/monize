@@ -28,14 +28,25 @@ export type CalendarLayer = 'transactions' | 'balances' | 'values' | 'dailyChang
 /**
  * The layers each surface offers, in the order its toolbar lists them.
  *
- * A union per surface rather than one flat list, so asking the investments
- * calendar for a `balances` layer is a compile error rather than a toggle that
- * silently does nothing.
+ * `as const satisfies` rather than an annotation: the annotation this used to
+ * carry widened both entries to the flat `CalendarLayer[]`, so the per-surface
+ * union below could not be derived and every wrong layer type-checked again.
  */
-export const SURFACE_LAYERS: Readonly<Record<ViewModeSurface, readonly CalendarLayer[]>> = {
+export const SURFACE_LAYERS = {
   transactions: ['transactions', 'balances'],
   investments: ['transactions', 'values', 'dailyChange'],
-};
+} as const satisfies Readonly<Record<ViewModeSurface, readonly CalendarLayer[]>>;
+
+/**
+ * The layers one surface offers, as a union the compiler refuses to widen.
+ *
+ * This is the mechanism, not the intention: `toggleLayer` and `isLayerOn` take
+ * `LayerOf<S>`, so asking the investments calendar for a `balances` layer is a
+ * type error at the call site. `CalendarLayer` stays the storage-level union,
+ * because a hand-edited localStorage entry can name any of them and
+ * `readSurface` has to recognise the ones that do not belong.
+ */
+export type LayerOf<S extends ViewModeSurface> = (typeof SURFACE_LAYERS)[S][number];
 
 export const VIEW_MODE_SURFACES: readonly ViewModeSurface[] = ['transactions', 'investments'];
 
@@ -64,10 +75,6 @@ function isViewMode(value: unknown): value is ViewMode {
   return typeof value === 'string' && (VIEW_MODES as readonly string[]).includes(value);
 }
 
-function isLayerOfSurface(surface: ViewModeSurface, value: unknown): value is CalendarLayer {
-  return typeof value === 'string' && (SURFACE_LAYERS[surface] as readonly string[]).includes(value);
-}
-
 /**
  * A stored surface, or the default when the stored one cannot be trusted.
  *
@@ -81,9 +88,11 @@ function readSurface(surface: ViewModeSurface, stored: unknown): SurfaceViewStat
 
   const view = isViewMode(candidate.view) ? candidate.view : 'table';
   const storedLayers: unknown[] = Array.isArray(candidate.layers) ? candidate.layers : [];
-  const layers = SURFACE_LAYERS[surface].filter(
-    (layer) => storedLayers.includes(layer) && isLayerOfSurface(surface, layer),
-  );
+  // Walking the surface's own list rather than the stored one is what discards
+  // a layer belonging to the other surface: anything not named here cannot
+  // survive, whatever storage claims.
+  const available: readonly CalendarLayer[] = SURFACE_LAYERS[surface];
+  const layers = available.filter((layer) => storedLayers.includes(layer));
 
   return { view, layers: layers.length > 0 ? [...layers] : defaultSurfaceState().layers };
 }
@@ -91,7 +100,7 @@ function readSurface(surface: ViewModeSurface, stored: unknown): SurfaceViewStat
 interface ViewModeState {
   surfaces: Record<ViewModeSurface, SurfaceViewState>;
   setView: (surface: ViewModeSurface, view: ViewMode) => void;
-  toggleLayer: (surface: ViewModeSurface, layer: CalendarLayer) => void;
+  toggleLayer: <S extends ViewModeSurface>(surface: S, layer: LayerOf<S>) => void;
 }
 
 export const useViewModeStore = create<ViewModeState>()(
@@ -117,7 +126,8 @@ export const useViewModeStore = create<ViewModeState>()(
           const isOn = current.layers.includes(layer);
           if (isOn && current.layers.length === 1) return state;
 
-          const layers = SURFACE_LAYERS[surface].filter((candidate) =>
+          const available: readonly CalendarLayer[] = SURFACE_LAYERS[surface];
+          const layers = available.filter((candidate) =>
             candidate === layer ? !isOn : current.layers.includes(candidate),
           );
 
@@ -153,7 +163,7 @@ export const useViewModeStore = create<ViewModeState>()(
  * bound to the surface so a caller cannot write to the other one by forgetting
  * an argument.
  */
-export function useViewMode(surface: ViewModeSurface) {
+export function useViewMode<S extends ViewModeSurface>(surface: S) {
   const view = useViewModeStore((state) => state.surfaces[surface].view);
   const layers = useViewModeStore((state) => state.surfaces[surface].layers);
   const setForSurface = useViewModeStore((state) => state.setView);
@@ -164,10 +174,10 @@ export function useViewMode(surface: ViewModeSurface) {
     [setForSurface, surface],
   );
   const toggleLayer = useCallback(
-    (layer: CalendarLayer) => toggleForSurface(surface, layer),
+    (layer: LayerOf<S>) => toggleForSurface(surface, layer),
     [toggleForSurface, surface],
   );
-  const isLayerOn = useCallback((layer: CalendarLayer) => layers.includes(layer), [layers]);
+  const isLayerOn = useCallback((layer: LayerOf<S>) => layers.includes(layer), [layers]);
 
   return { view, setView, layers, toggleLayer, isLayerOn };
 }

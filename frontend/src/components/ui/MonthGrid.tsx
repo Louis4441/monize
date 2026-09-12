@@ -130,9 +130,16 @@ export function MonthGrid({
       className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700"
     >
       <div role="row" className="grid grid-cols-7">
-        {labels.map((label) => (
+        {/*
+          The column is the identity; the label is only its value. Portuguese
+          abbreviates quarta and quinta alike ("qu"), and segunda and sexta
+          alike ("se"), so a key taken from the label collides with its own
+          sibling: rotating the week start then reconciles seven headers into
+          nine, in the wrong order, over columns that did not move.
+        */}
+        {labels.map((label, column) => (
           <div
-            key={label}
+            key={column}
             role="columnheader"
             className="min-w-0 truncate px-1 py-2 text-center text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700"
           >

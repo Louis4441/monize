@@ -3002,3 +3002,116 @@ describe("a dashboard widget reads a report rather than re-deriving it", () => {
     ).toBe(false);
   });
 });
+
+describe("a segmented control wears the chrome in segmented-control.ts", () => {
+  /**
+   * A pill holding two or more buttons where exactly one is pressed is one
+   * appearance, and `components/ui/segmented-control.ts` is where it is
+   * written. The reason here IS repair, not only reach: `ViewModeToggle` was
+   * added as a copy of `InvestmentViewToggle`'s three class constants and had
+   * already drifted by a `motion-reduce:transition-none` before either shipped,
+   * so the Investments toolbar would have carried two switches side by side and
+   * animated only one of them for a reader who asked for reduced motion.
+   *
+   * Two shapes break the rule and both are scanned: re-declaring a constant
+   * locally, and inlining the pressed segment's VALUE at a call site, which
+   * imports nothing and so silently skips the next change to it.
+   */
+  const HOME = "/src/components/ui/segmented-control.ts";
+  const LOCAL_DECL =
+    /\bconst\s+(BUTTON_BASE|BUTTON_ACTIVE|BUTTON_INACTIVE|SEGMENT_BASE_CLASS|SEGMENT_ACTIVE_CLASS|SEGMENT_INACTIVE_CLASS|SEGMENTED_GROUP_CLASS)\s*=/;
+  /** `SEGMENT_ACTIVE_CLASS`'s value spelled out instead of imported. */
+  const INLINE_ACTIVE =
+    /["'`]bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow-sm/;
+
+  /**
+   * Call sites that still inline it, with the reason each is here. Shrink-only:
+   * fixing one means DELETING its line, and the third test fails while a listed
+   * file no longer offends, so the register cannot outlive its subjects.
+   */
+  const INLINE_ACTIVE_BASELINE: ReadonlyArray<{ file: string; reason: string }> = [
+    {
+      file: "/src/components/bills/CashFlowForecastChart.tsx",
+      reason:
+        "predates the shared chrome: a range switcher built before segmented-control.ts existed.",
+    },
+    {
+      file: "/src/components/reports/BudgetVsActualReport.tsx",
+      reason:
+        "predates the shared chrome: two switchers built before segmented-control.ts existed.",
+    },
+  ];
+
+  const inliningFiles = () => {
+    const found = new Set<string>();
+    for (const [path, content] of productionSources()) {
+      if (path === HOME) continue;
+      for (const line of withoutComments(content).split("\n")) {
+        if (INLINE_ACTIVE.test(line)) found.add(path);
+      }
+    }
+    return found;
+  };
+
+  it("no file re-declares the segmented-control classes locally", () => {
+    const offenders: string[] = [];
+    for (const [path, content] of productionSources()) {
+      if (path === HOME) continue;
+      withoutComments(content)
+        .split("\n")
+        .forEach((line, i) => {
+          const match = line.match(LOCAL_DECL);
+          if (match) offenders.push(`${path}:${i + 1} re-declares ${match[1]}`);
+        });
+    }
+
+    expect(
+      offenders,
+      "Import segmentClass and SEGMENTED_GROUP_CLASS from @/components/ui/segmented-control.",
+    ).toEqual([]);
+  });
+
+  it("no new call site inlines the pressed segment's classes", () => {
+    const allowed = new Set(INLINE_ACTIVE_BASELINE.map((entry) => entry.file));
+    const offenders: string[] = [];
+    for (const [path, content] of productionSources()) {
+      if (path === HOME || allowed.has(path)) continue;
+      withoutComments(content)
+        .split("\n")
+        .forEach((line, i) => {
+          if (INLINE_ACTIVE.test(line)) {
+            offenders.push(`${path}:${i + 1} inlines SEGMENT_ACTIVE_CLASS`);
+          }
+        });
+    }
+
+    expect(
+      offenders,
+      "Call segmentClass(isActive) from @/components/ui/segmented-control.",
+    ).toEqual([]);
+  });
+
+  it("keeps the inlined-segment baseline shrink-only", () => {
+    const offending = inliningFiles();
+    expect(
+      INLINE_ACTIVE_BASELINE.map((entry) => entry.file).filter(
+        (file) => !offending.has(file),
+      ),
+      "This file no longer inlines the pressed segment -- delete its baseline line.",
+    ).toEqual([]);
+  });
+
+  it("reads the inlined classes in markup but not a mention of them in prose", () => {
+    // Both directions: this block's own explanation names the constants it
+    // bans re-declaring, and must not itself be a violation.
+    expect(
+      INLINE_ACTIVE.test(
+        "className={active ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow-sm' : ''}",
+      ),
+    ).toBe(true);
+    expect(
+      LOCAL_DECL.test(withoutComments("// const BUTTON_BASE = 'px-3 py-1';")),
+    ).toBe(false);
+    expect(LOCAL_DECL.test("const BUTTON_BASE = 'px-3 py-1';")).toBe(true);
+  });
+});
