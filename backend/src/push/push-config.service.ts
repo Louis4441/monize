@@ -90,11 +90,24 @@ export interface VapidIdentity {
  * instances apart without reading 87 base64 characters.
  */
 export function fingerprintPublicKey(publicKey: string): string {
-  return crypto
-    .createHash("sha256")
-    .update(publicKey)
-    .digest("hex")
-    .slice(0, 16);
+  return (
+    crypto
+      .createHash("sha256")
+      // The VAPID public half is handed to every browser by `/push/config`; it is
+      // an identifier, not a credential, and a short digest of it is the whole
+      // point -- there is no secret here for a work factor to protect. CodeQL
+      // reads `generateVAPIDKeys()` as a password source and reports
+      // js/insufficient-password-hash on the `.update(...)` call, which a
+      // suppression annotation covers only from the line directly below it.
+      // Default setup does not run the alert-suppression query, so the alert is
+      // dismissed as a false positive on the Security tab and the annotation is
+      // placed where it takes effect the day that query runs
+      // (docs/backend/modules-and-runtime.md, CodeQL suppressions).
+      // codeql[js/insufficient-password-hash]
+      .update(publicKey)
+      .digest("hex")
+      .slice(0, 16)
+  );
 }
 
 /**
