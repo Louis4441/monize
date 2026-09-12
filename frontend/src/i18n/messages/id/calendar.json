@@ -6,5 +6,38 @@
   },
   "grid": {
     "label": "Bulan"
+  },
+  "toolbar": {
+    "layers": "Lapisan"
+  },
+  "layers": {
+    "transactions": "Transaksi",
+    "balances": "Saldo",
+    "values": "Nilai",
+    "dailyChange": "Perubahan harian"
+  },
+  "legend": {
+    "label": "Keterangan",
+    "scheduled": "Terjadwal"
+  },
+  "chip": {
+    "noPayee": "Tanpa penerima",
+    "overdue": "Terlambat",
+    "scheduled": "Terjadwal"
+  },
+  "day": {
+    "moreChips": "+{count} lagi",
+    "newTransaction": "Transaksi baru pada hari ini",
+    "noItems": "Tidak ada apa pun pada hari ini.",
+    "scheduledHint": "Terjadwal. Buka Tagihan & Setoran untuk mengubahnya."
+  },
+  "banner": {
+    "title": "Beberapa angka tidak ditampilkan",
+    "rowCap": "Bulan ini memuat {count} transaksi, lebih dari {limit} yang dapat ditampilkan kalender. Persempit filter untuk melihatnya.",
+    "scheduledUnavailable": "Item terjadwal untuk bulan ini tidak dapat dimuat. Baris yang ditampilkan lengkap; yang terjadwal hilang.",
+    "scheduledTruncated": "Beberapa item terjadwal tidak ditampilkan sejauh ini ke depan. Mendekatlah ke hari ini untuk melihat semuanya."
+  },
+  "errors": {
+    "monthFailed": "Bulan ini tidak dapat dimuat."
   }
 }

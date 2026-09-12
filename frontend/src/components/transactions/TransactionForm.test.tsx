@@ -874,6 +874,41 @@ describe('TransactionForm', () => {
     });
   });
 
+  describe('defaultDate', () => {
+    it('opens a new entry on the day the caller named', async () => {
+      // The calendar's "New transaction on this day" means the day the reader
+      // clicked, not the date the last entry happened to be filed under.
+      render(
+        <TransactionForm
+          defaultDate="2026-03-07"
+          onSuccess={mockOnSuccess}
+          onCancel={mockOnCancel}
+        />,
+      );
+
+      await waitFor(() => {
+        expect((screen.getByLabelText('Date') as HTMLInputElement).value).toBe('2026-03-07');
+      });
+    });
+
+    it('leaves an edit on the row\'s own date', async () => {
+      const existing = createExistingTransaction({ transactionDate: '2024-01-15' });
+
+      render(
+        <TransactionForm
+          transaction={existing}
+          defaultDate="2026-03-07"
+          onSuccess={mockOnSuccess}
+          onCancel={mockOnCancel}
+        />,
+      );
+
+      await waitFor(() => {
+        expect((screen.getByLabelText('Date') as HTMLInputElement).value).toBe('2024-01-15');
+      });
+    });
+  });
+
   it('fetches accounts including closed accounts on mount', async () => {
     render(<TransactionForm onSuccess={mockOnSuccess} onCancel={mockOnCancel} />);
 

@@ -1840,4 +1840,42 @@ describe('TransactionFilterPanel', () => {
       );
     });
   });
+
+  describe('hideDateRange', () => {
+    it('offers the date fields by default', () => {
+      render(<TransactionFilterPanel {...defaultProps} filtersExpanded={true} />);
+
+      expect(screen.getByLabelText('Start Date')).toBeInTheDocument();
+      expect(screen.getByLabelText('End Date')).toBeInTheDocument();
+      expect(screen.getByLabelText('Time Period')).toBeInTheDocument();
+    });
+
+    it('withholds them, and the chip that summarises them, when the surface owns the dates', () => {
+      // Calendar mode's date filter is the month on screen; a second one could
+      // only disagree with it.
+      render(
+        <TransactionFilterPanel
+          {...defaultProps}
+          filtersExpanded={true}
+          filterStartDate="2026-06-01"
+          filterEndDate="2026-06-30"
+          hideDateRange
+        />,
+      );
+
+      expect(screen.queryByLabelText('Start Date')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('End Date')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Time Period')).not.toBeInTheDocument();
+      expect(screen.queryByText('2026-06-01 - 2026-06-30')).not.toBeInTheDocument();
+    });
+
+    it('keeps every other filter reachable', () => {
+      render(
+        <TransactionFilterPanel {...defaultProps} filtersExpanded={true} hideDateRange />,
+      );
+
+      expect(screen.getByLabelText('Amount From')).toBeInTheDocument();
+      expect(screen.getByLabelText('Amount To')).toBeInTheDocument();
+    });
+  });
 });

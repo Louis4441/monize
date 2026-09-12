@@ -34,7 +34,7 @@ Every task is safe to merge in any order that respects its dependencies: the end
 | B1 | `rate-index.util.ts` extraction + `GET /accounts/daily-balance-totals` | S1 | inert (extraction neutral) | [x] |
 | B2 | `investments-daily`: `pricesComplete` / `unpricedSecurityIds` (additive) + client type | S1 | neutral | [x] |
 | B3 | `external-flow.util.ts` extraction + `GET /portfolio/daily-movements` and `/detail` | S1, B2 | inert (extraction neutral) | [x] |
-| F2 | Transactions page: calendar wiring, Transactions layer, day panel, `TransactionForm.defaultDate` | F1 | inert | [ ] |
+| F2 | Transactions page: calendar wiring, Transactions layer, day panel, `TransactionForm.defaultDate` | F1 | inert | [x] |
 | F3 | Transactions page: Balances layer + banner | F2, B1 | inert | [ ] |
 | F4 | Investments page: calendar wiring, Transactions and Values layers, `InvestmentTransactionForm.defaultDate` | F1, B2 | inert | [ ] |
 | F5 | Investments page: Daily change layer + `DailyMovementDialog` | F4, B3 | inert | [ ] |
@@ -122,7 +122,7 @@ Definition of done adds the database gate: `npm run migration:lint`, `scripts/ve
 
 ### F2 -- Transactions page: calendar wiring and Transactions layer
 
-**Files:** `frontend/src/app/transactions/page.tsx`, `frontend/src/hooks/useTransactionFilters.ts` (expose the filter signature the request key needs; no behaviour change), `frontend/src/lib/calendar-rows.ts` + `.test.ts` (new), `frontend/src/lib/scheduled-effective-amount.ts` (`occurrenceTouchesAccounts`) + `.test.ts`, `frontend/src/hooks/useCalendarMonthData.ts` + `.test.ts` (new), `frontend/src/components/calendar/CalendarToolbar.tsx`, `CalendarDayCell.tsx`, `CalendarDayPanel.tsx`, `CalendarBanner.tsx`, `TransactionsCalendarView.tsx` + tests (new), `frontend/src/components/transactions/TransactionForm.tsx` (`defaultDate`) + test, `frontend/src/i18n/messages/en/calendar.json`, `docs/frontend/financial-figures.md` (entry: calendar figures).
+**Files:** `frontend/src/app/transactions/page.tsx` (the filter signature is derived there, from the same filter state the table's request reads, rather than added to `useTransactionFilters`), `frontend/src/components/transactions/TransactionFilterPanel.tsx` (`hideDateRange`), `frontend/src/lib/calendar-rows.ts` + `.test.ts` (new), `frontend/src/lib/scheduled-effective-amount.ts` (`occurrenceTouchesAccounts`) + `.test.ts`, `frontend/src/hooks/useCalendarMonthData.ts` + `.test.ts` (new), `frontend/src/components/calendar/CalendarToolbar.tsx`, `CalendarDayCell.tsx`, `CalendarDayPanel.tsx`, `CalendarBanner.tsx`, `TransactionsCalendarView.tsx` + tests (new), `frontend/src/components/transactions/TransactionForm.tsx` (`defaultDate`) + test, `frontend/src/i18n/messages/en/calendar.json`, `docs/frontend/financial-figures.md` (entry: calendar figures).
 
 - The toggle sits in the `PageHeader` actions; `view === 'calendar'` swaps the register card and `ListBottomPager` for `TransactionsCalendarView` and hides the date-range selector; every other filter still reaches the request.
 - Rows: `transactionsApi.getAllPages` for the grid's range with the page's filters; occurrences: `getOccurrences({ through: gridEnd })` filtered by `dueDate >= gridStart` and `occurrenceTouchesAccounts`. Over `CALENDAR_MAX_ROWS` the layer withholds with the notice (table C).

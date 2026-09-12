@@ -6,5 +6,38 @@
   },
   "grid": {
     "label": "월"
+  },
+  "toolbar": {
+    "layers": "레이어"
+  },
+  "layers": {
+    "transactions": "거래",
+    "balances": "잔액",
+    "values": "평가액",
+    "dailyChange": "일간 변동"
+  },
+  "legend": {
+    "label": "범례",
+    "scheduled": "예정"
+  },
+  "chip": {
+    "noPayee": "수취인 없음",
+    "overdue": "연체",
+    "scheduled": "예정"
+  },
+  "day": {
+    "moreChips": "+{count}개 더",
+    "newTransaction": "이 날짜에 새 거래",
+    "noItems": "이 날짜에는 아무것도 없습니다.",
+    "scheduledHint": "예정된 항목입니다. 변경하려면 청구서 및 입금을 여세요."
+  },
+  "banner": {
+    "title": "일부 수치가 표시되지 않습니다",
+    "rowCap": "이번 달에는 거래가 {count}건 있어 캘린더가 표시할 수 있는 {limit}건을 넘습니다. 필터를 좁혀서 확인하세요.",
+    "scheduledUnavailable": "이번 달의 예정 항목을 불러오지 못했습니다. 표시된 항목은 완전하지만 예정 항목이 빠졌습니다.",
+    "scheduledTruncated": "이보다 먼 미래의 일부 예정 항목은 표시되지 않습니다. 모두 보려면 오늘에 가까이 이동하세요."
+  },
+  "errors": {
+    "monthFailed": "이 달을 불러오지 못했습니다."
   }
 }
