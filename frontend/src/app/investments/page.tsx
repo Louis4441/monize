@@ -27,6 +27,10 @@ import {
   INVESTMENT_CHART_REFRESH_EVENT,
 } from '@/components/investments/InvestmentValueChart';
 import { TransactionList } from '@/components/transactions/TransactionList';
+import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
+import { useViewMode } from '@/store/viewModeStore';
+import { useFinancialToday } from '@/hooks/useFinancialToday';
+import { usePreferencesStore } from '@/store/preferencesStore';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useInvestmentData } from '@/hooks/useInvestmentData';
 import { useBrokerageFilterOptions } from '@/hooks/useBrokerageFilterOptions';
@@ -43,6 +47,10 @@ import {
 import { PAGE_SIZE } from '@/lib/constants';
 
 const TransactionForm = dynamic(() => import('@/components/transactions/TransactionForm').then(m => m.TransactionForm), { ssr: false });
+
+// Calendar mode's whole tree, loaded only once a reader switches to it, so the
+// register's first paint carries none of it.
+const InvestmentCalendarView = dynamic(() => import('@/components/calendar/InvestmentCalendarView').then(m => m.InvestmentCalendarView), { ssr: false });
 
 
 export default function InvestmentsPage() {
@@ -71,6 +79,12 @@ function InvestmentsContent() {
   // the same data as an undo/redo, so refresh the same way.
   useOnAiAction(refreshAfterWrite);
   const [transactionView, setTransactionView] = useLocalStorage<InvestmentTransactionView>('monize-investments-transaction-view', 'brokerage');
+  const { view, setView } = useViewMode('investments');
+  const financialToday = useFinancialToday();
+  const weekStartsOn = (usePreferencesStore((s) => s.preferences?.weekStartsOn) ?? 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  // The day a trade started from the calendar is filed under. Cleared by every
+  // other way of opening the form, so the remembered date keeps its usual job.
+  const [createOnDate, setCreateOnDate] = useState<string | undefined>(undefined);
   // Tracks whether the investment transaction form currently shows a currency
   // conversion section so the modal can be widened to fit it without scrolling.
   const [investmentFormNeedsConversion, setInvestmentFormNeedsConversion] = useState(false);
@@ -131,6 +145,34 @@ function InvestmentsContent() {
         : undefined;
     await data.handleRefreshPrices(scope);
   }, [data]);
+
+  const handleNewInvestmentTransaction = useCallback(() => {
+    setCreateOnDate(undefined);
+    data.handleNewTransaction();
+  }, [data]);
+
+  const handleNewCashTransaction = useCallback(() => {
+    setCreateOnDate(undefined);
+    data.openCashCreate();
+  }, [data]);
+
+  // A day on the calendar starts a trade on that day: the brokerage register is
+  // the one the calendar's own "New" belongs to.
+  const handleCreateOnDay = useCallback((date: string) => {
+    setCreateOnDate(date);
+    data.handleNewTransaction();
+  }, [data]);
+
+  // Symbols for what the scope holds now, so the calendar can name a security a
+  // withheld value blames. The month's own rows name only what it traded, and an
+  // unpriced holding is usually one it did not.
+  const heldSecurityLabels = useMemo(() => {
+    const labels = new Map<string, string>();
+    for (const holding of data.portfolioSummary?.holdings ?? []) {
+      labels.set(holding.securityId, holding.symbol);
+    }
+    return labels;
+  }, [data.portfolioSummary]);
 
   const handleTransactionViewChange = (view: InvestmentTransactionView) => {
     setTransactionView(view);
@@ -193,8 +235,8 @@ function InvestmentsContent() {
                   />
                 </div>
                 <NewTransactionButton
-                  onNewInvestment={data.handleNewTransaction}
-                  onNewCash={data.openCashCreate}
+                  onNewInvestment={handleNewInvestmentTransaction}
+                  onNewCash={handleNewCashTransaction}
                 />
               </>
             }
@@ -253,8 +295,38 @@ function InvestmentsContent() {
             />
           </div>
 
+          {/* The two registers, or the month calendar standing in for both.
+              Everything above this point is the same either way. */}
+          {view === 'calendar' && (
+            <div>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  {t('page.recentTransactions')}
+                </h3>
+                <ViewModeToggle value={view} onChange={setView} />
+              </div>
+              <InvestmentCalendarView
+                accounts={data.allAccounts.length > 0 ? data.allAccounts : data.accounts}
+                brokerageAccountIds={data.selectedAccountIds}
+                cashAccountIds={data.cashAccountIds}
+                heldSecurityLabels={heldSecurityLabels}
+                weekStartsOn={weekStartsOn}
+                today={financialToday}
+                displayCurrency={
+                  data.selectedAccountIds.length === 1
+                    ? data.accounts.find(a => a.id === data.selectedAccountIds[0])?.currencyCode ?? null
+                    : null
+                }
+                onEditInvestment={data.handleEditTransaction}
+                onEditCashTransaction={data.handleEditCashTransaction}
+                onCreateOnDay={handleCreateOnDay}
+                refreshKey={data.writeRefreshKey}
+              />
+            </div>
+          )}
+
           {/* Brokerage Transactions */}
-          {transactionView === 'brokerage' && (
+          {view === 'table' && transactionView === 'brokerage' && (
             <>
               <div>
                 <InvestmentTransactionList
@@ -270,10 +342,13 @@ function InvestmentsContent() {
                   availableSymbols={brokerageOptions.symbols}
                   availableActions={brokerageOptions.actions}
                   viewToggle={
-                    <InvestmentViewToggle
-                      value={transactionView}
-                      onChange={handleTransactionViewChange}
-                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <InvestmentViewToggle
+                        value={transactionView}
+                        onChange={handleTransactionViewChange}
+                      />
+                      <ViewModeToggle value={view} onChange={setView} />
+                    </div>
                   }
                   currentPage={data.currentPage}
                   totalPages={data.pagination?.totalPages ?? 1}
@@ -297,7 +372,7 @@ function InvestmentsContent() {
           )}
 
           {/* Cash Transactions */}
-          {transactionView === 'cash' && (
+          {view === 'table' && transactionView === 'cash' && (
             <>
             <div className="bg-white dark:bg-gray-800 shadow dark:shadow-gray-700/50 rounded-lg">
               <div className="px-3 pt-3 sm:px-4 sm:pt-4 flex flex-wrap justify-between items-center gap-2">
@@ -312,6 +387,7 @@ function InvestmentsContent() {
                     value={transactionView}
                     onChange={handleTransactionViewChange}
                   />
+                  <ViewModeToggle value={view} onChange={setView} />
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <button onClick={data.openCashCreate} className="inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 sm:min-w-[14rem]">
@@ -389,10 +465,12 @@ function InvestmentsContent() {
           {data.editingTransaction ? t('page.editTransaction') : t('page.newInvestmentTransaction')}
         </h2>
         <InvestmentTransactionForm
+          key={`${data.editingTransaction?.id ?? 'new'}-${createOnDate ?? ''}`}
           accounts={data.accounts}
           allAccounts={data.allAccounts}
           transaction={data.editingTransaction}
           defaultAccountId={data.getSelectedBrokerageAccountId()}
+          defaultDate={createOnDate}
           onSuccess={handleInvestmentTransactionSuccess}
           onCreateAndNew={data.handleFormCreateAndNew}
           onCancel={closeInvestmentTransactionModal}
@@ -409,8 +487,9 @@ function InvestmentsContent() {
           {data.editingCashTransaction ? t('page.editTransaction') : t('page.newTransaction')}
         </h2>
         <TransactionForm
-          key={data.editingCashTransaction?.id || 'new-cash'}
+          key={`${data.editingCashTransaction?.id || 'new-cash'}-${createOnDate ?? ''}`}
           transaction={data.editingCashTransaction}
+          defaultDate={createOnDate}
           defaultAccountId={data.cashAccountIds.length > 0 ? data.cashAccountIds[0] : undefined}
           onSuccess={data.handleCashFormSuccess}
           onCreateAndNew={data.handleCashFormCreateAndNew}

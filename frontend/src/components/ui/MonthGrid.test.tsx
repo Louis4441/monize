@@ -1,6 +1,7 @@
+import { createRef } from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, renderInLocale, screen, fireEvent, within } from '@/test/render';
-import { MonthGrid, type MonthGridDay } from './MonthGrid';
+import { render, renderInLocale, screen, fireEvent, within, act } from '@/test/render';
+import { MonthGrid, type MonthGridDay, type MonthGridHandle } from './MonthGrid';
 import { monthGridDays } from '@/lib/calendar-month';
 import commonNs from '@/i18n/messages/en/common.json';
 import ptCommonNs from '@/i18n/messages/pt/common.json';
@@ -230,6 +231,52 @@ describe('MonthGrid', () => {
       const stops = cells().filter((cell) => cell.getAttribute('tabindex') === '0');
       expect(stops).toHaveLength(1);
       expect(stops[0]).toHaveAttribute('aria-label', '07/01/2026');
+    });
+  });
+
+  describe('the grid keyboard pattern, at its ends', () => {
+    it.each([
+      ['Home', '06/14/2026'],
+      ['End', '06/20/2026'],
+    ])('%s moves to the end of the week the reader is in', (key, expected) => {
+      renderGrid();
+
+      fireEvent.keyDown(screen.getByLabelText('06/15/2026'), { key });
+
+      const moved = screen.getByLabelText(expected);
+      expect(moved).toHaveAttribute('tabindex', '0');
+      expect(moved).toHaveFocus();
+    });
+
+    it.each([
+      ['Home', '05/31/2026'],
+      ['End', '07/04/2026'],
+    ])('ctrl+%s moves to the end of the grid', (key, expected) => {
+      renderGrid();
+
+      fireEvent.keyDown(screen.getByLabelText('06/15/2026'), { key, ctrlKey: true });
+
+      expect(screen.getByLabelText(expected)).toHaveFocus();
+    });
+
+    it('leaves Home and End pressed on a control inside a cell to that control', () => {
+      renderGrid({ renderDay: (day) => <button type="button">chip {day.date}</button> });
+
+      fireEvent.keyDown(screen.getByRole('button', { name: 'chip 2026-06-10' }), {
+        key: 'Home',
+      });
+
+      expect(screen.getByLabelText('06/15/2026')).toHaveAttribute('tabindex', '0');
+    });
+
+    it('puts focus back on a day when its host asks', () => {
+      const ref = createRef<MonthGridHandle>();
+      render(grid({ ref }));
+
+      act(() => ref.current?.focusDay('2026-06-18'));
+
+      expect(screen.getByLabelText('06/18/2026')).toHaveFocus();
+      expect(screen.getByLabelText('06/18/2026')).toHaveAttribute('tabindex', '0');
     });
   });
 

@@ -1,6 +1,15 @@
 'use client';
 
-import { useCallback, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
+import {
+  useCallback,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { useTranslations } from 'next-intl';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from '@/components/ui/interactive-row';
@@ -25,6 +34,19 @@ interface MonthGridProps {
   renderDay: (day: MonthGridDay) => ReactNode;
   /** Id of the element naming this grid, usually the toolbar's month caption. */
   labelledBy?: string;
+  /**
+   * Handle for putting focus back on a day.
+   *
+   * A day panel opened from a cell takes focus with it; when it closes, focus
+   * belongs on the cell it came from rather than on the document, which is
+   * where a keyboard reader would otherwise have to start the month again.
+   */
+  ref?: RefObject<MonthGridHandle | null>;
+}
+
+export interface MonthGridHandle {
+  /** Move the grid's tab stop to a day and focus it, if the grid holds it. */
+  focusDay: (date: string) => void;
 }
 
 export interface MonthGridDay {
@@ -56,6 +78,7 @@ export function MonthGrid({
   onSelectDay,
   renderDay,
   labelledBy,
+  ref,
 }: MonthGridProps) {
   const t = useTranslations('calendar');
   const common = useTranslations('common');
@@ -89,6 +112,8 @@ export function MonthGrid({
     cellRefs.current.get(date)?.focus();
   }, []);
 
+  useImperativeHandle(ref, () => ({ focusDay: (date: string) => focusCell(date) }), [focusCell]);
+
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>, index: number) => {
       // A control inside the cell owns the keys pressed on it. A keydown is
@@ -110,6 +135,23 @@ export function MonthGrid({
           event.preventDefault();
           focusCell(next);
         }
+        return;
+      }
+
+      // Home and End are the row's ends, and with a modifier the grid's, which
+      // is the grid pattern every reader arriving with a screen reader expects.
+      if (event.key === 'Home' || event.key === 'End') {
+        event.preventDefault();
+        const wholeGrid = event.ctrlKey || event.metaKey;
+        const rowStart = index - (index % 7);
+        const target = wholeGrid
+          ? event.key === 'Home'
+            ? 0
+            : days.length - 1
+          : event.key === 'Home'
+            ? rowStart
+            : Math.min(rowStart + 6, days.length - 1);
+        focusCell(days[target]);
         return;
       }
 

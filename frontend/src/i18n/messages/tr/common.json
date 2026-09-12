@@ -243,7 +243,8 @@
     "srLabel": "Tutar kullanılamıyor",
     "scheduledFx": "Geçerli tutar hesaplanamıyor: bu planlanmış kaydın uzlaşma para birimi çifti için döviz kuru bulunamadı. Kaydedilen tutar daha eski bir kurla hesaplandığı için gösterilmiyor.",
     "displayFx": "Bu tutar burada gösterilemiyor: miktar biliniyor, ancak bu toplamın para birimine çevirmek için kur bulunmuyor. Kurları Para Birimleri sayfasından yenileyin.",
-    "noPrice": "Bu değer hesaplanamıyor: elde tutulan pay adedi biliniyor, ancak menkul kıymetin bunları değerlemek için bir fiyatı yok. Fiyatları yenileyin veya menkul kıymetin fiyat geçmişine elle bir fiyat ekleyin."
+    "noPrice": "Bu değer hesaplanamıyor: elde tutulan pay adedi biliniyor, ancak menkul kıymetin bunları değerlemek için bir fiyatı yok. Fiyatları yenileyin veya menkul kıymetin fiyat geçmişine elle bir fiyat ekleyin.",
+    "noBaseline": "Bu değer hesaplanamıyor: bir karşılaştırma ve karşılaştırılacak daha önceki bir değer yok. Eksik bir şey yok, bu yüzden eklenecek bir şey de yok."
   },
   "density": {
     "title": "Satır yoğunluğunu değiştir",

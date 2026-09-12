@@ -138,6 +138,39 @@ describe('InvestmentTransactionForm', () => {
     expect(screen.getByText('Date')).toBeInTheDocument();
   });
 
+  describe('defaultDate', () => {
+    it('opens a new trade on the day the caller named', async () => {
+      // The calendar's "New investment transaction on this day" means the day
+      // the reader clicked, not the date the last entry was filed under.
+      render(<InvestmentTransactionForm accounts={accounts} defaultDate="2026-03-07" />);
+
+      await waitFor(() => {
+        // The field shows the reader's own date format; the value it carries
+        // is the day the caller named.
+        expect((screen.getByLabelText('Date') as HTMLInputElement).value).toBe('03/07/2026');
+      });
+    });
+
+    it("leaves an edit on the row's own date", async () => {
+      const transaction = {
+        id: 't1', accountId: 'a1', action: 'BUY' as const, transactionDate: '2024-01-01',
+        quantity: 10, price: 50, commission: 5, totalAmount: 505, description: '',
+      } as any;
+
+      render(
+        <InvestmentTransactionForm
+          accounts={accounts}
+          transaction={transaction}
+          defaultDate="2026-03-07"
+        />,
+      );
+
+      await waitFor(() => {
+        expect((screen.getByLabelText('Date') as HTMLInputElement).value).toBe('01/01/2024');
+      });
+    });
+  });
+
   it('shows Create Transaction button for new form', async () => {
     render(<InvestmentTransactionForm accounts={accounts} />);
     await waitFor(() => {

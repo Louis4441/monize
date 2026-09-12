@@ -35,12 +35,12 @@ Every task is safe to merge in any order that respects its dependencies: the end
 | B2 | `investments-daily`: `pricesComplete` / `unpricedSecurityIds` (additive) + client type | S1 | neutral | [x] #1368 |
 | B3 | `external-flow.util.ts` extraction + `GET /portfolio/daily-movements` and `/detail` | S1, B2 | inert (extraction neutral) | [x] #1368 |
 | F2 | Transactions page: calendar wiring, Transactions layer, day panel, `TransactionForm.defaultDate` | F1 | inert | [x] |
-| F3 | Transactions page: Balances layer + banner | F2, B1 | inert | [ ] |
-| F4 | Investments page: calendar wiring, Transactions and Values layers, `InvestmentTransactionForm.defaultDate` | F1, B2 | inert | [ ] |
-| F5 | Investments page: Daily change layer + `DailyMovementDialog` | F4, B3 | inert | [ ] |
+| F3 | Transactions page: Balances layer + banner | F2, B1 | inert | [x] |
+| F4 | Investments page: calendar wiring, Transactions and Values layers, `InvestmentTransactionForm.defaultDate` | F1, B2 | inert | [x] |
+| F5 | Investments page: Daily change layer + `DailyMovementDialog` | F4, B3 | inert | [x] |
 | B4 | `calendar_day_notes` migration + schema, entity, module, three routes, backup coverage, mirrored length constant | S1 | inert* | [x] #1368 |
-| F7 | Day notes in the day panel and the cell, on both calendars | F2, F4, B4 | inert | [ ] |
-| F6 | Phone layout, keyboard navigation and screen-reader pass across both calendars | F3, F5, F7 | inert | [ ] |
+| F7 | Day notes in the day panel and the cell, on both calendars | F2, F4, B4 | inert | [x] |
+| F6 | Phone layout, keyboard navigation and screen-reader pass across both calendars | F3, F5, F7 | inert | [x] |
 | Q1 | `calendar.guard.test.ts` + the `ui-conventions.test.ts` month-grid block | F1 | none | [ ] |
 | Q2 | Backend integration suites `calendar-read-models.integration.spec.ts` and `calendar-day-notes.integration.spec.ts` | B1, B3, B4 | none | [ ] |
 | Q3 | Playwright `tests/calendar.spec.ts` | F3, F5, F7 | none | [ ] |

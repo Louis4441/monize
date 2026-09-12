@@ -1,18 +1,22 @@
 'use client';
 
-import { useId, useMemo, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { MonthGrid } from '@/components/ui/MonthGrid';
+import { MonthGrid, type MonthGridHandle } from '@/components/ui/MonthGrid';
 import { ReportError } from '@/components/reports/ReportError';
 import { CalendarBanner, type CalendarCause } from '@/components/calendar/CalendarBanner';
-import { CalendarDayCell } from '@/components/calendar/CalendarDayCell';
-import { CalendarDayPanel } from '@/components/calendar/CalendarDayPanel';
+import { CalendarBalanceFigure, CalendarDayCell } from '@/components/calendar/CalendarDayCell';
+import {
+  CalendarDayPanel,
+  type CalendarDayBalance,
+} from '@/components/calendar/CalendarDayPanel';
 import { CalendarToolbar } from '@/components/calendar/CalendarToolbar';
 import {
   CALENDAR_MAX_ROWS,
   useCalendarMonthData,
   type CalendarRowFilters,
 } from '@/hooks/useCalendarMonthData';
+import { useDailyBalanceTotals } from '@/hooks/useDailyBalanceTotals';
 import {
   groupCalendarRows,
   type CalendarAccount,
@@ -20,6 +24,9 @@ import {
 } from '@/lib/calendar-rows';
 import { monthGridDays, monthOf, type WeekStart } from '@/lib/calendar-month';
 import { occurrenceTouchesAccounts } from '@/lib/scheduled-effective-amount';
+import { useCalendarDayNotes } from '@/hooks/useCalendarDayNotes';
+import { useAuthStore } from '@/store/authStore';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useViewMode } from '@/store/viewModeStore';
 import type { Account, AccountType } from '@/types/account';
 import type { ScheduledTransaction } from '@/types/scheduled-transaction';
@@ -28,7 +35,7 @@ import type { Transaction } from '@/types/transaction';
 /** How many chips a day cell draws before the rest become a "+N more" line. */
 export const CALENDAR_DAY_CHIP_LIMIT = 3;
 
-const LAYERS = ['transactions'] as const;
+const LAYERS = ['transactions', 'balances'] as const;
 
 interface TransactionsCalendarViewProps {
   accounts: readonly Account[];
@@ -78,12 +85,40 @@ export function TransactionsCalendarView({
 
   const [month, setMonth] = useState(() => monthOf(today));
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const gridRef = useRef<MonthGridHandle>(null);
 
   const days = useMemo(() => monthGridDays(month, weekStartsOn), [month, weekStartsOn]);
   const gridStart = days[0];
   const gridEnd = days[days.length - 1];
 
+  // A note is personal and its routes are not delegate-reachable, so an acting
+  // delegate has no note surface and asks for nothing.
+  const isActingDelegate = useAuthStore((state) => !!state.actingAsUserId);
+  const notes = useCalendarDayNotes({
+    startDate: gridStart,
+    endDate: gridEnd,
+    enabled: !isActingDelegate,
+  });
+
   const data = useCalendarMonthData(gridStart, gridEnd, filters, refreshKey);
+
+  // The Balances layer is scoped by ACCOUNTS only: a balance filtered by
+  // category or payee would be the balance of a subset of the rows that moved
+  // it, which is not a balance of anything (design decision 2).
+  const balancesOn = layers.includes('balances');
+  const balances = useDailyBalanceTotals({
+    startDate: gridStart,
+    endDate: gridEnd,
+    accountIds: scopeAccountIds,
+    enabled: balancesOn,
+    refreshKey,
+  });
+  const balanceCurrency = balances.data?.currencyCode ?? null;
+  const forecast = balances.data?.forecast ?? null;
+  const scopeEmpty = balances.data?.scopeEmpty === true;
+  // A figure is drawn only while the layer is on, the response belongs to the
+  // month on screen, and the scope it describes holds an account.
+  const balancesReady = balancesOn && !balances.isStale && !scopeEmpty && balanceCurrency !== null;
 
   const accountsById = useMemo(() => {
     const map = new Map<string, CalendarAccount>();
@@ -162,10 +197,77 @@ export function TransactionsCalendarView({
         message: t('banner.scheduledTruncated'),
       });
     }
+
+    // Before the Balances layer's own causes, which return early: a note that
+    // could not be loaded is a cause whether or not that layer is on.
+    if (notes.error !== null) {
+      found.push({ key: 'notesUnavailable', message: t('banner.notesUnavailable') });
+    }
+
+    if (!balancesOn || balances.data === null) return found;
+
+    if (scopeEmpty) {
+      found.push({ key: 'balancesScopeEmpty', message: t('banner.balancesScopeEmpty') });
+      return found;
+    }
+
+    // Every pair the month could not price, named once rather than once per day:
+    // the same missing rate withholds every day it is needed on.
+    const pairs = [
+      ...new Set(balances.data.days.flatMap((day) => day.missingRatePairs)),
+    ].sort();
+    if (pairs.length > 0) {
+      found.push({
+        key: 'balancesMissingRates',
+        message: t('banner.balancesMissingRates', { pairs: pairs.join(', ') }),
+      });
+    }
+
+    if (!balances.data.forecast.complete) {
+      const names = balances.data.forecast.gaps.map((gap) => gap.name);
+      found.push({
+        key: 'balancesForecastGaps',
+        message:
+          names.length > 0
+            ? t('banner.balancesForecastGaps', { schedules: names.join(', ') })
+            : t('banner.balancesForecastWithheld'),
+      });
+    }
+
+    if (balances.data.forecast.unforecastableAccountIds.length > 0) {
+      found.push({
+        key: 'balancesUnforecastable',
+        message: t('banner.balancesUnforecastable', {
+          count: balances.data.forecast.unforecastableAccountIds.length,
+        }),
+      });
+    }
+
     return found;
-  }, [data.data, t]);
+  }, [data.data, balances.data, balancesOn, scopeEmpty, notes.error, t]);
+
+  const selectedBalance = useMemo<CalendarDayBalance | undefined>(() => {
+    if (!balancesReady || selectedDate === null) return undefined;
+    const point = balances.byDay.get(selectedDate);
+    if (!point || balanceCurrency === null || forecast === null) return undefined;
+    return { point, currencyCode: balanceCurrency, forecast };
+  }, [balancesReady, selectedDate, balances.byDay, balanceCurrency, forecast]);
 
   // Stale data may stay on screen; it may not stay actionable.
+  /**
+   * Close the day panel and put focus back where it came from.
+   *
+   * A panel opened from a cell took focus with it; dropping focus on the
+   * document instead would make a keyboard reader start the month again.
+   */
+  const closePanel = useCallback(() => {
+    const returningTo = selectedDate;
+    notes.requestChange(() => {
+      setSelectedDate(null);
+      if (returningTo !== null) gridRef.current?.focusDay(returningTo);
+    });
+  }, [notes, selectedDate]);
+
   const isActionable = !data.isLoading && !data.isStale && data.error === null;
 
   if (data.error !== null && data.data === null) {
@@ -176,10 +278,12 @@ export function TransactionsCalendarView({
     <div>
       <CalendarToolbar
         month={month}
-        onMonthChange={(next) => {
-          setMonth(next);
-          setSelectedDate(null);
-        }}
+        onMonthChange={(next) =>
+          notes.requestChange(() => {
+            setMonth(next);
+            setSelectedDate(null);
+          })
+        }
         today={today}
         monthLabelId={monthLabelId}
         availableLayers={LAYERS}
@@ -197,24 +301,46 @@ export function TransactionsCalendarView({
         </div>
       )}
 
+      {/* The Balances layer fails on its own terms: the rows and occurrences
+          below are unaffected by a balance request that did not answer. */}
+      {balancesOn && balances.error !== null && (
+        <div className="mb-3">
+          <ReportError message={t('errors.balancesFailed')} onRetry={balances.reload} />
+        </div>
+      )}
+
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-        <div className="min-w-0 flex-1" aria-busy={data.isLoading} inert={!isActionable}>
+        <div
+          className="min-w-0 flex-1"
+          aria-busy={data.isLoading || (balancesOn && balances.isLoading)}
+          inert={!isActionable}
+        >
           <MonthGrid
+            ref={gridRef}
             month={month}
             weekStartsOn={weekStartsOn}
             today={today}
             selectedDate={selectedDate}
-            onSelectDay={setSelectedDate}
+            onSelectDay={(day) => notes.requestChange(() => setSelectedDate(day))}
             labelledBy={monthLabelId}
-            renderDay={(day) => (
-              <CalendarDayCell
-                day={day}
-                rows={layers.includes('transactions') ? byDay.get(day.date) : undefined}
-                chipLimit={CALENDAR_DAY_CHIP_LIMIT}
-                onOpenDay={setSelectedDate}
-                onEditTransaction={onEditTransaction}
-              />
-            )}
+            renderDay={(day) => {
+              const point = balancesReady ? balances.byDay.get(day.date) : undefined;
+              return (
+                <CalendarDayCell
+                  day={day}
+                  rows={layers.includes('transactions') ? byDay.get(day.date) : undefined}
+                  chipLimit={CALENDAR_DAY_CHIP_LIMIT}
+                  onOpenDay={(day) => notes.requestChange(() => setSelectedDate(day))}
+                  onEditTransaction={onEditTransaction}
+                  note={notes.byDay.get(day.date)}
+                  figure={
+                    point && balanceCurrency !== null ? (
+                      <CalendarBalanceFigure point={point} currencyCode={balanceCurrency} />
+                    ) : undefined
+                  }
+                />
+              );
+            }}
           />
         </div>
 
@@ -223,9 +349,25 @@ export function TransactionsCalendarView({
             <CalendarDayPanel
               date={selectedDate}
               rows={layers.includes('transactions') ? byDay.get(selectedDate) : undefined}
+              balance={selectedBalance}
+              notes={
+                // No surface for an acting delegate (the routes are not theirs
+                // to call), and none while the list is absent: "this day has no
+                // note" is a claim only a loaded list can make, and the save is
+                // a whole-body upsert that would replace a note nobody saw. The
+                // banner already carries why it is absent.
+                isActingDelegate || !notes.loaded
+                  ? undefined
+                  : {
+                      note: notes.byDay.get(selectedDate),
+                      onSave: notes.save,
+                      onDelete: notes.remove,
+                      onDirtyChange: notes.setDraftDirty,
+                    }
+              }
               onEditTransaction={onEditTransaction}
               onCreateOnDay={onCreateOnDay}
-              onClose={() => setSelectedDate(null)}
+              onClose={closePanel}
               categoryColorMap={categoryColorMap}
               categoryIconMap={categoryIconMap}
               categoryLabelMap={categoryLabelMap}
@@ -233,6 +375,16 @@ export function TransactionsCalendarView({
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={notes.confirmDiscard.isOpen}
+        title={t('notes.discardTitle')}
+        message={t('notes.discardMessage')}
+        confirmLabel={t('notes.discardConfirm')}
+        variant="warning"
+        onConfirm={notes.confirmDiscard.onConfirm}
+        onCancel={notes.confirmDiscard.onCancel}
+      />
     </div>
   );
 }

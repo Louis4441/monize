@@ -18,8 +18,14 @@ interface UnknownAmountProps {
    * all: the quantity is known, and the security has no quoted price to value it
    * at. Naming a currency pair here would send the reader to the Currencies page
    * over a rate that is already there.
+   *
+   * `noBaseline` is the fourth, and the only one with NO fix: the figure is a
+   * comparison and there is nothing earlier to compare against -- the first day
+   * a scope held anything. Nothing is missing and nothing can be added, so the
+   * copy sends the reader nowhere. Reaching for one of the three above here
+   * would invent an errand out of a boundary.
    */
-  reason?: 'scheduledFx' | 'displayFx' | 'noPrice';
+  reason?: 'scheduledFx' | 'displayFx' | 'noPrice' | 'noBaseline';
   /** Extra classes for the wrapper, so a table cell can keep its alignment. */
   className?: string;
 }

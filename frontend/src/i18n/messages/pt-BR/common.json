@@ -243,7 +243,8 @@
     "srLabel": "Valor não disponível",
     "scheduledFx": "Não é possível determinar o valor atual: não há taxa de câmbio disponível para o par de moedas de liquidação deste item agendado. O valor salvo foi calculado com uma taxa anterior, por isso não é exibido.",
     "displayFx": "Este valor não pode ser exibido aqui: o montante é conhecido, mas não há taxa de câmbio disponível para convertê-lo na moeda deste total. Atualize as taxas na página Moedas.",
-    "noPrice": "Este valor não pode ser calculado: as ações mantidas são conhecidas, mas o ativo não tem preço para avaliá-las. Atualize os preços ou adicione um manualmente no histórico de preços do ativo."
+    "noPrice": "Este valor não pode ser calculado: as ações mantidas são conhecidas, mas o ativo não tem preço para avaliá-las. Atualize os preços ou adicione um manualmente no histórico de preços do ativo.",
+    "noBaseline": "Este valor não pode ser calculado: é uma comparação e não existe um valor anterior para comparar. Não falta nada, então não há nada a acrescentar."
   },
   "density": {
     "title": "Alternar densidade das linhas",

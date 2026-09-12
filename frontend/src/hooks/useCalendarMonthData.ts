@@ -2,10 +2,12 @@ import { useMemo } from 'react';
 import { useReportData } from '@/hooks/useReportData';
 import { createLogger } from '@/lib/logger';
 import { transactionsApi, type TransactionsGetAllParams } from '@/lib/transactions';
+import { investmentsApi } from '@/lib/investments';
 import { scheduledTransactionsApi } from '@/lib/scheduled-transactions';
 import { rowDate } from '@/lib/calendar-rows';
 import type { Transaction } from '@/types/transaction';
 import type { ScheduledOccurrence } from '@/types/scheduled-transaction';
+import type { InvestmentTransaction } from '@/types/investment';
 
 /**
  * How many rows a month's grid will draw before it withholds the layer.
@@ -209,6 +211,95 @@ export function useCalendarMonthData(
    * must not be actionable: `docs/frontend/api-and-cache.md`, "stale data may
    * stay on screen; it may not stay actionable".
    */
+  const isStale = result.data !== null && result.dataKey !== requestKey;
+
+  return useMemo(
+    () => ({ ...result, requestKey, isStale }),
+    [result, requestKey, isStale],
+  );
+}
+
+/**
+ * What the Investments calendar's Transactions layer draws for one month.
+ *
+ * Two registers, one grid: the brokerage rows and the cash sleeve's rows. The
+ * legs are reconciled by `dedupeInvestmentLegs` at the view, which is where the
+ * scope that decides "is the trade on screen" lives.
+ */
+export interface InvestmentCalendarMonthPayload {
+  brokerage: InvestmentTransaction[];
+  cash: Transaction[];
+  /** More rows than the grid will draw; the layer is withheld, not truncated. */
+  withheld: boolean;
+  rowCount: number;
+}
+
+/**
+ * The identity of one investment-calendar request: the range and both scopes.
+ *
+ * The cash scope is derived from the brokerage selection rather than chosen, so
+ * it cannot change on its own -- but it is part of the key anyway, because the
+ * accounts list arriving is what turns an empty derived scope into a real one,
+ * and the payload before and after that are answers to different questions.
+ */
+export function investmentCalendarRequestKey(
+  startDate: string,
+  endDate: string,
+  brokerageAccountIds: readonly string[],
+  cashAccountIds: readonly string[],
+): string {
+  return JSON.stringify([
+    startDate,
+    endDate,
+    [...brokerageAccountIds].sort(),
+    [...cashAccountIds].sort(),
+  ]);
+}
+
+export function useInvestmentCalendarMonthData(
+  startDate: string,
+  endDate: string,
+  brokerageAccountIds: readonly string[],
+  cashAccountIds: readonly string[],
+  refreshKey: number = 0,
+) {
+  const requestKey = investmentCalendarRequestKey(
+    startDate,
+    endDate,
+    brokerageAccountIds,
+    cashAccountIds,
+  );
+
+  const result = useReportData<InvestmentCalendarMonthPayload>(
+    async () => {
+      const [brokerage, cash] = await Promise.all([
+        investmentsApi.getAllTransactionPages({
+          // No ids means every investment account, which is what an empty
+          // selection means on this page.
+          accountIds:
+            brokerageAccountIds.length > 0 ? [...brokerageAccountIds].join(',') : undefined,
+          startDate,
+          endDate,
+        }),
+        // An empty cash scope is a page with no linked sleeves, not "every
+        // account": asking the register for no ids would answer with the whole
+        // ledger, which is not this page's.
+        cashAccountIds.length > 0
+          ? transactionsApi.getAllPages({
+              accountIds: [...cashAccountIds],
+              startDate,
+              endDate,
+            })
+          : Promise.resolve<Transaction[]>([]),
+      ]);
+
+      const rowCount = brokerage.length + cash.length;
+      return { brokerage, cash, rowCount, withheld: rowCount > CALENDAR_MAX_ROWS };
+    },
+    [requestKey, refreshKey],
+    { requestKey },
+  );
+
   const isStale = result.data !== null && result.dataKey !== requestKey;
 
   return useMemo(
