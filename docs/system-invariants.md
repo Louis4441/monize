@@ -149,6 +149,7 @@ implied.
 | INV-DISPATCH-004 | A failed push or email never rolls back, or surfaces through, the notification it is about | enforced |
 | INV-RLS-001 | Enforced mode refuses to run on a role that can bypass RLS | enforced |
 | INV-CACHE-001 | A money-moving write invalidates every derived cache | enforced |
+| INV-DAYNOTE-001 | A calendar date holds at most one note per user, and a save never reads first | enforced |
 | INV-PAYEE-001 | A contact lookup never overwrites a value the user entered, and the automatic one runs at most once per payee | enforced |
 | INV-PAYEE-002 | Google Places requests in one Pacific calendar month never exceed the cap for the key's owner | enforced |
 | INV-RELEASE-001 | The tested, imaged and tagged revisions are one revision | partial |
@@ -3361,6 +3362,34 @@ Required tests      Present: frontend cache-prefix-classification.guard.test.ts
                     derived (and be dropped) or reference-data (and be kept), so a
                     new family cannot default to stale; balance-cache.guard.test.ts
                     requires every balance-writing API method to invalidate.
+Status              enforced
+```
+
+### INV-DAYNOTE-001 -- one note per day, written without reading first
+
+```text
+Statement           A user holds at most one calendar day note per date, and a
+                    save neither loses a concurrent save nor fails on a
+                    constraint it did not expect.
+Enforcement         The UNIQUE constraint uq_calendar_day_notes_user_date is the
+                    mechanism; CalendarDayNotesService.upsert is how it is used --
+                    a single INSERT ... ON CONFLICT ON CONSTRAINT ... DO UPDATE
+                    inside withScopedDb, naming that constraint. There is no read
+                    before the decision, so there is no window between them. The
+                    row is RETURNINGed rather than echoed from the request, so a
+                    client adopts what was actually stored.
+Concurrency scope   per (user, date) row
+Failure response    two saves of the same day serialize; the later body wins and
+                    carries the later updated_at. A DELETE of a day holding no
+                    note succeeds -- idempotent, because the caller asked for a
+                    state it already has.
+Required tests      Present: calendar-day-notes.service.spec.ts asserts the
+                    statement is one INSERT naming the constraint;
+                    calendar-day-note.contract.spec.ts holds the length limit
+                    across the constant, the DTO and the column CHECK.
+                    Missing: a two-connection integration test that two
+                    concurrent upserts of one day leave one row (task Q2 of the
+                    calendar plan).
 Status              enforced
 ```
 

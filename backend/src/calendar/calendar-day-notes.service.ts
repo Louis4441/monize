@@ -29,7 +29,8 @@ interface DayNoteRow {
  * DO UPDATE`. Not a convenience -- a read-then-decide would let two saves of the
  * same day interleave, and the second would either lose the first or fail on the
  * unique constraint it did not expect. The constraint is the mechanism; the
- * statement is how it gets used (INV-DAYNOTE, `docs/concurrency-and-idempotency.md`).
+ * statement is how it gets used (INV-DAYNOTE-001,
+ * `docs/concurrency-and-idempotency.md`).
  *
  * `userId` is the caller's, from the JWT, on every route. It is never read from
  * the request, and the RLS policy on the table is the second line of that same
