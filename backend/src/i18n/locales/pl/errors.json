@@ -616,5 +616,11 @@
     "testFailed": "Test połączenia z Google Places nie powiódł się.",
     "referrerRestricted": "Ten klucz jest ograniczony przez odsyłacz HTTP, ale to wdrożenie nie ma ustawionego PUBLIC_APP_URL, więc nie wysyła żadnego odsyłacza i żadna lista dozwolonych nie może pasować. Ustaw PUBLIC_APP_URL albo ogranicz klucz według adresu IP -- opcji, która naprawdę chroni klucz po stronie serwera.",
     "referrerRejected": "Google odrzucił ograniczenie odsyłacza HTTP dla tego klucza. Monize wysyła \"{referer}\" (z PUBLIC_APP_URL); dodaj dokładnie tę wartość do dozwolonych odsyłaczy, pamiętając, że wzorzec taki jak *.example.com/* nie pasuje do samego example.com. Ograniczenie klucza według adresu IP to opcja, która naprawdę chroni klucz po stronie serwera."
+  },
+  "calendar": {
+    "noteOverlaps": "Te dni są już objęte inną notatką",
+    "noteSpanBackwards": "endDate musi być równa lub późniejsza niż startDate",
+    "noteSpanTooLong": "Notatka może obejmować najwyżej {{ days }} dni",
+    "noteSpanMissesDay": "Zakres musi obejmować dzień, dla którego notatka jest pisana"
   }
 }

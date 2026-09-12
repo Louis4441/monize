@@ -26,7 +26,16 @@ const sources = import.meta.glob('/src/**/*.{ts,tsx}', {
  * The modules that turn a month into days and draw them. Their tests are not
  * scanned: pinning a clock is exactly what a test is allowed to do.
  */
-const CALENDAR_DAY_MODULES = ['/src/lib/calendar-month.ts', '/src/components/ui/MonthGrid.tsx'];
+const CALENDAR_DAY_MODULES = [
+  '/src/lib/calendar-month.ts',
+  '/src/components/ui/MonthGrid.tsx',
+  // Steps and counts calendar days for a note's span; the same rule applies for
+  // the same reason.
+  '/src/lib/day-note-span.ts',
+  // Reads a typed month, and the year a partial entry leaves out comes from the
+  // month on screen -- never from the clock.
+  '/src/lib/month-input.ts',
+];
 
 /**
  * Written as a pattern because prose describing it is what a raw-text scan

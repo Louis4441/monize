@@ -299,11 +299,10 @@ function InvestmentsContent() {
               Everything above this point is the same either way. */}
           {view === 'calendar' && (
             <div>
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   {t('page.recentTransactions')}
                 </h3>
-                <ViewModeToggle value={view} onChange={setView} />
               </div>
               <InvestmentCalendarView
                 accounts={data.allAccounts.length > 0 ? data.allAccounts : data.accounts}
@@ -321,6 +320,7 @@ function InvestmentsContent() {
                 onEditCashTransaction={data.handleEditCashTransaction}
                 onCreateOnDay={handleCreateOnDay}
                 refreshKey={data.writeRefreshKey}
+                viewToggle={<ViewModeToggle value={view} onChange={setView} />}
               />
             </div>
           )}
@@ -342,14 +342,12 @@ function InvestmentsContent() {
                   availableSymbols={brokerageOptions.symbols}
                   availableActions={brokerageOptions.actions}
                   viewToggle={
-                    <div className="flex flex-wrap items-center gap-2">
-                      <InvestmentViewToggle
-                        value={transactionView}
-                        onChange={handleTransactionViewChange}
-                      />
-                      <ViewModeToggle value={view} onChange={setView} />
-                    </div>
+                    <InvestmentViewToggle
+                      value={transactionView}
+                      onChange={handleTransactionViewChange}
+                    />
                   }
+                  viewModeToggle={<ViewModeToggle value={view} onChange={setView} />}
                   currentPage={data.currentPage}
                   totalPages={data.pagination?.totalPages ?? 1}
                   totalItems={data.pagination?.total ?? 0}
@@ -387,7 +385,6 @@ function InvestmentsContent() {
                     value={transactionView}
                     onChange={handleTransactionViewChange}
                   />
-                  <ViewModeToggle value={view} onChange={setView} />
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <button onClick={data.openCashCreate} className="inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 sm:min-w-[14rem]">
@@ -416,6 +413,7 @@ function InvestmentsContent() {
               ) : (
                 <TransactionList
                   densityView="investments"
+                  viewToggle={<ViewModeToggle value={view} onChange={setView} />}
                   transactions={data.cashTransactions}
                   onEdit={data.handleEditCashTransaction}
                   onRefresh={data.refreshAfterWrite}

@@ -98,6 +98,24 @@
     "deleteMessage": "[XX-The note on this day is removed. This cannot be undone.-XX]",
     "discardTitle": "[XX-Discard this note?-XX]",
     "discardMessage": "[XX-The note you are writing has not been saved. Leaving this day discards it.-XX]",
-    "discardConfirm": "[XX-Discard-XX]"
+    "discardConfirm": "[XX-Discard-XX]",
+    "startDate": "[XX-First day-XX]",
+    "endDate": "[XX-Last day-XX]",
+    "spanRange": "[XX-{start} to {end}-XX]",
+    "spanCount": "[XX-{count, plural, one {# day} other {# days}}-XX]",
+    "spanBackwards": "[XX-The last day cannot be before the first.-XX]",
+    "spanTooLong": "[XX-A note can cover at most {days} days.-XX]",
+    "spanMissesDay": "[XX-The days you chose do not include the day you are writing this note on.-XX]",
+    "deleteSpanMessage": "[XX-{count, plural, one {The note on this day is removed. This cannot be undone.} other {This note covers # days, and all of them are cleared. This cannot be undone.}}-XX]"
+  },
+  "monthPicker": {
+    "title": "[XX-Go to another month-XX]",
+    "typeLabel": "[XX-Type a month or a year-XX]",
+    "placeholder": "[XX-e.g. Mar 1998, 1998-03, 3/1998-XX]",
+    "unreadable": "[XX-That is not a month we can read. Try a year, a month name, or 1998-03.-XX]",
+    "previousYear": "[XX-Previous year-XX]",
+    "nextYear": "[XX-Next year-XX]",
+    "yearBack": "[XX-A year back-XX]",
+    "yearForward": "[XX-A year forward-XX]"
   }
 }

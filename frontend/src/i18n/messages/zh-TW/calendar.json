@@ -98,6 +98,24 @@
     "deleteMessage": "這一天的備註將被刪除，且無法復原。",
     "discardTitle": "捨棄這則備註？",
     "discardMessage": "您正在寫的備註尚未儲存。離開這一天會捨棄它。",
-    "discardConfirm": "捨棄"
+    "discardConfirm": "捨棄",
+    "startDate": "開始日",
+    "endDate": "結束日",
+    "spanRange": "{start} 至 {end}",
+    "spanCount": "{count, plural, other {# 天}}",
+    "spanBackwards": "結束日不能早於開始日。",
+    "spanTooLong": "一則備註最多可涵蓋 {days} 天。",
+    "spanMissesDay": "所選的日期不包含您正在為其撰寫備註的那一天。",
+    "deleteSpanMessage": "{count, plural, other {此備註涵蓋 # 天，全部都會被清除。此操作無法復原。}}"
+  },
+  "monthPicker": {
+    "title": "跳至其他月份",
+    "typeLabel": "輸入月份或年份",
+    "placeholder": "例如 3月 1998、1998-03、3/1998",
+    "unreadable": "無法將其辨識為月份。請試試年份、月份名稱或 1998-03。",
+    "previousYear": "上一年",
+    "nextYear": "下一年",
+    "yearBack": "回到一年前",
+    "yearForward": "前進一年"
   }
 }

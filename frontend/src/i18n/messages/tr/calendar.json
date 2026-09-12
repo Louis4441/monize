@@ -98,6 +98,24 @@
     "deleteMessage": "Bu gündeki not kaldırılır. Bu geri alınamaz.",
     "discardTitle": "Bu not atılsın mı?",
     "discardMessage": "Yazdığınız not kaydedilmedi. Bu günden ayrılmak notu atar.",
-    "discardConfirm": "At"
+    "discardConfirm": "At",
+    "startDate": "İlk gün",
+    "endDate": "Son gün",
+    "spanRange": "{start} - {end}",
+    "spanCount": "{count, plural, one {# gün} other {# gün}}",
+    "spanBackwards": "Son gün, ilk günden önce olamaz.",
+    "spanTooLong": "Bir not en fazla {days} günü kapsayabilir.",
+    "spanMissesDay": "Seçtiğiniz günler, bu notu yazdığınız günü içermiyor.",
+    "deleteSpanMessage": "{count, plural, one {Bu gündeki not kaldırılacak. Bu geri alınamaz.} other {Bu not # günü kapsıyor ve hepsi temizlenecek. Bu geri alınamaz.}}"
+  },
+  "monthPicker": {
+    "title": "Başka bir aya git",
+    "typeLabel": "Bir ay veya yıl yazın",
+    "placeholder": "örn. Mar 1998, 1998-03, 3/1998",
+    "unreadable": "Bunu bir ay olarak okuyamıyoruz. Bir yıl, bir ay adı veya 1998-03 deneyin.",
+    "previousYear": "Önceki yıl",
+    "nextYear": "Sonraki yıl",
+    "yearBack": "Bir yıl geri",
+    "yearForward": "Bir yıl ileri"
   }
 }

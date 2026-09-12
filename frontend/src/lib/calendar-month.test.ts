@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  calendarDaysBetween,
   classifyCalendarDay,
   dayOfWeek,
   daysInMonth,
@@ -8,6 +9,7 @@ import {
   monthGridDays,
   monthOf,
   rotateWeekdayLabels,
+  shiftDate,
   shiftMonth,
   type WeekStart,
 } from './calendar-month';
@@ -230,5 +232,61 @@ describe('classifyCalendarDay', () => {
   it('rejects a date that does not exist on either side', () => {
     expect(() => classifyCalendarDay('2100-02-29', today)).toThrow(/calendar date/);
     expect(() => classifyCalendarDay(today, '2100-02-29')).toThrow(/calendar date/);
+  });
+});
+
+describe('shiftDate', () => {
+  it('steps a day in either direction', () => {
+    expect(shiftDate('2026-06-10', 1)).toBe('2026-06-11');
+    expect(shiftDate('2026-06-10', -1)).toBe('2026-06-09');
+    expect(shiftDate('2026-06-10', 0)).toBe('2026-06-10');
+  });
+
+  it('rolls the month and the year', () => {
+    expect(shiftDate('2026-01-31', 1)).toBe('2026-02-01');
+    expect(shiftDate('2026-03-01', -1)).toBe('2026-02-28');
+    expect(shiftDate('2026-12-31', 1)).toBe('2027-01-01');
+    expect(shiftDate('2026-01-01', -1)).toBe('2025-12-31');
+  });
+
+  it('counts the leap day in and out', () => {
+    expect(shiftDate('2024-02-28', 1)).toBe('2024-02-29');
+    expect(shiftDate('2024-03-01', -1)).toBe('2024-02-29');
+    // 2100 is divisible by 4 and is not a leap year.
+    expect(shiftDate('2100-02-28', 1)).toBe('2100-03-01');
+  });
+
+  it('steps a whole year without drifting', () => {
+    expect(shiftDate('2026-06-10', 365)).toBe('2027-06-10');
+    expect(shiftDate('2024-01-01', 366)).toBe('2025-01-01');
+  });
+
+  it('refuses a date that is not one', () => {
+    expect(() => shiftDate('2026-02-30', 1)).toThrow();
+  });
+});
+
+describe('calendarDaysBetween', () => {
+  it('counts one day as one day', () => {
+    expect(calendarDaysBetween('2026-06-10', '2026-06-10')).toBe(1);
+  });
+
+  it('counts inclusively, both ends', () => {
+    expect(calendarDaysBetween('2026-06-14', '2026-06-18')).toBe(5);
+  });
+
+  it('counts across a month and a year end', () => {
+    expect(calendarDaysBetween('2026-01-30', '2026-02-02')).toBe(4);
+    expect(calendarDaysBetween('2026-12-30', '2027-01-02')).toBe(4);
+  });
+
+  it('counts the leap day', () => {
+    expect(calendarDaysBetween('2024-02-28', '2024-03-01')).toBe(3);
+    expect(calendarDaysBetween('2026-02-28', '2026-03-01')).toBe(2);
+  });
+
+  it('reports a backwards range as negative, so a caller cannot read it as one day', () => {
+    expect(calendarDaysBetween('2026-06-18', '2026-06-14')).toBe(-5);
+    expect(calendarDaysBetween('2026-06-11', '2026-06-10')).toBe(-2);
   });
 });

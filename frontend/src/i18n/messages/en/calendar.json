@@ -98,6 +98,24 @@
     "deleteMessage": "The note on this day is removed. This cannot be undone.",
     "discardTitle": "Discard this note?",
     "discardMessage": "The note you are writing has not been saved. Leaving this day discards it.",
-    "discardConfirm": "Discard"
+    "discardConfirm": "Discard",
+    "startDate": "First day",
+    "endDate": "Last day",
+    "spanRange": "{start} to {end}",
+    "spanCount": "{count, plural, one {# day} other {# days}}",
+    "spanBackwards": "The last day cannot be before the first.",
+    "spanTooLong": "A note can cover at most {days} days.",
+    "spanMissesDay": "The days you chose do not include the day you are writing this note on.",
+    "deleteSpanMessage": "{count, plural, one {The note on this day is removed. This cannot be undone.} other {This note covers # days, and all of them are cleared. This cannot be undone.}}"
+  },
+  "monthPicker": {
+    "title": "Go to another month",
+    "typeLabel": "Type a month or a year",
+    "placeholder": "e.g. Mar 1998, 1998-03, 3/1998",
+    "unreadable": "That is not a month we can read. Try a year, a month name, or 1998-03.",
+    "previousYear": "Previous year",
+    "nextYear": "Next year",
+    "yearBack": "A year back",
+    "yearForward": "A year forward"
   }
 }

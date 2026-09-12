@@ -1,4 +1,9 @@
-import { ExecutionContext, ForbiddenException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  ExecutionContext,
+  ForbiddenException,
+} from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { JwtService } from "@nestjs/jwt";
 import { Test, TestingModule } from "@nestjs/testing";
@@ -38,16 +43,19 @@ import { applyRlsPolicies } from "../helpers/rls-setup";
 /**
  * The calendar's one write path against a real database (design section 6.4).
  *
- * Three properties need a live PostgreSQL and cannot be shown with a mocked
- * manager. The upsert is one statement over a unique constraint, so "the second
- * save is an update and not a second row" is a claim about
- * `uq_calendar_day_notes_user_date`, which only the database holds
- * (INV-DAYNOTE-001). The table is in the RLS **Direct** bucket with no delegate
- * arm, so "two users hold a note on the same date" is a claim about the policy,
- * not about the `WHERE user_id = $1` the service also writes. And the route's
- * refusal of an acting delegate is a claim about the absence of a decorator,
- * which only the real `Reflector` reading the real controller can answer -- the
- * guard's unit spec mocks exactly that answer.
+ * Four properties need a live PostgreSQL and cannot be shown with a mocked
+ * manager. The upsert is one statement resolving the row that COVERS a day, so
+ * "the second save is an update and not a second row" is a claim about the
+ * exclusion constraint `ex_calendar_day_notes_user_span` and about the CTE that
+ * reads it, which only the database holds (INV-DAYNOTE-001). A note covering a
+ * run of days must be reachable from the middle of that run and must refuse to
+ * run over another note, both of which are the same constraint answering. The
+ * table is in the RLS **Direct** bucket with no delegate arm, so "two users hold
+ * a note on the same date" is a claim about the policy, not about the
+ * `WHERE user_id = $1` the service also writes. And the route's refusal of an
+ * acting delegate is a claim about the absence of a decorator, which only the
+ * real `Reflector` reading the real controller can answer -- the guard's unit
+ * spec mocks exactly that answer.
  */
 describe("Calendar day notes under RLS enforcement", () => {
   jest.setTimeout(180000);
@@ -78,9 +86,10 @@ describe("Calendar day notes under RLS enforcement", () => {
 
   async function rowsFor(
     userId: string,
-  ): Promise<Array<{ note_date: string; body: string }>> {
+  ): Promise<Array<{ note_date: string; end_date: string; body: string }>> {
     return db.query(
-      `SELECT note_date::TEXT AS note_date, body FROM calendar_day_notes
+      `SELECT note_date::TEXT AS note_date, end_date::TEXT AS end_date, body
+         FROM calendar_day_notes
         WHERE user_id = $1 ORDER BY note_date`,
       [userId],
     );
@@ -125,13 +134,15 @@ describe("Calendar day notes under RLS enforcement", () => {
       const created = await notes.upsert(req(aliceId), DAY, {
         body: "Dentist at 9",
       });
-      expect(created.date).toBe(DAY);
+      expect(created.startDate).toBe(DAY);
+      // Neither end named: one day, which is what most notes are.
+      expect(created.endDate).toBe(DAY);
       expect(created.body).toBe("Dentist at 9");
 
       const updated = await notes.upsert(req(aliceId), DAY, {
         body: "Dentist moved to 11",
       });
-      expect(updated.date).toBe(DAY);
+      expect(updated.startDate).toBe(DAY);
       expect(updated.body).toBe("Dentist moved to 11");
     });
 
@@ -139,7 +150,7 @@ describe("Calendar day notes under RLS enforcement", () => {
     // row, carrying the second body. A read-then-decide would have produced
     // either two rows or a unique-violation under concurrency.
     expect(await rowsFor(aliceId)).toEqual([
-      { note_date: DAY, body: "Dentist moved to 11" },
+      { note_date: DAY, end_date: DAY, body: "Dentist moved to 11" },
     ]);
 
     await withUserContext(aliceId, async () => {
@@ -166,14 +177,14 @@ describe("Calendar day notes under RLS enforcement", () => {
       notes.upsert(req(bobId), DAY, { body: "Bob's day" }),
     );
 
-    // The unique constraint is on (user_id, note_date), so the same date twice
-    // is two rows -- and each user's list holds only their own, which under
-    // enforcement is the policy's answer as much as the query's.
+    // The exclusion constraint carries `user_id WITH =`, so the same date for
+    // two users is two rows -- and each user's list holds only their own, which
+    // under enforcement is the policy's answer as much as the query's.
     expect(await rowsFor(aliceId)).toEqual([
-      { note_date: DAY, body: "Alice's day" },
+      { note_date: DAY, end_date: DAY, body: "Alice's day" },
     ]);
     expect(await rowsFor(bobId)).toEqual([
-      { note_date: DAY, body: "Bob's day" },
+      { note_date: DAY, end_date: DAY, body: "Bob's day" },
     ]);
 
     const alicesList = await withUserContext(aliceId, () =>
@@ -183,6 +194,122 @@ describe("Calendar day notes under RLS enforcement", () => {
       }),
     );
     expect(alicesList.map((n) => n.body)).toEqual(["Alice's day"]);
+  });
+
+  describe("a note over a run of days", () => {
+    const FIRST = "2024-08-05";
+    const MIDDLE = "2024-08-07";
+    const LAST = "2024-08-09";
+
+    beforeEach(async () => {
+      await db.query("DELETE FROM calendar_day_notes WHERE user_id = $1", [
+        aliceId,
+      ]);
+    });
+
+    it("is written once, found from any of its days, and edited from the middle", async () => {
+      await withUserContext(aliceId, async () => {
+        const created = await notes.upsert(req(aliceId), FIRST, {
+          body: "Away in Lisbon",
+          endDate: LAST,
+        });
+        expect(created.startDate).toBe(FIRST);
+        expect(created.endDate).toBe(LAST);
+
+        // One row for five days -- the whole point of a span.
+        expect(await rowsFor(aliceId)).toHaveLength(1);
+
+        // A month that only touches the middle of the run still finds it:
+        // the range query overlaps rather than keying on the first day.
+        const listed = await notes.list(req(aliceId), {
+          startDate: MIDDLE,
+          endDate: MIDDLE,
+        });
+        expect(listed).toHaveLength(1);
+        expect(listed[0].startDate).toBe(FIRST);
+
+        // Edited from the middle, moving BOTH ends in one write: the CTE
+        // resolves the covering row from the anchor day, so there is no window
+        // where the note does not exist.
+        const moved = await notes.upsert(req(aliceId), MIDDLE, {
+          body: "Away in Lisbon, extended",
+          startDate: "2024-08-04",
+          endDate: "2024-08-10",
+        });
+        expect(moved.startDate).toBe("2024-08-04");
+        expect(moved.endDate).toBe("2024-08-10");
+      });
+
+      expect(await rowsFor(aliceId)).toEqual([
+        {
+          note_date: "2024-08-04",
+          end_date: "2024-08-10",
+          body: "Away in Lisbon, extended",
+        },
+      ]);
+    });
+
+    it("is removed whole from whichever of its days the caller names", async () => {
+      await withUserContext(aliceId, async () => {
+        await notes.upsert(req(aliceId), FIRST, {
+          body: "Away",
+          endDate: LAST,
+        });
+        await notes.remove(req(aliceId), MIDDLE);
+      });
+
+      expect(await rowsFor(aliceId)).toEqual([]);
+    });
+
+    it("refuses a span that runs over another of the caller's notes", async () => {
+      // The exclusion constraint is the mechanism, not a check the service
+      // performs; a 409 rather than a 500 is what the caller is told.
+      await withUserContext(aliceId, async () => {
+        await notes.upsert(req(aliceId), FIRST, {
+          body: "Away",
+          endDate: LAST,
+        });
+
+        await expect(
+          notes.upsert(req(aliceId), "2024-08-12", {
+            body: "Overlapping",
+            startDate: "2024-08-08",
+            endDate: "2024-08-12",
+          }),
+        ).rejects.toBeInstanceOf(ConflictException);
+      });
+
+      expect(await rowsFor(aliceId)).toEqual([
+        { note_date: FIRST, end_date: LAST, body: "Away" },
+      ]);
+    });
+
+    it("refuses a span that does not cover the day it is written from", async () => {
+      await withUserContext(aliceId, async () => {
+        await expect(
+          notes.upsert(req(aliceId), "2024-08-20", {
+            body: "Elsewhere",
+            startDate: FIRST,
+            endDate: LAST,
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
+
+      expect(await rowsFor(aliceId)).toEqual([]);
+    });
+
+    it("refuses a span longer than the CHECK constraint allows", async () => {
+      await withUserContext(aliceId, async () => {
+        await expect(
+          notes.upsert(req(aliceId), FIRST, {
+            body: "A decade",
+            endDate: "2034-08-05",
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
+
+      expect(await rowsFor(aliceId)).toEqual([]);
+    });
   });
 
   describe("an acting delegate is refused by the guard, not by the client", () => {
@@ -317,8 +444,8 @@ describe("Calendar day notes survive a backup round trip", () => {
       firstName: "Target",
     });
     await dataSource.query(
-      `INSERT INTO calendar_day_notes (user_id, note_date, body)
-       VALUES ($1, DATE '2024-06-14', 'Quarterly review')`,
+      `INSERT INTO calendar_day_notes (user_id, note_date, end_date, body)
+       VALUES ($1, DATE '2024-06-14', DATE '2024-06-16', 'Quarterly review')`,
       [source.id],
     );
 
@@ -338,7 +465,7 @@ describe("Calendar day notes survive a backup round trip", () => {
     expect(result.restored.calendarDayNotes).toBe(1);
 
     const restored = await dataSource.query(
-      `SELECT note_date::TEXT AS note_date, body, user_id
+      `SELECT note_date::TEXT AS note_date, end_date::TEXT AS end_date, body, user_id
          FROM calendar_day_notes WHERE user_id = $1`,
       [target.id],
     );
@@ -347,6 +474,7 @@ describe("Calendar day notes survive a backup round trip", () => {
     expect(restored).toEqual([
       {
         note_date: "2024-06-14",
+        end_date: "2024-06-16",
         body: "Quarterly review",
         user_id: target.id,
       },

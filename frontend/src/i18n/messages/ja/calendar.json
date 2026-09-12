@@ -98,6 +98,24 @@
     "deleteMessage": "この日のメモが削除されます。元に戻すことはできません。",
     "discardTitle": "このメモを破棄しますか？",
     "discardMessage": "作成中のメモは保存されていません。この日から移動すると破棄されます。",
-    "discardConfirm": "破棄"
+    "discardConfirm": "破棄",
+    "startDate": "開始日",
+    "endDate": "終了日",
+    "spanRange": "{start} 〜 {end}",
+    "spanCount": "{count, plural, other {#日間}}",
+    "spanBackwards": "終了日を開始日より前にはできません。",
+    "spanTooLong": "1件のメモが対象にできるのは最大 {days} 日です。",
+    "spanMissesDay": "選択した期間に、このメモを書いている日が含まれていません。",
+    "deleteSpanMessage": "{count, plural, other {このメモは#日間にわたっており、そのすべてが削除されます。元に戻すことはできません。}}"
+  },
+  "monthPicker": {
+    "title": "別の月へ移動",
+    "typeLabel": "月または年を入力",
+    "placeholder": "例: 3月 1998、1998-03、3/1998",
+    "unreadable": "月として読み取れませんでした。年、月の名前、または 1998-03 をお試しください。",
+    "previousYear": "前の年",
+    "nextYear": "次の年",
+    "yearBack": "1年前へ",
+    "yearForward": "1年先へ"
   }
 }

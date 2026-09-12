@@ -66,7 +66,16 @@ interface InvestmentTransactionListProps {
   availableActions?: string[];
   /** Which surface's remembered row density this register reads. */
   densityView?: DensityView;
+  /** The brokerage / cash switch, drawn beside this register's heading. */
   viewToggle?: React.ReactNode;
+  /**
+   * The Table / Calendar switch, drawn in the top toolbar between the density
+   * button and the pager -- the same corner it occupies in calendar mode, and
+   * beside the other control that changes what the whole list looks like.
+   * Only reaches the strip when this list owns its paging; without the strip
+   * there is nowhere for it to go and the page draws it itself.
+   */
+  viewModeToggle?: React.ReactNode;
   /**
    * Paging, when this list owns it. Supplied together, they put the pager in
    * the strip above the table -- the same strip, in the same place, as the cash
@@ -303,6 +312,7 @@ export function InvestmentTransactionList({
   availableActions,
   densityView = 'investments',
   viewToggle,
+  viewModeToggle,
   currentPage,
   totalPages,
   totalItems,
@@ -455,6 +465,11 @@ export function InvestmentTransactionList({
             {t('transactionList.title')}
           </h3>
           {viewToggle}
+          {/* The Table / Calendar switch lives in the strip above the table,
+              which this branch does not draw. It rides the heading here rather
+              than disappearing: a register that is still loading, or holds
+              nothing, is exactly when a reader reaches for another view of it. */}
+          <span className="ml-auto">{viewModeToggle}</span>
         </div>
         <div className="space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
@@ -477,6 +492,7 @@ export function InvestmentTransactionList({
               {t('transactionList.title')}
             </h3>
             {viewToggle}
+            {viewModeToggle}
           </div>
           {onNewTransaction && (
             <button
@@ -641,6 +657,7 @@ export function InvestmentTransactionList({
       {ownsPaging && (
         <ListTopToolbar
           densityView={densityView}
+          viewToggle={viewModeToggle}
           currentPage={currentPage}
           totalPages={totalPages}
           totalItems={totalItems}

@@ -264,10 +264,63 @@ function updatedAtTriggers(): { trigger: string; table: string }[] {
 }
 
 /**
+ * The table constraints TypeORM cannot express, extracted from `schema.sql`.
+ *
+ * `synchronize` builds the schema from entity metadata, and there is no
+ * decorator for an `EXCLUDE` constraint -- so without this step
+ * `ex_calendar_day_notes_user_span` exists in production and nowhere in the test
+ * database, and every assertion that overlapping day-note spans are refused
+ * (INV-DAYNOTE-001) would pass while proving nothing.
+ *
+ * Read from `schema.sql` rather than rebuilt from a literal here, so the
+ * harness gets the constraint the real database gets. A table that gains one
+ * gains it here too, by adding a row to `EXCLUSION_CONSTRAINTS` below.
+ */
+const EXCLUSION_CONSTRAINTS: ReadonlyArray<{
+  table: string;
+  constraint: string;
+}> = [
+  {
+    table: "calendar_day_notes",
+    constraint: "ex_calendar_day_notes_user_span",
+  },
+];
+
+function exclusionConstraints(): {
+  table: string;
+  constraint: string;
+  definition: string;
+}[] {
+  if (!fs.existsSync(SCHEMA_SQL)) {
+    throw new Error(`Schema not found at ${SCHEMA_SQL}`);
+  }
+  const sql = fs.readFileSync(SCHEMA_SQL, "utf8");
+
+  return EXCLUSION_CONSTRAINTS.map(({ table, constraint }) => {
+    // The clause as schema.sql writes it, up to the balancing paren of
+    // `EXCLUDE USING gist (...)`. Non-greedy to the `)` that closes it, which
+    // is the last thing before either a comma or the table's own `)`.
+    const pattern = new RegExp(
+      `CONSTRAINT\\s+${constraint}\\s+(EXCLUDE\\s+USING\\s+\\w+\\s*\\([\\s\\S]*?\\n\\s*\\))`,
+      "i",
+    );
+    const match = sql.match(pattern);
+    if (!match) {
+      throw new Error(
+        `Could not find ${constraint} in ${SCHEMA_SQL}. The extraction pattern and the ` +
+          "schema have diverged; fix the pattern rather than skipping the constraint, or " +
+          "every assertion that depends on it passes vacuously.",
+      );
+    }
+    return { table, constraint, definition: match[1] };
+  });
+}
+
+/**
  * Brings a `synchronize`-built test database up to the shape the real one has:
  * the runtime role and its grants, the RLS helper functions and policies, the
- * behavioural triggers that enforce rules the entities cannot express, and the
- * `updated_at` triggers.
+ * behavioural triggers that enforce rules the entities cannot express, the
+ * constraints they cannot express either, and the `updated_at` triggers.
  *
  * Call after the schema exists (i.e. after `DataSource.initialize()` with
  * `synchronize: true`). Idempotent, and re-applied per suite because
@@ -394,6 +447,28 @@ export async function applyRlsPolicies(
     await dataSource.query(
       `CREATE TRIGGER "${trigger}" BEFORE UPDATE ON "${table}"
        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()`,
+    );
+  }
+
+  // 6. The constraints entity metadata cannot express. `btree_gist` first: an
+  //    EXCLUDE mixing an equality column with a range needs it, and the real
+  //    database gets it from schema.sql.
+  const exclusions = exclusionConstraints();
+  if (exclusions.length > 0) {
+    await dataSource.query("CREATE EXTENSION IF NOT EXISTS btree_gist");
+  }
+  for (const { table, constraint, definition } of exclusions) {
+    const [{ exists: tableExists }] = await dataSource.query(
+      "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1) AS exists",
+      [table],
+    );
+    if (!tableExists) continue;
+
+    await dataSource.query(
+      `ALTER TABLE "${table}" DROP CONSTRAINT IF EXISTS "${constraint}"`,
+    );
+    await dataSource.query(
+      `ALTER TABLE "${table}" ADD CONSTRAINT "${constraint}" ${definition}`,
     );
   }
 }

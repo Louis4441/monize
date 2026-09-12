@@ -719,7 +719,7 @@ describe('InvestmentCalendarView', () => {
       // A note belongs to the day, not to a page: both calendars read one list
       // for the range they draw.
       mockListDayNotes.mockResolvedValue([
-        { date: '2026-06-10', body: 'Ex-dividend date', updatedAt: '2026-06-09T12:00:00.000Z' },
+        { startDate: '2026-06-10', endDate: '2026-06-10', body: 'Ex-dividend date', updatedAt: '2026-06-09T12:00:00.000Z' },
       ]);
 
       const { unmount } = renderView();

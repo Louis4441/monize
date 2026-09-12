@@ -3366,3 +3366,44 @@ describe('the payee column floor', () => {
     expect(payeeCell.className).toContain('max-w-[100px]');
   });
 });
+
+describe('the Table / Calendar switch in the register toolbar', () => {
+  it('sits between the density button and the pager', () => {
+    // The two controls that change what the WHOLE list looks like sit
+    // together, and the switch keeps the same corner of the screen it has in
+    // calendar mode.
+    render(
+      <TransactionList
+        transactions={[createTransaction()]}
+        currentPage={1}
+        totalPages={3}
+        totalItems={60}
+        pageSize={25}
+        onPageChange={vi.fn()}
+        viewToggle={<button type="button">Switch view</button>}
+      />,
+    );
+
+    const toggle = screen.getByRole('button', { name: 'Switch view' });
+    const density = screen.getByTitle('Toggle row density');
+    const firstPage = screen.getByTitle('First page');
+
+    expect(density.compareDocumentPosition(toggle)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(toggle.compareDocumentPosition(firstPage)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('survives an empty register, which is when a reader reaches for it', () => {
+    // A control that vanishes with the last row is one the reader cannot get
+    // back to without writing a transaction.
+    render(
+      <TransactionList
+        transactions={[]}
+        viewToggle={<button type="button">Switch view</button>}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Switch view' })).toBeInTheDocument();
+    // No pages of nothing to step through.
+    expect(screen.queryByTitle('First page')).not.toBeInTheDocument();
+  });
+});

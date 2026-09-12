@@ -98,6 +98,24 @@
     "deleteMessage": "De notitie op deze dag wordt verwijderd. Dit kan niet ongedaan worden gemaakt.",
     "discardTitle": "Deze notitie weggooien?",
     "discardMessage": "De notitie die je schrijft is niet opgeslagen. Deze dag verlaten gooit hem weg.",
-    "discardConfirm": "Weggooien"
+    "discardConfirm": "Weggooien",
+    "startDate": "Eerste dag",
+    "endDate": "Laatste dag",
+    "spanRange": "{start} tot en met {end}",
+    "spanCount": "{count, plural, one {# dag} other {# dagen}}",
+    "spanBackwards": "De laatste dag kan niet voor de eerste liggen.",
+    "spanTooLong": "Een notitie kan maximaal {days} dagen beslaan.",
+    "spanMissesDay": "De gekozen dagen bevatten niet de dag waarop u deze notitie schrijft.",
+    "deleteSpanMessage": "{count, plural, one {De notitie op deze dag wordt verwijderd. Dit kan niet ongedaan worden gemaakt.} other {Deze notitie beslaat # dagen en die worden allemaal gewist. Dit kan niet ongedaan worden gemaakt.}}"
+  },
+  "monthPicker": {
+    "title": "Naar een andere maand",
+    "typeLabel": "Typ een maand of een jaar",
+    "placeholder": "bijv. mrt 1998, 1998-03, 3/1998",
+    "unreadable": "Dat kunnen we niet als maand lezen. Probeer een jaar, een maandnaam of 1998-03.",
+    "previousYear": "Vorig jaar",
+    "nextYear": "Volgend jaar",
+    "yearBack": "Een jaar terug",
+    "yearForward": "Een jaar vooruit"
   }
 }

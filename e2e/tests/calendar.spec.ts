@@ -320,3 +320,100 @@ test.describe('Calendar day notes', () => {
     await expect(dayCell(page, day).getByTestId('calendar-day-note-marker')).toHaveCount(0);
   });
 });
+
+test.describe('Calendar month picker', () => {
+  test('jumps years away by typing a month, and by picking one', async ({
+    authedPage: page,
+    api,
+  }) => {
+    await createAccount(api, { name: `Cal Jump ${uniqueId()}` });
+
+    await page.goto('/transactions');
+    await switchToCalendar(page);
+
+    const thisMonth = todayYmd().slice(0, 7);
+    // The month heading IS the button that opens the picker, so its accessible
+    // name is the month itself.
+    const monthButton = page.getByRole('button', { name: /^\d{2}\/\d{4}$/ });
+    await expect(monthButton).toHaveText(`${thisMonth.slice(5)}/${thisMonth.slice(0, 4)}`);
+
+    // Typed: the only way to reach a month the arrows would take years over.
+    await monthButton.click();
+    const picker = page.getByRole('dialog', { name: 'Go to another month' });
+    await picker.getByLabel('Type a month or a year').fill('Mar 1998');
+    await picker.getByLabel('Type a month or a year').press('Enter');
+    await expect(monthButton).toHaveText('03/1998');
+    await expect(page.getByRole('gridcell', { name: '03/15/1998' })).toBeVisible();
+
+    // Picked: the year stepper plus a month button, from wherever the calendar
+    // happens to be.
+    await monthButton.click();
+    await page.getByRole('button', { name: 'Next year' }).click();
+    await page.getByRole('button', { name: 'Sep', exact: true }).click();
+    await expect(monthButton).toHaveText('09/1999');
+
+    await page.getByRole('button', { name: 'Today', exact: true }).click();
+    await expect(monthButton).toHaveText(`${thisMonth.slice(5)}/${thisMonth.slice(0, 4)}`);
+  });
+});
+
+test.describe('Calendar notes over a run of days', () => {
+  test('writes one note across several days and edits it from the middle', async ({
+    authedPage: page,
+    api,
+  }) => {
+    await createAccount(api, { name: `Cal Span ${uniqueId()}` });
+    const first = shiftDays(todayYmd(), -6);
+    const middle = shiftDays(todayYmd(), -4);
+    const last = shiftDays(todayYmd(), -2);
+    const body = `Away in Lisbon ${uniqueId()}`;
+
+    await page.goto('/transactions');
+    await switchToCalendar(page);
+
+    let panel = await openDay(page, first);
+    await panel.getByRole('button', { name: 'Add a note' }).click();
+    await panel.getByRole('textbox', { name: 'Note' }).fill(body);
+    await panel.getByLabel('Last day').fill(dayLabel(last));
+    await panel.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(panel.getByRole('region', { name: 'Note' })).toContainText(body);
+
+    // Stored as ONE note over five days: every day it covers is marked, and the
+    // day after it is not.
+    await page.reload();
+    for (const day of [first, middle, last]) {
+      await expect(dayCell(page, day).getByTestId('calendar-day-note-marker')).toHaveCount(1);
+    }
+    await expect(
+      dayCell(page, shiftDays(last, 1)).getByTestId('calendar-day-note-marker'),
+    ).toHaveCount(0);
+
+    // Reached from the MIDDLE of the run, which is the whole point of a span:
+    // the panel for a day in the middle carries the same note and edits it.
+    panel = await openDay(page, middle);
+    await expect(panel.getByRole('region', { name: 'Note' })).toContainText(body);
+    const edited = `${body} (extended)`;
+    await panel.getByRole('button', { name: 'Edit', exact: true }).click();
+    await panel.getByRole('textbox', { name: 'Note' }).fill(edited);
+    await panel.getByLabel('Last day').fill(dayLabel(shiftDays(last, 1)));
+    await panel.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(panel.getByRole('region', { name: 'Note' })).toContainText(edited);
+
+    await page.reload();
+    await expect(
+      dayCell(page, shiftDays(last, 1)).getByTestId('calendar-day-note-marker'),
+    ).toHaveCount(1);
+
+    // Deleting from any covered day clears the whole run.
+    panel = await openDay(page, last);
+    await panel.getByRole('button', { name: 'Delete', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: /delete/i }).click();
+    await expect(panel.getByRole('button', { name: 'Add a note' })).toBeVisible();
+
+    await page.reload();
+    for (const day of [first, middle, last]) {
+      await expect(dayCell(page, day).getByTestId('calendar-day-note-marker')).toHaveCount(0);
+    }
+  });
+});
+

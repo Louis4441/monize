@@ -8,6 +8,7 @@ import { Modal } from '@/components/ui/Modal';
 import { CARD_CLASS, HOVER_ROW_ON_CARD } from '@/components/ui/Card';
 import { useIsBelowDesktop } from '@/hooks/useIsMobile';
 import { CategoryPill } from '@/components/transactions/CategoryPill';
+import { PayeeLogo } from '@/components/payees/PayeeLogo';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
 import { BalanceForecastUnavailable } from '@/components/accounts/shared/BalanceForecastUnavailable';
 import { CalendarDayNote } from '@/components/calendar/CalendarDayNote';
@@ -59,9 +60,13 @@ interface CalendarDayPanelProps {
    * worse than no section (design decision 12).
    */
   notes?: {
+    /** The note COVERING this day; a multi-day note may start on another. */
     note?: DayNote;
-    onSave: (date: string, body: string) => Promise<unknown>;
-    onDelete: (date: string) => Promise<unknown>;
+    onSave: (
+      anchorDate: string,
+      note: { body: string; startDate: string; endDate: string },
+    ) => Promise<unknown>;
+    onDelete: (anchorDate: string) => Promise<unknown>;
     onDirtyChange: (dirty: boolean) => void;
   };
   onEditTransaction: (transaction: Transaction) => void;
@@ -195,9 +200,22 @@ export function CalendarDayPanel({
                   chip.isVoid ? 'line-through opacity-50' : ''
                 } ${chip.isFuture && !chip.isVoid ? 'opacity-60' : ''}`}
               >
-                <span className="flex items-baseline justify-between gap-2">
-                  <span className="truncate text-sm text-gray-900 dark:text-gray-100">
-                    {payeeDisplay(chip.transaction) ?? t('chip.noPayee')}
+                <span className="flex items-center justify-between gap-2">
+                  {/* The register's own badge, at the register's size: the day
+                      panel is a list of the same rows, so a payee is recognised
+                      here by the same mark it carries there. `PayeeLogo` falls
+                      back to a letter badge, so the column stays aligned for a
+                      free-text payee and for a row that names none. */}
+                  <span className="flex min-w-0 items-center gap-2">
+                    <PayeeLogo
+                      payee={chip.transaction.payee}
+                      name={payeeDisplay(chip.transaction)}
+                      size={20}
+                      className="shrink-0"
+                    />
+                    <span className="truncate text-sm text-gray-900 dark:text-gray-100">
+                      {payeeDisplay(chip.transaction) ?? t('chip.noPayee')}
+                    </span>
                   </span>
                   <span className="shrink-0 text-sm tabular-nums text-gray-900 dark:text-gray-100">
                     {formatCurrency(

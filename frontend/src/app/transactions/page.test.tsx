@@ -92,7 +92,14 @@ vi.mock('next/dynamic', () => ({
           </div>
         );
       }
-      return <div data-testid="dynamic-component">DynamicComponent</div>;
+      // The calendar is loaded through `dynamic()`, and it too draws the
+      // switch -- at the right-hand end of its own toolbar row.
+      return (
+        <div data-testid="dynamic-component">
+          DynamicComponent
+          {props.viewToggle}
+        </div>
+      );
     };
     return DynamicComponent;
   },
@@ -251,6 +258,10 @@ vi.mock('@/lib/budgets', () => ({
 vi.mock('@/components/transactions/TransactionList', () => ({
   TransactionList: (props: any) => (
     <div data-testid="transaction-list">
+      {/* The Table / Calendar switch is the register's now, handed down by the
+          page: a mock that dropped it would hide the only control this suite
+          uses to change the view. */}
+      {props.viewToggle}
       <span data-testid="tx-count">{props.transactions?.length ?? 0} transactions</span>
       {props.transactions?.map((t: any) => (
         <div key={t.id} data-testid={`tx-${t.id}`} onClick={() => props.onEdit(t)}>

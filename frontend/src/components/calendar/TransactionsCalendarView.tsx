@@ -54,6 +54,12 @@ interface TransactionsCalendarViewProps {
   onCreateOnDay: (date: string) => void;
   /** Bumped by the page after a write, so the month refetches. */
   refreshKey?: number;
+  /**
+   * The Table / Calendar switch, drawn at the right-hand end of the toolbar row
+   * so it sits with the month navigation and the legend rather than up beside
+   * the page title. The page owns it; this only says where it goes.
+   */
+  viewToggle?: React.ReactNode;
 }
 
 /**
@@ -78,6 +84,7 @@ export function TransactionsCalendarView({
   onEditTransaction,
   onCreateOnDay,
   refreshKey = 0,
+  viewToggle,
 }: TransactionsCalendarViewProps) {
   const t = useTranslations('calendar');
   const monthLabelId = useId();
@@ -291,6 +298,7 @@ export function TransactionsCalendarView({
         onToggleLayer={toggleLayer}
         legendAccountTypes={legend.accountTypes}
         legendHasScheduled={legend.hasScheduled}
+        viewToggle={viewToggle}
       />
 
       <CalendarBanner causes={causes} />

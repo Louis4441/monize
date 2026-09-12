@@ -131,7 +131,19 @@ from one of three new read models built out of those endpoints' services.
     names the two files.
 12. **A day note is one row per user per date, owner-only, plain text.** The
     same note appears on both calendars because it belongs to the day, not to
-    a page or an account. It is bounded at `CALENDAR_DAY_NOTE_MAX_LENGTH`
+    a page or an account.
+
+    > **Amended after the plan shipped.** A note now covers a RUN of
+    > consecutive days -- `note_date` through `end_date`, inclusive -- so a
+    > vacation is one note rather than nine. Everything else in this decision
+    > stands. "One row per date" becomes "at most one note covering any date",
+    > and the mechanism for it is no longer the UNIQUE constraint but the
+    > exclusion constraint `ex_calendar_day_notes_user_span` over
+    > `daterange(note_date, end_date, '[]')`, which is what lets the editor be
+    > opened from any day the span touches. See INV-DAYNOTE-001 and
+    > `docs/backend/modules-and-runtime.md`, both of which are canonical over
+    > the sketch in section 6.4 below.
+ It is bounded at `CALENDAR_DAY_NOTE_MAX_LENGTH`
     (2000 characters), mirrored in both layers the way
     `TRANSACTION_NOTE_MAX_LENGTH` is, so the textarea stops the user at the
     cap instead of the save reporting it. A delegate acting for an owner sees
@@ -323,6 +335,16 @@ Service `DailyMovementService` (`backend/src/securities/daily-movement.service.t
   the net-worth investment routes.
 
 ### 6.4 Day notes (new table and endpoints)
+
+> **Superseded in part.** The table and the routes below shipped as written and
+> then gained multi-day spans (see the amendment to decision 12). `end_date`
+> joins `note_date`, the UNIQUE constraint is replaced by an exclusion
+> constraint over the inclusive daterange, `PUT` takes an optional `startDate`
+> and `endDate` and treats `:date` as the day the note is being written FROM,
+> `DELETE` removes the note covering that day, and `DayNote` carries
+> `startDate` and `endDate` instead of `date`. `docs/backend/modules-and-runtime.md`
+> and INV-DAYNOTE-001 describe what is actually there; the rest of this section
+> is kept as the record of what was planned.
 
 Table `calendar_day_notes`, created by a timestamped migration
 (`YYYYMMDDHHMMSS_calendar_day_notes.sql`, per `database/CLAUDE.md`) that also

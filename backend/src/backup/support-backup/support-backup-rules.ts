@@ -75,6 +75,7 @@ export const RULES: Record<string, TableRules> = {
     id: keep,
     user_id: keep,
     note_date: keep,
+    end_date: keep,
     body: konst("***"), // NOT NULL, CHECK char_length >= 1
     created_at: keep,
     updated_at: keep,

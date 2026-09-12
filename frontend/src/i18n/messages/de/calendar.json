@@ -98,6 +98,24 @@
     "deleteMessage": "Die Notiz an diesem Tag wird entfernt. Dies kann nicht rückgängig gemacht werden.",
     "discardTitle": "Diese Notiz verwerfen?",
     "discardMessage": "Die Notiz, die Sie schreiben, wurde nicht gespeichert. Wenn Sie diesen Tag verlassen, geht sie verloren.",
-    "discardConfirm": "Verwerfen"
+    "discardConfirm": "Verwerfen",
+    "startDate": "Erster Tag",
+    "endDate": "Letzter Tag",
+    "spanRange": "{start} bis {end}",
+    "spanCount": "{count, plural, one {# Tag} other {# Tage}}",
+    "spanBackwards": "Der letzte Tag kann nicht vor dem ersten liegen.",
+    "spanTooLong": "Eine Notiz kann höchstens {days} Tage umfassen.",
+    "spanMissesDay": "Die gewählten Tage enthalten nicht den Tag, an dem Sie diese Notiz schreiben.",
+    "deleteSpanMessage": "{count, plural, one {Die Notiz an diesem Tag wird entfernt. Dies kann nicht rückgängig gemacht werden.} other {Diese Notiz umfasst # Tage, und alle werden gelöscht. Dies kann nicht rückgängig gemacht werden.}}"
+  },
+  "monthPicker": {
+    "title": "Zu einem anderen Monat springen",
+    "typeLabel": "Monat oder Jahr eingeben",
+    "placeholder": "z. B. Mär 1998, 1998-03, 3/1998",
+    "unreadable": "Das ist kein Monat, den wir lesen können. Versuchen Sie ein Jahr, einen Monatsnamen oder 1998-03.",
+    "previousYear": "Vorheriges Jahr",
+    "nextYear": "Nächstes Jahr",
+    "yearBack": "Ein Jahr zurück",
+    "yearForward": "Ein Jahr vor"
   }
 }

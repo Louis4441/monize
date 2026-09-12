@@ -17,7 +17,8 @@ describe("CalendarDayNotesController", () => {
     dayNotes = {
       list: jest.fn().mockResolvedValue([]),
       upsert: jest.fn().mockResolvedValue({
-        date: "2026-06-14",
+        startDate: "2026-06-14",
+        endDate: "2026-06-14",
         body: "hi",
         updatedAt: "2026-06-14T10:00:00.000Z",
       }),
@@ -45,17 +46,52 @@ describe("CalendarDayNotesController", () => {
       "2026-06-01",
       "2026-06-30",
     );
-    expect(dayNotes.upsert).toHaveBeenCalledWith("user-1", "2026-06-14", "hi");
+    expect(dayNotes.upsert).toHaveBeenCalledWith("user-1", "2026-06-14", {
+      startDate: "2026-06-14",
+      endDate: "2026-06-14",
+      body: "hi",
+    });
     expect(dayNotes.remove).toHaveBeenCalledWith("user-1", "2026-06-14");
   });
 
   it("returns the stored note from the write", async () => {
     const note = await controller.upsert(req, "2026-06-14", { body: "hi" });
     expect(note).toEqual({
-      date: "2026-06-14",
+      startDate: "2026-06-14",
+      endDate: "2026-06-14",
       body: "hi",
       updatedAt: "2026-06-14T10:00:00.000Z",
     });
+  });
+
+  it("passes the span through, with the day in the URL as the anchor", async () => {
+    // The anchor is the day the panel was showing; the span is what the editor
+    // asked for. A note opened from its third day and extended a day at the
+    // front is one request, not a delete and a create.
+    await controller.upsert(req, "2026-06-16", {
+      body: "Away",
+      startDate: "2026-06-14",
+      endDate: "2026-06-18",
+    });
+
+    expect(dayNotes.upsert).toHaveBeenCalledWith("user-1", "2026-06-16", {
+      startDate: "2026-06-14",
+      endDate: "2026-06-18",
+      body: "Away",
+    });
+  });
+
+  it("refuses a span that does not cover the day it was written from", async () => {
+    // The panel is showing that day; a span that skips it would store a note
+    // the reader is told they just wrote and cannot see.
+    await expect(
+      controller.upsert(req, "2026-06-16", {
+        body: "Away",
+        startDate: "2026-06-20",
+        endDate: "2026-06-22",
+      }),
+    ).rejects.toThrow(BadRequestException);
+    expect(dayNotes.upsert).not.toHaveBeenCalled();
   });
 
   describe("the :date parameter", () => {

@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useReportData } from '@/hooks/useReportData';
 import { calendarDayNotesApi } from '@/lib/calendar-day-notes';
+import { dayNotesByDay } from '@/lib/day-note-span';
 import type { DayNote } from '@/types/calendar';
 
 /**
@@ -10,11 +11,21 @@ import type { DayNote } from '@/types/calendar';
  * accounts a page is filtered to or the layers that happen to be on, so the
  * same note is on both calendars and switching a filter does not re-ask for it.
  *
+ * A note covers a run of consecutive days, so `byDay` holds one entry per day
+ * the note touches and every one of them is the SAME note object -- which is
+ * what lets the panel open the editor for a vacation from any day of it.
+ *
  * A note is owner-only and the routes are not delegate-reachable, so an acting
  * delegate asks for nothing (`enabled: false`) rather than asking and rendering
  * the 403 as an empty day.
  */
 export interface CalendarDayNotesState {
+  /**
+   * The note covering each day of the range, by day.
+   *
+   * A multi-day note appears under every day it covers. The server refuses
+   * overlapping spans for one user, so no day has two.
+   */
   byDay: ReadonlyMap<string, DayNote>;
   /**
    * The range's notes are actually in hand.
@@ -32,10 +43,20 @@ export interface CalendarDayNotesState {
   error: Error | null;
   isStale: boolean;
   reload: () => void;
-  /** Write one day's note whole and refetch the range. */
-  save: (date: string, body: string) => Promise<DayNote>;
-  /** Remove one day's note and refetch the range. Idempotent on the server. */
-  remove: (date: string) => Promise<void>;
+  /**
+   * Write the note the reader had open on `anchorDate`, span and all, then
+   * refetch the range. The anchor is the day the panel was showing, which need
+   * not be the span's first day.
+   */
+  save: (
+    anchorDate: string,
+    note: { body: string; startDate: string; endDate: string },
+  ) => Promise<DayNote>;
+  /**
+   * Remove the note covering `anchorDate`, however many days it covers, then
+   * refetch the range. Idempotent on the server.
+   */
+  remove: (anchorDate: string) => Promise<void>;
   /** Told by the editor whether there is an unsaved draft. */
   setDraftDirty: (dirty: boolean) => void;
   /**
@@ -68,20 +89,22 @@ export function useCalendarDayNotes(params: {
     { requestKey },
   );
 
-  const byDay = useMemo(() => {
-    const days = new Map<string, DayNote>();
-    for (const note of result.data ?? []) days.set(note.date, note);
-    return days;
-  }, [result.data]);
+  const byDay = useMemo(
+    () => dayNotesByDay(result.data ?? [], startDate, endDate),
+    [result.data, startDate, endDate],
+  );
 
   const { reload } = result;
 
   const save = useCallback(
-    async (date: string, body: string) => {
+    async (
+      anchorDate: string,
+      note: { body: string; startDate: string; endDate: string },
+    ) => {
       // The client's own write drops its `calendar:day-notes:` entries; the
-      // refetch is what puts the stored note, with the server's `updatedAt`, on
-      // screen.
-      const saved = await calendarDayNotesApi.upsert(date, body);
+      // refetch is what puts the stored note, with the server's `updatedAt` and
+      // the span it actually kept, on screen.
+      const saved = await calendarDayNotesApi.upsert(anchorDate, note);
       reload();
       return saved;
     },
@@ -89,8 +112,8 @@ export function useCalendarDayNotes(params: {
   );
 
   const remove = useCallback(
-    async (date: string) => {
-      await calendarDayNotesApi.remove(date);
+    async (anchorDate: string) => {
+      await calendarDayNotesApi.remove(anchorDate);
       reload();
     },
     [reload],

@@ -98,6 +98,24 @@
     "deleteMessage": "La note de ce jour est supprimée. Cette action est irréversible.",
     "discardTitle": "Abandonner cette note ?",
     "discardMessage": "La note que vous écrivez n'a pas été enregistrée. Quitter ce jour l'abandonne.",
-    "discardConfirm": "Abandonner"
+    "discardConfirm": "Abandonner",
+    "startDate": "Premier jour",
+    "endDate": "Dernier jour",
+    "spanRange": "{start} à {end}",
+    "spanCount": "{count, plural, one {# jour} other {# jours}}",
+    "spanBackwards": "Le dernier jour ne peut pas précéder le premier.",
+    "spanTooLong": "Une note peut couvrir au maximum {days} jours.",
+    "spanMissesDay": "Les jours choisis ne comprennent pas le jour où vous écrivez cette note.",
+    "deleteSpanMessage": "{count, plural, one {La note de ce jour sera supprimée. Cette action est irréversible.} other {Cette note couvre # jours, et tous seront effacés. Cette action est irréversible.}}"
+  },
+  "monthPicker": {
+    "title": "Aller à un autre mois",
+    "typeLabel": "Saisissez un mois ou une année",
+    "placeholder": "ex. mars 1998, 1998-03, 3/1998",
+    "unreadable": "Nous ne pouvons pas lire cela comme un mois. Essayez une année, un nom de mois ou 1998-03.",
+    "previousYear": "Année précédente",
+    "nextYear": "Année suivante",
+    "yearBack": "Un an en arrière",
+    "yearForward": "Un an en avant"
   }
 }

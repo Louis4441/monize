@@ -202,7 +202,8 @@ beforeEach(() => {
   mockGetDailyBalanceTotals.mockResolvedValue(balanceTotals());
   mockListDayNotes.mockResolvedValue([]);
   mockUpsertDayNote.mockResolvedValue({
-    date: '2026-06-10',
+    startDate: '2026-06-10',
+    endDate: '2026-06-10',
     body: 'Saved',
     updatedAt: '2026-06-10T00:00:00.000Z',
   });
@@ -369,6 +370,40 @@ describe('TransactionsCalendarView', () => {
 
       const panel = await screen.findByRole('complementary', { name: '06/10/2026' });
       expect(within(panel).getByText('Grocer')).toBeInTheDocument();
+    });
+
+    it('shows the payee badge beside the payee, as the register does', async () => {
+      // The day panel is a list of the same rows the register holds, so a payee
+      // is recognised here by the same mark it carries there.
+      mockGetAllPages.mockResolvedValue([
+        transaction({
+          payeeId: 'payee-1',
+          payee: { id: 'payee-1', name: 'Grocer', hasLogo: true } as Transaction['payee'],
+        }),
+      ]);
+      renderView();
+
+      await screen.findByRole('button', { name: /Grocer/ });
+      fireEvent.click(cell('06/10/2026'));
+
+      const panel = await screen.findByRole('complementary', { name: '06/10/2026' });
+      const logo = within(panel).getByRole('img', { name: 'Grocer' });
+      expect(logo).toBeInTheDocument();
+      // To the LEFT of the name, which is the placement that was asked for.
+      const name = within(panel).getByText('Grocer');
+      expect(logo.compareDocumentPosition(name)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+
+    it('keeps the row aligned when there is no payee to badge', async () => {
+      // `PayeeLogo` falls back to a letter badge rather than to nothing, so a
+      // free-text payee and a row that names none do not shift the column.
+      mockGetAllPages.mockResolvedValue([transaction({ payeeName: null })]);
+      renderView();
+
+      fireEvent.click(cell('06/10/2026'));
+
+      const panel = await screen.findByRole('complementary', { name: '06/10/2026' });
+      expect(within(panel).getByText('No payee')).toBeInTheDocument();
     });
 
     it('starts a new transaction on the day it is showing', async () => {
@@ -702,7 +737,7 @@ describe('TransactionsCalendarView', () => {
 
     it('marks the day that carries one and shows its first line', async () => {
       mockListDayNotes.mockResolvedValue([
-        { date: '2026-06-10', body: 'Call the landlord\nand the plumber', updatedAt: '2026-06-09T12:00:00.000Z' },
+        { startDate: '2026-06-10', endDate: '2026-06-10', body: 'Call the landlord\nand the plumber', updatedAt: '2026-06-09T12:00:00.000Z' },
       ]);
       renderView();
 
@@ -711,9 +746,73 @@ describe('TransactionsCalendarView', () => {
       expect(marker).not.toHaveTextContent('plumber');
     });
 
+    it('marks every day a run covers, and draws the text only once', async () => {
+      // A week away should read as one thing running across the grid rather
+      // than as seven separate notes repeating the same sentence.
+      mockListDayNotes.mockResolvedValue([
+        {
+          startDate: '2026-06-10',
+          endDate: '2026-06-13',
+          body: 'Away in Lisbon',
+          updatedAt: '2026-06-09T12:00:00.000Z',
+        },
+      ]);
+      renderView();
+
+      const first = await within(cell('06/10/2026')).findByTestId('calendar-day-note-marker');
+      expect(first).toHaveTextContent('Away in Lisbon');
+      expect(first).toHaveAttribute('data-note-span', 'start');
+
+      for (const [day, position] of [
+        ['06/11/2026', 'middle'],
+        ['06/12/2026', 'middle'],
+        ['06/13/2026', 'end'],
+      ] as const) {
+        const marker = within(cell(day)).getByTestId('calendar-day-note-marker');
+        expect(marker).toHaveAttribute('data-note-span', position);
+        expect(marker).not.toHaveTextContent('Away in Lisbon');
+      }
+
+      expect(
+        within(cell('06/14/2026')).queryByTestId('calendar-day-note-marker'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('opens the same note from the middle of a run, for editing', async () => {
+      // Reaching the editor from any covered day is the whole point of a span.
+      mockListDayNotes.mockResolvedValue([
+        {
+          startDate: '2026-06-10',
+          endDate: '2026-06-13',
+          body: 'Away in Lisbon',
+          updatedAt: '2026-06-09T12:00:00.000Z',
+        },
+      ]);
+      renderView();
+
+      await within(cell('06/12/2026')).findByTestId('calendar-day-note-marker');
+      fireEvent.click(cell('06/12/2026'));
+
+      const panel = await screen.findByRole('complementary', { name: '06/12/2026' });
+      expect(within(panel).getByText('Away in Lisbon')).toBeInTheDocument();
+
+      fireEvent.click(within(panel).getByRole('button', { name: 'Edit' }));
+      await act(async () => {
+        fireEvent.click(within(panel).getByRole('button', { name: 'Save' }));
+      });
+
+      // Anchored on the open day, carrying the whole span: the server resolves
+      // the covering row from that day.
+      expect(mockUpsertDayNote).toHaveBeenCalledWith('2026-06-12', {
+        body: 'Away in Lisbon',
+        startDate: '2026-06-10',
+        endDate: '2026-06-13',
+      });
+    });
+
     it('reads the note in the day panel, and writes one from there', async () => {
       mockListDayNotes.mockResolvedValue([
-        { date: '2026-06-10', body: 'Call the landlord', updatedAt: '2026-06-09T12:00:00.000Z' },
+        { startDate: '2026-06-10', endDate: '2026-06-10', body: 'Call the landlord', updatedAt: '2026-06-09T12:00:00.000Z' },
       ]);
       renderView();
 
@@ -724,14 +823,18 @@ describe('TransactionsCalendarView', () => {
       expect(within(panel).getByText('Call the landlord')).toBeInTheDocument();
 
       fireEvent.click(within(panel).getByRole('button', { name: 'Edit' }));
-      fireEvent.change(within(panel).getByRole('textbox'), {
+      fireEvent.change(within(panel).getByLabelText(calendarNs.notes.title), {
         target: { value: 'Call the plumber' },
       });
       await act(async () => {
         fireEvent.click(within(panel).getByRole('button', { name: 'Save' }));
       });
 
-      expect(mockUpsertDayNote).toHaveBeenCalledWith('2026-06-10', 'Call the plumber');
+      expect(mockUpsertDayNote).toHaveBeenCalledWith('2026-06-10', {
+        body: 'Call the plumber',
+        startDate: '2026-06-10',
+        endDate: '2026-06-10',
+      });
     });
 
     it('asks before a month change takes an unsaved draft away', async () => {
@@ -741,7 +844,9 @@ describe('TransactionsCalendarView', () => {
       fireEvent.click(cell('06/10/2026'));
       const panel = await screen.findByRole('complementary', { name: '06/10/2026' });
       fireEvent.click(within(panel).getByRole('button', { name: calendarNs.notes.add }));
-      fireEvent.change(within(panel).getByRole('textbox'), { target: { value: 'Draft' } });
+      fireEvent.change(within(panel).getByLabelText(calendarNs.notes.title), {
+        target: { value: 'Draft' },
+      });
 
       fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
 
@@ -750,7 +855,7 @@ describe('TransactionsCalendarView', () => {
       const dialog = screen.getByRole('dialog');
       fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
       expect(screen.getByRole('heading', { name: '06/2026' })).toBeInTheDocument();
-      expect(within(panel).getByRole('textbox')).toHaveValue('Draft');
+      expect(within(panel).getByLabelText(calendarNs.notes.title)).toHaveValue('Draft');
     });
 
     it('offers no note surface at all in an acting-delegate session', async () => {

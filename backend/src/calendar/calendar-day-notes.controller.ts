@@ -21,6 +21,7 @@ import { AuthGuard } from "@nestjs/passport";
 
 import { ParseCalendarDatePipe } from "../common/pipes/parse-calendar-date.pipe";
 import { CalendarDayNotesService, DayNote } from "./calendar-day-notes.service";
+import { resolveDayNoteSpan } from "./day-note-span";
 import { DayNotesQueryDto } from "./dto/day-notes-query.dto";
 import { UpsertDayNoteDto } from "./dto/upsert-day-note.dto";
 
@@ -55,27 +56,45 @@ export class CalendarDayNotesController {
   }
 
   @Put(":date")
-  @ApiOperation({ summary: "Write the caller's note for one day" })
-  @ApiParam({ name: "date", example: "2026-06-15" })
+  @ApiOperation({
+    summary: "Write the caller's note covering one day, span and all",
+  })
+  @ApiParam({
+    name: "date",
+    example: "2026-06-15",
+    description:
+      "The day the note is being written FROM. A span already covering it is rewritten, whichever of its days this is; otherwise a note is created.",
+  })
   @ApiResponse({ status: 200, description: "The stored note" })
-  @ApiResponse({ status: 400, description: "Blank, too long, or not a date" })
+  @ApiResponse({
+    status: 400,
+    description: "Blank, too long, not a date, or a span that misses the day",
+  })
   @ApiResponse({ status: 401, description: "Unauthorized" })
+  @ApiResponse({
+    status: 409,
+    description: "The span runs over another of the caller's notes",
+  })
   async upsert(
     @Request() req,
     @Param("date", ParseCalendarDatePipe) date: string,
     @Body() body: UpsertDayNoteDto,
   ): Promise<DayNote> {
-    return this.dayNotes.upsert(req.user.id, date, body.body);
+    return this.dayNotes.upsert(
+      req.user.id,
+      date,
+      resolveDayNoteSpan(date, body),
+    );
   }
 
   @Delete(":date")
   @HttpCode(204)
-  @ApiOperation({ summary: "Remove the caller's note for one day" })
+  @ApiOperation({ summary: "Remove the caller's note covering one day" })
   @ApiParam({ name: "date", example: "2026-06-15" })
   @ApiResponse({
     status: 204,
     description:
-      "The day holds no note. Idempotent: a day that held none succeeds too.",
+      "The day holds no note. The whole span goes, whichever of its days this is; idempotent, so a day that held none succeeds too.",
   })
   @ApiResponse({ status: 401, description: "Unauthorized" })
   async remove(
