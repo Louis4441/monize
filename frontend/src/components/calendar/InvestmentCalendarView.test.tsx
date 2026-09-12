@@ -8,6 +8,7 @@ import { TransactionStatus, type Transaction } from '@/types/transaction';
 import type { Account } from '@/types/account';
 import type { InvestmentTransaction } from '@/types/investment';
 import type { DailyInvestmentValue } from '@/types/net-worth';
+import type { DailyMovementPoint, DailyMovementsResponse } from '@/types/investment';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn(), refresh: vi.fn() }),
@@ -32,10 +33,12 @@ vi.mock('@/hooks/useExchangeRates', () => ({
 
 const mockGetAllTransactionPages = vi.fn();
 const mockGetDailyMovements = vi.fn();
+const mockGetDailyMovementDetail = vi.fn();
 vi.mock('@/lib/investments', () => ({
   investmentsApi: {
     getAllTransactionPages: (...args: unknown[]) => mockGetAllTransactionPages(...args),
     getDailyMovements: (...args: unknown[]) => mockGetDailyMovements(...args),
+    getDailyMovementDetail: (...args: unknown[]) => mockGetDailyMovementDetail(...args),
   },
 }));
 
@@ -100,6 +103,25 @@ function valuePoint(
   };
 }
 
+function movementPoint(
+  date: string,
+  overrides: Partial<DailyMovementPoint> = {},
+): DailyMovementPoint {
+  return {
+    date,
+    isTradingDay: true,
+    movement: 200,
+    movementPercent: 0.2,
+    complete: true,
+    reasons: [],
+    ...overrides,
+  };
+}
+
+function movements(days: DailyMovementPoint[]): DailyMovementsResponse {
+  return { currencyCode: 'CAD', today: TODAY, days };
+}
+
 const onEditInvestment = vi.fn();
 const onEditCashTransaction = vi.fn();
 const onCreateOnDay = vi.fn();
@@ -141,6 +163,19 @@ beforeEach(() => {
   mockGetAllTransactionPages.mockResolvedValue([]);
   mockGetAllPages.mockResolvedValue([]);
   mockGetInvestmentsDaily.mockResolvedValue([]);
+  mockGetDailyMovements.mockResolvedValue(movements([]));
+  mockGetDailyMovementDetail.mockResolvedValue({
+    date: '2026-06-11',
+    currencyCode: 'CAD',
+    movement: 200,
+    movementPercent: 0.2,
+    complete: true,
+    reasons: [],
+    gains: [],
+    losses: [],
+    unchangedCount: 0,
+    remainder: 200,
+  });
   withLayers('transactions');
 });
 
@@ -364,6 +399,142 @@ describe('InvestmentCalendarView', () => {
 
       expect(await screen.findByText(calendarNs.errors.monthFailed)).toBeInTheDocument();
       expect(screen.queryByRole('grid')).not.toBeInTheDocument();
+    });
+  });
+  describe('the daily change layer', () => {
+    it('asks only for days up to today', async () => {
+      withLayers('dailyChange');
+      renderView();
+
+      await waitFor(() => expect(mockGetDailyMovements).toHaveBeenCalled());
+      expect(mockGetDailyMovements).toHaveBeenCalledWith({
+        startDate: '2026-05-31',
+        endDate: TODAY,
+        accountIds: 'brokerage-1',
+        displayCurrency: undefined,
+      });
+    });
+
+    it('prints a complete day as a percentage (table B)', async () => {
+      withLayers('dailyChange');
+      mockGetDailyMovements.mockResolvedValue(movements([movementPoint('2026-06-11')]));
+      renderView();
+
+      const figure = await within(cell('06/11/2026')).findByTestId('calendar-change-figure');
+      expect(figure).toHaveTextContent('0.20%');
+      expect(figure.className).toContain('text-green-600');
+    });
+
+    it('colours a fall red and a flat session neutral', async () => {
+      withLayers('dailyChange');
+      mockGetDailyMovements.mockResolvedValue(
+        movements([
+          movementPoint('2026-06-10', { movement: -100, movementPercent: -0.1 }),
+          movementPoint('2026-06-11', { movement: 0, movementPercent: 0 }),
+        ]),
+      );
+      renderView();
+
+      const fall = await within(cell('06/10/2026')).findByTestId('calendar-change-figure');
+      expect(fall.className).toContain('text-red-600');
+      // Exactly zero is not a gain: a session that did not move is neutral.
+      const flat = within(cell('06/11/2026')).getByTestId('calendar-change-figure');
+      expect(flat.className).toContain('text-gray-500');
+      expect(flat.className).not.toContain('text-green-600');
+    });
+
+    it('leaves a non-trading day blank, with no unknown marker (example 4)', async () => {
+      withLayers('dailyChange');
+      mockGetDailyMovements.mockResolvedValue(
+        movements([
+          movementPoint('2026-06-13', {
+            isTradingDay: false,
+            movement: null,
+            movementPercent: null,
+            complete: false,
+            reasons: ['notTradingDay'],
+          }),
+        ]),
+      );
+      renderView();
+
+      await waitFor(() => expect(mockGetDailyMovements).toHaveBeenCalled());
+      const saturday = cell('06/13/2026');
+      expect(within(saturday).queryByTestId('calendar-change-figure')).toBeNull();
+      expect(within(saturday).queryByTestId('unknown-amount')).toBeNull();
+    });
+
+    it('leaves a zero-baseline day blank rather than unknown (example 5)', async () => {
+      withLayers('dailyChange');
+      mockGetDailyMovements.mockResolvedValue(
+        movements([
+          movementPoint('2026-06-11', {
+            movementPercent: null,
+            complete: false,
+            reasons: ['zeroBaseline'],
+          }),
+        ]),
+      );
+      renderView();
+
+      await waitFor(() => expect(mockGetDailyMovements).toHaveBeenCalled());
+      const day = cell('06/11/2026');
+      expect(within(day).queryByTestId('calendar-change-figure')).toBeNull();
+      expect(within(day).queryByTestId('unknown-amount')).toBeNull();
+    });
+
+    it('marks an unpriced trading day unknown (example 6)', async () => {
+      withLayers('dailyChange');
+      mockGetDailyMovements.mockResolvedValue(
+        movements([
+          movementPoint('2026-06-11', {
+            movement: null,
+            movementPercent: null,
+            complete: false,
+            reasons: ['unpricedHolding'],
+          }),
+        ]),
+      );
+      renderView();
+
+      await waitFor(() =>
+        expect(within(cell('06/11/2026')).getByTestId('unknown-amount')).toBeInTheDocument(),
+      );
+      expect(within(cell('06/11/2026')).queryByTestId('calendar-change-figure')).toBeNull();
+    });
+
+    it('opens the breakdown for the day whose percentage was clicked', async () => {
+      withLayers('dailyChange');
+      mockGetDailyMovements.mockResolvedValue(movements([movementPoint('2026-06-11')]));
+      renderView();
+
+      fireEvent.click(
+        await within(cell('06/11/2026')).findByTestId('calendar-change-figure'),
+      );
+
+      await waitFor(() => expect(mockGetDailyMovementDetail).toHaveBeenCalled());
+      expect(mockGetDailyMovementDetail).toHaveBeenCalledWith({
+        date: '2026-06-11',
+        accountIds: 'brokerage-1',
+        displayCurrency: undefined,
+      });
+    });
+
+    it('asks nothing while the layer is off', async () => {
+      renderView();
+
+      await waitFor(() => expect(mockGetAllTransactionPages).toHaveBeenCalled());
+      expect(mockGetDailyMovements).not.toHaveBeenCalled();
+    });
+
+    it('leaves the other layers intact when only the movements request fails', async () => {
+      withLayers('transactions', 'dailyChange');
+      mockGetAllTransactionPages.mockResolvedValue([brokerageRow()]);
+      mockGetDailyMovements.mockRejectedValue(new Error('offline'));
+      renderView();
+
+      expect(await screen.findByText(calendarNs.errors.movementsFailed)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /ABC/ })).toBeInTheDocument();
     });
   });
 });

@@ -6,9 +6,11 @@ import { MonthGrid } from '@/components/ui/MonthGrid';
 import { ReportError } from '@/components/reports/ReportError';
 import { CalendarBanner, type CalendarCause } from '@/components/calendar/CalendarBanner';
 import {
+  CalendarChangeFigure,
   CalendarDayCell,
   CalendarValueFigure,
 } from '@/components/calendar/CalendarDayCell';
+import { DailyMovementDialog } from '@/components/calendar/DailyMovementDialog';
 import {
   CalendarDayPanel,
   type CalendarDayValue,
@@ -20,6 +22,7 @@ import {
   useInvestmentCalendarMonthData,
 } from '@/hooks/useCalendarMonthData';
 import { useInvestmentDailyValues } from '@/hooks/useInvestmentDailyValues';
+import { useDailyMovements } from '@/hooks/useDailyMovements';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import {
   dedupeInvestmentLegs,
@@ -34,7 +37,7 @@ import type { Account, AccountType } from '@/types/account';
 import type { InvestmentTransaction } from '@/types/investment';
 import type { Transaction } from '@/types/transaction';
 
-const LAYERS = ['transactions', 'values'] as const;
+const LAYERS = ['transactions', 'values', 'dailyChange'] as const;
 
 interface InvestmentCalendarViewProps {
   /** Every account the page holds, for the cash chips' colours. */
@@ -82,6 +85,8 @@ export function InvestmentCalendarView({
 
   const [month, setMonth] = useState(() => monthOf(today));
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  /** The day whose gain/loss breakdown is open, if any. */
+  const [movementDate, setMovementDate] = useState<string | null>(null);
 
   const days = useMemo(() => monthGridDays(month, weekStartsOn), [month, weekStartsOn]);
   const gridStart = days[0];
@@ -113,6 +118,18 @@ export function InvestmentCalendarView({
     refreshKey,
   });
   const valuesReady = valuesOn && !values.isStale;
+
+  const changeOn = layers.includes('dailyChange');
+  const movements = useDailyMovements({
+    startDate: gridStart,
+    endDate: gridEnd,
+    today,
+    accountIds: brokerageAccountIds,
+    displayCurrency: foreignCurrency ?? undefined,
+    enabled: changeOn,
+    refreshKey,
+  });
+  const changeReady = changeOn && !movements.isStale;
 
   const accountsById = useMemo(() => {
     const map = new Map<string, CalendarAccount>();
@@ -242,10 +259,20 @@ export function InvestmentCalendarView({
         </div>
       )}
 
+      {changeOn && movements.error !== null && (
+        <div className="mb-3">
+          <ReportError message={t('errors.movementsFailed')} onRetry={movements.reload} />
+        </div>
+      )}
+
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         <div
           className="min-w-0 flex-1"
-          aria-busy={data.isLoading || (valuesOn && values.isLoading)}
+          aria-busy={
+            data.isLoading ||
+            (valuesOn && values.isLoading) ||
+            (changeOn && movements.isLoading)
+          }
           inert={!isActionable}
         >
           <MonthGrid
@@ -257,6 +284,7 @@ export function InvestmentCalendarView({
             labelledBy={monthLabelId}
             renderDay={(day) => {
               const point = valuesReady ? values.byDay.get(day.date) : undefined;
+              const movement = changeReady ? movements.byDay.get(day.date) : undefined;
               return (
                 <CalendarDayCell
                   day={day}
@@ -266,8 +294,18 @@ export function InvestmentCalendarView({
                   onEditTransaction={onEditCashTransaction}
                   onEditInvestment={onEditInvestment}
                   figure={
-                    point ? (
-                      <CalendarValueFigure point={point} currencyCode={reportingCurrency} />
+                    point || movement ? (
+                      <span className="flex items-baseline gap-1">
+                        {point && (
+                          <CalendarValueFigure point={point} currencyCode={reportingCurrency} />
+                        )}
+                        {movement && (
+                          <CalendarChangeFigure
+                            point={movement}
+                            onOpenDetail={setMovementDate}
+                          />
+                        )}
+                      </span>
                     ) : undefined
                   }
                 />
@@ -294,6 +332,13 @@ export function InvestmentCalendarView({
           </div>
         )}
       </div>
+
+      <DailyMovementDialog
+        date={movementDate}
+        accountIds={brokerageAccountIds}
+        displayCurrency={foreignCurrency ?? undefined}
+        onClose={() => setMovementDate(null)}
+      />
     </div>
   );
 }

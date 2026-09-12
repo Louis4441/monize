@@ -14,11 +14,12 @@ import {
   supportsAccruedInterest,
 } from '@/lib/investment-actions';
 import { isDailyValueComplete } from '@/hooks/useInvestmentDailyValues';
+import { gainLossColor } from '@/lib/format';
 import type { MonthGridDay } from '@/components/ui/MonthGrid';
 import type { CalendarDayRows } from '@/lib/calendar-rows';
 import type { DailyBalanceTotal } from '@/types/account';
 import type { DailyInvestmentValue } from '@/types/net-worth';
-import type { InvestmentTransaction } from '@/types/investment';
+import type { DailyMovementPoint, InvestmentTransaction } from '@/types/investment';
 import type { Transaction } from '@/types/transaction';
 
 interface CalendarDayCellProps {
@@ -277,5 +278,57 @@ export function CalendarValueFigure({
     >
       {formatCurrency(point.value, currencyCode)}
     </span>
+  );
+}
+
+/**
+ * The Daily change layer's figure for one day, as the cell prints it.
+ *
+ * Three renderings, and they never share markup (I3): a percentage, the unknown
+ * marker, or nothing at all. Which one is decided by `complete` and `reasons`,
+ * both the server's -- a weekend carries the previous close forward, so its
+ * arithmetic yields exactly zero and would otherwise be indistinguishable from a
+ * flat session (design decision 9).
+ *
+ * Exactly zero is neutral rather than green: `gainLossColor` calls a
+ * non-negative number a gain, which is right for a return and wrong for a
+ * session that did not move.
+ */
+export function CalendarChangeFigure({
+  point,
+  onOpenDetail,
+}: {
+  point: DailyMovementPoint;
+  onOpenDetail: (date: string) => void;
+}) {
+  const t = useTranslations('calendar');
+  const { formatPercent } = useNumberFormat();
+
+  // A day nothing held was priced on is blank: the market had no session to
+  // report, which is not a figure the reader is missing.
+  if (!point.isTradingDay) return null;
+
+  if (!point.complete) {
+    // No baseline to divide by is likewise blank rather than unknown: the day's
+    // movement is known, only the percentage is undefined.
+    if (point.reasons.includes('zeroBaseline')) return null;
+    return <UnknownAmount reason="noPrice" className="text-xs" />;
+  }
+
+  const percent = point.movementPercent;
+  if (percent === null) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpenDetail(point.date)}
+      aria-label={t('change.openDetail')}
+      data-testid="calendar-change-figure"
+      className={`rounded px-0.5 text-xs font-medium tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+        percent === 0 ? 'text-gray-500 dark:text-gray-400' : gainLossColor(percent)
+      }`}
+    >
+      {formatPercent(percent)}
+    </button>
   );
 }

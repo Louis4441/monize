@@ -49,7 +49,9 @@
   "errors": {
     "monthFailed": "[XX-This month could not be loaded.-XX]",
     "balancesFailed": "[XX-Balances could not be loaded for this month.-XX]",
-    "valuesFailed": "[XX-Portfolio values could not be loaded for this month.-XX]"
+    "valuesFailed": "[XX-Portfolio values could not be loaded for this month.-XX]",
+    "movementsFailed": "[XX-Daily changes could not be loaded for this month.-XX]",
+    "movementDetailFailed": "[XX-This day's breakdown could not be loaded.-XX]"
   },
   "balance": {
     "actualTitle": "[XX-Balance at end of day-XX]",
@@ -65,5 +67,24 @@
     "title": "[XX-Portfolio value-XX]",
     "unpriced": "[XX-No price is available for {securities} on this day, so the value is not shown. Add a price on the security's Price history, or refresh prices.-XX]",
     "missingRates": "[XX-No exchange rate for {pairs} on this day, so the value is not shown. Open Currencies and refresh the rates.-XX]"
+  },
+  "change": {
+    "openDetail": "[XX-Show what moved on this day-XX]",
+    "detailTitle": "[XX-What moved on {date}-XX]",
+    "headline": "[XX-Market movement-XX]",
+    "headlineValue": "[XX-{amount} ({percent})-XX]",
+    "gains": "[XX-Gains-XX]",
+    "losses": "[XX-Losses-XX]",
+    "unchanged": "[XX-{count, plural, one {# security closed unchanged.} other {# securities closed unchanged.}}-XX]",
+    "remainder": "[XX-Cash, distributions and trades-XX]",
+    "row": "[XX-{quantity} shares, {from} to {to} {currency}-XX]",
+    "reasons": {
+      "notTradingDay": "[XX-Nothing held was priced on this day, so there was no session to report.-XX]",
+      "unpricedHolding": "[XX-A holding had no price on this day or the one before it, so the movement is unknown.-XX]",
+      "missingRate": "[XX-An exchange rate was missing, so the movement could not be converted.-XX]",
+      "flowIncomplete": "[XX-A deposit or withdrawal on this day could not be converted, so the movement cannot be separated from it.-XX]",
+      "noPriorValue": "[XX-There is no earlier value to measure this day against.-XX]",
+      "zeroBaseline": "[XX-The portfolio was empty the day before, so there is no percentage to work out.-XX]"
+    }
   }
 }
