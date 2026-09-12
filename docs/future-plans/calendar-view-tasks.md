@@ -43,7 +43,7 @@ Every task is safe to merge in any order that respects its dependencies: the end
 | F6 | Phone layout, keyboard navigation and screen-reader pass across both calendars | F3, F5, F7 | inert | [x] |
 | Q1 | `calendar.guard.test.ts` + the `ui-conventions.test.ts` month-grid block | F1 | none | [x] |
 | Q2 | Backend integration suites `calendar-read-models.integration.spec.ts` and `calendar-day-notes.integration.spec.ts` | B1, B3, B4 | none | [x] |
-| Q3 | Playwright `tests/calendar.spec.ts` | F3, F5, F7 | none | [ ] |
+| Q3 | Playwright `tests/calendar.spec.ts` | F3, F5, F7 | none | [x] |
 | Q4 | Full-locale i18n pass (acceptance, final commit) | all above | none | [ ] |
 | M1 | Migrate `app/bills/page.tsx` and `UpcomingBillsReport.tsx` onto `MonthGrid`; shrink the baseline | F1, Q1 | neutral | [ ] (optional, separate proposal) |
 | R1 | Report: `investments-daily.value` should be `null` on an unpriced day (design 6.2) | B2 | none | [ ] (report only; not built here) |

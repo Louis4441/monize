@@ -289,6 +289,27 @@ export function createInvestmentTransaction(
   });
 }
 
+export interface CreatedSecurityPrice {
+  id: number;
+  priceDate: string;
+  closePrice: number;
+}
+
+// A manual close for one day. The calendar's Daily change layer reads the
+// closes dated a day to decide whether that day was a trading day at all, so a
+// spec about it has to put the prices on the days it means -- a BUY alone leaves
+// only its own transaction-derived close.
+export function createSecurityPrice(
+  api: ApiClient,
+  securityId: string,
+  data: { priceDate: string; closePrice: number },
+): Promise<CreatedSecurityPrice> {
+  return api.post<CreatedSecurityPrice>(`/securities/${securityId}/prices`, {
+    priceDate: data.priceDate,
+    closePrice: data.closePrice,
+  });
+}
+
 export interface CreatedBudget {
   id: string;
   name: string;
