@@ -136,6 +136,7 @@ INV-LOAN-002's entry names the missing source scan while its row said `--`.
 | INV-DISPATCH-004 delivery failure never surfaces | **required** | -- | -- | -- | -- | required | -- | -- |
 | INV-RLS-001 role privilege | supporting | -- | **required** | -- | required | -- | -- | -- |
 | INV-CACHE-001 cache invalidation | required | **required** | -- | -- | -- | -- | -- | required |
+| INV-DAYNOTE-001 one note per day | supporting | -- | required | **required** (not yet met) | -- | -- | -- | optional |
 | INV-PAYEE-001 lookup never overwrites | **required** | supporting | optional | optional | -- | -- | -- | -- |
 | INV-PAYEE-002 Google Places monthly cap | optional | supporting | **required** | -- | -- | -- | -- | -- |
 | INV-RELEASE-001 one revision | required | -- | -- | -- | -- | -- | -- | workflow self-test |

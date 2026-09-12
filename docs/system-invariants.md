@@ -3386,10 +3386,12 @@ Failure response    two saves of the same day serialize; the later body wins and
 Required tests      Present: calendar-day-notes.service.spec.ts asserts the
                     statement is one INSERT naming the constraint;
                     calendar-day-note.contract.spec.ts holds the length limit
-                    across the constant, the DTO and the column CHECK.
-                    Missing: a two-connection integration test that two
-                    concurrent upserts of one day leave one row (task Q2 of the
-                    calendar plan).
+                    across the constant, the DTO and the column CHECK. Both are
+                    supporting -- a unit spec sees the SQL, never the race.
+                    Missing: the PG integration test that the constraint exists
+                    and the upsert round-trips, and the two-connection test that
+                    two concurrent upserts of one day leave one row. Task Q2 of
+                    the calendar plan owes both.
 Status              enforced
 ```
 
