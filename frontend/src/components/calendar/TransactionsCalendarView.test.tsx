@@ -777,4 +777,89 @@ describe('TransactionsCalendarView', () => {
       expect(screen.getByRole('grid')).toBeInTheDocument();
     });
   });
+  describe('on a phone, and for a keyboard', () => {
+    /** Answer every media query as a viewport of this width. */
+    function viewport(width: number) {
+      window.matchMedia = vi.fn().mockImplementation((query: string) => {
+        const max = /max-width:\s*(\d+)px/.exec(query);
+        return {
+          matches: max ? width <= Number(max[1]) : false,
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(),
+        };
+      });
+    }
+
+    it('opens the day over the month at 400px, and beside it at 1280px', async () => {
+      viewport(400);
+      const narrow = renderView();
+      await waitFor(() => expect(mockGetAllPages).toHaveBeenCalled());
+      fireEvent.click(cell('06/10/2026'));
+
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+      narrow.unmount();
+
+      viewport(1280);
+      renderView();
+      await waitFor(() => expect(mockGetAllPages).toHaveBeenCalled());
+      fireEvent.click(cell('06/10/2026'));
+
+      expect(
+        await screen.findByRole('complementary', { name: '06/10/2026' }),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('counts what a phone cell cannot label', async () => {
+      viewport(400);
+      mockGetAllPages.mockResolvedValue([
+        transaction({ id: 'tx-1' }),
+        transaction({ id: 'tx-2' }),
+      ]);
+      renderView();
+
+      await screen.findAllByRole('button', { name: /Grocer/ });
+      // The dots say what kind; the count says how many, which is the part a
+      // row of dots cannot carry.
+      expect(within(cell('06/10/2026')).getByText('2')).toBeInTheDocument();
+    });
+
+    it('puts focus back on the day when the panel closes', async () => {
+      viewport(1280);
+      renderView();
+      await waitFor(() => expect(mockGetAllPages).toHaveBeenCalled());
+
+      const day = cell('06/10/2026');
+      fireEvent.click(day);
+      const panel = await screen.findByRole('complementary', { name: '06/10/2026' });
+
+      await act(async () => {
+        fireEvent.click(within(panel).getByRole('button', { name: 'Close' }));
+      });
+
+      expect(cell('06/10/2026')).toHaveFocus();
+    });
+
+    it('marks the grid busy while a month is loading, and not after', async () => {
+      let resolveRows: (rows: Transaction[]) => void = () => {};
+      mockGetAllPages.mockImplementationOnce(
+        () => new Promise<Transaction[]>((resolve) => { resolveRows = resolve; }),
+      );
+      renderView();
+
+      const grid = await screen.findByRole('grid');
+      expect(grid.parentElement).toHaveAttribute('aria-busy', 'true');
+
+      await act(async () => {
+        resolveRows([transaction()]);
+      });
+
+      expect(grid.parentElement).toHaveAttribute('aria-busy', 'false');
+    });
+  });
 });

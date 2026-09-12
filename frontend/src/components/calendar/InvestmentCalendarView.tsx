@@ -1,8 +1,8 @@
 'use client';
 
-import { useId, useMemo, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { MonthGrid } from '@/components/ui/MonthGrid';
+import { MonthGrid, type MonthGridHandle } from '@/components/ui/MonthGrid';
 import { ReportError } from '@/components/reports/ReportError';
 import { CalendarBanner, type CalendarCause } from '@/components/calendar/CalendarBanner';
 import {
@@ -88,6 +88,7 @@ export function InvestmentCalendarView({
 
   const [month, setMonth] = useState(() => monthOf(today));
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const gridRef = useRef<MonthGridHandle>(null);
   /** The day whose gain/loss breakdown is open, if any. */
   const [movementDate, setMovementDate] = useState<string | null>(null);
 
@@ -240,6 +241,20 @@ export function InvestmentCalendarView({
     return { point, currencyCode: reportingCurrency, securityLabels };
   }, [valuesReady, selectedDate, values.byDay, reportingCurrency, securityLabels]);
 
+  /**
+   * Close the day panel and put focus back where it came from.
+   *
+   * A panel opened from a cell took focus with it; dropping focus on the
+   * document instead would make a keyboard reader start the month again.
+   */
+  const closePanel = useCallback(() => {
+    const returningTo = selectedDate;
+    notes.requestChange(() => {
+      setSelectedDate(null);
+      if (returningTo !== null) gridRef.current?.focusDay(returningTo);
+    });
+  }, [notes, selectedDate]);
+
   const isActionable = !data.isLoading && !data.isStale && data.error === null;
 
   if (data.error !== null && data.data === null) {
@@ -296,6 +311,7 @@ export function InvestmentCalendarView({
           inert={!isActionable}
         >
           <MonthGrid
+            ref={gridRef}
             month={month}
             weekStartsOn={weekStartsOn}
             today={today}
@@ -355,7 +371,7 @@ export function InvestmentCalendarView({
               onEditInvestment={onEditInvestment}
               createLabel={t('day.newInvestmentTransaction')}
               onCreateOnDay={onCreateOnDay}
-              onClose={() => notes.requestChange(() => setSelectedDate(null))}
+              onClose={closePanel}
               categoryColorMap={EMPTY_CATEGORY_MAP}
               categoryIconMap={EMPTY_CATEGORY_MAP}
               categoryLabelMap={EMPTY_CATEGORY_LABELS}

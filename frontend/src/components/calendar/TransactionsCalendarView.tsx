@@ -1,8 +1,8 @@
 'use client';
 
-import { useId, useMemo, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { MonthGrid } from '@/components/ui/MonthGrid';
+import { MonthGrid, type MonthGridHandle } from '@/components/ui/MonthGrid';
 import { ReportError } from '@/components/reports/ReportError';
 import { CalendarBanner, type CalendarCause } from '@/components/calendar/CalendarBanner';
 import { CalendarBalanceFigure, CalendarDayCell } from '@/components/calendar/CalendarDayCell';
@@ -85,6 +85,7 @@ export function TransactionsCalendarView({
 
   const [month, setMonth] = useState(() => monthOf(today));
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const gridRef = useRef<MonthGridHandle>(null);
 
   const days = useMemo(() => monthGridDays(month, weekStartsOn), [month, weekStartsOn]);
   const gridStart = days[0];
@@ -253,6 +254,20 @@ export function TransactionsCalendarView({
   }, [balancesReady, selectedDate, balances.byDay, balanceCurrency, forecast]);
 
   // Stale data may stay on screen; it may not stay actionable.
+  /**
+   * Close the day panel and put focus back where it came from.
+   *
+   * A panel opened from a cell took focus with it; dropping focus on the
+   * document instead would make a keyboard reader start the month again.
+   */
+  const closePanel = useCallback(() => {
+    const returningTo = selectedDate;
+    notes.requestChange(() => {
+      setSelectedDate(null);
+      if (returningTo !== null) gridRef.current?.focusDay(returningTo);
+    });
+  }, [notes, selectedDate]);
+
   const isActionable = !data.isLoading && !data.isStale && data.error === null;
 
   if (data.error !== null && data.data === null) {
@@ -301,6 +316,7 @@ export function TransactionsCalendarView({
           inert={!isActionable}
         >
           <MonthGrid
+            ref={gridRef}
             month={month}
             weekStartsOn={weekStartsOn}
             today={today}
@@ -346,7 +362,7 @@ export function TransactionsCalendarView({
               }
               onEditTransaction={onEditTransaction}
               onCreateOnDay={onCreateOnDay}
-              onClose={() => notes.requestChange(() => setSelectedDate(null))}
+              onClose={closePanel}
               categoryColorMap={categoryColorMap}
               categoryIconMap={categoryIconMap}
               categoryLabelMap={categoryLabelMap}

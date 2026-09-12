@@ -117,9 +117,10 @@ export function CalendarDayCell({
         </p>
       )}
 
-      {/* Below sm the chips are dots: a phone cell has no room for a label,
-          and the day panel is the reading surface there. */}
-      <div className="sm:hidden flex flex-wrap gap-0.5" aria-hidden="true">
+      {/* Below sm the chips are dots and a count: a phone cell has no room for
+          a label, and the day panel is the reading surface there. The count is
+          what keeps a day with six items from reading like a day with three. */}
+      <div className="sm:hidden flex flex-wrap items-center gap-0.5" aria-hidden="true">
         {shownInvestments.map((chip) => (
           <span key={chip.key} className={`h-1.5 w-1.5 rounded-full ${chip.className}`} />
         ))}
@@ -132,6 +133,11 @@ export function CalendarDayCell({
             className={`h-1.5 w-1.5 rounded-full border border-dashed border-current ${chip.className}`}
           />
         ))}
+        {total > 0 && (
+          <span className="ml-0.5 text-[10px] leading-none text-gray-500 dark:text-gray-400">
+            {total}
+          </span>
+        )}
       </div>
 
       <div className="hidden sm:flex flex-col gap-0.5">

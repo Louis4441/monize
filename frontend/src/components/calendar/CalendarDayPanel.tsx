@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { ClockIcon, ExclamationTriangleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
 import { CARD_CLASS, HOVER_ROW_ON_CARD } from '@/components/ui/Card';
+import { useIsBelowDesktop } from '@/hooks/useIsMobile';
 import { CategoryPill } from '@/components/transactions/CategoryPill';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
 import { BalanceForecastUnavailable } from '@/components/accounts/shared/BalanceForecastUnavailable';
@@ -99,6 +101,10 @@ export function CalendarDayPanel({
   const t = useTranslations('calendar');
   const common = useTranslations('common');
   const { formatDate } = useDateFormat();
+  // Below `lg` there is no column to put a panel in, so the day opens over the
+  // month as a dialog: focus is trapped, Escape closes, and the grid is not
+  // left half-covered by a card the reader has to scroll past.
+  const asDialog = useIsBelowDesktop();
   const { formatCurrency } = useNumberFormat();
   const payeeDisplay = usePayeeDisplay();
   const actionInfo = useInvestmentActionInfo();
@@ -107,8 +113,11 @@ export function CalendarDayPanel({
   const occurrences = rows?.occurrences ?? [];
   const investments = rows?.investments ?? [];
 
-  return (
-    <aside className={`${CARD_CLASS} p-4`} aria-label={formatDate(date)}>
+  const body = (
+    <aside
+      className={asDialog ? 'p-1' : `${CARD_CLASS} p-4`}
+      aria-label={formatDate(date)}
+    >
       <div className="mb-3 flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
           {formatDate(date)}
@@ -256,6 +265,14 @@ export function CalendarDayPanel({
         {createLabel ?? t('day.newTransaction')}
       </Button>
     </aside>
+  );
+
+  if (!asDialog) return body;
+
+  return (
+    <Modal isOpen onClose={onClose} maxWidth="lg" padding="md">
+      {body}
+    </Modal>
   );
 }
 
