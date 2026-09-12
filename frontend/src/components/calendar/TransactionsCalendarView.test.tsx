@@ -7,7 +7,11 @@ import { useViewModeStore } from '@/store/viewModeStore';
 import { ACCOUNT_TYPE_META } from '@/lib/account-type-meta';
 import { SCHEDULED_KIND_CHIP_CLASSES } from '@/lib/scheduled-kind';
 import { TransactionStatus, type Transaction } from '@/types/transaction';
-import type { Account } from '@/types/account';
+import type {
+  Account,
+  DailyBalanceTotal,
+  DailyBalanceTotalsResponse,
+} from '@/types/account';
 import type {
   ScheduledOccurrence,
   ScheduledTransaction,
@@ -41,6 +45,13 @@ const mockGetOccurrences = vi.fn();
 vi.mock('@/lib/scheduled-transactions', () => ({
   scheduledTransactionsApi: {
     getOccurrences: (...args: unknown[]) => mockGetOccurrences(...args),
+  },
+}));
+
+const mockGetDailyBalanceTotals = vi.fn();
+vi.mock('@/lib/accounts', () => ({
+  accountsApi: {
+    getDailyBalanceTotals: (...args: unknown[]) => mockGetDailyBalanceTotals(...args),
   },
 }));
 
@@ -98,6 +109,51 @@ function occurrence(overrides: Partial<ScheduledOccurrence> = {}): ScheduledOccu
   };
 }
 
+/**
+ * A daily-balance-totals response covering the June 2026 grid.
+ *
+ * The days it carries are only the ones a test asserts on: a day the response
+ * does not mention draws no figure, which is the fifth state the layer has.
+ */
+function balanceTotals(
+  overrides: Partial<DailyBalanceTotalsResponse> = {},
+): DailyBalanceTotalsResponse {
+  return {
+    startDate: '2026-05-31',
+    endDate: '2026-07-04',
+    today: TODAY,
+    currencyCode: 'CAD',
+    days: [],
+    forecast: { complete: true, gaps: [], unforecastableAccountIds: [] },
+    scopeEmpty: false,
+    ...overrides,
+  };
+}
+
+function balanceDay(
+  date: string,
+  overrides: Partial<DailyBalanceTotal> = {},
+): DailyBalanceTotal {
+  return {
+    date,
+    total: 100,
+    knownSubtotal: 100,
+    isProjected: false,
+    missingRatePairs: [],
+    ...overrides,
+  };
+}
+
+/** The store state a test needs for the Balances layer to be on. */
+function withBalancesLayer() {
+  useViewModeStore.setState({
+    surfaces: {
+      transactions: { view: 'calendar', layers: ['transactions', 'balances'] },
+      investments: { view: 'table', layers: ['transactions'] },
+    },
+  });
+}
+
 const onEditTransaction = vi.fn();
 const onCreateOnDay = vi.fn();
 
@@ -131,6 +187,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockGetAllPages.mockResolvedValue([]);
   mockGetOccurrences.mockResolvedValue([]);
+  mockGetDailyBalanceTotals.mockResolvedValue(balanceTotals());
   useViewModeStore.setState({
     surfaces: {
       transactions: { view: 'calendar', layers: ['transactions'] },
@@ -430,6 +487,185 @@ describe('TransactionsCalendarView', () => {
         screen.queryByText(calendarNs.banner.scheduledUnavailable),
       ).not.toBeInTheDocument();
       expect(screen.queryByText(calendarNs.banner.scheduledTruncated)).not.toBeInTheDocument();
+    });
+  });
+  describe('the balances layer', () => {
+    it('asks for the grid range with the account scope, and nothing else', async () => {
+      withBalancesLayer();
+      renderView();
+
+      await waitFor(() => expect(mockGetDailyBalanceTotals).toHaveBeenCalled());
+      expect(mockGetDailyBalanceTotals).toHaveBeenCalledWith({
+        startDate: '2026-05-31',
+        endDate: '2026-07-04',
+        accountIds: 'chequing-1,card-1',
+        displayCurrency: undefined,
+      });
+    });
+
+    it('asks nothing at all while the layer is off', async () => {
+      renderView();
+
+      await waitFor(() => expect(mockGetAllPages).toHaveBeenCalled());
+      expect(mockGetDailyBalanceTotals).not.toHaveBeenCalled();
+    });
+
+    it('prints a settled day as a plain figure (example 1)', async () => {
+      withBalancesLayer();
+      mockGetDailyBalanceTotals.mockResolvedValue(
+        balanceTotals({
+          days: [balanceDay('2026-06-15', { total: 2599.56, knownSubtotal: 2599.56 })],
+        }),
+      );
+      renderView();
+
+      const figure = await within(cell('06/15/2026')).findByTestId('calendar-balance-actual');
+      expect(figure).toHaveTextContent('$2599.56');
+      expect(figure.className).not.toContain('italic');
+    });
+
+    it('shows the unknown marker, not the partial sum, when a rate is missing (example 1)', async () => {
+      withBalancesLayer();
+      mockGetDailyBalanceTotals.mockResolvedValue(
+        balanceTotals({
+          days: [
+            balanceDay('2026-06-16', {
+              total: null,
+              knownSubtotal: 1234.56,
+              missingRatePairs: ['USD->CAD'],
+            }),
+          ],
+        }),
+      );
+      renderView();
+
+      const dayCell = cell('06/16/2026');
+      await waitFor(() =>
+        expect(within(dayCell).getByTestId('unknown-amount')).toBeInTheDocument(),
+      );
+      expect(dayCell).not.toHaveTextContent('1234.56');
+
+      fireEvent.click(dayCell);
+      const panel = await screen.findByRole('complementary', { name: '06/16/2026' });
+      expect(within(panel).getByText(/USD->CAD/)).toBeInTheDocument();
+      // The partial sum is allowed here, and only under a caption saying so.
+      expect(within(panel).getByText(/Partial: \$1234.56/)).toBeInTheDocument();
+    });
+
+    it('prints a projected day in italics with a clock marker (example 2)', async () => {
+      withBalancesLayer();
+      mockGetDailyBalanceTotals.mockResolvedValue(
+        balanceTotals({
+          days: [balanceDay('2026-06-19', { total: 3100, knownSubtotal: 3100, isProjected: true })],
+        }),
+      );
+      renderView();
+
+      const figure = await within(cell('06/19/2026')).findByTestId(
+        'calendar-balance-projected',
+      );
+      expect(figure).toHaveTextContent('$3100.00');
+      expect(figure.className).toContain('italic');
+      expect(within(figure).getByLabelText('Projected')).toBeInTheDocument();
+    });
+
+    it('reads projected off the response, never off the browser clock (I2)', async () => {
+      withBalancesLayer();
+      // The server calls 06/10 a projection; by the client's own `today` prop it
+      // is five days past. The cell follows the response.
+      mockGetDailyBalanceTotals.mockResolvedValue(
+        balanceTotals({
+          days: [balanceDay('2026-06-10', { isProjected: true })],
+        }),
+      );
+      renderView();
+
+      expect(
+        await within(cell('06/10/2026')).findByTestId('calendar-balance-projected'),
+      ).toBeInTheDocument();
+    });
+
+    it('withholds every projected day and names the schedule when a forecast is incomplete', async () => {
+      withBalancesLayer();
+      mockGetDailyBalanceTotals.mockResolvedValue(
+        balanceTotals({
+          days: [
+            balanceDay('2026-06-15', { total: 2600, knownSubtotal: 2600 }),
+            balanceDay('2026-06-19', { total: null, knownSubtotal: 0, isProjected: true }),
+          ],
+          forecast: {
+            complete: false,
+            gaps: [
+              {
+                scheduledTransactionId: 'st-rent',
+                name: 'Rent',
+                reason: 'crossCurrencyTransfer',
+                fromCurrency: 'USD',
+                toCurrency: 'CAD',
+              },
+            ],
+            unforecastableAccountIds: [],
+          },
+        }),
+      );
+      renderView();
+
+      // History is untouched by a withheld projection.
+      expect(
+        await within(cell('06/15/2026')).findByTestId('calendar-balance-actual'),
+      ).toHaveTextContent('$2600.00');
+      expect(within(cell('06/19/2026')).getByTestId('unknown-amount')).toBeInTheDocument();
+      expect(screen.getByText(/Rent/)).toBeInTheDocument();
+
+      fireEvent.click(cell('06/19/2026'));
+      const panel = await screen.findByRole('complementary', { name: '06/19/2026' });
+      expect(within(panel).getByTestId('balance-forecast-unavailable')).toBeInTheDocument();
+    });
+
+    it('says the scope is empty rather than drawing a month of nothing', async () => {
+      withBalancesLayer();
+      mockGetDailyBalanceTotals.mockResolvedValue(balanceTotals({ scopeEmpty: true }));
+      renderView({ scopeAccountIds: [] });
+
+      expect(
+        await screen.findByText(calendarNs.banner.balancesScopeEmpty),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId('calendar-balance-actual')).not.toBeInTheDocument();
+    });
+
+    it('leaves the transactions layer intact when only the balances request fails', async () => {
+      withBalancesLayer();
+      mockGetAllPages.mockResolvedValue([transaction()]);
+      mockGetDailyBalanceTotals.mockRejectedValue(new Error('offline'));
+      renderView();
+
+      expect(await screen.findByText(calendarNs.errors.balancesFailed)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Grocer/ })).toBeInTheDocument();
+      expect(screen.queryByText(calendarNs.errors.monthFailed)).not.toBeInTheDocument();
+
+      mockGetDailyBalanceTotals.mockResolvedValue(
+        balanceTotals({ days: [balanceDay('2026-06-15', { total: 2600 })] }),
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      expect(
+        await within(cell('06/15/2026')).findByTestId('calendar-balance-actual'),
+      ).toBeInTheDocument();
+    });
+
+    it('names every missing pair in the month once, in the banner', async () => {
+      withBalancesLayer();
+      mockGetDailyBalanceTotals.mockResolvedValue(
+        balanceTotals({
+          days: [
+            balanceDay('2026-06-16', { total: null, missingRatePairs: ['USD->CAD'] }),
+            balanceDay('2026-06-17', { total: null, missingRatePairs: ['USD->CAD'] }),
+          ],
+        }),
+      );
+      renderView();
+
+      const banner = await screen.findByText(/No exchange rate is available for USD->CAD/);
+      expect(banner).toBeInTheDocument();
     });
   });
 });

@@ -7,8 +7,10 @@ import { ClockIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { usePayeeDisplay } from '@/hooks/usePayeeDisplay';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
+import { balanceColor } from '@/lib/format';
 import type { MonthGridDay } from '@/components/ui/MonthGrid';
 import type { CalendarDayRows } from '@/lib/calendar-rows';
+import type { DailyBalanceTotal } from '@/types/account';
 import type { Transaction } from '@/types/transaction';
 
 interface CalendarDayCellProps {
@@ -140,5 +142,53 @@ export function CalendarDayCell({
         </button>
       )}
     </div>
+  );
+}
+
+/**
+ * The Balances layer's figure for one day, as the cell prints it.
+ *
+ * The number, the currency and the projected-or-actual decision are all the
+ * server's (design I2): this reads `total` and `isProjected` off the day it was
+ * handed and renders them. It never sums, converts, or compares a date with the
+ * browser's clock.
+ *
+ * A `null` total is the unknown marker, never `knownSubtotal` wearing a total's
+ * caption -- the partial sum has its own line in the day panel, where there is
+ * room to say it is partial.
+ */
+export function CalendarBalanceFigure({
+  point,
+  currencyCode,
+}: {
+  point: DailyBalanceTotal;
+  currencyCode: string;
+}) {
+  const t = useTranslations('calendar');
+  const { formatCurrency } = useNumberFormat();
+
+  if (point.total === null) {
+    // Which unknown this is decides which screen repairs it: a missing pair is
+    // a rate to add, an unpriceable projection is a schedule to look at.
+    return (
+      <UnknownAmount
+        reason={point.missingRatePairs.length > 0 ? 'displayFx' : 'scheduledFx'}
+        className="text-xs"
+      />
+    );
+  }
+
+  return (
+    <span
+      className={`inline-flex items-baseline gap-0.5 text-xs tabular-nums ${balanceColor(
+        point.total,
+      )} ${point.isProjected ? 'italic' : ''}`}
+      data-testid={point.isProjected ? 'calendar-balance-projected' : 'calendar-balance-actual'}
+    >
+      {point.isProjected && (
+        <ClockIcon className="w-3 h-3 shrink-0 self-center" aria-label={t('balance.projected')} />
+      )}
+      {formatCurrency(point.total, currencyCode)}
+    </span>
   );
 }

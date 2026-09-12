@@ -5,14 +5,18 @@ import { useTranslations } from 'next-intl';
 import { MonthGrid } from '@/components/ui/MonthGrid';
 import { ReportError } from '@/components/reports/ReportError';
 import { CalendarBanner, type CalendarCause } from '@/components/calendar/CalendarBanner';
-import { CalendarDayCell } from '@/components/calendar/CalendarDayCell';
-import { CalendarDayPanel } from '@/components/calendar/CalendarDayPanel';
+import { CalendarBalanceFigure, CalendarDayCell } from '@/components/calendar/CalendarDayCell';
+import {
+  CalendarDayPanel,
+  type CalendarDayBalance,
+} from '@/components/calendar/CalendarDayPanel';
 import { CalendarToolbar } from '@/components/calendar/CalendarToolbar';
 import {
   CALENDAR_MAX_ROWS,
   useCalendarMonthData,
   type CalendarRowFilters,
 } from '@/hooks/useCalendarMonthData';
+import { useDailyBalanceTotals } from '@/hooks/useDailyBalanceTotals';
 import {
   groupCalendarRows,
   type CalendarAccount,
@@ -28,7 +32,7 @@ import type { Transaction } from '@/types/transaction';
 /** How many chips a day cell draws before the rest become a "+N more" line. */
 export const CALENDAR_DAY_CHIP_LIMIT = 3;
 
-const LAYERS = ['transactions'] as const;
+const LAYERS = ['transactions', 'balances'] as const;
 
 interface TransactionsCalendarViewProps {
   accounts: readonly Account[];
@@ -84,6 +88,24 @@ export function TransactionsCalendarView({
   const gridEnd = days[days.length - 1];
 
   const data = useCalendarMonthData(gridStart, gridEnd, filters, refreshKey);
+
+  // The Balances layer is scoped by ACCOUNTS only: a balance filtered by
+  // category or payee would be the balance of a subset of the rows that moved
+  // it, which is not a balance of anything (design decision 2).
+  const balancesOn = layers.includes('balances');
+  const balances = useDailyBalanceTotals({
+    startDate: gridStart,
+    endDate: gridEnd,
+    accountIds: scopeAccountIds,
+    enabled: balancesOn,
+    refreshKey,
+  });
+  const balanceCurrency = balances.data?.currencyCode ?? null;
+  const forecast = balances.data?.forecast ?? null;
+  const scopeEmpty = balances.data?.scopeEmpty === true;
+  // A figure is drawn only while the layer is on, the response belongs to the
+  // month on screen, and the scope it describes holds an account.
+  const balancesReady = balancesOn && !balances.isStale && !scopeEmpty && balanceCurrency !== null;
 
   const accountsById = useMemo(() => {
     const map = new Map<string, CalendarAccount>();
@@ -162,8 +184,55 @@ export function TransactionsCalendarView({
         message: t('banner.scheduledTruncated'),
       });
     }
+
+    if (!balancesOn || balances.data === null) return found;
+
+    if (scopeEmpty) {
+      found.push({ key: 'balancesScopeEmpty', message: t('banner.balancesScopeEmpty') });
+      return found;
+    }
+
+    // Every pair the month could not price, named once rather than once per day:
+    // the same missing rate withholds every day it is needed on.
+    const pairs = [
+      ...new Set(balances.data.days.flatMap((day) => day.missingRatePairs)),
+    ].sort();
+    if (pairs.length > 0) {
+      found.push({
+        key: 'balancesMissingRates',
+        message: t('banner.balancesMissingRates', { pairs: pairs.join(', ') }),
+      });
+    }
+
+    if (!balances.data.forecast.complete) {
+      const names = balances.data.forecast.gaps.map((gap) => gap.name);
+      found.push({
+        key: 'balancesForecastGaps',
+        message:
+          names.length > 0
+            ? t('banner.balancesForecastGaps', { schedules: names.join(', ') })
+            : t('banner.balancesForecastWithheld'),
+      });
+    }
+
+    if (balances.data.forecast.unforecastableAccountIds.length > 0) {
+      found.push({
+        key: 'balancesUnforecastable',
+        message: t('banner.balancesUnforecastable', {
+          count: balances.data.forecast.unforecastableAccountIds.length,
+        }),
+      });
+    }
+
     return found;
-  }, [data.data, t]);
+  }, [data.data, balances.data, balancesOn, scopeEmpty, t]);
+
+  const selectedBalance = useMemo<CalendarDayBalance | undefined>(() => {
+    if (!balancesReady || selectedDate === null) return undefined;
+    const point = balances.byDay.get(selectedDate);
+    if (!point || balanceCurrency === null || forecast === null) return undefined;
+    return { point, currencyCode: balanceCurrency, forecast };
+  }, [balancesReady, selectedDate, balances.byDay, balanceCurrency, forecast]);
 
   // Stale data may stay on screen; it may not stay actionable.
   const isActionable = !data.isLoading && !data.isStale && data.error === null;
@@ -197,8 +266,20 @@ export function TransactionsCalendarView({
         </div>
       )}
 
+      {/* The Balances layer fails on its own terms: the rows and occurrences
+          below are unaffected by a balance request that did not answer. */}
+      {balancesOn && balances.error !== null && (
+        <div className="mb-3">
+          <ReportError message={t('errors.balancesFailed')} onRetry={balances.reload} />
+        </div>
+      )}
+
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-        <div className="min-w-0 flex-1" aria-busy={data.isLoading} inert={!isActionable}>
+        <div
+          className="min-w-0 flex-1"
+          aria-busy={data.isLoading || (balancesOn && balances.isLoading)}
+          inert={!isActionable}
+        >
           <MonthGrid
             month={month}
             weekStartsOn={weekStartsOn}
@@ -206,15 +287,23 @@ export function TransactionsCalendarView({
             selectedDate={selectedDate}
             onSelectDay={setSelectedDate}
             labelledBy={monthLabelId}
-            renderDay={(day) => (
-              <CalendarDayCell
-                day={day}
-                rows={layers.includes('transactions') ? byDay.get(day.date) : undefined}
-                chipLimit={CALENDAR_DAY_CHIP_LIMIT}
-                onOpenDay={setSelectedDate}
-                onEditTransaction={onEditTransaction}
-              />
-            )}
+            renderDay={(day) => {
+              const point = balancesReady ? balances.byDay.get(day.date) : undefined;
+              return (
+                <CalendarDayCell
+                  day={day}
+                  rows={layers.includes('transactions') ? byDay.get(day.date) : undefined}
+                  chipLimit={CALENDAR_DAY_CHIP_LIMIT}
+                  onOpenDay={setSelectedDate}
+                  onEditTransaction={onEditTransaction}
+                  figure={
+                    point && balanceCurrency !== null ? (
+                      <CalendarBalanceFigure point={point} currencyCode={balanceCurrency} />
+                    ) : undefined
+                  }
+                />
+              );
+            }}
           />
         </div>
 
@@ -223,6 +312,7 @@ export function TransactionsCalendarView({
             <CalendarDayPanel
               date={selectedDate}
               rows={layers.includes('transactions') ? byDay.get(selectedDate) : undefined}
+              balance={selectedBalance}
               onEditTransaction={onEditTransaction}
               onCreateOnDay={onCreateOnDay}
               onClose={() => setSelectedDate(null)}
