@@ -15,6 +15,22 @@ vi.mock('@/lib/auth', () => ({
   },
 }));
 
+// The rehydrate chain asks for the profile AND the delegation context in one
+// `Promise.all`, so mocking only the first leaves the second on the real
+// `apiClient`. In jsdom that is a real request to the environment's origin,
+// `http://localhost:3000` -- which on a machine running the dev stack is the
+// backend. It answers 401, the client's 401 interceptor calls `logout()`, and
+// the store loses `isAuthenticated` partway through whichever test is running
+// when the round trip lands. The suite passes on a machine with nothing on that
+// port and fails on a developer's, which is the worst way for a test to be
+// wrong.
+const rehydrateGetContextsMock = vi.fn();
+vi.mock('@/lib/delegation', () => ({
+  delegationApi: {
+    getContexts: rehydrateGetContextsMock,
+  },
+}));
+
 const clearShareInboxMock = vi.fn();
 vi.mock('@/lib/share-inbox', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/share-inbox')>()),
@@ -24,6 +40,16 @@ vi.mock('@/lib/share-inbox', async (importOriginal) => ({
 describe('authStore', () => {
   beforeEach(() => {
     rehydrateGetProfileMock.mockReset();
+    rehydrateGetContextsMock.mockReset();
+    // The default every rehydration test wants: a user with no delegations
+    // still gets a successful empty payload, and the chain's own `.catch`
+    // turns a failure into "no delegation context" rather than a logout.
+    rehydrateGetContextsMock.mockResolvedValue({
+      actingAsUserId: null,
+      contexts: [],
+      capabilities: null,
+      sections: null,
+    });
     // Reset store to initial state
     useAuthStore.setState({
       user: null,
@@ -202,6 +228,11 @@ describe('authStore', () => {
       expect(state.isAuthenticated).toBe(true);
       expect(state._hasHydrated).toBe(true);
       expect(useConnectionStore.getState().isBackendDown).toBe(true);
+      // The chain really went through the mocked delegation client. Drop that
+      // mock and the call leaves the process instead, which is invisible on a
+      // machine with nothing listening on the jsdom origin's port and a logout
+      // partway through a later test on one that has the dev stack up.
+      expect(rehydrateGetContextsMock).toHaveBeenCalled();
     });
 
     it('logs out on non-502 error during rehydration', async () => {
