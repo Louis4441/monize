@@ -3115,3 +3115,108 @@ describe("a segmented control wears the chrome in segmented-control.ts", () => {
     expect(LOCAL_DECL.test("const BUTTON_BASE = 'px-3 py-1';")).toBe(true);
   });
 });
+
+describe("a month grid is MonthGrid", () => {
+  /**
+   * `components/ui/MonthGrid.tsx` is the month layout: whole weeks from
+   * `monthGridDays`, `common.weekdaysMin` rotated to the reader's
+   * `weekStartsOn`, `role="grid"` with one roving tab stop, arrow keys,
+   * `aria-current="date"` on the day the SERVER calls today.
+   *
+   * A hand-rolled copy is not merely duplicated markup. The two that predate
+   * it hardcode Sunday as the week start, key their cells by a `Date` built
+   * from a calendar string (the last day of the previous month west of UTC),
+   * and expose no grid semantics at all, so a keyboard reader tabs through
+   * every day of the month one stop at a time. Each of those is invisible in
+   * the one timezone and the one locale CI runs in.
+   *
+   * The scan keys on an unprefixed `grid-cols-7`: seven columns with no
+   * responsive prefix is a week, and a week laid out outside `MonthGrid` is a
+   * second month grid being born. A responsive `lg:grid-cols-7` is a card
+   * shelf that happens to hold seven cards and is not caught.
+   */
+  const GRID = "/src/components/ui/MonthGrid.tsx";
+  const SEVEN_COLUMNS = /(?<![\w:-])grid-cols-7\b/;
+
+  /**
+   * The month grids that predate `MonthGrid`. Shrink-only: task M1 migrates
+   * both onto the shared grid, and migrating one means DELETING its line --
+   * the third test fails while a listed file no longer offends, so the list
+   * cannot outlive its subjects.
+   */
+  const BASELINE: ReadonlyArray<{ file: string; reason: string }> = [
+    {
+      file: "/src/components/bills/ScheduledCalendarGrid.tsx",
+      reason:
+        "the Bills & Deposits calendar and the Upcoming Bills widget; migrates in M1, which is also what retires its browser-side recurrence walk.",
+    },
+    {
+      file: "/src/components/reports/UpcomingBillsReport.tsx",
+      reason:
+        "the report's own calendar view, a third copy of the same markup; migrates in M1 onto ScheduledCalendarGrid's replacement.",
+    },
+  ];
+
+  /**
+   * Seven columns that are not a month, recorded as decisions rather than as
+   * debt: neither draws weeks of a month, so neither is the thing the rule is
+   * about.
+   */
+  const NOT_A_MONTH: ReadonlyArray<{ file: string; reason: string }> = [
+    {
+      file: "/src/components/ui/CalendarPopover.tsx",
+      reason:
+        "the date-entry popover behind DateInput. It picks one day rather than displaying a month of content, and it is the one grid a MonthGrid cell may itself sit beside.",
+    },
+    {
+      file: "/src/components/reports/WeekendVsWeekdayReport.tsx",
+      reason:
+        "seven weekday tiles under the chart -- one per day of the week, no month, no dates.",
+    },
+  ];
+
+  function filesWithSevenColumns(): string[] {
+    return productionSources()
+      .filter(([path]) => path !== GRID)
+      .filter(([, source]) => SEVEN_COLUMNS.test(withoutComments(source)))
+      .map(([path]) => path)
+      .sort();
+  }
+
+  it("has no second month grid outside the recorded baseline", () => {
+    const allowed = new Set([
+      ...BASELINE.map((entry) => entry.file),
+      ...NOT_A_MONTH.map((entry) => entry.file),
+    ]);
+
+    expect(
+      filesWithSevenColumns().filter((path) => !allowed.has(path)),
+      "Render the month through <MonthGrid> (components/ui/MonthGrid.tsx) and pass a renderDay.",
+    ).toEqual([]);
+  });
+
+  it("keeps the baseline shrink-only", () => {
+    const offending = new Set(filesWithSevenColumns());
+    expect(
+      [...BASELINE, ...NOT_A_MONTH]
+        .map((entry) => entry.file)
+        .filter((file) => !offending.has(file)),
+      "This file no longer lays out seven columns -- delete its line here.",
+    ).toEqual([]);
+  });
+
+  it("still finds the shared grid, so the rule cannot pass by accident", () => {
+    const grid = sources[GRID];
+    expect(grid, `${GRID} not found -- update GRID in this test`).toBeTruthy();
+    expect(SEVEN_COLUMNS.test(grid)).toBe(true);
+  });
+
+  it("catches a planted week and ignores a responsive seven-card shelf", () => {
+    expect(SEVEN_COLUMNS.test('<div className="grid grid-cols-7">')).toBe(true);
+    expect(SEVEN_COLUMNS.test("'lg:grid-cols-7',")).toBe(false);
+    expect(SEVEN_COLUMNS.test('<div className="md:grid-cols-7">')).toBe(false);
+    expect(
+      SEVEN_COLUMNS.test(withoutComments("// a second grid-cols-7 is the defect")),
+    ).toBe(false);
+  });
+});

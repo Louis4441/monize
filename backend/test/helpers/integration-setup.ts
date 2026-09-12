@@ -16,7 +16,11 @@ import { ScheduledTransactionOverrideService } from "@/scheduled-transactions/sc
 import { ScheduledTransactionLoanService } from "@/scheduled-transactions/scheduled-transaction-loan.service";
 import type { TypeOrmModuleOptions } from "@nestjs/typeorm";
 import * as bcrypt from "bcryptjs";
-import { applyRlsPolicies } from "./rls-setup";
+import {
+  applyRlsPolicies,
+  TEST_APP_ROLE,
+  TEST_APP_ROLE_PASSWORD,
+} from "./rls-setup";
 import { settlePendingPriceWrites } from "@/securities/security-price.service";
 
 /**
@@ -104,8 +108,26 @@ const SCHEDULED_TRANSACTIONS_INTERNALS: unknown[] = [
  * NetWorthService.triggerDebouncedRecalc is mocked to a no-op to prevent
  * timer leaks in tests.
  */
+export interface IntegrationModuleOptions {
+  /**
+   * Connection overrides merged over `INTEGRATION_TYPEORM_OPTIONS`. The one
+   * caller today is the enforcement harness below, which points the module at
+   * the unprivileged runtime role after an owner connection has built the
+   * schema.
+   */
+  typeOrmOptions?: Record<string, unknown>;
+  /**
+   * Whether to install the RLS objects on the module's own connection. Off for
+   * a connection that is not the table owner: `provisionAppRole` and the policy
+   * migrations are owner work, and a caller that passes `false` has already
+   * done it on the owner connection.
+   */
+  applyRls?: boolean;
+}
+
 export async function createIntegrationModule(
   modules: any[],
+  { typeOrmOptions = {}, applyRls = true }: IntegrationModuleOptions = {},
 ): Promise<TestingModule> {
   if (!SCHEDULED_TRANSACTIONS_EXPORTS.includes(ScheduledTransactionsService)) {
     // A floor on the derivation: an empty or unrecognisable metadata read would
@@ -119,7 +141,10 @@ export async function createIntegrationModule(
     imports: [
       ConfigModule.forRoot({ isGlobal: true }),
       TestI18nModule,
-      TypeOrmModule.forRoot(INTEGRATION_TYPEORM_OPTIONS),
+      TypeOrmModule.forRoot({
+        ...INTEGRATION_TYPEORM_OPTIONS,
+        ...typeOrmOptions,
+      } as never),
       ...modules,
     ],
   })
@@ -152,7 +177,7 @@ export async function createIntegrationModule(
   // role + grants, RLS helper functions and policies, updated_at triggers (T1).
   // Policies ship without ENABLE, so this is inert for suites that do not opt
   // into enforcement -- see rls-setup.ts.
-  await applyRlsPolicies(module.get(DataSource));
+  if (applyRls) await applyRlsPolicies(module.get(DataSource));
 
   // Mock triggerDebouncedRecalc to prevent timer leaks.
   //
@@ -229,4 +254,87 @@ export async function createTestUserDirect(
     emailVerified: true,
   });
   return dataSource.manager.save(user);
+}
+
+/**
+ * A module whose services run against a database that is actually enforcing
+ * row-level security.
+ *
+ * Two connections, because production has two roles and one of them cannot do
+ * the other's job. `owner` builds the schema, installs the policies and the
+ * enable, and seeds -- it is the table owner, so RLS never filters it, which is
+ * what makes a fixture writable at all. The module's own connection is the
+ * unprivileged `monize_app` role, exactly as `RLS_MODE=enforce` configures the
+ * runtime, so every service call through `withScopedDb` is filtered by the same
+ * policies that ship.
+ *
+ * `RLS_MODE` is set to `enforce` for the harness's lifetime: at `off` no
+ * identity GUC is emitted, and a policied query from a role with no
+ * `app.current_user_id` returns zero rows -- a suite that forgot this reads as
+ * a scoping bug in every assertion at once.
+ *
+ * Seed through `owner`. A fixture written through the module's connection has
+ * to satisfy the same `WITH CHECK` the code under test does, which makes the
+ * fixture evidence of the thing it is meant to be independent of.
+ */
+export interface EnforcedIntegrationHarness {
+  module: TestingModule;
+  /** The table owner: builds the schema, seeds, cleans. Not filtered by RLS. */
+  owner: DataSource;
+  /** The module's connection, as the unprivileged runtime role. */
+  app: DataSource;
+  /** Closes both connections and restores `RLS_MODE`. */
+  close: () => Promise<void>;
+}
+
+export async function createEnforcedIntegrationModule(
+  modules: any[],
+): Promise<EnforcedIntegrationHarness> {
+  const owner = new DataSource({
+    ...INTEGRATION_TYPEORM_OPTIONS,
+  } as never);
+  await owner.initialize();
+  await applyRlsPolicies(owner, { includeEnable: true });
+
+  const previousMode = process.env.RLS_MODE;
+  process.env.RLS_MODE = "enforce";
+
+  let module: TestingModule;
+  try {
+    module = await createIntegrationModule(modules, {
+      typeOrmOptions: {
+        username: TEST_APP_ROLE,
+        password: TEST_APP_ROLE_PASSWORD,
+        // The owner connection above already built the schema and dropped the
+        // previous one. A second synchronize would race it, and the runtime
+        // role has no privilege to do either.
+        synchronize: false,
+        dropSchema: false,
+      },
+      applyRls: false,
+    });
+  } catch (err) {
+    restoreRlsMode(previousMode);
+    await owner.destroy();
+    throw err;
+  }
+
+  return {
+    module,
+    owner,
+    app: module.get(DataSource),
+    close: async () => {
+      await module.close();
+      restoreRlsMode(previousMode);
+      if (owner.isInitialized) await owner.destroy();
+    },
+  };
+}
+
+function restoreRlsMode(previous: string | undefined): void {
+  if (previous === undefined) {
+    delete process.env.RLS_MODE;
+  } else {
+    process.env.RLS_MODE = previous;
+  }
 }

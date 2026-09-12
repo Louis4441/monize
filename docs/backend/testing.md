@@ -54,6 +54,12 @@ CI runs `test:unit` and `test:integration` (filtered to `test/integration/*.spec
 
 Repair them or delete them -- what they must not stay is present, cited, and dead. Do not add `test:e2e` to CI until the three are fixed; it will be red.
 
+## An integration suite that wants RLS enforced needs two connections
+
+`createIntegrationModule(modules)` builds the schema as the table **owner**, and the owner bypasses row-level security -- so a suite built that way observes each service's own `WHERE user_id = $1` and nothing about the policies. `createEnforcedIntegrationModule(modules)` (`test/helpers/integration-setup.ts`) is the opt-in: the owner connection it returns as `owner` builds the schema, applies the policies **and** the enable migration, and seeds; the module's own connection is the unprivileged `monize_app` role, exactly as `RLS_MODE=enforce` configures the runtime, and the mode is set for the harness's lifetime and restored by `close()`.
+
+Two rules follow. Seed through `owner`: a fixture written through the module's connection has to satisfy the same `WITH CHECK` as the code under test, which makes the fixture evidence of the thing it was meant to be independent of. And assert once, early, that the harness is actually enforcing -- a query outside any scoped transaction must return zero rows. At `RLS_MODE=off` no identity GUC is emitted and every policied query returns nothing, which reads as a scoping bug in every assertion at once rather than as a misconfigured suite; the floor assertion says which it is. `calendar-read-models.integration.spec.ts` is the pattern.
+
 ## Testing Conventions
 
 Mock repositories use `Record<string, jest.Mock>`; tests use `Test.createTestingModule` with mocks injected via `getRepositoryToken()`. E2E tests live in `test/` with helpers under `test/helpers/` (`auth-helper.ts`, `test-database.ts`, `test-factories.ts`).

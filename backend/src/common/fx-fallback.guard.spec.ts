@@ -119,9 +119,13 @@ describe("currency conversion has no silent identity fallback", () => {
       const lines = readFileSync(file, "utf8").split("\n");
       for (const [index, line] of lines.entries()) {
         if (!RETURNS_INPUT.test(line)) continue;
-        const context = lines.slice(Math.max(0, index - 8), index + 1).join("\n");
+        const context = lines
+          .slice(Math.max(0, index - 8), index + 1)
+          .join("\n");
         if (!CONVERSION.test(context) || !ABSENT_RESULT.test(context)) continue;
-        (allowed.has(rel) ? allowedHits : offenders).push(`${rel}:${index + 1}`);
+        (allowed.has(rel) ? allowedHits : offenders).push(
+          `${rel}:${index + 1}`,
+        );
       }
     }
 
