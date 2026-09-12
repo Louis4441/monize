@@ -7,6 +7,11 @@ import { JsonbHandlerName } from "./support-backup-jsonb";
  * them, so the registry can be split across more than one file as it grows
  * without either half importing the other. `support-backup-rules.ts`
  * re-exports these names, so every existing import site is unchanged.
+ *
+ * `drop` writes NULL, so it is for a nullable column only: on a NOT NULL column
+ * with no default it produces a row the restore cannot insert, and
+ * `support-backup-rules.spec.ts` fails on one. Use `konst(...)` there, with a
+ * value the column's own `CHECK` accepts.
  */
 export type ColumnRule =
   | { t: "keep" } // structure, dates, enums, flags, FKs, public reference values

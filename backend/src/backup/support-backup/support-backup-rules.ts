@@ -64,13 +64,18 @@ export const RULES: Record<string, TableRules> = {
   },
   // A note is the user's own writing about their own day: whatever they put in
   // it, a support copy has no use for the text and every reason not to carry
-  // it. Dropped, not masked -- a masked note would still say how long it was
-  // and which days carried one, which is the same disclosure made quieter.
+  // it. Replaced whole, not masked -- a masked note would still say how long it
+  // was and which days carried one, which is the same disclosure made quieter.
+  //
+  // `konst`, not `drop`: the column is NOT NULL and
+  // `ck_calendar_day_notes_body_length` refuses an empty string, so a null (or
+  // a "") is a row no restore can insert, and a support backup restores through
+  // the same path as any other.
   calendar_day_notes: {
     id: keep,
     user_id: keep,
     note_date: keep,
-    body: drop,
+    body: konst("***"), // NOT NULL, CHECK char_length >= 1
     created_at: keep,
     updated_at: keep,
   },
@@ -415,7 +420,7 @@ export const RULES: Record<string, TableRules> = {
     document_type: keep, // a factsheet is a factsheet
     name: mask, // the user's own wording, and it can name them
     document_date: keep,
-    url: drop, // an address can identify the holder or the account it came from
+    url: konst(""), // NOT NULL; an address can identify the holder or the account it came from
     notes: drop, // free text
     created_at: keep,
     updated_at: keep,

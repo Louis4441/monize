@@ -355,8 +355,11 @@ all three.
 Backup: an export query (`SELECT * FROM calendar_day_notes WHERE user_id = $1
 ORDER BY note_date`) in `backend/src/backup/export-table-queries.ts`, a
 `restore-plan.ts` entry (`scopeToUser: true`, after `users`), and a
-`support-backup-rules.ts` allowlist with `body: drop` and everything else
-`keep`; the support-backup golden test fails until that decision is made.
+`support-backup-rules.ts` allowlist with everything `keep` except `body`; the
+support-backup golden test fails until that decision is made. `body` is
+`konst("***")` rather than `drop`: the column is NOT NULL with a minimum-length
+`CHECK`, and a support backup restores through the same path as any other, so a
+null there is a row no restore can insert.
 
 Module `backend/src/calendar/` (`calendar.module.ts`,
 `entities/calendar-day-note.entity.ts`, `calendar-day-notes.controller.ts`,

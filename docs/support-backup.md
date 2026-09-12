@@ -44,6 +44,15 @@ Starting from the same rows the normal export produces, the support backup:
   rewritten. `decimal_places` is kept: it is the arithmetic, and changing it
   would alter what every amount means in a file whose purpose is reproducing a
   calculation.
+- **Replaces a NOT NULL column rather than dropping it**: `drop` writes NULL,
+  which on a NOT NULL column with no default is a row the restore's `INSERT`
+  cannot take -- and `ON CONFLICT DO NOTHING` does not absorb a constraint
+  violation, so one such row aborts the whole restore transaction. The
+  de-identified form of such a column is `konst(...)`, and the value has to
+  satisfy the column's own `CHECK` too (`calendar_day_notes.body` is
+  `konst("***")`, not `konst("")`, because its `CHECK` refuses an empty
+  string). `support-backup-rules.spec.ts` scans `schema.sql` and fails a `drop`
+  on any NOT NULL column that has no default.
 - **Keeps masked values unique** on every UNIQUE column: masking is not
   injective (short values collapse to all-asterisks, e.g. tickers `AAPL`/`MSFT`
   both become `****`, and any two values sharing their first/last two characters
