@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act, within } from '@/test/render';
+import { CALENDAR_MAX_PER_SCHEDULE } from '@/hooks/useCalendarMonthData';
 import { TransactionsCalendarView } from './TransactionsCalendarView';
+import calendarNs from '@/i18n/messages/en/calendar.json';
 import { useViewModeStore } from '@/store/viewModeStore';
 import { ACCOUNT_TYPE_META } from '@/lib/account-type-meta';
 import { SCHEDULED_KIND_CHIP_CLASSES } from '@/lib/scheduled-kind';
@@ -148,7 +150,10 @@ describe('TransactionsCalendarView', () => {
       endDate: '2026-07-04',
       accountIds: ['chequing-1', 'card-1'],
     });
-    expect(mockGetOccurrences).toHaveBeenCalledWith({ through: '2026-07-04' });
+    expect(mockGetOccurrences).toHaveBeenCalledWith({
+      through: '2026-07-04',
+      maxPerSchedule: CALENDAR_MAX_PER_SCHEDULE,
+    });
   });
 
   describe('the transactions layer', () => {
@@ -380,6 +385,51 @@ describe('TransactionsCalendarView', () => {
 
       expect(screen.getByRole('button', { name: /Julys row/ })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Junes row/ })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('the scheduled half', () => {
+    it('draws the month and names the gap when only the occurrences fail', async () => {
+      // The occurrence endpoint refuses a `through` beyond five years, which
+      // the toolbar's next-month button reaches. The register's rows arrived,
+      // so a blank month with a retry button would hide what the reader asked
+      // for -- and silence would read as "nothing is due".
+      mockGetAllPages.mockResolvedValue([transaction()]);
+      mockGetOccurrences.mockRejectedValue(new Error('through is beyond the horizon'));
+
+      renderView();
+
+      await waitFor(() =>
+        expect(screen.getByText(calendarNs.banner.scheduledUnavailable)).toBeInTheDocument(),
+      );
+      expect(screen.getByRole('grid')).toBeInTheDocument();
+      expect(screen.queryByText(calendarNs.errors.monthFailed)).not.toBeInTheDocument();
+    });
+
+    it('says so when the per-schedule cap cut a schedule short of the grid', async () => {
+      mockGetAllPages.mockResolvedValue([]);
+      mockGetOccurrences.mockResolvedValue(
+        Array.from({ length: CALENDAR_MAX_PER_SCHEDULE }, () => occurrence()),
+      );
+
+      renderView();
+
+      await waitFor(() =>
+        expect(screen.getByText(calendarNs.banner.scheduledTruncated)).toBeInTheDocument(),
+      );
+    });
+
+    it('stays quiet when every schedule came back whole', async () => {
+      mockGetAllPages.mockResolvedValue([]);
+      mockGetOccurrences.mockResolvedValue([occurrence()]);
+
+      renderView();
+
+      await waitFor(() => expect(screen.getByRole('grid')).toBeInTheDocument());
+      expect(
+        screen.queryByText(calendarNs.banner.scheduledUnavailable),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(calendarNs.banner.scheduledTruncated)).not.toBeInTheDocument();
     });
   });
 });

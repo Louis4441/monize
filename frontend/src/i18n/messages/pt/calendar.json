@@ -33,7 +33,9 @@
   },
   "banner": {
     "title": "Alguns valores não são mostrados",
-    "rowCap": "Este mês contém {count} transações, mais do que as {limit} que um calendário pode mostrar. Restrinja os filtros para as ver."
+    "rowCap": "Este mês contém {count} transações, mais do que as {limit} que um calendário pode mostrar. Restrinja os filtros para as ver.",
+    "scheduledUnavailable": "Nao foi possivel carregar os itens agendados deste mes. As linhas mostradas estao completas; faltam as agendadas.",
+    "scheduledTruncated": "Alguns itens agendados nao sao mostrados tao a frente. Aproxime-se de hoje para ver todos."
   },
   "errors": {
     "monthFailed": "Não foi possível carregar este mês."

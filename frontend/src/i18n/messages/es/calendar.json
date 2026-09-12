@@ -33,7 +33,9 @@
   },
   "banner": {
     "title": "Algunas cifras no se muestran",
-    "rowCap": "Este mes contiene {count} transacciones, más de las {limit} que puede mostrar un calendario. Acota los filtros para verlas."
+    "rowCap": "Este mes contiene {count} transacciones, más de las {limit} que puede mostrar un calendario. Acota los filtros para verlas.",
+    "scheduledUnavailable": "No se pudieron cargar los elementos programados de este mes. Las filas mostradas estan completas; faltan las programadas.",
+    "scheduledTruncated": "Algunos elementos programados no se muestran tan lejos en el futuro. Acerquese a hoy para verlos todos."
   },
   "errors": {
     "monthFailed": "No se pudo cargar este mes."

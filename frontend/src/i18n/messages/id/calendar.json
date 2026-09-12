@@ -33,7 +33,9 @@
   },
   "banner": {
     "title": "Beberapa angka tidak ditampilkan",
-    "rowCap": "Bulan ini memuat {count} transaksi, lebih dari {limit} yang dapat ditampilkan kalender. Persempit filter untuk melihatnya."
+    "rowCap": "Bulan ini memuat {count} transaksi, lebih dari {limit} yang dapat ditampilkan kalender. Persempit filter untuk melihatnya.",
+    "scheduledUnavailable": "Item terjadwal untuk bulan ini tidak dapat dimuat. Baris yang ditampilkan lengkap; yang terjadwal hilang.",
+    "scheduledTruncated": "Beberapa item terjadwal tidak ditampilkan sejauh ini ke depan. Mendekatlah ke hari ini untuk melihat semuanya."
   },
   "errors": {
     "monthFailed": "Bulan ini tidak dapat dimuat."

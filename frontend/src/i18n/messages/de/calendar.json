@@ -33,7 +33,9 @@
   },
   "banner": {
     "title": "Einige Zahlen werden nicht angezeigt",
-    "rowCap": "Dieser Monat enthält {count} Transaktionen, mehr als die {limit}, die ein Kalender anzeigen kann. Grenzen Sie die Filter ein, um sie zu sehen."
+    "rowCap": "Dieser Monat enthält {count} Transaktionen, mehr als die {limit}, die ein Kalender anzeigen kann. Grenzen Sie die Filter ein, um sie zu sehen.",
+    "scheduledUnavailable": "Geplante Eintraege konnten fuer diesen Monat nicht geladen werden. Die angezeigten Buchungen sind vollstaendig, die geplanten fehlen.",
+    "scheduledTruncated": "Einige geplante Eintraege werden so weit im Voraus nicht angezeigt. Wechseln Sie naeher zu heute, um alle zu sehen."
   },
   "errors": {
     "monthFailed": "Dieser Monat konnte nicht geladen werden."

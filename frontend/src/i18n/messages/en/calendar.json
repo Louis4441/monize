@@ -33,7 +33,9 @@
   },
   "banner": {
     "title": "Some figures are not shown",
-    "rowCap": "This month holds {count} transactions, more than the {limit} a calendar can show. Narrow the filters to see them."
+    "rowCap": "This month holds {count} transactions, more than the {limit} a calendar can show. Narrow the filters to see them.",
+    "scheduledUnavailable": "Scheduled items could not be loaded for this month. The rows shown are complete; the scheduled ones are missing.",
+    "scheduledTruncated": "Some scheduled items are not shown this far ahead. Move closer to today to see them all."
   },
   "errors": {
     "monthFailed": "This month could not be loaded."

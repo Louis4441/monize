@@ -33,7 +33,9 @@
   },
   "banner": {
     "title": "Một số con số không được hiển thị",
-    "rowCap": "Tháng này có {count} giao dịch, nhiều hơn {limit} mà lịch có thể hiển thị. Hãy thu hẹp bộ lọc để xem."
+    "rowCap": "Tháng này có {count} giao dịch, nhiều hơn {limit} mà lịch có thể hiển thị. Hãy thu hẹp bộ lọc để xem.",
+    "scheduledUnavailable": "Khong the tai cac muc da len lich cho thang nay. Cac dong hien thi la day du; cac muc da len lich bi thieu.",
+    "scheduledTruncated": "Mot so muc da len lich khong duoc hien thi xa den vay. Hay den gan hom nay hon de xem tat ca."
   },
   "errors": {
     "monthFailed": "Không thể tải tháng này."

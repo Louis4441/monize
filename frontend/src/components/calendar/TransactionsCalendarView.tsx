@@ -147,6 +147,21 @@ export function TransactionsCalendarView({
         }),
       });
     }
+    // A month that draws its rows but not its scheduled items says so here.
+    // Silence would read as "nothing is due", which is the one answer the
+    // calendar does not have.
+    if (data.data?.occurrencesUnavailable) {
+      found.push({
+        key: 'scheduledUnavailable',
+        message: t('banner.scheduledUnavailable'),
+      });
+    }
+    if (data.data?.occurrencesTruncated) {
+      found.push({
+        key: 'scheduledTruncated',
+        message: t('banner.scheduledTruncated'),
+      });
+    }
     return found;
   }, [data.data, t]);
 

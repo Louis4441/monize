@@ -33,7 +33,9 @@
   },
   "banner": {
     "title": "Niektóre kwoty nie są pokazane",
-    "rowCap": "Ten miesiąc zawiera {count} transakcji, więcej niż {limit}, które kalendarz może pokazać. Zawęź filtry, aby je zobaczyć."
+    "rowCap": "Ten miesiąc zawiera {count} transakcji, więcej niż {limit}, które kalendarz może pokazać. Zawęź filtry, aby je zobaczyć.",
+    "scheduledUnavailable": "Nie udalo sie zaladowac zaplanowanych pozycji na ten miesiac. Pokazane wiersze sa kompletne; brakuje zaplanowanych.",
+    "scheduledTruncated": "Niektore zaplanowane pozycje nie sa pokazywane tak daleko w przod. Przejdz blizej dzisiaj, aby zobaczyc wszystkie."
   },
   "errors": {
     "monthFailed": "Nie udało się wczytać tego miesiąca."

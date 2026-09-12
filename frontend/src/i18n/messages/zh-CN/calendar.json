@@ -33,7 +33,9 @@
   },
   "banner": {
     "title": "部分数字未显示",
-    "rowCap": "本月有 {count} 笔交易，超过日历可显示的 {limit} 笔。请缩小筛选范围以查看。"
+    "rowCap": "本月有 {count} 笔交易，超过日历可显示的 {limit} 笔。请缩小筛选范围以查看。",
+    "scheduledUnavailable": "无法加载本月的计划项目。显示的条目是完整的，但缺少计划项目。",
+    "scheduledTruncated": "这么远的未来不会显示部分计划项目。请靠近今天以查看全部。"
   },
   "errors": {
     "monthFailed": "无法加载本月。"

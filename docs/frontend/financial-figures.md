@@ -32,6 +32,8 @@ Every number a month grid shows is one the server already decided: a row's own `
 
 **A month that cannot be drawn says so.** Past `CALENDAR_MAX_ROWS` the layer is withheld with a banner naming the count and pointing at the filters, rather than drawn as a wall of chips the reader cannot read; a failed request renders the retryable error over the layer and never an empty month.
 
+**The scheduled half fails on its own terms.** The occurrence endpoint bounds two things the toolbar does not: `maxPerSchedule` (`CALENDAR_MAX_PER_SCHEDULE`, sent explicitly so the request and the truncation check share one number) caps each schedule from its next occurrence, so a daily schedule stops arriving a few months out; and `through` is refused beyond `OCCURRENCE_HORIZON_MAX_DAYS`, which the next-month button reaches. Neither withholds the month: the register's rows are the calendar's substance, so the occurrence request is caught on its own and its absence becomes a named banner cause (`banner.scheduledUnavailable`, `banner.scheduledTruncated`). Silence here would read as "nothing is due", which is the one answer the calendar does not have.
+
 ## A scheduled transaction has four kinds, not two -- `scheduledKind`
 
 `amount < 0` / `> 0` answers half the question: a **transfer** between own accounts is neither bill nor deposit, and exactly **zero** is a deliberate placeholder for an amount unknown until it arrives. A sign ternary paints the zero green, and a `!st.isTransfer` filter deleted a scheduled transfer from both calendars (issue #1124).

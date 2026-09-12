@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@/test/render';
 import {
+  CALENDAR_MAX_PER_SCHEDULE,
   CALENDAR_MAX_ROWS,
   calendarRequestKey,
   useCalendarMonthData,
@@ -31,9 +32,9 @@ function transaction(id: string): Transaction {
   } as Transaction;
 }
 
-function occurrence(dueDate: string): ScheduledOccurrence {
+function occurrence(dueDate: string, scheduleId = 'st-1'): ScheduledOccurrence {
   return {
-    scheduledTransactionId: 'st-1',
+    scheduledTransactionId: scheduleId,
     originalDate: dueDate,
     dueDate,
     amount: -10,
@@ -100,7 +101,10 @@ describe('useCalendarMonthData', () => {
       startDate: '2026-05-31',
       endDate: '2026-07-04',
     });
-    expect(mockGetOccurrences).toHaveBeenCalledWith({ through: '2026-07-04' });
+    expect(mockGetOccurrences).toHaveBeenCalledWith({
+      through: '2026-07-04',
+      maxPerSchedule: CALENDAR_MAX_PER_SCHEDULE,
+    });
   });
 
   it('drops an occurrence the endpoint returned from before the grid starts', async () => {
@@ -184,5 +188,79 @@ describe('useCalendarMonthData', () => {
 
     await waitFor(() => expect(mockGetAllPages).toHaveBeenCalledTimes(2));
     expect(result.current.requestKey).toBe(key);
+  });
+});
+
+describe('useCalendarMonthData scheduled items', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('keeps the month when only the scheduled half fails', async () => {
+    // The register's rows are the calendar's substance. A blank month with a
+    // retry button, when those rows arrived, hides what the reader asked for
+    // -- and the occurrence endpoint refuses a `through` beyond five years, so
+    // the toolbar's own next-month button reaches this.
+    mockGetAllPages.mockResolvedValue([transaction('t-1')]);
+    mockGetOccurrences.mockRejectedValue(new Error('through must be within 1830 days of today'));
+
+    const { result } = renderHook(() =>
+      useCalendarMonthData('2031-06-01', '2031-07-05', {}),
+    );
+
+    await waitFor(() => expect(result.current.data).not.toBeNull());
+    expect(result.current.error).toBeNull();
+    expect(result.current.data?.transactions).toHaveLength(1);
+    expect(result.current.data?.occurrences).toEqual([]);
+    expect(result.current.data?.occurrencesUnavailable).toBe(true);
+  });
+
+  it('reports a schedule the per-schedule cap cut short of the grid', async () => {
+    // The cap counts from each schedule's next occurrence, not from the month
+    // on screen, so a daily schedule stops arriving a few months out. Drawing
+    // that month with nothing on it and saying nothing is the defect.
+    mockGetAllPages.mockResolvedValue([]);
+    mockGetOccurrences.mockResolvedValue(
+      Array.from({ length: CALENDAR_MAX_PER_SCHEDULE }, (_, i) =>
+        occurrence(`2026-06-${String((i % 28) + 1).padStart(2, '0')}`),
+      ),
+    );
+
+    const { result } = renderHook(() =>
+      useCalendarMonthData('2026-06-01', '2026-07-05', {}),
+    );
+
+    await waitFor(() => expect(result.current.data).not.toBeNull());
+    expect(result.current.data?.occurrencesTruncated).toBe(true);
+  });
+
+  it('reports no truncation when a schedule came back under the cap', async () => {
+    mockGetAllPages.mockResolvedValue([]);
+    mockGetOccurrences.mockResolvedValue([occurrence('2026-06-10'), occurrence('2026-06-17')]);
+
+    const { result } = renderHook(() =>
+      useCalendarMonthData('2026-06-01', '2026-07-05', {}),
+    );
+
+    await waitFor(() => expect(result.current.data).not.toBeNull());
+    expect(result.current.data?.occurrencesTruncated).toBe(false);
+    expect(result.current.data?.occurrencesUnavailable).toBe(false);
+  });
+
+  it('reports no truncation when a capped schedule already reaches the grid end', async () => {
+    // At the cap but the last one lands on the grid's last day: nothing is
+    // missing from this month, so the banner must stay quiet.
+    mockGetAllPages.mockResolvedValue([]);
+    mockGetOccurrences.mockResolvedValue([
+      ...Array.from({ length: CALENDAR_MAX_PER_SCHEDULE - 1 }, () => occurrence('2026-06-10')),
+      occurrence('2026-07-05'),
+    ]);
+
+    const { result } = renderHook(() =>
+      useCalendarMonthData('2026-06-01', '2026-07-05', {}),
+    );
+
+    await waitFor(() => expect(result.current.data).not.toBeNull());
+    expect(result.current.data?.occurrencesTruncated).toBe(false);
   });
 });

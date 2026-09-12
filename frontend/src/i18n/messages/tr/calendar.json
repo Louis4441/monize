@@ -33,7 +33,9 @@
   },
   "banner": {
     "title": "Bazı tutarlar gösterilmiyor",
-    "rowCap": "Bu ay {count} işlem içeriyor, bir takvimin gösterebileceği {limit} işlemden fazla. Görmek için filtreleri daraltın."
+    "rowCap": "Bu ay {count} işlem içeriyor, bir takvimin gösterebileceği {limit} işlemden fazla. Görmek için filtreleri daraltın.",
+    "scheduledUnavailable": "Bu ayin planlanmis ogeleri yuklenemedi. Gosterilen satirlar eksiksiz; planlanmis olanlar eksik.",
+    "scheduledTruncated": "Bazi planlanmis ogeler bu kadar ileride gosterilmez. Hepsini gormek icin bugune yaklasin."
   },
   "errors": {
     "monthFailed": "Bu ay yüklenemedi."

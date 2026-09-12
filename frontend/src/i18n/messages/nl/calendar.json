@@ -33,7 +33,9 @@
   },
   "banner": {
     "title": "Sommige bedragen worden niet getoond",
-    "rowCap": "Deze maand bevat {count} transacties, meer dan de {limit} die een kalender kan tonen. Beperk de filters om ze te zien."
+    "rowCap": "Deze maand bevat {count} transacties, meer dan de {limit} die een kalender kan tonen. Beperk de filters om ze te zien.",
+    "scheduledUnavailable": "Geplande items voor deze maand konden niet worden geladen. De getoonde regels zijn volledig; de geplande ontbreken.",
+    "scheduledTruncated": "Sommige geplande items worden zo ver vooruit niet getoond. Ga dichter naar vandaag om ze allemaal te zien."
   },
   "errors": {
     "monthFailed": "Deze maand kon niet worden geladen."
