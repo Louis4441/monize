@@ -1,3 +1,5 @@
+import type { BalanceForecastGap } from './banking-detail';
+
 export type AccountType =
   | 'CHEQUING'
   | 'SAVINGS'
@@ -443,4 +445,53 @@ export interface AccountBalancesAsOfResponse {
    */
   approximatedDisplayRates: Record<string, string>;
   accounts: AccountBalanceAsOf[];
+}
+
+/** One day of GET /accounts/daily-balance-totals. */
+export interface DailyBalanceTotal {
+  date: string;
+  /**
+   * The scope's end-of-day total in the response's `currencyCode`, or `null`
+   * when any component is unknown.
+   *
+   * `null` is not zero and zero is not `null`: a scope of emptied accounts
+   * totals a known 0.00. Print the unknown marker for `null` and name the cause
+   * from `missingRatePairs` or `forecast`; never print `knownSubtotal` in its
+   * place without a caption that says it is partial.
+   */
+  total: number | null;
+  /** The components that WERE known. Equal to `total` when the total is known. */
+  knownSubtotal: number;
+  /**
+   * `date > today` as the SERVER decided it. Read this, never the browser
+   * clock: a reader west of the server rolls over hours later, and a cell that
+   * consults its own clock calls a settled day a projection.
+   */
+  isProjected: boolean;
+  /** `"USD->CAD"` for each pair with no rate on the day this total is priced at. */
+  missingRatePairs: string[];
+}
+
+/** GET /accounts/daily-balance-totals: one total per calendar day. */
+export interface DailyBalanceTotalsResponse {
+  startDate: string;
+  endDate: string;
+  /** The server's financial today; `isProjected` was decided from it. */
+  today: string;
+  /** The one currency every scoped account shares, else the display currency. */
+  currencyCode: string;
+  days: DailyBalanceTotal[];
+  forecast: {
+    /** False means `total` is withheld on EVERY projected day. */
+    complete: boolean;
+    /** The schedules behind an incomplete projection, unioned over the scope. */
+    gaps: BalanceForecastGap[];
+    /**
+     * Accounts in scope that could not be projected at all, with no schedule to
+     * blame -- today, a joint account, whose forecast belongs to its owner.
+     */
+    unforecastableAccountIds: string[];
+  };
+  /** No account matched the scope: render the layer's notice, not an empty month. */
+  scopeEmpty: boolean;
 }

@@ -28,7 +28,11 @@ import {
 } from "../securities/investment-replay.util";
 import { Security } from "../securities/entities/security.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
-import { convertWithRateLookup } from "../common/currency-conversion.util";
+import {
+  RateIndex,
+  buildRateIndex,
+  convertAtDate,
+} from "../common/time-series/rate-index.util";
 import { FxAggregate } from "../common/fx-aggregate";
 import { applyActionToQuantity } from "../securities/investment-replay.util";
 import { formatDateYMDLocal } from "../common/date-utils";
@@ -45,8 +49,6 @@ const LIABILITY_TYPES: AccountType[] = [
   AccountType.MORTGAGE,
   AccountType.LINE_OF_CREDIT,
 ];
-
-type RateIndex = Map<string, Array<{ date: string; rate: number }>>;
 
 /**
  * Joint accounts to include in a grantee's net worth (joint-accounts spec,
@@ -2472,37 +2474,19 @@ export class NetWorthService {
     return { stored, txFallback };
   }
 
-  private async buildRateIndex(
+  private buildRateIndex(
     currencies: Set<string>,
     defaultCurrency: string,
     startDate: string,
     endDate: string,
   ): Promise<RateIndex> {
-    if (currencies.size === 0) return new Map();
-
-    const currArr = Array.from(currencies);
-    const rates: any[] = await this.scopedQuery(
-      `SELECT from_currency, to_currency, rate, rate_date
-       FROM exchange_rates
-       WHERE ((from_currency = ANY($1::TEXT[]) AND to_currency = $2)
-           OR (from_currency = $2 AND to_currency = ANY($1::TEXT[])))
-         AND rate_date >= ($3::DATE - INTERVAL '90 days')
-         AND rate_date <= ($4::DATE + INTERVAL '31 days')
-       ORDER BY rate_date`,
-      [currArr, defaultCurrency, startDate, endDate],
+    return buildRateIndex(
+      (sql, params) => this.scopedQuery(sql, params as any[]),
+      currencies,
+      defaultCurrency,
+      startDate,
+      endDate,
     );
-
-    const index: RateIndex = new Map();
-    for (const r of rates) {
-      const key = `${r.from_currency}->${r.to_currency}`;
-      if (!index.has(key)) index.set(key, []);
-      index.get(key)!.push({
-        date: this.toDateString(r.rate_date),
-        rate: Number(r.rate),
-      });
-    }
-
-    return index;
   }
 
   /**
@@ -2511,10 +2495,12 @@ export class NetWorthService {
    *
    * `null`, not the amount unchanged: this used to end in `result ?? amount`,
    * which reported 1,000 USD as 1,000 EUR and left a consumer unable to tell
-   * that from a genuine 1:1 pair (audit P5-009). The direct/inverse decision
-   * lives in the shared `convertWithRateLookup` so reports and net worth cannot
-   * diverge on how a pair resolves. Callers accumulate through `FxAggregate`;
-   * see `docs/specs/fx-conversion-completeness.md`.
+   * that from a genuine 1:1 pair (audit P5-009). The direct/inverse decision,
+   * the as-of walk and the look-ahead fallback live in
+   * `common/time-series/rate-index.util.ts`, so this service and
+   * `DailyBalanceTotalsService` cannot diverge on how a pair resolves. Callers
+   * accumulate through `FxAggregate`; see
+   * `docs/specs/fx-conversion-completeness.md`.
    */
   private convertCurrency(
     amount: number,
@@ -2523,64 +2509,7 @@ export class NetWorthService {
     monthEnd: string,
     rateIndex: RateIndex,
   ): number | null {
-    // Zero converts to zero at any rate, so it needs none (and records no
-    // gap): an emptied account in a currency with no stored rates is a settled
-    // zero, not an unknowable value, and flagging it incomplete would report a
-    // question that was never open as one that could not be answered.
-    if (amount === 0) return 0;
-
-    const converted = convertWithRateLookup(amount, from, to, (f, t) => {
-      const rates = rateIndex.get(`${f}->${t}`);
-      return rates
-        ? this.findBestRate(rates, `${f}->${t}`, monthEnd)
-        : undefined;
-    });
-    if (converted === null) {
-      this.logger.warn(
-        `No exchange rate available for ${from}->${to} on or around ${monthEnd}; the affected total is reported as unknown rather than converted 1:1`,
-      );
-    }
-    return converted;
-  }
-
-  /**
-   * Rate arrays whose look-ahead fallback has already been logged. Keyed by the
-   * per-request array object in the RateIndex, so each pair warns once per
-   * computation instead of once per chart point.
-   */
-  private readonly lookAheadWarned = new WeakSet<
-    Array<{ date: string; rate: number }>
-  >();
-
-  private findBestRate(
-    rates: Array<{ date: string; rate: number }>,
-    pair: string,
-    beforeOrOn: string,
-  ): number | undefined {
-    let best: number | undefined;
-    for (const r of rates) {
-      if (r.date <= beforeOrOn) best = r.rate;
-      else break;
-    }
-    // No rate on or before this date: fall back to the earliest one there is.
-    //
-    // This is look-ahead -- valuing a point with a rate from its future -- and
-    // the time-series contract forbids it in general. It is kept deliberately
-    // (DR-02 in the audit): a chart point that predates the rate history is
-    // more useful approximated than absent. What is NOT acceptable is it being
-    // invisible, so it is logged below; changing the fallback itself is a
-    // product decision recorded in docs/specs/fx-conversion-completeness.md
-    // section 6.
-    if (best === undefined && rates.length > 0) {
-      if (!this.lookAheadWarned.has(rates)) {
-        this.lookAheadWarned.add(rates);
-        this.logger.warn(
-          `Valuation on or before ${beforeOrOn} predates the stored ${pair} rate history; using the earliest stored rate (look-ahead, DR-02)`,
-        );
-      }
-      best = rates[0].rate;
-    }
-    return best;
+    return convertAtDate(amount, from, to, monthEnd, rateIndex, this.logger);
   }
 
   private resolveStartDate(account: Account, earliest: any): string {

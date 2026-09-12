@@ -7,6 +7,8 @@ import { LoanPaymentDetectorService } from "./loan-payment-detector.service";
 import { LoanPaymentSetupService } from "./loan-payment-setup.service";
 import { StatementCycleService } from "./statement-cycle.service";
 import { BalanceForecastService } from "./balance-forecast.service";
+import { DailyBalanceTotalsService } from "./daily-balance-totals.service";
+import { DailyBalanceTotalsQueryDto } from "./dto/daily-balance-totals-query.dto";
 import { AccountBalancesReportService } from "./account-balances-report.service";
 import { DelegationService } from "../delegation/delegation.service";
 
@@ -16,6 +18,7 @@ describe("AccountsController", () => {
   let mockExportService: Partial<Record<keyof AccountExportService, jest.Mock>>;
   let mockStatementCycleService: Record<string, jest.Mock>;
   let mockBalanceForecastService: Record<string, jest.Mock>;
+  let mockDailyBalanceTotals: Record<string, jest.Mock>;
   let mockBalancesReport: Record<string, jest.Mock>;
   let mockDelegationService: Record<string, jest.Mock>;
   let mockCrossOwnerAccess: Record<string, jest.Mock>;
@@ -54,6 +57,10 @@ describe("AccountsController", () => {
 
     mockBalanceForecastService = {
       getBalanceForecast: jest.fn(),
+    };
+
+    mockDailyBalanceTotals = {
+      getDailyBalanceTotals: jest.fn(),
     };
 
     mockBalancesReport = {
@@ -106,6 +113,10 @@ describe("AccountsController", () => {
         {
           provide: BalanceForecastService,
           useValue: mockBalanceForecastService,
+        },
+        {
+          provide: DailyBalanceTotalsService,
+          useValue: mockDailyBalanceTotals,
         },
         {
           provide: AccountBalancesReportService,
@@ -732,6 +743,89 @@ describe("AccountsController", () => {
         [],
         [],
       );
+    });
+  });
+
+  describe("getDailyBalanceTotals()", () => {
+    const query = {
+      startDate: "2026-06-01",
+      endDate: "2026-06-30",
+    } as DailyBalanceTotalsQueryDto;
+
+    it("passes the requested scope through for an owner", async () => {
+      mockDailyBalanceTotals.getDailyBalanceTotals.mockResolvedValue("totals");
+
+      const result = await controller.getDailyBalanceTotals(mockReq, {
+        ...query,
+        accountIds: ["acc-1"],
+        displayCurrency: "CAD",
+      } as DailyBalanceTotalsQueryDto);
+
+      expect(result).toBe("totals");
+      expect(mockDailyBalanceTotals.getDailyBalanceTotals).toHaveBeenCalledWith(
+        "user-1",
+        "2026-06-01",
+        "2026-06-30",
+        ["acc-1"],
+        "CAD",
+        [],
+      );
+    });
+
+    it("widens an owner's scope with the joint accounts they were granted", async () => {
+      mockJointAccounts.jointAccountIdSetFor.mockResolvedValue(
+        new Set(["joint-1"]),
+      );
+      mockDailyBalanceTotals.getDailyBalanceTotals.mockResolvedValue("totals");
+
+      await controller.getDailyBalanceTotals(mockReq, query);
+
+      expect(mockDailyBalanceTotals.getDailyBalanceTotals).toHaveBeenCalledWith(
+        "user-1",
+        "2026-06-01",
+        "2026-06-30",
+        undefined,
+        undefined,
+        ["joint-1"],
+      );
+    });
+
+    it("narrows an acting delegate to their readable accounts", async () => {
+      mockDelegationService.readableAccountIds.mockResolvedValue([
+        "acc-1",
+        "acc-2",
+      ]);
+      mockDailyBalanceTotals.getDailyBalanceTotals.mockResolvedValue("totals");
+
+      await controller.getDailyBalanceTotals(
+        { user: { id: "owner-1", isActing: true, delegationId: "d-1" } },
+        {
+          ...query,
+          accountIds: ["acc-2", "acc-9"],
+        } as DailyBalanceTotalsQueryDto,
+      );
+
+      expect(mockDailyBalanceTotals.getDailyBalanceTotals).toHaveBeenCalledWith(
+        "owner-1",
+        "2026-06-01",
+        "2026-06-30",
+        ["acc-2"],
+        undefined,
+        [],
+      );
+    });
+
+    it("gives a delegate with no readable accounts an empty scope, never every account", async () => {
+      mockDelegationService.readableAccountIds.mockResolvedValue([]);
+      mockDailyBalanceTotals.getDailyBalanceTotals.mockResolvedValue("totals");
+
+      await controller.getDailyBalanceTotals(
+        { user: { id: "owner-1", isActing: true, delegationId: "d-1" } },
+        query,
+      );
+
+      const ids = mockDailyBalanceTotals.getDailyBalanceTotals.mock.calls[0][3];
+      expect(ids).toEqual(["00000000-0000-0000-0000-000000000000"]);
     });
   });
 

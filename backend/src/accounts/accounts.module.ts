@@ -17,6 +17,7 @@ import { AccountsController } from "./accounts.controller";
 import { MortgageReminderService } from "./mortgage-reminder.service";
 import { StatementCycleService } from "./statement-cycle.service";
 import { BalanceForecastService } from "./balance-forecast.service";
+import { DailyBalanceTotalsService } from "./daily-balance-totals.service";
 import { AccountBalancesReportService } from "./account-balances-report.service";
 import { CategoriesModule } from "../categories/categories.module";
 import { ScheduledTransactionsModule } from "../scheduled-transactions/scheduled-transactions.module";
@@ -69,6 +70,7 @@ import { NotificationCenterModule } from "../notification-center/notification-ce
     MortgageReminderService,
     StatementCycleService,
     BalanceForecastService,
+    DailyBalanceTotalsService,
     AccountBalancesReportService,
   ],
   controllers: [AccountsController],
@@ -76,6 +78,7 @@ import { NotificationCenterModule } from "../notification-center/notification-ce
     AccountsService,
     StatementCycleService,
     BalanceForecastService,
+    DailyBalanceTotalsService,
     AccountBalancesReportService,
   ],
 })

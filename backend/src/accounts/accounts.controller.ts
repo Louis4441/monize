@@ -40,8 +40,10 @@ import { LoanPaymentDetectorService } from "./loan-payment-detector.service";
 import { LoanPaymentSetupService } from "./loan-payment-setup.service";
 import { StatementCycleService } from "./statement-cycle.service";
 import { BalanceForecastService } from "./balance-forecast.service";
+import { DailyBalanceTotalsService } from "./daily-balance-totals.service";
 import { AccountBalancesReportService } from "./account-balances-report.service";
 import { CreateAccountDto } from "./dto/create-account.dto";
+import { DailyBalanceTotalsQueryDto } from "./dto/daily-balance-totals-query.dto";
 import { UpdateAccountDto } from "./dto/update-account.dto";
 import { ReorderFavouriteAccountsDto } from "./dto/reorder-favourite-accounts.dto";
 import { SetDelegateFavouriteDto } from "./dto/set-delegate-favourite.dto";
@@ -107,6 +109,13 @@ function sanitizeDateFormat(input: string | undefined): string | undefined {
   return stripped;
 }
 
+/**
+ * A UUID that cannot match any real account. An acting delegate with no
+ * readable accounts gets a naturally-empty, correctly-shaped answer instead of
+ * `undefined`, which every scope resolver reads as "all accounts".
+ */
+const NO_SCOPED_ACCOUNT = "00000000-0000-0000-0000-000000000000";
+
 @ApiTags("Accounts")
 @Controller("accounts")
 @UseGuards(AuthGuard("jwt"))
@@ -119,6 +128,7 @@ export class AccountsController {
     private readonly loanPaymentSetupService: LoanPaymentSetupService,
     private readonly statementCycleService: StatementCycleService,
     private readonly balanceForecastService: BalanceForecastService,
+    private readonly dailyBalanceTotalsService: DailyBalanceTotalsService,
     private readonly accountBalancesReport: AccountBalancesReportService,
     private readonly delegationService: DelegationService,
     private readonly crossOwnerAccess: CrossOwnerAccessService,
@@ -307,6 +317,65 @@ export class AccountsController {
       dto.excluded,
     );
     return { excluded: dto.excluded };
+  }
+
+  /**
+   * Declared before every `:id` route: "daily-balance-totals" is a literal path
+   * segment, and a `:id` route above it would swallow it as an account id.
+   */
+  @Get("daily-balance-totals")
+  @ApiOperation({
+    summary: "Get the scope's end-of-day total for every day of a date range",
+    description:
+      "One total per calendar day across the accounts in scope, in one " +
+      "currency: actual through the server's today, projected after it. " +
+      "Complements GET /accounts/daily-balances, which is per account, per " +
+      "account currency and history only.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Daily balance totals computed successfully",
+  })
+  @ApiResponse({ status: 401, description: "Unauthorized" })
+  @AllowDelegate()
+  async getDailyBalanceTotals(
+    @Request() req,
+    @Query() query: DailyBalanceTotalsQueryDto,
+  ) {
+    let ids = query.accountIds;
+    let jointIds: string[] = [];
+    if (req.user.isActing) {
+      // Restrict to the delegate's READ-granted accounts (never an
+      // unfiltered owner-wide query), exactly as daily-balances does.
+      const readable = await this.delegationService.readableAccountIds(
+        req.user.delegationId,
+      );
+      const readableSet = new Set(readable);
+      ids =
+        ids && ids.length > 0
+          ? ids.filter((id) => readableSet.has(id))
+          : readable;
+      if (ids.length === 0) ids = [NO_SCOPED_ACCOUNT];
+    } else {
+      // Own context: joint accounts participate exactly like own accounts.
+      // The set is what authorizes them -- the service widens its ownership
+      // predicate to these exact ids and nothing else.
+      const jointSet = await this.jointAccounts.jointAccountIdSetFor(
+        req.user.realUserId ?? req.user.id,
+      );
+      jointIds =
+        ids && ids.length > 0
+          ? ids.filter((id) => jointSet.has(id))
+          : [...jointSet];
+    }
+    return this.dailyBalanceTotalsService.getDailyBalanceTotals(
+      req.user.id,
+      query.startDate,
+      query.endDate,
+      ids,
+      query.displayCurrency,
+      jointIds,
+    );
   }
 
   @Get("daily-balances")
