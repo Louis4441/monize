@@ -52,7 +52,9 @@ npm run i18n:check         # Verify the pseudo-locale is up to date (CI gate)
 | Random id | `crypto.randomUUID()` | `Math.random()` |
 | Chart colour | `chartColors` tokens (`lib/chart-colors.ts`) | a hex literal in a `fill`, `stroke` or `stopColor` |
 | Widget title that opens the fuller view | `titleHref` on `WidgetCard`, `href` on `WidgetHeading` | a button or link hand-rolled around the heading |
-| Month grid of scheduled occurrences | `buildScheduledCalendarDays` + `ScheduledCalendarGrid` | a second month grid |
+| Month grid | `MonthGrid` + `monthGridDays` (`lib/calendar-month.ts`); occurrence placement stays `buildScheduledCalendarDays` + `ScheduledCalendarGrid` until the bills grid migrates | a third month grid, or a `Date` built from a calendar date |
+| Table / Calendar choice for a screen | `useViewMode(surface)` (`store/viewModeStore.ts`) and `ViewModeToggle` | a local `useState`, a second store or a URL parameter |
+| Segmented control (a pill of buttons, one pressed) | `SEGMENTED_GROUP_CLASS` + `segmentClass` (`components/ui/segmented-control.ts`) | a local `BUTTON_BASE`/`BUTTON_ACTIVE` trio, or the pressed classes inlined |
 | A dashboard widget's breakdown of the ledger | the report's own endpoint through `builtInReportsApi` | summing transactions in the widget |
 | Report refresh / export buttons | `ReportToolbarActions`, last child of the toolbar row | rendering `ExportDropdown` or `RefreshPricesButton` in a report |
 | Toolbar row on a phone | `flex-wrap`, `w-full sm:w-auto`, `sm:ml-auto`, a button's height from `items-stretch` + `LabelSpacer` | an unwrapped row, a bare `ml-auto`, a hand-matched padding |

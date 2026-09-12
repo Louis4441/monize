@@ -1,0 +1,10 @@
+{
+  "view": {
+    "label": "Tampilan",
+    "table": "Tabel",
+    "calendar": "Kalender"
+  },
+  "grid": {
+    "label": "Bulan"
+  }
+}
