@@ -64,6 +64,27 @@ describe('viewModeStore', () => {
     expect(result.current.layers).toEqual(['transactions']);
   });
 
+  it("refuses the other surface's layers at the call site, not silently at runtime", () => {
+    // The mechanism is `LayerOf<S>` on `toggleLayer` and `isLayerOn`. Without
+    // it both accept the flat `CalendarLayer` union, so asking the investments
+    // calendar for `balances` compiles and does nothing -- indistinguishable
+    // from a layer that refuses to switch on. The two directives below are the
+    // assertion: remove the narrowing and `type-check` fails on them as unused,
+    // before any of this runs. (Spelling that directive out in prose would make
+    // this comment one of them -- the source-scan rule in CLAUDE.md, in its
+    // compiler form.)
+    const { result } = renderHook(() => useViewMode('investments'));
+
+    act(() => {
+      // @ts-expect-error 'balances' is the transactions calendar's layer
+      result.current.toggleLayer('balances');
+    });
+
+    // @ts-expect-error 'balances' is the transactions calendar's layer
+    expect(result.current.isLayerOn('balances')).toBe(false);
+    expect(result.current.layers).toEqual(['transactions']);
+  });
+
   it('offers each surface only its own layers', () => {
     expect(SURFACE_LAYERS.transactions).not.toContain('dailyChange');
     expect(SURFACE_LAYERS.investments).not.toContain('balances');
