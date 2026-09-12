@@ -239,6 +239,7 @@
     "splitAmountMismatch": "विभाजित राशियाँ ({{ roundedSum }}) लेनदेन राशि ({{ roundedAmount }}) के बराबर होनी चाहिए",
     "currencyCodeMustBeString": "मुद्रा कोड एक स्ट्रिंग होना चाहिए",
     "currencyCodeInvalid": "मुद्रा कोड ठीक 3 अक्षरों का होना चाहिए (जैसे, USD, CAD)",
+    "calendarDateInvalid": "तिथि YYYY-MM-DD प्रारूप में एक वास्तविक कैलेंडर तिथि होनी चाहिए",
     "csrfMissing": "CSRF टोकन अनुपस्थित है",
     "csrfInvalid": "अमान्य CSRF टोकन",
     "demoModeRestricted": "यह क्रिया डेमो मोड में उपलब्ध नहीं है।",

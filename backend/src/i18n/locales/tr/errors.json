@@ -239,6 +239,7 @@
     "splitAmountMismatch": "Bölüm tutarları ({{ roundedSum }}) işlem tutarına ({{ roundedAmount }}) eşit olmalıdır",
     "currencyCodeMustBeString": "Para birimi kodu bir dize olmalıdır",
     "currencyCodeInvalid": "Para birimi kodu tam olarak 3 harf olmalıdır (ör. USD, TRY)",
+    "calendarDateInvalid": "Tarih, YYYY-AA-GG biçiminde gerçek bir takvim tarihi olmalıdır",
     "csrfMissing": "CSRF kodu eksik",
     "csrfInvalid": "Geçersiz CSRF kodu",
     "demoModeRestricted": "Bu işlem demo modunda kullanılamaz.",

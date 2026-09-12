@@ -2468,6 +2468,33 @@ CREATE UNIQUE INDEX idx_push_subscriptions_endpoint ON push_subscriptions(endpoi
 -- Every send starts with "which of this user's devices are still live".
 CREATE INDEX idx_push_subscriptions_user_live ON push_subscriptions(user_id) WHERE disabled_at IS NULL;
 
+-- ---------------------------------------------------------------------------
+-- Calendar day notes
+--
+-- One free-text note per user per calendar date, written and read from the
+-- calendar's day panel. Nothing financial reads it and it moves no money.
+--
+-- UNIQUE (user_id, note_date) is what makes the write a single statement: the
+-- upsert is INSERT ... ON CONFLICT DO UPDATE, so two saves of the same day
+-- cannot interleave and a save never has to read first. The CHECK is the same
+-- number as CALENDAR_DAY_NOTE_MAX_LENGTH on both layers;
+-- backend/src/common/calendar-day-note.contract.spec.ts fails when the three
+-- disagree.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE calendar_day_notes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    note_date DATE NOT NULL,
+    body TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_calendar_day_notes_user_date UNIQUE (user_id, note_date),
+    CONSTRAINT ck_calendar_day_notes_body_length CHECK (char_length(body) BETWEEN 1 AND 2000)
+);
+
+CREATE INDEX idx_calendar_day_notes_user_date ON calendar_day_notes(user_id, note_date);
+
 -- ===========================================================================
 -- Row-Level Security policies
 --
@@ -2500,6 +2527,7 @@ DECLARE
         'ai_usage_logs',
         'auto_backup_settings',
         'budgets',
+        'calendar_day_notes',
         'custom_reports',
         'gem_strategies',
         'gem_strategy_accounts',

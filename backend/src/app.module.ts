@@ -52,6 +52,7 @@ import { AiRelayModule } from "./ai/relay/ai-relay.module";
 import { McpModule } from "./mcp/mcp.module";
 import { OAuthModule } from "./oauth/oauth.module";
 import { BudgetsModule } from "./budgets/budgets.module";
+import { CalendarModule } from "./calendar/calendar.module";
 import { TagsModule } from "./tags/tags.module";
 import { LoanScenariosModule } from "./loan-scenarios/loan-scenarios.module";
 import { LoanRateChangesModule } from "./loan-rate-changes/loan-rate-changes.module";
@@ -164,6 +165,7 @@ import { I18nModule } from "./i18n/i18n.module";
     McpModule,
     OAuthModule,
     BudgetsModule,
+    CalendarModule,
     TagsModule,
     LoanScenariosModule,
     LoanRateChangesModule,

@@ -102,6 +102,18 @@ A slashless pattern matches only against the path relative to the build context,
 
 `db-migrate` runs at container start and the server after it, so "this build calls a SQL function" and "this database has it" are separate facts; the gap surfaces as `function ... does not exist` behind a generic 500. Every SQL function `src/` calls is declared once in `backend/src/common/db/required-db-functions.ts` with the migration that creates it, and both `main.ts` and `db-migrate` refuse to serve a database missing one. `required-db-functions.spec.ts` holds the list in both directions -- crucially, a function defined in `schema.sql` and mentioned anywhere in `src/` must be registered.
 
+## A day note is the calendar's only write, and it is owner-only by construction
+
+`CalendarModule` (`src/calendar/`) owns `calendar_day_notes`: one free-text note per user per date, written and read from the calendar's day panel. It imports nothing and exports only its own service, because nothing financial reads it -- which is also why a save drops no balance cache and the client keeps it under its own `calendar:` prefix.
+
+Three decisions are load-bearing:
+
+- **The write is one statement.** `INSERT ... ON CONFLICT (user_id, note_date) DO UPDATE`, inside `withScopedDb`, with `userId` from the JWT. Not a convenience: a read-then-decide would let two saves of the same day interleave, and the second would either lose the first or fail on a unique constraint it did not expect. The constraint is the mechanism; the statement is how it is used.
+- **A blank body is a 400, never a delete.** Deleting is its own verb. Inferring it from an empty field would make an accidentally cleared textarea destroy the note on save. `DELETE` is idempotent instead: removing a note from a day that holds none succeeds, because a 404 there describes a state the caller asked for and already has.
+- **The routes are not `@AllowDelegate`.** A note is the owner's own writing about their own day; sharing it with a delegate is a separate product decision nobody has made. The decorator is absent rather than unused, so the client hiding the section is not the only thing keeping it private, and `calendar-day-notes.controller.spec.ts` fails if one is ever applied.
+
+`:date` is validated by `ParseCalendarDatePipe` (`common/pipes/parse-calendar-date.pipe.ts`), the counterpart of `ParseUUIDPipe` for a resource keyed by its day: a shape check alone accepts `2100-02-29`, which reaches Postgres as a date literal and fails there as a 500. The body's length is `CALENDAR_DAY_NOTE_MAX_LENGTH`, mirrored on the frontend and carried as a `CHECK` on the column; `calendar-day-note.contract.spec.ts` fails when any two of the three disagree. The table is in the RLS **Direct** bucket and needs no entry in any map in `docs/row-level-security-contract.md` -- the uniform policy covers it, shipped with its own `ENABLE` in its own migration.
+
 ## Environment
 
 Key env vars (see `.env.example` for full list):

@@ -239,6 +239,7 @@
     "splitAmountMismatch": "Jumlah pembagian ({{ roundedSum }}) harus sama dengan jumlah transaksi ({{ roundedAmount }})",
     "currencyCodeMustBeString": "Kode mata uang harus berupa string",
     "currencyCodeInvalid": "Kode mata uang harus tepat 3 huruf (mis., USD, CAD)",
+    "calendarDateInvalid": "Tanggal harus berupa tanggal kalender yang benar dalam format YYYY-MM-DD",
     "csrfMissing": "Token CSRF tidak ada",
     "csrfInvalid": "Token CSRF tidak valid",
     "demoModeRestricted": "Tindakan ini tidak tersedia dalam mode demo.",

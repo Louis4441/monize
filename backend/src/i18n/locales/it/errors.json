@@ -239,6 +239,7 @@
     "splitAmountMismatch": "Gli importi delle suddivisioni ({{ roundedSum }}) devono essere uguali all'importo della transazione ({{ roundedAmount }})",
     "currencyCodeMustBeString": "Il codice valuta deve essere una stringa",
     "currencyCodeInvalid": "Il codice valuta deve essere esattamente di 3 lettere (es. USD, CAD)",
+    "calendarDateInvalid": "La data deve essere una data di calendario reale nel formato AAAA-MM-GG",
     "csrfMissing": "Token CSRF mancante",
     "csrfInvalid": "Token CSRF non valido",
     "demoModeRestricted": "Questa azione non è disponibile in modalità demo.",

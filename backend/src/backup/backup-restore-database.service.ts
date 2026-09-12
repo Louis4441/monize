@@ -296,6 +296,14 @@ export class BackupRestoreDatabaseService {
     // Categories
     await manager.query("DELETE FROM categories WHERE user_id = $1", [userId]);
 
+    // Calendar day notes: no child rows and no foreign key but `users`, so the
+    // order relative to the rest does not matter -- only that it is cleared at
+    // all, or the insert's ON CONFLICT DO NOTHING would keep the destination's
+    // note and silently drop the archive's.
+    await manager.query("DELETE FROM calendar_day_notes WHERE user_id = $1", [
+      userId,
+    ]);
+
     // User preferences and auto-backup settings
     await manager.query("DELETE FROM auto_backup_settings WHERE user_id = $1", [
       userId,

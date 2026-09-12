@@ -239,6 +239,7 @@
     "splitAmountMismatch": "Splitsingsbedragen ({{ roundedSum }}) moeten gelijk zijn aan het transactiebedrag ({{ roundedAmount }})",
     "currencyCodeMustBeString": "Valutacode moet een tekenreeks zijn",
     "currencyCodeInvalid": "Valutacode moet precies 3 letters zijn (bijv. USD, CAD)",
+    "calendarDateInvalid": "De datum moet een bestaande kalenderdatum in JJJJ-MM-DD-formaat zijn",
     "csrfMissing": "CSRF-token ontbreekt",
     "csrfInvalid": "Ongeldig CSRF-token",
     "demoModeRestricted": "Deze actie is niet beschikbaar in de demomodus.",

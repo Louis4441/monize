@@ -239,6 +239,7 @@
     "splitAmountMismatch": "拆分金额（{{ roundedSum }}）必须等于交易金额（{{ roundedAmount }}）",
     "currencyCodeMustBeString": "货币代码必须是字符串",
     "currencyCodeInvalid": "货币代码必须恰好是 3 个字母（例如：USD、CAD）",
+    "calendarDateInvalid": "日期必须是 YYYY-MM-DD 格式的真实日历日期",
     "csrfMissing": "缺少 CSRF 令牌",
     "csrfInvalid": "CSRF 令牌无效",
     "demoModeRestricted": "此操作在演示模式下不可用。",

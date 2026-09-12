@@ -67,6 +67,10 @@ const REFERENCE_DATA: ReadonlyArray<[string, string]> = [
     "the AI provider status -- whether this user has a provider that can answer a lookup at all. It follows the provider rows in Settings, which drop it themselves; a transaction cannot change it",
   ],
   [
+    'calendar:',
+    "the reader's own notes on calendar dates. A note moves no money and nothing financial reads it, so a transaction write cannot change one; its own writes drop it",
+  ],
+  [
     'payee-lookup:',
     "whether a payee contact lookup can run and which source would answer it -- the Google Places configuration and cap, plus whether an AI provider exists. Its own settings writes drop it, and so does every AI provider mutation, because the answer depends on both; a transaction cannot change it",
   ],

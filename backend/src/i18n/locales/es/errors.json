@@ -239,6 +239,7 @@
     "splitAmountMismatch": "Las cantidades de los desgloses ({{ roundedSum }}) deben ser iguales a la cantidad de la transacción ({{ roundedAmount }})",
     "currencyCodeMustBeString": "El código de divisa debe ser una cadena",
     "currencyCodeInvalid": "El código de divisa debe tener exactamente 3 letras (p. ej., USD, CAD)",
+    "calendarDateInvalid": "La fecha debe ser una fecha de calendario real en formato AAAA-MM-DD",
     "csrfMissing": "Falta el token CSRF",
     "csrfInvalid": "Token CSRF no válido",
     "demoModeRestricted": "Esta acción no está disponible en modo demo.",

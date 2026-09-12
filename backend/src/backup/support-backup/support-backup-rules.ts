@@ -1,4 +1,13 @@
-import { JsonbHandlerName } from "./support-backup-jsonb";
+import {
+  drop,
+  jsonb,
+  keep,
+  konst,
+  mask,
+  scale,
+  scaleQty,
+} from "./support-backup-rule-kinds";
+import { PLANNING_RULES } from "./support-backup-rules.planning";
 
 /**
  * Per-column de-identification rules for the support backup. This registry is
@@ -8,27 +17,12 @@ import { JsonbHandlerName } from "./support-backup-jsonb";
  * column this registry does not classify -- so a future migration cannot
  * silently start leaking a new field.
  */
-export type ColumnRule =
-  | { t: "keep" } // structure, dates, enums, flags, FKs, public reference values
-  | { t: "mask" } // free text / names: keep first+last 2 chars, star the middle
-  | { t: "drop" } // set to null (highest-risk free text, secrets, bulk blobs)
-  | { t: "const"; value: unknown } // fixed replacement for NOT NULL dropped fields
-  | { t: "scale" } // private money magnitude x M (4 dp)
-  | { t: "scaleQty" } // private quantity x M (8 dp)
-  | { t: "jsonb"; handler: JsonbHandlerName }; // per-key handler for a JSON blob
+// The rule kinds and their shorthands live in their own file so the registry
+// can be split without either half importing the other; re-exported here so
+// existing import sites are unchanged.
+export type { ColumnRule, TableRules } from "./support-backup-rule-kinds";
 
-const keep: ColumnRule = { t: "keep" };
-const mask: ColumnRule = { t: "mask" };
-const drop: ColumnRule = { t: "drop" };
-const scale: ColumnRule = { t: "scale" };
-const scaleQty: ColumnRule = { t: "scaleQty" };
-const konst = (value: unknown): ColumnRule => ({ t: "const", value });
-const jsonb = (handler: JsonbHandlerName): ColumnRule => ({
-  t: "jsonb",
-  handler,
-});
-
-export type TableRules = Record<string, ColumnRule>;
+import type { TableRules } from "./support-backup-rule-kinds";
 
 /**
  * Tables never written to a support backup regardless of section selection.
@@ -67,6 +61,18 @@ export const RULES: Record<string, TableRules> = {
     is_active: keep,
     created_by_user_id: keep,
     created_at: keep,
+  },
+  // A note is the user's own writing about their own day: whatever they put in
+  // it, a support copy has no use for the text and every reason not to carry
+  // it. Dropped, not masked -- a masked note would still say how long it was
+  // and which days carried one, which is the same disclosure made quieter.
+  calendar_day_notes: {
+    id: keep,
+    user_id: keep,
+    note_date: keep,
+    body: drop,
+    created_at: keep,
+    updated_at: keep,
   },
   user_preferences: {
     user_id: keep,
@@ -670,106 +676,10 @@ export const RULES: Record<string, TableRules> = {
     created_at: keep,
     updated_at: keep,
   },
-  monte_carlo_scenarios: {
-    id: keep,
-    user_id: keep,
-    name: mask,
-    description: drop,
-    account_ids: keep, // UUID array, remapped + scoped by closure
-    starting_value: scale,
-    use_current_balance: keep,
-    years_to_retirement: keep,
-    annual_contribution: scale,
-    contribution_growth_rate: keep, // rate
-    years_in_retirement: keep,
-    annual_withdrawal: scale,
-    expected_return: keep,
-    volatility: keep,
-    inflation_rate: keep,
-    show_real_values: keep,
-    use_historical_returns: keep,
-    simulation_count: keep,
-    target_value: scale,
-    random_seed: keep,
-    is_favourite: keep,
-    sort_order: keep,
-    last_run_at: keep,
-    created_at: keep,
-    updated_at: keep,
-  },
-  monte_carlo_cash_flows: {
-    id: keep,
-    scenario_id: keep,
-    name: mask,
-    amount: scale,
-    flow_type: keep,
-    start_year: keep,
-    end_year: keep,
-    inflation_adjust: keep,
-    sort_order: keep,
-    created_at: keep,
-    updated_at: keep,
-  },
-  gem_strategies: {
-    id: keep,
-    user_id: keep,
-    name: mask,
-    cadence: keep,
-    lookback_months: keep,
-    tax_rate_percent: keep, // a rate, not an amount
-    commission_amount: scale,
-    // The rules link and its label are free text the user types into the
-    // settings tab; a URL beside a masked scenario name re-identifies nothing
-    // useful for a bug report.
-    rules_source_url: drop,
-    rules_source_label: drop,
-    created_at: keep,
-    updated_at: keep,
-  },
-  gem_strategy_accounts: {
-    id: keep,
-    user_id: keep,
-    strategy_id: keep,
-    account_id: keep,
-    created_at: keep,
-  },
-  gem_strategy_assets: {
-    id: keep,
-    user_id: keep,
-    strategy_id: keep,
-    role: keep,
-    security_id: keep,
-    created_at: keep,
-    updated_at: keep,
-  },
-  gem_strategy_signals: {
-    id: keep,
-    user_id: keep,
-    strategy_id: keep,
-    evaluated_on: keep,
-    effective_from: keep,
-    state: keep,
-    target_role: keep,
-    target_security_id: keep,
-    target_weight_percent: keep, // a share, not an amount
-    momentum: jsonb("gemMomentum"),
-    spread_pp: keep, // percentage points
-    lead_pp: keep, // percentage points
-    previous_role: keep,
-    benchmark_role: keep,
-    // A hash of the strategy's own settings. It identifies nothing about the
-    // user, and dropping it would make every restored signal look stale and be
-    // recomputed on the first read.
-    config_fingerprint: keep,
-    // Which version of the evaluation code wrote the row. Structural, says
-    // nothing about the user, and dropping it defaulted every restored signal
-    // to version 1 -- which the reader then files as legacy history and leaves
-    // out of the report entirely.
-    algorithm_version: keep,
-    executed: keep,
-    executed_at: keep,
-    created_at: keep,
-  },
+  // The planning tables -- Monte Carlo scenarios and GEM strategies -- live in
+  // their own file (a separate area from the account core above), merged here
+  // so every import site and the golden test still read one RULES map.
+  ...PLANNING_RULES,
 };
 
 /**

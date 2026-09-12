@@ -921,6 +921,49 @@ describe("Backup export/restore round-trip (integration)", () => {
     });
   });
 
+  it("carries a calendar day note through an export and restore", async () => {
+    const userA = await createTestUserDirect(dataSource, {
+      email: "note-a@example.com",
+    });
+    const userB = await createTestUserDirect(dataSource, {
+      email: "note-b@example.com",
+    });
+
+    await dataSource.query(
+      `INSERT INTO calendar_day_notes (id, user_id, note_date, body)
+       VALUES ($1, $2, '2026-06-14', 'Rent moved to the 15th')`,
+      [randomUUID(), userA.id],
+    );
+
+    const { buffer: backup } = await withUserContext(userA.id, () =>
+      service.exportToBuffer(userA.id),
+    );
+
+    const exported = JSON.parse(gunzipSync(backup).toString("utf-8"));
+    expect(exported.calendar_day_notes).toHaveLength(1);
+    expect(exported.calendar_day_notes[0]).toMatchObject({
+      body: "Rent moved to the 15th",
+    });
+
+    await withUserContext(userB.id, () =>
+      service.restoreData(userB.id, {
+        compressedData: backup,
+        password: PASSWORD,
+      }),
+    );
+
+    const restored = await dataSource.query(
+      `SELECT note_date::TEXT AS note_date, body
+         FROM calendar_day_notes WHERE user_id = $1`,
+      [userB.id],
+    );
+    // The day is a calendar date, so it must land on the same day whatever zone
+    // the restoring server is in.
+    expect(restored).toEqual([
+      { note_date: "2026-06-14", body: "Rent moved to the 15th" },
+    ]);
+  });
+
   it("rejects a restore when the confirmation password is invalid", async () => {
     const userA = await createTestUserDirect(dataSource, {
       email: "auth-a@example.com",
