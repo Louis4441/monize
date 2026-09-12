@@ -37,6 +37,20 @@ function shiftDays(ymd: string, days: number): string {
   return at.toISOString().slice(0, 10);
 }
 
+/**
+ * The `n`th of the month the calendar opens on.
+ *
+ * A day derived from today by subtraction can land outside the grid: the grid
+ * begins on the week-start day on or before the 1st, so `today - 6` is off it
+ * whenever today is in the first days of a month whose 1st sits at or near that
+ * week start -- 37 days a year, on which the cell simply does not exist and the
+ * spec fails for a reason that has nothing to do with what it tests. A day
+ * INSIDE the month is always in the grid, whatever the reader's week start.
+ */
+function dayOfCurrentMonth(n: number): string {
+  return `${todayYmd().slice(0, 8)}${String(n).padStart(2, '0')}`;
+}
+
 /** A day cell's accessible name is the date in the user's own format. */
 function dayLabel(ymd: string): string {
   return `${ymd.slice(5, 7)}/${ymd.slice(8, 10)}/${ymd.slice(0, 4)}`;
@@ -363,9 +377,13 @@ test.describe('Calendar notes over a run of days', () => {
     api,
   }) => {
     await createAccount(api, { name: `Cal Span ${uniqueId()}` });
-    const first = shiftDays(todayYmd(), -6);
-    const middle = shiftDays(todayYmd(), -4);
-    const last = shiftDays(todayYmd(), -2);
+    // Fixed days of the month on screen, not offsets from today: see
+    // `dayOfCurrentMonth`. The run is the 10th to the 14th, and the 15th is the
+    // day after it that must stay unmarked.
+    const first = dayOfCurrentMonth(10);
+    const middle = dayOfCurrentMonth(12);
+    const last = dayOfCurrentMonth(14);
+    const dayAfter = dayOfCurrentMonth(15);
     const body = `Away in Lisbon ${uniqueId()}`;
 
     await page.goto('/transactions');
@@ -385,7 +403,7 @@ test.describe('Calendar notes over a run of days', () => {
       await expect(dayCell(page, day).getByTestId('calendar-day-note-marker')).toHaveCount(1);
     }
     await expect(
-      dayCell(page, shiftDays(last, 1)).getByTestId('calendar-day-note-marker'),
+      dayCell(page, dayAfter).getByTestId('calendar-day-note-marker'),
     ).toHaveCount(0);
 
     // Reached from the MIDDLE of the run, which is the whole point of a span:
@@ -395,13 +413,13 @@ test.describe('Calendar notes over a run of days', () => {
     const edited = `${body} (extended)`;
     await panel.getByRole('button', { name: 'Edit', exact: true }).click();
     await panel.getByRole('textbox', { name: 'Note' }).fill(edited);
-    await panel.getByLabel('Last day').fill(dayLabel(shiftDays(last, 1)));
+    await panel.getByLabel('Last day').fill(dayLabel(dayAfter));
     await panel.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(panel.getByRole('region', { name: 'Note' })).toContainText(edited);
 
     await page.reload();
     await expect(
-      dayCell(page, shiftDays(last, 1)).getByTestId('calendar-day-note-marker'),
+      dayCell(page, dayAfter).getByTestId('calendar-day-note-marker'),
     ).toHaveCount(1);
 
     // Deleting from any covered day clears the whole run.
