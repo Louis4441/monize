@@ -113,6 +113,15 @@ interface InvestmentTransactionFormProps {
   allAccounts?: Account[];  // All accounts for funding dropdown (if not provided, uses accounts)
   transaction?: InvestmentTransaction;
   defaultAccountId?: string;
+  /**
+   * The day a new trade is filed under, `YYYY-MM-DD`.
+   *
+   * Read only in create mode, and only when set: the calendar's "New investment
+   * transaction on this day" means the day the reader clicked, which is not the
+   * date the last entry was filed under. An edit keeps the row's own date, and a
+   * form opened anywhere else keeps the remembered one.
+   */
+  defaultDate?: string;
   onSuccess?: () => void;
   onCancel?: () => void;
   onDirtyChange?: (isDirty: boolean) => void;
@@ -203,6 +212,7 @@ function InvestmentTransactionFormFields({
   allAccounts,
   transaction,
   defaultAccountId,
+  defaultDate,
   onSuccess,
   onCancel,
   onDirtyChange,
@@ -350,9 +360,9 @@ function InvestmentTransactionFormFields({
       : {
           accountId: defaultAccountId || '',
           action: 'BUY',
-          transactionDate: getRememberedTransactionDate(
-            LAST_INVESTMENT_TRANSACTION_DATE_KEY,
-          ),
+          transactionDate:
+            defaultDate ||
+            getRememberedTransactionDate(LAST_INVESTMENT_TRANSACTION_DATE_KEY),
           fundingAccountId: '',
           destinationAccountId: '',
           quantity: undefined,

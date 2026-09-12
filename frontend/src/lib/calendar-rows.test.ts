@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
+  chipForInvestment,
   chipForOccurrence,
   chipForTransaction,
+  dedupeInvestmentLegs,
   groupCalendarRows,
+  groupInvestmentCalendarRows,
   groupRowsByDay,
   rowDate,
   type CalendarAccount,
@@ -10,6 +13,7 @@ import {
 import { ACCOUNT_TYPE_META } from './account-type-meta';
 import { SCHEDULED_KIND_CHIP_CLASSES } from './scheduled-kind';
 import { TransactionStatus, type Transaction } from '@/types/transaction';
+import type { InvestmentTransaction } from '@/types/investment';
 import type {
   ScheduledOccurrence,
   ScheduledTransaction,
@@ -230,5 +234,96 @@ describe('groupCalendarRows', () => {
     });
 
     expect(days.get('2026-06-10')?.transactions).toHaveLength(1);
+  });
+});
+
+function brokerageRow(overrides: Partial<InvestmentTransaction> = {}): InvestmentTransaction {
+  return {
+    id: 'inv-1',
+    accountId: 'brokerage-1',
+    action: 'BUY',
+    transactionDate: '2026-06-10',
+    totalAmount: 505,
+    status: TransactionStatus.CLEARED,
+    security: { id: 'sec-1', symbol: 'ABC', currencyCode: 'USD' },
+    ...overrides,
+  } as InvestmentTransaction;
+}
+
+describe('dedupeInvestmentLegs (I5)', () => {
+  it('drops the cash leg of a trade that is itself on screen', () => {
+    const cash = withOverrides({
+      id: 'cash-leg',
+      accountId: 'sleeve-1',
+      linkedInvestmentTransactionId: 'inv-1',
+    });
+
+    expect(dedupeInvestmentLegs([cash], new Set(['inv-1']))).toEqual([]);
+  });
+
+  it('keeps the cash leg when its trade is out of scope', () => {
+    // The cash sleeve without its brokerage: this row is the only record of the
+    // movement the reader can see, so dropping it would lose the day.
+    const cash = withOverrides({
+      id: 'cash-leg',
+      accountId: 'sleeve-1',
+      linkedInvestmentTransactionId: 'inv-1',
+    });
+
+    expect(dedupeInvestmentLegs([cash], new Set())).toHaveLength(1);
+  });
+
+  it('keeps a cash row that is nobody\'s leg', () => {
+    const deposit = withOverrides({ id: 'cash-deposit', accountId: 'sleeve-1', amount: 1000 });
+
+    expect(dedupeInvestmentLegs([deposit], new Set(['inv-1']))).toHaveLength(1);
+  });
+});
+
+describe('chipForInvestment', () => {
+  it('wears the investment pill, whatever account the row sits in', () => {
+    expect(chipForInvestment(brokerageRow(), TODAY).className).toBe(
+      ACCOUNT_TYPE_META.INVESTMENT.pillClass,
+    );
+  });
+
+  it('carries the void and future flags rather than dropping the row', () => {
+    const voided = chipForInvestment(
+      brokerageRow({ status: TransactionStatus.VOID }),
+      TODAY,
+    );
+    const future = chipForInvestment(
+      brokerageRow({ transactionDate: '2026-06-20' }),
+      TODAY,
+    );
+
+    expect(voided.isVoid).toBe(true);
+    expect(future.isFuture).toBe(true);
+  });
+});
+
+describe('groupInvestmentCalendarRows', () => {
+  it('puts a trade and a cash row on their own days', () => {
+    const days = groupInvestmentCalendarRows({
+      brokerage: [brokerageRow()],
+      cash: [withOverrides({ id: 'cash-1', accountId: 'chequing-1', transactionDate: '2026-06-11' })],
+      accountsById,
+      today: TODAY,
+    });
+
+    expect(days.get('2026-06-10')?.investments).toHaveLength(1);
+    expect(days.get('2026-06-10')?.transactions).toHaveLength(0);
+    expect(days.get('2026-06-11')?.transactions).toHaveLength(1);
+  });
+
+  it('reads a timestamped trade date as its calendar day', () => {
+    const days = groupInvestmentCalendarRows({
+      brokerage: [brokerageRow({ transactionDate: '2026-06-10T00:00:00.000Z' })],
+      cash: [],
+      accountsById,
+      today: TODAY,
+    });
+
+    expect(days.get('2026-06-10')?.investments).toHaveLength(1);
   });
 });

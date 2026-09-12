@@ -1,5 +1,6 @@
 import { TransactionStatus, type Transaction } from '@/types/transaction';
 import type { AccountType } from '@/types/account';
+import type { InvestmentTransaction } from '@/types/investment';
 import type {
   ScheduledOccurrence,
   ScheduledTransaction,
@@ -46,9 +47,27 @@ export interface OccurrenceChip {
   isOverdue: boolean;
 }
 
+/**
+ * One brokerage row on the Investments calendar.
+ *
+ * A trade is one economic event even though it writes two rows -- the trade and
+ * the cash leg that settles it -- and this is the one the reader means, so the
+ * cash leg is dropped by `dedupeInvestmentLegs` when this row is in scope (I5).
+ */
+export interface InvestmentChip {
+  key: string;
+  transaction: InvestmentTransaction;
+  /** Always the investment pill: the row belongs to a brokerage by definition. */
+  className: string;
+  isVoid: boolean;
+  isFuture: boolean;
+}
+
 export interface CalendarDayRows {
   transactions: TransactionChip[];
   occurrences: OccurrenceChip[];
+  /** Brokerage rows; empty on the Transactions calendar, which has none. */
+  investments: InvestmentChip[];
 }
 
 /** A row's calendar day, whether the server sent a date or a timestamp. */
@@ -141,7 +160,7 @@ export function groupCalendarRows(input: {
   const dayOf = (date: string): CalendarDayRows => {
     const existing = days.get(date);
     if (existing) return existing;
-    const created: CalendarDayRows = { transactions: [], occurrences: [] };
+    const created: CalendarDayRows = { transactions: [], occurrences: [], investments: [] };
     days.set(date, created);
     return created;
   };
@@ -157,6 +176,84 @@ export function groupCalendarRows(input: {
     if (!schedule) continue;
     dayOf(rowDate(occurrence.dueDate)).occurrences.push(
       chipForOccurrence(occurrence, schedule, today),
+    );
+  }
+
+  return days;
+}
+
+/**
+ * How one brokerage row is drawn.
+ *
+ * The pill is the investment one whatever account the row sits in: a brokerage
+ * row is a trade, and the Investments calendar's other chips are the cash
+ * sleeve's, which keep their own account's colour.
+ */
+export function chipForInvestment(
+  transaction: InvestmentTransaction,
+  today: string,
+): InvestmentChip {
+  return {
+    key: transaction.id,
+    transaction,
+    className: ACCOUNT_TYPE_META.INVESTMENT.pillClass,
+    isVoid: transaction.status === TransactionStatus.VOID,
+    isFuture: rowDate(transaction.transactionDate) > today,
+  };
+}
+
+/**
+ * One economic event, one chip (design decision 5, I5).
+ *
+ * A trade writes two rows: the brokerage row and the cash-sleeve row that
+ * settles it, linked by `linkedInvestmentTransactionId`. Drawing both would
+ * show a purchase twice and read as two events on the same day. The brokerage
+ * row is the one that names the security, so the cash leg goes -- but only when
+ * its trade is actually on screen: a scope holding the cash sleeve without its
+ * brokerage keeps the cash row, which is then the only record of the movement
+ * the reader can see.
+ */
+export function dedupeInvestmentLegs(
+  cashRows: readonly Transaction[],
+  brokerageRowIds: ReadonlySet<string>,
+): Transaction[] {
+  return cashRows.filter((row) => {
+    const linked = row.linkedInvestmentTransactionId;
+    return !linked || !brokerageRowIds.has(linked);
+  });
+}
+
+/**
+ * Every chip the Investments calendar draws, keyed by day.
+ *
+ * The cash rows arrive already deduped against the brokerage rows, so this adds
+ * nothing up and decides nothing about what belongs on a day beyond the date
+ * each row carries.
+ */
+export function groupInvestmentCalendarRows(input: {
+  brokerage: readonly InvestmentTransaction[];
+  cash: readonly Transaction[];
+  accountsById: ReadonlyMap<string, CalendarAccount>;
+  today: string;
+}): Map<string, CalendarDayRows> {
+  const { brokerage, cash, accountsById, today } = input;
+  const days = new Map<string, CalendarDayRows>();
+
+  const dayOf = (date: string): CalendarDayRows => {
+    const existing = days.get(date);
+    if (existing) return existing;
+    const created: CalendarDayRows = { transactions: [], occurrences: [], investments: [] };
+    days.set(date, created);
+    return created;
+  };
+
+  for (const row of brokerage) {
+    dayOf(rowDate(row.transactionDate)).investments.push(chipForInvestment(row, today));
+  }
+
+  for (const row of cash) {
+    dayOf(rowDate(row.transactionDate)).transactions.push(
+      chipForTransaction(row, accountsById, today),
     );
   }
 

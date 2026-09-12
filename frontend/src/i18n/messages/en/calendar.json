@@ -23,13 +23,15 @@
   "chip": {
     "noPayee": "No payee",
     "overdue": "Overdue",
-    "scheduled": "Scheduled"
+    "scheduled": "Scheduled",
+    "noSymbol": "No symbol"
   },
   "day": {
     "moreChips": "+{count} more",
     "newTransaction": "New transaction on this day",
     "noItems": "Nothing on this day.",
-    "scheduledHint": "Scheduled. Open Bills & Deposits to change it."
+    "scheduledHint": "Scheduled. Open Bills & Deposits to change it.",
+    "newInvestmentTransaction": "New investment transaction on this day"
   },
   "banner": {
     "title": "Some figures are not shown",
@@ -40,11 +42,14 @@
     "balancesMissingRates": "No exchange rate is available for {pairs} on some days this month, so those totals are not shown. Open Currencies and refresh the rates.",
     "balancesForecastGaps": "The projected balance is withheld because these scheduled items cannot be priced yet: {schedules}.",
     "balancesForecastWithheld": "The projected balance is withheld: at least one scheduled item cannot be priced yet, and the reason was not reported.",
-    "balancesUnforecastable": "{count, plural, one {# account in scope carries no projection of its own, so projected totals are withheld.} other {# accounts in scope carry no projection of their own, so projected totals are withheld.}}"
+    "balancesUnforecastable": "{count, plural, one {# account in scope carries no projection of its own, so projected totals are withheld.} other {# accounts in scope carry no projection of their own, so projected totals are withheld.}}",
+    "valuesUnpriced": "No price is available for {securities} on some days this month, so those values are not shown. Add a price on the security's Price history, or refresh prices.",
+    "valuesMissingRates": "No exchange rate is available for {pairs} on some days this month, so those values are not shown. Open Currencies and refresh the rates."
   },
   "errors": {
     "monthFailed": "This month could not be loaded.",
-    "balancesFailed": "Balances could not be loaded for this month."
+    "balancesFailed": "Balances could not be loaded for this month.",
+    "valuesFailed": "Portfolio values could not be loaded for this month."
   },
   "balance": {
     "actualTitle": "Balance at end of day",
@@ -55,5 +60,10 @@
     "partial": "Partial: {amount} of the scope could be worked out; the rest could not, so no total is shown.",
     "missingRates": "No exchange rate for {pairs} on the day this figure is priced at. Open Currencies and refresh the rates.",
     "unforecastable": "{count, plural, one {# account in scope has no projection of its own, so the projected total is withheld.} other {# accounts in scope have no projection of their own, so the projected total is withheld.}}"
+  },
+  "value": {
+    "title": "Portfolio value",
+    "unpriced": "No price is available for {securities} on this day, so the value is not shown. Add a price on the security's Price history, or refresh prices.",
+    "missingRates": "No exchange rate for {pairs} on this day, so the value is not shown. Open Currencies and refresh the rates."
   }
 }

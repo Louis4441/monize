@@ -12,8 +12,16 @@ import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { usePayeeDisplay } from '@/hooks/usePayeeDisplay';
 import { balanceColor } from '@/lib/format';
+import { useInvestmentActionInfo } from '@/components/investments/InvestmentTransactionListParts';
+import {
+  redemptionTotalWithInterest,
+  supportsAccruedInterest,
+} from '@/lib/investment-actions';
+import { isDailyValueComplete } from '@/hooks/useInvestmentDailyValues';
 import type { CalendarDayRows } from '@/lib/calendar-rows';
 import type { DailyBalanceTotal, DailyBalanceTotalsResponse } from '@/types/account';
+import type { DailyInvestmentValue } from '@/types/net-worth';
+import type { InvestmentTransaction } from '@/types/investment';
 import type { Transaction } from '@/types/transaction';
 
 /** What the Balances layer knows about the day this panel is open on. */
@@ -25,13 +33,27 @@ export interface CalendarDayBalance {
   forecast: DailyBalanceTotalsResponse['forecast'];
 }
 
+/** What the Values layer knows about the day this panel is open on. */
+export interface CalendarDayValue {
+  point: DailyInvestmentValue;
+  currencyCode: string;
+  /** Symbols for the securities a withheld value names, keyed by id. */
+  securityLabels: ReadonlyMap<string, string>;
+}
+
 interface CalendarDayPanelProps {
   /** The day this panel is about, `YYYY-MM-DD`. */
   date: string;
   rows?: CalendarDayRows;
   /** Present only while the Balances layer is on and this day's figure arrived. */
   balance?: CalendarDayBalance;
+  /** Present only while the Values layer is on and this day has a point. */
+  value?: CalendarDayValue;
   onEditTransaction: (transaction: Transaction) => void;
+  /** Opens a brokerage row; absent on a calendar that draws none. */
+  onEditInvestment?: (transaction: InvestmentTransaction) => void;
+  /** The label the day's create button carries, when it is not a transaction. */
+  createLabel?: string;
   onCreateOnDay: (date: string) => void;
   onClose: () => void;
   categoryColorMap: ReadonlyMap<string, string | null>;
@@ -50,7 +72,10 @@ export function CalendarDayPanel({
   date,
   rows,
   balance,
+  value,
   onEditTransaction,
+  onEditInvestment,
+  createLabel,
   onCreateOnDay,
   onClose,
   categoryColorMap,
@@ -62,9 +87,11 @@ export function CalendarDayPanel({
   const { formatDate } = useDateFormat();
   const { formatCurrency } = useNumberFormat();
   const payeeDisplay = usePayeeDisplay();
+  const actionInfo = useInvestmentActionInfo();
 
   const transactions = rows?.transactions ?? [];
   const occurrences = rows?.occurrences ?? [];
+  const investments = rows?.investments ?? [];
 
   return (
     <aside className={`${CARD_CLASS} p-4`} aria-label={formatDate(date)}>
@@ -86,10 +113,42 @@ export function CalendarDayPanel({
         <CalendarDayBalanceSection balance={balance} hasOccurrences={occurrences.length > 0} />
       )}
 
-      {transactions.length === 0 && occurrences.length === 0 ? (
+      {value && <CalendarDayValueSection value={value} />}
+
+      {transactions.length === 0 && occurrences.length === 0 && investments.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">{t('day.noItems')}</p>
       ) : (
         <ul className="space-y-2">
+          {investments.map((chip) => (
+            <li key={chip.key}>
+              <button
+                type="button"
+                onClick={() => onEditInvestment?.(chip.transaction)}
+                className={`w-full rounded px-2 py-1.5 text-left ${HOVER_ROW_ON_CARD} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                  chip.isVoid ? 'line-through opacity-50' : ''
+                } ${chip.isFuture && !chip.isVoid ? 'opacity-60' : ''}`}
+              >
+                <span className="flex items-baseline justify-between gap-2">
+                  <span className="truncate text-sm text-gray-900 dark:text-gray-100">
+                    {chip.transaction.security?.symbol ?? t('chip.noSymbol')}{' '}
+                    {actionInfo(chip.transaction.action).label}
+                  </span>
+                  <span className="shrink-0 text-sm tabular-nums text-gray-900 dark:text-gray-100">
+                    {formatCurrency(
+                      supportsAccruedInterest(chip.transaction.action)
+                        ? redemptionTotalWithInterest(
+                            chip.transaction.totalAmount,
+                            chip.transaction.accruedInterest,
+                          )
+                        : chip.transaction.totalAmount,
+                      chip.transaction.security?.currencyCode,
+                    )}
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+
           {transactions.map((chip) => (
             <li key={chip.key}>
               <button
@@ -170,7 +229,7 @@ export function CalendarDayPanel({
         className="mt-4 w-full"
         onClick={() => onCreateOnDay(date)}
       >
-        {t('day.newTransaction')}
+        {createLabel ?? t('day.newTransaction')}
       </Button>
     </aside>
   );
@@ -252,6 +311,57 @@ function CalendarDayBalanceSection({
       {point.isProjected && forecast.unforecastableAccountIds.length > 0 && (
         <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
           {t('balance.unforecastable', { count: forecast.unforecastableAccountIds.length })}
+        </p>
+      )}
+    </section>
+  );
+}
+
+/**
+ * What the Values layer has to say about the open day.
+ *
+ * A withheld value names the securities or the currency pairs behind it, which
+ * is the difference between "we cannot value this day" and a figure the reader
+ * can repair: one manual price on the security named here fixes every day from
+ * its date forward.
+ */
+function CalendarDayValueSection({ value }: { value: CalendarDayValue }) {
+  const t = useTranslations('calendar');
+  const { formatCurrency } = useNumberFormat();
+  const { point, currencyCode, securityLabels } = value;
+
+  const unpriced = point.unpricedSecurityIds ?? [];
+  const pairs = point.missingRatePairs ?? [];
+
+  return (
+    <section
+      className="mb-3 border-b border-gray-200 dark:border-gray-700 pb-3"
+      aria-label={t('value.title')}
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <h4 className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+          {t('value.title')}
+        </h4>
+        {isDailyValueComplete(point) ? (
+          <span className="text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+            {formatCurrency(point.value, currencyCode)}
+          </span>
+        ) : (
+          <UnknownAmount reason={point.pricesComplete === false ? 'noPrice' : 'displayFx'} />
+        )}
+      </div>
+
+      {point.pricesComplete === false && (
+        <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+          {t('value.unpriced', {
+            securities: unpriced.map((id) => securityLabels.get(id) ?? id).join(', '),
+          })}
+        </p>
+      )}
+
+      {point.fxComplete === false && (
+        <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+          {t('value.missingRates', { pairs: pairs.join(', ') })}
         </p>
       )}
     </section>

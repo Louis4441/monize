@@ -8,9 +8,17 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { usePayeeDisplay } from '@/hooks/usePayeeDisplay';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
 import { balanceColor } from '@/lib/format';
+import { useInvestmentActionInfo } from '@/components/investments/InvestmentTransactionListParts';
+import {
+  redemptionTotalWithInterest,
+  supportsAccruedInterest,
+} from '@/lib/investment-actions';
+import { isDailyValueComplete } from '@/hooks/useInvestmentDailyValues';
 import type { MonthGridDay } from '@/components/ui/MonthGrid';
 import type { CalendarDayRows } from '@/lib/calendar-rows';
 import type { DailyBalanceTotal } from '@/types/account';
+import type { DailyInvestmentValue } from '@/types/net-worth';
+import type { InvestmentTransaction } from '@/types/investment';
 import type { Transaction } from '@/types/transaction';
 
 interface CalendarDayCellProps {
@@ -21,7 +29,9 @@ interface CalendarDayCellProps {
   chipLimit: number;
   onOpenDay: (date: string) => void;
   onEditTransaction: (transaction: Transaction) => void;
-  /** The Balances layer's figure for this day, when that layer is on. */
+  /** Opens a brokerage row; absent on a calendar that draws none. */
+  onEditInvestment?: (transaction: InvestmentTransaction) => void;
+  /** What the day's figure layer has to say: a balance, a value, a movement. */
   figure?: ReactNode;
 }
 
@@ -42,21 +52,32 @@ export function CalendarDayCell({
   chipLimit,
   onOpenDay,
   onEditTransaction,
+  onEditInvestment,
   figure,
 }: CalendarDayCellProps) {
   const t = useTranslations('calendar');
   const { formatCurrency } = useNumberFormat();
   const payeeDisplay = usePayeeDisplay();
+  const actionInfo = useInvestmentActionInfo();
 
   const transactions = rows?.transactions ?? [];
   const occurrences = rows?.occurrences ?? [];
-  const total = transactions.length + occurrences.length;
-  const shownTransactions = transactions.slice(0, chipLimit);
+  const investments = rows?.investments ?? [];
+  const total = transactions.length + occurrences.length + investments.length;
+  // A trade is what the reader came to the Investments calendar for, so the
+  // brokerage chips take the room first; the cash rows and then the scheduled
+  // items fill what is left.
+  const shownInvestments = investments.slice(0, chipLimit);
+  const shownTransactions = transactions.slice(
+    0,
+    Math.max(0, chipLimit - shownInvestments.length),
+  );
   const shownOccurrences = occurrences.slice(
     0,
-    Math.max(0, chipLimit - shownTransactions.length),
+    Math.max(0, chipLimit - shownInvestments.length - shownTransactions.length),
   );
-  const hidden = total - shownTransactions.length - shownOccurrences.length;
+  const hidden =
+    total - shownInvestments.length - shownTransactions.length - shownOccurrences.length;
 
   return (
     <div className="min-h-[6rem] sm:min-h-[7rem] flex flex-col gap-0.5">
@@ -78,6 +99,9 @@ export function CalendarDayCell({
       {/* Below sm the chips are dots: a phone cell has no room for a label,
           and the day panel is the reading surface there. */}
       <div className="sm:hidden flex flex-wrap gap-0.5" aria-hidden="true">
+        {shownInvestments.map((chip) => (
+          <span key={chip.key} className={`h-1.5 w-1.5 rounded-full ${chip.className}`} />
+        ))}
         {shownTransactions.map((chip) => (
           <span key={chip.key} className={`h-1.5 w-1.5 rounded-full ${chip.className}`} />
         ))}
@@ -90,6 +114,32 @@ export function CalendarDayCell({
       </div>
 
       <div className="hidden sm:flex flex-col gap-0.5">
+        {shownInvestments.map((chip) => (
+          <button
+            key={chip.key}
+            type="button"
+            onClick={() => onEditInvestment?.(chip.transaction)}
+            className={`${CHIP} ${chip.className} ${chip.isVoid ? 'line-through opacity-50' : ''} ${
+              chip.isFuture && !chip.isVoid ? 'opacity-60' : ''
+            }`}
+          >
+            {chip.transaction.security?.symbol ?? t('chip.noSymbol')}{' '}
+            {actionInfo(chip.transaction.action).shortLabel}{' '}
+            {formatCurrency(
+              // The figure the register shows for this row: a redemption's
+              // accrued interest moved with its proceeds, so the two are one
+              // cash movement.
+              supportsAccruedInterest(chip.transaction.action)
+                ? redemptionTotalWithInterest(
+                    chip.transaction.totalAmount,
+                    chip.transaction.accruedInterest,
+                  )
+                : chip.transaction.totalAmount,
+              chip.transaction.security?.currencyCode,
+            )}
+          </button>
+        ))}
+
         {shownTransactions.map((chip) => (
           <button
             key={chip.key}
@@ -189,6 +239,43 @@ export function CalendarBalanceFigure({
         <ClockIcon className="w-3 h-3 shrink-0 self-center" aria-label={t('balance.projected')} />
       )}
       {formatCurrency(point.total, currencyCode)}
+    </span>
+  );
+}
+
+/**
+ * The Values layer's figure for one day, as the cell prints it.
+ *
+ * A day whose value the server could not work out is the unknown marker, and
+ * which flag withheld it decides which repair the marker points at: an unpriced
+ * holding is a price to add, a missing pair is a rate. A day after today has no
+ * point at all and prints nothing -- a market value is never projected (design
+ * decision 7), and blank is not the same rendering as unknown (I3).
+ */
+export function CalendarValueFigure({
+  point,
+  currencyCode,
+}: {
+  point: DailyInvestmentValue;
+  currencyCode: string;
+}) {
+  const { formatCurrency } = useNumberFormat();
+
+  if (!isDailyValueComplete(point)) {
+    return (
+      <UnknownAmount
+        reason={point.pricesComplete === false ? 'noPrice' : 'displayFx'}
+        className="text-xs"
+      />
+    );
+  }
+
+  return (
+    <span
+      className="text-xs tabular-nums text-gray-900 dark:text-gray-100"
+      data-testid="calendar-value-figure"
+    >
+      {formatCurrency(point.value, currencyCode)}
     </span>
   );
 }
