@@ -358,7 +358,9 @@
       "NO_POSITION": "Các tài khoản của chiến lược không nắm giữ công cụ nào.",
       "FIRST_RUN": "Chiến lược này chưa được đánh giá – tín hiệu đầu tiên xuất hiện sau lần đánh giá đã lên lịch tiếp theo.",
       "STALE_PRICES": "Một số giá làm cơ sở cho báo cáo này không còn mới, nên tín hiệu có thể thay đổi sau khi cập nhật. Cũ nhất, hoặc thiếu hoàn toàn, là:",
-      "CALCULATION_FAILED": "Không thể tính tín hiệu từ dữ liệu hiện có."
+      "CALCULATION_FAILED": "Không thể tính tín hiệu từ dữ liệu hiện có.",
+      "SHORT_HISTORY": "Không đủ lịch sử giá để đánh giá kỳ hiện tại. Các vai trò này cần giá từ {from}:",
+      "shortHistoryFix": "Mở từng công cụ này và dùng “Thêm một năm lịch sử giá”, sau đó mở lại báo cáo này."
     },
     "footer": {
       "pastResults": "Kết quả trong quá khứ không bảo đảm lợi nhuận tương lai.",

@@ -248,7 +248,9 @@
     },
     "collapseAll": "Alles inklappen",
     "expandAll": "Alles uitklappen",
-    "groupCount": "{count} koers(en)"
+    "groupCount": "{count} koers(en)",
+    "addYearButton": "Nog een jaar historie toevoegen",
+    "addYearTitle": "Nog een jaar historische koersen ophalen bij de aanbieder"
   },
   "transactionHistory": {
     "accountLabel": "Rekening",

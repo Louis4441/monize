@@ -248,7 +248,9 @@
     },
     "collapseAll": "Alle einklappen",
     "expandAll": "Alle ausklappen",
-    "groupCount": "{count} Kurs(e)"
+    "groupCount": "{count} Kurs(e)",
+    "addYearButton": "Ein weiteres Jahr Historie hinzufügen",
+    "addYearTitle": "Ein weiteres Jahr historischer Kurse vom Anbieter abrufen"
   },
   "transactionHistory": {
     "accountLabel": "Konto",

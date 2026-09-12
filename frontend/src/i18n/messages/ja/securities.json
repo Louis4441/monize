@@ -248,7 +248,9 @@
     },
     "collapseAll": "すべて折りたたむ",
     "expandAll": "すべて展開",
-    "groupCount": "価格 {count} 件"
+    "groupCount": "価格 {count} 件",
+    "addYearButton": "履歴をもう1年追加",
+    "addYearTitle": "プロバイダーから過去価格をさらに1年分取得します"
   },
   "transactionHistory": {
     "accountLabel": "勘定科目",

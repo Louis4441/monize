@@ -24,6 +24,11 @@ vi.mock('@/hooks/useDateFormat', () => ({
   }),
 }));
 
+// Pin "today" so the "add another year" range is computed deterministically.
+vi.mock('@/hooks/useFinancialToday', () => ({
+  useFinancialToday: () => '2026-08-14',
+}));
+
 const { investmentsApi } = await import('@/lib/investments');
 
 const mockSecurity = {
@@ -813,6 +818,51 @@ describe('SecurityPriceHistory', () => {
       });
 
       expect(onPricesChanged).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Add Another Year of History', () => {
+    it('backfills the next range deeper than the loaded history and reloads', async () => {
+      const toast = (await import('react-hot-toast')).default;
+      // One stored close from 2024-06-01; against the pinned "today" of
+      // 2026-08-14 that is roughly two years, so one year more asks the
+      // provider for 5y (the next bucket up), which also disables the
+      // holding-period clip so history from before the first trade is kept.
+      (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue([
+        {
+          id: 1,
+          securityId: 'sec-1',
+          priceDate: '2024-06-01',
+          openPrice: null,
+          highPrice: null,
+          lowPrice: null,
+          closePrice: 100,
+          volume: null,
+          source: 'yahoo_finance',
+          createdAt: 'x',
+        },
+      ]);
+      (investmentsApi.backfillSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue({
+        symbol: 'AAPL',
+        success: true,
+        pricesLoaded: 300,
+        provider: 'yahoo',
+      });
+      await renderComponent();
+
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('button', { name: 'Add Another Year of History' }),
+        );
+      });
+
+      expect(investmentsApi.backfillSecurityPrices).toHaveBeenCalledWith(
+        'sec-1',
+        '5y',
+      );
+      expect(toast.success).toHaveBeenCalledWith('Updated 300 prices for AAPL');
+      // Reloaded after the fetch (initial mount + post-fetch).
+      expect(investmentsApi.getSecurityPrices).toHaveBeenCalledTimes(2);
     });
   });
 });

@@ -12,9 +12,10 @@ import {
   SecurityPrice,
   CreateSecurityPriceData,
 } from '@/types/investment';
-import { investmentsApi } from '@/lib/investments';
+import { investmentsApi, type BackfillRange } from '@/lib/investments';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { useFinancialToday } from '@/hooks/useFinancialToday';
 import { useLongPress } from '@/hooks/useLongPress';
 import { RowActionSheet, type RowAction } from '@/components/ui/row-actions';
 import { getErrorMessage } from '@/lib/errors';
@@ -95,12 +96,14 @@ export function SecurityPriceHistory({
   const t = useTranslations('securities');
   const { formatDate, formatMonth } = useDateFormat();
   const { formatNumber } = useNumberFormat();
+  const today = useFinancialToday();
   const [prices, setPrices] = useState<SecurityPrice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingPrice, setEditingPrice] = useState<SecurityPrice | undefined>();
   const [deletingPrice, setDeletingPrice] = useState<SecurityPrice | undefined>();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isAddingYear, setIsAddingYear] = useState(false);
   // Mobile has no per-row action buttons -- a long-press (or right-click on a
   // desktop pointer) opens the shared action sheet instead.
   const [contextPrice, setContextPrice] = useState<SecurityPrice | undefined>();
@@ -227,6 +230,67 @@ export function SecurityPriceHistory({
     }
   }, [security.id, loadPrices, onPricesChanged, t]);
 
+  // Extend the stored history one provider bucket deeper than what is loaded,
+  // so each press reaches roughly another year further back. Unlike "force
+  // update" (which fetches a year and clips to the first transaction), passing
+  // an explicit range disables the clip and stores everything the provider
+  // returns -- which is what the GEM report's momentum window needs when a
+  // recently added instrument only has a year of history.
+  const handleAddYear = useCallback(async () => {
+    const earliest = prices.length
+      ? [...prices].map((price) => price.priceDate).sort()[0]
+      : null;
+    const years = earliest
+      ? Math.max(
+          0,
+          Math.floor(
+            (Date.parse(today) - Date.parse(earliest)) / (365.25 * 86_400_000),
+          ),
+        )
+      : 0;
+    const target = years + 1;
+    const range: BackfillRange =
+      target <= 1
+        ? '1y'
+        : target <= 2
+          ? '2y'
+          : target <= 5
+            ? '5y'
+            : target <= 10
+              ? '10y'
+              : 'max';
+    setIsAddingYear(true);
+    try {
+      const result = await investmentsApi.backfillSecurityPrices(
+        security.id,
+        range,
+      );
+      if (result.success) {
+        toast.success(
+          result.pricesLoaded
+            ? t('priceHistory.toasts.updatedCount', {
+                count: result.pricesLoaded,
+                symbol: result.symbol,
+              })
+            : t('priceHistory.toasts.noPricesFound', { symbol: result.symbol }),
+        );
+        await loadPrices();
+        await onPricesChanged?.();
+      } else {
+        toast.error(
+          result.error ||
+            t('priceHistory.toasts.updatePricesFailed', {
+              symbol: result.symbol,
+            }),
+        );
+      }
+    } catch (error) {
+      toast.error(getErrorMessage(error, t('priceHistory.toasts.updateFetchFailed')));
+    } finally {
+      setIsAddingYear(false);
+    }
+  }, [prices, today, security.id, loadPrices, onPricesChanged, t]);
+
   const isFormOpen = showAddForm || !!editingPrice;
   // One decimal count across every price column and every row, so the figures
   // form a column instead of a ragged edge. Taken over the whole series rather
@@ -271,11 +335,26 @@ export function SecurityPriceHistory({
               onClick={handleForceUpdate}
               size="sm"
               isLoading={isUpdating}
+              disabled={isAddingYear}
               title={t('priceHistory.forceUpdateTitle')}
             >
               {t('priceHistory.forceUpdateButton')}
             </Button>
-            <Button onClick={() => setShowAddForm(true)} size="sm" disabled={isUpdating}>
+            <Button
+              variant="outline"
+              onClick={handleAddYear}
+              size="sm"
+              isLoading={isAddingYear}
+              disabled={isUpdating}
+              title={t('priceHistory.addYearTitle')}
+            >
+              {t('priceHistory.addYearButton')}
+            </Button>
+            <Button
+              onClick={() => setShowAddForm(true)}
+              size="sm"
+              disabled={isUpdating || isAddingYear}
+            >
               {t('priceHistory.addPriceButton')}
             </Button>
             {yearGroups.length > 0 && (

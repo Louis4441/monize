@@ -248,7 +248,9 @@
     },
     "collapseAll": "Comprimi tutto",
     "expandAll": "Espandi tutto",
-    "groupCount": "{count} prezzo/i"
+    "groupCount": "{count} prezzo/i",
+    "addYearButton": "Aggiungi un altro anno di storico",
+    "addYearTitle": "Recupera un altro anno di prezzi storici dal fornitore"
   },
   "transactionHistory": {
     "accountLabel": "Conto",

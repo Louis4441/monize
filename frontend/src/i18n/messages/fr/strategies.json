@@ -358,7 +358,9 @@
       "NO_POSITION": "Les comptes de la stratégie ne détiennent aucun instrument.",
       "FIRST_RUN": "Cette stratégie n'a pas encore été évaluée : le premier signal apparaîtra après la prochaine évaluation planifiée.",
       "STALE_PRICES": "Certains cours derrière ce rapport ne sont pas à jour ; le signal peut changer après leur actualisation. Les plus anciens, ou totalement absents, concernent :",
-      "CALCULATION_FAILED": "Le signal n'a pas pu être calculé à partir des données disponibles."
+      "CALCULATION_FAILED": "Le signal n'a pas pu être calculé à partir des données disponibles.",
+      "SHORT_HISTORY": "Historique de prix insuffisant pour évaluer la période actuelle. Ces rôles ont besoin de prix remontant jusqu’au {from} :",
+      "shortHistoryFix": "Ouvrez chacun de ces instruments et utilisez « Ajouter une année d’historique de prix », puis rouvrez ce rapport."
     },
     "footer": {
       "pastResults": "Les performances passées ne garantissent pas les rendements futurs.",

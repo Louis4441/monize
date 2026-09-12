@@ -248,7 +248,9 @@
     },
     "collapseAll": "Thu gọn tất cả",
     "expandAll": "Mở rộng tất cả",
-    "groupCount": "{count} giá"
+    "groupCount": "{count} giá",
+    "addYearButton": "Thêm một năm lịch sử",
+    "addYearTitle": "Tải thêm một năm giá lịch sử từ nhà cung cấp"
   },
   "transactionHistory": {
     "accountLabel": "Tài khoản",

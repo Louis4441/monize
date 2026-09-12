@@ -358,7 +358,9 @@
       "NO_POSITION": "策略帳戶中沒有任何標的。",
       "FIRST_RUN": "此策略尚未評估 — 第一個訊號會在下次排定的評估後出現。",
       "STALE_PRICES": "本報告依據的部分價格並非最新，重新整理後訊號可能改變。最舊的或完全缺失的是：",
-      "CALCULATION_FAILED": "無法以現有資料計算訊號。"
+      "CALCULATION_FAILED": "無法以現有資料計算訊號。",
+      "SHORT_HISTORY": "價格歷史不足，無法計算目前週期。這些角色需要回溯至 {from} 的價格：",
+      "shortHistoryFix": "開啟每個此類商品並使用「再新增一年價格歷史」，然後重新開啟此報表。"
     },
     "footer": {
       "pastResults": "過往表現不保證未來報酬。",

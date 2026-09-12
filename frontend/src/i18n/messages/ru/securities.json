@@ -248,7 +248,9 @@
     },
     "collapseAll": "Свернуть всё",
     "expandAll": "Развернуть всё",
-    "groupCount": "цен: {count}"
+    "groupCount": "цен: {count}",
+    "addYearButton": "Добавить ещё один год истории",
+    "addYearTitle": "Загрузить у поставщика ещё один год исторических цен"
   },
   "transactionHistory": {
     "accountLabel": "Счёт",
