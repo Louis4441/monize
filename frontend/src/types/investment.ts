@@ -773,3 +773,81 @@ export interface MarketIndex {
   exchanges: string[];
   coverage: MarketIndexCoverage;
 }
+
+/**
+ * Why a day's market movement could not be reported.
+ *
+ * `notTradingDay` is a THIRD state, not a kind of unknown: nothing happened, the
+ * cell is blank, and there is nothing for the reader to fix. Every other reason
+ * shows the unknown marker and names a repair, and the two renderings never
+ * overlap.
+ */
+export type DailyMovementReason =
+  | 'notTradingDay'
+  | 'unpricedHolding'
+  | 'missingRate'
+  | 'flowIncomplete'
+  | 'noPriorValue'
+  | 'zeroBaseline';
+
+/** One day of GET /portfolio/daily-movements. */
+export interface DailyMovementPoint {
+  date: string;
+  isTradingDay: boolean;
+  /**
+   * The day's market movement in the response's currency. Also non-null on a
+   * `zeroBaseline` day, where the money moved is known and only the percentage
+   * is not; the cell still renders blank, because it reads `complete`.
+   */
+  movement: number | null;
+  movementPercent: number | null;
+  /** Render the cell from THIS, never by re-deriving the reasons. */
+  complete: boolean;
+  reasons: DailyMovementReason[];
+}
+
+export interface DailyMovementsResponse {
+  currencyCode: string;
+  /** The server's financial today; nothing after it was evaluated. */
+  today: string;
+  days: DailyMovementPoint[];
+}
+
+/** One security's contribution to a day's movement. */
+export interface SecurityDayMove {
+  securityId: string;
+  symbol: string;
+  name: string;
+  /** The security's own currency, which the prices below are in. */
+  currencyCode: string;
+  quantity: number;
+  close: number;
+  previousClose: number;
+  /** The date the previous close was struck on, which need not be the day before. */
+  previousCloseDate: string;
+  /** `close - previousClose`, in the security's currency, at price precision. */
+  priceChange: number;
+  changePercent: number | null;
+  /** The money it moved, in the reporting currency; null when no rate was known. */
+  change: number | null;
+}
+
+/** GET /portfolio/daily-movements/detail: one day, broken down by security. */
+export interface DailyMovementDetailResponse {
+  date: string;
+  currencyCode: string;
+  movement: number | null;
+  movementPercent: number | null;
+  complete: boolean;
+  reasons: DailyMovementReason[];
+  /** Already sorted by the money each row moved, largest first. Do not re-sort. */
+  gains: SecurityDayMove[];
+  losses: SecurityDayMove[];
+  unchangedCount: number;
+  /**
+   * The part of the day's move no per-security close explains: a dividend, a
+   * position first priced that day, cash interest. `null` when any component is
+   * unknown, so a popup that shows it can be trusted to reconcile.
+   */
+  remainder: number | null;
+}

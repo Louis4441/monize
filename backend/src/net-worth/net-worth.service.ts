@@ -35,6 +35,10 @@ import {
 } from "../common/time-series/rate-index.util";
 import { FxAggregate } from "../common/fx-aggregate";
 import { applyActionToQuantity } from "../securities/investment-replay.util";
+import {
+  UNFILTERED_INVESTMENT_SCOPE_SQL,
+  resolveInvestmentScopeAccountIds,
+} from "../securities/investment-scope.util";
 import { formatDateYMDLocal } from "../common/date-utils";
 import { positionCloseAsOf, PricePoint } from "./position-price.util";
 import { preferredCurrency } from "../common/default-currency.util";
@@ -814,23 +818,14 @@ export class NetWorthService {
     const params: any[] = [userId, start, end];
 
     if (accountIds && accountIds.length > 0) {
-      // Resolve the requested accounts plus their linked pairs in one query
-      // (an account, anything linked to it, and the account it links to)
-      // instead of one round-trip per id.
-      const resolved: { id: string }[] = await this.scopedQuery(
-        `SELECT id FROM accounts
-         WHERE user_id = $2
-           AND (
-             id = ANY($1)
-             OR linked_account_id = ANY($1)
-             OR id IN (
-               SELECT linked_account_id FROM accounts
-               WHERE id = ANY($1) AND user_id = $2
-             )
-           )`,
-        [accountIds, userId],
+      // The brokerage and its cash sleeve are one portfolio; the widening rule
+      // is `resolveInvestmentScopeAccountIds`, shared with every other surface
+      // that takes this filter.
+      const idArray = await resolveInvestmentScopeAccountIds(
+        (sql, params) => this.scopedQuery(sql, params as any[]),
+        userId,
+        accountIds,
       );
-      const idArray = [...new Set(resolved.map((a) => a.id))];
       if (idArray.length === 0) {
         // No matching accounts found — return empty result
         return [];
@@ -840,7 +835,7 @@ export class NetWorthService {
       accountFilter = `AND a.id IN (${placeholders})`;
       params.push(...idArray);
     } else {
-      accountFilter = `AND (a.account_sub_type IN ('INVESTMENT_CASH', 'INVESTMENT_BROKERAGE') OR (a.account_type = 'INVESTMENT' AND a.account_sub_type IS NULL))`;
+      accountFilter = `AND ${UNFILTERED_INVESTMENT_SCOPE_SQL}`;
     }
 
     const snapshots: any[] = await this.scopedQuery(
@@ -1154,28 +1149,19 @@ export class NetWorthService {
     const acctParams: any[] = [userId];
 
     if (accountIds && accountIds.length > 0) {
-      // Resolve the requested accounts plus their linked pairs in one query
-      // instead of one round-trip per id.
-      const resolved: { id: string }[] = await this.scopedQuery(
-        `SELECT id FROM accounts
-         WHERE user_id = $2
-           AND (
-             id = ANY($1)
-             OR linked_account_id = ANY($1)
-             OR id IN (
-               SELECT linked_account_id FROM accounts
-               WHERE id = ANY($1) AND user_id = $2
-             )
-           )`,
-        [accountIds, userId],
+      // The brokerage and its cash sleeve are one portfolio; see
+      // `resolveInvestmentScopeAccountIds`.
+      const idArray = await resolveInvestmentScopeAccountIds(
+        (sql, params) => this.scopedQuery(sql, params as any[]),
+        userId,
+        accountIds,
       );
-      const idArray = [...new Set(resolved.map((a) => a.id))];
       if (idArray.length === 0) return [];
       const placeholders = idArray.map((_, i) => `$${i + 2}`).join(", ");
       accountFilter = `AND a.id IN (${placeholders})`;
       acctParams.push(...idArray);
     } else {
-      accountFilter = `AND (a.account_sub_type IN ('INVESTMENT_CASH', 'INVESTMENT_BROKERAGE') OR (a.account_type = 'INVESTMENT' AND a.account_sub_type IS NULL))`;
+      accountFilter = `AND ${UNFILTERED_INVESTMENT_SCOPE_SQL}`;
     }
 
     // Get investment accounts in scope
@@ -1744,26 +1730,17 @@ export class NetWorthService {
     const acctParams: any[] = [userId];
 
     if (accountIds && accountIds.length > 0) {
-      const resolved: { id: string }[] = await this.scopedQuery(
-        `SELECT id FROM accounts
-         WHERE user_id = $2
-           AND (
-             id = ANY($1)
-             OR linked_account_id = ANY($1)
-             OR id IN (
-               SELECT linked_account_id FROM accounts
-               WHERE id = ANY($1) AND user_id = $2
-             )
-           )`,
-        [accountIds, userId],
+      const idArray = await resolveInvestmentScopeAccountIds(
+        (sql, params) => this.scopedQuery(sql, params as any[]),
+        userId,
+        accountIds,
       );
-      const idArray = [...new Set(resolved.map((a) => a.id))];
       if (idArray.length === 0) return [];
       const placeholders = idArray.map((_, i) => `$${i + 2}`).join(", ");
       accountFilter = `AND a.id IN (${placeholders})`;
       acctParams.push(...idArray);
     } else {
-      accountFilter = `AND (a.account_sub_type IN ('INVESTMENT_CASH', 'INVESTMENT_BROKERAGE') OR (a.account_type = 'INVESTMENT' AND a.account_sub_type IS NULL))`;
+      accountFilter = `AND ${UNFILTERED_INVESTMENT_SCOPE_SQL}`;
     }
 
     return this.scopedQuery(
@@ -2494,7 +2471,15 @@ export class NetWorthService {
    * are merged chronologically, so an accepted price always wins on its date
    * while legacy history still values dates the store does not reach.
    */
-  private async loadValuationSeries(
+  /**
+   * The two price sources `positionCloseAsOf` merges, loaded for a window.
+   *
+   * Public because `DailyMovementService` values the same positions on the same
+   * days and must read the same observations: a second loader would be a second
+   * answer to "what priced this holding", which is the disagreement
+   * INV-HOLDING-002 exists to prevent.
+   */
+  async loadValuationSeries(
     securityIds: string[],
     start: string,
     end: string,
