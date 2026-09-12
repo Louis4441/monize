@@ -1,0 +1,10 @@
+{
+  "view": {
+    "label": "Weergave",
+    "table": "Tabel",
+    "calendar": "Kalender"
+  },
+  "grid": {
+    "label": "Maand"
+  }
+}

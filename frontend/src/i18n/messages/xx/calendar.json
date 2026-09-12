@@ -1,0 +1,10 @@
+{
+  "view": {
+    "label": "[XX-View-XX]",
+    "table": "[XX-Table-XX]",
+    "calendar": "[XX-Calendar-XX]"
+  },
+  "grid": {
+    "label": "[XX-Month-XX]"
+  }
+}

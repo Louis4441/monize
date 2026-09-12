@@ -29,8 +29,8 @@ Every task is safe to merge in any order that respects its dependencies: the end
 
 | ID | Task | Depends on | Deploy impact | Status |
 |----|------|-----------|---------------|--------|
-| S1 | Discussion agreeing `calendar-view.md`; label `approved-to-build` | -- | none | [ ] |
-| F1 | `lib/calendar-month.ts`, `MonthGrid`, `ViewModeToggle`, `viewModeStore` (+ guard entries) | S1 | inert | [ ] |
+| S1 | Discussion agreeing `calendar-view.md`; label `approved-to-build` | -- | none | [x] |
+| F1 | `lib/calendar-month.ts`, `MonthGrid`, `ViewModeToggle`, `viewModeStore` (+ guard entries) | S1 | inert | [x] |
 | B1 | `rate-index.util.ts` extraction + `GET /accounts/daily-balance-totals` | S1 | inert (extraction neutral) | [ ] |
 | B2 | `investments-daily`: `pricesComplete` / `unpricedSecurityIds` (additive) + client type | S1 | neutral | [ ] |
 | B3 | `external-flow.util.ts` extraction + `GET /portfolio/daily-movements` and `/detail` | S1, B2 | inert (extraction neutral) | [ ] |
@@ -60,17 +60,19 @@ Every task is safe to merge in any order that respects its dependencies: the end
 
 Open a Discussion linking `calendar-view.md`, summarising decisions 1-11 and the three endpoints, and asking the maintainer to confirm two choices explicitly: the app-palette colouring (decision 4, not Quicken's three families) and the net-of-flows daily change (decision 8, not price-only). Record the answers as edits to the design before F1 starts.
 
+Both are confirmed: app-palette chip colouring, and the daily change net of external flows. The design records the answers beside each decision.
+
 ### F1 -- Grid, toggle, store
 
 **Files:** `frontend/src/lib/calendar-month.ts` + `.test.ts` (new), `frontend/src/components/ui/MonthGrid.tsx` + `.test.tsx` (new), `frontend/src/components/ui/ViewModeToggle.tsx` + `.test.tsx` (new), `frontend/src/store/viewModeStore.ts` + `.test.ts` (new), `frontend/src/store/persisted-storage.guard.test.ts` (one entry with its reason), `frontend/src/i18n/messages.ts` (register `calendar`), `frontend/src/i18n/messages/en/calendar.json` (new), `docs/frontend/ui-conventions.md` (entry "A month grid is `MonthGrid`"), `frontend/CLAUDE.md` (one row).
 
-- `monthGridDays(month, weekStartsOn)` returns 35 or 42 `YYYY-MM-DD` strings; pure string and integer arithmetic, no `Date` at the boundary (`docs/testing-contract.md`, dates: test the string through the function, never a pre-normalised `Date`).
+- `monthGridDays(month, weekStartsOn)` returns the whole weeks covering the month as `YYYY-MM-DD` strings (35 or 42, and 28 for a non-leap February aligned to the week start -- design section 4); pure string and integer arithmetic, no `Date` at the boundary (`docs/testing-contract.md`, dates: test the string through the function, never a pre-normalised `Date`).
 - `classifyCalendarDay(date, today)` -> `'past' | 'today' | 'future'`; `today` is a required argument.
 - `MonthGrid` per design section 10: `role="grid"`, rotated `common.weekdaysMin` headers, roving tabindex, arrow keys, `aria-current="date"`, phone cell variant. It renders whatever `renderDay` returns and knows nothing about money.
 - `ViewModeToggle` copies `InvestmentViewToggle`'s segmented control (`aria-pressed`), labels `calendar.view.table` / `calendar.view.calendar`.
 - `viewModeStore`: `{ surfaces: Record<ViewModeSurface, { view, layers }> }`, key `monize-view-mode`, `merge` discards junk, default `table` with the Transactions layer on. Reason line in the guard: authenticated only; which view and layers a screen shows, a fact about the screen, survives logout like density.
 
-**Acceptance:** nothing renders the toggle yet (inert). `calendar-month.test.ts` covers every `weekStartsOn` 0..6 and the dates table (`2024-02-29`, `2100-02-28`, `2025-01-31`, `2025-12-31`). `MonthGrid.test.tsx` proves arrow-key navigation and that a 400px viewport does not overflow. `persisted-storage.guard.test.ts` green with the new entry and the pre-login footprint unchanged.
+**Acceptance:** nothing renders the toggle yet (inert). `calendar-month.test.ts` covers every `weekStartsOn` 0..6 and the dates table (`2024-02-29`, `2000-02-29`, `2100-02-28`, `2100-02-29` rejected, `2025-01-31`, `2025-12-31`). `MonthGrid.test.tsx` proves arrow-key navigation and that a 400px viewport does not overflow. `persisted-storage.guard.test.ts` green with the new entry and the pre-login footprint unchanged.
 
 ### B1 -- Rate index extraction + daily balance totals
 

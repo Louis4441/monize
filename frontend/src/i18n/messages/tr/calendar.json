@@ -1,0 +1,10 @@
+{
+  "view": {
+    "label": "Görünüm",
+    "table": "Tablo",
+    "calendar": "Takvim"
+  },
+  "grid": {
+    "label": "Ay"
+  }
+}
