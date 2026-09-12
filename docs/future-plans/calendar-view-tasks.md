@@ -44,7 +44,7 @@ Every task is safe to merge in any order that respects its dependencies: the end
 | Q1 | `calendar.guard.test.ts` + the `ui-conventions.test.ts` month-grid block | F1 | none | [x] |
 | Q2 | Backend integration suites `calendar-read-models.integration.spec.ts` and `calendar-day-notes.integration.spec.ts` | B1, B3, B4 | none | [x] |
 | Q3 | Playwright `tests/calendar.spec.ts` | F3, F5, F7 | none | [x] |
-| Q4 | Full-locale i18n pass (acceptance, final commit) | all above | none | [ ] |
+| Q4 | Full-locale i18n pass (acceptance, final commit) | all above | none | [x] (translated per task; verified here) |
 | M1 | Migrate `app/bills/page.tsx` and `UpcomingBillsReport.tsx` onto `MonthGrid`; shrink the baseline | F1, Q1 | neutral | [ ] (optional, separate proposal) |
 | R1 | Report: `investments-daily.value` should be `null` on an unpriced day (design 6.2) | B2 | none | [ ] (report only; not built here) |
 
@@ -196,6 +196,10 @@ The journeys in design section 11's e2e row, seeded through the factories, one f
 **Files:** `frontend/src/i18n/messages/*/calendar.json` (every locale), regenerated `xx`.
 
 Translate every key added under `calendar` in one commit; `messages.parity.test.ts` and `npm run i18n:check` green.
+
+**What actually happened, and what acceptance checked.** The pass landed per task rather than once at the end: F1 through F7 each translated the keys they added across every locale, so by the time Q4 came round there was nothing left to translate. Acceptance therefore verified rather than wrote. Every key of the `calendar` namespace, and the `common` keys the calendar added (`unknownAmount.noBaseline`, `weekdaysMin`), carries a locale-specific value in all 19 translated locales; the handful that match English are right to (`change.headlineValue` is `{amount} ({percent})`, `unknownAmount.marker` is an em dash, and French spells "Transactions", "Gains" and "Note" as English does). `en-GB` and `en-US` are partial overlays over `en` and need no `calendar.json`, since nothing in the namespace is spelled differently on either side of the Atlantic. `messages.parity.test.ts` (1,574 cases), `npm run i18n:check` on both layers, and the backend's `errors.common.calendarDateInvalid` across every locale are green.
+
+Worth keeping for the next plan: a per-task pass costs nothing extra and leaves no locale behind a feature flag, but it does mean the final task has no commit of its own. Say so in the plan rather than leaving a checkbox that looks skipped.
 
 ### M1 -- Migrate the legacy grids (optional, separate proposal)
 
