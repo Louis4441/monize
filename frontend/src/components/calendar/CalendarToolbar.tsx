@@ -4,13 +4,23 @@ import { useTranslations } from 'next-intl';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { HOVER_ROW_ON_PAGE } from '@/components/ui/Card';
 import { useDateFormat } from '@/hooks/useDateFormat';
-import { shiftMonth } from '@/lib/calendar-month';
+import { monthOf, shiftMonth } from '@/lib/calendar-month';
 import { SCHEDULED_KIND_CHIP_CLASSES } from '@/lib/scheduled-kind';
 import { ACCOUNT_TYPE_META } from '@/lib/account-type-meta';
 import type { AccountType } from '@/types/account';
 import type { CalendarLayer } from '@/store/viewModeStore';
 
-interface CalendarToolbarProps {
+/**
+ * Generic over the layers this toolbar offers rather than over every layer
+ * that exists.
+ *
+ * `useViewMode(surface).toggleLayer` takes that surface's own layers, so a
+ * toolbar declaring the flat `CalendarLayer` union cannot be handed one: the
+ * parameter is contravariant, and the assignment is a type error. Inferring
+ * `L` from `availableLayers` also says the true thing, which is that this
+ * toolbar can only toggle a layer it draws a button for.
+ */
+interface CalendarToolbarProps<L extends CalendarLayer> {
   /** `YYYY-MM`. */
   month: string;
   onMonthChange: (month: string) => void;
@@ -19,9 +29,9 @@ interface CalendarToolbarProps {
   /** Id the grid points `aria-labelledby` at, so the grid is named by its month. */
   monthLabelId: string;
   /** The layers this surface offers, in toolbar order. */
-  availableLayers: readonly CalendarLayer[];
+  availableLayers: readonly L[];
   activeLayers: readonly CalendarLayer[];
-  onToggleLayer: (layer: CalendarLayer) => void;
+  onToggleLayer: (layer: L) => void;
   /** Account types present in the month, for the legend. */
   legendAccountTypes: readonly AccountType[];
   /** Whether the month holds any scheduled occurrence. */
@@ -39,12 +49,23 @@ const LAYER_OFF =
   `border-gray-300 text-gray-600 dark:border-gray-600 dark:text-gray-400 ${HOVER_ROW_ON_PAGE}`;
 
 /**
+ * The catalogue key for one layer's button.
+ *
+ * Written as its own function so the key is the concrete
+ * `layers.${CalendarLayer}` union rather than one built from the generic `L`,
+ * which next-intl cannot resolve to a message.
+ */
+function layerLabelKey(layer: CalendarLayer): `layers.${CalendarLayer}` {
+  return `layers.${layer}`;
+}
+
+/**
  * The row above the grid: which month, which layers, and what the colours mean.
  *
  * The month is the calendar's own state rather than the page's date filter
  * (design decision 2), so the navigation here is the only thing that moves it.
  */
-export function CalendarToolbar({
+export function CalendarToolbar<L extends CalendarLayer>({
   month,
   onMonthChange,
   today,
@@ -54,7 +75,7 @@ export function CalendarToolbar({
   onToggleLayer,
   legendAccountTypes,
   legendHasScheduled,
-}: CalendarToolbarProps) {
+}: CalendarToolbarProps<L>) {
   const t = useTranslations('calendar');
   const common = useTranslations('common');
   const { formatMonth } = useDateFormat();
@@ -89,7 +110,7 @@ export function CalendarToolbar({
         <button
           type="button"
           className={`${LAYER_BUTTON} ${LAYER_OFF} ml-1`}
-          onClick={() => onMonthChange(today.slice(0, 7))}
+          onClick={() => onMonthChange(monthOf(today))}
         >
           {common('calendar.today')}
         </button>
@@ -104,7 +125,7 @@ export function CalendarToolbar({
             onClick={() => onToggleLayer(layer)}
             className={`${LAYER_BUTTON} ${activeLayers.includes(layer) ? LAYER_ON : LAYER_OFF}`}
           >
-            {t(`layers.${layer}`)}
+            {t(layerLabelKey(layer))}
           </button>
         ))}
       </div>
