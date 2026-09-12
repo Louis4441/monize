@@ -6,5 +6,38 @@
   },
   "grid": {
     "label": "Monat"
+  },
+  "toolbar": {
+    "layers": "Ebenen"
+  },
+  "layers": {
+    "transactions": "Transaktionen",
+    "balances": "Salden",
+    "values": "Werte",
+    "dailyChange": "Tagesveränderung"
+  },
+  "legend": {
+    "label": "Legende",
+    "scheduled": "Geplant"
+  },
+  "chip": {
+    "noPayee": "Kein Zahlungsempfänger",
+    "overdue": "Überfällig",
+    "scheduled": "Geplant"
+  },
+  "day": {
+    "moreChips": "+{count} weitere",
+    "newTransaction": "Neue Transaktion an diesem Tag",
+    "noItems": "Nichts an diesem Tag.",
+    "scheduledHint": "Geplant. Zum Ändern Rechnungen & Einzahlungen öffnen."
+  },
+  "banner": {
+    "title": "Einige Zahlen werden nicht angezeigt",
+    "rowCap": "Dieser Monat enthält {count} Transaktionen, mehr als die {limit}, die ein Kalender anzeigen kann. Grenzen Sie die Filter ein, um sie zu sehen.",
+    "scheduledUnavailable": "Geplante Eintraege konnten fuer diesen Monat nicht geladen werden. Die angezeigten Buchungen sind vollstaendig, die geplanten fehlen.",
+    "scheduledTruncated": "Einige geplante Eintraege werden so weit im Voraus nicht angezeigt. Wechseln Sie naeher zu heute, um alle zu sehen."
+  },
+  "errors": {
+    "monthFailed": "Dieser Monat konnte nicht geladen werden."
   }
 }

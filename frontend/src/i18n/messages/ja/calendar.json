@@ -6,5 +6,38 @@
   },
   "grid": {
     "label": "月"
+  },
+  "toolbar": {
+    "layers": "レイヤー"
+  },
+  "layers": {
+    "transactions": "取引",
+    "balances": "残高",
+    "values": "評価額",
+    "dailyChange": "日次変動"
+  },
+  "legend": {
+    "label": "凡例",
+    "scheduled": "予定"
+  },
+  "chip": {
+    "noPayee": "支払先なし",
+    "overdue": "期限超過",
+    "scheduled": "予定"
+  },
+  "day": {
+    "moreChips": "他{count}件",
+    "newTransaction": "この日に新規取引",
+    "noItems": "この日は何もありません。",
+    "scheduledHint": "予定です。変更するには請求と入金を開いてください。"
+  },
+  "banner": {
+    "title": "一部の数値は表示されていません",
+    "rowCap": "この月には{count}件の取引があり、カレンダーが表示できる{limit}件を超えています。フィルターを絞り込んで確認してください。",
+    "scheduledUnavailable": "今月の予定項目を読み込めませんでした。表示中の行は完全ですが、予定項目がありません。",
+    "scheduledTruncated": "これより先の予定項目の一部は表示されません。すべてを見るには今日に近づけてください。"
+  },
+  "errors": {
+    "monthFailed": "この月を読み込めませんでした。"
   }
 }

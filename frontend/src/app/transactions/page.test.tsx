@@ -547,6 +547,45 @@ describe('TransactionsPage', () => {
     });
   });
 
+  describe('Table / Calendar', () => {
+    /**
+     * One test rather than three: the view is a persisted store, so a test that
+     * leaves it on Calendar leaves it there for the next one. This ends where it
+     * started, and the store is deliberately not imported here -- doing so
+     * rehydrates it mid-render and the page updates outside act().
+     */
+    it('starts on the table, swaps the register for the calendar, and swaps back', async () => {
+      await act(async () => {
+        render(<TransactionsPage />);
+      });
+      await waitFor(() => expect(screen.getByTestId('transaction-list')).toBeInTheDocument());
+
+      expect(screen.getByRole('button', { name: 'Table' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      expect(screen.getByRole('button', { name: 'Calendar' })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Calendar' }));
+      });
+
+      await waitFor(() =>
+        expect(screen.queryByTestId('transaction-list')).not.toBeInTheDocument(),
+      );
+      expect(screen.getByTestId('dynamic-component')).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Table' }));
+      });
+
+      await waitFor(() => expect(screen.getByTestId('transaction-list')).toBeInTheDocument());
+    });
+  });
+
   describe('Data Loading', () => {
     it('loads accounts, categories, payees in parallel on mount', async () => {
       mockGetAllAccounts.mockResolvedValue(mockAccounts);

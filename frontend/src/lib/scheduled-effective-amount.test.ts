@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   nextOccurrenceEffectiveAmount,
+  occurrenceAccountIds,
   occurrenceSettlementAccountId,
+  occurrenceTouchesAccounts,
   overrideEffectiveAmount,
   scheduleEffectiveAmount,
   sumEffectiveOccurrences,
@@ -369,5 +371,100 @@ describe('occurrenceSettlementAccountId', () => {
         accounts,
       ),
     ).toBe('acc-chequing');
+  });
+});
+
+describe('the accounts an occurrence touches', () => {
+  const accountsById = new Map([
+    ['brokerage-1', { linkedAccountId: 'sleeve-1' }],
+    ['sleeve-1', { linkedAccountId: null }],
+    ['chequing-1', { linkedAccountId: null }],
+    ['savings-1', { linkedAccountId: null }],
+  ]);
+
+  const bill = (overrides: Partial<ScheduledTransaction> = {}) =>
+    ({
+      id: 'st-bill',
+      amount: -1200,
+      currencyCode: 'CAD',
+      accountId: 'chequing-1',
+      isInvestment: false,
+      isSplit: false,
+      isTransfer: false,
+      ...overrides,
+    }) as ScheduledTransaction;
+
+  const occurrence = (transferAccountId: string | null = null) => ({
+    transferAccountId,
+  });
+
+  it('names the account a plain bill settles in', () => {
+    expect(occurrenceAccountIds(occurrence(), bill(), accountsById)).toEqual([
+      'chequing-1',
+    ]);
+  });
+
+  it('names both legs of a transfer', () => {
+    expect(
+      occurrenceAccountIds(occurrence('savings-1'), bill({ isTransfer: true }), accountsById),
+    ).toEqual(['chequing-1', 'savings-1']);
+  });
+
+  it('names the settlement account of an investment schedule, never the brokerage', () => {
+    // INV-OCCURRENCE-003: the brokerage is where the security lands; the cash
+    // leaves the funding account. A calendar filtered to the funding account
+    // that read accountId would leave out a purchase draining it.
+    const schedule = bill({
+      accountId: 'brokerage-1',
+      isInvestment: true,
+      investmentFundingAccountId: 'chequing-1',
+    });
+
+    const ids = occurrenceAccountIds(occurrence(), schedule, accountsById);
+
+    expect(ids).toEqual(['chequing-1']);
+    expect(ids).not.toContain('brokerage-1');
+  });
+
+  it('falls to the brokerage linked cash sleeve when no funding account is named', () => {
+    const schedule = bill({ accountId: 'brokerage-1', isInvestment: true });
+    expect(occurrenceAccountIds(occurrence(), schedule, accountsById)).toEqual(['sleeve-1']);
+  });
+
+  it("prefers the server's settlement account over anything derived", () => {
+    const schedule = bill({
+      accountId: 'brokerage-1',
+      isInvestment: true,
+      investmentFundingAccountId: 'chequing-1',
+      settlementAccountId: 'savings-1',
+    });
+    expect(occurrenceAccountIds(occurrence(), schedule, accountsById)).toEqual(['savings-1']);
+  });
+
+  it('names no account when an investment settlement cannot be identified', () => {
+    // Naming the brokerage here would charge an account whose cash never moves.
+    const schedule = bill({ accountId: 'unknown-brokerage', isInvestment: true });
+    expect(occurrenceAccountIds(occurrence(), schedule, accountsById)).toEqual([]);
+  });
+
+  it('is in scope when any account it touches is', () => {
+    const transfer = bill({ isTransfer: true });
+
+    expect(
+      occurrenceTouchesAccounts(occurrence('savings-1'), transfer, accountsById, new Set(['savings-1'])),
+    ).toBe(true);
+    expect(
+      occurrenceTouchesAccounts(occurrence('savings-1'), transfer, accountsById, new Set(['chequing-1'])),
+    ).toBe(true);
+    expect(
+      occurrenceTouchesAccounts(occurrence('savings-1'), transfer, accountsById, new Set(['other-1'])),
+    ).toBe(false);
+  });
+
+  it('is in no scope when it touches no account this client can name', () => {
+    const schedule = bill({ accountId: 'unknown-brokerage', isInvestment: true });
+    expect(
+      occurrenceTouchesAccounts(occurrence(), schedule, accountsById, new Set(['chequing-1'])),
+    ).toBe(false);
   });
 });

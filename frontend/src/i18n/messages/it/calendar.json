@@ -6,5 +6,38 @@
   },
   "grid": {
     "label": "Mese"
+  },
+  "toolbar": {
+    "layers": "Livelli"
+  },
+  "layers": {
+    "transactions": "Transazioni",
+    "balances": "Saldi",
+    "values": "Valori",
+    "dailyChange": "Variazione giornaliera"
+  },
+  "legend": {
+    "label": "Legenda",
+    "scheduled": "Pianificato"
+  },
+  "chip": {
+    "noPayee": "Nessun beneficiario",
+    "overdue": "Scaduto",
+    "scheduled": "Pianificato"
+  },
+  "day": {
+    "moreChips": "+{count} altri",
+    "newTransaction": "Nuova transazione in questo giorno",
+    "noItems": "Niente in questo giorno.",
+    "scheduledHint": "Pianificato. Apri Bollette e depositi per modificarlo."
+  },
+  "banner": {
+    "title": "Alcune cifre non sono mostrate",
+    "rowCap": "Questo mese contiene {count} transazioni, più delle {limit} che un calendario può mostrare. Restringi i filtri per vederle.",
+    "scheduledUnavailable": "Non e stato possibile caricare le voci pianificate di questo mese. Le righe mostrate sono complete; mancano quelle pianificate.",
+    "scheduledTruncated": "Alcune voci pianificate non sono mostrate cosi avanti nel tempo. Avvicinati a oggi per vederle tutte."
+  },
+  "errors": {
+    "monthFailed": "Impossibile caricare questo mese."
   }
 }

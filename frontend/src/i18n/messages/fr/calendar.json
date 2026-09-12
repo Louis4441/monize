@@ -6,5 +6,38 @@
   },
   "grid": {
     "label": "Mois"
+  },
+  "toolbar": {
+    "layers": "Calques"
+  },
+  "layers": {
+    "transactions": "Transactions",
+    "balances": "Soldes",
+    "values": "Valeurs",
+    "dailyChange": "Variation quotidienne"
+  },
+  "legend": {
+    "label": "Légende",
+    "scheduled": "Planifié"
+  },
+  "chip": {
+    "noPayee": "Aucun bénéficiaire",
+    "overdue": "En retard",
+    "scheduled": "Planifié"
+  },
+  "day": {
+    "moreChips": "+{count} de plus",
+    "newTransaction": "Nouvelle transaction ce jour",
+    "noItems": "Rien ce jour.",
+    "scheduledHint": "Planifié. Ouvrez Factures et dépôts pour le modifier."
+  },
+  "banner": {
+    "title": "Certains chiffres ne sont pas affichés",
+    "rowCap": "Ce mois contient {count} transactions, plus que les {limit} qu'un calendrier peut afficher. Affinez les filtres pour les voir.",
+    "scheduledUnavailable": "Les elements planifies de ce mois n'ont pas pu etre charges. Les lignes affichees sont completes ; les planifiees manquent.",
+    "scheduledTruncated": "Certains elements planifies ne sont pas affiches aussi loin dans le futur. Rapprochez-vous d'aujourd'hui pour tous les voir."
+  },
+  "errors": {
+    "monthFailed": "Ce mois n'a pas pu être chargé."
   }
 }
