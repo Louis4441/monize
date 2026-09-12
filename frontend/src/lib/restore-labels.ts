@@ -7,6 +7,7 @@
 export const RESTORE_LABELS: Record<string, string> = {
   userPreferences: 'User Preferences',
   userCurrencyPreferences: 'Currency Preferences',
+  calendarDayNotes: 'Calendar Day Notes',
   categories: 'Categories',
   payees: 'Payees',
   payeeAliases: 'Payee Aliases',
