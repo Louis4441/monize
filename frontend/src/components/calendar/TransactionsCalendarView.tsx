@@ -351,7 +351,12 @@ export function TransactionsCalendarView({
               rows={layers.includes('transactions') ? byDay.get(selectedDate) : undefined}
               balance={selectedBalance}
               notes={
-                isActingDelegate
+                // No surface for an acting delegate (the routes are not theirs
+                // to call), and none while the list is absent: "this day has no
+                // note" is a claim only a loaded list can make, and the save is
+                // a whole-body upsert that would replace a note nobody saw. The
+                // banner already carries why it is absent.
+                isActingDelegate || !notes.loaded
                   ? undefined
                   : {
                       note: notes.byDay.get(selectedDate),

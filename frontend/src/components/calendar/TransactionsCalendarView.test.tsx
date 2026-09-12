@@ -776,6 +776,29 @@ describe('TransactionsCalendarView', () => {
       ).toBeInTheDocument();
       expect(screen.getByRole('grid')).toBeInTheDocument();
     });
+
+    it('offers no note to write while the list is absent', async () => {
+      // The save is a whole-body upsert, so offering "Add a note" over a list
+      // that never arrived invites the reader to replace a stored note the
+      // client never saw. "This day has none" is a claim only a loaded list can
+      // make; the banner above already says why there is none to read.
+      mockListDayNotes.mockRejectedValue(new Error('offline'));
+      renderView();
+
+      await screen.findByText(calendarNs.banner.notesUnavailable);
+      fireEvent.click(cell('06/10/2026'));
+      const panel = await screen.findByRole('complementary', { name: '06/10/2026' });
+
+      expect(
+        within(panel).queryByRole('button', { name: calendarNs.notes.add }),
+      ).not.toBeInTheDocument();
+      expect(mockUpsertDayNote).not.toHaveBeenCalled();
+      // The rest of the day is untouched: the note half failing is not the
+      // month failing.
+      expect(
+        within(panel).getByRole('button', { name: calendarNs.day.newTransaction }),
+      ).toBeInTheDocument();
+    });
   });
   describe('on a phone, and for a keyboard', () => {
     /** Answer every media query as a viewport of this width. */
@@ -827,6 +850,27 @@ describe('TransactionsCalendarView', () => {
       // The dots say what kind; the count says how many, which is the part a
       // row of dots cannot carry.
       expect(within(cell('06/10/2026')).getByText('2')).toBeInTheDocument();
+    });
+
+    it('announces the phone count, which is all a screen reader has there', async () => {
+      // Below sm the chip list is `display: none` and the dots are decoration,
+      // so the count is the only thing left that says how many items a day
+      // holds. Hiding it from assistive technology leaves a month of bare dates.
+      viewport(400);
+      mockGetAllPages.mockResolvedValue([
+        transaction({ id: 'tx-1' }),
+        transaction({ id: 'tx-2' }),
+      ]);
+      renderView();
+
+      await screen.findAllByRole('button', { name: /Grocer/ });
+      const dayCell = cell('06/10/2026');
+
+      expect(within(dayCell).getByText('2 items')).toBeInTheDocument();
+      // The glyph itself stays decoration: the number is read once, as a count
+      // of something, not twice as a stray digit.
+      expect(within(dayCell).getByText('2')).toHaveAttribute('aria-hidden', 'true');
+      expect(within(cell('06/11/2026')).queryByText(/item/)).toBeNull();
     });
 
     it('puts focus back on the day when the panel closes', async () => {

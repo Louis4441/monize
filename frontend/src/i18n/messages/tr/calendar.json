@@ -27,6 +27,7 @@
     "noSymbol": "Sembol yok"
   },
   "day": {
+    "itemCount": "{count, plural, other {# öğe}}",
     "moreChips": "+{count} daha",
     "newTransaction": "Bu güne yeni işlem",
     "noItems": "Bu günde bir şey yok.",

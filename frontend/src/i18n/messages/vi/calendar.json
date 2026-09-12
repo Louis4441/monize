@@ -27,6 +27,7 @@
     "noSymbol": "Không có mã"
   },
   "day": {
+    "itemCount": "{count, plural, other {# mục}}",
     "moreChips": "+{count} nữa",
     "newTransaction": "Giao dịch mới trong ngày này",
     "noItems": "Không có gì trong ngày này.",

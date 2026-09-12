@@ -27,6 +27,7 @@
     "noSymbol": "Tanpa simbol"
   },
   "day": {
+    "itemCount": "{count, plural, other {# entri}}",
     "moreChips": "+{count} lagi",
     "newTransaction": "Transaksi baru pada hari ini",
     "noItems": "Tidak ada apa pun pada hari ini.",

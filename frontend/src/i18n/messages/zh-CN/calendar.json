@@ -27,6 +27,7 @@
     "noSymbol": "无代码"
   },
   "day": {
+    "itemCount": "{count, plural, other {#项}}",
     "moreChips": "另有 {count} 项",
     "newTransaction": "在这一天新建交易",
     "noItems": "这一天没有任何内容。",

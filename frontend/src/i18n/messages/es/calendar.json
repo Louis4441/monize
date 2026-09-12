@@ -27,6 +27,7 @@
     "noSymbol": "Sin símbolo"
   },
   "day": {
+    "itemCount": "{count, plural, one {# elemento} other {# elementos}}",
     "moreChips": "+{count} más",
     "newTransaction": "Nueva transacción en este día",
     "noItems": "Nada en este día.",

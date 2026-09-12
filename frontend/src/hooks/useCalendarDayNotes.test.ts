@@ -79,6 +79,24 @@ describe('useCalendarDayNotes', () => {
 
     await waitFor(() => expect(result.current.error).not.toBeNull());
     expect(result.current.byDay.size).toBe(0);
+    // An empty map is what a failure and an empty range have in common, so it
+    // cannot be what a caller reads before offering to write one.
+    expect(result.current.loaded).toBe(false);
+  });
+
+  it('separates a range that holds no note from a list it does not have', async () => {
+    mockList.mockResolvedValue([]);
+    const { result } = renderNotes();
+
+    await waitFor(() => expect(result.current.loaded).toBe(true));
+    expect(result.current.byDay.size).toBe(0);
+  });
+
+  it('reports no list in an acting-delegate session, not an empty one', async () => {
+    const { result } = renderNotes(false);
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.loaded).toBe(false);
   });
 
   describe('leaving a day with a draft', () => {

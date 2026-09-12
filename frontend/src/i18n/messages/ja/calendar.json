@@ -27,6 +27,7 @@
     "noSymbol": "シンボルなし"
   },
   "day": {
+    "itemCount": "{count, plural, other {#件}}",
     "moreChips": "他{count}件",
     "newTransaction": "この日に新規取引",
     "noItems": "この日は何もありません。",

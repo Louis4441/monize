@@ -6,6 +6,7 @@ import { TABLE_BODY_CLASS } from '@/components/ui/Table';
 import { ReportError } from '@/components/reports/ReportError';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
+import { movementUnknownReason } from '@/components/calendar/CalendarDayCell';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useReportData } from '@/hooks/useReportData';
@@ -106,7 +107,9 @@ function DailyMovementDetail({ detail }: { detail: DailyMovementDetailResponse }
             })}
           </span>
         ) : (
-          <UnknownAmount reason="noPrice" />
+          // The same mapping the cell's marker uses: one writer for "which
+          // repair does a withheld movement point at".
+          <UnknownAmount reason={movementUnknownReason(detail.reasons)} />
         )}
       </div>
 
@@ -138,7 +141,7 @@ function DailyMovementDetail({ detail }: { detail: DailyMovementDetailResponse }
           {t('change.remainder')}
         </span>
         {detail.remainder === null ? (
-          <UnknownAmount reason="noPrice" />
+          <UnknownAmount reason={movementUnknownReason(detail.reasons)} />
         ) : (
           <span className="text-sm tabular-nums text-gray-900 dark:text-gray-100">
             {formatCurrency(detail.remainder, detail.currencyCode)}

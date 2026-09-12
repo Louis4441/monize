@@ -16,6 +16,17 @@ import type { DayNote } from '@/types/calendar';
  */
 export interface CalendarDayNotesState {
   byDay: ReadonlyMap<string, DayNote>;
+  /**
+   * The range's notes are actually in hand.
+   *
+   * False means the list is ABSENT -- not yet asked for, still in flight, failed,
+   * or belonging to a range the reader has left -- which is a different thing
+   * from a range that holds no note. A caller that offers to write a note reads
+   * this first: "this day has none" is a claim only a loaded list can make, and
+   * the write is a whole-body upsert that would replace a note the client never
+   * saw.
+   */
+  loaded: boolean;
   isLoading: boolean;
   /** The list could not be loaded; the other layers are unaffected. */
   error: Error | null;
@@ -119,10 +130,12 @@ export function useCalendarDayNotes(params: {
   );
 
   const isStale = result.data !== null && result.dataKey !== requestKey;
+  const loaded = result.data !== null && !isStale;
 
   return useMemo(
     () => ({
       byDay,
+      loaded,
       isLoading: result.isLoading,
       error: result.error,
       isStale,
@@ -135,6 +148,7 @@ export function useCalendarDayNotes(params: {
     }),
     [
       byDay,
+      loaded,
       result.isLoading,
       result.error,
       isStale,

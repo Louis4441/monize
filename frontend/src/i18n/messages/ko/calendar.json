@@ -27,6 +27,7 @@
     "noSymbol": "종목 코드 없음"
   },
   "day": {
+    "itemCount": "{count, plural, other {#개 항목}}",
     "moreChips": "+{count}개 더",
     "newTransaction": "이 날짜에 새 거래",
     "noItems": "이 날짜에는 아무것도 없습니다.",

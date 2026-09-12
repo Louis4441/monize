@@ -27,6 +27,7 @@
     "noSymbol": "कोई प्रतीक नहीं"
   },
   "day": {
+    "itemCount": "{count, plural, one {# प्रविष्टि} other {# प्रविष्टियाँ}}",
     "moreChips": "+{count} और",
     "newTransaction": "इस दिन नया लेनदेन",
     "noItems": "इस दिन कुछ नहीं।",

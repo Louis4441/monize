@@ -27,6 +27,7 @@
     "noSymbol": "Без тикера"
   },
   "day": {
+    "itemCount": "{count, plural, one {# запис} few {# записи} many {# записів} other {# записів}}",
     "moreChips": "+{count} ще",
     "newTransaction": "Нова транзакція цього дня",
     "noItems": "Цього дня нічого немає.",

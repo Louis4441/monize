@@ -37,10 +37,23 @@ import { useAuthStore } from '@/store/authStore';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useViewMode } from '@/store/viewModeStore';
 import type { Account, AccountType } from '@/types/account';
-import type { InvestmentTransaction } from '@/types/investment';
+import type { DailyMovementReason, InvestmentTransaction } from '@/types/investment';
 import type { Transaction } from '@/types/transaction';
 
 const LAYERS = ['transactions', 'values', 'dailyChange'] as const;
+
+/**
+ * The catalogue key for one withheld-movement reason.
+ *
+ * Written as its own function for the reason `CalendarToolbar`'s
+ * `layerLabelKey` is: a key built inline from a `for ... of` binding widens to
+ * `string`, which next-intl cannot resolve to a message.
+ */
+function movementReasonKey(
+  reason: DailyMovementReason,
+): `change.reasons.${DailyMovementReason}` {
+  return `change.reasons.${reason}`;
+}
 
 interface InvestmentCalendarViewProps {
   /** Every account the page holds, for the cash chips' colours. */
@@ -49,6 +62,16 @@ interface InvestmentCalendarViewProps {
   brokerageAccountIds: readonly string[];
   /** Their linked cash sleeves, as the page derives them. */
   cashAccountIds: readonly string[];
+  /**
+   * Symbols for the securities the scope HOLDS, keyed by security id.
+   *
+   * A withheld value names the security behind it, and the month's own rows only
+   * name what the month traded -- which the security that went unpriced usually
+   * was not. Without the held set, a position bought in March and unpriced ever
+   * since is reported to a June reader as its UUID, which is a repair
+   * instruction nobody can follow.
+   */
+  heldSecurityLabels?: ReadonlyMap<string, string>;
   weekStartsOn: WeekStart;
   /** The financial today: which month opens, and where the Values layer stops. */
   today: string;
@@ -73,6 +96,7 @@ export function InvestmentCalendarView({
   accounts,
   brokerageAccountIds,
   cashAccountIds,
+  heldSecurityLabels,
   weekStartsOn,
   today,
   displayCurrency = null,
@@ -167,14 +191,22 @@ export function InvestmentCalendarView({
     });
   }, [data.data, accountsById, today]);
 
-  /** Symbols for the securities this month traded, so a withheld value can name one. */
+  /**
+   * Symbols for every security a withheld value might name.
+   *
+   * The scope's current holdings first, because an unpriced position is usually
+   * one the month on screen did not trade; the month's own rows on top, so a
+   * security bought and sold inside it is still named after the holding is gone.
+   * An id that survives both is printed as itself, which is the honest last
+   * resort rather than a blank.
+   */
   const securityLabels = useMemo(() => {
-    const labels = new Map<string, string>();
+    const labels = new Map<string, string>(heldSecurityLabels);
     for (const row of data.data?.brokerage ?? []) {
       if (row.security?.id && row.security.symbol) labels.set(row.security.id, row.security.symbol);
     }
     return labels;
-  }, [data.data]);
+  }, [data.data, heldSecurityLabels]);
 
   const legend = useMemo(() => {
     const accountTypes = new Set<AccountType>();
@@ -197,42 +229,72 @@ export function InvestmentCalendarView({
       });
     }
 
-    // Before the Values layer's own causes, which return early: a note that
-    // could not be loaded is a cause whether or not that layer is on.
+    // A note that could not be loaded is a cause whether or not a figure layer
+    // is on, so it is composed before either of them.
     if (notes.error !== null) {
       found.push({ key: 'notesUnavailable', message: t('banner.notesUnavailable') });
     }
 
-    if (!valuesOn) return found;
-
-    const unpriced = new Set<string>();
-    const pairs = new Set<string>();
-    for (const point of values.byDay.values()) {
-      if (point.pricesComplete === false) {
-        for (const id of point.unpricedSecurityIds ?? []) unpriced.add(id);
+    if (valuesOn) {
+      const unpriced = new Set<string>();
+      const pairs = new Set<string>();
+      for (const point of values.byDay.values()) {
+        if (point.pricesComplete === false) {
+          for (const id of point.unpricedSecurityIds ?? []) unpriced.add(id);
+        }
+        if (point.fxComplete === false) {
+          for (const pair of point.missingRatePairs ?? []) pairs.add(pair);
+        }
       }
-      if (point.fxComplete === false) {
-        for (const pair of point.missingRatePairs ?? []) pairs.add(pair);
+
+      if (unpriced.size > 0) {
+        found.push({
+          key: 'valuesUnpriced',
+          message: t('banner.valuesUnpriced', {
+            securities: [...unpriced].map((id) => securityLabels.get(id) ?? id).join(', '),
+          }),
+        });
+      }
+      if (pairs.size > 0) {
+        found.push({
+          key: 'valuesMissingRates',
+          message: t('banner.valuesMissingRates', { pairs: [...pairs].sort().join(', ') }),
+        });
       }
     }
 
-    if (unpriced.size > 0) {
-      found.push({
-        key: 'valuesUnpriced',
-        message: t('banner.valuesUnpriced', {
-          securities: [...unpriced].map((id) => securityLabels.get(id) ?? id).join(', '),
-        }),
-      });
-    }
-    if (pairs.size > 0) {
-      found.push({
-        key: 'valuesMissingRates',
-        message: t('banner.valuesMissingRates', { pairs: [...pairs].sort().join(', ') }),
-      });
+    // The change layer's causes, composed once for the month.
+    //
+    // Without this a withheld percentage has no surface that says why it was
+    // withheld: the cell can carry one marker for six reasons, and
+    // `DailyMovementDialog`, which does list the server's own wording, opens
+    // only from the percentage button a COMPLETE day draws. `zeroBaseline` is
+    // not a cause here -- that day is deliberately blank rather than withheld,
+    // so there is nothing for the reader to repair.
+    if (changeOn) {
+      const reasons = new Set<DailyMovementReason>();
+      for (const point of movements.byDay.values()) {
+        if (!point.isTradingDay || point.complete) continue;
+        for (const reason of point.reasons) {
+          if (reason !== 'zeroBaseline') reasons.add(reason);
+        }
+      }
+      for (const reason of reasons) {
+        found.push({ key: `change:${reason}`, message: t(movementReasonKey(reason)) });
+      }
     }
 
     return found;
-  }, [data.data, valuesOn, values.byDay, securityLabels, notes.error, t]);
+  }, [
+    data.data,
+    valuesOn,
+    values.byDay,
+    changeOn,
+    movements.byDay,
+    securityLabels,
+    notes.error,
+    t,
+  ]);
 
   const selectedValue = useMemo<CalendarDayValue | undefined>(() => {
     if (!valuesReady || selectedDate === null) return undefined;
@@ -358,7 +420,12 @@ export function InvestmentCalendarView({
               rows={layers.includes('transactions') ? byDay.get(selectedDate) : undefined}
               value={selectedValue}
               notes={
-                isActingDelegate
+                // No surface for an acting delegate (the routes are not theirs
+                // to call), and none while the list is absent: "this day has no
+                // note" is a claim only a loaded list can make, and the save is
+                // a whole-body upsert that would replace a note nobody saw. The
+                // banner already carries why it is absent.
+                isActingDelegate || !notes.loaded
                   ? undefined
                   : {
                       note: notes.byDay.get(selectedDate),

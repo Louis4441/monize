@@ -163,6 +163,17 @@ function InvestmentsContent() {
     data.handleNewTransaction();
   }, [data]);
 
+  // Symbols for what the scope holds now, so the calendar can name a security a
+  // withheld value blames. The month's own rows name only what it traded, and an
+  // unpriced holding is usually one it did not.
+  const heldSecurityLabels = useMemo(() => {
+    const labels = new Map<string, string>();
+    for (const holding of data.portfolioSummary?.holdings ?? []) {
+      labels.set(holding.securityId, holding.symbol);
+    }
+    return labels;
+  }, [data.portfolioSummary]);
+
   const handleTransactionViewChange = (view: InvestmentTransactionView) => {
     setTransactionView(view);
     if (view === 'cash') {
@@ -298,6 +309,7 @@ function InvestmentsContent() {
                 accounts={data.allAccounts.length > 0 ? data.allAccounts : data.accounts}
                 brokerageAccountIds={data.selectedAccountIds}
                 cashAccountIds={data.cashAccountIds}
+                heldSecurityLabels={heldSecurityLabels}
                 weekStartsOn={weekStartsOn}
                 today={financialToday}
                 displayCurrency={

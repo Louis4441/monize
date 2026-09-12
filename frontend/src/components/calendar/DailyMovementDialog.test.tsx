@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@/test/render';
 import { DailyMovementDialog } from './DailyMovementDialog';
 import calendarNs from '@/i18n/messages/en/calendar.json';
+import commonNs from '@/i18n/messages/en/common.json';
 import type {
   DailyMovementDetailResponse,
   SecurityDayMove,
@@ -140,6 +141,14 @@ describe('DailyMovementDialog', () => {
     await waitFor(() => expect(screen.getAllByTestId('unknown-amount').length).toBe(3));
     expect(screen.getByText(calendarNs.change.reasons.missingRate)).toBeInTheDocument();
     expect(screen.queryByTestId('movement-headline')).not.toBeInTheDocument();
+    // The headline and the remainder name the rate, not a price: the dialog
+    // reads the same mapping the cell's marker does.
+    expect(
+      screen.getAllByRole('button', { name: commonNs.unknownAmount.displayFx }).length,
+    ).toBe(3);
+    expect(
+      screen.queryByRole('button', { name: commonNs.unknownAmount.noPrice }),
+    ).toBeNull();
   });
 
   it('keeps the order the server sent the rows in', async () => {

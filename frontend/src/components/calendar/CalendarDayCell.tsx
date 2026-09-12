@@ -24,7 +24,11 @@ import type { CalendarDayRows } from '@/lib/calendar-rows';
 import type { DailyBalanceTotal } from '@/types/account';
 import type { DayNote } from '@/types/calendar';
 import type { DailyInvestmentValue } from '@/types/net-worth';
-import type { DailyMovementPoint, InvestmentTransaction } from '@/types/investment';
+import type {
+  DailyMovementPoint,
+  DailyMovementReason,
+  InvestmentTransaction,
+} from '@/types/investment';
 import type { Transaction } from '@/types/transaction';
 
 interface CalendarDayCellProps {
@@ -119,23 +123,33 @@ export function CalendarDayCell({
 
       {/* Below sm the chips are dots and a count: a phone cell has no room for
           a label, and the day panel is the reading surface there. The count is
-          what keeps a day with six items from reading like a day with three. */}
-      <div className="sm:hidden flex flex-wrap items-center gap-0.5" aria-hidden="true">
-        {shownInvestments.map((chip) => (
-          <span key={chip.key} className={`h-1.5 w-1.5 rounded-full ${chip.className}`} />
-        ))}
-        {shownTransactions.map((chip) => (
-          <span key={chip.key} className={`h-1.5 w-1.5 rounded-full ${chip.className}`} />
-        ))}
-        {shownOccurrences.map((chip) => (
-          <span
-            key={chip.key}
-            className={`h-1.5 w-1.5 rounded-full border border-dashed border-current ${chip.className}`}
-          />
-        ))}
+          what keeps a day with six items from reading like a day with three.
+
+          The dots are decoration and are hidden from assistive technology; the
+          count is not, because below sm it is the ONLY thing that says how many
+          items a day holds -- the chip list below is `display: none` there, so
+          hiding the count too would leave a phone screen reader a month of bare
+          dates. The glyph stays `aria-hidden` beside an `sr-only` phrase so the
+          number is read as a count of something rather than as a stray digit. */}
+      <div className="sm:hidden flex flex-wrap items-center gap-0.5">
+        <span className="flex flex-wrap items-center gap-0.5" aria-hidden="true">
+          {shownInvestments.map((chip) => (
+            <span key={chip.key} className={`h-1.5 w-1.5 rounded-full ${chip.className}`} />
+          ))}
+          {shownTransactions.map((chip) => (
+            <span key={chip.key} className={`h-1.5 w-1.5 rounded-full ${chip.className}`} />
+          ))}
+          {shownOccurrences.map((chip) => (
+            <span
+              key={chip.key}
+              className={`h-1.5 w-1.5 rounded-full border border-dashed border-current ${chip.className}`}
+            />
+          ))}
+        </span>
         {total > 0 && (
           <span className="ml-0.5 text-[10px] leading-none text-gray-500 dark:text-gray-400">
-            {total}
+            <span aria-hidden="true">{total}</span>
+            <span className="sr-only">{t('day.itemCount', { count: total })}</span>
           </span>
         )}
       </div>
@@ -308,6 +322,30 @@ export function CalendarValueFigure({
 }
 
 /**
+ * Which repair a withheld movement points the reader at.
+ *
+ * The marker carries one `UnknownAmount` cause and the server sent six, so the
+ * mapping is made here rather than guessed: an unpriced holding is a price to
+ * add, a missing rate or an unconvertible flow is a rate to refresh, and the
+ * scope's first day is neither -- there is no earlier value to measure it
+ * against and nothing the reader can do about it. Naming a price for a missing
+ * display rate, or a rate for a boundary, sends them to a screen where there is
+ * nothing to fix; `displayFx` exists because that mistake was made before.
+ *
+ * `notTradingDay` and `zeroBaseline` never reach here: those days are blank.
+ * The banner carries the server's own wording for every reason present in the
+ * month; this is the cell's one-glyph share of it.
+ */
+export function movementUnknownReason(
+  reasons: readonly DailyMovementReason[],
+): 'noPrice' | 'displayFx' | 'noBaseline' {
+  if (reasons.includes('unpricedHolding')) return 'noPrice';
+  // `decide` returns this one alone, so it is not masking another cause.
+  if (reasons.includes('noPriorValue')) return 'noBaseline';
+  return 'displayFx';
+}
+
+/**
  * The Daily change layer's figure for one day, as the cell prints it.
  *
  * Three renderings, and they never share markup (I3): a percentage, the unknown
@@ -338,7 +376,7 @@ export function CalendarChangeFigure({
     // No baseline to divide by is likewise blank rather than unknown: the day's
     // movement is known, only the percentage is undefined.
     if (point.reasons.includes('zeroBaseline')) return null;
-    return <UnknownAmount reason="noPrice" className="text-xs" />;
+    return <UnknownAmount reason={movementUnknownReason(point.reasons)} className="text-xs" />;
   }
 
   const percent = point.movementPercent;

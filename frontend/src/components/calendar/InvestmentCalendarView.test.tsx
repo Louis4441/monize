@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, within } from '@/test/render';
 import { InvestmentCalendarView } from './InvestmentCalendarView';
 import calendarNs from '@/i18n/messages/en/calendar.json';
+import commonNs from '@/i18n/messages/en/common.json';
 import { useViewModeStore } from '@/store/viewModeStore';
 import { useAuthStore } from '@/store/authStore';
 import { TransactionsCalendarView } from './TransactionsCalendarView';
@@ -350,6 +351,36 @@ describe('InvestmentCalendarView', () => {
       expect(within(panel).getByText(/No price is available for ABC/)).toBeInTheDocument();
     });
 
+    it('names a held security the month never traded, not its id', async () => {
+      // The case example 6 actually describes: a position bought months ago and
+      // unpriced ever since. It has no row in the month on screen, so the
+      // month's own rows cannot name it and only the held set can. Printing the
+      // id is a repair instruction the reader cannot follow.
+      withLayers('transactions', 'values');
+      mockGetAllTransactionPages.mockResolvedValue([]);
+      mockGetInvestmentsDaily.mockResolvedValue([
+        valuePoint('2026-06-15', {
+          value: 40000,
+          pricesComplete: false,
+          unpricedSecurityIds: ['sec-gic'],
+        }),
+      ]);
+      renderView({ heldSecurityLabels: new Map([['sec-gic', 'GIC-2029']]) });
+
+      const dayCell = cell('06/15/2026');
+      await waitFor(() =>
+        expect(within(dayCell).getByTestId('unknown-amount')).toBeInTheDocument(),
+      );
+
+      expect(screen.getByText(/GIC-2029/, { selector: 'li' })).toBeInTheDocument();
+      expect(screen.queryByText(/sec-gic/)).toBeNull();
+
+      fireEvent.click(dayCell);
+      const panel = await screen.findByRole('complementary', { name: '06/15/2026' });
+      expect(within(panel).getByText(/No price is available for GIC-2029/)).toBeInTheDocument();
+      expect(within(panel).queryByText(/sec-gic/)).toBeNull();
+    });
+
     it('shows unknown and names the pair when a rate is missing', async () => {
       withLayers('transactions', 'values');
       mockGetInvestmentsDaily.mockResolvedValue([
@@ -518,6 +549,135 @@ describe('InvestmentCalendarView', () => {
         expect(within(cell('06/11/2026')).getByTestId('unknown-amount')).toBeInTheDocument(),
       );
       expect(within(cell('06/11/2026')).queryByTestId('calendar-change-figure')).toBeNull();
+      // An unpriced holding IS a price to add, so this is the one reason the
+      // marker's default was right about.
+      expect(
+        within(cell('06/11/2026')).getByRole('button', {
+          name: commonNs.unknownAmount.noPrice,
+        }),
+      ).toBeInTheDocument();
+    });
+
+    it('points a missing rate at the rates, not at the security price', async () => {
+      // The marker carries one of three causes for six server reasons, so the
+      // mapping is made rather than assumed: telling a reader to add a price
+      // when what is missing is a display rate sends them to the wrong screen.
+      withLayers('dailyChange');
+      mockGetDailyMovements.mockResolvedValue(
+        movements([
+          movementPoint('2026-06-11', {
+            movement: null,
+            movementPercent: null,
+            complete: false,
+            reasons: ['missingRate'],
+          }),
+        ]),
+      );
+      renderView();
+
+      const marker = await within(cell('06/11/2026')).findByTestId('unknown-amount');
+      expect(marker).toBeInTheDocument();
+      expect(
+        within(cell('06/11/2026')).getByRole('button', {
+          name: commonNs.unknownAmount.displayFx,
+        }),
+      ).toBeInTheDocument();
+      expect(
+        within(cell('06/11/2026')).queryByRole('button', {
+          name: commonNs.unknownAmount.noPrice,
+        }),
+      ).toBeNull();
+    });
+
+    it('sends the scope\'s first day nowhere, because there is nothing to fix', async () => {
+      // `decide` returns `noPriorValue` alone: the day before precedes the
+      // scope's inception. Neither a price nor a rate is missing, so a marker
+      // naming either invents an errand out of a boundary.
+      withLayers('dailyChange');
+      mockGetDailyMovements.mockResolvedValue(
+        movements([
+          movementPoint('2026-06-11', {
+            movement: null,
+            movementPercent: null,
+            complete: false,
+            reasons: ['noPriorValue'],
+          }),
+        ]),
+      );
+      renderView();
+
+      await waitFor(() =>
+        expect(within(cell('06/11/2026')).getByTestId('unknown-amount')).toBeInTheDocument(),
+      );
+      expect(
+        within(cell('06/11/2026')).getByRole('button', {
+          name: commonNs.unknownAmount.noBaseline,
+        }),
+      ).toBeInTheDocument();
+      expect(screen.getByText(calendarNs.change.reasons.noPriorValue)).toBeInTheDocument();
+    });
+
+    it('names every reason the month withheld a change for, in the banner', async () => {
+      // The cell has one glyph and `DailyMovementDialog` opens only from a
+      // percentage a COMPLETE day draws, so without the banner a withheld
+      // change has no surface anywhere that says why.
+      withLayers('dailyChange');
+      mockGetDailyMovements.mockResolvedValue(
+        movements([
+          movementPoint('2026-06-10', {
+            movement: null,
+            movementPercent: null,
+            complete: false,
+            reasons: ['missingRate'],
+          }),
+          movementPoint('2026-06-11', {
+            movement: null,
+            movementPercent: null,
+            complete: false,
+            reasons: ['flowIncomplete'],
+          }),
+          // Blank, not withheld: there is nothing here for a reader to repair.
+          movementPoint('2026-06-12', {
+            movementPercent: null,
+            complete: false,
+            reasons: ['zeroBaseline'],
+          }),
+          // Likewise: a weekend had no session to report.
+          movementPoint('2026-06-13', {
+            isTradingDay: false,
+            movement: null,
+            movementPercent: null,
+            complete: false,
+            reasons: ['notTradingDay'],
+          }),
+        ]),
+      );
+      renderView();
+
+      expect(
+        await screen.findByText(calendarNs.change.reasons.missingRate),
+      ).toBeInTheDocument();
+      expect(screen.getByText(calendarNs.change.reasons.flowIncomplete)).toBeInTheDocument();
+      expect(screen.queryByText(calendarNs.change.reasons.zeroBaseline)).toBeNull();
+      expect(screen.queryByText(calendarNs.change.reasons.notTradingDay)).toBeNull();
+    });
+
+    it('says nothing in the banner while the change layer is off', async () => {
+      withLayers('transactions');
+      mockGetDailyMovements.mockResolvedValue(
+        movements([
+          movementPoint('2026-06-11', {
+            movement: null,
+            movementPercent: null,
+            complete: false,
+            reasons: ['missingRate'],
+          }),
+        ]),
+      );
+      renderView();
+
+      await waitFor(() => expect(mockGetAllTransactionPages).toHaveBeenCalled());
+      expect(screen.queryByText(calendarNs.change.reasons.missingRate)).toBeNull();
     });
 
     it('opens the breakdown for the day whose percentage was clicked', async () => {

@@ -27,6 +27,7 @@
     "noSymbol": "[XX-No symbol-XX]"
   },
   "day": {
+    "itemCount": "[XX-{count, plural, one {# item} other {# items}}-XX]",
     "moreChips": "[XX-+{count} more-XX]",
     "newTransaction": "[XX-New transaction on this day-XX]",
     "noItems": "[XX-Nothing on this day.-XX]",
