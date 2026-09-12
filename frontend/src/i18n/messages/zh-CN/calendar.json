@@ -1,0 +1,10 @@
+{
+  "view": {
+    "label": "视图",
+    "table": "表格",
+    "calendar": "日历"
+  },
+  "grid": {
+    "label": "月份"
+  }
+}

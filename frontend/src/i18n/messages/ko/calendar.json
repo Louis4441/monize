@@ -1,0 +1,10 @@
+{
+  "view": {
+    "label": "보기",
+    "table": "표",
+    "calendar": "달력"
+  },
+  "grid": {
+    "label": "월"
+  }
+}

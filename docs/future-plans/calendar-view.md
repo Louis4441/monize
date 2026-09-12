@@ -136,9 +136,12 @@ from one of three new read models built out of those endpoints' services.
 ## 4. Definitions
 
 - **Grid day**: a `YYYY-MM-DD` string. The grid for month `M` under week start
-  `w` is the 35 or 42 days from the `w`-day on or before the 1st of `M` to the
+  `w` is the whole weeks from the `w`-day on or before the 1st of `M` to the
   day before the next `w`-day after the last of `M` (`monthGridDays`,
-  `lib/calendar-month.ts`).
+  `lib/calendar-month.ts`). That is 35 or 42 days for almost every month, and
+  28 for a non-leap February whose 1st falls on `w`, where four whole weeks
+  already cover the month and a fifth would hold days neither `M` nor the
+  week-completion rule asks for.
 - **Scope**: the ordered set of account ids a layer is asked about. The
   Investments page's scope resolves linked pairs server-side exactly as
   `getDailyInvestments` does today.

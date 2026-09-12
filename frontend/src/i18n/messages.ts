@@ -28,6 +28,7 @@ const NAMESPACES = [
   "ai",
   "bills",
   "budgets",
+  "calendar",
   "categories",
   "categoryDetail",
   "currencies",

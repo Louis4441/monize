@@ -100,6 +100,20 @@ A widget's title is a link to the fuller view of the same figures, named as a ro
 
 The grid prints names on dates and no amount per occurrence, which is why `scheduled-calendar.ts` is on the client-expansion exemption list in `scheduled-effective-amount.guard.test.ts`. Anything that wants a per-occurrence *amount* asks the server (`GET /scheduled-transactions/occurrences`) instead.
 
+## A month grid is `MonthGrid`, and its days are strings
+
+`components/ui/MonthGrid.tsx` is the month layout: whole weeks, `common.weekdaysMin` rotated to the reader's `weekStartsOn`, `role="grid"` with one roving tab stop, arrow keys, `aria-current="date"` on the day the *server* calls today, and `aria-selected` on the open day. It takes a `renderDay` and knows nothing about what goes in a cell -- no money, no filter, no endpoint -- which is what lets the Transactions and Investments calendars share one grid without sharing a contract.
+
+`lib/calendar-month.ts` decides which days a month's grid holds (`monthGridDays`), rotates the labels (`rotateWeekdayLabels`), steps the month (`shiftMonth`) and classifies a day against a `today` it is *given* (`classifyCalendarDay`, which has no default: actual-versus-projected is the server's day, not the browser's). Every function takes and returns `YYYY-MM-DD` or `YYYY-MM` and does integer arithmetic on the parts. Nothing builds a `Date`: a `Date` from a calendar date is an instant in the browser's zone, so `new Date('2026-03-01')` is the last day of February west of UTC and the grid loses or repeats a day at the boundary.
+
+The grid is whole weeks covering the month, so it is 35 or 42 days -- and 28 for a non-leap February whose 1st falls on the week start, where four whole weeks already cover it.
+
+`components/bills/ScheduledCalendarGrid.tsx` is the one remaining second grid; it migrates onto `MonthGrid` in its own PR, and until then it is named here rather than silently tolerated. A third month grid is a review failure: the calendar's own guard suite is what will make it a test failure.
+
+## A screen's Table / Calendar choice is `viewModeStore`, not a URL parameter
+
+`store/viewModeStore.ts` holds `{ view, layers }` per surface (`transactions`, `investments`) under one localStorage key, the density store's pattern, and `components/ui/ViewModeToggle.tsx` is the segmented control that moves it -- `InvestmentViewToggle`'s control deliberately, because the two sit side by side in the Investments toolbar. Which view a screen is on is a fact about the screen, so a laptop and a desktop signed into the same account need not agree; it is not a `user_preferences` column and not a URL parameter, which would impose the sender's reading habit on whoever opens a shared link. `useViewMode(surface)` binds the actions to one surface so a caller cannot write to the other. At least one layer is always on: a calendar with every layer off is a month of empty boxes, which reads as a page that failed rather than as a choice.
+
 ## The device can override a stored preference, and the predicate is never the viewport
 
 Two settings mean "unless this device knows better". `DateInput` is a text box on
