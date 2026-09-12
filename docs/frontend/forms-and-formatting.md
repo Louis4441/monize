@@ -162,6 +162,17 @@ and refuses a literal written beside the constant. A description belonging to
 another entity -- a budget's, a security's, a custom report's -- keeps its own
 limit and is deliberately out of scope.
 
+A calendar day note is the second field written to that pattern, against its
+own constant: `CALENDAR_DAY_NOTE_MAX_LENGTH` (`lib/calendar-day-note.ts`,
+mirrored by `backend/src/common/calendar-day-note.ts` and the
+`ck_calendar_day_notes_body_length` CHECK, held equal by
+`backend/src/common/calendar-day-note.contract.spec.ts`). The textarea in
+`components/calendar/CalendarDayNote.tsx` carries it, saving is an explicit
+Save rather than a blur, a blank body disables Save instead of being sent as a
+delete, and Delete asks through `ConfirmDialog`. It is a separate number from
+the transaction cap on purpose: the two fields are bounded by different tables,
+and one constant serving both would move a limit nobody asked to move.
+
 ## A CSV file is written by `exportToCsv`, and a number in it is a number
 
 `lib/csv-export.ts` is the only CSV writer: BOM, CRLF, RFC 4180 quoting, formula-injection guard, download. Multi-table exports take `exportCsvSections` (`MonteCarloReport` had a hand-rolled copy that quoted every field and guarded none). `ui-conventions.test.ts` fails on a second `text/csv` Blob or a second `replace(/"/g, '""')`.

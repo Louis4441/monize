@@ -3,6 +3,8 @@ import { render, screen, waitFor, fireEvent, within } from '@/test/render';
 import { InvestmentCalendarView } from './InvestmentCalendarView';
 import calendarNs from '@/i18n/messages/en/calendar.json';
 import { useViewModeStore } from '@/store/viewModeStore';
+import { useAuthStore } from '@/store/authStore';
+import { TransactionsCalendarView } from './TransactionsCalendarView';
 import { ACCOUNT_TYPE_META } from '@/lib/account-type-meta';
 import { TransactionStatus, type Transaction } from '@/types/transaction';
 import type { Account } from '@/types/account';
@@ -45,6 +47,19 @@ vi.mock('@/lib/investments', () => ({
 const mockGetAllPages = vi.fn();
 vi.mock('@/lib/transactions', () => ({
   transactionsApi: { getAllPages: (...args: unknown[]) => mockGetAllPages(...args) },
+}));
+
+const mockListDayNotes = vi.fn();
+vi.mock('@/lib/calendar-day-notes', () => ({
+  calendarDayNotesApi: {
+    list: (...args: unknown[]) => mockListDayNotes(...args),
+    upsert: vi.fn(),
+    remove: vi.fn(),
+  },
+}));
+
+vi.mock('@/lib/scheduled-transactions', () => ({
+  scheduledTransactionsApi: { getOccurrences: vi.fn().mockResolvedValue([]) },
 }));
 
 const mockGetInvestmentsDaily = vi.fn();
@@ -164,6 +179,8 @@ beforeEach(() => {
   mockGetAllPages.mockResolvedValue([]);
   mockGetInvestmentsDaily.mockResolvedValue([]);
   mockGetDailyMovements.mockResolvedValue(movements([]));
+  mockListDayNotes.mockResolvedValue([]);
+  useAuthStore.setState({ actingAsUserId: null });
   mockGetDailyMovementDetail.mockResolvedValue({
     date: '2026-06-11',
     currencyCode: 'CAD',
@@ -535,6 +552,56 @@ describe('InvestmentCalendarView', () => {
 
       expect(await screen.findByText(calendarNs.errors.movementsFailed)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /ABC/ })).toBeInTheDocument();
+    });
+  });
+  describe('day notes', () => {
+    it('shows the same note the Transactions calendar shows for that date', async () => {
+      // A note belongs to the day, not to a page: both calendars read one list
+      // for the range they draw.
+      mockListDayNotes.mockResolvedValue([
+        { date: '2026-06-10', body: 'Ex-dividend date', updatedAt: '2026-06-09T12:00:00.000Z' },
+      ]);
+
+      const { unmount } = renderView();
+      expect(
+        await within(cell('06/10/2026')).findByTestId('calendar-day-note-marker'),
+      ).toHaveTextContent('Ex-dividend date');
+      unmount();
+
+      useViewModeStore.setState({
+        surfaces: {
+          transactions: { view: 'calendar', layers: ['transactions'] },
+          investments: { view: 'table', layers: ['transactions'] },
+        },
+      });
+
+      render(
+        <TransactionsCalendarView
+          accounts={accounts}
+          scheduledTransactions={[]}
+          filters={{}}
+          scopeAccountIds={[]}
+          weekStartsOn={0}
+          today={TODAY}
+          categoryColorMap={new Map()}
+          categoryIconMap={new Map()}
+          categoryLabelMap={new Map()}
+          onEditTransaction={vi.fn()}
+          onCreateOnDay={vi.fn()}
+        />,
+      );
+
+      expect(
+        await within(cell('06/10/2026')).findByTestId('calendar-day-note-marker'),
+      ).toHaveTextContent('Ex-dividend date');
+    });
+
+    it('offers no note surface at all in an acting-delegate session', async () => {
+      useAuthStore.setState({ actingAsUserId: 'owner-1' });
+      renderView();
+
+      await waitFor(() => expect(mockGetAllTransactionPages).toHaveBeenCalled());
+      expect(mockListDayNotes).not.toHaveBeenCalled();
     });
   });
 });

@@ -44,7 +44,8 @@
     "balancesForecastWithheld": "[XX-The projected balance is withheld: at least one scheduled item cannot be priced yet, and the reason was not reported.-XX]",
     "balancesUnforecastable": "[XX-{count, plural, one {# account in scope carries no projection of its own, so projected totals are withheld.} other {# accounts in scope carry no projection of their own, so projected totals are withheld.}}-XX]",
     "valuesUnpriced": "[XX-No price is available for {securities} on some days this month, so those values are not shown. Add a price on the security's Price history, or refresh prices.-XX]",
-    "valuesMissingRates": "[XX-No exchange rate is available for {pairs} on some days this month, so those values are not shown. Open Currencies and refresh the rates.-XX]"
+    "valuesMissingRates": "[XX-No exchange rate is available for {pairs} on some days this month, so those values are not shown. Open Currencies and refresh the rates.-XX]",
+    "notesUnavailable": "[XX-Your notes could not be loaded for this month. Any note you have written is still stored.-XX]"
   },
   "errors": {
     "monthFailed": "[XX-This month could not be loaded.-XX]",
@@ -86,5 +87,16 @@
       "noPriorValue": "[XX-There is no earlier value to measure this day against.-XX]",
       "zeroBaseline": "[XX-The portfolio was empty the day before, so there is no percentage to work out.-XX]"
     }
+  },
+  "notes": {
+    "title": "[XX-Note-XX]",
+    "add": "[XX-Add a note-XX]",
+    "saveFailed": "[XX-The note could not be saved. Try again.-XX]",
+    "deleteFailed": "[XX-The note could not be deleted. Try again.-XX]",
+    "deleteTitle": "[XX-Delete this note?-XX]",
+    "deleteMessage": "[XX-The note on this day is removed. This cannot be undone.-XX]",
+    "discardTitle": "[XX-Discard this note?-XX]",
+    "discardMessage": "[XX-The note you are writing has not been saved. Leaving this day discards it.-XX]",
+    "discardConfirm": "[XX-Discard-XX]"
   }
 }

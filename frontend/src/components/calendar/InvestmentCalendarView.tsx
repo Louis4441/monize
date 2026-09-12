@@ -32,6 +32,9 @@ import {
 } from '@/lib/calendar-rows';
 import { monthGridDays, monthOf, type WeekStart } from '@/lib/calendar-month';
 import { preferredCurrency } from '@/lib/default-currency';
+import { useCalendarDayNotes } from '@/hooks/useCalendarDayNotes';
+import { useAuthStore } from '@/store/authStore';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useViewMode } from '@/store/viewModeStore';
 import type { Account, AccountType } from '@/types/account';
 import type { InvestmentTransaction } from '@/types/investment';
@@ -91,6 +94,15 @@ export function InvestmentCalendarView({
   const days = useMemo(() => monthGridDays(month, weekStartsOn), [month, weekStartsOn]);
   const gridStart = days[0];
   const gridEnd = days[days.length - 1];
+
+  // A note is personal and its routes are not delegate-reachable, so an acting
+  // delegate has no note surface and asks for nothing.
+  const isActingDelegate = useAuthStore((state) => !!state.actingAsUserId);
+  const notes = useCalendarDayNotes({
+    startDate: gridStart,
+    endDate: gridEnd,
+    enabled: !isActingDelegate,
+  });
 
   // The same resolution the portfolio chart makes: a foreign single-account
   // currency is asked for explicitly, and anything else is the reader's own
@@ -184,6 +196,12 @@ export function InvestmentCalendarView({
       });
     }
 
+    // Before the Values layer's own causes, which return early: a note that
+    // could not be loaded is a cause whether or not that layer is on.
+    if (notes.error !== null) {
+      found.push({ key: 'notesUnavailable', message: t('banner.notesUnavailable') });
+    }
+
     if (!valuesOn) return found;
 
     const unpriced = new Set<string>();
@@ -213,7 +231,7 @@ export function InvestmentCalendarView({
     }
 
     return found;
-  }, [data.data, valuesOn, values.byDay, securityLabels, t]);
+  }, [data.data, valuesOn, values.byDay, securityLabels, notes.error, t]);
 
   const selectedValue = useMemo<CalendarDayValue | undefined>(() => {
     if (!valuesReady || selectedDate === null) return undefined;
@@ -232,10 +250,12 @@ export function InvestmentCalendarView({
     <div>
       <CalendarToolbar
         month={month}
-        onMonthChange={(next) => {
-          setMonth(next);
-          setSelectedDate(null);
-        }}
+        onMonthChange={(next) =>
+          notes.requestChange(() => {
+            setMonth(next);
+            setSelectedDate(null);
+          })
+        }
         today={today}
         monthLabelId={monthLabelId}
         availableLayers={LAYERS}
@@ -280,7 +300,7 @@ export function InvestmentCalendarView({
             weekStartsOn={weekStartsOn}
             today={today}
             selectedDate={selectedDate}
-            onSelectDay={setSelectedDate}
+            onSelectDay={(day) => notes.requestChange(() => setSelectedDate(day))}
             labelledBy={monthLabelId}
             renderDay={(day) => {
               const point = valuesReady ? values.byDay.get(day.date) : undefined;
@@ -290,9 +310,10 @@ export function InvestmentCalendarView({
                   day={day}
                   rows={layers.includes('transactions') ? byDay.get(day.date) : undefined}
                   chipLimit={CALENDAR_DAY_CHIP_LIMIT}
-                  onOpenDay={setSelectedDate}
+                  onOpenDay={(day) => notes.requestChange(() => setSelectedDate(day))}
                   onEditTransaction={onEditCashTransaction}
                   onEditInvestment={onEditInvestment}
+                  note={notes.byDay.get(day.date)}
                   figure={
                     point || movement ? (
                       <span className="flex items-baseline gap-1">
@@ -320,11 +341,21 @@ export function InvestmentCalendarView({
               date={selectedDate}
               rows={layers.includes('transactions') ? byDay.get(selectedDate) : undefined}
               value={selectedValue}
+              notes={
+                isActingDelegate
+                  ? undefined
+                  : {
+                      note: notes.byDay.get(selectedDate),
+                      onSave: notes.save,
+                      onDelete: notes.remove,
+                      onDirtyChange: notes.setDraftDirty,
+                    }
+              }
               onEditTransaction={onEditCashTransaction}
               onEditInvestment={onEditInvestment}
               createLabel={t('day.newInvestmentTransaction')}
               onCreateOnDay={onCreateOnDay}
-              onClose={() => setSelectedDate(null)}
+              onClose={() => notes.requestChange(() => setSelectedDate(null))}
               categoryColorMap={EMPTY_CATEGORY_MAP}
               categoryIconMap={EMPTY_CATEGORY_MAP}
               categoryLabelMap={EMPTY_CATEGORY_LABELS}
@@ -332,6 +363,17 @@ export function InvestmentCalendarView({
           </div>
         )}
       </div>
+
+
+      <ConfirmDialog
+        isOpen={notes.confirmDiscard.isOpen}
+        title={t('notes.discardTitle')}
+        message={t('notes.discardMessage')}
+        confirmLabel={t('notes.discardConfirm')}
+        variant="warning"
+        onConfirm={notes.confirmDiscard.onConfirm}
+        onCancel={notes.confirmDiscard.onCancel}
+      />
 
       <DailyMovementDialog
         date={movementDate}

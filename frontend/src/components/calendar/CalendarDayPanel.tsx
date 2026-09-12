@@ -8,6 +8,7 @@ import { CARD_CLASS, HOVER_ROW_ON_CARD } from '@/components/ui/Card';
 import { CategoryPill } from '@/components/transactions/CategoryPill';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
 import { BalanceForecastUnavailable } from '@/components/accounts/shared/BalanceForecastUnavailable';
+import { CalendarDayNote } from '@/components/calendar/CalendarDayNote';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { usePayeeDisplay } from '@/hooks/usePayeeDisplay';
@@ -21,6 +22,7 @@ import { isDailyValueComplete } from '@/hooks/useInvestmentDailyValues';
 import type { CalendarDayRows } from '@/lib/calendar-rows';
 import type { DailyBalanceTotal, DailyBalanceTotalsResponse } from '@/types/account';
 import type { DailyInvestmentValue } from '@/types/net-worth';
+import type { DayNote } from '@/types/calendar';
 import type { InvestmentTransaction } from '@/types/investment';
 import type { Transaction } from '@/types/transaction';
 
@@ -49,6 +51,17 @@ interface CalendarDayPanelProps {
   balance?: CalendarDayBalance;
   /** Present only while the Values layer is on and this day has a point. */
   value?: CalendarDayValue;
+  /**
+   * The note surface, absent in an acting-delegate session: a note is personal,
+   * the routes are not delegate-reachable, and a section that could only fail is
+   * worse than no section (design decision 12).
+   */
+  notes?: {
+    note?: DayNote;
+    onSave: (date: string, body: string) => Promise<unknown>;
+    onDelete: (date: string) => Promise<unknown>;
+    onDirtyChange: (dirty: boolean) => void;
+  };
   onEditTransaction: (transaction: Transaction) => void;
   /** Opens a brokerage row; absent on a calendar that draws none. */
   onEditInvestment?: (transaction: InvestmentTransaction) => void;
@@ -73,6 +86,7 @@ export function CalendarDayPanel({
   rows,
   balance,
   value,
+  notes,
   onEditTransaction,
   onEditInvestment,
   createLabel,
@@ -114,6 +128,16 @@ export function CalendarDayPanel({
       )}
 
       {value && <CalendarDayValueSection value={value} />}
+
+      {notes && (
+        <CalendarDayNote
+          date={date}
+          note={notes.note}
+          onSave={notes.onSave}
+          onDelete={notes.onDelete}
+          onDirtyChange={notes.onDirtyChange}
+        />
+      )}
 
       {transactions.length === 0 && occurrences.length === 0 && investments.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">{t('day.noItems')}</p>

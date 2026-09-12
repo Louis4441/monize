@@ -3,7 +3,11 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { ClockIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import {
+  ClockIcon,
+  ExclamationTriangleIcon,
+  PencilSquareIcon,
+} from '@heroicons/react/24/outline';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { usePayeeDisplay } from '@/hooks/usePayeeDisplay';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
@@ -18,6 +22,7 @@ import { gainLossColor } from '@/lib/format';
 import type { MonthGridDay } from '@/components/ui/MonthGrid';
 import type { CalendarDayRows } from '@/lib/calendar-rows';
 import type { DailyBalanceTotal } from '@/types/account';
+import type { DayNote } from '@/types/calendar';
 import type { DailyInvestmentValue } from '@/types/net-worth';
 import type { DailyMovementPoint, InvestmentTransaction } from '@/types/investment';
 import type { Transaction } from '@/types/transaction';
@@ -32,6 +37,8 @@ interface CalendarDayCellProps {
   onEditTransaction: (transaction: Transaction) => void;
   /** Opens a brokerage row; absent on a calendar that draws none. */
   onEditInvestment?: (transaction: InvestmentTransaction) => void;
+  /** The reader's own note on this day, when they have one. */
+  note?: DayNote;
   /** What the day's figure layer has to say: a balance, a value, a movement. */
   figure?: ReactNode;
 }
@@ -54,6 +61,7 @@ export function CalendarDayCell({
   onOpenDay,
   onEditTransaction,
   onEditInvestment,
+  note,
   figure,
 }: CalendarDayCellProps) {
   const t = useTranslations('calendar');
@@ -96,6 +104,18 @@ export function CalendarDayCell({
         </span>
         {figure}
       </div>
+
+      {note && (
+        <p
+          className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400"
+          data-testid="calendar-day-note-marker"
+        >
+          <PencilSquareIcon className="w-3 h-3 shrink-0" aria-label={t('notes.title')} />
+          {/* The first line only, and on a phone not even that: the day panel is
+              where a note is read. */}
+          <span className="hidden sm:inline truncate">{note.body.split('\n')[0]}</span>
+        </p>
+      )}
 
       {/* Below sm the chips are dots: a phone cell has no room for a label,
           and the day panel is the reading surface there. */}

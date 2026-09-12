@@ -4,6 +4,7 @@ import { CALENDAR_MAX_PER_SCHEDULE } from '@/hooks/useCalendarMonthData';
 import { TransactionsCalendarView } from './TransactionsCalendarView';
 import calendarNs from '@/i18n/messages/en/calendar.json';
 import { useViewModeStore } from '@/store/viewModeStore';
+import { useAuthStore } from '@/store/authStore';
 import { ACCOUNT_TYPE_META } from '@/lib/account-type-meta';
 import { SCHEDULED_KIND_CHIP_CLASSES } from '@/lib/scheduled-kind';
 import { TransactionStatus, type Transaction } from '@/types/transaction';
@@ -45,6 +46,17 @@ const mockGetOccurrences = vi.fn();
 vi.mock('@/lib/scheduled-transactions', () => ({
   scheduledTransactionsApi: {
     getOccurrences: (...args: unknown[]) => mockGetOccurrences(...args),
+  },
+}));
+
+const mockListDayNotes = vi.fn();
+const mockUpsertDayNote = vi.fn();
+const mockRemoveDayNote = vi.fn();
+vi.mock('@/lib/calendar-day-notes', () => ({
+  calendarDayNotesApi: {
+    list: (...args: unknown[]) => mockListDayNotes(...args),
+    upsert: (...args: unknown[]) => mockUpsertDayNote(...args),
+    remove: (...args: unknown[]) => mockRemoveDayNote(...args),
   },
 }));
 
@@ -188,6 +200,14 @@ beforeEach(() => {
   mockGetAllPages.mockResolvedValue([]);
   mockGetOccurrences.mockResolvedValue([]);
   mockGetDailyBalanceTotals.mockResolvedValue(balanceTotals());
+  mockListDayNotes.mockResolvedValue([]);
+  mockUpsertDayNote.mockResolvedValue({
+    date: '2026-06-10',
+    body: 'Saved',
+    updatedAt: '2026-06-10T00:00:00.000Z',
+  });
+  mockRemoveDayNote.mockResolvedValue(undefined);
+  useAuthStore.setState({ actingAsUserId: null });
   useViewModeStore.setState({
     surfaces: {
       transactions: { view: 'calendar', layers: ['transactions'] },
@@ -666,6 +686,95 @@ describe('TransactionsCalendarView', () => {
 
       const banner = await screen.findByText(/No exchange rate is available for USD->CAD/);
       expect(banner).toBeInTheDocument();
+    });
+  });
+  describe('day notes', () => {
+    it('asks for the grid range once, and not again when a filter moves', async () => {
+      renderView();
+
+      await waitFor(() => expect(mockListDayNotes).toHaveBeenCalled());
+      expect(mockListDayNotes).toHaveBeenCalledWith({
+        startDate: '2026-05-31',
+        endDate: '2026-07-04',
+      });
+      expect(mockListDayNotes).toHaveBeenCalledTimes(1);
+    });
+
+    it('marks the day that carries one and shows its first line', async () => {
+      mockListDayNotes.mockResolvedValue([
+        { date: '2026-06-10', body: 'Call the landlord\nand the plumber', updatedAt: '2026-06-09T12:00:00.000Z' },
+      ]);
+      renderView();
+
+      const marker = await within(cell('06/10/2026')).findByTestId('calendar-day-note-marker');
+      expect(marker).toHaveTextContent('Call the landlord');
+      expect(marker).not.toHaveTextContent('plumber');
+    });
+
+    it('reads the note in the day panel, and writes one from there', async () => {
+      mockListDayNotes.mockResolvedValue([
+        { date: '2026-06-10', body: 'Call the landlord', updatedAt: '2026-06-09T12:00:00.000Z' },
+      ]);
+      renderView();
+
+      await within(cell('06/10/2026')).findByTestId('calendar-day-note-marker');
+      fireEvent.click(cell('06/10/2026'));
+
+      const panel = await screen.findByRole('complementary', { name: '06/10/2026' });
+      expect(within(panel).getByText('Call the landlord')).toBeInTheDocument();
+
+      fireEvent.click(within(panel).getByRole('button', { name: 'Edit' }));
+      fireEvent.change(within(panel).getByRole('textbox'), {
+        target: { value: 'Call the plumber' },
+      });
+      await act(async () => {
+        fireEvent.click(within(panel).getByRole('button', { name: 'Save' }));
+      });
+
+      expect(mockUpsertDayNote).toHaveBeenCalledWith('2026-06-10', 'Call the plumber');
+    });
+
+    it('asks before a month change takes an unsaved draft away', async () => {
+      renderView();
+
+      await waitFor(() => expect(mockListDayNotes).toHaveBeenCalled());
+      fireEvent.click(cell('06/10/2026'));
+      const panel = await screen.findByRole('complementary', { name: '06/10/2026' });
+      fireEvent.click(within(panel).getByRole('button', { name: calendarNs.notes.add }));
+      fireEvent.change(within(panel).getByRole('textbox'), { target: { value: 'Draft' } });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
+
+      expect(await screen.findByText(calendarNs.notes.discardMessage)).toBeInTheDocument();
+      // The draft survives a cancel, and so does the month it belongs to.
+      const dialog = screen.getByRole('dialog');
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+      expect(screen.getByRole('heading', { name: '06/2026' })).toBeInTheDocument();
+      expect(within(panel).getByRole('textbox')).toHaveValue('Draft');
+    });
+
+    it('offers no note surface at all in an acting-delegate session', async () => {
+      useAuthStore.setState({ actingAsUserId: 'owner-1' });
+      renderView();
+
+      await waitFor(() => expect(mockGetAllPages).toHaveBeenCalled());
+      expect(mockListDayNotes).not.toHaveBeenCalled();
+
+      fireEvent.click(cell('06/10/2026'));
+      const panel = await screen.findByRole('complementary', { name: '06/10/2026' });
+      expect(
+        within(panel).queryByRole('button', { name: calendarNs.notes.add }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('says so in the banner when the notes could not be loaded', async () => {
+      mockListDayNotes.mockRejectedValue(new Error('offline'));
+      renderView();
+
+      expect(
+        await screen.findByText(calendarNs.banner.notesUnavailable),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('grid')).toBeInTheDocument();
     });
   });
 });

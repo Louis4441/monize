@@ -24,6 +24,9 @@ import {
 } from '@/lib/calendar-rows';
 import { monthGridDays, monthOf, type WeekStart } from '@/lib/calendar-month';
 import { occurrenceTouchesAccounts } from '@/lib/scheduled-effective-amount';
+import { useCalendarDayNotes } from '@/hooks/useCalendarDayNotes';
+import { useAuthStore } from '@/store/authStore';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useViewMode } from '@/store/viewModeStore';
 import type { Account, AccountType } from '@/types/account';
 import type { ScheduledTransaction } from '@/types/scheduled-transaction';
@@ -86,6 +89,15 @@ export function TransactionsCalendarView({
   const days = useMemo(() => monthGridDays(month, weekStartsOn), [month, weekStartsOn]);
   const gridStart = days[0];
   const gridEnd = days[days.length - 1];
+
+  // A note is personal and its routes are not delegate-reachable, so an acting
+  // delegate has no note surface and asks for nothing.
+  const isActingDelegate = useAuthStore((state) => !!state.actingAsUserId);
+  const notes = useCalendarDayNotes({
+    startDate: gridStart,
+    endDate: gridEnd,
+    enabled: !isActingDelegate,
+  });
 
   const data = useCalendarMonthData(gridStart, gridEnd, filters, refreshKey);
 
@@ -185,6 +197,12 @@ export function TransactionsCalendarView({
       });
     }
 
+    // Before the Balances layer's own causes, which return early: a note that
+    // could not be loaded is a cause whether or not that layer is on.
+    if (notes.error !== null) {
+      found.push({ key: 'notesUnavailable', message: t('banner.notesUnavailable') });
+    }
+
     if (!balancesOn || balances.data === null) return found;
 
     if (scopeEmpty) {
@@ -225,7 +243,7 @@ export function TransactionsCalendarView({
     }
 
     return found;
-  }, [data.data, balances.data, balancesOn, scopeEmpty, t]);
+  }, [data.data, balances.data, balancesOn, scopeEmpty, notes.error, t]);
 
   const selectedBalance = useMemo<CalendarDayBalance | undefined>(() => {
     if (!balancesReady || selectedDate === null) return undefined;
@@ -245,10 +263,12 @@ export function TransactionsCalendarView({
     <div>
       <CalendarToolbar
         month={month}
-        onMonthChange={(next) => {
-          setMonth(next);
-          setSelectedDate(null);
-        }}
+        onMonthChange={(next) =>
+          notes.requestChange(() => {
+            setMonth(next);
+            setSelectedDate(null);
+          })
+        }
         today={today}
         monthLabelId={monthLabelId}
         availableLayers={LAYERS}
@@ -285,7 +305,7 @@ export function TransactionsCalendarView({
             weekStartsOn={weekStartsOn}
             today={today}
             selectedDate={selectedDate}
-            onSelectDay={setSelectedDate}
+            onSelectDay={(day) => notes.requestChange(() => setSelectedDate(day))}
             labelledBy={monthLabelId}
             renderDay={(day) => {
               const point = balancesReady ? balances.byDay.get(day.date) : undefined;
@@ -294,8 +314,9 @@ export function TransactionsCalendarView({
                   day={day}
                   rows={layers.includes('transactions') ? byDay.get(day.date) : undefined}
                   chipLimit={CALENDAR_DAY_CHIP_LIMIT}
-                  onOpenDay={setSelectedDate}
+                  onOpenDay={(day) => notes.requestChange(() => setSelectedDate(day))}
                   onEditTransaction={onEditTransaction}
+                  note={notes.byDay.get(day.date)}
                   figure={
                     point && balanceCurrency !== null ? (
                       <CalendarBalanceFigure point={point} currencyCode={balanceCurrency} />
@@ -313,9 +334,19 @@ export function TransactionsCalendarView({
               date={selectedDate}
               rows={layers.includes('transactions') ? byDay.get(selectedDate) : undefined}
               balance={selectedBalance}
+              notes={
+                isActingDelegate
+                  ? undefined
+                  : {
+                      note: notes.byDay.get(selectedDate),
+                      onSave: notes.save,
+                      onDelete: notes.remove,
+                      onDirtyChange: notes.setDraftDirty,
+                    }
+              }
               onEditTransaction={onEditTransaction}
               onCreateOnDay={onCreateOnDay}
-              onClose={() => setSelectedDate(null)}
+              onClose={() => notes.requestChange(() => setSelectedDate(null))}
               categoryColorMap={categoryColorMap}
               categoryIconMap={categoryIconMap}
               categoryLabelMap={categoryLabelMap}
@@ -323,6 +354,16 @@ export function TransactionsCalendarView({
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={notes.confirmDiscard.isOpen}
+        title={t('notes.discardTitle')}
+        message={t('notes.discardMessage')}
+        confirmLabel={t('notes.discardConfirm')}
+        variant="warning"
+        onConfirm={notes.confirmDiscard.onConfirm}
+        onCancel={notes.confirmDiscard.onCancel}
+      />
     </div>
   );
 }
