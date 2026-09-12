@@ -12,6 +12,8 @@
       "Bash(npm run i18n:*)",
       "Bash(npm run migration:lint*)",
       "Bash(npm run build*)",
+      "Bash(npm ci*)",
+      "Bash(npm install*)",
       "Bash(npx tsc *)",
       "Bash(npx jest *)",
       "Bash(npx vitest *)",
