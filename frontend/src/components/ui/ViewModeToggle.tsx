@@ -2,31 +2,29 @@
 
 import { useTranslations } from 'next-intl';
 import type { ViewMode } from '@/store/viewModeStore';
+import { SEGMENTED_GROUP_CLASS, segmentClass } from '@/components/ui/segmented-control';
 
 interface ViewModeToggleProps {
   value: ViewMode;
   onChange: (view: ViewMode) => void;
 }
 
-const BUTTON_BASE = 'px-3 py-1 text-sm font-medium rounded transition-colors motion-reduce:transition-none';
-const BUTTON_ACTIVE = 'bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow-sm';
-const BUTTON_INACTIVE =
-  'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200';
-
 /**
  * The segmented control that switches a screen between its table and its
  * month calendar.
  *
- * It is `InvestmentViewToggle`'s control, deliberately: the two sit side by
+ * It wears `InvestmentViewToggle`'s chrome, deliberately: the two sit side by
  * side in the Investments toolbar, so a second styling of the same idea would
- * read as two different kinds of switch.
+ * read as two different kinds of switch. Both take it from
+ * `segmented-control.ts` rather than each spelling it out, which is how the
+ * two last drifted apart.
  */
 export function ViewModeToggle({ value, onChange }: ViewModeToggleProps) {
   const t = useTranslations('calendar');
 
   return (
     <div
-      className="inline-flex rounded-md bg-gray-100 dark:bg-gray-700 p-0.5"
+      className={SEGMENTED_GROUP_CLASS}
       role="group"
       aria-label={t('view.label')}
     >
@@ -34,7 +32,7 @@ export function ViewModeToggle({ value, onChange }: ViewModeToggleProps) {
         type="button"
         onClick={() => onChange('table')}
         aria-pressed={value === 'table'}
-        className={`${BUTTON_BASE} ${value === 'table' ? BUTTON_ACTIVE : BUTTON_INACTIVE}`}
+        className={segmentClass(value === 'table')}
       >
         {t('view.table')}
       </button>
@@ -42,7 +40,7 @@ export function ViewModeToggle({ value, onChange }: ViewModeToggleProps) {
         type="button"
         onClick={() => onChange('calendar')}
         aria-pressed={value === 'calendar'}
-        className={`${BUTTON_BASE} ${value === 'calendar' ? BUTTON_ACTIVE : BUTTON_INACTIVE}`}
+        className={segmentClass(value === 'calendar')}
       >
         {t('view.calendar')}
       </button>
