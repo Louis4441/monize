@@ -3,9 +3,7 @@
 --
 -- UNIQUE (user_id, note_date) is what makes the write a single statement: the
 -- upsert is INSERT ... ON CONFLICT DO UPDATE, so two saves of the same day
--- cannot interleave and a save never has to read first. It is also the only
--- index this table needs: the constraint already builds a btree on exactly
--- (user_id, note_date), which is the one predicate every read here uses.
+-- cannot interleave and a save never has to read first.
 --
 -- Direct RLS bucket, owner only: no delegate arm, so the uniform policy covers
 -- it with no entry in any map.
@@ -20,6 +18,9 @@ CREATE TABLE IF NOT EXISTS calendar_day_notes (
     CONSTRAINT uq_calendar_day_notes_user_date UNIQUE (user_id, note_date),
     CONSTRAINT ck_calendar_day_notes_body_length CHECK (char_length(body) BETWEEN 1 AND 2000)
 );
+
+CREATE INDEX IF NOT EXISTS idx_calendar_day_notes_user_date
+    ON calendar_day_notes(user_id, note_date);
 
 ALTER TABLE calendar_day_notes ENABLE ROW LEVEL SECURITY;
 
