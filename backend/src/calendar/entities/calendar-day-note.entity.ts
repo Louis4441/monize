@@ -2,7 +2,6 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  Index,
   PrimaryGeneratedColumn,
   Unique,
   UpdateDateColumn,
@@ -13,11 +12,13 @@ import {
  *
  * The unique constraint is the model: a date has at most one note, which is
  * what lets the write be a single `INSERT ... ON CONFLICT DO UPDATE` rather
- * than a read followed by a decision.
+ * than a read followed by a decision. It is also the table's only index -- the
+ * constraint already builds a btree on exactly `(user_id, note_date)`, so a
+ * separate `@Index` on the same columns would be a second write per save
+ * buying nothing.
  */
 @Entity("calendar_day_notes")
 @Unique("uq_calendar_day_notes_user_date", ["userId", "noteDate"])
-@Index("idx_calendar_day_notes_user_date", ["userId", "noteDate"])
 export class CalendarDayNote {
   @PrimaryGeneratedColumn("uuid")
   id: string;
