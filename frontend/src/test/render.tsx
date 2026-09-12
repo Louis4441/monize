@@ -93,5 +93,45 @@ function customRenderHook<Result, Props>(
   });
 }
 
+/**
+ * Render in a locale other than `en`, for a test whose subject IS what a
+ * different catalogue draws.
+ *
+ * The shared providers pin `en`, so a test about another locale used to have
+ * no option but to build a `NextIntlClientProvider` of its own and reach past
+ * this module for RTL's `render` -- two exemptions in
+ * `intl-harness.guard.test.ts` each time, and a provider carrying whatever
+ * namespaces its author happened to list.
+ *
+ * Building it here instead keeps this module the one place the provider is
+ * constructed, and keeps `onError` attached: a namespace the caller did not
+ * supply fails the test by name rather than rendering its keys, which is the
+ * defect the hand-built wrappers kept reintroducing. The caller still chooses
+ * the namespaces, because globbing twenty locales' catalogues into every test
+ * file that imports this module is not worth what it costs.
+ */
+function renderInLocale(
+  ui: ReactElement,
+  {
+    locale,
+    messages,
+    ...options
+  }: RenderOptions & { locale: string; messages: Record<string, unknown> },
+) {
+  function LocaleProviders({ children }: { children: ReactNode }) {
+    return (
+      <NextIntlClientProvider
+        locale={locale}
+        messages={messages}
+        onError={recordIfIntlError}
+      >
+        <ThemeProvider>{children}</ThemeProvider>
+      </NextIntlClientProvider>
+    );
+  }
+
+  return render(ui, { ...options, wrapper: LocaleProviders });
+}
+
 export * from '@testing-library/react';
-export { customRender as render, customRenderHook as renderHook };
+export { customRender as render, customRenderHook as renderHook, renderInLocale };

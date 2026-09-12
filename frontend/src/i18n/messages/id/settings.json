@@ -748,6 +748,7 @@
     "storedBackups": {
       "heading": "Cadangan Otomatis",
       "description": "Cadangan yang dibuat server ini untuk Anda sesuai jadwalnya sendiri. Unduh salah satu untuk menyimpan salinan Anda sendiri, atau pulihkan darinya melalui formulir di bawah.",
+      "adminScheduleNote": "Pengaturan cadangan otomatis ada di <link>Admin → Cadangan</link>.",
       "loading": "Memuat cadangan...",
       "loadFailed": "Gagal memuat cadangan yang tersimpan di server",
       "retryButton": "Coba Lagi",

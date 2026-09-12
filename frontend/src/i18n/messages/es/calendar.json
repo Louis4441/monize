@@ -1,0 +1,10 @@
+{
+  "view": {
+    "label": "Vista",
+    "table": "Tabla",
+    "calendar": "Calendario"
+  },
+  "grid": {
+    "label": "Mes"
+  }
+}

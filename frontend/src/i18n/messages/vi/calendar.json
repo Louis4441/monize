@@ -1,0 +1,10 @@
+{
+  "view": {
+    "label": "Chế độ xem",
+    "table": "Bảng",
+    "calendar": "Lịch"
+  },
+  "grid": {
+    "label": "Tháng"
+  }
+}

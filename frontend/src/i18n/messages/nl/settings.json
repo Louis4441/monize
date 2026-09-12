@@ -748,6 +748,7 @@
     "storedBackups": {
       "heading": "Automatische back-ups",
       "description": "Back-ups die deze server volgens zijn eigen schema voor u heeft gemaakt. Download er een om zelf een kopie te bewaren, of herstel er een mee via het formulier hieronder.",
+      "adminScheduleNote": "De instellingen voor automatische back-ups staan in <link>Beheer → Back-ups</link>.",
       "loading": "Back-ups laden...",
       "loadFailed": "De op de server opgeslagen back-ups konden niet worden geladen",
       "retryButton": "Opnieuw proberen",

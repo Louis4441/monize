@@ -748,6 +748,7 @@
     "storedBackups": {
       "heading": "[XX-Automatic Backups-XX]",
       "description": "[XX-Backups this server created for you on its own schedule. Download one to keep your own copy, or restore from one using the form below.-XX]",
+      "adminScheduleNote": "[XX-Automatic backup settings are in <link>Admin → Backups</link>.-XX]",
       "loading": "[XX-Loading backups...-XX]",
       "loadFailed": "[XX-Failed to load the backups stored on the server-XX]",
       "retryButton": "[XX-Try Again-XX]",

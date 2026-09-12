@@ -23,8 +23,10 @@ import { describe, it, expect } from 'vitest';
  *      below it, so adding one narrows the catalogue rather than widening it.
  *
  * Both lists shrink only. An entry is a deliberate exception with a reason, not
- * a to-do: a test that genuinely varies the locale has to build its own
- * provider, because the shared one pins `en`.
+ * a to-do. The two locale-varying entries predate `renderInLocale`
+ * (`src/test/render.tsx`), which builds the provider in the one place that is
+ * allowed to and keeps `onError` attached -- so a test whose subject is another
+ * catalogue now needs no exemption at all, and a new one must not take one.
  */
 /**
  * TEST files only. Both patterns are correct and necessary in production --
@@ -77,9 +79,9 @@ const ALLOWED_RTL_RENDER = new Set([
 ]);
 
 const ALLOWED_PROVIDER = new Set([
-  // Locale-varying, as above. (`src/test/render.tsx` -- the one place the
-  // provider is legitimately built -- is not a test file, so the scan never
-  // reaches it and it needs no exemption.)
+  // Locale-varying, as above, and predating `renderInLocale`. (`src/test/render.tsx`
+  // -- the one place the provider is legitimately built -- is not a test file, so
+  // the scan never reaches it and it needs no exemption.)
   '/src/app/error.test.tsx',
   '/src/components/whats-new/WhatsNewModal.test.tsx',
 ]);

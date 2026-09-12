@@ -748,6 +748,7 @@
     "storedBackups": {
       "heading": "自动备份",
       "description": "此服务器按其自身计划为你创建的备份。下载一份自行保存，或使用下方表单从中恢复。",
+      "adminScheduleNote": "自动备份设置位于<link>管理 → 备份</link>。",
       "loading": "正在加载备份...",
       "loadFailed": "无法加载服务器上存储的备份",
       "retryButton": "重试",

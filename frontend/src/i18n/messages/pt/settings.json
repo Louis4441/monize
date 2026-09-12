@@ -748,6 +748,7 @@
     "storedBackups": {
       "heading": "Cópias de segurança automáticas",
       "description": "Cópias de segurança que este servidor criou para si segundo o seu próprio agendamento. Transfira uma para guardar a sua própria cópia ou restaure a partir de uma com o formulário abaixo.",
+      "adminScheduleNote": "As definições de cópia automática estão em <link>Admin → Cópias de segurança</link>.",
       "loading": "A carregar cópias de segurança...",
       "loadFailed": "Não foi possível carregar as cópias de segurança guardadas no servidor",
       "retryButton": "Tentar novamente",

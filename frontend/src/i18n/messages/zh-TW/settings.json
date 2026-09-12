@@ -748,6 +748,7 @@
     "storedBackups": {
       "heading": "自動備份",
       "description": "此伺服器依其自身排程為你建立的備份。下載一份自行保存，或使用下方表單從中還原。",
+      "adminScheduleNote": "自動備份設定位於<link>管理 → 備份</link>。",
       "loading": "正在載入備份...",
       "loadFailed": "無法載入伺服器上儲存的備份",
       "retryButton": "重試",

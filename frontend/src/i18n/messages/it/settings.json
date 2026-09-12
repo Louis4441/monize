@@ -748,6 +748,7 @@
     "storedBackups": {
       "heading": "Backup automatici",
       "description": "Backup creati per te da questo server secondo la sua pianificazione. Scaricane uno per conservare una copia tua, oppure ripristinane uno con il modulo qui sotto.",
+      "adminScheduleNote": "Le impostazioni di backup automatico si trovano in <link>Admin → Backup</link>.",
       "loading": "Caricamento dei backup...",
       "loadFailed": "Impossibile caricare i backup archiviati sul server",
       "retryButton": "Riprova",

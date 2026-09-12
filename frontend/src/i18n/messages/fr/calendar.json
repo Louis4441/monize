@@ -1,0 +1,10 @@
+{
+  "view": {
+    "label": "Affichage",
+    "table": "Tableau",
+    "calendar": "Calendrier"
+  },
+  "grid": {
+    "label": "Mois"
+  }
+}

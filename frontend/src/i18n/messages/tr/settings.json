@@ -748,6 +748,7 @@
     "storedBackups": {
       "heading": "Otomatik Yedekler",
       "description": "Bu sunucunun kendi zamanlamasına göre sizin için oluşturduğu yedekler. Kendi kopyanızı saklamak için birini indirin veya aşağıdaki formla birinden geri yükleyin.",
+      "adminScheduleNote": "Otomatik yedekleme ayarları <link>Yönetici → Yedekler</link> bölümündedir.",
       "loading": "Yedekler yükleniyor...",
       "loadFailed": "Sunucuda saklanan yedekler yüklenemedi",
       "retryButton": "Yeniden Dene",
