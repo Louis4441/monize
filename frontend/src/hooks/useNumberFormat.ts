@@ -213,6 +213,34 @@ export function useNumberFormat() {
     [numberFormat, defaultCurrency, language]
   );
 
+  /**
+   * As much of a money figure as a narrow cell can hold: compact notation, and
+   * no fraction digits at all below the first thousand.
+   *
+   * A calendar day on a phone is a column about fifty pixels wide, and a
+   * balance rendered in full simply does not fit in one -- a figure that
+   * overflows or wraps mid-number is not a figure a reader can use.
+   * `formatCurrencyAxis` is the same compact notation for a chart tick, but it
+   * keeps one fraction digit at every size, which reads as a broken cent on a
+   * three-figure balance ("$344.3"). This is the figure for a cell: "$344",
+   * "$13.3K", "$1.2M".
+   */
+  const formatCurrencyTight = useCallback(
+    (amount: number, currencyCode?: string): string => {
+      const currency = currencyCode || defaultCurrency;
+      const locale = getEffectiveLocale(numberFormat, language);
+      return getNumberFormat(locale, {
+        style: 'currency',
+        currency,
+        currencyDisplay: 'narrowSymbol',
+        notation: 'compact',
+        compactDisplay: 'short',
+        maximumFractionDigits: Math.abs(amount) < 1000 ? 0 : 1,
+      }).format(amount);
+    },
+    [numberFormat, defaultCurrency, language]
+  );
+
   const formatNumber = useCallback(
     (value: number, decimals: number = 2): string => {
       const locale = getEffectiveLocale(numberFormat, language);
@@ -428,5 +456,5 @@ export function useNumberFormat() {
     [numberFormat, defaultCurrency, language]
   );
 
-  return { formatCurrency, formatCurrencyPrecise, formatCurrencyCompact, formatCurrencyAxis, formatCurrencyFlag, formatCurrencyLabel, formatNumber, formatBytes, formatPercent, formatPercentTrimmed, formatSignedPercent, formatQuantity, formatShareQuantity, formatPrice, defaultCurrency, numberFormat, numberLocale, numberSeparators };
+  return { formatCurrency, formatCurrencyPrecise, formatCurrencyCompact, formatCurrencyAxis, formatCurrencyTight, formatCurrencyFlag, formatCurrencyLabel, formatNumber, formatBytes, formatPercent, formatPercentTrimmed, formatSignedPercent, formatQuantity, formatShareQuantity, formatPrice, defaultCurrency, numberFormat, numberLocale, numberSeparators };
 }

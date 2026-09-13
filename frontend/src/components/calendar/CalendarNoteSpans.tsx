@@ -26,6 +26,10 @@ interface CalendarNoteSpansProps {
  * screen reader (`CalendarDayCell`), the layer above the cells is `aria-hidden`,
  * and it lets every click through to the day underneath -- so reading or editing
  * a note is the same click on the same day it has always been.
+ *
+ * A phone gets the same band rather than a glyph: a column there is about fifty
+ * pixels, so the band drops the pencil and takes two lines of smaller type to
+ * put as much of the sentence on screen as the run is wide.
  */
 export function CalendarNoteSpans({ week, byDay }: CalendarNoteSpansProps) {
   const spans = dayNoteWeekSpans(week, byDay);
@@ -38,15 +42,25 @@ export function CalendarNoteSpans({ week, byDay }: CalendarNoteSpansProps) {
           data-testid="calendar-note-span"
           data-note-columns={span.columns}
           style={{ gridColumn: `${span.startColumn} / span ${span.columns}` }}
-          className={`flex min-w-0 items-center gap-1 overflow-hidden px-1 py-0.5 text-xs ${NOTE_PAPER_CLASS} ${
-            span.opensHere ? 'ml-1 rounded-l' : ''
-          } ${span.closesHere ? 'mr-1 rounded-r' : ''}`}
+          className={`flex min-w-0 items-center gap-1 overflow-hidden px-0.5 py-0.5 text-[10px] leading-tight sm:px-1 sm:text-xs ${NOTE_PAPER_CLASS} ${
+            span.opensHere ? 'ml-0.5 rounded-l sm:ml-1' : ''
+          } ${span.closesHere ? 'mr-0.5 rounded-r sm:mr-1' : ''}`}
         >
           {/* The pencil marks where the note begins; a band continuing from the
               week above carries the text alone, so the glyph never claims a
-              second start for one note. */}
-          {span.opensHere && <PencilSquareIcon aria-hidden className="h-3 w-3 shrink-0" />}
-          <span className="truncate">{noteLine(span.note)}</span>
+              second start for one note. Below `sm` it is dropped entirely: on a
+              phone column its twelve pixels are two or three letters of the
+              note, and the band's own square edge already says where the run
+              opens. */}
+          {span.opensHere && (
+            <PencilSquareIcon aria-hidden className="hidden h-3 w-3 shrink-0 sm:block" />
+          )}
+          {/* Two lines of a phone column, one truncated line from `sm` up:
+              `line-clamp-none` puts the display back to a block, which is what
+              `truncate`'s ellipsis needs. */}
+          <span className="line-clamp-2 min-w-0 break-words sm:line-clamp-none sm:truncate">
+            {noteLine(span.note)}
+          </span>
         </div>
       ))}
     </>

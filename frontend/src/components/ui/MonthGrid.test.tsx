@@ -316,7 +316,7 @@ describe('MonthGrid', () => {
       expect(weeks.flat()).toEqual(days);
     });
 
-    it('draws the layer over the week, under no cell, and only from sm up', () => {
+    it('draws the layer over the week, under no cell, at every width', () => {
       const { container } = renderGrid({
         renderWeekSpans: () => <div data-testid="span">Away</div>,
       });
@@ -332,9 +332,10 @@ describe('MonthGrid', () => {
           .getAllByRole('gridcell')
           .at(-1),
       );
-      // A phone column is 50px wide, which is no room for a band.
-      expect(layer.className).toContain('hidden');
-      expect(layer.className).toContain('sm:grid');
+      // Drawn at every width: a phone column is narrow enough that the run's
+      // own width is the only room a note's text has to be read in.
+      expect(layer.className).toContain('grid');
+      expect(layer.className).not.toContain('hidden');
     });
 
     it('keeps the layer out of the grid semantics and out of the way of a click', () => {

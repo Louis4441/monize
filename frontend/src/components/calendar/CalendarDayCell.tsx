@@ -3,12 +3,9 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import {
-  ClockIcon,
-  ExclamationTriangleIcon,
-  PencilSquareIcon,
-} from '@heroicons/react/24/outline';
+import { ClockIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { usePayeeDisplay } from '@/hooks/usePayeeDisplay';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
 import { balanceColor } from '@/lib/format';
@@ -113,10 +110,11 @@ export function CalendarDayCell({
       // cell holds the day's chips and the note's band, so it is half again as
       // tall (7rem -> 10.5rem) and a day with three chips no longer fills it.
       className={`min-h-[6rem] sm:min-h-[10.5rem] flex flex-col gap-0.5 ${
-        // The note's band is drawn across the bottom of the week from sm up, so
-        // a covered day keeps that much room free rather than letting a busy
-        // day's last chip end up underneath it.
-        note ? 'sm:pb-6' : ''
+        // The note's band is drawn across the bottom of the week at every
+        // width, so a covered day keeps that much room free rather than letting
+        // a busy day's last chip end up underneath it. A phone band takes two
+        // lines of smaller type, which is taller than the desktop band's one.
+        note ? 'pb-8 sm:pb-6' : ''
       }`}
     >
       {/* On a phone the figure goes UNDER the date rather than beside it: a
@@ -152,18 +150,22 @@ export function CalendarDayCell({
           hiding the count too would leave a phone screen reader a month of bare
           dates. The glyph stays `aria-hidden` beside an `sr-only` phrase so the
           number is read as a count of something rather than as a stray digit. */}
-      <div className="sm:hidden flex flex-wrap items-center gap-0.5">
-        <span className="flex flex-wrap items-center gap-0.5" aria-hidden="true">
+      <div className="sm:hidden flex flex-wrap items-center gap-1">
+        {/* Dots big enough to tell one colour from another at arm's length, and
+            wrapping onto as many rows as the day needs: a phone column fits
+            three of them, so a busy day is two rows of dots rather than five
+            squeezed into one. */}
+        <span className="flex flex-wrap items-center gap-1" aria-hidden="true">
           {shownInvestments.map((chip) => (
-            <span key={chip.key} className={`h-1.5 w-1.5 rounded-full ${chip.className}`} />
+            <span key={chip.key} className={`h-2.5 w-2.5 rounded-full ${chip.className}`} />
           ))}
           {shownTransactions.map((chip) => (
-            <span key={chip.key} className={`h-1.5 w-1.5 rounded-full ${chip.className}`} />
+            <span key={chip.key} className={`h-2.5 w-2.5 rounded-full ${chip.className}`} />
           ))}
           {shownOccurrences.map((chip) => (
             <span
               key={chip.key}
-              className={`h-1.5 w-1.5 rounded-full border border-dashed border-current ${chip.className}`}
+              className={`h-2.5 w-2.5 rounded-full border border-dashed border-current ${chip.className}`}
             />
           ))}
         </span>
@@ -270,18 +272,16 @@ export function CalendarDayCell({
 }
 
 /**
- * One day's note, as the cell shows it.
+ * One day's note, for a screen reader.
  *
- * Below `sm` this is the whole of it: the pencil on a one-day note and on the
- * first day of a run, a continuation bar on the days after it, so a week away
- * reads as one thing running across the grid rather than as seven separate
- * notes -- and so the same sentence is not printed seven times.
+ * The note is SEEN as a band across the days it covers (`CalendarNoteSpans`),
+ * at every width, and that band is decoration the screen reader never meets. So
+ * this is what tells a screen reader which days a note covers, and it is
+ * `sr-only` everywhere: a second visible copy in the cell would print the same
+ * sentence once per covered day.
  *
- * From `sm` up the note is drawn as a band across the bottom of the days it
- * covers (`CalendarNoteSpans`), and that band is decoration the screen reader
- * never sees. So this does not disappear there, it goes `sr-only`: it stays the
- * thing that tells a screen reader which days a note covers, which is why the
- * bar carries an accessible name rather than `aria-hidden`.
+ * A day in the middle or at the end of a run says only that it is covered --
+ * the text belongs to the run, and is carried by the day the run opens on.
  */
 function CalendarDayNoteMarker({
   note,
@@ -293,38 +293,29 @@ function CalendarDayNoteMarker({
   label: string;
 }) {
   const position = dayNoteSpanPosition(note, date);
-
-  if (position === 'middle' || position === 'end') {
-    return (
-      <p
-        className="flex items-center text-xs text-gray-500 dark:text-gray-400 sm:sr-only"
-        data-testid="calendar-day-note-marker"
-        data-note-span={position}
-      >
-        <span
-          className={`block h-0.5 flex-1 rounded-full bg-gray-300 dark:bg-gray-600 ${
-            position === 'end' ? 'mr-1' : ''
-          }`}
-          role="img"
-          aria-label={label}
-        />
-      </p>
-    );
-  }
+  const continues = position === 'middle' || position === 'end';
 
   return (
-    <p
-      className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 sm:sr-only"
-      data-testid="calendar-day-note-marker"
-      data-note-span={position}
-    >
-      <PencilSquareIcon className="w-3 h-3 shrink-0" aria-label={label} />
-      {/* The first line, for a screen reader from sm up and for nobody on a
-          phone: there the day panel is where a note is read, and from sm up the
-          band at the bottom of the day is where it is seen. */}
-      <span className="hidden sm:inline truncate">{note.body.split('\n')[0]}</span>
+    <p className="sr-only" data-testid="calendar-day-note-marker" data-note-span={position}>
+      <span>{label}</span> {!continues && <span>{note.body.split('\n')[0]}</span>}
     </p>
   );
+}
+
+/**
+ * The money formatter a day cell's figure reads in, for the width it is drawn
+ * at.
+ *
+ * A phone column is about fifty pixels, where "$13,344.33" either overflows the
+ * cell or wraps mid-number; `formatCurrencyTight` renders the same figure as
+ * "$13.3K", and "$344" where a thousand does not scale. A real branch and not a
+ * breakpoint class: the two renderings are different TEXT, so drawing both and
+ * hiding one would read the day's balance to a screen reader twice.
+ */
+function useDayFigureMoney(): (value: number, currencyCode?: string) => string {
+  const { formatCurrency, formatCurrencyTight } = useNumberFormat();
+  const isMobile = useIsMobile();
+  return isMobile ? formatCurrencyTight : formatCurrency;
 }
 
 /**
@@ -347,7 +338,7 @@ export function CalendarBalanceFigure({
   currencyCode: string;
 }) {
   const t = useTranslations('calendar');
-  const { formatCurrency } = useNumberFormat();
+  const formatMoney = useDayFigureMoney();
 
   if (point.total === null) {
     // Which unknown this is decides which screen repairs it: a missing pair is
@@ -370,7 +361,7 @@ export function CalendarBalanceFigure({
       {point.isProjected && (
         <ClockIcon className="w-3 h-3 shrink-0 self-center" aria-label={t('balance.projected')} />
       )}
-      {formatCurrency(point.total, currencyCode)}
+      {formatMoney(point.total, currencyCode)}
     </span>
   );
 }
@@ -391,7 +382,7 @@ export function CalendarValueFigure({
   point: DailyInvestmentValue;
   currencyCode: string;
 }) {
-  const { formatCurrency } = useNumberFormat();
+  const formatMoney = useDayFigureMoney();
 
   if (!isDailyValueComplete(point)) {
     return (
@@ -407,7 +398,7 @@ export function CalendarValueFigure({
       className="text-xs tabular-nums text-gray-900 dark:text-gray-100"
       data-testid="calendar-value-figure"
     >
-      {formatCurrency(point.value, currencyCode)}
+      {formatMoney(point.value, currencyCode)}
     </span>
   );
 }

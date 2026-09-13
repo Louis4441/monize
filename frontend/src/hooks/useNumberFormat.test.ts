@@ -170,6 +170,28 @@ describe('useNumberFormat', () => {
     expect(formatted).toBeTruthy();
   });
 
+  it('formatCurrencyTight drops the decimals below a thousand and scales above it', () => {
+    // The figure a calendar day on a phone has room for: no cents at three
+    // figures, and K/M rather than a number that overflows its column.
+    const { result } = renderHook(() => useNumberFormat());
+    expect(result.current.formatCurrencyTight(344.33)).toBe('$344');
+    expect(result.current.formatCurrencyTight(13344.33)).toBe('$13.3K');
+    expect(result.current.formatCurrencyTight(2_500_000)).toBe('$2.5M');
+  });
+
+  it('formatCurrencyTight keeps a negative balance negative, and honours the currency', () => {
+    const { result } = renderHook(() => useNumberFormat());
+    expect(result.current.formatCurrencyTight(-13344.33)).toBe('-$13.3K');
+    expect(result.current.formatCurrencyTight(1500, 'EUR')).toBe('€1.5K');
+  });
+
+  it('formatCurrencyTight renders a zero balance as zero, not as unknown', () => {
+    // An account holding nothing holds zero: the tight figure is the only thing
+    // a phone cell prints, so it has to say so.
+    const { result } = renderHook(() => useNumberFormat());
+    expect(result.current.formatCurrencyTight(0)).toBe('$0');
+  });
+
   it('formatCurrencyLabel produces M suffix for millions', () => {
     const { result } = renderHook(() => useNumberFormat());
     expect(result.current.formatCurrencyLabel(2_500_000)).toContain('M');
