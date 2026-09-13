@@ -15,8 +15,8 @@ interface ViewModeToggleProps {
  * month calendar.
  *
  * Icons rather than words, because of where it sits: the calendar toolbar's
- * right-hand end beside a legend, and the register's grey strip between the
- * density button and the pager. Both rows compete for width on a phone, and a
+ * right-hand end beside a legend, and the register's grey strip beside the
+ * "Showing 1-25 of 90" line. Both rows compete for width on a phone, and a
  * table and a month grid are two of the few things a pictogram says faster than
  * a label. The words survive as the accessible name and the tooltip, so the
  * control is still named for a screen reader and for anyone who hovers it.
