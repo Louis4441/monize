@@ -50,6 +50,17 @@ interface CalendarDayCellProps {
   figure?: ReactNode;
 }
 
+/**
+ * How many dots a phone cell draws.
+ *
+ * Deliberately one more than `CALENDAR_DAY_CHIP_LIMIT`, and not the same
+ * number: a chip is a LINE in a cell of fixed height, so its limit is that
+ * height in chips, while the dots wrap onto as many rows as the day needs and
+ * six of them are two rows of a phone column. The count beside them is the
+ * day's whole total either way, so a day holding more than this still says so.
+ */
+export const CALENDAR_DAY_DOT_LIMIT = 6;
+
 // A chip is a row, not a line of text: what the row is about reads from the
 // left and its figure is pushed to the right edge, so a day's amounts line up
 // under each other the way the register's amount column does.
@@ -89,18 +100,13 @@ export function CalendarDayCell({
   const occurrences = rows?.occurrences ?? [];
   const investments = rows?.investments ?? [];
   const total = transactions.length + occurrences.length + investments.length;
-  // A trade is what the reader came to the Investments calendar for, so the
-  // brokerage chips take the room first; the cash rows and then the scheduled
-  // items fill what is left.
-  const shownInvestments = investments.slice(0, chipLimit);
-  const shownTransactions = transactions.slice(
-    0,
-    Math.max(0, chipLimit - shownInvestments.length),
+  // The chips a desktop cell has the height for, and the dots a phone cell has
+  // the room for -- one order of precedence, two limits.
+  const { shownInvestments, shownTransactions, shownOccurrences } = fillDay(
+    { transactions, occurrences, investments },
+    chipLimit,
   );
-  const shownOccurrences = occurrences.slice(
-    0,
-    Math.max(0, chipLimit - shownInvestments.length - shownTransactions.length),
-  );
+  const dots = fillDay({ transactions, occurrences, investments }, CALENDAR_DAY_DOT_LIMIT);
   const hidden =
     total - shownInvestments.length - shownTransactions.length - shownOccurrences.length;
 
@@ -156,13 +162,13 @@ export function CalendarDayCell({
             three of them, so a busy day is two rows of dots rather than five
             squeezed into one. */}
         <span className="flex flex-wrap items-center gap-1" aria-hidden="true">
-          {shownInvestments.map((chip) => (
+          {dots.shownInvestments.map((chip) => (
             <span key={chip.key} className={`h-2.5 w-2.5 rounded-full ${chip.className}`} />
           ))}
-          {shownTransactions.map((chip) => (
+          {dots.shownTransactions.map((chip) => (
             <span key={chip.key} className={`h-2.5 w-2.5 rounded-full ${chip.className}`} />
           ))}
-          {shownOccurrences.map((chip) => (
+          {dots.shownOccurrences.map((chip) => (
             <span
               key={chip.key}
               className={`h-2.5 w-2.5 rounded-full border border-dashed border-current ${chip.className}`}
@@ -269,6 +275,27 @@ export function CalendarDayCell({
       )}
     </div>
   );
+}
+
+/**
+ * Which of a day's rows a limited number of marks stands for.
+ *
+ * A trade is what the reader came to the Investments calendar for, so the
+ * brokerage rows take the room first; the cash rows and then the scheduled
+ * items fill what is left. One order for both the chips and the dots, which is
+ * what keeps a phone's marks standing for the same rows a desktop's chips name.
+ */
+function fillDay(rows: CalendarDayRows, limit: number) {
+  const shownInvestments = rows.investments.slice(0, limit);
+  const shownTransactions = rows.transactions.slice(
+    0,
+    Math.max(0, limit - shownInvestments.length),
+  );
+  const shownOccurrences = rows.occurrences.slice(
+    0,
+    Math.max(0, limit - shownInvestments.length - shownTransactions.length),
+  );
+  return { shownInvestments, shownTransactions, shownOccurrences };
 }
 
 /**
