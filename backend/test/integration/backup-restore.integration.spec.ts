@@ -929,9 +929,12 @@ describe("Backup export/restore round-trip (integration)", () => {
       email: "note-b@example.com",
     });
 
+    // A note covering a RUN of days, so the round trip is asked about both
+    // ends: a backup that carried only `note_date` would restore a five-day
+    // vacation as a single day and nothing else would notice.
     await dataSource.query(
-      `INSERT INTO calendar_day_notes (id, user_id, note_date, body)
-       VALUES ($1, $2, '2026-06-14', 'Rent moved to the 15th')`,
+      `INSERT INTO calendar_day_notes (id, user_id, note_date, end_date, body)
+       VALUES ($1, $2, '2026-06-14', '2026-06-18', 'Rent moved to the 15th')`,
       [randomUUID(), userA.id],
     );
 
@@ -953,14 +956,18 @@ describe("Backup export/restore round-trip (integration)", () => {
     );
 
     const restored = await dataSource.query(
-      `SELECT note_date::TEXT AS note_date, body
+      `SELECT note_date::TEXT AS note_date, end_date::TEXT AS end_date, body
          FROM calendar_day_notes WHERE user_id = $1`,
       [userB.id],
     );
-    // The day is a calendar date, so it must land on the same day whatever zone
-    // the restoring server is in.
+    // Both ends are calendar dates, so both must land on the same day whatever
+    // zone the restoring server is in.
     expect(restored).toEqual([
-      { note_date: "2026-06-14", body: "Rent moved to the 15th" },
+      {
+        note_date: "2026-06-14",
+        end_date: "2026-06-18",
+        body: "Rent moved to the 15th",
+      },
     ]);
   });
 

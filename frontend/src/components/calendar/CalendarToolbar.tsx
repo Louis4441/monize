@@ -1,7 +1,9 @@
 'use client';
 
+import { useCallback, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { CalendarMonthPicker } from '@/components/calendar/CalendarMonthPicker';
 import { HOVER_ROW_ON_PAGE } from '@/components/ui/Card';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { monthOf, shiftMonth } from '@/lib/calendar-month';
@@ -36,6 +38,16 @@ interface CalendarToolbarProps<L extends CalendarLayer> {
   legendAccountTypes: readonly AccountType[];
   /** Whether the month holds any scheduled occurrence. */
   legendHasScheduled: boolean;
+  /**
+   * The Table / Calendar switch, last in the row.
+   *
+   * It lives here rather than beside the page title so it sits in the same row
+   * as the month navigation and the legend, which is where the rest of the
+   * calendar's chrome is; in table mode the same control rides the register's
+   * own toolbar (`ListTopToolbar`). Passed in rather than rendered here because
+   * which surface it switches is the page's business, not this row's.
+   */
+  viewToggle?: React.ReactNode;
 }
 
 const NAV_BUTTON =
@@ -75,10 +87,22 @@ export function CalendarToolbar<L extends CalendarLayer>({
   onToggleLayer,
   legendAccountTypes,
   legendHasScheduled,
+  viewToggle,
 }: CalendarToolbarProps<L>) {
   const t = useTranslations('calendar');
   const common = useTranslations('common');
   const { formatMonth } = useDateFormat();
+
+  const monthButtonRef = useRef<HTMLButtonElement>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  const jumpTo = useCallback(
+    (next: string) => {
+      onMonthChange(next);
+      setPickerOpen(false);
+    },
+    [onMonthChange],
+  );
 
   return (
     <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -93,12 +117,34 @@ export function CalendarToolbar<L extends CalendarLayer>({
         >
           <ChevronLeftIcon className="w-5 h-5" />
         </button>
+        {/* The month is a control, not a caption: stepping from June 2026 to
+            March 1998 is 339 clicks on the arrows beside it. The heading stays
+            the grid's accessible name, so the button lives inside it rather
+            than replacing it. */}
         <h2
           id={monthLabelId}
-          className="min-w-[9rem] text-center text-base font-semibold text-gray-900 dark:text-gray-100"
+          className="text-base font-semibold text-gray-900 dark:text-gray-100"
         >
-          {formatMonth(month)}
+          <button
+            ref={monthButtonRef}
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded={pickerOpen}
+            onClick={() => setPickerOpen((open) => !open)}
+            title={t('monthPicker.title')}
+            className={`min-w-[9rem] rounded-md px-2 py-1 text-center ${HOVER_ROW_ON_PAGE} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
+          >
+            {formatMonth(month)}
+          </button>
         </h2>
+        {pickerOpen && (
+          <CalendarMonthPicker
+            month={month}
+            onSelect={jumpTo}
+            onClose={() => setPickerOpen(false)}
+            anchorRef={monthButtonRef}
+          />
+        )}
         <button
           type="button"
           className={NAV_BUTTON}
@@ -130,35 +176,45 @@ export function CalendarToolbar<L extends CalendarLayer>({
         ))}
       </div>
 
-      {(legendAccountTypes.length > 0 || legendHasScheduled) && (
-        <ul
-          className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:ml-auto"
-          aria-label={t('legend.label')}
-        >
-          {legendAccountTypes.map((accountType) => (
-            <li key={accountType} className="flex items-center gap-1.5">
-              <span
-                aria-hidden="true"
-                className={`inline-block w-3 h-3 rounded-sm ${ACCOUNT_TYPE_META[accountType].pillClass}`}
-              />
-              <span className="text-xs text-gray-600 dark:text-gray-400">
-                {common(`accountTypes.${accountType}`)}
-              </span>
-            </li>
-          ))}
-          {legendHasScheduled && (
-            <li className="flex items-center gap-1.5">
-              <span
-                aria-hidden="true"
-                className={`inline-block w-3 h-3 rounded-sm border border-dashed border-current ${SCHEDULED_KIND_CHIP_CLASSES.bill}`}
-              />
-              <span className="text-xs text-gray-600 dark:text-gray-400">
-                {t('legend.scheduled')}
-              </span>
-            </li>
-          )}
-        </ul>
-      )}
+      {/* Everything that belongs at the right-hand end of the row, in one
+          group: two `ml-auto` siblings would SPLIT the free space between them
+          rather than both moving right, which is how the switch would end up
+          floating in the middle of a month with no legend. */}
+      <div className="flex flex-wrap items-center gap-3 sm:ml-auto">
+        {(legendAccountTypes.length > 0 || legendHasScheduled) && (
+          <ul
+            className="flex flex-wrap items-center gap-x-3 gap-y-1"
+            aria-label={t('legend.label')}
+          >
+            {legendAccountTypes.map((accountType) => (
+              <li key={accountType} className="flex items-center gap-1.5">
+                <span
+                  aria-hidden="true"
+                  className={`inline-block w-3 h-3 rounded-sm ${ACCOUNT_TYPE_META[accountType].pillClass}`}
+                />
+                <span className="text-xs text-gray-600 dark:text-gray-400">
+                  {common(`accountTypes.${accountType}`)}
+                </span>
+              </li>
+            ))}
+            {legendHasScheduled && (
+              <li className="flex items-center gap-1.5">
+                <span
+                  aria-hidden="true"
+                  className={`inline-block w-3 h-3 rounded-sm border border-dashed border-current ${SCHEDULED_KIND_CHIP_CLASSES.bill}`}
+                />
+                <span className="text-xs text-gray-600 dark:text-gray-400">
+                  {t('legend.scheduled')}
+                </span>
+              </li>
+            )}
+          </ul>
+        )}
+
+        {/* Last in the row, so the switch sits in the same place whether or not
+            the month happens to have a legend to draw. */}
+        {viewToggle}
+      </div>
     </div>
   );
 }

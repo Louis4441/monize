@@ -47,6 +47,8 @@ const VIEWS = productionEntries('/src/components/calendar/');
 const DATA_MODULES: ReadonlyArray<string> = [
   '/src/lib/calendar-rows.ts',
   '/src/lib/calendar-month.ts',
+  '/src/lib/day-note-span.ts',
+  '/src/lib/month-input.ts',
   '/src/hooks/useCalendarMonthData.ts',
   '/src/hooks/useCalendarDayNotes.ts',
   '/src/hooks/useDailyBalanceTotals.ts',

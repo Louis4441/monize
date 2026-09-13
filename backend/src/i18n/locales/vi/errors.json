@@ -616,5 +616,11 @@
     "testFailed": "Kiểm tra kết nối Google Places thất bại.",
     "referrerRestricted": "Khóa này bị giới hạn theo HTTP referrer, nhưng bản triển khai này chưa đặt PUBLIC_APP_URL nên không gửi referrer nào và không danh sách cho phép nào có thể khớp. Hãy đặt PUBLIC_APP_URL, hoặc giới hạn khóa theo địa chỉ IP — tùy chọn thực sự bảo vệ một khóa phía máy chủ.",
     "referrerRejected": "Google đã từ chối giới hạn HTTP referrer của khóa này. Monize gửi \"{referer}\" (từ PUBLIC_APP_URL); hãy thêm đúng giá trị đó vào danh sách referrer được phép, lưu ý rằng mẫu như *.example.com/* không khớp với example.com trần. Giới hạn khóa theo địa chỉ IP mới là tùy chọn thực sự bảo vệ một khóa phía máy chủ."
+  },
+  "calendar": {
+    "noteOverlaps": "Những ngày đó đã được một ghi chú khác bao phủ",
+    "noteSpanBackwards": "endDate phải bằng hoặc sau startDate",
+    "noteSpanTooLong": "Một ghi chú chỉ có thể kéo dài tối đa {{ days }} ngày",
+    "noteSpanMissesDay": "Khoảng thời gian phải bao gồm ngày mà ghi chú được viết"
   }
 }

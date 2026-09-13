@@ -85,6 +85,12 @@ interface TransactionListProps {
    * fails on one that does not.
    */
   densityView?: DensityView;
+  /**
+   * The Table / Calendar switch for the screen this register is the table half
+   * of, rendered in the top toolbar between the density button and the pager.
+   * Absent on a screen that offers no calendar.
+   */
+  viewToggle?: React.ReactNode;
   showToolbar?: boolean;
   /** Transaction id to flash and scroll to (e.g. arriving from a deep link). */
   highlightTransactionId?: string | null;
@@ -224,6 +230,7 @@ export function TransactionList({
   categoryLabelMap,
   budgetStatusMap,
   densityView = 'transactions',
+  viewToggle,
   showToolbar = true,
   highlightTransactionId,
   showFxColumns = false,
@@ -526,16 +533,26 @@ export function TransactionList({
 
   if (transactions.length === 0) {
     return (
-      <EmptyState
-        className="bg-gray-50 dark:bg-gray-800 rounded-lg"
-        icon={
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        }
-        title={t('list.empty.title')}
-        description={t('list.empty.body')}
-      />
+      <div>
+        {/* The switch survives an empty register: "there is nothing here" is
+            exactly when a reader reaches for another view of it, and a control
+            that vanishes with the last row is one they cannot get back to
+            without a transaction. The pager does not come with it -- there are
+            no pages of nothing to step through. */}
+        {showToolbar && viewToggle && (
+          <ListTopToolbar densityView={densityView} viewToggle={viewToggle} />
+        )}
+        <EmptyState
+          className="bg-gray-50 dark:bg-gray-800 rounded-lg"
+          icon={
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          }
+          title={t('list.empty.title')}
+          description={t('list.empty.body')}
+        />
+      </div>
     );
   }
 
@@ -545,6 +562,7 @@ export function TransactionList({
       {showToolbar && (
         <ListTopToolbar
           densityView={densityView}
+          viewToggle={viewToggle}
           currentPage={currentPage}
           totalPages={totalPages}
           totalItems={totalItems}

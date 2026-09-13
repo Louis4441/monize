@@ -4,7 +4,10 @@ import "reflect-metadata";
 import { plainToInstance } from "class-transformer";
 import { validateSync } from "class-validator";
 
-import { CALENDAR_DAY_NOTE_MAX_LENGTH } from "./calendar-day-note";
+import {
+  CALENDAR_DAY_NOTE_MAX_LENGTH,
+  CALENDAR_DAY_NOTE_MAX_SPAN_DAYS,
+} from "./calendar-day-note";
 import { UpsertDayNoteDto } from "../calendar/dto/upsert-day-note.dto";
 
 /**
@@ -97,6 +100,78 @@ describe("the calendar day note length", () => {
     expect(backendDto).toContain("CALENDAR_DAY_NOTE_MAX_LENGTH");
     expect(backendDto).not.toMatch(
       new RegExp(`MaxLength\\(\\s*${CALENDAR_DAY_NOTE_MAX_LENGTH}\\s*\\)`),
+    );
+  });
+});
+
+/**
+ * A note's span has ONE bound, in three places, for the reason its length does:
+ * the form that stops the user extending it, the resolver that refuses the
+ * save, and the CHECK constraint that refuses the row.
+ *
+ * The CHECK counts the days BEYOND the first (`end_date - note_date`), which is
+ * the same number both constants carry; a note therefore covers at most that
+ * many days plus one.
+ */
+describe("the calendar day note span", () => {
+  it("is the number the frontend stops extending at", () => {
+    const frontend = readFileSync(
+      join(repoRoot, "frontend/src/lib/calendar-day-note.ts"),
+      "utf8",
+    );
+    const declared = frontend.match(
+      /CALENDAR_DAY_NOTE_MAX_SPAN_DAYS\s*=\s*(\d+)/,
+    );
+    expect(declared).not.toBeNull();
+    expect(Number(declared![1])).toBe(CALENDAR_DAY_NOTE_MAX_SPAN_DAYS);
+  });
+
+  it("is the number the database enforces", () => {
+    const schema = readFileSync(join(repoRoot, "database/schema.sql"), "utf8");
+    const check = schema.match(
+      /ck_calendar_day_notes_span CHECK \(end_date >= note_date AND end_date - note_date <= (\d+)\)/,
+    );
+    expect(check).not.toBeNull();
+    expect(Number(check![1])).toBe(CALENDAR_DAY_NOTE_MAX_SPAN_DAYS);
+  });
+
+  it("is carried by the migration that adds the column, not only by schema.sql", () => {
+    const migration = readFileSync(
+      join(
+        repoRoot,
+        "database/migrations/20260912200152_calendar_day_note_spans.sql",
+      ),
+      "utf8",
+    );
+    expect(migration).toContain(
+      `CHECK (end_date >= note_date AND end_date - note_date <= ${CALENDAR_DAY_NOTE_MAX_SPAN_DAYS})`,
+    );
+  });
+
+  it("is guarded by the exclusion constraint in both schema.sql and the migration", () => {
+    // Non-overlap is what makes "the note covering this day" a question with
+    // one answer, and it is the reason the old UNIQUE is gone. A fresh install
+    // reads schema.sql and an upgraded one reads the migration; the constraint
+    // in one and not the other is two databases that are supposed to be one.
+    const schema = readFileSync(join(repoRoot, "database/schema.sql"), "utf8");
+    const migration = readFileSync(
+      join(
+        repoRoot,
+        "database/migrations/20260912200152_calendar_day_note_spans.sql",
+      ),
+      "utf8",
+    );
+    for (const sql of [schema, migration]) {
+      expect(sql).toContain("CREATE EXTENSION IF NOT EXISTS btree_gist");
+      expect(sql).toMatch(
+        /ex_calendar_day_notes_user_span[\s\S]*EXCLUDE USING gist[\s\S]*user_id WITH =[\s\S]*daterange\(note_date, end_date, '\[\]'\) WITH &&/,
+      );
+    }
+    // The per-date UNIQUE said a thing that spans make untrue, so it is gone
+    // from the live schema and dropped by the migration.
+    expect(schema).not.toContain("uq_calendar_day_notes_user_date");
+    expect(migration).toContain(
+      "DROP CONSTRAINT IF EXISTS uq_calendar_day_notes_user_date",
     );
   });
 });

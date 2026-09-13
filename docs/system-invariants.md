@@ -149,7 +149,7 @@ implied.
 | INV-DISPATCH-004 | A failed push or email never rolls back, or surfaces through, the notification it is about | enforced |
 | INV-RLS-001 | Enforced mode refuses to run on a role that can bypass RLS | enforced |
 | INV-CACHE-001 | A money-moving write invalidates every derived cache | enforced |
-| INV-DAYNOTE-001 | A calendar date holds at most one note per user, and a save never reads first | enforced |
+| INV-DAYNOTE-001 | A calendar date is covered by at most one of a user's notes, and a save never reads first | enforced |
 | INV-PAYEE-001 | A contact lookup never overwrites a value the user entered, and the automatic one runs at most once per payee | enforced |
 | INV-PAYEE-002 | Google Places requests in one Pacific calendar month never exceed the cap for the key's owner | enforced |
 | INV-RELEASE-001 | The tested, imaged and tagged revisions are one revision | partial |
@@ -3368,25 +3368,44 @@ Status              enforced
 ### INV-DAYNOTE-001 -- one note per day, written without reading first
 
 ```text
-Statement           A user holds at most one calendar day note per date, and a
-                    save neither loses a concurrent save nor fails on a
+Statement           A calendar date is covered by at most one of a user's notes,
+                    and a save neither loses a concurrent save nor fails on a
                     constraint it did not expect.
-Enforcement         The UNIQUE constraint uq_calendar_day_notes_user_date is the
-                    mechanism; CalendarDayNotesService.upsert is how it is used --
-                    a single INSERT ... ON CONFLICT ON CONSTRAINT ... DO UPDATE
-                    inside withScopedDb, naming that constraint. There is no read
-                    before the decision, so there is no window between them. The
-                    row is RETURNINGed rather than echoed from the request, so a
-                    client adopts what was actually stored.
-Concurrency scope   per (user, date) row
+Enforcement         A note covers note_date through end_date inclusive, so the
+                    rule is about ranges rather than rows. The mechanism is the
+                    exclusion constraint ex_calendar_day_notes_user_span --
+                    EXCLUDE USING gist (user_id WITH =, daterange(note_date,
+                    end_date, '[]') WITH &&), which needs btree_gist for the
+                    equality half. CalendarDayNotesService.upsert is how it is
+                    used: ONE statement inside withScopedDb whose CTEs resolve
+                    the row covering the anchor day, update it if there is one
+                    and insert if there is not. There is no read before the
+                    decision, so there is no window between them. The anchor is
+                    the day the panel was showing rather than the span's first
+                    day, which is what lets one request move either end of a
+                    span instead of a delete and a create with a gap between
+                    them. The row is RETURNINGed rather than echoed from the
+                    request, so a client adopts what was actually stored.
+Concurrency scope   per (user, daterange) -- the constraint's own scope, which is
+                    wider than a row: two saves that touch no common row still
+                    serialize when their spans meet.
 Failure response    two saves of the same day serialize; the later body wins and
-                    carries the later updated_at. A DELETE of a day holding no
-                    note succeeds -- idempotent, because the caller asked for a
-                    state it already has.
-Required tests      Present: calendar-day-notes.service.spec.ts asserts the
-                    statement is one INSERT naming the constraint;
-                    calendar-day-note.contract.spec.ts holds the length limit
-                    across the constant, the DTO and the column CHECK. Both are
+                    carries the later updated_at. Two concurrent CREATES for one
+                    day both find no target and both insert, and the constraint
+                    refuses the second with SQLSTATE 23P01, which the service
+                    reports as 409 rather than 500. A span that runs over another
+                    of the caller's notes is the same 409. A DELETE of a day
+                    holding no note succeeds -- idempotent, because the caller
+                    asked for a state it already has; a DELETE of a day a span
+                    covers removes the whole span.
+Required tests      Present: calendar-day-notes.service.spec.ts asserts the write
+                    is one statement resolving by BETWEEN, and that 23P01 becomes
+                    a 409 while any other database error passes through;
+                    day-note-span.spec.ts holds the three span rules the route
+                    parameter takes part in; calendar-day-note.contract.spec.ts
+                    holds the length limit and the span bound across the
+                    constants, the DTO and the column CHECKs, and the exclusion
+                    constraint across schema.sql and its migration. All are
                     supporting -- a unit spec sees the SQL, never the race.
                     Missing: the PG integration test that the constraint exists
                     and the upsert round-trips, and the two-connection test that

@@ -26,6 +26,17 @@ interface ListTopToolbarProps {
   itemName?: string;
   /** Buttons that belong to the list itself (export, and the like). */
   actions?: React.ReactNode;
+  /**
+   * The Table / Calendar switch for the screen this list is the table half of.
+   *
+   * Last of the buttons and therefore immediately left of the pager: the two
+   * controls that change what the whole list looks like -- how dense its rows
+   * are and whether it is a list at all -- sit together, and the switch is in
+   * the same corner of the screen in both views (in calendar mode it is the
+   * right-hand end of `CalendarToolbar`). Absent on a list whose screen offers
+   * no calendar.
+   */
+  viewToggle?: React.ReactNode;
 }
 
 /**
@@ -49,11 +60,13 @@ export function ListTopToolbar({
   onPageChange,
   itemName,
   actions,
+  viewToggle,
 }: ListTopToolbarProps) {
   const buttons = (
     <div className="flex items-center gap-1 flex-shrink-0">
       {actions}
       <DensityToggle view={densityView} hideLabelOnMobile className="flex-shrink-0" />
+      {viewToggle}
     </div>
   );
 

@@ -5,6 +5,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE EXTENSION IF NOT EXISTS pg_trgm; -- trigram indexes for transaction search
+CREATE EXTENSION IF NOT EXISTS btree_gist; -- equality columns beside a range in one GiST exclusion constraint
 
 -- Schema migration tracking (used by db-migrate to track applied migrations)
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -2484,15 +2485,28 @@ CREATE INDEX idx_push_subscriptions_user_live ON push_subscriptions(user_id) WHE
 -- disagree.
 -- ---------------------------------------------------------------------------
 
+-- One free-text note over a run of consecutive days: note_date is the first day
+-- and end_date the last, inclusive at both ends. A one-day note has both equal.
+--
+-- The exclusion constraint is what makes "the note covering this day" a
+-- well-formed question: two spans of one user whose inclusive dateranges
+-- overlap cannot both exist, so every day is covered by at most one note and
+-- the editor can be reached from any day the span touches (INV-DAYNOTE-001).
+-- It also indexes (user_id, span), which is the only way this table is read.
 CREATE TABLE calendar_day_notes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     note_date DATE NOT NULL,
+    end_date DATE NOT NULL,
     body TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uq_calendar_day_notes_user_date UNIQUE (user_id, note_date),
-    CONSTRAINT ck_calendar_day_notes_body_length CHECK (char_length(body) BETWEEN 1 AND 2000)
+    CONSTRAINT ck_calendar_day_notes_span CHECK (end_date >= note_date AND end_date - note_date <= 366),
+    CONSTRAINT ck_calendar_day_notes_body_length CHECK (char_length(body) BETWEEN 1 AND 2000),
+    CONSTRAINT ex_calendar_day_notes_user_span EXCLUDE USING gist (
+        user_id WITH =,
+        daterange(note_date, end_date, '[]') WITH &&
+    )
 );
 
 -- ===========================================================================

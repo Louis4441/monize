@@ -616,5 +616,11 @@
     "testFailed": "Der Google-Places-Verbindungstest ist fehlgeschlagen.",
     "referrerRestricted": "Dieser Schlüssel ist auf HTTP-Referrer beschränkt, aber für diese Installation ist keine PUBLIC_APP_URL gesetzt, sodass kein Referrer gesendet wird und keine Positivliste passen kann. Setzen Sie PUBLIC_APP_URL oder beschränken Sie den Schlüssel stattdessen per IP-Adresse -- die Option, die einen serverseitigen Schlüssel tatsächlich schützt.",
     "referrerRejected": "Google hat die HTTP-Referrer-Beschränkung dieses Schlüssels abgelehnt. Monize sendet \"{referer}\" (aus PUBLIC_APP_URL); fügen Sie genau diesen Wert zu den zulässigen Referrern hinzu und beachten Sie, dass ein Muster wie *.example.com/* nicht auf ein einfaches example.com passt. Den Schlüssel stattdessen per IP-Adresse zu beschränken ist die Option, die einen serverseitigen Schlüssel tatsächlich schützt."
+  },
+  "calendar": {
+    "noteOverlaps": "Diese Tage sind bereits durch eine andere Notiz abgedeckt",
+    "noteSpanBackwards": "endDate muss am oder nach startDate liegen",
+    "noteSpanTooLong": "Eine Notiz darf höchstens {{ days }} Tage umfassen",
+    "noteSpanMissesDay": "Der Zeitraum muss den Tag enthalten, an dem die Notiz geschrieben wird"
   }
 }

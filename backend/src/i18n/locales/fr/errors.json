@@ -616,5 +616,11 @@
     "testFailed": "Le test de connexion à Google Places a échoué.",
     "referrerRestricted": "Cette clé est restreinte par référent HTTP, mais cette installation n'a pas de PUBLIC_APP_URL définie : aucun référent n'est envoyé et aucune liste d'autorisation ne peut correspondre. Définissez PUBLIC_APP_URL, ou restreignez la clé par adresse IP, l'option qui protège réellement une clé côté serveur.",
     "referrerRejected": "Google a rejeté la restriction de référent HTTP de cette clé. Monize envoie « {referer} » (depuis PUBLIC_APP_URL) ; ajoutez exactement cette valeur aux référents autorisés, en notant qu'un motif tel que *.example.com/* ne correspond pas à un simple example.com. Restreindre la clé par adresse IP est l'option qui protège réellement une clé côté serveur."
+  },
+  "calendar": {
+    "noteOverlaps": "Ces jours sont déjà couverts par une autre note",
+    "noteSpanBackwards": "endDate doit être égal ou postérieur à startDate",
+    "noteSpanTooLong": "Une note peut couvrir au maximum {{ days }} jours",
+    "noteSpanMissesDay": "La période doit inclure le jour depuis lequel la note est écrite"
   }
 }

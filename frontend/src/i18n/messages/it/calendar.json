@@ -98,6 +98,24 @@
     "deleteMessage": "La nota di questo giorno viene rimossa. L'operazione non può essere annullata.",
     "discardTitle": "Scartare questa nota?",
     "discardMessage": "La nota che stai scrivendo non è stata salvata. Uscendo da questo giorno viene scartata.",
-    "discardConfirm": "Scarta"
+    "discardConfirm": "Scarta",
+    "startDate": "Primo giorno",
+    "endDate": "Ultimo giorno",
+    "spanRange": "da {start} a {end}",
+    "spanCount": "{count, plural, one {# giorno} other {# giorni}}",
+    "spanBackwards": "L'ultimo giorno non può precedere il primo.",
+    "spanTooLong": "Una nota può coprire al massimo {days} giorni.",
+    "spanMissesDay": "I giorni scelti non includono il giorno in cui stai scrivendo questa nota.",
+    "deleteSpanMessage": "{count, plural, one {La nota di questo giorno verrà rimossa. L'operazione non può essere annullata.} other {Questa nota copre # giorni e verranno cancellati tutti. L'operazione non può essere annullata.}}"
+  },
+  "monthPicker": {
+    "title": "Vai a un altro mese",
+    "typeLabel": "Digita un mese o un anno",
+    "placeholder": "es. mar 1998, 1998-03, 3/1998",
+    "unreadable": "Non riusciamo a leggerlo come un mese. Prova con un anno, il nome di un mese o 1998-03.",
+    "previousYear": "Anno precedente",
+    "nextYear": "Anno successivo",
+    "yearBack": "Un anno indietro",
+    "yearForward": "Un anno avanti"
   }
 }

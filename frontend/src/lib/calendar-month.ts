@@ -138,6 +138,34 @@ export function monthGridDays(month: string, weekStartsOn: WeekStart): string[] 
 }
 
 /**
+ * `date` moved by `delta` whole days, in either direction, across month and
+ * year ends.
+ *
+ * Integer arithmetic on the civil calendar, like everything else here: a
+ * millisecond offset would be a day short or a day long across a daylight-saving
+ * boundary, and the calendar's days are calendar days.
+ */
+export function shiftDate(date: string, delta: number): string {
+  let cursor = requireDate(date, 'date');
+  for (let step = 0; step < Math.abs(delta); step++) {
+    cursor = delta > 0 ? nextDay(...cursor) : previousDay(...cursor);
+  }
+  return toDateString(...cursor);
+}
+
+/**
+ * Inclusive whole days from `from` to `to`; `1` when they are the same day and
+ * negative when `to` is the earlier of the two.
+ */
+export function calendarDaysBetween(from: string, to: string): number {
+  const [fromYear, fromMonth, fromDay] = requireDate(from, 'from');
+  const [toYear, toMonth, toDay] = requireDate(to, 'to');
+  const span =
+    daysFromCivil(toYear, toMonth, toDay) - daysFromCivil(fromYear, fromMonth, fromDay);
+  return span >= 0 ? span + 1 : span - 1;
+}
+
+/**
  * Weekday labels rotated so the first is `weekStartsOn`.
  *
  * `common.weekdaysMin` is stored Sunday-first in every locale, so the rotation

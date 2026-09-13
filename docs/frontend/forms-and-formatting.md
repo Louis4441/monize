@@ -173,6 +173,20 @@ delete, and Delete asks through `ConfirmDialog`. It is a separate number from
 the transaction cap on purpose: the two fields are bounded by different tables,
 and one constant serving both would move a limit nobody asked to move.
 
+A note covers a RUN of consecutive days, so the editor carries two `DateInput`s
+beside the body and the save sends the whole span. The anchor is the day the
+panel was showing, not the span's first day: that is what lets a vacation be
+edited from any day of it and what lets one request move either end. The three
+rules the editor checks -- no backwards span, no span longer than
+`CALENDAR_DAY_NOTE_MAX_SPAN_DAYS + 1` days, no span that skips the day it is
+being written from -- are the server's own (`resolveDayNoteSpan`), repeated here
+so the reader is told at the field rather than by a 400 with nothing pointing at
+one; they disable Save, they do not make it safe. Changing either end counts as
+a draft to lose, so stepping the month asks first even with the body untouched.
+`lib/day-note-span.ts` turns the range's notes into the by-day map every surface
+reads: one entry per day covered, the same note object on each, clipped to the
+grid so a year-long note does not put 365 entries in a map the grid reads 42 of.
+
 The note surface is drawn only when `useCalendarDayNotes` reports `loaded`. The
 save is a whole-body upsert, so offering "Add a note" over a list that failed or
 has not arrived invites the reader to replace a stored note the client never

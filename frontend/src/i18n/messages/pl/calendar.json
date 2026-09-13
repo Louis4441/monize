@@ -98,6 +98,24 @@
     "deleteMessage": "Notatka z tego dnia zostanie usunięta. Tej operacji nie można cofnąć.",
     "discardTitle": "Odrzucić tę notatkę?",
     "discardMessage": "Notatka, którą piszesz, nie została zapisana. Opuszczenie tego dnia ją odrzuca.",
-    "discardConfirm": "Odrzuć"
+    "discardConfirm": "Odrzuć",
+    "startDate": "Pierwszy dzień",
+    "endDate": "Ostatni dzień",
+    "spanRange": "{start} do {end}",
+    "spanCount": "{count, plural, one {# dzień} few {# dni} many {# dni} other {# dnia}}",
+    "spanBackwards": "Ostatni dzień nie może być wcześniejszy niż pierwszy.",
+    "spanTooLong": "Notatka może obejmować najwyżej {days} dni.",
+    "spanMissesDay": "Wybrane dni nie obejmują dnia, dla którego piszesz tę notatkę.",
+    "deleteSpanMessage": "{count, plural, one {Notatka z tego dnia zostanie usunięta. Tej operacji nie można cofnąć.} few {Ta notatka obejmuje # dni i wszystkie zostaną wyczyszczone. Tej operacji nie można cofnąć.} many {Ta notatka obejmuje # dni i wszystkie zostaną wyczyszczone. Tej operacji nie można cofnąć.} other {Ta notatka obejmuje # dnia i wszystkie zostaną wyczyszczone. Tej operacji nie można cofnąć.}}"
+  },
+  "monthPicker": {
+    "title": "Przejdź do innego miesiąca",
+    "typeLabel": "Wpisz miesiąc lub rok",
+    "placeholder": "np. mar 1998, 1998-03, 3/1998",
+    "unreadable": "Nie potrafimy odczytać tego jako miesiąca. Spróbuj podać rok, nazwę miesiąca lub 1998-03.",
+    "previousYear": "Poprzedni rok",
+    "nextYear": "Następny rok",
+    "yearBack": "Rok wstecz",
+    "yearForward": "Rok naprzód"
   }
 }

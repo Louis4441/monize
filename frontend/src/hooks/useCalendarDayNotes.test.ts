@@ -14,8 +14,8 @@ vi.mock('@/lib/calendar-day-notes', () => ({
   },
 }));
 
-function note(date: string, body = 'Call the landlord'): DayNote {
-  return { date, body, updatedAt: '2026-06-09T12:00:00.000Z' };
+function note(startDate: string, body = 'Call the landlord', endDate = startDate): DayNote {
+  return { startDate, endDate, body, updatedAt: '2026-06-09T12:00:00.000Z' };
 }
 
 function renderNotes(enabled = true) {
@@ -54,10 +54,18 @@ describe('useCalendarDayNotes', () => {
     await waitFor(() => expect(mockList).toHaveBeenCalledTimes(1));
 
     await act(async () => {
-      await result.current.save('2026-06-10', 'Saved');
+      await result.current.save('2026-06-10', {
+        body: 'Saved',
+        startDate: '2026-06-10',
+        endDate: '2026-06-10',
+      });
     });
 
-    expect(mockUpsert).toHaveBeenCalledWith('2026-06-10', 'Saved');
+    expect(mockUpsert).toHaveBeenCalledWith('2026-06-10', {
+      body: 'Saved',
+      startDate: '2026-06-10',
+      endDate: '2026-06-10',
+    });
     await waitFor(() => expect(mockList).toHaveBeenCalledTimes(2));
   });
 
@@ -138,6 +146,38 @@ describe('useCalendarDayNotes', () => {
 
       expect(action).toHaveBeenCalled();
       expect(result.current.confirmDiscard.isOpen).toBe(false);
+    });
+  });
+
+  describe('a note that covers a run of days', () => {
+    it('answers for every day the span touches, with the same note', async () => {
+      // One row, nine days. The panel asks "the note for this day" and gets the
+      // vacation back from any of them, which is what makes it editable from
+      // all of them.
+      mockList.mockResolvedValue([note('2026-06-14', 'Away in Lisbon', '2026-06-18')]);
+      const { result } = renderNotes();
+
+      await waitFor(() => expect(result.current.byDay.size).toBe(5));
+      for (const day of ['2026-06-14', '2026-06-15', '2026-06-16', '2026-06-17', '2026-06-18']) {
+        expect(result.current.byDay.get(day)?.body).toBe('Away in Lisbon');
+      }
+      expect(result.current.byDay.get('2026-06-19')).toBeUndefined();
+      expect(result.current.byDay.get('2026-06-13')).toBeUndefined();
+    });
+
+    it('marks only the days of a run that this grid actually holds', async () => {
+      // A note running from before the grid to after it covers every day on
+      // screen -- and nothing off it, so the map stays the size of the grid
+      // rather than the size of the span.
+      mockList.mockResolvedValue([note('2026-01-01', 'Sabbatical', '2026-12-31')]);
+      const { result } = renderNotes();
+
+      await waitFor(() => expect(result.current.byDay.size).toBeGreaterThan(0));
+      expect(result.current.byDay.get('2026-05-31')?.body).toBe('Sabbatical');
+      expect(result.current.byDay.get('2026-07-04')?.body).toBe('Sabbatical');
+      // 2026-05-31 through 2026-07-04 inclusive.
+      expect(result.current.byDay.size).toBe(35);
+      expect(result.current.byDay.get('2026-07-05')).toBeUndefined();
     });
   });
 });

@@ -92,4 +92,33 @@ describe('ListTopToolbar', () => {
 
     expect(screen.getByText('Export')).toBeInTheDocument();
   });
+
+  it('puts the Table / Calendar switch between the density button and the pager', () => {
+    // The two controls that change what the WHOLE list looks like sit together,
+    // and the switch keeps the same corner of the screen it has in calendar
+    // mode. Order is the assertion: "immediately left of the pager" is the
+    // placement, not merely "somewhere in the bar".
+    render(
+      <ListTopToolbar
+        densityView="transactions"
+        {...PAGING}
+        onPageChange={vi.fn()}
+        viewToggle={<button type="button">Switch view</button>}
+      />,
+    );
+
+    const toggle = screen.getByRole('button', { name: 'Switch view' });
+    const density = screen.getByTitle('Toggle row density');
+    const firstPage = screen.getByTitle('First page');
+
+    expect(density.compareDocumentPosition(toggle)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(toggle.compareDocumentPosition(firstPage)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('leaves the bar as it was on a list whose screen offers no calendar', () => {
+    render(<ListTopToolbar densityView="transactions" {...PAGING} onPageChange={vi.fn()} />);
+
+    expect(screen.queryByRole('button', { name: 'Switch view' })).not.toBeInTheDocument();
+    expect(screen.getByTitle('Toggle row density')).toBeInTheDocument();
+  });
 });

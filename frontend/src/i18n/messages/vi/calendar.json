@@ -98,6 +98,24 @@
     "deleteMessage": "Ghi chú của ngày này sẽ bị xóa. Không thể hoàn tác.",
     "discardTitle": "Bỏ ghi chú này?",
     "discardMessage": "Ghi chú bạn đang viết chưa được lưu. Rời khỏi ngày này sẽ bỏ nó.",
-    "discardConfirm": "Bỏ"
+    "discardConfirm": "Bỏ",
+    "startDate": "Ngày đầu",
+    "endDate": "Ngày cuối",
+    "spanRange": "{start} đến {end}",
+    "spanCount": "{count, plural, other {# ngày}}",
+    "spanBackwards": "Ngày cuối không thể trước ngày đầu.",
+    "spanTooLong": "Một ghi chú chỉ có thể kéo dài tối đa {days} ngày.",
+    "spanMissesDay": "Những ngày bạn chọn không bao gồm ngày bạn đang viết ghi chú này.",
+    "deleteSpanMessage": "{count, plural, other {Ghi chú này kéo dài # ngày và tất cả sẽ bị xoá. Không thể hoàn tác.}}"
+  },
+  "monthPicker": {
+    "title": "Đi tới tháng khác",
+    "typeLabel": "Nhập một tháng hoặc một năm",
+    "placeholder": "vd. Thg 3 1998, 1998-03, 3/1998",
+    "unreadable": "Chúng tôi không đọc được đó là tháng nào. Hãy thử một năm, tên tháng hoặc 1998-03.",
+    "previousYear": "Năm trước",
+    "nextYear": "Năm sau",
+    "yearBack": "Lùi một năm",
+    "yearForward": "Tiến một năm"
   }
 }

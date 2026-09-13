@@ -98,6 +98,24 @@
     "deleteMessage": "Catatan pada hari ini dihapus. Tindakan ini tidak dapat dibatalkan.",
     "discardTitle": "Buang catatan ini?",
     "discardMessage": "Catatan yang sedang Anda tulis belum disimpan. Meninggalkan hari ini akan membuangnya.",
-    "discardConfirm": "Buang"
+    "discardConfirm": "Buang",
+    "startDate": "Hari pertama",
+    "endDate": "Hari terakhir",
+    "spanRange": "{start} sampai {end}",
+    "spanCount": "{count, plural, other {# hari}}",
+    "spanBackwards": "Hari terakhir tidak boleh sebelum hari pertama.",
+    "spanTooLong": "Sebuah catatan dapat mencakup maksimal {days} hari.",
+    "spanMissesDay": "Hari yang Anda pilih tidak mencakup hari tempat catatan ini ditulis.",
+    "deleteSpanMessage": "{count, plural, other {Catatan ini mencakup # hari, dan semuanya akan dihapus. Tindakan ini tidak dapat dibatalkan.}}"
+  },
+  "monthPicker": {
+    "title": "Buka bulan lain",
+    "typeLabel": "Ketik bulan atau tahun",
+    "placeholder": "mis. Mar 1998, 1998-03, 3/1998",
+    "unreadable": "Kami tidak dapat membaca itu sebagai bulan. Coba tahun, nama bulan, atau 1998-03.",
+    "previousYear": "Tahun sebelumnya",
+    "nextYear": "Tahun berikutnya",
+    "yearBack": "Mundur setahun",
+    "yearForward": "Maju setahun"
   }
 }

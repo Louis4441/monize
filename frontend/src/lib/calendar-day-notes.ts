@@ -11,7 +11,9 @@ import { dedupe, invalidateCache } from './apiCache';
  * below do before returning.
  *
  * Keyed by range rather than by account scope or filters: a note belongs to the
- * day, not to what the reader is looking at on it.
+ * day, not to what the reader is looking at on it. The range asks for every
+ * note whose span TOUCHES it, so a vacation that began before the month shows
+ * on the days of it the month holds.
  */
 export const calendarDayNotesApi = {
   list: async (params: { startDate: string; endDate: string }): Promise<DayNote[]> => {
@@ -27,18 +29,34 @@ export const calendarDayNotesApi = {
   },
 
   /**
-   * Write the note for one day, whole. The response is the STORED note --
-   * adopt that, not the text that was sent, so `updatedAt` is the server's.
+   * Write the note the reader had open on `anchorDate`, whole.
+   *
+   * `anchorDate` is the day the panel was showing, not the span's first day:
+   * the server resolves the note covering it, so a five-day note is edited from
+   * its third day and the same request may move either end of the span. One
+   * write, so there is no window where the note does not exist.
+   *
+   * The response is the STORED note -- adopt that, not the text that was sent,
+   * so `updatedAt` is the server's and the span is the one it kept.
    */
-  upsert: async (date: string, body: string): Promise<DayNote> => {
-    const response = await apiClient.put<DayNote>(`/calendar/day-notes/${date}`, { body });
+  upsert: async (
+    anchorDate: string,
+    note: { body: string; startDate: string; endDate: string },
+  ): Promise<DayNote> => {
+    const response = await apiClient.put<DayNote>(
+      `/calendar/day-notes/${anchorDate}`,
+      note,
+    );
     invalidateCache('calendar:day-notes:');
     return response.data;
   },
 
-  /** Idempotent: removing a day that holds no note succeeds. */
-  remove: async (date: string): Promise<void> => {
-    await apiClient.delete(`/calendar/day-notes/${date}`);
+  /**
+   * Remove the note covering `anchorDate`, however many days it covers.
+   * Idempotent: removing a day that holds no note succeeds.
+   */
+  remove: async (anchorDate: string): Promise<void> => {
+    await apiClient.delete(`/calendar/day-notes/${anchorDate}`);
     invalidateCache('calendar:day-notes:');
   },
 };

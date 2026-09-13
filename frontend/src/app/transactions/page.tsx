@@ -1058,15 +1058,12 @@ function TransactionsContent() {
           subtitle={t('page.subtitle')}
           helpUrl="https://github.com/kenlasko/monize/wiki/Transactions"
           actions={
-            <div className="flex items-center gap-2">
-              <ViewModeToggle value={view} onChange={setView} />
-              <Button
-                {...tourAnchor(TOUR_ANCHORS.transactionsNewButton)}
-                onClick={handleCreateNew}
-              >
-                {t('page.newButton')}
-              </Button>
-            </div>
+            <Button
+              {...tourAnchor(TOUR_ANCHORS.transactionsNewButton)}
+              onClick={handleCreateNew}
+            >
+              {t('page.newButton')}
+            </Button>
           }
         />
         {(() => {
@@ -1452,6 +1449,7 @@ function TransactionsContent() {
             onEditTransaction={handleEdit}
             onCreateOnDay={handleCreateOnDay}
             refreshKey={reloadKey}
+            viewToggle={<ViewModeToggle value={view} onChange={setView} />}
           />
         ) : (
           <>
@@ -1479,6 +1477,7 @@ function TransactionsContent() {
               onPayeeFilterClick={filters.handlePayeeFilterClick}
               onExport={handleExport}
               isExporting={isExporting}
+              viewToggle={<ViewModeToggle value={view} onChange={setView} />}
               isSingleAccountView={filters.filterAccountIds.length === 1}
               selectionMode={bulkSelectMode}
               selectedIds={selection.selectedIds}

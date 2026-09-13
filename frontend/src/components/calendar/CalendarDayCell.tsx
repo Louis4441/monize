@@ -18,6 +18,7 @@ import {
   supportsAccruedInterest,
 } from '@/lib/investment-actions';
 import { isDailyValueComplete } from '@/hooks/useInvestmentDailyValues';
+import { dayNoteSpanPosition } from '@/lib/day-note-span';
 import { gainLossColor } from '@/lib/format';
 import type { MonthGridDay } from '@/components/ui/MonthGrid';
 import type { CalendarDayRows } from '@/lib/calendar-rows';
@@ -41,7 +42,12 @@ interface CalendarDayCellProps {
   onEditTransaction: (transaction: Transaction) => void;
   /** Opens a brokerage row; absent on a calendar that draws none. */
   onEditInvestment?: (transaction: InvestmentTransaction) => void;
-  /** The reader's own note on this day, when they have one. */
+  /**
+   * The note covering this day, when there is one.
+   *
+   * A multi-day note is the SAME object on every day it covers, so the cell
+   * draws where this day sits in it rather than repeating the text nine times.
+   */
   note?: DayNote;
   /** What the day's figure layer has to say: a balance, a value, a movement. */
   figure?: ReactNode;
@@ -110,15 +116,7 @@ export function CalendarDayCell({
       </div>
 
       {note && (
-        <p
-          className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400"
-          data-testid="calendar-day-note-marker"
-        >
-          <PencilSquareIcon className="w-3 h-3 shrink-0" aria-label={t('notes.title')} />
-          {/* The first line only, and on a phone not even that: the day panel is
-              where a note is read. */}
-          <span className="hidden sm:inline truncate">{note.body.split('\n')[0]}</span>
-        </p>
+        <CalendarDayNoteMarker note={note} date={day.date} label={t('notes.title')} />
       )}
 
       {/* Below sm the chips are dots and a count: a phone cell has no room for
@@ -233,6 +231,61 @@ export function CalendarDayCell({
         </button>
       )}
     </div>
+  );
+}
+
+/**
+ * One day's note, as the cell shows it.
+ *
+ * A one-day note and the FIRST day of a run read the same: the pencil and the
+ * note's first line. The days after it carry a continuation bar instead, so a
+ * week away reads as one thing running across the grid rather than as seven
+ * separate notes -- and so the same sentence is not printed seven times.
+ *
+ * The bar is decoration; the accessible name is what tells a screen reader the
+ * day is covered, because `aria-hidden` on the glyph would otherwise leave the
+ * continuation days silent.
+ */
+function CalendarDayNoteMarker({
+  note,
+  date,
+  label,
+}: {
+  note: DayNote;
+  date: string;
+  label: string;
+}) {
+  const position = dayNoteSpanPosition(note, date);
+
+  if (position === 'middle' || position === 'end') {
+    return (
+      <p
+        className="flex items-center text-xs text-gray-500 dark:text-gray-400"
+        data-testid="calendar-day-note-marker"
+        data-note-span={position}
+      >
+        <span
+          className={`block h-0.5 flex-1 rounded-full bg-gray-300 dark:bg-gray-600 ${
+            position === 'end' ? 'mr-1' : ''
+          }`}
+          role="img"
+          aria-label={label}
+        />
+      </p>
+    );
+  }
+
+  return (
+    <p
+      className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400"
+      data-testid="calendar-day-note-marker"
+      data-note-span={position}
+    >
+      <PencilSquareIcon className="w-3 h-3 shrink-0" aria-label={label} />
+      {/* The first line only, and on a phone not even that: the day panel is
+          where a note is read. */}
+      <span className="hidden sm:inline truncate">{note.body.split('\n')[0]}</span>
+    </p>
   );
 }
 
