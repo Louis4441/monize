@@ -161,12 +161,12 @@ describe('Pagination', () => {
     expect(group).toContainElement(screen.getByTitle('Last page'));
   });
 
-  it('puts infoRight after the page stepper, not before it', () => {
+  it('puts infoRight before the page stepper', () => {
     render(<Pagination {...defaultProps} infoRight={<span>Extra info</span>} />);
 
-    const lastPage = screen.getByTitle('Last page');
     const extra = screen.getByText('Extra info');
+    const firstPage = screen.getByTitle('First page');
 
-    expect(lastPage.compareDocumentPosition(extra)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(extra.compareDocumentPosition(firstPage)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 });

@@ -93,10 +93,10 @@ describe('ListTopToolbar', () => {
     expect(screen.getByText('Export')).toBeInTheDocument();
   });
 
-  it('reads count, switch, pager, then the list buttons', () => {
+  it('reads count, switch, then the list buttons and the pager', () => {
     // Order is the assertion, not merely "somewhere in the bar": the switch
     // reads with the line saying what the reader is looking at, and export and
-    // density sit at the right-hand end AFTER the page stepper.
+    // density sit at the right-hand end in front of the page stepper.
     render(
       <ListTopToolbar
         densityView="transactions"
@@ -109,17 +109,17 @@ describe('ListTopToolbar', () => {
 
     const count = screen.getByText('90');
     const toggle = screen.getByRole('button', { name: 'Switch view' });
-    const lastPage = screen.getByTitle('Last page');
     const exportButton = screen.getByRole('button', { name: 'Export' });
     const density = screen.getByTitle('Toggle row density');
+    const firstPage = screen.getByTitle('First page');
 
     expect(count.compareDocumentPosition(toggle)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(toggle.compareDocumentPosition(lastPage)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(lastPage.compareDocumentPosition(exportButton)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(toggle.compareDocumentPosition(exportButton)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(exportButton.compareDocumentPosition(density)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(density.compareDocumentPosition(firstPage)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
-  it('keeps the pager and the list buttons in one wrapping row', () => {
+  it('keeps the list buttons and the pager in one wrapping row', () => {
     // They were a column that stacked below a fixed width, which put export and
     // density on a line of their own while there was still room for both.
     render(
