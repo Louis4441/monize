@@ -11,7 +11,8 @@ interface PaginationProps {
   onPageChange: (page: number) => void;
   itemName?: string; // e.g., "transactions", "securities"
   minimal?: boolean; // Remove shadow and rounded styling for inline use
-  infoRight?: React.ReactNode; // Optional content to render right of "Showing X-Y of Z"
+  infoRight?: React.ReactNode; // Optional content to render left of the page stepper
+  infoAfter?: React.ReactNode; // Optional content to render immediately right of "Showing X-Y of Z"
 }
 
 export function Pagination({
@@ -23,6 +24,7 @@ export function Pagination({
   itemName = 'items',
   minimal = false,
   infoRight,
+  infoAfter,
 }: PaginationProps) {
   const t = useTranslations('common');
   const [inputPage, setInputPage] = useState(currentPage.toString());
@@ -74,15 +76,19 @@ export function Pagination({
 
   return (
     <div className={`flex flex-col min-[820px]:flex-row items-center justify-between gap-3 ${minimal ? 'bg-transparent' : 'bg-white dark:bg-gray-800 px-4 py-3 shadow dark:shadow-gray-700/50 rounded-lg'}`}>
-      {/* Showing X-Y of Z */}
-      <div className="text-sm text-gray-700 dark:text-gray-300">
-        {t('pagination.showing')}{' '}
-        <span className="font-medium">{startItem}</span>
-        {' '}-{' '}
-        <span className="font-medium">{endItem}</span>
-        {' '}{t('pagination.of')}{' '}
-        <span className="font-medium">{totalItems}</span>
-        {' '}{itemName}
+      {/* Showing X-Y of Z, and whatever the caller wants read as part of that
+          line rather than as part of the paging controls. */}
+      <div className="flex items-center gap-2">
+        <div className="text-sm text-gray-700 dark:text-gray-300">
+          {t('pagination.showing')}{' '}
+          <span className="font-medium">{startItem}</span>
+          {' '}-{' '}
+          <span className="font-medium">{endItem}</span>
+          {' '}{t('pagination.of')}{' '}
+          <span className="font-medium">{totalItems}</span>
+          {' '}{itemName}
+        </div>
+        {infoAfter}
       </div>
 
       {/* Navigation controls + optional right content.

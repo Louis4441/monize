@@ -3368,10 +3368,10 @@ describe('the payee column floor', () => {
 });
 
 describe('the Table / Calendar switch in the register toolbar', () => {
-  it('sits between the density button and the pager', () => {
-    // The two controls that change what the WHOLE list looks like sit
-    // together, and the switch keeps the same corner of the screen it has in
-    // calendar mode.
+  it('sits beside the count, left of the export and density buttons', () => {
+    // The switch reads with the line saying what the reader is looking at; the
+    // buttons that act on the list as drawn keep the right-hand end, in front
+    // of the pager.
     render(
       <TransactionList
         transactions={[createTransaction()]}
@@ -3380,16 +3380,21 @@ describe('the Table / Calendar switch in the register toolbar', () => {
         totalItems={60}
         pageSize={25}
         onPageChange={vi.fn()}
+        onExport={vi.fn()}
         viewToggle={<button type="button">Switch view</button>}
       />,
     );
 
+    const count = screen.getByText('60');
     const toggle = screen.getByRole('button', { name: 'Switch view' });
+    const exportButton = screen.getByTitle('Export transactions to CSV');
     const density = screen.getByTitle('Toggle row density');
     const firstPage = screen.getByTitle('First page');
 
-    expect(density.compareDocumentPosition(toggle)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(toggle.compareDocumentPosition(firstPage)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(count.compareDocumentPosition(toggle)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(toggle.compareDocumentPosition(exportButton)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(exportButton.compareDocumentPosition(density)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(density.compareDocumentPosition(firstPage)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('survives an empty register, which is when a reader reaches for it', () => {

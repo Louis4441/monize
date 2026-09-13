@@ -93,26 +93,48 @@ describe('ListTopToolbar', () => {
     expect(screen.getByText('Export')).toBeInTheDocument();
   });
 
-  it('puts the Table / Calendar switch between the density button and the pager', () => {
-    // The two controls that change what the WHOLE list looks like sit together,
-    // and the switch keeps the same corner of the screen it has in calendar
-    // mode. Order is the assertion: "immediately left of the pager" is the
-    // placement, not merely "somewhere in the bar".
+  it('puts the Table / Calendar switch beside the count, left of the list buttons', () => {
+    // Order is the assertion: "immediately right of the Showing line" is the
+    // placement, not merely "somewhere in the bar". The switch reads with what
+    // the reader is looking at; the buttons that act on the list as drawn --
+    // export, density -- keep the right-hand end, left of the pager.
     render(
       <ListTopToolbar
         densityView="transactions"
         {...PAGING}
         onPageChange={vi.fn()}
+        actions={<button type="button">Export</button>}
         viewToggle={<button type="button">Switch view</button>}
       />,
     );
 
+    const count = screen.getByText('90');
     const toggle = screen.getByRole('button', { name: 'Switch view' });
+    const exportButton = screen.getByRole('button', { name: 'Export' });
     const density = screen.getByTitle('Toggle row density');
     const firstPage = screen.getByTitle('First page');
 
+    expect(count.compareDocumentPosition(toggle)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(toggle.compareDocumentPosition(exportButton)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(exportButton.compareDocumentPosition(density)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(density.compareDocumentPosition(firstPage)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('keeps the switch with the buttons when there is no pager to sit beside', () => {
+    // The empty register draws the bar without paging props, so there is no
+    // count line for the switch to ride: it stays in the button group rather
+    // than disappearing.
+    render(
+      <ListTopToolbar
+        densityView="transactions"
+        viewToggle={<button type="button">Switch view</button>}
+      />,
+    );
+
+    const density = screen.getByTitle('Toggle row density');
+    const toggle = screen.getByRole('button', { name: 'Switch view' });
+
     expect(density.compareDocumentPosition(toggle)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(toggle.compareDocumentPosition(firstPage)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('leaves the bar as it was on a list whose screen offers no calendar', () => {
