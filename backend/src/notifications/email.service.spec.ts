@@ -1,6 +1,6 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
-import { EmailService } from "./email.service";
+import { EmailService, resolveSmtpTransportSecurity } from "./email.service";
 
 // Mock nodemailer before importing EmailService
 jest.mock("nodemailer", () => ({
@@ -24,7 +24,7 @@ describe("EmailService", () => {
             SMTP_HOST: "smtp.example.com",
             SMTP_USER: "user@example.com",
             SMTP_PASSWORD: "password123",
-            SMTP_PORT: 587,
+            SMTP_PORT: "587",
             EMAIL_FROM: "noreply@monize.app",
           };
           return config[key] ?? defaultVal;
@@ -194,6 +194,8 @@ describe("EmailService", () => {
     });
   });
 
+  // `SMTP_PORT` arrives as the string "465", the way ConfigService returns it.
+  // A mock that supplied the number hid the defect this suite now covers.
   describe("when SMTP is configured with port 465", () => {
     beforeEach(async () => {
       (nodemailer.createTransport as jest.Mock).mockClear();
@@ -203,7 +205,7 @@ describe("EmailService", () => {
             SMTP_HOST: "smtp.example.com",
             SMTP_USER: "user@example.com",
             SMTP_PASSWORD: "password123",
-            SMTP_PORT: 465,
+            SMTP_PORT: "465",
             EMAIL_FROM: "noreply@monize.app",
           };
           return config[key] ?? defaultVal;
@@ -266,6 +268,69 @@ describe("EmailService", () => {
     it("returns false for verifyConnection", async () => {
       const result = await service.verifyConnection();
       expect(result).toBe(false);
+    });
+  });
+
+  /**
+   * Regression: `SMTP_PORT` is a string in every deployment, so the former
+   * `port === 465` never matched and port 465 opened in cleartext. Gmail's
+   * implicit-TLS port answers that by closing the socket, which nodemailer
+   * surfaces as `Error: Unexpected socket close`.
+   */
+  describe("resolveSmtpTransportSecurity", () => {
+    it("selects implicit TLS for the string port 465", () => {
+      expect(resolveSmtpTransportSecurity("465", undefined)).toEqual({
+        port: 465,
+        secure: true,
+        portInvalid: false,
+      });
+    });
+
+    it("selects STARTTLS for the string port 587", () => {
+      expect(resolveSmtpTransportSecurity("587", undefined)).toEqual({
+        port: 587,
+        secure: false,
+        portInvalid: false,
+      });
+    });
+
+    it("accepts a numeric port too", () => {
+      expect(resolveSmtpTransportSecurity(465, undefined).secure).toBe(true);
+    });
+
+    it("defaults an unset or empty port without calling it invalid", () => {
+      for (const raw of [undefined, null, "", "   "]) {
+        expect(resolveSmtpTransportSecurity(raw, undefined)).toEqual({
+          port: 587,
+          secure: false,
+          portInvalid: false,
+        });
+      }
+    });
+
+    it("reports a port that is not a usable TCP port", () => {
+      for (const raw of ["ten", "58.7", "-1", "0", "70000"]) {
+        expect(resolveSmtpTransportSecurity(raw, undefined)).toEqual({
+          port: 587,
+          secure: false,
+          portInvalid: true,
+        });
+      }
+    });
+
+    it("lets SMTP_SECURE turn implicit TLS on for a non-standard port", () => {
+      expect(resolveSmtpTransportSecurity("2465", "true").secure).toBe(true);
+      expect(resolveSmtpTransportSecurity("2465", "TRUE ").secure).toBe(true);
+      expect(resolveSmtpTransportSecurity("2465", true).secure).toBe(true);
+      expect(resolveSmtpTransportSecurity("2465", undefined).secure).toBe(
+        false,
+      );
+    });
+
+    it("never lets SMTP_SECURE turn implicit TLS off on port 465", () => {
+      // The Helm chart ships the string "false" as its default; port 465 has
+      // no cleartext phase, so honouring that literally would break the send.
+      expect(resolveSmtpTransportSecurity("465", "false").secure).toBe(true);
     });
   });
 });
