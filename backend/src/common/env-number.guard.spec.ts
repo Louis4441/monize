@@ -70,7 +70,7 @@ describe("numeric environment variables are coerced, not type-asserted", () => {
   });
 
   it("still sees the banned shape when it is real code, not prose", () => {
-    const prose = "/**\n * configService.get<number>(\"SMTP_PORT\")\n */\n";
+    const prose = '/**\n * configService.get<number>("SMTP_PORT")\n */\n';
     const code = 'const p = this.configService.get<number>("SMTP_PORT");\n';
     const banned = /\.get\s*<\s*(number|boolean)\s*>\s*\(/;
 
