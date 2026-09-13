@@ -11,7 +11,7 @@ interface PaginationProps {
   onPageChange: (page: number) => void;
   itemName?: string; // e.g., "transactions", "securities"
   minimal?: boolean; // Remove shadow and rounded styling for inline use
-  infoRight?: React.ReactNode; // Optional content to render left of the page stepper
+  infoRight?: React.ReactNode; // Optional content to render right of the page stepper
   infoAfter?: React.ReactNode; // Optional content to render immediately right of "Showing X-Y of Z"
 }
 
@@ -91,14 +91,15 @@ export function Pagination({
         {infoAfter}
       </div>
 
-      {/* Navigation controls + optional right content.
+      {/* Navigation controls, then whatever the caller puts at the right-hand
+          end of them.
 
-          Narrow enough and the two stack: the page stepper is seven controls
-          wide and the buttons beside it belong to the list rather than to the
-          paging, so on a phone the stepper takes a line of its own under them
-          instead of both being squeezed into one. */}
-      <div className="flex flex-col items-end gap-2 min-[820px]:flex-row min-[820px]:items-center">
-        {infoRight}
+          One row that wraps rather than a column that stacks at a fixed width:
+          the stepper is seven controls wide and the buttons after it are two
+          more, so a breakpoint guess puts them on a line of their own while
+          there is still room for both. Wrapping only splits them where the row
+          genuinely does not fit. */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <div className="flex items-center space-x-1">
         {/* First page */}
         <button
@@ -183,6 +184,7 @@ export function Pagination({
           »»
         </button>
         </div>
+        {infoRight}
       </div>
     </div>
   );

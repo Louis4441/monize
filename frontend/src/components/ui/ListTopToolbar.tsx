@@ -9,8 +9,8 @@ interface ListTopToolbarProps {
   densityView: DensityView;
   /**
    * Paging state. Supply all five or none: with them the bar carries the
-   * pager and the buttons ride on its right, without them it is the buttons
-   * alone.
+   * pager and the buttons ride at the right-hand end of it, after the page
+   * stepper; without them it is the buttons alone.
    *
    * A single page keeps the pager too. Its buttons are inert there, but the
    * line beside them -- "Showing 1-7 of 7 transactions" -- is the answer to
@@ -33,17 +33,18 @@ interface ListTopToolbarProps {
    * bar rather than with the buttons on the right: what the reader is looking
    * at -- these rows, this many of them -- and the control that changes which
    * shape they are looking at read as one statement, and it leaves the
-   * right-hand end to the controls that act on the list as drawn (export,
-   * density, paging). With no pager to sit beside it stays with the buttons,
-   * which is the only place left. Absent on a list whose screen offers no
+   * right-hand end to the pager and the controls that act on the list as
+   * drawn (export, density). With no pager to sit beside it stays with the
+   * buttons, which is the only place left. Absent on a list whose screen offers no
    * calendar.
    */
   viewToggle?: React.ReactNode;
 }
 
 /**
- * The grey strip above a table: where you are in the list on the left, the
- * controls that act on the whole list on the right.
+ * The grey strip above a table: where you are in the list and the switch that
+ * changes its shape on the left, the pager and then the controls that act on
+ * the whole list on the right.
  *
  * It is one component because it is one thing the user learns once. The cash
  * register drew it and the brokerage register did not, so the two halves of an

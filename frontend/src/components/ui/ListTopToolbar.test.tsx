@@ -93,11 +93,10 @@ describe('ListTopToolbar', () => {
     expect(screen.getByText('Export')).toBeInTheDocument();
   });
 
-  it('puts the Table / Calendar switch beside the count, left of the list buttons', () => {
-    // Order is the assertion: "immediately right of the Showing line" is the
-    // placement, not merely "somewhere in the bar". The switch reads with what
-    // the reader is looking at; the buttons that act on the list as drawn --
-    // export, density -- keep the right-hand end, left of the pager.
+  it('reads count, switch, pager, then the list buttons', () => {
+    // Order is the assertion, not merely "somewhere in the bar": the switch
+    // reads with the line saying what the reader is looking at, and export and
+    // density sit at the right-hand end AFTER the page stepper.
     render(
       <ListTopToolbar
         densityView="transactions"
@@ -110,14 +109,33 @@ describe('ListTopToolbar', () => {
 
     const count = screen.getByText('90');
     const toggle = screen.getByRole('button', { name: 'Switch view' });
+    const lastPage = screen.getByTitle('Last page');
     const exportButton = screen.getByRole('button', { name: 'Export' });
     const density = screen.getByTitle('Toggle row density');
-    const firstPage = screen.getByTitle('First page');
 
     expect(count.compareDocumentPosition(toggle)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(toggle.compareDocumentPosition(exportButton)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(toggle.compareDocumentPosition(lastPage)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(lastPage.compareDocumentPosition(exportButton)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(exportButton.compareDocumentPosition(density)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(density.compareDocumentPosition(firstPage)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('keeps the pager and the list buttons in one wrapping row', () => {
+    // They were a column that stacked below a fixed width, which put export and
+    // density on a line of their own while there was still room for both.
+    render(
+      <ListTopToolbar
+        densityView="transactions"
+        {...PAGING}
+        onPageChange={vi.fn()}
+        actions={<button type="button">Export</button>}
+      />,
+    );
+
+    const row = screen.getByTitle('Last page').parentElement!.parentElement!;
+
+    expect(row.className).toContain('flex-wrap');
+    expect(row.className).not.toContain('flex-col');
+    expect(row).toContainElement(screen.getByRole('button', { name: 'Export' }));
   });
 
   it('keeps the switch with the buttons when there is no pager to sit beside', () => {
