@@ -8,6 +8,7 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { DataSource } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
+import { resolvePositiveInt } from "../common/env-number.util";
 import { AiProviderConfig } from "./entities/ai-provider-config.entity";
 import { EncryptionService } from "../common/encryption/encryption.service";
 import { AiProviderFactory } from "./ai-provider.factory";
@@ -82,11 +83,18 @@ export class AiService {
     private readonly configService: ConfigService,
     private readonly relayService: AiRelayService,
   ) {
-    const envVal = this.configService.get<number>("AI_MAX_PROVIDERS_PER_USER");
-    this.maxProvidersPerUser =
-      envVal && Number.isInteger(envVal) && envVal > 0
-        ? envVal
-        : DEFAULT_MAX_AI_PROVIDERS_PER_USER;
+    // `ConfigService` returns the raw string, so `Number.isInteger` on it is
+    // always false and every configured cap silently became the default.
+    const maxProviders = resolvePositiveInt(
+      this.configService.get("AI_MAX_PROVIDERS_PER_USER"),
+      DEFAULT_MAX_AI_PROVIDERS_PER_USER,
+    );
+    if (maxProviders.invalid) {
+      this.logger.warn(
+        `AI_MAX_PROVIDERS_PER_USER must be a positive integer; using ${DEFAULT_MAX_AI_PROVIDERS_PER_USER}`,
+      );
+    }
+    this.maxProvidersPerUser = maxProviders.value;
 
     // SECURITY: Validate AI_DEFAULT_BASE_URL at startup.
     // Self-hosted providers (ollama, openai-compatible) only need basic URL

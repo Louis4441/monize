@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as nodemailer from "nodemailer";
 import { Transporter } from "nodemailer";
+import { resolvePositiveInt } from "../common/env-number.util";
 
 /**
  * What this replica's own SMTP sends have done lately. Purely in-process --
@@ -67,6 +68,56 @@ export function isSmtpTransportFailure(error: unknown): boolean {
   return typeof responseCode !== "number";
 }
 
+const DEFAULT_SMTP_PORT = 587;
+/** The only port that speaks TLS from the first byte; everything else is STARTTLS. */
+const IMPLICIT_TLS_PORT = 465;
+const MAX_TCP_PORT = 65535;
+
+export interface ResolvedSmtpTransportSecurity {
+  port: number;
+  /** True for implicit TLS (TLS before the greeting), false for STARTTLS. */
+  secure: boolean;
+  /** A supplied port that was not a usable TCP port, so the default was used. */
+  portInvalid: boolean;
+}
+
+/**
+ * Decide the port and the TLS mode from the deployment's raw environment.
+ *
+ * `ConfigService` hands back `process.env` unchanged, so `SMTP_PORT` is the
+ * **string** `"465"` in every real deployment and a number only in a test that
+ * mocks the reader. `port === 465` is therefore false against Gmail's implicit
+ * TLS port, the transport opens in cleartext and sends `EHLO`, and the relay --
+ * which expects a TLS ClientHello -- hangs up without answering. Nodemailer
+ * reports that as `Error: Unexpected socket close`, whose stack points at a
+ * timer rather than at this decision. Coerce through `resolvePositiveInt`, the
+ * repository's rule for every numeric environment variable.
+ *
+ * `SMTP_SECURE` is documented in `README.md` and shipped by the Helm
+ * configmap, so it is read here: it can only turn implicit TLS *on*, for a
+ * relay offering it on a non-standard port. It cannot turn it off, because
+ * port 465 has no cleartext phase to fall back to and the chart's own default
+ * is the string `"false"` -- honouring that literally would break exactly the
+ * port-465 deployments this fix is for.
+ */
+export function resolveSmtpTransportSecurity(
+  rawPort: unknown,
+  rawSecure: unknown,
+): ResolvedSmtpTransportSecurity {
+  const resolved = resolvePositiveInt(rawPort, DEFAULT_SMTP_PORT);
+  const outOfRange = resolved.value > MAX_TCP_PORT;
+  const port = outOfRange ? DEFAULT_SMTP_PORT : resolved.value;
+  const secureRequested =
+    typeof rawSecure === "string"
+      ? rawSecure.trim().toLowerCase() === "true"
+      : rawSecure === true;
+  return {
+    port,
+    secure: port === IMPLICIT_TLS_PORT || secureRequested,
+    portInvalid: resolved.invalid || outOfRange,
+  };
+}
+
 @Injectable()
 export class EmailService implements OnModuleInit {
   private readonly logger = new Logger(EmailService.name);
@@ -90,9 +141,15 @@ export class EmailService implements OnModuleInit {
       return;
     }
 
-    const port = this.configService.get<number>("SMTP_PORT", 587);
-    // Port 465 uses implicit TLS; port 587 uses STARTTLS (secure must be false)
-    const secure = port === 465;
+    const { port, secure, portInvalid } = resolveSmtpTransportSecurity(
+      this.configService.get("SMTP_PORT"),
+      this.configService.get("SMTP_SECURE"),
+    );
+    if (portInvalid) {
+      this.logger.warn(
+        `SMTP_PORT must be an integer from 1 to ${MAX_TCP_PORT}; using ${DEFAULT_SMTP_PORT}`,
+      );
+    }
 
     const transportOptions: Record<string, unknown> = {
       host,
@@ -101,7 +158,8 @@ export class EmailService implements OnModuleInit {
       auth: { user, pass: password },
     };
 
-    // For port 587, require STARTTLS upgrade (don't fall back to plaintext)
+    // Without implicit TLS, require the STARTTLS upgrade rather than falling
+    // back to plaintext.
     if (!secure) {
       transportOptions.requireTLS = true;
     }

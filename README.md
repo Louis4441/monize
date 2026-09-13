@@ -346,6 +346,7 @@ npm run dev
 | `OIDC_CALLBACK_URL` | OIDC callback URL | - |
 | `SMTP_HOST` | SMTP server host | - |
 | `SMTP_PORT` | SMTP server port | `587` |
+| `SMTP_SECURE` | Force implicit TLS on a port other than 465. Port 465 already selects it, and this cannot switch it off | `false` |
 | `SMTP_USER` | SMTP username | - |
 | `SMTP_PASSWORD` | SMTP password | - |
 | `EMAIL_FROM` | Email sender address | - |
@@ -367,7 +368,6 @@ npm run dev
 | `BACKUP_HOST_DIR` | Host folder mapped to `BACKUP_CONTAINER_DIR` by docker-compose | `./monize/backups` |
 | `ATTACHMENT_CONTAINER_DIR` | Container folder local attachments are written to (was `ATTACHMENT_LOCAL_DIR`) | `/data/attachments` |
 | `ATTACHMENT_HOST_DIR` | Host folder mapped to `ATTACHMENT_CONTAINER_DIR` by docker-compose | `./monize/attachments` |
-| `SMTP_SECURE` | Use TLS for SMTP | `false` |
 
 The `AI_DEFAULT_*` and `AI_QUERY_*` variables configure the **centrally managed
 AI** -- the provider used for any user who has not configured one of their own.

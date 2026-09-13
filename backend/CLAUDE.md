@@ -60,7 +60,7 @@ Each module holds `{feature}.module.ts`, controller, service, their specs, `enti
 | Copy composed outside a request (email, push body) | `emailTranslator(i18n, recipientLang)` | the request locale or English |
 | A notification | `NotificationService.create` | a second `INSERT` into `notifications` |
 | Sending a push | ask the notification layer | importing `web-push` outside `WebPushSender` |
-| A numeric environment variable | `resolvePositiveInt`, declared in a table beside its documentation | a bare `Number(process.env.X)` |
+| A numeric environment variable | `resolvePositiveInt`, declared in a table beside its documentation | a bare `Number(process.env.X)`, or `configService.get<number>(...)`, which asserts the type without coercing |
 | A log line, including pre-boot scripts | NestJS `Logger` | `console.*` |
 | A third-party `fetch` | `ProviderHealthService` gates and `describeFetchFailure` | a bare `fetch` or logging `error.stack` from a `catch` |
 | A literal inside a regular expression | `escapeRegExp` | a hand-written character class |
