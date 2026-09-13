@@ -1,6 +1,14 @@
 'use client';
 
-import { Fragment, useMemo } from 'react';
+import {
+  Fragment,
+  useMemo,
+  useRef,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
@@ -14,6 +22,7 @@ import { useDateFormat } from '@/hooks/useDateFormat';
 import { useDateRange } from '@/hooks/useDateRange';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useReportData } from '@/hooks/useReportData';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { SortableHeader } from '@/components/ui/SortableHeader';
@@ -32,6 +41,47 @@ const SORT_DIR_STORAGE_KEY =
   'monize-reports-monthly-category-breakdown-sort-dir';
 const INCLUDE_CURRENT_MONTH_STORAGE_KEY =
   'monize-reports-monthly-category-breakdown-include-current-month';
+const NAME_OFFSET_STORAGE_KEY =
+  'monize-reports-monthly-category-breakdown-name-offset';
+
+/**
+ * Phone-only collapse of the category column.
+ *
+ * A month-columnar report cannot fit a phone, and the sticky category column is
+ * the width the months are missing. Dragging the column sideways slides it out
+ * of view to the left *and* moves its right edge by the same amount, so the
+ * months take exactly the width the names give up -- the two halves of the
+ * gesture are one number (`--mcb-name-off`).
+ *
+ * The wrap width (`--mcb-name-full`) never changes while dragging, so the names
+ * reflow at no point under the finger and the rows keep their height; only the
+ * visible width (`--mcb-name-w`) and the shift move. Every rule reverts at `sm`,
+ * where the column stays the plain sticky column it has always been.
+ *
+ * The width has to come from a clipping block *inside* the cell rather than
+ * from the cell: an auto-layout table ignores `width` and `max-width` on a
+ * `<td>` and sizes the column from its content, so a fixed-width name would
+ * simply hold the column open. A `w-[var(--mcb-name-w)] overflow-hidden` block
+ * contributes its own width and nothing of what it clips, which is exactly the
+ * number the drag controls.
+ */
+const MOBILE_NAME_WIDTH = 116;
+/**
+ * The column never collapses past this: a fully vanished column leaves nothing
+ * to grab to pull the names back, and the header keeps its sort indicator.
+ */
+const MOBILE_NAME_STUB = 28;
+const MAX_NAME_OFFSET = MOBILE_NAME_WIDTH - MOBILE_NAME_STUB;
+/** Horizontal travel before a press becomes a drag, so a tap still drills down. */
+const NAME_DRAG_THRESHOLD = 4;
+const NAME_CELL_CLASS = 'p-0 overflow-hidden touch-pan-y sm:touch-auto';
+const NAME_CLIP_CLASS =
+  'w-[var(--mcb-name-w)] overflow-hidden sm:w-auto sm:overflow-visible';
+/** The header shares the column but also carries the sort indicator. */
+const NAME_HEAD_CLIP_CLASS =
+  'w-[calc(var(--mcb-name-w)_-_1.25rem)] overflow-hidden sm:w-auto sm:overflow-visible';
+const NAME_INNER_CLASS =
+  'w-[var(--mcb-name-full)] ml-[calc(-1*var(--mcb-name-off))] break-words sm:w-auto sm:ml-0 sm:break-normal';
 
 // Deviation thresholds (fraction of the non-zero average) mirroring yaffa.
 const DEVIATION_LEVEL_1 = 0.05;
@@ -331,6 +381,88 @@ export function MonthlyCategoryBreakdownReport() {
   );
   const [includeCurrentMonth, setIncludeCurrentMonth] =
     useLocalStorage<boolean>(INCLUDE_CURRENT_MONTH_STORAGE_KEY, false);
+
+  // How far the category column is dragged out of view. Only a phone collapses
+  // it; every width above `sm` reverts the rules and ignores the number.
+  const isMobile = useIsMobile();
+  const [storedNameOffset, setStoredNameOffset] = useLocalStorage<number>(
+    NAME_OFFSET_STORAGE_KEY,
+    0,
+  );
+  const nameOffset = isMobile
+    ? Math.min(MAX_NAME_OFFSET, Math.max(0, storedNameOffset))
+    : 0;
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<{
+    startX: number;
+    startOffset: number;
+    offset: number;
+    moved: boolean;
+  } | null>(null);
+  // A press that turned into a drag must not also fire the name's drill-down.
+  const suppressClickRef = useRef(false);
+
+  // The drag writes the custom properties straight onto the scroll container.
+  // Routing every pointermove through React state would re-render the whole
+  // matrix (and write localStorage) per frame; the final value is committed
+  // once on release, which re-renders to the same numbers.
+  const paintNameOffset = (offset: number) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.style.setProperty('--mcb-name-off', `${offset}px`);
+    el.style.setProperty('--mcb-name-w', `${MOBILE_NAME_WIDTH - offset}px`);
+  };
+
+  const handleNamePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    // A drag whose click never arrived (the pointer was released outside the
+    // cell) must not leave the flag armed to swallow the next unrelated click.
+    suppressClickRef.current = false;
+    if (!isMobile) return;
+    if (!(e.target as HTMLElement).closest('[data-name-cell]')) return;
+    dragRef.current = {
+      startX: e.clientX,
+      startOffset: nameOffset,
+      offset: nameOffset,
+      moved: false,
+    };
+  };
+
+  const handleNamePointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const dx = e.clientX - drag.startX;
+    if (!drag.moved) {
+      // Below the threshold the press is still a tap; capture only once the
+      // gesture is unmistakably horizontal, so a vertical scroll still scrolls.
+      if (Math.abs(dx) < NAME_DRAG_THRESHOLD) return;
+      drag.moved = true;
+      // Not every environment implements pointer capture; the drag still works
+      // without it, it just ends when the pointer leaves the container.
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    }
+    // Dragging left (dx < 0) slides the names away and narrows the column.
+    drag.offset = Math.min(MAX_NAME_OFFSET, Math.max(0, drag.startOffset - dx));
+    paintNameOffset(drag.offset);
+  };
+
+  const handleNamePointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    dragRef.current = null;
+    if (!drag) return;
+    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
+    }
+    if (!drag.moved) return;
+    suppressClickRef.current = true;
+    setStoredNameOffset(drag.offset);
+  };
+
+  const handleNameClickCapture = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (!suppressClickRef.current) return;
+    suppressClickRef.current = false;
+    e.preventDefault();
+    e.stopPropagation();
+  };
 
   // The current calendar month (YYYY-MM); the latest column is in progress and
   // excluded by default unless the user opts to include it.
@@ -736,6 +868,29 @@ export function MonthlyCategoryBreakdownReport() {
     return `${sign} ${formatCurrency(Math.abs(normalized), currency)}`;
   };
 
+  /**
+   * A cell in the category column: the clipping block plus the inner block that
+   * carries the padding and slides with the drag. The cell's own padding lives
+   * in `innerClassName` (and its desktop truncation with it), because padding
+   * left on the `<td>` would hold the collapsed column open by its own width.
+   */
+  const renderNameCell = (
+    className: string,
+    innerClassName: string,
+    children: ReactNode,
+    title?: string,
+  ) => (
+    <td
+      data-name-cell=""
+      className={`${NAME_CELL_CLASS} ${className}`}
+      title={title}
+    >
+      <div className={NAME_CLIP_CLASS}>
+        <div className={`${NAME_INNER_CLASS} ${innerClassName}`}>{children}</div>
+      </div>
+    </td>
+  );
+
   const months = model?.months ?? [];
   const hasData =
     model != null &&
@@ -779,18 +934,18 @@ export function MonthlyCategoryBreakdownReport() {
         {/* Subcategory rows (sorted alphabetically) */}
         {section.rows.map((row) => (
           <tr key={row.categoryId || row.displayName} className="group hover:bg-gray-50 dark:hover:bg-gray-700">
-            <td
-              className="sticky left-0 z-10 bg-white dark:bg-gray-800 group-hover:bg-gray-50 dark:group-hover:bg-gray-700 pl-5 pr-2 py-1 text-gray-900 dark:text-gray-100 truncate max-w-[220px]"
-              title={row.displayName}
-            >
+            {renderNameCell(
+              'sticky left-0 z-10 bg-white dark:bg-gray-800 group-hover:bg-gray-50 dark:group-hover:bg-gray-700 text-gray-900 dark:text-gray-100',
+              'pl-5 pr-2 py-1 sm:max-w-[220px]',
               <button
                 type="button"
                 onClick={() => drillDownRange(rowDrillIds(row))}
-                className="block w-full text-left truncate hover:underline"
+                className="block w-full text-left hover:underline sm:truncate"
               >
                 {row.displayName}
-              </button>
-            </td>
+              </button>,
+              row.displayName,
+            )}
             {months.map((m) => {
               const value = row.values[m] || 0;
               const cls = showDeviations
@@ -828,9 +983,14 @@ export function MonthlyCategoryBreakdownReport() {
         ))}
         {/* Section subtotal */}
         <tr className="font-bold bg-gray-50 dark:bg-gray-900 border-t-2 border-gray-300 dark:border-gray-600">
-          <td className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-900 px-2 py-1 truncate" title={`${t('monthlyCategoryBreakdown.subtotal')}: ${section.title}`}>
-            {t('monthlyCategoryBreakdown.subtotal')}: {section.title}
-          </td>
+          {renderNameCell(
+            'sticky left-0 z-10 bg-gray-50 dark:bg-gray-900',
+            'px-2 py-1 sm:truncate',
+            <>
+              {t('monthlyCategoryBreakdown.subtotal')}: {section.title}
+            </>,
+            `${t('monthlyCategoryBreakdown.subtotal')}: ${section.title}`,
+          )}
           {months.map((m) => {
             const value = section.subtotals[m] || 0;
             return (
@@ -884,9 +1044,11 @@ export function MonthlyCategoryBreakdownReport() {
       : 'text-red-700 dark:text-red-300';
     return (
       <tr className="font-bold bg-gray-100 dark:bg-gray-900 border-t-2 border-gray-400 dark:border-gray-500">
-        <td className={`sticky left-0 z-10 bg-gray-100 dark:bg-gray-900 px-2 py-1 ${accent}`}>
-          {label}
-        </td>
+        {renderNameCell(
+          `sticky left-0 z-10 bg-gray-100 dark:bg-gray-900 ${accent}`,
+          'px-2 py-1',
+          label,
+        )}
         {months.map((m) => (
           <td key={m} className={`px-2 py-1 text-right ${accent}`}>
             {formatGrand(monthly[m] || 0, isIncome, formatCurrency, currency)}
@@ -946,15 +1108,18 @@ export function MonthlyCategoryBreakdownReport() {
         </tr>
         {tr.rows.map((row) => (
           <tr key={`${row.direction}-${row.accountId}`} className="group hover:bg-gray-50 dark:hover:bg-gray-700">
-            <td className="sticky left-0 z-10 bg-white dark:bg-gray-800 group-hover:bg-gray-50 dark:group-hover:bg-gray-700 pl-5 pr-2 py-1 text-gray-900 dark:text-gray-100 truncate max-w-[220px]" title={row.displayName}>
+            {renderNameCell(
+              'sticky left-0 z-10 bg-white dark:bg-gray-800 group-hover:bg-gray-50 dark:group-hover:bg-gray-700 text-gray-900 dark:text-gray-100',
+              'pl-5 pr-2 py-1 sm:max-w-[220px]',
               <button
                 type="button"
                 onClick={() => drillTransfersRange([row.accountId])}
-                className="block w-full text-left truncate hover:underline"
+                className="block w-full text-left hover:underline sm:truncate"
               >
                 {row.displayName}
-              </button>
-            </td>
+              </button>,
+              row.displayName,
+            )}
             {months.map((m) => {
               const value = row.values[m] || 0;
               return (
@@ -988,15 +1153,17 @@ export function MonthlyCategoryBreakdownReport() {
           </tr>
         ))}
         <tr className="font-bold bg-gray-100 dark:bg-gray-900 border-t-2 border-gray-400 dark:border-gray-500">
-          <td className={`sticky left-0 z-10 bg-gray-100 dark:bg-gray-900 px-2 py-1 ${accent}`}>
+          {renderNameCell(
+            `sticky left-0 z-10 bg-gray-100 dark:bg-gray-900 ${accent}`,
+            'px-2 py-1',
             <button
               type="button"
               onClick={() => drillTransfersRange(model!.allTransferAccountIds)}
               className="text-left hover:underline"
             >
               {t('monthlyCategoryBreakdown.totalTransfers')}
-            </button>
-          </td>
+            </button>,
+          )}
           {months.map((m) => {
             const value = tr.monthly[m] || 0;
             return (
@@ -1045,15 +1212,17 @@ export function MonthlyCategoryBreakdownReport() {
     drill?: { range: () => void; month: (m: string) => void },
   ) => (
     <tr className="group font-bold bg-gray-100 dark:bg-gray-900 hover:bg-gray-200 dark:hover:bg-gray-800">
-      <td className={`sticky left-0 z-10 bg-gray-100 dark:bg-gray-900 group-hover:bg-gray-200 dark:group-hover:bg-gray-800 px-2 py-1 ${accent}`}>
-        {drill ? (
+      {renderNameCell(
+        `sticky left-0 z-10 bg-gray-100 dark:bg-gray-900 group-hover:bg-gray-200 dark:group-hover:bg-gray-800 ${accent}`,
+        'px-2 py-1',
+        drill ? (
           <button type="button" onClick={drill.range} className="text-left hover:underline">
             {label}
           </button>
         ) : (
           label
-        )}
-      </td>
+        ),
+      )}
       {months.map((m) => {
         const value = monthly[m] || 0;
         return (
@@ -1151,7 +1320,22 @@ export function MonthlyCategoryBreakdownReport() {
             {t('monthlyCategoryBreakdown.noData')}
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <div
+            ref={scrollRef}
+            className="overflow-x-auto"
+            style={
+              {
+                '--mcb-name-full': `${MOBILE_NAME_WIDTH}px`,
+                '--mcb-name-off': `${nameOffset}px`,
+                '--mcb-name-w': `${MOBILE_NAME_WIDTH - nameOffset}px`,
+              } as CSSProperties
+            }
+            onPointerDown={handleNamePointerDown}
+            onPointerMove={handleNamePointerMove}
+            onPointerUp={handleNamePointerUp}
+            onPointerCancel={handleNamePointerUp}
+            onClickCapture={handleNameClickCapture}
+          >
             <table className="min-w-full text-xs border-collapse">
               <thead>
                 <tr className="text-gray-500 dark:text-gray-400">
@@ -1161,9 +1345,13 @@ export function MonthlyCategoryBreakdownReport() {
                     sortDirection={sortDir}
                     onSort={handleSort}
                     align="left"
-                    className="sticky left-0 z-10 bg-white dark:bg-gray-800 px-2 py-2 font-medium min-w-[180px]"
+                    className={`sticky left-0 z-10 bg-white dark:bg-gray-800 font-medium sm:px-2 sm:py-2 sm:min-w-[180px] ${NAME_CELL_CLASS}`}
                   >
-                    {t('monthlyCategoryBreakdown.category')}
+                    <span className={`block ${NAME_HEAD_CLIP_CLASS}`}>
+                      <span className={`block px-2 py-2 sm:p-0 ${NAME_INNER_CLASS}`}>
+                        {t('monthlyCategoryBreakdown.category')}
+                      </span>
+                    </span>
                   </SortableHeader>
                   {months.map((m) => (
                     <SortableHeader
@@ -1260,15 +1448,17 @@ export function MonthlyCategoryBreakdownReport() {
                   },
                 )}
                 <tr className="group font-bold bg-gray-100 dark:bg-gray-900 hover:bg-gray-200 dark:hover:bg-gray-800 border-t-2 border-gray-400 dark:border-gray-500">
-                  <td className="sticky left-0 z-10 bg-gray-100 dark:bg-gray-900 group-hover:bg-gray-200 dark:group-hover:bg-gray-800 px-2 py-1">
+                  {renderNameCell(
+                    'sticky left-0 z-10 bg-gray-100 dark:bg-gray-900 group-hover:bg-gray-200 dark:group-hover:bg-gray-800',
+                    'px-2 py-1',
                     <button
                       type="button"
                       onClick={() => drillDownRange(model!.allCategoryIds)}
                       className="text-left hover:underline"
                     >
                       {t('monthlyCategoryBreakdown.balance')}
-                    </button>
-                  </td>
+                    </button>,
+                  )}
                   {months.map((m) => {
                     const bal = model!.monthlyBalance[m] || 0;
                     return (
@@ -1315,9 +1505,11 @@ export function MonthlyCategoryBreakdownReport() {
                   )}
                 {model!.hasTransfers && (
                   <tr className="group font-bold bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 border-t-2 border-gray-400 dark:border-gray-500">
-                    <td className="sticky left-0 z-10 bg-gray-200 dark:bg-gray-800 group-hover:bg-gray-300 dark:group-hover:bg-gray-700 px-2 py-1">
-                      {t('monthlyCategoryBreakdown.overallTotal')}
-                    </td>
+                    {renderNameCell(
+                      'sticky left-0 z-10 bg-gray-200 dark:bg-gray-800 group-hover:bg-gray-300 dark:group-hover:bg-gray-700',
+                      'px-2 py-1',
+                      t('monthlyCategoryBreakdown.overallTotal'),
+                    )}
                     {months.map((m) => {
                       const ov = model!.monthlyOverall[m] || 0;
                       return (
@@ -1354,19 +1546,22 @@ export function MonthlyCategoryBreakdownReport() {
                     : model!.totalExpensesAvg;
                   return (
                     <tr key={`recap-${si}`} className="group font-bold bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800">
-                      <td className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-900 group-hover:bg-gray-100 dark:group-hover:bg-gray-800 px-2 py-1 truncate" title={section.title}>
-                        {section.allCategoryIds.length > 0 ? (
+                      {renderNameCell(
+                        'sticky left-0 z-10 bg-gray-50 dark:bg-gray-900 group-hover:bg-gray-100 dark:group-hover:bg-gray-800',
+                        'px-2 py-1 sm:truncate',
+                        section.allCategoryIds.length > 0 ? (
                           <button
                             type="button"
                             onClick={() => drillDownRange(section.allCategoryIds)}
-                            className="block w-full text-left truncate hover:underline"
+                            className="block w-full text-left hover:underline sm:truncate"
                           >
                             {section.title}
                           </button>
                         ) : (
                           section.title
-                        )}
-                      </td>
+                        ),
+                        section.title,
+                      )}
                       {months.map((m) => {
                         const value = section.subtotals[m] || 0;
                         return (
