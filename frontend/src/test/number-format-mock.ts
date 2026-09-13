@@ -51,6 +51,18 @@ export function numberFormatMockDefaults() {
       money(value, digits ?? 2),
     formatCurrencyCompact: (value: number) => money(value, 0),
     formatCurrencyAxis: (value: number) => money(value, 0),
+    // Through Intl's own compact notation, so a default is the shape the real
+    // formatter produces ("$13.3K") rather than a full figure a narrow-cell
+    // assertion would pass against by accident.
+    formatCurrencyTight: (value: number) =>
+      new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        currencyDisplay: 'narrowSymbol',
+        notation: 'compact',
+        compactDisplay: 'short',
+        maximumFractionDigits: Math.abs(value) < 1000 ? 0 : 1,
+      }).format(value),
     formatCurrencyFlag: (value: number) => money(value, 2),
     formatCurrencyLabel: (value: number) => money(value, 2),
     formatNumber: (value: number, digits = 2) => plain(value, digits),

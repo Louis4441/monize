@@ -40,8 +40,9 @@ interface MonthGridProps {
    *
    * The layer is decoration: it is hidden from assistive technology and passes
    * every click through to the day beneath, so whatever it draws must also be in
-   * the cells it covers. Phones do not draw it -- a column is 50px there, which
-   * is no room for a band -- so a cell has to stand on its own below `sm`.
+   * the cells it covers. It is drawn at every width: a phone column is narrow
+   * enough that a span is the only way a note's text is read at all, since the
+   * run's whole width is what there is to read it in.
    */
   renderWeekSpans?: (week: readonly string[]) => ReactNode;
   /** Id of the element naming this grid, usually the toolbar's month caption. */
@@ -256,7 +257,7 @@ export function MonthGrid({
           {renderWeekSpans && (
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 bottom-0 hidden grid-cols-7 pb-1 sm:grid"
+              className="pointer-events-none absolute inset-x-0 bottom-0 grid grid-cols-7 pb-1"
             >
               {renderWeekSpans(week)}
             </div>

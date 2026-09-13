@@ -19,6 +19,7 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useReportData } from '@/hooks/useReportData';
 import { usePriceRefresh } from '@/hooks/usePriceRefresh';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import { useWidgetConfig } from '@/hooks/useWidgetConfig';
 import { resolveRangePreset } from '@/lib/date-range';
@@ -57,6 +58,11 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
   const { formatCurrency, formatCurrencyAxis, formatSignedPercent } = useNumberFormat();
   const { defaultCurrency } = useExchangeRates();
   const formatChartDate = useChartDateFormat();
+  // The refresh control sits on the title's line on a desktop and beside the
+  // value on a phone, so which line it belongs to is a real branch rather than
+  // a breakpoint class: rendering it twice would give one control two
+  // accessible names in one card.
+  const isMobile = useIsMobile();
   const { config, updateConfig } = useWidgetConfig<PortfolioValueConfig>(
     WIDGET_ID,
     PORTFOLIO_VALUE_DEFAULT,
@@ -189,68 +195,77 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
 
   const loading = isLoading || dataLoading;
 
+  const refreshButton = (
+    <button
+      type="button"
+      onClick={handleRefresh}
+      disabled={isRefreshing}
+      aria-label={t('portfolioValue.refresh')}
+      title={t('portfolioValue.refresh')}
+      className="flex-shrink-0 p-1.5 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      <svg
+        className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+      </svg>
+    </button>
+  );
+
   return (
     <WidgetCard
       title={t('portfolioValue.title')}
       titleHref="/reports/portfolio-value"
       widgetId={WIDGET_ID}
       headerRight={
-        /* Two lines, and the same two at every width: the window and the refresh
-           control ride up on the title's line beside the settings gear, and the
-           figures take the line under them -- the value, with the move
-           right-aligned beneath it in smaller type, so the two end on the same
-           edge and read as one figure and its change. */
-        <div className="flex flex-wrap items-center justify-end gap-x-2">
+        /* The window the chart draws, and on a desktop the control that
+           reprices it, to its left. The figures are not here: a header-right
+           column ends where the settings gear begins, and the value reads as
+           the card's figure only when it ends on the card's own edge. */
+        <div className="flex items-center gap-x-2">
+          {!isMobile && refreshButton}
           <span className="whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
             {t(`widgets.rangeLabels.${config.range}` as Parameters<typeof t>[0])}
           </span>
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            aria-label={t('portfolioValue.refresh')}
-            title={t('portfolioValue.refresh')}
-            className="flex-shrink-0 p-1.5 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg
-              className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
-          {/* `w-full` is what puts the figures on their own line: the controls
-              above keep the title's line whatever the card's width. */}
-          <div className="flex w-full flex-col items-end gap-0.5">
-            {totalPortfolioValue !== null && (
-              <span className="whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-gray-100">
-                {formatCurrency(totalPortfolioValue, defaultCurrency)}
-              </span>
-            )}
-            {/* The move over the window, in money and as a share of where it
-                started. An unknown baseline shows nothing at all rather than a
-                change of zero, which would read as a flat market. */}
-            {!loading && change !== null && (
-              <span
-                className={`whitespace-nowrap text-xs font-medium ${gainLossColor(change)}`}
-                data-testid="portfolio-period-change"
-              >
-                {change >= 0 ? '+' : ''}
-                {formatCurrency(change, defaultCurrency)}
-                {changePercent !== null && (
-                  <span className="ml-1">({formatSignedPercent(changePercent, 1)})</span>
-                )}
-              </span>
-            )}
-          </div>
         </div>
       }
       configControls={configControls}
       configTitle={t('portfolioValue.title')}
     >
+      {/* The value and the move it made, on their own row at the top of the
+          body: the body spans the whole card, so the two end flush with its
+          right edge at every width instead of stopping short of the gear. On a
+          phone the refresh control rides at their left, which is the line that
+          still has room for it. */}
+      <div className="mb-2 flex items-center justify-end gap-2" data-testid="portfolio-figures">
+        {isMobile && refreshButton}
+        <div className="flex flex-col items-end gap-0.5">
+          {totalPortfolioValue !== null && (
+            <span className="whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {formatCurrency(totalPortfolioValue, defaultCurrency)}
+            </span>
+          )}
+          {/* The move over the window, in money and as a share of where it
+              started. An unknown baseline shows nothing at all rather than a
+              change of zero, which would read as a flat market. */}
+          {!loading && change !== null && (
+            <span
+              className={`whitespace-nowrap text-xs font-medium ${gainLossColor(change)}`}
+              data-testid="portfolio-period-change"
+            >
+              {change >= 0 ? '+' : ''}
+              {formatCurrency(change, defaultCurrency)}
+              {changePercent !== null && (
+                <span className="ml-1">({formatSignedPercent(changePercent, 1)})</span>
+              )}
+            </span>
+          )}
+        </div>
+      </div>
       {loading ? (
         <div className="flex-1 min-h-[260px] animate-pulse rounded-md bg-gray-100 dark:bg-gray-700/50" />
       ) : chartData.length === 0 ? (

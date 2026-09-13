@@ -485,7 +485,7 @@ decided in the one file the guard already watches.
 
 | Session | Note on `d` | Cell | Day panel |
 |---|---|---|---|
-| owner | exists | note glyph and the first line, truncated; on a phone the glyph only | body through `LinkifiedText`; Edit; Delete |
+| owner | exists | a band across the days the note covers, at every width: the first line, truncated on a desktop and clamped to two lines on a phone; the cell's own copy is `sr-only` | body through `LinkifiedText`; Edit; Delete |
 | owner | none | nothing | "Add a note" |
 | owner, editing `d`, month or day changed | any | | confirmation; the draft survives a cancel |
 | owner, Save for `d` in flight, panel now shows `d2` | any | | response for `d` discarded; the list refetched; `d2`'s form untouched |

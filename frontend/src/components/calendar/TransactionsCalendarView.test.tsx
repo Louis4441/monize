@@ -4,6 +4,7 @@ import { CALENDAR_MAX_PER_SCHEDULE } from '@/hooks/useCalendarMonthData';
 import { SWIPE_ANIMATION_MS, SWIPE_PAGINATE_ATTR } from '@/hooks/swipe-gesture';
 import { NOTE_PAPER_CLASS } from './note-paper';
 import { CALENDAR_DAY_CHIP_LIMIT, TransactionsCalendarView } from './TransactionsCalendarView';
+import { CALENDAR_DAY_DOT_LIMIT } from './CalendarDayCell';
 import calendarNs from '@/i18n/messages/en/calendar.json';
 import { useViewModeStore } from '@/store/viewModeStore';
 import { useAuthStore } from '@/store/authStore';
@@ -924,6 +925,10 @@ describe('TransactionsCalendarView', () => {
       const marker = await within(cell('06/10/2026')).findByTestId('calendar-day-note-marker');
       expect(marker).toHaveTextContent('Call the landlord');
       expect(marker).not.toHaveTextContent('plumber');
+      // The band is what the reader SEES, at every width; the cell's copy is
+      // the screen reader's, and printing it too would put the same sentence on
+      // screen once per covered day.
+      expect(marker.className).toBe('sr-only');
     });
 
     it('marks every day a run covers, and draws the text only once', async () => {
@@ -977,6 +982,11 @@ describe('TransactionsCalendarView', () => {
       expect(bands[0]).not.toHaveTextContent('back on the 14th');
       expect(bands[0]).toHaveAttribute('data-note-columns', '4');
       expect(bands[0].style.gridColumn).toBe('4 / span 4');
+      // Readable at every width, which on a phone means two lines of the
+      // column rather than one line ellipsed after four characters.
+      const line = within(bands[0]).getByText('Away in Lisbon');
+      expect(line.className).toContain('line-clamp-2');
+      expect(line.className).toContain('sm:truncate');
     });
 
     it('breaks a run at the week and opens it again on the next row', async () => {
@@ -1066,11 +1076,14 @@ describe('TransactionsCalendarView', () => {
       await screen.findAllByTestId('calendar-note-span');
       const noted = within(cell('06/10/2026')).getByTestId('calendar-day-note-marker')
         .parentElement!;
+      // At every width, because the band is drawn at every width -- and a shade
+      // taller on a phone, where it takes two lines of smaller type.
+      expect(noted.className).toContain('pb-8');
       expect(noted.className).toContain('sm:pb-6');
       // A day no note covers keeps every pixel for its own rows.
       expect(
         within(cell('06/11/2026')).getByText('11').parentElement!.parentElement!.className,
-      ).not.toContain('sm:pb-6');
+      ).not.toContain('pb-6');
     });
 
     it('opens the same note from the middle of a run, for editing', async () => {
@@ -1306,6 +1319,73 @@ describe('TransactionsCalendarView', () => {
       const row = figure.parentElement!;
       expect(row.className).toContain('flex-col');
       expect(row.className).toContain('sm:flex-row');
+    });
+
+    it('fits the balance to the width of the cell on a phone, and prints it in full from sm up', async () => {
+      // A phone column is about fifty pixels: "$13,344.33" either overflows it
+      // or wraps mid-number, and neither is a figure. The compact rendering is
+      // the same number, said in the room there is.
+      viewport(400);
+      withBalancesLayer();
+      mockGetDailyBalanceTotals.mockResolvedValue(
+        balanceTotals({ days: [balanceDay('2026-06-10', { total: 13344.33 })] }),
+      );
+      const phone = renderView();
+
+      expect(
+        await within(cell('06/10/2026')).findByTestId('calendar-balance-actual'),
+      ).toHaveTextContent('$13.3K');
+      phone.unmount();
+
+      viewport(1280);
+      renderView();
+      expect(
+        await within(cell('06/10/2026')).findByTestId('calendar-balance-actual'),
+      ).toHaveTextContent('$13344.33');
+    });
+
+    it('draws a phone dot big enough to read, on as many rows as the day needs', async () => {
+      // A dot is the whole of what a phone cell says about a row's kind, so it
+      // is drawn at a size that reads -- and the row of them wraps rather than
+      // squeezing a busy day onto one line.
+      viewport(400);
+      mockGetAllPages.mockResolvedValue([
+        transaction({ id: 'tx-1' }),
+        transaction({ id: 'tx-2' }),
+        transaction({ id: 'tx-3' }),
+      ]);
+      renderView();
+
+      await screen.findAllByRole('button', { name: /Grocer/ });
+      const dots = within(cell('06/10/2026')).getByText('3').parentElement!
+        .previousElementSibling!;
+      expect(dots.className).toContain('flex-wrap');
+      expect(dots.children).toHaveLength(3);
+      for (const dot of dots.children) {
+        expect(dot.className).toContain('h-2.5');
+        expect(dot.className).toContain('w-2.5');
+      }
+    });
+
+    it('draws one more dot than the desktop cell has chips, and counts the rest', async () => {
+      // The dots wrap, so a phone cell is not bound by the height that decides
+      // the chip list: six is two rows of a phone column. The count beside them
+      // is still the day's whole total, so a seventh row is not lost.
+      expect(CALENDAR_DAY_DOT_LIMIT).toBe(CALENDAR_DAY_CHIP_LIMIT + 1);
+      viewport(400);
+      mockGetAllPages.mockResolvedValue(
+        Array.from({ length: CALENDAR_DAY_DOT_LIMIT + 1 }, (_, i) =>
+          transaction({ id: `tx-${i}` }),
+        ),
+      );
+      renderView();
+
+      await screen.findAllByRole('button', { name: /Grocer/ });
+      const day = cell('06/10/2026');
+      const dots = within(day).getByText(String(CALENDAR_DAY_DOT_LIMIT + 1)).parentElement!
+        .previousElementSibling!;
+      expect(dots.children).toHaveLength(CALENDAR_DAY_DOT_LIMIT);
+      expect(within(day).getByText('7 items')).toBeInTheDocument();
     });
 
     it('puts focus back on the day when the panel closes', async () => {

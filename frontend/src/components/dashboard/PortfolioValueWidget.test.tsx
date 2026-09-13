@@ -49,6 +49,23 @@ vi.mock('@/hooks/usePriceRefresh', () => ({
 
 const investmentAccount = { id: 'i1', accountType: 'INVESTMENT', accountSubType: 'INVESTMENT_BROKERAGE', name: 'Brokerage' } as Account;
 
+/** Answer every media query as a viewport of this width. */
+function viewport(width: number) {
+  window.matchMedia = vi.fn().mockImplementation((query: string) => {
+    const max = /max-width:\s*(\d+)px/.exec(query);
+    return {
+      matches: max ? width <= Number(max[1]) : false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    };
+  });
+}
+
 async function renderWidget() {
   await act(async () => {
     render(<PortfolioValueWidget accounts={[investmentAccount]} isLoading={false} />);
@@ -119,10 +136,12 @@ describe('PortfolioValueWidget', () => {
     );
   });
 
-  it('keeps the window, the refresh and the gear on the title line, figures below', async () => {
+  it('keeps the window and the refresh on the title line, figures on the card\'s own edge', async () => {
     // A widget header is one line for what the widget IS and its controls; the
-    // value and its move take the line under them, right-aligned on one edge so
-    // they read as a figure and its change rather than two numbers.
+    // value and its move take a row of the card body, right-aligned on one
+    // edge so they read as a figure and its change rather than two numbers --
+    // and that edge is the card's, not the one where the settings gear starts.
+    viewport(1280);
     getPortfolioSummary.mockResolvedValue({ totalPortfolioValue: 10000, holdings: [] });
     getInvestmentsMonthly.mockResolvedValue([
       { month: '2026-05', value: 8000 },
@@ -136,26 +155,47 @@ describe('PortfolioValueWidget', () => {
     const refresh = screen.getByLabelText('Refresh current value');
     const gear = screen.getByLabelText('Configure Portfolio Value over Time');
 
-    // One column for the two figures, aligned on their right edges, and it takes
-    // a line of its own whatever the card's width.
+    // One column for the two figures, aligned on their right edges, in a row of
+    // the body rather than in the header beside the gear.
     const figures = value.parentElement!;
     expect(change.parentElement).toBe(figures);
     expect(figures.className).toContain('flex-col');
     expect(figures.className).toContain('items-end');
-    expect(figures.className).toContain('w-full');
+    const figuresRow = screen.getByTestId('portfolio-figures');
+    expect(figuresRow).toContainElement(figures);
+    expect(figuresRow.className).toContain('justify-end');
+    expect(figuresRow).not.toContainElement(gear);
     // Smaller than the value it sits under.
     expect(change.className).toContain('text-xs');
     expect(value.className).toContain('text-sm');
 
-    // The window and the refresh control are above that column, in the order
-    // they are read: the window, then the button that acts on it.
-    expect(range.parentElement).not.toBe(figures);
-    expect(refresh.parentElement).not.toBe(figures);
-    expect(range.compareDocumentPosition(refresh)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(refresh.compareDocumentPosition(figures)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    // On a desktop the control that reprices the chart sits on the title's
+    // line, to the LEFT of the window it acts on.
+    expect(figuresRow).not.toContainElement(refresh);
+    expect(refresh.compareDocumentPosition(range)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(range.compareDocumentPosition(figuresRow)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
-    // The gear holds the first line with them rather than centring across both.
+    // The gear keeps the top of the header, whatever the header-right holds.
     expect(gear.className).toContain('self-start');
+  });
+
+  it('moves the refresh control beside the value on a phone', async () => {
+    // A phone title line holds the window and the gear and nothing else, so
+    // the refresh control rides on the figures' row instead -- one control, in
+    // one place, never a second copy hidden at the other breakpoint.
+    viewport(400);
+    getPortfolioSummary.mockResolvedValue({ totalPortfolioValue: 10000, holdings: [] });
+    getInvestmentsMonthly.mockResolvedValue([{ month: '2026-06', value: 10000 }]);
+    await renderWidget();
+
+    const refresh = screen.getByLabelText('Refresh current value');
+    const value = screen.getByText('$10000');
+    const figuresRow = screen.getByTestId('portfolio-figures');
+
+    expect(screen.getAllByLabelText('Refresh current value')).toHaveLength(1);
+    expect(figuresRow).toContainElement(refresh);
+    // To the left of the figure it refreshes.
+    expect(refresh.compareDocumentPosition(value)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('shows no period change while the series is empty', async () => {
