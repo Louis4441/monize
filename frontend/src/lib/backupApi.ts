@@ -184,6 +184,113 @@ export interface StoredBackupsReport {
   backups: StoredBackup[];
 }
 
+/** Which S3 destination a user's completed backups are copied to. */
+export type BackupOffsiteS3Mode = 'off' | 'deployment' | 'own';
+
+/** One configured target kind. A user may hold both at once (3-2-1). */
+export type BackupOffsiteDestination = 's3' | 'email';
+
+/** The published tier of the artifact that was copied; never `partial`. */
+export type BackupOffsiteTier = 'daily' | 'weekly' | 'monthly';
+
+/**
+ * Where one off-machine copy has got to.
+ *
+ * Mirrors the backend's `BackupOffsiteUploadStatus`. `pending`/`uploading` are
+ * in flight, `uploaded` is verified, `failed` is retried by the reaper,
+ * `conflict` is a key already holding different bytes, and the two `skipped-*`
+ * values are copies deliberately not made.
+ */
+export type BackupOffsiteUploadStatus =
+  | 'pending'
+  | 'uploading'
+  | 'uploaded'
+  | 'failed'
+  | 'conflict'
+  | 'skipped-unencrypted'
+  | 'skipped-too-large';
+
+/**
+ * The caller's off-machine destinations, as the server is willing to describe
+ * them.
+ *
+ * The two stored credentials are **write-only**: the server reports whether
+ * each one is set and never its value, so `s3AccessKeyIdSet` /
+ * `s3SecretAccessKeySet` are the whole of what a form can know about them.
+ * `deploymentS3Available` and `encryptionConfigured` are facts about the
+ * deployment rather than the row, and they are here so the surface can say what
+ * this server can do before the user fills anything in.
+ */
+export interface BackupOffsiteSettingsView {
+  s3Mode: BackupOffsiteS3Mode;
+  s3Bucket: string | null;
+  s3Region: string | null;
+  s3Prefix: string | null;
+  s3Endpoint: string | null;
+  s3ForcePathStyle: boolean;
+  /** Whether an access key id is stored. Never its value. */
+  s3AccessKeyIdSet: boolean;
+  /** Whether a secret access key is stored. Never its value. */
+  s3SecretAccessKeySet: boolean;
+  emailEnabled: boolean;
+  emailTo: string | null;
+  /** Whether this deployment has a bucket of its own to offer. */
+  deploymentS3Available: boolean;
+  /** Whether this deployment can store a credential at all (ENCRYPTION_KEY). */
+  encryptionConfigured: boolean;
+}
+
+/**
+ * A change to those destinations. Every field is optional and the server
+ * applies only the ones present, so a caller sends what moved and nothing else.
+ *
+ * A blank credential string means "the form left this alone", never "forget the
+ * stored one" -- the value is never rendered back, so the input is empty on
+ * every load and an empty-means-clear reading would wipe a working destination
+ * on the next unrelated save. `clearS3Credentials` is the instruction to forget.
+ */
+export interface UpdateBackupOffsiteSettingsData {
+  s3Mode?: BackupOffsiteS3Mode;
+  s3Bucket?: string | null;
+  s3Region?: string | null;
+  s3Prefix?: string | null;
+  s3Endpoint?: string | null;
+  s3ForcePathStyle?: boolean;
+  /** Write-only; the server stores it encrypted and never returns it. */
+  s3AccessKeyId?: string;
+  /** Write-only; the server stores it encrypted and never returns it. */
+  s3SecretAccessKey?: string;
+  clearS3Credentials?: boolean;
+  emailEnabled?: boolean;
+  emailTo?: string | null;
+}
+
+/**
+ * One (destination, object key) copy of one artifact, as the ledger holds it.
+ *
+ * `objectKey` is the full S3 key for an S3 row and the artifact's filename for
+ * an email one; either way its last segment names the recovery point. A
+ * non-success row keeps `lastError`, which is what makes a failure findable
+ * rather than a copy that silently never happened.
+ */
+export interface BackupOffsiteUpload {
+  id: string;
+  destination: BackupOffsiteDestination;
+  objectKey: string;
+  tier: BackupOffsiteTier;
+  /** SHA-256 of the artifact bytes, hex. */
+  digest: string;
+  sizeBytes: number;
+  status: BackupOffsiteUploadStatus;
+  attempts: number;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Rows the off-site copy list asks for. The endpoint's own cap is 200. */
+export const OFFSITE_UPLOADS_PAGE_SIZE = 20;
+
 export interface BackupEncryptionStatus {
   enabled: boolean;
   /**
@@ -419,6 +526,45 @@ export const backupApi = {
     } catch (error) {
       return normalizeBlobError(error);
     }
+  },
+
+  /**
+   * The caller's own off-machine destinations. Open to every signed-in account:
+   * a destination is a decision about this user's own data leaving the machine,
+   * not an operator setting like the schedule behind it.
+   */
+  getOffsiteSettings: async (): Promise<BackupOffsiteSettingsView> => {
+    const response = await apiClient.get<BackupOffsiteSettingsView>(
+      '/backup/offsite-settings',
+    );
+    return response.data;
+  },
+
+  /**
+   * Change one or more destinations. The server refuses (400) a destination it
+   * could not actually use -- no deployment bucket, an incomplete own bucket, no
+   * encryption key, email on with no address -- and names what to change, so the
+   * caller shows that message rather than a generic failure.
+   */
+  updateOffsiteSettings: async (
+    data: UpdateBackupOffsiteSettingsData,
+  ): Promise<BackupOffsiteSettingsView> => {
+    const response = await apiClient.patch<BackupOffsiteSettingsView>(
+      '/backup/offsite-settings',
+      data,
+    );
+    return response.data;
+  },
+
+  /** The caller's recent off-machine copies, newest first. */
+  listOffsiteUploads: async (
+    limit: number = OFFSITE_UPLOADS_PAGE_SIZE,
+  ): Promise<BackupOffsiteUpload[]> => {
+    const response = await apiClient.get<BackupOffsiteUpload[]>(
+      '/backup/offsite-uploads',
+      { params: { limit } },
+    );
+    return response.data;
   },
 
   getEncryptionStatus: async (): Promise<BackupEncryptionStatus> => {
