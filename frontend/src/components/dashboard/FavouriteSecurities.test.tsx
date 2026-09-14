@@ -27,6 +27,13 @@ vi.mock('@/hooks/useNumberFormat', async () => {
     }),
   };
 });
+// The caption prints a date through the user's own format; what matters here is
+// that it prints the session, not which arrangement of digits it chose.
+vi.mock('@/hooks/useDateFormat', () => ({
+  useDateFormat: () => ({
+    formatDateWithoutYear: (value: string) => `on ${value}`,
+  }),
+}));
 vi.mock('@/store/preferencesStore', () => ({
   usePreferencesStore: (selector: any) => selector({ preferences: { defaultCurrency: 'USD' } }),
 }));
@@ -40,6 +47,7 @@ const quote = (overrides: Partial<FavouriteSecurityQuote> = {}): FavouriteSecuri
   previousPrice: 174.5,
   dailyChange: 5.5,
   dailyChangePercent: 3.15,
+  priceDate: '2026-02-09',
   ...overrides,
 });
 
@@ -162,5 +170,53 @@ describe('FavouriteSecurities', () => {
     const row = screen.getByRole('button', { name: /Price history for AAPL/i });
     expect(row.className).toContain('hover:border-blue-400');
     expect(row.className).toContain('dark:hover:border-blue-500');
+  });
+
+  it('captions the list with the session its changes are for', () => {
+    render(
+      <FavouriteSecurities
+        securities={[quote({ priceDate: '2026-02-06' })]}
+        isLoading={false}
+      />,
+    );
+
+    expect(screen.getByText('Daily change · on 2026-02-06')).toBeInTheDocument();
+  });
+
+  it('dates a row whose market closed a session before the others', () => {
+    render(
+      <FavouriteSecurities
+        securities={[
+          quote({ priceDate: '2026-02-09' }),
+          quote({ securityId: '2', symbol: 'MSFT', priceDate: '2026-02-06' }),
+        ]}
+        isLoading={false}
+      />,
+    );
+
+    expect(screen.getByText('Daily change · on 2026-02-09')).toBeInTheDocument();
+    expect(screen.getByText('as of on 2026-02-06')).toBeInTheDocument();
+    expect(screen.queryByText('as of on 2026-02-09')).not.toBeInTheDocument();
+  });
+
+  it('marks the change unknown when the quote is too old to have a day in it', () => {
+    // The price is the last one there is and still worth showing. What the day
+    // did to it is not known, and the previous session's move printed here as
+    // though it were today's is the defect this replaced. A zero would be a
+    // second wrong answer: it would say the security held its price.
+    render(
+      <FavouriteSecurities
+        securities={[
+          quote({ dailyChange: null, dailyChangePercent: null, priceDate: null }),
+        ]}
+        isLoading={false}
+      />,
+    );
+
+    expect(screen.getByText('$180.00')).toBeInTheDocument();
+    expect(screen.getByTestId('unknown-amount')).toBeInTheDocument();
+    expect(screen.queryByText(/0\.00%/)).not.toBeInTheDocument();
+    // With no dated change on the list, the caption keeps the plain label.
+    expect(screen.getByText('Daily change')).toBeInTheDocument();
   });
 });

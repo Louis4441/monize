@@ -248,6 +248,54 @@ inputs.
 `holdings.service.ts` implements this correctly (`qty *= txQty`). Section 9
 records where it is implemented additively instead.
 
+### A daily change needs two adjacent closes AND a current one
+
+Every surface that shows a security's day-over-day move reads the two most
+recent rows of `security_prices` and subtracts. That pair is a daily move only
+while both hold:
+
+```text
+adjacent   the gap between the two closes is under DAILY_PRICE_GAP_EXCLUSION_DAYS (7)
+current    the NEWER close is under DAILY_PRICE_STALE_AFTER_DAYS (5) old, against
+           the reader's own todayYMD()
+```
+
+`backend/src/securities/daily-change.util.ts` (`resolveDailyPriceChange`) is the
+one place that decides both, and `daily-change.guard.spec.ts` fails a file that
+pulls the two-most-recent window without calling it.
+
+The second rule is the one that was missing. When no price row lands for a
+security -- its provider skipped the symbol, its exchange was shut while others
+traded, that one fetch failed -- the two most recent closes become the previous
+session's and the one before it, and the delta is a real move of an earlier day.
+Served under a "daily change" caption it reads as today's, and it repeats every
+morning until a new price arrives. Checking only the gap between the two closes
+does not catch it: two rows a day apart stay a day apart forever.
+
+Four days is the widest a live feed goes quiet for a reason that is not
+staleness (a Thursday close read on the Monday of a Good Friday weekend), which
+is why five is the cut. A close dated *ahead* of the reader's day -- an Asian
+session printing while a North American reader is still on the previous date --
+is current, not stale.
+
+What the surfaces do with a refusal differs, and each is the honest answer for
+what that screen is:
+
+| Surface | With a current move | Without one |
+|---|---|---|
+| Top Movers (`getTopMovers`) | ranks the holding | drops it: a movers list has no figure for it |
+| Favourite securities (`getFavouriteSecurities`) | prints the change | keeps the price, reports the change as `null` |
+
+Never 0 for the refusal. A zero change is a security that traded and held its
+price, which is a different fact from one whose move nobody knows.
+
+`priceDate` carries the session to the client, and the widgets caption
+themselves with it (`Daily change · 6 Feb`), because a Friday close read on a
+Saturday is still the day's move and the reader has to be told which day that
+was. The caption names the newest session on screen; a row from an earlier one
+(a market that closed a session before the others) dates itself with
+`widgets.asOf`.
+
 ## 7. Scheduled occurrences
 
 An occurrence may carry an override. `scheduled_transaction_overrides` is unique

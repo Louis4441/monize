@@ -24,8 +24,14 @@ interface UnknownAmountProps {
    * a scope held anything. Nothing is missing and nothing can be added, so the
    * copy sends the reader nowhere. Reaching for one of the three above here
    * would invent an errand out of a boundary.
+   *
+   * `staleQuote` is the fifth: the figure is a day's move, and the security's
+   * most recent price is older than the last trading session, so there is no
+   * current day to have moved over. Reaching for `noPrice` here would send the
+   * reader looking for a price that is already stored -- what is missing is a
+   * *recent* one.
    */
-  reason?: 'scheduledFx' | 'displayFx' | 'noPrice' | 'noBaseline';
+  reason?: 'scheduledFx' | 'displayFx' | 'noPrice' | 'noBaseline' | 'staleQuote';
   /** Extra classes for the wrapper, so a table cell can keep its alignment. */
   className?: string;
 }

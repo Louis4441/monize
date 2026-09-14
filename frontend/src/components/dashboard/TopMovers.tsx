@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { TopMover } from '@/types/investment';
 import { WidgetHeading } from './widget-meta';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { useDateFormat } from '@/hooks/useDateFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
 import { CARD_CLASS } from '@/components/ui/Card';
@@ -215,6 +216,7 @@ export function TopMovers({ movers, isLoading, hasInvestmentAccounts, onRefresh,
   const t = useTranslations('dashboard');
   const router = useRouter();
   const { formatCurrency, formatCurrencyPrecise, formatPercent } = useNumberFormat();
+  const { formatDateWithoutYear } = useDateFormat();
   const { convertToDefault, defaultCurrency } = useExchangeRates();
   const [filter, setFilter] = useState<MoverFilter>(() =>
     readStoredChoice(FILTER_STORAGE_KEY, MOVER_FILTERS, 'all'),
@@ -291,6 +293,17 @@ export function TopMovers({ movers, isLoading, hasInvestmentAccounts, onRefresh,
         : convertToDefault(mover.dailyValueChange, mover.currencyCode),
   }));
   const topMovers = rankMovers(rows, filter, metric);
+  // The session the list is captioned with: the newest one among the rows on
+  // screen. The server returns a change only while its newer close is the
+  // current session, so this is today while the markets these holdings trade on
+  // are open and Friday's over a weekend -- which is what the caption has to
+  // say rather than leaving a bare "daily change" over it. Markets close on
+  // different days, so a row from an earlier session names its own date.
+  const latestSession = topMovers.reduce<string | null>(
+    (latest, { mover }) =>
+      latest === null || mover.priceDate > latest ? mover.priceDate : latest,
+    null,
+  );
 
   return (
     <div className={`${CARD_CLASS} p-3 sm:p-6 lg:min-h-[500px]`}>
@@ -300,7 +313,11 @@ export function TopMovers({ movers, isLoading, hasInvestmentAccounts, onRefresh,
         </WidgetHeading>
         <div className="flex items-center gap-2">
           <RefreshButton onRefresh={onRefresh} isRefreshing={isRefreshing} refreshTitle={t('topMovers.refreshPrices')} />
-          <span className="text-sm text-gray-500 dark:text-gray-400">{t('topMovers.dailyChange')}</span>
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            {latestSession
+              ? t('topMovers.dailyChangeOn', { date: formatDateWithoutYear(latestSession) })
+              : t('topMovers.dailyChange')}
+          </span>
         </div>
       </div>
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -396,6 +413,14 @@ export function TopMovers({ movers, isLoading, hasInvestmentAccounts, onRefresh,
                       {isPositive ? '+' : ''}{formatCurrencyPrecise(mover.dailyChange, mover.currencyCode)} ({isPositive ? '+' : ''}{formatPercent(mover.dailyChangePercent)})
                     </div>
                   </>
+                )}
+                {/* A holding whose market closed a session before the others:
+                    its figures are a real day's move, just not the day the
+                    caption above names. */}
+                {latestSession && mover.priceDate < latestSession && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {t('widgets.asOf', { date: formatDateWithoutYear(mover.priceDate) })}
+                  </div>
                 )}
               </div>
             </button>

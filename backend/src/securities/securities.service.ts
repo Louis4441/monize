@@ -29,6 +29,8 @@ import {
   countryForCurrency,
   COUNTRY_OPTIONS,
 } from "./security-enums";
+import { todayYMD } from "../common/date-utils";
+import { PricePoint, resolveDailyPriceChange } from "./daily-change.util";
 
 /**
  * A security decorated with what its most recent price row says.
@@ -56,8 +58,17 @@ export interface FavouriteSecurityQuote {
   currencyCode: string;
   currentPrice: number | null;
   previousPrice: number | null;
-  dailyChange: number;
-  dailyChangePercent: number;
+  /**
+   * The day-over-day move, or `null` when the stored prices describe no daily
+   * move: fewer than two closes, a zero base, two closes that are not adjacent
+   * sessions, or a newest close that is no longer the current session.
+   * `daily-change.util.ts` decides which. Never 0 for those cases -- a zero
+   * change is a security that held its price, which is a different fact.
+   */
+  dailyChange: number | null;
+  dailyChangePercent: number | null;
+  /** The session the change is for, or `null` when there is no change to date. */
+  priceDate: string | null;
 }
 
 /**
@@ -830,15 +841,18 @@ export class SecuritiesService {
     if (securities.length === 0) return [];
 
     const ids = securities.map((s) => s.id);
-    // Two most recent prices per security in a single pass.
+    // Two most recent prices per security in a single pass. The dates come with
+    // them: whether the pair is a daily move at all is a question about when
+    // the two closes are, not only what they are.
     const priceRows: Array<{
       security_id: string;
       close_price: string;
+      price_date: string | Date;
       rn: string;
     }> = await withScopedDb(this.dataSource, (m) =>
       m.query(
-        `SELECT security_id, close_price, rn FROM (
-         SELECT security_id, close_price,
+        `SELECT security_id, close_price, price_date, rn FROM (
+         SELECT security_id, close_price, price_date,
                 ROW_NUMBER() OVER (PARTITION BY security_id ORDER BY price_date DESC) as rn
          FROM security_prices
          WHERE security_id = ANY($1::uuid[])
@@ -849,27 +863,22 @@ export class SecuritiesService {
       ),
     );
 
-    const priceMap = new Map<string, number[]>();
+    const priceMap = new Map<string, PricePoint[]>();
     for (const row of priceRows) {
       const existing = priceMap.get(row.security_id) || [];
-      existing.push(Number(row.close_price));
+      existing.push({ price: Number(row.close_price), date: row.price_date });
       priceMap.set(row.security_id, existing);
     }
 
+    const today = todayYMD();
     return securities.map((s) => {
       const prices = priceMap.get(s.id) || [];
-      const currentPrice = prices[0] ?? null;
-      const previousPrice = prices[1] ?? null;
-      let dailyChange = 0;
-      let dailyChangePercent = 0;
-      if (
-        currentPrice != null &&
-        previousPrice != null &&
-        previousPrice !== 0
-      ) {
-        dailyChange = currentPrice - previousPrice;
-        dailyChangePercent = (dailyChange / previousPrice) * 100;
-      }
+      // The price shown is the latest close there is, even when it is too old
+      // to yield a daily move -- a watchlist that blanked the price would be
+      // hiding the one figure it does know.
+      const currentPrice = prices[0]?.price ?? null;
+      const previousPrice = prices[1]?.price ?? null;
+      const change = resolveDailyPriceChange(prices, today);
       return {
         securityId: s.id,
         symbol: s.symbol,
@@ -877,8 +886,9 @@ export class SecuritiesService {
         currencyCode: s.currencyCode,
         currentPrice,
         previousPrice,
-        dailyChange,
-        dailyChangePercent,
+        dailyChange: change?.dailyChange ?? null,
+        dailyChangePercent: change?.dailyChangePercent ?? null,
+        priceDate: change?.priceDate ?? null,
       };
     });
   }
