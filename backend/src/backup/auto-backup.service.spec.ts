@@ -29,6 +29,7 @@ import { AutoBackupSettings } from "./entities/auto-backup-settings.entity";
 import { User } from "../users/entities/user.entity";
 import { DemoModeService } from "../common/demo-mode.service";
 import { SystemAlertService } from "../system-alerts/system-alert.service";
+import { BackupOffsiteDispatchService } from "./offsite/backup-offsite-dispatch.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import {
   createUserMaintenanceMock,
@@ -92,6 +93,16 @@ describe("AutoBackupService", () => {
   let mockSystemAlerts: {
     raiseAdminAlert: jest.Mock;
     raiseUserAlert: jest.Mock;
+  };
+  /**
+   * The off-machine copy, typed to the real method so a call this suite accepts
+   * is one `BackupOffsiteDispatchService` could serve. It is a collaborator of
+   * ours, not a driver's, so `docs/backend/testing.md` asks for the type.
+   */
+  let mockOffsiteDispatch: {
+    dispatchAfterBackup: jest.MockedFunction<
+      BackupOffsiteDispatchService["dispatchAfterBackup"]
+    >;
   };
 
   /** A real directory, standing in for the operator's mounted backup volume. */
@@ -205,6 +216,10 @@ describe("AutoBackupService", () => {
           useValue: mockSystemAlerts,
         },
         {
+          provide: BackupOffsiteDispatchService,
+          useValue: mockOffsiteDispatch,
+        },
+        {
           provide: ConfigService,
           useValue: {
             get: jest.fn((key: string) =>
@@ -303,6 +318,12 @@ describe("AutoBackupService", () => {
       // The real service never throws; the double keeps that contract.
       raiseAdminAlert: jest.fn().mockResolvedValue({ created: 1, emailed: 0 }),
       raiseUserAlert: jest.fn().mockResolvedValue({ created: true }),
+    };
+
+    mockOffsiteDispatch = {
+      // As the real one: it resolves whatever happened off-machine, because a
+      // copy's failure is never the backup's (INV-BACKUP-003).
+      dispatchAfterBackup: jest.fn().mockResolvedValue(undefined) as never,
     };
 
     service = await createService();
@@ -1648,6 +1669,122 @@ describe("AutoBackupService", () => {
       } finally {
         log.mockRestore();
       }
+    });
+  });
+
+  /**
+   * The off-machine copy is dispatched from the tail of a run, and only from a
+   * run that produced a complete artifact (INV-BACKUP-003).
+   *
+   * Both halves matter and they fail in opposite directions. Dispatching a
+   * partial artifact would put a backup that cannot be restored in full where an
+   * operator reaches for it in a crisis; letting the dispatch's failure reach
+   * the run would turn a backup that is on disk into one recorded as failed, so
+   * the next window's retention would count one fewer artifact than exists.
+   */
+  describe("the off-machine copy (INV-BACKUP-003)", () => {
+    const dueSettings = () =>
+      createSettings({
+        enabled: true,
+        folderPath: root,
+        nextBackupAt: new Date(Date.now() - 3600000),
+      });
+
+    it("is dispatched after a complete automatic run, with the artifact's own digest", async () => {
+      mockSettingsRepo.find.mockResolvedValue([dueSettings()]);
+
+      await service.handleAutoBackupCron();
+
+      expect(mockOffsiteDispatch.dispatchAfterBackup).toHaveBeenCalledTimes(1);
+      const [dispatched] =
+        mockOffsiteDispatch.dispatchAfterBackup.mock.calls[0];
+      const filename = (await listBackups(folderFor()))[0];
+      const onDisk = readFileSync(join(folderFor(), filename));
+      expect(dispatched).toEqual({
+        userId,
+        folder: folderFor(),
+        filename,
+        tier: "daily",
+        digest: createHash("sha256").update(onDisk).digest("hex"),
+        sizeBytes: onDisk.length,
+        origin: "automatic",
+      });
+    });
+
+    it("is dispatched only after the run's outcome is durable", async () => {
+      mockSettingsRepo.find.mockResolvedValue([dueSettings()]);
+      const order: string[] = [];
+      updateBuilder.execute.mockImplementation(async () => {
+        order.push("outcome");
+        return { affected: 1 };
+      });
+      mockOffsiteDispatch.dispatchAfterBackup.mockImplementation(async () => {
+        order.push("dispatch");
+      });
+
+      await service.handleAutoBackupCron();
+
+      // A copy that preceded the outcome write could be the only record of a
+      // run whose own row never landed.
+      expect(order).toEqual(["outcome", "dispatch"]);
+    });
+
+    it("is dispatched from a manual run too, marked as one", async () => {
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ folderPath: root }),
+      );
+
+      await service.runManualBackup(userId);
+
+      expect(
+        mockOffsiteDispatch.dispatchAfterBackup.mock.calls[0][0],
+      ).toMatchObject({ origin: "manual", tier: "daily" });
+    });
+
+    it("is not dispatched for a partial artifact", async () => {
+      mockSettingsRepo.find.mockResolvedValue([dueSettings()]);
+      mockBackupService.exportToBuffer.mockResolvedValue({
+        buffer: Buffer.from("incomplete-export"),
+        report: {
+          complete: false,
+          expectedAttachments: 3,
+          includedAttachments: 1,
+          missingAttachments: 2,
+          inconsistentAttachments: 0,
+        },
+      });
+
+      await service.handleAutoBackupCron();
+
+      expect(await listBackups(folderFor())).toEqual([
+        expect.stringMatching(/^monize-backup-partial-/),
+      ]);
+      expect(mockOffsiteDispatch.dispatchAfterBackup).not.toHaveBeenCalled();
+    });
+
+    it("does not let a dispatch rejection change the recorded status", async () => {
+      mockSettingsRepo.find.mockResolvedValue([dueSettings()]);
+      // The real service never rejects; this is the double doing what it must
+      // not, so the assertion is about this class's containment rather than the
+      // other's promise.
+      mockOffsiteDispatch.dispatchAfterBackup.mockRejectedValue(
+        new Error("the bucket is on fire"),
+      );
+
+      await expect(service.handleAutoBackupCron()).resolves.toBeUndefined();
+
+      expect(updateBuilder.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lastBackupStatus: "success",
+          lastBackupError: null,
+        }),
+      );
+      expect(updateBuilder.set).not.toHaveBeenCalledWith(
+        expect.objectContaining({ lastBackupStatus: "failed" }),
+      );
+      // The artifact is still on disk, which is the whole point of the copy
+      // being a copy.
+      expect(await listBackups(folderFor())).toHaveLength(1);
     });
   });
 

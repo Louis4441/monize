@@ -57,6 +57,8 @@ import {
   isEncryptedBackupFileName,
   PARTIAL_TIER_NAME,
 } from "./backup-file-names";
+import { BackupOffsiteDispatchService } from "./offsite/backup-offsite-dispatch.service";
+import { BackupOffsiteTier } from "./offsite/entities/backup-offsite-upload.entity";
 import { tr } from "../i18n/translate";
 
 /**
@@ -227,6 +229,11 @@ export class AutoBackupService {
     private readonly demoMode: DemoModeService,
     private readonly maintenance: UserMaintenanceService,
     private readonly systemAlerts: SystemAlertService,
+    // The off-machine copy of a completed artifact. Dispatched on the tail of a
+    // run, after the local outcome is durable and outside the export
+    // transaction (INV-BACKUP-003); it never throws, so it cannot turn a written
+    // backup into a failed one.
+    private readonly offsiteDispatch: BackupOffsiteDispatchService,
     config: ConfigService,
   ) {
     this.defaultFolderPath = this.resolveConfiguredFolderPath(
@@ -298,6 +305,24 @@ export class AutoBackupService {
       this.resolveFolderPath(folderPath),
     );
     return this.assertAllowedRoot(this.userFolderPath(root, userId));
+  }
+
+  /**
+   * The folder one user's stored artifacts are read back from, for a caller
+   * outside this class -- the off-site retry sweep, which holds a durable row
+   * describing a copy and has to find the artifact again hours later.
+   *
+   * It resolves from the user's *current* settings rather than from anything
+   * remembered, because an operator may have moved the backup root since the
+   * artifact was written, and it runs the same containment checks every other
+   * read does (`resolveUserFolderForRead`): a public entry point that skipped
+   * them would be the one hole in a fence this class otherwise keeps whole.
+   */
+  async resolveStoredBackupFolder(userId: string): Promise<string> {
+    const settings = await this.scoped(AutoBackupSettings, (repo) =>
+      repo.findOne({ where: { userId } }),
+    );
+    return this.resolveUserFolderForRead(userId, settings?.folderPath);
   }
 
   /**
@@ -803,11 +828,8 @@ export class AutoBackupService {
       settings.folderPath,
     );
     const timezone = settings.timezone || "UTC";
-    const { filename, report } = await this.exportToFile(
-      userId,
-      userFolder,
-      timezone,
-    );
+    const artifact = await this.exportToFile(userId, userFolder, timezone);
+    const { filename, report } = artifact;
     // A partial artifact is published under its own `partial-<date>` name and
     // its own retention tier, so it cannot replace this day's complete artifact
     // and no later retention pass counts it as one (F3RB-001, issue #1069). It
@@ -832,6 +854,10 @@ export class AutoBackupService {
       );
     }
     await this.scoped(AutoBackupSettings, (repo) => repo.save(settings));
+
+    // After the local artifact exists and this run's own bookkeeping is durable,
+    // and outside every transaction above (INV-BACKUP-003).
+    await this.dispatchOffsiteCopy(userId, userFolder, artifact, "manual");
 
     return {
       message: report.complete
@@ -1236,9 +1262,10 @@ export class AutoBackupService {
     const timezone = settings.timezone || "UTC";
     // RLS (task C2): the export reads this user's entire dataset, and the
     // settings write below is that user's row -- both under a user context.
-    const { filename, report } = await withUserContext(settings.userId, () =>
+    const artifact = await withUserContext(settings.userId, () =>
       this.exportToFile(settings.userId, userFolder, timezone),
     );
+    const { filename, report } = artifact;
     // Promotion and retention run only for a complete artifact; a partial is
     // written but never allowed to displace a complete copy (F3R7-001).
     await this.applyBackupOutcome(
@@ -1262,9 +1289,66 @@ export class AutoBackupService {
       settings.lastBackupError,
     );
 
+    // Last, and only now: the local copy is written and the run is recorded, so
+    // the off-machine copy can neither precede it nor take it down with it
+    // (INV-BACKUP-003, and the push-after-commit shape of
+    // `docs/external-side-effects.md` section 4a).
+    await this.dispatchOffsiteCopy(
+      settings.userId,
+      userFolder,
+      artifact,
+      "automatic",
+    );
+
     this.logger.log(
       `Auto-backup ${report.complete ? "completed" : "written (partial)"} for user ${settings.userId}: ${filename}`,
     );
+  }
+
+  /**
+   * Offer one written artifact to the user's off-machine destinations.
+   *
+   * Two gates, and both are invariants rather than tidiness. **Only a complete
+   * artifact is a candidate** (INV-BACKUP-003): a partial one is published under
+   * its own `partial-` tier precisely because it is not this day's recovery
+   * point, and copying it off-machine would put a backup that cannot be restored
+   * in full where an operator reaches for it in a crisis. **The tier comes out
+   * of the filename**, the same source retention and the owner-facing listing
+   * read it from, so the durable off-site row cannot disagree with the artifact
+   * it names.
+   *
+   * `dispatchAfterBackup` never throws, and this method catches anyway. The
+   * containment has to be a property of *this* class: the cron's per-user catch
+   * records a failed window, so a rejection escaping here would turn a backup
+   * that is complete and on disk into one recorded as failed -- and the manual
+   * path would answer a 500 for a backup it had already written.
+   */
+  private async dispatchOffsiteCopy(
+    userId: string,
+    userFolder: string,
+    artifact: WrittenArtifact,
+    origin: BackupRunOrigin,
+  ): Promise<void> {
+    if (!artifact.report.complete) return;
+    const tier = publishedOffsiteTier(artifact.filename);
+    if (!tier) return;
+    try {
+      await this.offsiteDispatch.dispatchAfterBackup({
+        userId,
+        folder: userFolder,
+        filename: artifact.filename,
+        tier,
+        digest: artifact.digest,
+        sizeBytes: artifact.sizeBytes,
+        origin,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Off-site dispatch of ${artifact.filename} for user ${userId} could ` +
+          `not be started: ${error instanceof Error ? error.message : String(error)}. ` +
+          "The local backup is unaffected.",
+      );
+    }
   }
 
   /**
@@ -1973,4 +2057,18 @@ export class AutoBackupService {
  */
 function utcDateString(at: Date = new Date()): string {
   return at.toISOString().slice(0, 10);
+}
+
+/**
+ * The retention tier a *published* artifact's name declares, or `null` for a
+ * `partial-` one and for anything this module did not write.
+ *
+ * `BackupOffsiteTier` is the narrower of the two vocabularies -- the off-site
+ * table's CHECK constraint admits only the three published tiers -- so this is
+ * where the wider one is narrowed, once, rather than at each call site.
+ */
+function publishedOffsiteTier(filename: string): BackupOffsiteTier | null {
+  const classified = classifyBackupFileName(filename);
+  if (!classified || classified.tier === PARTIAL_TIER_NAME) return null;
+  return classified.tier;
 }

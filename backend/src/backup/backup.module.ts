@@ -13,10 +13,14 @@ import { SupportBackupService } from "./support-backup/support-backup.service";
 import { BackupOffsiteController } from "./offsite/backup-offsite.controller";
 import { BackupOffsiteSettingsService } from "./offsite/backup-offsite-settings.service";
 import { BackupOffsiteS3Uploader } from "./offsite/backup-offsite-s3.uploader";
+import { BackupOffsiteEmailSender } from "./offsite/backup-offsite-email.sender";
+import { BackupOffsiteDispatchService } from "./offsite/backup-offsite-dispatch.service";
+import { BackupOffsiteRetryService } from "./offsite/backup-offsite-retry.service";
 import { AuthModule } from "../auth/auth.module";
 import { EncryptionModule } from "../common/encryption/encryption.module";
 import { AttachmentsModule } from "../attachments/attachments.module";
 import { SystemAlertsModule } from "../system-alerts/system-alerts.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 
 @Module({
   imports: [
@@ -26,6 +30,11 @@ import { SystemAlertsModule } from "../system-alerts/system-alerts.module";
     AttachmentsModule,
     // AutoBackupService raises BACKUP_FAILED / BACKUP_PARTIAL admin alerts.
     SystemAlertsModule,
+    // For EmailService: the emailed off-machine copy of a completed artifact
+    // (`docs/specs/backup-off-machine.md` section 5). A bare edge -- nothing
+    // reachable from NotificationsModule imports this module back, so it cannot
+    // lie on a require cycle (`src/module-graph.spec.ts`).
+    NotificationsModule,
   ],
   controllers: [
     BackupController,
@@ -49,6 +58,11 @@ import { SystemAlertsModule } from "../system-alerts/system-alerts.module";
     // uploader that is the only S3 surface this path has (INV-BACKUP-004).
     BackupOffsiteSettingsService,
     BackupOffsiteS3Uploader,
+    BackupOffsiteEmailSender,
+    // The dispatch on the tail of a completed backup, and the hourly sweep that
+    // re-attempts what failed -- one claim and one perform, shared.
+    BackupOffsiteDispatchService,
+    BackupOffsiteRetryService,
   ],
   exports: [BackupEncryptionService],
 })
