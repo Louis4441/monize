@@ -96,7 +96,9 @@ Failure response    The copy is skipped and an admin alert is raised naming the
 Required tests      Unit: a .json.gz artifact is never handed to the uploader; a
                     .mzbe artifact is. Guard: egress is unreachable from a
                     plaintext artifact.
-Status              unenforced (spec only; no egress path exists yet)
+Status              enforced (the dispatcher's gate, the sender's own gate,
+                    and backup-offsite.guard.spec.ts; docs/system-invariants.md
+                    is canonical)
 ```
 
 The artifact carries third-party API keys **in the clear** inside its data (they
@@ -130,7 +132,8 @@ Failure response    An egress failure never fails the local backup; it is record
 Required tests      Unit: dispatch runs only on report.complete and only after the
                     outcome write; an upload throw does not change
                     lastBackupStatus from success.
-Status              unenforced (spec only)
+Status              enforced (dispatched after applyBackupOutcome, only
+                    on a complete artifact; auto-backup.service.spec.ts)
 ```
 
 ### INV-BACKUP-004 -- the application cannot delete or overwrite an off-machine copy
@@ -157,7 +160,9 @@ Failure response    A precondition failure (key already exists) is reconciled by
 Required tests      Guard: off-site uploader has no DeleteObjectCommand import and
                     no unconditional overwrite. Unit: an existing key is not
                     overwritten.
-Status              unenforced (spec only)
+Status              partial (the application half is enforced by the uploader
+                    and its guard; the operator's IAM policy is documentation
+                    this repository cannot observe)
 ```
 
 The existing `S3StorageProvider`
@@ -183,15 +188,26 @@ Enforcement         PutObject sends the SHA-256 as x-amz-checksum-sha256 so S3
                     matching checksum. EXT-002 / EXT-003.
 Concurrency scope   per artifact
 Crash semantics     A crash between the verified put and the state write leaves
-                    the row "pending"/"uploading"; a re-run re-puts under the same
-                    key (idempotent by digest, section 5) rather than duplicating.
+                    the row "uploading", which no ordinary predicate would select
+                    again -- so the claim is a lease. Each retry sweep first
+                    expires claims older than OFFSITE_CLAIM_LEASE_MINUTES (60,
+                    above the S3 total deadline times its attempts) back to
+                    "failed" in one statement, and the ordinary backoff
+                    re-attempts them. The trade, per destination: an S3 re-put of
+                    bytes whose first attempt landed is reconciled by digest
+                    under the same key (section 5) and changes nothing, while an
+                    email re-attempt can deliver the same encrypted artifact
+                    twice -- the survivable direction against a copy that is
+                    never delivered and a row nobody finds (EXT-003).
 Retry semantics     A transient failure leaves "failed" with the digest recorded;
                     Stage 2's retry re-attempts the same bytes under the same key.
 Failure response    "failed" is a durable, findable state, not a silent success.
 Required tests      Two-connection / integration where the property is a real S3
                     round-trip (test bucket or MinIO): a corrupted body is
                     rejected; a re-run of an already-uploaded artifact is a no-op.
-Status              unenforced (spec only)
+Status              partial (S3 verifies by checksum; email can only record
+                    that SMTP accepted the message, and a lease-expired retry
+                    can deliver it twice)
 ```
 
 ## 5. Truth table -- when a copy is attempted and recorded
@@ -270,9 +286,25 @@ Consequences:
   recorded `uploaded`; treated as `failed`.
 - **Bucket returns "key exists" with a different digest** -> `conflict` + alert,
   never overwrite (section 5).
+- **The replica holding the claim dies** -> the row stays `uploading` and no
+  predicate would ever select it again, so the claim is a lease: the next sweep
+  after `OFFSITE_CLAIM_LEASE_MINUTES` (60) moves it back to `failed` with
+  `last_error` saying the claim expired, and the ordinary backoff re-attempts it.
+  The lease is set above the S3 total deadline (5 minutes) times its attempts (3)
+  so a slow-but-live upload is never reclaimed under itself.
 
 Every non-success terminal state is durable and attributable to the user and the
 artifact, per EXT-003.
+
+The lease makes one trade explicit rather than leaving it to a crash. **For S3 a
+re-attempt is a no-op when the first put landed**: the key carries the digest,
+the conditional put refuses the taken key, the recorded digest matches, and the
+row is recorded `uploaded` without anything being overwritten. **For email it can
+deliver the same encrypted artifact twice**, because SMTP acceptance is the only
+signal the medium gives and it cannot distinguish a message already delivered
+from one never sent. Delivering a duplicate copy of a backup the user already has
+is the survivable direction against a copy that was never made and a row nobody
+ever looks at again.
 
 ## 8. Numerical / worked examples
 

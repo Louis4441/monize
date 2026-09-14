@@ -176,6 +176,46 @@ into a different account cannot collide with that account's rows, and every tabl
 and column is checked against an allowlist. What it lacks is integrity
 verification of the payload, per EXT-002 above.
 
+### Off-machine copies
+
+A completed automatic backup is also copied to the user's off-machine
+destinations -- an S3 bucket, an emailed attachment, or both
+(`docs/specs/backup-off-machine.md`, INV-BACKUP-002..005). It is the first backup
+egress path in the codebase, and every rule this document argues for is visible
+in it:
+
+- **The local artifact is durable and recorded first, and the copy happens
+  after, outside the transaction.** `AutoBackupService.dispatchOffsiteCopy` runs
+  on the tail of a run, after `applyBackupOutcome`, and only for an artifact
+  whose report is complete -- the push-after-commit shape of section 4a. The copy
+  never fails the backup: `dispatchAfterBackup` does not throw and the call site
+  catches anyway.
+- **Each (user, destination, key) copy is claimed before it is attempted.**
+  Every replica fires the backup cron and the hourly retry sweep, so the durable
+  row is moved `pending`/`failed` -> `uploading` by one conditional
+  `UPDATE ... RETURNING`; exactly one caller gets the row back. The claim, the
+  external call and the outcome are three separate short steps, with no
+  transaction open across the call.
+- **Verified, then recorded.** An S3 put declares the artifact's SHA-256 so the
+  destination validates it, and the row becomes `uploaded` only when the echoed
+  checksum matches (EXT-002). For email, `sendMail` resolving is the whole of the
+  verification the medium offers, and the row says `uploaded` only after it.
+- **A claim is a lease.** A replica killed mid-upload used to leave the row
+  `uploading` with nothing able to reclaim it -- an effect nobody could verify
+  and nobody would find, which EXT-003 forbids. Each sweep now expires claims
+  older than `OFFSITE_CLAIM_LEASE_MINUTES` (one hour, comfortably above the S3
+  deadline times its attempts) back to `failed` before selecting candidates. The
+  trade is deliberate and asymmetric: a re-attempted S3 put is a
+  digest-reconciled no-op because the key carries the digest, while a re-attempted
+  email can deliver the same encrypted artifact twice. A duplicate copy is the
+  survivable direction against no copy at all.
+- **The application never deletes off-machine.** The uploader constructs no
+  delete and no read command and every completing write is conditional, so
+  retention of the copies is the operator's bucket lifecycle or object-lock
+  policy (INV-BACKUP-004). Nothing here can un-write what it wrote, which is why
+  a taken key holding a different digest is recorded as `conflict` and alerted
+  rather than resolved.
+
 ## 4. Email
 
 `EmailService` is a thin `nodemailer` wrapper. It writes nothing to the
@@ -462,6 +502,8 @@ added rather than as it stands.
 | Emergency-access reminder | `lastReminderSentAt` written after the send, and it is the gate | EXT-001 |
 | AI insight generation | Process-local `Set` as the reentrancy guard; cooldown is a check-then-act; inserts carry no idempotency key | EXT-001 |
 | Payee contact enrichment | In-flight guard and admission queue are process-local; two replicas can both pay for one lookup (the second UPDATE affects zero rows, so the data is right and only the cost is duplicated) | EXT-001 |
+| Off-machine backup copy (email) | An accepted trade, not an omission: a claim expired by the lease is re-attempted, and SMTP offers no way to tell a message already delivered from one never sent, so the same artifact can arrive twice. Delivering a duplicate copy is the survivable direction against never delivering it | EXT-003 |
+| Off-machine backup copy (S3) | A stuck `uploading` row is reclaimed after the lease and re-attempted, reconciled by digest. What remains: nothing reconciles a bucket object against the ledger, so an object written by an attempt whose row never reached `uploaded` is referenced by nothing -- bytes nobody references, the survivable side, and the operator's lifecycle policy is what ages them out | EXT-003 |
 
 Two rows are absent from this table on purpose, and both are settled: per-user
 backup sharding with admin-gated folder endpoints, and the FX/price natural-key

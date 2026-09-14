@@ -58,6 +58,22 @@ const COMPLETING_COMMANDS = [
 ];
 
 const UPLOADER = "backend/src/backup/offsite/backup-offsite-s3.uploader.ts";
+const DISPATCHER =
+  "backend/src/backup/offsite/backup-offsite-dispatch.service.ts";
+const EMAIL_SENDER =
+  "backend/src/backup/offsite/backup-offsite-email.sender.ts";
+
+/** The helper that decides, from the name alone, whether an artifact may leave. */
+const ENCRYPTION_GATE = "isEncryptedBackupFileName(";
+
+/** The one status a refused plaintext artifact may exit with. */
+const REFUSAL_STATUS = "skipped-unencrypted";
+
+/**
+ * The unencrypted artifact's extension. Spelling it here is safe: the scan reads
+ * the directory's non-spec files, and this file is not one of them.
+ */
+const PLAINTEXT_EXTENSION = "json.gz";
 
 /**
  * Blank every comment body, preserving length and line breaks so an offender's
@@ -146,22 +162,73 @@ export function constructionArguments(src: string, command: string): string[] {
   return found;
 }
 
+/**
+ * The body of every `{ ... }` block opened after `marker`, brace-matched so a
+ * nested object literal or callback cannot end one early. Used to read a
+ * branch's own text rather than the whole file's, which is the difference
+ * between "the file mentions the refusal somewhere" and "this branch takes it".
+ */
+export function bracedBlocksAfter(src: string, marker: string): string[] {
+  const found: string[] = [];
+  let from = 0;
+  for (;;) {
+    const at = src.indexOf(marker, from);
+    if (at === -1) return found;
+    const open = src.indexOf("{", at);
+    if (open === -1) return found;
+    let depth = 0;
+    let i = open;
+    for (; i < src.length; i++) {
+      if (src[i] === "{") depth++;
+      else if (src[i] === "}") {
+        depth--;
+        if (depth === 0) break;
+      }
+    }
+    found.push(src.slice(open, i + 1));
+    from = at + marker.length;
+  }
+}
+
+/**
+ * The first line of a block that is code, for an offender report. Comments have
+ * already been blanked, so the first non-blank line is what the branch does.
+ */
+function firstStatementOf(block: string): string {
+  return (
+    block
+      .split("\n")
+      .slice(1)
+      .map((line) => line.trim())
+      .find((line) => line.length > 0) ?? block.trim()
+  );
+}
+
 const REPO_ROOT = findRepoRoot(__dirname);
 const describeTree = REPO_ROOT || process.env.CI ? describe : describe.skip;
 
+/**
+ * Every non-spec source in the egress directory, comments blanked.
+ *
+ * The inventory comes from `git ls-files`, so a split, a rename or a brand-new
+ * file is scanned automatically -- and an untracked one is invisible until it is
+ * staged (`docs/guard-tests.md`).
+ */
+function offsiteSources(): { file: string; code: string }[] {
+  const root = requireRepoRoot(REPO_ROOT);
+  return gitListFiles(
+    root,
+    "--cached --others --exclude-standard -- backend/src/backup/offsite",
+  )
+    .filter((file) => file.endsWith(".ts") && !file.endsWith(".spec.ts"))
+    .map((file) => ({
+      file,
+      code: blankComments(readFileSync(join(root, file), "utf8")),
+    }));
+}
+
 describeTree("the off-site egress path is append-only (INV-BACKUP-004)", () => {
-  const sources = (): { file: string; code: string }[] => {
-    const root = requireRepoRoot(REPO_ROOT);
-    return gitListFiles(
-      root,
-      "--cached --others --exclude-standard -- backend/src/backup/offsite",
-    )
-      .filter((file) => file.endsWith(".ts") && !file.endsWith(".spec.ts"))
-      .map((file) => ({
-        file,
-        code: blankComments(readFileSync(join(root, file), "utf8")),
-      }));
-  };
+  const sources = offsiteSources;
 
   it("scans the directory it claims to scan", () => {
     // Anti-vacuity: an inventory that found nothing would make every assertion
@@ -215,6 +282,112 @@ describeTree("the off-site egress path is append-only (INV-BACKUP-004)", () => {
 });
 
 /**
+ * Only an encrypted artifact leaves the machine, held mechanically
+ * (INV-BACKUP-002).
+ *
+ * The artifact carries third-party API keys in the clear inside it, so a
+ * plaintext (`.json.gz`) copy on S3 or in a mailbox is the account's secrets
+ * published, not merely an unencrypted backup. Three things keep that from
+ * happening, and each is the kind a later edit undoes without noticing.
+ *
+ * 1. **Both egress doors ask the same question.** The dispatcher selects
+ *    candidates with `isEncryptedBackupFileName`, and the email sender asks
+ *    again -- a refusal is worth as much as its least-guarded entry point, and
+ *    the sender is reachable from the retry sweep as well as from a backup run.
+ * 2. **The plaintext extension is not a literal this directory holds.** Nothing
+ *    here may act on an unencrypted artifact except to refuse it, so code that
+ *    names `.json.gz` is code deciding something about a plaintext artifact --
+ *    the extension a key round-trips is read off the name instead
+ *    (`backup-offsite-keys.ts`).
+ * 3. **The plaintext branch has one exit.** Every branch the encryption gate
+ *    refuses ends in `skipped-unencrypted`, directly or through
+ *    `refuseUnencrypted`: a durable row saying the copy was withheld, never a
+ *    fall-through to an uploader or a silent `return`.
+ *
+ * Comments are blanked first, for the reason the append-only guard above gives:
+ * the prose explaining the rule names the very pattern the rule bans.
+ */
+describeTree(
+  "only an encrypted artifact reaches a destination (INV-BACKUP-002)",
+  () => {
+    const dispatcherCode = (): string =>
+      blankComments(
+        readFileSync(join(requireRepoRoot(REPO_ROOT), DISPATCHER), "utf8"),
+      );
+
+    it("scans both egress doors", () => {
+      // Anti-vacuity: an inventory missing either file would let every
+      // assertion below pass while checking nothing.
+      const files = offsiteSources().map((source) => source.file);
+      expect(files).toContain(DISPATCHER);
+      expect(files).toContain(EMAIL_SENDER);
+    });
+
+    it("asks the one encryption question at both egress doors", () => {
+      const byFile = new Map(
+        offsiteSources().map((source) => [source.file, source.code]),
+      );
+      const offenders = [DISPATCHER, EMAIL_SENDER]
+        .filter((file) => !(byFile.get(file) ?? "").includes(ENCRYPTION_GATE))
+        .map(
+          (file) =>
+            `${file} does not call ${ENCRYPTION_GATE}: every path that hands ` +
+            `an artifact to a destination decides encryption with that one ` +
+            `helper (INV-BACKUP-002), because a refusal is worth as much as ` +
+            `its least-guarded entry point.`,
+        );
+      expect(offenders).toEqual([]);
+    });
+
+    it("names no plaintext artifact extension anywhere under offsite/", () => {
+      const offenders = offsiteSources()
+        .filter((source) => source.code.includes(PLAINTEXT_EXTENSION))
+        .map(
+          ({ file }) =>
+            `${file} names the ${PLAINTEXT_EXTENSION} extension in code: an ` +
+            `unencrypted artifact never leaves the machine (INV-BACKUP-002), ` +
+            `so nothing on this path may branch on it. Read the extension off ` +
+            `the filename (extensionOf in backup-offsite-keys.ts) or test for ` +
+            `the encrypted one with ${ENCRYPTION_GATE}.`,
+        );
+      expect(offenders).toEqual([]);
+    });
+
+    it("leaves every refused branch as skipped-unencrypted", () => {
+      const code = dispatcherCode();
+      const branches = bracedBlocksAfter(code, `!${ENCRYPTION_GATE}`);
+      // The marker this assertion needs to be checking anything: a dispatcher
+      // with no refusing branch left would pass an empty list.
+      expect(branches.length).toBeGreaterThan(0);
+      const offenders = branches
+        .filter(
+          (branch) =>
+            !branch.includes(REFUSAL_STATUS) &&
+            !branch.includes("refuseUnencrypted("),
+        )
+        .map(
+          (branch) =>
+            `${DISPATCHER} refuses an unencrypted artifact and leaves the ` +
+            `branch as something other than "${REFUSAL_STATUS}" ` +
+            `(INV-BACKUP-002): ${firstStatementOf(branch)}. ` +
+            `The withheld copy has to be a durable row an operator can find.`,
+        );
+      expect(offenders).toEqual([]);
+    });
+
+    it("writes that status through the one refusal helper", () => {
+      const code = dispatcherCode();
+      const helper = bracedBlocksAfter(
+        code,
+        "private async refuseUnencrypted",
+      )[0];
+      expect(helper).toBeDefined();
+      expect(helper).toContain(REFUSAL_STATUS);
+    });
+  },
+);
+
+/**
  * The mechanism, in both directions. A scan that prose can trip is also a scan
  * that prose can satisfy, so each half is fed a fixture that must fail and one
  * that must pass.
@@ -264,6 +437,31 @@ describe("the guard's own scanning", () => {
     expect(
       constructionArguments(unconditional, "PutObjectCommand")[0],
     ).not.toContain("IfNoneMatch");
+  });
+
+  it("reads a branch's own block, not the file around it", () => {
+    const src = [
+      "if (!isEncryptedBackupFileName(name)) {",
+      '  return { status: "skipped-unencrypted", detail: { why: 1 } };',
+      "}",
+      'const elsewhere = "skipped-unencrypted";',
+    ].join("\n");
+    const [branch] = bracedBlocksAfter(src, "!isEncryptedBackupFileName(");
+    expect(branch).toContain("skipped-unencrypted");
+    // The nested object literal did not end the block early, and the line after
+    // it is not part of the branch.
+    expect(branch).toContain("{ why: 1 }");
+    expect(branch).not.toContain("const elsewhere");
+  });
+
+  it("fails a refused branch that takes another exit", () => {
+    const src = [
+      "if (!isEncryptedBackupFileName(name)) {",
+      "  await this.uploader.upload(target, key, bytes, digest);",
+      "}",
+    ].join("\n");
+    const [branch] = bracedBlocksAfter(src, "!isEncryptedBackupFileName(");
+    expect(branch).not.toContain("skipped-unencrypted");
   });
 
   it("does not credit an IfNoneMatch that belongs to a different command", () => {

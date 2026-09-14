@@ -317,9 +317,10 @@ describe("off-site upload claim (integration)", () => {
 
       await retry.handleRetrySweep();
 
-      // `uploading` included: a row another replica is holding is not this
-      // sweep's to take, and re-sending bytes that may already be off-machine
-      // is the email destination's duplicate.
+      // `uploading` included: a row another replica is holding is not the
+      // selection's to take. A claim that is never finished is reclaimed by the
+      // lease instead -- a separate statement, on `claimed_at`, which none of
+      // these rows carries.
       expect(claimAndPerform).not.toHaveBeenCalled();
     });
   });

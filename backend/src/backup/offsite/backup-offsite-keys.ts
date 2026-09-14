@@ -70,7 +70,17 @@ function keyFileName(filename: string, digest: string): string {
   return `${stem}-${digest.slice(0, DIGEST_SEGMENT_LENGTH)}${ext}`;
 }
 
-/** The two extensions an artifact can carry, as `backup-file-names.ts` writes them. */
+/**
+ * The extension run a backup filename ends with -- `.mzbe`, or the two-part one
+ * an unencrypted artifact carries.
+ *
+ * Read off the name rather than named here, and that is the point: the plaintext
+ * extension is not a literal this directory has any business holding, because
+ * nothing here may act on a plaintext artifact except to refuse it
+ * (INV-BACKUP-002, held by `backup-offsite.guard.spec.ts`). A key is still
+ * composed for such an artifact -- the `skipped-unencrypted` row names the file
+ * it is about -- so the run has to round-trip whatever the name carries.
+ */
 function extensionOf(filename: string): string {
-  return filename.endsWith(".mzbe") ? ".mzbe" : ".json.gz";
+  return /\.[A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*$/.exec(filename)?.[0] ?? "";
 }

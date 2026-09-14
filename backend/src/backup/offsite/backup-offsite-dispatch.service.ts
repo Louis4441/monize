@@ -132,9 +132,13 @@ interface PerformResult {
  * **The external call happens outside every transaction.** The claim is one
  * short transaction, the upload or the send is none, and the terminal outcome is
  * another short one (`docs/external-side-effects.md` sections 1 and 4a). A crash
- * in between leaves the row `uploading`, which the reaper does not reclaim --
- * deliberately: re-sending bytes that may already be off-machine is the S3 path's
- * idempotent no-op but the email path's duplicate.
+ * in between leaves the row `uploading`, and the claim is therefore a lease: the
+ * reaper hands it back after `OFFSITE_CLAIM_LEASE_MINUTES`
+ * (`backup-offsite-retry.service.ts`), because a row nothing ever reclaims is an
+ * unverifiable effect nobody finds (EXT-003). Re-sending bytes that may already
+ * be off-machine is the S3 path's digest-reconciled no-op and the email path's
+ * possible duplicate -- the survivable direction against never delivering the
+ * copy at all.
  */
 @Injectable()
 export class BackupOffsiteDispatchService {

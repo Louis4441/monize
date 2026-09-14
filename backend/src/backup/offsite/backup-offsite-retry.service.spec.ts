@@ -1,8 +1,13 @@
+import { Logger } from "@nestjs/common";
+
 import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
 import type { AutoBackupService } from "../auto-backup.service";
 import type { BackupOffsiteDispatchService } from "./backup-offsite-dispatch.service";
 import { MAX_OFFSITE_ATTEMPTS } from "./backup-offsite-dispatch.service";
-import { BackupOffsiteRetryService } from "./backup-offsite-retry.service";
+import {
+  BackupOffsiteRetryService,
+  OFFSITE_CLAIM_LEASE_MINUTES,
+} from "./backup-offsite-retry.service";
 
 jest.mock("../../common/db/scoped-db", () =>
   jest
@@ -68,13 +73,127 @@ describe("BackupOffsiteRetryService", () => {
     );
   });
 
-  afterEach(() => jest.clearAllMocks());
+  afterEach(() => {
+    jest.clearAllMocks();
+    // The Logger spies below are installed per test; leaving one in place would
+    // silence the next spec file's logging as well.
+    jest.restoreAllMocks();
+  });
+
+  /** The sweep's statements, in the order it issued them. */
+  const statements = (): { sql: string; params: unknown[] }[] =>
+    query.mock.calls.map(([sql, params]) => ({
+      sql: String(sql),
+      params: (params ?? []) as unknown[],
+    }));
+
+  /** The one statement that selects retry candidates. */
+  const selectStatement = (): { sql: string; params: unknown[] } => {
+    const found = statements().find((statement) =>
+      statement.sql.includes("SELECT"),
+    );
+    if (!found) throw new Error("the sweep issued no SELECT");
+    return found;
+  };
+
+  /**
+   * A `query` that answers per statement, so the expiry can return rows while
+   * the selection returns none (or the other way round).
+   */
+  const answerBySql = (answers: {
+    expire?: unknown[] | Error;
+    select?: unknown[];
+  }): void => {
+    query.mockImplementation(async (sql: string) => {
+      if (String(sql).includes("status = 'uploading'")) {
+        if (answers.expire instanceof Error) throw answers.expire;
+        return answers.expire ?? [];
+      }
+      return answers.select ?? [];
+    });
+  };
+
+  /**
+   * The lease that makes a dead replica's claim reclaimable (INV-BACKUP-005's
+   * crash half).
+   *
+   * What a mocked `query` can prove is the statement and its ordering; whether
+   * PostgreSQL hands the row to exactly one of two sweeping replicas is the
+   * integration spec's (`test/integration/backup-offsite-claim.integration.spec.ts`,
+   * `docs/verification-contract.md`). The "below the lease" case is likewise the
+   * statement's own predicate: the rows it does not match are the rows it does
+   * not touch, so what is asserted here is that the predicate is the claim's age
+   * against the lease and nothing wider.
+   */
+  describe("expiring a stale claim", () => {
+    it("expires stale claims before it selects any candidate", async () => {
+      await service.handleRetrySweep();
+
+      const issued = statements();
+      const [first] = issued;
+      expect(first.sql).toContain("UPDATE backup_offsite_uploads");
+      expect(first.sql).toContain("SET status = 'failed'");
+      expect(first.sql).toContain("WHERE status = 'uploading'");
+      // The claim's own age, not the row's last update: a row re-claimed inside
+      // the hour has a fresh `claimed_at` and is a live upload.
+      expect(first.sql).toContain("claimed_at <= now() - (INTERVAL '1 minute'");
+      expect(first.params[1]).toBe(OFFSITE_CLAIM_LEASE_MINUTES);
+      // The selection is the statement after it, not before or instead of it.
+      expect(issued[1].sql).toContain("FROM backup_offsite_uploads");
+      expect(issued[1].sql).toContain("SELECT");
+    });
+
+    it("records why the row failed, in the row", async () => {
+      await service.handleRetrySweep();
+
+      expect(String(statements()[0].params[0])).toContain("claim expired");
+    });
+
+    it("leases for longer than an attempt can honestly take", async () => {
+      // 5 minutes of S3 total deadline times 3 SDK attempts is the longest one
+      // request may run; a lease under that would reclaim a live upload.
+      expect(OFFSITE_CLAIM_LEASE_MINUTES).toBeGreaterThan(5 * 3);
+    });
+
+    it("logs how many claims it reclaimed", async () => {
+      const warn = jest.spyOn(Logger.prototype, "warn").mockImplementation();
+      answerBySql({ expire: [{ id: "row-9" }, { id: "row-10" }] });
+
+      await service.handleRetrySweep();
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(`reclaimed 2 copy(s)`),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(`${OFFSITE_CLAIM_LEASE_MINUTES} minutes`),
+      );
+    });
+
+    it("says nothing when no claim is over the lease", async () => {
+      const warn = jest.spyOn(Logger.prototype, "warn").mockImplementation();
+      answerBySql({ expire: [] });
+
+      await service.handleRetrySweep();
+
+      expect(warn).not.toHaveBeenCalled();
+      // And the sweep carried on to its own work rather than stopping there.
+      expect(selectStatement().sql).toContain("FROM backup_offsite_uploads");
+    });
+
+    it("still sweeps when the expiry statement fails", async () => {
+      answerBySql({ expire: new Error("db down"), select: [dueRow()] });
+
+      await expect(service.handleRetrySweep()).resolves.toBeUndefined();
+
+      expect(claimAndPerform).toHaveBeenCalledTimes(1);
+    });
+  });
 
   describe("which rows it asks for", () => {
     it("selects failed copies under the attempt ceiling whose backoff has elapsed", async () => {
       await service.handleRetrySweep();
 
-      const [sql, params] = query.mock.calls[0];
+      const { sql, params } = selectStatement();
       expect(sql).toContain("FROM backup_offsite_uploads");
       expect(sql).toContain("status = 'failed'");
       expect(sql).toContain("attempts < $1");

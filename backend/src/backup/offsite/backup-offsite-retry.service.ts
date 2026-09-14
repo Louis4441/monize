@@ -29,6 +29,30 @@ import {
  */
 const SWEEP_LIMIT = 200;
 
+/**
+ * How long a replica may hold a claim before another one may take the copy back.
+ *
+ * The number has to exceed the longest an honest attempt can run, or the sweep
+ * would reclaim a copy that is still being uploaded and two replicas would send
+ * the same bytes at once. The bound on an attempt is the transport's:
+ * `S3_REQUEST_TIMEOUT_MS` (5 minutes) is the aborting total deadline of one S3
+ * request and `S3_MAX_ATTEMPTS` (3) SDK attempts fit *inside* it, so one request
+ * can take 5 minutes and a multipart upload is a sequence of them, each with its
+ * own deadline. Five minutes times three attempts is 15 minutes; an hour is four
+ * times that, which leaves room for a multipart artifact's create, parts and
+ * completion without ever reclaiming a live upload.
+ *
+ * Exported so the statement below and the spec that pins it read one number.
+ */
+export const OFFSITE_CLAIM_LEASE_MINUTES = 60;
+
+/**
+ * What an expired claim records, so an operator reading the row learns that the
+ * replica holding it never came back rather than that the destination refused.
+ */
+const CLAIM_EXPIRED_ERROR =
+  "claim expired: the replica that held it did not record an outcome";
+
 /** One `failed` row the sweep has decided is due. */
 interface DueUpload {
   id: string;
@@ -69,6 +93,22 @@ interface DueUpload {
  * `try`, the shape `handleAutoBackupCron` already holds: a sweep that ended at
  * the first bad row would leave every later user's copy undone with nothing
  * recorded.
+ *
+ * **A claim is a lease, and the trade that makes it is stated rather than
+ * hidden.** A replica killed between the claim and the outcome write leaves the
+ * row `uploading`, which no predicate here would ever select again: the copy
+ * would be stuck forever in a state nobody reconciles, which is precisely the
+ * unverifiable effect EXT-003 forbids. So every sweep first expires claims older
+ * than `OFFSITE_CLAIM_LEASE_MINUTES` back to `failed`, and the ordinary backoff
+ * then re-attempts them. What that buys and what it costs, per destination: for
+ * S3 a re-attempt of bytes whose first put did land is a digest-reconciled no-op
+ * (the key carries the digest, the conditional put refuses, and the recorded
+ * digest matches, so the row is recorded `uploaded` -- section 6 of
+ * `docs/specs/backup-off-machine.md`); for email it can deliver the same
+ * encrypted artifact to the same mailbox twice, because SMTP acceptance is all
+ * the verification that medium offers. A duplicate copy off-machine is the
+ * survivable direction against no copy at all, and the duplicate is the same
+ * bytes under the same name.
  */
 @Injectable()
 export class BackupOffsiteRetryService {
@@ -90,6 +130,10 @@ export class BackupOffsiteRetryService {
    */
   @Cron("30 * * * *")
   async handleRetrySweep(): Promise<void> {
+    // Before anything is selected: a copy whose replica died mid-upload is not a
+    // copy in progress, and only this statement can tell the sweep so.
+    await this.expireStaleClaims();
+
     let due: DueUpload[];
     try {
       due = await this.selectDue();
@@ -111,6 +155,56 @@ export class BackupOffsiteRetryService {
             `${row.destination}:${row.objectKey}: ${messageOf(error)}`,
         );
       }
+    }
+  }
+
+  /**
+   * Hand every expired claim back, in one statement, before the selection runs.
+   *
+   * One `UPDATE`, not a read followed by a write: the predicate is re-evaluated
+   * under each row's lock, so two replicas sweeping at the same minute expire
+   * each row once and the loser's statement matches nothing. `RETURNING id` is
+   * what makes the count real -- the driver discards `rowCount` for some
+   * statements (`common/db/query-result.ts`) -- and the count is logged because a
+   * replica that died mid-upload is the only thing that produces one.
+   *
+   * Cross-user by construction, like the selection below it, so it runs under
+   * the system context.
+   *
+   * A failure here is logged and the sweep carries on: the rows it could not
+   * reclaim are next hour's, and refusing to retry every *other* due copy
+   * because of it would be the larger harm.
+   */
+  private async expireStaleClaims(): Promise<number> {
+    try {
+      const expired = await withSystemContext(() =>
+        withScopedDb(this.dataSource, (manager) =>
+          manager.query(
+            `UPDATE backup_offsite_uploads
+                SET status = 'failed',
+                    last_error = $1,
+                    updated_at = now()
+              WHERE status = 'uploading'
+                AND claimed_at <= now() - (INTERVAL '1 minute' * $2)
+              RETURNING id`,
+            [CLAIM_EXPIRED_ERROR, OFFSITE_CLAIM_LEASE_MINUTES],
+          ),
+        ),
+      );
+      const count = returnedRows<{ id: string }>(expired).length;
+      if (count > 0) {
+        this.logger.warn(
+          `Off-site retry sweep reclaimed ${count} copy(s) whose claim had ` +
+            `expired after ${OFFSITE_CLAIM_LEASE_MINUTES} minutes; they are ` +
+            "failed and will be re-attempted",
+        );
+      }
+      return count;
+    } catch (error) {
+      this.logger.error(
+        `Off-site retry sweep could not expire stale claims: ${messageOf(error)}`,
+      );
+      return 0;
     }
   }
 
