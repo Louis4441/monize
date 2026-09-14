@@ -1,7 +1,8 @@
 # Backups Off the Machine: Agent Task List
 
 The task graph for `docs/future-plans/backup-off-machine.md`. The invariants are
-`docs/specs/backup-off-machine.md`. Discussion #1369 (`approved-to-build`).
+`docs/specs/backup-off-machine.md`. Discussion #1369 (`approved-to-build`); the
+maintainer's decisions are the table in the plan.
 
 ## How to use this list (read first, every session)
 
@@ -9,13 +10,11 @@ The task graph for `docs/future-plans/backup-off-machine.md`. The invariants are
   names the files it may touch. Touching files outside that scope is a scope
   violation -- split it into its own task instead.
 - **Link the discussion** (#1369) and name the invariant IDs in every PR.
-- This feature touches shared area (`auto-backup.service.ts`, the backup docs). If
-  the horizontal-scaling S2 task ("S3 as the backup store") is in flight, name it
-  in your PR so the maintainer sequences the two -- they collide on the same file
-  and config. See the plan's "Relationship to the horizontal-scaling plan".
-- **Stage gate.** Do not start Stage 2 before Stage 1 is merged, or Stage 3 before
-  Stage 2, unless the maintainer re-orders. Stages 2 and 3 are independently
-  deferrable.
+- This feature touches shared area (`auto-backup.service.ts`,
+  `s3-storage.provider.ts`, `email.service.ts`, the backup docs). If the
+  horizontal-scaling S2 task is in flight, name it in your PR so the maintainer
+  sequences the two. See the plan's "Relationship to the horizontal-scaling
+  plan".
 
 ## Definition of done for every task
 
@@ -23,17 +22,21 @@ The task graph for `docs/future-plans/backup-off-machine.md`. The invariants are
   `lint && type-check && i18n:check` clean (frontend).
 - Unit tests green: `TZ=UTC npm run test:unit -- --coverage` at or above the
   layer thresholds.
-- A **two-connection integration spec** where the claim is that a real S3 or
-  PostgreSQL property holds (the round-trip and single-winner tasks): `npm run
-  build && npm run test:integration`. A mocked S3 client proves the call, not the
-  property -- use MinIO or a test bucket.
+- A **two-connection integration spec** where the claim is that a real
+  PostgreSQL property holds (the single-winner claims): `npm run build && npm run
+  test:integration`. S3 behaviour is proven against a local fake endpoint that
+  implements the documented S3 semantics (412 on a failed `IfNoneMatch`, a
+  checksum rejection), the pattern `s3-storage.provider.deadline.spec.ts` uses;
+  a mocked client proves the call, not the property.
 - A migration is mirrored into `database/schema.sql` in the same commit;
   `npm run migration:lint` and `scripts/verify-schema.sh` pass; new raw-SQL
-  columns pass `raw-sql-columns.spec.ts`.
+  columns pass `raw-sql-columns.spec.ts`; new tables carry RLS policies.
 - New env vars are in `.env.example`; `node scripts/check-env-docs.mjs` passes.
 - A new `@Cron` has its row in `docs/cron-jobs.md`.
 - New invariants are added to **both** `docs/system-invariants.md` and
   `docs/verification-contract.md` section 3 (parity spec).
+- Every new `withUserContext`/`withSystemContext` call site is added to
+  `WITH_CONTEXT_ALLOWLIST` in `backend/eslint.config.mjs` as a reviewed decision.
 - English-first strings, then `npm run i18n:pseudo`, then every other locale as
   the final commit (i18n parity).
 - New files staged (`git add -N`) before running the tree-walking guard specs.
@@ -42,23 +45,21 @@ The task graph for `docs/future-plans/backup-off-machine.md`. The invariants are
 
 | ID | Task | Depends on | Deploy impact | Status |
 | --- | --- | --- | --- | --- |
-| B1 | Compute the egress digest (SHA-256 of the exact bytes) in `exportToFile` and return it with `{ filename, report }`. No egress yet. Files: `backend/src/backup/auto-backup.service.ts` (+spec). Invariant: INV-BACKUP-005 (foundation). | -- | neutral | [ ] |
-| B2 | Extract shared S3 transport (lazy client, `withDeadline`, key-safety) from `s3-storage.provider.ts` into a shared helper; both providers use it. No behaviour change. Files: new `backend/src/attachments/storage/*` helper, `s3-storage.provider.ts` (+specs). Invariant: none (refactor -- name it in the PR per shared-area rule). | -- | neutral | [ ] |
-| B3 | `BackupOffsiteS3Uploader`: one conditional, checksummed `PutObject`; no delete/overwrite import. Files: new `backend/src/backup/*offsite*` + spec + guard spec. Invariant: INV-BACKUP-004. | B2 | neutral | [ ] |
-| B4 | Migration + `schema.sql` for `backup_offsite_uploads`; RLS-scoped. Files: `database/migrations/*`, `database/schema.sql`, entity. Invariant: INV-BACKUP-005. | -- | new table | [ ] |
-| B5 | Config plumbing: `BACKUP_OFFSITE_PROVIDER`, `BACKUP_S3_*` in `.env.example`; boot refusal when provider=s3 and bucket unset. Files: config, `.env.example`. Invariant: none. | -- | neutral (off by default) | [ ] |
-| B6 | Dispatch egress after `applyBackupOutcome` for a complete, encrypted artifact, outside the export transaction, single-winner across replicas; write durable state. Files: `auto-backup.service.ts` (+spec), integration spec (MinIO). Invariant: INV-BACKUP-002, INV-BACKUP-003, INV-BACKUP-005. | B1, B3, B4, B5 | egress off by default | [ ] |
-| B7 | Plaintext-refusal path + admin alert + source-scan guard that egress is unreachable from a `.json.gz` artifact. Files: dispatcher, alert, guard spec, i18n. Invariant: INV-BACKUP-002. | B6 | neutral | [ ] |
-| B8 | Admin surface: per-user off-site status (key, digest, status, attempts). Files: controller/service, frontend, i18n (all locales). Invariant: none. | B6 | neutral | [ ] |
-| B9 | Add INV-BACKUP-002..005 to `system-invariants.md` + `verification-contract.md` section 3 (may fold into B6/B7 if landed together). Files: the two docs. Invariant: all four. | B6, B7 | neutral | [ ] |
-| R1 | Stage 2: conditional claim + reaper cron; bounded attempts + backoff; re-attempt under the same key; `cron-jobs.md` row. Files: dispatcher/reaper (+specs), two-connection integration spec, `docs/cron-jobs.md`. Invariant: INV-BACKUP-005 (retry). | B6 | new cron | [ ] |
-| E1 | Stage 3: resolve attach-vs-link; add the send path bounded by `BACKUP_EMAIL_MAX_BYTES`, encrypted-only. Files: `email.service.ts` (+spec), config, `.env.example`, i18n. Invariant: INV-BACKUP-002, INV-BACKUP-005. | R1 | new config (off by default) | [ ] |
+| B1 | Egress digest: SHA-256 of the exact bytes in `exportToFile`, returned with `{ filename, report }`. Files: `backend/src/backup/auto-backup.service.ts` (+spec). Invariant: INV-BACKUP-005 (foundation). | -- | neutral | [ ] |
+| B2 | Shared S3 transport module (client build, deadline, key safety) used by `s3-storage.provider.ts` with no behaviour change. Files: new `backend/src/attachments/storage/s3-transport.ts` (+spec), `s3-storage.provider.ts`. Invariant: none (refactor, named in the PR). | -- | neutral | [ ] |
+| B3 | `BackupOffsiteS3Uploader`: conditional checksummed put, multipart above `BACKUP_S3_MULTIPART_PART_BYTES`, `IfNoneMatch` on the completing call, abort on failure, no delete import; per-user or deployment credentials. Files: new `backend/src/backup/offsite/*` + spec against a fake S3 endpoint + guard spec. Invariant: INV-BACKUP-004. | B2 | neutral | [ ] |
+| B4 | Migration + `schema.sql` + entities for `backup_offsite_settings` (encrypted secret columns) and `backup_offsite_uploads`; RLS policies. Files: `database/migrations/*`, `database/schema.sql`, entities. Invariant: INV-BACKUP-005. | -- | two new tables | [ ] |
+| B5 | Config + settings API: `BACKUP_S3_*`, `BACKUP_EMAIL_MAX_BYTES` in `.env.example`; settings service (secrets masked on read, encrypted on write via `EncryptionService`), DTOs, controller under `AuthGuard('jwt')`. Files: `backend/src/backup/offsite/*`, `.env.example`, i18n `en`. Invariant: none. | B4 | neutral | [ ] |
+| B6 | Dispatch after `applyBackupOutcome` for a complete, encrypted artifact; per destination claim (`pending -> uploading`, conditional UPDATE), perform, verified outcome; plaintext refusal + admin alert; never fails the backup. Files: `auto-backup.service.ts` (+spec), `backup/offsite/*`, eslint allowlist, integration spec (claim). Invariant: INV-BACKUP-002, -003, -005. | B1, B3, B4, B5 | off until configured | [ ] |
+| B7 | Email destination: attachment-carrying send on `EmailService`, `BACKUP_EMAIL_MAX_BYTES` bound, notice path above it, encrypted-only. Files: `backend/src/notifications/email.service.ts` (+spec), `backup/offsite/*`, i18n. Invariant: INV-BACKUP-002, -005. | B6 | off until configured | [ ] |
+| B8 | Retry reaper: hourly cron, conditional claim, bounded attempts + backoff, same key; `docs/cron-jobs.md` row; two-connection integration for the claim. Files: `backup/offsite/*`, `docs/cron-jobs.md`. Invariant: INV-BACKUP-005 (retry). | B6 | new cron | [ ] |
+| B9 | Guards + catalog: the two `*.guard.spec.ts`; INV-BACKUP-002..005 in `system-invariants.md` + `verification-contract.md`; `external-side-effects.md` and `docs/backend/backup.md` updated. Files: the docs, guard specs. Invariant: all four. | B6, B7 | neutral | [ ] |
+| F1 | Frontend: destinations settings (S3 mode + own-bucket form with write-only secret, email toggle + address) and per-destination status list, on the Backup & Restore settings surface; i18n all locales; tests. Files: `frontend/src/**` (backup settings), `frontend/src/i18n/messages/*`. Invariant: none. | B5, B6 | neutral | [ ] |
 
 ## Suggested order
 
-1. **Neutral foundations (parallelizable):** B1, B2, B4, B5.
-2. **Uploader:** B3 (after B2).
-3. **Wire it up:** B6 (after B1, B3, B4, B5), then B7, then B9, then B8.
-4. **Stage 2:** R1 (after Stage 1 merged).
-5. **Stage 3:** E1 (after R1, and after the attach-vs-link open question is
-   resolved with the maintainer).
+1. **Neutral foundations (parallelizable):** B1, B2, B4.
+2. **Uploader and config:** B3 (after B2), B5 (after B4).
+3. **Wire it up:** B6, then B7, then B8.
+4. **Catalog and guards:** B9.
+5. **Surface:** F1.
