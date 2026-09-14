@@ -54,7 +54,7 @@ maintainer's decisions are the table in the plan.
 | B7 | Email destination: attachment-carrying send on `EmailService`, `BACKUP_EMAIL_MAX_BYTES` bound, notice path above it, encrypted-only. Files: `backend/src/notifications/email.service.ts` (+spec), `backup/offsite/*`, i18n. Invariant: INV-BACKUP-002, -005. | B6 | off until configured | [x] |
 | B8 | Retry reaper: hourly cron, conditional claim, bounded attempts + backoff, same key; `docs/cron-jobs.md` row; two-connection integration for the claim. Files: `backup/offsite/*`, `docs/cron-jobs.md`. Invariant: INV-BACKUP-005 (retry). | B6 | new cron | [x] |
 | B9 | Guards + catalog: the two `*.guard.spec.ts`; INV-BACKUP-002..005 in `system-invariants.md` + `verification-contract.md`; `external-side-effects.md` and `docs/backend/backup.md` updated. Files: the docs, guard specs. Invariant: all four. | B6, B7 | neutral | [x] |
-| F1 | Frontend: destinations settings (S3 mode + own-bucket form with write-only secret, email toggle + address) and per-destination status list, on the Backup & Restore settings surface; i18n all locales; tests. Files: `frontend/src/**` (backup settings), `frontend/src/i18n/messages/*`. Invariant: none. | B5, B6 | neutral | [ ] |
+| F1 | Frontend: destinations settings (S3 mode + own-bucket form with write-only secret, email toggle + address) and per-destination status list, on the Backup & Restore settings surface; i18n all locales; tests. Files: `frontend/src/**` (backup settings), `frontend/src/i18n/messages/*`. Invariant: none. | B5, B6 | neutral | [x] |
 
 ## Suggested order
 
