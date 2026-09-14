@@ -96,6 +96,7 @@
       "noLosers": "Сегодня нет падающих активов."
     },
     "dailyChange": "Изменение за день",
+    "dailyChangeOn": "Изменение за день \u00b7 {date}",
     "openPriceHistory": "История цены: {symbol}",
     "refreshPrices": "Обновить цены",
     "viewPortfolio": "Просмотреть портфель",
@@ -116,6 +117,7 @@
     "empty": "Нет избранных ценных бумаг. Перейдите на <securitiesLink>страницу ценных бумаг</securitiesLink> и отметьте звёздочкой те, которые хотите отслеживать.",
     "noPriceYet": "Цена пока отсутствует",
     "dailyChange": "Изменение за день",
+    "dailyChangeOn": "Изменение за день \u00b7 {date}",
     "openPriceHistory": "История цены: {symbol}",
     "refreshPrices": "Обновить цены",
     "manage": "Управление ценными бумагами"
@@ -173,6 +175,7 @@
   },
   "widgets": {
     "configure": "Настроить {name}",
+    "asOf": "на {date}",
     "done": "Готово",
     "configSaveFailed": "Не удалось сохранить настройки виджета. Повторите попытку.",
     "timeframe": "Период",

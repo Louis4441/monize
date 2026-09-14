@@ -169,7 +169,9 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
   const isPositive = summary!.change >= 0;
 
   return (
-    <div className={`${CARD_CLASS} p-3 sm:p-6 lg:min-h-[500px] flex flex-col h-full`}>
+    // Height comes from the grid's stretch, never from `h-full`: see
+    // WidgetCard for why a percentage height on an auto row overflows.
+    <div className={`${CARD_CLASS} p-3 sm:p-6 lg:min-h-[500px] flex flex-col`}>
       <div className="flex items-center justify-between mb-1">
         <WidgetHeading id="net-worth" href="/reports/net-worth">
           {t('netWorth.title')}

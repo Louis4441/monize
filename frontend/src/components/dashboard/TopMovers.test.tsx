@@ -29,6 +29,14 @@ vi.mock('@/hooks/useNumberFormat', async () => {
 // The widget ranks Holdings by the day's move converted into the reader's own
 // currency, so the table is mocked with one pair that converts (EUR) and one
 // that does not (GBP) -- both branches of the ranking rule have a fixture.
+// The caption prints a date through the user's own format. What it says is a
+// preference; that it says the session the figures are for is the rule, so the
+// formatter is pinned and the assertions read the wiring.
+vi.mock('@/hooks/useDateFormat', () => ({
+  useDateFormat: () => ({
+    formatDateWithoutYear: (value: string) => `on ${value}`,
+  }),
+}));
 vi.mock('@/hooks/useExchangeRates', () => ({
   useExchangeRates: () => ({
     defaultCurrency: 'USD',
@@ -58,6 +66,36 @@ describe('TopMovers', () => {
   it('renders empty state with investment accounts but no movers', () => {
     render(<TopMovers movers={[]} isLoading={false} hasInvestmentAccounts={true} />);
     expect(screen.getByText('No price changes available yet.')).toBeInTheDocument();
+  });
+
+  it('captions the list with the session its figures are for', () => {
+    // A bare "Daily change" over a Friday close read on a Saturday claims a day
+    // nothing was measured on. The server only sends a change whose newer close
+    // is current, so the caption names which session that was.
+    const movers = [
+      { securityId: '1', symbol: 'AAPL', name: 'Apple Inc.', currentPrice: 180, dailyChange: 5.5, dailyChangePercent: 3.15, currencyCode: 'USD', priceDate: '2026-02-06' },
+    ] as any[];
+
+    render(<TopMovers movers={movers} isLoading={false} hasInvestmentAccounts={true} />);
+
+    expect(screen.getByText('Daily change · on 2026-02-06')).toBeInTheDocument();
+  });
+
+  it('dates a row whose market closed a session before the others', () => {
+    // Markets do not all close on the same days. The caption names the newest
+    // session on screen, so a row from an earlier one says so itself rather
+    // than being read as part of the day the heading names.
+    const movers = [
+      { securityId: '1', symbol: 'AAPL', name: 'Apple Inc.', currentPrice: 180, dailyChange: 5.5, dailyChangePercent: 3.15, currencyCode: 'USD', priceDate: '2026-02-09' },
+      { securityId: '2', symbol: 'MSFT', name: 'Microsoft', currentPrice: 400, dailyChange: -2.0, dailyChangePercent: -0.5, currencyCode: 'USD', priceDate: '2026-02-06' },
+    ] as any[];
+
+    render(<TopMovers movers={movers} isLoading={false} hasInvestmentAccounts={true} />);
+
+    expect(screen.getByText('Daily change · on 2026-02-09')).toBeInTheDocument();
+    expect(screen.getByText('as of on 2026-02-06')).toBeInTheDocument();
+    // The row the caption is about does not repeat it.
+    expect(screen.queryByText('as of on 2026-02-09')).not.toBeInTheDocument();
   });
 
   it('renders movers with symbol, name, and price', () => {
@@ -373,6 +411,7 @@ describe('rankMovers', () => {
       dailyChangePercent,
       marketValue: 10_000,
       dailyValueChange,
+      priceDate: '2026-02-09',
     },
     valueChange,
   });

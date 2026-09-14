@@ -96,6 +96,7 @@
       "noLosers": "Сьогодні немає падіння."
     },
     "dailyChange": "Денна зміна",
+    "dailyChangeOn": "Денна зміна \u00b7 {date}",
     "openPriceHistory": "Історія ціни: {symbol}",
     "refreshPrices": "Оновити ціни",
     "viewPortfolio": "Переглянути портфель",
@@ -116,6 +117,7 @@
     "empty": "Ще немає обраних цінних паперів. Відвідайте <securitiesLink>сторінку цінних паперів</securitiesLink> та позначте зірочкою ті, які хочете відстежувати тут.",
     "noPriceYet": "Ціна ще відсутня",
     "dailyChange": "Денна зміна",
+    "dailyChangeOn": "Денна зміна \u00b7 {date}",
     "openPriceHistory": "Історія ціни: {symbol}",
     "refreshPrices": "Оновити ціни",
     "manage": "Керувати цінними паперами"
@@ -173,6 +175,7 @@
   },
   "widgets": {
     "configure": "Налаштувати {name}",
+    "asOf": "станом на {date}",
     "done": "Готово",
     "configSaveFailed": "Не вдалося зберегти налаштування віджета. Будь ласка, спробуйте ще раз.",
     "timeframe": "Часовий проміжок",

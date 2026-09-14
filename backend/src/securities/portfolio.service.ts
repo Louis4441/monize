@@ -23,7 +23,8 @@ import { QuoteProviderRegistry } from "./providers/quote-provider.registry";
 import { roundMoney } from "../common/round.util";
 import { collectTagKeys } from "../tags/tag-key-value.util";
 import { mapWithConcurrency } from "../common/concurrency.util";
-import { formatDateYMD } from "../common/date-utils";
+import { formatDateYMD, todayYMD } from "../common/date-utils";
+import { priceDateYmd, resolveDailyPriceChange } from "./daily-change.util";
 import {
   IntradayInterval,
   IntradayPoint,
@@ -51,6 +52,13 @@ export interface TopMover {
   previousPrice: number;
   dailyChange: number;
   dailyChangePercent: number;
+  /**
+   * The session the change is for -- the calendar day of the newer close.
+   * Surfaces caption the figures with it: a Friday close read on a Saturday is
+   * still the day's move, and saying which day it was is the difference
+   * between a dated figure and one that claims today.
+   */
+  priceDate: string;
   marketValue: number | null;
   /**
    * What the day's move did to the position: `dailyChange * quantity held`, in
@@ -427,14 +435,6 @@ const RANGE_FALLBACKS: Record<
 };
 
 const INTRADAY_CACHE_TTL_MS = 60_000;
-
-// Gap (in days) between a security's two most recent prices at or above which
-// their delta is NOT treated as a "daily" move in Top Movers. A normal
-// daily-priced security spans 1-4 days (weekends/holidays); a weekly-priced
-// fund spans exactly 7, and a sparsely priced holding such as a GIC can span
-// months -- all of which would otherwise surface a stale, perpetual daily
-// change.
-const DAILY_PRICE_GAP_EXCLUSION_DAYS = 7;
 
 @Injectable()
 export class PortfolioService {
@@ -938,28 +938,18 @@ export class PortfolioService {
       activeHoldings.map((h) => [h.securityId, h.security]),
     );
 
+    // The reader's own day decides whether a stored close is the current
+    // session, so it is read once for the whole sweep rather than per security.
+    const today = todayYMD();
+
     for (const securityId of securityIds) {
-      const prices = priceMap.get(securityId);
-      if (!prices || prices.length < 2) continue;
+      // Two closes are a daily move only while they are adjacent sessions and
+      // the newer one is current; anything else is a real move of some other
+      // period, and a mover list has no figure to show for it.
+      const change = resolveDailyPriceChange(priceMap.get(securityId), today);
+      if (!change) continue;
 
-      const [current, previous] = prices;
-      if (previous.price === 0) continue;
-
-      // Skip securities whose two most recent prices are far apart: the
-      // "previous" close isn't an adjacent trading session, so the delta is a
-      // long-period change rather than a daily move. Without this a sparsely
-      // priced holding (e.g. a matured GIC re-bought under the same symbol) or a
-      // weekly-priced fund reports the same stale "daily" change every day.
-      const gapDays = Math.round(
-        (new Date(current.date).getTime() - new Date(previous.date).getTime()) /
-          86_400_000,
-      );
-      if (gapDays >= DAILY_PRICE_GAP_EXCLUSION_DAYS) continue;
-
-      const currentPrice = current.price;
-      const previousPrice = previous.price;
-      const dailyChange = currentPrice - previousPrice;
-      const dailyChangePercent = (dailyChange / previousPrice) * 100;
+      const { currentPrice, previousPrice, dailyChange } = change;
       const security = securityLookup.get(securityId);
       const totalQty = quantityMap.get(securityId) || 0;
 
@@ -971,7 +961,8 @@ export class PortfolioService {
         currentPrice,
         previousPrice,
         dailyChange,
-        dailyChangePercent,
+        dailyChangePercent: change.dailyChangePercent,
+        priceDate: change.priceDate,
         marketValue: currentPrice * totalQty,
         dailyValueChange: roundMoney(dailyChange * totalQty),
       });
@@ -1024,19 +1015,20 @@ export class PortfolioService {
     const priceRows: Array<{
       security_id: string;
       close_price: string;
+      price_date: string | Date;
       period: string;
     }> = await withScopedDb(this.dataSource, (m) =>
       m.query(
-        `SELECT security_id, close_price, period FROM (
-         SELECT security_id, close_price, 'current' as period,
+        `SELECT security_id, close_price, price_date, period FROM (
+         SELECT security_id, close_price, price_date, 'current' as period,
                 ROW_NUMBER() OVER (PARTITION BY security_id ORDER BY price_date DESC) as rn
          FROM security_prices
          WHERE security_id = ANY($1)
            AND price_date <= $2::DATE
        ) sub WHERE rn = 1
        UNION ALL
-       SELECT security_id, close_price, period FROM (
-         SELECT security_id, close_price, 'previous' as period,
+       SELECT security_id, close_price, price_date, period FROM (
+         SELECT security_id, close_price, price_date, 'previous' as period,
                 ROW_NUMBER() OVER (PARTITION BY security_id ORDER BY price_date DESC) as rn
          FROM security_prices
          WHERE security_id = ANY($1)
@@ -1049,9 +1041,13 @@ export class PortfolioService {
     // Build price maps per security
     const currentPriceMap = new Map<string, number>();
     const previousPriceMap = new Map<string, number>();
+    // The close the current side actually used, which is the last one on or
+    // before the period end rather than the period end itself.
+    const currentDateMap = new Map<string, string>();
     for (const row of priceRows) {
       if (row.period === "current") {
         currentPriceMap.set(row.security_id, Number(row.close_price));
+        currentDateMap.set(row.security_id, priceDateYmd(row.price_date));
       } else {
         previousPriceMap.set(row.security_id, Number(row.close_price));
       }
@@ -1089,6 +1085,7 @@ export class PortfolioService {
         previousPrice,
         dailyChange,
         dailyChangePercent,
+        priceDate: currentDateMap.get(securityId) ?? currentEnd,
         marketValue: currentPrice * totalQty,
         dailyValueChange: roundMoney(dailyChange * totalQty),
       });

@@ -83,7 +83,13 @@ export function WidgetCard({
   return (
     <Card
       padding="md"
-      className={`${minHeightClass} flex flex-col h-full ${className}`}
+      // The card fills its row through the grid's own stretch, and never
+      // through `h-full`: `height: 100%` on an item of an auto-sized row is a
+      // percentage of a track the item is itself supposed to size, and WebKit
+      // sizes that row without the item's own content in it. The card then
+      // keeps the height its neighbour set while its own content -- the pie
+      // chart's opened Other list -- spills out of the box (issue #1382).
+      className={`${minHeightClass} flex flex-col ${className}`}
     >
       {/* The header wraps rather than squeezing the title: a widget whose
           header-right carries a figure, a range and a button needs more width

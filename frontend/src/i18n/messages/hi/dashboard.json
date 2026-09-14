@@ -96,6 +96,7 @@
       "noLosers": "आज कोई हानिकर्ता नहीं।"
     },
     "dailyChange": "दैनिक परिवर्तन",
+    "dailyChangeOn": "दैनिक परिवर्तन \u00b7 {date}",
     "openPriceHistory": "{symbol} का मूल्य इतिहास",
     "refreshPrices": "मूल्य रीफ्रेश करें",
     "viewPortfolio": "पोर्टफोलियो देखें",
@@ -116,6 +117,7 @@
     "empty": "अभी कोई पसंदीदा प्रतिभूति नहीं। <securitiesLink>प्रतिभूति पृष्ठ</securitiesLink> पर जाएं और जिन प्रतिभूतियों को यहाँ ट्रैक करना चाहते हैं उन्हें स्टार करें।",
     "noPriceYet": "अभी कोई मूल्य नहीं",
     "dailyChange": "दैनिक परिवर्तन",
+    "dailyChangeOn": "दैनिक परिवर्तन \u00b7 {date}",
     "openPriceHistory": "{symbol} का मूल्य इतिहास",
     "refreshPrices": "मूल्य रीफ्रेश करें",
     "manage": "प्रतिभूतियां प्रबंधित करें"
@@ -173,6 +175,7 @@
   },
   "widgets": {
     "configure": "{name} कॉन्फ़िगर करें",
+    "asOf": "{date} तक",
     "done": "हो गया",
     "configSaveFailed": "विजेट सेटिंग्स सहेजी नहीं जा सकीं। कृपया पुनः प्रयास करें।",
     "timeframe": "समय-सीमा",

@@ -96,6 +96,7 @@
       "noLosers": "Bugün kaybedenler yok."
     },
     "dailyChange": "Günlük değişim",
+    "dailyChangeOn": "Günlük değişim \u00b7 {date}",
     "openPriceHistory": "{symbol} fiyat geçmişi",
     "refreshPrices": "Fiyatları yenile",
     "viewPortfolio": "Portföyü görüntüle",
@@ -116,6 +117,7 @@
     "empty": "Henüz favori menkul kıymet yok. <securitiesLink>Menkul Kıymetler sayfasını</securitiesLink> ziyaret edin ve burada takip etmek istediğiniz menkul kıymetleri yıldızlayın.",
     "noPriceYet": "Henüz fiyat yok",
     "dailyChange": "Günlük değişim",
+    "dailyChangeOn": "Günlük değişim \u00b7 {date}",
     "openPriceHistory": "{symbol} fiyat geçmişi",
     "refreshPrices": "Fiyatları yenile",
     "manage": "Menkul kıymetleri yönet"
@@ -173,6 +175,7 @@
   },
   "widgets": {
     "configure": "{name} yapılandır",
+    "asOf": "{date} itibarıyla",
     "done": "Tamam",
     "configSaveFailed": "Widget ayarları kaydedilemedi. Lütfen tekrar deneyin.",
     "timeframe": "Zaman aralığı",

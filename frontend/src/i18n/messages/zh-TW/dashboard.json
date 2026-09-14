@@ -96,6 +96,7 @@
       "noLosers": "今日無下跌標的。"
     },
     "dailyChange": "每日變動",
+    "dailyChangeOn": "每日變動 \u00b7 {date}",
     "openPriceHistory": "{symbol} 的價格歷史",
     "refreshPrices": "更新價格",
     "viewPortfolio": "查看投資組合",
@@ -116,6 +117,7 @@
     "empty": "尚無我的最愛證券。請前往<securitiesLink>證券頁面</securitiesLink>，將您想追蹤的證券加入星號。",
     "noPriceYet": "尚無價格",
     "dailyChange": "每日變動",
+    "dailyChangeOn": "每日變動 \u00b7 {date}",
     "openPriceHistory": "{symbol} 的價格歷史",
     "refreshPrices": "更新價格",
     "manage": "管理證券"
@@ -173,6 +175,7 @@
   },
   "widgets": {
     "configure": "設定{name}",
+    "asOf": "截至 {date}",
     "done": "完成",
     "configSaveFailed": "無法儲存小工具設定。請再試一次。",
     "timeframe": "時間範圍",

@@ -3003,6 +3003,74 @@ describe("a dashboard widget reads a report rather than re-deriving it", () => {
   });
 });
 
+describe("a dashboard card stretches to its row, never `h-full`", () => {
+  /**
+   * A widget card is an item of the dashboard's auto-sized grid rows, and a
+   * grid item with `height: 100%` is asking for a percentage of a track whose
+   * size it is itself supposed to decide. Chromium and Gecko resolve the cycle
+   * by measuring the item's content first, so the row grows and nothing shows;
+   * WebKit -- every browser on iPad, whatever its badge says -- takes the row
+   * from the item's SIBLING instead. One widget per row is the same answer
+   * either way, which is why a phone and a portrait tablet look right and a
+   * landscape tablet does not: the card keeps its neighbour's height while its
+   * own content, the Expense by Category chart with its Other list opened,
+   * spills out of the box it is drawn in.
+   *
+   * `align-items: stretch` is the grid's default, so the card fills its row
+   * with `h-full` deleted rather than in spite of it. The scan keys on the card
+   * shell specifically -- a class list that carries the card surface, the
+   * widget min-height, or WidgetCard's `minHeightClass` -- so an `h-full` on
+   * something inside a widget, which is not a grid item, is not the subject.
+   */
+  const CARD_SHELL = /CARD_CLASS|minHeightClass|min-h-\[/;
+  const FULL_HEIGHT = /(?<![\w:-])h-full\b/;
+
+  function widgetShellsPinningTheirHeight(): string[] {
+    const offenders: string[] = [];
+    for (const [path, content] of productionSources()) {
+      if (!path.startsWith("/src/components/dashboard/")) continue;
+      withoutComments(content)
+        .split("\n")
+        .forEach((line, i) => {
+          if (CARD_SHELL.test(line) && FULL_HEIGHT.test(line)) {
+            offenders.push(`${path}:${i + 1}`);
+          }
+        });
+    }
+    return offenders;
+  }
+
+  it("has no widget card shell setting h-full", () => {
+    expect(
+      widgetShellsPinningTheirHeight(),
+      "Delete `h-full`: the grid stretches the card to its row already, and a percentage height there is read from the neighbouring widget on WebKit.",
+    ).toEqual([]);
+  });
+
+  it("still reads the widgets, so the rule cannot pass over an empty sweep", () => {
+    const shells = productionSources().filter(
+      ([path, content]) =>
+        path.startsWith("/src/components/dashboard/") &&
+        CARD_SHELL.test(withoutComments(content)),
+    );
+    expect(shells.length).toBeGreaterThan(5);
+  });
+
+  it("catches a planted shell and ignores an inner fill or a prose mention", () => {
+    expect(
+      CARD_SHELL.test("`${CARD_CLASS} lg:min-h-[500px] flex flex-col h-full`") &&
+        FULL_HEIGHT.test("`${CARD_CLASS} lg:min-h-[500px] flex flex-col h-full`"),
+    ).toBe(true);
+    expect(
+      CARD_SHELL.test('<div className="flex-1 min-h-0 h-full">'),
+    ).toBe(false);
+    expect(FULL_HEIGHT.test('<div className="lg:h-full">')).toBe(false);
+    expect(
+      FULL_HEIGHT.test(withoutComments("// the shell used to carry h-full")),
+    ).toBe(false);
+  });
+});
+
 describe("a segmented control wears the chrome in segmented-control.ts", () => {
   /**
    * A pill holding two or more buttons where exactly one is pressed is one

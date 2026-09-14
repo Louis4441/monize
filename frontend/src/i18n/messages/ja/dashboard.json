@@ -96,6 +96,7 @@
       "noLosers": "今日の値下がり銘柄はありません。"
     },
     "dailyChange": "日次変動",
+    "dailyChangeOn": "日次変動 \u00b7 {date}",
     "openPriceHistory": "{symbol} の価格履歴",
     "refreshPrices": "価格を更新",
     "viewPortfolio": "ポートフォリオを見る",
@@ -116,6 +117,7 @@
     "empty": "お気に入りの有価証券がまだありません。<securitiesLink>有価証券ページ</securitiesLink>を開いて追跡したい有価証券をスターしてください。",
     "noPriceYet": "価格未登録",
     "dailyChange": "日次変動",
+    "dailyChangeOn": "日次変動 \u00b7 {date}",
     "openPriceHistory": "{symbol} の価格履歴",
     "refreshPrices": "価格を更新",
     "manage": "有価証券を管理"
@@ -173,6 +175,7 @@
   },
   "widgets": {
     "configure": "{name}を設定",
+    "asOf": "{date}時点",
     "done": "完了",
     "configSaveFailed": "ウィジェット設定を保存できませんでした。もう一度お試しください。",
     "timeframe": "期間",

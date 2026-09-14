@@ -96,6 +96,7 @@
       "noLosers": "Heute keine Verlierer."
     },
     "dailyChange": "Tagesveränderung",
+    "dailyChangeOn": "Tagesveränderung \u00b7 {date}",
     "openPriceHistory": "Kursverlauf für {symbol}",
     "refreshPrices": "Kurse aktualisieren",
     "viewPortfolio": "Portfolio anzeigen",
@@ -116,6 +117,7 @@
     "empty": "Noch keine Favoritwertpapiere. Besuchen Sie die <securitiesLink>Wertpapierseite</securitiesLink> und markieren Sie die Wertpapiere, die Sie hier verfolgen möchten.",
     "noPriceYet": "Noch kein Kurs",
     "dailyChange": "Tagesveränderung",
+    "dailyChangeOn": "Tagesveränderung \u00b7 {date}",
     "openPriceHistory": "Kursverlauf für {symbol}",
     "refreshPrices": "Kurse aktualisieren",
     "manage": "Wertpapiere verwalten"
@@ -173,6 +175,7 @@
   },
   "widgets": {
     "configure": "{name} konfigurieren",
+    "asOf": "Stand {date}",
     "done": "Fertig",
     "configSaveFailed": "Widget-Einstellungen konnten nicht gespeichert werden. Bitte versuchen Sie es erneut.",
     "timeframe": "Zeitraum",

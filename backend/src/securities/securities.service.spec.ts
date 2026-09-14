@@ -836,6 +836,16 @@ describe("SecuritiesService", () => {
   });
 
   describe("getFavouriteSecurities", () => {
+    // A daily change is only a daily change while its newer close is the
+    // session the reader is in, so these cases have a today: the fixtures price
+    // Friday 2026-02-06 and Monday 2026-02-09, and the clock is that Monday.
+    beforeEach(() => {
+      jest.useFakeTimers().setSystemTime(new Date("2026-02-09T12:00:00.000Z"));
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
     it("returns an empty array when the user has no favourites", async () => {
       securitiesRepository.find.mockResolvedValue([]);
 
@@ -853,8 +863,18 @@ describe("SecuritiesService", () => {
     it("computes the daily change from the two most recent prices", async () => {
       securitiesRepository.find.mockResolvedValue([{ ...mockSecurity }]);
       scopedManager.query.mockResolvedValue([
-        { security_id: "sec-1", close_price: "110", rn: "1" },
-        { security_id: "sec-1", close_price: "100", rn: "2" },
+        {
+          security_id: "sec-1",
+          close_price: "110",
+          price_date: "2026-02-09",
+          rn: "1",
+        },
+        {
+          security_id: "sec-1",
+          close_price: "100",
+          price_date: "2026-02-06",
+          rn: "2",
+        },
       ]);
 
       const [quote] = await service.getFavouriteSecurities("user-1");
@@ -866,23 +886,59 @@ describe("SecuritiesService", () => {
           currentPrice: 110,
           previousPrice: 100,
           dailyChange: 10,
+          priceDate: "2026-02-09",
         }),
       );
       expect(quote.dailyChangePercent).toBeCloseTo(10);
     });
 
-    it("reports a zero change when fewer than two prices exist", async () => {
+    it("keeps the price but reports no change when the newest close is stale", async () => {
+      // The watchlist still knows what this security last traded at. What it
+      // does not know is what the day did to it, and last week's move printed
+      // under a "daily change" caption is the defect this replaced.
       securitiesRepository.find.mockResolvedValue([{ ...mockSecurity }]);
       scopedManager.query.mockResolvedValue([
-        { security_id: "sec-1", close_price: "110", rn: "1" },
+        {
+          security_id: "sec-1",
+          close_price: "110",
+          price_date: "2026-02-02",
+          rn: "1",
+        },
+        {
+          security_id: "sec-1",
+          close_price: "100",
+          price_date: "2026-01-30",
+          rn: "2",
+        },
+      ]);
+
+      const [quote] = await service.getFavouriteSecurities("user-1");
+
+      expect(quote.currentPrice).toBe(110);
+      expect(quote.dailyChange).toBeNull();
+      expect(quote.dailyChangePercent).toBeNull();
+      expect(quote.priceDate).toBeNull();
+    });
+
+    it("reports an unknown change when fewer than two prices exist", async () => {
+      // Never 0: a security that has been priced once has not held its price,
+      // it has no previous close to have moved from.
+      securitiesRepository.find.mockResolvedValue([{ ...mockSecurity }]);
+      scopedManager.query.mockResolvedValue([
+        {
+          security_id: "sec-1",
+          close_price: "110",
+          price_date: "2026-02-09",
+          rn: "1",
+        },
       ]);
 
       const [quote] = await service.getFavouriteSecurities("user-1");
 
       expect(quote.currentPrice).toBe(110);
       expect(quote.previousPrice).toBeNull();
-      expect(quote.dailyChange).toBe(0);
-      expect(quote.dailyChangePercent).toBe(0);
+      expect(quote.dailyChange).toBeNull();
+      expect(quote.dailyChangePercent).toBeNull();
     });
 
     it("returns a null price when the security has no prices yet", async () => {
@@ -892,7 +948,31 @@ describe("SecuritiesService", () => {
       const [quote] = await service.getFavouriteSecurities("user-1");
 
       expect(quote.currentPrice).toBeNull();
+      expect(quote.dailyChange).toBeNull();
+    });
+
+    it("reports a security that held its price as a zero change", async () => {
+      securitiesRepository.find.mockResolvedValue([{ ...mockSecurity }]);
+      scopedManager.query.mockResolvedValue([
+        {
+          security_id: "sec-1",
+          close_price: "110",
+          price_date: "2026-02-09",
+          rn: "1",
+        },
+        {
+          security_id: "sec-1",
+          close_price: "110",
+          price_date: "2026-02-06",
+          rn: "2",
+        },
+      ]);
+
+      const [quote] = await service.getFavouriteSecurities("user-1");
+
       expect(quote.dailyChange).toBe(0);
+      expect(quote.dailyChangePercent).toBe(0);
+      expect(quote.priceDate).toBe("2026-02-09");
     });
   });
 

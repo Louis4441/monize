@@ -244,7 +244,8 @@
     "scheduledFx": "Jumlah saat ini tidak dapat ditentukan: tidak ada nilai tukar yang tersedia untuk pasangan mata uang penyelesaian item terjadwal ini. Jumlah yang tersimpan dihitung dengan kurs lama, sehingga tidak ditampilkan.",
     "displayFx": "Angka ini tidak dapat ditampilkan di sini: jumlahnya diketahui, tetapi tidak ada nilai tukar yang tersedia untuk mengonversinya ke mata uang total ini. Segarkan kurs Anda di halaman Mata Uang.",
     "noPrice": "Nilai ini tidak dapat dihitung: jumlah saham yang dimiliki diketahui, tetapi efek ini tidak memiliki harga untuk menilainya. Segarkan harga, atau tambahkan satu secara manual di riwayat harga efek tersebut.",
-    "noBaseline": "Angka ini tidak dapat dihitung: ini adalah perbandingan, dan tidak ada nilai sebelumnya untuk dibandingkan. Tidak ada yang hilang, jadi tidak ada yang perlu ditambahkan."
+    "noBaseline": "Angka ini tidak dapat dihitung: ini adalah perbandingan, dan tidak ada nilai sebelumnya untuk dibandingkan. Tidak ada yang hilang, jadi tidak ada yang perlu ditambahkan.",
+    "staleQuote": "Perubahan hari ini tidak dapat dihitung: harga terbaru efek ini lebih lama daripada sesi perdagangan terakhir, sehingga perubahan apa pun darinya adalah perubahan hari sebelumnya. Segarkan harga, atau periksa penyedia kuotasi efek tersebut."
   },
   "density": {
     "title": "Ubah kepadatan baris",

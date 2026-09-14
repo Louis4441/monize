@@ -1889,6 +1889,16 @@ describe("PortfolioService", () => {
   });
 
   describe("getTopMovers", () => {
+    // Whether a stored close is still the current session is a question about
+    // today, so every case here has one: the fixtures price Friday 2026-02-06
+    // and Monday 2026-02-09, and the clock is that Monday.
+    beforeEach(() => {
+      jest.useFakeTimers().setSystemTime(new Date("2026-02-09T12:00:00.000Z"));
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
     describe("when user has active holdings with price history", () => {
       beforeEach(() => {
         accountsRepository.find.mockResolvedValue([
@@ -1907,7 +1917,7 @@ describe("PortfolioService", () => {
           {
             security_id: "sec-1",
             close_price: "180",
-            price_date: "2026-02-07",
+            price_date: "2026-02-09",
             rn: "1",
           },
           {
@@ -1920,7 +1930,7 @@ describe("PortfolioService", () => {
           {
             security_id: "sec-2",
             close_price: "90",
-            price_date: "2026-02-07",
+            price_date: "2026-02-09",
             rn: "1",
           },
           {
@@ -1947,7 +1957,7 @@ describe("PortfolioService", () => {
           {
             security_id: "sec-1",
             close_price: "180",
-            price_date: "2026-02-07",
+            price_date: "2026-02-09",
             rn: "1",
           },
           {
@@ -1959,7 +1969,7 @@ describe("PortfolioService", () => {
           {
             security_id: "sec-2",
             close_price: "90",
-            price_date: "2026-02-07",
+            price_date: "2026-02-09",
             rn: "1",
           },
           {
@@ -1984,7 +1994,7 @@ describe("PortfolioService", () => {
           {
             security_id: "sec-1",
             close_price: "180",
-            price_date: "2026-02-07",
+            price_date: "2026-02-09",
             rn: "1",
           },
           {
@@ -1997,7 +2007,7 @@ describe("PortfolioService", () => {
           {
             security_id: "sec-2",
             close_price: "90",
-            price_date: "2026-02-07",
+            price_date: "2026-02-09",
             rn: "1",
           },
           {
@@ -2078,7 +2088,7 @@ describe("PortfolioService", () => {
           {
             security_id: "sec-2",
             close_price: "90",
-            price_date: "2026-02-07",
+            price_date: "2026-02-09",
             rn: "1",
           },
           {
@@ -2111,14 +2121,14 @@ describe("PortfolioService", () => {
           {
             security_id: "sec-1",
             close_price: "180",
-            price_date: "2026-02-07",
+            price_date: "2026-02-09",
             rn: "1",
           },
           // Two prices for VFV
           {
             security_id: "sec-2",
             close_price: "90",
-            price_date: "2026-02-07",
+            price_date: "2026-02-09",
             rn: "1",
           },
           {
@@ -2147,7 +2157,7 @@ describe("PortfolioService", () => {
           {
             security_id: "sec-1",
             close_price: "180",
-            price_date: "2026-02-07",
+            price_date: "2026-02-09",
             rn: "1",
           },
           {
@@ -2192,7 +2202,7 @@ describe("PortfolioService", () => {
           {
             security_id: "sec-2",
             close_price: "100",
-            price_date: "2026-02-07",
+            price_date: "2026-02-09",
             rn: "1",
           },
           {
@@ -2233,7 +2243,7 @@ describe("PortfolioService", () => {
           {
             security_id: "sec-1",
             close_price: "180",
-            price_date: "2026-02-07",
+            price_date: "2026-02-09",
             rn: "1",
           },
           {
@@ -2261,7 +2271,7 @@ describe("PortfolioService", () => {
           {
             security_id: "sec-3",
             close_price: "36",
-            price_date: "2026-02-07",
+            price_date: "2026-02-09",
             rn: "1",
           },
           {
@@ -2290,18 +2300,19 @@ describe("PortfolioService", () => {
         holdingsRepository.find.mockResolvedValue([mockHoldingAAPL]);
         // A matured GIC re-bought under the same symbol: the previous price
         // (80,000, a year ago) and the current price (50,000) are not adjacent
-        // trading sessions, so the -37.5% delta is not a daily move.
+        // trading sessions, so the -37.5% delta is not a daily move. The newer
+        // close is today's, so adjacency is the only rule that can exclude it.
         securityPriceRepository.query.mockResolvedValue([
           {
             security_id: "sec-1",
             close_price: "50000",
-            price_date: "2025-06-23",
+            price_date: "2026-02-09",
             rn: "1",
           },
           {
             security_id: "sec-1",
             close_price: "80000",
-            price_date: "2024-06-23",
+            price_date: "2025-02-10",
             rn: "2",
           },
         ]);
@@ -2350,13 +2361,13 @@ describe("PortfolioService", () => {
           {
             security_id: "sec-1",
             close_price: "180",
-            price_date: "2026-02-13",
+            price_date: "2026-02-09",
             rn: "1",
           },
           {
             security_id: "sec-1",
             close_price: "175",
-            price_date: "2026-02-06",
+            price_date: "2026-02-02",
             rn: "2",
           },
         ]);
@@ -2367,6 +2378,66 @@ describe("PortfolioService", () => {
       });
     });
 
+    describe("when the most recent price is no longer the current session", () => {
+      beforeEach(() => {
+        accountsRepository.find.mockResolvedValue([
+          mockBrokerageAccount,
+          mockCashAccount,
+        ]);
+        holdingsRepository.find.mockResolvedValue([mockHoldingAAPL]);
+      });
+
+      it("skips the security rather than serving an earlier session's move as today's", async () => {
+        // No price row landed for this holding all week -- its provider skipped
+        // the symbol -- so its two most recent closes are still last Monday's
+        // and the Friday before. That delta is a real move, but it is not
+        // today's, and the widget used to repeat it every morning until a new
+        // price arrived.
+        securityPriceRepository.query.mockResolvedValue([
+          {
+            security_id: "sec-1",
+            close_price: "180",
+            price_date: "2026-02-02",
+            rn: "1",
+          },
+          {
+            security_id: "sec-1",
+            close_price: "175",
+            price_date: "2026-01-30",
+            rn: "2",
+          },
+        ]);
+
+        const result = await service.getTopMovers(userId);
+
+        expect(result).toHaveLength(0);
+      });
+
+      it("keeps a close old enough only for a holiday weekend", async () => {
+        // Thursday's close read on the Monday of a Good Friday weekend: four
+        // days old, and the most recent session there is.
+        securityPriceRepository.query.mockResolvedValue([
+          {
+            security_id: "sec-1",
+            close_price: "180",
+            price_date: "2026-02-05",
+            rn: "1",
+          },
+          {
+            security_id: "sec-1",
+            close_price: "175",
+            price_date: "2026-02-04",
+            rn: "2",
+          },
+        ]);
+
+        const result = await service.getTopMovers(userId);
+
+        expect(result).toHaveLength(1);
+        expect(result[0].priceDate).toBe("2026-02-05");
+      });
+    });
+
     describe("when a security has no regular price feed (skipPriceUpdates)", () => {
       it("excludes it even when its two transaction prices are on adjacent days", async () => {
         accountsRepository.find.mockResolvedValue([
@@ -2374,8 +2445,9 @@ describe("PortfolioService", () => {
           mockCashAccount,
         ]);
         // A GIC whose only "prices" are buy/sell transactions. A sell on
-        // 2025-06-13 and a re-buy on 2025-06-14 land one day apart, so the
-        // date-gap check does not catch it; the skipPriceUpdates flag must.
+        // 2026-02-06 and a re-buy on 2026-02-09 land one session apart and are
+        // current, so neither date rule catches it; the skipPriceUpdates flag
+        // must.
         const gicHolding = {
           ...mockHoldingAAPL,
           security: { ...mockSecurityAAPL, skipPriceUpdates: true },
@@ -2385,13 +2457,13 @@ describe("PortfolioService", () => {
           {
             security_id: "sec-1",
             close_price: "50000",
-            price_date: "2025-06-14",
+            price_date: "2026-02-09",
             rn: "1",
           },
           {
             security_id: "sec-1",
             close_price: "80000",
-            price_date: "2025-06-13",
+            price_date: "2026-02-06",
             rn: "2",
           },
         ]);

@@ -525,6 +525,13 @@ export interface TopMover {
    * against a holding priced in another currency.
    */
   dailyValueChange: number | null;
+  /**
+   * The session the change is for: the calendar day of the newer close the
+   * server measured it from. A Friday close read on a Saturday is still the
+   * day's move; captioning it with its own date is what keeps it from claiming
+   * to be today's.
+   */
+  priceDate: string;
 }
 
 export interface SecurityPrice {
@@ -606,8 +613,16 @@ export interface FavouriteSecurityQuote {
   currencyCode: string;
   currentPrice: number | null;
   previousPrice: number | null;
-  dailyChange: number;
-  dailyChangePercent: number;
+  /**
+   * The day's move, or `null` when the stored prices describe no current daily
+   * move (fewer than two closes, or a newest close that is no longer the
+   * current session). Never 0 for those: a security that held its price is a
+   * different fact from one nobody has a move for.
+   */
+  dailyChange: number | null;
+  dailyChangePercent: number | null;
+  /** The session the change is for, or `null` when there is no change. */
+  priceDate: string | null;
 }
 
 export interface InvestmentTransactionPaginationInfo {

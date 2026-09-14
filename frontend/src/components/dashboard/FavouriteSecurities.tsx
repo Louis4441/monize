@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { FavouriteSecurityQuote } from '@/types/investment';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { useDateFormat } from '@/hooks/useDateFormat';
+import { UnknownAmount } from '@/components/ui/UnknownAmount';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { WidgetHeading } from './widget-meta';
 import { CARD_CLASS } from '@/components/ui/Card';
@@ -46,8 +48,20 @@ export function FavouriteSecurities({ securities, isLoading, onRefresh, isRefres
   const t = useTranslations('dashboard');
   const router = useRouter();
   const { formatCurrencyPrecise, formatPercent } = useNumberFormat();
+  const { formatDateWithoutYear } = useDateFormat();
   const defaultCurrency = preferredCurrency(
     usePreferencesStore((s) => s.preferences?.defaultCurrency),
+  );
+  // The session the header is captioned with: the newest one the list has a
+  // change for. The server withholds a change whose newest close is no longer
+  // current, so this is the day the figures below belong to -- Friday's over a
+  // weekend -- and a watchlist with no current change keeps the plain label.
+  const latestSession = securities.reduce<string | null>(
+    (latest, sec) =>
+      sec.priceDate !== null && (latest === null || sec.priceDate > latest)
+        ? sec.priceDate
+        : latest,
+    null,
   );
 
   if (isLoading) {
@@ -101,12 +115,20 @@ export function FavouriteSecurities({ securities, isLoading, onRefresh, isRefres
         </WidgetHeading>
         <div className="flex items-center gap-2">
           <RefreshButton onRefresh={onRefresh} isRefreshing={isRefreshing} refreshTitle={t('favouriteSecurities.refreshPrices')} />
-          <span className="text-sm text-gray-500 dark:text-gray-400">{t('favouriteSecurities.dailyChange')}</span>
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            {latestSession
+              ? t('favouriteSecurities.dailyChangeOn', { date: formatDateWithoutYear(latestSession) })
+              : t('favouriteSecurities.dailyChange')}
+          </span>
         </div>
       </div>
       <div className="space-y-2 sm:space-y-3">
         {securities.map((sec) => {
-          const isPositive = sec.dailyChange >= 0;
+          // `null` is not a direction: a quote with no current daily move has no
+          // sign to colour and no figure to print, which is a different row
+          // from one that moved by zero.
+          const change = sec.dailyChange;
+          const isPositive = change !== null && change >= 0;
           const isForeign = sec.currencyCode && sec.currencyCode !== defaultCurrency;
           const fmtPrice = (value: number) => {
             const formatted = formatCurrencyPrecise(value, sec.currencyCode);
@@ -139,18 +161,34 @@ export function FavouriteSecurities({ securities, isLoading, onRefresh, isRefres
                     </div>
                     <div
                       className={`text-sm font-medium ${
-                        isPositive
-                          ? 'text-green-600 dark:text-green-400'
-                          : 'text-red-600 dark:text-red-400'
+                        change === null
+                          ? ''
+                          : isPositive
+                            ? 'text-green-600 dark:text-green-400'
+                            : 'text-red-600 dark:text-red-400'
                       }`}
                     >
-                      {isPositive ? '+' : ''}
-                      {formatCurrencyPrecise(sec.dailyChange, sec.currencyCode)} ({isPositive ? '+' : ''}
-                      {formatPercent(sec.dailyChangePercent)})
+                      {change === null || sec.dailyChangePercent === null ? (
+                        <UnknownAmount reason="staleQuote" />
+                      ) : (
+                        <>
+                          {isPositive ? '+' : ''}
+                          {formatCurrencyPrecise(change, sec.currencyCode)} ({isPositive ? '+' : ''}
+                          {formatPercent(sec.dailyChangePercent)})
+                        </>
+                      )}
                     </div>
                   </>
                 ) : (
                   <div className="text-sm text-gray-400 dark:text-gray-500">{t('favouriteSecurities.noPriceYet')}</div>
+                )}
+                {/* A security whose market closed a session before the others:
+                    its change is a real day's move, just not the day the
+                    caption above names. */}
+                {latestSession && sec.priceDate !== null && sec.priceDate < latestSession && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {t('widgets.asOf', { date: formatDateWithoutYear(sec.priceDate) })}
+                  </div>
                 )}
               </div>
             </button>

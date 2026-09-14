@@ -96,6 +96,7 @@
       "noLosers": "[XX-No losers today.-XX]"
     },
     "dailyChange": "[XX-Daily change-XX]",
+    "dailyChangeOn": "[XX-Daily change · {date}-XX]",
     "openPriceHistory": "[XX-Price history for {symbol}-XX]",
     "refreshPrices": "[XX-Refresh prices-XX]",
     "viewPortfolio": "[XX-View portfolio-XX]",
@@ -116,6 +117,7 @@
     "empty": "[XX-No favourite securities yet. Visit the <securitiesLink>Securities page</securitiesLink> and star the securities you want to track here.-XX]",
     "noPriceYet": "[XX-No price yet-XX]",
     "dailyChange": "[XX-Daily change-XX]",
+    "dailyChangeOn": "[XX-Daily change · {date}-XX]",
     "openPriceHistory": "[XX-Price history for {symbol}-XX]",
     "refreshPrices": "[XX-Refresh prices-XX]",
     "manage": "[XX-Manage securities-XX]"
@@ -173,6 +175,7 @@
   },
   "widgets": {
     "configure": "[XX-Configure {name}-XX]",
+    "asOf": "[XX-as of {date}-XX]",
     "done": "[XX-Done-XX]",
     "configSaveFailed": "[XX-Couldn't save widget settings. Please try again.-XX]",
     "timeframe": "[XX-Timeframe-XX]",

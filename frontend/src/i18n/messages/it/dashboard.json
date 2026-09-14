@@ -96,6 +96,7 @@
       "noLosers": "Nessuna perdita oggi."
     },
     "dailyChange": "Variazione giornaliera",
+    "dailyChangeOn": "Variazione giornaliera \u00b7 {date}",
     "openPriceHistory": "Storico prezzi di {symbol}",
     "refreshPrices": "Aggiorna quotazioni",
     "viewPortfolio": "Visualizza portafoglio",
@@ -116,6 +117,7 @@
     "empty": "Nessun titolo preferito. Visita la <securitiesLink>pagina Titoli</securitiesLink> e aggiungi ai preferiti i titoli che vuoi monitorare.",
     "noPriceYet": "Nessun prezzo disponibile",
     "dailyChange": "Variazione giornaliera",
+    "dailyChangeOn": "Variazione giornaliera \u00b7 {date}",
     "openPriceHistory": "Storico prezzi di {symbol}",
     "refreshPrices": "Aggiorna quotazioni",
     "manage": "Gestisci titoli"
@@ -173,6 +175,7 @@
   },
   "widgets": {
     "configure": "Configura {name}",
+    "asOf": "al {date}",
     "done": "Fine",
     "configSaveFailed": "Impossibile salvare le impostazioni del widget. Riprova.",
     "timeframe": "Intervallo di tempo",
