@@ -19,7 +19,7 @@ import { withScopedDb } from "../common/db/scoped-db";
 import { affectedRowCount } from "../common/db/query-result";
 import { Cron } from "@nestjs/schedule";
 import { promises as fs, readdirSync, unlinkSync } from "fs";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { resolve } from "path";
 import {
   cleanStaleTempFiles,
@@ -150,6 +150,30 @@ export interface StoredBackup {
 export interface StoredBackupsReport {
   enabled: boolean;
   backups: StoredBackup[];
+}
+
+/**
+ * What one written artifact is, to anything downstream of the write.
+ *
+ * `digest` is the **egress digest** (`docs/specs/backup-off-machine.md` section
+ * 3): the SHA-256 of the exact bytes handed to `writeFileAtomic`, computed once
+ * over the buffer that was written rather than re-read from the file, so the
+ * value is the identity of the artifact this run produced and not of whatever
+ * happens to sit under that name later. It is the checksum an off-machine copy
+ * declares (INV-BACKUP-005), the disambiguator in its object key, and the
+ * durable identity its state row carries -- one digest, computed once.
+ *
+ * `sizeBytes` travels with it because the two are one claim about the same
+ * bytes: a size that disagrees with the file on disk means the digest describes
+ * something the reader is not holding.
+ */
+interface WrittenArtifact {
+  filename: string;
+  report: BackupCompletenessReport;
+  /** SHA-256 of the written bytes, lowercase hex. */
+  digest: string;
+  /** Length of the written bytes. */
+  sizeBytes: number;
 }
 
 interface BackupFile {
@@ -1381,12 +1405,16 @@ export class AutoBackupService {
     return changed ? managed : null;
   }
 
-  /** Write one export into `userFolder` and return the filename written. */
+  /**
+   * Write one export into `userFolder` and describe what was written: the
+   * filename, the completeness report the name was chosen from, and the egress
+   * digest and size of the exact bytes (`WrittenArtifact`).
+   */
   private async exportToFile(
     userId: string,
     userFolder: string,
     timezone: string,
-  ): Promise<{ filename: string; report: BackupCompletenessReport }> {
+  ): Promise<WrittenArtifact> {
     const user = await this.scoped(User, (repo) =>
       repo.findOne({ where: { id: userId } }),
     );
@@ -1460,10 +1488,19 @@ export class AutoBackupService {
     // extension that sorted newest and that retention counted.
     await writeFileAtomic(filepath, buffer);
 
+    // Over `buffer`, the bytes `writeFileAtomic` just published, and not over a
+    // re-read of `filepath`: a hash of the file answers "what is under this name
+    // now", which a concurrent same-day run can already have changed, while the
+    // egress digest has to name the artifact this run wrote. `writeFileAtomic`
+    // has already refused to publish a file whose length disagrees with the
+    // buffer, so the two are the same bytes at the moment of the rename.
+    const digest = createHash("sha256").update(buffer).digest("hex");
+
     this.logger.log(
-      `Backup written to ${filepath}${encryptionPassword ? " (encrypted)" : ""}`,
+      `Backup written to ${filepath}${encryptionPassword ? " (encrypted)" : ""} ` +
+        `(sha256 ${digest}, ${buffer.length} bytes)`,
     );
-    return { filename, report };
+    return { filename, report, digest, sizeBytes: buffer.length };
   }
 
   /** Returns the copy error's message when the promotion failed, else null. */

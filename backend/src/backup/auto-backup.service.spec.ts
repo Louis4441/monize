@@ -16,6 +16,7 @@ import {
 } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
+import { createHash } from "crypto";
 import {
   AutoBackupService,
   DEFAULT_BACKUP_CONTAINER_DIR,
@@ -1521,6 +1522,132 @@ describe("AutoBackupService", () => {
       await expect(service.runManualBackup(userId)).rejects.toThrow(
         /not found/,
       );
+    });
+  });
+
+  /**
+   * The egress digest (`docs/specs/backup-off-machine.md` section 3, foundation
+   * of INV-BACKUP-005).
+   *
+   * The write path had no integrity record at all: nothing said what the bytes
+   * under a final filename were supposed to be, which is why an off-machine copy
+   * could not be verified and a truncated artifact could not be recognised. The
+   * digest is computed once over the buffer handed to `writeFileAtomic`, and the
+   * claim these tests make is the one that matters downstream -- it is the
+   * SHA-256 of the bytes a reader actually finds on disk, not merely of
+   * something the service held in memory. So they recompute it from the file.
+   */
+  describe("the egress digest of a written artifact", () => {
+    /** The digest and size the service logged for the artifact it just wrote. */
+    const loggedIdentity = (
+      log: jest.SpyInstance,
+    ): { digest: string; sizeBytes: number } => {
+      const line = log.mock.calls
+        .map((call) => String(call[0]))
+        .find((message) => message.includes("Backup written to"));
+      const match = /\(sha256 ([0-9a-f]{64}), (\d+) bytes\)/.exec(line ?? "");
+      if (!match) {
+        throw new Error(`No artifact identity in the log: ${line ?? "(none)"}`);
+      }
+      return { digest: match[1], sizeBytes: Number(match[2]) };
+    };
+
+    it("is the SHA-256 of the bytes that ended up on disk", async () => {
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true, folderPath: root }),
+      );
+      // Not the default fixture's bytes: a digest test whose payload every
+      // other test shares cannot tell "hashed the artifact" from "hashed a
+      // constant this suite happens to write everywhere".
+      const payload = Buffer.concat([
+        Buffer.from("egress-digest-payload-", "utf8"),
+        // Bytes rather than escapes: a NUL and a high byte written into the
+        // source are what `source-bytes.spec.ts` bans, and the artifact under
+        // test is compressed or encrypted, so it is binary either way.
+        Buffer.from([0x00, 0xff]),
+      ]);
+      mockBackupService.exportToBuffer.mockResolvedValue({
+        buffer: payload,
+        report: {
+          complete: true,
+          expectedAttachments: 0,
+          includedAttachments: 0,
+          missingAttachments: 0,
+          inconsistentAttachments: 0,
+        },
+      });
+      const log = jest
+        .spyOn(Logger.prototype, "log")
+        .mockImplementation(() => undefined);
+
+      try {
+        const result = await service.runManualBackup(userId);
+
+        const onDisk = readFileSync(join(folderFor(), result.filename));
+        const recomputed = createHash("sha256").update(onDisk).digest("hex");
+        const identity = loggedIdentity(log);
+        expect(identity.digest).toBe(recomputed);
+        expect(identity.sizeBytes).toBe(onDisk.length);
+        // And it is a digest of these bytes specifically, so a future change
+        // that hashed the filename or an empty buffer fails here.
+        expect(identity.digest).toBe(
+          createHash("sha256").update(payload).digest("hex"),
+        );
+      } finally {
+        log.mockRestore();
+      }
+    });
+
+    it("differs when the bytes differ", async () => {
+      // The anti-constant check: two runs of the same user on the same day
+      // produce the same filename, and the digest is what distinguishes the two
+      // artifacts (it is the key's disambiguator off-machine). A digest that did
+      // not move with the bytes would collapse them into one recovery point.
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true, folderPath: root }),
+      );
+      const log = jest
+        .spyOn(Logger.prototype, "log")
+        .mockImplementation(() => undefined);
+
+      try {
+        mockBackupService.exportToBuffer.mockResolvedValue({
+          buffer: Buffer.from("first-export"),
+          report: {
+            complete: true,
+            expectedAttachments: 0,
+            includedAttachments: 0,
+            missingAttachments: 0,
+            inconsistentAttachments: 0,
+          },
+        });
+        await service.runManualBackup(userId);
+        const first = loggedIdentity(log);
+
+        log.mockClear();
+        mockBackupService.exportToBuffer.mockResolvedValue({
+          buffer: Buffer.from("second-export-with-an-attachment"),
+          report: {
+            complete: true,
+            expectedAttachments: 0,
+            includedAttachments: 0,
+            missingAttachments: 0,
+            inconsistentAttachments: 0,
+          },
+        });
+        const second = await service.runManualBackup(userId);
+        const secondIdentity = loggedIdentity(log);
+
+        expect(secondIdentity.digest).not.toBe(first.digest);
+        expect(secondIdentity.sizeBytes).not.toBe(first.sizeBytes);
+        expect(secondIdentity.digest).toBe(
+          createHash("sha256")
+            .update(readFileSync(join(folderFor(), second.filename)))
+            .digest("hex"),
+        );
+      } finally {
+        log.mockRestore();
+      }
     });
   });
 
