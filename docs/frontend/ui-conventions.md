@@ -94,6 +94,14 @@ An `unobtrusive` anchorless step parks its card in the bottom-**right** corner, 
 
 A widget's title is a link to the fuller view of the same figures, named as a route: `titleHref` on `WidgetCard`, `href` on `WidgetHeading`. Both render it through `WidgetTitle`, the one place that decides what a title looks like and how it behaves; a widget with no fuller view passes neither and gets a plain heading.
 
+## A dashboard widget card stretches to its row, and never sets `h-full`
+
+The dashboard is a two-column grid of auto-sized rows (`app/dashboard/page.tsx`), and `align-items: stretch` is what already makes the two cards in a row the same height. `h-full` on top of that asks for a percentage of a track the card is itself supposed to size. Chromium and Gecko break the cycle by measuring the card's content first, so the row grows to fit; WebKit -- which is every browser on an iPad, Firefox included -- does not, and sizes the row without the card's own content in it, leaving the card at the height its neighbour set. With one widget per row there is no neighbour and the two agree, which is why the defect showed only on a landscape tablet: the Expense by Category card kept its neighbour's height while its opened Other list spilled out of the box, under the row below it.
+
+So a widget's outermost element carries its min-height (`minHeightClass` on `WidgetCard`, `lg:min-h-[500px]` on the two shells that draw their own card) and nothing else about height. `ui-conventions.test.ts` scans `components/dashboard/` for `h-full` on a line that also names the card surface, the min-height or `minHeightClass`; an `h-full` *inside* a widget is not a grid item and is not the subject.
+
+The inner content area stays `flex-1 min-h-0`: it is what lets a chart fill the card and an inner list scroll. It is also what lets content leave the card when the card's height is wrong, so a card that must grow with its content -- a disclosure, an expanding list -- depends on the row growing, and the row grows only while nothing pins the card's height.
+
 ## A month of scheduled occurrences is drawn once
 
 `lib/scheduled-calendar.ts` decides what falls on which day (`occurrencesInWindow` applies each override, so a moved occurrence appears on the day it was moved to and not the day it was generated for; the scan reaches a month past the grid so an occurrence moved *into* view is still found), and `components/bills/ScheduledCalendarGrid.tsx` draws it. The Bills & Deposits page and the Upcoming Bills widget both read them, differing only in `maxChipsPerDay` and the cell height. Chip colour is `SCHEDULED_KIND_CHIP_CLASSES[occurrenceKind(...)]` -- classified from the occurrence, never from the schedule's stored sign.
