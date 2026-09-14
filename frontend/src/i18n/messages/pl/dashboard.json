@@ -96,6 +96,7 @@
       "noLosers": "Brak spadków dzisiaj."
     },
     "dailyChange": "Zmiana dzienna",
+    "dailyChangeOn": "Zmiana dzienna \u00b7 {date}",
     "openPriceHistory": "Historia ceny: {symbol}",
     "refreshPrices": "Odśwież ceny",
     "viewPortfolio": "Zobacz portfel",
@@ -116,6 +117,7 @@
     "empty": "Brak ulubionych papierów wartościowych. Odwiedź <securitiesLink>stronę Papiery wartościowe</securitiesLink> i oznacz gwiazdką te, które chcesz tu śledzić.",
     "noPriceYet": "Brak ceny",
     "dailyChange": "Zmiana dzienna",
+    "dailyChangeOn": "Zmiana dzienna \u00b7 {date}",
     "openPriceHistory": "Historia ceny: {symbol}",
     "refreshPrices": "Odśwież ceny",
     "manage": "Zarządzaj papierami wartościowymi"
@@ -173,6 +175,7 @@
   },
   "widgets": {
     "configure": "Konfiguruj {name}",
+    "asOf": "na {date}",
     "done": "Gotowe",
     "configSaveFailed": "Nie udało się zapisać ustawień widżetu. Spróbuj ponownie.",
     "timeframe": "Zakres czasu",

@@ -96,6 +96,7 @@
       "noLosers": "Không có cổ phiếu giảm hôm nay."
     },
     "dailyChange": "Thay đổi hàng ngày",
+    "dailyChangeOn": "Thay đổi hàng ngày \u00b7 {date}",
     "openPriceHistory": "Lịch sử giá của {symbol}",
     "refreshPrices": "Làm mới giá",
     "viewPortfolio": "Xem danh mục đầu tư",
@@ -116,6 +117,7 @@
     "empty": "Chưa có chứng khoán yêu thích nào. Truy cập <securitiesLink>trang Chứng khoán</securitiesLink> và gắn sao các chứng khoán bạn muốn theo dõi tại đây.",
     "noPriceYet": "Chưa có giá",
     "dailyChange": "Thay đổi hàng ngày",
+    "dailyChangeOn": "Thay đổi hàng ngày \u00b7 {date}",
     "openPriceHistory": "Lịch sử giá của {symbol}",
     "refreshPrices": "Làm mới giá",
     "manage": "Quản lý chứng khoán"
@@ -173,6 +175,7 @@
   },
   "widgets": {
     "configure": "Cấu hình {name}",
+    "asOf": "tính đến {date}",
     "done": "Xong",
     "configSaveFailed": "Không thể lưu cài đặt tiện ích. Vui lòng thử lại.",
     "timeframe": "Khung thời gian",

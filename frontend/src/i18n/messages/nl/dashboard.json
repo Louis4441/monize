@@ -96,6 +96,7 @@
       "noLosers": "Vandaag geen dalers."
     },
     "dailyChange": "Dagelijkse wijziging",
+    "dailyChangeOn": "Dagelijkse wijziging \u00b7 {date}",
     "openPriceHistory": "Koersgeschiedenis van {symbol}",
     "refreshPrices": "Koersen vernieuwen",
     "viewPortfolio": "Portefeuille bekijken",
@@ -116,6 +117,7 @@
     "empty": "Nog geen favoriete waardepapieren. Ga naar de <securitiesLink>pagina Waardepapieren</securitiesLink> en markeer de waardepapieren die je hier wilt volgen.",
     "noPriceYet": "Nog geen koers",
     "dailyChange": "Dagelijkse wijziging",
+    "dailyChangeOn": "Dagelijkse wijziging \u00b7 {date}",
     "openPriceHistory": "Koersgeschiedenis van {symbol}",
     "refreshPrices": "Koersen vernieuwen",
     "manage": "Waardepapieren beheren"
@@ -173,6 +175,7 @@
   },
   "widgets": {
     "configure": "{name} configureren",
+    "asOf": "per {date}",
     "done": "Klaar",
     "configSaveFailed": "Kon de widgetinstellingen niet opslaan. Probeer het opnieuw.",
     "timeframe": "Tijdsbestek",
