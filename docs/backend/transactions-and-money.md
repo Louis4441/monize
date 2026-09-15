@@ -33,7 +33,7 @@ Also: `Uncategorized` (the user filed it nowhere) and `Unknown category` (we cou
 
 ## A category filter names a type with a pseudo-id, never with the type's ids
 
-`categoryIds` (`parseCategoryIds`, `common/query-param-utils.ts`) accepts four pseudo-ids beside UUIDs: `uncategorized`, `transfer`, `income` and `expense`. The two type pseudo-ids resolve inside `getAllCategoryIdsWithChildren` (`common/category-tree.util.ts`), the one helper every category predicate already expands its ids through, so no predicate site enumerates a type and none needs to know the tokens exist. A client that listed a type's ids overflowed the request line at a few hundred categories (`docs/frontend/api-and-cache.md`, "A filter the server can apply is not a list the client enumerates").
+`categoryIds` (`parseCategoryIds`, `common/query-param-utils.ts`) accepts four pseudo-ids beside UUIDs: `uncategorized`, `transfer`, `income` and `expense`. The two type pseudo-ids resolve inside `getAllCategoryIdsWithChildren` (`common/category-tree.util.ts`), the one helper every category predicate already expands its ids through, so no predicate site enumerates a type and none needs to know the two type pseudo-ids exist. A client that listed a type's ids overflowed the request line at a few hundred categories (`docs/frontend/api-and-cache.md`, "A filter the server can apply is not a list the client enumerates").
 
 ## A money value carries the currency it was calculated into
 

@@ -282,19 +282,19 @@ export function buildCategoryFilterOptions(
  */
 export function canonicalizeCategoryFilter(ids: string[], categories: Category[]): string[] {
   let result = ids;
-  for (const [token, wantIncome] of [['income', true], ['expense', false]] as const) {
+  for (const [pseudoId, wantIncome] of [['income', true], ['expense', false]] as const) {
     const typeIds = new Set(categories.filter((c) => c.isIncome === wantIncome).map((c) => c.id));
     if (typeIds.size === 0) continue;
     const selected = new Set(result);
-    const covered = selected.has(token) || [...typeIds].every((id) => selected.has(id));
+    const covered = selected.has(pseudoId) || [...typeIds].every((id) => selected.has(id));
     if (!covered) continue;
-    let placed = selected.has(token);
+    let placed = selected.has(pseudoId);
     result = result.flatMap((id) => {
-      if (id === token) return [id];
+      if (id === pseudoId) return [id];
       if (!typeIds.has(id)) return [id];
       if (placed) return [];
       placed = true;
-      return [token];
+      return [pseudoId];
     });
   }
   return result;
