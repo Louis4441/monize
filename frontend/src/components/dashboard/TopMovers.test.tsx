@@ -81,10 +81,10 @@ describe('TopMovers', () => {
     expect(screen.getByText('Daily change · on 2026-02-06')).toBeInTheDocument();
   });
 
-  it('dates a row whose market closed a session before the others', () => {
-    // Markets do not all close on the same days. The caption names the newest
-    // session on screen, so a row from an earlier one says so itself rather
-    // than being read as part of the day the heading names.
+  it('captions a board whose rows disagree on the session with no date at all', () => {
+    // A board of movers is one session's, and the server sends one session's
+    // rows. If two ever arrived from different days, the caption would be a
+    // claim about one of them over the other's figures, so it says nothing.
     const movers = [
       { securityId: '1', symbol: 'AAPL', name: 'Apple Inc.', currentPrice: 180, dailyChange: 5.5, dailyChangePercent: 3.15, currencyCode: 'USD', priceDate: '2026-02-09' },
       { securityId: '2', symbol: 'MSFT', name: 'Microsoft', currentPrice: 400, dailyChange: -2.0, dailyChangePercent: -0.5, currencyCode: 'USD', priceDate: '2026-02-06' },
@@ -92,10 +92,9 @@ describe('TopMovers', () => {
 
     render(<TopMovers movers={movers} isLoading={false} hasInvestmentAccounts={true} />);
 
-    expect(screen.getByText('Daily change · on 2026-02-09')).toBeInTheDocument();
-    expect(screen.getByText('as of on 2026-02-06')).toBeInTheDocument();
-    // The row the caption is about does not repeat it.
-    expect(screen.queryByText('as of on 2026-02-09')).not.toBeInTheDocument();
+    expect(screen.getByText('Daily change')).toBeInTheDocument();
+    expect(screen.queryByText('Daily change · on 2026-02-09')).not.toBeInTheDocument();
+    expect(screen.queryByText('Daily change · on 2026-02-06')).not.toBeInTheDocument();
   });
 
   it('renders movers with symbol, name, and price', () => {

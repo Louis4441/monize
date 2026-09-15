@@ -2438,6 +2438,96 @@ describe("PortfolioService", () => {
       });
     });
 
+    describe("when one holding has not priced for the session the others have", () => {
+      beforeEach(() => {
+        accountsRepository.find.mockResolvedValue([
+          mockBrokerageAccount,
+          mockCashAccount,
+        ]);
+        holdingsRepository.find.mockResolvedValue([
+          mockHoldingAAPL,
+          mockHoldingVFV,
+        ]);
+      });
+
+      it("drops it rather than ranking yesterday's move on today's board", async () => {
+        // The defect: AAPL's provider has not posted Monday's close yet, so its
+        // two most recent rows are Friday's and Thursday's. Four days is inside
+        // the staleness window -- it has to be, or a Monday after a holiday
+        // Friday would empty the board -- so the age rule passes it, and its
+        // Friday move (+11.43%) outranked every holding that actually moved
+        // today. Only the rest of the board says Friday is over.
+        securityPriceRepository.query.mockResolvedValue([
+          {
+            security_id: "sec-1",
+            close_price: "195",
+            price_date: "2026-02-06",
+            rn: "1",
+          },
+          {
+            security_id: "sec-1",
+            close_price: "175",
+            price_date: "2026-02-05",
+            rn: "2",
+          },
+          {
+            security_id: "sec-2",
+            close_price: "90",
+            price_date: "2026-02-09",
+            rn: "1",
+          },
+          {
+            security_id: "sec-2",
+            close_price: "95",
+            price_date: "2026-02-06",
+            rn: "2",
+          },
+        ]);
+
+        const result = await service.getTopMovers(userId);
+
+        expect(result.map((m) => m.symbol)).toEqual(["VFV.TO"]);
+        expect(result[0].priceDate).toBe("2026-02-09");
+      });
+
+      it("keeps both when neither priced today, so a weekend still has a board", async () => {
+        // Read on the Monday before either market reports: nothing is behind
+        // anything else, Friday's session is the newest there is, and Friday's
+        // board is what the widget captions with Friday's date.
+        securityPriceRepository.query.mockResolvedValue([
+          {
+            security_id: "sec-1",
+            close_price: "180",
+            price_date: "2026-02-06",
+            rn: "1",
+          },
+          {
+            security_id: "sec-1",
+            close_price: "175",
+            price_date: "2026-02-05",
+            rn: "2",
+          },
+          {
+            security_id: "sec-2",
+            close_price: "90",
+            price_date: "2026-02-06",
+            rn: "1",
+          },
+          {
+            security_id: "sec-2",
+            close_price: "95",
+            price_date: "2026-02-05",
+            rn: "2",
+          },
+        ]);
+
+        const result = await service.getTopMovers(userId);
+
+        expect(result).toHaveLength(2);
+        expect(result.every((m) => m.priceDate === "2026-02-06")).toBe(true);
+      });
+    });
+
     describe("when a security has no regular price feed (skipPriceUpdates)", () => {
       it("excludes it even when its two transaction prices are on adjacent days", async () => {
         accountsRepository.find.mockResolvedValue([

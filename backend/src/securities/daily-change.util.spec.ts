@@ -1,6 +1,7 @@
 import {
   DAILY_PRICE_GAP_EXCLUSION_DAYS,
   DAILY_PRICE_STALE_AFTER_DAYS,
+  keepNewestSession,
   priceDateYmd,
   resolveDailyPriceChange,
 } from "./daily-change.util";
@@ -158,5 +159,67 @@ describe("resolveDailyPriceChange", () => {
     expect(
       resolveDailyPriceChange(points(["", 110], ["2026-02-06", 100]), TODAY),
     ).toBeNull();
+  });
+});
+
+/**
+ * The rule the age test cannot carry on its own: a feed that skips one symbol
+ * and a market that was shut leave the same day-old close behind, and only the
+ * rest of the board says which happened.
+ */
+describe("keepNewestSession", () => {
+  const row = (symbol: string, priceDate: string) => ({ symbol, priceDate });
+
+  it("drops a holding that did not price while the others did", () => {
+    // The defect: this holding's last move is Monday's, a real move of a day
+    // that is over, and it outranked every holding that actually moved today.
+    expect(
+      keepNewestSession([
+        row("XMU", "2026-02-09"),
+        row("ZGI", "2026-02-10"),
+        row("XPF", "2026-02-10"),
+      ]),
+    ).toEqual([row("ZGI", "2026-02-10"), row("XPF", "2026-02-10")]);
+  });
+
+  it("keeps every row when no holding priced today, so a weekend has a board", () => {
+    // Nothing is stale here relative to anything else: Friday's session is the
+    // newest there is, and Friday's board is the honest one to show.
+    const friday = [row("XMU", "2026-02-06"), row("ZGI", "2026-02-06")];
+
+    expect(keepNewestSession(friday)).toEqual(friday);
+  });
+
+  it("keeps a lone holding, whose own session is the newest there is", () => {
+    expect(keepNewestSession([row("XMU", "2026-02-06")])).toEqual([
+      row("XMU", "2026-02-06"),
+    ]);
+  });
+
+  it("orders by day rather than by the text of a date", () => {
+    // A year boundary and a month boundary: YYYY-MM-DD compares as text in the
+    // order it compares as days, and nothing else here relies on that.
+    expect(
+      keepNewestSession([
+        row("A", "2025-12-31"),
+        row("B", "2026-01-01"),
+        row("C", "2026-09-02"),
+        row("D", "2026-09-10"),
+      ]),
+    ).toEqual([row("D", "2026-09-10")]);
+  });
+
+  it("has nothing to show for an empty board", () => {
+    expect(keepNewestSession([])).toEqual([]);
+  });
+
+  it("leaves the board it was given alone", () => {
+    // The caller sorts what comes back; a helper that filtered in place would
+    // take rows off the list the caller still holds.
+    const rows = [row("XMU", "2026-02-09"), row("ZGI", "2026-02-10")];
+
+    keepNewestSession(rows);
+
+    expect(rows).toEqual([row("XMU", "2026-02-09"), row("ZGI", "2026-02-10")]);
   });
 });
