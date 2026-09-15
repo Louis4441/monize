@@ -31,6 +31,10 @@ The test that matters is the round trip: every name we emit must resolve back to
 
 Also: `Uncategorized` (the user filed it nowhere) and `Unknown category` (we could not resolve the name of the category they did file it under) are different facts with different constants. Do not fold the second into the first.
 
+## A category filter names a type with a pseudo-id, never with the type's ids
+
+`categoryIds` (`parseCategoryIds`, `common/query-param-utils.ts`) accepts four pseudo-ids beside UUIDs: `uncategorized`, `transfer`, `income` and `expense`. The two type pseudo-ids resolve inside `getAllCategoryIdsWithChildren` (`common/category-tree.util.ts`), the one helper every category predicate already expands its ids through, so no predicate site enumerates a type and none needs to know the tokens exist. A client that listed a type's ids overflowed the request line at a few hundred categories (`docs/frontend/api-and-cache.md`, "A filter the server can apply is not a list the client enumerates").
+
 ## A money value carries the currency it was calculated into
 
 Not the currency of the account it is filed under. `InvestmentTransaction.exchangeRate` converts a trade into the *settlement* account's currency (the funding account when named, else the brokerage's linked cash account), so a PLN brokerage funded from EUR holds a EUR cost basis. The amount and its currency travel together (`ReplayedLot.currencyCode`), and a consumer compares that field against what it is reporting in. A mismatch is **unknown**, not a conversion -- today's rate answers today's question, not the acquisition's -- and two acquisitions settled in different currencies cannot be summed at all.

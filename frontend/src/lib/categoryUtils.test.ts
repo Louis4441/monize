@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildCategoryTree, getCategorySelectOptions, buildCategoryColorMap, buildCategoryLabelMap, buildDescendantIdSet, rollupToDirectChildren, categoryIdsByType } from './categoryUtils';
+import { buildCategoryTree, getCategorySelectOptions, buildCategoryColorMap, buildCategoryLabelMap, buildDescendantIdSet, rollupToDirectChildren, buildCategoryFilterOptions, canonicalizeCategoryFilter, resolveSelectedCategories, SpecialCategoryFilterLabels } from './categoryUtils';
 import { Category } from '@/types/category';
 
 function makeCategory(overrides: Partial<Category> & { id: string; name: string }): Category {
@@ -255,18 +255,68 @@ describe('rollupToDirectChildren', () => {
   });
 });
 
-describe('categoryIdsByType', () => {
-  it('splits parents and children by isIncome, keeping each subtree whole', () => {
-    const salary = makeCategory({ id: 'inc-1', name: 'Salary', isIncome: true });
-    const bonus = makeCategory({ id: 'inc-2', name: 'Bonus', isIncome: true, parentId: 'inc-1' });
+const labels: SpecialCategoryFilterLabels = {
+  uncategorized: 'Uncategorized',
+  transfer: 'Transfers',
+  income: 'All income categories',
+  expense: 'All expense categories',
+};
+const salary = makeCategory({ id: 'inc-1', name: 'Salary', isIncome: true });
+const bonus = makeCategory({ id: 'inc-2', name: 'Bonus', isIncome: true, parentId: 'inc-1' });
 
-    expect(categoryIdsByType([groceries, food, fastFood, salary, bonus])).toEqual({
-      income: ['inc-1', 'inc-2'],
-      expense: ['cat-1', 'cat-3', 'cat-4'],
-    });
+describe('buildCategoryFilterOptions', () => {
+  it('lists the four labelled pseudo-ids first, then the tree', () => {
+    const result = buildCategoryFilterOptions([food, fastFood, salary], labels);
+    expect(result.slice(0, 4)).toEqual([
+      { value: 'uncategorized', label: 'Uncategorized' },
+      { value: 'transfer', label: 'Transfers' },
+      { value: 'income', label: 'All income categories' },
+      { value: 'expense', label: 'All expense categories' },
+    ]);
+    expect(result.slice(4).map((o) => o.value)).toEqual(['cat-3', 'inc-1']);
+    expect(result[4].children?.map((o) => o.value)).toEqual(['cat-4']);
+  });
+});
+
+describe('resolveSelectedCategories', () => {
+  it('renders every pseudo-id as a labelled chip and drops unknown ids', () => {
+    const result = resolveSelectedCategories(
+      ['income', 'cat-1', 'missing', 'transfer', 'expense', 'uncategorized'],
+      [groceries],
+      labels,
+    );
+    expect(result.map((c) => c.name)).toEqual([
+      'All income categories', 'Groceries', 'Transfers', 'All expense categories', 'Uncategorized',
+    ]);
+  });
+});
+
+describe('canonicalizeCategoryFilter', () => {
+  const all = [groceries, food, fastFood, salary, bonus];
+
+  it('collapses a selection of every category of a type into its pseudo-id, in place', () => {
+    expect(canonicalizeCategoryFilter(['cat-1', 'inc-1', 'uncategorized', 'inc-2'], all))
+      .toEqual(['cat-1', 'income', 'uncategorized']);
   });
 
-  it('returns empty groups for no categories', () => {
-    expect(categoryIdsByType([])).toEqual({ income: [], expense: [] });
+  it('leaves a partial type as ids', () => {
+    expect(canonicalizeCategoryFilter(['cat-1', 'inc-1'], all)).toEqual(['cat-1', 'inc-1']);
+  });
+
+  it('drops ids a present pseudo-id already covers', () => {
+    expect(canonicalizeCategoryFilter(['inc-1', 'expense', 'cat-3', 'income'], all))
+      .toEqual(['expense', 'income']);
+  });
+
+  it('turns Select All into the four pseudo-ids', () => {
+    const everything = ['uncategorized', 'transfer', 'income', 'expense', ...all.map((c) => c.id)];
+    expect(canonicalizeCategoryFilter(everything, all)).toEqual(['uncategorized', 'transfer', 'income', 'expense']);
+  });
+
+  it('never collapses a type that has no categories', () => {
+    expect(canonicalizeCategoryFilter(['cat-1', 'cat-3', 'cat-4'], [groceries, food, fastFood]))
+      .toEqual(['expense']);
+    expect(canonicalizeCategoryFilter([], [groceries])).toEqual([]);
+    expect(canonicalizeCategoryFilter(['cat-1'], [])).toEqual(['cat-1']);
   });
 });

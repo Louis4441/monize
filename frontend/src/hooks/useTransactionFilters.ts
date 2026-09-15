@@ -8,9 +8,11 @@ import {
   buildCategoryIconMap,
   buildCategoryLabelMap,
   buildCategoryFilterOptions,
-  categoryIdsByType,
+  canonicalizeCategoryFilter,
+  isSpecialCategoryFilterId,
   resolveSelectedCategories,
 } from '@/lib/categoryUtils';
+import { useCategoryFilterLabels } from '@/hooks/useCategoryFilterLabels';
 import { Account } from '@/types/account';
 import { Category } from '@/types/category';
 import { Payee } from '@/types/payee';
@@ -169,7 +171,14 @@ export function useTransactionFilters({ accounts, categories, payees, tags, week
   const [filterAccountStatus, setFilterAccountStatus] = useState<'active' | 'closed' | ''>(() =>
     getStoredValue<'active' | 'closed' | ''>(STORAGE_KEYS.accountStatus, '')
   );
-  const [filterCategoryIds, setFilterCategoryIds] = useState<string[]>([]);
+  const [rawFilterCategoryIds, setFilterCategoryIds] = useState<string[]>([]);
+  // What the user ticked, with any whole type collapsed to its pseudo-id. Every
+  // reader (the requests, the URL, localStorage, the chips, the picker) sees
+  // this form, so a selection of every category is never sent as an id list.
+  const filterCategoryIds = useMemo(
+    () => canonicalizeCategoryFilter(rawFilterCategoryIds, categories),
+    [rawFilterCategoryIds, categories],
+  );
   const [filterPayeeIds, setFilterPayeeIds] = useState<string[]>([]);
   const [filterStartDate, setFilterStartDate] = useState<string>('');
   const [filterEndDate, setFilterEndDate] = useState<string>('');
@@ -268,7 +277,8 @@ export function useTransactionFilters({ accounts, categories, payees, tags, week
   }, [router]);
 
   // Get display info for selected filters
-  const selectedCategories = resolveSelectedCategories(filterCategoryIds, categories);
+  const categoryFilterLabels = useCategoryFilterLabels();
+  const selectedCategories = resolveSelectedCategories(filterCategoryIds, categories, categoryFilterLabels);
 
   const selectedPayees = filterPayeeIds
     .map(id => payees.find(p => p.id === id))
@@ -294,10 +304,9 @@ export function useTransactionFilters({ accounts, categories, payees, tags, week
 
   // Memoize filter option arrays
   const categoryFilterOptions = useMemo(
-    () => buildCategoryFilterOptions(categories),
-    [categories],
+    () => buildCategoryFilterOptions(categories, categoryFilterLabels),
+    [categories, categoryFilterLabels],
   );
-  const categoryIdsByTypeMemo = useMemo(() => categoryIdsByType(categories), [categories]);
 
   const categoryColorMap = useMemo(() => buildCategoryColorMap(categories), [categories]);
   const categoryIconMap = useMemo(() => buildCategoryIconMap(categories), [categories]);
@@ -358,9 +367,8 @@ export function useTransactionFilters({ accounts, categories, payees, tags, week
   // When categories change, remove any selected category filter IDs that no longer exist
   useEffect(() => {
     if (!filtersInitialized || filterCategoryIds.length === 0 || categories.length === 0) return;
-    const specialIds = new Set(['uncategorized', 'transfer']);
     const categoryIds = new Set(categories.map(c => c.id));
-    const validSelectedIds = filterCategoryIds.filter(id => specialIds.has(id) || categoryIds.has(id));
+    const validSelectedIds = filterCategoryIds.filter(id => isSpecialCategoryFilterId(id) || categoryIds.has(id));
     if (validSelectedIds.length !== filterCategoryIds.length) {
       setFilterCategoryIds(validSelectedIds); // eslint-disable-line react-hooks/set-state-in-effect -- sync invalid selections after data change
     }
@@ -421,9 +429,10 @@ export function useTransactionFilters({ accounts, categories, payees, tags, week
       return getFilterValues(STORAGE_KEYS.accountIds, ids || id, hasAnyUrlParams);
     };
     const getCategoryIds = () => {
+      // A type deep link is the pseudo-id itself; the server expands it.
       const categoryType = searchParams.get('categoryType');
       if (categoryType === 'income' || categoryType === 'expense') {
-        return categoryIdsByType(categories)[categoryType];
+        return [categoryType];
       }
       const ids = searchParams.get('categoryIds');
       const id = searchParams.get('categoryId');
@@ -578,8 +587,7 @@ export function useTransactionFilters({ accounts, categories, payees, tags, week
     // A malformed id is ignored rather than applied, matching the
     // targetTransactionId handling (special category pseudo-ids excepted).
     const isSpecialCategory =
-      entity.kind === 'category' &&
-      (entity.id === 'uncategorized' || entity.id === 'transfer');
+      entity.kind === 'category' && isSpecialCategoryFilterId(entity.id);
     if (!isSpecialCategory && !UUID_REGEX.test(entity.id)) return;
 
     setFilterAccountIds(entity.kind === 'account' ? [entity.id] : []);
@@ -868,7 +876,6 @@ export function useTransactionFilters({ accounts, categories, payees, tags, week
     // Filter options
     accountFilterOptions,
     categoryFilterOptions,
-    categoryIdsByType: categoryIdsByTypeMemo,
     payeeFilterOptions,
     tagFilterOptions,
     categoryColorMap,

@@ -681,7 +681,7 @@ export class TransactionsController {
     name: "categoryIds",
     required: false,
     description:
-      "Filter by category IDs (comma-separated, supports 'uncategorized' and 'transfer')",
+      "Filter by category IDs (comma-separated, supports the pseudo-ids 'uncategorized', 'transfer', 'income' and 'expense')",
   })
   @ApiQuery({
     name: "payeeIds",
@@ -1019,7 +1019,7 @@ export class TransactionsController {
     name: "categoryIds",
     required: false,
     description:
-      "Filter by category IDs (comma-separated, supports 'uncategorized' and 'transfer')",
+      "Filter by category IDs (comma-separated, supports the pseudo-ids 'uncategorized', 'transfer', 'income' and 'expense')",
   })
   @ApiQuery({
     name: "payeeIds",

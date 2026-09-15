@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act } from '@/test/render';
 
 const mockPush = vi.fn();
 const mockReplace = vi.fn();
@@ -50,16 +50,16 @@ describe('useTransactionFilters - categoryType', () => {
     localStorage.clear();
   });
 
-  it('resolves categoryType=income to all income category IDs', () => {
+  it('resolves categoryType=income to the income pseudo-id, never the ids', () => {
     mockSearchParams = new URLSearchParams('categoryType=income&startDate=2024-01-01');
     const { result } = renderHook(() => useTransactionFilters(defaultOptions));
-    expect(result.current.filterCategoryIds).toEqual(['cat-salary', 'cat-bonus']);
+    expect(result.current.filterCategoryIds).toEqual(['income']);
   });
 
-  it('resolves categoryType=expense to all expense category IDs', () => {
+  it('resolves categoryType=expense to the expense pseudo-id, never the ids', () => {
     mockSearchParams = new URLSearchParams('categoryType=expense&startDate=2024-01-01');
     const { result } = renderHook(() => useTransactionFilters(defaultOptions));
-    expect(result.current.filterCategoryIds).toEqual(['cat-food', 'cat-rent']);
+    expect(result.current.filterCategoryIds).toEqual(['expense']);
   });
 
   it('uses explicit categoryIds when categoryType is not present', () => {
@@ -71,13 +71,77 @@ describe('useTransactionFilters - categoryType', () => {
   it('prefers categoryType over categoryIds when both present', () => {
     mockSearchParams = new URLSearchParams('categoryType=income&categoryIds=cat-food&startDate=2024-01-01');
     const { result } = renderHook(() => useTransactionFilters(defaultOptions));
-    expect(result.current.filterCategoryIds).toEqual(['cat-salary', 'cat-bonus']);
+    expect(result.current.filterCategoryIds).toEqual(['income']);
   });
 
   it('returns empty category filter when no URL params present and no localStorage', () => {
     mockSearchParams = new URLSearchParams();
     const { result } = renderHook(() => useTransactionFilters(defaultOptions));
     expect(result.current.filterCategoryIds).toEqual([]);
+  });
+});
+
+describe('useTransactionFilters - category type canonicalisation', () => {
+  // A few hundred categories used to overflow the request line and the page
+  // URL once every id of a type was selected (Select All, or a whole type
+  // ticked by hand). The hook exposes the collapsed form everywhere.
+  const manyCategories = Array.from({ length: 300 }, (_, i) => ({
+    id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+    name: `Category ${i}`,
+    isIncome: i % 3 === 0,
+    parentId: null,
+  })) as any[];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSearchParams = new URLSearchParams();
+    localStorage.clear();
+  });
+
+  it('collapses a selection of every category into the pseudo-ids and keeps the URL short', () => {
+    const { result } = renderHook(() =>
+      useTransactionFilters({ ...defaultOptions, categories: manyCategories }),
+    );
+    act(() => {
+      result.current.setFilterCategoryIds([
+        'uncategorized', 'transfer', ...manyCategories.map((c) => c.id),
+      ]);
+    });
+    expect(result.current.filterCategoryIds).toEqual(['uncategorized', 'transfer', 'income', 'expense']);
+    act(() => {
+      result.current.updateUrl(1, {
+        accountIds: [], categoryIds: result.current.filterCategoryIds, payeeIds: [], tagIds: [],
+        startDate: '', endDate: '', search: '', amountFrom: '', amountTo: '',
+        statuses: [], originalCurrencyCodes: [],
+        tagKey: '', tagKeyOp: 'hasValue', tagKeyValue: '', hasAttachments: '',
+      });
+    });
+    const url = mockReplace.mock.calls[0][0] as string;
+    expect(url).toContain('categoryIds=uncategorized%2Ctransfer%2Cincome%2Cexpense');
+    expect(url.length).toBeLessThan(200);
+  });
+
+  it('collapses an oversized list stored before the fix once categories load', () => {
+    localStorage.setItem(
+      'transactions.filter.categoryIds',
+      JSON.stringify(manyCategories.filter((c) => c.isIncome).map((c) => c.id)),
+    );
+    const { result } = renderHook(() =>
+      useTransactionFilters({ ...defaultOptions, categories: manyCategories }),
+    );
+    expect(result.current.filterCategoryIds).toEqual(['income']);
+  });
+
+  it('leaves a partial type as ids and keeps the pseudo-ids through pruning', () => {
+    const { result, rerender } = renderHook(
+      (props: any) => useTransactionFilters(props),
+      { initialProps: { ...defaultOptions, categories: [] as any[] } as any },
+    );
+    act(() => {
+      result.current.setFilterCategoryIds(['income', 'cat-food', 'missing']);
+    });
+    rerender({ ...defaultOptions, categories: allCategories } as any);
+    expect(result.current.filterCategoryIds).toEqual(['income', 'cat-food']);
   });
 });
 

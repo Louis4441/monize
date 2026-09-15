@@ -27,11 +27,6 @@ const hierarchicalOptions: MultiSelectOption[] = [
   },
 ];
 
-const quickSelections = [
-  { id: 'food', label: 'All food', values: ['food', 'fruit', 'meat'] },
-  { id: 'transport', label: 'All transport', values: ['transport', 'bus', 'train'] },
-];
-
 describe('MultiSelect', () => {
   const onChange = vi.fn();
 
@@ -638,77 +633,6 @@ describe('MultiSelect', () => {
     it('renders no sizer by default, leaving other call sites untouched', () => {
       render(<MultiSelect options={flatOptions} value={[]} onChange={onChange} />);
       expect(screen.queryByTestId('multiselect-sizer')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('quickSelections', () => {
-    it('renders no quick-selection row when the prop is absent', () => {
-      render(<MultiSelect options={hierarchicalOptions} value={[]} onChange={onChange} />);
-      fireEvent.click(screen.getByRole('button'));
-      expect(screen.queryByRole('button', { name: 'All food' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { pressed: true })).not.toBeInTheDocument();
-    });
-
-    it('adds the selection\'s values to the current selection without dropping others', () => {
-      render(
-        <MultiSelect
-          options={hierarchicalOptions}
-          value={['bus']}
-          onChange={onChange}
-          quickSelections={quickSelections}
-        />
-      );
-      fireEvent.click(screen.getByRole('button'));
-      const food = screen.getByRole('button', { name: 'All food' });
-      expect(food).toHaveAttribute('aria-pressed', 'false');
-      fireEvent.click(food);
-      expect(onChange).toHaveBeenCalledWith(['bus', 'food', 'fruit', 'meat']);
-    });
-
-    it('reads as pressed once every value is selected and removes exactly those on click', () => {
-      render(
-        <MultiSelect
-          options={hierarchicalOptions}
-          value={['food', 'fruit', 'meat', 'bus']}
-          onChange={onChange}
-          quickSelections={quickSelections}
-        />
-      );
-      fireEvent.click(screen.getByRole('button'));
-      const food = screen.getByRole('button', { name: 'All food' });
-      expect(food).toHaveAttribute('aria-pressed', 'true');
-      expect(screen.getByRole('button', { name: 'All transport' })).toHaveAttribute('aria-pressed', 'false');
-      fireEvent.click(food);
-      expect(onChange).toHaveBeenCalledWith(['bus']);
-    });
-
-    it('only adds the visible members while a search is active', () => {
-      render(
-        <MultiSelect
-          options={hierarchicalOptions}
-          value={[]}
-          onChange={onChange}
-          quickSelections={quickSelections}
-        />
-      );
-      fireEvent.click(screen.getByRole('button'));
-      fireEvent.change(screen.getByPlaceholderText('Search...'), { target: { value: 'fru' } });
-      fireEvent.click(screen.getByRole('button', { name: 'All food' }));
-      expect(onChange).toHaveBeenCalledWith(['fruit']);
-    });
-
-    it('is not pressed when none of its members are visible', () => {
-      render(
-        <MultiSelect
-          options={hierarchicalOptions}
-          value={['food', 'fruit', 'meat']}
-          onChange={onChange}
-          quickSelections={quickSelections}
-        />
-      );
-      fireEvent.click(screen.getByRole('button'));
-      fireEvent.change(screen.getByPlaceholderText('Search...'), { target: { value: 'bus' } });
-      expect(screen.getByRole('button', { name: 'All food' })).toHaveAttribute('aria-pressed', 'false');
     });
   });
 });

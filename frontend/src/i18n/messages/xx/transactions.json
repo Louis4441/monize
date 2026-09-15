@@ -243,10 +243,6 @@
       "yes": "[XX-Yes-XX]",
       "no": "[XX-No-XX]"
     },
-    "categoryQuickSelections": {
-      "income": "[XX-Income-XX]",
-      "expenses": "[XX-Expenses-XX]"
-    },
     "placeholders": {
       "accounts": "[XX-All accounts-XX]",
       "payees": "[XX-All payees-XX]",

@@ -243,10 +243,6 @@
       "yes": "Yes",
       "no": "No"
     },
-    "categoryQuickSelections": {
-      "income": "Income",
-      "expenses": "Expenses"
-    },
     "placeholders": {
       "accounts": "All accounts",
       "payees": "All payees",
