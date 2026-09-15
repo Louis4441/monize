@@ -8,6 +8,7 @@ import {
   UploadPartCommand,
 } from "@aws-sdk/client-s3";
 import { createHash } from "crypto";
+import { tokenHashesEqual } from "../../auth/crypto.util";
 import {
   buildS3Client,
   withS3Deadline,
@@ -131,8 +132,9 @@ export class BackupOffsiteS3Uploader {
 
     // A 200 is not the verification; the echoed checksum is. An endpoint that
     // ignored the header would otherwise let an unverified copy be recorded as
-    // done, which is the failure INV-BACKUP-005 exists to prevent.
-    if (response.ChecksumSHA256 !== digest.base64) {
+    // done, which is the failure INV-BACKUP-005 exists to prevent. Compared in
+    // constant time through the repository's digest-equality helper.
+    if (!tokenHashesEqual(response.ChecksumSHA256 ?? null, digest.base64)) {
       throw new Error(
         `Off-site backup ${objectKey} was not verified: the destination ` +
           `answered with checksum ${response.ChecksumSHA256 ?? "(none)"} for ` +
@@ -244,7 +246,10 @@ export class BackupOffsiteS3Uploader {
             options,
           ),
       );
-      if (!uploaded.ETag || uploaded.ChecksumSHA256 !== partChecksum) {
+      if (
+        !uploaded.ETag ||
+        !tokenHashesEqual(uploaded.ChecksumSHA256 ?? null, partChecksum)
+      ) {
         throw new Error(
           `Off-site backup ${objectKey} part ${number} was not verified: the ` +
             `destination answered with checksum ` +

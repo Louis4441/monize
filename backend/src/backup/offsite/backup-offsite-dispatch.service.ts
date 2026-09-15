@@ -1,8 +1,10 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { createHash } from "crypto";
 import { promises as fs } from "fs";
-import { resolve } from "path";
+import { resolve, sep } from "path";
 import { DataSource, EntityTarget, ObjectLiteral, Repository } from "typeorm";
+
+import { tokenHashesEqual } from "../../auth/crypto.util";
 
 import { affectedRowCount, returnedRows } from "../../common/db/query-result";
 import { withScopedDb } from "../../common/db/scoped-db";
@@ -463,7 +465,10 @@ export class BackupOffsiteDispatchService {
       };
     }
     const digest = createHash("sha256").update(bytes).digest("hex");
-    if (bytes.length !== claim.sizeBytes || digest !== claim.digest) {
+    if (
+      bytes.length !== claim.sizeBytes ||
+      !tokenHashesEqual(digest, claim.digest)
+    ) {
       // Never upload what was not measured: the destination is told a checksum,
       // the key carries it, and an append-only destination cannot correct an
       // object later.
@@ -597,10 +602,14 @@ export class BackupOffsiteDispatchService {
    * The exact bytes under `<folder>/<filename>`, or `null` when there is no such
    * file.
    *
-   * The folder is server-computed and already inside a permitted root; the
-   * filename is classified before it is joined and the join is containment-
-   * checked all the same, because a validated name and an unchecked join is how
-   * a check becomes decorative (CWE-22).
+   * The path opened is a directory entry's, never the claim's own string: the
+   * requested name is matched against the user's folder listing and the matching
+   * entry is what is joined and read, so the value reaching the filesystem is one
+   * this deployment wrote rather than one carried in on a row -- the same CWE-22
+   * boundary `AutoBackupService.openStoredBackup` states, and what lets a SAST
+   * tool see it. The name is classified before the listing, and the join is
+   * containment-checked all the same, because a validated name and an unchecked
+   * join is how a check becomes decorative.
    */
   private async readArtifact(
     claim: OffsiteUploadClaim,
@@ -611,11 +620,22 @@ export class BackupOffsiteDispatchService {
           "this deployment writes backups under",
       );
     }
-    const path = resolve(claim.folder, claim.filename);
-    if (!path.startsWith(claim.folder + "/")) {
+    let entries: string[];
+    try {
+      entries = await fs.readdir(claim.folder);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code === "ENOENT") return null;
+      throw error;
+    }
+    // Only the server's own readdir string is joined; `claim.filename` is used to
+    // match, never to build the path.
+    const entry = entries.find((name) => name === claim.filename);
+    if (entry === undefined) return null;
+    const path = resolve(claim.folder, entry);
+    if (!path.startsWith(claim.folder + sep)) {
       throw new Error(
-        `Refusing to read ${JSON.stringify(claim.filename)}: it resolves ` +
-          "outside the user's backup folder",
+        `Refusing to read ${JSON.stringify(entry)}: it resolves outside the ` +
+          "user's backup folder",
       );
     }
     try {
