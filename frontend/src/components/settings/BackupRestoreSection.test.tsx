@@ -20,9 +20,7 @@ vi.mock('@/lib/backupApi', () => ({
     downloadStoredBackup: vi.fn(),
     getOffsiteSettings: vi.fn(),
     updateOffsiteSettings: vi.fn(),
-    listOffsiteUploads: vi.fn(),
   },
-  OFFSITE_UPLOADS_PAGE_SIZE: 20,
   BACKUP_PASSWORD_REQUIRED_CODE: 'BACKUP_PASSWORD_REQUIRED',
   // Mirror the real magic-byte sniffing so the restore form shows the
   // backup-password field only for encrypted (.mzbe) uploads.
@@ -105,8 +103,10 @@ describe('BackupRestoreSection', () => {
       enabled: false,
       backups: [],
     });
-    // Off-site destinations are off and nothing has been copied: the subsection
-    // renders its own form and an empty ledger, which no test below is about.
+    // Off-site destinations are off: the folded destinations form renders its
+    // own controls, which no test below is about. It only mounts when the
+    // stored-backups sub-section itself renders (schedule armed or artifacts on
+    // disk), so most tests below never reach it.
     (backupApi.getOffsiteSettings as ReturnType<typeof vi.fn>).mockResolvedValue(
       {
         s3Mode: 'off',
@@ -122,9 +122,6 @@ describe('BackupRestoreSection', () => {
         deploymentS3Available: true,
         encryptionConfigured: true,
       },
-    );
-    (backupApi.listOffsiteUploads as ReturnType<typeof vi.fn>).mockResolvedValue(
-      [],
     );
   });
 

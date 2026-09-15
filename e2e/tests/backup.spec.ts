@@ -63,12 +63,14 @@ test.describe('Backup & restore', () => {
 
     // Automatic backups are a deployment concern configured on the admin-only
     // Backups surface; a plain user's Settings has manual export/restore only,
-    // and no automatic-backup schedule to set anywhere. Assert the section
-    // heading is absent rather than the words "Automatic Backup" anywhere: the
-    // Off-site Copies subsection on this same page describes copying each
-    // completed automatic backup, so the prose legitimately says it.
+    // and no automatic-backup schedule to set anywhere. Assert the admin
+    // section heading "Automatic Backup" (singular) is absent, matching it
+    // exactly: this page shows the user's own "Automatic Backups" (plural)
+    // sub-section, and a substring name match would match that and misfire.
+    // The Off-site destinations block folded under it also mentions automatic
+    // backups in its prose, which is legitimate.
     await expect(
-      page.getByRole('heading', { name: 'Automatic Backup' }),
+      page.getByRole('heading', { name: 'Automatic Backup', exact: true }),
     ).toHaveCount(0);
   });
 
@@ -77,12 +79,14 @@ test.describe('Backup & restore', () => {
   }) => {
     // The IA split moved automatic-backup configuration onto Admin -> Backups,
     // so even an administrator no longer finds it stacked in their own Settings.
-    // The heading, not the words: the Off-site Copies subsection here mentions
-    // automatic backups in its description.
+    // Match "Automatic Backup" (singular) exactly: this page always shows the
+    // user's own "Automatic Backups" (plural) sub-section, which a substring
+    // name match would match and misfire on. The Off-site destinations block
+    // folded under it mentions automatic backups in its description.
     await adminPage.goto('/settings');
     await expect(adminPage.getByText('Create Backup')).toBeVisible();
     await expect(
-      adminPage.getByRole('heading', { name: 'Automatic Backup' }),
+      adminPage.getByRole('heading', { name: 'Automatic Backup', exact: true }),
     ).toHaveCount(0);
   });
 

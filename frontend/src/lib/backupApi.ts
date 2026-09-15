@@ -169,6 +169,17 @@ export interface StoredBackup {
   size: number;
   /** True for an encrypted Monize envelope, which needs its password to restore. */
   encrypted: boolean;
+  /**
+   * The newest off-site copy status for each destination this artifact has
+   * off-site rows for. Present only when the artifact has any such row, and a
+   * destination key is present only when that destination has a status for it.
+   * A destination with no key here has no status for this artifact, and its
+   * icon is not drawn. `null` is never a licence to guess a copy happened.
+   */
+  offsite?: {
+    s3?: BackupOffsiteUploadStatus;
+    email?: BackupOffsiteUploadStatus;
+  };
 }
 
 /**
@@ -189,9 +200,6 @@ export type BackupOffsiteS3Mode = 'off' | 'deployment' | 'own';
 
 /** One configured target kind. A user may hold both at once (3-2-1). */
 export type BackupOffsiteDestination = 's3' | 'email';
-
-/** The published tier of the artifact that was copied; never `partial`. */
-export type BackupOffsiteTier = 'daily' | 'weekly' | 'monthly';
 
 /**
  * Where one off-machine copy has got to.
@@ -264,32 +272,6 @@ export interface UpdateBackupOffsiteSettingsData {
   emailEnabled?: boolean;
   emailTo?: string | null;
 }
-
-/**
- * One (destination, object key) copy of one artifact, as the ledger holds it.
- *
- * `objectKey` is the full S3 key for an S3 row and the artifact's filename for
- * an email one; either way its last segment names the recovery point. A
- * non-success row keeps `lastError`, which is what makes a failure findable
- * rather than a copy that silently never happened.
- */
-export interface BackupOffsiteUpload {
-  id: string;
-  destination: BackupOffsiteDestination;
-  objectKey: string;
-  tier: BackupOffsiteTier;
-  /** SHA-256 of the artifact bytes, hex. */
-  digest: string;
-  sizeBytes: number;
-  status: BackupOffsiteUploadStatus;
-  attempts: number;
-  lastError: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** Rows the off-site copy list asks for. The endpoint's own cap is 200. */
-export const OFFSITE_UPLOADS_PAGE_SIZE = 20;
 
 export interface BackupEncryptionStatus {
   enabled: boolean;
@@ -552,17 +534,6 @@ export const backupApi = {
     const response = await apiClient.patch<BackupOffsiteSettingsView>(
       '/backup/offsite-settings',
       data,
-    );
-    return response.data;
-  },
-
-  /** The caller's recent off-machine copies, newest first. */
-  listOffsiteUploads: async (
-    limit: number = OFFSITE_UPLOADS_PAGE_SIZE,
-  ): Promise<BackupOffsiteUpload[]> => {
-    const response = await apiClient.get<BackupOffsiteUpload[]>(
-      '/backup/offsite-uploads',
-      { params: { limit } },
     );
     return response.data;
   },

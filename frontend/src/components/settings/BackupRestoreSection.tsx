@@ -22,7 +22,6 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { downloadBlob } from '@/lib/download';
 import { User } from '@/types/auth';
 import { takeOidcReauthArtifact } from '@/lib/stepUpToken';
-import { OffsiteBackupSubsection } from './OffsiteBackupSubsection';
 import { StoredBackupsSubsection } from './StoredBackupsSubsection';
 
 
@@ -409,12 +408,10 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
         </Button>
       </div>
 
+      {/* The automatic backups the server holds for this user, with each
+          artifact's off-site copy status and the off-site destination settings
+          folded in as a collapsible block of their own. */}
       <StoredBackupsSubsection onRestore={handleStoredBackupSelected} />
-
-      {/* Where those same artifacts are copied to once they are written. Every
-          user manages their own: a destination is a decision about this user's
-          data leaving the machine, not an operator setting about the disk. */}
-      <OffsiteBackupSubsection />
 
       {/* Restore Section */}
       <div ref={restoreSectionRef}>
