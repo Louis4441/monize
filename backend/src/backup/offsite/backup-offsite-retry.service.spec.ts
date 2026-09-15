@@ -138,6 +138,10 @@ describe("BackupOffsiteRetryService", () => {
       // the hour has a fresh `claimed_at` and is a live upload.
       expect(first.sql).toContain("claimed_at <= now() - (INTERVAL '1 minute'");
       expect(first.params[1]).toBe(OFFSITE_CLAIM_LEASE_MINUTES);
+      // The claim it is handing back never completed an attempt, so it gives the
+      // attempt back too: without this, restarts during the upload window would
+      // exhaust the retry budget of a destination that never actually refused.
+      expect(first.sql).toContain("attempts = GREATEST(attempts - 1, 0)");
       // The selection is the statement after it, not before or instead of it.
       expect(issued[1].sql).toContain("FROM backup_offsite_uploads");
       expect(issued[1].sql).toContain("SELECT");

@@ -180,9 +180,21 @@ export class BackupOffsiteRetryService {
       const expired = await withSystemContext(() =>
         withScopedDb(this.dataSource, (manager) =>
           manager.query(
+            // `attempts` is decremented, not left as the claim raised it. The
+            // claim increments on the way in and `recordOutcome` keeps that
+            // value, so `attempts` is meant to count *completed* attempts -- and
+            // a claim the lease is reclaiming never completed one: its replica
+            // died before recording an outcome. Leaving it counted would let
+            // deploy churn during the upload window spend the whole
+            // MAX_OFFSITE_ATTEMPTS budget of a destination that never actually
+            // refused, writing the copy off and alerting it as unrecoverable
+            // over five restarts that had nothing to do with the destination.
+            // A stale row was claimed exactly once since its last outcome, so
+            // `- 1` undoes precisely that claim; GREATEST floors it at zero.
             `UPDATE backup_offsite_uploads
                 SET status = 'failed',
                     last_error = $1,
+                    attempts = GREATEST(attempts - 1, 0),
                     updated_at = now()
               WHERE status = 'uploading'
                 AND claimed_at <= now() - (INTERVAL '1 minute' * $2)
