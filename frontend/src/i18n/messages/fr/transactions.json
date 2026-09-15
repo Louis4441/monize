@@ -243,10 +243,6 @@
       "yes": "Oui",
       "no": "Non"
     },
-    "categoryQuickSelections": {
-      "income": "Revenus",
-      "expenses": "Dépenses"
-    },
     "placeholders": {
       "accounts": "Tous les comptes",
       "payees": "Tous les bénéficiaires",

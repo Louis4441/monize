@@ -243,10 +243,6 @@
       "yes": "예",
       "no": "아니오"
     },
-    "categoryQuickSelections": {
-      "income": "수입",
-      "expenses": "지출"
-    },
     "placeholders": {
       "accounts": "모든 계정",
       "payees": "모든 수취인",

@@ -122,6 +122,12 @@
     "noOptions": "未找到选项",
     "selectedCount": "已选择 {count}"
   },
+  "categoryFilter": {
+    "uncategorized": "未分类",
+    "transfers": "转账",
+    "allIncome": "所有收入分类",
+    "allExpenses": "所有支出分类"
+  },
   "combobox": {
     "createOption": "创建 \"{value}\"",
     "deleteOption": "删除“{value}”"

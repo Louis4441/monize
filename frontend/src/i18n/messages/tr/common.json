@@ -122,6 +122,12 @@
     "noOptions": "Seçenek bulunamadı",
     "selectedCount": "{count} seçildi"
   },
+  "categoryFilter": {
+    "uncategorized": "Kategorisiz",
+    "transfers": "Transferler",
+    "allIncome": "Tüm gelir kategorileri",
+    "allExpenses": "Tüm gider kategorileri"
+  },
   "combobox": {
     "createOption": "\"{value}\" oluştur",
     "deleteOption": "\"{value}\" sil"

@@ -122,6 +122,12 @@
     "noOptions": "옵션을 찾을 수 없습니다",
     "selectedCount": "{count} 선택됨"
   },
+  "categoryFilter": {
+    "uncategorized": "미분류",
+    "transfers": "이체",
+    "allIncome": "모든 수입 카테고리",
+    "allExpenses": "모든 지출 카테고리"
+  },
   "combobox": {
     "createOption": "\"{value}\" 만들기",
     "deleteOption": "\"{value}\" 삭제"

@@ -243,10 +243,6 @@
       "yes": "是",
       "no": "否"
     },
-    "categoryQuickSelections": {
-      "income": "收入",
-      "expenses": "支出"
-    },
     "placeholders": {
       "accounts": "所有科目",
       "payees": "所有收款人",
