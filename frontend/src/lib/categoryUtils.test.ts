@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildCategoryTree, getCategorySelectOptions, buildCategoryColorMap, buildCategoryLabelMap, buildDescendantIdSet, rollupToDirectChildren } from './categoryUtils';
+import { buildCategoryTree, getCategorySelectOptions, buildCategoryColorMap, buildCategoryLabelMap, buildDescendantIdSet, rollupToDirectChildren, categoryIdsByType } from './categoryUtils';
 import { Category } from '@/types/category';
 
 function makeCategory(overrides: Partial<Category> & { id: string; name: string }): Category {
@@ -252,5 +252,21 @@ describe('rollupToDirectChildren', () => {
       'cat-3',
     );
     expect(result).toEqual([]);
+  });
+});
+
+describe('categoryIdsByType', () => {
+  it('splits parents and children by isIncome, keeping each subtree whole', () => {
+    const salary = makeCategory({ id: 'inc-1', name: 'Salary', isIncome: true });
+    const bonus = makeCategory({ id: 'inc-2', name: 'Bonus', isIncome: true, parentId: 'inc-1' });
+
+    expect(categoryIdsByType([groceries, food, fastFood, salary, bonus])).toEqual({
+      income: ['inc-1', 'inc-2'],
+      expense: ['cat-1', 'cat-3', 'cat-4'],
+    });
+  });
+
+  it('returns empty groups for no categories', () => {
+    expect(categoryIdsByType([])).toEqual({ income: [], expense: [] });
   });
 });

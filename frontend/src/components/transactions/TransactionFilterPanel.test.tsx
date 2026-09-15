@@ -104,6 +104,7 @@ describe('TransactionFilterPanel', () => {
     selectedPayees: [] as Payee[],
     accountFilterOptions: [],
     categoryFilterOptions: [],
+    categoryIdsByType: { income: [] as string[], expense: [] as string[] },
     payeeFilterOptions: [],
     formatDate: vi.fn((d: string) => d),
     filterTagIds: [] as string[],
@@ -485,6 +486,32 @@ describe('TransactionFilterPanel', () => {
       expect(defaultProps.handleArrayFilterChange).toHaveBeenCalledWith(
         defaultProps.setFilterCategoryIds,
         ['cat-1']
+      );
+    });
+
+    it('offers Income and Expenses quick selections that select every category of that type', () => {
+      const options = [
+        { value: 'cat-salary', label: 'Salary' },
+        { value: 'cat-food', label: 'Food' },
+        { value: 'cat-rent', label: 'Rent' },
+      ];
+
+      render(
+        <TransactionFilterPanel
+          {...defaultProps}
+          filtersExpanded={true}
+          categoryFilterOptions={options}
+          categoryIdsByType={{ income: ['cat-salary'], expense: ['cat-food', 'cat-rent'] }}
+        />
+      );
+
+      fireEvent.click(screen.getByText('All categories'));
+      expect(screen.getByRole('button', { name: 'Income' })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Expenses' }));
+
+      expect(defaultProps.handleArrayFilterChange).toHaveBeenCalledWith(
+        defaultProps.setFilterCategoryIds,
+        ['cat-food', 'cat-rent']
       );
     });
 

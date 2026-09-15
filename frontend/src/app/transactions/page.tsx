@@ -1363,6 +1363,7 @@ function TransactionsContent() {
           selectedTags={filters.selectedTags}
           accountFilterOptions={filters.accountFilterOptions}
           categoryFilterOptions={filters.categoryFilterOptions}
+          categoryIdsByType={filters.categoryIdsByType}
           payeeFilterOptions={filters.payeeFilterOptions}
           tagFilterOptions={filters.tagFilterOptions}
           formatDate={formatDate}

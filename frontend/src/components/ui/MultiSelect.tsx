@@ -13,6 +13,18 @@ export interface MultiSelectOption {
   children?: MultiSelectOption[];  // Child options
 }
 
+/**
+ * A named set of option values a caller offers as one click, such as "every
+ * income category". The picker treats it like Select All over that set: it
+ * adds the members that are currently visible, reads as pressed once they are
+ * all selected, and removes them again on the next click.
+ */
+export interface MultiSelectQuickSelection {
+  id: string;
+  label: string;
+  values: string[];
+}
+
 interface MultiSelectProps {
   label?: string;
   ariaLabel?: string;
@@ -35,6 +47,7 @@ interface MultiSelectProps {
    * measurement pass and tracks the real font.
    */
   sizeToLongestOption?: boolean;
+  quickSelections?: MultiSelectQuickSelection[];
 }
 
 export function MultiSelect({
@@ -50,6 +63,7 @@ export function MultiSelect({
   onCreateNew,
   createNewLabel = 'Create new...',
   sizeToLongestOption = false,
+  quickSelections,
 }: MultiSelectProps) {
   const t = useTranslations('common');
   const [isOpen, setIsOpen] = useState(false);
@@ -181,20 +195,41 @@ export function MultiSelect({
     );
   }, [flatOptions, searchText]);
 
+  // Add to / remove from the current selection without touching the rest
+  const addValues = (values: string[]) => {
+    onChange([...new Set([...value, ...values])]);
+  };
+
+  const removeValues = (values: string[]) => {
+    const removed = new Set(values);
+    onChange(value.filter(v => !removed.has(v)));
+  };
+
   // Select all / clear all - only affects visible (filtered) options
   const handleSelectAll = () => {
-    const visibleValues = filteredOptions.map(o => o.value);
-    // Add all visible options to current selection
-    const newValue = [...new Set([...value, ...visibleValues])];
-    onChange(newValue);
+    addValues(filteredOptions.map(o => o.value));
   };
 
   const handleClearAll = () => {
-    const visibleValues = new Set(filteredOptions.map(o => o.value));
-    // Remove only visible options from current selection
-    const newValue = value.filter(v => !visibleValues.has(v));
-    onChange(newValue);
+    removeValues(filteredOptions.map(o => o.value));
   };
+
+  // A quick selection is scoped to the visible options exactly as Select All
+  // is, so a search narrows what it touches rather than reaching past the list.
+  const visibleValueSet = useMemo(
+    () => new Set(filteredOptions.map(o => o.value)),
+    [filteredOptions],
+  );
+
+  const quickSelectionStates = useMemo(
+    () =>
+      (quickSelections ?? []).map(selection => {
+        const scoped = selection.values.filter(v => visibleValueSet.has(v));
+        const pressed = scoped.length > 0 && scoped.every(v => value.includes(v));
+        return { ...selection, scoped, pressed };
+      }),
+    [quickSelections, visibleValueSet, value],
+  );
 
   // Calculate dropdown position from trigger button. Opens downward by
   // default, but flips above the trigger when there isn't enough room below
@@ -421,6 +456,30 @@ export function MultiSelect({
               {t('multiSelect.clear')}
             </button>
           </div>
+
+          {/* Caller-defined quick selections (e.g. every income category) */}
+          {quickSelectionStates.length > 0 && (
+            <div className="flex flex-wrap gap-x-3 gap-y-1 px-3 py-2 border-b border-gray-200 dark:border-gray-700 text-sm">
+              {quickSelectionStates.map(selection => (
+                <button
+                  key={selection.id}
+                  type="button"
+                  aria-pressed={selection.pressed}
+                  onClick={() =>
+                    selection.pressed ? removeValues(selection.scoped) : addValues(selection.scoped)
+                  }
+                  className={cn(
+                    'text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300',
+                    'rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
+                    'transition-colors motion-reduce:transition-none',
+                    selection.pressed && 'font-medium',
+                  )}
+                >
+                  {selection.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Options list */}
           <div className="flex-1 min-h-0 overflow-auto py-1">

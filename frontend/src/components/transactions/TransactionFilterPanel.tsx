@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { MultiSelect, MultiSelectOption } from '@/components/ui/MultiSelect';
 import { exchangeRatesApi } from '@/lib/exchange-rates';
@@ -17,6 +17,7 @@ import { TransactionStatus } from '@/types/transaction';
 import { TimePeriod, TIME_PERIOD_OPTIONS, resolveTimePeriod } from '@/lib/time-periods';
 import { collectTagKeys } from '@/lib/tag-key-value';
 import { orderAccountsForPicker } from '@/lib/account-utils';
+import { CategoryIdsByType } from '@/lib/categoryUtils';
 import { TagKeyOp } from '@/hooks/useTransactionFilters';
 
 
@@ -70,6 +71,7 @@ interface TransactionFilterPanelProps {
   selectedTags: Tag[];
   accountFilterOptions: MultiSelectOption[];
   categoryFilterOptions: MultiSelectOption[];
+  categoryIdsByType: CategoryIdsByType;
   payeeFilterOptions: MultiSelectOption[];
   tagFilterOptions: MultiSelectOption[];
   formatDate: (date: string) => string;
@@ -137,6 +139,7 @@ export function TransactionFilterPanel({
   selectedTags,
   accountFilterOptions,
   categoryFilterOptions,
+  categoryIdsByType,
   payeeFilterOptions,
   tagFilterOptions,
   formatDate,
@@ -172,6 +175,16 @@ export function TransactionFilterPanel({
     { value: TransactionStatus.RECONCILED, label: STATUS_LABELS[TransactionStatus.RECONCILED] },
     { value: TransactionStatus.VOID, label: STATUS_LABELS[TransactionStatus.VOID] },
   ];
+
+  // One click for every income or every expense category. The id lists come
+  // from the hook, so the buttons and the ?categoryType= deep link agree.
+  const categoryQuickSelections = useMemo(
+    () => [
+      { id: 'income', label: t('filter.categoryQuickSelections.income'), values: categoryIdsByType.income },
+      { id: 'expense', label: t('filter.categoryQuickSelections.expenses'), values: categoryIdsByType.expense },
+    ],
+    [categoryIdsByType, t],
+  );
 
   // Currency filter options: the user's active currencies, merged with any codes
   // already selected (so a filter restored from the URL still shows its chips).
@@ -571,6 +584,7 @@ export function TransactionFilterPanel({
                   value={filterCategoryIds}
                   onChange={(values) => handleArrayFilterChange(setFilterCategoryIds, values)}
                   placeholder={t('filter.placeholders.categories')}
+                  quickSelections={categoryQuickSelections}
                 />
 
                 <MultiSelect

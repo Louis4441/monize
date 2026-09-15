@@ -263,6 +263,26 @@ export function buildCategoryFilterOptions(categories: Category[]): MultiSelectO
   return [...SPECIAL_CATEGORY_FILTER_OPTIONS, ...buildOptions()];
 }
 
+/** Category ids split by their type, for a surface that selects a whole type at once. */
+export interface CategoryIdsByType {
+  income: string[];
+  expense: string[];
+}
+
+/**
+ * Every category id split by `isIncome`. A child always carries its parent's
+ * type (the server rewrites descendants when a parent changes), so each group
+ * is made of whole subtrees and MultiSelect's parent checkboxes read as fully
+ * checked once a group is selected. The pseudo-options "uncategorized" and
+ * "transfer" are in neither group.
+ */
+export function categoryIdsByType(categories: Category[]): CategoryIdsByType {
+  return {
+    income: categories.filter((c) => c.isIncome).map((c) => c.id),
+    expense: categories.filter((c) => !c.isIncome).map((c) => c.id),
+  };
+}
+
 /**
  * Resolve selected category filter IDs (including the special
  * "uncategorized"/"transfer" pseudo-IDs) to Category-like records for chip

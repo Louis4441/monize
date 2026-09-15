@@ -8,6 +8,7 @@ import {
   buildCategoryIconMap,
   buildCategoryLabelMap,
   buildCategoryFilterOptions,
+  categoryIdsByType,
   resolveSelectedCategories,
 } from '@/lib/categoryUtils';
 import { Account } from '@/types/account';
@@ -296,6 +297,7 @@ export function useTransactionFilters({ accounts, categories, payees, tags, week
     () => buildCategoryFilterOptions(categories),
     [categories],
   );
+  const categoryIdsByTypeMemo = useMemo(() => categoryIdsByType(categories), [categories]);
 
   const categoryColorMap = useMemo(() => buildCategoryColorMap(categories), [categories]);
   const categoryIconMap = useMemo(() => buildCategoryIconMap(categories), [categories]);
@@ -421,8 +423,7 @@ export function useTransactionFilters({ accounts, categories, payees, tags, week
     const getCategoryIds = () => {
       const categoryType = searchParams.get('categoryType');
       if (categoryType === 'income' || categoryType === 'expense') {
-        const isIncome = categoryType === 'income';
-        return categories.filter(c => c.isIncome === isIncome).map(c => c.id);
+        return categoryIdsByType(categories)[categoryType];
       }
       const ids = searchParams.get('categoryIds');
       const id = searchParams.get('categoryId');
@@ -867,6 +868,7 @@ export function useTransactionFilters({ accounts, categories, payees, tags, week
     // Filter options
     accountFilterOptions,
     categoryFilterOptions,
+    categoryIdsByType: categoryIdsByTypeMemo,
     payeeFilterOptions,
     tagFilterOptions,
     categoryColorMap,
