@@ -63,8 +63,13 @@ test.describe('Backup & restore', () => {
 
     // Automatic backups are a deployment concern configured on the admin-only
     // Backups surface; a plain user's Settings has manual export/restore only,
-    // and no automatic-backup schedule to set anywhere.
-    await expect(page.getByText('Automatic Backup')).toHaveCount(0);
+    // and no automatic-backup schedule to set anywhere. Assert the section
+    // heading is absent rather than the words "Automatic Backup" anywhere: the
+    // Off-site Copies subsection on this same page describes copying each
+    // completed automatic backup, so the prose legitimately says it.
+    await expect(
+      page.getByRole('heading', { name: 'Automatic Backup' }),
+    ).toHaveCount(0);
   });
 
   test('keeps automatic backup settings out of Settings for an admin too', async ({
@@ -72,9 +77,13 @@ test.describe('Backup & restore', () => {
   }) => {
     // The IA split moved automatic-backup configuration onto Admin -> Backups,
     // so even an administrator no longer finds it stacked in their own Settings.
+    // The heading, not the words: the Off-site Copies subsection here mentions
+    // automatic backups in its description.
     await adminPage.goto('/settings');
     await expect(adminPage.getByText('Create Backup')).toBeVisible();
-    await expect(adminPage.getByText('Automatic Backup')).toHaveCount(0);
+    await expect(
+      adminPage.getByRole('heading', { name: 'Automatic Backup' }),
+    ).toHaveCount(0);
   });
 
   test('configures automatic backups on the admin Backups page', async ({
