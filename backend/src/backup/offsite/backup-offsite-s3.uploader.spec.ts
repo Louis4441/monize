@@ -323,7 +323,12 @@ describe("BackupOffsiteS3Uploader against a fake S3 endpoint", () => {
     const body = Buffer.from("encrypted-artifact");
     const digest = hexSha(body);
     await expect(
-      uploader.upload(targetFor({ prefix: "../escape/" }), keyFor(digest), body, digest),
+      uploader.upload(
+        targetFor({ prefix: "../escape/" }),
+        keyFor(digest),
+        body,
+        digest,
+      ),
     ).rejects.toThrow(/safe prefix alphabet/);
   });
 
