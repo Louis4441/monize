@@ -243,6 +243,10 @@
       "yes": "Sim",
       "no": "Não"
     },
+    "categoryQuickSelections": {
+      "income": "Receitas",
+      "expenses": "Despesas"
+    },
     "placeholders": {
       "accounts": "Todas as contas",
       "payees": "Todos os beneficiários",

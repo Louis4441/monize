@@ -243,6 +243,10 @@
       "yes": "Так",
       "no": "Ні"
     },
+    "categoryQuickSelections": {
+      "income": "Доходи",
+      "expenses": "Витрати"
+    },
     "placeholders": {
       "accounts": "Всі рахунки",
       "payees": "Всі одержувачі платежів",

@@ -243,6 +243,10 @@
       "yes": "Да",
       "no": "Нет"
     },
+    "categoryQuickSelections": {
+      "income": "Доходы",
+      "expenses": "Расходы"
+    },
     "placeholders": {
       "accounts": "Все счета",
       "payees": "Все получатели",

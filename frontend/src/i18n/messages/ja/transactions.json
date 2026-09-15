@@ -243,6 +243,10 @@
       "yes": "はい",
       "no": "いいえ"
     },
+    "categoryQuickSelections": {
+      "income": "収入",
+      "expenses": "支出"
+    },
     "placeholders": {
       "accounts": "すべての口座",
       "payees": "すべての支払先",

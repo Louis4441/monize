@@ -243,6 +243,10 @@
       "yes": "Có",
       "no": "Không"
     },
+    "categoryQuickSelections": {
+      "income": "Thu nhập",
+      "expenses": "Chi tiêu"
+    },
     "placeholders": {
       "accounts": "Tất cả tài khoản",
       "payees": "Tất cả người nhận",

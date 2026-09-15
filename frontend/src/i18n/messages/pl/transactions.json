@@ -243,6 +243,10 @@
       "yes": "Tak",
       "no": "Nie"
     },
+    "categoryQuickSelections": {
+      "income": "Przychody",
+      "expenses": "Wydatki"
+    },
     "placeholders": {
       "accounts": "Wszystkie konta",
       "payees": "Wszyscy odbiorcy",

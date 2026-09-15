@@ -243,6 +243,10 @@
       "yes": "Ja",
       "no": "Nee"
     },
+    "categoryQuickSelections": {
+      "income": "Inkomsten",
+      "expenses": "Uitgaven"
+    },
     "placeholders": {
       "accounts": "Alle rekeningen",
       "payees": "Alle begunstigden",

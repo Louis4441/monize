@@ -243,6 +243,10 @@
       "yes": "हाँ",
       "no": "नहीं"
     },
+    "categoryQuickSelections": {
+      "income": "आय",
+      "expenses": "व्यय"
+    },
     "placeholders": {
       "accounts": "सभी खाते",
       "payees": "सभी भुगतानकर्ता",

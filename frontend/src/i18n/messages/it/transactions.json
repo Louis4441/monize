@@ -243,6 +243,10 @@
       "yes": "Sì",
       "no": "No"
     },
+    "categoryQuickSelections": {
+      "income": "Entrate",
+      "expenses": "Uscite"
+    },
     "placeholders": {
       "accounts": "Tutti i conti",
       "payees": "Tutti i beneficiari",

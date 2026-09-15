@@ -243,6 +243,10 @@
       "yes": "Ja",
       "no": "Nein"
     },
+    "categoryQuickSelections": {
+      "income": "Einnahmen",
+      "expenses": "Ausgaben"
+    },
     "placeholders": {
       "accounts": "Alle Konten",
       "payees": "Alle Zahlungsempfänger",

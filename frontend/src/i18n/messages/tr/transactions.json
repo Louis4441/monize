@@ -243,6 +243,10 @@
       "yes": "Evet",
       "no": "Hayır"
     },
+    "categoryQuickSelections": {
+      "income": "Gelirler",
+      "expenses": "Giderler"
+    },
     "placeholders": {
       "accounts": "Tüm hesaplar",
       "payees": "Tüm alacaklılar",

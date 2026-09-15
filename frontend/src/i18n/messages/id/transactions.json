@@ -243,6 +243,10 @@
       "yes": "Ya",
       "no": "Tidak"
     },
+    "categoryQuickSelections": {
+      "income": "Pendapatan",
+      "expenses": "Pengeluaran"
+    },
     "placeholders": {
       "accounts": "Semua akun",
       "payees": "Semua penerima",
