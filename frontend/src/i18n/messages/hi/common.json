@@ -122,6 +122,12 @@
     "noOptions": "कोई विकल्प नहीं मिला",
     "selectedCount": "{count} चयनित"
   },
+  "categoryFilter": {
+    "uncategorized": "अवर्गीकृत",
+    "transfers": "स्थानांतरण",
+    "allIncome": "सभी आय श्रेणियाँ",
+    "allExpenses": "सभी व्यय श्रेणियाँ"
+  },
   "combobox": {
     "createOption": "\"{value}\" बनाएं",
     "deleteOption": "\"{value}\" हटाएँ"

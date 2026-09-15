@@ -122,6 +122,12 @@
     "noOptions": "オプションが見つかりません",
     "selectedCount": "{count} 選択中"
   },
+  "categoryFilter": {
+    "uncategorized": "未分類",
+    "transfers": "振替",
+    "allIncome": "すべての収入カテゴリ",
+    "allExpenses": "すべての支出カテゴリ"
+  },
   "combobox": {
     "createOption": "\"{value}\" を作成",
     "deleteOption": "「{value}」を削除"

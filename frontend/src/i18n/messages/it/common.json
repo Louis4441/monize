@@ -122,6 +122,12 @@
     "noOptions": "Nessuna opzione trovata",
     "selectedCount": "{count} selezionati"
   },
+  "categoryFilter": {
+    "uncategorized": "Senza categoria",
+    "transfers": "Trasferimenti",
+    "allIncome": "Tutte le categorie di entrate",
+    "allExpenses": "Tutte le categorie di uscite"
+  },
   "combobox": {
     "createOption": "Crea \"{value}\"",
     "deleteOption": "Elimina «{value}»"

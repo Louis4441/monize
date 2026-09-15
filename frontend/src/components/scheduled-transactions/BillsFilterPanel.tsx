@@ -7,6 +7,7 @@ import { Account } from '@/types/account';
 import { Category } from '@/types/category';
 import { BillsPayeeOption } from '@/lib/bills-filters';
 import { buildCategoryFilterOptions, resolveSelectedCategories } from '@/lib/categoryUtils';
+import { useCategoryFilterLabels } from '@/hooks/useCategoryFilterLabels';
 
 interface BillsFilterPanelProps {
   filtersExpanded: boolean;
@@ -56,14 +57,15 @@ export function BillsFilterPanel(props: BillsFilterPanelProps) {
     [payees],
   );
 
+  const categoryFilterLabels = useCategoryFilterLabels();
   const categoryOptions: MultiSelectOption[] = useMemo(
-    () => buildCategoryFilterOptions(categories),
-    [categories],
+    () => buildCategoryFilterOptions(categories, categoryFilterLabels),
+    [categories, categoryFilterLabels],
   );
 
   const selectedCategories = useMemo(
-    () => resolveSelectedCategories(selectedCategoryIds, categories),
-    [selectedCategoryIds, categories],
+    () => resolveSelectedCategories(selectedCategoryIds, categories, categoryFilterLabels),
+    [selectedCategoryIds, categories, categoryFilterLabels],
   );
 
   return (

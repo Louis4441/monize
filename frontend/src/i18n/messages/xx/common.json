@@ -122,6 +122,12 @@
     "noOptions": "[XX-No options found-XX]",
     "selectedCount": "[XX-{count} selected-XX]"
   },
+  "categoryFilter": {
+    "uncategorized": "[XX-Uncategorized-XX]",
+    "transfers": "[XX-Transfers-XX]",
+    "allIncome": "[XX-All income categories-XX]",
+    "allExpenses": "[XX-All expense categories-XX]"
+  },
   "combobox": {
     "createOption": "[XX-Create \"{value}\"-XX]",
     "deleteOption": "[XX-Delete \"{value}\"-XX]"

@@ -8,6 +8,7 @@ import { useOnAiAction } from '@/hooks/useOnAiAction';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
+import { isSpecialCategoryFilterId } from '@/lib/categoryUtils';
 import { TransactionFilterPanel } from '@/components/transactions/TransactionFilterPanel';
 import { TagKeyBreakdownChart } from '@/components/transactions/TagKeyBreakdownChart';
 import { ListBottomPager } from '@/components/ui/ListBottomPager';
@@ -813,7 +814,7 @@ function TransactionsContent() {
   const singleFilteredCategory = useMemo(() => {
     if (filters.filterCategoryIds.length !== 1) return undefined;
     const id = filters.filterCategoryIds[0];
-    if (id === 'uncategorized' || id === 'transfer') return undefined;
+    if (isSpecialCategoryFilterId(id)) return undefined;
     return categories.find((c) => c.id === id);
   }, [filters.filterCategoryIds, categories]);
 

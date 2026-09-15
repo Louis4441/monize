@@ -137,7 +137,6 @@ const RTL_IMPORT_BASELINE = new Set([
   '/src/hooks/useSwipeNavigation.test.ts',
   '/src/hooks/useTableDensity.test.ts',
   '/src/hooks/useTourAnchor.test.ts',
-  '/src/hooks/useTransactionFilters.test.ts',
   '/src/hooks/useTransactionSelection.test.ts',
   '/src/hooks/useTransactionSubmitMode.test.ts',
   '/src/hooks/useWidgetConfig.test.tsx',

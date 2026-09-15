@@ -122,6 +122,12 @@
     "noOptions": "Geen opties gevonden",
     "selectedCount": "{count} geselecteerd"
   },
+  "categoryFilter": {
+    "uncategorized": "Niet gecategoriseerd",
+    "transfers": "Overboekingen",
+    "allIncome": "Alle inkomstencategorieën",
+    "allExpenses": "Alle uitgavencategorieën"
+  },
   "combobox": {
     "createOption": "Maak \"{value}\" aan",
     "deleteOption": "\"{value}\" verwijderen"

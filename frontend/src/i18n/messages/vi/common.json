@@ -122,6 +122,12 @@
     "noOptions": "Không tìm thấy tùy chọn",
     "selectedCount": "Đã chọn {count}"
   },
+  "categoryFilter": {
+    "uncategorized": "Chưa phân loại",
+    "transfers": "Chuyển tiền",
+    "allIncome": "Tất cả danh mục thu nhập",
+    "allExpenses": "Tất cả danh mục chi tiêu"
+  },
   "combobox": {
     "createOption": "Tạo \"{value}\"",
     "deleteOption": "Xóa \"{value}\""

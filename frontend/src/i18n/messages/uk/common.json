@@ -122,6 +122,12 @@
     "noOptions": "Варіанти не знайдено",
     "selectedCount": "Вибрано {count}"
   },
+  "categoryFilter": {
+    "uncategorized": "Некатегоризовані",
+    "transfers": "Перекази",
+    "allIncome": "Усі категорії доходів",
+    "allExpenses": "Усі категорії витрат"
+  },
   "combobox": {
     "createOption": "Створити \"{value}\"",
     "deleteOption": "Видалити «{value}»"

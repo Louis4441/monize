@@ -122,6 +122,12 @@
     "noOptions": "Варианты не найдены",
     "selectedCount": "Выбрано {count}"
   },
+  "categoryFilter": {
+    "uncategorized": "Без категории",
+    "transfers": "Переводы",
+    "allIncome": "Все категории доходов",
+    "allExpenses": "Все категории расходов"
+  },
   "combobox": {
     "createOption": "Создать \"{value}\"",
     "deleteOption": "Удалить «{value}»"

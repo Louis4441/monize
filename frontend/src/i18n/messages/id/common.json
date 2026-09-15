@@ -122,6 +122,12 @@
     "noOptions": "Tidak ada opsi ditemukan",
     "selectedCount": "{count} dipilih"
   },
+  "categoryFilter": {
+    "uncategorized": "Belum Dikategorikan",
+    "transfers": "Transfer",
+    "allIncome": "Semua kategori pendapatan",
+    "allExpenses": "Semua kategori pengeluaran"
+  },
   "combobox": {
     "createOption": "Buat \"{value}\"",
     "deleteOption": "Hapus \"{value}\""
