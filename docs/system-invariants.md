@@ -1,33 +1,3 @@
-Direction           Bill or deposit, outflow or income, is decided from
-                    EffectiveScheduledOccurrence.directionAmount, which is
-                    `number | null`: the occurrence's own amount when known, the
-                    snapshot's sign only where that sign is PROVABLE without the
-                    missing rate (a top-level investment is one scalar times one
-                    positive rate; a split whose lines all point the same way
-                    stays on that side of zero, because an investment line's cash
-                    impact is signed by its action), and `null` for a mixed-sign
-                    aggregate, whose direction the missing rate decides. "An
-                    exchange rate is positive, so it cannot flip a sign" holds for
-                    the first two and fails for the third: a +10 parent made of a
-                    fixed +100 beside an unpriceable BUY posts -20 or +20.
-                    `null` travels rather than collapsing: AI/MCP report
-                    `kind: "unknown"` and withhold BOTH bucket totals (the item
-                    could belong to either), the reminder email draws a neutral
-                    badge, the forecast prompt says DIRECTION UNKNOWN, the client's
-                    occurrenceKind answers `'unknown'` with neutral styling and no
-                    sign, and an outflow-only read KEEPS the occurrence -- its
-                    amount is unknown too, so the consumer's total is withheld,
-                    where dropping it would hide a possible payment behind a total
-                    that still looked complete.
-                    The candidate read may narrow on the stored sign only for
-                    shapes nothing can move: it keeps every FX-sensitive schedule
-                    AND every schedule carrying an override with an amount or its
-                    own splits (an override replaces the amount and the SHAPE, so
-                    a +100 schedule overridden to -250, or to a split holding an
-                    embedded investment with no amount of its own, is a genuine
-                    outflow the snapshot cannot see). The direction is applied
-                    after pricing, and the per-schedule cap after that -- capping
-                    first let an overridden credit hide the real outflow behind it.
 # System Invariants
 
 The conditions that must hold regardless of which controller, service, cron,
@@ -1646,20 +1616,35 @@ Aggregation rule    A total is null when any component is unknown; the partial s
                     default-currency.util.ts) -- thirteen copies had drifted to
                     two different currencies.
 Direction           Bill or deposit, outflow or income, is decided from
-                    EffectiveScheduledOccurrence.directionAmount -- the
-                    occurrence's own amount when known, the snapshot's sign only
-                    when it is not. "An exchange rate is positive, so it cannot
-                    flip a sign" holds for one scalar times one rate and fails for
-                    a mixed-sign split parent, where only the investment line
-                    re-prices: a parent stored at -200 posts +150 once that line
-                    moves. Reading the snapshot reported a re-priced deposit as a
-                    bill (AI/MCP, the forecast) and a SQL prefilter on
-                    `st.amount < 0` dropped the reverse case from the budget
-                    entirely. The candidate read therefore narrows on the stored
-                    sign only for shapes no rate can move and keeps every
-                    FX-sensitive row; the direction is applied after pricing.
-                    The client's equivalent is occurrenceKind, which already read
-                    the occurrence first.
+                    EffectiveScheduledOccurrence.directionAmount, which is
+                    `number | null`: the occurrence's own amount when known, the
+                    snapshot's sign only where that sign is PROVABLE without the
+                    missing rate (a top-level investment is one scalar times one
+                    positive rate; a split whose lines all point the same way
+                    stays on that side of zero, because an investment line's cash
+                    impact is signed by its action), and `null` for a mixed-sign
+                    aggregate, whose direction the missing rate decides. "An
+                    exchange rate is positive, so it cannot flip a sign" holds for
+                    the first two and fails for the third: a +10 parent made of a
+                    fixed +100 beside an unpriceable BUY posts -20 or +20.
+                    `null` travels rather than collapsing: AI/MCP report
+                    `kind: "unknown"` and withhold BOTH bucket totals (the item
+                    could belong to either), the reminder email draws a neutral
+                    badge, the forecast prompt says DIRECTION UNKNOWN, the client's
+                    occurrenceKind answers `'unknown'` with neutral styling and no
+                    sign, and an outflow-only read KEEPS the occurrence -- its
+                    amount is unknown too, so the consumer's total is withheld,
+                    where dropping it would hide a possible payment behind a total
+                    that still looked complete.
+                    The candidate read may narrow on the stored sign only for
+                    shapes nothing can move: it keeps every FX-sensitive schedule
+                    AND every schedule carrying an override with an amount or its
+                    own splits (an override replaces the amount and the SHAPE, so
+                    a +100 schedule overridden to -250, or to a split holding an
+                    embedded investment with no amount of its own, is a genuine
+                    outflow the snapshot cannot see). The direction is applied
+                    after pricing, and the per-schedule cap after that -- capping
+                    first let an overridden credit hide the real outflow behind it.
 Concurrency scope   per occurrence; the resolver's FX caches are per read
 Failure response    the occurrence renders as unavailable (UnknownAmount, or the
                     localized budgets.alerts.billDue.amountUnavailable copy) and
