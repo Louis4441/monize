@@ -4,6 +4,8 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  Index,
+  Unique,
 } from "typeorm";
 
 /** One configured target kind for one user. A user may hold both. */
@@ -45,6 +47,21 @@ export type BackupOffsiteUploadStatus =
  * egress, not portable user data.
  */
 @Entity("backup_offsite_uploads")
+// The natural key of the copy, and the arbiter of the claim's
+// `INSERT ... ON CONFLICT (user_id, destination, object_key)`. Declared here as
+// well as in the migration and schema.sql because the integration suite builds
+// its schema from the entities: without the decorator the test database has no
+// constraint for `ON CONFLICT` to match, and the single-winner race would have
+// nothing to contend over (AGENTS.md, "declared in all three").
+@Unique("uq_backup_offsite_uploads_user_dest_key", [
+  "userId",
+  "destination",
+  "objectKey",
+])
+// The reaper selects failed rows aged by updated_at; the owner-facing list reads
+// newest-first per user. Both mirror the migration's indexes.
+@Index("idx_backup_offsite_uploads_status_updated", ["status", "updatedAt"])
+@Index("idx_backup_offsite_uploads_user_created", ["userId", "createdAt"])
 export class BackupOffsiteUpload {
   @PrimaryGeneratedColumn("uuid")
   id: string;
