@@ -30,6 +30,12 @@ import { User } from "../users/entities/user.entity";
 import { DemoModeService } from "../common/demo-mode.service";
 import { SystemAlertService } from "../system-alerts/system-alert.service";
 import { BackupOffsiteDispatchService } from "./offsite/backup-offsite-dispatch.service";
+import { offsiteObjectKey } from "./offsite/backup-offsite-keys";
+import {
+  BackupOffsiteDestination,
+  BackupOffsiteUpload,
+  BackupOffsiteUploadStatus,
+} from "./offsite/entities/backup-offsite-upload.entity";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import {
   createUserMaintenanceMock,
@@ -85,6 +91,7 @@ describe("AutoBackupService", () => {
   let service: AutoBackupService;
   let mockSettingsRepo: Record<string, jest.Mock>;
   let mockUsersRepo: Record<string, jest.Mock>;
+  let mockOffsiteUploadRepo: Record<string, jest.Mock>;
   let mockBackupService: Record<string, jest.Mock>;
   let mockBackupEncryption: Record<string, jest.Mock>;
   let updateBuilder: Record<string, jest.Mock>;
@@ -176,6 +183,7 @@ describe("AutoBackupService", () => {
     scoped = createScopedDbMocks([
       [AutoBackupSettings, mockSettingsRepo as never],
       [User, mockUsersRepo as never],
+      [BackupOffsiteUpload, mockOffsiteUploadRepo as never],
     ]);
     // The cron claims each due window with a guarded
     // `UPDATE ... RETURNING`, which the pg driver answers as
@@ -288,6 +296,13 @@ describe("AutoBackupService", () => {
       ),
       // Managed-user enrollment sweeps every non-admin user; no such users by
       // default, so the cron tests below exercise only the due-backup path.
+      find: jest.fn().mockResolvedValue([]),
+    };
+
+    // The off-site ledger the stored-backups listing reads to attach each
+    // artifact's copy status. Empty by default, so listings that are not about
+    // off-site status carry no `offsite` field.
+    mockOffsiteUploadRepo = {
       find: jest.fn().mockResolvedValue([]),
     };
 
@@ -1281,6 +1296,122 @@ describe("AutoBackupService", () => {
           "monize-backup-daily-2026-04-15.json.gz",
         ),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    /**
+     * The off-machine copy status the read endpoint attaches to each stored
+     * backup, so the Settings row can show a per-destination icon. The ledger
+     * rows are seeded through the same mocked DataSource the rest of this suite
+     * uses, and each is a real `BackupOffsiteUpload` whose object key is built by
+     * the production helper -- so the filename the listing groups by is the one
+     * the dispatcher would actually have written.
+     */
+    describe("off-site copy status", () => {
+      /** A ledger row a real dispatch could have written for `filename`. */
+      function offsiteRow(opts: {
+        destination: BackupOffsiteDestination;
+        filename: string;
+        digest: string;
+        status: BackupOffsiteUploadStatus;
+      }): BackupOffsiteUpload {
+        const row = new BackupOffsiteUpload();
+        row.userId = userId;
+        row.destination = opts.destination;
+        // S3 addresses the artifact by its sharded, digest-suffixed key; email
+        // by the filename itself. `offsiteArtifactFileName` inverts both, so the
+        // listing recovers `filename` either way.
+        row.objectKey =
+          opts.destination === "s3"
+            ? offsiteObjectKey(userId, opts.filename, opts.digest)
+            : opts.filename;
+        row.tier = "daily";
+        row.digest = opts.digest;
+        row.sizeBytes = 10;
+        row.status = opts.status;
+        row.attempts = 1;
+        row.lastError = null;
+        row.claimedAt = null;
+        row.createdAt = new Date();
+        row.updatedAt = new Date();
+        return row;
+      }
+
+      it("reports each destination's newest status on the artifact it names", async () => {
+        mockSettingsRepo.findOne.mockResolvedValue(
+          createSettings({ enabled: true }),
+        );
+        const filename = "monize-backup-daily-2026-04-15.mzbe";
+        await seed(filename, userId, "bytes");
+        const digest = "a".repeat(64);
+        // Newest first, as `order: { createdAt: "DESC" }` returns them.
+        mockOffsiteUploadRepo.find.mockResolvedValue([
+          offsiteRow({
+            destination: "s3",
+            filename,
+            digest,
+            status: "uploaded",
+          }),
+          offsiteRow({
+            destination: "email",
+            filename,
+            digest,
+            status: "failed",
+          }),
+        ]);
+
+        const result = await service.listStoredBackups(userId);
+
+        expect(result.backups).toHaveLength(1);
+        expect(result.backups[0].offsite).toEqual({
+          s3: "uploaded",
+          email: "failed",
+        });
+      });
+
+      it("leaves offsite undefined for an artifact with no ledger row", async () => {
+        mockSettingsRepo.findOne.mockResolvedValue(
+          createSettings({ enabled: true }),
+        );
+        await seed("monize-backup-daily-2026-04-15.mzbe");
+        mockOffsiteUploadRepo.find.mockResolvedValue([]);
+
+        const result = await service.listStoredBackups(userId);
+
+        expect(result.backups).toHaveLength(1);
+        expect(result.backups[0].offsite).toBeUndefined();
+        // Absent, not present-and-empty: a weekly/monthly/partial or an
+        // un-dispatched file carries no `offsite` at all.
+        expect("offsite" in result.backups[0]).toBe(false);
+      });
+
+      it("keeps the newest row when two exist for one (artifact, destination)", async () => {
+        mockSettingsRepo.findOne.mockResolvedValue(
+          createSettings({ enabled: true }),
+        );
+        const filename = "monize-backup-daily-2026-04-15.mzbe";
+        await seed(filename);
+        // A same-day re-export writes a second S3 row under a new digest -- a
+        // different object key that still round-trips to this same filename. The
+        // read is newest first, so the first row seen is the current status.
+        mockOffsiteUploadRepo.find.mockResolvedValue([
+          offsiteRow({
+            destination: "s3",
+            filename,
+            digest: "b".repeat(64),
+            status: "uploaded",
+          }),
+          offsiteRow({
+            destination: "s3",
+            filename,
+            digest: "a".repeat(64),
+            status: "failed",
+          }),
+        ]);
+
+        const result = await service.listStoredBackups(userId);
+
+        expect(result.backups[0].offsite).toEqual({ s3: "uploaded" });
+      });
     });
   });
 

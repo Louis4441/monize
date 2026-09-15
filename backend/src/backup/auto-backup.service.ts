@@ -58,7 +58,12 @@ import {
   PARTIAL_TIER_NAME,
 } from "./backup-file-names";
 import { BackupOffsiteDispatchService } from "./offsite/backup-offsite-dispatch.service";
-import { BackupOffsiteTier } from "./offsite/entities/backup-offsite-upload.entity";
+import { offsiteArtifactFileName } from "./offsite/backup-offsite-keys";
+import {
+  BackupOffsiteTier,
+  BackupOffsiteUpload,
+  BackupOffsiteUploadStatus,
+} from "./offsite/entities/backup-offsite-upload.entity";
 import { tr } from "../i18n/translate";
 
 /**
@@ -106,6 +111,20 @@ export const WEEKLY_DAYS = [7, 14, 21, 28];
 export const MONTHLY_DAY = 1;
 
 /**
+ * How many of this user's off-site ledger rows one stored-backups listing reads,
+ * newest first, to attach each artifact's copy status.
+ *
+ * Generous by design and never a correctness bound: only a published `daily`
+ * artifact is dispatched off-machine (`dispatchOffsiteCopy`), the currently
+ * stored dailies are the newest recovery points, and their ledger rows are
+ * therefore the newest rows -- so the artifacts a listing can show a status for
+ * always sit at the top of this window, well inside it for any realistic
+ * retention. The cap only keeps an append-only table's whole history out of one
+ * read.
+ */
+const OFFSITE_STATUS_SCAN_LIMIT = 500;
+
+/**
  * A per-user backup directory name: the user's UUID. Used to keep those
  * directories out of the folder picker -- listing them would turn it into user
  * enumeration, and offering one as a destination would nest a second level
@@ -138,6 +157,17 @@ export interface StoredBackup {
   size: number;
   /** True for an encrypted Monize envelope, which needs its password to restore. */
   encrypted: boolean;
+  /**
+   * The newest off-machine copy status per destination for this artifact, as an
+   * icon on its row. Present only when at least one off-site ledger row names
+   * the artifact: a weekly or monthly promotion, a partial, or a file that was
+   * never dispatched has no rows and no `offsite`
+   * (`docs/specs/backup-off-machine.md`).
+   */
+  offsite?: {
+    s3?: BackupOffsiteUploadStatus;
+    email?: BackupOffsiteUploadStatus;
+  };
 }
 
 /**
@@ -355,6 +385,11 @@ export class AutoBackupService {
       return { enabled, backups: [] };
     }
 
+    // Each artifact's off-machine copy status, keyed by the local filename its
+    // ledger row round-trips to. One scoped read for the whole listing, matched
+    // in memory -- there is no per-file query.
+    const offsiteByFilename = await this.offsiteStatusByFilename(userId);
+
     const backups: StoredBackup[] = [];
     for (const name of entries) {
       if (isTempBackupName(name)) continue;
@@ -362,11 +397,15 @@ export class AutoBackupService {
       try {
         const stat = await fs.stat(this.safePath(folder, name));
         if (!stat.isFile()) continue;
+        const offsite = offsiteByFilename.get(name);
         backups.push({
           filename: name,
           modifiedAt: stat.mtime.toISOString(),
           size: stat.size,
           encrypted: isEncryptedBackupFileName(name),
+          // Only when a ledger row names this artifact; a promotion, a partial
+          // or an un-dispatched file simply has none.
+          ...(offsite ? { offsite } : {}),
         });
       } catch {
         // Retention can delete a file between the listing and the stat. A row
@@ -379,6 +418,47 @@ export class AutoBackupService {
     // one written.
     backups.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
     return { enabled, backups };
+  }
+
+  /**
+   * The newest off-machine copy status per destination, for every artifact of
+   * this user's that a ledger row names -- the icon each stored-backup row
+   * shows.
+   *
+   * Read under the caller's own scope like the rest of this listing, newest
+   * first, and grouped by the LOCAL filename each row round-trips to through
+   * `offsiteArtifactFileName` (the inverse of the key the dispatcher wrote), so
+   * the two directions cannot drift and no object key is hand-parsed here. Rows
+   * arrive newest first, so the first status seen for a (filename, destination)
+   * pair -- for example a same-day re-export that produced a second row -- is
+   * the current one. A filename with no row is absent from the map, and its
+   * `offsite` stays undefined.
+   */
+  private async offsiteStatusByFilename(
+    userId: string,
+  ): Promise<Map<string, NonNullable<StoredBackup["offsite"]>>> {
+    const rows = await this.scoped(BackupOffsiteUpload, (repo) =>
+      repo.find({
+        where: { userId },
+        order: { createdAt: "DESC" },
+        take: OFFSITE_STATUS_SCAN_LIMIT,
+      }),
+    );
+    const byFilename = new Map<string, NonNullable<StoredBackup["offsite"]>>();
+    for (const row of rows) {
+      const filename = offsiteArtifactFileName(
+        row.destination,
+        row.objectKey,
+        row.digest,
+      );
+      const group = byFilename.get(filename) ?? {};
+      // Newest first, so the first status seen for a destination wins.
+      if (group[row.destination] === undefined) {
+        group[row.destination] = row.status;
+      }
+      byFilename.set(filename, group);
+    }
+    return byFilename;
   }
 
   /**
