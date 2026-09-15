@@ -293,6 +293,40 @@ describe("BackupOffsiteS3Uploader against a fake S3 endpoint", () => {
     );
   });
 
+  it("accepts a dotted key prefix the settings DTO admits", async () => {
+    // `S3_KEY_PREFIX` in the DTO allows a dot, so a user is told `my.backups/`
+    // is a valid prefix. The uploader validated prefix segments with the
+    // attachment key alphabet, which forbids the dot, so every put under such a
+    // prefix threw before the key ever left -- a configuration accepted at save
+    // time that failed permanently at 02:00. The prefix now shares the DTO's
+    // alphabet.
+    const body = Buffer.from("encrypted-artifact");
+    const digest = hexSha(body);
+
+    const result = await uploader.upload(
+      targetFor({ prefix: "my.backups/" }),
+      keyFor(digest),
+      body,
+      digest,
+    );
+
+    expect(result).toEqual({
+      outcome: "uploaded",
+      objectKey: `my.backups/${keyFor(digest)}`,
+    });
+    expect(objects.get(`my.backups/${keyFor(digest)}`)?.body.equals(body)).toBe(
+      true,
+    );
+  });
+
+  it("still refuses a prefix segment that climbs out of its area", async () => {
+    const body = Buffer.from("encrypted-artifact");
+    const digest = hexSha(body);
+    await expect(
+      uploader.upload(targetFor({ prefix: "../escape/" }), keyFor(digest), body, digest),
+    ).rejects.toThrow(/safe prefix alphabet/);
+  });
+
   it("does not overwrite a key the destination already holds", async () => {
     const first = Buffer.from("the-original-artifact");
     const digest = hexSha(first);

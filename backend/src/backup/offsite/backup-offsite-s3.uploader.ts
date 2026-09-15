@@ -375,8 +375,29 @@ function normalizedDigest(sha256Hex: string): { hex: string; base64: string } {
 function normalizedPrefix(prefix: string | undefined): string {
   const trimmed = (prefix ?? "").replace(/^\/+|\/+$/g, "");
   if (!trimmed) return "";
-  for (const segment of trimmed.split("/")) assertSafeSegment(segment);
+  for (const segment of trimmed.split("/")) assertSafePrefixSegment(segment);
   return `${trimmed}/`;
+}
+
+/** The key-prefix alphabet the DTO admits (`S3_KEY_PREFIX`): the safe key set plus interior dots. */
+const SAFE_PREFIX_SEGMENT = /^[A-Za-z0-9._-]+$/;
+
+/**
+ * One prefix segment, held to the same alphabet the settings DTO validates a
+ * user's `s3Prefix` against -- letters, digits, dots, `_` and `-` -- rather than
+ * to the attachment key alphabet, which forbids the dot a legal S3 prefix (and
+ * the DTO) allows. A prefix the user was told is valid must not fail at the put.
+ * `..` and empty segments are still refused, so a prefix cannot climb out of the
+ * area it names even when it reached the uploader from the deployment env, which
+ * the DTO never validated.
+ */
+function assertSafePrefixSegment(segment: string): void {
+  if (!SAFE_PREFIX_SEGMENT.test(segment) || segment === "..") {
+    throw new Error(
+      `Refusing to address the off-site object key prefix segment ` +
+        `${JSON.stringify(segment)}: it is outside the safe prefix alphabet`,
+    );
+  }
 }
 
 /**
