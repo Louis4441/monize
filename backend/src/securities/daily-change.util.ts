@@ -135,3 +135,39 @@ export function resolveDailyPriceChange(
     priceDate,
   };
 }
+
+/**
+ * The rows of a movers board that belong to the session the board is showing:
+ * the newest session any of them has.
+ *
+ * `resolveDailyPriceChange` asks whether one security's pair of closes is a
+ * daily move at all, and it asks against a fixed age, which cannot separate a
+ * market that was shut from a feed that skipped one symbol -- both leave the
+ * same day-old close behind, and the shut market is the ordinary case the age
+ * rule has to let through, or every board would empty out on a weekend. What
+ * separates them is the rest of the portfolio: when the other holdings priced
+ * today and this one did not, its last move is an earlier session's, and an
+ * earlier session's move is not a mover today. Ranked beside them it takes a
+ * place on the board for a day that is over, and keeps it every morning until
+ * a new price arrives.
+ *
+ * So the session is read from the rows rather than from the reader's day: over
+ * a weekend nothing has a close for today, every row is Friday's, and the board
+ * is Friday's under its own date. A holding whose own market was shut is off
+ * the board until it prices again -- it has no figure for the session being
+ * ranked. This is a rule about a ranked list of one day's moves, not about a
+ * per-security readout: a watchlist prints each security's own dated change.
+ *
+ * `priceDate` is `YYYY-MM-DD` (`priceDateYmd`), where ordering by string is
+ * ordering by day.
+ */
+export function keepNewestSession<T extends { priceDate: string }>(
+  changes: readonly T[],
+): T[] {
+  let newest: string | null = null;
+  for (const change of changes) {
+    if (newest === null || change.priceDate > newest) newest = change.priceDate;
+  }
+  if (newest === null) return [];
+  return changes.filter((change) => change.priceDate === newest);
+}

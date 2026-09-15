@@ -293,17 +293,16 @@ export function TopMovers({ movers, isLoading, hasInvestmentAccounts, onRefresh,
         : convertToDefault(mover.dailyValueChange, mover.currencyCode),
   }));
   const topMovers = rankMovers(rows, filter, metric);
-  // The session the list is captioned with: the newest one among the rows on
-  // screen. The server returns a change only while its newer close is the
-  // current session, so this is today while the markets these holdings trade on
-  // are open and Friday's over a weekend -- which is what the caption has to
-  // say rather than leaving a bare "daily change" over it. Markets close on
-  // different days, so a row from an earlier session names its own date.
-  const latestSession = topMovers.reduce<string | null>(
-    (latest, { mover }) =>
-      latest === null || mover.priceDate > latest ? mover.priceDate : latest,
-    null,
-  );
+  // The session the list is captioned with. A board of movers is one session's
+  // -- the server sends only the holdings that priced for the newest session
+  // any of them has -- so every row carries the same date, and it is today
+  // while the markets these holdings trade on are reporting and Friday's over a
+  // weekend. Naming it is what keeps a Friday board read on a Saturday from
+  // claiming to be Saturday's; should rows ever disagree, the caption drops
+  // back to the undated wording rather than stamping one row's session onto
+  // another's figures.
+  const sessions = new Set(topMovers.map(({ mover }) => mover.priceDate));
+  const session = sessions.size === 1 ? [...sessions][0] : null;
 
   return (
     <div className={`${CARD_CLASS} p-3 sm:p-6 lg:min-h-[500px]`}>
@@ -314,8 +313,8 @@ export function TopMovers({ movers, isLoading, hasInvestmentAccounts, onRefresh,
         <div className="flex items-center gap-2">
           <RefreshButton onRefresh={onRefresh} isRefreshing={isRefreshing} refreshTitle={t('topMovers.refreshPrices')} />
           <span className="text-sm text-gray-500 dark:text-gray-400">
-            {latestSession
-              ? t('topMovers.dailyChangeOn', { date: formatDateWithoutYear(latestSession) })
+            {session
+              ? t('topMovers.dailyChangeOn', { date: formatDateWithoutYear(session) })
               : t('topMovers.dailyChange')}
           </span>
         </div>
@@ -413,14 +412,6 @@ export function TopMovers({ movers, isLoading, hasInvestmentAccounts, onRefresh,
                       {isPositive ? '+' : ''}{formatCurrencyPrecise(mover.dailyChange, mover.currencyCode)} ({isPositive ? '+' : ''}{formatPercent(mover.dailyChangePercent)})
                     </div>
                   </>
-                )}
-                {/* A holding whose market closed a session before the others:
-                    its figures are a real day's move, just not the day the
-                    caption above names. */}
-                {latestSession && mover.priceDate < latestSession && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {t('widgets.asOf', { date: formatDateWithoutYear(mover.priceDate) })}
-                  </div>
                 )}
               </div>
             </button>

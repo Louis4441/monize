@@ -292,9 +292,39 @@ price, which is a different fact from one whose move nobody knows.
 `priceDate` carries the session to the client, and the widgets caption
 themselves with it (`Daily change · 6 Feb`), because a Friday close read on a
 Saturday is still the day's move and the reader has to be told which day that
-was. The caption names the newest session on screen; a row from an earlier one
-(a market that closed a session before the others) dates itself with
-`widgets.asOf`.
+was.
+
+### A board of movers is one session's
+
+The age rule above is absolute, and an absolute age cannot separate a market
+that was shut from a feed that skipped one symbol: both leave the same day-old
+close behind. It has to let the shut market through, or every board would empty
+out on a weekend -- so it lets the skipped symbol through too, and the holding
+that did not price keeps its last real move at the top of a board captioned with
+a day it was not measured on, every morning until a new price arrives.
+
+What separates the two is the rest of the portfolio. `keepNewestSession`
+(`backend/src/securities/daily-change.util.ts`) reads the session from the rows
+themselves -- the newest `priceDate` any of them has -- and keeps only the rows
+that carry it:
+
+| The board's rows | Session shown | What happens to the rest |
+|---|---|---|
+| some priced today, one priced yesterday | today | the day-old holding is off the board: it has no move for the session being ranked |
+| none priced today (a weekend, a holiday) | the newest they have | nothing: every row is that session's, and the caption says so |
+
+`getTopMovers` filters through it before ranking, so the client receives one
+session's rows and captions the board with their shared date. A row that
+disagrees is a contract violation, and `TopMovers` drops back to the undated
+`Daily change` wording rather than stamping one row's session onto another's
+figures.
+
+The rule is about a **ranked list of one day's moves**, not about a per-security
+readout. The favourites watchlist is the per-security case: it is a fixed list
+in symbol order, so each row prints its own dated change (`widgets.asOf`) and
+nothing is ranked against anything. `getMonthOverMonthMovers` is a different
+period entirely -- the last close on or before each month end, per security, by
+design -- and does not filter.
 
 ## 7. Scheduled occurrences
 

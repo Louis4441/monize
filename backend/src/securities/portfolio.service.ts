@@ -24,7 +24,11 @@ import { roundMoney } from "../common/round.util";
 import { collectTagKeys } from "../tags/tag-key-value.util";
 import { mapWithConcurrency } from "../common/concurrency.util";
 import { formatDateYMD, todayYMD } from "../common/date-utils";
-import { priceDateYmd, resolveDailyPriceChange } from "./daily-change.util";
+import {
+  keepNewestSession,
+  priceDateYmd,
+  resolveDailyPriceChange,
+} from "./daily-change.util";
 import {
   IntradayInterval,
   IntradayPoint,
@@ -968,12 +972,18 @@ export class PortfolioService {
       });
     }
 
+    // A board of movers is one session's. A holding that did not price while
+    // the others did has no move for the session being ranked, only an earlier
+    // one, and ranked beside them it would hold a place on the board for a day
+    // that is over -- every morning, until a new price arrives.
+    const board = keepNewestSession(movers);
+
     // Sort by absolute daily change percent descending
-    movers.sort(
+    board.sort(
       (a, b) => Math.abs(b.dailyChangePercent) - Math.abs(a.dailyChangePercent),
     );
 
-    return movers;
+    return board;
   }
 
   /**
