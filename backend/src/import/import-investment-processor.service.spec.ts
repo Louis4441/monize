@@ -757,7 +757,7 @@ describe("ImportInvestmentProcessorService", () => {
       expect(firstSaveArg.totalAmount).toBe(0);
     });
 
-    it("scales holding quantity and divides averageCost on SPLIT import", async () => {
+    it("leaves the stored holding untouched on a SPLIT import", async () => {
       const securityMap = new Map<string, string | null>();
       securityMap.set("Apple Inc", "sec-1");
       const ctx = makeContext({ securityMap });
@@ -788,13 +788,14 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      // The mutated holding object is the same reference passed to save().
+      // The split is a ledger row; the position it scales is re-derived from
+      // the ledger after the block, not multiplied into the stored figure here.
       const savedHolding = managerOf(ctx)
         .save.mock.calls.map((call: any) => call[0])
         .find((arg: any) => arg === existingHolding);
-      expect(savedHolding).toBeDefined();
-      expect(savedHolding.quantity).toBe(200);
-      expect(savedHolding.averageCost).toBe(75);
+      expect(savedHolding).toBeUndefined();
+      expect(existingHolding.quantity).toBe(100);
+      expect(existingHolding.averageCost).toBe(150);
     });
 
     it("does not create a holding from thin air for SPLIT when none exists", async () => {
@@ -971,47 +972,12 @@ describe("ImportInvestmentProcessorService", () => {
     });
   });
 
-  describe("processHoldings (via processTransaction)", () => {
-    it("should create a new holding for BUY when none exists", async () => {
-      const securityMap = new Map<string, string | null>();
-      securityMap.set("Test Stock", "sec-1");
-      const ctx = makeContext({ securityMap });
-
-      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
-        if (entity === Security && opts?.where?.id === "sec-1") {
-          return Promise.resolve({ id: "sec-1", symbol: "TST" });
-        }
-        if (entity === Holding) {
-          return Promise.resolve(null);
-        }
-        return Promise.resolve(null);
-      });
-
-      const qifTx = {
-        action: "Buy",
-        security: "Test Stock",
-        quantity: 10,
-        price: 100,
-        date: "2025-01-15",
-      };
-
-      await service.processTransaction(ctx, qifTx);
-
-      const saveCalls = managerOf(ctx).save.mock.calls;
-      const holdingSave = saveCalls.find(
-        (call: any) =>
-          call[0] instanceof Holding || call[0]?.averageCost !== undefined,
-      );
-      expect(holdingSave).toBeDefined();
-      expect(holdingSave[0].quantity).toBe(10);
-      expect(holdingSave[0].averageCost).toBe(100);
-    });
-
-    it("blends the commission into averageCost, as a rebuild computes it (FR-008)", async () => {
-      // 10 shares at 100 with 10 commission cost 101.00 per share -- the same
-      // figure acquisitionUnitCost yields on a rebuild. The bare price here
-      // was the live-vs-rebuild drift left alive on the import surface: the
-      // holdings page showed 100.00 until an unrelated recompute changed it.
+  describe("holdings are left to the ledger projection", () => {
+    it("writes no Holding row for a BUY", async () => {
+      // An import arrives in file order, which is not date order, so a per-row
+      // average cost blended here disagrees with the ledger replay (issue
+      // #1388). `ImportService` rebuilds the imported accounts from the ledger
+      // once the block is written, in the same transaction.
       const securityMap = new Map<string, string | null>();
       securityMap.set("Test Stock", "sec-1");
       const ctx = makeContext({ securityMap });
@@ -1028,25 +994,18 @@ describe("ImportInvestmentProcessorService", () => {
         security: "Test Stock",
         quantity: 10,
         price: 100,
-        commission: 10,
         date: "2025-01-15",
       });
 
-      const saveCalls = managerOf(ctx).save.mock.calls;
-      const holdingSave = saveCalls.find(
-        (call: any) =>
-          call[0] instanceof Holding || call[0]?.averageCost !== undefined,
-      );
-      expect(holdingSave).toBeDefined();
-      expect(holdingSave[0].averageCost).toBe(101);
+      const savedHoldings = managerOf(ctx)
+        .save.mock.calls.map((call: any) => call[0])
+        .filter((arg: any) => arg instanceof Holding);
+      expect(savedHoldings).toEqual([]);
+      // ...but the investment row itself is still written.
+      expect(ctx.importResult.imported).toBe(1);
     });
 
-    it("books a Grant (ADD_SHARES) without writing a basis (quantity-only)", async () => {
-      // Every other surface (isQuantityOnlyAction, adjustQuantity,
-      // computeHoldingsMap) defines ADD_SHARES as basis-free: shares arrive
-      // with no cost. Seeding averageCost from an imported grant/vest price
-      // wrote a basis the first rebuild silently erased. (ShrsIn maps to
-      // TRANSFER_IN, which genuinely carries a basis.)
+    it("writes no Holding row for a SELL", async () => {
       const securityMap = new Map<string, string | null>();
       securityMap.set("Test Stock", "sec-1");
       const ctx = makeContext({ securityMap });
@@ -1059,199 +1018,17 @@ describe("ImportInvestmentProcessorService", () => {
       });
 
       await service.processTransaction(ctx, {
-        action: "Grant",
-        security: "Test Stock",
-        quantity: 10,
-        price: 50,
-        date: "2025-01-15",
-      });
-
-      const saveCalls = managerOf(ctx).save.mock.calls;
-      const holdingSave = saveCalls.find(
-        (call: any) =>
-          call[0] instanceof Holding || call[0]?.averageCost !== undefined,
-      );
-      expect(holdingSave).toBeDefined();
-      expect(holdingSave[0].quantity).toBe(10);
-      expect(holdingSave[0].averageCost).toBe(0);
-    });
-
-    it("should update existing holding quantity for BUY and recalculate average cost", async () => {
-      const securityMap = new Map<string, string | null>();
-      securityMap.set("Test Stock", "sec-1");
-      const ctx = makeContext({ securityMap });
-
-      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
-        if (entity === Security && opts?.where?.id === "sec-1") {
-          return Promise.resolve({ id: "sec-1", symbol: "TST" });
-        }
-        if (entity === Holding) {
-          return Promise.resolve({
-            accountId,
-            securityId: "sec-1",
-            quantity: 10,
-            averageCost: 80,
-          });
-        }
-        return Promise.resolve(null);
-      });
-
-      const qifTx = {
-        action: "Buy",
-        security: "Test Stock",
-        quantity: 10,
-        price: 120,
-        date: "2025-01-15",
-      };
-
-      await service.processTransaction(ctx, qifTx);
-
-      const saveCalls = managerOf(ctx).save.mock.calls;
-      const holdingSave = saveCalls.find(
-        (call: any) =>
-          call[0]?.securityId === "sec-1" &&
-          call[0]?.averageCost !== undefined &&
-          call[0]?.quantity === 20,
-      );
-      expect(holdingSave).toBeDefined();
-      // Average: (10*80 + 10*120) / 20 = 2000/20 = 100
-      expect(holdingSave[0].averageCost).toBe(100);
-      expect(holdingSave[0].quantity).toBe(20);
-    });
-
-    it("should decrease holding quantity for SELL", async () => {
-      const securityMap = new Map<string, string | null>();
-      securityMap.set("Test Stock", "sec-1");
-      const ctx = makeContext({ securityMap });
-
-      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
-        if (entity === Security && opts?.where?.id === "sec-1") {
-          return Promise.resolve({ id: "sec-1", symbol: "TST" });
-        }
-        if (entity === Holding) {
-          return Promise.resolve({
-            accountId,
-            securityId: "sec-1",
-            quantity: 20,
-            averageCost: 100,
-          });
-        }
-        return Promise.resolve(null);
-      });
-
-      const qifTx = {
         action: "Sell",
         security: "Test Stock",
-        quantity: 5,
+        quantity: 4,
         price: 120,
-        date: "2025-01-15",
-      };
-
-      await service.processTransaction(ctx, qifTx);
-
-      const saveCalls = managerOf(ctx).save.mock.calls;
-      const holdingSave = saveCalls.find(
-        (call: any) =>
-          call[0]?.securityId === "sec-1" && call[0]?.quantity === 15,
-      );
-      expect(holdingSave).toBeDefined();
-    });
-
-    it("should NOT update holdings for DIVIDEND action", async () => {
-      const securityMap = new Map<string, string | null>();
-      securityMap.set("Test Stock", "sec-1");
-      const ctx = makeContext({ securityMap });
-
-      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
-        if (entity === Security && opts?.where?.id === "sec-1") {
-          return Promise.resolve({ id: "sec-1", symbol: "TST" });
-        }
-        return Promise.resolve(null);
+        date: "2025-02-15",
       });
 
-      const qifTx = {
-        action: "Div",
-        security: "Test Stock",
-        amount: 50,
-        date: "2025-01-15",
-      };
-
-      await service.processTransaction(ctx, qifTx);
-
-      const saveCalls = managerOf(ctx).save.mock.calls;
-      const holdingSave = saveCalls.find(
-        (call: any) => call[0]?.averageCost !== undefined,
-      );
-      // Dividend with no quantity should not create holdings
-      expect(holdingSave).toBeUndefined();
-    });
-
-    it("should increase holding quantity for REINVEST", async () => {
-      const securityMap = new Map<string, string | null>();
-      securityMap.set("Test ETF", "sec-1");
-      const ctx = makeContext({ securityMap });
-
-      managerOf(ctx).findOne.mockImplementation((entity: any, _opts: any) => {
-        if (entity === Holding) {
-          return Promise.resolve({
-            accountId,
-            securityId: "sec-1",
-            quantity: 50,
-            averageCost: 100,
-          });
-        }
-        return Promise.resolve(null);
-      });
-
-      const qifTx = {
-        action: "ReinvDiv",
-        security: "Test ETF",
-        quantity: 2,
-        price: 110,
-        date: "2025-01-15",
-      };
-
-      await service.processTransaction(ctx, qifTx);
-
-      const saveCalls = managerOf(ctx).save.mock.calls;
-      const holdingSave = saveCalls.find(
-        (call: any) => call[0]?.quantity === 52,
-      );
-      expect(holdingSave).toBeDefined();
-    });
-
-    it("should decrease holding quantity for TRANSFER_OUT", async () => {
-      const securityMap = new Map<string, string | null>();
-      securityMap.set("Test Stock", "sec-1");
-      const ctx = makeContext({ securityMap });
-
-      managerOf(ctx).findOne.mockImplementation((entity: any, _opts: any) => {
-        if (entity === Holding) {
-          return Promise.resolve({
-            accountId,
-            securityId: "sec-1",
-            quantity: 100,
-            averageCost: 50,
-          });
-        }
-        return Promise.resolve(null);
-      });
-
-      const qifTx = {
-        action: "ShrsOut",
-        security: "Test Stock",
-        quantity: 30,
-        price: 60,
-        date: "2025-01-15",
-      };
-
-      await service.processTransaction(ctx, qifTx);
-
-      const saveCalls = managerOf(ctx).save.mock.calls;
-      const holdingSave = saveCalls.find(
-        (call: any) => call[0]?.quantity === 70,
-      );
-      expect(holdingSave).toBeDefined();
+      const savedHoldings = managerOf(ctx)
+        .save.mock.calls.map((call: any) => call[0])
+        .filter((arg: any) => arg instanceof Holding);
+      expect(savedHoldings).toEqual([]);
     });
   });
 

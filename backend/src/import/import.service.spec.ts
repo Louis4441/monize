@@ -28,6 +28,7 @@ import { Holding } from "../securities/entities/holding.entity";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { SecurityPriceService } from "../securities/security-price.service";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
+import { HoldingsService } from "../securities/holdings.service";
 import { ImportEntityCreatorService } from "./import-entity-creator.service";
 import { ImportPostProcessingService } from "./import-post-processing.service";
 import { ImportInvestmentProcessorService } from "./import-investment-processor.service";
@@ -107,6 +108,7 @@ describe("ImportService", () => {
   let mockNetWorthService: Record<string, jest.Mock>;
   let mockSecurityPriceService: Record<string, jest.Mock>;
   let mockExchangeRateService: Record<string, jest.Mock>;
+  let mockHoldingsService: Record<string, jest.Mock>;
   /** How many categories the import created via the guarded insert. */
   let importedCategoryCount: number;
   let mockQueryRunner: {
@@ -304,6 +306,13 @@ describe("ImportService", () => {
       backfillHistoricalRates: jest.fn().mockResolvedValue(undefined),
     };
 
+    // The import writes the ledger and then re-derives the imported accounts'
+    // holdings from it in the same transaction, instead of blending each row
+    // into an average cost in file order.
+    mockHoldingsService = {
+      rebuildAccountsFromTransactions: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ImportService,
@@ -311,6 +320,7 @@ describe("ImportService", () => {
         { provide: NetWorthService, useValue: mockNetWorthService },
         { provide: SecurityPriceService, useValue: mockSecurityPriceService },
         { provide: ExchangeRateService, useValue: mockExchangeRateService },
+        { provide: HoldingsService, useValue: mockHoldingsService },
         ImportPostProcessingService,
         ImportEntityCreatorService,
         ImportInvestmentProcessorService,
@@ -2265,7 +2275,7 @@ describe("ImportService", () => {
         expect(savedAutoSecurity!.skipPriceUpdates).toBe(true);
       });
 
-      it("creates and updates holdings for BUY transactions", async () => {
+      it("rebuilds the imported account's holdings from the ledger, writing none itself", async () => {
         mockedParseQif.mockReturnValue({
           accountType: "INVESTMENT",
           accountName: "",
@@ -2320,7 +2330,9 @@ describe("ImportService", () => {
 
         await service.importQifFile(userId, makeInvestmentDto());
 
-        // Should save a new Holding
+        // No Holding row is written by the import itself: an import arrives in
+        // file order, which is not date order, so a blended average written
+        // here disagrees with the ledger replay (issue #1388).
         const holdingSave = mockQueryRunner.manager.save.mock.calls.find(
           (call: unknown[]) =>
             (call[0] as Record<string, unknown>)?.accountId ===
@@ -2329,12 +2341,19 @@ describe("ImportService", () => {
             (call[0] as Record<string, unknown>)?.quantity !== undefined &&
             !(call[0] as Record<string, unknown>)?.action, // Not an InvestmentTransaction
         );
-        expect(holdingSave).toBeDefined();
-        expect(holdingSave[0].quantity).toBe(10);
-        expect(holdingSave[0].averageCost).toBe(150);
+        expect(holdingSave).toBeUndefined();
+        // The position is re-derived from the ledger the block has just
+        // written, inside the import's own transaction.
+        expect(
+          mockHoldingsService.rebuildAccountsFromTransactions,
+        ).toHaveBeenCalledWith(
+          userId,
+          expect.arrayContaining(["acct-brokerage"]),
+          mockQueryRunner.manager,
+        );
       });
 
-      it("updates existing holding with weighted average cost for BUY", async () => {
+      it("does not blend a second BUY into the stored average cost", async () => {
         mockedParseQif.mockReturnValue({
           accountType: "INVESTMENT",
           accountName: "",
@@ -2396,14 +2415,19 @@ describe("ImportService", () => {
 
         await service.importQifFile(userId, makeInvestmentDto());
 
-        // Should update holding: new quantity = 10+10 = 20, new avg cost = (10*150 + 10*200)/20 = 175
+        // The old path wrote quantity 20 at 175.00 here. Whether 175.00 is
+        // right depends on the dates of every row in the ledger, which one row
+        // being imported cannot know -- so nothing is written and the account
+        // is rebuilt from the ledger after the block.
         const holdingSave = mockQueryRunner.manager.save.mock.calls.find(
           (call: unknown[]) =>
             (call[0] as Record<string, unknown>)?.securityId === "sec-aapl" &&
             (call[0] as Record<string, unknown>)?.quantity === 20,
         );
-        expect(holdingSave).toBeDefined();
-        expect(holdingSave[0].averageCost).toBe(175);
+        expect(holdingSave).toBeUndefined();
+        expect(
+          mockHoldingsService.rebuildAccountsFromTransactions,
+        ).toHaveBeenCalled();
       });
 
       it("backfills historical security prices for investment imports", async () => {

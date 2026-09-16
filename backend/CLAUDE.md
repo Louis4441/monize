@@ -68,6 +68,7 @@ Each module holds `{feature}.module.ts`, controller, service, their specs, `enti
 | A predicate that decides which row counts | one named helper called from every site | the clauses spelled out per site |
 | A folded investment action | `applyActionToQuantity` / `acquisitionCost` | a hand-rolled replay |
 | A calendar date stepped over a range | `enumerateDaysYMD` / `addDaysYMD` | a local-midnight `Date` read back with `toISOString()` |
+| Writing `holdings.quantity` / `average_cost` | `rebuildScopesFromTransactions` in the ledger write's own transaction, ordered by `INVESTMENT_REPLAY_ORDER` | an incremental delta or blended average |
 | A register or running-balance order | `applyRegisterOrder` (`src/transactions/register-order.ts`) | a hand-written `ORDER BY created_at` |
 | Excluding investment cash from a report | `investmentExclusionSql` / `applyInvestmentTransactionFilters`, `reportableTransactionAmountSql` | an account-type or sub-type predicate |
 | A SQL function called from `src/` | declared in `src/common/db/required-db-functions.ts` with its migration | a bare call the boot check does not know |

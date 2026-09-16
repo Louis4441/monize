@@ -4021,19 +4021,22 @@ export class InvestmentTransactionsService {
       // incremental reverse-then-reapply subtracted a delta from an average
       // cost that had been blended in a different order, so editing a
       // back-dated row left the stored figure disagreeing with the replay.
-      const editedScopes: HoldingScope[] = [];
+      const editedScopes = new Map<string, HoldingScope>();
       if (oldSecurityId) {
-        editedScopes.push({ accountId, securityId: oldSecurityId });
+        editedScopes.set(`${accountId}:${oldSecurityId}`, {
+          accountId,
+          securityId: oldSecurityId,
+        });
       }
       if (saved.securityId) {
-        editedScopes.push({
+        editedScopes.set(`${saved.accountId}:${saved.securityId}`, {
           accountId: saved.accountId,
           securityId: saved.securityId,
         });
       }
       await this.holdingsService.rebuildScopesFromTransactions(
         userId,
-        editedScopes,
+        Array.from(editedScopes.values()),
         manager,
       );
 

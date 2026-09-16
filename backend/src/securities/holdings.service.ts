@@ -60,11 +60,11 @@ export class HoldingsService {
 
   /**
    * Run `fn` on the caller's transaction when one was handed in, otherwise in a
-   * scoped transaction of our own. The optional-manager parameters on the
-   * holdings mutators exist because the investment-transaction flows call them
-   * from inside their own write block; a nested `withScopedDb` would join that
-   * transaction anyway, but threading the manager keeps the repository
-   * instances identical to what the caller is already using.
+   * scoped transaction of our own. The optional-manager parameters exist
+   * because the investment-transaction flows call in from inside their own
+   * write block; a nested `withScopedDb` would join that transaction anyway,
+   * but threading the manager keeps the repository instances identical to what
+   * the caller is already using.
    */
   private inScope<T>(
     manager: EntityManager | undefined,

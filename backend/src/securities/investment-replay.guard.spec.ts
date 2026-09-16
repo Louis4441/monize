@@ -153,45 +153,60 @@ describe("investment action replay is written once", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("never blends a raw price into a holding for an acquisition", () => {
-    // FR-008: the incremental holding update for BUY / REINVEST / TRANSFER_IN
-    // passed `Number(price)`, while every rebuild folds the commission into
-    // basis. So a 10-share buy at 100 with 10 commission read 100.00 per share
-    // live and 101.00 after any recompute -- and the live figure reported the
-    // commission as gain on the disposal. The two figures come from one helper
-    // or they drift, so the rule is scannable: an acquisition branch that
-    // touches a holding passes `acquisitionUnitCost`, never a bare price.
+  it("never maintains a holding's average cost outside the ledger fold", () => {
+    // Issue #1388: `holdings.average_cost` was maintained incrementally --
+    // each acquisition blended into the stored average as it arrived -- which
+    // makes the stored figure a function of INSERTION order. A back-dated sale
+    // entered after a later purchase then relieved basis the replay says the
+    // position never held: 15.0000 stored against 16.6667 replayed.
+    //
+    // The rule is that the column is only ever WRITTEN by a fold over the
+    // ledger, in the order INVESTMENT_REPLAY_ORDER gives. Two files own such a
+    // fold; anywhere else, a write to the column is a second maintainer of
+    // derived state, which is what drifts.
+    const WRITERS = new Set([
+      // rebuildScopesFromTransactions / rebuildAccountsFromTransactions /
+      // rebuildFromTransactions, all over computeHoldingsMap.
+      "securities/holdings.service.ts",
+      // undo/redo rebuilds the whole account from the same ledger.
+      "action-history/action-history.service.ts",
+    ]);
     const offenders: string[] = [];
-    const ACQUISITIONS = ["BUY", "REINVEST", "TRANSFER_IN"];
+
+    for (const file of files) {
+      const rel = relative(SRC_ROOT, file).split("\\").join("/");
+      if (WRITERS.has(rel)) continue;
+
+      const lines = readFileSync(file, "utf8").split("\n");
+      for (const [index, line] of lines.entries()) {
+        // `holding.averageCost = ...` (the entity write) or `average_cost = `
+        // in raw SQL. A read (`Number(h.averageCost)`) is untouched.
+        const writesColumn =
+          /\.averageCost\s*=[^=]/.test(line) ||
+          /\baverage_cost\s*=[^=]/.test(line);
+        if (!writesColumn) continue;
+        offenders.push(`${rel}:${index + 1}`);
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("has no holdings mutator taking a quantity delta", () => {
+    // The deleted shape: `updateHolding(userId, accountId, securityId, delta,
+    // price, manager)`. A method that takes "how much the position moved" is
+    // an accumulator by construction -- it cannot know where in the ledger the
+    // movement belongs. Ledger writers name the SCOPE they touched and the
+    // rebuild reads the rows.
+    const offenders: string[] = [];
 
     for (const file of files) {
       const rel = relative(SRC_ROOT, file).split("\\").join("/");
       if (ALLOWED.has(rel)) continue;
 
-      const lines = readFileSync(file, "utf8").split("\n");
-      for (const [index, line] of lines.entries()) {
-        const isAcquisitionBranch = ACQUISITIONS.some(
-          (action) =>
-            new RegExp(`case\\s+InvestmentAction\\.${action}\\s*:`).test(
-              line,
-            ) || new RegExp(`case\\s+["']${action}["']\\s*:`).test(line),
-        );
-        if (!isAcquisitionBranch) continue;
-
-        // Only the branch body, up to the next case label. Fall-through
-        // (`case BUY:` immediately followed by `case REINVEST:`) leaves an empty
-        // slice, which correctly has nothing to complain about.
-        const branch = lines
-          .slice(index + 1, index + 26)
-          .join("\n")
-          .split(/\n\s*case\s/)[0];
-
-        // Only branches that actually write a holding's cost are in scope.
-        if (!/updateHolding\s*\(|createOrUpdate\s*\(/.test(branch)) continue;
-        if (branch.includes("acquisitionUnitCost")) continue;
-        if (branch.includes("acquisitionCost")) continue;
-
-        offenders.push(`${rel}:${index + 1}`);
+      const source = readFileSync(file, "utf8");
+      if (/\b(updateHolding|createOrUpdate|adjustQuantity)\s*\(/.test(source)) {
+        offenders.push(rel);
       }
     }
 

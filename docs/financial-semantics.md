@@ -239,11 +239,11 @@ Additive result:    92 shares   (a difference of -88 shares)
 
 The ratio is stored in the `quantity` column of the `SPLIT` investment
 transaction, validated only as `> 0`. A reverse split is the same operation with
-a ratio below one -- `reverseSplit(ratio)` is literally
-`applySplit(1 / ratio)`, and a 1-for-2 reverse split is `ratio = 0.5`, halving
-shares and doubling per-share cost. There is no separate reverse-split action,
-so any code that special-cases "ratio greater than one" is wrong for half the
-inputs.
+a ratio below one: a 1-for-2 reverse split is `ratio = 0.5`, halving shares and
+doubling per-share cost. There is no separate reverse-split action, so any code
+that special-cases "ratio greater than one" is wrong for half the inputs, and
+nothing applies a ratio to a stored holding -- the position is re-derived from
+the ledger the SPLIT row now belongs to (INV-HOLDING-001).
 
 `holdings.service.ts` implements this correctly (`qty *= txQty`). Section 9
 records where it is implemented additively instead.

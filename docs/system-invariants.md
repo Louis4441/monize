@@ -300,22 +300,52 @@ too.
 
 ```text
 Statement           holdings.quantity and average_cost equal a deterministic
-                    replay of that account's investment ledger.
+                    replay of that account's investment ledger, whatever order
+                    the rows were entered in.
 Source of truth     investment_transactions
-Enforcement         Every mutation path takes an account-scoped advisory lock.
-                    lockHoldingScope (common/db/locks.ts) is taken by
-                    createOrUpdate, updateHolding, applySplit, reverseSplit,
-                    adjustQuantity and rebuild -- advisory rather than a row lock
-                    because a rebuild must serialize against investment_transactions
-                    inserts that no holdings row-lock covers -- so two concurrent
-                    trades on one (account, security) cannot lose an update.
+Enforcement         No path writes the columns incrementally. Every ledger write
+                    -- create, update, delete, status change, account or security
+                    change, both legs of a transfer, the embedded-split rows, and
+                    a QIF/CSV/OFX import block -- finishes by re-deriving the
+                    touched (account, security) scopes from the ledger through
+                    HoldingsService.rebuildScopesFromTransactions
+                    (securities/holdings.service.ts), in the SAME withScopedDb
+                    transaction as the write, so the projection commits or rolls
+                    back with it. Undo/redo rebuilds the whole account the same
+                    way; POST /holdings/rebuild rebuilds every account.
+                    Economic order comes from INVESTMENT_REPLAY_ORDER
+                    (securities/investment-replay.util.ts): transaction_date,
+                    then created_at, then id. The id leg is what makes the replay
+                    a function of the ledger rather than of the plan -- rows
+                    written by one import or one split share created_at to the
+                    microsecond. The basis fold itself is computeHoldingsMap,
+                    over applyActionToQuantity and acquisitionCost.
+                    lockHoldingScope (common/db/locks.ts) is still taken by every
+                    writer before it reads -- advisory rather than a row lock
+                    because a rebuild must serialize against
+                    investment_transactions inserts that no holdings row-lock
+                    covers -- so a concurrent trade cannot be replaced by a
+                    projection that never saw it.
                     UNIQUE(account_id, security_id) still prevents duplicate rows.
+                    A scope the ledger has no rows for projects to "no holding":
+                    the row is deleted. An imported opening position is an
+                    ADD_SHARES row, not a holding with nothing behind it.
 Concurrency scope   per (account, security)
 Retry semantics     Serialized by the lock; a lost update cannot occur.
 Failure response    the stored holding equals a deterministic replay of the ledger.
+Known gap           an unpriced acquisition (acquisitionCost returns null) adds
+                    shares but no basis, so the average cost it produces is a
+                    partial figure with nothing marking it as one. The column has
+                    no completeness flag; the surfaces that need one derive it
+                    from the ledger (docs/financial-calculation-contract.md).
 Required tests      Two-connection (concurrent trades on one holding, the stored
                     row compared against the replay):
                     backend/test/integration/holding-concurrent-trades.integration.spec.ts.
+                    Out-of-order entry through the real service, stored row
+                    compared against the replay:
+                    backend/test/integration/holding-ledger-projection.integration.spec.ts.
+                    Source scan: no average-cost arithmetic outside the fold,
+                    backend/src/securities/investment-replay.guard.spec.ts.
 Status              enforced
 ```
 

@@ -13,6 +13,7 @@ import {
   ConflictException,
 } from "@nestjs/common";
 import { InvestmentTransactionsService } from "./investment-transactions.service";
+import { INVESTMENT_REPLAY_ORDER } from "./investment-replay.util";
 import { UpdateInvestmentTransactionDto } from "./dto/update-investment-transaction.dto";
 import {
   InvestmentTransaction,
@@ -249,10 +250,7 @@ describe("InvestmentTransactionsService", () => {
     transactionsService = {};
 
     holdingsService = {
-      updateHolding: jest.fn().mockResolvedValue(undefined),
-      adjustQuantity: jest.fn().mockResolvedValue(undefined),
-      applySplit: jest.fn().mockResolvedValue(undefined),
-      reverseSplit: jest.fn().mockResolvedValue(undefined),
+      rebuildScopesFromTransactions: jest.fn().mockResolvedValue(undefined),
       findByAccountAndSecurity: jest.fn().mockResolvedValue(null),
       removeAllForUser: jest.fn().mockResolvedValue(5),
       rebuildFromTransactions: jest.fn().mockResolvedValue({
@@ -469,14 +467,12 @@ describe("InvestmentTransactionsService", () => {
       // 150.999 per share), so blending the raw price in here would report the
       // commission as gain on the eventual disposal until something happened to
       // trigger a recompute (FR-008).
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        10,
-        150.999,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        false,
       );
     });
 
@@ -563,14 +559,12 @@ describe("InvestmentTransactionsService", () => {
 
       await service.create(userId, sellDto);
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -5,
-        160,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        false,
       );
     });
 
@@ -775,14 +769,12 @@ describe("InvestmentTransactionsService", () => {
 
       await service.create(userId, reinvestDto);
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        2,
-        150,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        false,
       );
       // No cash transaction for REINVEST
       expect(transactionRepository.create).not.toHaveBeenCalled();
@@ -822,14 +814,12 @@ describe("InvestmentTransactionsService", () => {
 
       await service.create(userId, transferInDto);
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        20,
-        100,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        false,
       );
       expect(transactionRepository.create).not.toHaveBeenCalled();
     });
@@ -867,19 +857,17 @@ describe("InvestmentTransactionsService", () => {
 
       await service.create(userId, transferOutDto);
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -10,
-        100,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        false,
       );
       expect(transactionRepository.create).not.toHaveBeenCalled();
     });
 
-    it("creates an ADD_SHARES transaction using adjustQuantity", async () => {
+    it("creates an ADD_SHARES transaction that adds to the position", async () => {
       const addSharesDto = {
         accountId,
         securityId,
@@ -911,18 +899,17 @@ describe("InvestmentTransactionsService", () => {
 
       await service.create(userId, addSharesDto);
 
-      expect(holdingsService.adjustQuantity).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        5,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
       );
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
       expect(transactionRepository.create).not.toHaveBeenCalled();
     });
 
-    it("creates a REMOVE_SHARES transaction using adjustQuantity with negative delta", async () => {
+    it("creates a REMOVE_SHARES transaction that reduces the position", async () => {
       const removeSharesDto = {
         accountId,
         securityId,
@@ -954,11 +941,11 @@ describe("InvestmentTransactionsService", () => {
 
       await service.create(userId, removeSharesDto);
 
-      expect(holdingsService.adjustQuantity).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -3,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
       );
     });
@@ -1076,7 +1063,7 @@ describe("InvestmentTransactionsService", () => {
       );
     });
 
-    it("calls holdingsService.applySplit with the supplied ratio for SPLIT", async () => {
+    it("re-derives the position from the ledger for a SPLIT", async () => {
       accountsService.findOne.mockResolvedValue(mockInvestmentAccount);
       investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
         createMockQueryBuilder({ ...mockBuyTransaction, action: "SPLIT" }),
@@ -1091,14 +1078,14 @@ describe("InvestmentTransactionsService", () => {
 
       await service.create(userId, dto);
 
-      expect(holdingsService.applySplit).toHaveBeenCalledWith(
-        accountId,
-        securityId,
-        2,
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
+        userId,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
       );
       // SPLIT must not write a cash transaction.
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
     });
 
     it("rebuilds holdings from history after creating a SPLIT", async () => {
@@ -1149,10 +1136,11 @@ describe("InvestmentTransactionsService", () => {
 
       await service.create(userId, dto);
 
-      expect(holdingsService.applySplit).toHaveBeenCalledWith(
-        accountId,
-        securityId,
-        0.5,
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
+        userId,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
       );
     });
@@ -1980,28 +1968,21 @@ describe("InvestmentTransactionsService", () => {
       await service.update(userId, transactionId, { quantity: 20 });
 
       // Should reverse the original effects first
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -10, // Reverse: remove original 10 shares
-        // The commissioned unit cost (10 * 150 + 9.99) / 10. Inert for this
-        // negative delta; read only if the reversal recreates a deleted
-        // holding row.
-        150.999,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        true,
       );
 
       // Then apply new effects
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        expect.any(Number), // New quantity applied
-        expect.any(Number),
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        true,
       );
     });
 
@@ -2539,18 +2520,15 @@ describe("InvestmentTransactionsService", () => {
 
       await service.remove(userId, transactionId);
 
-      // Should reverse BUY holdings (remove shares). The unit cost argument
-      // is inert for a negative delta (updateHolding blends prices only for
-      // positive ones); it is read only when the reversal has to recreate a
-      // deleted holding row, where it must be the commissioned figure.
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      // The position is re-derived from the ledger the row has just left --
+      // not from the stored figure minus this row's delta, which is what made
+      // deleting a back-dated trade converge on the wrong average cost.
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -10,
-        150.999,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        true,
       );
 
       // Should delete cash transaction and reverse balance
@@ -2584,14 +2562,12 @@ describe("InvestmentTransactionsService", () => {
       await service.remove(userId, tx.id);
 
       // Should reverse SELL: add shares back
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        5, // Add back the sold shares
-        160,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        true,
       );
     });
 
@@ -2611,15 +2587,12 @@ describe("InvestmentTransactionsService", () => {
 
       await service.remove(userId, reinvestTx.id);
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -3,
-        // (3 * 150 + 9.99) / 3
-        153.33,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        true,
       );
     });
 
@@ -2639,15 +2612,12 @@ describe("InvestmentTransactionsService", () => {
 
       await service.remove(userId, transferInTx.id);
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -20,
-        // (20 * 100 + 9.99) / 20
-        100.4995,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        true,
       );
     });
 
@@ -2667,14 +2637,12 @@ describe("InvestmentTransactionsService", () => {
 
       await service.remove(userId, transferOutTx.id);
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        10,
-        100,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        true,
       );
     });
 
@@ -2694,11 +2662,11 @@ describe("InvestmentTransactionsService", () => {
 
       await service.remove(userId, addSharesTx.id);
 
-      expect(holdingsService.adjustQuantity).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -5,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
       );
     });
@@ -2719,16 +2687,16 @@ describe("InvestmentTransactionsService", () => {
 
       await service.remove(userId, removeSharesTx.id);
 
-      expect(holdingsService.adjustQuantity).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        3,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
       );
     });
 
-    it("reverses SPLIT by calling reverseSplit on holdings", async () => {
+    it("re-derives the position after removing an embedded SPLIT", async () => {
       const splitTx = {
         ...mockBuyTransaction,
         id: "inv-tx-split",
@@ -2744,14 +2712,14 @@ describe("InvestmentTransactionsService", () => {
 
       await service.remove(userId, splitTx.id);
 
-      expect(holdingsService.reverseSplit).toHaveBeenCalledWith(
-        accountId,
-        securityId,
-        2,
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
+        userId,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
       );
-      // Reversing a SPLIT must NOT remove cash transactions or call updateHolding.
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
+      // Reversing a SPLIT must NOT remove cash transactions.
       // Rebuild holdings from history so any incremental drift from the
       // original (possibly buggy) apply is corrected.
       expect(holdingsService.rebuildFromTransactions).toHaveBeenCalledWith(
@@ -2920,9 +2888,16 @@ describe("InvestmentTransactionsService", () => {
         userId,
       });
       expect(investmentTransactionsRepository.remove).toHaveBeenCalledWith(tx);
-      // ...but nothing is reversed, because nothing was contributed.
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
-      expect(holdingsService.adjustQuantity).not.toHaveBeenCalled();
+      // ...and the position is re-derived from what is left of the ledger.
+      // That a VOID row contributed nothing is the rebuild's filter, covered
+      // in holdings.service.spec.ts, not a delta this seam declines to apply.
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
+        userId,
+        [{ accountId, securityId }],
+        expect.anything(),
+      );
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
     });
   });
@@ -3009,8 +2984,9 @@ describe("InvestmentTransactionsService", () => {
         { status: TransactionStatus.CLEARED },
       );
       // Only crossing the VOID boundary moves shares or money.
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
-      expect(holdingsService.adjustQuantity).not.toHaveBeenCalled();
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).not.toHaveBeenCalled();
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
       expect(
         holdingsService.validateNoNegativeHoldingsHistory,
@@ -3024,14 +3000,12 @@ describe("InvestmentTransactionsService", () => {
 
       // Holdings reversal at the row's stored quantities (unit cost is the
       // commissioned figure, as everywhere else).
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -10,
-        150.999,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        true,
       );
       expect(investmentTransactionsRepository.update).toHaveBeenCalledWith(
         transactionId,
@@ -3066,14 +3040,12 @@ describe("InvestmentTransactionsService", () => {
         TransactionStatus.CLEARED,
       );
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        10,
-        150.999,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        true,
       );
       expect(mockQueryRunner.manager.update).toHaveBeenCalledWith(
         Transaction,
@@ -3098,7 +3070,9 @@ describe("InvestmentTransactionsService", () => {
 
       expect(investmentTransactionsRepository.update).not.toHaveBeenCalled();
       expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).not.toHaveBeenCalled();
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
     });
 
@@ -3118,7 +3092,9 @@ describe("InvestmentTransactionsService", () => {
 
       expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
       expect(investmentTransactionsRepository.update).not.toHaveBeenCalled();
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).not.toHaveBeenCalled();
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
     });
 
@@ -3183,25 +3159,17 @@ describe("InvestmentTransactionsService", () => {
         linkedLegId,
         { status: TransactionStatus.VOID },
       );
-      // Reversing a TRANSFER_OUT returns the shares to the source; reversing
-      // the TRANSFER_IN removes them from the destination.
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      // Two rows describing one movement of shares cross the boundary
+      // together, so both positions are re-derived in one call.
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        10,
+        [
+          { accountId: accountId, securityId: securityId },
+          { accountId: "account-2", securityId: securityId },
+        ],
         expect.anything(),
-        expect.anything(),
-        true,
-      );
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
-        userId,
-        "account-2",
-        securityId,
-        -10,
-        expect.anything(),
-        expect.anything(),
-        true,
       );
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
     });
@@ -3218,14 +3186,12 @@ describe("InvestmentTransactionsService", () => {
 
       await service.updateStatus(userId, transactionId, TransactionStatus.VOID);
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -10,
-        150.999,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        true,
       );
       expect(mockQueryRunner.manager.update).not.toHaveBeenCalledWith(
         Transaction,
@@ -3272,7 +3238,8 @@ describe("InvestmentTransactionsService", () => {
       expect(investmentTransactionsRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({ status: TransactionStatus.VOID }),
       );
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
+      // The VOID row's exclusion is the rebuild's status filter, not a
+      // holdings write this path declines to make.
       // The cash leg is still created -- the event stays visible in the cash
       // ledger -- but carries VOID and moves nothing.
       expect(transactionRepository.create).toHaveBeenCalledWith(
@@ -5078,7 +5045,7 @@ describe("InvestmentTransactionsService", () => {
       });
     });
 
-    it("does NOT update holdings for a future-dated BUY transaction", async () => {
+    it("re-derives the position for a future-dated BUY, which the cutoff excludes", async () => {
       const savedTx = {
         ...mockBuyTransaction,
         transactionDate: "2027-06-15",
@@ -5092,7 +5059,16 @@ describe("InvestmentTransactionsService", () => {
 
       await service.create(userId, createBuyDto);
 
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
+      // The row is future-dated, so `transaction_date <= cutoff` leaves it out
+      // of the replay -- the exclusion is the rebuild's, and is covered in
+      // holdings.service.spec.ts. What this path owes is the request.
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
+        userId,
+        [{ accountId, securityId }],
+        expect.anything(),
+      );
     });
 
     it("does NOT create a cash transaction for a future-dated BUY", async () => {
@@ -5116,7 +5092,7 @@ describe("InvestmentTransactionsService", () => {
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
     });
 
-    it("does NOT update holdings for a future-dated SELL transaction", async () => {
+    it("re-derives the position for a future-dated SELL, which the cutoff excludes", async () => {
       const sellDto = {
         accountId,
         securityId,
@@ -5140,12 +5116,12 @@ describe("InvestmentTransactionsService", () => {
 
       await service.create(userId, sellDto);
 
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
+      expect(holdingsService.rebuildScopesFromTransactions).toHaveBeenCalled();
       // The cash side IS created so the user sees the projected proceeds.
       expect(transactionRepository.create).toHaveBeenCalled();
     });
 
-    it("does NOT touch holdings when deleting a future-dated transaction", async () => {
+    it("re-derives the position when deleting a future-dated transaction", async () => {
       const futureTx = {
         ...mockBuyTransaction,
         transactionDate: "2027-06-15",
@@ -5158,8 +5134,7 @@ describe("InvestmentTransactionsService", () => {
 
       await service.remove(userId, transactionId);
 
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
-      expect(holdingsService.adjustQuantity).not.toHaveBeenCalled();
+      expect(holdingsService.rebuildScopesFromTransactions).toHaveBeenCalled();
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
       // The linked cash transaction (which was created with the future date)
       // is torn down with the investment row.
@@ -5499,14 +5474,12 @@ describe("InvestmentTransactionsService", () => {
           entity && entity.constructor && entity.constructor.name === "Object",
       );
       expect(transactionSaves.length).toBeGreaterThan(0); // saved the InvestmentTransaction
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        75,
-        10,
-        mockQueryRunner.manager,
-        false,
+        [{ accountId: accountId, securityId: securityId }],
+        expect.anything(),
       );
       // The embedded path should never invoke the cash-side balance update
       // for a cash account (only holdings updates).
@@ -5629,8 +5602,8 @@ describe("InvestmentTransactionsService", () => {
         },
       );
 
-      // No holdings update for DIVIDEND, no cash transaction either
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
+      // No cash transaction either. A DIVIDEND moves no shares, which is the
+      // replay reducer's answer, not something this seam decides.
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
       expect(created).toBeDefined();
       expect(mockQueryRunner.manager.create).toHaveBeenCalledWith(
@@ -5664,14 +5637,12 @@ describe("InvestmentTransactionsService", () => {
         },
       );
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -10,
-        50,
-        mockQueryRunner.manager,
-        false,
+        [{ accountId: accountId, securityId: securityId }],
+        expect.anything(),
       );
       // Cash side suppressed
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
@@ -5929,14 +5900,12 @@ describe("InvestmentTransactionsService", () => {
       );
 
       // Reverse-of-BUY decrements holdings by qty
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -5,
-        10,
-        mockQueryRunner.manager,
-        true,
+        [{ accountId: accountId, securityId: securityId }],
+        expect.anything(),
       );
       expect(mockQueryRunner.manager.remove).toHaveBeenCalledWith(embedded);
     });
@@ -5980,25 +5949,21 @@ describe("InvestmentTransactionsService", () => {
     it("creates both legs and moves holdings at the supplied cost basis", async () => {
       const result = await service.transferSecurity(userId, transferDto);
 
-      // TRANSFER_OUT draws down the source at cost basis.
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      // Both legs carry the per-share cost basis into the ledger, and both
+      // positions are then re-derived from it in one call.
+      const legPrices = mockQueryRunner.manager.create.mock.calls
+        .filter(([entity]: any[]) => entity === InvestmentTransaction)
+        .map(([, data]: any[]) => data.price);
+      expect(legPrices).toEqual([1.67, 1.67]);
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -100,
-        1.67,
-        mockQueryRunner.manager,
-        false,
-      );
-      // TRANSFER_IN adds to the destination at the same per-share cost.
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
-        userId,
-        toAccountId,
-        securityId,
-        100,
-        1.67,
-        mockQueryRunner.manager,
-        false,
+        [
+          { accountId, securityId },
+          { accountId: toAccountId, securityId },
+        ],
+        expect.anything(),
       );
       expect(dataSource.transaction).toHaveBeenCalled();
       expect(result).toHaveProperty("transferOut");
@@ -6088,23 +6053,19 @@ describe("InvestmentTransactionsService", () => {
         costPerShare: 0,
       });
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      const zeroLegPrices = mockQueryRunner.manager.create.mock.calls
+        .filter(([entity]: any[]) => entity === InvestmentTransaction)
+        .map(([, data]: any[]) => data.price);
+      expect(zeroLegPrices).toEqual([0, 0]);
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -100,
-        0,
-        mockQueryRunner.manager,
-        false,
-      );
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
-        userId,
-        toAccountId,
-        securityId,
-        100,
-        0,
-        mockQueryRunner.manager,
-        false,
+        [
+          { accountId, securityId },
+          { accountId: toAccountId, securityId },
+        ],
+        expect.anything(),
       );
       expect(dataSource.transaction).toHaveBeenCalled();
     });
@@ -6123,24 +6084,12 @@ describe("InvestmentTransactionsService", () => {
         costPerShare: 0,
       });
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
-        userId,
-        accountId,
-        securityId,
-        -100,
-        4.25,
-        mockQueryRunner.manager,
-        false,
-      );
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
-        userId,
-        toAccountId,
-        securityId,
-        100,
-        4.25,
-        mockQueryRunner.manager,
-        false,
-      );
+      // The carried basis reaches the ledger, which is what the rebuild then
+      // reads -- a stale client value cannot poison the destination.
+      const carriedPrices = mockQueryRunner.manager.create.mock.calls
+        .filter(([entity]: any[]) => entity === InvestmentTransaction)
+        .map(([, data]: any[]) => data.price);
+      expect(carriedPrices).toEqual([4.25, 4.25]);
     });
 
     it("rejects transferring into a non-brokerage (cash sleeve) account", async () => {
@@ -6252,8 +6201,11 @@ describe("InvestmentTransactionsService", () => {
 
       await service.update(userId, "leg-out", { quantity: 50 });
 
-      // Both legs reversed (add/remove) and reapplied -> 4 holding updates.
-      expect(holdingsService.updateHolding).toHaveBeenCalled();
+      // A transfer edit re-derives both accounts from the ledger in the
+      // caller's transaction.
+      expect(
+        holdingsService.rebuildAccountsFromTransactions,
+      ).toHaveBeenCalled();
       // Both legs saved.
       const savedActions = mockQueryRunner.manager.save.mock.calls
         .map((c: any[]) => c[0]?.action)
@@ -6454,9 +6406,7 @@ describe("InvestmentTransactionsService", () => {
       await service.getSecurityTransactionHistory(userId, securityId);
 
       expect(investmentTransactionsRepository.find).toHaveBeenCalledWith(
-        expect.objectContaining({
-          order: { transactionDate: "ASC", createdAt: "ASC" },
-        }),
+        expect.objectContaining({ order: INVESTMENT_REPLAY_ORDER }),
       );
     });
 
@@ -7599,7 +7549,9 @@ describe("InvestmentTransactionsService", () => {
         expect(investmentTransactionsRepository.remove).not.toHaveBeenCalled();
         expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
         expect(accountsService.updateBalance).not.toHaveBeenCalled();
-        expect(holdingsService.updateHolding).not.toHaveBeenCalled();
+        expect(
+          holdingsService.rebuildScopesFromTransactions,
+        ).not.toHaveBeenCalled();
         expect(mockActionHistoryService.record).not.toHaveBeenCalled();
       });
 
