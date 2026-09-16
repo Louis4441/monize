@@ -290,9 +290,15 @@ describe("resolveFxRate", () => {
     ];
     const descending = [...ascending].reverse();
     const at = (rows: DatedRate[]) =>
-      resolveFxRate("EUR", "USD", "2026-06-22", lookupFrom({ "EUR->USD": rows }), {
-        today: TODAY,
-      });
+      resolveFxRate(
+        "EUR",
+        "USD",
+        "2026-06-22",
+        lookupFrom({ "EUR->USD": rows }),
+        {
+          today: TODAY,
+        },
+      );
     expect(at(descending)).toEqual(at(ascending));
   });
 
@@ -310,7 +316,12 @@ describe("resolveFxRate", () => {
 
   it("names each gap differently so a reader learns which repair applies", () => {
     const lines = (
-      ["unknown_currency", "no_observation", "only_after_date", "stale_observation"] as const
+      [
+        "unknown_currency",
+        "no_observation",
+        "only_after_date",
+        "stale_observation",
+      ] as const
     ).map((reason) => describeFxGap("EUR->USD", "2026-03-01", reason));
     expect(new Set(lines).size).toBe(4);
     expect(lines.every((line) => line.includes("EUR->USD"))).toBe(true);
