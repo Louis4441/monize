@@ -237,6 +237,11 @@ describe('InvestmentTransactionHistoryReport', () => {
     mockGetInvestmentAccounts.mockResolvedValue([
       { id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' },
     ]);
+    // The activity badges are the server's by-action subtotals now, so the
+    // summary has to carry the action for the badge to exist at all.
+    mockGetTransactionSummary.mockResolvedValue(
+      summaryFixture({ transactionCount: 1, byAction: [actionFixture('BUY')] }),
+    );
     render(<InvestmentTransactionHistoryReport />);
     await waitFor(() => {
       expect(screen.getByText(/Transaction History/)).toBeInTheDocument();

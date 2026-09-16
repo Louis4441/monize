@@ -139,11 +139,27 @@ function summaryFixture(over: Record<string, unknown> = {}) {
   };
 }
 
+let container: HTMLElement;
+
 async function renderReport() {
   await act(async () => {
-    render(<InvestmentTransactionHistoryReport />);
+    ({ container } = render(<InvestmentTransactionHistoryReport />));
   });
-  await waitFor(() => expect(screen.getByText('AAA')).toBeInTheDocument());
+  // `getAllBy`: the truncation case pages the same two rows fifty times over,
+  // so the symbol is on screen many times.
+  await waitFor(() => expect(screen.getAllByText('AAA').length).toBeGreaterThan(0));
+}
+
+/**
+ * Every figure the page renders, as one flat list of strings.
+ *
+ * A money cell carries its phone caption in the same `<td>` ("TotalEUR
+ * 1000.00 EUR"), so an exact-text query would miss it; asking for substrings
+ * over the rendered text is what makes these assertions about the figures
+ * rather than about the caption markup around them.
+ */
+function renderedText(): string {
+  return container.textContent ?? '';
 }
 
 describe('InvestmentTransactionHistoryReport currencies', () => {
@@ -163,17 +179,17 @@ describe('InvestmentTransactionHistoryReport currencies', () => {
     await renderReport();
     // Two 1,000s that are NOT the same money. Before the fix both read
     // "PLN 1000.00", the account's currency.
-    expect(screen.getAllByText('EUR 1000.00 EUR').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('USD 1000.00 USD').length).toBeGreaterThanOrEqual(1);
-    expect(screen.queryByText('PLN 1000.00')).not.toBeInTheDocument();
+    expect(renderedText()).toContain('EUR 1000.00 EUR');
+    expect(renderedText()).toContain('USD 1000.00 USD');
+    expect(renderedText()).not.toContain('PLN 1000.00');
   });
 
   it('never shows the arithmetic sum of two currencies as the volume', async () => {
     await renderReport();
     // 2,000 is what adding the raw numbers gives. The answer is the server's
     // conversion at each row's own date.
-    expect(screen.queryByText('PLN 2000.00')).not.toBeInTheDocument();
-    expect(screen.getByText('PLN 8092.80')).toBeInTheDocument();
+    expect(renderedText()).not.toContain('PLN 2000.00');
+    expect(renderedText()).toContain('PLN 8092.80');
   });
 
   it('asks the server for the summary over the filtered set', async () => {
@@ -212,7 +228,7 @@ describe('InvestmentTransactionHistoryReport currencies', () => {
     expect(screen.getByText('Known Volume')).toBeInTheDocument();
     expect(screen.queryByText('Total Volume')).not.toBeInTheDocument();
     expect(screen.getAllByTestId('partial-total-marker').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('PLN 4339.00').length).toBeGreaterThanOrEqual(1);
+    expect(renderedText()).toContain('PLN 4339.00');
   });
 
   it('renders an unknown amount rather than guessing a currency for a row with no security', async () => {
@@ -242,15 +258,22 @@ describe('InvestmentTransactionHistoryReport currencies', () => {
     await waitFor(() => expect(screen.getByText(/Transaction History/)).toBeInTheDocument());
 
     expect(screen.getAllByTestId('unknown-amount').length).toBeGreaterThanOrEqual(1);
-    expect(screen.queryByText('PLN 40.00')).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('PLN 40.00');
   });
 
   it('says the table is truncated while the KPIs still cover everything', async () => {
     // Every fetched page reports more to come, so the client stops at its cap.
-    mockGetTransactions.mockResolvedValue({
-      data: EQUAL_NUMBERS_TWO_CURRENCIES,
-      pagination: { hasMore: true },
-    });
+    // Unique ids per page: a repeated React key is a warning this harness fails
+    // on, and it would say nothing about truncation.
+    mockGetTransactions.mockImplementation(({ page }: { page: number }) =>
+      Promise.resolve({
+        data: EQUAL_NUMBERS_TWO_CURRENCIES.map((tx) => ({
+          ...tx,
+          id: `${tx.id}-p${page}`,
+        })),
+        pagination: { hasMore: true },
+      }),
+    );
     mockGetTransactionSummary.mockResolvedValue(
       summaryFixture({ transactionCount: 12345 }),
     );
@@ -258,7 +281,7 @@ describe('InvestmentTransactionHistoryReport currencies', () => {
 
     expect(screen.getByTestId('truncated-notice')).toBeInTheDocument();
     // The count card is the server's, not the number of rows on screen.
-    expect(screen.getByText('12345')).toBeInTheDocument();
+    expect(renderedText()).toContain('12345');
   });
 
   it('does not claim truncation when every page was fetched', async () => {
