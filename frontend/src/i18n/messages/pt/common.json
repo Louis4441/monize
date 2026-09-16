@@ -243,9 +243,11 @@
     "srLabel": "Valor não disponível",
     "scheduledFx": "Não é possível determinar o valor atual: não há taxa de câmbio disponível para o par de moedas de liquidação deste item agendado. O valor guardado foi calculado com uma taxa anterior, pelo que não é mostrado.",
     "displayFx": "Este valor não pode ser mostrado aqui: o montante é conhecido, mas não há taxa de câmbio disponível para o converter na moeda deste total. Atualize as taxas na página Moedas.",
+    "noCashBalance": "Este valor não pode ser calculado: uma conta de caixa nesta vista não indicou saldo para este dia, pelo que o que continha é desconhecido, não zero. Recarregue o relatório; se persistir, os saldos do dia não puderam ser calculados e vale a pena comunicá-lo.",
     "noPrice": "Este valor não pode ser calculado: as ações detidas são conhecidas, mas o título não tem preço com que as valorizar. Atualize os preços ou adicione um manualmente no histórico de preços do título.",
     "noBaseline": "Este valor não pode ser calculado: é uma comparação e não existe um valor anterior com que o comparar. Não falta nada, por isso não há nada a acrescentar.",
-    "staleQuote": "A variação do dia não pode ser calculada: o preço mais recente do título é anterior à última sessão, pelo que qualquer variação a partir dele seria a de um dia anterior. Atualize as cotações ou verifique o fornecedor de cotações do título."
+    "staleQuote": "A variação do dia não pode ser calculada: o preço mais recente do título é anterior à última sessão, pelo que qualquer variação a partir dele seria a de um dia anterior. Atualize as cotações ou verifique o fornecedor de cotações do título.",
+    "unknownCurrency": "Este montante não pode ser mostrado: o registo não indica nenhum título, pelo que a moeda do valor é desconhecida. Abra a transação e atribua-lhe um título para que os seus montantes possam ser identificados."
   },
   "density": {
     "title": "Alternar densidade das linhas",

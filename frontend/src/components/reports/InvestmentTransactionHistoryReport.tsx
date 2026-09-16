@@ -189,7 +189,7 @@ export function InvestmentTransactionHistoryReport() {
       .catch((error) => logger.error('Failed to load accounts:', error));
   }, []);
 
-  const { data: response, isLoading, error, reload } = useReportData<TransactionPage>(
+  const { data: response, isLoading, error, reload } = useReportData<TransactionPage | null>(
     async () => {
       if (!isValid) return null;
       const allTransactions: InvestmentTransaction[] = [];
@@ -223,7 +223,7 @@ export function InvestmentTransactionHistoryReport() {
    * currency, which only the server can convert at the rate that stood on the
    * trade's own date.
    */
-  const { data: summary, reload: reloadSummary } = useReportData<InvestmentTransactionSummary>(
+  const { data: summary, reload: reloadSummary } = useReportData<InvestmentTransactionSummary | null>(
     async () => {
       if (!isValid) return null;
       return investmentReportsApi.getTransactionSummary({

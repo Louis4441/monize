@@ -37,7 +37,8 @@ interface UnknownAmountProps {
     | 'noPrice'
     | 'noBaseline'
     | 'staleQuote'
-    | 'noCashBalance';
+    | 'noCashBalance'
+    | 'unknownCurrency';
   /** Extra classes for the wrapper, so a table cell can keep its alignment. */
   className?: string;
 }
