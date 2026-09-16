@@ -34,6 +34,31 @@ export function baseInvestmentAction(
 }
 
 /**
+ * The order every ledger replay reads `investment_transactions` in.
+ *
+ * A position is a function of *economic* order, not of the order the rows were
+ * entered in: a back-dated SELL entered after a later BUY still relieves basis
+ * before that BUY blends in. `transaction_date` alone is not a total order --
+ * rows written by one import or one split share `created_at` to the microsecond
+ * -- so the primary key breaks the remaining tie and makes the replay a pure
+ * function of the ledger's contents rather than of the plan PostgreSQL happened
+ * to choose. Without the `id` leg two replays of the same unchanged ledger could
+ * relieve basis in different orders and store two different average costs.
+ *
+ * Use this constant for a TypeORM `order`, and `INVESTMENT_REPLAY_ORDER_SQL`
+ * for a raw `SELECT`, rather than restating the columns.
+ */
+export const INVESTMENT_REPLAY_ORDER = {
+  transactionDate: "ASC",
+  createdAt: "ASC",
+  id: "ASC",
+} as const;
+
+/** `INVESTMENT_REPLAY_ORDER` spelled for a raw `ORDER BY`. */
+export const INVESTMENT_REPLAY_ORDER_SQL =
+  "transaction_date ASC, created_at ASC, id ASC";
+
+/**
  * The canonical share-count effect of one investment action.
  *
  * Every surface that reconstructs a position from its transaction history --

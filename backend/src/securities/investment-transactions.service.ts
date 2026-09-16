@@ -29,6 +29,7 @@ import {
   acquisitionUnitCost,
   applyActionToQuantity,
   baseInvestmentAction,
+  INVESTMENT_REPLAY_ORDER,
 } from "./investment-replay.util";
 import {
   disposalCashAmount,
@@ -2875,7 +2876,7 @@ export class InvestmentTransactionsService {
       m.getRepository(InvestmentTransaction).find({
         where: { userId, securityId },
         relations: ["account"],
-        order: { transactionDate: "ASC", createdAt: "ASC" },
+        order: INVESTMENT_REPLAY_ORDER,
       }),
     );
 

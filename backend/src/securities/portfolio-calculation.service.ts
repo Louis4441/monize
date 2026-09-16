@@ -33,6 +33,7 @@ import {
   applyActionToQuantity,
   baseInvestmentAction,
   CASH_INCOME_ACTIONS,
+  INVESTMENT_REPLAY_ORDER,
 } from "./investment-replay.util";
 import { stripBrokerageSuffix } from "../accounts/account-name.util";
 
@@ -824,7 +825,7 @@ export class PortfolioCalculationService {
           // Rows as effects: a VOID transaction moved no shares and no cost.
           status: NON_VOID_INVESTMENT_STATUS,
         },
-        order: { transactionDate: "ASC", createdAt: "ASC" },
+        order: INVESTMENT_REPLAY_ORDER,
       }),
     );
 
@@ -1257,7 +1258,7 @@ export class PortfolioCalculationService {
       m.getRepository(InvestmentTransaction).find({
         where,
         relations: ["security", "account"],
-        order: { transactionDate: "ASC", createdAt: "ASC" },
+        order: INVESTMENT_REPLAY_ORDER,
       }),
     );
 
@@ -1436,7 +1437,7 @@ export class PortfolioCalculationService {
       m.getRepository(InvestmentTransaction).find({
         where,
         relations: ["security", "account"],
-        order: { transactionDate: "ASC", createdAt: "ASC" },
+        order: INVESTMENT_REPLAY_ORDER,
       }),
     );
 
@@ -2649,7 +2650,7 @@ export class PortfolioCalculationService {
           status: NON_VOID_INVESTMENT_STATUS,
         },
         relations: ["security"],
-        order: { transactionDate: "ASC", createdAt: "ASC" },
+        order: INVESTMENT_REPLAY_ORDER,
       }),
     );
 

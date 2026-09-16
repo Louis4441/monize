@@ -20,6 +20,7 @@ import {
   acquisitionCost,
   applyActionToQuantity,
   isQuantityOnlyAction,
+  INVESTMENT_REPLAY_ORDER_SQL,
 } from "../securities/investment-replay.util";
 import { Security } from "../securities/entities/security.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
@@ -1384,7 +1385,7 @@ export class ActionHistoryService {
       `SELECT * FROM investment_transactions
        WHERE account_id = $1 AND user_id = $2 AND transaction_date <= CURRENT_DATE
          AND status != 'VOID'
-       ORDER BY transaction_date ASC, created_at ASC`,
+       ORDER BY ${INVESTMENT_REPLAY_ORDER_SQL}`,
       [accountId, userId],
     );
 

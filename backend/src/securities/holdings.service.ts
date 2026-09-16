@@ -22,6 +22,7 @@ import {
   SHARE_MOVING_ACTIONS,
   acquisitionCost,
   isQuantityOnlyAction,
+  INVESTMENT_REPLAY_ORDER,
 } from "./investment-replay.util";
 import { Holding } from "./entities/holding.entity";
 import {
@@ -151,10 +152,7 @@ export class HoldingsService {
     const transactions = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(InvestmentTransaction).find({
         where,
-        order: {
-          transactionDate: "ASC",
-          createdAt: "ASC",
-        },
+        order: INVESTMENT_REPLAY_ORDER,
       }),
     );
 
@@ -569,10 +567,7 @@ export class HoldingsService {
       return m.getRepository(InvestmentTransaction).find({
         where,
         relations: ["security"],
-        order: {
-          transactionDate: "ASC",
-          createdAt: "ASC",
-        },
+        order: INVESTMENT_REPLAY_ORDER,
       });
     });
 
@@ -757,10 +752,7 @@ export class HoldingsService {
         // Rows as effects: a VOID transaction moved no shares.
         status: NON_VOID_INVESTMENT_STATUS,
       },
-      order: {
-        transactionDate: "ASC",
-        createdAt: "ASC",
-      },
+      order: INVESTMENT_REPLAY_ORDER,
     });
 
     const holdingsMap = this.computeHoldingsMap(transactions);
@@ -859,10 +851,7 @@ export class HoldingsService {
           // Rows as effects: a VOID transaction moved no shares.
           status: NON_VOID_INVESTMENT_STATUS,
         },
-        order: {
-          transactionDate: "ASC",
-          createdAt: "ASC",
-        },
+        order: INVESTMENT_REPLAY_ORDER,
       });
 
       // Map: accountId -> securityId -> { quantity, totalCost }
