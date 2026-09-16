@@ -773,6 +773,7 @@
   "investmentTransactions": {
     "totalTransactions": "Total Transactions",
     "totalVolume": "Total Volume",
+    "knownVolume": "Known Volume",
     "actionTypes": "Action Types",
     "securitiesTraded": "Securities Traded",
     "allActionsPlaceholder": "All Actions",
@@ -805,7 +806,22 @@
     "actionReinvestCapitalGainLong": "Reinvest Long-Term Cap Gain",
     "actionCapitalGainShort": "Short-Term Capital Gain",
     "actionCapitalGainLong": "Long-Term Capital Gain",
-    "actionRedeem": "Redeem CD/Bond"
+    "actionRedeem": "Redeem CD/Bond",
+    "colCommission": "Commission",
+    "colPriceCurrency": "Price Currency",
+    "colAmountCurrency": "Amount Currency",
+    "colCommissionCurrency": "Commission Currency",
+    "truncatedNotice": "Only the first {shown, plural, one {# row} other {# rows}} are listed. The figures above cover every matching transaction.",
+    "sortWithinCurrency": "Amounts are in each security's own currency, so these rows are grouped by currency before being sorted by value.",
+    "csvSummaryTitle": "Summary, converted",
+    "csvMeasure": "Measure",
+    "csvValue": "Value",
+    "csvReportingCurrency": "Reporting currency",
+    "csvKnownSubtotal": "Known subtotal",
+    "csvFxComplete": "Conversion",
+    "csvComplete": "Complete",
+    "csvPartial": "Partial",
+    "csvMissingPairs": "Missing rate pairs"
   },
   "loanAmortization": {
     "empty": "No loan or mortgage accounts found. Add a loan account to see the payment history.",

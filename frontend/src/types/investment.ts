@@ -333,6 +333,47 @@ export interface InvestmentTransaction {
   updatedAt: string;
 }
 
+/**
+ * One converted accumulation from the server: the total only when every
+ * component converted, the part that did convert beside it, and the pairs that
+ * stopped it. Read `fxComplete === false`; absent means no information.
+ */
+export interface InvestmentConvertedAggregate {
+  total: number | null;
+  knownSubtotal: number;
+  missingPairs: string[];
+  unknownCount: number;
+  /** Rows left out of `knownSubtotal` by either cause. */
+  excludedCount: number;
+  fxComplete?: boolean;
+}
+
+export interface InvestmentTransactionActionSummary extends InvestmentConvertedAggregate {
+  action: InvestmentAction;
+  count: number;
+}
+
+/**
+ * `GET /reports/investment-transactions/summary` -- the KPIs of the Investment
+ * Transaction History report, over the whole filtered set rather than the pages
+ * the client happened to fetch.
+ */
+export interface InvestmentTransactionSummary extends InvestmentConvertedAggregate {
+  /** The currency `total` and `knownSubtotal` are in. */
+  currencyCode: string;
+  transactionCount: number;
+  securitiesTraded: number;
+  byAction: InvestmentTransactionActionSummary[];
+  /**
+   * Distinct currencies the filtered rows' amounts are in. More than one means
+   * a table sorted by a raw amount compares across currencies, which the report
+   * says out loud rather than doing silently.
+   */
+  amountCurrencies: string[];
+  /** True when some row names no security, so its amount has no unit at all. */
+  hasUnknownCurrency: boolean;
+}
+
 export interface SecurityHistoryAccount {
   accountId: string;
   accountName: string;

@@ -590,6 +590,18 @@ Known gap           **An unconverted amount still reaches a report under the
                     beside a total that is null when anything was left out. The
                     report and the dashboard widget drawing each of them mark the
                     same subtotal through PartialTotal. The remaining callers of
+                    A third surface is done on the investment side: Investment
+                    Transaction History no longer labels a row's amount with the
+                    account's currency (price, commission and total_amount are
+                    the SECURITY's, which the row now states in
+                    amountCurrencyCode / priceCurrencyCode /
+                    commissionCurrencyCode) and no longer sums across currencies
+                    on the client. Its KPIs come from
+                    investment-reports/investment-transaction-summary.service.ts,
+                    which converts each row at its own transaction date and
+                    accumulates through FxAggregate, answering with total,
+                    knownSubtotal, missingPairs, excludedCount and fxComplete.
+                    The remaining callers of
                     convertAmount are Income by Source, Spending by Payee,
                     Monthly Spending Trend, Monthly Category Breakdown, and the
                     anomaly, comparison, tax/recurring and data-quality families;

@@ -773,6 +773,7 @@
   "investmentTransactions": {
     "totalTransactions": "[XX-Total Transactions-XX]",
     "totalVolume": "[XX-Total Volume-XX]",
+    "knownVolume": "[XX-Known Volume-XX]",
     "actionTypes": "[XX-Action Types-XX]",
     "securitiesTraded": "[XX-Securities Traded-XX]",
     "allActionsPlaceholder": "[XX-All Actions-XX]",
@@ -805,7 +806,22 @@
     "actionReinvestCapitalGainLong": "[XX-Reinvest Long-Term Cap Gain-XX]",
     "actionCapitalGainShort": "[XX-Short-Term Capital Gain-XX]",
     "actionCapitalGainLong": "[XX-Long-Term Capital Gain-XX]",
-    "actionRedeem": "[XX-Redeem CD/Bond-XX]"
+    "actionRedeem": "[XX-Redeem CD/Bond-XX]",
+    "colCommission": "[XX-Commission-XX]",
+    "colPriceCurrency": "[XX-Price Currency-XX]",
+    "colAmountCurrency": "[XX-Amount Currency-XX]",
+    "colCommissionCurrency": "[XX-Commission Currency-XX]",
+    "truncatedNotice": "[XX-Only the first {shown, plural, one {# row} other {# rows}} are listed. The figures above cover every matching transaction.-XX]",
+    "sortWithinCurrency": "[XX-Amounts are in each security's own currency, so these rows are grouped by currency before being sorted by value.-XX]",
+    "csvSummaryTitle": "[XX-Summary, converted-XX]",
+    "csvMeasure": "[XX-Measure-XX]",
+    "csvValue": "[XX-Value-XX]",
+    "csvReportingCurrency": "[XX-Reporting currency-XX]",
+    "csvKnownSubtotal": "[XX-Known subtotal-XX]",
+    "csvFxComplete": "[XX-Conversion-XX]",
+    "csvComplete": "[XX-Complete-XX]",
+    "csvPartial": "[XX-Partial-XX]",
+    "csvMissingPairs": "[XX-Missing rate pairs-XX]"
   },
   "loanAmortization": {
     "empty": "[XX-No loan or mortgage accounts found. Add a loan account to see the payment history.-XX]",

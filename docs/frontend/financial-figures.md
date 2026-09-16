@@ -276,3 +276,13 @@ Same currency is 1:1 *by definition* and stays a known conversion -- keep it dis
 ## Withholding a figure is only honest if the reader learns why
 
 A cumulative series with one unpriceable occurrence is withheld whole -- but a blank forward line is indistinguishable from "nothing scheduled". `BalanceForecastResult.gaps` names the schedule, the currency pair and the cause, and `BalanceForecastUnavailable` renders the fix (refresh rates on Currencies; check the security's and settlement account's currency). A `null` with no explanation is a dead end, not a correction.
+
+## An investment row's money is in the row's own currency, never the account's or the reader's
+
+`price`, `commission` and `totalAmount` on an investment transaction are stored in the **security's** currency (`docs/financial-semantics.md` section 6). The row states it: `amountCurrencyCode`, `priceCurrencyCode` and `commissionCurrencyCode` (`types/investment.ts`), with `settlementCurrencyCode` for the cash leg. Format with `formatCurrency(value, thatCode)`; a `null` code is unknown and renders `UnknownAmount reason="unknownCurrency"`, never the account's currency and never `defaultCurrency`. `security.currencyCode` is the only accepted fallback, being the same fact from the same row.
+
+Deriving the unit from the account made a EUR trade and a USD trade in a PLN brokerage both print `1 000,00 zl`, and a single selected account was read as proof of a single currency, which skipped conversion entirely (issue #1394).
+
+Totals over those rows are the server's, not the client's: `investmentReportsApi.getTransactionSummary` converts every matching row at the rate that stood on its own transaction date and answers with `total`, `knownSubtotal`, `missingPairs`, `excludedCount` and `fxComplete`. Two reasons, either sufficient. The client pages the register and stops at a cap, so a figure summed here describes part of the data under a caption that says "total"; and only the server can price a trade at its own date. Render the aggregate through `PartialTotal` and relabel the caption when `fxComplete === false`.
+
+Sorting a money column across currencies compares numbers that are not comparable. The table sorts by `(currency, value)` and says so under the heading; it never ranks a raw 100 EUR above a raw 90 USD.

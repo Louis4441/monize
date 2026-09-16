@@ -3288,3 +3288,66 @@ describe("a month grid is MonthGrid", () => {
     ).toBe(false);
   });
 });
+
+/**
+ * An investment transaction's `price`, `commission` and `totalAmount` are in the
+ * SECURITY's currency, and `formatCurrency(value)` with no second argument
+ * formats in the READER's. One-argument formatting of those three fields is
+ * therefore a mislabel every time, and it is a mechanical one: the call names
+ * the field it is about. Issue #1394 shipped exactly this, twice, in one file.
+ *
+ * `docs/frontend/financial-figures.md` ("An investment row's money is in the
+ * row's own currency") has the rule and what to pass instead.
+ */
+describe("an investment amount is formatted with its own currency", () => {
+  /**
+   * A `formatCurrency*` call whose single argument mentions one of the three
+   * fields. The argument list is matched up to the first `)` or `,`, so a call
+   * that DOES pass a currency has a comma and does not match.
+   */
+  const UNLABELLED_INVESTMENT_MONEY =
+    /\b(?:formatCurrency\w*|fmtValue)\(\s*[^,()]*\b(?:totalAmount|\.price|\.commission)\b[^,()]*\)/;
+
+  function offendingLines(): string[] {
+    const found: string[] = [];
+    for (const [path, content] of productionSources()) {
+      withoutComments(content)
+        .split("\n")
+        .forEach((line, index) => {
+          if (UNLABELLED_INVESTMENT_MONEY.test(line)) {
+            found.push(`${path}:${index + 1}`);
+          }
+        });
+    }
+    return found;
+  }
+
+  it("never formats a price, commission or total amount in the reader's currency", () => {
+    expect(
+      offendingLines(),
+      "Pass the row's own currency: formatCurrency(value, tx.amountCurrencyCode ?? tx.security?.currencyCode), and render UnknownAmount when it is null.",
+    ).toEqual([]);
+  });
+
+  it("catches the mislabel and passes a labelled call", () => {
+    expect(
+      UNLABELLED_INVESTMENT_MONEY.test("formatCurrency(Math.abs(tx.totalAmount))"),
+    ).toBe(true);
+    expect(UNLABELLED_INVESTMENT_MONEY.test("formatCurrencyFull(tx.price)")).toBe(
+      true,
+    );
+    // The wrapper shape, which is how the defect actually shipped: a local
+    // `fmtValue` that formats in one report-wide display currency.
+    expect(UNLABELLED_INVESTMENT_MONEY.test("fmtValue(entry.price)")).toBe(true);
+    expect(
+      UNLABELLED_INVESTMENT_MONEY.test(
+        "formatCurrency(tx.totalAmount, tx.amountCurrencyCode)",
+      ),
+    ).toBe(false);
+    expect(
+      UNLABELLED_INVESTMENT_MONEY.test(
+        withoutComments("// formatCurrency(tx.totalAmount) is the defect"),
+      ),
+    ).toBe(false);
+  });
+});

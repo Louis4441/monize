@@ -49,6 +49,7 @@ vi.mock('@/components/ui/DateRangeSelector', () => ({
 
 const mockGetTransactions = vi.fn();
 const mockGetInvestmentAccounts = vi.fn();
+const mockGetTransactionSummary = vi.fn();
 
 vi.mock('@/lib/investments', () => ({
   investmentsApi: {
@@ -56,6 +57,45 @@ vi.mock('@/lib/investments', () => ({
     getInvestmentAccounts: (...args: any[]) => mockGetInvestmentAccounts(...args),
   },
 }));
+
+vi.mock('@/lib/investment-reports', () => ({
+  investmentReportsApi: {
+    getTransactionSummary: (...args: any[]) => mockGetTransactionSummary(...args),
+  },
+}));
+
+/** The server's KPI answer; every card reads this and nothing else. */
+function summaryFixture(over: Record<string, unknown> = {}) {
+  return {
+    currencyCode: 'CAD',
+    transactionCount: 0,
+    securitiesTraded: 0,
+    total: 0,
+    knownSubtotal: 0,
+    missingPairs: [],
+    unknownCount: 0,
+    excludedCount: 0,
+    fxComplete: true,
+    byAction: [],
+    amountCurrencies: [],
+    hasUnknownCurrency: false,
+    ...over,
+  };
+}
+
+function actionFixture(action: string, over: Record<string, unknown> = {}) {
+  return {
+    action,
+    count: 1,
+    total: 0,
+    knownSubtotal: 0,
+    missingPairs: [],
+    unknownCount: 0,
+    excludedCount: 0,
+    fxComplete: true,
+    ...over,
+  };
+}
 
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({
@@ -69,11 +109,13 @@ vi.mock('@/lib/logger', () => ({
 describe('InvestmentTransactionHistoryReport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetTransactionSummary.mockResolvedValue(summaryFixture());
   });
 
   it('shows loading state initially', () => {
     mockGetTransactions.mockReturnValue(new Promise(() => {}));
     mockGetInvestmentAccounts.mockReturnValue(new Promise(() => {}));
+    mockGetTransactionSummary.mockReturnValue(new Promise(() => {}));
     render(<InvestmentTransactionHistoryReport />);
     expect(document.querySelector('.animate-pulse')).toBeTruthy();
   });
@@ -162,6 +204,11 @@ describe('InvestmentTransactionHistoryReport', () => {
       pagination: { hasMore: false },
     });
     mockGetInvestmentAccounts.mockResolvedValue([]);
+    mockGetTransactionSummary.mockResolvedValue(
+      summaryFixture({
+        byAction: [actionFixture('BUY'), actionFixture('DIVIDEND')],
+      }),
+    );
     render(<InvestmentTransactionHistoryReport />);
     await waitFor(() => {
       expect(screen.getByText('Activity Summary')).toBeInTheDocument();
@@ -298,6 +345,11 @@ describe('InvestmentTransactionHistoryReport', () => {
       pagination: { hasMore: false },
     });
     mockGetInvestmentAccounts.mockResolvedValue([]);
+    // The count is the server's over the whole filtered set, not a client-side
+    // distinct over the pages that happened to be fetched.
+    mockGetTransactionSummary.mockResolvedValue(
+      summaryFixture({ securitiesTraded: 2, transactionCount: 3 }),
+    );
     render(<InvestmentTransactionHistoryReport />);
     await waitFor(() => {
       expect(screen.getByText('Securities Traded')).toBeInTheDocument();

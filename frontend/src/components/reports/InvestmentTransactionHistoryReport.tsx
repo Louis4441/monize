@@ -4,7 +4,13 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { format } from 'date-fns';
 import { investmentsApi } from '@/lib/investments';
-import { InvestmentTransaction, InvestmentAction } from '@/types/investment';
+import { investmentReportsApi } from '@/lib/investment-reports';
+import {
+  InvestmentTransaction,
+  InvestmentAction,
+  InvestmentConvertedAggregate,
+  InvestmentTransactionSummary,
+} from '@/types/investment';
 import { Account } from '@/types/account';
 import { parseLocalDate } from '@/lib/utils';
 import { useDateFormat } from '@/hooks/useDateFormat';
@@ -18,10 +24,12 @@ import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions'
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { ReportError } from '@/components/reports/ReportError';
-import { exportToCsv } from '@/lib/csv-export';
+import { exportToCsv, exportCsvSections } from '@/lib/csv-export';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import { PartialTotal } from '@/components/ui/PartialTotal';
+import { UnknownAmount } from '@/components/ui/UnknownAmount';
+import type { ConvertedTotal } from '@/lib/currency-total';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 import { useTranslations } from 'next-intl';
@@ -40,15 +48,60 @@ const logger = createLogger('InvestmentTransactionHistoryReport');
 
 const MAX_PAGES = 50;
 
-interface ActionSummary {
-  action: InvestmentAction;
-  count: number;
-  totalAmount: number;
-  missingCurrencies: string[];
-  excludedCount: number;
+const ACCOUNTS_STORAGE_KEY = 'monize-reports-investment-transactions-accounts';
+
+/** What the table lists: the pages that were fetched, and whether that was all. */
+interface TransactionPage {
+  transactions: InvestmentTransaction[];
+  /** True when the fetch stopped at `MAX_PAGES` with more still to come. */
+  truncated: boolean;
 }
 
-const ACCOUNTS_STORAGE_KEY = 'monize-reports-investment-transactions-accounts';
+/**
+ * The currency a row's `price`, `commission` and `totalAmount` are in: the
+ * SECURITY's, which the server states on each row. `security.currencyCode` is
+ * the same fact from the same row and is the only accepted fallback, for a
+ * backend that predates the explicit field.
+ *
+ * `null` is unknown and renders as unknown. The account's currency is not the
+ * answer and neither is the reader's: taking it from the account is what
+ * printed a EUR trade and a USD trade with the same symbol (issue #1394).
+ */
+function rowAmountCurrency(tx: InvestmentTransaction): string | null {
+  return tx.amountCurrencyCode ?? tx.security?.currencyCode ?? null;
+}
+
+function rowPriceCurrency(tx: InvestmentTransaction): string | null {
+  return tx.priceCurrencyCode ?? tx.security?.currencyCode ?? null;
+}
+
+function rowCommissionCurrency(tx: InvestmentTransaction): string | null {
+  return tx.commissionCurrencyCode ?? tx.security?.currencyCode ?? null;
+}
+
+/**
+ * The server's aggregate as the shape `PartialTotal` reads.
+ *
+ * The subtotal is what goes on screen; `missingPairs` are `"USD->PLN"`, and the
+ * marker names the source side, which is the currency the reader has to find a
+ * rate for.
+ */
+/**
+ * One column of the CSV / PDF. `formatted` is the PDF's rendering; the CSV
+ * writes raw numbers, which is what makes them numbers in a spreadsheet.
+ */
+interface ExportColumn {
+  label: string;
+  value: (tx: InvestmentTransaction, formatted: boolean) => string | number;
+}
+
+function asConvertedTotal(aggregate: InvestmentConvertedAggregate): ConvertedTotal {
+  return {
+    value: aggregate.knownSubtotal,
+    missingCurrencies: [...new Set(aggregate.missingPairs.map((pair) => pair.split('->')[0]))],
+    excludedCount: aggregate.excludedCount,
+  };
+}
 
 export function InvestmentTransactionHistoryReport() {
   const t = useTranslations('reports');
@@ -59,7 +112,10 @@ export function InvestmentTransactionHistoryReport() {
   // deliberately does not (see the `date` column's `csvValue`): a machine reads
   // that one, and ISO is what every unconverted sibling export writes.
   const { formatDate } = useDateFormat();
-  const { defaultCurrency, convertToDefault } = useExchangeRates();
+  // Only for the reader's own currency, which decides whether a row's figure
+  // needs its ISO code spelled beside it. Nothing here converts: the one
+  // conversion is the server's, at each row's own transaction date.
+  const { defaultCurrency } = useExchangeRates();
   const [accounts, setAccounts] = useState<Account[]>([]);
   // Persisted so the report opens on the accounts the user last chose.
   const [selectedAccountIds, setSelectedAccountIds] = usePersistedAccountFilter(
@@ -105,31 +161,26 @@ export function InvestmentTransactionHistoryReport() {
     { field: 'date', direction: 'desc' },
   );
 
-  const accountCurrencyMap = useMemo(() => {
-    const map = new Map<string, string>();
-    accounts.forEach((a) => map.set(a.id, a.currencyCode));
-    return map;
-  }, [accounts]);
-
   const selectedAccount = isSingleAccount
     ? accounts.find((a) => a.id === selectedAccountIds[0])
     : undefined;
-  const displayCurrency = selectedAccount?.currencyCode || defaultCurrency;
-  const isForeign = displayCurrency !== defaultCurrency;
 
-  const getTxAmount = useCallback((tx: InvestmentTransaction): number | null => {
-    const amount = Math.abs(tx.totalAmount);
-    if (isSingleAccount) return amount;
-    const txCurrency = accountCurrencyMap.get(tx.accountId) || defaultCurrency;
-    return convertToDefault(amount, txCurrency);
-  }, [isSingleAccount, accountCurrencyMap, defaultCurrency, convertToDefault]);
-
-  const fmtValue = useCallback((value: number): string => {
-    if (isForeign) {
-      return `${formatCurrencyFull(value, displayCurrency)} ${displayCurrency}`;
-    }
-    return formatCurrencyFull(value);
-  }, [isForeign, displayCurrency, formatCurrencyFull]);
+  /**
+   * A row's own money, in a row's own currency. The ISO code is appended when
+   * that currency is not the reader's, because two currencies can share a
+   * symbol and the row is the only place the difference is stated.
+   *
+   * `null` in, `null` out: the caller renders `UnknownAmount` rather than
+   * labelling the figure with a currency nobody established.
+   */
+  const fmtRowMoney = useCallback(
+    (value: number, currency: string | null): string | null => {
+      if (currency === null) return null;
+      if (currency === defaultCurrency) return formatCurrencyFull(value, currency);
+      return `${formatCurrencyFull(value, currency)} ${currency}`;
+    },
+    [formatCurrencyFull, defaultCurrency],
+  );
 
   // Fetch accounts once on mount
   useEffect(() => {
@@ -138,7 +189,7 @@ export function InvestmentTransactionHistoryReport() {
       .catch((error) => logger.error('Failed to load accounts:', error));
   }, []);
 
-  const { data: response, isLoading, error, reload } = useReportData(
+  const { data: response, isLoading, error, reload } = useReportData<TransactionPage>(
     async () => {
       if (!isValid) return null;
       const allTransactions: InvestmentTransaction[] = [];
@@ -156,15 +207,48 @@ export function InvestmentTransactionHistoryReport() {
         hasMore = result.pagination.hasMore;
         page++;
       }
-      return allTransactions;
+      // `hasMore` still set after the last allowed page means the table below is
+      // showing part of the answer. The KPIs do not come from here, so they stay
+      // whole; the table says what it is missing.
+      return { transactions: allTransactions, truncated: hasMore };
     },
     [selectedAccountIds, rangeStart, rangeEnd, isValid],
   );
 
+  /**
+   * The KPIs, computed by the server over the WHOLE filtered set.
+   *
+   * Not derived from the rows above for two independent reasons: those rows are
+   * capped at `MAX_PAGES`, and each carries an amount in its own security's
+   * currency, which only the server can convert at the rate that stood on the
+   * trade's own date.
+   */
+  const { data: summary, reload: reloadSummary } = useReportData<InvestmentTransactionSummary>(
+    async () => {
+      if (!isValid) return null;
+      return investmentReportsApi.getTransactionSummary({
+        accountIds: selectedAccountIds,
+        startDate: rangeStart || undefined,
+        endDate: rangeEnd,
+        actions: selectedActions,
+      });
+    },
+    [selectedAccountIds, rangeStart, rangeEnd, selectedActions, isValid],
+  );
+
+  const reloadAll = useCallback(() => {
+    reload();
+    reloadSummary();
+  }, [reload, reloadSummary]);
+
   // Only the first load shows the full skeleton. Later reloads (e.g. changing
   // the account filter) keep the existing content -- and the account dropdown --
   // mounted so they update in place instead of unmounting the whole report.
-  const transactions = useMemo<InvestmentTransaction[]>(() => response ?? [], [response]);
+  const transactions = useMemo<InvestmentTransaction[]>(
+    () => response?.transactions ?? [],
+    [response],
+  );
+  const isTruncated = response?.truncated === true;
 
   // Action filtering happens client-side so toggling actions never re-fetches.
   const filteredTransactions = useMemo(() => {
@@ -173,54 +257,33 @@ export function InvestmentTransactionHistoryReport() {
     return transactions.filter((tx) => set.has(tx.action));
   }, [transactions, selectedActions]);
 
-  const actionSummaries = useMemo((): ActionSummary[] => {
-    const map = new Map<InvestmentAction, ActionSummary>();
+  // Every KPI reads the server's one answer. The client-side cross-currency sum
+  // that used to stand here added a EUR 1,000 trade to a USD 1,000 trade and
+  // captioned the result in the reader's own currency (issue #1394).
+  const actionSummaries = useMemo(() => summary?.byAction ?? [], [summary]);
+  const reportingCurrency = summary?.currencyCode ?? defaultCurrency;
 
-    filteredTransactions.forEach((tx) => {
-      let entry = map.get(tx.action);
-      if (!entry) {
-        entry = { action: tx.action, count: 0, totalAmount: 0, missingCurrencies: [], excludedCount: 0 };
-        map.set(tx.action, entry);
-      }
-      entry.count += 1;
-      const amount = getTxAmount(tx);
-      // The row is still counted -- the transaction happened -- but an
-      // unconvertible amount does not join a total in another currency; its
-      // currency is named so the action's volume reads as a subtotal.
-      if (amount !== null) {
-        entry.totalAmount += amount;
-      } else {
-        const currency = accountCurrencyMap.get(tx.accountId) || defaultCurrency;
-        if (!entry.missingCurrencies.includes(currency)) entry.missingCurrencies.push(currency);
-        entry.excludedCount += 1;
-      }
-    });
-
-    return Array.from(map.values()).sort((a, b) => b.totalAmount - a.totalAmount);
-  }, [filteredTransactions, getTxAmount, accountCurrencyMap, defaultCurrency]);
-
-  const totalAmount = useMemo(
-    () =>
-      filteredTransactions.reduce((sum, tx) => {
-        const amount = getTxAmount(tx);
-        return amount === null ? sum : sum + amount;
-      }, 0),
-    [filteredTransactions, getTxAmount],
+  /** The KPI's own figure, in the reporting currency the server named. */
+  const fmtReportingMoney = useCallback(
+    (value: number): string => formatCurrencyFull(value, reportingCurrency),
+    [formatCurrencyFull, reportingCurrency],
   );
 
-  // Transactions counted but left out of the volume total because their currency
-  // has no rate, so the total volume is a subtotal whenever this is non-empty.
-  const volumeGaps = useMemo(() => {
-    const missing = new Set<string>();
-    let excludedCount = 0;
+  /**
+   * True when the table's amounts span more than one currency, so a sort by
+   * Price or Total cannot compare the raw numbers. The rows are grouped by
+   * currency instead, and the report says so rather than doing it silently.
+   */
+  const sortsWithinCurrency = useMemo(() => {
+    const currencies = new Set<string>();
+    let hasUnknown = false;
     for (const tx of filteredTransactions) {
-      if (getTxAmount(tx) === null) {
-        missing.add(accountCurrencyMap.get(tx.accountId) || defaultCurrency);
-        excludedCount += 1;
-      }
+      const currency = rowAmountCurrency(tx);
+      if (currency === null) hasUnknown = true;
+      else currencies.add(currency);
     }
-    return { missingCurrencies: [...missing], excludedCount };
-  }, [filteredTransactions, getTxAmount, accountCurrencyMap, defaultCurrency]);
+    return currencies.size > 1 || (hasUnknown && currencies.size > 0);
+  }, [filteredTransactions]);
 
   const accountNameMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -254,17 +317,25 @@ export function InvestmentTransactionHistoryReport() {
             b.quantity != null ? Math.abs(b.quantity) : null,
           );
           break;
+        // Both money columns sort by (currency, value). Comparing the raw
+        // numbers would rank a 100 EUR price above a 90 USD one on arithmetic
+        // that means nothing across currencies; grouping first keeps every
+        // comparison inside one unit, and the caption under the table says so.
         case 'price':
-          comparison = compareValues(a.price, b.price);
+          comparison =
+            compareValues(rowPriceCurrency(a), rowPriceCurrency(b)) ||
+            compareValues(a.price, b.price);
           break;
         case 'total':
-          comparison = compareValues(getTxAmount(a), getTxAmount(b));
+          comparison =
+            compareValues(rowAmountCurrency(a), rowAmountCurrency(b)) ||
+            compareValues(Math.abs(a.totalAmount), Math.abs(b.totalAmount));
           break;
       }
       return sortDirection === 'asc' ? comparison : -comparison;
     });
     return sorted;
-  }, [filteredTransactions, sortField, sortDirection, accountNameMap, getTxAmount]);
+  }, [filteredTransactions, sortField, sortDirection, accountNameMap]);
 
   // The seven sortable columns, keyed by field so the record is exhaustive and
   // each entry must name its own key (see `SortColumnsByField`). One entry
@@ -317,39 +388,140 @@ export function InvestmentTransactionHistoryReport() {
       label: t('investmentTransactions.colPrice'),
       align: 'right',
       csvValue: (tx, formatted) =>
-        tx.price != null ? (formatted ? fmtValue(tx.price) : tx.price) : '',
+        tx.price != null
+          ? formatted
+            ? (fmtRowMoney(tx.price, rowPriceCurrency(tx)) ?? tCommon('unknownAmount.marker'))
+            : tx.price
+          : '',
     },
     total: {
       field: 'total',
       label: t('investmentTransactions.colTotal'),
       align: 'right',
       csvValue: (tx, formatted) =>
-        formatted ? fmtValue(Math.abs(tx.totalAmount)) : Math.abs(tx.totalAmount),
+        formatted
+          ? (fmtRowMoney(Math.abs(tx.totalAmount), rowAmountCurrency(tx)) ??
+            tCommon('unknownAmount.marker'))
+          : Math.abs(tx.totalAmount),
     },
-  }), [t, actionLabels, accountNameMap, fmtValue, formatShareQuantity]);
+  }), [t, tCommon, actionLabels, accountNameMap, fmtRowMoney, formatShareQuantity]);
 
-  // Their order, rendered by BOTH header rows, matched by the cells' DOM order
-  // and by the export's columns. DERIVED from the record rather than re-listed:
+  /**
+   * The export's own columns, for the CSV and the PDF alike.
+   *
+   * Every figure is written beside the currency it is in, in its OWN column, so
+   * a spreadsheet can group by unit instead of adding two currencies together --
+   * which is what the export invited when it wrote bare numbers under one
+   * heading (issue #1394). The table and the export read the same row through
+   * the same three `row*Currency` helpers, so a column hidden on screen cannot
+   * change what the file says.
+   *
+   * There is deliberately no per-row CONVERTED column here. The conversion the
+   * KPIs use happens on the server, at the rate that stood on each row's own
+   * date, and the client never sees that rate; a converted figure written here
+   * would be a second answer to a question the server has already answered.
+   * The converted view is the summary section below instead.
+   */
+  const exportColumns = useMemo<ExportColumn[]>(
+    () => [
+      { label: t('investmentTransactions.colDate'), value: columns.date.csvValue },
+      { label: t('investmentTransactions.colAction'), value: columns.action.csvValue },
+      { label: t('investmentTransactions.colSecurity'), value: columns.security.csvValue },
+      { label: t('investmentTransactions.colAccount'), value: columns.account.csvValue },
+      { label: t('investmentTransactions.colQuantity'), value: columns.quantity.csvValue },
+      {
+        label: t('investmentTransactions.colPriceCurrency'),
+        value: (tx: InvestmentTransaction) => rowPriceCurrency(tx) ?? '',
+      },
+      { label: t('investmentTransactions.colPrice'), value: columns.price.csvValue },
+      {
+        label: t('investmentTransactions.colAmountCurrency'),
+        value: (tx: InvestmentTransaction) => rowAmountCurrency(tx) ?? '',
+      },
+      { label: t('investmentTransactions.colTotal'), value: columns.total.csvValue },
+      {
+        label: t('investmentTransactions.colCommissionCurrency'),
+        value: (tx: InvestmentTransaction) => rowCommissionCurrency(tx) ?? '',
+      },
+      {
+        label: t('investmentTransactions.colCommission'),
+        value: (tx: InvestmentTransaction, formatted: boolean) =>
+          tx.commission == null
+            ? ''
+            : formatted
+              ? (fmtRowMoney(tx.commission, rowCommissionCurrency(tx)) ??
+                tCommon('unknownAmount.marker'))
+              : tx.commission,
+      },
+    ],
+    [t, tCommon, columns, fmtRowMoney],
+  );
+
+  // Their order, rendered by BOTH header rows and matched by the cells' DOM
+  // order. The export has its own wider list above, built from these same
+  // accessors. DERIVED from the record rather than re-listed:
   // a hand-written list beside an exhaustive record is not exhaustive, so a
   // field added to the union would compile and still ship with no sort control
   // in either header. The record's declaration order is the column order.
   const sortColumns: readonly SortColumn[] = useMemo(() => Object.values(columns), [columns]);
 
   const getExportData = useCallback((formatted: boolean) => {
-    // Both halves from the one ordered record: the headings from each column's
-    // label and the cells from its own `csvValue`, so a reorder cannot put a
+    // Both halves from the one ordered list: the headings from each column's
+    // label and the cells from its own accessor, so a reorder cannot put a
     // heading over another column's figures.
-    const headers = sortColumns.map((col) => col.label);
+    const headers = exportColumns.map((col) => col.label);
     const rows: (string | number)[][] = sortedTransactions.map((tx) =>
-      sortColumns.map((col) => col.csvValue(tx, formatted)),
+      exportColumns.map((col) => col.value(tx, formatted)),
     );
     return { headers, rows };
-  }, [sortedTransactions, sortColumns]);
+  }, [sortedTransactions, exportColumns]);
+
+  /**
+   * The converted half of the export: the reporting currency, what converted,
+   * what did not and why. One section rather than per-row columns, because the
+   * conversion is the server's and is stated once at the level it was made.
+   */
+  const getSummarySection = useCallback(() => {
+    if (!summary) return null;
+    const complete = summary.fxComplete !== false;
+    return {
+      title: t('investmentTransactions.csvSummaryTitle'),
+      headers: [
+        t('investmentTransactions.csvMeasure'),
+        t('investmentTransactions.csvValue'),
+      ],
+      rows: [
+        [t('investmentTransactions.csvReportingCurrency'), summary.currencyCode],
+        [t('investmentTransactions.totalTransactions'), summary.transactionCount],
+        [
+          t('investmentTransactions.totalVolume'),
+          complete && summary.total !== null ? summary.total : '',
+        ],
+        [t('investmentTransactions.csvKnownSubtotal'), summary.knownSubtotal],
+        [
+          t('investmentTransactions.csvFxComplete'),
+          complete
+            ? t('investmentTransactions.csvComplete')
+            : t('investmentTransactions.csvPartial'),
+        ],
+        [t('investmentTransactions.csvMissingPairs'), summary.missingPairs.join(' ')],
+        [t('investmentTransactions.securitiesTraded'), summary.securitiesTraded],
+      ] as (string | number)[][],
+    };
+  }, [summary, t]);
 
   const handleExportCsv = useCallback(() => {
     const { headers, rows } = getExportData(false);
-    exportToCsv('investment-transactions', headers, rows);
-  }, [getExportData]);
+    const summarySection = getSummarySection();
+    if (!summarySection) {
+      exportToCsv('investment-transactions', headers, rows);
+      return;
+    }
+    exportCsvSections('investment-transactions', [
+      { title: t('investmentTransactions.pdfTitle'), headers, rows },
+      summarySection,
+    ]);
+  }, [getExportData, getSummarySection, t]);
 
   const handleExportPdf = useCallback(async () => {
     const { exportToPdf } = await import('@/lib/pdf-export');
@@ -357,26 +529,36 @@ export function InvestmentTransactionHistoryReport() {
     const accountLabel = selectedAccount
       ? mainAccountName(selectedAccount.name)
       : t('investmentTransactions.allAccounts');
-    const uniqueSecurities = new Set(filteredTransactions.filter((tx) => tx.security).map((tx) => tx.security!.symbol)).size;
-    // A transaction with no rate is counted but left out of the volume, so the
-    // PDF marks it partial rather than printing a subtotal as the whole.
-    const volumeSuffix = volumeGaps.excludedCount > 0 ? ` ${tCommon('partialTotal.srSuffix')}` : '';
+    // Every figure here is the server's, over the whole filtered set. A partial
+    // one is marked and captioned as a subtotal rather than printed as a total.
+    const volumePartial = summary ? summary.fxComplete === false : false;
+    const volumeText = summary
+      ? `${fmtReportingMoney(volumePartial ? summary.knownSubtotal : (summary.total ?? summary.knownSubtotal))}${
+          volumePartial ? ` ${tCommon('partialTotal.srSuffix')}` : ''
+        }`
+      : tCommon('unknownAmount.marker');
+    const transactionCount = summary?.transactionCount ?? filteredTransactions.length;
+    // A withheld total is relabelled here too: the caption changes, rather than
+    // a subtotal being printed under one that says "total".
+    const volumeLabel = volumePartial
+      ? t('investmentTransactions.knownVolume')
+      : t('investmentTransactions.totalVolume');
     await exportToPdf({
       title: t('investmentTransactions.pdfTitle'),
-      subtitle: `${accountLabel} | ${filteredTransactions.length} transactions | Total volume: ${fmtValue(totalAmount)}${volumeSuffix}`,
+      subtitle: `${accountLabel} | ${transactionCount} | ${volumeLabel}: ${volumeText}`,
       summaryCards: [
-        { label: t('investmentTransactions.totalTransactions'), value: String(filteredTransactions.length), color: '#111827' },
-        { label: t('investmentTransactions.totalVolume'), value: `${fmtValue(totalAmount)}${volumeSuffix}`, color: '#111827' },
+        { label: t('investmentTransactions.totalTransactions'), value: String(transactionCount), color: '#111827' },
+        { label: volumeLabel, value: volumeText, color: '#111827' },
         { label: t('investmentTransactions.actionTypes'), value: String(actionSummaries.length), color: '#111827' },
-        { label: t('investmentTransactions.securitiesTraded'), value: String(uniqueSecurities), color: '#111827' },
+        { label: t('investmentTransactions.securitiesTraded'), value: String(summary?.securitiesTraded ?? 0), color: '#111827' },
       ],
       tableData: { headers, rows },
       filename: 'investment-transactions',
     });
-  }, [getExportData, selectedAccount, filteredTransactions, fmtValue, totalAmount, actionSummaries, t, tCommon, volumeGaps.excludedCount, mainAccountName]);
+  }, [getExportData, selectedAccount, filteredTransactions.length, summary, fmtReportingMoney, actionSummaries, t, tCommon, mainAccountName]);
 
   if (error) {
-    return <ReportError onRetry={reload} />;
+    return <ReportError onRetry={reloadAll} />;
   }
 
   if (isLoading && response === null) {
@@ -397,15 +579,30 @@ export function InvestmentTransactionHistoryReport() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400">{t('investmentTransactions.totalTransactions')}</div>
           <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            {filteredTransactions.length}
+            {summary?.transactionCount ?? filteredTransactions.length}
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">{t('investmentTransactions.totalVolume')}</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            {summary && summary.fxComplete === false
+              ? t('investmentTransactions.knownVolume')
+              : t('investmentTransactions.totalVolume')}
+          </div>
           <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            <PartialTotal total={{ value: totalAmount, ...volumeGaps }} displayCurrency={displayCurrency}>
-              {fmtValue(totalAmount)}
-            </PartialTotal>
+            {/* A withheld total is relabelled, not left under a "Total" caption:
+                the subtotal shows with the marker naming the pairs that stopped
+                it. Until the server answers there is no figure at all. */}
+            {summary ? (
+              <PartialTotal total={asConvertedTotal(summary)} displayCurrency={summary.currencyCode}>
+                {fmtReportingMoney(
+                  summary.fxComplete === false
+                    ? summary.knownSubtotal
+                    : (summary.total ?? summary.knownSubtotal),
+                )}
+              </PartialTotal>
+            ) : (
+              <UnknownAmount reason="displayFx" />
+            )}
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
@@ -417,7 +614,7 @@ export function InvestmentTransactionHistoryReport() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400">{t('investmentTransactions.securitiesTraded')}</div>
           <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            {new Set(filteredTransactions.filter((tx) => tx.security).map((tx) => tx.security!.symbol)).size}
+            {summary?.securitiesTraded ?? 0}
           </div>
         </div>
       </div>
@@ -453,7 +650,7 @@ export function InvestmentTransactionHistoryReport() {
             onChange={setDateRange}
           />
           <ReportToolbarActions
-            onRefreshComplete={reload}
+            onRefreshComplete={reloadAll}
             onExportCsv={handleExportCsv}
             onExportPdf={handleExportPdf}
             disabled={filteredTransactions.length === 0}
@@ -482,10 +679,14 @@ export function InvestmentTransactionHistoryReport() {
                 <span className="text-sm text-gray-500 dark:text-gray-400">
                   (
                   <PartialTotal
-                    total={{ value: summary.totalAmount, missingCurrencies: summary.missingCurrencies, excludedCount: summary.excludedCount }}
-                    displayCurrency={displayCurrency}
+                    total={asConvertedTotal(summary)}
+                    displayCurrency={reportingCurrency}
                   >
-                    {fmtValue(summary.totalAmount)}
+                    {fmtReportingMoney(
+                      summary.fxComplete === false
+                        ? summary.knownSubtotal
+                        : (summary.total ?? summary.knownSubtotal),
+                    )}
                   </PartialTotal>
                   )
                 </span>
@@ -508,6 +709,22 @@ export function InvestmentTransactionHistoryReport() {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               {t('investmentTransactions.transactionHistory', { count: filteredTransactions.length })}
             </h3>
+            {/* The table is capped; the figures above are not. Saying so is what
+                keeps a listing of part of the data from reading as all of it. */}
+            {isTruncated && (
+              <p className="mt-1 text-sm text-amber-600 dark:text-amber-400" data-testid="truncated-notice">
+                {t('investmentTransactions.truncatedNotice', {
+                  shown: filteredTransactions.length,
+                })}
+              </p>
+            )}
+            {/* Amounts in different currencies are not comparable numbers, so
+                the money sorts group by currency and the reader is told. */}
+            {sortsWithinCurrency && (sortField === 'price' || sortField === 'total') && (
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400" data-testid="sort-currency-notice">
+                {t('investmentTransactions.sortWithinCurrency')}
+              </p>
+            )}
           </div>
           {/* Below `sm` the table becomes a block and each row wraps into a
               two-column grid of EQUAL `minmax(0,1fr)` tracks (for the reason
@@ -706,7 +923,11 @@ export function InvestmentTransactionHistoryReport() {
                       className={`col-start-2 row-start-2 text-gray-900 dark:text-gray-100 ${MONEY_CELL}`}
                     >
                       <CellLabel className={CAPTION_CLASS}>{columns.price.label}</CellLabel>
-                      {tx.price != null ? fmtValue(tx.price) : '-'}
+                      {tx.price == null
+                        ? '-'
+                        : (fmtRowMoney(tx.price, rowPriceCurrency(tx)) ?? (
+                            <UnknownAmount reason="unknownCurrency" />
+                          ))}
                     </td>
                     {/* The total takes the right of line 1 beside the security:
                         it is the figure the row is read for. */}
@@ -715,7 +936,9 @@ export function InvestmentTransactionHistoryReport() {
                       className={`col-start-2 row-start-1 font-medium text-gray-900 dark:text-gray-100 ${MONEY_CELL}`}
                     >
                       <CellLabel className={CAPTION_CLASS}>{columns.total.label}</CellLabel>
-                      {fmtValue(Math.abs(tx.totalAmount))}
+                      {fmtRowMoney(Math.abs(tx.totalAmount), rowAmountCurrency(tx)) ?? (
+                        <UnknownAmount reason="unknownCurrency" />
+                      )}
                     </td>
                   </tr>
                 ))}
