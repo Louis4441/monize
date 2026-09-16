@@ -1,0 +1,272 @@
+import { InvestmentTransactionSummaryService } from "./investment-transaction-summary.service";
+import { InvestmentAction } from "../securities/entities/investment-transaction.entity";
+import { UserPreference } from "../users/entities/user-preference.entity";
+import {
+  createScopedDbMocks,
+  ManagerMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
+
+interface RowInput {
+  action?: InvestmentAction;
+  date?: string;
+  amount?: string;
+  currency?: string | null;
+  symbol?: string | null;
+}
+
+function row(over: RowInput = {}) {
+  return {
+    action: over.action ?? InvestmentAction.BUY,
+    transaction_date: over.date ?? "2026-09-01",
+    total_amount: over.amount ?? "1000.0000",
+    currency_code: over.currency === undefined ? "EUR" : over.currency,
+    symbol: over.symbol === undefined ? "AAA" : over.symbol,
+  };
+}
+
+describe("InvestmentTransactionSummaryService", () => {
+  let service: InvestmentTransactionSummaryService;
+  let manager: ManagerMock;
+  let preferences: { findOne: jest.Mock };
+  let exchangeRateService: { getRateForDate: jest.Mock };
+
+  /** Rows the statement returns; the linked-account lookup answers empty. */
+  function returnRows(rows: unknown[]): void {
+    manager.query.mockImplementation((sql: string) =>
+      Promise.resolve(
+        sql.includes("FROM accounts")
+          ? []
+          : (rows as Record<string, unknown>[]),
+      ),
+    );
+  }
+
+  beforeEach(() => {
+    preferences = {
+      findOne: jest.fn().mockResolvedValue({ defaultCurrency: "PLN" }),
+    };
+    exchangeRateService = { getRateForDate: jest.fn() };
+    const { manager: managerMock, dataSource } = createScopedDbMocks([
+      [UserPreference, preferences as never],
+    ]);
+    manager = managerMock;
+    service = new InvestmentTransactionSummaryService(
+      dataSource as never,
+      exchangeRateService as never,
+    );
+  });
+
+  it("converts each row at its own transaction date and totals in the reporting currency", async () => {
+    // The reproduction from issue #1394: two 1,000 trades of equal NUMERIC
+    // value in different currencies. Their arithmetic sum, 2,000, is never the
+    // answer.
+    returnRows([
+      row({ currency: "EUR", date: "2026-09-01", symbol: "AAA" }),
+      row({ currency: "USD", date: "2026-09-02", symbol: "BBB" }),
+    ]);
+    exchangeRateService.getRateForDate.mockImplementation(
+      (from: string, _to: string, date: string) => {
+        if (from === "EUR" && date === "2026-09-01")
+          return Promise.resolve(4.339);
+        if (from === "USD" && date === "2026-09-02")
+          return Promise.resolve(3.7538);
+        return Promise.resolve(null);
+      },
+    );
+
+    const summary = await service.summarize("u1", {});
+
+    expect(summary.currencyCode).toBe("PLN");
+    expect(summary.total).toBeCloseTo(8092.8, 4);
+    expect(summary.total).not.toBe(2000);
+    expect(summary.fxComplete).toBe(true);
+    expect(summary.missingPairs).toEqual([]);
+    expect(summary.transactionCount).toBe(2);
+    expect(summary.securitiesTraded).toBe(2);
+    expect(summary.amountCurrencies).toEqual(["EUR", "USD"]);
+  });
+
+  it("withholds the total and names the pair when one rate is missing", async () => {
+    returnRows([
+      row({ currency: "EUR", date: "2026-09-01" }),
+      row({ currency: "USD", date: "2026-09-02" }),
+    ]);
+    exchangeRateService.getRateForDate.mockImplementation((from: string) =>
+      Promise.resolve(from === "EUR" ? 4.339 : null),
+    );
+
+    const summary = await service.summarize("u1", {});
+
+    expect(summary.total).toBeNull();
+    expect(summary.knownSubtotal).toBeCloseTo(4339, 4);
+    expect(summary.missingPairs).toEqual(["USD->PLN"]);
+    expect(summary.fxComplete).toBe(false);
+    // The pairs alone cannot say how many rows fell out of the subtotal.
+    expect(summary.excludedCount).toBe(1);
+  });
+
+  it("asks for no rate when the row is already in the reporting currency", async () => {
+    returnRows([row({ currency: "PLN", amount: "250.0000" })]);
+
+    const summary = await service.summarize("u1", {});
+
+    expect(exchangeRateService.getRateForDate).not.toHaveBeenCalled();
+    expect(summary.total).toBe(250);
+    expect(summary.fxComplete).toBe(true);
+  });
+
+  it("asks for no rate for a zero amount, and still reports it as a known zero", async () => {
+    returnRows([row({ currency: "JPY", amount: "0.0000" })]);
+
+    const summary = await service.summarize("u1", {});
+
+    expect(exchangeRateService.getRateForDate).not.toHaveBeenCalled();
+    expect(summary.total).toBe(0);
+    expect(summary.fxComplete).toBe(true);
+  });
+
+  it("reports an empty filter as a known zero, not as unknown", async () => {
+    returnRows([]);
+    const summary = await service.summarize("u1", {});
+    expect(summary.total).toBe(0);
+    expect(summary.transactionCount).toBe(0);
+    expect(summary.byAction).toEqual([]);
+  });
+
+  it("withholds without naming a pair when a row has no security currency", async () => {
+    returnRows([row({ currency: null, symbol: null, amount: "40.0000" })]);
+
+    const summary = await service.summarize("u1", {});
+
+    expect(summary.total).toBeNull();
+    expect(summary.missingPairs).toEqual([]);
+    expect(summary.unknownCount).toBe(1);
+    expect(summary.excludedCount).toBe(1);
+    expect(summary.hasUnknownCurrency).toBe(true);
+    expect(summary.knownSubtotal).toBe(0);
+  });
+
+  it("sums volume as magnitude and splits it by action", async () => {
+    returnRows([
+      row({
+        action: InvestmentAction.BUY,
+        currency: "PLN",
+        amount: "100.0000",
+      }),
+      row({
+        action: InvestmentAction.SELL,
+        currency: "PLN",
+        amount: "-300.0000",
+      }),
+    ]);
+
+    const summary = await service.summarize("u1", {});
+
+    expect(summary.total).toBe(400);
+    expect(summary.byAction).toEqual([
+      expect.objectContaining({
+        action: InvestmentAction.SELL,
+        count: 1,
+        total: 300,
+      }),
+      expect.objectContaining({
+        action: InvestmentAction.BUY,
+        count: 1,
+        total: 100,
+      }),
+    ]);
+  });
+
+  it("marks only the affected action incomplete", async () => {
+    returnRows([
+      row({
+        action: InvestmentAction.BUY,
+        currency: "PLN",
+        amount: "100.0000",
+      }),
+      row({
+        action: InvestmentAction.SELL,
+        currency: "USD",
+        amount: "50.0000",
+      }),
+    ]);
+    exchangeRateService.getRateForDate.mockResolvedValue(null);
+
+    const summary = await service.summarize("u1", {});
+
+    const buy = summary.byAction.find((a) => a.action === InvestmentAction.BUY);
+    const sell = summary.byAction.find(
+      (a) => a.action === InvestmentAction.SELL,
+    );
+    expect(buy?.total).toBe(100);
+    expect(buy?.fxComplete).toBe(true);
+    expect(sell?.total).toBeNull();
+    expect(sell?.missingPairs).toEqual(["USD->PLN"]);
+  });
+
+  it("asks for one rate per currency-day however many rows share it", async () => {
+    returnRows([
+      row({ currency: "EUR", date: "2026-09-01" }),
+      row({ currency: "EUR", date: "2026-09-01" }),
+      row({ currency: "EUR", date: "2026-09-02" }),
+    ]);
+    exchangeRateService.getRateForDate.mockResolvedValue(4);
+
+    await service.summarize("u1", {});
+
+    expect(exchangeRateService.getRateForDate).toHaveBeenCalledTimes(2);
+  });
+
+  it("treats a non-positive rate as no rate rather than as a conversion", async () => {
+    returnRows([row({ currency: "EUR" })]);
+    exchangeRateService.getRateForDate.mockResolvedValue(0);
+
+    const summary = await service.summarize("u1", {});
+
+    expect(summary.total).toBeNull();
+    expect(summary.missingPairs).toEqual(["EUR->PLN"]);
+  });
+
+  it("filters by account, date and action, widening to linked cash accounts", async () => {
+    manager.query.mockImplementation((sql: string) =>
+      Promise.resolve(sql.includes("FROM accounts") ? [{ id: "cash-1" }] : []),
+    );
+
+    await service.summarize("u1", {
+      accountIds: ["acc-1"],
+      startDate: "2026-01-01",
+      endDate: "2026-12-31",
+      actions: [InvestmentAction.BUY],
+    });
+
+    const rowsCall = manager.query.mock.calls.find(
+      (call: unknown[]) =>
+        typeof call[0] === "string" &&
+        (call[0] as string).includes("investment_transactions"),
+    );
+    expect(rowsCall?.[0]).toContain("it.account_id = ANY($4)");
+    expect(rowsCall?.[0]).toContain("it.transaction_date >= $5");
+    expect(rowsCall?.[0]).toContain("it.transaction_date <= $6");
+    expect(rowsCall?.[0]).toContain("it.action = ANY($7)");
+    expect(rowsCall?.[1]).toEqual([
+      "u1",
+      InvestmentAction.INTEREST,
+      InvestmentAction.REDEEM,
+      ["acc-1", "cash-1"],
+      "2026-01-01",
+      "2026-12-31",
+      [InvestmentAction.BUY],
+    ]);
+  });
+
+  it("falls back to the one reporting-currency constant when no preference is stored", async () => {
+    preferences.findOne.mockResolvedValue(null);
+    returnRows([]);
+    const summary = await service.summarize("u1", {});
+    expect(summary.currencyCode).toBe("USD");
+  });
+});
