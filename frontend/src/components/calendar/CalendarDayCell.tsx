@@ -414,7 +414,13 @@ export function CalendarValueFigure({
   if (!isDailyValueComplete(point)) {
     return (
       <UnknownAmount
-        reason={point.pricesComplete === false ? 'noPrice' : 'displayFx'}
+        reason={
+          point.pricesComplete === false
+            ? 'noPrice'
+            : point.cashComplete === false
+              ? 'noCashBalance'
+              : 'displayFx'
+        }
         className="text-xs"
       />
     );
@@ -447,8 +453,12 @@ export function CalendarValueFigure({
  */
 export function movementUnknownReason(
   reasons: readonly DailyMovementReason[],
-): 'noPrice' | 'displayFx' | 'noBaseline' {
+): 'noPrice' | 'displayFx' | 'noBaseline' | 'noCashBalance' {
   if (reasons.includes('unpricedHolding')) return 'noPrice';
+  // A cash account that reported no balance is neither a price nor a rate: the
+  // day's balance is missing, and sending the reader to either screen is the
+  // errand `displayFx` exists to avoid.
+  if (reasons.includes('cashIncomplete')) return 'noCashBalance';
   // `decide` returns this one alone, so it is not masking another cause.
   if (reasons.includes('noPriorValue')) return 'noBaseline';
   return 'displayFx';

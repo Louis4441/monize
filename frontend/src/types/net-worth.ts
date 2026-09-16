@@ -18,7 +18,7 @@ export interface MonthlyInvestmentValue {
  * position it cannot price and drops a component it cannot convert. Read the
  * flags before printing this under a total's caption.
  *
- * All four flags are optional because a response from an older backend
+ * All of the flags are optional because a response from an older backend
  * mid-deploy carries none of them, and absent means NO INFORMATION, not
  * "complete". That is why every read of them is `=== false`, never `!flag`:
  * truthiness turns a silent response into a withheld figure on every day.
@@ -37,6 +37,13 @@ export interface DailyInvestmentValue {
   pricesComplete?: boolean;
   /** The securities behind `pricesComplete: false`, so a reader can price them. */
   unpricedSecurityIds?: string[];
+  /**
+   * False when a cash account in the scope produced no balance for this day, so
+   * its contribution is unknown rather than zero.
+   */
+  cashComplete?: boolean;
+  /** The accounts behind `cashComplete: false`. */
+  unknownCashAccountIds?: string[];
 }
 
 export type InvestmentBreakdownGranularity = 'daily' | 'monthly';

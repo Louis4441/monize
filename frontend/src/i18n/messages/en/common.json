@@ -243,6 +243,7 @@
     "srLabel": "Amount not available",
     "scheduledFx": "The current amount cannot be worked out: no exchange rate is available for this scheduled item's settlement currency pair. The stored amount was calculated at an older rate, so it is not shown.",
     "displayFx": "This figure cannot be shown here: the amount is known, but no exchange rate is available to convert it into the currency this total is reported in. Refresh your rates on the Currencies page.",
+    "noCashBalance": "This value cannot be worked out: a cash account in this view reported no balance for this day, so what it held is unknown rather than zero. Reload the report; if it persists, the day's balances could not be worked out and this is worth reporting.",
     "noPrice": "This value cannot be worked out: the shares held are known, but the security has no price to value them at. Refresh prices, or add one by hand on the security's Price history.",
     "noBaseline": "This figure cannot be worked out: it is a comparison, and there is no earlier value to measure it against. Nothing is missing, so there is nothing to add.",
     "staleQuote": "The day's move cannot be worked out: the security's most recent price is older than the last trading session, so any change from it would be an earlier day's. Refresh prices, or check the security's quote provider."

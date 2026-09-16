@@ -655,6 +655,98 @@ describe('PortfolioValueReport', () => {
     expect(mockGetInvestmentsDaily).toHaveBeenCalled();
   });
 
+  describe('a day the server could not finish', () => {
+    const kpi = (label: string) =>
+      screen.getByText(label).parentElement!.textContent;
+
+    it('withholds the high, the low and the change when a day is incomplete', async () => {
+      // The cash sleeve of one account has no balance for 06-01, so that point
+      // is a subtotal: it cannot be ranked against whole days, and it is one of
+      // the two endpoints the period change is measured between (#1389).
+      mockDateRangeValue = '3m';
+      mockGetInvestmentsDaily.mockResolvedValue([
+        {
+          date: '2024-06-01',
+          value: 50000,
+          fxComplete: true,
+          pricesComplete: true,
+          cashComplete: false,
+          unknownCashAccountIds: ['cash-1'],
+        },
+        {
+          date: '2024-06-02',
+          value: 51000,
+          fxComplete: true,
+          pricesComplete: true,
+          cashComplete: true,
+          unknownCashAccountIds: [],
+        },
+      ]);
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      render(<PortfolioValueReport />);
+      await waitFor(() => {
+        expect(screen.getByText('Lowest Value')).toBeInTheDocument();
+      });
+
+      await waitFor(() => expect(kpi('Lowest Value')).toContain('N/A'));
+      expect(kpi('Lowest Value')).not.toContain('$50000');
+      expect(kpi('Highest Value')).toContain('N/A');
+      expect(kpi('Period Change')).toContain('N/A');
+      expect(kpi('Period Return')).toContain('N/A');
+    });
+
+    it('prints the figures when every day is complete', async () => {
+      mockDateRangeValue = '3m';
+      mockGetInvestmentsDaily.mockResolvedValue([
+        {
+          date: '2024-06-01',
+          value: 50000,
+          fxComplete: true,
+          pricesComplete: true,
+          cashComplete: true,
+          unknownCashAccountIds: [],
+        },
+        {
+          date: '2024-06-02',
+          value: 51000,
+          fxComplete: true,
+          pricesComplete: true,
+          cashComplete: true,
+          unknownCashAccountIds: [],
+        },
+      ]);
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      render(<PortfolioValueReport />);
+      await waitFor(() => {
+        expect(screen.getByText('Lowest Value')).toBeInTheDocument();
+      });
+
+      await waitFor(() => expect(kpi('Lowest Value')).toContain('$50000'));
+      expect(kpi('Highest Value')).toContain('$51000');
+      expect(kpi('Period Change')).not.toContain('N/A');
+    });
+
+    it('says nothing about completeness a response never claimed', async () => {
+      // An older backend mid-deploy sends no flags at all. Absent is no
+      // information, so the figures are printed as before.
+      mockDateRangeValue = '3m';
+      mockGetInvestmentsDaily.mockResolvedValue([
+        { date: '2024-06-01', value: 50000 },
+        { date: '2024-06-02', value: 51000 },
+      ]);
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      render(<PortfolioValueReport />);
+      await waitFor(() => {
+        expect(screen.getByText('Lowest Value')).toBeInTheDocument();
+      });
+
+      await waitFor(() => expect(kpi('Lowest Value')).toContain('$50000'));
+    });
+  });
+
   it('shows intraday unavailable state for 1d range with fallbackToDaily', async () => {
     mockDateRangeValue = '1d';
     mockGetIntradayValue.mockResolvedValue({

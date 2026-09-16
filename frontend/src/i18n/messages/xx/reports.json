@@ -1154,6 +1154,7 @@
     "lowestValue": "[XX-Lowest Value-XX]",
     "periodChange": "[XX-Period Change-XX]",
     "periodReturn": "[XX-Period Return-XX]",
+    "incompleteTooltip": "[XX-Some days in this window are missing a price, an exchange rate or a cash balance, so the figures that depend on every day are not shown.-XX]",
     "priorCloseTooltip": "[XX-Measured from the previous trading day's close on {date}.-XX]",
     "notAvailable": "[XX-N/A-XX]",
     "intradayUnavailable": "[XX-Detailed intraday pricing unavailable-XX]",

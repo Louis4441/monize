@@ -418,7 +418,15 @@ function CalendarDayValueSection({ value }: { value: CalendarDayValue }) {
             {formatCurrency(point.value, currencyCode)}
           </span>
         ) : (
-          <UnknownAmount reason={point.pricesComplete === false ? 'noPrice' : 'displayFx'} />
+          <UnknownAmount
+            reason={
+              point.pricesComplete === false
+                ? 'noPrice'
+                : point.cashComplete === false
+                  ? 'noCashBalance'
+                  : 'displayFx'
+            }
+          />
         )}
       </div>
 

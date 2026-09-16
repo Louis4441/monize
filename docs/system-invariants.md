@@ -358,6 +358,15 @@ day is the contract's real answer and a behaviour change to four charts, reporte
 as its own proposal. Every consumer reads the flag as `pricesComplete === false`:
 absent means an older backend said nothing, not that the day was complete.
 
+Cash is the same question asked of the other half of the point. The per-day
+balance query is asked for every account in the resolved scope, so an account
+with no row for a day it was asked about is missing data: the day carries
+`cashComplete: false` and `unknownCashAccountIds`, read the same way and folded
+into `DailyMovementService`'s `complete` as the `cashIncomplete` reason. Before
+#1389 that walk was over the maps the query returned, keyed by a day name a
+local `Date` had shifted, so the first day of every range reported a portfolio
+with no cash in it at all.
+
 ### INV-TRANSFER-001 -- both legs, one decision
 
 ```text

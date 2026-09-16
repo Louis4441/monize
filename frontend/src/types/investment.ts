@@ -809,6 +809,7 @@ export type DailyMovementReason =
   | 'unpricedHolding'
   | 'missingRate'
   | 'flowIncomplete'
+  | 'cashIncomplete'
   | 'noPriorValue'
   | 'zeroBaseline';
 

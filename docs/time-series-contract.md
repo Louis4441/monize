@@ -207,6 +207,29 @@ issue #1081 reported: the per-security portfolio chart opened in 1990 and
 flattened three decades of nothing against the x-axis. `net-worth.service.ts`
 carries the allowlist and the scan test that holds it.
 
+### 2.6 A sample date is a calendar date, not an instant
+
+A series keyed by calendar date enumerates `YYYY-MM-DD` strings and steps them
+with `addDaysYMD` (`backend/src/common/date-utils.ts`) or, for a whole window,
+`enumerateDaysYMD` (`backend/src/net-worth/series-dates.util.ts`). A `Date` built
+from a date string plus `T00:00:00` is LOCAL midnight, and `toISOString()` reads
+UTC components: the pair names every day one day early in any process east of
+Greenwich, and drops the last day of the window entirely. The database returns
+real calendar dates, so the keys stop matching and every lookup against them
+falls to its default.
+
+That default is the second half of the rule. A series point looks up its
+components by date; when a component the query was asked to produce has no row
+for that date, the point is missing data, not holding zero. Walk the EXPECTED
+components -- the resolved account scope, not the maps the query happened to
+return -- so a missing map is visible, and give the gap a completeness flag of
+its own (`cashComplete` and `unknownCashAccountIds` on
+`DailyInvestmentValue`) rather than a `?? 0` that reads as a measurement. Zero is
+the right answer only where the query legitimately says "no movement" and the
+opening balance is already carried; a row that was never produced says nothing
+at all. `series-dates.guard.spec.ts` scans `backend/src/net-worth/` for both
+shapes.
+
 ## 3. Missing returns are never zero
 
 - A period with no usable prices has `return: null`. Never `0`.

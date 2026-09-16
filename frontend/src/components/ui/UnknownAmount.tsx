@@ -31,7 +31,13 @@ interface UnknownAmountProps {
    * reader looking for a price that is already stored -- what is missing is a
    * *recent* one.
    */
-  reason?: 'scheduledFx' | 'displayFx' | 'noPrice' | 'noBaseline' | 'staleQuote';
+  reason?:
+    | 'scheduledFx'
+    | 'displayFx'
+    | 'noPrice'
+    | 'noBaseline'
+    | 'staleQuote'
+    | 'noCashBalance';
   /** Extra classes for the wrapper, so a table cell can keep its alignment. */
   className?: string;
 }

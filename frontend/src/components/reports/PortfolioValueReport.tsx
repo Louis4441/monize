@@ -172,8 +172,11 @@ export function PortfolioValueReport() {
   const chartRef = useRef<HTMLDivElement>(null);
   // `iso` is the point's own date/timestamp, kept beside the display label so
   // the prior-close baseline can be looked up for the data actually on screen.
+  // `complete` is the server's completeness for that point, absent where the
+  // endpoint reports none (intraday, by-security) -- absent is NO INFORMATION,
+  // so every read of it is `=== false`.
   const [chartPoints, setChartPoints] = useState<
-    Array<{ name: string; Value: number; iso: string }>
+    Array<{ name: string; Value: number; iso: string; complete?: boolean }>
   >([]);
   const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -328,6 +331,12 @@ export function PortfolioValueReport() {
             name: formatChartDate(d.date, 'MMM d, yyyy'),
             Value: d.value,
             iso: d.date,
+            // A day short of a price, a rate or a cash balance is a subtotal;
+            // the KPIs below refuse to name it a high, a low or a change.
+            complete:
+              d.pricesComplete !== false &&
+              d.fxComplete !== false &&
+              d.cashComplete !== false,
           })),
         );
       } else {
@@ -569,14 +578,29 @@ export function PortfolioValueReport() {
       return {
         change: 0 as number | null,
         changePercent: 0 as number | null,
-        highest: 0,
-        lowest: 0,
+        highest: 0 as number | null,
+        lowest: 0 as number | null,
       };
     }
     const values = chartPoints.map((d) => d.Value);
-    const highest = Math.max(...values);
-    const lowest = Math.min(...values);
-    const current = chartPoints[chartPoints.length - 1]?.Value || 0;
+    // A point the server could not finish is a subtotal, and a subtotal can sit
+    // anywhere in the ordering: the real high or low may be the day that is
+    // missing a component. One incomplete point therefore leaves BOTH extremes
+    // unknown rather than quietly ranking a partial figure against whole ones.
+    const extremesKnown = chartPoints.every((p) => p.complete !== false);
+    const highest = extremesKnown ? Math.max(...values) : null;
+    const lowest = extremesKnown ? Math.min(...values) : null;
+    const lastPoint = chartPoints[chartPoints.length - 1];
+    const firstPoint = chartPoints[0];
+    const current = lastPoint?.Value || 0;
+    // A change is a difference of its two endpoints, so an endpoint that is a
+    // subtotal makes the difference unknown, not approximate.
+    const endpointIncomplete =
+      lastPoint?.complete === false ||
+      (!usesPriorClose && firstPoint?.complete === false);
+    if (endpointIncomplete) {
+      return { change: null, changePercent: null, highest, lowest };
+    }
     if (usesPriorClose) {
       // A baseline that has not loaded (or could not be established) leaves
       // the change unknown -- never the first point's change wearing the
@@ -587,7 +611,7 @@ export function PortfolioValueReport() {
         ...priorCloseChange(current, priorClose?.value ?? null),
       };
     }
-    const initial = chartPoints[0]?.Value || 0;
+    const initial = firstPoint?.Value || 0;
     const change = current - initial;
     const changePercent = initial !== 0 ? (change / Math.abs(initial)) * 100 : 0;
     return {
@@ -597,6 +621,13 @@ export function PortfolioValueReport() {
       lowest,
     };
   }, [chartPoints, usesPriorClose, priorClose]);
+
+  // Which KPI captions the window cannot stand behind, so the cards say so
+  // rather than printing a partial figure under a total's caption.
+  const valuesIncomplete = useMemo(
+    () => chartPoints.some((p) => p.complete === false),
+    [chartPoints],
+  );
 
   const sortedChartTableData = useMemo(() => {
     const sorted = chartPoints.map((p, idx) => ({ ...p, index: idx }));
@@ -721,7 +752,10 @@ export function PortfolioValueReport() {
         : chartPoints.findIndex((p) => p.Value === summary.lowest),
     [chartPoints, summary.lowest],
   );
-  const showFlags = summary.highest !== summary.lowest;
+  const showFlags =
+    summary.highest !== null &&
+    summary.lowest !== null &&
+    summary.highest !== summary.lowest;
 
   // The Portfolio Breakdown table's five sortable columns, keyed by field so the
   // record is exhaustive: adding a member to `PortfolioBreakdownSortField` is a
@@ -754,8 +788,22 @@ export function PortfolioValueReport() {
       title: t('portfolioValue.pdfTitle'),
       subtitle: accountLabel,
       summaryCards: [
-        { label: t('portfolioValue.highestValue'), value: fmtVal(summary.highest), color: '#111827' },
-        { label: t('portfolioValue.lowestValue'), value: fmtVal(summary.lowest), color: '#111827' },
+        {
+          label: t('portfolioValue.highestValue'),
+          value:
+            summary.highest === null
+              ? t('portfolioValue.notAvailable')
+              : fmtVal(summary.highest),
+          color: summary.highest === null ? '#6b7280' : '#111827',
+        },
+        {
+          label: t('portfolioValue.lowestValue'),
+          value:
+            summary.lowest === null
+              ? t('portfolioValue.notAvailable')
+              : fmtVal(summary.lowest),
+          color: summary.lowest === null ? '#6b7280' : '#111827',
+        },
         {
           label: t('portfolioValue.periodChange'),
           value:
@@ -827,20 +875,45 @@ export function PortfolioValueReport() {
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">{t('portfolioValue.highestValue')}</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
+            {t('portfolioValue.highestValue')}
+            {valuesIncomplete && (
+              <InfoTooltip placement="top" text={t('portfolioValue.incompleteTooltip')} />
+            )}
+          </div>
           <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            {fmtVal(summary.highest)}
+            {summary.highest === null ? (
+              <span className="text-gray-400 dark:text-gray-500 text-base font-normal">
+                {t('portfolioValue.notAvailable')}
+              </span>
+            ) : (
+              fmtVal(summary.highest)
+            )}
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">{t('portfolioValue.lowestValue')}</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
+            {t('portfolioValue.lowestValue')}
+            {valuesIncomplete && (
+              <InfoTooltip placement="top" text={t('portfolioValue.incompleteTooltip')} />
+            )}
+          </div>
           <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            {fmtVal(summary.lowest)}
+            {summary.lowest === null ? (
+              <span className="text-gray-400 dark:text-gray-500 text-base font-normal">
+                {t('portfolioValue.notAvailable')}
+              </span>
+            ) : (
+              fmtVal(summary.lowest)
+            )}
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
             {t('portfolioValue.periodChange')}
+            {valuesIncomplete && (
+              <InfoTooltip placement="top" text={t('portfolioValue.incompleteTooltip')} />
+            )}
             {priorClose && (
               <InfoTooltip
                 placement="top"
@@ -1177,6 +1250,9 @@ export function PortfolioValueReport() {
                       return <circle key={`dot-${index}`} cx={cx} cy={cy} r={0} fill="none" />;
                     }
                     const value = isHighest ? summary.highest : summary.lowest;
+                    if (value === null) {
+                      return <circle key={`dot-${index}`} cx={cx} cy={cy} r={0} fill="none" />;
+                    }
                     // Place the bubble to the side of its dot (with a horizontal
                     // connector) instead of above/below. This puts the bubble
                     // in the chart's middle vertical band -- well clear of the
