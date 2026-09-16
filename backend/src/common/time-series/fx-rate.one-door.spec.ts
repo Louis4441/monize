@@ -98,7 +98,9 @@ function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) {
-      return entry === "node_modules" || entry === "dist" ? [] : sourceFiles(full);
+      return entry === "node_modules" || entry === "dist"
+        ? []
+        : sourceFiles(full);
     }
     if (!entry.endsWith(".ts") || entry.endsWith(".spec.ts")) return [];
     return [full];

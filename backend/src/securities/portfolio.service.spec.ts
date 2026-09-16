@@ -166,6 +166,40 @@ describe("PortfolioService", () => {
 
     exchangeRateService = {
       getLatestRate: jest.fn(),
+      // `resolveStoredRate` is the door `convertToDefault` asks. It answers
+      // from the same stored pairs these tests configure through
+      // `getLatestRate`, direct then inverse, in the resolution shape the real
+      // method returns -- a double that handed back a bare number could not
+      // express the "unknown, and here is why" half the callers branch on.
+      resolveStoredRate: jest.fn(async (from: string, to: string) => {
+        const direct = await exchangeRateService.getLatestRate(from, to);
+        const usableDirect = direct != null && direct > 0 ? direct : null;
+        const inverse = usableDirect
+          ? null
+          : await exchangeRateService.getLatestRate(to, from);
+        const usableInverse = inverse != null && inverse > 0 ? inverse : null;
+        const rate = usableDirect ?? (usableInverse ? 1 / usableInverse : null);
+        if (rate === null) {
+          return {
+            status: "unknown",
+            rate: null,
+            observedRate: null,
+            observedOn: null,
+            direction: null,
+            ageDays: null,
+            reason: "no_observation",
+          };
+        }
+        return {
+          status: "resolved",
+          rate,
+          observedRate: usableDirect ?? usableInverse,
+          observedOn: "2026-02-07",
+          direction: usableDirect ? "direct" : "inverse",
+          ageDays: 0,
+          reason: null,
+        };
+      }),
       // Default: no live quote available, so primeLiveRates leaves the cache
       // unset and conversions fall back to the stored getLatestRate path that
       // these tests configure. Tests for the live-rate path override this.

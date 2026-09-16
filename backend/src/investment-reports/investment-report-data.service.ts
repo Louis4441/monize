@@ -846,7 +846,11 @@ export class InvestmentReportDataService {
     const key = `${from}->${to}`;
     const cached = cache.get(key);
     if (cached !== undefined) return cached;
-    const rate = await this.exchangeRateService.getRateForDate(from, to, onDate);
+    const rate = await this.exchangeRateService.getRateForDate(
+      from,
+      to,
+      onDate,
+    );
     const usable = rate !== null && rate > 0 ? rate : null;
     if (usable === null) {
       this.logger.warn(

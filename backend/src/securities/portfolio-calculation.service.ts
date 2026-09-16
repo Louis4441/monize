@@ -398,7 +398,11 @@ export class PortfolioCalculationService {
         // request instead of re-running the lookup and re-warning per
         // holding -- the warn below is therefore once per pair per cache.
         this.logger.warn(
-          describeFxGap(cacheKey, todayYMD(), resolved.reason ?? "no_observation"),
+          describeFxGap(
+            cacheKey,
+            todayYMD(),
+            resolved.reason ?? "no_observation",
+          ),
         );
         rateCache.set(cacheKey, null);
         return null;

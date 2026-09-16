@@ -981,11 +981,17 @@ export class ExchangeRateService implements OnModuleInit {
       else observed.set(key, [point]);
     }
 
-    return resolveFxRate(from, to, onDate, (f, t) => observed.get(`${f}->${t}`), {
-      mode,
-      maxAgeDays,
-      today,
-    });
+    return resolveFxRate(
+      from,
+      to,
+      onDate,
+      (f, t) => observed.get(`${f}->${t}`),
+      {
+        mode,
+        maxAgeDays,
+        today,
+      },
+    );
   }
 
   /**
@@ -1105,7 +1111,11 @@ export class ExchangeRateService implements OnModuleInit {
     }
 
     this.logger.warn(
-      describeFxGap(`${from}->${to}`, target, stored.reason ?? "no_observation"),
+      describeFxGap(
+        `${from}->${to}`,
+        target,
+        stored.reason ?? "no_observation",
+      ),
     );
     return null;
   }
