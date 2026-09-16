@@ -95,7 +95,7 @@ implied.
 | INV-TRANSFER-001 | A transfer's two legs share the VOID boundary and one balance decision | enforced |
 | INV-REDEEM-001 | A redemption's accrued interest moves cash once and is income once | enforced |
 | INV-RECONCILE-001 | While the strict lock is on, a reconciled transaction is not altered | enforced |
-| INV-FX-001 | An unavailable rate never becomes 1:1 | partial |
+| INV-FX-001 | An unavailable rate never becomes 1:1, a rate from after the date, or an unboundedly old one | partial |
 | INV-REPORT-001 | A report's account scope is investment linkage, not account type | enforced |
 | INV-REPORT-002 | A chart's down-sampling never reaches a count, a total or an export | enforced |
 | INV-LOAN-001 | A recurring overpayment's cadence is a calendar, not a payment interval | enforced |
@@ -497,7 +497,11 @@ Status              enforced
 ```text
 Statement           A cross-currency value must never become a valid-looking 1:1
                     value, and an unconverted amount must never be returned under
-                    the target currency's label.
+                    the target currency's label. Nor may a valuation date be
+                    priced by an observation struck AFTER it (look-ahead), nor by
+                    one older than FX_MAX_RATE_AGE_DAYS: both produce a
+                    valid-looking figure from evidence that does not describe the
+                    date, which is the same failure wearing a timestamp.
 Source of truth     exchange_rates
 Enforcement         The 1:1 half is enforced. Consumers return null on an absent
                     rate, and accumulate through FxAggregate. net-worth.service.ts
@@ -509,6 +513,24 @@ Enforcement         The 1:1 half is enforced. Consumers return null on an absent
                     conversion, `rate ... : 1` / `?? 1`, and an unreviewed
                     `1 / reverse` reciprocal, and asserts each reviewed
                     reciprocal returns null when neither direction exists.
+                    The date half is enforced by
+                    common/time-series/fx-rate-resolver.ts (resolveFxRate), the
+                    one door: historical mode takes the newest observation dated
+                    on or before the date, in either stored direction, within
+                    FX_MAX_RATE_AGE_DAYS, and answers `unknown` with a named
+                    reason otherwise; live mode takes the freshest observation
+                    under the same bound. rate-index.util.ts (convertAtDate,
+                    resolveIndexedRate), ExchangeRateService.resolveStoredRate /
+                    getRateForDate, PortfolioCalculationService.resolveDailyRate
+                    and InvestmentReportDataService.fxRate all route through it,
+                    and buildRateIndex / buildDailyRateIndex load the window plus
+                    one age bound before it so a date's answer does not depend on
+                    the window's width (issue #1390, which also closed DR-02 in
+                    docs/specs/fx-conversion-completeness.md section 6). A second
+                    scanning guard,
+                    common/time-series/fx-rate.one-door.spec.ts, fails a new
+                    newest-rate read outside the door and carries the shrink-only
+                    baseline of the dateless call sites that remain.
                     The mislabelling half is NOT enforced on the built-in report
                     path: see Known gap below.
 Known gap           **An unconverted amount still reaches a report under the

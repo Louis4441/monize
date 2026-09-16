@@ -61,7 +61,7 @@ describe("InvestmentReportDataService", () => {
   let holdingsRepository: { find: jest.Mock };
   let securitiesRepository: { find: jest.Mock };
   let accountsRepository: { find: jest.Mock };
-  let exchangeRateService: { getLatestRate: jest.Mock };
+  let exchangeRateService: { getRateForDate: jest.Mock };
   let manager: ManagerMock;
 
   beforeEach(() => {
@@ -71,7 +71,9 @@ describe("InvestmentReportDataService", () => {
     accountsRepository = {
       find: jest.fn().mockResolvedValue([{ id: "acc1", name: "Brokerage" }]),
     };
-    exchangeRateService = { getLatestRate: jest.fn().mockResolvedValue(null) };
+    exchangeRateService = {
+      getRateForDate: jest.fn().mockResolvedValue(null),
+    };
     const { manager: managerMock, dataSource } = createScopedDbMocks([
       [InvestmentTransaction, txRepository as never],
       [Holding, holdingsRepository as never],
@@ -521,7 +523,7 @@ describe("InvestmentReportDataService", () => {
         volume: "1000",
       }),
     ]);
-    exchangeRateService.getLatestRate.mockResolvedValue(0.75); // CAD -> USD
+    exchangeRateService.getRateForDate.mockResolvedValue(0.75); // CAD -> USD
 
     const rows = await service.computeHoldings(
       "u1",
@@ -616,7 +618,7 @@ describe("InvestmentReportDataService", () => {
     expect(v.totalReturn3Year).not.toBeNull();
   });
 
-  it("uses the reverse FX rate when only the inverse pair exists", async () => {
+  it("leaves the direct/inverse decision to the one ladder and converts at the as-of date", async () => {
     securitiesRepository.find.mockResolvedValue([
       {
         id: "sec1",
@@ -639,10 +641,10 @@ describe("InvestmentReportDataService", () => {
       }),
     ]);
     manager.query.mockResolvedValue([priceRow({ close_price: "120" })]);
-    // EUR->USD missing, USD->EUR = 0.8 -> rate = 1/0.8 = 1.25
-    exchangeRateService.getLatestRate.mockImplementation((from: string) =>
-      from === "EUR" ? Promise.resolve(null) : Promise.resolve(0.8),
-    );
+    // Only EUR->USD is asked for: `getRateForDate` already consults both
+    // stored directions, so a caller-side reverse chase would be a second
+    // resolver (issue #1390). 1/0.8 = 1.25 is what the ladder hands back.
+    exchangeRateService.getRateForDate.mockResolvedValue(1.25);
 
     const rows = await service.computeHoldings(
       "u1",
@@ -651,6 +653,13 @@ describe("InvestmentReportDataService", () => {
       "USD",
     );
     expect(rows[0].values.exchangeRate).toBe(1.25);
+    // The report's as-of date, not today: a report run "as of" a past date used
+    // to be valued at the latest rate and changed every morning.
+    expect(exchangeRateService.getRateForDate).toHaveBeenCalledWith(
+      "EUR",
+      "USD",
+      "2024-06-10",
+    );
   });
 
   it("returns null valuation columns when no price is available", async () => {

@@ -51,10 +51,11 @@ const BASELINE: ReadonlyArray<{ file: string; reason: string }> = [
     file: "currencies/exchange-rate.service.ts",
     reason:
       "getLatestRate takes an optional maxAgeDays and its money call sites " +
-      "pass one; getRateForDate's carry-forward has an upper bound but no " +
-      "lower one. Pre-existing, and deliberately not built upon -- the " +
-      "Security Performance comparison converts nothing (see " +
-      "docs/security-benchmark-comparison.md section 2).",
+      "pass one. getRateForDate is no longer among them: it resolves through " +
+      "fx-rate-resolver.ts, which bounds the carry-forward at " +
+      "FX_MAX_RATE_AGE_DAYS and refuses look-ahead (issue #1390). What is " +
+      "left here is getLatestRate itself, kept for the dateless callers " +
+      "fx-rate.one-door.spec.ts records.",
   },
   {
     file: "securities/portfolio.service.ts",

@@ -28,6 +28,13 @@ import {
   EmptyWindowMemory,
   monthFetchWindow,
 } from "../common/time-series/history-fill";
+import {
+  FX_MAX_RATE_AGE_DAYS,
+  FxRateMode,
+  FxRateResolution,
+  describeFxGap,
+  resolveFxRate,
+} from "../common/time-series/fx-rate-resolver";
 import { preferredCurrency } from "../common/default-currency.util";
 
 // Cap concurrent Yahoo FX fetches so the daily refresh does not burst every
@@ -912,6 +919,76 @@ export class ExchangeRateService implements OnModuleInit {
   }
 
   /**
+   * The stored observations that could price `onDate`, resolved through the one
+   * door (`resolveFxRate`).
+   *
+   * This is the shared stored-rate step behind `getRateForDate` and any caller
+   * that needs the *whole* answer -- the observation's own date, the direction
+   * it was stored in, and the reason there is none -- rather than a bare
+   * number. Only the admissible span is read (`FX_MAX_RATE_AGE_DAYS` back from
+   * the clamped date, both directions), which is what stops one ancient row
+   * standing in for a date it says nothing about and, equally, stops that row
+   * short-circuiting the provider fetch that would have filled the gap.
+   */
+  async resolveStoredRate(
+    from: string,
+    to: string,
+    onDate: string,
+    options?: { mode?: FxRateMode; maxAgeDays?: number },
+  ): Promise<FxRateResolution> {
+    const mode = options?.mode ?? "historical";
+    const maxAgeDays = options?.maxAgeDays ?? FX_MAX_RATE_AGE_DAYS;
+    const today = todayYMD();
+
+    if (!from || !to || from === to) {
+      return resolveFxRate(from, to, onDate, () => undefined, {
+        mode,
+        maxAgeDays,
+        today,
+      });
+    }
+
+    const requested = onDate.slice(0, 10);
+    const reference =
+      mode === "live" ? today : requested > today ? today : requested;
+    const floor = new Date(`${reference}T00:00:00.000Z`);
+    floor.setUTCDate(floor.getUTCDate() - maxAgeDays);
+    const span = And(
+      MoreThanOrEqual(floor),
+      LessThanOrEqual(new Date(`${reference}T00:00:00.000Z`)),
+    );
+
+    const rows = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(ExchangeRate).find({
+        where: [
+          { fromCurrency: from, toCurrency: to, rateDate: span },
+          { fromCurrency: to, toCurrency: from, rateDate: span },
+        ],
+        order: { rateDate: "ASC" },
+      }),
+    );
+
+    const observed = new Map<string, Array<{ date: string; rate: number }>>();
+    for (const row of rows) {
+      const key = `${row.fromCurrency}->${row.toCurrency}`;
+      const date =
+        row.rateDate instanceof Date
+          ? row.rateDate.toISOString().slice(0, 10)
+          : String(row.rateDate).slice(0, 10);
+      const list = observed.get(key);
+      const point = { date, rate: Number(row.rate) };
+      if (list) list.push(point);
+      else observed.set(key, [point]);
+    }
+
+    return resolveFxRate(from, to, onDate, (f, t) => observed.get(`${f}->${t}`), {
+      mode,
+      maxAgeDays,
+      today,
+    });
+  }
+
+  /**
    * Get the exchange rate for a currency pair as of a specific date.
    *
    * Unlike getLatestRate (the once-a-day stored snapshot), this returns the
@@ -923,24 +1000,34 @@ export class ExchangeRateService implements OnModuleInit {
    *      the clamp a future date fell through to a Yahoo window that contains
    *      nothing, and the lookup returned null for a scheduled transaction
    *      posted ahead of time.
-   *   1. The stored rate on the closest date on or before the target. This is
-   *      what makes a weekend or a holiday resolve: Saturday and Sunday carry
-   *      Friday's rate forward, which is the closest day that has one.
-   *   2. A short historical daily window fetched from Yahoo around the target
-   *      date; the value on the closest day on or before the target is used and
-   *      persisted for reuse. The window (not the full "max" history) keeps the
-   *      request small and fast. When the target predates every point in the
-   *      window, the nearest point in either direction wins.
-   *   3. The latest stored rate of any date, as a last resort, so a pair that
-   *      has a rate today still resolves for a date the provider has no data
-   *      for at all.
+   *   1. The stored observations inside the admissible span, resolved by
+   *      `resolveFxRate`: the most recent one on or before the target, in
+   *      either stored direction. This is what makes a weekend or a holiday
+   *      resolve -- Saturday and Sunday carry Friday's rate forward.
+   *   2. When the span holds none, a historical daily window fetched from the
+   *      provider around the target date, resolved by the same rule and
+   *      persisted for reuse. The step is driven by *coverage of the target*,
+   *      not by "does this pair have any row at all": one 2019 row used to
+   *      short-circuit it, which is how a 285-day hole stayed a hole.
    * Returns null when no rate can be determined (so the caller can reject or
-   * flag the operation rather than silently assuming 1.0).
+   * flag the operation rather than silently assuming 1.0). There is no
+   * unbounded "latest stored rate of any date" step any more: a rate is a price
+   * and an arbitrarily old one does not describe the date being asked about
+   * (`docs/time-series-contract.md` section 2.2).
    */
   async getRateForDate(
     from: string,
     to: string,
     date: string | Date,
+    options?: {
+      /**
+       * Fetch a provider window when the stored span covers nothing. Default
+       * true; a read-only caller (a report converting hundreds of rows) passes
+       * false to stay inside the database.
+       */
+      fetchMissing?: boolean;
+      mode?: FxRateMode;
+    },
   ): Promise<number | null> {
     if (from === to) return 1;
 
@@ -951,26 +1038,19 @@ export class ExchangeRateService implements OnModuleInit {
 
     // 0. Clamp a future date to today: today's rate is the best available
     //    estimate, and it is the same figure the bills list is showing.
-    const todayUtc = new Date().toISOString().slice(0, 10);
+    const todayUtc = todayYMD();
     const target = requested > todayUtc ? todayUtc : requested;
     const targetDate = new Date(`${target}T00:00:00.000Z`);
 
-    // 1. Closest stored rate on or before the target date (carry-forward over
-    //    weekends and holidays).
-    const stored = await withScopedDb(this.dataSource, (manager) =>
-      manager.getRepository(ExchangeRate).findOne({
-        where: {
-          fromCurrency: from,
-          toCurrency: to,
-          rateDate: LessThanOrEqual(targetDate),
-        },
-        order: { rateDate: "DESC" },
-      }),
-    );
-    if (stored) return Number(stored.rate);
+    // 1. The stored history, through the one door.
+    const stored = await this.resolveStoredRate(from, to, target, {
+      mode: options?.mode,
+    });
+    if (stored.rate !== null) return stored.rate;
+    if (options?.fetchMissing === false) return null;
 
-    // 2. Fetch a Yahoo window around the target (not the full "max" history)
-    //    and use the rate on the closest day on or before the target.
+    // 2. Fetch a provider window around the target (not the full "max" history)
+    //    and resolve it by the same rule.
     //
     //    The window is wide because it costs nothing to be: one call returns
     //    the whole daily series for the period, and every bar in it is
@@ -978,8 +1058,11 @@ export class ExchangeRateService implements OnModuleInit {
     //    a date field through a month of history pays for a single fetch, and
     //    the reverse pair is filled in at the same time. It was two weeks back
     //    and one point kept, so neighbouring dates each went back out to the
-    //    provider and ran into its rate limits.
-    const windowStart = new Date(targetDate.getTime() - 45 * 86_400_000);
+    //    provider and ran into its rate limits. The span back is the age bound
+    //    itself, so the fetch covers exactly what the bound would accept.
+    const windowStart = new Date(
+      targetDate.getTime() - FX_MAX_RATE_AGE_DAYS * 86_400_000,
+    );
     const windowEnd = new Date(targetDate.getTime() + 7 * 86_400_000);
     const series = await this.fetchYahooHistoricalRatesWindow(
       from,
@@ -988,30 +1071,17 @@ export class ExchangeRateService implements OnModuleInit {
       windowEnd,
     );
     if (series && series.length > 0) {
-      const targetTime = targetDate.getTime();
-      const sorted = [...series].sort(
-        (a, b) => a.date.getTime() - b.date.getTime(),
-      );
-      const onOrBefore = sorted.filter((p) => p.date.getTime() <= targetTime);
-      // Prefer the closest day on or before the target -- a Saturday takes
-      // Friday's rate. When the target predates every point in the window, take
-      // the nearest point in either direction instead: a best-effort rate from
-      // the closest day the market traded beats a silent 1.0.
-      const chosen =
-        onOrBefore.length > 0
-          ? onOrBefore[onOrBefore.length - 1]
-          : sorted.reduce((best, point) =>
-              Math.abs(point.date.getTime() - targetTime) <
-              Math.abs(best.date.getTime() - targetTime)
-                ? point
-                : best,
-            );
+      const fetched = series.map((point) => ({
+        date: point.date.toISOString().slice(0, 10),
+        rate: point.rate,
+      }));
       try {
         // The whole window, not just the day that was asked for: the next
-        // lookup for any date in it is then a database read.
-        const stored = await this.persistRateSeries(from, to, series);
+        // lookup for any date in it is then a database read. Persisted whether
+        // or not the target itself resolves, because a neighbouring date may.
+        const persisted = await this.persistRateSeries(from, to, series);
         this.logger.log(
-          `Stored ${stored} daily ${from}/${to} rates around ${target} from one lookup`,
+          `Stored ${persisted} daily ${from}/${to} rates around ${target} from one lookup`,
         );
       } catch (error) {
         this.logger.warn(
@@ -1020,13 +1090,24 @@ export class ExchangeRateService implements OnModuleInit {
           }`,
         );
       }
-      return chosen.rate;
+      // The same rule as the stored step: the closest bar on or before the
+      // target, never one from after it. A window that brackets the target but
+      // starts after it answers nothing -- it used to answer with its nearest
+      // point in either direction, which is the look-ahead this closes.
+      const resolved = resolveFxRate(
+        from,
+        to,
+        target,
+        (f, t) => (f === from && t === to ? fetched : undefined),
+        { mode: options?.mode, today: todayUtc },
+      );
+      if (resolved.rate !== null) return resolved.rate;
     }
 
-    // 3. Nothing for this date anywhere. A pair that has any stored rate at all
-    //    still resolves -- better a known rate from another day than refusing
-    //    the posting outright.
-    return this.getLatestRate(from, to);
+    this.logger.warn(
+      describeFxGap(`${from}->${to}`, target, stored.reason ?? "no_observation"),
+    );
+    return null;
   }
 
   /**
@@ -1038,9 +1119,10 @@ export class ExchangeRateService implements OnModuleInit {
    * `date` is optional and defaults to today (`todayYMD`, the caller's request
    * timezone); a future date is clamped to today by `getRateForDate`, and the
    * clamped date is what `date` reports back. The rate goes through
-   * `resolveFxRateOrNull`, the one market-rate ladder (stored on-or-before the
-   * date, then a provider window, then the latest stored rate of any date), so
-   * the figure matches what a transaction posted on that date would carry.
+   * `resolveFxRateOrNull`, the one market-rate ladder (the admissible stored
+   * observations on or before the date, then a provider window resolved by the
+   * same rule), so the figure matches what a transaction posted on that date
+   * would carry.
    *
    * Returns `null` when no usable rate exists in either direction -- never `1`,
    * and never the input amount: `docs/specs/fx-conversion-completeness.md`.

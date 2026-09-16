@@ -391,7 +391,7 @@ describe("PortfolioCalculationService.calculateCapitalGainsByMonth", () => {
   let service: PortfolioCalculationService;
   let txRepo: { find: jest.Mock };
   let priceRepo: { query: jest.Mock };
-  let exchangeRateService: { getLatestRate: jest.Mock };
+  let exchangeRateService: { resolveStoredRate: jest.Mock };
 
   const userId = "user-1";
   const accountId = "acct-1";
@@ -441,7 +441,7 @@ describe("PortfolioCalculationService.calculateCapitalGainsByMonth", () => {
   beforeEach(() => {
     txRepo = { find: jest.fn() };
     priceRepo = { query: jest.fn().mockResolvedValue([]) };
-    exchangeRateService = { getLatestRate: jest.fn().mockResolvedValue(null) };
+    exchangeRateService = { resolveStoredRate: storedRateDouble() };
     service = buildService(
       [[InvestmentTransaction, txRepo as never]],
       exchangeRateService,
@@ -606,7 +606,7 @@ describe("PortfolioCalculationService.calculateCapitalGainsByMonth", () => {
     //
     // The rate used to fall back to 1, which valued 100 USD shares as 100 CAD
     // and produced a confident gain figure from an arbitrary conversion.
-    exchangeRateService.getLatestRate.mockResolvedValue(null);
+    exchangeRateService.resolveStoredRate = storedRateDouble();
     txRepo.find.mockResolvedValue([
       makeTx({
         id: "buy",
@@ -649,7 +649,7 @@ describe("PortfolioCalculationService.calculateCapitalGainsByMonth", () => {
   it("still computes gains when the security and account share a currency", async () => {
     // The same-currency path must not be caught by the missing-rate handling:
     // rate 1 is correct here because the codes are equal, and no lookup happens.
-    exchangeRateService.getLatestRate.mockResolvedValue(null);
+    exchangeRateService.resolveStoredRate = storedRateDouble();
     txRepo.find.mockResolvedValue([
       makeTx({
         id: "buy",
@@ -842,7 +842,7 @@ describe("PortfolioCalculationService.calculateCapitalGainsByDay", () => {
   let service: PortfolioCalculationService;
   let txRepo: { find: jest.Mock };
   let priceRepo: { query: jest.Mock };
-  let exchangeRateService: { getLatestRate: jest.Mock };
+  let exchangeRateService: { resolveStoredRate: jest.Mock };
 
   const userId = "user-1";
   const accountId = "acct-1";
@@ -890,7 +890,7 @@ describe("PortfolioCalculationService.calculateCapitalGainsByDay", () => {
   beforeEach(() => {
     txRepo = { find: jest.fn() };
     priceRepo = { query: jest.fn().mockResolvedValue([]) };
-    exchangeRateService = { getLatestRate: jest.fn().mockResolvedValue(null) };
+    exchangeRateService = { resolveStoredRate: storedRateDouble() };
     service = buildService(
       [[InvestmentTransaction, txRepo as never]],
       exchangeRateService,
@@ -1141,12 +1141,64 @@ describe("PortfolioCalculationService.primeLiveRates", () => {
   });
 });
 
+/**
+ * `ExchangeRateService.resolveStoredRate` as the real one answers: the stored
+ * observation for a pair, or an `unknown` resolution naming why there is none.
+ * A double that returned a bare number could not express the second, which is
+ * the half the callers branch on.
+ */
+function storedRateDouble(
+  rates: Record<string, number | null> = {},
+): jest.Mock {
+  return jest.fn(async (from: string, to: string) => {
+    if (from === to) {
+      return {
+        status: "same_currency",
+        rate: 1,
+        observedRate: 1,
+        observedOn: null,
+        direction: "identity",
+        ageDays: 0,
+        reason: null,
+      };
+    }
+    const direct = rates[`${from}->${to}`];
+    const inverse = rates[`${to}->${from}`];
+    const rate =
+      direct != null && direct > 0
+        ? direct
+        : inverse != null && inverse > 0
+          ? 1 / inverse
+          : null;
+    if (rate === null) {
+      return {
+        status: "unknown",
+        rate: null,
+        observedRate: null,
+        observedOn: null,
+        direction: null,
+        ageDays: null,
+        reason: "no_observation",
+      };
+    }
+    return {
+      status: "resolved",
+      rate,
+      observedRate: direct != null && direct > 0 ? direct : inverse,
+      observedOn: "2026-06-15",
+      direction: direct != null && direct > 0 ? "direct" : "inverse",
+      ageDays: 0,
+      reason: null,
+    };
+  });
+}
+
 describe("PortfolioCalculationService.convertToDefault", () => {
   let service: PortfolioCalculationService;
-  let exchangeRateService: { getLatestRate: jest.Mock };
+  let exchangeRateService: { resolveStoredRate: jest.Mock };
 
   beforeEach(() => {
-    exchangeRateService = { getLatestRate: jest.fn().mockResolvedValue(null) };
+    exchangeRateService = { resolveStoredRate: storedRateDouble() };
     service = buildService([], exchangeRateService);
   });
 
@@ -1163,7 +1215,7 @@ describe("PortfolioCalculationService.convertToDefault", () => {
     );
 
     expect(result).toBe(0);
-    expect(exchangeRateService.getLatestRate).not.toHaveBeenCalled();
+    expect(exchangeRateService.resolveStoredRate).not.toHaveBeenCalled();
   });
 
   it("still reports a non-zero amount with no rate as unknown", async () => {
@@ -1187,8 +1239,8 @@ describe("PortfolioCalculationService.convertToDefault", () => {
     expect(await service.convertToDefault(250, "EUR", "CAD", cache)).toBeNull();
     expect(await service.convertToDefault(999, "EUR", "CAD", cache)).toBeNull();
 
-    // Direct + inverse for the first call only; the cached null answers the rest.
-    expect(exchangeRateService.getLatestRate).toHaveBeenCalledTimes(2);
+    // One resolution for the first call only; the cached null answers the rest.
+    expect(exchangeRateService.resolveStoredRate).toHaveBeenCalledTimes(1);
   });
 
   it("a cached absence does not shadow the zero shortcut", async () => {
@@ -1242,8 +1294,10 @@ describe("PortfolioCalculationService daily rate index", () => {
       );
 
       expect([...index.keys()].sort()).toEqual(["CAD->USD", "USD->CAD"]);
+      // One age bound before the window opens, so a bar's rate does not
+      // change when the chart around it is widened (issue #1390).
       expect(exchangeRateService.getRateHistory).toHaveBeenCalledWith(
-        "2026-05-20",
+        "2026-04-05",
         "2026-06-04",
       );
     });
@@ -1298,7 +1352,12 @@ describe("PortfolioCalculationService daily rate index", () => {
       );
     });
 
-    it("falls back to the earliest known rate when the date precedes all history", async () => {
+    /**
+     * Was: "falls back to the earliest known rate when the date precedes all
+     * history". Issue #1390: a bar is never valued at a rate struck after it,
+     * and a rate older than the age bound is not that bar's rate either.
+     */
+    it("is undefined for a date the whole loaded history postdates", async () => {
       exchangeRateService.getRateHistory.mockResolvedValue([
         rate("USD", "CAD", 1.4, "2026-06-01"),
       ]);
@@ -1309,9 +1368,25 @@ describe("PortfolioCalculationService daily rate index", () => {
         "2026-06-04",
       );
 
-      expect(service.resolveDailyRate(index, "USD", "CAD", "2026-05-15")).toBe(
-        1.4,
+      expect(
+        service.resolveDailyRate(index, "USD", "CAD", "2026-05-15"),
+      ).toBeUndefined();
+    });
+
+    it("is undefined once the newest loaded rate is past the age bound", async () => {
+      exchangeRateService.getRateHistory.mockResolvedValue([
+        rate("USD", "CAD", 1.4, "2026-06-01"),
+      ]);
+      const index = await service.buildDailyRateIndex(
+        ["USD"],
+        "CAD",
+        "2026-05-20",
+        "2026-09-04",
       );
+
+      expect(
+        service.resolveDailyRate(index, "USD", "CAD", "2026-09-01"),
+      ).toBeUndefined();
     });
 
     it("inverts the reverse pair when only that direction is stored", async () => {
@@ -2654,7 +2729,7 @@ describe("PortfolioCalculationService.calculateHoldingsWithValues", () => {
         [InvestmentTransaction, txRepo],
         [Account, accountRepo],
       ],
-      { getLatestRate: jest.fn().mockResolvedValue(1) },
+      { resolveStoredRate: storedRateDouble() },
     );
     jest
       .spyOn(service, "calculateCostBasisLotsInAccountCurrency")
@@ -2758,7 +2833,7 @@ describe("PortfolioCalculationService.calculateHoldingsWithValues", () => {
         [InvestmentTransaction, txRepo],
         [Account, accountRepo],
       ],
-      { getLatestRate: jest.fn().mockResolvedValue(null) },
+      { resolveStoredRate: storedRateDouble() },
     );
     jest
       .spyOn(service, "calculateCostBasisLotsInAccountCurrency")
@@ -2849,7 +2924,9 @@ describe("PortfolioCalculationService.calculateTWR", () => {
   const runTwr = async (currencyCode: string, latestRate: number | null) => {
     const txRepo = { find: jest.fn().mockResolvedValue(buys(currencyCode)) };
     const service = buildService([[InvestmentTransaction, txRepo]], {
-      getLatestRate: jest.fn().mockResolvedValue(latestRate),
+      resolveStoredRate: storedRateDouble(
+        latestRate === null ? {} : { "USD->CAD": latestRate },
+      ),
     });
     jest.spyOn(service, "getAllPricesForSecurities").mockResolvedValue(
       new Map([
@@ -2919,7 +2996,7 @@ describe("PortfolioCalculationService.calculateTWR", () => {
       ]),
     };
     const service = buildService([[InvestmentTransaction, txRepo]], {
-      getLatestRate: jest.fn().mockResolvedValue(1),
+      resolveStoredRate: storedRateDouble(),
     });
     jest.spyOn(service, "getAllPricesForSecurities").mockResolvedValue(
       new Map([
@@ -3011,7 +3088,7 @@ describe("PortfolioCalculationService.calculateTWR", () => {
       ]),
     };
     const service = buildService([[InvestmentTransaction, txRepo]], {
-      getLatestRate: jest.fn().mockResolvedValue(1),
+      resolveStoredRate: storedRateDouble(),
     });
     jest.spyOn(service, "getAllPricesForSecurities").mockResolvedValue(
       new Map([

@@ -92,6 +92,7 @@ Money is `decimal(20,4)`. In JavaScript, never accumulate floats: sum `Math.roun
 One sentence each; the reasoning and the guard that holds each one are in the contract documents.
 
 - **An exchange rate is not money.** Rates are `NUMERIC(20,10)`: `roundFxRate`, never `roundMoney` or `toFixed(4)`; convert with `applyFxConversion`, validate with `normalizeFxEntry` (`backend/src/common/fx-entry.util.ts`).
+- **A rate for a date is `resolveFxRate`** (`backend/src/common/time-series/fx-rate-resolver.ts`): the newest observation on or before the date within `FX_MAX_RATE_AGE_DAYS`, never one struck after it and never an unboundedly old one; `null` otherwise. INV-FX-001.
 - **Rate 1 means "same currency", never "no rate found".** A failed lookup is unknown, not `1` and not the unconverted amount. Aggregate through `FxAggregate` (`backend/src/common/fx-aggregate.ts`); its `total` is `null` while `knownSubtotal` carries what converted.
 - **A currency code is derived from the account**, never accepted from the request: `assertTransactionCurrencyMatchesAccount`.
 - **A preview computes what the commit will do, through the same code.** Call the same resolver from both.

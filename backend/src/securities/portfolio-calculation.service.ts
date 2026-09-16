@@ -16,10 +16,18 @@ import {
 } from "./portfolio.service";
 import { roundMoney } from "../common/round.util";
 import { parseTag } from "../tags/tag-key-value.util";
-import { formatDateYMD, formatDateYMDLocal } from "../common/date-utils";
+import {
+  formatDateYMD,
+  formatDateYMDLocal,
+  todayYMD,
+} from "../common/date-utils";
 import { mapWithConcurrency } from "../common/concurrency.util";
-import { convertWithRateLookup } from "../common/currency-conversion.util";
 import { FxAggregate } from "../common/fx-aggregate";
+import {
+  FX_MAX_RATE_AGE_DAYS,
+  describeFxGap,
+  resolveFxRate,
+} from "../common/time-series/fx-rate-resolver";
 import {
   acquisitionCost,
   applyActionToQuantity,
@@ -373,30 +381,29 @@ export class PortfolioCalculationService {
     const cacheKey = `${fromCurrency}->${defaultCurrency}`;
     let rate = rateCache.get(cacheKey);
     if (rate === undefined) {
-      const directRate = await this.exchangeRateService.getLatestRate(
+      // One door, `live` mode: the freshest stored observation in either
+      // direction, still inside the age bound. Two unbounded `getLatestRate`
+      // calls plus a hand-rolled reciprocal is what let this path and the
+      // report path quote different rates for one pair in one session, and let
+      // either of them quote a rate from months ago as "current".
+      const resolved = await this.exchangeRateService.resolveStoredRate(
         fromCurrency,
         defaultCurrency,
+        todayYMD(),
+        { mode: "live" },
       );
-      if (directRate !== null && directRate > 0) {
-        rate = directRate;
-      } else {
-        const reverseRate = await this.exchangeRateService.getLatestRate(
-          defaultCurrency,
-          fromCurrency,
+      if (resolved.rate === null) {
+        // The absence is cached too (`null`), so a portfolio with many
+        // holdings in one unrated currency resolves the pair once per
+        // request instead of re-running the lookup and re-warning per
+        // holding -- the warn below is therefore once per pair per cache.
+        this.logger.warn(
+          describeFxGap(cacheKey, todayYMD(), resolved.reason ?? "no_observation"),
         );
-        if (reverseRate === null || reverseRate <= 0) {
-          // The absence is cached too (`null`), so a portfolio with many
-          // holdings in one unrated currency resolves the pair once per
-          // request instead of re-running both lookups and re-warning per
-          // holding -- the warn below is therefore once per pair per cache.
-          this.logger.warn(
-            `No exchange rate available for ${cacheKey}; the affected total is reported as unknown rather than converted 1:1`,
-          );
-          rateCache.set(cacheKey, null);
-          return null;
-        }
-        rate = 1 / reverseRate;
+        rateCache.set(cacheKey, null);
+        return null;
       }
+      rate = resolved.rate;
       rateCache.set(cacheKey, rate);
     }
     if (rate === null) return null;
@@ -484,8 +491,16 @@ export class PortfolioCalculationService {
     const index: DailyRateIndex = new Map();
     if (needed.size === 0) return index;
 
+    // Load one age bound before the window opens, anchored at today when the
+    // window opens later than that (a future bar resolves at today's rate).
+    // Those are exactly the observations any date in [startDate, endDate] can
+    // be priced by, so widening or narrowing the chart cannot change a bar's
+    // rate -- which loading only the window itself did (issue #1390).
+    const anchor = startDate < todayYMD() ? startDate : todayYMD();
+    const floor = new Date(`${anchor}T00:00:00.000Z`);
+    floor.setUTCDate(floor.getUTCDate() - FX_MAX_RATE_AGE_DAYS);
     const rows = await this.exchangeRateService.getRateHistory(
-      startDate,
+      floor.toISOString().slice(0, 10),
       endDate,
     );
     for (const row of rows) {
@@ -528,10 +543,12 @@ export class PortfolioCalculationService {
 
   /**
    * Resolve the stored daily rate for converting 1 unit of `from` to `to` as of
-   * `dateStr` (YYYY-MM-DD) from a `DailyRateIndex`. Picks the most recent rate
-   * at or before the date; if none exists yet it uses the earliest known rate.
-   * Returns undefined when the pair is absent in either direction so callers can
-   * apply their own fallback.
+   * `dateStr` (YYYY-MM-DD) from a `DailyRateIndex`, through the one door.
+   *
+   * Returns `undefined` when no admissible observation exists in either
+   * direction, so callers report the bar as unknown. It used to end in
+   * `best ?? rates[0].rate` -- the earliest stored rate, from after the bar
+   * being valued (issue #1390).
    */
   resolveDailyRate(
     index: DailyRateIndex,
@@ -539,17 +556,10 @@ export class PortfolioCalculationService {
     to: string,
     dateStr: string,
   ): number | undefined {
-    const result = convertWithRateLookup(1, from, to, (f, t) => {
-      const rates = index.get(`${f}->${t}`);
-      if (!rates || rates.length === 0) return undefined;
-      let best: number | undefined;
-      for (const r of rates) {
-        if (r.date <= dateStr) best = r.rate;
-        else break;
-      }
-      return best ?? rates[0].rate;
-    });
-    return result == null ? undefined : result;
+    const resolved = resolveFxRate(from, to, dateStr, (f, t) =>
+      index.get(`${f}->${t}`),
+    );
+    return resolved.rate === null ? undefined : resolved.rate;
   }
 
   // ---------------------------------------------------------------------------
@@ -1474,23 +1484,27 @@ export class PortfolioCalculationService {
     const fxCache = new Map<string, number>();
     // `null` when the pair has no rate. This used to end `: 1`, valuing a
     // foreign security's period start and end as though its currency were the
-    // account's (audit P5-009). Rate 1 only when the codes are equal.
+    // account's (audit P5-009). Rate 1 only when the codes are equal -- a
+    // missing code is unknown, and the lookup is the one bounded door rather
+    // than two unbounded latest-rate reads with a hand-rolled reciprocal.
     const fxRate = async (
       from: string | null,
       to: string | null,
     ): Promise<number | null> => {
-      if (!from || !to || from === to) return 1;
+      if (!from || !to) return null;
+      if (from === to) return 1;
       const cacheKey = `${from}->${to}`;
       const cached = fxCache.get(cacheKey);
       if (cached !== undefined) return cached;
-      let rate = await this.exchangeRateService.getLatestRate(from, to);
-      if (rate === null || rate <= 0) {
-        const reverse = await this.exchangeRateService.getLatestRate(to, from);
-        if (reverse === null || reverse <= 0) return null;
-        rate = 1 / reverse;
-      }
-      fxCache.set(cacheKey, rate);
-      return rate;
+      const resolved = await this.exchangeRateService.resolveStoredRate(
+        from,
+        to,
+        todayYMD(),
+        { mode: "live" },
+      );
+      if (resolved.rate === null) return null;
+      fxCache.set(cacheKey, resolved.rate);
+      return resolved.rate;
     };
 
     const results: CapitalGainEntry[] = [];

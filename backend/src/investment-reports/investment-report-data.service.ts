@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { DataSource, In } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { Holding } from "../securities/entities/holding.entity";
@@ -17,7 +17,8 @@ import {
 import { Account } from "../accounts/entities/account.entity";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { InvestmentCellValue } from "./dto/execute-investment-report.dto";
-import { roundToDecimals, sumMoney } from "../common/round.util";
+import { roundToDecimals } from "../common/round.util";
+import { FxAggregate } from "../common/fx-aggregate";
 import { todayYMD } from "../common/date-utils";
 
 /** One computed holding row plus the fields needed to group it. */
@@ -150,6 +151,8 @@ function securityCurrencyAcquisitionCost(
  */
 @Injectable()
 export class InvestmentReportDataService {
+  private readonly logger = new Logger(InvestmentReportDataService.name);
+
   constructor(
     private dataSource: DataSource,
     private exchangeRateService: ExchangeRateService,
@@ -262,7 +265,7 @@ export class InvestmentReportDataService {
       this.loadPrices(securityIds, asOfDate),
     ]);
 
-    const fxCache = new Map<string, number>();
+    const fxCache = new Map<string, number | null>();
     const year = Number(asOfDate.slice(0, 4));
     const periodStarts: Record<string, string> = {
       totalReturn1Week: isoAddDays(asOfDate, -7),
@@ -353,6 +356,7 @@ export class InvestmentReportDataService {
       const fxRate = await this.fxRate(
         security.currencyCode,
         baseCurrency,
+        asOfDate,
         fxCache,
       );
       // Unknown rate makes the base-currency value unknown, not equal to the
@@ -426,9 +430,19 @@ export class InvestmentReportDataService {
     }
 
     // Second pass: % of portfolio against total (base-currency) market value.
-    const totalBase = sumMoney(computed.map((c) => c.marketValueBase ?? 0));
+    //
+    // Through `FxAggregate`, so a holding whose rate or price is unknown
+    // withholds the denominator instead of shrinking it: `?? 0` silently
+    // divided by a partial sum, which inflated every other row's share of the
+    // portfolio and wore a total's name while doing it.
+    const portfolioValue = new FxAggregate();
     for (const c of computed) {
-      if (c.marketValueBase !== null && totalBase > 0) {
+      if (c.marketValueBase === null) portfolioValue.addUnknown();
+      else portfolioValue.addConverted(c.marketValueBase);
+    }
+    const totalBase = portfolioValue.total;
+    for (const c of computed) {
+      if (c.marketValueBase !== null && totalBase !== null && totalBase > 0) {
         c.holding.values.portfolioPercent = roundToDecimals(
           (c.marketValueBase / totalBase) * 100,
           4,
@@ -809,30 +823,37 @@ export class InvestmentReportDataService {
   }
 
   /**
-   * Latest rate for a pair, or `null` when there is none.
+   * The rate for a pair **on the report's as-of date**, or `null`.
    *
-   * `null`, not 1: this used to end `rate = reverse !== null ? 1 / reverse : 1`,
-   * so a base-currency column for a security with no rate reported the foreign
-   * number as though the currencies were at par (audit P5-009, same defect as
-   * the net-worth and portfolio paths). Rate 1 is returned only when the two
-   * codes are equal.
+   * It used to call `getLatestRate` regardless of the date, so a report run
+   * "as of" last March valued its holdings at today's rate and changed every
+   * morning; and it returned 1 whenever either code was missing, which is a
+   * base-currency column carrying a foreign number (issue #1390, INV-FX-001).
+   * Rate 1 is returned only when the two codes are equal. The lookup goes
+   * through `getRateForDate`, the one ladder, so this report and every other
+   * surface quote one rate for one pair on one date.
    */
   private async fxRate(
     from: string,
     to: string,
-    cache: Map<string, number>,
+    onDate: string,
+    cache: Map<string, number | null>,
   ): Promise<number | null> {
-    if (!from || !to || from === to) return 1;
+    // A missing code is not a pair, so there is nothing to convert and nothing
+    // to claim: unknown, never 1.
+    if (!from || !to) return null;
+    if (from === to) return 1;
     const key = `${from}->${to}`;
     const cached = cache.get(key);
     if (cached !== undefined) return cached;
-    let rate = await this.exchangeRateService.getLatestRate(from, to);
-    if (rate === null || rate <= 0) {
-      const reverse = await this.exchangeRateService.getLatestRate(to, from);
-      if (reverse === null || reverse <= 0) return null;
-      rate = 1 / reverse;
+    const rate = await this.exchangeRateService.getRateForDate(from, to, onDate);
+    const usable = rate !== null && rate > 0 ? rate : null;
+    if (usable === null) {
+      this.logger.warn(
+        `No exchange rate available for ${key} on or before ${onDate}; the affected base-currency figures are reported as unknown rather than converted 1:1`,
+      );
     }
-    cache.set(key, rate);
-    return rate;
+    cache.set(key, usable);
+    return usable;
   }
 }

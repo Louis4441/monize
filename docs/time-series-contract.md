@@ -168,6 +168,13 @@ from a stale price, and it fails more quietly, because no figure on the page
 is denominated in a rate. A conversion feeding a number the user acts on takes
 a bounded rate or returns unknown.
 
+The door is `resolveFxRate`
+(`backend/src/common/time-series/fx-rate-resolver.ts`): the newest observation
+on or before the date, in either stored direction, within
+`FX_MAX_RATE_AGE_DAYS`, never one from after the date, and `null` with a named
+reason otherwise -- `backend/src/common/time-series/fx-rate.one-door.spec.ts`
+fails a newest-rate read that bypasses it.
+
 ### 2.3 A boundary needs two observations, not two lookups
 
 When a span's two ends are bounded independently, both can resolve to the

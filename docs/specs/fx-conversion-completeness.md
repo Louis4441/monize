@@ -146,20 +146,55 @@ a snapshot row whose conversion was incomplete is written from the
 is observable rather than silent. This is recorded as a known limitation, not as
 correct behaviour.
 
-## 6. DR-02: look-ahead
+## 6. DR-02: look-ahead -- closed, the fallback is removed
 
-`findBestRate` falls back to the *earliest* available rate when none exists on
-or before the valuation date, which values a historical point using a rate from
-its future. That is look-ahead, and the time-series contract forbids it.
+`findBestRate` used to fall back to the *earliest* available rate when none
+existed on or before the valuation date, which values a historical point using
+a rate from its future. That is look-ahead, and the time-series contract
+forbids it. The original decision here was to keep it and log it, and to leave
+changing it as a product decision "not made here".
 
-Decision: keep the fallback -- a pre-history chart point is more useful with an
-approximate rate than absent -- but stop it being invisible. In this stage the
-fallback is logged by `findBestRate` (once per pair per computation), naming
-the pair and the valuation date it predates. Reporting it to API consumers as a
-named gap (`rate_from_after_valuation_date`), so a chart can label the point,
-is deliberately staged with the nullable-totals rollout (section 8) and is
-**not implemented yet** -- until then the log is the only signal. Changing the
-fallback itself is a product decision and is not made here.
+**Issue #1390 makes that decision: the fallback is removed.** What it produced
+was not an approximation but a different number every time the history moved,
+and the case that reported it was a 285-day hole in `exchange_rates` back-filled
+with a rate first observed nine months after the dates it was pricing --
+silently, because the figure looked plausible and the only signal was a log
+line nobody reads. A rate struck after a date is not evidence about that date.
+
+The same issue settles the other half, which DR-02 never covered: an
+**unboundedly old** carried-forward rate is not a rate either. Section 2.2 of
+`docs/time-series-contract.md` already says an exchange rate is a price; a
+price from nine months ago does not describe today any more than one from next
+June does.
+
+The policy now, in one place -- `backend/src/common/time-series/fx-rate-resolver.ts`:
+
+| Question | Answer |
+| --- | --- |
+| Which observation prices a date? | The most recent one dated **on or before** it, in either stored direction. |
+| How old may it be? | At most `FX_MAX_RATE_AGE_DAYS` (45). Long weekends, public holidays on either side and a provider outage fit comfortably inside that; a market move does not. |
+| Direct or inverse? | Whichever observed the date more recently. A tie goes to direct, so the answer is deterministic. |
+| Nothing admissible? | `null`, with a named reason: `no_observation`, `only_after_date`, `stale_observation`, `unknown_currency`. |
+| Equal codes? | `1`, without consulting the history. Nothing else may produce `1`. |
+| Missing code? | Unknown. Not `1`. |
+| "Right now"? | `live` mode: the freshest observation, under the same age bound. |
+
+Every rate lookup that feeds a reported figure routes through it:
+`convertAtDate` / `resolveIndexedRate` (the chart and daily-balance indexes),
+`ExchangeRateService.resolveStoredRate` and `getRateForDate`,
+`PortfolioCalculationService.resolveDailyRate` and `convertToDefault`, and
+`InvestmentReportDataService.fxRate`. `buildRateIndex` and
+`buildDailyRateIndex` load the reported window plus one age bound before it,
+rather than a fixed day margin, so a date's rate does not change when the chart
+around it is widened. `backend/src/common/time-series/fx-rate.one-door.spec.ts`
+fails a new newest-rate read outside the door and carries the shrink-only
+baseline of the dateless call sites that remain.
+
+Reporting the gap to API consumers is still the `FxAggregate` quadruple of
+section 3: a pair the resolver refuses lands in `missingPairs` and clears
+`fxComplete`, exactly as a pair with no rows at all does. The *reason* travels
+in the warn log (once per pair per computation) rather than on the pair string,
+because `missingPairs` is a public field the frontend reads.
 
 ## 7. Test matrix
 
