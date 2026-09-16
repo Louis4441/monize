@@ -42,6 +42,7 @@
       "dueSoon": "Próximos a vencer",
       "all": "Todos los próximos"
     },
+    "viewLabel": "Vista",
     "viewList": "Lista",
     "viewCalendar": "Calendario",
     "previousMonth": "Mes anterior",

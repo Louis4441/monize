@@ -42,6 +42,7 @@
       "dueSoon": "Wkrótce wymagalne",
       "all": "Wszystkie nadchodzące"
     },
+    "viewLabel": "Widok",
     "viewList": "Lista",
     "viewCalendar": "Kalendarz",
     "previousMonth": "Poprzedni miesiąc",

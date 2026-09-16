@@ -55,6 +55,7 @@ npm run i18n:check         # Verify the pseudo-locale is up to date (CI gate)
 | Month grid | `MonthGrid` + `monthGridDays` (`lib/calendar-month.ts`); occurrence placement stays `buildScheduledCalendarDays` + `ScheduledCalendarGrid` until the bills grid migrates | a third month grid, or a `Date` built from a calendar date |
 | Table / Calendar choice for a screen | `useViewMode(surface)` (`store/viewModeStore.ts`) and `ViewModeToggle` | a local `useState`, a second store or a URL parameter |
 | Segmented control (a pill of buttons, one pressed) | `SEGMENTED_GROUP_CLASS` + `segmentClass` (`components/ui/segmented-control.ts`) | a local `BUTTON_BASE`/`BUTTON_ACTIVE` trio, or the pressed classes inlined |
+| Switcher in a dashboard widget header | `WidgetSegmentedControl` (`components/dashboard/`), an `icon` option where two must share the line | a toolbar pill beside it, or a wrapping second row |
 | A dashboard widget's breakdown of the ledger | the report's own endpoint through `builtInReportsApi` | summing transactions in the widget |
 | Report refresh / export buttons | `ReportToolbarActions`, last child of the toolbar row | rendering `ExportDropdown` or `RefreshPricesButton` in a report |
 | A dashboard card filling its grid row | the grid's own `stretch` plus the card's min-height | `h-full` on a widget's outermost element |

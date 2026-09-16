@@ -42,6 +42,7 @@
       "dueSoon": "Binnenkort verschuldigd",
       "all": "Alle aankomende"
     },
+    "viewLabel": "Weergave",
     "viewList": "Lijst",
     "viewCalendar": "Kalender",
     "previousMonth": "Vorige maand",

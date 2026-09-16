@@ -265,6 +265,23 @@ describe('UpcomingBills', () => {
     expect(mockUpdateConfig).toHaveBeenCalledWith({ view: 'calendar' });
   });
 
+  it('keeps the scope buttons and an icon-only view switch on one row', () => {
+    render(<UpcomingBills accounts={[]} scheduledTransactions={[]} isLoading={false} maxItems={defaultMaxItems} />);
+
+    // Icons rather than words: the labels survive as the accessible name and
+    // the tooltip, which is what lets the view switch sit beside the scope
+    // buttons instead of wrapping onto a line of its own.
+    const listButton = screen.getByRole('button', { name: 'List' });
+    expect(listButton).toHaveTextContent('');
+    expect(listButton).toHaveAttribute('title', 'List');
+    expect(listButton.querySelector('svg')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Calendar' })).toHaveAttribute('title', 'Calendar');
+
+    const row = listButton.closest('[role="group"]')!.parentElement!;
+    expect(row).toContainElement(screen.getByRole('button', { name: 'All upcoming' }));
+    expect(row.className).not.toContain('flex-wrap');
+  });
+
   it('lays the same occurrences out on a month grid in the calendar view', () => {
     widgetConfig.current = { scope: 'all', view: 'calendar' };
     const dueDate = futureDateStr(2);

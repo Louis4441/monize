@@ -42,6 +42,7 @@
       "dueSoon": "Bald fällig",
       "all": "Alle anstehenden"
     },
+    "viewLabel": "Ansicht",
     "viewList": "Liste",
     "viewCalendar": "Kalender",
     "previousMonth": "Vorheriger Monat",
