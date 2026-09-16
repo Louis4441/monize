@@ -635,4 +635,57 @@ describe('MultiSelect', () => {
       expect(screen.queryByTestId('multiselect-sizer')).not.toBeInTheDocument();
     });
   });
+
+  describe('separatorAfter', () => {
+    // The rule is drawn on the row *below* the boundary, so it cannot survive
+    // as a stray line when the rows on one side of it stop being rendered.
+    const ruleClass = 'border-t';
+    const groupedOptions: MultiSelectOption[] = [
+      { value: 'a', label: 'Alpha', separatorAfter: true },
+      { value: 'b', label: 'Beta' },
+      { value: 'c', label: 'Gamma' },
+    ];
+    const rowFor = (label: string) => screen.getByText(label).closest('label')!;
+
+    it('rules the row after the marked option, and no other row', () => {
+      render(<MultiSelect options={groupedOptions} value={[]} onChange={onChange} />);
+      fireEvent.click(screen.getByRole('button'));
+
+      expect(rowFor('Beta').className).toContain(ruleClass);
+      expect(rowFor('Alpha').className).not.toContain(ruleClass);
+      expect(rowFor('Gamma').className).not.toContain(ruleClass);
+    });
+
+    it('draws no rule when the marked option is the last one left', () => {
+      render(
+        <MultiSelect
+          options={[{ value: 'a', label: 'Alpha', separatorAfter: true }]}
+          value={[]}
+          onChange={onChange}
+        />,
+      );
+      fireEvent.click(screen.getByRole('button'));
+
+      expect(rowFor('Alpha').className).not.toContain(ruleClass);
+    });
+
+    it('drops the rule while searching, where the boundary no longer holds', () => {
+      render(<MultiSelect options={groupedOptions} value={[]} onChange={onChange} />);
+      fireEvent.click(screen.getByRole('button'));
+      fireEvent.change(screen.getByPlaceholderText('Search...'), { target: { value: 'a' } });
+
+      // Alpha, Beta and Gamma all match 'a', so the rows are the same three --
+      // only the grouping they were in has gone.
+      expect(rowFor('Beta').className).not.toContain(ruleClass);
+    });
+
+    it('leaves an unmarked list with no rules at all', () => {
+      render(<MultiSelect options={flatOptions} value={[]} onChange={onChange} />);
+      fireEvent.click(screen.getByRole('button'));
+
+      for (const label of ['Alpha', 'Beta', 'Gamma']) {
+        expect(rowFor(label).className).not.toContain(ruleClass);
+      }
+    });
+  });
 });

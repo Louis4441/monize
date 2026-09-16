@@ -266,6 +266,8 @@ However a surface selects a category, the option list is one shape: built from `
 
 Whether a picker *offers* to create is a property of the surface, not the field: a form that can create passes the creator to **every** category picker it renders, split lines included (`SplitEditor`'s lines silently discarded unmatched text while the Category field offered "+ Create" -- issue #1187). An asynchronous create addresses the row it came from **by id** (rows can move while the request is in flight), and the new category's `isIncome` comes from what the creator returned.
 
+**A filter list's group boundary is a flag on the option, never a divider the caller draws.** `MultiSelectOption.separatorAfter` rules the row *below* the boundary, so a `MultiSelect` marked this way cannot leave a stray line behind when a search stops rendering the rows on one side of it. `buildCategoryFilterOptions` sets it on the last of `SPECIAL_CATEGORY_FILTER_IDS`, which is what separates the four filters for what a record *is* (no category, a transfer, a whole type) from the categories underneath; every panel built from that list gets the same boundary. The rule is dropped while a search is flattening the hierarchy, and when the marked option is the last row left.
+
 ## An account balance is coloured by its sign -- `balanceColor`, never by account type
 
 `balanceColor` (`lib/format.ts`) is the one rule: negative is red, everything else neutral. Do not add `|| isLiability` (or any `accountType` test) -- a credit card at a credit balance is not in the red, and the sign already carries the meaning. `gainLossColor` is the sibling for a *change* in value (green when up), not for a balance.

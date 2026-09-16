@@ -11,6 +11,13 @@ export interface MultiSelectOption {
   label: string;
   parentId?: string | null;  // For hierarchical options
   children?: MultiSelectOption[];  // Child options
+  /**
+   * Close a group after this option: the row that follows it is drawn with a
+   * rule above it. Suppressed while searching, because the list is flattened
+   * to matches and the boundary the rule marks no longer holds, and it draws
+   * nothing when this option is the last one left.
+   */
+  separatorAfter?: boolean;
 }
 
 interface MultiSelectProps {
@@ -435,7 +442,7 @@ export function MultiSelect({
                     {t('multiSelect.noOptions')}
                   </div>
                 )}
-                {filteredOptions.map((option) => {
+                {filteredOptions.map((option, index) => {
                   const selectionState = getSelectionState(option.value, option.hasChildren);
                   const isChecked = selectionState === 'all';
                   const isIndeterminate = selectionState === 'some';
@@ -444,13 +451,20 @@ export function MultiSelect({
                   const isSearching = searchText.length > 0;
                   const parentLabel = option.parentValue ? optionMap.get(option.parentValue)?.label : null;
 
+                  // The rule belongs to the row below the boundary rather than
+                  // to a divider element of its own, so it cannot outlive the
+                  // rows it separates when a search empties one side.
+                  const startsGroup =
+                    !isSearching && filteredOptions[index - 1]?.separatorAfter === true;
+
                   return (
                     <label
                       key={option.value}
                       className={cn(
                         'flex items-center px-3 py-2 cursor-pointer',
                         'transition-colors motion-reduce:transition-none hover:bg-gray-100 dark:hover:bg-gray-700',
-                        option.hasChildren && 'font-medium'
+                        option.hasChildren && 'font-medium',
+                        startsGroup && 'mt-1 border-t border-gray-200 dark:border-gray-700'
                       )}
                       style={{ paddingLeft: isSearching ? '0.75rem' : `${(option.level * 1.25) + 0.75}rem` }}
                     >
