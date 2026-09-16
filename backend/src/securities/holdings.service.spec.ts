@@ -6,6 +6,7 @@ import {
   InvestmentAction,
 } from "./entities/investment-transaction.entity";
 import { NON_VOID_INVESTMENT_STATUS } from "./investment-row-effects.util";
+import { INVESTMENT_REPLAY_ORDER } from "./investment-replay.util";
 import {
   Account,
   AccountType,
@@ -528,566 +529,266 @@ describe("HoldingsService", () => {
     });
   });
 
-  describe("createOrUpdate", () => {
-    it("creates a new holding when none exists", async () => {
-      holdingsRepository.findOne.mockResolvedValue(null);
-      const createdHolding = {
+  describe("rebuildScopesFromTransactions", () => {
+    const USER = "11111111-1111-1111-1111-111111111111";
+
+    /**
+     * A `manager.find` that honours the `order` option, so the spec exercises
+     * the ordering the service asks for rather than the order the fixture
+     * happens to be written in. Without this the fixture's own array order
+     * would silently stand in for the database's ORDER BY and the regression
+     * below could not fail.
+     */
+    const stubLedger = (
+      rows: Record<string, unknown>[],
+      accounts: Record<string, unknown>[] = [mockAccount],
+    ) => {
+      mockQueryRunner.manager.find.mockImplementation(
+        (entity: unknown, options: { order?: Record<string, string> }) => {
+          if (entity === Account) return Promise.resolve(accounts);
+          if (entity !== InvestmentTransaction) return Promise.resolve([]);
+          const keys = Object.keys(options?.order ?? {});
+          const sorted = [...rows].sort((a, b) => {
+            for (const key of keys) {
+              const left = String(a[key] ?? "");
+              const right = String(b[key] ?? "");
+              if (left !== right) return left < right ? -1 : 1;
+            }
+            return 0;
+          });
+          return Promise.resolve(sorted);
+        },
+      );
+    };
+
+    const sameInstant = new Date("2026-04-01T00:00:00.000Z");
+
+    // The reproduction from issue #1388, written in INSERTION order: the SELL
+    // was entered third but dated between the two purchases.
+    const buyBuySellOutOfOrder = [
+      {
+        id: "tx-1",
         accountId: "acc-1",
         securityId: "sec-1",
-        quantity: 10,
-        averageCost: 150,
-      };
-      holdingsRepository.create.mockReturnValue(createdHolding);
-      holdingsRepository.save.mockResolvedValue({
-        ...createdHolding,
-        id: "new-hold",
-      });
-
-      const result = await service.createOrUpdate(
-        "11111111-1111-1111-1111-111111111111",
-        "acc-1",
-        "sec-1",
-        10,
-        150,
-      );
-
-      expect(accountsService.findOne).toHaveBeenCalledWith(
-        "11111111-1111-1111-1111-111111111111",
-        "acc-1",
-      );
-      expect(securitiesService.findOne).toHaveBeenCalledWith(
-        "11111111-1111-1111-1111-111111111111",
-        "sec-1",
-      );
-      expect(holdingsRepository.create).toHaveBeenCalledWith({
-        accountId: "acc-1",
-        securityId: "sec-1",
-        quantity: 10,
-        averageCost: 150,
-      });
-      expect(holdingsRepository.save).toHaveBeenCalledWith(createdHolding);
-      expect(result.id).toBe("new-hold");
-    });
-
-    it("updates existing holding when buying more shares", async () => {
-      const existingHolding = {
-        id: "hold-1",
-        accountId: "acc-1",
-        securityId: "sec-1",
+        action: InvestmentAction.BUY,
+        transactionDate: "2026-01-01",
         quantity: 100,
-        averageCost: 150,
-      };
-      holdingsRepository.findOne.mockResolvedValue(existingHolding);
-      holdingsRepository.save.mockImplementation((data) =>
-        Promise.resolve(data),
-      );
-
-      const result = await service.createOrUpdate(
-        "11111111-1111-1111-1111-111111111111",
-        "acc-1",
-        "sec-1",
-        50,
-        200,
-      );
-
-      // New average cost: (100*150 + 50*200) / 150 = (15000 + 10000) / 150 = 166.666...
-      expect(result.quantity).toBe(150);
-      expect(result.averageCost).toBeCloseTo(166.6667, 3);
-    });
-
-    it("updates existing holding when selling shares (keeps average cost)", async () => {
-      const existingHolding = {
-        id: "hold-1",
+        price: 10,
+        commission: 0,
+        createdAt: new Date("2026-04-01T00:00:00.000Z"),
+      },
+      {
+        id: "tx-2",
         accountId: "acc-1",
         securityId: "sec-1",
+        action: InvestmentAction.BUY,
+        transactionDate: "2026-03-01",
         quantity: 100,
-        averageCost: 150,
-      };
-      holdingsRepository.findOne.mockResolvedValue(existingHolding);
-      holdingsRepository.save.mockImplementation((data) =>
-        Promise.resolve(data),
-      );
-
-      const result = await service.createOrUpdate(
-        "11111111-1111-1111-1111-111111111111",
-        "acc-1",
-        "sec-1",
-        -30,
-        200,
-      );
-
-      expect(result.quantity).toBe(70);
-      // Average cost should remain 150 when selling
-      expect(result.averageCost).toBe(150);
-    });
-
-    it("propagates error when account ownership check fails", async () => {
-      accountsService.findOne.mockRejectedValue(
-        new NotFoundException("Account not found"),
-      );
-
-      await expect(
-        service.createOrUpdate(
-          "11111111-1111-1111-1111-111111111111",
-          "acc-999",
-          "sec-1",
-          10,
-          150,
-        ),
-      ).rejects.toThrow(NotFoundException);
-    });
-
-    it("propagates error when security ownership check fails", async () => {
-      securitiesService.findOne.mockRejectedValue(
-        new NotFoundException("Security not found"),
-      );
-
-      await expect(
-        service.createOrUpdate(
-          "11111111-1111-1111-1111-111111111111",
-          "acc-1",
-          "sec-999",
-          10,
-          150,
-        ),
-      ).rejects.toThrow(NotFoundException);
-    });
-
-    it("handles buying shares when averageCost is null on existing holding", async () => {
-      const existingHolding = {
-        id: "hold-1",
+        price: 20,
+        commission: 0,
+        createdAt: new Date("2026-04-01T00:00:01.000Z"),
+      },
+      {
+        id: "tx-3",
         accountId: "acc-1",
         securityId: "sec-1",
+        action: InvestmentAction.SELL,
+        transactionDate: "2026-02-01",
         quantity: 50,
-        averageCost: null,
-      };
-      holdingsRepository.findOne.mockResolvedValue(existingHolding);
-      holdingsRepository.save.mockImplementation((data) =>
-        Promise.resolve(data),
+        price: 12,
+        commission: 0,
+        createdAt: new Date("2026-04-01T00:00:02.000Z"),
+      },
+    ];
+
+    it("stores the average cost the ledger replay gives, not the one insertion order gives", async () => {
+      // Replayed by date: buy 100 at 10 (basis 1,000), sell 50 relieving 500,
+      // then buy 100 at 20 -- 150 shares, basis 2,500, 16.6667 a share.
+      // Blended in insertion order the two buys average to 15.00 first and the
+      // sale relieves 750, leaving 150 shares at 15.00: the stored figure the
+      // issue reports, and what the holdings page showed until something
+      // unrelated triggered a rebuild.
+      stubLedger(buyBuySellOutOfOrder);
+      holdingsRepository.find.mockResolvedValue([]);
+
+      await service.rebuildScopesFromTransactions(
+        USER,
+        [{ accountId: "acc-1", securityId: "sec-1" }],
+        mockQueryRunner.manager as never,
       );
 
-      const result = await service.createOrUpdate(
-        "11111111-1111-1111-1111-111111111111",
-        "acc-1",
-        "sec-1",
-        50,
-        200,
-      );
-
-      // (50*0 + 50*200) / 100 = 100
-      expect(result.quantity).toBe(100);
-      expect(result.averageCost).toBeCloseTo(100, 2);
+      expect(holdingsRepository.save).toHaveBeenCalledTimes(1);
+      const stored = holdingsRepository.save.mock.calls[0][0];
+      expect(stored.quantity).toBeCloseTo(150, 8);
+      expect(stored.averageCost).toBeCloseTo(2500 / 150, 6);
+      expect(stored.averageCost).not.toBeCloseTo(15, 4);
     });
 
-    it("correctly handles selling all shares", async () => {
-      const existingHolding = {
-        id: "hold-1",
-        accountId: "acc-1",
-        securityId: "sec-1",
-        quantity: 100,
-        averageCost: 150,
-      };
-      holdingsRepository.findOne.mockResolvedValue(existingHolding);
-      holdingsRepository.save.mockImplementation((data) =>
-        Promise.resolve(data),
+    it("re-converges after the back-dated row is deleted", async () => {
+      // The same position with the SELL gone: two purchases, 200 shares,
+      // basis 3,000. A delta applied to the stored 16.6667 could not reach it.
+      stubLedger(buyBuySellOutOfOrder.slice(0, 2));
+      holdingsRepository.find.mockResolvedValue([
+        { ...mockHolding, quantity: 150, averageCost: 2500 / 150 },
+      ]);
+
+      await service.rebuildScopesFromTransactions(
+        USER,
+        [{ accountId: "acc-1", securityId: "sec-1" }],
+        mockQueryRunner.manager as never,
       );
 
-      const result = await service.createOrUpdate(
-        "11111111-1111-1111-1111-111111111111",
-        "acc-1",
-        "sec-1",
-        -100,
-        200,
-      );
-
-      expect(result.quantity).toBe(0);
-      // Average cost remains unchanged when selling
-      expect(result.averageCost).toBe(150);
+      const stored = holdingsRepository.save.mock.calls[0][0];
+      expect(stored.quantity).toBeCloseTo(200, 8);
+      expect(stored.averageCost).toBeCloseTo(15, 8);
     });
 
-    it("snaps near-zero quantity to exactly zero after selling all shares", async () => {
-      // Simulate floating-point drift: 100.00005 - 100 = 0.00005 (below 0.0001 threshold)
-      const existingHolding = {
-        id: "hold-1",
-        accountId: "acc-1",
-        securityId: "sec-1",
-        quantity: 100.00005,
-        averageCost: 150,
-      };
-      holdingsRepository.findOne.mockResolvedValue(existingHolding);
-      holdingsRepository.save.mockImplementation((data) =>
-        Promise.resolve(data),
+    it("breaks a same-day, same-created_at tie on the primary key", async () => {
+      // One import writes both rows in a single transaction, so they share
+      // `created_at` to the microsecond and `transaction_date` cannot separate
+      // them either. The id is what makes the replay a function of the ledger:
+      // "a" buys before "b" sells, so the sale relieves basis that exists.
+      stubLedger([
+        {
+          id: "b-sell",
+          accountId: "acc-1",
+          securityId: "sec-1",
+          action: InvestmentAction.SELL,
+          transactionDate: "2026-05-01",
+          quantity: 40,
+          price: 30,
+          commission: 0,
+          createdAt: sameInstant,
+        },
+        {
+          id: "a-buy",
+          accountId: "acc-1",
+          securityId: "sec-1",
+          action: InvestmentAction.BUY,
+          transactionDate: "2026-05-01",
+          quantity: 100,
+          price: 10,
+          commission: 0,
+          createdAt: sameInstant,
+        },
+      ]);
+      holdingsRepository.find.mockResolvedValue([]);
+
+      await service.rebuildScopesFromTransactions(
+        USER,
+        [{ accountId: "acc-1", securityId: "sec-1" }],
+        mockQueryRunner.manager as never,
       );
 
-      const result = await service.createOrUpdate(
-        "11111111-1111-1111-1111-111111111111",
-        "acc-1",
-        "sec-1",
-        -100,
-        150,
-      );
-
-      // The tiny residual (0.00005) should be snapped to exactly 0
-      expect(result.quantity).toBe(0);
+      const stored = holdingsRepository.save.mock.calls[0][0];
+      expect(stored.quantity).toBeCloseTo(60, 8);
+      // Basis relieved at the purchase's own average, so the survivors still
+      // cost 10 each. Folded the other way round the sale would relieve
+      // nothing (no shares held yet) and 60 shares would carry 1,000 of basis.
+      expect(stored.averageCost).toBeCloseTo(10, 8);
     });
 
-    it("rejects when selling more than held by default", async () => {
-      const existingHolding = {
-        id: "hold-1",
-        accountId: "acc-1",
-        securityId: "sec-1",
-        quantity: 0,
-        averageCost: 150,
-      };
-      holdingsRepository.findOne.mockResolvedValue(existingHolding);
+    it("reads the ledger in the shared replay order", async () => {
+      stubLedger(buyBuySellOutOfOrder);
+      holdingsRepository.find.mockResolvedValue([]);
 
-      await expect(
-        service.createOrUpdate(
-          "11111111-1111-1111-1111-111111111111",
-          "acc-1",
-          "sec-1",
-          -100,
-          150,
-        ),
-      ).rejects.toThrow(/Insufficient shares/);
+      await service.rebuildScopesFromTransactions(
+        USER,
+        [{ accountId: "acc-1", securityId: "sec-1" }],
+        mockQueryRunner.manager as never,
+      );
+
+      const call = mockQueryRunner.manager.find.mock.calls.find(
+        ([entity]: unknown[]) => entity === InvestmentTransaction,
+      );
+      expect(call?.[1].order).toBe(INVESTMENT_REPLAY_ORDER);
     });
 
-    it("allows negative intermediate state when allowNegative=true", async () => {
-      const existingHolding = {
-        id: "hold-1",
-        accountId: "acc-1",
-        securityId: "sec-1",
-        quantity: 0,
-        averageCost: 150,
-      };
-      holdingsRepository.findOne.mockResolvedValue(existingHolding);
-      holdingsRepository.save.mockImplementation((data) =>
-        Promise.resolve(data),
+    it("deletes the holding when the ledger no longer accounts for any shares", async () => {
+      stubLedger([]);
+      holdingsRepository.find.mockResolvedValue([mockHolding]);
+
+      await service.rebuildScopesFromTransactions(
+        USER,
+        [{ accountId: "acc-1", securityId: "sec-1" }],
+        mockQueryRunner.manager as never,
       );
 
-      const result = await service.createOrUpdate(
-        "11111111-1111-1111-1111-111111111111",
-        "acc-1",
-        "sec-1",
-        -100,
-        150,
-        undefined,
-        true,
-      );
-
-      expect(result.quantity).toBe(-100);
-    });
-
-    it("does not update averageCost while running quantity stays non-positive", async () => {
-      // Reverse of a past BUY can leave quantity at -100 with the original
-      // avg cost of 50. Applying a new BUY(150 @ 60) bringing quantity to 50
-      // should inherit the new trade's price as the avg cost rather than
-      // producing a distorted blended value.
-      const existingHolding = {
-        id: "hold-1",
-        accountId: "acc-1",
-        securityId: "sec-1",
-        quantity: -100,
-        averageCost: 50,
-      };
-      holdingsRepository.findOne.mockResolvedValue(existingHolding);
-      holdingsRepository.save.mockImplementation((data) =>
-        Promise.resolve(data),
-      );
-
-      const result = await service.createOrUpdate(
-        "11111111-1111-1111-1111-111111111111",
-        "acc-1",
-        "sec-1",
-        150,
-        60,
-        undefined,
-        true,
-      );
-
-      expect(result.quantity).toBe(50);
-      expect(result.averageCost).toBe(60);
-    });
-  });
-
-  describe("updateHolding", () => {
-    it("delegates to createOrUpdate", async () => {
-      holdingsRepository.findOne.mockResolvedValue(null);
-      const createdHolding = {
-        accountId: "acc-1",
-        securityId: "sec-1",
-        quantity: 10,
-        averageCost: 100,
-      };
-      holdingsRepository.create.mockReturnValue(createdHolding);
-      holdingsRepository.save.mockResolvedValue({
-        ...createdHolding,
-        id: "new-hold",
-      });
-
-      const result = await service.updateHolding(
-        "11111111-1111-1111-1111-111111111111",
-        "acc-1",
-        "sec-1",
-        10,
-        100,
-      );
-
-      expect(accountsService.findOne).toHaveBeenCalledWith(
-        "11111111-1111-1111-1111-111111111111",
-        "acc-1",
-      );
-      expect(securitiesService.findOne).toHaveBeenCalledWith(
-        "11111111-1111-1111-1111-111111111111",
-        "sec-1",
-      );
-      expect(result.id).toBe("new-hold");
-    });
-  });
-
-  describe("adjustQuantity", () => {
-    it("creates new holding when none exists (positive quantity)", async () => {
-      holdingsRepository.findOne.mockResolvedValue(null);
-      const createdHolding = {
-        accountId: "acc-1",
-        securityId: "sec-1",
-        quantity: 25,
-        averageCost: 0,
-      };
-      holdingsRepository.create.mockReturnValue(createdHolding);
-      holdingsRepository.save.mockResolvedValue({
-        ...createdHolding,
-        id: "new-hold",
-      });
-
-      await service.adjustQuantity(
-        "11111111-1111-1111-1111-111111111111",
-        "acc-1",
-        "sec-1",
-        25,
-      );
-
-      expect(accountsService.findOne).toHaveBeenCalledWith(
-        "11111111-1111-1111-1111-111111111111",
-        "acc-1",
-      );
-      expect(securitiesService.findOne).toHaveBeenCalledWith(
-        "11111111-1111-1111-1111-111111111111",
-        "sec-1",
-      );
-      expect(holdingsRepository.create).toHaveBeenCalledWith({
-        accountId: "acc-1",
-        securityId: "sec-1",
-        quantity: 25,
-        averageCost: 0,
-      });
-      expect(holdingsRepository.save).toHaveBeenCalled();
-    });
-
-    it("throws NotFoundException when removing shares from non-existent holding", async () => {
-      holdingsRepository.findOne.mockResolvedValue(null);
-
-      await expect(
-        service.adjustQuantity(
-          "11111111-1111-1111-1111-111111111111",
-          "acc-1",
-          "sec-1",
-          -10,
-        ),
-      ).rejects.toThrow(NotFoundException);
-
-      await expect(
-        service.adjustQuantity(
-          "11111111-1111-1111-1111-111111111111",
-          "acc-1",
-          "sec-1",
-          -10,
-        ),
-      ).rejects.toThrow("Cannot remove shares from a non-existent holding");
-    });
-
-    it("adjusts quantity on existing holding without changing averageCost", async () => {
-      const existingHolding = {
-        id: "hold-1",
-        accountId: "acc-1",
-        securityId: "sec-1",
-        quantity: 100,
-        averageCost: 150,
-      };
-      holdingsRepository.findOne.mockResolvedValue(existingHolding);
-      holdingsRepository.save.mockImplementation((data) =>
-        Promise.resolve(data),
-      );
-
-      const result = await service.adjustQuantity(
-        "11111111-1111-1111-1111-111111111111",
-        "acc-1",
-        "sec-1",
-        25,
-      );
-
-      expect(result.quantity).toBe(125);
-      expect(result.averageCost).toBe(150);
-    });
-
-    it("reduces quantity on existing holding", async () => {
-      const existingHolding = {
-        id: "hold-1",
-        accountId: "acc-1",
-        securityId: "sec-1",
-        quantity: 100,
-        averageCost: 150,
-      };
-      holdingsRepository.findOne.mockResolvedValue(existingHolding);
-      holdingsRepository.save.mockImplementation((data) =>
-        Promise.resolve(data),
-      );
-
-      const result = await service.adjustQuantity(
-        "11111111-1111-1111-1111-111111111111",
-        "acc-1",
-        "sec-1",
-        -30,
-      );
-
-      expect(result.quantity).toBe(70);
-      expect(result.averageCost).toBe(150);
-    });
-
-    it("propagates error when account ownership check fails", async () => {
-      accountsService.findOne.mockRejectedValue(
-        new NotFoundException("Account not found"),
-      );
-
-      await expect(
-        service.adjustQuantity(
-          "11111111-1111-1111-1111-111111111111",
-          "acc-999",
-          "sec-1",
-          10,
-        ),
-      ).rejects.toThrow(NotFoundException);
-    });
-
-    it("propagates error when security ownership check fails", async () => {
-      securitiesService.findOne.mockRejectedValue(
-        new NotFoundException("Security not found"),
-      );
-
-      await expect(
-        service.adjustQuantity(
-          "11111111-1111-1111-1111-111111111111",
-          "acc-1",
-          "sec-999",
-          10,
-        ),
-      ).rejects.toThrow(NotFoundException);
-    });
-  });
-
-  describe("applySplit", () => {
-    it("doubles quantity and halves averageCost on a 2-for-1 split", async () => {
-      const existingHolding = {
-        id: "hold-1",
-        accountId: "acc-1",
-        securityId: "sec-1",
-        quantity: 100,
-        averageCost: 150,
-      };
-      holdingsRepository.findOne.mockResolvedValue(existingHolding);
-      holdingsRepository.save.mockImplementation((data) =>
-        Promise.resolve(data),
-      );
-
-      const result = await service.applySplit("acc-1", "sec-1", 2);
-
-      expect(result?.quantity).toBe(200);
-      expect(result?.averageCost).toBe(75);
-    });
-
-    it("halves quantity and doubles averageCost on a 1-for-2 reverse split", async () => {
-      const existingHolding = {
-        id: "hold-1",
-        accountId: "acc-1",
-        securityId: "sec-1",
-        quantity: 100,
-        averageCost: 50,
-      };
-      holdingsRepository.findOne.mockResolvedValue(existingHolding);
-      holdingsRepository.save.mockImplementation((data) =>
-        Promise.resolve(data),
-      );
-
-      const result = await service.applySplit("acc-1", "sec-1", 0.5);
-
-      expect(result?.quantity).toBe(50);
-      expect(result?.averageCost).toBe(100);
-    });
-
-    it("preserves total cost basis across the split", async () => {
-      const existingHolding = {
-        id: "hold-1",
-        accountId: "acc-1",
-        securityId: "sec-1",
-        quantity: 75,
-        averageCost: 80,
-      };
-      holdingsRepository.findOne.mockResolvedValue(existingHolding);
-      holdingsRepository.save.mockImplementation((data) =>
-        Promise.resolve(data),
-      );
-
-      const before =
-        Number(existingHolding.quantity) * Number(existingHolding.averageCost);
-      const result = await service.applySplit("acc-1", "sec-1", 1.5);
-      const after = Number(result!.quantity) * Number(result!.averageCost);
-
-      expect(after).toBeCloseTo(before, 6);
-    });
-
-    it("returns null without saving when no holding exists", async () => {
-      holdingsRepository.findOne.mockResolvedValue(null);
-
-      const result = await service.applySplit("acc-1", "sec-1", 2);
-
-      expect(result).toBeNull();
+      expect(holdingsRepository.remove).toHaveBeenCalledWith(mockHolding);
       expect(holdingsRepository.save).not.toHaveBeenCalled();
     });
 
-    it("rejects ratios that are zero or negative", async () => {
-      await expect(service.applySplit("acc-1", "sec-1", 0)).rejects.toThrow(
-        "Split ratio must be greater than zero",
+    it("leaves scopes nobody named alone", async () => {
+      // The ledger read is an `In() x In()` cross product, so a row belonging
+      // to a pair the caller did not name must not fold into the result, and
+      // that pair's stored holding must not be rewritten.
+      stubLedger([
+        ...buyBuySellOutOfOrder,
+        {
+          id: "tx-other",
+          accountId: "acc-1",
+          securityId: "sec-2",
+          action: InvestmentAction.BUY,
+          transactionDate: "2026-01-01",
+          quantity: 10,
+          price: 5,
+          commission: 0,
+          createdAt: sameInstant,
+        },
+      ]);
+      holdingsRepository.find.mockResolvedValue([mockHolding, mockHolding2]);
+
+      await service.rebuildScopesFromTransactions(
+        USER,
+        [{ accountId: "acc-1", securityId: "sec-1" }],
+        mockQueryRunner.manager as never,
       );
-      await expect(service.applySplit("acc-1", "sec-1", -1)).rejects.toThrow(
-        "Split ratio must be greater than zero",
-      );
+
+      expect(holdingsRepository.save).toHaveBeenCalledTimes(1);
+      expect(holdingsRepository.save.mock.calls[0][0].securityId).toBe("sec-1");
+      expect(holdingsRepository.remove).not.toHaveBeenCalled();
     });
-  });
 
-  describe("reverseSplit", () => {
-    it("undoes a 2-for-1 split (halves quantity, doubles averageCost)", async () => {
-      const existingHolding = {
-        id: "hold-1",
-        accountId: "acc-1",
-        securityId: "sec-1",
-        quantity: 200,
-        averageCost: 75,
-      };
-      holdingsRepository.findOne.mockResolvedValue(existingHolding);
-      holdingsRepository.save.mockImplementation((data) =>
-        Promise.resolve(data),
+    it("does not touch a non-brokerage account's rows", async () => {
+      stubLedger(buyBuySellOutOfOrder, [
+        {
+          ...mockAccount,
+          accountSubType: AccountSubType.INVESTMENT_CASH,
+        },
+      ]);
+      holdingsRepository.find.mockResolvedValue([mockHolding]);
+
+      await service.rebuildScopesFromTransactions(
+        USER,
+        [{ accountId: "acc-1", securityId: "sec-1" }],
+        mockQueryRunner.manager as never,
       );
 
-      const result = await service.reverseSplit("acc-1", "sec-1", 2);
-
-      expect(result?.quantity).toBe(100);
-      expect(result?.averageCost).toBe(150);
+      expect(holdingsRepository.save).not.toHaveBeenCalled();
+      expect(holdingsRepository.remove).not.toHaveBeenCalled();
     });
 
-    it("rejects ratios that are zero or negative", async () => {
-      await expect(service.reverseSplit("acc-1", "sec-1", 0)).rejects.toThrow(
-        "Split ratio must be greater than zero",
+    it("takes the holdings lock before reading the ledger", async () => {
+      stubLedger(buyBuySellOutOfOrder);
+      holdingsRepository.find.mockResolvedValue([]);
+      const order: string[] = [];
+      mockQueryRunner.manager.query.mockImplementation(() => {
+        order.push("lock");
+        return Promise.resolve([]);
+      });
+      const find = mockQueryRunner.manager.find.getMockImplementation()!;
+      mockQueryRunner.manager.find.mockImplementation((...args: unknown[]) => {
+        order.push("find");
+        return (find as (...a: unknown[]) => unknown)(...args);
+      });
+
+      await service.rebuildScopesFromTransactions(
+        USER,
+        [{ accountId: "acc-1", securityId: "sec-1" }],
+        mockQueryRunner.manager as never,
       );
+
+      expect(order[0]).toBe("lock");
     });
   });
 

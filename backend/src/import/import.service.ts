@@ -4,6 +4,8 @@ import {
   NotFoundException,
   ConflictException,
   Logger,
+  Inject,
+  forwardRef,
 } from "@nestjs/common";
 import { DataSource, EntityManager, In, IsNull } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
@@ -54,6 +56,7 @@ import { ImportPostProcessingService } from "./import-post-processing.service";
 import { ImportInvestmentProcessorService } from "./import-investment-processor.service";
 import { ImportRegularProcessorService } from "./import-regular-processor.service";
 import { Security } from "../securities/entities/security.entity";
+import { HoldingsService } from "../securities/holdings.service";
 import { Tag } from "../tags/entities/tag.entity";
 import {
   Transaction,
@@ -73,7 +76,34 @@ export class ImportService {
     private entityCreator: ImportEntityCreatorService,
     private investmentProcessor: ImportInvestmentProcessorService,
     private regularProcessor: ImportRegularProcessorService,
+    @Inject(forwardRef(() => HoldingsService))
+    private holdingsService: HoldingsService,
   ) {}
+
+  /**
+   * Re-derive the imported accounts' holdings from the ledger the import has
+   * just written, inside the import's own transaction.
+   *
+   * An import arrives in file order, which is not date order. A per-row
+   * incremental average cost therefore blended a later-dated purchase into a
+   * position that, replayed, had already been sold down -- the stored figure
+   * and `POST /holdings/rebuild` disagreed (issue #1388). The rebuild filters
+   * non-investment accounts out itself, so the caller passes whatever it
+   * touched.
+   */
+  private async rebuildImportedHoldings(
+    manager: EntityManager,
+    userId: string,
+    accountIds: Iterable<string>,
+  ): Promise<void> {
+    const ids = Array.from(new Set(accountIds));
+    if (ids.length === 0) return;
+    await this.holdingsService.rebuildAccountsFromTransactions(
+      userId,
+      ids,
+      manager,
+    );
+  }
 
   // --- QIF ---
 
@@ -418,6 +448,8 @@ export class ImportService {
             }
           }
         }
+
+        await this.rebuildImportedHoldings(manager, userId, affectedAccountIds);
 
         // Post-block cleanup: detect and remove Quicken merged split transfers
         // that were imported before their split counterparts (reverse block order).
@@ -1323,6 +1355,8 @@ export class ImportService {
             );
           }
         }
+
+        await this.rebuildImportedHoldings(manager, userId, affectedAccountIds);
       });
     } catch (error) {
       this.logger.error(
