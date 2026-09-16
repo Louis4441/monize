@@ -63,6 +63,7 @@ Each module holds `{feature}.module.ts`, controller, service, their specs, `enti
 | A numeric environment variable | `resolvePositiveInt`, declared in a table beside its documentation | a bare `Number(process.env.X)`, or `configService.get<number>(...)`, which asserts the type without coercing |
 | A log line, including pre-boot scripts | NestJS `Logger` | `console.*` |
 | A third-party `fetch` | `ProviderHealthService` gates and `describeFetchFailure` | a bare `fetch` or logging `error.stack` from a `catch` |
+| Storing a provider price | `refuseForeignCurrency` / `verifyProviderCurrency` (`src/securities/providers/quote-currency.util.ts`) before the write | writing a quote or a historical series whose currency was never compared with the security's |
 | A literal inside a regular expression | `escapeRegExp` | a hand-written character class |
 | A text filter offered to a person or a model | `ILike` or a case-insensitive comparison | `Like` |
 | A predicate that decides which row counts | one named helper called from every site | the clauses spelled out per site |

@@ -422,6 +422,7 @@
   },
   "securities": {
     "accountMustBeInvestment": "[XX-Account must be of type INVESTMENT-XX]",
+    "providerCurrencyMismatch": "[XX-Price update refused for {{ symbol }}: {{ provider }} quotes it in {{ reported }}, but the security is recorded in {{ configured }}. Correct the security's currency, symbol or exchange, then refresh.-XX]",
     "securityIdRequired": "[XX-Security ID is required for {{ action }} transactions-XX]",
     "exchangeRateUnavailable": "[XX-Could not determine an exchange rate for {{ from }} -> {{ to }} on the transaction date. Supply an explicit exchangeRate so the cash posting is correct.-XX]",
     "splitRatioRequired": "[XX-Split ratio (quantity) must be greater than zero-XX]",

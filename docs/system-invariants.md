@@ -96,6 +96,7 @@ implied.
 | INV-REDEEM-001 | A redemption's accrued interest moves cash once and is income once | enforced |
 | INV-RECONCILE-001 | While the strict lock is on, a reconciled transaction is not altered | enforced |
 | INV-FX-001 | An unavailable rate never becomes 1:1, a rate from after the date, or an unboundedly old one | partial |
+| INV-PRICE-001 | A stored price is in the currency the security is recorded in | partial |
 | INV-REPORT-001 | A report's account scope is investment linkage, not account type | enforced |
 | INV-REPORT-002 | A chart's down-sampling never reaches a count, a total or an export | enforced |
 | INV-LOAN-001 | A recurring overpayment's cadence is a calendar, not a payment interval | enforced |
@@ -624,6 +625,73 @@ claim to check against the scan, and read the scan for what it actually matches.
 `docs/verification-contract.md` section 6 still describes both load-bearing FX
 scans as having landed "with the fix, so no exception list"; that is now true of
 the first scan only.
+
+### INV-PRICE-001 -- a stored price is in the currency the security is recorded in
+
+```text
+Statement           A row in security_prices is a bare number, and the currency it
+                    is read in is securities.currency_code. So a provider answer
+                    may be stored against a security only when the currency the
+                    provider reports for that answer is the security's own, after
+                    one normalization of both sides (GBX/GBp is GBP).
+Source of truth     The provider's own metadata: Yahoo's chart `meta.currency`,
+                    MSN's chart `currency`. It, not the exchange, is what says
+                    which listing answered -- a USD-denominated ETF on the LSE is
+                    the case an exchange guess gets wrong.
+Enforcement         securities/providers/quote-currency.util.ts decides it once:
+                    normalizeQuoteCurrency on both sides, verifyProviderCurrency
+                    returning accepted/verified, accepted/unverified or refused.
+                    SecurityPriceService.refuseForeignCurrency is the single call
+                    site wrapper: it runs inside fetchQuoteWithFallback and
+                    fetchHistoricalWithFallback (where a refused provider is
+                    passed over and the next one faces the same check), inside
+                    fillPriceWindow, which reaches bulkUpsertPrices through
+                    neither, and again per security immediately before every
+                    savePriceData and bulkUpsertPrices on the group paths
+                    (refreshAllPricesGlobally, backfillHistoricalPrices,
+                    settleDailyBarsGlobally), because those fetch once for a
+                    representative and write for every security sharing its
+                    symbol and exchange -- and the group key holds no currency.
+                    The provider contract carries the currency because
+                    fetchHistoricalSeries returns a HistoricalSeries bundle; a
+                    bare HistoricalPrice[] cannot state what its numbers are in.
+Known gap           **Unverifiable is accepted, not refused.** A provider that
+                    reports no currency (MSN's chart series routinely does not,
+                    and its Quotes endpoint only sometimes does), or a security
+                    with no recorded currency, is stored with a logged warning
+                    rather than refused: refusing would leave MSN-priced
+                    securities with no prices at all. And a stored row still does
+                    not record the currency it was written in, so a row written
+                    before this check, or written unverified, cannot be audited
+                    from the database. Closing that is a column on
+                    security_prices plus a migration, which this entry does not
+                    claim.
+Concurrency scope   security
+Retry semantics     A refusal is deterministic for a given provider answer, so a
+                    retry refuses again until the security's currency, symbol or
+                    exchange is corrected.
+Crash semantics     The check precedes the write on every path, so a crash between
+                    them leaves the row untouched rather than half-converted.
+Failure response    refuse: no price row is written, the security is reported as
+                    failed the way a failed fetch already is
+                    (PriceUpdateResult.error / HistoricalBackfillResult.error,
+                    which the UI raises as a toast), with a tr() message naming
+                    both currencies.
+Required tests      Present: providers/quote-currency.util.spec.ts (the table:
+                    match, GBX normalized once, mismatch, either side silent) and
+                    security-price.service.spec.ts, which asserts no write mock is
+                    called on a mismatched quote, on a mismatched historical
+                    series, and when the fallback provider is the mismatching one,
+                    and that an unreported currency is stored with a warning.
+                    Owed: an integration test that a refused refresh leaves the
+                    previous row intact.
+Status              partial
+```
+
+A GBP listing stored against a USD-configured security understates every close
+by the GBP/USD rate -- 23 to 35 per cent over the range in issue #1393 -- and
+nothing in the stored series says so, because the series is numbers and the
+currency is on another table's row.
 
 ### INV-REPORT-001 -- a report's account scope is investment linkage, not account type
 

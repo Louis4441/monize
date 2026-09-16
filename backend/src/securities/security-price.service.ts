@@ -15,8 +15,13 @@ import {
   QuoteProviderName,
   QuoteResult,
   HistoricalPrice,
+  HistoricalSeries,
   SecurityLookupResult,
 } from "./providers/quote-provider.interface";
+import {
+  normalizeQuoteCurrency,
+  verifyProviderCurrency,
+} from "./providers/quote-currency.util";
 import {
   DEFAULT_QUOTE_PROVIDER,
   QuoteProviderRegistry,
@@ -213,6 +218,28 @@ interface UserContext {
 interface HistoricalWithProvider {
   prices: HistoricalPrice[];
   provider: QuoteProviderName;
+  /**
+   * The currency the provider says these bars are in, normalized. Carried from
+   * the provider's own answer so every write site can refuse a series that
+   * belongs to another listing of the same ticker.
+   */
+  currencyCode: string | null;
+}
+
+/**
+ * What an acceptance point came back with: the answer, or the reason there is
+ * none to store. A refusal is a *reported* fact about the security -- the
+ * provider answered about a different currency -- so it reaches the user as
+ * that security's error rather than as "no price data available".
+ */
+interface QuoteAcceptance {
+  quote: QuoteResult | null;
+  refusal?: string;
+}
+
+interface HistoricalAcceptance {
+  bundle: HistoricalWithProvider | null;
+  refusal?: string;
 }
 
 @Injectable()
@@ -279,7 +306,7 @@ export class SecurityPriceService {
   private async fetchQuoteWithFallback(
     security: Security,
     ctx: UserContext,
-  ): Promise<QuoteResult | null> {
+  ): Promise<QuoteAcceptance> {
     const ordered = this.providers.resolveForSecurity(
       security,
       ctx.defaultQuoteProvider,
@@ -289,6 +316,7 @@ export class SecurityPriceService {
       `Refresh ${security.symbol}: override=${security.quoteProvider ?? "(none)"} default=${ctx.defaultQuoteProvider} → trying [${ordered.map((p) => p.name).join(", ")}]`,
     );
 
+    let refusal: string | undefined;
     for (const provider of ordered) {
       try {
         const quote = await provider.fetchQuote(
@@ -297,10 +325,24 @@ export class SecurityPriceService {
           this.optsFor(provider, security, ctx),
         );
         if (quote && quote.regularMarketPrice !== undefined) {
+          // A price is a number in a currency, and the row it would be written
+          // to carries only the number. So the answer is checked here, before
+          // anybody can store it, and a provider quoting another listing of
+          // this ticker is passed over rather than accepted -- the next
+          // provider gets its turn and faces the same check.
+          const mismatch = this.refuseForeignCurrency(
+            security,
+            quote.currencyCode,
+            provider.name,
+          );
+          if (mismatch) {
+            refusal = mismatch;
+            continue;
+          }
           this.logger.log(
             `Refresh ${security.symbol}: ${provider.name} returned price=${quote.regularMarketPrice}`,
           );
-          return { ...quote, provider: provider.name };
+          return { quote: { ...quote, provider: provider.name } };
         }
         this.logger.log(
           `Refresh ${security.symbol}: ${provider.name} returned no usable price`,
@@ -314,29 +356,45 @@ export class SecurityPriceService {
     this.logger.warn(
       `Refresh ${security.symbol}: no provider returned a price`,
     );
-    return null;
+    return { quote: null, refusal };
   }
 
   private async fetchHistoricalWithFallback(
     security: Security,
     range: string,
     ctx: UserContext,
-  ): Promise<HistoricalWithProvider | null> {
+  ): Promise<HistoricalAcceptance> {
     const ordered = this.providers.resolveForSecurity(
       security,
       ctx.defaultQuoteProvider,
     );
 
+    let refusal: string | undefined;
     for (const provider of ordered) {
       try {
-        const prices = await provider.fetchHistorical(
+        const series = await provider.fetchHistoricalSeries(
           security.symbol,
           security.exchange,
           range,
           this.optsFor(provider, security, ctx),
         );
-        if (prices && prices.length > 0) {
-          return { prices, provider: provider.name };
+        if (series && series.prices.length > 0) {
+          const mismatch = this.refuseForeignCurrency(
+            security,
+            series.currencyCode,
+            provider.name,
+          );
+          if (mismatch) {
+            refusal = mismatch;
+            continue;
+          }
+          return {
+            bundle: {
+              prices: series.prices,
+              provider: provider.name,
+              currencyCode: series.currencyCode,
+            },
+          };
         }
       } catch (err) {
         this.logger.warn(
@@ -344,7 +402,53 @@ export class SecurityPriceService {
         );
       }
     }
-    return null;
+    return { bundle: null, refusal };
+  }
+
+  /**
+   * The one comparison every price acceptance point makes: does the currency
+   * the provider reported match the one the security is recorded in.
+   *
+   * Returns the message to report when it does not, and `null` when the answer
+   * may be stored. A provider that reports no currency at all (MSN's chart
+   * series) is accepted as unverified rather than refused, because refusing it
+   * would leave those securities with no prices; the decision is logged.
+   *
+   * Called per *security*, never per group: the refresh and backfill passes
+   * fetch once for a representative and write for every security sharing its
+   * symbol and exchange, and those securities can be recorded in different
+   * currencies.
+   */
+  private refuseForeignCurrency(
+    security: Pick<Security, "symbol" | "currencyCode">,
+    reported: string | null | undefined,
+    provider: QuoteProviderName,
+    opts: { warnUnverified?: boolean } = {},
+  ): string | null {
+    const verdict = verifyProviderCurrency(security.currencyCode, reported);
+    if (verdict.accepted) {
+      if (!verdict.verified && opts.warnUnverified !== false) {
+        this.logger.warn(
+          `Storing ${provider} prices for ${security.symbol} unverified: ` +
+            (verdict.reason === "provider-silent"
+              ? "the provider reported no trading currency"
+              : "the security has no recorded currency"),
+        );
+      }
+      return null;
+    }
+    const message = tr(
+      "errors.securities.providerCurrencyMismatch",
+      `Price update refused for ${security.symbol}: ${provider} quotes it in ${verdict.reported}, but the security is recorded in ${verdict.configured}. Correct the security's currency, symbol or exchange, then refresh.`,
+      {
+        symbol: security.symbol,
+        provider,
+        reported: verdict.reported,
+        configured: verdict.configured,
+      },
+    );
+    this.logger.warn(message);
+    return message;
   }
 
   private optsFor(
@@ -560,14 +664,14 @@ export class SecurityPriceService {
 
     for (let i = 0; i < groups.length; i++) {
       const group = groups[i];
-      const quote = quotes[i];
+      const { quote, refusal } = quotes[i];
 
       if (!quote || quote.regularMarketPrice === undefined) {
         for (const security of group) {
           results.push({
             symbol: security.symbol,
             success: false,
-            error: "No price data available",
+            error: refusal ?? "No price data available",
           });
           failed++;
         }
@@ -597,6 +701,25 @@ export class SecurityPriceService {
 
       const tradingDate = formatDateYMD(getTradingDateFromQuote(quote));
       for (const security of group) {
+        // Per security, although the quote was fetched once for the group: the
+        // group is keyed on symbol and exchange, not on currency, so two users
+        // holding the same ticker can have recorded it differently and only one
+        // of them may be right about this answer.
+        const mismatch = this.refuseForeignCurrency(
+          security,
+          quote.currencyCode,
+          quote.provider ?? DEFAULT_QUOTE_PROVIDER,
+          { warnUnverified: false },
+        );
+        if (mismatch) {
+          results.push({
+            symbol: security.symbol,
+            success: false,
+            error: mismatch,
+          });
+          failed++;
+          continue;
+        }
         try {
           await this.savePriceData(security.id, tradingDate, quote);
           await this.persistMarketSession(security, quote);
@@ -688,13 +811,13 @@ export class SecurityPriceService {
 
     for (let i = 0; i < securities.length; i++) {
       const security = securities[i];
-      const quote = quotes[i];
+      const { quote, refusal } = quotes[i];
 
       if (!quote || quote.regularMarketPrice === undefined) {
         results.push({
           symbol: security.symbol,
           success: false,
-          error: "No price data available",
+          error: refusal ?? "No price data available",
         });
         failed++;
         continue;
@@ -1018,7 +1141,10 @@ export class SecurityPriceService {
     for (const p of ordered) {
       try {
         const quote = await p.fetchQuote(symbol, exchange);
-        const currency = quote?.currencyCode?.trim();
+        // Through the same normalization the acceptance check applies, so the
+        // currency a security is created with is comparable -- letter for
+        // letter -- with the one every later price answer is measured against.
+        const currency = normalizeQuoteCurrency(quote?.currencyCode);
         if (currency) return currency;
       } catch (err) {
         this.logger.warn(
@@ -1123,27 +1249,32 @@ export class SecurityPriceService {
         groupEarliestDates.length > 0 &&
         groupEarliestDates.some((d) => d < oneYearAgoStr);
 
-      const daily = await this.fetchHistoricalWithFallback(
+      const dailyAttempt = await this.fetchHistoricalWithFallback(
         representative,
         range ?? "1y",
         ctx,
       );
+      const daily = dailyAttempt.bundle;
 
       let maxBundle: HistoricalWithProvider | null = null;
+      let maxRefusal: string | undefined;
       if (!range && needsOlderData) {
-        maxBundle = await this.fetchHistoricalWithFallback(
+        const maxAttempt = await this.fetchHistoricalWithFallback(
           representative,
           "max",
           ctx,
         );
+        maxBundle = maxAttempt.bundle;
+        maxRefusal = maxAttempt.refusal;
       }
 
       if (!daily && !maxBundle) {
+        const refusal = dailyAttempt.refusal ?? maxRefusal;
         for (const security of group) {
           results.push({
             symbol: security.symbol,
             success: false,
-            error: "No historical data available",
+            error: refusal ?? "No historical data available",
           });
           failed++;
         }
@@ -1201,6 +1332,24 @@ export class SecurityPriceService {
             provider: winner.provider,
           });
           successful++;
+          continue;
+        }
+
+        // The series was fetched for the representative; this security only
+        // shares its symbol and exchange, not necessarily its currency.
+        const mismatch = this.refuseForeignCurrency(
+          security,
+          winner.currencyCode,
+          winner.provider,
+          { warnUnverified: false },
+        );
+        if (mismatch) {
+          results.push({
+            symbol: security.symbol,
+            success: false,
+            error: mismatch,
+          });
+          failed++;
           continue;
         }
 
@@ -1411,7 +1560,7 @@ export class SecurityPriceService {
     let failed = 0;
 
     for (const [i, group] of groups.entries()) {
-      const bundle = bundles[i];
+      const bundle = bundles[i].bundle;
       if (!bundle || bundle.prices.length === 0) {
         failed += group.length;
         continue;
@@ -1419,6 +1568,20 @@ export class SecurityPriceService {
       const source = sourceFor(bundle.provider);
 
       for (const security of group) {
+        // Settlement writes the official bars over the day's quotes, so it is
+        // a price write like any other and faces the same check -- per
+        // security, because the group shares a symbol rather than a currency.
+        if (
+          this.refuseForeignCurrency(
+            security,
+            bundle.currencyCode,
+            bundle.provider,
+            { warnUnverified: false },
+          )
+        ) {
+          failed++;
+          continue;
+        }
         // Per security rather than per group: the session lives on the row, and
         // a symbol nothing has quoted yet has none, which is a different answer
         // from a symbol whose exchange is known.
@@ -1545,11 +1708,16 @@ export class SecurityPriceService {
       preferredExchanges: [],
     };
 
-    const bundle = await this.fetchHistoricalWithFallback(
+    const { bundle, refusal } = await this.fetchHistoricalWithFallback(
       security,
       range,
       userCtx,
     );
+    // A refused series is a reported fault, not an absence: this method throws
+    // so the user who asked for the history is told why they got none, while
+    // `backfillSecurityRange` keeps turning it into a zero for the background
+    // callers that only want a count.
+    if (refusal) throw new Error(refusal);
     if (!bundle || bundle.prices.length === 0) {
       this.logger.warn(`No historical prices available for ${security.symbol}`);
       return 0;
@@ -1723,17 +1891,17 @@ export class SecurityPriceService {
       userCtx.defaultQuoteProvider,
     )) {
       const opts = this.optsFor(provider, security, userCtx);
-      let prices: HistoricalPrice[] | null = null;
+      let series: HistoricalSeries | null = null;
       try {
-        prices = provider.fetchHistoricalWindow
-          ? await provider.fetchHistoricalWindow(
+        series = provider.fetchHistoricalWindowSeries
+          ? await provider.fetchHistoricalWindowSeries(
               security.symbol,
               security.exchange,
               fromDate,
               toDate,
               opts,
             )
-          : await provider.fetchHistorical(
+          : await provider.fetchHistoricalSeries(
               security.symbol,
               security.exchange,
               rangeReaching(date),
@@ -1749,18 +1917,28 @@ export class SecurityPriceService {
       // `null` is no answer at all. The difference is what decides whether the
       // caller may remember the window as empty, so it is tracked rather than
       // collapsed into "nothing came back".
-      if (prices !== null) answered = true;
-      if (!prices || prices.length === 0) continue;
+      if (series !== null) answered = true;
+      if (!series || series.prices.length === 0) continue;
+
+      // This path reaches `bulkUpsertPrices` without going through either
+      // fallback helper, so it is an acceptance point of its own and makes the
+      // same comparison. A refused provider gives this security's next one its
+      // turn; the fill stays best-effort and stores nothing it cannot vouch for.
+      if (
+        this.refuseForeignCurrency(security, series.currencyCode, provider.name)
+      ) {
+        continue;
+      }
 
       await this.bulkUpsertPrices(
         security.id,
-        prices,
+        series.prices,
         sourceFor(provider.name),
       );
       this.logger.log(
-        `Filled ${prices.length} prices for ${security.symbol} around ${date} via ${provider.name}`,
+        `Filled ${series.prices.length} prices for ${security.symbol} around ${date} via ${provider.name}`,
       );
-      return { stored: prices.length, answered: true };
+      return { stored: series.prices.length, answered: true };
     }
 
     return { stored: 0, answered };
@@ -1842,16 +2020,25 @@ export class SecurityPriceService {
 
     const needsOlderData = !!earliestTx && earliestTx < oneYearAgoStr;
 
-    const daily = await this.fetchHistoricalWithFallback(security, "1y", ctx);
-    const maxBundle = needsOlderData
+    const dailyAttempt = await this.fetchHistoricalWithFallback(
+      security,
+      "1y",
+      ctx,
+    );
+    const maxAttempt = needsOlderData
       ? await this.fetchHistoricalWithFallback(security, "max", ctx)
       : null;
+    const daily = dailyAttempt.bundle;
+    const maxBundle = maxAttempt?.bundle ?? null;
 
     if (!daily && !maxBundle) {
       return {
         symbol: security.symbol,
         success: false,
-        error: "No historical data available",
+        error:
+          dailyAttempt.refusal ??
+          maxAttempt?.refusal ??
+          "No historical data available",
       };
     }
 

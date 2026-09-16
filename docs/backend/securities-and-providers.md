@@ -16,6 +16,65 @@ A daily bar is not a quote, so settling clears `quoted_at`; and a `source = 'man
 
 Related: **a bar's timestamp is the instant its session opened, so the day it belongs to is the exchange's calendar day.** `barDate` reads it in `meta.exchangeTimezoneName`, falling back to UTC; `setHours(0,0,0,0)` made `price_date` a function of the container's timezone.
 
+## A price is a number in a currency, and only one side of that reaches the row
+
+`security_prices` stores the number; the currency it is read in is
+`securities.currency_code`. So the two have to be checked against each other
+before the write, or a provider that answered about *another listing of the same
+ticker* -- the LSE line of a US stock, a GBP share class of a USD fund -- writes
+numbers understated by the exchange rate on every row, with nothing in the stored
+series to show it. The exchange is not the answer either: a USD-denominated ETF
+on the LSE is exactly the case an exchange guess gets wrong, which is why
+`QuoteResult.currencyCode` exists and is read from the instrument.
+
+**The comparison is one function.** `verifyProviderCurrency`
+(`providers/quote-currency.util.ts`) normalizes both sides with
+`normalizeQuoteCurrency` -- trim, upper-case, GBX/GBp to GBP -- and returns
+accepted-and-verified, accepted-but-unverified, or refused.
+`SecurityPriceService.refuseForeignCurrency` is the only caller shape: it returns
+the `tr()` message to report, or `null` to proceed. Normalization is a comparison
+and not a second conversion: both providers already divide pence into pounds
+(`convertGbxToGbp`) before returning bars, so the function is idempotent and
+"GBP" in gives "GBP" out.
+
+**A historical payload carries its own metadata, because an array cannot.**
+`fetchHistoricalSeries` (and the optional `fetchHistoricalWindowSeries`) return a
+`HistoricalSeries` -- `prices` plus the `currencyCode`, provider symbol and
+exchange the provider named -- and that is what every path writing into
+`security_prices` calls. Yahoo's and MSN's `fetchHistorical` survive as
+prices-only wrappers for the two callers that have no security to verify against:
+the FX pair series and the market-index series. The bundle preserves the
+load-bearing distinction the callers already depended on: `null` is no answer,
+an empty `prices` is an answer with no bars.
+
+**Where the check runs, and why it is not one place.** The shared acceptance
+points are `fetchQuoteWithFallback` and `fetchHistoricalWithFallback`, where a
+provider whose currency disagrees is *passed over* rather than accepted -- the
+next provider gets its turn and faces the same check, and the last refusal is
+what the caller reports. `fillPriceWindow` reaches `bulkUpsertPrices` through
+neither, so it is an acceptance point of its own. And the group paths --
+`refreshAllPricesGlobally`, `backfillHistoricalPrices`, `settleDailyBarsGlobally`
+-- fetch once for a representative and write for every security sharing its
+symbol and exchange, while `groupKey` holds no currency: a second user's row for
+the same ticker can be recorded in a different currency and only one of them can
+be right about the answer. So the check runs again per security immediately
+before each `savePriceData` and `bulkUpsertPrices`, quietly (the fetch path has
+already logged what it had to say).
+
+**Unverifiable is accepted with a warning, and that is a decision, not an
+oversight.** MSN's chart series reports no currency at all, so refusing every
+silent provider would leave MSN-priced securities with no prices; the same goes
+for a security with no recorded currency. Those store with a logged warning. What
+this does not buy is auditability of what is already stored: a price row does not
+record the currency it was written in, so rows written before this check cannot
+be told apart from the database. That would be a column on `security_prices` and
+a migration.
+
+`fetchAuthoritativeCurrency`, which corrects the exchange-guessed currency at
+security-create time, reads the same `normalizeQuoteCurrency`, so the currency a
+security is created with is comparable letter for letter with the one every later
+answer is measured against. INV-PRICE-001.
+
 ## A payload coarser than daily is a different series, not a sparse one
 
 A provider asked for a long range may answer weekly or monthly bars; written into a daily table they overwrite the real daily rows on those dates, and under the one-basis-per-series rule monthly rows carrying adjusted closes made `loadPriceSeries` *drop every daily row around them*. `assertDailySeries` (`providers/daily-spacing.util.ts`) is the one test, and it runs inside `bulkUpsertPrices` -- not in its four callers, because a guard one caller forgets is not a guard (each caller already reports a failed security, so the throw surfaces as "this one did not update"). The threshold, the median (never the mean -- one long exchange closure must not make a daily series look weekly) and the minimum sample size live there too; `daily-spacing.util.spec.ts` fails on a second copy of any of them under `securities/`.

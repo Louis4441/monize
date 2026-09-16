@@ -438,6 +438,136 @@ describe("YahooFinanceService", () => {
     });
   });
 
+  describe("fetchHistoricalSeries", () => {
+    // The bars carry no currency, so the bundle has to: an acceptance point
+    // cannot refuse a foreign listing it was never told about.
+    it("carries the series currency, with the pence unit mapped to pounds once", async () => {
+      mockFetchResponse({
+        chart: {
+          result: [
+            {
+              meta: { currency: "GBp", symbol: "VOD.L" },
+              timestamp: [1700000000],
+              indicators: {
+                quote: [
+                  {
+                    open: [5000],
+                    high: [5200],
+                    low: [4900],
+                    close: [5150],
+                    volume: [1000000],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      });
+
+      const series = await service.fetchHistoricalSeries("VOD.L");
+
+      expect(series).not.toBeNull();
+      expect(series!.currencyCode).toBe("GBP");
+      expect(series!.symbol).toBe("VOD.L");
+      // Pence divided into pounds exactly once, by the same read of the same
+      // field that named the currency.
+      expect(series!.prices[0].close).toBe(51.5);
+    });
+
+    it("reports no currency rather than guessing when the payload omits one", async () => {
+      mockFetchResponse({
+        chart: {
+          result: [
+            {
+              timestamp: [1700000000],
+              indicators: {
+                quote: [
+                  {
+                    open: [180],
+                    high: [185],
+                    low: [178],
+                    close: [183],
+                    volume: [50000000],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      });
+
+      const series = await service.fetchHistoricalSeries("AAPL");
+
+      expect(series!.currencyCode).toBeNull();
+      expect(series!.prices).toHaveLength(1);
+    });
+  });
+
+  describe("fetchHistoricalSeries", () => {
+    // The bars carry no currency, so the bundle has to: an acceptance point
+    // cannot refuse a foreign listing it was never told about.
+    it("carries the series currency, with the pence unit mapped to pounds once", async () => {
+      mockFetchResponse({
+        chart: {
+          result: [
+            {
+              meta: { currency: "GBp", symbol: "VOD.L" },
+              timestamp: [1700000000],
+              indicators: {
+                quote: [
+                  {
+                    open: [5000],
+                    high: [5200],
+                    low: [4900],
+                    close: [5150],
+                    volume: [1000000],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      });
+
+      const series = await service.fetchHistoricalSeries("VOD.L");
+
+      expect(series).not.toBeNull();
+      expect(series!.currencyCode).toBe("GBP");
+      expect(series!.symbol).toBe("VOD.L");
+      // Pence divided into pounds exactly once, by the same read of the same
+      // field that named the currency.
+      expect(series!.prices[0].close).toBe(51.5);
+    });
+
+    it("reports no currency rather than guessing when the payload omits one", async () => {
+      mockFetchResponse({
+        chart: {
+          result: [
+            {
+              timestamp: [1700000000],
+              indicators: {
+                quote: [
+                  {
+                    open: [180],
+                    high: [185],
+                    low: [178],
+                    close: [183],
+                    volume: [50000000],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      });
+
+      const series = await service.fetchHistoricalSeries("AAPL");
+
+      expect(series!.currencyCode).toBeNull();
+      expect(series!.prices).toHaveLength(1);
+    });
+  });
+
   describe("fetchHistorical", () => {
     it("should fetch and parse historical price data", async () => {
       mockFetchResponse({

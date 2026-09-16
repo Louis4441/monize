@@ -1,4 +1,4 @@
-import { NotFoundException } from "@nestjs/common";
+import { Logger, NotFoundException } from "@nestjs/common";
 import {
   SecurityPriceService,
   settlePendingPriceWrites,
@@ -158,6 +158,10 @@ describe("SecurityPriceService", () => {
             regularMarketDayLow: overrides.regularMarketDayLow ?? 189.0,
             regularMarketVolume: overrides.regularMarketVolume ?? 50000000,
             regularMarketTime: overrides.regularMarketTime ?? 1748800000,
+            // Absent unless a test states one: Yahoo's chart meta carries
+            // `currency` for some instruments and not others, and "not
+            // reported" is a case of its own.
+            ...(overrides.currency ? { currency: overrides.currency } : {}),
           },
         },
       ],
@@ -179,6 +183,7 @@ describe("SecurityPriceService", () => {
           meta: {
             exchangeTimezoneName:
               overrides.exchangeTimezone ?? "America/New_York",
+            ...(overrides.currency ? { currency: overrides.currency } : {}),
           },
           timestamp: overrides.timestamps ?? [1748700000, 1748800000],
           indicators: {
@@ -277,6 +282,10 @@ describe("SecurityPriceService", () => {
     msnFinanceService = {
       fetchQuote: jest.fn().mockResolvedValue(null),
       fetchHistorical: jest.fn().mockResolvedValue(null),
+      // Every price write path takes the series, so the double answers with
+      // the bundle the real provider returns: bars plus the currency they are
+      // quoted in.
+      fetchHistoricalSeries: jest.fn().mockResolvedValue(null),
       lookupSecurity: jest.fn().mockResolvedValue(null),
       fetchStockSectorInfo: jest.fn().mockResolvedValue(null),
       fetchEtfSectorWeightings: jest.fn().mockResolvedValue(null),
@@ -1848,17 +1857,20 @@ describe("SecurityPriceService", () => {
 
       const recent = new Date(Date.now() - daySeconds * 1000);
       recent.setHours(0, 0, 0, 0);
-      msnFinanceService.fetchHistorical.mockResolvedValue([
-        {
-          date: recent,
-          open: 10,
-          high: 11,
-          low: 9,
-          close: 10.5,
-          adjClose: 10.5,
-          volume: 1000,
-        },
-      ]);
+      msnFinanceService.fetchHistoricalSeries.mockResolvedValue({
+        prices: [
+          {
+            date: recent,
+            open: 10,
+            high: 11,
+            low: 9,
+            close: 10.5,
+            adjClose: 10.5,
+            volume: 1000,
+          },
+        ],
+        currencyCode: "USD",
+      });
       msnFinanceService.resolveInstrumentId.mockResolvedValue("MSN-123");
       // Yahoo should never be reached, but guard against accidental calls.
       global.fetch = jest
@@ -1875,7 +1887,7 @@ describe("SecurityPriceService", () => {
       expect(result.success).toBe(true);
       expect(result.provider).toBe("msn");
       expect(result.pricesLoaded).toBe(1);
-      expect(msnFinanceService.fetchHistorical).toHaveBeenCalled();
+      expect(msnFinanceService.fetchHistoricalSeries).toHaveBeenCalled();
       expect(securitiesRepository.update).toHaveBeenCalledWith("sec-1", {
         msnInstrumentId: "MSN-123",
       });
@@ -3540,7 +3552,7 @@ describe("SecurityPriceService", () => {
 
     beforeEach(() => {
       windowSpy = jest
-        .spyOn(yahoo, "fetchHistoricalWindow")
+        .spyOn(yahoo, "fetchHistoricalWindowSeries")
         .mockResolvedValue(null);
       securitiesRepository.find.mockResolvedValue([mockSecurity]);
     });
@@ -3552,10 +3564,10 @@ describe("SecurityPriceService", () => {
     // rest of the month becomes a database read.
     it("fetches the month around the date and stores every bar", async () => {
       const date = "2017-08-18";
-      windowSpy.mockResolvedValue([
-        bar("2017-08-16", 20),
-        bar("2017-08-17", 21),
-      ]);
+      windowSpy.mockResolvedValue({
+        prices: [bar("2017-08-16", 20), bar("2017-08-17", 21)],
+        currencyCode: "USD",
+      });
 
       const loaded = await service.ensurePricesForDate(["sec-1"], date);
 
@@ -3596,9 +3608,10 @@ describe("SecurityPriceService", () => {
       securitiesRepository.find.mockResolvedValue([
         { ...mockSecurity, quoteProvider: "msn" },
       ]);
-      msnFinanceService.fetchHistorical.mockResolvedValue([
-        bar(daysAgo(3000), 20),
-      ]);
+      msnFinanceService.fetchHistoricalSeries.mockResolvedValue({
+        prices: [bar(daysAgo(3000), 20)],
+        currencyCode: "USD",
+      });
 
       const loaded = await service.ensurePricesForDate(
         ["sec-1"],
@@ -3607,7 +3620,7 @@ describe("SecurityPriceService", () => {
 
       expect(loaded).toBe(1);
       expect(windowSpy).not.toHaveBeenCalled();
-      const [, , range] = msnFinanceService.fetchHistorical.mock.calls[0];
+      const [, , range] = msnFinanceService.fetchHistoricalSeries.mock.calls[0];
       // A shade over eight years back: "5y" would not reach it and "max" is
       // more than it needs.
       expect(range).toBe("10y");
@@ -3617,13 +3630,14 @@ describe("SecurityPriceService", () => {
       securitiesRepository.find.mockResolvedValue([
         { ...mockSecurity, quoteProvider: "msn" },
       ]);
-      msnFinanceService.fetchHistorical.mockResolvedValue([
-        bar(daysAgo(60), 20),
-      ]);
+      msnFinanceService.fetchHistoricalSeries.mockResolvedValue({
+        prices: [bar(daysAgo(60), 20)],
+        currencyCode: "USD",
+      });
 
       await service.ensurePricesForDate(["sec-1"], daysAgo(60));
 
-      const [, , range] = msnFinanceService.fetchHistorical.mock.calls[0];
+      const [, , range] = msnFinanceService.fetchHistoricalSeries.mock.calls[0];
       expect(range).toBe("1y");
     });
 
@@ -3633,7 +3647,7 @@ describe("SecurityPriceService", () => {
       // `[]`, not `null`: the provider answering "no bars in that window" is
       // what may be remembered. `null` is no answer at all -- a failure or a
       // refusal -- and remembering that poisons the month for everyone.
-      windowSpy.mockResolvedValue([]);
+      windowSpy.mockResolvedValue({ prices: [], currencyCode: null });
 
       await service.ensurePricesForDate(["sec-1"], "2017-08-18");
       const afterFirst = windowSpy.mock.calls.length;
@@ -3646,7 +3660,7 @@ describe("SecurityPriceService", () => {
     });
 
     it("does ask again for a different month", async () => {
-      windowSpy.mockResolvedValue([]);
+      windowSpy.mockResolvedValue({ prices: [], currencyCode: null });
 
       await service.ensurePricesForDate(["sec-1"], "2017-08-18");
       const afterFirst = windowSpy.mock.calls.length;
@@ -3665,7 +3679,7 @@ describe("SecurityPriceService", () => {
       ]);
       windowSpy.mockImplementation(async (symbol: string) => {
         if (symbol === "AAPL") throw new Error("rate limited");
-        return [bar("2017-08-17", 90)];
+        return { prices: [bar("2017-08-17", 90)], currencyCode: "USD" };
       });
 
       const loaded = await service.ensurePricesForDate(
@@ -3717,7 +3731,7 @@ describe("SecurityPriceService", () => {
       // two-minute outage ended.
       seedSecurity();
       jest
-        .spyOn(yahoo, "fetchHistoricalWindow")
+        .spyOn(yahoo, "fetchHistoricalWindowSeries")
         .mockImplementation(async () => {
           health.recordFailure("yahoo_finance", dnsFailure());
           return null;
@@ -3736,13 +3750,149 @@ describe("SecurityPriceService", () => {
       // The memory has to keep working, or a report reloaded on the same date
       // re-asks the provider for every security it has no history for.
       seedSecurity();
-      jest.spyOn(yahoo, "fetchHistoricalWindow").mockResolvedValue([]);
+      jest
+        .spyOn(yahoo, "fetchHistoricalWindowSeries")
+        .mockResolvedValue({ prices: [], currencyCode: null });
 
       await service.ensurePricesForDate(["sec-1"], "2026-03-15");
 
       securitiesRepository.find.mockClear();
       await service.ensurePricesForDate(["sec-1"], "2026-03-16");
       expect(securitiesRepository.find).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * A stored price row is a bare number; the currency it is read in is the
+   * security's. So an answer about another listing of the same ticker is wrong
+   * by the exchange rate on every row, and nothing in the series says so.
+   * INV-PRICE-001.
+   */
+  describe("provider currency acceptance", () => {
+    /** Every statement that would have written into `security_prices`. */
+    const priceWrites = (): unknown[][] =>
+      [
+        ...scopedManagerQuery.mock.calls,
+        ...dataSourceMock.query.mock.calls,
+      ].filter(
+        ([sql]) =>
+          typeof sql === "string" &&
+          sql.includes("INSERT INTO security_prices"),
+      );
+
+    it("refuses a quote in another currency and writes nothing", async () => {
+      // AAPL is recorded in USD; the provider answers about a GBP listing.
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(
+            makeYahooChartResponse({
+              currency: "GBP",
+              regularMarketPrice: 150,
+            }),
+          ),
+        ) as jest.Mock;
+
+      const result = await service.refreshAllPrices();
+
+      expect(result.updated).toBe(0);
+      expect(result.failed).toBe(1);
+      // Both currencies named, because the reader has to know which side to
+      // correct.
+      expect(result.results[0].error).toContain("GBP");
+      expect(result.results[0].error).toContain("USD");
+      expect(priceWrites()).toHaveLength(0);
+    });
+
+    it("accepts the pence quote unit for a GBP security, converted once", async () => {
+      securitiesRepository.find.mockResolvedValue([
+        { ...mockSecurity, currencyCode: "GBP" } as Security,
+      ]);
+      global.fetch = jest.fn().mockResolvedValue(
+        createMockFetchResponse(
+          makeYahooChartResponse({
+            currency: "GBp",
+            regularMarketPrice: 19350,
+          }),
+        ),
+      ) as jest.Mock;
+
+      const result = await service.refreshAllPrices();
+
+      expect(result.updated).toBe(1);
+      // 19350 pence stored as 193.50 pounds: the provider divides once, and
+      // the acceptance check maps the code without touching the number again.
+      expect(result.results[0].price).toBe(193.5);
+    });
+
+    it("stores an answer from a provider that reports no currency, and says so", async () => {
+      const warn = jest.spyOn(Logger.prototype, "warn").mockImplementation();
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(makeYahooChartResponse()),
+        ) as jest.Mock;
+
+      const result = await service.refreshAllPrices();
+
+      // Unverifiable is accepted rather than refused: MSN's chart series
+      // reports no currency at all, and refusing every silent provider would
+      // leave those securities with no prices.
+      expect(result.updated).toBe(1);
+      expect(
+        warn.mock.calls.some(([line]) => String(line).includes("unverified")),
+      ).toBe(true);
+      warn.mockRestore();
+    });
+
+    it("refuses a mismatching historical series and upserts no bars", async () => {
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      dataSourceMock.query.mockResolvedValueOnce([]);
+      const daySeconds = 24 * 60 * 60;
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      global.fetch = jest.fn().mockResolvedValue(
+        createMockFetchResponse(
+          makeYahooHistoricalResponse({
+            currency: "GBP",
+            timestamps: [nowSeconds - 2 * daySeconds, nowSeconds - daySeconds],
+            closes: [193.0, 194.0],
+          }),
+        ),
+      ) as jest.Mock;
+
+      const result = await service.backfillHistoricalPrices();
+
+      expect(result.successful).toBe(0);
+      expect(result.failed).toBe(1);
+      expect(result.results[0].error).toContain("GBP");
+      expect(priceWrites()).toHaveLength(0);
+    });
+
+    it("refuses the fallback provider's answer on the same comparison", async () => {
+      securitiesRepository.find.mockResolvedValue([mockSecurity]);
+      // The primary has nothing usable, so the fallback gets its turn -- and
+      // faces the same check rather than being trusted for having answered.
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse({ chart: { result: [] } }),
+        ) as jest.Mock;
+      msnFinanceService.fetchQuote.mockResolvedValue({
+        symbol: "AAPL",
+        regularMarketPrice: 150,
+        regularMarketTime: 1748800000,
+        currencyCode: "GBP",
+        provider: "msn",
+      });
+
+      const result = await service.refreshAllPrices();
+
+      expect(result.updated).toBe(0);
+      expect(result.failed).toBe(1);
+      expect(result.results[0].error).toContain("GBP");
+      expect(priceWrites()).toHaveLength(0);
     });
   });
 });
