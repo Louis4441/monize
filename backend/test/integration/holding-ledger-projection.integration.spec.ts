@@ -129,7 +129,9 @@ describe("holding is a ledger projection (integration, INV-HOLDING-001)", () => 
         }
         quantity -= qty;
       } else {
-        throw new Error(`replay fixture saw an unexpected action: ${row.action}`);
+        throw new Error(
+          `replay fixture saw an unexpected action: ${row.action}`,
+        );
       }
     }
     return {
