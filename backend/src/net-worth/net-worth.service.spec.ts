@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { NetWorthService } from "./net-worth.service";
+import { enumerateDaysYMD } from "./series-dates.util";
 import { MonthlyAccountBalance } from "./entities/monthly-account-balance.entity";
 import {
   Account,
@@ -2797,6 +2798,9 @@ describe("NetWorthService", () => {
         // rather than a subtotal.
         pricesComplete: true,
         unpricedSecurityIds: [],
+        // No cash account in scope, so there is no balance to be missing.
+        cashComplete: true,
+        unknownCashAccountIds: [],
       });
       expect(result[1]).toMatchObject({ date: "2025-03-02", value: 1020 });
       expect(result[2]).toMatchObject({ date: "2025-03-03", value: 1010 });
@@ -2838,6 +2842,125 @@ describe("NetWorthService", () => {
       expect(result).toHaveLength(2);
       expect(result[0]).toMatchObject({ date: "2025-03-01", value: 5000 });
       expect(result[1]).toMatchObject({ date: "2025-03-02", value: 5100 });
+    });
+
+    /**
+     * A day's cash is a property of the day, not of the window it was asked
+     * about. #1389: the series keyed its points off a local-midnight `Date`, so
+     * every key was a day early east of Greenwich and the first requested day
+     * matched no row -- `?? 0` then drew a portfolio that had suddenly lost its
+     * whole cash sleeve on exactly the first day of every range.
+     */
+    it("reports the same cash for a day whichever window asks for it", async () => {
+      // The cash sleeve holds 5000 from before either window, and moves once,
+      // on 03-03. Both queries below answer with what the SQL answers: a row
+      // per account per calendar day of the window it was given.
+      const balanceOn = (date: string): string =>
+        date >= "2025-03-03" ? "5250" : "5000";
+      const cashRowsFor = (start: string, end: string) =>
+        enumerateDaysYMD(start, end).map((date) => ({
+          date,
+          balance: balanceOn(date),
+          account_id: "cash-1",
+        }));
+
+      const runWindow = async (start: string, end: string) => {
+        prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+        reportQuery.mockResolvedValueOnce([
+          {
+            id: "cash-1",
+            account_type: "INVESTMENT",
+            account_sub_type: "INVESTMENT_CASH",
+            currency_code: "USD",
+            opening_balance: 5000,
+          },
+        ]);
+        securityRepository.findByIds.mockResolvedValue([]);
+        reportQuery.mockResolvedValueOnce(cashRowsFor(start, end));
+        return service.getDailyInvestments("user-1", start, end);
+      };
+
+      const first = await runWindow("2025-03-01", "2025-03-04");
+      const second = await runWindow("2025-03-03", "2025-03-06");
+
+      // The window's own edges are the days the caller asked for, both ends.
+      expect(first.map((p) => p.date)).toEqual([
+        "2025-03-01",
+        "2025-03-02",
+        "2025-03-03",
+        "2025-03-04",
+      ]);
+      expect(second[0].date).toBe("2025-03-03");
+      expect(second[second.length - 1].date).toBe("2025-03-06");
+
+      // The first day of a range carries the balance the account really held,
+      // not zero, and the overlap agrees point for point.
+      expect(first[0]).toMatchObject({
+        date: "2025-03-01",
+        value: 5000,
+        cashComplete: true,
+        unknownCashAccountIds: [],
+      });
+      const overlap = ["2025-03-03", "2025-03-04"];
+      for (const date of overlap) {
+        const a = first.find((p) => p.date === date);
+        const b = second.find((p) => p.date === date);
+        expect(b).toMatchObject({
+          value: a!.value,
+          cashComplete: a!.cashComplete,
+          unknownCashAccountIds: a!.unknownCashAccountIds,
+        });
+      }
+      expect(second[0].value).toBe(5250);
+    });
+
+    it("reports a cash account with no row for a day as unknown, not zero", async () => {
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "cash-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_CASH",
+          currency_code: "USD",
+          opening_balance: 5000,
+        },
+        {
+          id: "cash-2",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_CASH",
+          currency_code: "USD",
+          opening_balance: 1000,
+        },
+      ]);
+      securityRepository.findByIds.mockResolvedValue([]);
+
+      // The second account produced no row for 03-01. Its balance for that day
+      // is unknown; the day's `value` is a subtotal of what is known.
+      reportQuery.mockResolvedValueOnce([
+        { date: "2025-03-01", balance: "5000", account_id: "cash-1" },
+        { date: "2025-03-02", balance: "5000", account_id: "cash-1" },
+        { date: "2025-03-02", balance: "1000", account_id: "cash-2" },
+      ]);
+
+      const result = await service.getDailyInvestments(
+        "user-1",
+        "2025-03-01",
+        "2025-03-02",
+      );
+
+      expect(result[0]).toMatchObject({
+        date: "2025-03-01",
+        value: 5000,
+        cashComplete: false,
+        unknownCashAccountIds: ["cash-2"],
+      });
+      expect(result[1]).toMatchObject({
+        date: "2025-03-02",
+        value: 6000,
+        cashComplete: true,
+        unknownCashAccountIds: [],
+      });
     });
 
     it("names an unpriced holding and leaves value as it was (design 6.2)", async () => {

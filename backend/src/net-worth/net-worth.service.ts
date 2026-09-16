@@ -39,7 +39,8 @@ import {
   UNFILTERED_INVESTMENT_SCOPE_SQL,
   resolveInvestmentScopeAccountIds,
 } from "../securities/investment-scope.util";
-import { formatDateYMDLocal } from "../common/date-utils";
+import { formatDateYMDLocal, todayYMD } from "../common/date-utils";
+import { enumerateDaysYMD } from "./series-dates.util";
 import { positionCloseAsOf, PricePoint } from "./position-price.util";
 import { preferredCurrency } from "../common/default-currency.util";
 import {
@@ -72,11 +73,14 @@ export interface JointNetWorthScope {
  * One day of `GET /net-worth/investments-daily`: the scope's market value plus
  * cash at the close of that calendar day, in the reporting currency.
  *
- * Two completeness bits, for two different repairs. `fxComplete` says every
+ * Three completeness bits, for three different repairs. `fxComplete` says every
  * component converted; `pricesComplete` says every position the scope held that
- * day had an accepted close on or before it. A day can be short of either, and
- * the reader who has to fix it needs to know which -- a missing rate is fixed in
- * Currencies, a missing price by entering one for the security.
+ * day had an accepted close on or before it; `cashComplete` says every cash
+ * account in the scope produced a balance for the day. A day can be short of any
+ * of them, and the reader who has to fix it needs to know which -- a missing rate
+ * is fixed in Currencies, a missing price by entering one for the security, and a
+ * cash account with no balance for a day it was asked for is a defect to report
+ * rather than a zero balance to draw (#1389).
  *
  * `value` is NOT withheld when `pricesComplete` is false. It is a subtotal on
  * such a day, which `docs/financial-calculation-contract.md` section 1 says a
@@ -104,6 +108,15 @@ export interface DailyInvestmentValue {
   pricesComplete: boolean;
   /** The securities behind `pricesComplete: false`, so a reader can price them. */
   unpricedSecurityIds: string[];
+  /**
+   * False when a cash account in the scope produced no balance for this day, so
+   * its contribution is unknown rather than zero. The per-day balance query
+   * already carries the opening balance and everything dated before the window,
+   * so a row it did not produce for a day it was asked for is missing data.
+   */
+  cashComplete: boolean;
+  /** The accounts behind `cashComplete: false`. */
+  unknownCashAccountIds: string[];
 }
 
 export type InvestmentBreakdownGranularity = "daily" | "monthly";
@@ -1143,7 +1156,9 @@ export class NetWorthService {
     );
     const defaultCurrency = displayCurrency || preferredCurrency(pref);
 
-    const end = endDate || new Date().toISOString().slice(0, 10);
+    // "Today" is the request's calendar day, not a UTC slice of the clock:
+    // `todayYMD()` reads the request timezone where one is set.
+    const end = endDate || todayYMD();
 
     let accountFilter = "";
     const acctParams: any[] = [userId];
@@ -1281,14 +1296,10 @@ export class NetWorthService {
       }
     }
 
-    // Generate daily dates
-    const dates: string[] = [];
-    const d = new Date(start + "T00:00:00");
-    const endD = new Date(end + "T00:00:00");
-    while (d <= endD) {
-      dates.push(d.toISOString().substring(0, 10));
-      d.setDate(d.getDate() + 1);
-    }
+    // The calendar days of the window, keyed exactly as the SQL above keys its
+    // rows. Iterated as strings: a local-midnight `Date` read back in UTC named
+    // every day one early east of Greenwich (#1389).
+    const dates = enumerateDaysYMD(start, end);
 
     // Currency conversion setup: include both account currencies (for cash
     // balances) and security currencies (for holdings market value). Prices in
@@ -1404,9 +1415,17 @@ export class NetWorthService {
         }
       }
 
-      // Add cash balances for INVESTMENT_CASH and standalone accounts
-      for (const [acctId, dailyMap] of cashBalances) {
-        const bal = dailyMap.get(dateStr) ?? 0;
+      // Add cash balances for INVESTMENT_CASH and standalone accounts. The walk
+      // is over the accounts in scope, not over the maps the query returned: an
+      // account with no row for this day is a missing component, and `?? 0`
+      // turned exactly that into a real-looking zero balance (#1389).
+      const unknownCashAccountIds = new Set<string>();
+      for (const acctId of cashIds) {
+        const bal = cashBalances.get(acctId)?.get(dateStr);
+        if (bal === undefined) {
+          unknownCashAccountIds.add(acctId);
+          continue;
+        }
         const currency = acctCurrency.get(acctId) || defaultCurrency;
         dayValue.add(
           this.convertCurrency(
@@ -1428,6 +1447,8 @@ export class NetWorthService {
         missingRatePairs: dayValue.missingPairs,
         pricesComplete: unpricedSecurityIds.size === 0,
         unpricedSecurityIds: [...unpricedSecurityIds].sort(),
+        cashComplete: unknownCashAccountIds.size === 0,
+        unknownCashAccountIds: [...unknownCashAccountIds].sort(),
       });
     }
 
@@ -1466,7 +1487,7 @@ export class NetWorthService {
     );
     const defaultCurrency = opts.displayCurrency || preferredCurrency(pref);
 
-    const end = opts.endDate || new Date().toISOString().slice(0, 10);
+    const end = opts.endDate || todayYMD();
 
     const empty: InvestmentBreakdown = {
       granularity,
@@ -1540,7 +1561,7 @@ export class NetWorthService {
     const sampleDates =
       granularity === "monthly"
         ? this.enumerateMonths(start, end)
-        : this.enumerateDays(start, end);
+        : enumerateDaysYMD(start, end);
     if (sampleDates.length === 0) return empty;
 
     // --- Price lookups -------------------------------------------------------
@@ -1803,18 +1824,6 @@ export class NetWorthService {
     if (!earliest) return end;
     const inception = this.toDateString(earliest);
     return inception > end ? end : inception;
-  }
-
-  /** All calendar days in [start, end] inclusive, as YYYY-MM-DD strings. */
-  private enumerateDays(start: string, end: string): string[] {
-    const dates: string[] = [];
-    const d = new Date(start + "T00:00:00");
-    const endD = new Date(end + "T00:00:00");
-    while (d <= endD) {
-      dates.push(d.toISOString().substring(0, 10));
-      d.setDate(d.getDate() + 1);
-    }
-    return dates;
   }
 
   /** Month-first dates for every month spanned by [start, end], YYYY-MM-01. */

@@ -423,7 +423,9 @@ export class DailyMovementService {
           {
             value: point.value,
             complete:
-              point.fxComplete !== false && point.pricesComplete !== false,
+              point.fxComplete !== false &&
+              point.pricesComplete !== false &&
+              point.cashComplete !== false,
             reasons: valueReasons(point),
           } satisfies DailyMovementValue,
         ]),

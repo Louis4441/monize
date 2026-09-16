@@ -31,56 +31,55 @@ function legacyEnumerateDays(
 }
 
 describe("enumerateDaysYMD", () => {
-  const cases: Array<{ name: string; start: string; end: string; expected: string[] }> =
-    [
-      {
-        name: "a single day",
-        start: "2026-06-01",
-        end: "2026-06-01",
-        expected: ["2026-06-01"],
-      },
-      {
-        name: "the window the defect was reported on",
-        start: "2026-06-01",
-        end: "2026-06-03",
-        expected: ["2026-06-01", "2026-06-02", "2026-06-03"],
-      },
-      {
-        name: "a spring-forward DST boundary (Europe/Warsaw, 2026-03-29)",
-        start: "2026-03-28",
-        end: "2026-03-30",
-        expected: ["2026-03-28", "2026-03-29", "2026-03-30"],
-      },
-      {
-        name: "a fall-back DST boundary (America/New_York, 2026-11-01)",
-        start: "2026-10-31",
-        end: "2026-11-02",
-        expected: ["2026-10-31", "2026-11-01", "2026-11-02"],
-      },
-      {
-        name: "a month boundary in a leap year",
-        start: "2024-02-27",
-        end: "2024-03-01",
-        expected: ["2024-02-27", "2024-02-28", "2024-02-29", "2024-03-01"],
-      },
-      {
-        name: "a year boundary",
-        start: "2025-12-30",
-        end: "2026-01-02",
-        expected: [
-          "2025-12-30",
-          "2025-12-31",
-          "2026-01-01",
-          "2026-01-02",
-        ],
-      },
-      {
-        name: "a reversed window",
-        start: "2026-06-03",
-        end: "2026-06-01",
-        expected: [],
-      },
-    ];
+  const cases: Array<{
+    name: string;
+    start: string;
+    end: string;
+    expected: string[];
+  }> = [
+    {
+      name: "a single day",
+      start: "2026-06-01",
+      end: "2026-06-01",
+      expected: ["2026-06-01"],
+    },
+    {
+      name: "the window the defect was reported on",
+      start: "2026-06-01",
+      end: "2026-06-03",
+      expected: ["2026-06-01", "2026-06-02", "2026-06-03"],
+    },
+    {
+      name: "a spring-forward DST boundary (Europe/Warsaw, 2026-03-29)",
+      start: "2026-03-28",
+      end: "2026-03-30",
+      expected: ["2026-03-28", "2026-03-29", "2026-03-30"],
+    },
+    {
+      name: "a fall-back DST boundary (America/New_York, 2026-11-01)",
+      start: "2026-10-31",
+      end: "2026-11-02",
+      expected: ["2026-10-31", "2026-11-01", "2026-11-02"],
+    },
+    {
+      name: "a month boundary in a leap year",
+      start: "2024-02-27",
+      end: "2024-03-01",
+      expected: ["2024-02-27", "2024-02-28", "2024-02-29", "2024-03-01"],
+    },
+    {
+      name: "a year boundary",
+      start: "2025-12-30",
+      end: "2026-01-02",
+      expected: ["2025-12-30", "2025-12-31", "2026-01-01", "2026-01-02"],
+    },
+    {
+      name: "a reversed window",
+      start: "2026-06-03",
+      end: "2026-06-01",
+      expected: [],
+    },
+  ];
 
   it.each(cases)("$name", ({ start, end, expected }) => {
     expect(enumerateDaysYMD(start, end)).toEqual(expected);

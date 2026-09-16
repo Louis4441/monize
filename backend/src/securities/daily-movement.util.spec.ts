@@ -207,6 +207,15 @@ describe("valueReasons", () => {
       "unpricedHolding",
       "missingRate",
     ]);
+    // A cash account that reported no balance for the day is its own cause:
+    // the repair is neither a price nor a rate (#1389).
+    expect(
+      valueReasons({
+        fxComplete: true,
+        pricesComplete: true,
+        cashComplete: false,
+      }),
+    ).toEqual(["cashIncomplete"]);
   });
 
   it("reads an absent flag as no information, not as incomplete", () => {
