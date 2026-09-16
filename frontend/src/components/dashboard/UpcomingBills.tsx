@@ -13,6 +13,7 @@ import {
   startOfMonth,
   subMonths,
 } from 'date-fns';
+import { CalendarDaysIcon, ListBulletIcon } from '@heroicons/react/24/outline';
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
 import { Account } from '@/types/account';
 import { parseLocalDate } from '@/lib/utils';
@@ -245,8 +246,11 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
   // empty state of its own.
   const calendarDays = buildScheduledCalendarDays(upcomingItems, calendarMonth);
 
+  // Scope and view on one row: the view switch is icons so both fit beside the
+  // heading on a phone instead of the second one wrapping to its own line. The
+  // labels stay as the accessible name and the tooltip.
   const viewControls = (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex items-center gap-2">
       <WidgetSegmentedControl
         value={config.scope}
         onChange={(scope) => updateConfig({ scope })}
@@ -258,9 +262,18 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
       <WidgetSegmentedControl
         value={config.view}
         onChange={(view) => updateConfig({ view })}
+        ariaLabel={t('upcomingBills.viewLabel')}
         options={[
-          { value: 'list', label: t('upcomingBills.viewList') },
-          { value: 'calendar', label: t('upcomingBills.viewCalendar') },
+          {
+            value: 'list',
+            label: t('upcomingBills.viewList'),
+            icon: <ListBulletIcon className="w-4 h-4" aria-hidden="true" />,
+          },
+          {
+            value: 'calendar',
+            label: t('upcomingBills.viewCalendar'),
+            icon: <CalendarDaysIcon className="w-4 h-4" aria-hidden="true" />,
+          },
         ]}
       />
     </div>

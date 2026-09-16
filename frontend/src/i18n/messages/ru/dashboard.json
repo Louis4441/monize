@@ -42,6 +42,7 @@
       "dueSoon": "Скоро к оплате",
       "all": "Все предстоящие"
     },
+    "viewLabel": "Вид",
     "viewList": "Список",
     "viewCalendar": "Календарь",
     "previousMonth": "Предыдущий месяц",

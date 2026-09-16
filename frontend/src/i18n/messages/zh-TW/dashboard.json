@@ -42,6 +42,7 @@
       "dueSoon": "即將到期",
       "all": "全部即將到來"
     },
+    "viewLabel": "檢視模式",
     "viewList": "清單",
     "viewCalendar": "日曆",
     "previousMonth": "上個月",

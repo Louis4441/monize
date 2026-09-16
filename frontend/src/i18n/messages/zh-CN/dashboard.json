@@ -42,6 +42,7 @@
       "dueSoon": "即将到期",
       "all": "全部即将到来"
     },
+    "viewLabel": "视图",
     "viewList": "列表",
     "viewCalendar": "日历",
     "previousMonth": "上个月",

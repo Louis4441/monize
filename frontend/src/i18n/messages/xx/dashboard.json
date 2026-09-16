@@ -42,6 +42,7 @@
       "dueSoon": "[XX-Due soon-XX]",
       "all": "[XX-All upcoming-XX]"
     },
+    "viewLabel": "[XX-View-XX]",
     "viewList": "[XX-List-XX]",
     "viewCalendar": "[XX-Calendar-XX]",
     "previousMonth": "[XX-Previous month-XX]",
