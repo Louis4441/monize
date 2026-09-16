@@ -20,6 +20,7 @@ import { applyVoidTransitionToMirrorLeg } from "../transactions/void-status-tran
 import { assertReconciledRowsMutable } from "../transactions/reconciled-lock.util";
 import { investmentRowHasEffect } from "./investment-row-effects.util";
 import { formatInvestmentCashPayeeName } from "./investment-cash-payee.util";
+import { attachInvestmentRowCurrencies } from "./investment-transaction-currencies.util";
 import {
   InvestmentTransaction,
   InvestmentAction,
@@ -2780,6 +2781,9 @@ export class InvestmentTransactionsService {
         .getMany();
 
       await this.attachAccruedInterest(m, userId, data);
+      // The unit travels with the figure: price, commission and total are the
+      // security's currency, never the account's (issue #1394).
+      attachInvestmentRowCurrencies(data);
 
       return {
         data,

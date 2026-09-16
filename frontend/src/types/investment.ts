@@ -294,6 +294,26 @@ export interface InvestmentTransaction {
   // the field, which means no information -- not zero interest.
   accruedInterest?: number;
   exchangeRate: number;
+  /**
+   * The unit each money field above is in. `price`, `commission` and
+   * `totalAmount` are stored in the SECURITY's currency, never the account's
+   * and never the reader's: deriving the label from the account is what printed
+   * a EUR trade and a USD trade with the same symbol and summed them into one
+   * "total volume" (issue #1394).
+   *
+   * `null` is unknown -- a row naming no security has no security currency --
+   * and renders as unknown rather than falling back to anything.
+   *
+   * Optional for the rolling-deploy reason the portfolio flags are: a backend
+   * that predates the field sends nothing, and a path that does not load the
+   * relations sends nothing either. `security.currencyCode` is the same fact
+   * from the same row and is the only accepted fallback.
+   */
+  amountCurrencyCode?: string | null;
+  priceCurrencyCode?: string | null;
+  commissionCurrencyCode?: string | null;
+  /** Currency the row's cash leg settles in (funding account, else the account). */
+  settlementCurrencyCode?: string | null;
   description: string | null;
   // Same enum as regular transactions. A VOID row moves no shares and no
   // cash; the register strikes it through and excludes it from balances.
