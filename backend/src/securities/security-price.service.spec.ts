@@ -3679,7 +3679,10 @@ describe("SecurityPriceService", () => {
       ]);
       windowSpy.mockImplementation(async (symbol: string) => {
         if (symbol === "AAPL") throw new Error("rate limited");
-        return { prices: [bar("2017-08-17", 90)], currencyCode: "USD" };
+        // RY is the TSX security, recorded in CAD: the answer has to be in the
+        // security's own currency or the fill refuses it, which is a different
+        // test.
+        return { prices: [bar("2017-08-17", 90)], currencyCode: "CAD" };
       });
 
       const loaded = await service.ensurePricesForDate(
