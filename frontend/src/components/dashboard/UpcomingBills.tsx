@@ -249,8 +249,14 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
   // Scope and view on one row: the view switch is icons so both fit beside the
   // heading on a phone instead of the second one wrapping to its own line. The
   // labels stay as the accessible name and the tooltip.
+  //
+  // On a phone the row takes the header's own line (`w-full sm:w-auto`, the
+  // toolbar convention) and holds its two ends apart: scope against the left
+  // edge, view against the right. Not `sm:ml-auto` on the view switch -- the
+  // two groups are one row here, not a toolbar's leading and trailing groups,
+  // and the scope pair must stay left whichever line the row lands on.
   const viewControls = (
-    <div className="flex items-center gap-2">
+    <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
       <WidgetSegmentedControl
         value={config.scope}
         onChange={(scope) => updateConfig({ scope })}

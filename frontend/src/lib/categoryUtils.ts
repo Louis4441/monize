@@ -268,7 +268,17 @@ export function buildCategoryFilterOptions(
           },
         ];
       });
-  const special = SPECIAL_CATEGORY_FILTER_IDS.map((id) => ({ value: id, label: labels[id] }));
+  // A group rule under the last pseudo-id: the four above it filter by what a
+  // record *is* (no category, a transfer, a whole type) and everything below
+  // is a category you can pick. Marked on the option rather than drawn by the
+  // caller so every panel using this list gets the same boundary; MultiSelect
+  // drops the rule when a search has flattened the list or when nothing
+  // follows it.
+  const special = SPECIAL_CATEGORY_FILTER_IDS.map((id, index) => ({
+    value: id,
+    label: labels[id],
+    separatorAfter: index === SPECIAL_CATEGORY_FILTER_IDS.length - 1,
+  }));
   return [...special, ...buildOptions()];
 }
 

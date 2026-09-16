@@ -280,6 +280,13 @@ describe('UpcomingBills', () => {
     const row = listButton.closest('[role="group"]')!.parentElement!;
     expect(row).toContainElement(screen.getByRole('button', { name: 'All upcoming' }));
     expect(row.className).not.toContain('flex-wrap');
+    // On a phone the row owns the header's line and holds its ends apart, so
+    // the scope pair stays against the left edge and the view switch sits
+    // against the right; from `sm` up the two groups pack together again.
+    expect(row.className).toContain('w-full');
+    expect(row.className).toContain('justify-between');
+    expect(row.className).toContain('sm:w-auto');
+    expect(row.className).toContain('sm:justify-start');
   });
 
   it('lays the same occurrences out on a month grid in the calendar view', () => {

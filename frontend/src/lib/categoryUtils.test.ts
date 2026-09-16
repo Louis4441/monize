@@ -268,13 +268,28 @@ describe('buildCategoryFilterOptions', () => {
   it('lists the four labelled pseudo-ids first, then the tree', () => {
     const result = buildCategoryFilterOptions([food, fastFood, salary], labels);
     expect(result.slice(0, 4)).toEqual([
-      { value: 'uncategorized', label: 'Uncategorized' },
-      { value: 'transfer', label: 'Transfers' },
-      { value: 'income', label: 'All income categories' },
-      { value: 'expense', label: 'All expense categories' },
+      { value: 'uncategorized', label: 'Uncategorized', separatorAfter: false },
+      { value: 'transfer', label: 'Transfers', separatorAfter: false },
+      { value: 'income', label: 'All income categories', separatorAfter: false },
+      { value: 'expense', label: 'All expense categories', separatorAfter: true },
     ]);
     expect(result.slice(4).map((o) => o.value)).toEqual(['cat-3', 'inc-1']);
     expect(result[4].children?.map((o) => o.value)).toEqual(['cat-4']);
+  });
+
+  it('closes the pseudo-id group after the last one, and nowhere else', () => {
+    const result = buildCategoryFilterOptions([food, fastFood, salary], labels);
+    // Exactly one boundary, on the last pseudo-id: everything above it filters
+    // by what a record is, everything below is a category you can pick.
+    expect(result.filter((o) => o.separatorAfter).map((o) => o.value)).toEqual(['expense']);
+  });
+
+  it('still marks the boundary when there are no categories to separate', () => {
+    // The list is the four pseudo-ids and nothing else. The flag stays put;
+    // MultiSelect is what declines to draw a rule under the last row.
+    const result = buildCategoryFilterOptions([], labels);
+    expect(result).toHaveLength(4);
+    expect(result[3]).toMatchObject({ value: 'expense', separatorAfter: true });
   });
 });
 
