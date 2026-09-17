@@ -22,7 +22,7 @@
  *   GET into two hundred provider calls. What the cap leaves out stays missing,
  *   and the report names it the same way it named everything else it could not
  *   convert -- the point of this module is to answer more questions, never to
- *   invent an answer (INV-FX-001, `docs/time-series-contract.md` section 2).
+ *   invent an answer (INV-FX-001, `docs/time-series-contract.md` section 2.2).
  *
  * The caller re-reads the rate index from the database afterwards rather than
  * patching what it holds in memory, so what the series converts with is exactly
