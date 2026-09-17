@@ -3,6 +3,7 @@
     "noneToUpdate": "No securities to update",
     "updated": "{count, plural, one {# security price updated} other {# security prices updated}}",
     "partialFailure": "Prices updated: {updated} succeeded, {failed} failed{symbols}",
+    "partialFailureWithReasons": "Prices updated: {updated} succeeded, {failed} failed{symbols}\n{reasons}",
     "failed": "Failed to refresh prices"
   },
   "page": {

@@ -703,10 +703,15 @@ Retry semantics     A refusal is deterministic for a given provider answer, so a
 Crash semantics     The check precedes the write on every path, so a crash between
                     them leaves the row untouched rather than half-converted.
 Failure response    refuse: no price row is written, the security is reported as
-                    failed the way a failed fetch already is
-                    (PriceUpdateResult.error / HistoricalBackfillResult.error,
-                    which the UI raises as a toast), with a tr() message naming
-                    both currencies.
+                    failed the way a failed fetch already is, with a tr() message
+                    naming both currencies. That message travels as
+                    PriceUpdateResult.error / HistoricalBackfillResult.error and
+                    is shown verbatim on both client paths: the force-update
+                    button (SecurityPriceHistory.tsx) and the refresh hook
+                    (usePriceRefresh.ts, which appends the distinct reasons to
+                    the partial-failure toast). A failure count alone would not
+                    do: this refusal is repaired by correcting the security's
+                    currency, symbol or exchange, never by refreshing again.
 Required tests      Present: providers/quote-currency.util.spec.ts (the table:
                     match, GBX normalized once, mismatch, either side silent) and
                     security-price.service.spec.ts, which asserts no write mock is
@@ -714,7 +719,9 @@ Required tests      Present: providers/quote-currency.util.spec.ts (the table:
                     series, and when the fallback provider is the mismatching one,
                     that an unreported currency is stored with a warning, and
                     that a group whose representative refuses still prices the
-                    members the answer fits (refresh and backfill).
+                    members the answer fits (refresh and backfill); and
+                    frontend usePriceRefresh.test.tsx, that the refusal reason
+                    reaches the toast.
                     Owed: an integration test that a refused refresh leaves the
                     previous row intact.
 Status              partial

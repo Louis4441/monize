@@ -104,16 +104,30 @@ export function usePriceRefresh({ onRefreshComplete }: UsePriceRefreshOptions = 
         lastRefreshTimestamp = Date.now();
         if (!silent) {
           if (result.failed > 0) {
-            const failedSymbols = result.results
-              .filter((r) => !r.success)
-              .map((r) => r.symbol);
-            const symbolList = failedSymbols.join(', ');
+            const failures = result.results.filter((r) => !r.success);
+            const symbolList = failures.map((r) => r.symbol).join(', ');
+            // The server already says *why* it refused, translated, and a
+            // currency mismatch is repaired by editing the security rather
+            // than by refreshing again: a count of failures alone sends the
+            // reader nowhere. Distinct, because one refusal usually covers
+            // every symbol in a group.
+            const reasons = [
+              ...new Set(failures.map((r) => r.error).filter((e): e is string => !!e)),
+            ];
+            const symbols = symbolList ? ` (${symbolList})` : '';
             toast.error(
-              t('priceRefresh.partialFailure', {
-                updated: result.updated,
-                failed: result.failed,
-                symbols: symbolList ? ` (${symbolList})` : '',
-              }),
+              reasons.length > 0
+                ? t('priceRefresh.partialFailureWithReasons', {
+                    updated: result.updated,
+                    failed: result.failed,
+                    symbols,
+                    reasons: reasons.join('\n'),
+                  })
+                : t('priceRefresh.partialFailure', {
+                    updated: result.updated,
+                    failed: result.failed,
+                    symbols,
+                  }),
               { duration: 8000 },
             );
           } else {
