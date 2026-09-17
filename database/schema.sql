@@ -896,6 +896,26 @@ CREATE TABLE market_index_sync (
     last_error TEXT
 );
 
+-- The upstream release check's answer, as one row. Held on the deployment
+-- rather than in a field per process: two replicas answering /updates from two
+-- caches disagree about whether an update exists, and a restart re-asks GitHub,
+-- whose unauthenticated rate limit is per IP and shared by every replica behind
+-- one egress address. The row is also the claim -- the refresh stamps
+-- checked_at only when the stored one is older than the window, and only the
+-- statement that stamped it calls GitHub. Singleton, no owner column, so
+-- RLS-exempt (see the marker block at the foot of the RLS section).
+CREATE TABLE update_check_state (
+    id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
+    -- When GitHub was last ASKED. A failed check still holds the window, or an
+    -- unreachable provider turns every tick on every replica into a request.
+    checked_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    latest_version TEXT,
+    release_url TEXT,
+    release_name TEXT,
+    published_at TIMESTAMPTZ,
+    last_error TEXT
+);
+
 -- Deployment-wide leases for the three outbound market-data fetch jobs
 -- (exchange rates, security prices, market indexes). Each cron fires on every
 -- replica; the writes underneath are idempotent upserts, so the data converges
@@ -3377,6 +3397,7 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- rls-exempt: push_instance_config
 -- rls-exempt: schema_migrations
 -- rls-exempt: single_use_tokens
+-- rls-exempt: update_check_state
 -- ---------------------------------------------------------------------------
 
 -- Verification helper (run manually; not part of the migration's effect):

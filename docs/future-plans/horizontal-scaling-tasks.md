@@ -97,7 +97,7 @@
 | S2 | S3 backup target for automatic backups | -- | none until selected | [ ] |
 | C1 | `claimOnce` per owner and month around budget period rollover | -- | neutral | [x] |
 | C2 | Deployment-wide `fetch_sync` lease around FX, security price and market index fetches | -- | neutral | [x] |
-| C3 | Release-check cache to a one-row table | -- | neutral | [ ] |
+| C3 | Release-check cache to a one-row table | -- | neutral | [x] |
 | C4 | Demo seed under the lifecycle advisory lock | -- | neutral (demo only) | [ ] |
 | G1 | Whole-tree process-local-state guard with allowlist | A4, X1, R4 | none | [ ] |
 | G2 | `INV-HA-001..005` in both contract docs | A3, K1, R3, S1 | none | [ ] |
@@ -1247,11 +1247,17 @@ not exist.
 
 ### C3 -- Release-check cache to a one-row table
 
-- [ ] Status:
+- [x] Status: done.
 
-**Scope:** migration + `schema.sql` (`update_check_state (id BOOLEAN PK, checked_at, latest_version, release_url, error)`),
-`backend/src/updates/updates.service.ts` and spec, an entity, `docs/cron-jobs.md`,
-`backend/src/common/db/rls-exempt-tables.ts`.
+**Scope:** migration + `schema.sql` (`update_check_state`),
+`backend/src/updates/updates.service.ts` and spec,
+`backend/src/updates/entities/update-check-state.entity.ts` (new),
+`docs/cron-jobs.md`, `backend/src/common/db/rls-exempt-tables.ts`,
+`docs/row-level-security-contract.md` (the contract entry the exemption
+requires), `backend/eslint.config.mjs` (`WITH_CONTEXT_ALLOWLIST`),
+`backend/src/backup/export-table-queries.ts` (the new table's backup
+classification), `backend/test/integration/update-check-state.integration.spec.ts`
+(new).
 
 **Pattern:** `push_instance_config` for a singleton row.
 
@@ -1265,7 +1271,34 @@ once per 12 hours per deployment.
 
 **Tests:** service spec with a clock; two instances, one fetch.
 
-**Notes:**
+**Notes:** the in-memory `cache` field is gone rather than kept as a
+read-through. Every read is the row, so the two replicas cannot disagree at all,
+and the endpoint is not hot enough for the extra query to matter.
+
+"Once per 12 hours per deployment" needed the freshness check and the claim to
+be **one statement**, not a read then a fetch: two replicas ticking together
+would both pass a read. `claimCheck` is a conditional upsert that moves
+`checked_at` only when the stored one is older than the window, and only the
+statement that moved it goes on to call GitHub.
+
+It stamps on the **attempt**, not the outcome, which is the same thing the old
+field did: a failed check still holds the window, because stamping only on
+success would turn an unreachable GitHub into a request from every replica on
+every tick -- exactly when a per-IP rate limit shared across one egress address
+is least affordable. The last known version is kept through a failure, so the
+banner says "could not check" rather than "nothing to install".
+
+The table carries `release_name` and `published_at` as well as the four columns
+this task named. `getStatus` returns both, so leaving them out would have made
+them null on any replica that had not itself fetched -- the defect being fixed,
+in two fields.
+
+`readLatestRelease` is public and reads under the **caller's** identity;
+`update_check_state` is RLS-exempt, so a request transaction sees it without a
+bypass, and seeding one on a request path would widen the fence for nothing.
+Only the refresh (a cron and a bootstrap hook, with no request behind either)
+seeds `withSystemContext`, which is the one `WITH_CONTEXT_ALLOWLIST` entry this
+task adds.
 
 ### C4 -- Demo seed under the lifecycle advisory lock
 

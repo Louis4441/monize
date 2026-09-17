@@ -159,6 +159,10 @@ export const INTENTIONALLY_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
   // market data. Coordination state for one deployment; restored elsewhere it
   // would say a fetch happened that the new instance never made.
   "fetch_sync",
+  // What THIS installation last learned about the upstream release, and when it
+  // last asked. Installation state, not user content: restored elsewhere it
+  // would hold a window the new instance never spent.
+  "update_check_state",
   // Instance-bound delivery ledger for this deployment's egress; not portable
   // user data. Same category as push_subscriptions above: a row names an object
   // key in a bucket this instance uploads to, and restored elsewhere it would

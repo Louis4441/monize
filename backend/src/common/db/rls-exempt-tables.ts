@@ -48,6 +48,8 @@ export const RLS_EXEMPT_TABLES: Readonly<Record<string, string>> = {
     "Migration infrastructure, written only by db-migrate running as the owner.",
   single_use_tokens:
     "One-shot claims keyed by purpose and a SHA-256 hash; no owner column, and the hash is what keeps the shared table from being replayable.",
+  update_check_state:
+    "Singleton record of what this deployment last learned about the upstream release; no owner column, one instance checks one upstream.",
 };
 
 /** The exempt table names, sorted, for comparison against the schema block. */

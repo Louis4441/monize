@@ -147,6 +147,12 @@ const WITH_CONTEXT_ALLOWLIST = [
   // transaction on purpose, because an outage is not part of whatever request
   // discovered it.
   "src/provider-health/provider-health.service.ts",
+  // The upstream release check: one singleton row for the whole deployment (one
+  // instance checks one upstream), written from a cron and a bootstrap hook
+  // with no request to inherit an identity from. The READ stays on the
+  // caller's own identity -- the table is RLS-exempt, so a request transaction
+  // sees it without a bypass.
+  "src/updates/updates.service.ts",
   // Two genuinely cross-user pieces of work, and only those: generating the
   // deployment's one VAPID key pair on the bootstrap hook (no request behind
   // it), and counting the devices that key pair serves across every account.
