@@ -74,6 +74,27 @@ export interface JointNetWorthScope {
 }
 
 /**
+ * Whether the investment valuation walks this account's LEDGER CASH.
+ *
+ * The cash sleeve and the standalone investment account that predates the pair
+ * hold cash the series adds to market value; a brokerage row holds positions,
+ * and its own ledger rows are not valued. Written once because it is a boundary,
+ * not a filter: any figure measured against this series -- a period's external
+ * flow above all -- has to be drawn around the same accounts, or money moves
+ * across a line the valuation cannot see and the difference reads as
+ * performance (`docs/specs/portfolio-period-result.md` section 6).
+ */
+export function isValuationCashAccount(account: {
+  account_type: string;
+  account_sub_type: string | null;
+}): boolean {
+  return (
+    account.account_sub_type === "INVESTMENT_CASH" ||
+    (account.account_type === "INVESTMENT" && !account.account_sub_type)
+  );
+}
+
+/**
  * One day of `GET /net-worth/investments-daily`: the scope's market value plus
  * cash at the close of that calendar day, in the reporting currency.
  *
@@ -1218,11 +1239,7 @@ export class NetWorthService {
       )
       .map((a) => a.id);
     const cashIds = investAccounts
-      .filter(
-        (a) =>
-          a.account_sub_type === "INVESTMENT_CASH" ||
-          (a.account_type === "INVESTMENT" && !a.account_sub_type),
-      )
+      .filter((a) => isValuationCashAccount(a))
       .map((a) => a.id);
     // Load investment transactions up to end date for holdings replay
     const invTxs: any[] =
@@ -1262,50 +1279,23 @@ export class NetWorthService {
     const { stored: pricesBySec, txFallback: txPricesBySec } =
       await this.loadValuationSeries(securityIds, start, end);
 
-    // Load daily cash balances for INVESTMENT_CASH and standalone accounts
+    // Daily cash balances for INVESTMENT_CASH and standalone accounts, through
+    // the one statement `loadDailyCashBalances` holds: this series and the
+    // by-security breakdown ask the same question, and a second spelling of it
+    // would be two answers to "what did this account hold that day" (#1389).
     const cashBalances = new Map<string, Map<string, number>>();
     if (cashIds.length > 0) {
-      const cashRows: any[] = await this.scopedQuery(
-        `WITH target_accounts AS (
-            SELECT id, opening_balance
-            FROM accounts WHERE id = ANY($1::UUID[])
-          ),
-          pre_period AS (
-            SELECT t.account_id, SUM(t.amount) as total
-            FROM transactions t
-            JOIN target_accounts ta ON ta.id = t.account_id
-            WHERE ${LEDGER_MOVEMENT_PREDICATE}
-              AND t.transaction_date < $2
-            GROUP BY t.account_id
-          ),
-          daily_tx AS (
-            SELECT t.account_id, t.transaction_date::DATE as tx_date, SUM(t.amount) as total
-            FROM transactions t
-            JOIN target_accounts ta ON ta.id = t.account_id
-            WHERE ${LEDGER_MOVEMENT_PREDICATE}
-              AND t.transaction_date >= $2
-              AND t.transaction_date <= $3
-            GROUP BY t.account_id, t.transaction_date::DATE
-          ),
-          account_daily AS (
-            SELECT d.dt::DATE as date, ta.id as account_id,
-              (ta.opening_balance + COALESCE(pp.total, 0) +
-                COALESCE(SUM(dtx.total) OVER (
-                  PARTITION BY ta.id ORDER BY d.dt ROWS UNBOUNDED PRECEDING
-                ), 0)
-              ) as balance
-            FROM target_accounts ta
-            CROSS JOIN generate_series($2::TIMESTAMP, $3::TIMESTAMP, '1 day') d(dt)
-            LEFT JOIN pre_period pp ON pp.account_id = ta.id
-            LEFT JOIN daily_tx dtx ON dtx.account_id = ta.id AND dtx.tx_date = d.dt::DATE
-          )
-          SELECT date::TEXT, balance::NUMERIC, account_id FROM account_daily ORDER BY date`,
-        [cashIds, start, end],
+      const cashRows: any[] = await this.loadDailyCashBalances(
+        cashIds,
+        start,
+        end,
       );
       for (const r of cashRows) {
         if (!cashBalances.has(r.account_id))
           cashBalances.set(r.account_id, new Map());
-        cashBalances.get(r.account_id)!.set(r.date, Number(r.balance));
+        cashBalances
+          .get(r.account_id)!
+          .set(this.toDateString(r.date), Number(r.balance));
       }
     }
 
@@ -1534,11 +1524,7 @@ export class NetWorthService {
       )
       .map((a) => a.id);
     const cashIds = investAccounts
-      .filter(
-        (a) =>
-          a.account_sub_type === "INVESTMENT_CASH" ||
-          (a.account_type === "INVESTMENT" && !a.account_sub_type),
-      )
+      .filter((a) => isValuationCashAccount(a))
       .map((a) => a.id);
 
     // Investment transactions from inception up to the window end, so holdings
