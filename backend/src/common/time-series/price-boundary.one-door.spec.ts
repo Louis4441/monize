@@ -48,16 +48,6 @@ const BASELINE: ReadonlyArray<{ file: string; reason: string }> = [
       "valuation.",
   },
   {
-    file: "currencies/exchange-rate.service.ts",
-    reason:
-      "getLatestRate takes an optional maxAgeDays and its money call sites " +
-      "pass one. getRateForDate is no longer among them: it resolves through " +
-      "fx-rate-resolver.ts, which bounds the carry-forward at " +
-      "FX_MAX_RATE_AGE_DAYS and refuses look-ahead (issue #1390). What is " +
-      "left here is getLatestRate itself, kept for the dateless callers " +
-      "fx-rate.one-door.spec.ts records.",
-  },
-  {
     file: "securities/portfolio.service.ts",
     reason:
       "getLatestPrices and the ROW_NUMBER latest-close CTEs behind the " +

@@ -5,6 +5,7 @@ import { FxAggregate } from "../common/fx-aggregate";
 import { resolveUserDefaultCurrency } from "../common/default-currency.util";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { InvestmentAction } from "../securities/entities/investment-transaction.entity";
+import { investmentEffectStatusSql } from "../securities/investment-row-effects.util";
 import {
   InvestmentTransactionActionSummary,
   InvestmentTransactionSummary,
@@ -250,7 +251,10 @@ export class InvestmentTransactionSummaryService {
            FROM investment_transactions it
            LEFT JOIN securities s ON s.id = it.security_id
           WHERE it.user_id = $1
+            AND ${investmentEffectStatusSql("it")}
             AND NOT (it.action = $2 AND EXISTS (
+                  -- The parent is looked up as a record (includes VOID): what
+                  -- decides whether the child row counts is the child's status.
                   SELECT 1 FROM investment_transactions parent
                    WHERE parent.id = it.linked_transaction_id
                      AND parent.user_id = it.user_id

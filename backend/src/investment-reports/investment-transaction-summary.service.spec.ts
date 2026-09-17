@@ -248,6 +248,9 @@ describe("InvestmentTransactionSummaryService", () => {
         typeof call[0] === "string" &&
         (call[0] as string).includes("investment_transactions"),
     );
+    // A voided trade moved nothing, so it is not volume (INV-PORTMOVE-006's
+    // sibling for a report: a VOID row is a record, never an effect).
+    expect(rowsCall?.[0]).toContain("it.status != 'VOID'");
     expect(rowsCall?.[0]).toContain("it.account_id = ANY($4)");
     expect(rowsCall?.[0]).toContain("it.transaction_date >= $5");
     expect(rowsCall?.[0]).toContain("it.transaction_date <= $6");

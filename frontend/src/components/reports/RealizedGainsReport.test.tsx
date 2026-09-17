@@ -485,8 +485,10 @@ describe('RealizedGainsReport', () => {
     await waitFor(() => {
       expect(screen.getByText('$110.00 EUR')).toBeInTheDocument();
     });
-    // The proceeds are the account's currency, so they carry no foreign suffix.
-    expect(screen.getByText('$5500.00')).toBeInTheDocument();
+    // The proceeds are the account's currency, so they carry no foreign suffix
+    // (the figure appears in the KPI card and in the row).
+    expect(screen.getAllByText('$5500.00').length).toBeGreaterThan(0);
+    expect(screen.queryByText('$5500.00 CAD')).not.toBeInTheDocument();
   });
 
   it('uses convertToDefault when no account is selected (All Accounts)', async () => {
