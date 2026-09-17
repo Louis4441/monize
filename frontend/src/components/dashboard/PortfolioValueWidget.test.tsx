@@ -28,12 +28,41 @@ vi.mock('@/hooks/useNumberFormat', async () => {
 
 const getInvestmentsMonthly = vi.fn();
 const getInvestmentsDaily = vi.fn();
+const getInvestmentsPeriodResult = vi.fn();
 vi.mock('@/lib/net-worth', () => ({
   netWorthApi: {
     getInvestmentsMonthly: (...a: unknown[]) => getInvestmentsMonthly(...a),
     getInvestmentsDaily: (...a: unknown[]) => getInvestmentsDaily(...a),
+    getInvestmentsPeriodResult: (...a: unknown[]) =>
+      getInvestmentsPeriodResult(...a),
   },
 }));
+
+/**
+ * A period result as the server sends it. The defaults are a window in which
+ * nothing happened; each test overrides only the figures it is about.
+ */
+function periodResult(overrides: Record<string, unknown> = {}) {
+  return {
+    currency: 'USD',
+    startDate: '2026-01-02',
+    endDate: '2026-06-30',
+    startValue: 10000,
+    endValue: 10000,
+    valueChange: 0,
+    netExternalFlows: 0,
+    knownFlowSubtotal: 0,
+    investmentResult: 0,
+    returnPercent: 0,
+    returnMethod: 'simple' as const,
+    complete: true,
+    reasons: [] as string[],
+    missingRatePairs: [],
+    unpricedSecurityIds: [],
+    unknownCashAccountIds: [],
+    ...overrides,
+  };
+}
 
 const getPortfolioSummary = vi.fn();
 vi.mock('@/lib/investments', () => ({
@@ -76,6 +105,8 @@ describe('PortfolioValueWidget', () => {
   beforeEach(() => {
     getInvestmentsMonthly.mockReset();
     getInvestmentsDaily.mockReset();
+    getInvestmentsPeriodResult.mockReset();
+    getInvestmentsPeriodResult.mockResolvedValue(periodResult());
     getPortfolioSummary.mockReset();
     getPortfolioSummary.mockResolvedValue({ totalPortfolioValue: 12345, holdings: [] });
     triggerManualRefresh.mockReset();
@@ -124,16 +155,85 @@ describe('PortfolioValueWidget', () => {
     expect(triggerManualRefresh).toHaveBeenCalledWith(undefined);
   });
 
-  it('shows the move over the window in money and percent', async () => {
+  it('shows the investment result over the window, not the value change', async () => {
+    // The issue's reproduction (#1392): two deposits of 10,000 with a price
+    // that never moves. The series rose by 10,000 and the market did nothing,
+    // so the headline is the server's investment result of 0 -- and the value
+    // change it is NOT is named beside it rather than printed as the figure.
+    getInvestmentsMonthly.mockResolvedValue([
+      { month: '2026-01', value: 10000 },
+      { month: '2026-06', value: 20000 },
+    ]);
+    getInvestmentsPeriodResult.mockResolvedValue(
+      periodResult({
+        startValue: 10000,
+        endValue: 20000,
+        valueChange: 10000,
+        netExternalFlows: 10000,
+        knownFlowSubtotal: 10000,
+        investmentResult: 0,
+        returnPercent: 0,
+      }),
+    );
+    await renderWidget();
+    const figure = screen.getByTestId('portfolio-period-change');
+    // The headline itself, before the help text that explains it: the caption
+    // says investment result and the figure is the server's 0 / 0%.
+    expect(figure.textContent).toMatch(/^Investment result\+\$0\(\+0\.0%\)/);
+    // The deposit is not the headline, under any caption.
+    expect(figure.textContent).not.toMatch(/^[^V]*\$10000/);
+    expect(figure).not.toHaveTextContent('100.0%');
+    expect(
+      screen.getByLabelText(
+        'Value change +$10000, of which deposits and withdrawals were +$10000. The investment result is what is left.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('renders a withheld result as unknown with the cause the server gave', async () => {
     getInvestmentsMonthly.mockResolvedValue([
       { month: '2026-05', value: 8000 },
       { month: '2026-06', value: 10000 },
     ]);
-    await renderWidget();
-    // 1Y measures from the first point drawn, so 8000 -> 10000 is +2000 (+25%).
-    expect(screen.getByTestId('portfolio-period-change')).toHaveTextContent(
-      '+$2000(+25.0%)',
+    getInvestmentsPeriodResult.mockResolvedValue(
+      periodResult({
+        valueChange: null,
+        netExternalFlows: null,
+        investmentResult: null,
+        returnPercent: null,
+        complete: false,
+        reasons: ['incompletePrices'],
+        unpricedSecurityIds: ['sec-1'],
+      }),
     );
+    await renderWidget();
+    const figure = screen.getByTestId('portfolio-period-change');
+    expect(figure).toContainElement(screen.getByTestId('unknown-amount'));
+    // The marker names the one repair: a price to add, not a rate to refresh.
+    expect(
+      screen.getByLabelText(/the security has no price to value them at/),
+    ).toBeInTheDocument();
+    expect(figure).not.toHaveTextContent('$0');
+    // The two figures behind it are withheld in the same words, never blank.
+    expect(
+      screen.getByLabelText(
+        'Value change N/A, of which deposits and withdrawals were N/A. The investment result is what is left.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('shows no figure at all when the period request fails', async () => {
+    // A failed request is not a period that did nothing: never a zero, and
+    // never the previous window's figure under this window's caption.
+    getInvestmentsMonthly.mockResolvedValue([
+      { month: '2026-05', value: 8000 },
+      { month: '2026-06', value: 10000 },
+    ]);
+    getInvestmentsPeriodResult.mockRejectedValue(new Error('period unavailable'));
+    await renderWidget();
+    expect(screen.queryByTestId('portfolio-period-change')).toBeNull();
+    expect(screen.queryByText(/\$2000/)).toBeNull();
+    expect(screen.queryByText(/\+\$0/)).toBeNull();
   });
 
   it('keeps the window and the refresh on the title line, figures on the card\'s own edge', async () => {
@@ -198,32 +298,42 @@ describe('PortfolioValueWidget', () => {
     expect(refresh.compareDocumentPosition(value)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
-  it('shows no period change while the series is empty', async () => {
-    // An unknown baseline is not a flat market: nothing is printed rather than
-    // a change of zero.
+  it('shows no period figure while the series is empty', async () => {
+    // With nothing on screen there is no window to measure, so no request is
+    // made and nothing is printed -- never a change of zero.
     getInvestmentsMonthly.mockResolvedValue([]);
     await renderWidget();
     expect(screen.queryByTestId('portfolio-period-change')).toBeNull();
+    expect(getInvestmentsPeriodResult).not.toHaveBeenCalled();
   });
 
-  it('measures the MTD change from the close before the window', async () => {
-    configState.current = { range: 'mtd', accountIds: [] };
-    getInvestmentsDaily.mockImplementation((params: { endDate?: string }) =>
-      // The baseline lookup asks for the days before the window; the chart's own
-      // request carries the window itself.
-      Promise.resolve(
-        params.endDate === '2026-06-30'
-          ? [{ date: '2026-06-30', value: 9000 }]
-          : [
-              { date: '2026-07-01', value: 9500 },
-              { date: '2026-07-02', value: 9900 },
-            ],
-      ),
+  it('asks for the MTD period against the close before the first point drawn', async () => {
+    configState.current = { range: 'mtd', accountIds: ['i1'] };
+    getInvestmentsDaily.mockResolvedValue([
+      { date: '2026-07-01', value: 9500 },
+      { date: '2026-07-02', value: 9900 },
+    ]);
+    getInvestmentsPeriodResult.mockResolvedValue(
+      periodResult({ investmentResult: 400, returnPercent: 4 }),
     );
     await renderWidget();
-    // 9900 against the 30 June close of 9000, not against the 1 July point.
+    // The client picks the date; the server measures. MTD reports against the
+    // previous close, so the day before the first point goes out as the
+    // baseline, for the same account scope as the series.
+    expect(getInvestmentsPeriodResult).toHaveBeenCalledWith(
+      expect.objectContaining({ baselineDate: '2026-06-30', accountIds: 'i1' }),
+    );
     expect(screen.getByTestId('portfolio-period-change')).toHaveTextContent(
-      '+$900(+10.0%)',
+      '+$400(+4.0%)',
+    );
+  });
+
+  it('sends no baseline date on a range measured from its own first point', async () => {
+    configState.current = { range: '1y', accountIds: [] };
+    getInvestmentsMonthly.mockResolvedValue([{ month: '2026-06', value: 10000 }]);
+    await renderWidget();
+    expect(getInvestmentsPeriodResult).toHaveBeenCalledWith(
+      expect.objectContaining({ baselineDate: undefined }),
     );
   });
 

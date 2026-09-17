@@ -24,14 +24,16 @@ import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import { useWidgetConfig } from '@/hooks/useWidgetConfig';
 import { resolveRangePreset } from '@/lib/date-range';
 import { usePortfolioRangeWindow } from '@/hooks/usePortfolioRangeWindow';
-import { usePortfolioChangeBaseline } from '@/hooks/usePortfolioChangeBaseline';
+import { usePortfolioPeriodResult } from '@/hooks/usePortfolioPeriodResult';
 import {
-  isoDatePart,
-  portfolioSeriesChange,
-} from '@/components/investments/portfolio-change-baseline';
+  hasUnmeasuredFlow,
+  periodResultUnknownReason,
+} from '@/components/investments/portfolio-period-result';
 import { chartColors } from '@/lib/chart-colors';
 import { gainLossColor } from '@/lib/format';
 import { ChartTooltipPanel } from '@/components/reports/ChartTooltip';
+import { InfoTooltip } from '@/components/ui/InfoTooltip';
+import { UnknownAmount } from '@/components/ui/UnknownAmount';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { WidgetCard, WidgetConfigRow, WidgetMessage } from './WidgetCard';
@@ -150,26 +152,32 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
 
   const totalPortfolioValue = summary?.totalPortfolioValue ?? null;
 
-  // 1W and MTD report their move against the close of the trading day before
-  // the window, the way every quote source does; the longer ranges measure from
-  // the first point drawn. Both rules live in `portfolio-change-baseline.ts`,
-  // shared with the Investments chart so the two cannot disagree about the same
-  // window.
-  const { usesPriorClose, priorClose } = usePortfolioChangeBaseline({
+  // What the portfolio DID over this window, as the server worked it out. A
+  // change read off the plotted series counts the reader's own deposits as
+  // performance (INV-PORTRESULT-001), so nothing here subtracts two points: the
+  // widget asks the same endpoint the Portfolio Value report reads, for the
+  // same scope and window, and prints what comes back. 1W and MTD still report
+  // against the previous close -- that date is all this layer decides.
+  const { periodResult } = usePortfolioPeriodResult({
     range: config.range,
-    firstPointDate: isoDatePart(chartData[0]?.date),
+    startDate: start,
+    endDate: end,
+    firstPointIso: series?.[0]?.date,
+    hasSeries: chartData.length > 0,
     accountIds: accountIdsCsv,
     displayCurrency: defaultCurrency,
   });
 
-  const { change, changePercent } = useMemo(
-    () =>
-      portfolioSeriesChange(
-        chartData.map((point) => point.value),
-        { usesPriorClose, priorCloseValue: priorClose?.value ?? null },
-      ),
-    [chartData, usesPriorClose, priorClose],
-  );
+  const investmentResult = periodResult?.investmentResult ?? null;
+  const returnPercent = periodResult?.returnPercent ?? null;
+  const unknownReason = periodResultUnknownReason(periodResult?.reasons ?? []);
+  // The two figures the headline is made of, named where the caption has no
+  // room for them. A withheld one says so in the same words the report's cards
+  // and exports use -- never an empty space a reader completes as zero.
+  const breakdownText = (value: number | null) =>
+    value === null
+      ? t('portfolioValue.notAvailable')
+      : `${value >= 0 ? '+' : ''}${formatCurrency(value, defaultCurrency)}`;
 
   const configControls = (
     <>
@@ -249,18 +257,50 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
               {formatCurrency(totalPortfolioValue, defaultCurrency)}
             </span>
           )}
-          {/* The move over the window, in money and as a share of where it
-              started. An unknown baseline shows nothing at all rather than a
-              change of zero, which would read as a flat market. */}
-          {!loading && change !== null && (
+          {/* What the holdings earned over the window, with the reader's own
+              deposits taken out -- captioned as the investment result, because
+              a value change under a "Change" caption reports a transfer as a
+              gain. The value change and the net deposits behind it are named in
+              the tooltip, which is the only room this card has for them.
+
+              A server that has not answered shows nothing at all: a failed
+              request is not a period that did nothing. A figure the server
+              withheld is the unknown marker with its own cause, never a zero. */}
+          {!loading && periodResult && (
             <span
-              className={`whitespace-nowrap text-xs font-medium ${gainLossColor(change)}`}
+              className={`flex items-center gap-1 whitespace-nowrap text-xs font-medium ${investmentResult === null ? '' : gainLossColor(investmentResult)}`}
               data-testid="portfolio-period-change"
             >
-              {change >= 0 ? '+' : ''}
-              {formatCurrency(change, defaultCurrency)}
-              {changePercent !== null && (
-                <span className="ml-1">({formatSignedPercent(changePercent, 1)})</span>
+              <span className="text-gray-500 dark:text-gray-400">
+                {t('portfolioValue.investmentResult')}
+              </span>
+              {investmentResult === null ? (
+                <UnknownAmount reason={unknownReason} className="font-normal" />
+              ) : (
+                <>
+                  {investmentResult >= 0 ? '+' : ''}
+                  {formatCurrency(investmentResult, defaultCurrency)}
+                  {returnPercent !== null && (
+                    <span>({formatSignedPercent(returnPercent, 1)})</span>
+                  )}
+                </>
+              )}
+              <InfoTooltip
+                placement="top"
+                align="right"
+                text={t('portfolioValue.periodBreakdownTooltip', {
+                  valueChange: breakdownText(periodResult.valueChange),
+                  netFlows: breakdownText(periodResult.netExternalFlows),
+                })}
+              />
+              {/* Two movements the server could not count as a flow; the
+                  marker's generic copy would leave the reader nowhere to go. */}
+              {hasUnmeasuredFlow(periodResult.reasons) && (
+                <InfoTooltip
+                  placement="top"
+                  align="right"
+                  text={t('portfolioValue.unmeasuredFlowTooltip')}
+                />
               )}
             </span>
           )}
