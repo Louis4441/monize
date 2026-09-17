@@ -325,8 +325,10 @@ export class PortfolioPeriodResultService {
             AND it.transaction_date <= $3
             AND it.status IS DISTINCT FROM 'VOID'
             AND (
-              it.funding_account_id IS NOT NULL
-              AND NOT (it.funding_account_id = ANY($5::UUID[]))
+              (
+                it.funding_account_id IS NOT NULL
+                AND NOT (it.funding_account_id = ANY($5::UUID[]))
+              )
               OR EXISTS (
                 SELECT 1 FROM transactions ct
                  WHERE ct.id = it.transaction_id
