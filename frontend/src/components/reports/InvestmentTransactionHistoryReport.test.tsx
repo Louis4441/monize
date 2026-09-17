@@ -424,6 +424,98 @@ describe('InvestmentTransactionHistoryReport', () => {
     }
   });
 
+  /**
+   * A failed KPI request is a failed report, not a report of the rows the
+   * client happens to hold.
+   *
+   * The summary answers all four cards over the WHOLE filtered set; the table's
+   * rows are capped at fifty pages and filtered again client-side. Reading the
+   * error as "no summary" put the capped row count under "Total Transactions",
+   * zero under "Securities Traded", and an exchange-rate tooltip over a 500 --
+   * an outage rendered as a plausible answer with an errand attached.
+   */
+  describe('when the summary request fails', () => {
+    beforeEach(() => {
+      mockGetTransactions.mockResolvedValue({
+        data: [
+          {
+            id: 'tx1',
+            accountId: 'acc-1',
+            security: { symbol: 'AAPL', name: 'Apple' },
+            transactionDate: '2025-06-15',
+            quantity: 10,
+            price: 100,
+            totalAmount: 1000,
+            action: 'BUY',
+          },
+        ],
+        pagination: { hasMore: false },
+      });
+      mockGetInvestmentAccounts.mockResolvedValue([
+        { id: 'acc-1', name: 'Brokerage', accountSubType: 'INVESTMENT_CASH', currencyCode: 'CAD' },
+      ]);
+      mockGetTransactionSummary.mockRejectedValue(new Error('500'));
+    });
+
+    it('shows the retryable report error, not the KPI block', async () => {
+      await act(async () => {
+        render(<InvestmentTransactionHistoryReport />);
+      });
+      await waitFor(() =>
+        expect(screen.getByText('Failed to load report data. Please try again.')).toBeInTheDocument(),
+      );
+      expect(screen.queryByText('Total Transactions')).not.toBeInTheDocument();
+      expect(screen.queryByText('Securities Traded')).not.toBeInTheDocument();
+      // The currency tooltip is the wrong story for a transport failure: it
+      // sends the reader to the Currencies page over a rate that is not the
+      // problem.
+      expect(screen.queryByTestId('unknown-amount')).not.toBeInTheDocument();
+    });
+
+    it('retries both requests from the error screen', async () => {
+      await act(async () => {
+        render(<InvestmentTransactionHistoryReport />);
+      });
+      await waitFor(() => expect(screen.getByText('Try again')).toBeInTheDocument());
+      mockGetTransactionSummary.mockResolvedValue(
+        summaryFixture({ transactionCount: 7, securitiesTraded: 3 }),
+      );
+      await act(async () => {
+        fireEvent.click(screen.getByText('Try again'));
+      });
+      await waitFor(() => expect(screen.getByText('Total Transactions')).toBeInTheDocument());
+      expect(screen.getByText('Total Transactions').parentElement?.textContent).toContain('7');
+      expect(screen.getByText('Securities Traded').parentElement?.textContent).toContain('3');
+    });
+  });
+
+  it('waits for the summary rather than captioning the capped rows as the totals', async () => {
+    mockGetTransactions.mockResolvedValue({
+      data: [
+        {
+          id: 'tx1',
+          accountId: 'acc-1',
+          security: { symbol: 'AAPL', name: 'Apple' },
+          transactionDate: '2025-06-15',
+          quantity: 10,
+          price: 100,
+          totalAmount: 1000,
+          action: 'BUY',
+        },
+      ],
+      pagination: { hasMore: false },
+    });
+    mockGetInvestmentAccounts.mockResolvedValue([
+      { id: 'acc-1', name: 'Brokerage', accountSubType: 'INVESTMENT_CASH', currencyCode: 'CAD' },
+    ]);
+    mockGetTransactionSummary.mockReturnValue(new Promise(() => {}));
+    await act(async () => {
+      render(<InvestmentTransactionHistoryReport />);
+    });
+    expect(document.querySelector('.animate-pulse')).toBeTruthy();
+    expect(screen.queryByText('Total Transactions')).not.toBeInTheDocument();
+  });
+
   it('restores the persisted account selection', async () => {
     window.localStorage.setItem(
       'monize-reports-investment-transactions-accounts',

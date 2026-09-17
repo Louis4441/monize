@@ -223,7 +223,12 @@ export function InvestmentTransactionHistoryReport() {
    * currency, which only the server can convert at the rate that stood on the
    * trade's own date.
    */
-  const { data: summary, reload: reloadSummary } = useReportData<InvestmentTransactionSummary | null>(
+  const {
+    data: summary,
+    isLoading: isSummaryLoading,
+    error: summaryError,
+    reload: reloadSummary,
+  } = useReportData<InvestmentTransactionSummary | null>(
     async () => {
       if (!isValid) return null;
       return investmentReportsApi.getTransactionSummary({
@@ -262,6 +267,18 @@ export function InvestmentTransactionHistoryReport() {
   // captioned the result in the reader's own currency (issue #1394).
   const actionSummaries = useMemo(() => summary?.byAction ?? [], [summary]);
   const reportingCurrency = summary?.currencyCode ?? defaultCurrency;
+
+  /**
+   * What a KPI shows when the server has not answered: a marker, never a number.
+   *
+   * The counts have no client-side substitute. The rows above are capped at
+   * `MAX_PAGES` and filtered by whatever the reader selected, so their length is
+   * a different measurement wearing the server's caption, and `0` securities is
+   * a claim nobody made. A failed summary does not reach here at all -- it is
+   * the report's error screen, below -- so this is the one honest state left:
+   * the request has not answered yet.
+   */
+  const unknownKpi = tCommon('unknownAmount.marker');
 
   /** The KPI's own figure, in the reporting currency the server named. */
   const fmtReportingMoney = useCallback(
@@ -537,7 +554,9 @@ export function InvestmentTransactionHistoryReport() {
           volumePartial ? ` ${tCommon('partialTotal.srSuffix')}` : ''
         }`
       : tCommon('unknownAmount.marker');
-    const transactionCount = summary?.transactionCount ?? filteredTransactions.length;
+    // The server's count or nothing: the rows on screen are capped and filtered,
+    // so their length under this caption would be a different measurement.
+    const transactionCount = summary ? String(summary.transactionCount) : unknownKpi;
     // A withheld total is relabelled here too: the caption changes, rather than
     // a subtotal being printed under one that says "total".
     const volumeLabel = volumePartial
@@ -547,21 +566,28 @@ export function InvestmentTransactionHistoryReport() {
       title: t('investmentTransactions.pdfTitle'),
       subtitle: `${accountLabel} | ${transactionCount} | ${volumeLabel}: ${volumeText}`,
       summaryCards: [
-        { label: t('investmentTransactions.totalTransactions'), value: String(transactionCount), color: '#111827' },
+        { label: t('investmentTransactions.totalTransactions'), value: transactionCount, color: '#111827' },
         { label: volumeLabel, value: volumeText, color: '#111827' },
-        { label: t('investmentTransactions.actionTypes'), value: String(actionSummaries.length), color: '#111827' },
-        { label: t('investmentTransactions.securitiesTraded'), value: String(summary?.securitiesTraded ?? 0), color: '#111827' },
+        { label: t('investmentTransactions.actionTypes'), value: summary ? String(actionSummaries.length) : unknownKpi, color: '#111827' },
+        { label: t('investmentTransactions.securitiesTraded'), value: summary ? String(summary.securitiesTraded) : unknownKpi, color: '#111827' },
       ],
       tableData: { headers, rows },
       filename: 'investment-transactions',
     });
-  }, [getExportData, selectedAccount, filteredTransactions.length, summary, fmtReportingMoney, actionSummaries, t, tCommon, mainAccountName]);
+  }, [getExportData, selectedAccount, summary, unknownKpi, fmtReportingMoney, actionSummaries, t, tCommon, mainAccountName]);
 
-  if (error) {
+  // A failed summary is a failed report, the way every sibling report treats a
+  // secondary request that fails: one retryable error screen over the whole
+  // thing. It is not a missing exchange rate, and the rows the client happens to
+  // hold are not the answer to any of the four KPIs.
+  if (error || summaryError) {
     return <ReportError onRetry={reloadAll} />;
   }
 
-  if (isLoading && response === null) {
+  // Neither request has an answer to show yet. The summary is gated here too:
+  // without it the KPI block has nothing but markers, and a card reading the
+  // capped client rows in its place is the defect this gate closes.
+  if ((isLoading && response === null) || (isSummaryLoading && summary === null)) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-6">
         <div className="space-y-4">
@@ -579,7 +605,7 @@ export function InvestmentTransactionHistoryReport() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400">{t('investmentTransactions.totalTransactions')}</div>
           <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            {summary?.transactionCount ?? filteredTransactions.length}
+            {summary ? summary.transactionCount : unknownKpi}
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
@@ -591,7 +617,11 @@ export function InvestmentTransactionHistoryReport() {
           <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
             {/* A withheld total is relabelled, not left under a "Total" caption:
                 the subtotal shows with the marker naming the pairs that stopped
-                it. Until the server answers there is no figure at all. */}
+                it. Until the server answers there is no figure at all -- and no
+                cause to name either: a request that has not answered is not a
+                missing exchange rate, so this is the bare marker rather than
+                `UnknownAmount`, whose every reason would send the reader to a
+                screen that can fix nothing. */}
             {summary ? (
               <PartialTotal total={asConvertedTotal(summary)} displayCurrency={summary.currencyCode}>
                 {fmtReportingMoney(
@@ -601,20 +631,20 @@ export function InvestmentTransactionHistoryReport() {
                 )}
               </PartialTotal>
             ) : (
-              <UnknownAmount reason="displayFx" />
+              unknownKpi
             )}
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400">{t('investmentTransactions.actionTypes')}</div>
           <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            {actionSummaries.length}
+            {summary ? actionSummaries.length : unknownKpi}
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400">{t('investmentTransactions.securitiesTraded')}</div>
           <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            {summary?.securitiesTraded ?? 0}
+            {summary ? summary.securitiesTraded : unknownKpi}
           </div>
         </div>
       </div>
