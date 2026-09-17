@@ -186,8 +186,16 @@ export function PortfolioValueReport() {
   // `complete` is the server's completeness for that point, absent where the
   // endpoint reports none (intraday, by-security) -- absent is NO INFORMATION,
   // so every read of it is `=== false`.
+  //
+  // `Value` is NULL on a point the server could not finish. The server's
+  // `value` there is the subtotal of what it could price and convert, and a
+  // subtotal plotted on a value axis is indistinguishable from a measured one
+  // -- a whole holding period of unpriced securities drew as a flat line near
+  // zero (#1389). The chart breaks instead (`connectNulls={false}`), the table
+  // and the CSV print it as unavailable, and `IncompleteDataDetails` names the
+  // cause beside the withheld KPIs.
   const [chartPoints, setChartPoints] = useState<
-    Array<{ name: string; Value: number; iso: string; complete?: boolean }>
+    Array<{ name: string; Value: number | null; iso: string; complete?: boolean }>
   >([]);
   // What the portfolio DID over the window, as the server worked it out: the
   // value change, the money the reader moved in or out, and what is left. Null
@@ -351,17 +359,21 @@ export function PortfolioValueReport() {
         const data = await netWorthApi.getInvestmentsDaily(params);
         if (loadSeqRef.current !== seq) return;
         setChartPoints(
-          data.map((d) => ({
-            name: formatChartDate(d.date, 'MMM d, yyyy'),
-            Value: d.value,
-            iso: d.date,
+          data.map((d) => {
             // A day short of a price, a rate or a cash balance is a subtotal;
-            // the KPIs below refuse to name it a high, a low or a change.
-            complete:
+            // the KPIs below refuse to name it a high, a low or a change, and
+            // the chart refuses to plot it at all.
+            const complete =
               d.pricesComplete !== false &&
               d.fxComplete !== false &&
-              d.cashComplete !== false,
-          })),
+              d.cashComplete !== false;
+            return {
+              name: formatChartDate(d.date, 'MMM d, yyyy'),
+              Value: complete ? d.value : null,
+              iso: d.date,
+              complete,
+            };
+          }),
         );
       } else {
         const data = await netWorthApi.getInvestmentsMonthly(params);
@@ -407,7 +419,7 @@ export function PortfolioValueReport() {
       setChartPoints(
         points.map((p) => ({
           name: p.name,
-          Value: p.total,
+          Value: p.complete ? p.total : null,
           iso: p.iso,
           complete: p.complete,
         })),
@@ -657,15 +669,20 @@ export function PortfolioValueReport() {
     if (chartPoints.length === 0) {
       return { highest: null as number | null, lowest: null as number | null };
     }
-    const values = chartPoints.map((d) => d.Value);
     // A point the server could not finish is a subtotal, and a subtotal can sit
     // anywhere in the ordering: the real high or low may be the day that is
     // missing a component. One incomplete point therefore leaves BOTH extremes
     // unknown rather than quietly ranking a partial figure against whole ones.
     const extremesKnown = chartPoints.every((p) => p.complete !== false);
+    const values = chartPoints
+      .map((d) => d.Value)
+      .filter((v): v is number => v !== null);
+    if (!extremesKnown || values.length === 0) {
+      return { highest: null as number | null, lowest: null as number | null };
+    }
     return {
-      highest: extremesKnown ? Math.max(...values) : null,
-      lowest: extremesKnown ? Math.min(...values) : null,
+      highest: Math.max(...values),
+      lowest: Math.min(...values),
     };
   }, [chartPoints]);
 
@@ -716,7 +733,11 @@ export function PortfolioValueReport() {
       // zooming to the total's min/max (which would clip the lower bands).
       securitiesActive
         ? ([0, 'auto'] as [number, 'auto'])
-        : computeTightYAxisDomain(chartPoints.map((d) => d.Value)),
+        : computeTightYAxisDomain(
+            chartPoints
+              .map((d) => d.Value)
+              .filter((v): v is number => v !== null),
+          ),
     [chartPoints, securitiesActive],
   );
 
@@ -743,13 +764,28 @@ export function PortfolioValueReport() {
   }, [breakdown, t]);
 
   const stackedChartData = useMemo(() => {
-    if (!breakdown) return [] as Array<Record<string, number | string>>;
+    if (!breakdown) return [] as Array<Record<string, number | string | null>>;
     // Point names are pre-formatted at load time (date or intraday time).
-    return breakdown.points.map((p) => ({
-      name: p.name,
-      total: p.total,
-      ...p.values,
-    }));
+    //
+    // An incomplete point draws no band at all. A stack whose height is short a
+    // component is the same lie as a line drawn through a subtotal, and it is
+    // worse here: the missing band is exactly the security the reader is
+    // looking for (#1389). Every band goes null together so the stack breaks
+    // rather than settling onto a shorter total.
+    return breakdown.points.map((p) => {
+      const known = p.complete !== false;
+      const bands = Object.fromEntries(
+        Object.entries(p.values).map(([key, value]) => [
+          key,
+          known ? value : null,
+        ]),
+      );
+      return {
+        name: p.name,
+        total: known ? p.total : null,
+        ...bands,
+      };
+    });
   }, [breakdown]);
 
   const sortedBreakdownRows = useMemo(() => {
@@ -962,7 +998,13 @@ export function PortfolioValueReport() {
       return;
     }
     const headers = [t('portfolioValue.csvColDate'), t('portfolioValue.csvColValue')];
-    const rows = sortedChartTableData.map((p) => [p.name, p.Value]);
+    // A CSV cell cannot carry the grey marker the table uses, so a withheld
+    // point exports the same words the card prints -- never an empty cell a
+    // spreadsheet reads as zero.
+    const rows = sortedChartTableData.map((p) => [
+      p.name,
+      p.Value === null ? t('portfolioValue.notAvailable') : p.Value,
+    ]);
     exportCsvSections('portfolio-value', [
       periodSummarySection(),
       { headers, rows },
@@ -1325,6 +1367,7 @@ export function PortfolioValueReport() {
                       type="monotone"
                       dataKey={s.key}
                       stackId="pf"
+                      connectNulls={false}
                       stroke={s.color}
                       strokeWidth={1}
                       fill={s.color}
@@ -1368,7 +1411,13 @@ export function PortfolioValueReport() {
                   <tr key={`${row.index}-${row.name}`} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                     <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{row.name}</td>
                     <td className="px-4 py-3 text-right text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {fmtFull(row.Value)}
+                      {row.Value === null ? (
+                        <span className="text-gray-400 dark:text-gray-500 font-normal">
+                          {t('portfolioValue.notAvailable')}
+                        </span>
+                      ) : (
+                        fmtFull(row.Value)
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -1406,6 +1455,7 @@ export function PortfolioValueReport() {
                 <Area
                   type="monotone"
                   dataKey="Value"
+                  connectNulls={false}
                   stroke={chartColors.income}
                   strokeWidth={2}
                   fillOpacity={1}

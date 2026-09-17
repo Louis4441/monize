@@ -105,14 +105,21 @@ vi.mock('@/components/ui/ExportDropdown', () => ({
 
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: any) => <div data-testid="responsive-container">{children}</div>,
-  AreaChart: ({ children }: any) => <div data-testid="area-chart">{children}</div>,
+  // `data-points` carries the rows the chart was actually handed, so a test can
+  // see what is plotted rather than only what the KPI cards say (#1389).
+  AreaChart: ({ children, data }: any) => (
+    <div data-testid="area-chart" data-points={JSON.stringify(data ?? [])}>
+      {children}
+    </div>
+  ),
   Legend: () => null,
   // Invoke the dot render-prop so the high/low bubble wiring (and its dismiss
   // control) is exercised. Indices 0..2 cover both extremes of the 3-point
   // series the dismiss test renders.
-  Area: ({ dot }: any) =>
+  Area: ({ dot, connectNulls }: any) =>
     typeof dot === 'function' ? (
       <>
+        <span data-testid="area-connect-nulls">{String(connectNulls)}</span>
         {dot({ cx: 10, cy: 20, index: 0 })}
         {dot({ cx: 30, cy: 40, index: 1 })}
         {dot({ cx: 50, cy: 60, index: 2 })}
@@ -847,6 +854,53 @@ describe('PortfolioValueReport', () => {
       expect(kpi('Value Change')).not.toContain('$');
       expect(kpi('Net Deposits and Withdrawals')).not.toContain('$');
       expect(kpi('Investment Result')).toContain('N/A');
+    });
+
+    /**
+     * The rule survives to the pixel (`docs/time-series-contract.md` rule 3).
+     * The server's `value` on an incomplete day is the subtotal of what it
+     * could price and convert, so plotting it draws a measured-looking line --
+     * a whole holding period of unpriced securities read as a flat line near
+     * zero, which is what was reported against #1389. The point is a gap.
+     */
+    it('plots no point for a day the server could not finish', async () => {
+      mockDateRangeValue = '3m';
+      mockGetInvestmentsDaily.mockResolvedValue([
+        {
+          date: '2024-06-01',
+          // The subtotal: the account held a security nothing could price.
+          value: 0,
+          fxComplete: true,
+          pricesComplete: false,
+          unpricedSecurityIds: ['sec-a'],
+          cashComplete: true,
+          unknownCashAccountIds: [],
+        },
+        {
+          date: '2024-06-02',
+          value: 51000,
+          fxComplete: true,
+          pricesComplete: true,
+          unpricedSecurityIds: [],
+          cashComplete: true,
+          unknownCashAccountIds: [],
+        },
+      ]);
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      render(<PortfolioValueReport />);
+      await waitFor(() => {
+        expect(screen.getByTestId('area-chart')).toBeInTheDocument();
+      });
+
+      await waitFor(() => {
+        const plotted = JSON.parse(
+          screen.getByTestId('area-chart').getAttribute('data-points')!,
+        ) as Array<{ Value: number | null }>;
+        expect(plotted.map((p) => p.Value)).toEqual([null, 51000]);
+      });
+      // ...and the gap is a gap, not a segment drawn across it.
+      expect(screen.getByTestId('area-connect-nulls').textContent).toBe('false');
     });
 
     it('prints the figures when every day is complete', async () => {
