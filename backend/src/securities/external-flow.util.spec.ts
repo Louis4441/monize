@@ -10,10 +10,12 @@ describe("external-flow.util", () => {
     /**
      * The statement `PortfolioMovementAlertService.externalFlow` issued before
      * this module existed, copied verbatim from its last commit with the two
-     * shared exclusions expanded. `PortfolioMovementAlertService` has no unit
-     * spec of its own, so this literal IS the proof that the extraction changed
-     * no row: if the generated predicate ever stops matching it, the daily
-     * movement notification has silently started measuring something else.
+     * shared exclusions expanded. This literal IS the proof that the extraction
+     * changed no row: if the generated predicate ever stops matching it, the
+     * daily movement notification has silently started measuring something else.
+     * (The producer's own behaviour is covered by
+     * `notification-center/portfolio-movement-alert.service.spec.ts`; what it
+     * asks this SQL for is the `perDay` form.)
      */
     const ORIGINAL_UNSCOPED = `
       FROM transactions t
