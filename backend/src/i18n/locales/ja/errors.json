@@ -336,6 +336,7 @@
   "netWorth": {
     "invalidStartDate": "startDate は YYYY-MM-DD 形式でなければなりません",
     "invalidEndDate": "endDate は YYYY-MM-DD 形式でなければなりません",
+    "invalidBaselineDate": "baselineDate は YYYY-MM-DD 形式でなければなりません",
     "invalidAccountIds": "accountIds はカンマ区切りのUUIDでなければなりません",
     "invalidGranularity": "granularity は 'daily' または 'monthly' である必要があります"
   },

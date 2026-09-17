@@ -336,6 +336,7 @@
   "netWorth": {
     "invalidStartDate": "startDate YYYY-MM-DD प्रारूप में होनी चाहिए",
     "invalidEndDate": "endDate YYYY-MM-DD प्रारूप में होनी चाहिए",
+    "invalidBaselineDate": "baselineDate YYYY-MM-DD प्रारूप में होनी चाहिए",
     "invalidAccountIds": "accountIds अल्पविराम-अलग UUID होने चाहिए",
     "invalidGranularity": "granularity 'daily' या 'monthly' होना चाहिए"
   },

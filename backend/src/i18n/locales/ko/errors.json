@@ -336,6 +336,7 @@
   "netWorth": {
     "invalidStartDate": "startDate는 YYYY-MM-DD 형식이어야 합니다",
     "invalidEndDate": "endDate는 YYYY-MM-DD 형식이어야 합니다",
+    "invalidBaselineDate": "baselineDate는 YYYY-MM-DD 형식이어야 합니다",
     "invalidAccountIds": "accountIds는 쉼표로 구분된 UUID여야 합니다",
     "invalidGranularity": "granularity는 'daily' 또는 'monthly'여야 합니다"
   },

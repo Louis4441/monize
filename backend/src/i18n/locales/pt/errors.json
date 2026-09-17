@@ -336,6 +336,7 @@
   "netWorth": {
     "invalidStartDate": "startDate deve estar no formato YYYY-MM-DD",
     "invalidEndDate": "endDate deve estar no formato YYYY-MM-DD",
+    "invalidBaselineDate": "baselineDate deve estar no formato YYYY-MM-DD",
     "invalidAccountIds": "accountIds deve ser uma lista de UUIDs separados por vírgulas",
     "invalidGranularity": "granularity deve ser 'daily' ou 'monthly'"
   },

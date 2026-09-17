@@ -336,6 +336,7 @@
   "netWorth": {
     "invalidStartDate": "startDate 必須為 YYYY-MM-DD 格式",
     "invalidEndDate": "endDate 必須為 YYYY-MM-DD 格式",
+    "invalidBaselineDate": "baselineDate 必須為 YYYY-MM-DD 格式",
     "invalidAccountIds": "accountIds 必須是以逗號分隔的 UUID",
     "invalidGranularity": "granularity 必須為 'daily' 或 'monthly'"
   },
