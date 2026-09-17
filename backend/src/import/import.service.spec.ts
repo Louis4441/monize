@@ -804,8 +804,7 @@ describe("ImportService", () => {
         expect(txCreateCall[1].status).toBe(TransactionStatus.UNRECONCILED);
       });
 
-      it("updates account balance via read-modify-write", async () => {
-        // When updateAccountBalance is called, manager.findOne for Account returns the account
+      it("moves the account balance with an atomic delta, not a read-modify-write", async () => {
         mockQueryRunner.manager.findOne.mockImplementation(
           (entity: unknown, options: { where?: { id?: string } }) => {
             if (entity === Account && options?.where?.id === "acct-1") {
@@ -820,18 +819,18 @@ describe("ImportService", () => {
 
         await service.importQifFile(userId, makeBaseDto());
 
-        // Verify update was called for Account balance (amount = -50, so 1000 + (-50) = 950)
-        const updateCalls = mockQueryRunner.manager.update.mock.calls.filter(
-          (call: unknown[]) => call[0] === Account,
-        );
-        expect(updateCalls.length).toBeGreaterThan(0);
-        const balanceUpdate = updateCalls.find(
-          (call: unknown[]) =>
-            call[1] === "acct-1" &&
-            (call[2] as Record<string, unknown>).currentBalance !== undefined,
-        );
-        expect(balanceUpdate).toBeDefined();
-        expect(balanceUpdate[2].currentBalance).toBe(950);
+        // The imported row is -50, so the database is told to move the balance
+        // by -50; no absolute balance is ever computed in JavaScript.
+        const balanceWrites = (
+          mockQueryRunner.query.mock.calls as unknown[][]
+        ).filter(([sql]) => String(sql).includes("current_balance = ROUND"));
+        expect(balanceWrites.length).toBeGreaterThan(0);
+        expect(balanceWrites[0][1]).toEqual([-50, "acct-1"]);
+        expect(
+          mockQueryRunner.manager.update.mock.calls.filter(
+            (call: unknown[]) => call[0] === Account,
+          ),
+        ).toEqual([]);
       });
 
       it("handles multiple transactions in a single import", async () => {
@@ -1790,14 +1789,17 @@ describe("ImportService", () => {
       expect(advisory).toBeGreaterThanOrEqual(0);
       expect((calls[advisory][1] as unknown[])[1]).toBe("acct-brokerage");
 
-      const accountUpdate = (
-        mockQueryRunner.manager.update.mock.calls as unknown[][]
-      ).findIndex((call) => call[0] === Account);
-      expect(accountUpdate).toBeGreaterThanOrEqual(0);
+      // The balance write is the atomic delta statement, and it must come after
+      // the advisory lock: it row-locks `accounts` where the old
+      // read-modify-write did.
+      const balanceWrite = calls.findIndex(([sql]) =>
+        String(sql).includes("current_balance = ROUND"),
+      );
+      expect(balanceWrite).toBeGreaterThanOrEqual(0);
       expect(
         mockQueryRunner.query.mock.invocationCallOrder[advisory],
       ).toBeLessThan(
-        mockQueryRunner.manager.update.mock.invocationCallOrder[accountUpdate],
+        mockQueryRunner.query.mock.invocationCallOrder[balanceWrite],
       );
     });
 

@@ -85,6 +85,15 @@ lock-free: the read and the write are one statement, so no other transaction can
 interleave between them. Prefer this whenever the update is expressible as a
 delta.
 
+The import's per-row balance write is the same statement, issued on the import
+transaction's `EntityManager`:
+`backend/src/import/import-context.ts` `updateAccountBalance`, the one door the
+QIF, OFX, CSV and investment processors move a balance through. The delta it
+passes is rounded with `roundMoney` (4dp, the column's precision) and the sum is
+rounded by the database. `backend/test/integration/import-balance-delta.integration.spec.ts`
+holds both halves: an import's amounts land at 4dp, and two deltas on two
+connections compose rather than one overwriting the other.
+
 ### 2 -- unique index as the guarantee
 
 ```sql
@@ -424,7 +433,7 @@ this table when a mechanism lands, not when someone judges the window small.
 
 | Value or operation | Current state | Rule breached |
 | --- | --- | --- |
-| `accounts.current_balance` | Three postures coexist on one column: a lock-free atomic delta (`updateBalance`), an unlocked read-then-write absolute recompute (`recalculateCurrentBalance`, the hourly `applyDueTransactionBalances`, `import-post-processing`, `write-transactions`, `action-history.recalculateBalance`), and a pessimistically locked read-then-write (`update`, `close`). A delta committing between a recompute's SELECT and its UPDATE is silently discarded. | CONC-001, CONC-003 |
+| `accounts.current_balance` | Three postures coexist on one column: a lock-free atomic delta (`updateBalance`, `import-context.updateAccountBalance`), an unlocked read-then-write absolute recompute (`recalculateCurrentBalance`, the hourly `applyDueTransactionBalances`, `import-post-processing`, `write-transactions`, `action-history.recalculateBalance`), and a pessimistically locked read-then-write (`update`, `close`). A delta committing between a recompute's SELECT and its UPDATE is silently discarded. | CONC-001, CONC-003 |
 | `holdings.quantity` / `average_cost` | Every mutation path is a JavaScript read-modify-write inside a transaction with no lock and no atomic delta. `UNIQUE(account_id, security_id)` prevents duplicate rows and does nothing about a lost update to the same row. | CONC-001 |
 | `users.failed_login_attempts` | Read in one statement, incremented in JavaScript, written as an absolute value in a later statement with no lock. Two concurrent failures lose an increment, so the counter under-counts and the lockout threshold is reached late. The comment directly above it reads "Atomically increment failed attempts". | CONC-001, CONC-007 |
 | Emergency-access claim consumption | Check-then-act: the in-transaction re-read passes no `lock` option, and the consuming write is an entity `save` by primary key with no `WHERE claim_token_used_at IS NULL`. The code immediately beside it uses the CAS predicate correctly for voiding *sibling* tokens. The comment claims re-validation "under lock". There is no partial unique index on unused tokens to act as a backstop. | CONC-001, CONC-002, CONC-007 |

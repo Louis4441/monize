@@ -55,6 +55,9 @@ describe("ImportInvestmentProcessorService", () => {
     }),
     findOne: jest.fn().mockResolvedValue(null),
     update: jest.fn().mockResolvedValue({ affected: 1 }),
+    // `updateAccountBalance` moves a balance with one atomic
+    // `current_balance = current_balance + $1` statement.
+    query: jest.fn().mockResolvedValue([[], 1]),
     create: jest.fn().mockImplementation((_cls: any, data: any) => data),
     createQueryBuilder: jest.fn().mockReturnValue(makeMockQueryBuilder()),
   });
