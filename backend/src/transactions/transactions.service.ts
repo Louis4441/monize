@@ -2139,6 +2139,27 @@ export class TransactionsService {
     // One transaction: split rebuild, field update, tags, and balance
     // adjustments commit or roll back together. Nested service calls join it.
     await withScopedDb(this.dataSource, async (m) => {
+      // First lock of the transaction: advisory before row locks
+      // (`common/db/locks.ts`). If this row is a split parent carrying embedded
+      // investment rows, this edit reaches the holdings advisory lock later --
+      // through `deleteSplitSideEffects`, through `createEmbeddedForSplit`, and
+      // through `applyParentStatusToTransferCounterparts` ->
+      // `applyParentStatusToEmbeddedRows` -- while
+      // `InvestmentTransactionsService.update()` reaches the same parent the
+      // other way round: `lockHoldingScope` first, then
+      // `updateEmbeddedSplitParent`'s `lockTransactionRow` on that parent.
+      // Taking the advisory lock after the row lock below left the two paths
+      // each holding the other's next lock (40P01).
+      //
+      // Unconditional, and before the row is read: whether this row is a split
+      // parent cannot be known without locking it, and the ids come from an
+      // unlocked `SELECT` inside the helper, which takes no lock and so may
+      // precede the advisory one. A row with no embedded investment legs locks
+      // nothing. A brokerage account named only by the incoming splits needs no
+      // lock here: no committed embedded row of this parent sits in it, so
+      // nothing can be holding it while waiting for this parent's row.
+      await this.splitService.lockEmbeddedInvestmentScopes(m, userId, [id]);
+
       // The values a balance delta reverses are read HERE, under a row lock,
       // not from the snapshot `findOne` above returned.
       //

@@ -307,10 +307,12 @@ transaction, so the opening call never double-acquires and the rebuild's own cal
 stays where it is -- a rebuild reached from anywhere else still takes it before
 reading the ledger.
 
-The same obligation falls on the two paths that reach a position *through*
-something else, because both of them row-lock `accounts` on the way:
+The same obligation falls on the paths that reach a position *through* something
+else, because each of them row-locks the split parent, `accounts`, or both on the
+way:
 
-- **A split parent's status change.** The reconciliation and bulk routes both
+- **A split parent's status change.** The reconciliation, bulk and generic
+  `TransactionsService.update` routes all
   row-lock the parent (`lockTransactionRow` / `lockTransactionRows`) and then
   row-lock `accounts` for its balance, while `InvestmentTransactionsService`
   reaches the same parent the other way round -- `lockHoldingScope` first, then
@@ -322,9 +324,12 @@ something else, because both of them row-lock `accounts` on the way:
   row locks still leaves advisory-A-then-row-P racing row-P-then-advisory-A,
   which is `40P01` for both. The helper's own `SELECT` of the brokerage accounts
   is unlocked, so it may precede the advisory lock, and the call is
-  unconditional on the reconciliation route because whether the row is a split
-  parent cannot be known without locking it -- a row with no embedded
-  investment legs locks nothing.
+  unconditional on the reconciliation and generic-update routes because whether
+  the row is a split parent cannot be known without locking it -- a row with no
+  embedded investment legs locks nothing. The generic route reaches the advisory
+  lock by three further ways besides the status propagation --
+  `deleteSplitSideEffects`, `createEmbeddedForSplit` and the rebuild each take
+  it -- which is the same cycle and the same first statement.
   `applyParentStatusToEmbeddedRows` takes the same re-entrant lock itself, so a
   caller that forgets still cannot reach the rebuild without it.
 - **An import.** `ImportService` takes `lockHoldingScope` over every investment
@@ -384,7 +389,7 @@ worth keeping: CONC-003 can only be checked against a list of all writers.
 | `accounts/accounts.service.ts` `close` | `Account` row | Race between the balance check and the close |
 | `strategies/gem-signal.service.ts` | advisory, per `strategyId` | Materialization interleaving with a settings save |
 | `securities/investment-transactions.service.ts` `create`, `update`, `remove`, `transferSecurity`, `createEmbeddedForSplit` | advisory, per account (`lockHoldingScope`), first statement of the transaction | A ledger write and a rebuild racing on one position, and the lock order that keeps it deadlock-free |
-| `transactions/transaction-reconciliation.service.ts`, `transactions/transaction-bulk-update.service.ts` (split-status routes) | advisory, per brokerage account (`lockEmbeddedInvestmentScopes`), first statement of the transaction | The embedded rows' rebuild takes the same lock, and an investment write row-locks the same parent after taking it |
+| `transactions/transaction-reconciliation.service.ts`, `transactions/transaction-bulk-update.service.ts`, `transactions/transactions.service.ts` `update` (split-parent writes) | advisory, per brokerage account (`lockEmbeddedInvestmentScopes`), first statement of the transaction | The embedded rows' rebuild takes the same lock, and an investment write row-locks the same parent after taking it |
 | `import/import.service.ts` | advisory, per investment account (`lockHoldingScope`), first statement of the import transaction | The import's balance writes row-lock `accounts` before `rebuildImportedHoldings` |
 
 ### Conditional claims that exist

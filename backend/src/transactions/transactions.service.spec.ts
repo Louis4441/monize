@@ -374,6 +374,13 @@ describe("TransactionsService", () => {
           useValue: {
             createEmbeddedForSplit: jest.fn().mockResolvedValue({}),
             reverseAndRemoveEmbedded: jest.fn().mockResolvedValue(undefined),
+            // The split-status propagation the update path reaches, and the
+            // advisory lock it is fronted by; both return what the real methods
+            // return (a set of touched accounts, and nothing).
+            applyParentStatusToEmbeddedRows: jest
+              .fn()
+              .mockResolvedValue(new Set<string>()),
+            lockEmbeddedHoldingScopes: jest.fn().mockResolvedValue(undefined),
           },
         },
         {
@@ -5450,6 +5457,54 @@ describe("TransactionsService", () => {
         // is another committed-parent field so it is asserted precisely.
         { parentStatus: TransactionStatus.UNRECONCILED },
         expect.any(Set),
+      );
+    });
+
+    /**
+     * Lock order (`common/db/locks.ts`): advisory locks come before row locks.
+     *
+     * The generic `PATCH /transactions/:id` route reaches the holdings advisory
+     * lock late -- through `deleteSplitSideEffects`, `createEmbeddedForSplit`
+     * and `applyParentStatusToTransferCounterparts` ->
+     * `applyParentStatusToEmbeddedRows` -- while
+     * `InvestmentTransactionsService.update()` takes that advisory lock first
+     * and then row-locks the same split parent. Advisory A then row P against
+     * row P then advisory A is `40P01` for both, so the advisory lock is the
+     * first statement of this transaction, not merely the first lock before the
+     * balance write.
+     */
+    it("locks the embedded investment scopes before the parent's row lock", async () => {
+      transactionsRepository.findOne.mockResolvedValue({
+        ...mockTx,
+        isSplit: true,
+        status: TransactionStatus.VOID,
+      });
+      lockedRow = {
+        ...mockTx,
+        isSplit: true,
+        status: TransactionStatus.UNRECONCILED,
+      };
+      splitsRepository.find.mockResolvedValue([]);
+      const lockScopes = jest.spyOn(
+        splitService,
+        "lockEmbeddedInvestmentScopes",
+      );
+
+      // The module mock is shared across this file's tests, so its recorded
+      // invocation order carries earlier cases' calls; the ordering assertion
+      // below is about this run only.
+      (lockTransactionRow as jest.Mock).mockClear();
+
+      await service.update("user-1", "tx-1", {
+        status: TransactionStatus.VOID,
+      } as any);
+
+      expect(lockScopes).toHaveBeenCalledWith(expect.anything(), "user-1", [
+        "tx-1",
+      ]);
+      expect(lockTransactionRow).toHaveBeenCalled();
+      expect(lockScopes.mock.invocationCallOrder[0]).toBeLessThan(
+        (lockTransactionRow as jest.Mock).mock.invocationCallOrder[0],
       );
     });
   });
