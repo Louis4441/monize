@@ -126,8 +126,10 @@ export class InvestmentTransactionSummaryService {
       const from = row.currency_code;
 
       if (from === null) {
-        // No security means no currency for this amount at all. There is no
-        // pair to name, and the reader's own currency is not the answer.
+        // Neither the security nor the account named a currency, so there is
+        // no pair to name and the reader's own currency is not the answer. A
+        // security-less row is not this case: the statement above reads its
+        // currency from the investment account.
         hasUnknownCurrency = true;
         overall.addUnknown();
         bucket.fx.addUnknown();
@@ -261,14 +263,19 @@ export class InvestmentTransactionSummaryService {
       return m.query(
         // includes VOID rows: records read -- the card counts what the table
         // lists; `investmentRowHasEffect` above decides what the volume sums.
+        // `COALESCE` is the same rule as `investmentRowCurrencies`: an amount
+        // is in the security's currency, and a row that names no security is
+        // in the investment account's, which is where
+        // `resolveSettlementCurrencyPair` denominated it when it was written.
         `SELECT it.action AS action,
                 it.status AS status,
                 TO_CHAR(it.transaction_date, 'YYYY-MM-DD') AS transaction_date,
                 it.total_amount::text AS total_amount,
-                s.currency_code AS currency_code,
+                COALESCE(s.currency_code, a.currency_code) AS currency_code,
                 s.symbol AS symbol
            FROM investment_transactions it
            LEFT JOIN securities s ON s.id = it.security_id
+           LEFT JOIN accounts a ON a.id = it.account_id
           WHERE it.user_id = $1
             AND NOT (it.action = $2 AND EXISTS (
                   -- The parent is looked up as a record (includes VOID): what

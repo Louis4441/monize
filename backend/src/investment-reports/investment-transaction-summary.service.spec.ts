@@ -140,7 +140,48 @@ describe("InvestmentTransactionSummaryService", () => {
     expect(summary.byAction).toEqual([]);
   });
 
-  it("withholds without naming a pair when a row has no security currency", async () => {
+  /**
+   * A cash INTEREST posting names no security, and its amount is not unknown:
+   * the write path denominated it in the investment account's currency
+   * (`resolveSettlementCurrencyPair`). Reading it as unknown withheld the whole
+   * "Total volume" card over one such row (issue #1394).
+   */
+  it("counts a security-less row in its account's currency", async () => {
+    returnRows([
+      row({
+        action: InvestmentAction.INTEREST,
+        currency: "USD",
+        symbol: null,
+        amount: "100.0000",
+      }),
+    ]);
+    exchangeRateService.getRateForDate.mockResolvedValue(3.7538);
+
+    const summary = await service.summarize("u1", {});
+
+    expect(summary.total).toBeCloseTo(375.38, 4);
+    expect(summary.hasUnknownCurrency).toBe(false);
+    expect(summary.unknownCount).toBe(0);
+    expect(summary.excludedCount).toBe(0);
+    expect(summary.amountCurrencies).toEqual(["USD"]);
+    expect(summary.securitiesTraded).toBe(0);
+  });
+
+  it("reads a row's currency from its account when it names no security", async () => {
+    // The statement is where that fallback lives, so this is what proves it:
+    // the fold above cannot see which column the code came from.
+    returnRows([]);
+
+    await service.summarize("u1", {});
+
+    const sql = manager.query.mock.calls
+      .map(([text]) => String(text))
+      .find((text) => text.includes("FROM investment_transactions"));
+    expect(sql).toContain("COALESCE(s.currency_code, a.currency_code)");
+    expect(sql).toContain("LEFT JOIN accounts a ON a.id = it.account_id");
+  });
+
+  it("withholds without naming a pair when neither a security nor the account has a currency", async () => {
     returnRows([row({ currency: null, symbol: null, amount: "40.0000" })]);
 
     const summary = await service.summarize("u1", {});

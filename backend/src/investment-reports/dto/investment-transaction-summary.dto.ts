@@ -113,6 +113,11 @@ export interface InvestmentTransactionSummary extends ConvertedAggregate {
    * currencies, which the report says out loud instead of doing silently.
    */
   amountCurrencies: string[];
-  /** True when some row names no security, so its amount has no unit at all. */
+  /**
+   * True when some row's amount has no unit at all: neither a security nor the
+   * account it is filed under named a currency. A row that simply names no
+   * security is not one of these -- its amount is in its investment account's
+   * currency, the same one the write path denominated it in.
+   */
   hasUnknownCurrency: boolean;
 }

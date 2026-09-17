@@ -301,8 +301,10 @@ export interface InvestmentTransaction {
    * a EUR trade and a USD trade with the same symbol and summed them into one
    * "total volume" (issue #1394).
    *
-   * `null` is unknown -- a row naming no security has no security currency --
-   * and renders as unknown rather than falling back to anything.
+   * A row that names no security is not unknown: the server denominates it in
+   * the investment account's currency when it writes it and stamps that here.
+   * `null` is unknown -- neither a security nor an account was loaded -- and
+   * renders as unknown rather than falling back to anything.
    *
    * Optional for the rolling-deploy reason the portfolio flags are: a backend
    * that predates the field sends nothing, and a path that does not load the

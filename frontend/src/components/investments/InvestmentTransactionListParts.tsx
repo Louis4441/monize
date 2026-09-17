@@ -9,6 +9,7 @@ import {
   redemptionTotalWithInterest,
   supportsAccruedInterest,
 } from '@/lib/investment-actions';
+import { rowAmountCurrency, rowPriceCurrency } from '@/lib/investment-row-currency';
 import type { RowAction } from '@/components/ui/row-actions/rowAction';
 
 /**
@@ -204,7 +205,10 @@ export function InvestmentPriceValue({
 }) {
   if (tx.action === 'SPLIT' && !tx.price) return <>-</>;
   if (tx.price == null) return <UnknownAmount reason="noPrice" />;
-  const currencyCode = tx.security?.currencyCode;
+  // The row's own stamp, never the account it is filed under and never the
+  // reader's: a security-less row is denominated in its investment account's
+  // currency by the write path, and the server states that on the row.
+  const currencyCode = rowPriceCurrency(tx);
   if (!currencyCode) return <UnknownAmount reason="unknownCurrency" />;
   return (
     <>
@@ -223,6 +227,7 @@ export function InvestmentTotalValue({
   formatCurrency: FormatCurrency;
   defaultCurrency: string;
 }) {
+  const amountCurrency = rowAmountCurrency(tx);
   return (
     <>
       {formatCurrency(
@@ -232,10 +237,10 @@ export function InvestmentTotalValue({
         supportsAccruedInterest(tx.action)
           ? redemptionTotalWithInterest(tx.totalAmount, tx.accruedInterest)
           : tx.totalAmount,
-        tx.security?.currencyCode,
+        amountCurrency ?? undefined,
       )}
-      {tx.security?.currencyCode && tx.security.currencyCode !== defaultCurrency && (
-        <span className="ml-1 font-normal">{tx.security.currencyCode}</span>
+      {amountCurrency && amountCurrency !== defaultCurrency && (
+        <span className="ml-1 font-normal">{amountCurrency}</span>
       )}
     </>
   );

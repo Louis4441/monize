@@ -6,6 +6,11 @@ import { format } from 'date-fns';
 import { investmentsApi } from '@/lib/investments';
 import { investmentReportsApi } from '@/lib/investment-reports';
 import {
+  rowAmountCurrency,
+  rowCommissionCurrency,
+  rowPriceCurrency,
+} from '@/lib/investment-row-currency';
+import {
   InvestmentTransaction,
   InvestmentAction,
   InvestmentConvertedAggregate,
@@ -55,28 +60,6 @@ interface TransactionPage {
   transactions: InvestmentTransaction[];
   /** True when the fetch stopped at `MAX_PAGES` with more still to come. */
   truncated: boolean;
-}
-
-/**
- * The currency a row's `price`, `commission` and `totalAmount` are in: the
- * SECURITY's, which the server states on each row. `security.currencyCode` is
- * the same fact from the same row and is the only accepted fallback, for a
- * backend that predates the explicit field.
- *
- * `null` is unknown and renders as unknown. The account's currency is not the
- * answer and neither is the reader's: taking it from the account is what
- * printed a EUR trade and a USD trade with the same symbol (issue #1394).
- */
-function rowAmountCurrency(tx: InvestmentTransaction): string | null {
-  return tx.amountCurrencyCode ?? tx.security?.currencyCode ?? null;
-}
-
-function rowPriceCurrency(tx: InvestmentTransaction): string | null {
-  return tx.priceCurrencyCode ?? tx.security?.currencyCode ?? null;
-}
-
-function rowCommissionCurrency(tx: InvestmentTransaction): string | null {
-  return tx.commissionCurrencyCode ?? tx.security?.currencyCode ?? null;
 }
 
 /**

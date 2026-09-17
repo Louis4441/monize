@@ -29,20 +29,45 @@ describe("investmentRowCurrencies", () => {
     expect(codes.amountCurrencyCode).toBe("USD");
   });
 
-  it("reports an unknown amount currency rather than the account's when no security is named", () => {
-    // The regression: falling back to the account here is what printed a
-    // foreign trade with the reader's own symbol.
+  it("denominates a security-less row in the investment account's currency", () => {
+    // What the write path did with it: `resolveSettlementCurrencyPair` takes
+    // the `from` side of a security-less posting from the investment account,
+    // so calling the same figure unknown here contradicted the stored row and
+    // withheld the report's total over a cash INTEREST posting.
     expect(
       investmentRowCurrencies({
         security: null,
-        account: { currencyCode: "PLN" },
+        account: { currencyCode: "USD" },
       }),
     ).toEqual({
-      amountCurrencyCode: null,
-      priceCurrencyCode: null,
-      commissionCurrencyCode: null,
+      amountCurrencyCode: "USD",
+      priceCurrencyCode: "USD",
+      commissionCurrencyCode: "USD",
+      settlementCurrencyCode: "USD",
+    });
+  });
+
+  it("keeps a security-less row's amount in the investment account, not the funding account", () => {
+    // The funding account is the `to` side of the pair; the amount is stored
+    // on the `from` side.
+    expect(
+      investmentRowCurrencies({
+        security: null,
+        account: { currencyCode: "USD" },
+        fundingAccount: { currencyCode: "PLN" },
+      }),
+    ).toEqual({
+      amountCurrencyCode: "USD",
+      priceCurrencyCode: "USD",
+      commissionCurrencyCode: "USD",
       settlementCurrencyCode: "PLN",
     });
+  });
+
+  it("reports an unknown amount currency when neither a security nor the account is loaded", () => {
+    expect(
+      investmentRowCurrencies({ security: null }).amountCurrencyCode,
+    ).toBeNull();
   });
 
   it("reports an unknown settlement currency when neither account is loaded", () => {

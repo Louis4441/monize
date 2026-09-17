@@ -2842,7 +2842,9 @@ export class InvestmentTransactionsService {
 
       await this.attachAccruedInterest(m, userId, data);
       // The unit travels with the figure: price, commission and total are the
-      // security's currency, never the account's (issue #1394).
+      // security's currency, never the account's for a trade (issue #1394),
+      // and the investment account's for a row that names no security, which
+      // is where the write path denominated it.
       attachInvestmentRowCurrencies(data);
 
       return {

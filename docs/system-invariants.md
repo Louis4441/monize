@@ -644,7 +644,10 @@ Known gap           **An unconverted amount still reaches a report under the
                     the SECURITY's, which the row now states in
                     amountCurrencyCode / priceCurrencyCode /
                     commissionCurrencyCode) and no longer sums across currencies
-                    on the client. Its KPIs come from
+                    on the client. A row that names no security carries the
+                    investment account's currency there, the one the write path
+                    denominated it in; calling it unknown withheld the card over
+                    one cash INTEREST posting. Its KPIs come from
                     investment-reports/investment-transaction-summary.service.ts,
                     which converts each row at its own transaction date and
                     accumulates through FxAggregate, answering with total,

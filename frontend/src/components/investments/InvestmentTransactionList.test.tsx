@@ -303,6 +303,26 @@ describe('InvestmentTransactionList', () => {
       expect(screen.getByTestId('unknown-amount')).toBeInTheDocument();
       expect(screen.queryByText('$150.00')).not.toBeInTheDocument();
     });
+
+    it('prints a security-less row in the currency the server stamped on it', () => {
+      // A cash INTEREST posting is denominated in its investment account's
+      // currency by the write path, and the server states that on the row.
+      // Reading only `security.currencyCode` drew it as unknown instead.
+      const transactions = [
+        makeTx({
+          id: 'interest',
+          action: 'INTEREST',
+          security: null,
+          price: 100,
+          totalAmount: 100,
+          amountCurrencyCode: 'USD',
+          priceCurrencyCode: 'USD',
+        }),
+      ] as any[];
+      render(<InvestmentTransactionList transactions={transactions} isLoading={false} />);
+      expect(screen.queryByTestId('unknown-amount')).not.toBeInTheDocument();
+      expect(screen.getAllByText('USD').length).toBeGreaterThan(0);
+    });
   });
 
   it('shows foreign currency indicator for non-default currencies', () => {
