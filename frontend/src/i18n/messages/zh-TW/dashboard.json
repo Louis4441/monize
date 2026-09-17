@@ -201,7 +201,11 @@
   "portfolioValue": {
     "title": "投資組合價值",
     "empty": "尚無投資歷史可顯示。",
-    "refresh": "重新整理目前價值"
+    "refresh": "重新整理目前價值",
+    "investmentResult": "投資結果",
+    "notAvailable": "不適用",
+    "periodBreakdownTooltip": "價值變化為 {valueChange}，其中存取款為 {netFlows}。投資結果是剩餘的部分。",
+    "unmeasuredFlowTooltip": "如果某筆交易在這些帳戶以外結算，或某個拆分將投資項目與一般支出混在一起，則結果無法與轉移的資金分開。"
   },
   "spendingByPayee": {
     "title": "依收款人分析支出",

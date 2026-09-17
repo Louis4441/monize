@@ -201,7 +201,11 @@
   "portfolioValue": {
     "title": "ポートフォリオ価値",
     "empty": "表示する投資履歴がまだありません。",
-    "refresh": "現在の価値を更新"
+    "refresh": "現在の価値を更新",
+    "investmentResult": "投資成果",
+    "notAvailable": "N/A",
+    "periodBreakdownTooltip": "価値の変動は{valueChange}で、そのうち入出金は{netFlows}でした。投資成果は残りの部分です。",
+    "unmeasuredFlowTooltip": "これらの口座以外で決済された取引や、投資明細と通常の支出が混在する分割がある場合、成果を移動した資金と切り分けることができません。"
   },
   "spendingByPayee": {
     "title": "支払先別支出",

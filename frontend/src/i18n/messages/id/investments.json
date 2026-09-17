@@ -124,6 +124,12 @@
     "noDataForPeriod": "Tidak ada data investasi untuk periode ini.",
     "highestValue": "Nilai Tertinggi",
     "lowestValue": "Nilai Terendah",
+    "investmentResult": "Hasil Investasi",
+    "investmentReturn": "Imbal Hasil",
+    "investmentResultTooltip": "Apa yang diperoleh kepemilikan selama periode ini, setelah dikurangi setoran dan penarikan Anda sendiri. Persentase hanya berlaku untuk angka ini.",
+    "unmeasuredFlowTooltip": "Sebuah transaksi yang diselesaikan di luar akun-akun ini, atau pemisahan yang mencampur baris investasi dengan pengeluaran biasa, berarti hasilnya tidak dapat dipisahkan dari uang yang berpindah.",
+    "valueChangeLine": "Perubahan nilai {amount}",
+    "netFlowsLine": "Setoran dan penarikan bersih {amount}",
     "priorCloseTooltip": "Diukur dari harga penutupan hari bursa sebelumnya pada {date}.",
     "notAvailable": "N/A",
     "portfolioLabel": "Portofolio:"

@@ -124,6 +124,12 @@
     "noDataForPeriod": "Sem dados de investimento para este período.",
     "highestValue": "Valor Mais Alto",
     "lowestValue": "Valor Mais Baixo",
+    "investmentResult": "Resultado do Investimento",
+    "investmentReturn": "Rentabilidade",
+    "investmentResultTooltip": "O que as posições renderam neste período, deduzidos os seus próprios depósitos e levantamentos. Uma percentagem aplica-se apenas a este valor.",
+    "unmeasuredFlowTooltip": "Uma operação liquidada fora destas contas, ou uma divisão que mistura uma linha de investimento com uma despesa comum, significa que o resultado não pode ser separado do dinheiro movimentado.",
+    "valueChangeLine": "Variação de valor {amount}",
+    "netFlowsLine": "Depósitos e levantamentos líquidos {amount}",
     "priorCloseTooltip": "Medido a partir do fecho da sessão anterior, em {date}.",
     "notAvailable": "N/D",
     "portfolioLabel": "Portefólio:"

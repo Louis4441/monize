@@ -124,6 +124,12 @@
     "noDataForPeriod": "この期間の投資データがありません。",
     "highestValue": "最高値",
     "lowestValue": "最低値",
+    "investmentResult": "投資成果",
+    "investmentReturn": "リターン",
+    "investmentResultTooltip": "この期間に保有資産が得た成果から、ご自身の入出金を差し引いたものです。パーセンテージはこの数値に対してのみ意味を持ちます。",
+    "unmeasuredFlowTooltip": "これらの口座以外で決済された取引や、投資明細と通常の支出が混在する分割がある場合、成果を移動した資金と切り分けることができません。",
+    "valueChangeLine": "価値の変動 {amount}",
+    "netFlowsLine": "純入出金額 {amount}",
     "priorCloseTooltip": "前営業日（{date}）の終値を基準に算出しています。",
     "notAvailable": "N/A",
     "portfolioLabel": "ポートフォリオ："

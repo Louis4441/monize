@@ -201,7 +201,11 @@
   "portfolioValue": {
     "title": "포트폴리오 가치",
     "empty": "아직 표시할 투자 내역이 없습니다.",
-    "refresh": "현재 가치 새로고침"
+    "refresh": "현재 가치 새로고침",
+    "investmentResult": "투자 결과",
+    "notAvailable": "해당 없음",
+    "periodBreakdownTooltip": "가치 변동은 {valueChange}이며, 이 중 입출금은 {netFlows}였습니다. 투자 결과는 남은 부분입니다.",
+    "unmeasuredFlowTooltip": "이 계좌 밖에서 결제된 거래이거나, 투자 항목과 일반 지출이 섞인 분할 항목이 있으면 결과를 이동한 자금과 분리할 수 없습니다."
   },
   "spendingByPayee": {
     "title": "수취인별 지출",

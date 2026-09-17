@@ -124,6 +124,12 @@
     "noDataForPeriod": "Keine Investitionsdaten für diesen Zeitraum.",
     "highestValue": "Höchstwert",
     "lowestValue": "Tiefstwert",
+    "investmentResult": "Anlageergebnis",
+    "investmentReturn": "Rendite",
+    "investmentResultTooltip": "Was die Bestände in diesem Zeitraum erwirtschaftet haben, abzüglich Ihrer eigenen Ein- und Auszahlungen. Ein Prozentsatz bezieht sich nur auf diesen Wert.",
+    "unmeasuredFlowTooltip": "Ein Geschäft, das außerhalb dieser Konten abgewickelt wurde, oder eine Aufteilung, die eine Investitionsposition mit gewöhnlichen Ausgaben vermischt, bedeutet, dass das Ergebnis nicht vom bewegten Geld getrennt werden kann.",
+    "valueChangeLine": "Wertveränderung {amount}",
+    "netFlowsLine": "Netto-Ein- und Auszahlungen {amount}",
     "priorCloseTooltip": "Gemessen ab dem Schlusskurs des vorherigen Handelstags am {date}.",
     "notAvailable": "N/A",
     "portfolioLabel": "Portfolio:"

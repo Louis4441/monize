@@ -201,7 +201,11 @@
   "portfolioValue": {
     "title": "Portföy Değeri",
     "empty": "Henüz gösterilecek yatırım geçmişi yok.",
-    "refresh": "Güncel değeri yenile"
+    "refresh": "Güncel değeri yenile",
+    "investmentResult": "Yatırım Sonucu",
+    "notAvailable": "Yok",
+    "periodBreakdownTooltip": "Değer değişimi {valueChange}, bunun {netFlows} kadarı yatırılan ve çekilen tutardı. Yatırım sonucu geriye kalan kısımdır.",
+    "unmeasuredFlowTooltip": "Bu hesapların dışında kapatılan bir işlem ya da bir yatırım kalemini olağan bir harcamayla karıştıran bir bölme, sonucun taşınan paradan ayrılamayacağı anlamına gelir."
   },
   "spendingByPayee": {
     "title": "Alacaklıya Göre Harcama",

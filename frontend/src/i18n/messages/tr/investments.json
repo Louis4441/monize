@@ -124,6 +124,12 @@
     "noDataForPeriod": "Bu dönem için yatırım verisi yok.",
     "highestValue": "En Yüksek Değer",
     "lowestValue": "En Düşük Değer",
+    "investmentResult": "Yatırım Sonucu",
+    "investmentReturn": "Getiri",
+    "investmentResultTooltip": "Bu dönemde varlıkların, kendi yatırdığınız ve çektiğiniz tutarlar düşüldükten sonra kazandığı miktar. Yüzde yalnızca bu rakam üzerinden hesaplanır.",
+    "unmeasuredFlowTooltip": "Bu hesapların dışında kapatılan bir işlem ya da bir yatırım kalemini olağan bir harcamayla karıştıran bir bölme, sonucun taşınan paradan ayrılamayacağı anlamına gelir.",
+    "valueChangeLine": "Değer değişimi {amount}",
+    "netFlowsLine": "Net yatırılan ve çekilen tutar {amount}",
     "priorCloseTooltip": "Bir önceki işlem gününün ({date}) kapanışına göre ölçülür.",
     "notAvailable": "Yok",
     "portfolioLabel": "Portföy:"

@@ -124,6 +124,12 @@
     "noDataForPeriod": "此期間無投資資料。",
     "highestValue": "最高價值",
     "lowestValue": "最低價值",
+    "investmentResult": "投資結果",
+    "investmentReturn": "報酬",
+    "investmentResultTooltip": "扣除您自己的存取款後，持股在此期間的收益。百分比僅適用於此數值。",
+    "unmeasuredFlowTooltip": "如果某筆交易在這些帳戶以外結算，或某個拆分將投資項目與一般支出混在一起，則結果無法與轉移的資金分開。",
+    "valueChangeLine": "價值變化 {amount}",
+    "netFlowsLine": "淨存取款 {amount}",
     "priorCloseTooltip": "以上一交易日（{date}）收盤價為基準計算。",
     "notAvailable": "不適用",
     "portfolioLabel": "投資組合："

@@ -201,7 +201,11 @@
   "portfolioValue": {
     "title": "Valor de la cartera",
     "empty": "Aún no hay historial de inversiones para mostrar.",
-    "refresh": "Actualizar valor actual"
+    "refresh": "Actualizar valor actual",
+    "investmentResult": "Resultado de la inversión",
+    "notAvailable": "N/A",
+    "periodBreakdownTooltip": "Cambio de valor {valueChange}, del cual los depósitos y retiros fueron {netFlows}. El resultado de la inversión es lo que queda.",
+    "unmeasuredFlowTooltip": "Una operación liquidada fuera de estas cuentas, o un desglose que mezcla una línea de inversión con un gasto ordinario, significa que el resultado no se puede separar del dinero movido."
   },
   "spendingByPayee": {
     "title": "Gastos por beneficiario",

@@ -201,7 +201,11 @@
   "portfolioValue": {
     "title": "Portfolio-Wert",
     "empty": "Noch keine Anlagehistorie vorhanden.",
-    "refresh": "Aktuellen Wert aktualisieren"
+    "refresh": "Aktuellen Wert aktualisieren",
+    "investmentResult": "Anlageergebnis",
+    "notAvailable": "N/A",
+    "periodBreakdownTooltip": "Wertveränderung {valueChange}, davon waren Ein- und Auszahlungen {netFlows}. Das Anlageergebnis ist das, was übrig bleibt.",
+    "unmeasuredFlowTooltip": "Ein Geschäft, das außerhalb dieser Konten abgewickelt wurde, oder eine Aufteilung, die eine Investitionsposition mit gewöhnlichen Ausgaben vermischt, bedeutet, dass das Ergebnis nicht vom bewegten Geld getrennt werden kann."
   },
   "spendingByPayee": {
     "title": "Ausgaben nach Zahlungsempfänger",

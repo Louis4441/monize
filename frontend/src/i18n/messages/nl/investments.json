@@ -124,6 +124,12 @@
     "noDataForPeriod": "Geen beleggingsgegevens voor deze periode.",
     "highestValue": "Hoogste waarde",
     "lowestValue": "Laagste waarde",
+    "investmentResult": "Beleggingsresultaat",
+    "investmentReturn": "Rendement",
+    "investmentResultTooltip": "Wat de posities in deze periode hebben opgeleverd, na aftrek van uw eigen stortingen en opnames. Een percentage geldt alleen voor dit cijfer.",
+    "unmeasuredFlowTooltip": "Een transactie die buiten deze rekeningen is afgewikkeld, of een splitsing die een investeringsregel combineert met een gewone uitgave, betekent dat het resultaat niet kan worden gescheiden van het verplaatste geld.",
+    "valueChangeLine": "Waardeverandering {amount}",
+    "netFlowsLine": "Netto stortingen en opnames {amount}",
     "priorCloseTooltip": "Gemeten vanaf de slotkoers van de vorige handelsdag op {date}.",
     "notAvailable": "N/A",
     "portfolioLabel": "Portefeuille:"

@@ -124,6 +124,12 @@
     "noDataForPeriod": "此时段无投资数据。",
     "highestValue": "最高价值",
     "lowestValue": "最低价值",
+    "investmentResult": "投资结果",
+    "investmentReturn": "回报",
+    "investmentResultTooltip": "扣除您自己的存取款后，持仓在此期间的收益。百分比仅适用于此数值。",
+    "unmeasuredFlowTooltip": "如果某笔交易在这些账户之外结算，或某个拆分将投资行与普通支出混在一起，则结果无法与转移的资金分开。",
+    "valueChangeLine": "价值变化 {amount}",
+    "netFlowsLine": "净存取款 {amount}",
     "priorCloseTooltip": "以上一交易日（{date}）收盘价为基准计算。",
     "notAvailable": "不适用",
     "portfolioLabel": "投资组合："

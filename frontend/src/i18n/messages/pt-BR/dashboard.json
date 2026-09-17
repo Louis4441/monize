@@ -201,7 +201,11 @@
   "portfolioValue": {
     "title": "Valor do Portfólio",
     "empty": "Ainda não há histórico de investimentos para mostrar.",
-    "refresh": "Atualizar valor atual"
+    "refresh": "Atualizar valor atual",
+    "investmentResult": "Resultado do Investimento",
+    "notAvailable": "N/D",
+    "periodBreakdownTooltip": "Variação de valor {valueChange}, dos quais depósitos e retiradas foram {netFlows}. O resultado do investimento é o que resta.",
+    "unmeasuredFlowTooltip": "Uma operação liquidada fora dessas contas, ou um desdobramento que mistura uma linha de investimento com um gasto comum, significa que o resultado não pode ser separado do dinheiro movimentado."
   },
   "spendingByPayee": {
     "title": "Despesas por Beneficiário",

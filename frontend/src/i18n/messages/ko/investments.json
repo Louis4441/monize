@@ -124,6 +124,12 @@
     "noDataForPeriod": "이 기간에 대한 투자 데이터가 없습니다.",
     "highestValue": "최고 가치",
     "lowestValue": "최저 가치",
+    "investmentResult": "투자 결과",
+    "investmentReturn": "수익률",
+    "investmentResultTooltip": "이 기간 동안 보유 자산이 얻은 것에서 본인의 입출금을 제외한 값입니다. 백분율은 이 수치에 대해서만 의미가 있습니다.",
+    "unmeasuredFlowTooltip": "이 계좌 밖에서 결제된 거래이거나, 투자 항목과 일반 지출이 섞인 분할 항목이 있으면 결과를 이동한 자금과 분리할 수 없습니다.",
+    "valueChangeLine": "가치 변동 {amount}",
+    "netFlowsLine": "순 입출금액 {amount}",
     "priorCloseTooltip": "직전 거래일({date}) 종가를 기준으로 계산한 값입니다.",
     "notAvailable": "해당 없음",
     "portfolioLabel": "포트폴리오:"

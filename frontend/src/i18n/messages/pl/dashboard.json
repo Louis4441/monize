@@ -201,7 +201,11 @@
   "portfolioValue": {
     "title": "Wartość portfela",
     "empty": "Brak historii inwestycji do wyświetlenia.",
-    "refresh": "Odśwież bieżącą wartość"
+    "refresh": "Odśwież bieżącą wartość",
+    "investmentResult": "Wynik inwestycyjny",
+    "notAvailable": "Brak",
+    "periodBreakdownTooltip": "Zmiana wartości {valueChange}, z czego wpłaty i wypłaty wyniosły {netFlows}. Wynik inwestycyjny to to, co pozostaje.",
+    "unmeasuredFlowTooltip": "Transakcja rozliczona poza tymi kontami albo podział łączący pozycję inwestycyjną ze zwykłym wydatkiem oznacza, że wyniku nie da się oddzielić od przesuniętych pieniędzy."
   },
   "spendingByPayee": {
     "title": "Wydatki według odbiorcy",

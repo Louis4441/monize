@@ -201,7 +201,11 @@
   "portfolioValue": {
     "title": "Nilai Portofolio",
     "empty": "Belum ada riwayat investasi untuk ditampilkan.",
-    "refresh": "Segarkan nilai saat ini"
+    "refresh": "Segarkan nilai saat ini",
+    "investmentResult": "Hasil Investasi",
+    "notAvailable": "N/A",
+    "periodBreakdownTooltip": "Perubahan nilai {valueChange}, di mana setoran dan penarikan sebesar {netFlows}. Hasil investasi adalah sisanya.",
+    "unmeasuredFlowTooltip": "Sebuah transaksi yang diselesaikan di luar akun-akun ini, atau pemisahan yang mencampur baris investasi dengan pengeluaran biasa, berarti hasilnya tidak dapat dipisahkan dari uang yang berpindah."
   },
   "spendingByPayee": {
     "title": "Pengeluaran per Penerima",
