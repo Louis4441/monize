@@ -413,6 +413,7 @@
   "securities": {
     "exchangeRateUnavailable": "Nie można ustalić kursu wymiany dla {{ from }} -> {{ to }} na dzień transakcji. Podaj jawny exchangeRate, aby księgowanie na koncie gotówkowym było poprawne.",
     "accountMustBeInvestment": "Konto musi być typu INVESTMENT",
+    "providerCurrencyMismatch": "Odrzucono aktualizację ceny dla {{ symbol }}: {{ provider }} notuje ją w {{ reported }}, ale papier wartościowy jest zapisany w {{ configured }}. Popraw walutę, symbol lub giełdę papieru wartościowego, a następnie odśwież ponownie.",
     "securityIdRequired": "Identyfikator papieru wartościowego jest wymagany dla transakcji {{ action }}",
     "splitRatioRequired": "Współczynnik splitu (ilość) musi być większy od zera",
     "acquisitionPriceRequired": "Transakcje {{ action }} wymagają ceny za jednostkę większej od zera. W przypadku udziałów nabytych bez znanego kosztu użyj ADD_SHARES.",

@@ -228,8 +228,8 @@
     "portfolioMovement": {
       "titleUp": "Inwestycje w górę o {{ percent }}%",
       "titleDown": "Inwestycje w dół o {{ percent }}%",
-      "messageUp": "Twoje inwestycje są dziś wyżej o {{ percent }}%, z wyłączeniem wpłat i wypłat. Otwórz, aby przejrzeć.",
-      "messageDown": "Twoje inwestycje są dziś niżej o {{ percent }}%, z wyłączeniem wpłat i wypłat. Otwórz, aby przejrzeć."
+      "messageUp": "Twoje inwestycje są wyżej o {{ percent }}% w okresie od {{ from }} do {{ to }}, z wyłączeniem wpłat i wypłat. Otwórz, aby przejrzeć.",
+      "messageDown": "Twoje inwestycje są niżej o {{ percent }}% w okresie od {{ from }} do {{ to }}, z wyłączeniem wpłat i wypłat. Otwórz, aby przejrzeć."
     },
     "balanceThreshold": {
       "titleLow": "{{ account }} jest poniżej Twojego progu",

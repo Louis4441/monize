@@ -228,8 +228,8 @@
     "portfolioMovement": {
       "titleUp": "Anlagen {{ percent }}% im Plus",
       "titleDown": "Anlagen {{ percent }}% im Minus",
-      "messageUp": "Ihre Anlagen liegen heute {{ percent }}% im Plus, ohne Ein- und Auszahlungen. Öffnen Sie zur Prüfung.",
-      "messageDown": "Ihre Anlagen liegen heute {{ percent }}% im Minus, ohne Ein- und Auszahlungen. Öffnen Sie zur Prüfung."
+      "messageUp": "Ihre Anlagen liegen vom {{ from }} bis {{ to }} um {{ percent }}% im Plus, ohne Ein- und Auszahlungen. Öffnen Sie zur Prüfung.",
+      "messageDown": "Ihre Anlagen liegen vom {{ from }} bis {{ to }} um {{ percent }}% im Minus, ohne Ein- und Auszahlungen. Öffnen Sie zur Prüfung."
     },
     "balanceThreshold": {
       "titleLow": "{{ account }} liegt unter Ihrem Schwellenwert",

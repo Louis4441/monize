@@ -413,6 +413,7 @@
   "securities": {
     "exchangeRateUnavailable": "Não foi possível determinar uma taxa de câmbio para {{ from }} -> {{ to }} na data da transação. Informe um exchangeRate explícito para que o lançamento na conta de caixa fique correto.",
     "accountMustBeInvestment": "A conta deve ser do tipo INVESTMENT",
+    "providerCurrencyMismatch": "Atualização de preço recusada para {{ symbol }}: o {{ provider }} cota em {{ reported }}, mas o título está registrado em {{ configured }}. Corrija a moeda, o símbolo ou a bolsa do título e atualize novamente.",
     "securityIdRequired": "O ID do título é obrigatório para transações de {{ action }}",
     "splitRatioRequired": "O índice de desdobramento (quantidade) deve ser maior que zero",
     "acquisitionPriceRequired": "É necessário um preço por cota maior que zero para transações {{ action }}. Use ADD_SHARES para cotas adquiridas sem um custo conhecido.",

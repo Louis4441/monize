@@ -71,8 +71,8 @@
   "portfolioMovement": {
     "titleUp": "निवेश {percent}% ऊपर",
     "titleDown": "निवेश {percent}% नीचे",
-    "messageUp": "आज आपके निवेश {percent}% ऊपर हैं, जमा और निकासी को छोड़कर। समीक्षा के लिए खोलें।",
-    "messageDown": "आज आपके निवेश {percent}% नीचे हैं, जमा और निकासी को छोड़कर। समीक्षा के लिए खोलें।"
+    "messageUp": "{from} से {to} तक आपके निवेश {percent}% ऊपर हैं, जमा और निकासी को छोड़कर। समीक्षा के लिए खोलें।",
+    "messageDown": "{from} से {to} तक आपके निवेश {percent}% नीचे हैं, जमा और निकासी को छोड़कर। समीक्षा के लिए खोलें।"
   },
   "balanceThreshold": {
     "titleLow": "{account} आपकी सीमा से नीचे है",

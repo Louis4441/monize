@@ -71,8 +71,8 @@
   "portfolioMovement": {
     "titleUp": "Beleggingen {percent}% hoger",
     "titleDown": "Beleggingen {percent}% lager",
-    "messageUp": "Uw beleggingen staan vandaag {percent}% hoger, exclusief stortingen en opnames. Open om te bekijken.",
-    "messageDown": "Uw beleggingen staan vandaag {percent}% lager, exclusief stortingen en opnames. Open om te bekijken."
+    "messageUp": "Uw beleggingen staan van {from} tot {to} {percent}% hoger, exclusief stortingen en opnames. Open om te bekijken.",
+    "messageDown": "Uw beleggingen staan van {from} tot {to} {percent}% lager, exclusief stortingen en opnames. Open om te bekijken."
   },
   "balanceThreshold": {
     "titleLow": "{account} ligt onder uw drempel",

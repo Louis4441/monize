@@ -413,6 +413,7 @@
   "securities": {
     "exchangeRateUnavailable": "Impossibile determinare un tasso di cambio per {{ from }} -> {{ to }} alla data della transazione. Fornisci un exchangeRate esplicito affinché la registrazione sul conto di liquidità sia corretta.",
     "accountMustBeInvestment": "Il conto deve essere di tipo INVESTMENT",
+    "providerCurrencyMismatch": "Aggiornamento del prezzo rifiutato per {{ symbol }}: {{ provider }} lo quota in {{ reported }}, ma il titolo è registrato in {{ configured }}. Correggi la valuta, il simbolo o la borsa del titolo, quindi aggiorna di nuovo.",
     "securityIdRequired": "L'ID titolo è obbligatorio per le transazioni {{ action }}",
     "splitRatioRequired": "Il rapporto di suddivisione (quantità) deve essere maggiore di zero",
     "acquisitionPriceRequired": "Per le transazioni {{ action }} è richiesto un prezzo per quota maggiore di zero. Usa ADD_SHARES per le quote acquisite senza un costo noto.",

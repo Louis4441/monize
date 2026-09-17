@@ -71,8 +71,8 @@
   "portfolioMovement": {
     "titleUp": "Placements en hausse de {percent} %",
     "titleDown": "Placements en baisse de {percent} %",
-    "messageUp": "Vos placements sont en hausse de {percent} % aujourd'hui, hors dépôts et retraits. Ouvrez pour examiner.",
-    "messageDown": "Vos placements sont en baisse de {percent} % aujourd'hui, hors dépôts et retraits. Ouvrez pour examiner."
+    "messageUp": "Vos placements sont en hausse de {percent} % du {from} au {to}, hors dépôts et retraits. Ouvrez pour examiner.",
+    "messageDown": "Vos placements sont en baisse de {percent} % du {from} au {to}, hors dépôts et retraits. Ouvrez pour examiner."
   },
   "balanceThreshold": {
     "titleLow": "{account} est en dessous de votre seuil",

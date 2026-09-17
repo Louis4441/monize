@@ -71,8 +71,8 @@
   "portfolioMovement": {
     "titleUp": "Yatırımlar %{percent} arttı",
     "titleDown": "Yatırımlar %{percent} azaldı",
-    "messageUp": "Yatırımlarınız bugün, para yatırma ve çekme hariç %{percent} arttı. İncelemek için açın.",
-    "messageDown": "Yatırımlarınız bugün, para yatırma ve çekme hariç %{percent} azaldı. İncelemek için açın."
+    "messageUp": "Yatırımlarınız {from} - {to} arasında, para yatırma ve çekme hariç %{percent} arttı. İncelemek için açın.",
+    "messageDown": "Yatırımlarınız {from} - {to} arasında, para yatırma ve çekme hariç %{percent} azaldı. İncelemek için açın."
   },
   "balanceThreshold": {
     "titleLow": "{account} eşiğinizin altında",

@@ -71,8 +71,8 @@
   "portfolioMovement": {
     "titleUp": "投資が {percent}% 上昇",
     "titleDown": "投資が {percent}% 下落",
-    "messageUp": "本日、入出金を除いて投資が {percent}% 上昇しています。確認するには開いてください。",
-    "messageDown": "本日、入出金を除いて投資が {percent}% 下落しています。確認するには開いてください。"
+    "messageUp": "{from}から{to}にかけて、入出金を除いて投資が {percent}% 上昇しています。確認するには開いてください。",
+    "messageDown": "{from}から{to}にかけて、入出金を除いて投資が {percent}% 下落しています。確認するには開いてください。"
   },
   "balanceThreshold": {
     "titleLow": "{account} がしきい値を下回っています",

@@ -71,8 +71,8 @@
   "portfolioMovement": {
     "titleUp": "투자 {percent}% 상승",
     "titleDown": "투자 {percent}% 하락",
-    "messageUp": "오늘 입출금을 제외하고 투자가 {percent}% 상승했습니다. 검토하려면 여세요.",
-    "messageDown": "오늘 입출금을 제외하고 투자가 {percent}% 하락했습니다. 검토하려면 여세요."
+    "messageUp": "{from}부터 {to}까지 입출금을 제외하고 투자가 {percent}% 상승했습니다. 검토하려면 여세요.",
+    "messageDown": "{from}부터 {to}까지 입출금을 제외하고 투자가 {percent}% 하락했습니다. 검토하려면 여세요."
   },
   "balanceThreshold": {
     "titleLow": "{account}이(가) 기준값 아래입니다",

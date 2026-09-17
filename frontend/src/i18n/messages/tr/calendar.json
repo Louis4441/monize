@@ -85,6 +85,7 @@
       "unpricedHolding": "Bir pozisyonun bu günde veya bir önceki günde fiyatı yoktu, bu yüzden hareket bilinmiyor.",
       "missingRate": "Bir döviz kuru eksikti, bu yüzden hareket dönüştürülemedi.",
       "flowIncomplete": "Bu güne ait bir yatırma veya çekme dönüştürülemedi, bu yüzden hareket ondan ayrılamıyor.",
+      "cashIncomplete": "Bir nakit hesap bu gün için bakiye bildirmedi, bu yüzden günün değeri eksik ve hareket bilinmiyor.",
       "noPriorValue": "Bu günü karşılaştıracak daha önceki bir değer yok.",
       "zeroBaseline": "Portföy bir önceki gün boştu, bu yüzden hesaplanacak bir yüzde yok."
     }

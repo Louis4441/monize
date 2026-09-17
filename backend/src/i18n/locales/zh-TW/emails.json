@@ -228,8 +228,8 @@
     "portfolioMovement": {
       "titleUp": "投資上漲 {{ percent }}%",
       "titleDown": "投資下跌 {{ percent }}%",
-      "messageUp": "今天您的投資上漲了 {{ percent }}%（不含存入與提出）。開啟以查看。",
-      "messageDown": "今天您的投資下跌了 {{ percent }}%（不含存入與提出）。開啟以查看。"
+      "messageUp": "從 {{ from }} 到 {{ to }}，您的投資上漲了 {{ percent }}%（不含存入與提出）。開啟以查看。",
+      "messageDown": "從 {{ from }} 到 {{ to }}，您的投資下跌了 {{ percent }}%（不含存入與提出）。開啟以查看。"
     },
     "balanceThreshold": {
       "titleLow": "{{ account }} 低於您的閾值",

@@ -413,6 +413,7 @@
   "securities": {
     "exchangeRateUnavailable": "İşlem tarihinde {{ from }} -> {{ to }} için bir döviz kuru belirlenemedi. Nakit hesabına kaydın doğru olması için açık bir exchangeRate girin.",
     "accountMustBeInvestment": "Hesap YATIRİM türünde olmalıdır",
+    "providerCurrencyMismatch": "{{ symbol }} için fiyat güncellemesi reddedildi: {{ provider }} bunu {{ reported }} cinsinden bildiriyor, ancak menkul kıymet {{ configured }} cinsinden kayıtlı. Menkul kıymetin para birimini, sembolünü veya borsasını düzeltip yeniden yenileyin.",
     "securityIdRequired": "{{ action }} işlemleri için menkul kıymet kimliği gereklidir",
     "splitRatioRequired": "Bölünme oranı (miktar) sıfırdan büyük olmalıdır",
     "acquisitionPriceRequired": "{{ action }} işlemleri için sıfırdan büyük bir birim fiyat gereklidir. Maliyeti bilinmeyen paylar için ADD_SHARES kullanın.",

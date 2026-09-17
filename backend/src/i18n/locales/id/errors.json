@@ -413,6 +413,7 @@
   "securities": {
     "exchangeRateUnavailable": "Tidak dapat menentukan nilai tukar untuk {{ from }} -> {{ to }} pada tanggal transaksi. Berikan exchangeRate eksplisit agar pencatatan ke akun kas benar.",
     "accountMustBeInvestment": "Akun harus bertipe INVESTMENT",
+    "providerCurrencyMismatch": "Pembaruan harga ditolak untuk {{ symbol }}: {{ provider }} mengutipnya dalam {{ reported }}, tetapi sekuritas ini tercatat dalam {{ configured }}. Perbaiki mata uang, simbol, atau bursa sekuritas ini, lalu segarkan kembali.",
     "securityIdRequired": "ID sekuritas diperlukan untuk transaksi {{ action }}",
     "splitRatioRequired": "Rasio pemecahan (kuantitas) harus lebih dari nol",
     "acquisitionPriceRequired": "Harga per lembar wajib diisi dan harus lebih besar dari nol untuk transaksi {{ action }}. Gunakan ADD_SHARES untuk saham yang diperoleh tanpa biaya yang diketahui.",
