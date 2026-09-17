@@ -5465,9 +5465,9 @@ describe("InvestmentTransactionsService", () => {
 
       let rebuiltBeforeReturn = false;
       dataSource.transaction.mockImplementation(async (...args: unknown[]) => {
-        const fn = (
-          typeof args[0] === "function" ? args[0] : args[1]
-        ) as (m: unknown) => Promise<unknown>;
+        const fn = (typeof args[0] === "function" ? args[0] : args[1]) as (
+          m: unknown,
+        ) => Promise<unknown>;
         const result = await fn(mockQueryRunner.manager);
         rebuiltBeforeReturn =
           holdingsService.rebuildScopesFromTransactions.mock.calls.length > 0;
