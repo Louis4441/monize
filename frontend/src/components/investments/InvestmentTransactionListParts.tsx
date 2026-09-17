@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { CellLabel } from '@/components/ui/Table';
+import { UnknownAmount } from '@/components/ui/UnknownAmount';
 import { StatusCellButton } from '@/components/transactions/StatusCellButton';
 import { InvestmentTransaction } from '@/types/investment';
 import {
@@ -186,6 +187,11 @@ export function InvestmentSharesValue({
  * holds the cash amount rather than a per-share price. That the header
  * overstates what the figure is for those actions is a property of the column
  * this renderer serves, not of the layout calling it.
+ *
+ * Two states are not figures. A row with no `price` has nothing measured, and
+ * `0` would read as a free trade; a row with no security has no currency for
+ * the number it does hold, and the reader's own currency is a unit nobody
+ * priced it in. Each is drawn as unknown, naming its own cause.
  */
 export function InvestmentPriceValue({
   tx,
@@ -196,18 +202,14 @@ export function InvestmentPriceValue({
   formatCurrency: FormatCurrency;
   defaultCurrency: string;
 }) {
+  if (tx.action === 'SPLIT' && !tx.price) return <>-</>;
+  if (tx.price == null) return <UnknownAmount reason="noPrice" />;
+  const currencyCode = tx.security?.currencyCode;
+  if (!currencyCode) return <UnknownAmount reason="unknownCurrency" />;
   return (
     <>
-      {tx.action === 'SPLIT' && !tx.price ? (
-        '-'
-      ) : (
-        <>
-          {formatCurrency(tx.price ?? 0, tx.security?.currencyCode, 4)}
-          {tx.security?.currencyCode && tx.security.currencyCode !== defaultCurrency && (
-            <span className="ml-1">{tx.security.currencyCode}</span>
-          )}
-        </>
-      )}
+      {formatCurrency(tx.price, currencyCode, 4)}
+      {currencyCode !== defaultCurrency && <span className="ml-1">{currencyCode}</span>}
     </>
   );
 }

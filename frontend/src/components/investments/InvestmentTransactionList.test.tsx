@@ -286,6 +286,25 @@ describe('InvestmentTransactionList', () => {
     expect(screen.getAllByText('-').length).toBeGreaterThanOrEqual(1);
   });
 
+  describe('a price that is not a figure', () => {
+    it('draws an unpriced row as unknown rather than as a zero price', () => {
+      // `price ?? 0` printed "$0.00", which reads as a measured free trade.
+      const transactions = [makeTx({ id: 'no-price', price: null })] as any[];
+      render(<InvestmentTransactionList transactions={transactions} isLoading={false} />);
+      expect(screen.getByTestId('unknown-amount')).toBeInTheDocument();
+      expect(screen.queryByText('$0.00')).not.toBeInTheDocument();
+    });
+
+    it('draws a row with no security as unknown rather than in the reader’s currency', () => {
+      // The amount is in the SECURITY's currency; with no security there is no
+      // unit for it, and the reader's CAD is one nobody priced this in.
+      const transactions = [makeTx({ id: 'no-security', security: null, price: 150 })] as any[];
+      render(<InvestmentTransactionList transactions={transactions} isLoading={false} />);
+      expect(screen.getByTestId('unknown-amount')).toBeInTheDocument();
+      expect(screen.queryByText('$150.00')).not.toBeInTheDocument();
+    });
+  });
+
   it('shows foreign currency indicator for non-default currencies', () => {
     const transactions = [makeTx({
       security: { symbol: 'AAPL', name: 'Apple', currencyCode: 'USD' },
