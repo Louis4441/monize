@@ -1220,7 +1220,15 @@
     "pdfColHoldings": "Posições",
     "pdfColCash": "Dinheiro",
     "pdfColTotal": "Total",
-    "pdfColGainLoss": "Ganho/Perda"
+    "pdfColGainLoss": "Ganho/Perda",
+    "incompleteDetailsTitle": "Dados incompletos no período selecionado",
+    "incompleteMissingPrices": "Preços ausentes",
+    "incompleteMissingRates": "Taxas de câmbio ausentes",
+    "incompleteMissingCash": "Saldos de caixa ausentes",
+    "incompleteDateRange": "{start} a {end}",
+    "incompleteEntrySeparator": ": ",
+    "incompleteUnknownSecurity": "Título desconhecido",
+    "incompleteUnknownAccount": "Conta desconhecida"
   },
   "realizedGains": {
     "totalProceeds": "Total de Receitas",

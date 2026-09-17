@@ -1220,7 +1220,15 @@
     "pdfColHoldings": "Vị thế",
     "pdfColCash": "Tiền mặt",
     "pdfColTotal": "Tổng",
-    "pdfColGainLoss": "Lãi/Lỗ"
+    "pdfColGainLoss": "Lãi/Lỗ",
+    "incompleteDetailsTitle": "Dữ liệu không đầy đủ trong khoảng thời gian đã chọn",
+    "incompleteMissingPrices": "Giá bị thiếu",
+    "incompleteMissingRates": "Tỷ giá hối đoái bị thiếu",
+    "incompleteMissingCash": "Số dư tiền mặt bị thiếu",
+    "incompleteDateRange": "{start} đến {end}",
+    "incompleteEntrySeparator": ": ",
+    "incompleteUnknownSecurity": "Chứng khoán không xác định",
+    "incompleteUnknownAccount": "Tài khoản không xác định"
   },
   "realizedGains": {
     "totalProceeds": "Tổng tiền thu",

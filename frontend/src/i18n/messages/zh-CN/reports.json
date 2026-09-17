@@ -1220,7 +1220,15 @@
     "pdfColHoldings": "持仓",
     "pdfColCash": "现金",
     "pdfColTotal": "合计",
-    "pdfColGainLoss": "盈亏"
+    "pdfColGainLoss": "盈亏",
+    "incompleteDetailsTitle": "所选期间的数据不完整",
+    "incompleteMissingPrices": "缺失的价格",
+    "incompleteMissingRates": "缺失的汇率",
+    "incompleteMissingCash": "缺失的现金余额",
+    "incompleteDateRange": "{start} 至 {end}",
+    "incompleteEntrySeparator": "：",
+    "incompleteUnknownSecurity": "未知证券",
+    "incompleteUnknownAccount": "未知账户"
   },
   "realizedGains": {
     "totalProceeds": "总收益",

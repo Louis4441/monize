@@ -1220,7 +1220,15 @@
     "pdfColHoldings": "保有銘柄",
     "pdfColCash": "現金",
     "pdfColTotal": "合計",
-    "pdfColGainLoss": "損益"
+    "pdfColGainLoss": "損益",
+    "incompleteDetailsTitle": "選択した期間のデータが不完全です",
+    "incompleteMissingPrices": "不足している価格",
+    "incompleteMissingRates": "不足している為替レート",
+    "incompleteMissingCash": "不足している現金残高",
+    "incompleteDateRange": "{start} 〜 {end}",
+    "incompleteEntrySeparator": "：",
+    "incompleteUnknownSecurity": "不明な有価証券",
+    "incompleteUnknownAccount": "不明な口座"
   },
   "realizedGains": {
     "totalProceeds": "総収益",

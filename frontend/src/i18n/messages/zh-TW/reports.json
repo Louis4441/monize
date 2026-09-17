@@ -1220,7 +1220,15 @@
     "pdfColHoldings": "持倉",
     "pdfColCash": "現金",
     "pdfColTotal": "總計",
-    "pdfColGainLoss": "損益"
+    "pdfColGainLoss": "損益",
+    "incompleteDetailsTitle": "所選期間的資料不完整",
+    "incompleteMissingPrices": "缺少的價格",
+    "incompleteMissingRates": "缺少的匯率",
+    "incompleteMissingCash": "缺少的現金結餘",
+    "incompleteDateRange": "{start} 至 {end}",
+    "incompleteEntrySeparator": "：",
+    "incompleteUnknownSecurity": "未知證券",
+    "incompleteUnknownAccount": "未知科目"
   },
   "realizedGains": {
     "totalProceeds": "總收益",

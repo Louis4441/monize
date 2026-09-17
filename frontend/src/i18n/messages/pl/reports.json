@@ -1220,7 +1220,15 @@
     "pdfColHoldings": "Pozycje",
     "pdfColCash": "Gotówka",
     "pdfColTotal": "Suma",
-    "pdfColGainLoss": "Zysk/Strata"
+    "pdfColGainLoss": "Zysk/Strata",
+    "incompleteDetailsTitle": "Niekompletne dane w wybranym okresie",
+    "incompleteMissingPrices": "Brakujące ceny",
+    "incompleteMissingRates": "Brakujące kursy wymiany",
+    "incompleteMissingCash": "Brakujące salda gotówkowe",
+    "incompleteDateRange": "{start} do {end}",
+    "incompleteEntrySeparator": ": ",
+    "incompleteUnknownSecurity": "Nieznany papier wartościowy",
+    "incompleteUnknownAccount": "Nieznane konto"
   },
   "realizedGains": {
     "totalProceeds": "Łączne wpływy",

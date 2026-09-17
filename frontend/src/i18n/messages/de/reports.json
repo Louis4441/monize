@@ -1220,7 +1220,15 @@
     "pdfColHoldings": "Bestände",
     "pdfColCash": "Bargeld",
     "pdfColTotal": "Gesamt",
-    "pdfColGainLoss": "Gewinn/Verlust"
+    "pdfColGainLoss": "Gewinn/Verlust",
+    "incompleteDetailsTitle": "Unvollständige Daten im ausgewählten Zeitraum",
+    "incompleteMissingPrices": "Fehlende Kurse",
+    "incompleteMissingRates": "Fehlende Wechselkurse",
+    "incompleteMissingCash": "Fehlende Bargeldsalden",
+    "incompleteDateRange": "{start} bis {end}",
+    "incompleteEntrySeparator": ": ",
+    "incompleteUnknownSecurity": "Unbekanntes Wertpapier",
+    "incompleteUnknownAccount": "Unbekanntes Konto"
   },
   "realizedGains": {
     "totalProceeds": "Gesamterlöse",

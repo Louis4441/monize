@@ -1220,7 +1220,15 @@
     "pdfColHoldings": "Kepemilikan",
     "pdfColCash": "Tunai",
     "pdfColTotal": "Total",
-    "pdfColGainLoss": "Keuntungan/Kerugian"
+    "pdfColGainLoss": "Keuntungan/Kerugian",
+    "incompleteDetailsTitle": "Data tidak lengkap pada periode yang dipilih",
+    "incompleteMissingPrices": "Harga yang hilang",
+    "incompleteMissingRates": "Kurs yang hilang",
+    "incompleteMissingCash": "Saldo kas yang hilang",
+    "incompleteDateRange": "{start} sampai {end}",
+    "incompleteEntrySeparator": ": ",
+    "incompleteUnknownSecurity": "Sekuritas tidak diketahui",
+    "incompleteUnknownAccount": "Akun tidak diketahui"
   },
   "realizedGains": {
     "totalProceeds": "Total Hasil",

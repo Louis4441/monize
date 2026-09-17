@@ -1220,7 +1220,15 @@
     "pdfColHoldings": "Активы",
     "pdfColCash": "Наличные",
     "pdfColTotal": "Итого",
-    "pdfColGainLoss": "Прибыль/убыток"
+    "pdfColGainLoss": "Прибыль/убыток",
+    "incompleteDetailsTitle": "Неполные данные за выбранный период",
+    "incompleteMissingPrices": "Отсутствующие цены",
+    "incompleteMissingRates": "Отсутствующие обменные курсы",
+    "incompleteMissingCash": "Отсутствующие остатки денежных средств",
+    "incompleteDateRange": "с {start} по {end}",
+    "incompleteEntrySeparator": ": ",
+    "incompleteUnknownSecurity": "Неизвестная ценная бумага",
+    "incompleteUnknownAccount": "Неизвестный счёт"
   },
   "realizedGains": {
     "totalProceeds": "Всего выручки",

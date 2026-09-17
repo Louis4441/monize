@@ -1220,7 +1220,15 @@
     "pdfColHoldings": "Varlıklar",
     "pdfColCash": "Nakit",
     "pdfColTotal": "Toplam",
-    "pdfColGainLoss": "Kazanç/Kayıp"
+    "pdfColGainLoss": "Kazanç/Kayıp",
+    "incompleteDetailsTitle": "Seçilen dönemde eksik veri",
+    "incompleteMissingPrices": "Eksik fiyatlar",
+    "incompleteMissingRates": "Eksik döviz kurları",
+    "incompleteMissingCash": "Eksik nakit bakiyeleri",
+    "incompleteDateRange": "{start} - {end}",
+    "incompleteEntrySeparator": ": ",
+    "incompleteUnknownSecurity": "Bilinmeyen menkul kıymet",
+    "incompleteUnknownAccount": "Bilinmeyen hesap"
   },
   "realizedGains": {
     "totalProceeds": "Toplam Gelir",

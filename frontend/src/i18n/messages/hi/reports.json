@@ -1220,7 +1220,15 @@
     "pdfColHoldings": "होल्डिंग",
     "pdfColCash": "नकद",
     "pdfColTotal": "कुल",
-    "pdfColGainLoss": "लाभ/हानि"
+    "pdfColGainLoss": "लाभ/हानि",
+    "incompleteDetailsTitle": "चयनित अवधि में अपूर्ण डेटा",
+    "incompleteMissingPrices": "अनुपस्थित मूल्य",
+    "incompleteMissingRates": "अनुपस्थित विनिमय दरें",
+    "incompleteMissingCash": "अनुपस्थित नकद शेष",
+    "incompleteDateRange": "{start} से {end} तक",
+    "incompleteEntrySeparator": ": ",
+    "incompleteUnknownSecurity": "अज्ञात प्रतिभूति",
+    "incompleteUnknownAccount": "अज्ञात खाता"
   },
   "realizedGains": {
     "totalProceeds": "कुल आय",

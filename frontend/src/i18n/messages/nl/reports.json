@@ -1220,7 +1220,15 @@
     "pdfColHoldings": "Posities",
     "pdfColCash": "Contanten",
     "pdfColTotal": "Totaal",
-    "pdfColGainLoss": "Winst/verlies"
+    "pdfColGainLoss": "Winst/verlies",
+    "incompleteDetailsTitle": "Onvolledige gegevens in de geselecteerde periode",
+    "incompleteMissingPrices": "Ontbrekende koersen",
+    "incompleteMissingRates": "Ontbrekende wisselkoersen",
+    "incompleteMissingCash": "Ontbrekende liquide saldi",
+    "incompleteDateRange": "{start} tot {end}",
+    "incompleteEntrySeparator": ": ",
+    "incompleteUnknownSecurity": "Onbekend waardepapier",
+    "incompleteUnknownAccount": "Onbekende rekening"
   },
   "realizedGains": {
     "totalProceeds": "Totale opbrengsten",

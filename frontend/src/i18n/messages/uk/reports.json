@@ -1220,7 +1220,15 @@
     "pdfColHoldings": "Позиції",
     "pdfColCash": "Готівка",
     "pdfColTotal": "Разом",
-    "pdfColGainLoss": "Прибуток/збиток"
+    "pdfColGainLoss": "Прибуток/збиток",
+    "incompleteDetailsTitle": "Неповні дані за обраний період",
+    "incompleteMissingPrices": "Відсутні ціни",
+    "incompleteMissingRates": "Відсутні курси обміну",
+    "incompleteMissingCash": "Відсутні залишки коштів",
+    "incompleteDateRange": "з {start} до {end}",
+    "incompleteEntrySeparator": ": ",
+    "incompleteUnknownSecurity": "Невідомий цінний папір",
+    "incompleteUnknownAccount": "Невідомий рахунок"
   },
   "realizedGains": {
     "totalProceeds": "Загальний виторг",
