@@ -3786,16 +3786,14 @@ describe("SecurityPriceService", () => {
     it("refuses a quote in another currency and writes nothing", async () => {
       // AAPL is recorded in USD; the provider answers about a GBP listing.
       securitiesRepository.find.mockResolvedValue([mockSecurity]);
-      global.fetch = jest
-        .fn()
-        .mockResolvedValue(
-          createMockFetchResponse(
-            makeYahooChartResponse({
-              currency: "GBP",
-              regularMarketPrice: 150,
-            }),
-          ),
-        ) as jest.Mock;
+      global.fetch = jest.fn().mockResolvedValue(
+        createMockFetchResponse(
+          makeYahooChartResponse({
+            currency: "GBP",
+            regularMarketPrice: 150,
+          }),
+        ),
+      ) as jest.Mock;
 
       const result = await service.refreshAllPrices();
 
