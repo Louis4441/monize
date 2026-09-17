@@ -729,6 +729,7 @@
     "nativeNote": "以各持倉原幣顯示價值。",
     "baseNote": "以 {currency} 顯示價值。",
     "partialFxNote": "部分數據無法使用：缺少 {pairs} 的匯率。在找到匯率之前，「佔投資組合百分比」欄將保持空白。",
+    "partialPriceNote": "部分數值無法使用：{symbols} 沒有價格。在這些持股有價格之前，「投資組合佔比」欄將保持空白。",
     "asOf": "截至 {date}",
     "holdingCount": "{count, plural, one {# 個持倉} other {# 個持倉}}",
     "noHoldings": "所選科目及日期找不到持倉。",

@@ -729,6 +729,7 @@
     "nativeNote": "Los valores se muestran en la divisa nativa de cada posición.",
     "baseNote": "Los valores se muestran en {currency}.",
     "partialFxNote": "Algunas cifras no están disponibles: no hay tipo de cambio para {pairs}. La columna «% de la cartera» permanece en blanco mientras falte un tipo de cambio.",
+    "partialPriceNote": "Algunas cifras no están disponibles: no hay precio para {symbols}. La columna «% de la cartera» permanece vacía hasta que esas posiciones tengan precio.",
     "asOf": "Al {date}",
     "holdingCount": "{count, plural, one {# posición} other {# posiciones}}",
     "noHoldings": "No se encontraron posiciones para las cuentas y fecha seleccionadas.",

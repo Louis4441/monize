@@ -729,6 +729,7 @@
     "nativeNote": "Valeurs affichées dans la devise native de chaque position.",
     "baseNote": "Valeurs affichées en {currency}.",
     "partialFxNote": "Certains chiffres ne sont pas disponibles : aucun taux de change pour {pairs}. La colonne « % du portefeuille » reste vide tant qu'un taux manque.",
+    "partialPriceNote": "Certaines valeurs sont indisponibles : aucun cours pour {symbols}. La colonne « % du portefeuille » reste vide tant que ces positions ne sont pas valorisées.",
     "asOf": "Au {date}",
     "holdingCount": "{count, plural, one {# position} other {# positions}}",
     "noHoldings": "Aucune position trouvée pour les comptes et la date sélectionnés.",

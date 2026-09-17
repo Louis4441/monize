@@ -729,6 +729,7 @@
     "nativeNote": "Werte in der Heimwährung jeder Position angezeigt.",
     "baseNote": "Werte in {currency} angezeigt.",
     "partialFxNote": "Einige Werte sind nicht verfügbar: kein Wechselkurs für {pairs}. Die Spalte „% des Portfolios“ bleibt leer, solange ein Kurs fehlt.",
+    "partialPriceNote": "Einige Werte sind nicht verfügbar: kein Kurs für {symbols}. Die Spalte „% des Portfolios“ bleibt leer, bis diese Positionen bewertet sind.",
     "asOf": "Stand {date}",
     "holdingCount": "{count, plural, one {# Position} other {# Positionen}}",
     "noHoldings": "Keine Positionen für die gewählten Konten und das Datum gefunden.",

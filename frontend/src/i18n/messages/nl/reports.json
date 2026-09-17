@@ -729,6 +729,7 @@
     "nativeNote": "Waarden weergegeven in de eigen valuta van elke positie.",
     "baseNote": "Waarden weergegeven in {currency}.",
     "partialFxNote": "Sommige cijfers zijn niet beschikbaar: geen wisselkoers voor {pairs}. De kolom “% van portefeuille” blijft leeg zolang een koers ontbreekt.",
+    "partialPriceNote": "Sommige cijfers zijn niet beschikbaar: geen koers voor {symbols}. De kolom \"% van portefeuille\" blijft leeg totdat die posities een koers hebben.",
     "asOf": "Per {date}",
     "holdingCount": "{count, plural, one {# positie} other {# posities}}",
     "noHoldings": "Geen posities gevonden voor de geselecteerde rekeningen en datum.",

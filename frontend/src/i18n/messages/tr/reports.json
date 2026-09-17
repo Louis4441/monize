@@ -729,6 +729,7 @@
     "nativeNote": "Değerler her varlığın yerel para birimi cinsinden gösterilmektedir.",
     "baseNote": "Değerler {currency} cinsinden gösterilmektedir.",
     "partialFxNote": "Bazı rakamlar kullanılamıyor: {pairs} için döviz kuru yok. Kur bulunana kadar “Portföyün %'si” sütunu boş kalır.",
+    "partialPriceNote": "Bazı rakamlar mevcut değil: {symbols} için fiyat yok. Bu pozisyonlar fiyatlanana kadar \"Portföy %'si\" sütunu boş kalır.",
     "asOf": "{date} itibarıyla",
     "holdingCount": "{count, plural, one {# varlık} other {# varlık}}",
     "noHoldings": "Seçilen hesaplar ve tarih için varlık bulunamadı.",

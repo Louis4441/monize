@@ -729,6 +729,7 @@
     "nativeNote": "Wartości pokazane w walucie natywnej każdej pozycji.",
     "baseNote": "Wartości pokazane w {currency}.",
     "partialFxNote": "Niektóre wartości są niedostępne: brak kursu wymiany dla {pairs}. Kolumna „% portfela” pozostaje pusta, dopóki kurs jest nieznany.",
+    "partialPriceNote": "Niektóre wartości są niedostępne: brak ceny dla {symbols}. Kolumna „% portfela” pozostaje pusta, dopóki te pozycje nie mają wyceny.",
     "asOf": "Na dzień {date}",
     "holdingCount": "{count, plural, one {# pozycja} few {# pozycje} many {# pozycji} other {# pozycji}}",
     "noHoldings": "Nie znaleziono pozycji dla wybranych kont i daty.",

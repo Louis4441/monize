@@ -729,6 +729,7 @@
     "nativeNote": "各保有銘柄の現地通貨で表示されます。",
     "baseNote": "{currency} で表示されます。",
     "partialFxNote": "一部の数値は利用できません：{pairs} の為替レートがありません。レートが見つからない間、「ポートフォリオの割合」列は空欄のままになります。",
+    "partialPriceNote": "一部の数値は利用できません：{symbols} の価格がありません。これらの保有銘柄に価格が付くまで、「ポートフォリオの割合」列は空欄のままになります。",
     "asOf": "{date} 時点",
     "holdingCount": "{count, plural, one {# 件の保有} other {# 件の保有}}",
     "noHoldings": "選択した口座と日付の保有銘柄が見つかりません。",

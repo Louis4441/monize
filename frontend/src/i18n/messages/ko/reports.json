@@ -729,6 +729,7 @@
     "nativeNote": "각 보유 항목의 현지 통화로 표시된 값입니다.",
     "baseNote": "{currency}로 표시된 값입니다.",
     "partialFxNote": "일부 수치를 사용할 수 없습니다: {pairs}에 대한 환율이 없습니다. 환율을 찾을 때까지 “포트폴리오 비율” 열은 비어 있습니다.",
+    "partialPriceNote": "일부 수치를 사용할 수 없습니다. {symbols}의 가격이 없습니다. 해당 보유 종목에 가격이 매겨질 때까지 \"포트폴리오 비율\" 열은 비어 있습니다.",
     "asOf": "{date} 기준",
     "holdingCount": "{count, plural, one {# 개의 보유 항목} other {# 개의 보유 항목}}",
     "noHoldings": "선택한 계정 및 날짜에 대한 보유 항목이 없습니다.",

@@ -729,6 +729,7 @@
     "nativeNote": "Valori visualizzati nella valuta nativa di ogni posizione.",
     "baseNote": "Valori visualizzati in {currency}.",
     "partialFxNote": "Alcuni dati non sono disponibili: nessun tasso di cambio per {pairs}. La colonna «% del portafoglio» resta vuota finché manca un tasso.",
+    "partialPriceNote": "Alcuni valori non sono disponibili: nessun prezzo per {symbols}. La colonna «% del portafoglio» resta vuota finché quelle posizioni non hanno un prezzo.",
     "asOf": "Al {date}",
     "holdingCount": "{count, plural, one {# posizione} other {# posizioni}}",
     "noHoldings": "Nessuna posizione trovata per i conti e la data selezionati.",

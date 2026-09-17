@@ -729,6 +729,7 @@
     "nativeNote": "Nilai ditampilkan dalam mata uang asli setiap kepemilikan.",
     "baseNote": "Nilai ditampilkan dalam {currency}.",
     "partialFxNote": "Beberapa angka tidak tersedia: tidak ada kurs untuk {pairs}. Kolom “% dari portofolio” akan tetap kosong selama kurs belum tersedia.",
+    "partialPriceNote": "Beberapa angka tidak tersedia: tidak ada harga untuk {symbols}. Kolom \"% portofolio\" tetap kosong sampai kepemilikan tersebut memiliki harga.",
     "asOf": "Per {date}",
     "holdingCount": "{count, plural, one {# kepemilikan} other {# kepemilikan}}",
     "noHoldings": "Tidak ada kepemilikan ditemukan untuk akun dan tanggal yang dipilih.",

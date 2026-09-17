@@ -729,6 +729,7 @@
     "nativeNote": "Giá trị hiển thị theo tiền tệ nguyên bản của mỗi vị thế.",
     "baseNote": "Giá trị hiển thị theo {currency}.",
     "partialFxNote": "Một số số liệu không khả dụng: không có tỷ giá hối đoái cho {pairs}. Cột “% danh mục” sẽ để trống khi thiếu tỷ giá.",
+    "partialPriceNote": "Một số số liệu không có sẵn: không có giá cho {symbols}. Cột \"% danh mục\" để trống cho đến khi các vị thế đó có giá.",
     "asOf": "Tính đến {date}",
     "holdingCount": "{count, plural, one {# vị thế} other {# vị thế}}",
     "noHoldings": "Không tìm thấy vị thế nào cho các tài khoản và ngày đã chọn.",
