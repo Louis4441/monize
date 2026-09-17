@@ -145,17 +145,17 @@ export class PortfolioMovementAlertService {
           }
         : null;
 
-    // The flow and the price evidence only matter when there is a same-currency
-    // baseline to measure a period against; otherwise the decision rebaselines
-    // or withholds before reading either.
+    const capturedOn = state?.baseline_captured_on ?? null;
+
+    // The flow and the price evidence only matter when there is a same-currency,
+    // dated baseline to measure a period against; otherwise the decision
+    // rebaselines or withholds before reading either.
     const comparable =
       baseline != null &&
       baseline.currency === currency &&
-      state?.baseline_captured_on != null &&
+      capturedOn != null &&
       summary.valuationComplete === true;
-    const baselineDate = comparable
-      ? (state!.baseline_captured_on as string)
-      : null;
+    const baselineDate = comparable ? capturedOn : null;
 
     const flow =
       baselineDate === null
@@ -180,6 +180,7 @@ export class PortfolioMovementAlertService {
       pricesCurrentSinceBaseline: stale.length === 0,
       currency,
       baseline,
+      baselineDateKnown: capturedOn != null,
       flow,
       movePercent,
     };
@@ -188,7 +189,11 @@ export class PortfolioMovementAlertService {
     if (decision.rebaselineTo != null) {
       await this.storeBaseline(userId, decision.rebaselineTo, currency, today);
     }
-    if (decision.fire == null) return false;
+    // `decideMovement` replaces an undated baseline instead of comparing
+    // against it, so a fired decision always has a real opening date; the
+    // second arm is what proves it to the compiler, in place of a fallback
+    // that would stamp today's date over a period that did not start today.
+    if (decision.fire == null || baselineDate === null) return false;
 
     const prefs = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(UserPreference).findOne({ where: { userId } }),
@@ -198,9 +203,7 @@ export class PortfolioMovementAlertService {
       buildPortfolioNotification(
         decision.fire,
         currency,
-        // `baselineDate` is non-null on every path that fires: a decision only
-        // reaches `fire` through the comparable branch above.
-        baselineDate ?? today,
+        baselineDate,
         today,
         numberFormatterFor(prefs?.numberFormat, prefs?.language),
       ),

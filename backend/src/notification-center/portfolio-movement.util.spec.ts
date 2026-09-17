@@ -6,6 +6,7 @@ const base = (over: Partial<MovementInputs>): MovementInputs => ({
   pricesCurrentSinceBaseline: true,
   currency: "USD",
   baseline: { value: 100_000, currency: "USD" },
+  baselineDateKnown: true,
   flow: { complete: true, value: 0 },
   movePercent: 5,
   ...over,
@@ -46,6 +47,17 @@ describe("decideMovement", () => {
       base({ currency: "EUR", baseline: { value: 90_000, currency: "USD" } }),
     );
     expect(d).toEqual({ fire: null, rebaselineTo: 100_000 });
+  });
+
+  it("re-baselines without firing when the baseline carries no capture date", () => {
+    // An undated baseline names no period: the flow has nothing to span and no
+    // held position's close can be stale against it, so a difference computed
+    // against it is not a measured movement. Firing here would also have put
+    // the run's own date in front of the reader as the period's opening.
+    const d = decideMovement(
+      base({ baselineDateKnown: false, mvToday: 130_000 }),
+    );
+    expect(d).toEqual({ fire: null, rebaselineTo: 130_000 });
   });
 
   it("re-baselines without firing when the baseline value is 0", () => {

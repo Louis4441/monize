@@ -321,6 +321,25 @@ describe("PortfolioMovementAlertService", () => {
     ]);
   });
 
+  it("replaces a baseline stored without a capture date instead of comparing against it", async () => {
+    // A value and a currency with no date name no period. Comparing against
+    // one used to fire on a flow of a complete zero and a price-freshness
+    // check with nothing to be stale against, and stamped the run's own date
+    // on the notification as the period's opening.
+    const { service, notify, baselineWrites, flowStatements } = setup({
+      state: stateOf({ baseline_captured_on: null }),
+      summary: summaryOf({ totalPortfolioValue: 130_000 }),
+    });
+
+    await service.run();
+
+    expect(notify).not.toHaveBeenCalled();
+    expect(flowStatements).toEqual([]);
+    expect(baselineWrites).toEqual([
+      { value: 130_000, currency: "USD", on: TODAY },
+    ]);
+  });
+
   it("withholds everything, including the baseline, on an incomplete valuation", async () => {
     const { service, notify, baselineWrites } = setup({
       summary: summaryOf({

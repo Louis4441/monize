@@ -3513,7 +3513,10 @@ Enforcement         loadExternalFlowSubtotals({ perDay: true }) supplies the dat
                     DailyMovementService.flowOn -- resolve that date's rate
                     through the one FX door (ExchangeRateService.getRateForDate /
                     convertAtDate, INV-FX-001). The fold accumulates integer
-                    1/10000 units, so a many-day window does not drift.
+                    1/10000 units, so a many-day window does not drift. There is
+                    no window to convert without a baseline date, so
+                    decideMovement's baselineDateKnown arm replaces an undated
+                    baseline instead of measuring a period against it.
 Concurrency scope   per user, per run
 Retry semantics     Read-only and idempotent: a re-run resolves the same dates.
 Crash semantics     No write precedes the decision; a crash leaves the baseline.
@@ -3547,6 +3550,9 @@ Enforcement         PortfolioService.getLatestPriceObservations returns the date
                     stalePricedSecurityIds
                     (notification-center/portfolio-price-freshness.util.ts) is the
                     policy and decideMovement applies it before the arithmetic.
+                    A baseline with no capture date has no period for a close to
+                    be stale against, so decideMovement's baselineDateKnown arm
+                    replaces such a baseline rather than reaching this check.
 Concurrency scope   per user, per run
 Retry semantics     Read-only and idempotent.
 Crash semantics     No write precedes the decision.

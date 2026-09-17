@@ -32,6 +32,15 @@ export interface MovementInputs {
   currency: string;
   /** The stored baseline, or null when none has been captured. */
   baseline: { value: number; currency: string } | null;
+  /**
+   * Whether the stored baseline carries the date it was captured on.
+   *
+   * A baseline without one names no period: there is nothing to measure the
+   * day's external flow over (INV-PORTMOVE-007), nothing for a held position's
+   * close to be stale against (INV-PORTMOVE-008) and no opening date to put in
+   * front of the reader. Such a baseline is replaced, not compared.
+   */
+  baselineDateKnown: boolean;
   /** The day's external cash flow into the investment accounts. */
   flow: { complete: boolean; value: number };
   /** The user's threshold in percent; <= 0 or null means the alert is off. */
@@ -77,7 +86,9 @@ const roundPercent = (value: number): number => {
  *
  * 1. Value incomplete -> no-op (no alert, no rebaseline): a subtotal is unknown.
  * 2. Off (no threshold) -> no-op: nothing to maintain a baseline for.
- * 3. No baseline, or a reporting-currency change -> rebaseline, no alert.
+ * 3. No baseline, a reporting-currency change, or a baseline with no capture
+ *    date -> rebaseline, no alert: an undated baseline names no period, so the
+ *    flow and the price-freshness evidence below have nothing to span.
  * 4. Flow incomplete -> no-op: an unconvertible contribution makes the movement
  *    unknown; do not rebaseline on an unknown run either.
  * 5. A held position priced before the baseline date -> no-op: today's value is
@@ -94,7 +105,11 @@ export function decideMovement(input: MovementInputs): MovementDecision {
   if (input.movePercent == null || input.movePercent <= 0) {
     return { fire: null, rebaselineTo: null };
   }
-  if (input.baseline == null || input.baseline.currency !== input.currency) {
+  if (
+    input.baseline == null ||
+    input.baseline.currency !== input.currency ||
+    !input.baselineDateKnown
+  ) {
     return { fire: null, rebaselineTo: input.mvToday };
   }
   if (!input.flow.complete) return { fire: null, rebaselineTo: null };

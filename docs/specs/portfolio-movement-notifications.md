@@ -224,12 +224,13 @@ and only rounded for display (`PORTFOLIO_MOVE_PERCENT_DECIMALS`, a ratio -- neve
 
 ```
 for each user with move_alert_percent set:            // withSystemContext fan-out
-  withUserContext(userId): withScopedDb:              // baseline r-m-w in one tx
+  withUserContext(userId):                            // one identity per user
     const ccy = preferredCurrency(pref)               // shared resolver (INV-...-003)
     const s = portfolio.getPortfolioSummary(userId)   // MV(today) + completeness
     if (s.valuationComplete !== true) return           // INV-PORTMOVE-001/002 no-op
     const mvToday = s.totalPortfolioValue              // holdings + cash, in ccy
-    if (baseline == null || baselineCurrency !== ccy):
+    if (baseline == null || baselineCurrency !== ccy
+        || baseline_captured_on == null):             // no period to measure
         record baseline = { mvToday, ccy, today }; return           // 003/004/005
     const flow = externalFlow(A, baseline_captured_on, today)       // Section 2
     if (!flow.complete) return                          // INV-PORTMOVE-001/002 no-op
@@ -250,15 +251,34 @@ for each user with move_alert_percent set:            // withSystemContext fan-o
                   baselineDate: baseline_captured_on, valuationDate: today,
                   currencyCode: ccy },
           target: "/investments",
-          dedupeKey: `portmove:${userId}:${today}`,      // one per day
+          dedupeKey: `portmove:${ccy}:${today}`,        // one per day, per user
         })
     record baseline = { mvToday, ccy, today }            // rebaseline each complete run
 ```
 
-`dedupeKey` carries the day, so at most one movement alert exists per day
-(crossing). Delivery, throttle and fan-out are the seam's. The baseline advances
-to today's complete `MV` on every complete run whether or not it fired, so the next
-day measures from today.
+**What makes a re-run safe is the dedupe key, not one long transaction.** The
+evaluation is not wrapped in a single transaction: the baseline read
+(`loadState`), the baseline write (`storeBaseline`) and the notification each
+run in their own `withScopedDb` call under the user's identity. Nothing between
+them is a read-modify-write of a row another writer contends for -- this cron is
+the only writer of `notification_portfolio_state.baseline_*`, guarded by the
+per-process `running` flag, and `storeBaseline` is one `INSERT ... ON CONFLICT
+DO UPDATE` -- and a second run of the same day recomputes the same figures from
+the same rows. The notification is idempotent on the key: `dedupeKey` is scoped
+per user by `idx_notifications_dedupe`, the partial unique index on
+`notifications(user_id, dedupe_key)`, so at most one movement alert per user
+exists for a day (the key itself carries the reporting currency and the day, not
+the user id). Delivery, throttle and fan-out are the seam's. The baseline
+advances to today's complete `MV` on every complete run whether or not it fired,
+so the next day measures from today.
+
+**An undated baseline is replaced, never compared against.** A stored value and
+currency with no `baseline_captured_on` names no period: the external flow has no
+window to span (INV-PORTMOVE-007) and no held position's close can be stale
+against it (INV-PORTMOVE-008), so the run records a fresh baseline instead of
+computing a difference whose opening date would have to be invented.
+`decideMovement` takes `baselineDateKnown` and refuses on that arm, which is why
+the producer needs no fallback date when it stamps `baselineDate`.
 
 **The alert names what it measured.** The period is both boundary dates
 (`baselineDate`, `valuationDate`) and the figure is its three components
@@ -398,7 +418,7 @@ Integration additionally owns the classification itself
 transfer, the transfer that crossed the boundary and the mixed split, run as real
 SQL, plus the per-day conversion over them.
 
-Integration (CI-owned): the baseline read-modify-write under `withScopedDb`, the
+Integration (CI-owned): the baseline write under `withScopedDb`, the
 RLS policy, schema drift, the new table's backup round-trip, and a real
 `getPortfolioSummary` returning an incomplete valuation (an unpriced security in a
 real database).
