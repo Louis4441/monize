@@ -248,6 +248,41 @@ because a lookup cannot aggregate. It also scans for a group's provenance
 derived from its members (`.every(... isProjected ...)`) and pins the Debt
 Payoff Timeline's three axes to `dataKey="axisKey"`. INV-REPORT-002.
 
+## A period's change, flows and result are three figures the server sends
+
+A chart of portfolio value has every number needed to work out `last - first`,
+and that figure is not what the portfolio earned: it counts the deposits the
+reader made inside the window. `PortfolioValueReport` derived it for years and
+printed the result under a "Period Return" caption, so two deposits with a
+price that never moved read as +100% (issue #1392).
+
+Read `GET /net-worth/investments-period-result`
+(`netWorthApi.getInvestmentsPeriodResult`) and print what it says: `valueChange`
+captioned as a value change, `netExternalFlows` beside it, `investmentResult`
+as the performance, and a percentage only over the last of the three. Nothing
+on the client subtracts, divides or falls back to the series when the request
+fails -- an unanswered request leaves every figure unknown, never zero.
+
+**The client picks the dates; the server measures.** `usesPriorCloseBaseline`
+and `previousCalendarDay` (`components/investments/portfolio-change-baseline.ts`)
+still decide that 1d, 1w and mtd report against the previous trading day's
+close, and that date goes out as `baselineDate`. The arithmetic over it does
+not come back to the browser.
+
+**A withheld figure names one repair.** `periodResultUnknownReason`
+(`components/investments/portfolio-period-result.ts`) maps the server's five
+reasons onto the one `UnknownAmount` cause each card can draw -- an unpriced
+holding is a price to add, a cash gap is neither a price nor a rate, an
+unconvertible amount is a rate to refresh, and a boundary (`zeroStart`,
+`noValueSeries`) is nothing anybody can fix. It is the sibling of
+`movementUnknownReason`, for the same reason.
+
+**Still to migrate**: `PortfolioValueWidget` and `InvestmentValueChart` print a
+change and a percentage derived from the series through
+`portfolioSeriesChange`. Both are value changes with no flow beside them, so a
+deposit still moves the percentage they show; the endpoint above is what they
+should read.
+
 ## An unknown value must not render as a measured zero
 
 The server sends `null` rather than `0` for anything it could not work out (`docs/financial-calculation-contract.md`), and the last hundred pixels are where that gets thrown away:

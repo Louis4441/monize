@@ -326,6 +326,51 @@ nothing is ranked against anything. `getMonthOverMonthMovers` is a different
 period entirely -- the last close on or before each month end, per security, by
 design -- and does not filter.
 
+### A period's value change is not what the portfolio earned
+
+Over any window a portfolio reports three different figures, and collapsing
+them into one reports a deposit as performance:
+
+| Figure | What it is | Includes the reader's own money? |
+|---|---|---|
+| `valueChange` | `MV(end) - MV(baseline)` | yes |
+| `netExternalFlows` | the cash that crossed the scope's boundary on `(baseline, end]` | it IS that money |
+| `investmentResult` | `valueChange - netExternalFlows` | no |
+
+A percentage belongs over the third and nowhere else. A security at 100 that
+never moves, bought with 10,000 in January and another 10,000 in June, has a
+value change of +10,000 and an investment result of exactly 0; the report that
+divided the first figure by the January value announced a 100 per cent return
+(issue #1392).
+
+Which rows are external flow is **not** decided here: it is
+`loadExternalFlowSubtotals` (`backend/src/securities/external-flow.util.ts`),
+the classifier the daily movement notification already shares. A deposit, a
+withdrawal and a transfer whose counterparty is outside the scope are external;
+a dividend, interest, a buy, a sell and a transfer between two scoped accounts
+are internal, and internal flows are return. Each day's subtotal converts at
+**its own day's** rate -- January's deposit is January's money -- through
+`resolveFxRate`, and a subtotal with no rate makes the whole flow unknown
+rather than smaller (`FxAggregate`).
+
+**The lower bound is exclusive.** `MV(baseline)` is the close of the baseline
+day and already holds every flow that landed on it, so counting those again
+subtracts them from a starting value that contains them.
+
+**The return method is named on the wire.** `returnMethod: "simple"` divides
+the period's result by the value it started with and ignores when each flow
+arrived; it is neither Modified Dietz nor a time-weighted return, both of which
+need a complete value on every flow date rather than only at the two
+boundaries. The union exists so a later time-weighted figure arrives as a new
+method rather than as the same caption meaning something else.
+
+`decidePeriodResult`
+(`backend/src/net-worth/portfolio-period-result.util.ts`) is the one place the
+policy lives, `PortfolioPeriodResultService` reads the boundaries from the very
+series the chart draws, and `docs/specs/portfolio-period-result.md` holds the
+truth table, the numerical examples and the missing-data policy.
+INV-PORTRESULT-001.
+
 ## 7. Scheduled occurrences
 
 An occurrence may carry an override. `scheduled_transaction_overrides` is unique

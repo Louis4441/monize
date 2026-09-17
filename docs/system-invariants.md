@@ -97,6 +97,7 @@ implied.
 | INV-RECONCILE-001 | While the strict lock is on, a reconciled transaction is not altered | enforced |
 | INV-FX-001 | An unavailable rate never becomes 1:1, a rate from after the date, or an unboundedly old one | partial |
 | INV-PRICE-001 | A stored price is in the currency the security is recorded in | partial |
+| INV-PORTRESULT-001 | A period change is not a return: value change, external flows and investment result are three figures | partial |
 | INV-REPORT-001 | A report's account scope is investment linkage, not account type | enforced |
 | INV-REPORT-002 | A chart's down-sampling never reaches a count, a total or an export | enforced |
 | INV-LOAN-001 | A recurring overpayment's cadence is a calendar, not a payment interval | enforced |
@@ -706,6 +707,46 @@ A GBP listing stored against a USD-configured security understates every close
 by the GBP/USD rate -- 23 to 35 per cent over the range in issue #1393 -- and
 nothing in the stored series says so, because the series is numbers and the
 currency is on another table's row.
+
+### INV-PORTRESULT-001 -- a period change is not a return
+
+```text
+Statement           A surface reporting what a portfolio did over a period
+                    reports three figures and not one: valueChange (the two
+                    boundary closes subtracted, which includes the money the
+                    reader moved in), netExternalFlows (that money), and
+                    investmentResult (the difference). A percentage is reported
+                    over investmentResult alone. Each figure is null, with its
+                    cause named, whenever a component is unknown: a boundary
+                    close that is a subtotal withholds the value change, and a
+                    flow subtotal with no rate for its day withholds the flow
+                    and the result rather than shrinking them.
+Source of truth     The value series from
+                    NetWorthService.getDailyInvestments with its completeness
+                    bits, and the external-flow classifier
+                    loadExternalFlowSubtotals -- the same two the daily
+                    movement notification reads, so the two measures cannot
+                    disagree about the same accounts.
+Enforcement         decidePeriodResult
+                    (backend/src/net-worth/portfolio-period-result.util.ts) is
+                    the only place the policy is written, pure and
+                    table-tested; PortfolioPeriodResultService serves it at
+                    GET /net-worth/investments-period-result over the very
+                    series the chart draws, converting each day's flow at that
+                    day's rate through resolveFxRate and FxAggregate.
+                    PortfolioValueReport prints it and derives nothing.
+                    docs/specs/portfolio-period-result.md has the truth table,
+                    the numerical examples and the test matrix.
+Status              partial
+```
+
+The Portfolio Value Over Time report is the surface this was written for, and
+it upholds it. Two others do not yet: `PortfolioValueWidget` and
+`InvestmentValueChart` still derive a change and a percentage from the plotted
+series through `portfolioSeriesChange`, so a deposit inside their window still
+moves the figure they show. They are value changes with no flow beside them,
+which is why the status here is `partial` rather than `enforced` -- the
+endpoint exists and the migration is the remaining work, not a new decision.
 
 ### INV-REPORT-001 -- a report's account scope is investment linkage, not account type
 
