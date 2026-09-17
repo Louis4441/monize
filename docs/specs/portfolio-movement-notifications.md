@@ -127,6 +127,10 @@ negative one is a loss the market produced; a deposit-only day is `movement ~= 0
   (INV-NOTIFY-001), from a cron under `withSystemContext` fan-out /
   `withUserContext` body, **after** the day's price refresh. It never hooks a price
   or balance write.
+- **INV-PORTMOVE-006 (movement is a market return, never a contribution).** The
+  external flow is always subtracted; a deposit-only day never fires. The flow is
+  derived through `investment-filter.util.ts`, so an auto-generated trade leg is
+  never counted as a contribution and a dividend is never counted as one either.
 - **INV-PORTMOVE-007 (a flow is worth its own day's rate).** Status:
   **enforced**. The external flow is read per day
   (`loadExternalFlowSubtotals({ perDay: true })`) and each `(date, currency)`
@@ -159,10 +163,6 @@ negative one is a loss the market produced; a deposit-only day is `movement ~= 0
   until it is priced (manually or otherwise) or the position is closed. That is
   the "complete, or withhold" trade, and the producer logs the securities it is
   waiting on.
-- **INV-PORTMOVE-006 (movement is a market return, never a contribution).** The
-  external flow is always subtracted; a deposit-only day never fires. The flow is
-  derived through `investment-filter.util.ts`, so an auto-generated trade leg is
-  never counted as a contribution and a dividend is never counted as one either.
 
 ---
 
