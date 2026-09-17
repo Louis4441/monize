@@ -33,6 +33,13 @@
     in neither, and it needs a live PostgreSQL, so `npm run test:unit` will not
     tell you. Every table these tasks add is coordination state for one
     deployment and belongs in the excluded set with its reason.
+  - **`IF NOT EXISTS` belongs in the migration, not in `schema.sql`.** Do not
+    paste the migration's body across unchanged: `db-init` applies `schema.sql`
+    once, gated on whether `users` exists, so the guard buys nothing there and
+    the plain `CREATE TABLE` / `CREATE INDEX` is a tripwire -- it errors loudly
+    if `schema.sql` ever meets a non-empty database instead of skipping and
+    leaving a table nobody checked. The file is 80 plain `CREATE TABLE` to one
+    guarded (`schema_migrations`, which the migrator bootstraps too).
   - Migrations: file named `date -u +%Y%m%d%H%M%S`_description.sql per
     `docs/database-migrations.md`, every statement idempotent (`IF NOT
     EXISTS`, `DROP ... IF EXISTS` before `CREATE POLICY`/`TRIGGER`), mirrored

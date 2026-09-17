@@ -1615,7 +1615,7 @@ CREATE INDEX idx_ai_insights_user_type ON ai_insights(user_id, type);
 -- replica queued, and a restart between "enqueued" and "answered" loses the
 -- turn with nothing able to notice. Direct RLS bucket, owner only: a delegate
 -- reading someone's accounts has no business claiming their prompts.
-CREATE TABLE IF NOT EXISTS ai_relay_prompts (
+CREATE TABLE ai_relay_prompts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     -- pending -> claimed -> answered, or expired from either of the first two.
@@ -1638,15 +1638,15 @@ CREATE TABLE IF NOT EXISTS ai_relay_prompts (
       CHECK (status IN ('pending', 'claimed', 'answered', 'expired'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_ai_relay_prompts_claim
+CREATE INDEX idx_ai_relay_prompts_claim
     ON ai_relay_prompts(user_id, status, created_at);
-CREATE INDEX IF NOT EXISTS idx_ai_relay_prompts_expiry
+CREATE INDEX idx_ai_relay_prompts_expiry
     ON ai_relay_prompts(expires_at);
 
 -- One row per user whose agent has ever polled. Progress, not business data:
 -- these columns decide whether the tunnel indicator reads offline, listening
 -- or busy, and nothing financial reads them.
-CREATE TABLE IF NOT EXISTS ai_relay_agents (
+CREATE TABLE ai_relay_agents (
     user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     last_poll_at TIMESTAMPTZ,
     idle_since TIMESTAMPTZ,
@@ -1656,7 +1656,7 @@ CREATE TABLE IF NOT EXISTS ai_relay_agents (
 -- Write-confirmation cards composed after the browser's stream gave up, so an
 -- action the agent decided on is still approvable when the browser returns
 -- instead of being silently lost.
-CREATE TABLE IF NOT EXISTS ai_relay_actions (
+CREATE TABLE ai_relay_actions (
     -- The descriptor's own id. Text, not UUID: this table does not get to
     -- choose the grammar of an id the agent minted.
     id TEXT NOT NULL,
@@ -1669,7 +1669,7 @@ CREATE TABLE IF NOT EXISTS ai_relay_actions (
     PRIMARY KEY (user_id, id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_ai_relay_actions_expiry
+CREATE INDEX idx_ai_relay_actions_expiry
     ON ai_relay_actions(expires_at);
 
 -- Personal Access Tokens (for MCP server and API access)
@@ -2190,7 +2190,7 @@ CREATE TRIGGER trg_job_claims_guard_update
 --
 -- The increment and the window reset are one INSERT ... ON CONFLICT DO UPDATE
 -- in the service, so two concurrent failures cannot lose one.
-CREATE TABLE IF NOT EXISTS auth_attempt_counters (
+CREATE TABLE auth_attempt_counters (
     scope TEXT NOT NULL,
     key TEXT NOT NULL,
     count INTEGER NOT NULL DEFAULT 0,
@@ -2198,7 +2198,7 @@ CREATE TABLE IF NOT EXISTS auth_attempt_counters (
     PRIMARY KEY (scope, key)
 );
 
-CREATE INDEX IF NOT EXISTS idx_auth_attempt_counters_expiry
+CREATE INDEX idx_auth_attempt_counters_expiry
     ON auth_attempt_counters(window_expires_at);
 
 -- One-shot claims: a TOTP code, a confirmed AI action descriptor. The claim is
@@ -2207,14 +2207,14 @@ CREATE INDEX IF NOT EXISTS idx_auth_attempt_counters_expiry
 --
 -- token_hash is SHA-256 of the secret, never the secret: with no owner column
 -- every session can read this table, and what it holds must not be replayable.
-CREATE TABLE IF NOT EXISTS single_use_tokens (
+CREATE TABLE single_use_tokens (
     purpose TEXT NOT NULL,
     token_hash TEXT NOT NULL,
     expires_at TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (purpose, token_hash)
 );
 
-CREATE INDEX IF NOT EXISTS idx_single_use_tokens_expiry
+CREATE INDEX idx_single_use_tokens_expiry
     ON single_use_tokens(expires_at);
 
 -- Trigger for tags updated_at
