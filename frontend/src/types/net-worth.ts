@@ -74,6 +74,19 @@ export interface InvestmentBreakdownPoint {
   cashComplete?: boolean;
   /** The accounts behind `cashComplete: false`. */
   unknownCashAccountIds?: string[];
+  /**
+   * False when a security held at this point had no accepted close on or before
+   * it: its band is absent entirely, so `total` is a subtotal of the rest.
+   * Read as `=== false`.
+   */
+  pricesComplete?: boolean;
+  /** The securities behind `pricesComplete: false`, so a reader can price them. */
+  unpricedSecurityIds?: string[];
+  /**
+   * `"USD->EUR"` for each pair THIS point could not convert, so the dates that
+   * need a rate are identifiable rather than only the pairs.
+   */
+  missingRatePairs?: string[];
 }
 
 export interface InvestmentBreakdown {

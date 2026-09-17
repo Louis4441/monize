@@ -4199,6 +4199,9 @@ describe("NetWorthService", () => {
         values: { "sec-1": 1000, cash: 5000 },
         cashComplete: true,
         unknownCashAccountIds: [],
+        pricesComplete: true,
+        unpricedSecurityIds: [],
+        missingRatePairs: [],
       });
       expect(result.points[1]).toEqual({
         date: "2024-06-01",
@@ -4206,6 +4209,9 @@ describe("NetWorthService", () => {
         values: { "sec-1": 1100, cash: 5000 },
         cashComplete: true,
         unknownCashAccountIds: [],
+        pricesComplete: true,
+        unpricedSecurityIds: [],
+        missingRatePairs: [],
       });
     });
 
@@ -4315,6 +4321,9 @@ describe("NetWorthService", () => {
           values: { "sec-1": 1000 },
           cashComplete: true,
           unknownCashAccountIds: [],
+          pricesComplete: true,
+          unpricedSecurityIds: [],
+          missingRatePairs: [],
         },
         {
           date: "2025-03-02",
@@ -4322,8 +4331,87 @@ describe("NetWorthService", () => {
           values: { "sec-1": 1000 },
           cashComplete: true,
           unknownCashAccountIds: [],
+          pricesComplete: true,
+          unpricedSecurityIds: [],
+          missingRatePairs: [],
         },
       ]);
+    });
+
+    /**
+     * #1389 follow-up, in the breakdown: the "By security" view had no
+     * per-point price completeness at all, so a security held on a day nothing
+     * could price simply had no band and `total` silently shrank. The point now
+     * names the security, and the response's own dates say which days to
+     * repair.
+     */
+    it("names the security a point could not price (#1389)", async () => {
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "brok-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_BROKERAGE",
+          currency_code: "USD",
+          opening_balance: 0,
+        },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        {
+          account_id: "brok-1",
+          security_id: "sec-priced",
+          action: "BUY",
+          quantity: "10",
+          transaction_date: "2025-02-01",
+        },
+        {
+          account_id: "brok-1",
+          security_id: "sec-dark",
+          action: "BUY",
+          quantity: "5",
+          transaction_date: "2025-02-01",
+        },
+      ]);
+      securityRepository.findByIds.mockResolvedValue([
+        {
+          id: "sec-priced",
+          symbol: "MSFT",
+          name: "Microsoft",
+          currencyCode: "USD",
+          skipPriceUpdates: false,
+        },
+        {
+          id: "sec-dark",
+          symbol: "DARK",
+          name: "Nothing prices this",
+          currencyCode: "USD",
+          skipPriceUpdates: false,
+        },
+      ]);
+      // Only the first security has a close; `sec-dark` has none from either
+      // source.
+      reportQuery.mockResolvedValueOnce([
+        {
+          security_id: "sec-priced",
+          price_date: "2025-03-01",
+          close_price: "100",
+        },
+      ]);
+
+      const result = await service.getInvestmentBreakdown("user-1", {
+        granularity: "daily",
+        startDate: "2025-03-01",
+        endDate: "2025-03-01",
+      });
+
+      expect(result.points).toHaveLength(1);
+      expect(result.points[0].pricesComplete).toBe(false);
+      expect(result.points[0].unpricedSecurityIds).toEqual(["sec-dark"]);
+      // The total is the subtotal of the band that could be valued, which is
+      // exactly why the flag has to travel with it.
+      expect(result.points[0].total).toBe(1000);
+      expect(result.points[0].missingRatePairs).toEqual([]);
     });
 
     // Issue #1242, by-security daily: a skipPriceUpdates security's band uses
@@ -4509,6 +4597,9 @@ describe("NetWorthService", () => {
           values: { "sec-1": 1000, other: 250 },
           cashComplete: true,
           unknownCashAccountIds: [],
+          pricesComplete: true,
+          unpricedSecurityIds: [],
+          missingRatePairs: [],
         },
       ]);
     });

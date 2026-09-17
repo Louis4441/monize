@@ -410,10 +410,22 @@ export function PortfolioValueReport() {
         iso: p.date,
         total: p.total,
         values: p.values,
-        // A point missing a cash balance, or a breakdown missing a rate, is a
-        // subtotal: the KPI cards refuse to call it a high or a low. Read as
-        // `=== false` -- an older backend sends neither flag (#1389).
-        complete: p.cashComplete !== false && data.fxComplete !== false,
+        // A point missing a cash balance, a price or a rate is a subtotal: the
+        // KPI cards refuse to call it a high or a low and the chart draws no
+        // band for it. Read as `=== false` -- an older backend sends neither
+        // flag (#1389).
+        //
+        // The rate read is the POINT's own list where the response carries one,
+        // because the response-level `fxComplete` is the union over the window
+        // and would withhold every point over one unconvertible day. A response
+        // without per-point lists is an older backend, and then the union is
+        // all there is.
+        complete:
+          p.cashComplete !== false &&
+          p.pricesComplete !== false &&
+          (p.missingRatePairs
+            ? p.missingRatePairs.length === 0
+            : data.fxComplete !== false),
       }));
       setBreakdown({ series: data.series, points, kind: granularity });
       setChartPoints(

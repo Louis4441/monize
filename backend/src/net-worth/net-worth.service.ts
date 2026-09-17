@@ -177,6 +177,21 @@ export interface InvestmentBreakdownPoint {
   cashComplete: boolean;
   /** The accounts behind `cashComplete: false`. */
   unknownCashAccountIds: string[];
+  /**
+   * False when a security held at this point had no accepted close on or before
+   * its valuation date. Its band is missing entirely -- unknown, not zero -- so
+   * `total` here is a subtotal of the bands that could be valued. Mirrors
+   * {@link DailyInvestmentValue.pricesComplete}; read as `=== false`.
+   */
+  pricesComplete: boolean;
+  /** The securities behind `pricesComplete: false`, so a reader can price them. */
+  unpricedSecurityIds: string[];
+  /**
+   * `"USD->EUR"` for each pair THIS point could not convert. The
+   * response-level `missingRatePairs` is the union over the window, which
+   * cannot say which dates to repair; this one dates each pair (#1389).
+   */
+  missingRatePairs: string[];
 }
 
 export interface InvestmentBreakdown {
@@ -1624,6 +1639,10 @@ export class NetWorthService {
       cash: number;
       /** Scoped cash accounts with no balance for this point; see the point. */
       unknownCashAccountIds: string[];
+      /** Securities held at this point that nothing could price; see the point. */
+      unpricedSecurityIds: string[];
+      /** Pairs this point alone could not convert; see the point. */
+      missingRatePairs: string[];
     }> = [];
 
     // Pairs the whole breakdown could not resolve a rate for. Collected across
@@ -1659,6 +1678,12 @@ export class NetWorthService {
       }
 
       const valuesBySec = new Map<string, number>();
+      // What this point alone is short of, so the reader learns WHICH security
+      // and WHICH pair over WHICH dates rather than that "something" was
+      // missing somewhere in the range (#1389). The whole-response
+      // `missingPairs` below stays as it is: it answers a different question.
+      const unpricedSecurityIds = new Set<string>();
+      const pointMissingPairs = new Set<string>();
       for (const [secId, qty] of holdings) {
         if (Math.abs(qty) < 0.00000001) continue;
         const security = securityMap.get(secId);
@@ -1667,7 +1692,12 @@ export class NetWorthService {
           txSeries.get(secId),
           valuationDate,
         );
-        if (price == null) continue;
+        // Held, but nothing priced it: its band is unknown, not zero, and the
+        // point's total is a subtotal of the rest.
+        if (price == null) {
+          unpricedSecurityIds.add(secId);
+          continue;
+        }
         const secCurrency = security?.currencyCode || defaultCurrency;
         const value = this.convertCurrency(
           qty * price,
@@ -1680,6 +1710,7 @@ export class NetWorthService {
         // rather than entered at 1:1, and recorded so the point can say so.
         if (value === null) {
           missingPairs.add(`${secCurrency}->${defaultCurrency}`);
+          pointMissingPairs.add(`${secCurrency}->${defaultCurrency}`);
           continue;
         }
         valuesBySec.set(secId, (valuesBySec.get(secId) ?? 0) + value);
@@ -1713,13 +1744,18 @@ export class NetWorthService {
           defaultCurrency,
         );
       }
-      for (const pair of cashAggregate.missingPairs) missingPairs.add(pair);
+      for (const pair of cashAggregate.missingPairs) {
+        missingPairs.add(pair);
+        pointMissingPairs.add(pair);
+      }
 
       ungrouped.push({
         date: sampleDate,
         valuesBySec,
         cash: cashAggregate.knownSubtotal,
         unknownCashAccountIds: [...unknownCashAccountIds].sort(),
+        unpricedSecurityIds: [...unpricedSecurityIds].sort(),
+        missingRatePairs: [...pointMissingPairs].sort(),
       });
     }
 
@@ -1965,6 +2001,8 @@ export class NetWorthService {
       valuesBySec: Map<string, number>;
       cash: number;
       unknownCashAccountIds: string[];
+      unpricedSecurityIds: string[];
+      missingRatePairs: string[];
     }>,
     securityMap: Map<string, Security>,
     limit: number,
@@ -2038,6 +2076,9 @@ export class NetWorthService {
         values,
         cashComplete: pt.unknownCashAccountIds.length === 0,
         unknownCashAccountIds: pt.unknownCashAccountIds,
+        pricesComplete: pt.unpricedSecurityIds.length === 0,
+        unpricedSecurityIds: pt.unpricedSecurityIds,
+        missingRatePairs: pt.missingRatePairs,
       };
     });
 
