@@ -272,7 +272,11 @@ describe('InvestmentValueChart', () => {
     // them are named on the secondary lines.
     expect(screen.getByText('$15000.00')).toBeInTheDocument();
     expect(screen.getByText('$10000.00')).toBeInTheDocument();
-    expect(screen.getByText('+$5000.00')).toBeInTheDocument();
+    // The period figures are second-stage: the request cannot be made until
+    // the series is on screen, so wait for it rather than for the title.
+    await waitFor(() =>
+      expect(screen.getByText('+$5000.00')).toBeInTheDocument(),
+    );
     expect(screen.getByText('+50.0%')).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.getByTestId('period-value-change')).toHaveTextContent(
