@@ -47,6 +47,22 @@ export interface HoldingScope {
   securityId: string;
 }
 
+/**
+ * One position where the stored row and a replay of the ledger disagree.
+ *
+ * Read-only evidence: `replayedQuantity` / `replayedAverageCost` are `null`
+ * when the ledger accounts for no shares at all, which is a different finding
+ * from "it accounts for a different number".
+ */
+export interface HoldingDiscrepancy {
+  accountId: string;
+  securityId: string;
+  storedQuantity: number;
+  storedAverageCost: number | null;
+  replayedQuantity: number | null;
+  replayedAverageCost: number | null;
+}
+
 @Injectable()
 export class HoldingsService {
   private readonly logger = new Logger(HoldingsService.name);
@@ -388,6 +404,91 @@ export class HoldingsService {
    */
   private serverToday(): string {
     return formatDateYMDLocal(new Date());
+  }
+
+  /**
+   * Compare one user's stored holdings against a replay of their ledger, and
+   * return only the positions that disagree.
+   *
+   * **Reads only.** Nothing here writes, deletes or locks: the answer is
+   * evidence for a human, and the repair is `POST /holdings/rebuild`, which the
+   * owner runs when they have looked at what is reported. A rebuild is the
+   * right repair for drift that predates the ledger-projection rule and the
+   * wrong response to a replay that disagrees for some other reason, which is
+   * why this refuses to make the choice.
+   *
+   * The replay is `computeHoldingsMap` over `INVESTMENT_REPLAY_ORDER` -- the
+   * same fold `rebuildScopesFromTransactions` writes from -- so a position this
+   * reports is exactly one a rebuild would change.
+   */
+  async findLedgerDiscrepancies(
+    userId: string,
+    manager: EntityManager,
+    asOfDate?: string,
+  ): Promise<HoldingDiscrepancy[]> {
+    const accounts = await manager.find(Account, {
+      where: { userId, accountType: AccountType.INVESTMENT },
+    });
+    const eligibleIds = accounts
+      .filter(
+        (a) =>
+          a.accountSubType === AccountSubType.INVESTMENT_BROKERAGE ||
+          !a.accountSubType,
+      )
+      .map((a) => a.id);
+    if (eligibleIds.length === 0) return [];
+
+    const stored = await manager.find(Holding, {
+      where: { accountId: In(eligibleIds) },
+    });
+    if (stored.length === 0) return [];
+
+    const transactions = await manager.find(InvestmentTransaction, {
+      where: {
+        userId,
+        accountId: In(eligibleIds),
+        transactionDate: LessThanOrEqual(asOfDate ?? this.serverToday()),
+        // Rows as effects: a VOID transaction moved no shares.
+        status: NON_VOID_INVESTMENT_STATUS,
+      },
+      order: INVESTMENT_REPLAY_ORDER,
+    });
+    const replayed = this.computeHoldingsMap(transactions);
+
+    const discrepancies: HoldingDiscrepancy[] = [];
+    for (const row of stored) {
+      const data = replayed.get(row.accountId)?.get(row.securityId);
+      const storedQuantity = Number(row.quantity);
+      const storedAverageCost =
+        row.averageCost === null ? null : Number(row.averageCost);
+      const replayedQuantity = data ? data.quantity : null;
+      const replayedAverageCost =
+        data && data.quantity > 0 ? data.totalCost / data.quantity : null;
+
+      // Both figures are stored to a fixed scale (quantity 8, average cost 10),
+      // so the comparison is against the smallest difference the column can
+      // hold rather than an exact equality no float round-trip survives.
+      const quantityDiffers =
+        replayedQuantity === null ||
+        Math.abs(replayedQuantity - storedQuantity) > 0.00000001;
+      const costDiffers =
+        (storedAverageCost === null) !== (replayedAverageCost === null) ||
+        (storedAverageCost !== null &&
+          replayedAverageCost !== null &&
+          Math.abs(replayedAverageCost - storedAverageCost) > 0.0000000001);
+
+      if (quantityDiffers || costDiffers) {
+        discrepancies.push({
+          accountId: row.accountId,
+          securityId: row.securityId,
+          storedQuantity,
+          storedAverageCost,
+          replayedQuantity,
+          replayedAverageCost,
+        });
+      }
+    }
+    return discrepancies;
   }
 
   /**

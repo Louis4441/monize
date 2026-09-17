@@ -749,6 +749,64 @@ describe("HoldingsService", () => {
       expect(holdingsRepository.remove).not.toHaveBeenCalled();
     });
 
+    it("writes only the named pairs when two scopes span two accounts and two securities", async () => {
+      // The cross product the `In() x In()` read returns is
+      // {acc-1, acc-2} x {sec-1, sec-2}: four pairs for two that were asked
+      // about. The ledger holds a real position in (acc-1, sec-2), which
+      // nobody named, and without the `wanted` filter it folds into the map
+      // and is written from a read that was never meant to cover it.
+      stubLedger(
+        [
+          ...buyBuySellOutOfOrder,
+          {
+            id: "tx-b-s2",
+            accountId: "acc-2",
+            securityId: "sec-2",
+            action: InvestmentAction.BUY,
+            transactionDate: "2026-01-01",
+            quantity: 10,
+            price: 5,
+            commission: 0,
+            createdAt: sameInstant,
+          },
+          {
+            id: "tx-a-s2",
+            accountId: "acc-1",
+            securityId: "sec-2",
+            action: InvestmentAction.BUY,
+            transactionDate: "2026-01-01",
+            quantity: 7,
+            price: 3,
+            commission: 0,
+            createdAt: sameInstant,
+          },
+        ],
+        [mockAccount, mockAccount2],
+      );
+      holdingsRepository.find.mockResolvedValue([
+        mockHolding,
+        // The unnamed pair's stored row: it must survive untouched, neither
+        // rewritten nor deleted.
+        mockHolding2,
+      ]);
+
+      await service.rebuildScopesFromTransactions(
+        USER,
+        [
+          { accountId: "acc-1", securityId: "sec-1" },
+          { accountId: "acc-2", securityId: "sec-2" },
+        ],
+        mockQueryRunner.manager as never,
+      );
+
+      const written = holdingsRepository.save.mock.calls.map(
+        ([row]: [{ accountId: string; securityId: string }]) =>
+          `${row.accountId}:${row.securityId}`,
+      );
+      expect(new Set(written)).toEqual(new Set(["acc-1:sec-1", "acc-2:sec-2"]));
+      expect(holdingsRepository.remove).not.toHaveBeenCalled();
+    });
+
     it("does not touch a non-brokerage account's rows", async () => {
       stubLedger(buyBuySellOutOfOrder, [
         {
@@ -789,6 +847,129 @@ describe("HoldingsService", () => {
       );
 
       expect(order[0]).toBe("lock");
+    });
+  });
+
+  /**
+   * The repair path for holdings written before the ledger-projection rule
+   * (INV-HOLDING-001): a read-only comparison a human acts on, never a write.
+   */
+  describe("findLedgerDiscrepancies", () => {
+    const USER = "11111111-1111-1111-1111-111111111111";
+
+    const buyBuySell = [
+      {
+        id: "tx-1",
+        accountId: "acc-1",
+        securityId: "sec-1",
+        action: InvestmentAction.BUY,
+        transactionDate: "2026-01-01",
+        quantity: 100,
+        price: 10,
+        commission: 0,
+        createdAt: new Date("2026-04-01T00:00:00.000Z"),
+      },
+      {
+        id: "tx-2",
+        accountId: "acc-1",
+        securityId: "sec-1",
+        action: InvestmentAction.BUY,
+        transactionDate: "2026-03-01",
+        quantity: 100,
+        price: 20,
+        commission: 0,
+        createdAt: new Date("2026-04-01T00:00:01.000Z"),
+      },
+      {
+        id: "tx-3",
+        accountId: "acc-1",
+        securityId: "sec-1",
+        action: InvestmentAction.SELL,
+        transactionDate: "2026-02-01",
+        quantity: 50,
+        price: 12,
+        commission: 0,
+        createdAt: new Date("2026-04-01T00:00:02.000Z"),
+      },
+    ];
+
+    /**
+     * The ledger read honours the `order` option, as the database does: the
+     * whole point of the comparison is that the replay's order is not the
+     * order the rows were entered in, so a stub that returned the fixture's
+     * own order would make the mismatch vanish.
+     */
+    const stubReads = (
+      stored: Record<string, unknown>[],
+      ledger: Record<string, unknown>[],
+    ) => {
+      mockQueryRunner.manager.find.mockImplementation(
+        (entity: unknown, options: { order?: Record<string, string> }) => {
+          if (entity === Account) return Promise.resolve([mockAccount]);
+          if (entity === Holding) return Promise.resolve(stored);
+          if (entity !== InvestmentTransaction) return Promise.resolve([]);
+          const keys = Object.keys(options?.order ?? {});
+          const sorted = [...ledger].sort((a, b) => {
+            for (const key of keys) {
+              const left = String(a[key] ?? "");
+              const right = String(b[key] ?? "");
+              if (left !== right) return left < right ? -1 : 1;
+            }
+            return 0;
+          });
+          return Promise.resolve(sorted);
+        },
+      );
+    };
+
+    it("reports a stored average cost the replay disagrees with, and writes nothing", async () => {
+      // The issue #1388 shape: 15.00 blended in insertion order against
+      // 16.6667 replayed by date.
+      stubReads(
+        [{ ...mockHolding, quantity: 150, averageCost: 15 }],
+        buyBuySell,
+      );
+
+      const found = await service.findLedgerDiscrepancies(
+        USER,
+        mockQueryRunner.manager as never,
+      );
+
+      expect(found).toHaveLength(1);
+      expect(found[0].storedAverageCost).toBeCloseTo(15, 8);
+      expect(found[0].replayedAverageCost).toBeCloseTo(2500 / 150, 6);
+      expect(holdingsRepository.save).not.toHaveBeenCalled();
+      expect(holdingsRepository.remove).not.toHaveBeenCalled();
+      expect(mockQueryRunner.manager.save).not.toHaveBeenCalled();
+      expect(mockQueryRunner.manager.remove).not.toHaveBeenCalled();
+    });
+
+    it("reports nothing when the stored row already equals the replay", async () => {
+      stubReads(
+        [{ ...mockHolding, quantity: 150, averageCost: 2500 / 150 }],
+        buyBuySell,
+      );
+
+      const found = await service.findLedgerDiscrepancies(
+        USER,
+        mockQueryRunner.manager as never,
+      );
+
+      expect(found).toEqual([]);
+    });
+
+    it("reports a stored row the ledger accounts for no shares at all", async () => {
+      stubReads([{ ...mockHolding, quantity: 100, averageCost: 12 }], []);
+
+      const found = await service.findLedgerDiscrepancies(
+        USER,
+        mockQueryRunner.manager as never,
+      );
+
+      // A different finding from "a different number": nothing behind it.
+      expect(found).toHaveLength(1);
+      expect(found[0].replayedQuantity).toBeNull();
+      expect(found[0].replayedAverageCost).toBeNull();
     });
   });
 

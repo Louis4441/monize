@@ -337,17 +337,49 @@ Enforcement         No path writes the columns incrementally. Every ledger write
 Concurrency scope   per (account, security)
 Retry semantics     Serialized by the lock; a lost update cannot occur.
 Failure response    the stored holding equals a deterministic replay of the ledger.
+Repair path         a row written before this rule can still be wrong, and
+                    nothing in the database says which: an average cost is a bare
+                    number with no record of how it was arrived at.
+                    HoldingsDriftReportService
+                    (securities/holdings-drift-report.service.ts) reports them at
+                    boot, read-only, through
+                    HoldingsService.findLedgerDiscrepancies -- the same fold the
+                    rebuild writes from -- naming both figures and
+                    POST /holdings/rebuild. It writes nothing: no migration and
+                    no unattended rebuild, because the same replay that repairs
+                    pre-rule drift would silently overwrite an incomplete
+                    imported history, and the owner is the one who can tell the
+                    two apart.
 Known gap           an unpriced acquisition (acquisitionCost returns null) adds
                     shares but no basis, so the average cost it produces is a
                     partial figure with nothing marking it as one. The column has
                     no completeness flag; the surfaces that need one derive it
                     from the ledger (docs/financial-calculation-contract.md).
+                    Four narrower risks are open and unclosed, recorded here
+                    rather than fixed in passing: action-history.service.ts keeps
+                    a second fold over the ledger that does not filter by
+                    SHARE_MOVING_ACTIONS, so its undo/redo rebuild and
+                    computeHoldingsMap can disagree about a non-share-moving
+                    action; transferSecurity reads the source position's carried
+                    cost before the transaction it writes in, so a concurrent
+                    trade can move the basis between the read and the write;
+                    update() and remove() derive the scopes they will rebuild
+                    from a snapshot loaded before the transaction, without
+                    lockInvestmentTransactionRow, so a row that moved account or
+                    security in between is rebuilt on the old pair; and a
+                    security recorded in GBX normalizes to GBP for the provider
+                    currency check (quote-currency.util.ts) while currency_code
+                    stays GBX, so every reader of that column sees a unit the
+                    prices are not in.
 Required tests      Two-connection (concurrent trades on one holding, the stored
                     row compared against the replay):
                     backend/test/integration/holding-concurrent-trades.integration.spec.ts.
                     Out-of-order entry through the real service, stored row
                     compared against the replay:
                     backend/test/integration/holding-ledger-projection.integration.spec.ts.
+                    Read-only drift report, seeded mismatch logged and nothing
+                    written: securities/holdings-drift-report.service.spec.ts and
+                    the findLedgerDiscrepancies cases in holdings.service.spec.ts.
                     Source scan: no average-cost arithmetic outside the fold,
                     and no hand-written replay order over the investment ledger
                     (an ORDER BY or a TypeORM `order` naming transaction_date
