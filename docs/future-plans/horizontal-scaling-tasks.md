@@ -98,7 +98,7 @@
 | C1 | `claimOnce` per owner and month around budget period rollover | -- | neutral | [x] |
 | C2 | Deployment-wide `fetch_sync` lease around FX, security price and market index fetches | -- | neutral | [x] |
 | C3 | Release-check cache to a one-row table | -- | neutral | [x] |
-| C4 | Demo seed under the lifecycle advisory lock | -- | neutral (demo only) | [ ] |
+| C4 | Demo seed under the lifecycle advisory lock | -- | neutral (demo only) | [x] |
 | G1 | Whole-tree process-local-state guard with allowlist | A4, X1, R4 | none | [ ] |
 | G2 | `INV-HA-001..005` in both contract docs | A3, K1, R3, S1 | none | [ ] |
 | D1 | Helm: Deployments, PDB, spread, autoscaling, `clusterMode`, `redis.url` | F2 | none (defaults unchanged) | [ ] |
@@ -1302,12 +1302,14 @@ task adds.
 
 ### C4 -- Demo seed under the lifecycle advisory lock
 
-- [ ] Status:
+- [x] Status: done.
 
-**Scope:** `backend/src/db-demo-check.ts`, `backend/src/database/seed.ts`,
-`backend/docker-entrypoint.sh` (only if the step order changes),
-`backend/src/startup-logging.spec.ts` (`PRE_BOOT_SCRIPTS` already lists both;
-confirm).
+**Scope:** `backend/src/db-demo-check.ts` and its spec,
+`backend/src/database/seed.ts`,
+`backend/test/integration/demo-seed-lock.integration.spec.ts` (new).
+`backend/docker-entrypoint.sh` is **unchanged** -- the step order did not need
+to move -- and `PRE_BOOT_SCRIPTS` in `backend/src/startup-logging.spec.ts`
+already lists both scripts, confirmed by running it.
 
 **Pattern:** `backend/src/db-init.ts`'s use of `DB_LIFECYCLE_LOCK_KEY` from
 `backend/src/common/db/advisory-locks.ts`: session-scoped blocking
@@ -1324,7 +1326,37 @@ keeps one shape (named `Logger`, no `console`).
 seed invocations (the `db-init` spec, if one exists, is the pattern; else a
 small harness calling the exported function twice on two connections).
 
-**Notes:**
+**Notes:** both halves are needed and neither is sufficient. The probe takes the
+lock before it reads, so two containers starting together do not both read "no
+demo user" at once -- but a session lock dies with its connection and the shell
+runs the seeder as a **separate process**, so the probe cannot hold it across
+its own exit. `seed.ts` therefore re-asks the same question after acquiring the
+lock itself, on the connection that holds it: the probe narrows the window, the
+re-check closes it.
+
+The re-check has to be on the locked connection, which is why
+`demoUserExistsOn(client)` was split out of `demoUserExists()`. Asking on a
+second connection would be answering about a moment the lock does not cover.
+
+`seed.ts` opens its own direct `pg.Client` for the lock -- never the pooled
+runtime connection, which the RLS design forbids from holding cross-transaction
+session state, and which a transaction-mode pooler could put the lock and the
+read on different server sessions of. It opens it *before* the Nest application
+context, so a follower that finds the seed done exits without paying for one,
+and holds it until the seed has finished so a waiter re-reads a completed seed
+rather than a half-written one.
+
+A follower that finds the demo user exits **0**, not 1: the data it would have
+written is already there, and a non-zero exit would crash-loop a pod over work
+that is done.
+
+The non-demo `SeedService` path takes the lock too (it is a lifecycle
+operation) but has no predicate to re-check; it is only ever run by hand.
+
+The integration spec drives `acquireDbLifecycleLock` and `demoUserExistsOn` on
+two real connections rather than invoking `seed.ts`, which calls `process.exit`
+and builds a Nest context -- neither belongs in a Jest worker, and neither is
+what this task changed.
 
 ### G1 -- Whole-tree process-local-state guard
 
