@@ -88,7 +88,7 @@
 | G2 | `INV-HA-001..005` in both contract docs | A3, K1, R3, S1 | none | [ ] |
 | D1 | Helm: Deployments, PDB, spread, autoscaling, `clusterMode`, `redis.url` | F2 | none (defaults unchanged) | [ ] |
 | D2 | `docker-compose.ha.yml` example | F2 | none | [ ] |
-| D3 | CI: `redis` service in the integration job | -- | none | [ ] |
+| D3 | CI: `redis` service in the integration job | -- | none | [x] |
 | D4 | E2E: one shard on `CLUSTER_MODE=multi` with two backends | R6, T1, D1 | none | [ ] |
 
 ## Suggested order
@@ -1188,7 +1188,7 @@ both backends green; killing one backend leaves the app usable.
 
 ### D3 -- CI Redis service
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `.github/workflows/ci.yml` (`backend-integration-tests` job).
 
@@ -1203,7 +1203,15 @@ it per test.
 **Acceptance:** the `zizmor-scan` job stays green (the pin); the job runs
 unchanged until R6/T1 add specs.
 
-**Notes:**
+**Notes:** `redis:7-alpine` resolved to
+`sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf`, a
+multi-arch index. Resolve a refresh the same way rather than copying a
+per-architecture manifest digest, which would pin CI to one runner
+architecture.
+
+`zizmor --offline .github/workflows/ci.yml` reports no findings. Note that the
+`zizmor-scan` job runs the scan with `|| true` and only uploads SARIF, so it
+cannot go red on a finding; the pin is for the finding's sake, not the job's.
 
 ### D4 -- E2E shard on `CLUSTER_MODE=multi`
 
