@@ -302,10 +302,17 @@ export class SecurityPriceService {
   /**
    * Try each provider in registry order. Both "throws" and "returns null"
    * trigger the fallback. Returns the first quote that has a usable price.
+   *
+   * `group` is every security the caller will write this answer to -- the
+   * symbol/exchange group the fetch is made for, defaulting to `security`
+   * alone. The fetch-time currency check passes the answer on when *any*
+   * member could store it (see `acceptedBySomeMember`); the refusal that
+   * decides what is written is still made per security at the write.
    */
   private async fetchQuoteWithFallback(
     security: Security,
     ctx: UserContext,
+    group: readonly Security[] = [security],
   ): Promise<QuoteAcceptance> {
     const ordered = this.providers.resolveForSecurity(
       security,
@@ -330,8 +337,8 @@ export class SecurityPriceService {
           // anybody can store it, and a provider quoting another listing of
           // this ticker is passed over rather than accepted -- the next
           // provider gets its turn and faces the same check.
-          const mismatch = this.refuseForeignCurrency(
-            security,
+          const mismatch = this.acceptedBySomeMember(
+            group,
             quote.currencyCode,
             provider.name,
           );
@@ -359,10 +366,12 @@ export class SecurityPriceService {
     return { quote: null, refusal };
   }
 
+  /** Same group semantics as `fetchQuoteWithFallback`. */
   private async fetchHistoricalWithFallback(
     security: Security,
     range: string,
     ctx: UserContext,
+    group: readonly Security[] = [security],
   ): Promise<HistoricalAcceptance> {
     const ordered = this.providers.resolveForSecurity(
       security,
@@ -379,8 +388,8 @@ export class SecurityPriceService {
           this.optsFor(provider, security, ctx),
         );
         if (series && series.prices.length > 0) {
-          const mismatch = this.refuseForeignCurrency(
-            security,
+          const mismatch = this.acceptedBySomeMember(
+            group,
             series.currencyCode,
             provider.name,
           );
@@ -414,10 +423,11 @@ export class SecurityPriceService {
    * series) is accepted as unverified rather than refused, because refusing it
    * would leave those securities with no prices; the decision is logged.
    *
-   * Called per *security*, never per group: the refresh and backfill passes
-   * fetch once for a representative and write for every security sharing its
-   * symbol and exchange, and those securities can be recorded in different
-   * currencies.
+   * At a *write* this is called per security, never per group: the refresh and
+   * backfill passes fetch once for a representative and write for every
+   * security sharing its symbol and exchange, and those securities can be
+   * recorded in different currencies. At a *fetch* the group form
+   * `acceptedBySomeMember` asks it of the whole group instead.
    */
   private refuseForeignCurrency(
     security: Pick<Security, "symbol" | "currencyCode">,
@@ -449,6 +459,38 @@ export class SecurityPriceService {
     );
     this.logger.warn(message);
     return message;
+  }
+
+  /**
+   * The fetch-time form of `refuseForeignCurrency`, asked of a whole
+   * symbol/exchange group at once.
+   *
+   * A group is keyed on symbol and exchange, never on currency, so its members
+   * can be recorded in different currencies and at most some of them are right
+   * about any one provider answer. Judging the fetch on the representative
+   * alone let one user's mis-recorded currency stop the fetch for every other
+   * holder of that ticker: the whole group was marked failed although the
+   * answer was storable for all but one of them. So the fetch passes the answer
+   * on as soon as *one* member could store it, and the per-security check at
+   * the write (the only refusal point that matters) decides who actually gets
+   * it. Returns `null` to accept, or the refusal message when no member can.
+   */
+  private acceptedBySomeMember(
+    group: readonly Security[],
+    reported: string | null | undefined,
+    provider: QuoteProviderName,
+  ): string | null {
+    const accepting = group.find(
+      (member) =>
+        verifyProviderCurrency(member.currencyCode, reported).accepted,
+    );
+    // Either way this delegates, so the unverified-storage warning and the
+    // refusal message are written in exactly one place.
+    return this.refuseForeignCurrency(
+      accepting ?? group[0],
+      reported,
+      provider,
+    );
   }
 
   private optsFor(
@@ -658,7 +700,7 @@ export class SecurityPriceService {
           defaultQuoteProvider: DEFAULT_QUOTE_PROVIDER,
           preferredExchanges: [],
         };
-        return this.fetchQuoteWithFallback(rep, ctx);
+        return this.fetchQuoteWithFallback(rep, ctx, group);
       },
     );
 
@@ -1253,6 +1295,7 @@ export class SecurityPriceService {
         representative,
         range ?? "1y",
         ctx,
+        group,
       );
       const daily = dailyAttempt.bundle;
 
@@ -1263,6 +1306,7 @@ export class SecurityPriceService {
           representative,
           "max",
           ctx,
+          group,
         );
         maxBundle = maxAttempt.bundle;
         maxRefusal = maxAttempt.refusal;
@@ -1551,7 +1595,12 @@ export class SecurityPriceService {
           defaultQuoteProvider: DEFAULT_QUOTE_PROVIDER,
           preferredExchanges: [],
         };
-        return this.fetchHistoricalWithFallback(rep, SETTLEMENT_RANGE, ctx);
+        return this.fetchHistoricalWithFallback(
+          rep,
+          SETTLEMENT_RANGE,
+          ctx,
+          group,
+        );
       },
     );
 

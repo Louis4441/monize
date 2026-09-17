@@ -61,6 +61,15 @@ be right about the answer. So the check runs again per security immediately
 before each `savePriceData` and `bulkUpsertPrices`, quietly (the fetch path has
 already logged what it had to say).
 
+**A group fetch is judged on the group, never on its representative.** The three
+group paths pass the whole group into `fetchQuoteWithFallback` /
+`fetchHistoricalWithFallback`, which accept the answer as soon as *one* member
+could store it (`acceptedBySomeMember`). Judging the fetch on the representative
+alone meant one user's mis-recorded currency marked every other holder of that
+ticker failed, although the answer was storable for all but one of them. The
+per-security check at the write is what decides who gets the answer; the fetch
+only decides whether to keep looking for a provider.
+
 **Unverifiable is accepted with a warning, and that is a decision, not an
 oversight.** MSN's chart series reports no currency at all, so refusing every
 silent provider would leave MSN-priced securities with no prices; the same goes

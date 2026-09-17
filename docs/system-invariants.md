@@ -677,6 +677,11 @@ Enforcement         securities/providers/quote-currency.util.ts decides it once:
                     settleDailyBarsGlobally), because those fetch once for a
                     representative and write for every security sharing its
                     symbol and exchange -- and the group key holds no currency.
+                    Those three pass the whole group into the fetch helpers,
+                    which accept an answer one member could store
+                    (acceptedBySomeMember) rather than judging the group on its
+                    representative; the per-security check at the write is the
+                    refusal point.
                     The provider contract carries the currency because
                     fetchHistoricalSeries returns a HistoricalSeries bundle; a
                     bare HistoricalPrice[] cannot state what its numbers are in.
@@ -707,7 +712,9 @@ Required tests      Present: providers/quote-currency.util.spec.ts (the table:
                     security-price.service.spec.ts, which asserts no write mock is
                     called on a mismatched quote, on a mismatched historical
                     series, and when the fallback provider is the mismatching one,
-                    and that an unreported currency is stored with a warning.
+                    that an unreported currency is stored with a warning, and
+                    that a group whose representative refuses still prices the
+                    members the answer fits (refresh and backfill).
                     Owed: an integration test that a refused refresh leaves the
                     previous row intact.
 Status              partial

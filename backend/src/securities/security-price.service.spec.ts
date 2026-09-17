@@ -3871,6 +3871,109 @@ describe("SecurityPriceService", () => {
       expect(priceWrites()).toHaveLength(0);
     });
 
+    /**
+     * A symbol group is keyed on symbol and exchange, never on currency. One
+     * member's mis-recorded currency must not decide the fetch for the rest:
+     * the group is asked as a whole, and the refusal is made per security at
+     * the write.
+     */
+    it("prices the members a group answer fits although the representative refuses it", async () => {
+      const misrecorded = {
+        ...mockSecurity,
+        id: "sec-eur",
+        currencyCode: "EUR",
+      } as Security;
+      const correct = {
+        ...mockSecurity,
+        id: "sec-usd",
+        currencyCode: "USD",
+      } as Security;
+      // The mis-recorded one is first, so it is the group's representative.
+      securitiesRepository.find.mockResolvedValue([misrecorded, correct]);
+      global.fetch = jest.fn().mockResolvedValue(
+        createMockFetchResponse(
+          makeYahooChartResponse({
+            currency: "USD",
+            regularMarketPrice: 150,
+          }),
+        ),
+      ) as jest.Mock;
+
+      const result = await service.refreshAllPrices();
+
+      expect(result.updated).toBe(1);
+      expect(result.failed).toBe(1);
+      const writes = priceWrites();
+      expect(writes).toHaveLength(1);
+      expect((writes[0][1] as unknown[])[0]).toBe("sec-usd");
+      const refused = result.results.find((r) => !r.success);
+      expect(refused?.error).toContain("EUR");
+    });
+
+    it("fails the whole group only when no member could store the answer", async () => {
+      const eur = { ...mockSecurity, id: "sec-eur", currencyCode: "EUR" };
+      const cad = { ...mockSecurity, id: "sec-cad", currencyCode: "CAD" };
+      securitiesRepository.find.mockResolvedValue([eur, cad] as Security[]);
+      global.fetch = jest.fn().mockResolvedValue(
+        createMockFetchResponse(
+          makeYahooChartResponse({
+            currency: "USD",
+            regularMarketPrice: 150,
+          }),
+        ),
+      ) as jest.Mock;
+
+      const result = await service.refreshAllPrices();
+
+      expect(result.updated).toBe(0);
+      expect(result.failed).toBe(2);
+      expect(priceWrites()).toHaveLength(0);
+    });
+
+    /**
+     * The per-security check at the backfill write, which the group fetch now
+     * relies on: it is the only thing standing between a group answer and a
+     * member recorded in another currency.
+     */
+    it("backfills only the group members the series' currency fits", async () => {
+      const misrecorded = {
+        ...mockSecurity,
+        id: "sec-eur",
+        currencyCode: "EUR",
+      } as Security;
+      const correct = {
+        ...mockSecurity,
+        id: "sec-usd",
+        currencyCode: "USD",
+      } as Security;
+      securitiesRepository.find.mockResolvedValue([misrecorded, correct]);
+      dataSourceMock.query.mockResolvedValueOnce([]);
+      const daySeconds = 24 * 60 * 60;
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      global.fetch = jest.fn().mockResolvedValue(
+        createMockFetchResponse(
+          makeYahooHistoricalResponse({
+            currency: "USD",
+            timestamps: [nowSeconds - 2 * daySeconds, nowSeconds - daySeconds],
+            closes: [193.0, 194.0],
+          }),
+        ),
+      ) as jest.Mock;
+
+      const result = await service.backfillHistoricalPrices();
+
+      expect(result.successful).toBe(1);
+      expect(result.failed).toBe(1);
+      const writes = priceWrites();
+      expect(writes.length).toBeGreaterThan(0);
+      // Whatever the bulk statement was issued through, every bar it carries
+      // belongs to the security the series' currency fits.
+      for (const [, params] of writes) {
+        expect((params as unknown[]).includes("sec-eur")).toBe(false);
+        expect((params as unknown[]).includes("sec-usd")).toBe(true);
+      }
+    });
+
     it("refuses the fallback provider's answer on the same comparison", async () => {
       securitiesRepository.find.mockResolvedValue([mockSecurity]);
       // The primary has nothing usable, so the fallback gets its turn -- and
