@@ -34,7 +34,11 @@ import {
   convertAtDate,
 } from "../common/time-series/rate-index.util";
 import { FxAggregate } from "../common/fx-aggregate";
-import { applyActionToQuantity } from "../securities/investment-replay.util";
+import {
+  applyActionToQuantity,
+  INVESTMENT_REPLAY_ORDER,
+  INVESTMENT_REPLAY_ORDER_SQL,
+} from "../securities/investment-replay.util";
 import {
   UNFILTERED_INVESTMENT_SCOPE_SQL,
   resolveInvestmentScopeAccountIds,
@@ -1229,7 +1233,7 @@ export class NetWorthService {
            WHERE account_id = ANY($1::UUID[])
              AND transaction_date <= $2
              AND status != 'VOID'
-           ORDER BY transaction_date ASC, created_at ASC`,
+           ORDER BY ${INVESTMENT_REPLAY_ORDER_SQL}`,
             [brokerageIds, end],
           )
         : [];
@@ -1547,7 +1551,7 @@ export class NetWorthService {
              WHERE account_id = ANY($1::UUID[])
                AND transaction_date <= $2
                AND status != 'VOID'
-             ORDER BY transaction_date ASC, created_at ASC`,
+             ORDER BY ${INVESTMENT_REPLAY_ORDER_SQL}`,
             [brokerageIds, end],
           )
         : [];
@@ -2207,7 +2211,7 @@ export class NetWorthService {
           // Rows as effects: a VOID transaction moved no shares.
           status: NON_VOID_INVESTMENT_STATUS,
         },
-        order: { transactionDate: "ASC", createdAt: "ASC" },
+        order: INVESTMENT_REPLAY_ORDER,
       }),
     );
 

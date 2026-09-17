@@ -213,6 +213,48 @@ describe("investment action replay is written once", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("orders every investment_transactions replay through the shared constant", () => {
+    // Issue #1388: a replay ordered only by `(transaction_date, created_at)` is
+    // not a total order -- rows written by one import or one split share
+    // `created_at` to the microsecond -- so two replays of the same unchanged
+    // ledger can relieve basis in different orders and disagree. The `id` leg
+    // is what makes the fold a function of the ledger's contents. The mistake
+    // is mechanical, so it is scanned for rather than written down.
+    //
+    // Only the file that declares the order may spell the columns out.
+    const ORDER_OWNER = "securities/investment-replay.util.ts";
+    const offenders: string[] = [];
+
+    for (const file of files) {
+      const rel = relative(SRC_ROOT, file).split("\\").join("/");
+      if (rel === ORDER_OWNER) continue;
+
+      const source = readFileSync(file, "utf8");
+      // Only files that read the investment ledger; a replay is over
+      // `investment_transactions` or the entity that maps it.
+      const touchesLedger =
+        source.includes("investment_transactions") ||
+        source.includes("InvestmentTransaction");
+      if (!touchesLedger) continue;
+
+      const lines = source.split("\n");
+      for (const [index, line] of lines.entries()) {
+        const rawOrder =
+          /ORDER\s+BY[^`;]*transaction_date\s+ASC/i.test(line) &&
+          !/\bid\s+ASC/i.test(line);
+        const typeormOrder =
+          /order:\s*\{[^}]*transactionDate:\s*["']ASC["']/.test(line) &&
+          !/\bid:\s*["']ASC["']/.test(line);
+        if (rawOrder || typeormOrder) offenders.push(`${rel}:${index + 1}`);
+      }
+    }
+
+    // A replay that genuinely is not over the investment ledger orders its own
+    // rows; nothing qualifies today, and an addition here states which query it
+    // is and why the id tiebreak cannot matter to it.
+    expect(offenders).toEqual([]);
+  });
+
   it("multiplies rather than adds wherever a split ratio is applied", () => {
     // The specific arithmetic that was wrong, caught by shape: a split ratio
     // added to a running quantity. `*=` is the only correct operator here, and

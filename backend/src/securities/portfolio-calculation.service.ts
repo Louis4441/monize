@@ -783,14 +783,13 @@ export class PortfolioCalculationService {
    *
    * Quantity-only actions (ADD_SHARES/REMOVE_SHARES) move units and carry no
    * price, so they leave the running cost alone and mark the lot's basis
-   * **unknown** (`basisKnown: false`). They are not a zero-cost sleeve: the
-   * application itself keeps two different answers for what those units cost.
-   * `HoldingsService.adjustQuantity` leaves `average_cost` per share untouched,
-   * so the stored basis grows with an `ADD_SHARES` and shrinks with a
-   * `REMOVE_SHARES`; `computeHoldingsMap`, the full rebuild, holds `totalCost`
-   * fixed instead, so the same history gives a different stored basis depending
-   * on whether a rebuild has run since. Neither is derivable here, and a
-   * position whose cost has two answers has none.
+   * **unknown** (`basisKnown: false`). They are not a zero-cost sleeve: what
+   * those units cost is not in the ledger at all. `computeHoldingsMap`
+   * (`HoldingsService`) is now the only writer of `quantity` and
+   * `average_cost`, and it holds `totalCost` fixed across such a row, so the
+   * per-share average moves with the count while the money behind it stays
+   * whatever the priced rows said. That is a projection of an unknown, not a
+   * measurement of one, so it is not reported as a basis here.
    *
    * SPLIT is not in that class: it scales quantity and preserves total cost,
    * which is what both live paths do, so the per-share average adjusts and the

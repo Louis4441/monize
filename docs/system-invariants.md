@@ -349,6 +349,9 @@ Required tests      Two-connection (concurrent trades on one holding, the stored
                     compared against the replay:
                     backend/test/integration/holding-ledger-projection.integration.spec.ts.
                     Source scan: no average-cost arithmetic outside the fold,
+                    and no hand-written replay order over the investment ledger
+                    (an ORDER BY or a TypeORM `order` naming transaction_date
+                    without the id leg), both in
                     backend/src/securities/investment-replay.guard.spec.ts.
 Status              enforced
 ```

@@ -21,7 +21,10 @@ import { PORTFOLIO_MOVE_PERCENT_DECIMALS } from "../notification-center/portfoli
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { Security } from "./entities/security.entity";
 import { loadExternalFlowSubtotals } from "./external-flow.util";
-import { applyActionToQuantity } from "./investment-replay.util";
+import {
+  applyActionToQuantity,
+  INVESTMENT_REPLAY_ORDER_SQL,
+} from "./investment-replay.util";
 import {
   UNFILTERED_INVESTMENT_SCOPE_SQL,
   resolveInvestmentScopeAccountIds,
@@ -475,7 +478,7 @@ export class DailyMovementService {
           WHERE account_id = ANY($1::UUID[])
             AND transaction_date <= $2
             AND status != 'VOID'
-          ORDER BY transaction_date ASC, created_at ASC`,
+          ORDER BY ${INVESTMENT_REPLAY_ORDER_SQL}`,
         [accountIds, endDate],
       ),
     );

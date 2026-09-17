@@ -4,7 +4,10 @@ import { withScopedDb } from "../common/db/scoped-db";
 import { FxAggregate } from "../common/fx-aggregate";
 import { convertWithRateLookup } from "../common/currency-conversion.util";
 import { roundMoney } from "../common/round.util";
-import { applyActionToQuantity } from "../securities/investment-replay.util";
+import {
+  applyActionToQuantity,
+  INVESTMENT_REPLAY_ORDER_SQL,
+} from "../securities/investment-replay.util";
 import {
   BOUNDARY_LAG_DAYS,
   closeAt,
@@ -566,7 +569,7 @@ export class AccountBalancesReportService {
           AND security_id IS NOT NULL
           AND status != 'VOID'
           AND transaction_date <= $2
-        ORDER BY transaction_date ASC, created_at ASC`,
+        ORDER BY ${INVESTMENT_REPLAY_ORDER_SQL}`,
       [accountIds, asOfDate],
     );
 

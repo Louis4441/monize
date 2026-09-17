@@ -13,6 +13,7 @@ import {
   applyActionToQuantity,
   baseInvestmentAction,
   CASH_INCOME_ACTIONS,
+  INVESTMENT_REPLAY_ORDER,
 } from "../securities/investment-replay.util";
 import { Account } from "../accounts/entities/account.entity";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
@@ -260,7 +261,7 @@ export class InvestmentReportDataService {
           accountId: In(accountIds),
           status: NON_VOID_INVESTMENT_STATUS,
         },
-        order: { transactionDate: "ASC", createdAt: "ASC" },
+        order: INVESTMENT_REPLAY_ORDER,
       }),
     );
     let groups = this.groupTransactions(transactions, asOfDate);
