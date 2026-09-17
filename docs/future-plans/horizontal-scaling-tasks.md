@@ -41,9 +41,9 @@
 
 | ID | Task | Depends on | Deploy impact | Status |
 |----|------|-----------|---------------|--------|
-| F1 | `CLUSTER_MODE` parsing (`backend/src/common/cluster/cluster-mode.ts`), boot-matrix check as a pure function, `main.ts` refusal/warning wiring, `JWT_SECRET` fatal in every mode, `.env.example` | -- | none (`single` unchanged; the `JWT_SECRET` refusal is the one deliberate exception, called out in the release note) | [ ] |
+| F1 | `CLUSTER_MODE` parsing (`backend/src/common/cluster/cluster-mode.ts`), boot-matrix check as a pure function, `main.ts` refusal/warning wiring, `JWT_SECRET` fatal in every mode, `.env.example` | -- | none (`single` unchanged; the `JWT_SECRET` refusal is the one deliberate exception, called out in the release note) | [x] |
 | F2 | `ClusterModule` (global): mode provider; in `multi`, one `ioredis` client and one subscriber connection with `REDIS_URL` / `REDIS_KEY_PREFIX`; `PING` at boot; readiness probe extension in `backend/src/health/health.controller.ts` | F1 | multi-only | [ ] |
-| F3 | Doc corrections: `docs/concurrency-and-idempotency.md` section 8 (auto-posting and demo reset are claimed), `docs/external-side-effects.md` (reminders dedupe, backup uses `writeFileAtomic`), `docs/cron-jobs.md` note on `CLUSTER_MODE` | -- | none | [ ] |
+| F3 | Doc corrections: `docs/concurrency-and-idempotency.md` section 8 (auto-posting and demo reset are claimed), `docs/external-side-effects.md` (reminders dedupe, backup uses `writeFileAtomic`), `docs/cron-jobs.md` note on `CLUSTER_MODE` | -- | none | [x] |
 | F4 | ADR `0005` (cluster mode and optional Redis; alternatives: PostgreSQL `LISTEN`/`NOTIFY`, sticky routing, always-on Redis), index row in `docs/adr/README.md` | F1 | none | [ ] |
 | A1 | Migration + `schema.sql`: `auth_attempt_counters`, `single_use_tokens`; RLS exemption with reason in `docs/row-level-security-contract.md` and `RLS_EXEMPT_TABLES`; daily sweep cron | -- | none (tables nothing reads yet) | [ ] |
 | A2 | `AuthAttemptCounterService` (atomic upsert `RETURNING count`); `two-factor.service.ts` attempt maps replaced; two-connection spec proves both concurrent increments count | A1 | neutral | [ ] |

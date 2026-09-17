@@ -27,6 +27,7 @@ import { isOidcProviderPath } from "./oauth/oidc-provider-paths";
 import { installOidcProviderLogBridge } from "./oauth/oidc-provider-log-bridge";
 import { DataSource } from "typeorm";
 import { parseRlsMode } from "./common/db/rls-config";
+import { checkClusterBoot } from "./common/cluster/cluster-mode";
 import { assertRuntimeRoleSafe } from "./common/db/runtime-role-check";
 import { assertRequiredDbFunctions } from "./common/db/required-db-functions";
 import { ConfigService } from "@nestjs/config";
@@ -87,6 +88,40 @@ if (process.env.NODE_ENV !== "production") {
     );
     process.exit(1);
   });
+}
+
+/**
+ * Check the cluster boot matrix and exit if this configuration cannot serve.
+ *
+ * Runs before `NestFactory.create` on purpose. Everything it refuses is already
+ * fatal further in -- `JwtStrategy` throws on a missing `JWT_SECRET` -- but it
+ * is fatal as a dependency-injection failure, which reaches the operator as a
+ * stack trace through Nest's container rather than as a sentence naming the
+ * variable. The refusal shape is `assertRequiredDbFunctionsOrExit` below: log
+ * the reason, `process.exit(1)`, before anything listens.
+ */
+function assertClusterBootOrExit(): void {
+  const logger = new Logger("ClusterMode");
+  // Named one by one rather than handing over `process.env`: the list of
+  // variables the boot matrix reads is part of what it promises, and it belongs
+  // where a reader of the bootstrap can see it.
+  const report = checkClusterBoot({
+    CLUSTER_MODE: process.env.CLUSTER_MODE,
+    REDIS_URL: process.env.REDIS_URL,
+    JWT_SECRET: process.env.JWT_SECRET,
+  });
+  for (const warning of report.warnings) {
+    logger.warn(warning);
+  }
+  if (report.refusals.length > 0) {
+    for (const refusal of report.refusals) {
+      logger.error(refusal);
+    }
+    process.exit(1);
+  }
+  if (report.mode === "multi") {
+    logger.log("CLUSTER_MODE=multi: this replica is one of several.");
+  }
 }
 
 /**
@@ -161,6 +196,10 @@ function reportEncryptionKeyStatus(configService: ConfigService): void {
 
 async function bootstrap() {
   logger.log("Starting application");
+
+  // Before the container is built: a refusal here is a sentence, the same
+  // refusal from inside a provider constructor is a stack trace.
+  assertClusterBootOrExit();
 
   const app = await NestFactory.create(AppModule);
 
