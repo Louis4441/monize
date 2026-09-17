@@ -1609,6 +1609,69 @@ CREATE INDEX idx_ai_insights_user_dismissed ON ai_insights(user_id, is_dismissed
 CREATE INDEX idx_ai_insights_expires ON ai_insights(expires_at);
 CREATE INDEX idx_ai_insights_user_type ON ai_insights(user_id, type);
 
+-- AI relay: the queue between a browser holding an SSE stream and the user's
+-- own MCP agent long-polling for work. Rows rather than process memory because
+-- a second replica serving the agent's poll cannot see a prompt the first
+-- replica queued, and a restart between "enqueued" and "answered" loses the
+-- turn with nothing able to notice. Direct RLS bucket, owner only: a delegate
+-- reading someone's accounts has no business claiming their prompts.
+CREATE TABLE IF NOT EXISTS ai_relay_prompts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    -- pending -> claimed -> answered, or expired from either of the first two.
+    -- The CHECK is the state machine's vocabulary; the transitions are
+    -- conditional UPDATEs where the loser gets zero rows.
+    -- Born pending: the default is the initial state, not a convenience.
+    status TEXT NOT NULL DEFAULT 'pending',
+    -- The turn as the agent receives it: prompt text, prior history, attachment
+    -- refs. JSONB because it is a payload handed over whole, never filtered on.
+    prompt JSONB NOT NULL,
+    answer JSONB,
+    -- The MCP session that claimed this turn. A relay turn belongs to ONE
+    -- session; liveness from another session the user has open is not part of it.
+    claimed_by TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    claimed_at TIMESTAMPTZ,
+    answered_at TIMESTAMPTZ,
+    expires_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT ck_ai_relay_prompts_status
+      CHECK (status IN ('pending', 'claimed', 'answered', 'expired'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_relay_prompts_claim
+    ON ai_relay_prompts(user_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_ai_relay_prompts_expiry
+    ON ai_relay_prompts(expires_at);
+
+-- One row per user whose agent has ever polled. Progress, not business data:
+-- these columns decide whether the tunnel indicator reads offline, listening
+-- or busy, and nothing financial reads them.
+CREATE TABLE IF NOT EXISTS ai_relay_agents (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    last_poll_at TIMESTAMPTZ,
+    idle_since TIMESTAMPTZ,
+    idle_disconnected_at TIMESTAMPTZ
+);
+
+-- Write-confirmation cards composed after the browser's stream gave up, so an
+-- action the agent decided on is still approvable when the browser returns
+-- instead of being silently lost.
+CREATE TABLE IF NOT EXISTS ai_relay_actions (
+    -- The descriptor's own id. Text, not UUID: this table does not get to
+    -- choose the grammar of an id the agent minted.
+    id TEXT NOT NULL,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    card JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMPTZ NOT NULL,
+    -- Owner first: the pickup endpoint drains by user, and an action id is only
+    -- unique within the user who owns it.
+    PRIMARY KEY (user_id, id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_relay_actions_expiry
+    ON ai_relay_actions(expires_at);
+
 -- Personal Access Tokens (for MCP server and API access)
 CREATE TABLE personal_access_tokens (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -2671,6 +2734,9 @@ DECLARE
         'attachment_blob_tombstones',
         'ai_insights',
         'ai_provider_configs',
+        'ai_relay_actions',
+        'ai_relay_agents',
+        'ai_relay_prompts',
         'ai_usage_logs',
         'auto_backup_settings',
         'backup_offsite_settings',

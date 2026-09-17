@@ -71,7 +71,7 @@
 | K1 | `oauth_instance_config` + `OauthSigningKeysService`; provider gets `jwks` | -- | neutral | [ ] |
 | X1 | AI action anti-replay onto `single_use_tokens`, MCP path included | A1 | neutral | [ ] |
 | R1 | `EVENT_BUS` token, interface, `MemoryEventBus` wired as default | -- | none | [x] |
-| R2 | Migration: `ai_relay_prompts`, `ai_relay_agents` with RLS policies | -- | none | [ ] |
+| R2 | Migration: `ai_relay_prompts`, `ai_relay_agents` with RLS policies | -- | none | [x] |
 | R3 | Relay queue on rows: insert, claim, answer; in-memory queue maps removed | R1, R2 | neutral | [ ] |
 | R4 | Late answers, buffered actions and agent liveness on rows; remaining maps removed | R3 | neutral | [ ] |
 | R5 | Relay attachments through the attachment storage provider | R3 | neutral | [ ] |
@@ -581,7 +581,7 @@ serving many per-user channels, and this is how a spec sees it.
 
 ### R2 -- Migration: `ai_relay_prompts`, `ai_relay_agents`
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** one migration + `schema.sql`, two entities under
 `backend/src/ai/relay/entities/` (new), `database/CLAUDE.md` only if it lists
@@ -611,7 +611,34 @@ spec picks the tables up from the catalog automatically.
 **Traps:** `JSONB` columns come back as objects from `pg`; do not
 `JSON.parse` them. Prompts may carry attachment references, not bytes (R5).
 
-**Notes:**
+**Notes:** three entities, not the two the Scope names -- step 3's
+`ai_relay_actions` needs one like the other two, and R4 reads it.
+
+Two additions to the shape sketched above, each because the harness or the
+current service demands it:
+
+- `ai_relay_prompts.claimed_by TEXT`. `PendingPrompt.claimedBy` already carries
+  the claiming MCP session, and a relay turn belongs to one session: liveness
+  from another session the same user has open must not steer it. R4's late-answer
+  path reads it. Adding it now costs a column; adding it in R3 costs a migration.
+- `status` carries `DEFAULT 'pending'` and its CHECK is named
+  `ck_ai_relay_prompts_status`. The RLS enforcement spec's generic seeder
+  (`rls-catalog.ts`) generates a `t<n>` string for any NOT NULL text column with
+  no default, which no CHECK-constrained column can accept; a default is how the
+  other such columns in this schema (`security_documents.document_type`) stay
+  seedable, and `pending` is the state a turn is born in rather than a
+  convenience.
+
+The `@Check` and the three `@ManyToOne(() => User, { onDelete: "CASCADE" })`
+relations are on the entities for the same reason: the integration harness
+builds its database from entity metadata, so a constraint or a delete rule that
+only `schema.sql` carries is one no integration spec can observe, and a spec
+that cannot observe it is not evidence about production.
+
+`verify-schema.sh` is blind to a default that differs between a migration and
+`schema.sql`: `CREATE TABLE IF NOT EXISTS` is skipped on the baseline, so the
+two never disagree in its dump. `schema.sql` is the authority for a fresh
+install -- change both by hand and check both.
 
 ### R3 -- Relay queue on rows
 
