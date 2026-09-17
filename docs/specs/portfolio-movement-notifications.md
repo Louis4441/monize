@@ -127,6 +127,38 @@ negative one is a loss the market produced; a deposit-only day is `movement ~= 0
   (INV-NOTIFY-001), from a cron under `withSystemContext` fan-out /
   `withUserContext` body, **after** the day's price refresh. It never hooks a price
   or balance write.
+- **INV-PORTMOVE-007 (a flow is worth its own day's rate).** Status:
+  **enforced**. The external flow is read per day
+  (`loadExternalFlowSubtotals({ perDay: true })`) and each `(date, currency)`
+  subtotal is converted at **that date's** rate, through the one resolver
+  (`ExchangeRateService.getRateForDate`, historical mode, INV-FX-001). Folding a
+  multi-day window at the run day's rate moves the FX difference between the two
+  dates into the movement and reports it as a market return -- a Monday run
+  priced Friday's and Saturday's deposits at Monday's close. A `(date, currency)`
+  pair with no rate makes the flow incomplete, and `missingPairs` names the day
+  as well as the pair, because a withheld figure has to say what would repair it.
+  Held by `portfolio-flow.util.spec.ts` (the fold), the producer's spec (the
+  dates it asks the resolver for) and `test/integration/portfolio-movement-flow.integration.spec.ts`
+  (the same rows through real SQL).
+- **INV-PORTMOVE-008 (a movement needs evidence from its own period).** Status:
+  **enforced**. When a security held in a non-zero quantity has no accepted close
+  dated on or after `baseline_captured_on`, the run is incomplete for the
+  movement: no alert, and the baseline is not advanced. Valuation legitimately
+  carries a close forward (`docs/time-series-contract.md` section 2.1, second
+  exception) and this does **not** change that -- the position keeps its carried
+  value, is not dropped, and the two runs' position sets are not intersected.
+  What it stops is the comparison: a carried position contributes the same figure
+  to both ends only until its price arrives or its row disappears, and that run
+  books the whole catch-up as one day's market move (the 94% "movement" in
+  kenlasko/monize#1391). The dates come from the very observations that priced
+  today's value (`PortfolioService.getLatestPriceObservations`, the dated form of
+  the query `getLatestPrices` runs), so the check cannot disagree with the figure
+  it is vouching for; the policy is `stalePricedSecurityIds`
+  (`notification-center/portfolio-price-freshness.util.ts`). **Consequence, by
+  design:** a holding whose feed dies permanently silences this user's alert
+  until it is priced (manually or otherwise) or the position is closed. That is
+  the "complete, or withhold" trade, and the producer logs the securities it is
+  waiting on.
 - **INV-PORTMOVE-006 (movement is a market return, never a contribution).** The
   external flow is always subtracted; a deposit-only day never fires. The flow is
   derived through `investment-filter.util.ts`, so an auto-generated trade leg is
@@ -201,6 +233,7 @@ for each user with move_alert_percent set:            // withSystemContext fan-o
         record baseline = { mvToday, ccy, today }; return           // 003/004/005
     const flow = externalFlow(A, baseline_captured_on, today)       // Section 2
     if (!flow.complete) return                          // INV-PORTMOVE-001/002 no-op
+    if (anyHeldCloseOlderThan(baseline_captured_on)) return         // INV-PORTMOVE-008
     if (baseline_value == 0):
         record baseline = { mvToday, ccy, today }; return           // INV-PORTMOVE-004
     const movement = mvToday - baseline_value - flow.value
@@ -213,7 +246,9 @@ for each user with move_alert_percent set:            // withSystemContext fan-o
           data: { changePercent: round(pct, PORTFOLIO_MOVE_PERCENT_DECIMALS),
                   direction: pct >= 0 ? "up" : "down",
                   movementValue: movement, baselineValue: baseline_value,
-                  currentValue: mvToday, currencyCode: ccy },
+                  currentValue: mvToday, externalFlow: flow.value,
+                  baselineDate: baseline_captured_on, valuationDate: today,
+                  currencyCode: ccy },
           target: "/investments",
           dedupeKey: `portmove:${userId}:${today}`,      // one per day
         })
@@ -224,6 +259,16 @@ for each user with move_alert_percent set:            // withSystemContext fan-o
 (crossing). Delivery, throttle and fan-out are the seam's. The baseline advances
 to today's complete `MV` on every complete run whether or not it fired, so the next
 day measures from today.
+
+**The alert names what it measured.** The period is both boundary dates
+(`baselineDate`, `valuationDate`) and the figure is its three components
+(`baselineValue`, `currentValue`, `externalFlow`) in the one currency, so a
+reader can reproduce it instead of trusting it. The copy says the period -- a
+Monday run measures from Friday, and "today" was wrong as often as it was right.
+No new column: `notification_portfolio_state.baseline_captured_on` already is the
+period's opening date, and `valuationDate` is the run's own day. A row written
+before the producer carried these falls back WHOLE to its stored English copy
+rather than being relabelled with a day it was never about.
 
 ---
 
@@ -261,8 +306,12 @@ completeness sources.
 ## 8. Missing-data policy
 
 - `valuationComplete !== true` on the current run -> no alert, no rebaseline.
-- `externalFlow` incomplete (any included flow unconvertible) -> no alert, no
+- `externalFlow` incomplete (any included `(date, currency)` subtotal
+  unconvertible **at its own date**, INV-PORTMOVE-007) -> no alert, no
   rebaseline.
+- A held position whose latest accepted close predates `baseline_captured_on`
+  (INV-PORTMOVE-008) -> no alert, no rebaseline. The position keeps its carried
+  value in the valuation; it is the comparison that is refused.
 - A stored baseline is only ever a complete `MV`.
 - `baseline_value == 0` -> undefined percentage -> no alert, rebaseline only.
 - No value is defaulted, no flow is defaulted to zero, no percentage is computed
@@ -334,7 +383,20 @@ completeness sources.
     the producer does not `roundMoney` a percentage).
 11. **Write door / category wiring / delivery matrix / target route**: the
     `INVESTMENTS` category resolves, the target resolves, one writer.
-12. **Rolling-deploy safety**: an absent `valuationComplete` reads as incomplete.
+12. **Rolling-deploy safety**: an absent `valuationComplete` reads as incomplete,
+    and a stored row with no `baselineDate`/`valuationDate` falls back whole to
+    its stored copy rather than being relabelled.
+13. **Flow rate date** (INV-PORTMOVE-007): a deposit on a Saturday folds at
+    Saturday's rate on a Monday run, and the resolver is never asked for the run
+    day's rate for it; one day's missing rate withholds and names that day.
+14. **Stale price withholds** (INV-PORTMOVE-008): a held position last priced
+    before the baseline date raises nothing and leaves the baseline where it was,
+    while a position priced ON the baseline date is current.
+
+Integration additionally owns the classification itself
+(`test/integration/portfolio-movement-flow.integration.spec.ts`): the internal
+transfer, the transfer that crossed the boundary and the mixed split, run as real
+SQL, plus the per-day conversion over them.
 
 Integration (CI-owned): the baseline read-modify-write under `withScopedDb`, the
 RLS policy, schema drift, the new table's backup round-trip, and a real

@@ -148,6 +148,8 @@ implied.
 | INV-DISPATCH-002 | The in-app row is written for every `notify`, whatever the matrix or the throttle says | enforced |
 | INV-DISPATCH-003 | The throttle gates only the notification-mode fan-out, never the in-app row or a report, and never an escalation | enforced |
 | INV-DISPATCH-004 | A failed push or email never rolls back, or surfaces through, the notification it is about | enforced |
+| INV-PORTMOVE-007 | A portfolio movement's external flow is converted at the date each amount crossed the boundary | enforced |
+| INV-PORTMOVE-008 | A portfolio movement is withheld while a held position's price predates the period it measures | enforced |
 | INV-RLS-001 | Enforced mode refuses to run on a role that can bypass RLS | enforced |
 | INV-CACHE-001 | A money-moving write invalidates every derived cache | enforced |
 | INV-DAYNOTE-001 | A calendar date is covered by at most one of a user's notes, and a save never reads first | enforced |
@@ -3452,6 +3454,76 @@ Why it exists       A read-path producer (bill reminders on GET /notifications)
                     detaches the fan-out so a stalled push endpoint cannot hold
                     the reader; the guarantee has to hold on that path exactly
                     as on the awaited one.
+Status              enforced
+```
+
+### INV-PORTMOVE-007 -- a flow is worth its own day's rate
+
+```text
+Statement           The external cash flow subtracted from a portfolio movement
+                    is converted per (date, currency) at the rate of the date the
+                    cash crossed the boundary, never at the rate of the day the
+                    producer happens to run. A pair with no rate on its own date
+                    makes the flow unknown, which withholds the movement.
+Source of truth     transactions (the dated subtotals) and exchange_rates.
+Enforcement         loadExternalFlowSubtotals({ perDay: true }) supplies the date;
+                    foldExternalFlow takes rateFor(currency, date) and both
+                    callers -- PortfolioMovementAlertService.externalFlow and
+                    DailyMovementService.flowOn -- resolve that date's rate
+                    through the one FX door (ExchangeRateService.getRateForDate /
+                    convertAtDate, INV-FX-001). The fold accumulates integer
+                    1/10000 units, so a many-day window does not drift.
+Concurrency scope   per user, per run
+Retry semantics     Read-only and idempotent: a re-run resolves the same dates.
+Crash semantics     No write precedes the decision; a crash leaves the baseline.
+Failure response    complete: false, missingPairs naming the pair AND the day;
+                    the producer withholds and does not advance the baseline.
+Required tests      notification-center/portfolio-flow.util.spec.ts (the fold),
+                    notification-center/portfolio-movement-alert.service.spec.ts
+                    (the dates the resolver is asked for),
+                    test/integration/portfolio-movement-flow.integration.spec.ts
+                    (the same rows through real SQL).
+Why it exists       The producer converted a whole window at the run day's rate,
+                    so a Monday run priced Friday's and Saturday's deposits at
+                    Monday's close and reported the weekend's FX move as a market
+                    return (kenlasko/monize#1391).
+Status              enforced
+```
+
+### INV-PORTMOVE-008 -- a movement needs evidence from its own period
+
+```text
+Statement           While a security held in a non-zero quantity has no accepted
+                    close dated on or after the baseline date, the run is
+                    incomplete for the movement: no alert, and the baseline is
+                    not advanced. The position is NOT dropped from the valuation
+                    and the two runs' position sets are not intersected -- it is
+                    the comparison that is refused, not the value.
+Source of truth     security_prices (the observation that priced the position).
+Enforcement         PortfolioService.getLatestPriceObservations returns the dated
+                    form of the query getLatestPrices already ran, so the check
+                    reads the very rows that produced today's value;
+                    stalePricedSecurityIds
+                    (notification-center/portfolio-price-freshness.util.ts) is the
+                    policy and decideMovement applies it before the arithmetic.
+Concurrency scope   per user, per run
+Retry semantics     Read-only and idempotent.
+Crash semantics     No write precedes the decision.
+Failure response    No notification; baseline unchanged; the producer logs the
+                    securities it is waiting on.
+Required tests      notification-center/portfolio-price-freshness.util.spec.ts,
+                    notification-center/portfolio-movement.util.spec.ts (the
+                    guard's position in the order),
+                    notification-center/portfolio-movement-alert.service.spec.ts.
+Why it exists       A carried close contributes the same figure to both ends of
+                    the comparison only until it arrives or disappears; the run
+                    it changes on books the whole catch-up as one day's market
+                    move -- the 94% "movement" in kenlasko/monize#1391. Carrying
+                    a close forward is legitimate for VALUATION
+                    (docs/time-series-contract.md section 2.1, second exception),
+                    which is why this refuses the movement rather than the price.
+                    Consequence by design: a permanently dead feed silences this
+                    user's alert until the holding is priced or closed.
 Status              enforced
 ```
 

@@ -134,6 +134,8 @@ INV-LOAN-002's entry names the missing source scan while its row said `--`.
 | INV-DISPATCH-002 in-app row always written | **required** | -- | optional | -- | -- | -- | -- | -- |
 | INV-DISPATCH-003 throttle gates fan-out only | **required** | -- | optional | required (not yet met) | optional | -- | -- | -- |
 | INV-DISPATCH-004 delivery failure never surfaces | **required** | -- | -- | -- | -- | required | -- | -- |
+| INV-PORTMOVE-007 flow priced on its own date | **required** | supporting | **required** | -- | -- | -- | -- | optional |
+| INV-PORTMOVE-008 movement needs its period's evidence | **required** | supporting | optional | -- | -- | -- | -- | optional |
 | INV-RLS-001 role privilege | supporting | -- | **required** | -- | required | -- | -- | -- |
 | INV-CACHE-001 cache invalidation | required | **required** | -- | -- | -- | -- | -- | required |
 | INV-DAYNOTE-001 one note covering a day | supporting | -- | required | **required** (not yet met) | -- | -- | -- | optional |
