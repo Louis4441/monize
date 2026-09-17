@@ -2247,9 +2247,12 @@ export class InvestmentTransactionsService {
      */
     parentStatus?: TransactionStatus,
   ): Promise<InvestmentTransaction> {
-    // First database statement this method makes in the caller's transaction:
-    // advisory before row locks (`common/db/locks.ts`). The rebuild at the end
-    // takes the same re-entrant lock.
+    // First database statement this method makes; the rebuild at the end takes
+    // the same re-entrant lock. It is *not* the first statement of the caller's
+    // transaction: a split rebuild has already row-locked the parent by the time
+    // it gets here, so the caller takes `lockEmbeddedInvestmentScopes` before
+    // that row lock and this call then costs nothing
+    // (`common/db/locks.ts`, 40P01).
     await lockHoldingScope(manager, [brokerageAccountId]);
 
     if (!isInvestmentActionAllowedInSplit(dto.action)) {

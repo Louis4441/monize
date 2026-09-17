@@ -332,6 +332,18 @@ way:
   it -- which is the same cycle and the same first statement.
   `applyParentStatusToEmbeddedRows` takes the same re-entrant lock itself, so a
   caller that forgets still cannot reach the rebuild without it.
+- **A split set replaced.** `TransactionSplitService.updateSplits` is the same
+  cycle without a status change: it row-locks the parent, then tears the
+  existing embedded investment rows down (`deleteSplitSideEffects` ->
+  `reverseAndRemoveEmbedded` -> the rebuild) and builds the new ones
+  (`createEmbeddedForSplit`), each under the holdings advisory lock. It takes
+  `lockEmbeddedInvestmentScopes` as the first statement of its transaction for
+  the same reason, and `createEmbeddedForSplit`'s own call is then the re-entrant
+  one. `addSplit` refuses an investment split outright and reaches no advisory
+  lock, so it needs none. A brokerage account only the incoming splits name is
+  not locked up front: no committed embedded row of that parent sits in it, so
+  no transaction can hold that account's advisory lock while waiting for this
+  parent's row.
 - **An import.** `ImportService` takes `lockHoldingScope` over every investment
   account the user already has as the first statement of both import
   transactions, because the accounts the file turns out to touch are discovered
@@ -389,7 +401,7 @@ worth keeping: CONC-003 can only be checked against a list of all writers.
 | `accounts/accounts.service.ts` `close` | `Account` row | Race between the balance check and the close |
 | `strategies/gem-signal.service.ts` | advisory, per `strategyId` | Materialization interleaving with a settings save |
 | `securities/investment-transactions.service.ts` `create`, `update`, `remove`, `transferSecurity`, `createEmbeddedForSplit` | advisory, per account (`lockHoldingScope`), first statement of the transaction | A ledger write and a rebuild racing on one position, and the lock order that keeps it deadlock-free |
-| `transactions/transaction-reconciliation.service.ts`, `transactions/transaction-bulk-update.service.ts`, `transactions/transactions.service.ts` `update` (split-parent writes) | advisory, per brokerage account (`lockEmbeddedInvestmentScopes`), first statement of the transaction | The embedded rows' rebuild takes the same lock, and an investment write row-locks the same parent after taking it |
+| `transactions/transaction-reconciliation.service.ts`, `transactions/transaction-bulk-update.service.ts`, `transactions/transactions.service.ts` `update`, `transactions/transaction-split.service.ts` `updateSplits` (split-parent writes) | advisory, per brokerage account (`lockEmbeddedInvestmentScopes`), first statement of the transaction | The embedded rows' rebuild takes the same lock, and an investment write row-locks the same parent after taking it |
 | `import/import.service.ts` | advisory, per investment account (`lockHoldingScope`), first statement of the import transaction | The import's balance writes row-lock `accounts` before `rebuildImportedHoldings` |
 
 ### Conditional claims that exist
