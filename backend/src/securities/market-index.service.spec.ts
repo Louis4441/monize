@@ -13,6 +13,11 @@ import {
   DataSourceMock,
   ManagerMock,
 } from "../test-helpers/scoped-db-testing";
+import {
+  createFetchSyncMock,
+  type FetchSyncMock,
+} from "../test-helpers/job-claim-testing";
+import { FetchSyncJob } from "../common/jobs/fetch-sync.service";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -92,6 +97,7 @@ function bar(
 
 describe("MarketIndexService", () => {
   let service: MarketIndexService;
+  let fetchSync: FetchSyncMock;
   let manager: ManagerMock;
   let dataSource: DataSourceMock;
   let yahoo: jest.Mocked<
@@ -117,10 +123,12 @@ describe("MarketIndexService", () => {
     };
     breakerClock = Date.now();
     health = createTestProviderHealth(() => breakerClock);
+    fetchSync = createFetchSyncMock();
     service = new MarketIndexService(
       dataSource as never,
       yahoo as never,
       health,
+      fetchSync as never,
     );
   });
 
@@ -900,6 +908,30 @@ describe("MarketIndexService", () => {
     it("seeds its own system context, since no request is behind it", async () => {
       await service.scheduledRefresh();
       expect(systemContext).toHaveBeenCalled();
+    });
+
+    it("takes the deployment-wide lease before calling the provider", async () => {
+      await service.scheduledRefresh();
+
+      expect(fetchSync.withLease).toHaveBeenCalledWith(
+        FetchSyncJob.MarketIndexes,
+        expect.any(Number),
+        expect.any(Function),
+      );
+      // Shorter than the daily interval, so a crashed holder never blocks the
+      // next tick.
+      const [, leaseMs] = fetchSync.withLease.mock.calls[0];
+      expect(leaseMs).toBeLessThan(24 * 60 * 60 * 1000);
+    });
+
+    // 24 indexes x up to 11 yearly chunks, once per replica, is exactly the
+    // burst the lease exists to collapse.
+    it("fetches nothing when another replica holds the lease", async () => {
+      fetchSync.withLease.mockImplementation(async () => false);
+
+      await service.scheduledRefresh();
+
+      expect(yahoo.fetchHistoricalWindow).not.toHaveBeenCalled();
     });
 
     it("ignores the cooldown: a daily schedule is the request", async () => {

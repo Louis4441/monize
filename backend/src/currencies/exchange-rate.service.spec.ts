@@ -13,6 +13,12 @@ import {
   getRequestContext,
   requestContextStorage,
 } from "../common/request-context";
+import {
+  createFetchSyncMock,
+  fetchSyncProvider,
+  type FetchSyncMock,
+} from "../test-helpers/job-claim-testing";
+import { FetchSyncJob } from "../common/jobs/fetch-sync.service";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -29,6 +35,7 @@ jest.mock("../common/date-utils", () => ({
 
 describe("ExchangeRateService", () => {
   let service: ExchangeRateService;
+  let fetchSync: FetchSyncMock;
   let health: ProviderHealthService;
   let exchangeRateRepository: Record<string, jest.Mock>;
   /** Rows the single-rate upsert wrote, in order, as the service supplied them. */
@@ -165,6 +172,7 @@ describe("ExchangeRateService", () => {
     };
 
     health = createTestProviderHealth();
+    fetchSync = createFetchSyncMock();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ExchangeRateService,
@@ -173,6 +181,7 @@ describe("ExchangeRateService", () => {
         // The real breaker, so a spec that drives the provider to failure sees
         // what production sees.
         { provide: ProviderHealthService, useValue: health },
+        fetchSyncProvider(fetchSync),
       ],
     }).compile();
 
@@ -1507,6 +1516,41 @@ describe("ExchangeRateService", () => {
 
       // Should not throw
       await expect(service.scheduledRateRefresh()).resolves.toBeUndefined();
+    });
+
+    it("takes the deployment-wide lease before calling the provider", async () => {
+      dataSource.query.mockResolvedValue([{ code: "USD" }]);
+
+      await service.scheduledRateRefresh();
+
+      expect(fetchSync.withLease).toHaveBeenCalledWith(
+        FetchSyncJob.ExchangeRates,
+        expect.any(Number),
+        expect.any(Function),
+      );
+    });
+
+    // The reason the lease exists: N replicas firing this cron is N times the
+    // provider bill, and the upserts underneath converge either way.
+    it("makes no provider call when another replica holds the lease", async () => {
+      fetchSync.withLease.mockImplementation(async () => false);
+      dataSource.query.mockResolvedValue([{ code: "USD" }]);
+
+      await service.scheduledRateRefresh();
+
+      expect(yahooFinanceService.fetchQuote).not.toHaveBeenCalled();
+    });
+
+    it("keeps the lease shorter than the daily interval", async () => {
+      dataSource.query.mockResolvedValue([{ code: "USD" }]);
+
+      await service.scheduledRateRefresh();
+
+      // A crashed holder must never block the next tick; the expiry alone is
+      // what hands the job back.
+      const [, leaseMs] = fetchSync.withLease.mock.calls[0];
+      expect(leaseMs).toBeLessThan(24 * 60 * 60 * 1000);
+      expect(leaseMs).toBeGreaterThan(0);
     });
   });
   /**

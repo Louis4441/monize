@@ -155,6 +155,10 @@ export const INTENTIONALLY_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
   // instance must not hand it the keys that sign for the real issuer, and the
   // ciphertext would be unreadable there anyway without the same ENCRYPTION_KEY.
   "oauth_instance_config",
+  // Deployment-wide leases naming which replica of THIS installation fetched
+  // market data. Coordination state for one deployment; restored elsewhere it
+  // would say a fetch happened that the new instance never made.
+  "fetch_sync",
   // Instance-bound delivery ledger for this deployment's egress; not portable
   // user data. Same category as push_subscriptions above: a row names an object
   // key in a bucket this instance uploads to, and restored elsewhere it would

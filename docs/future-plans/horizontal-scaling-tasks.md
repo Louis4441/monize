@@ -96,7 +96,7 @@
 | S1 | Boot refusals in `multi` for per-pod attachments and backups | F1 | multi-only | [ ] |
 | S2 | S3 backup target for automatic backups | -- | none until selected | [ ] |
 | C1 | `claimOnce` per owner and month around budget period rollover | -- | neutral | [x] |
-| C2 | Deployment-wide `fetch_sync` lease around FX, security price and market index fetches | -- | neutral | [ ] |
+| C2 | Deployment-wide `fetch_sync` lease around FX, security price and market index fetches | -- | neutral | [x] |
 | C3 | Release-check cache to a one-row table | -- | neutral | [ ] |
 | C4 | Demo seed under the lifecycle advisory lock | -- | neutral (demo only) | [ ] |
 | G1 | Whole-tree process-local-state guard with allowlist | A4, X1, R4 | none | [ ] |
@@ -1156,17 +1156,27 @@ moved into the resolved-claims paragraphs beside the demo reset.
 
 ### C2 -- Fetch crons behind a deployment-wide sync claim
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** one migration + `schema.sql` (`fetch_sync`),
 `backend/src/common/jobs/fetch-sync.service.ts` (new) + spec,
+`backend/src/common/jobs/entities/fetch-sync.entity.ts` (new, added to scope:
+the integration harness builds its schema from entity metadata with
+`synchronize: true`, so a table with no entity does not exist there),
 `backend/src/common/jobs/job-claim.module.ts`,
 `backend/src/currencies/exchange-rate.service.ts` and spec (`onModuleInit`
 sweep and the 17:05 cron), `backend/src/securities/security-price.service.ts`
 and spec (17:00 cron), `backend/src/securities/market-index.service.ts` and
 spec (17:10 cron), `backend/src/common/db/rls-exempt-tables.ts`,
 `docs/row-level-security-contract.md`, `docs/cron-jobs.md`,
-`backend/test/integration/fetch-sync.integration.spec.ts` (new).
+`backend/test/integration/fetch-sync.integration.spec.ts` (new),
+`backend/src/backup/export-table-queries.ts` (the new table's backup
+classification, which the definition of done requires),
+`backend/src/test-helpers/job-claim-testing.ts` (the `FetchSyncService`
+double), and the four specs that construct one of the three services:
+`currencies/rls-context-smoke.spec.ts`, `securities/rls-context-smoke.spec.ts`,
+`currencies/exchange-rate.service.spec.ts`, and
+`test/integration/manual-price-snapshot-recovery.integration.spec.ts`.
 
 **Pattern:** the `market_index_sync` table in `database/schema.sql`
 (`index_code PRIMARY KEY, last_attempt_at, last_success_at, last_error`) and
@@ -1207,7 +1217,33 @@ fields in these files; do not add new `Map`s. Add the new cron-adjacent
 service to `WITH_CONTEXT_ALLOWLIST` only if it seeds its own context (it
 should not; the callers already do).
 
-**Notes:**
+**Notes:** `FetchSyncService` seeds no context of its own, so
+`WITH_CONTEXT_ALLOWLIST` was not touched -- all three callers already wrap in
+`withSystemContext`, and the lease sits inside that wrap.
+
+The service carries a fourth method the task did not name, `withLease(job,
+leaseMs, fn)`, and the three crons call that rather than `claim`/`markSuccess`
+by hand. The lease has to come back on **both** paths, and three call sites each
+spelling out the same `try`/`catch` is the shape that ends up right in two of
+the three places. `markFailure` records the reason and releases, then rethrows:
+how a failed fetch is reported is each cron's own decision, and swallowing it
+here would take that away from all three at once.
+
+The market-index warm-up (`onApplicationBootstrap`) takes the lease too, not
+just the cron -- a rollout is exactly where N identical bursts of 24 indexes are
+least welcome. Its per-index `respectCooldown` is untouched: `market_index_sync`
+answers how often ONE index is worth re-asking for, this answers which replica
+asks at all.
+
+Leases are 15/30/20 minutes for FX, prices and indexes -- longer than a run,
+far shorter than the daily interval, so a killed holder never blocks the next
+tick and the expiry alone hands the job back. Each service spec asserts that
+bound rather than the literal, so tuning one does not silently drop it.
+
+A `FetchSync` entity was needed. `backend/test/helpers/integration-setup.ts`
+builds its schema from entity metadata (`synchronize: true`) while production
+applies `schema.sql`, so without one the integration spec met a table that did
+not exist.
 
 ### C3 -- Release-check cache to a one-row table
 

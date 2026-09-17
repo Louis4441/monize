@@ -9,6 +9,10 @@ import { Security } from "./entities/security.entity";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { withSystemContext } from "../common/db/with-context";
+import {
+  FetchSyncJob,
+  FetchSyncService,
+} from "../common/jobs/fetch-sync.service";
 import { lockAccountsForBalanceWrite } from "../common/db/locks";
 import {
   QuoteProvider,
@@ -229,7 +233,17 @@ export class SecurityPriceService {
     private dataSource: DataSource,
     private netWorthService: NetWorthService,
     private providers: QuoteProviderRegistry,
+    private readonly fetchSync: FetchSyncService,
   ) {}
+
+  /**
+   * How long one replica holds the price fetch.
+   *
+   * The refresh plus settlement plus the snapshot recalc is the longest of the
+   * three fetch jobs, so the lease is the longest -- and still far shorter than
+   * the daily interval, so a killed replica never blocks tomorrow.
+   */
+  private readonly FETCH_LEASE_MS = 30 * 60 * 1000;
 
   // ─── User preference loading ─────────────────────────────────────────────
 
@@ -1462,21 +1476,32 @@ export class SecurityPriceService {
       // RLS (task C2): the price refresh groups securities across users by
       // symbol (irreducibly cross-user), and the snapshot recalc fans out over
       // every investment account, so the whole job runs under a system context.
-      await withSystemContext(async () => {
-        const result = await this.refreshAllPrices();
-        // Settlement runs *after* the quote refresh, and its writes are the
-        // ones that survive: the quote is what the security is worth right now
-        // (and is all a still-open market can offer), the bar is what the
-        // finished session actually did. Ordering them the other way round
-        // would leave the day holding a 17:00 quote again.
-        const settlement = await this.settleDailyBars();
-        if (result.updated > 0 || settlement.barsSettled > 0) {
-          this.logger.log(
-            "Recalculating investment snapshots after price refresh",
-          );
-          await this.netWorthService.recalculateAllInvestmentSnapshots();
-        }
-      });
+      // One replica per tick calls the provider (task C2). The price upserts are
+      // idempotent, so this is a cost control: N replicas is N times the quota
+      // and N chances to trip the breaker on a provider that is merely slow.
+      // The settlement and the snapshot recalc ride inside the lease because
+      // they are what this run's fetch is for.
+      await withSystemContext(() =>
+        this.fetchSync.withLease(
+          FetchSyncJob.SecurityPrices,
+          this.FETCH_LEASE_MS,
+          async () => {
+            const result = await this.refreshAllPrices();
+            // Settlement runs *after* the quote refresh, and its writes are the
+            // ones that survive: the quote is what the security is worth right now
+            // (and is all a still-open market can offer), the bar is what the
+            // finished session actually did. Ordering them the other way round
+            // would leave the day holding a 17:00 quote again.
+            const settlement = await this.settleDailyBars();
+            if (result.updated > 0 || settlement.barsSettled > 0) {
+              this.logger.log(
+                "Recalculating investment snapshots after price refresh",
+              );
+              await this.netWorthService.recalculateAllInvestmentSnapshots();
+            }
+          },
+        ),
+      );
     } catch (error) {
       this.logger.error(`Scheduled price refresh failed: ${error.message}`);
     }

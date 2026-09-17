@@ -896,6 +896,27 @@ CREATE TABLE market_index_sync (
     last_error TEXT
 );
 
+-- Deployment-wide leases for the three outbound market-data fetch jobs
+-- (exchange rates, security prices, market indexes). Each cron fires on every
+-- replica; the writes underneath are idempotent upserts, so the data converges
+-- and only the provider bill does not. A lease rather than a permanent claim,
+-- because this is a cost control and a crashed holder must never block the next
+-- tick: lease_until is shorter than the cron interval. lease_token identifies
+-- the holder, so a worker delayed past its own expiry cannot release a lease
+-- another replica has retaken.
+--
+-- Distinct from market_index_sync, which keeps its own per-index attempt
+-- cooldown: that decides how often ONE index is worth re-asking for, this
+-- decides which replica asks at all. Deployment-wide state with no owner
+-- column, so RLS-exempt -- see the marker block at the foot of the RLS section.
+CREATE TABLE fetch_sync (
+    job TEXT PRIMARY KEY,
+    lease_until TIMESTAMPTZ,
+    lease_token UUID,
+    last_success_at TIMESTAMPTZ,
+    last_error TEXT
+);
+
 -- Outbound market-data provider availability, and what has already been said
 -- about it by email. The in-process circuit breaker decides whether to call
 -- out; this row is what survives a restart (an outage that restarts the
@@ -3345,6 +3366,7 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- rls-exempt: auth_attempt_counters
 -- rls-exempt: currencies
 -- rls-exempt: exchange_rates
+-- rls-exempt: fetch_sync
 -- rls-exempt: google_places_instance_usage
 -- rls-exempt: market_index_prices
 -- rls-exempt: market_index_sync
