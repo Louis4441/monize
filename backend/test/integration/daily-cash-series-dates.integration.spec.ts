@@ -95,8 +95,9 @@ describe("daily cash series dates (integration)", () => {
     // Every day found its account's row: a key the SQL spells differently is an
     // account with no balance for the day, not a zero.
     expect(series.every((point) => point.cashComplete === true)).toBe(true);
-    expect(series.every((point) => point.unknownCashAccountIds.length === 0))
-      .toBe(true);
+    expect(
+      series.every((point) => point.unknownCashAccountIds.length === 0),
+    ).toBe(true);
     // The balances line up with the ledger on the days the keys claim, so the
     // agreement above is not two lists that merely happen to be the same length.
     expect(series.map((point) => point.value)).toEqual([

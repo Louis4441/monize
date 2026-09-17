@@ -183,8 +183,18 @@ describe("decidePeriodResult", () => {
 
   it("reads an absent cashComplete as no information, not as incomplete", () => {
     const decision = decidePeriodResult({
-      start: { date: "2026-01-02", value: 10_000, fxComplete: true, pricesComplete: true },
-      end: { date: "2026-06-30", value: 11_000, fxComplete: true, pricesComplete: true },
+      start: {
+        date: "2026-01-02",
+        value: 10_000,
+        fxComplete: true,
+        pricesComplete: true,
+      },
+      end: {
+        date: "2026-06-30",
+        value: 11_000,
+        fxComplete: true,
+        pricesComplete: true,
+      },
       flow: complete(0),
     });
 
