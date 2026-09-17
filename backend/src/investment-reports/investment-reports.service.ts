@@ -193,6 +193,8 @@ export class InvestmentReportsService {
       rows: holdings,
       fxComplete,
       missingPairs,
+      pricesComplete,
+      unpricedSymbols,
     } = await this.dataService.computeHoldings(
       userId,
       accountIds,
@@ -230,6 +232,11 @@ export class InvestmentReportsService {
       // reader who is not told that reads the blanks as zero.
       fxComplete,
       missingPairs,
+      // A missing price withholds the same denominator as a missing rate and
+      // is a different repair, so it travels as its own cause rather than
+      // borrowing `fxComplete`.
+      pricesComplete,
+      unpricedSymbols,
     };
   }
 

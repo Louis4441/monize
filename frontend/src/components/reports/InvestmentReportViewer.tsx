@@ -250,6 +250,11 @@ export function InvestmentReportViewer({ reportId }: InvestmentReportViewerProps
   // every pair resolved.
   const fxPartial = result?.fxComplete === false;
   const missingPairs = result?.missingPairs ?? [];
+  // The other cause of the same blanks, and a different repair: an unpriced
+  // holding withholds the denominator exactly as a missing rate does, so it is
+  // named on its own rather than under the exchange-rate caption.
+  const pricesPartial = result?.pricesComplete === false;
+  const unpricedSymbols = result?.unpricedSymbols ?? [];
   // The pairs the server refused, in the shape PartialTotal explains: each
   // pair's source currency is the one with no rate to the base currency.
   const fxGap: ConvertedTotal = {
@@ -366,6 +371,15 @@ export function InvestmentReportViewer({ reportId }: InvestmentReportViewerProps
                 pairs: (result.missingPairs ?? []).join(', '),
               })}
             </PartialTotal>
+          </p>
+        )}
+        {/* Both causes are shown when both apply: naming one makes the reader
+            fix it and watch nothing change. */}
+        {pricesPartial && result && (
+          <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+            {t('investmentReportViewer.partialPriceNote', {
+              symbols: unpricedSymbols.join(', '),
+            })}
           </p>
         )}
       </div>

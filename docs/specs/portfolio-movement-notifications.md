@@ -162,7 +162,14 @@ negative one is a loss the market produced; a deposit-only day is `movement ~= 0
   design:** a holding whose feed dies permanently silences this user's alert
   until it is priced (manually or otherwise) or the position is closed. That is
   the "complete, or withhold" trade, and the producer logs the securities it is
-  waiting on.
+  waiting on (by security id, at `warn`, with the baseline date it is waiting
+  against). A manual price entry re-arms it the same way a feed would: the run
+  whose `baseline_captured_on` is on or before that price's date sees a current
+  close and fires or rebaselines normally. It re-arms *that* run, not the
+  feature -- a position priced less often than the run's daily cadence (a
+  quarterly-NAV fund) is stale again against the baseline the next run records,
+  so it keeps withholding between entries. Closing the gap for such a holding
+  is a pricing-cadence change, not a change to this rule.
 
 ---
 

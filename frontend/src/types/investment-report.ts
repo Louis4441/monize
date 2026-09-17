@@ -173,4 +173,12 @@ export interface InvestmentReportResult {
   fxComplete?: boolean;
   /** `"SEK->USD"` for each pair the rate door could not resolve. */
   missingPairs?: string[];
+  /**
+   * False when a held position had no price on or before the as-of date. Read
+   * as `=== false` for the same reason as `fxComplete`, and reported as its
+   * own cause: the repair is a price refresh, not a rate.
+   */
+  pricesComplete?: boolean;
+  /** The symbol of each unpriced position. */
+  unpricedSymbols?: string[];
 }

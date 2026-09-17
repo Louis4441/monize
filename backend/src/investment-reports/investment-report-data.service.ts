@@ -30,6 +30,12 @@ import { todayYMD } from "../common/date-utils";
  * row and blanks `portfolioPercent` on *every* row, and nothing in the payload
  * said why. A consumer reads `fxComplete === false` and relabels the figures;
  * `missingPairs` names what to fix.
+ *
+ * A missing *price* withholds the same denominator by the same arithmetic and
+ * is a different repair -- refresh the security's price, not the rate table --
+ * so it is tracked separately: `pricesComplete` and `unpricedSymbols`. A
+ * consumer that only read `fxComplete` showed a blank "% of portfolio" column
+ * under no explanation at all whenever one holding had no close.
  */
 export interface ComputedHoldings {
   rows: ComputedHolding[];
@@ -37,6 +43,10 @@ export interface ComputedHoldings {
   fxComplete: boolean;
   /** `"SEK->USD"` for each unresolvable pair, in first-seen order. */
   missingPairs: string[];
+  /** False when any held position had no price on or before the as-of date. */
+  pricesComplete: boolean;
+  /** The symbol of each such position, in first-seen order. */
+  unpricedSymbols: string[];
 }
 
 /** One computed holding row plus the fields needed to group it. */
@@ -217,7 +227,13 @@ export class InvestmentReportDataService {
     mergeAccounts = false,
   ): Promise<ComputedHoldings> {
     if (accountIds.length === 0)
-      return { rows: [], fxComplete: true, missingPairs: [] };
+      return {
+        rows: [],
+        fxComplete: true,
+        missingPairs: [],
+        pricesComplete: true,
+        unpricedSymbols: [],
+      };
 
     const accountMap = await this.loadAccounts(accountIds);
 
@@ -299,6 +315,9 @@ export class InvestmentReportDataService {
       holding: ComputedHolding;
       marketValueBase: number | null;
     }[] = [];
+    // Held positions with no close on or before the as-of date. A Set keeps
+    // first-seen order and does not repeat a symbol held in two accounts.
+    const unpricedSymbols = new Set<string>();
 
     for (const group of groups.values()) {
       const security = securityMap.get(group.securityId);
@@ -382,6 +401,10 @@ export class InvestmentReportDataService {
       // native one.
       const marketValueBase =
         marketValue !== null && fxRate !== null ? marketValue * fxRate : null;
+
+      // Recorded after the closed-position filters above, so a position the
+      // report does not list cannot mark the report incomplete.
+      if (lastPrice === null) unpricedSymbols.add(security.symbol);
 
       const { high: high52, low: low52 } = this.fiftyTwoWeek(prices, asOfDate);
 
@@ -481,6 +504,8 @@ export class InvestmentReportDataService {
       rows: computed.map((c) => c.holding),
       fxComplete: missingPairs.length === 0,
       missingPairs,
+      pricesComplete: unpricedSymbols.size === 0,
+      unpricedSymbols: [...unpricedSymbols],
     };
   }
 

@@ -729,6 +729,7 @@
     "nativeNote": "Values shown in each holding's native currency.",
     "baseNote": "Values shown in {currency}.",
     "partialFxNote": "Some figures are unavailable: no exchange rate for {pairs}. The % of portfolio column stays blank while a rate is missing.",
+    "partialPriceNote": "Some figures are unavailable: no price for {symbols}. The % of portfolio column stays blank until those holdings are priced.",
     "asOf": "As of {date}",
     "holdingCount": "{count, plural, one {# holding} other {# holdings}}",
     "noHoldings": "No holdings found for the selected accounts and date.",

@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import { PortfolioMovementAlertService } from "./portfolio-movement-alert.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import { UserPreference } from "../users/entities/user-preference.entity";
@@ -256,6 +257,46 @@ describe("PortfolioMovementAlertService", () => {
     expect(getLatestPriceObservations).toHaveBeenCalledWith([SECURITY]);
     expect(notify).not.toHaveBeenCalled();
     expect(baselineWrites).toEqual([]);
+  });
+
+  /**
+   * The documented consequence of INV-PORTMOVE-008 is that the reader repairs
+   * it by pricing the holding, so the two halves of that promise are held
+   * here: the withheld run names the securities it is waiting on, and a price
+   * dated on the baseline date itself re-arms the very next run.
+   */
+  it("names the securities it is waiting on when it withholds", async () => {
+    const { service } = setup({
+      summary: summaryOf({ totalPortfolioValue: 194_000 }),
+      priceDates: { [SECURITY]: "2026-06-30" },
+    });
+    const warn = jest
+      .spyOn(Logger.prototype, "warn")
+      .mockImplementation(() => undefined);
+
+    await service.run();
+
+    const lines = warn.mock.calls.map(([message]) => String(message));
+    warn.mockRestore();
+    // The security it is waiting on, and the date it is waiting against.
+    expect(lines.some((line) => line.includes(SECURITY))).toBe(true);
+    expect(lines.some((line) => line.includes(FRIDAY))).toBe(true);
+  });
+
+  it("re-arms on a price entered on the baseline date", async () => {
+    // A manual entry is a price like any other: the run whose baseline date is
+    // on or before it sees a current close and proceeds.
+    const { service, notify, baselineWrites } = setup({
+      summary: summaryOf({ totalPortfolioValue: 92_000 }),
+      priceDates: { [SECURITY]: FRIDAY },
+    });
+
+    await service.run();
+
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(baselineWrites).toEqual([
+      { value: 92_000, currency: "USD", on: TODAY },
+    ]);
   });
 
   it("fires once and re-baselines on a complete run over the threshold", async () => {

@@ -702,6 +702,74 @@ describe("InvestmentReportDataService", () => {
 
     expect(result.fxComplete).toBe(true);
     expect(result.missingPairs).toEqual([]);
+    expect(result.pricesComplete).toBe(true);
+    expect(result.unpricedSymbols).toEqual([]);
+  });
+
+  /**
+   * Issue #1390, the other cause. An unpriced holding withholds the same
+   * denominator by the same arithmetic, but `fxComplete` stayed true and
+   * `missingPairs` empty, so the blank "% of portfolio" column carried no
+   * explanation at all and the rate table was the wrong thing to go and check.
+   */
+  it("reports an unpriced holding as its own cause, not as a rate gap", async () => {
+    securitiesRepository.find.mockResolvedValue([
+      {
+        id: "sec1",
+        symbol: "AAA",
+        name: "Alpha",
+        securityType: "STOCK",
+        currencyCode: "USD",
+      },
+      {
+        id: "sec2",
+        symbol: "BBB",
+        name: "Beta",
+        securityType: "STOCK",
+        currencyCode: "USD",
+      },
+    ]);
+    holdingsRepository.find.mockResolvedValue([
+      holding({ quantity: 10, averageCost: 100 }),
+      holding({ securityId: "sec2", quantity: 5, averageCost: 40 }),
+    ]);
+    txRepository.find.mockResolvedValue([
+      makeTx({
+        action: InvestmentAction.BUY,
+        transactionDate: "2024-01-10",
+        quantity: 10,
+        price: 100,
+        totalAmount: 1000,
+      }),
+      makeTx({
+        securityId: "sec2",
+        action: InvestmentAction.BUY,
+        transactionDate: "2024-01-10",
+        quantity: 5,
+        price: 40,
+        totalAmount: 200,
+      }),
+    ]);
+    // Only the first security has a close on or before the as-of date.
+    manager.query.mockResolvedValue([priceRow({ close_price: "120" })]);
+
+    const result = await service.computeHoldings(
+      "u1",
+      ["acc1"],
+      "2024-06-10",
+      "USD",
+    );
+
+    expect(result.pricesComplete).toBe(false);
+    expect(result.unpricedSymbols).toEqual(["BBB"]);
+    // The rate table is not the thing to go and fix.
+    expect(result.fxComplete).toBe(true);
+    expect(result.missingPairs).toEqual([]);
+    // The denominator is still withheld, on every row.
+    expect(result.rows.map((r) => r.values.portfolioPercent)).toEqual([
+      null,
+      null,
+    ]);
   });
 
   it("leaves the direct/inverse decision to the one ladder and converts at the as-of date", async () => {

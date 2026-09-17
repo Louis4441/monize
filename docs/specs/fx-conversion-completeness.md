@@ -208,6 +208,15 @@ caller that converts inside its window loads exactly its window. `backend/src/co
 fails a new newest-rate read outside the door and carries the shrink-only
 baseline of the dateless call sites that remain.
 
+**A rate is not the only thing that can be missing, and the two are not one
+flag.** In the investment report an unpriced holding withholds the portfolio
+denominator by exactly the same arithmetic as an unresolvable pair, so
+`InvestmentReportDataService.computeHoldings` answers `pricesComplete` and
+`unpricedSymbols` beside `fxComplete` and `missingPairs`, and
+`InvestmentReportViewer` reads each `=== false` and names the cause it has. One
+flag for both would have sent a reader to the Currencies screen to repair a
+price.
+
 Reporting the gap to API consumers is still the `FxAggregate` quadruple of
 section 3: a pair the resolver refuses lands in `missingPairs` and clears
 `fxComplete`, exactly as a pair with no rows at all does. The *reason* travels

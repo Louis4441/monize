@@ -26,7 +26,14 @@ function computed(
   rows: ComputedHolding[],
   over: Partial<ComputedHoldings> = {},
 ): ComputedHoldings {
-  return { rows, fxComplete: true, missingPairs: [], ...over };
+  return {
+    rows,
+    fxComplete: true,
+    missingPairs: [],
+    pricesComplete: true,
+    unpricedSymbols: [],
+    ...over,
+  };
 }
 
 function holding(
@@ -326,6 +333,29 @@ describe("InvestmentReportsService", () => {
 
       expect(result.fxComplete).toBe(false);
       expect(result.missingPairs).toEqual(["SEK->USD"]);
+    });
+
+    /** The price gap is the other cause and travels as its own pair. */
+    it("carries the price gap into the response, separately from the rate gap", async () => {
+      reportsRepository.findOne.mockResolvedValue(baseReport);
+      dataService.computeHoldings.mockResolvedValue(
+        computed(
+          [
+            holding({
+              symbol: "BBB",
+              values: { symbol: "BBB", marketValue: null },
+            }),
+          ],
+          { pricesComplete: false, unpricedSymbols: ["BBB"] },
+        ),
+      );
+
+      const result = await service.execute("u1", "r1");
+
+      expect(result.pricesComplete).toBe(false);
+      expect(result.unpricedSymbols).toEqual(["BBB"]);
+      expect(result.fxComplete).toBe(true);
+      expect(result.missingPairs).toEqual([]);
     });
 
     it("reports a complete conversion as complete", async () => {

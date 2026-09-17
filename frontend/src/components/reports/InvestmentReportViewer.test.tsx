@@ -116,6 +116,40 @@ describe('InvestmentReportViewer', () => {
     expect(screen.getByTestId('partial-total-marker')).toBeInTheDocument();
   });
 
+  /**
+   * The other cause of the same blanks. `pricesComplete` stayed absent while
+   * an unpriced holding withheld the denominator, so the column was blank
+   * under no explanation and the exchange-rate caption would have sent the
+   * reader to the wrong screen.
+   */
+  it('names the unpriced holdings when the server reports a price gap', async () => {
+    mockExecute.mockResolvedValue({
+      ...result,
+      pricesComplete: false,
+      unpricedSymbols: ['BBB'],
+    });
+
+    await renderViewer();
+
+    expect(await screen.findByText(/no price for BBB/)).toBeInTheDocument();
+    expect(screen.queryByText(/no exchange rate for/)).not.toBeInTheDocument();
+  });
+
+  it('names both causes when both apply', async () => {
+    mockExecute.mockResolvedValue({
+      ...result,
+      fxComplete: false,
+      missingPairs: ['SEK->USD'],
+      pricesComplete: false,
+      unpricedSymbols: ['BBB'],
+    });
+
+    await renderViewer();
+
+    expect(await screen.findByText(/no exchange rate for SEK->USD/)).toBeInTheDocument();
+    expect(screen.getByText(/no price for BBB/)).toBeInTheDocument();
+  });
+
   it('shows no partial marker when the conversion was complete', async () => {
     mockExecute.mockResolvedValue({ ...result, fxComplete: true, missingPairs: [] });
 
