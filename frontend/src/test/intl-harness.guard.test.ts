@@ -127,7 +127,6 @@ const RTL_IMPORT_BASELINE = new Set([
   '/src/hooks/useOnAiAction.test.ts',
   '/src/hooks/useOnUndoRedo.test.ts',
   '/src/hooks/usePersistedAccountFilter.test.ts',
-  '/src/hooks/usePortfolioChangeBaseline.test.ts',
   '/src/hooks/useRelativeTime.test.ts',
   '/src/hooks/useReportData.test.ts',
   '/src/hooks/useScrollSpy.test.ts',

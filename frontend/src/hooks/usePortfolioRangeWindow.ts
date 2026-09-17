@@ -15,10 +15,9 @@ const logger = createLogger('PortfolioRangeWindow');
  * The window a Portfolio Value chart requests, with YTD's trading-day lookup
  * folded in.
  *
- * One hook rather than the rule in one place and the lookup in another, for the
- * same reason `usePortfolioChangeBaseline` is one hook: while the two are out
- * of step the chart draws a window under a rule it is not actually using, and
- * nothing about it looks wrong.
+ * One hook rather than the rule in one place and the lookup in another: while
+ * the two are out of step the chart draws a window under a rule it is not
+ * actually using, and nothing about it looks wrong.
  *
  * **The lookup carries the request that produced it.** A first-priced day
  * fetched for one account selection says nothing about another, so it is stored
