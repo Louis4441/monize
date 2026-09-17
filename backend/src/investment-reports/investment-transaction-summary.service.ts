@@ -5,7 +5,7 @@ import { FxAggregate } from "../common/fx-aggregate";
 import { resolveUserDefaultCurrency } from "../common/default-currency.util";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { InvestmentAction } from "../securities/entities/investment-transaction.entity";
-import { investmentEffectStatusSql } from "../securities/investment-row-effects.util";
+import { investmentRowHasEffect } from "../securities/investment-row-effects.util";
 import {
   InvestmentTransactionActionSummary,
   InvestmentTransactionSummary,
@@ -15,6 +15,7 @@ import {
 /** One filtered row, as the statement below returns it. */
 interface SummaryRow {
   action: InvestmentAction;
+  status: string;
   transaction_date: string;
   total_amount: string;
   currency_code: string | null;
@@ -74,6 +75,9 @@ function describe(
  * The row set is exactly the one the report's table lists -- `findAll`'s,
  * including VOID rows and excluding a redemption's accrued-interest companion
  * -- so the count on the card and the rows underneath it are the same rows.
+ * Counts read rows as records, so a VOID row is counted; amounts read rows as
+ * effects, so a VOID row contributes nothing. It is a known zero, not an
+ * unknown: it leaves the total complete and is not an exclusion.
  */
 @Injectable()
 export class InvestmentTransactionSummaryService {
@@ -110,6 +114,11 @@ export class InvestmentTransactionSummaryService {
       }
       bucket.count += 1;
       if (row.symbol) symbols.add(row.symbol);
+
+      // A voided trade is still a row the register lists, so it is counted;
+      // it moved no money, so it adds a known zero to the volume rather than
+      // an unknown, and the total stays complete.
+      if (!investmentRowHasEffect(row)) continue;
 
       // The report reads volume, so the magnitude: a sale and a purchase of the
       // same size are two thousand of activity, not zero.
@@ -180,6 +189,11 @@ export class InvestmentTransactionSummaryService {
    *
    * `null` means no rate was found for the pair; `getRateForDate` already
    * returns 1 only when the two codes are equal.
+   *
+   * `fetchMissing: false` keeps a report GET inside the database: a filter
+   * spanning years of trades would otherwise ask the provider once per
+   * (pair, date) that the stored span does not cover, with nothing caching
+   * the misses.
    */
   private async rateOn(
     from: string,
@@ -190,7 +204,9 @@ export class InvestmentTransactionSummaryService {
     const key = `${from}->${to}@${date}`;
     const cached = cache.get(key);
     if (cached !== undefined) return cached;
-    const rate = await this.exchangeRateService.getRateForDate(from, to, date);
+    const rate = await this.exchangeRateService.getRateForDate(from, to, date, {
+      fetchMissing: false,
+    });
     const usable = rate === null || rate <= 0 ? null : rate;
     cache.set(key, usable);
     return usable;
@@ -243,7 +259,10 @@ export class InvestmentTransactionSummaryService {
       }
 
       return m.query(
+        // includes VOID rows: records read -- the card counts what the table
+        // lists; `investmentRowHasEffect` above decides what the volume sums.
         `SELECT it.action AS action,
+                it.status AS status,
                 TO_CHAR(it.transaction_date, 'YYYY-MM-DD') AS transaction_date,
                 it.total_amount::text AS total_amount,
                 s.currency_code AS currency_code,
@@ -251,7 +270,6 @@ export class InvestmentTransactionSummaryService {
            FROM investment_transactions it
            LEFT JOIN securities s ON s.id = it.security_id
           WHERE it.user_id = $1
-            AND ${investmentEffectStatusSql("it")}
             AND NOT (it.action = $2 AND EXISTS (
                   -- The parent is looked up as a record (includes VOID): what
                   -- decides whether the child row counts is the child's status.

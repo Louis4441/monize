@@ -1,5 +1,6 @@
 import { InvestmentTransactionSummaryService } from "./investment-transaction-summary.service";
 import { InvestmentAction } from "../securities/entities/investment-transaction.entity";
+import { TransactionStatus } from "../transactions/entities/transaction-status.enum";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import {
   createScopedDbMocks,
@@ -12,6 +13,7 @@ jest.mock("../common/db/scoped-db", () =>
 
 interface RowInput {
   action?: InvestmentAction;
+  status?: TransactionStatus;
   date?: string;
   amount?: string;
   currency?: string | null;
@@ -21,6 +23,7 @@ interface RowInput {
 function row(over: RowInput = {}) {
   return {
     action: over.action ?? InvestmentAction.BUY,
+    status: over.status ?? TransactionStatus.CLEARED,
     transaction_date: over.date ?? "2026-09-01",
     total_amount: over.amount ?? "1000.0000",
     currency_code: over.currency === undefined ? "EUR" : over.currency,
@@ -150,6 +153,91 @@ describe("InvestmentTransactionSummaryService", () => {
     expect(summary.knownSubtotal).toBe(0);
   });
 
+  it("counts a VOID row with the table and leaves it out of the volume", async () => {
+    // The card sits over the register's own rows, which list VOID trades
+    // struck through: counting fewer rows than the table lists is the defect.
+    // The voided 1,000 is a known zero, so the total stays complete.
+    returnRows([
+      row({
+        status: TransactionStatus.CLEARED,
+        currency: "PLN",
+        amount: "1000.0000",
+        symbol: "AAA",
+      }),
+      row({
+        status: TransactionStatus.VOID,
+        currency: "PLN",
+        amount: "1000.0000",
+        symbol: "BBB",
+      }),
+    ]);
+
+    const summary = await service.summarize("u1", {});
+
+    expect(summary.transactionCount).toBe(2);
+    expect(summary.securitiesTraded).toBe(2);
+    expect(summary.total).toBe(1000);
+    expect(summary.fxComplete).toBe(true);
+    expect(summary.excludedCount).toBe(0);
+    expect(summary.byAction).toEqual([
+      expect.objectContaining({
+        action: InvestmentAction.BUY,
+        count: 2,
+        total: 1000,
+      }),
+    ]);
+  });
+
+  it("asks for no rate for a VOID row in a foreign currency", async () => {
+    returnRows([row({ status: TransactionStatus.VOID, currency: "EUR" })]);
+
+    const summary = await service.summarize("u1", {});
+
+    expect(exchangeRateService.getRateForDate).not.toHaveBeenCalled();
+    expect(summary.total).toBe(0);
+    expect(summary.transactionCount).toBe(1);
+  });
+
+  it("reads stored rates only, never fetching a provider window per row-day", async () => {
+    // A report GET converting hundreds of row-days must stay inside the
+    // database: nothing caches a miss, so one absent pair-day would fan out
+    // to the provider on every request.
+    returnRows([row({ currency: "EUR", date: "2026-09-01" })]);
+    exchangeRateService.getRateForDate.mockResolvedValue(4);
+
+    await service.summarize("u1", {});
+
+    expect(exchangeRateService.getRateForDate).toHaveBeenCalledWith(
+      "EUR",
+      "PLN",
+      "2026-09-01",
+      { fetchMissing: false },
+    );
+  });
+
+  it("withholds the action's total too when one of its rows has no currency", async () => {
+    returnRows([
+      row({ currency: "PLN", amount: "100.0000" }),
+      row({ currency: null, symbol: null, amount: "40.0000" }),
+    ]);
+
+    const summary = await service.summarize("u1", {});
+
+    expect(summary.total).toBeNull();
+    expect(summary.knownSubtotal).toBe(100);
+    expect(summary.byAction).toEqual([
+      expect.objectContaining({
+        action: InvestmentAction.BUY,
+        count: 2,
+        total: null,
+        knownSubtotal: 100,
+        unknownCount: 1,
+        excludedCount: 1,
+        fxComplete: false,
+      }),
+    ]);
+  });
+
   it("sums volume as magnitude and splits it by action", async () => {
     returnRows([
       row({
@@ -248,9 +336,6 @@ describe("InvestmentTransactionSummaryService", () => {
         typeof call[0] === "string" &&
         (call[0] as string).includes("investment_transactions"),
     );
-    // A voided trade moved nothing, so it is not volume (INV-PORTMOVE-006's
-    // sibling for a report: a VOID row is a record, never an effect).
-    expect(rowsCall?.[0]).toContain("it.status != 'VOID'");
     expect(rowsCall?.[0]).toContain("it.account_id = ANY($4)");
     expect(rowsCall?.[0]).toContain("it.transaction_date >= $5");
     expect(rowsCall?.[0]).toContain("it.transaction_date <= $6");

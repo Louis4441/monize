@@ -261,6 +261,46 @@ describe('InvestmentTransactionHistoryReport currencies', () => {
     expect(document.body.textContent).not.toContain('PLN 40.00');
   });
 
+  it('counts a voided row in the card, so the card and the heading agree', async () => {
+    // The register lists a voided trade, so the KPI counts it: a card reading
+    // one over a table of two is the defect. Its money is a known zero, so the
+    // volume is the surviving trade's alone and the total stays complete.
+    mockGetTransactions.mockResolvedValue({
+      data: [
+        EQUAL_NUMBERS_TWO_CURRENCIES[0],
+        { ...EQUAL_NUMBERS_TWO_CURRENCIES[1], status: 'VOID' },
+      ],
+      pagination: { hasMore: false },
+    });
+    mockGetTransactionSummary.mockResolvedValue(
+      summaryFixture({
+        transactionCount: 2,
+        total: 4339,
+        knownSubtotal: 4339,
+        byAction: [
+          {
+            action: 'BUY',
+            count: 2,
+            total: 4339,
+            knownSubtotal: 4339,
+            missingPairs: [],
+            unknownCount: 0,
+            excludedCount: 0,
+            fxComplete: true,
+          },
+        ],
+      }),
+    );
+    await renderReport();
+
+    const countCard = screen.getByText('Total Transactions').parentElement;
+    expect(countCard?.textContent).toContain('2');
+    expect(screen.getByText('Transaction History (2)')).toBeInTheDocument();
+    expect(screen.queryByTestId('truncated-notice')).not.toBeInTheDocument();
+    expect(screen.getByText('Total Volume')).toBeInTheDocument();
+    expect(renderedText()).toContain('PLN 4339.00');
+  });
+
   it('says the table is truncated while the KPIs still cover everything', async () => {
     // Every fetched page reports more to come, so the client stops at its cap.
     // Unique ids per page: a repeated React key is a warning this harness fails
