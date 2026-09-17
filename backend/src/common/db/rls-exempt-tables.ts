@@ -20,6 +20,8 @@
  * paragraph repeated in two places is how the previous four copies diverged.
  */
 export const RLS_EXEMPT_TABLES: Readonly<Record<string, string>> = {
+  auth_attempt_counters:
+    "Rate-limit and lockout counters keyed by opaque scope/key hash; no owner column, written on the failure path before any identity is established.",
   currencies:
     "Global reference data keyed by ISO 4217 code; created_by_user_id is attribution, not ownership.",
   exchange_rates:
@@ -40,6 +42,8 @@ export const RLS_EXEMPT_TABLES: Readonly<Record<string, string>> = {
     "Singleton deployment push identity (one VAPID key pair per instance); no owner column, one identity is every user's.",
   schema_migrations:
     "Migration infrastructure, written only by db-migrate running as the owner.",
+  single_use_tokens:
+    "One-shot claims keyed by purpose and a SHA-256 hash; no owner column, and the hash is what keeps the shared table from being replayable.",
 };
 
 /** The exempt table names, sorted, for comparison against the schema block. */

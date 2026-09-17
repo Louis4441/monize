@@ -13,9 +13,10 @@ A constraint here is usually the strongest available form of a system rule, so s
 2. **Update `schema.sql`** in the same commit, so a fresh install matches a migrated database.
 3. **Update the TypeORM entity** if a mapped table changed: columns are `snake_case`, properties `camelCase`, mapped with `@Column({ name: 'snake_case_name' })`.
 4. **Update the DTO** if the field is user-editable, and **the frontend type** in `frontend/src/types/`.
-5. **Classify a new column in the support backup** if its table is exported: `backend/src/backup/support-backup/support-backup-rules.ts` is an allowlist (`keep` for structure, dates, enums, flags and foreign keys; `mask` for names; `drop` for free text, secrets and anything that re-identifies a masked value; `const` instead of `drop` when the column is NOT NULL). The golden test in `backend/test/integration/support-backup.integration.spec.ts` fails until the decision is made.
-6. **Ship the table's RLS policy in the same migration** if the table is user-owned (below).
-7. **Restart the backend**; migrations apply on startup.
+5. **Classify a new table in the backup**: `INTENTIONALLY_EXCLUDED_TABLES` in `backend/src/backup/export-table-queries.ts`, or an export query beside the others. The coverage guard in `backend/test/integration/backup-restore.integration.spec.ts` fails a table in neither, so the decision is explicit rather than a silent data loss on restore.
+6. **Classify a new column in the support backup** if its table is exported: `backend/src/backup/support-backup/support-backup-rules.ts` is an allowlist (`keep` for structure, dates, enums, flags and foreign keys; `mask` for names; `drop` for free text, secrets and anything that re-identifies a masked value; `const` instead of `drop` when the column is NOT NULL). The golden test in `backend/test/integration/support-backup.integration.spec.ts` fails until the decision is made.
+7. **Ship the table's RLS policy in the same migration** if the table is user-owned (below).
+8. **Restart the backend**; migrations apply on startup.
 
 ## Row-level security (hard rules)
 

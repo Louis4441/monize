@@ -352,6 +352,16 @@ month boundary from minting quota rather than returning it. There is no `@Versio
 anywhere in the codebase -- conditional `WHERE` is the whole of its optimistic
 concurrency control.
 
+The failed-login counter is the codebase's one use of mechanism 1 on a column
+the security model reads. `recordFailedAttempt` (`backend/src/auth/auth.service.ts`)
+is a single `UPDATE users u SET failed_login_attempts = u.failed_login_attempts + 1,
+locked_until = CASE WHEN ... END FROM prev WHERE u.id = prev.id RETURNING`, so the
+increment and the lockout decision it feeds are one statement over one row: the
+threshold is evaluated on the value the database just wrote, never on one read
+before the bcrypt compare. The `prev` CTE carries the pre-update `locked_until`
+out in the same `RETURNING` so the caller can tell "locked now" from "already
+locked" without a second read. INV-AUTH-002.
+
 Two jobs this register once listed as gaps are claimed, and are listed here
 instead. Scheduled auto-posting (`scheduled-transactions.service.ts` `post`,
 reached by the hourly cron and by a manual post alike) claims the occurrence
@@ -374,7 +384,6 @@ this table when a mechanism lands, not when someone judges the window small.
 | --- | --- | --- |
 | `accounts.current_balance` | Three postures coexist on one column: a lock-free atomic delta (`updateBalance`), an unlocked read-then-write absolute recompute (`recalculateCurrentBalance`, the hourly `applyDueTransactionBalances`, `import-post-processing`, `write-transactions`, `action-history.recalculateBalance`), and a pessimistically locked read-then-write (`update`, `close`). A delta committing between a recompute's SELECT and its UPDATE is silently discarded. | CONC-001, CONC-003 |
 | `holdings.quantity` / `average_cost` | Every mutation path is a JavaScript read-modify-write inside a transaction with no lock and no atomic delta. `UNIQUE(account_id, security_id)` prevents duplicate rows and does nothing about a lost update to the same row. | CONC-001 |
-| `users.failed_login_attempts` | Read in one statement, incremented in JavaScript, written as an absolute value in a later statement with no lock. Two concurrent failures lose an increment, so the counter under-counts and the lockout threshold is reached late. The comment directly above it reads "Atomically increment failed attempts". | CONC-001, CONC-007 |
 | Emergency-access claim consumption | Check-then-act: the in-transaction re-read passes no `lock` option, and the consuming write is an entity `save` by primary key with no `WHERE claim_token_used_at IS NULL`. The code immediately beside it uses the CAS predicate correctly for voiding *sibling* tokens. The comment claims re-validation "under lock". There is no partial unique index on unused tokens to act as a backstop. | CONC-001, CONC-002, CONC-007 |
 | `budget-period-cron` monthly rollover | No claim around the tick: every replica walks every active budget. The writes beneath it are guarded -- `closePeriod` takes a pessimistic lock on the OPEN period row, and the next period is created with `ON CONFLICT (budget_id, period_start) DO NOTHING RETURNING` whose loser re-reads the winner's row -- so the data converges. What does not converge is the report: the loser of the close lock finds no OPEN period, `closePeriod` raises `BadRequestException`, and the cron's per-budget `try/catch` counts the normal outcome of a two-replica tick as a failure and logs a stack for it. | CONC-004, CONC-006 |
 | Logout vs rotation | Logout's family revoke is an unlocked bulk `UPDATE`. It happens to be safe because `isRevoked = true` is idempotent and the end state is order-independent -- but this is a property of the value, not a protocol, and it stops holding the moment logout writes anything else. | CONC-003 (tolerated; document, do not copy) |

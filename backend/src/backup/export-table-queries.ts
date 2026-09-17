@@ -161,6 +161,26 @@ export const INTENTIONALLY_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
   // artifact that can be mailed to its own destination must not carry the
   // credential for that destination.
   "backup_offsite_settings",
+  // Authentication rate-limit and lockout counters for this deployment. A
+  // restore carrying them would either resurrect a lockout the user has since
+  // waited out or, worse, hand a fresh instance a spent window that lets the
+  // next attacker start from a clean count. Neither is user content, and both
+  // rows are keyed by an opaque hash with no owner column to restore them under.
+  "auth_attempt_counters",
+  // Spent one-shot claims: a TOTP code inside its 90-second reuse window, a
+  // confirmed AI action descriptor. Every row is dead within minutes of being
+  // written, and restoring one would refuse a code the user is entitled to use.
+  "single_use_tokens",
+  // The AI relay's live handshake between a browser stream and an MCP agent
+  // running on the user's own machine. A queued prompt describes a socket that
+  // closed when the backup was taken; a claim names an MCP session that no
+  // longer exists; a liveness row would tell the restored instance an agent is
+  // connected when none is. Restoring any of the three makes the tunnel
+  // indicator lie and could hand a stale write-confirmation card to a user who
+  // never asked for it.
+  "ai_relay_prompts",
+  "ai_relay_agents",
+  "ai_relay_actions",
 ]);
 
 export function buildExportTableQueries(

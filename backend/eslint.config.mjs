@@ -28,6 +28,11 @@ const WITH_CONTEXT_ALLOWLIST = [
   "src/attachments/attachment-orphan-sweeper.service.ts",
   "src/auth/auth.controller.ts",
   "src/auth/auth.service.ts",
+  // Daily sweep of the two auth state tables (auth_attempt_counters,
+  // single_use_tokens). Both are keyed by an opaque scope/hash with no owner
+  // column, so there is no user whose context could see the rows; a cron with
+  // no request behind it seeds its own system context.
+  "src/auth/auth-state-sweeper.service.ts",
   "src/auth/pat.service.ts",
   "src/auth/strategies/jwt.strategy.ts",
   "src/auth/token.service.ts",

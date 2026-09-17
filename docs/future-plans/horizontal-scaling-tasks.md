@@ -25,6 +25,21 @@
     increment), a two-connection spec under `backend/test/integration/` and
     `npm run test:integration` green. A unit test with a mocked manager does
     not discharge this (`docs/verification-contract.md`, VER-001).
+  - **A new table is classified in the backup** in the same PR:
+    `INTENTIONALLY_EXCLUDED_TABLES` in
+    `backend/src/backup/export-table-queries.ts`, or an export query. The
+    coverage guard in
+    `backend/test/integration/backup-restore.integration.spec.ts` fails a table
+    in neither, and it needs a live PostgreSQL, so `npm run test:unit` will not
+    tell you. Every table these tasks add is coordination state for one
+    deployment and belongs in the excluded set with its reason.
+  - **`IF NOT EXISTS` belongs in the migration, not in `schema.sql`.** Do not
+    paste the migration's body across unchanged: `db-init` applies `schema.sql`
+    once, gated on whether `users` exists, so the guard buys nothing there and
+    the plain `CREATE TABLE` / `CREATE INDEX` is a tripwire -- it errors loudly
+    if `schema.sql` ever meets a non-empty database instead of skipping and
+    leaving a table nobody checked. The file is 80 plain `CREATE TABLE` to one
+    guarded (`schema_migrations`, which the migrator bootstraps too).
   - Migrations: file named `date -u +%Y%m%d%H%M%S`_description.sql per
     `docs/database-migrations.md`, every statement idempotent (`IF NOT
     EXISTS`, `DROP ... IF EXISTS` before `CREATE POLICY`/`TRIGGER`), mirrored
@@ -62,16 +77,16 @@
 | F1 | `CLUSTER_MODE` parsing, boot-matrix check, `main.ts` wiring, `JWT_SECRET` fatal, `.env.example` | -- | none (`JWT_SECRET` refusal is the one deliberate exception) | [x] |
 | F2 | `ClusterModule`: mode provider, Redis client and subscriber in `multi`, `PING` at boot, readiness probe | F1 | multi-only | [ ] |
 | F3 | Doc corrections in `concurrency-and-idempotency.md`, `external-side-effects.md`, `cron-jobs.md` | -- | none | [x] |
-| F5 | Concurrency register: retire the stale `users.failed_login_attempts` gap row | -- | none | [ ] |
+| F5 | Concurrency register: retire the stale `users.failed_login_attempts` gap row | -- | none | [x] |
 | F4 | ADR 0005 and index row | F1 | none | [ ] |
-| A1 | Migration: `auth_attempt_counters`, `single_use_tokens`; RLS exemption; sweep cron | -- | none | [ ] |
+| A1 | Migration: `auth_attempt_counters`, `single_use_tokens`; RLS exemption; sweep cron | -- | none | [x] |
 | A2 | `AuthAttemptCounterService`; 2FA attempt maps replaced | A1 | neutral | [ ] |
 | A3 | `usedTotpCodes` replaced by a `single_use_tokens` claim | A1 | neutral | [ ] |
 | A4 | Step-up and auth-email counters onto the service; interval prune removed | A2 | neutral | [ ] |
 | K1 | `oauth_instance_config` + `OauthSigningKeysService`; provider gets `jwks` | -- | neutral | [ ] |
 | X1 | AI action anti-replay onto `single_use_tokens`, MCP path included | A1 | neutral | [ ] |
-| R1 | `EVENT_BUS` token, interface, `MemoryEventBus` wired as default | -- | none | [ ] |
-| R2 | Migration: `ai_relay_prompts`, `ai_relay_agents` with RLS policies | -- | none | [ ] |
+| R1 | `EVENT_BUS` token, interface, `MemoryEventBus` wired as default | -- | none | [x] |
+| R2 | Migration: `ai_relay_prompts`, `ai_relay_agents` with RLS policies | -- | none | [x] |
 | R3 | Relay queue on rows: insert, claim, answer; in-memory queue maps removed | R1, R2 | neutral | [ ] |
 | R4 | Late answers, buffered actions and agent liveness on rows; remaining maps removed | R3 | neutral | [ ] |
 | R5 | Relay attachments through the attachment storage provider | R3 | neutral | [ ] |
@@ -88,7 +103,7 @@
 | G2 | `INV-HA-001..005` in both contract docs | A3, K1, R3, S1 | none | [ ] |
 | D1 | Helm: Deployments, PDB, spread, autoscaling, `clusterMode`, `redis.url` | F2 | none (defaults unchanged) | [ ] |
 | D2 | `docker-compose.ha.yml` example | F2 | none | [ ] |
-| D3 | CI: `redis` service in the integration job | -- | none | [ ] |
+| D3 | CI: `redis` service in the integration job | -- | none | [x] |
 | D4 | E2E: one shard on `CLUSTER_MODE=multi` with two backends | R6, T1, D1 | none | [ ] |
 
 ## Suggested order
@@ -206,7 +221,7 @@ still stale on `main`; it is F5.
 
 ### F5 -- Retire the stale `users.failed_login_attempts` gap row
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `docs/concurrency-and-idempotency.md` (section 8 only).
 
@@ -254,7 +269,7 @@ requirement is that single-replica deployments need nothing new).
 
 ### A1 -- Migration: `auth_attempt_counters`, `single_use_tokens`
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** one new file under `database/migrations/`, `database/schema.sql`,
 `backend/src/common/db/rls-exempt-tables.ts`,
@@ -305,7 +320,19 @@ too or the harness's catalog check (`rls-catalog.ts`) fails. A cron file that
 holds a `Map`/`Set` field fails `derived-state-writers.guard.spec.ts`; the
 sweeper holds none.
 
-**Notes:**
+**Notes:** the `rls-exempt:` marker goes **only** in the block at the foot of
+`database/schema.sql`. `rls-exempt-tables.spec.ts` parses every such line in
+the file and compares the sorted list without de-duplicating, so a second copy
+above the table definition fails it. The migration may carry one (the
+`push_chart_artifacts` migration does); nothing parses migrations.
+
+The sweeper spec asserts the statements, not a fake clock: the predicate is the
+stored expiry against the database's `CURRENT_TIMESTAMP`, so there is no
+process clock to fake, and a spec that faked one would be asserting the defect.
+`verify-schema.sh` needs Docker; where that is unavailable the same two
+databases and the same double replay run against a local PostgreSQL 16 and the
+normalized `pg_dump` diff is empty, with CI's `Schema vs Migrations Drift` job
+as the gate.
 
 ### A2 -- `AuthAttemptCounterService`; 2FA attempt maps replaced
 
@@ -524,7 +551,7 @@ imports. Do not create a second single-use table.
 
 ### R1 -- Event bus token, interface, memory implementation
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `backend/src/common/events/event-bus.interface.ts` (new),
 `backend/src/common/events/memory-event-bus.ts` (new) + spec,
@@ -555,11 +582,21 @@ throwing handler does not stop the others.
 **Traps:** the `Map` in `MemoryEventBus` is process-local by design; when G1
 lands, allowlist it with that reason.
 
-**Notes:**
+**Notes:** `publish` snapshots the subscriber set before the `await`. A handler
+that unsubscribes its neighbour is the ordinary SSE case (one request ending
+closes the waiter it shares a user channel with), and iterating the live `Set`
+would then skip a handler that was subscribed when the message was published.
+The unsubscribe closure is idempotent for the same reason: a waiter that
+unsubscribes on both the disconnect and the timeout path must not remove a
+handler a later subscribe re-added. Both have a spec.
+
+`activeChannels()` is on `MemoryEventBus` only, not on `EventBus`: an empty
+`Set` left behind after the last unsubscribe is a slow leak in a process
+serving many per-user channels, and this is how a spec sees it.
 
 ### R2 -- Migration: `ai_relay_prompts`, `ai_relay_agents`
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** one migration + `schema.sql`, two entities under
 `backend/src/ai/relay/entities/` (new), `database/CLAUDE.md` only if it lists
@@ -589,7 +626,34 @@ spec picks the tables up from the catalog automatically.
 **Traps:** `JSONB` columns come back as objects from `pg`; do not
 `JSON.parse` them. Prompts may carry attachment references, not bytes (R5).
 
-**Notes:**
+**Notes:** three entities, not the two the Scope names -- step 3's
+`ai_relay_actions` needs one like the other two, and R4 reads it.
+
+Two additions to the shape sketched above, each because the harness or the
+current service demands it:
+
+- `ai_relay_prompts.claimed_by TEXT`. `PendingPrompt.claimedBy` already carries
+  the claiming MCP session, and a relay turn belongs to one session: liveness
+  from another session the same user has open must not steer it. R4's late-answer
+  path reads it. Adding it now costs a column; adding it in R3 costs a migration.
+- `status` carries `DEFAULT 'pending'` and its CHECK is named
+  `ck_ai_relay_prompts_status`. The RLS enforcement spec's generic seeder
+  (`rls-catalog.ts`) generates a `t<n>` string for any NOT NULL text column with
+  no default, which no CHECK-constrained column can accept; a default is how the
+  other such columns in this schema (`security_documents.document_type`) stay
+  seedable, and `pending` is the state a turn is born in rather than a
+  convenience.
+
+The `@Check` and the three `@ManyToOne(() => User, { onDelete: "CASCADE" })`
+relations are on the entities for the same reason: the integration harness
+builds its database from entity metadata, so a constraint or a delete rule that
+only `schema.sql` carries is one no integration spec can observe, and a spec
+that cannot observe it is not evidence about production.
+
+`verify-schema.sh` is blind to a default that differs between a migration and
+`schema.sql`: `CREATE TABLE IF NOT EXISTS` is skipped on the baseline, so the
+two never disagree in its dump. `schema.sql` is the authority for a fresh
+install -- change both by hand and check both.
 
 ### R3 -- Relay queue on rows
 
@@ -1139,7 +1203,7 @@ both backends green; killing one backend leaves the app usable.
 
 ### D3 -- CI Redis service
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `.github/workflows/ci.yml` (`backend-integration-tests` job).
 
@@ -1154,7 +1218,15 @@ it per test.
 **Acceptance:** the `zizmor-scan` job stays green (the pin); the job runs
 unchanged until R6/T1 add specs.
 
-**Notes:**
+**Notes:** `redis:7-alpine` resolved to
+`sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf`, a
+multi-arch index. Resolve a refresh the same way rather than copying a
+per-architecture manifest digest, which would pin CI to one runner
+architecture.
+
+`zizmor --offline .github/workflows/ci.yml` reports no findings. Note that the
+`zizmor-scan` job runs the scan with `|| true` and only uploads SARIF, so it
+cannot go red on a finding; the pin is for the finding's sake, not the job's.
 
 ### D4 -- E2E shard on `CLUSTER_MODE=multi`
 

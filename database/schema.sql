@@ -1609,6 +1609,69 @@ CREATE INDEX idx_ai_insights_user_dismissed ON ai_insights(user_id, is_dismissed
 CREATE INDEX idx_ai_insights_expires ON ai_insights(expires_at);
 CREATE INDEX idx_ai_insights_user_type ON ai_insights(user_id, type);
 
+-- AI relay: the queue between a browser holding an SSE stream and the user's
+-- own MCP agent long-polling for work. Rows rather than process memory because
+-- a second replica serving the agent's poll cannot see a prompt the first
+-- replica queued, and a restart between "enqueued" and "answered" loses the
+-- turn with nothing able to notice. Direct RLS bucket, owner only: a delegate
+-- reading someone's accounts has no business claiming their prompts.
+CREATE TABLE ai_relay_prompts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    -- pending -> claimed -> answered, or expired from either of the first two.
+    -- The CHECK is the state machine's vocabulary; the transitions are
+    -- conditional UPDATEs where the loser gets zero rows.
+    -- Born pending: the default is the initial state, not a convenience.
+    status TEXT NOT NULL DEFAULT 'pending',
+    -- The turn as the agent receives it: prompt text, prior history, attachment
+    -- refs. JSONB because it is a payload handed over whole, never filtered on.
+    prompt JSONB NOT NULL,
+    answer JSONB,
+    -- The MCP session that claimed this turn. A relay turn belongs to ONE
+    -- session; liveness from another session the user has open is not part of it.
+    claimed_by TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    claimed_at TIMESTAMPTZ,
+    answered_at TIMESTAMPTZ,
+    expires_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT ck_ai_relay_prompts_status
+      CHECK (status IN ('pending', 'claimed', 'answered', 'expired'))
+);
+
+CREATE INDEX idx_ai_relay_prompts_claim
+    ON ai_relay_prompts(user_id, status, created_at);
+CREATE INDEX idx_ai_relay_prompts_expiry
+    ON ai_relay_prompts(expires_at);
+
+-- One row per user whose agent has ever polled. Progress, not business data:
+-- these columns decide whether the tunnel indicator reads offline, listening
+-- or busy, and nothing financial reads them.
+CREATE TABLE ai_relay_agents (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    last_poll_at TIMESTAMPTZ,
+    idle_since TIMESTAMPTZ,
+    idle_disconnected_at TIMESTAMPTZ
+);
+
+-- Write-confirmation cards composed after the browser's stream gave up, so an
+-- action the agent decided on is still approvable when the browser returns
+-- instead of being silently lost.
+CREATE TABLE ai_relay_actions (
+    -- The descriptor's own id. Text, not UUID: this table does not get to
+    -- choose the grammar of an id the agent minted.
+    id TEXT NOT NULL,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    card JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMPTZ NOT NULL,
+    -- Owner first: the pickup endpoint drains by user, and an action id is only
+    -- unique within the user who owns it.
+    PRIMARY KEY (user_id, id)
+);
+
+CREATE INDEX idx_ai_relay_actions_expiry
+    ON ai_relay_actions(expires_at);
+
 -- Personal Access Tokens (for MCP server and API access)
 CREATE TABLE personal_access_tokens (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -2113,6 +2176,46 @@ CREATE TRIGGER trg_job_claims_guard_update
       AND OLD.expires_at > CURRENT_TIMESTAMP
     )
     EXECUTE FUNCTION guard_job_claim_lease_ownership();
+
+-- Authentication attempt counters: the rate limits and lockouts that used to
+-- live in a Map per process. A counter in process memory is not a limit when
+-- more than one process serves the same account -- each replica enforces its
+-- own -- and it forgets everything on a restart, which is the cheapest way to
+-- clear a lockout there is.
+--
+-- No user_id: these are written on the failure path, before any identity is
+-- established, and `key` is a hash so a table every session can read is not a
+-- directory of who tried to log in. Exempt; see the block at the foot of this
+-- file and docs/row-level-security-contract.md.
+--
+-- The increment and the window reset are one INSERT ... ON CONFLICT DO UPDATE
+-- in the service, so two concurrent failures cannot lose one.
+CREATE TABLE auth_attempt_counters (
+    scope TEXT NOT NULL,
+    key TEXT NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0,
+    window_expires_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (scope, key)
+);
+
+CREATE INDEX idx_auth_attempt_counters_expiry
+    ON auth_attempt_counters(window_expires_at);
+
+-- One-shot claims: a TOTP code, a confirmed AI action descriptor. The claim is
+-- the INSERT, so the winner is decided by the primary key rather than by a
+-- read the loser also passed.
+--
+-- token_hash is SHA-256 of the secret, never the secret: with no owner column
+-- every session can read this table, and what it holds must not be replayable.
+CREATE TABLE single_use_tokens (
+    purpose TEXT NOT NULL,
+    token_hash TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (purpose, token_hash)
+);
+
+CREATE INDEX idx_single_use_tokens_expiry
+    ON single_use_tokens(expires_at);
 
 -- Trigger for tags updated_at
 CREATE TRIGGER update_tags_updated_at BEFORE UPDATE ON tags FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -2631,6 +2734,9 @@ DECLARE
         'attachment_blob_tombstones',
         'ai_insights',
         'ai_provider_configs',
+        'ai_relay_actions',
+        'ai_relay_agents',
+        'ai_relay_prompts',
         'ai_usage_logs',
         'auto_backup_settings',
         'backup_offsite_settings',
@@ -3206,6 +3312,7 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- table in neither a policy migration nor this list fails
 -- backend/test/integration/rls-enforcement.integration.spec.ts.
 --
+-- rls-exempt: auth_attempt_counters
 -- rls-exempt: currencies
 -- rls-exempt: exchange_rates
 -- rls-exempt: google_places_instance_usage
@@ -3216,6 +3323,7 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- rls-exempt: push_chart_artifacts
 -- rls-exempt: push_instance_config
 -- rls-exempt: schema_migrations
+-- rls-exempt: single_use_tokens
 -- ---------------------------------------------------------------------------
 
 -- Verification helper (run manually; not part of the migration's effect):
