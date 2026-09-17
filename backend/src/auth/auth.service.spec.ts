@@ -32,6 +32,7 @@ import {
   createUserPreferenceRepoMock,
   type UserPreferenceRepoMock,
 } from "../test-helpers/user-preference-testing";
+import { authAttemptCounterProvider } from "../test-helpers/auth-attempt-counter-testing";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -198,6 +199,7 @@ describe("AuthService", () => {
         AuthService,
         TokenService,
         TwoFactorService,
+        authAttemptCounterProvider(),
         AuthEmailService,
         { provide: JwtService, useValue: jwtService },
         {

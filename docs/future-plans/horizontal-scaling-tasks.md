@@ -80,7 +80,7 @@
 | F5 | Concurrency register: retire the stale `users.failed_login_attempts` gap row | -- | none | [x] |
 | F4 | ADR 0005 and index row | F1 | none | [ ] |
 | A1 | Migration: `auth_attempt_counters`, `single_use_tokens`; RLS exemption; sweep cron | -- | none | [x] |
-| A2 | `AuthAttemptCounterService`; 2FA attempt maps replaced | A1 | neutral | [ ] |
+| A2 | `AuthAttemptCounterService`; 2FA attempt maps replaced | A1 | neutral | [x] |
 | A3 | `usedTotpCodes` replaced by a `single_use_tokens` claim | A1 | neutral | [ ] |
 | A4 | Step-up and auth-email counters onto the service; interval prune removed | A2 | neutral | [ ] |
 | K1 | `oauth_instance_config` + `OauthSigningKeysService`; provider gets `jwks` | -- | neutral | [ ] |
@@ -336,13 +336,19 @@ as the gate.
 
 ### A2 -- `AuthAttemptCounterService`; 2FA attempt maps replaced
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `backend/src/auth/auth-attempt-counter.service.ts` (new),
 `backend/src/auth/auth-attempt-counter.service.spec.ts` (new),
 `backend/src/auth/two-factor.service.ts`, `backend/src/auth/two-factor.service.spec.ts`,
 `backend/src/auth/auth.module.ts`,
-`backend/test/integration/auth-attempt-counter.integration.spec.ts` (new).
+`backend/test/integration/auth-attempt-counter.integration.spec.ts` (new),
+`backend/src/test-helpers/auth-attempt-counter-testing.ts` (new, added to scope:
+the limiter thresholds are asserted by more than one spec, so the double that
+reproduces the statement's semantics belongs beside the other service doubles
+rather than copied per spec), `backend/src/auth/auth.service.spec.ts` (added to
+scope: it constructs a real `TwoFactorService`, so the new constructor argument
+has to be provided there or the module cannot compile).
 
 **Pattern:** `recordFailedAttempt` in `backend/src/auth/auth.service.ts`
 (increment and threshold decision in one statement, `RETURNING` the
@@ -381,7 +387,23 @@ after `windowExpiresAt` returns `1`.
 that is A3, leave it. Keys must not be the raw temp token (a JWT) -- hash it.
 The backup-code path already takes a row lock; do not reroute it.
 
-**Notes:**
+**Notes:** the window is **5 minutes**, not `BASE_LOCKOUT_MS`, which this task's
+step 2 named. The `Map` entries carried `Date.now() + 5 * 60 * 1000`, and the
+acceptance is "the same limits as today", so the constant moved across as
+`ATTEMPT_WINDOW_MS`. `BASE_LOCKOUT_MS` is the separate, longer clock the tenth
+per-user failure writes to `users.locked_until`; conflating the two would have
+made a lockout six times longer than it is now.
+
+`increment` always runs through `runOutsideActiveScopedManager`, not only when a
+caller happens to hold a transaction: a failure counter written inside the
+transaction that then refuses the request rolls back with the refusal, and the
+limiter counts nothing. `verify2FA` holds no ambient transaction today, so the
+call is a no-op there, but the property is the service's, not the call site's.
+`peek` and `reset` join the caller's transaction as usual.
+
+Scopes are exported from `two-factor.service.ts` as `TWO_FACTOR_TOKEN_SCOPE`
+(`2fa-token`) and `TWO_FACTOR_USER_SCOPE` (`2fa-user`) so the specs assert the
+strings rather than re-spell them.
 
 ### A3 -- `usedTotpCodes` replaced by a single-use claim
 

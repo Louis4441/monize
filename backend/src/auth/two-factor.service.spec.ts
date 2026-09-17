@@ -10,7 +10,11 @@ import {
 import { DataSource } from "typeorm";
 import bcrypt from "bcryptjs";
 import * as otplib from "otplib";
-import { TwoFactorService } from "./two-factor.service";
+import {
+  TwoFactorService,
+  TWO_FACTOR_TOKEN_SCOPE,
+  TWO_FACTOR_USER_SCOPE,
+} from "./two-factor.service";
 import { TokenService } from "./token.service";
 import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
@@ -21,6 +25,12 @@ import {
   createUserPreferenceRepoMock,
   type UserPreferenceRepoMock,
 } from "../test-helpers/user-preference-testing";
+import {
+  authAttemptCounterProvider,
+  createAuthAttemptCounterMock,
+  type AuthAttemptCounterMock,
+} from "../test-helpers/auth-attempt-counter-testing";
+import { hashToken } from "./crypto.util";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -53,6 +63,7 @@ describe("TwoFactorService", () => {
   let configService: { get: jest.Mock };
   let dataSource: Record<string, jest.Mock>;
   let tokenService: Record<string, jest.Mock>;
+  let attemptCounters: AuthAttemptCounterMock;
 
   const mockUser: Partial<User> = {
     id: "user-1",
@@ -178,6 +189,8 @@ describe("TwoFactorService", () => {
       execute: jest.fn().mockResolvedValue({}),
     });
 
+    attemptCounters = createAuthAttemptCounterMock();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TwoFactorService,
@@ -185,6 +198,7 @@ describe("TwoFactorService", () => {
         { provide: ConfigService, useValue: configService },
         { provide: DataSource, useValue: dataSource },
         { provide: TokenService, useValue: tokenService },
+        authAttemptCounterProvider(attemptCounters),
       ],
     }).compile();
 
@@ -1024,45 +1038,73 @@ describe("TwoFactorService", () => {
     });
   });
 
-  describe("cleanupExpired2FAAttempts", () => {
-    it("should clean up expired entries from both maps", async () => {
-      // Trigger some failed attempts to populate the maps
-      const encryptedSecret = encrypt("TOTP_SECRET", TEST_TOTP_KEY);
+  describe("attempt counters", () => {
+    const encryptedSecret = () => encrypt("TOTP_SECRET", TEST_TOTP_KEY);
+
+    beforeEach(() => {
       usersRepository.findOne.mockResolvedValue({
         ...mockUser,
-        twoFactorSecret: encryptedSecret,
+        twoFactorSecret: encryptedSecret(),
       });
       jwtService.verify.mockReturnValue({
         sub: "user-1",
         type: "2fa_pending",
       });
+    });
+
+    // The scope and key strings are the contract between replicas: two
+    // processes that spell them differently enforce two separate limits.
+    it("counts a failure under the documented scopes, hashing the temp token", async () => {
       (otplib.verifySync as jest.Mock).mockReturnValue({ valid: false });
 
-      await expect(service.verify2FA("token-1", "wrong1")).rejects.toThrow(
+      await expect(service.verify2FA("temp-token", "000000")).rejects.toThrow(
         UnauthorizedException,
       );
 
-      // Now manipulate time to make entries expired
-      const twoFactorAttempts = (service as any).twoFactorAttempts;
-      const user2FAAttempts = (service as any).user2FAAttempts;
-
-      // Set expiry to the past
-      for (const [key] of twoFactorAttempts.entries()) {
-        twoFactorAttempts.set(key, { count: 1, expiresAt: Date.now() - 1000 });
+      expect(attemptCounters.increment).toHaveBeenCalledWith(
+        TWO_FACTOR_TOKEN_SCOPE,
+        hashToken("temp-token"),
+        5 * 60 * 1000,
+      );
+      expect(attemptCounters.increment).toHaveBeenCalledWith(
+        TWO_FACTOR_USER_SCOPE,
+        "user-1",
+        5 * 60 * 1000,
+      );
+      // The raw JWT never reaches the table.
+      for (const [, key] of attemptCounters.increment.mock.calls) {
+        expect(key).not.toContain("temp-token");
       }
-      for (const [key] of user2FAAttempts.entries()) {
-        user2FAAttempts.set(key, { count: 1, expiresAt: Date.now() - 1000 });
-      }
+    });
 
-      // Next call should clean up expired entries
+    it("clears both counters on success", async () => {
       (otplib.verifySync as jest.Mock).mockReturnValue({ valid: true });
-      usersRepository.findOne.mockResolvedValue({
-        ...mockUser,
-        twoFactorSecret: encryptedSecret,
-      });
 
-      const result = await service.verify2FA("token-1", "123456");
-      expect(result.accessToken).toBe("mock-access-token");
+      await service.verify2FA("temp-token", "123456");
+
+      expect(attemptCounters.reset).toHaveBeenCalledWith(
+        TWO_FACTOR_TOKEN_SCOPE,
+        hashToken("temp-token"),
+      );
+      expect(attemptCounters.reset).toHaveBeenCalledWith(
+        TWO_FACTOR_USER_SCOPE,
+        "user-1",
+      );
+    });
+
+    // The point of moving the counters onto rows: a count another replica (or
+    // this one, before a restart) wrote is the count this request is refused on.
+    it("refuses on a count this process never incremented", async () => {
+      attemptCounters.rows.set(`${TWO_FACTOR_USER_SCOPE}\u0000user-1`, {
+        count: 10,
+        windowExpiresAt: new Date(Date.now() + 60_000),
+      });
+      (otplib.verifySync as jest.Mock).mockReturnValue({ valid: true });
+
+      await expect(service.verify2FA("fresh-token", "123456")).rejects.toThrow(
+        "Too many verification attempts. Your account has been temporarily locked.",
+      );
+      expect(otplib.verifySync).not.toHaveBeenCalled();
     });
   });
 
