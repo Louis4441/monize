@@ -59,9 +59,10 @@
 
 | ID | Task | Depends on | Deploy impact | Status |
 |----|------|-----------|---------------|--------|
-| F1 | `CLUSTER_MODE` parsing, boot-matrix check, `main.ts` wiring, `JWT_SECRET` fatal, `.env.example` | -- | none (`JWT_SECRET` refusal is the one deliberate exception) | [ ] |
+| F1 | `CLUSTER_MODE` parsing, boot-matrix check, `main.ts` wiring, `JWT_SECRET` fatal, `.env.example` | -- | none (`JWT_SECRET` refusal is the one deliberate exception) | [x] |
 | F2 | `ClusterModule`: mode provider, Redis client and subscriber in `multi`, `PING` at boot, readiness probe | F1 | multi-only | [ ] |
-| F3 | Doc corrections in `concurrency-and-idempotency.md`, `external-side-effects.md`, `cron-jobs.md` | -- | none | [ ] |
+| F3 | Doc corrections in `concurrency-and-idempotency.md`, `external-side-effects.md`, `cron-jobs.md` | -- | none | [x] |
+| F5 | Concurrency register: retire the stale `users.failed_login_attempts` gap row | -- | none | [ ] |
 | F4 | ADR 0005 and index row | F1 | none | [ ] |
 | A1 | Migration: `auth_attempt_counters`, `single_use_tokens`; RLS exemption; sweep cron | -- | none | [ ] |
 | A2 | `AuthAttemptCounterService`; 2FA attempt maps replaced | A1 | neutral | [ ] |
@@ -92,7 +93,8 @@
 
 ## Suggested order
 
-1. F1, F3, A1, R1, R2, D3 (no behaviour change, unblock everything).
+1. F1 and F3 (done), F5, A1, R1, R2, D3 (no behaviour change, unblock
+   everything).
 2. A2, A3, A4, X1, K1, C1, C2, C3, C4 (the `neutral` durability fixes; each
    improves a single-replica deployment on its own).
 3. R3, R4, R5, M1 (relay and MCP on rows).
@@ -111,60 +113,27 @@ doing the work.
 
 ### F1 -- `CLUSTER_MODE` parsing, boot-matrix check, `main.ts` wiring
 
-- [ ] Status:
+- [x] Status: done (commits `9612aa78`, `8e40e06c`).
 
-**Scope:** `backend/src/common/cluster/cluster-mode.ts` (new),
-`backend/src/common/cluster/cluster-mode.spec.ts` (new), `backend/src/main.ts`,
-`.env.example`, `docker-compose.dev.yml`, `docker-compose.prod.yml`,
-`docker-compose.e2e.yml` (an explicit `CLUSTER_MODE: "single"` beside
-`RLS_MODE`).
+**What shipped** (read these before any task that depends on F1):
 
-**Pattern:** `parseRlsMode` in `backend/src/common/db/rls-config.ts` for the
-parse-and-throw; `assertRequiredDbFunctionsOrExit` and
-`reportEncryptionKeyStatus` in `backend/src/main.ts` for refuse-versus-warn.
+- `backend/src/common/cluster/cluster-mode.ts`: `CLUSTER_MODES`,
+  `DEFAULT_CLUSTER_MODE`, `MIN_JWT_SECRET_LENGTH`,
+  `parseClusterMode(raw)` (throws on an unrecognized value),
+  `getClusterMode()`, and `checkClusterBoot(env: ClusterBootEnv): ClusterBootReport`
+  where `ClusterBootEnv` is `{ CLUSTER_MODE?, REDIS_URL?, JWT_SECRET? }` and
+  the report is `{ mode, refusals, warnings }`. Pure; reads no `process.env`.
+- `backend/src/main.ts`: `assertClusterBootOrExit()` with
+  `new Logger("ClusterMode")`, called before `app.listen`; it names each env
+  var it passes one by one, so a new matrix input is added to that call as
+  well as to `ClusterBootEnv`.
+- `.env.example`: `CLUSTER_MODE` and `REDIS_URL` documented in the
+  `Application` section. `REDIS_KEY_PREFIX` (F2), `ATTACHMENT_SHARED_VOLUME`
+  and `BACKUP_SHARED_VOLUME` (S1) are **not** there yet.
+- `backend/src/common/cluster/cluster-mode.spec.ts`: the table-driven matrix.
 
-**Steps:**
-
-1. `cluster-mode.ts` exports `type ClusterMode = "single" | "multi"`,
-   `parseClusterMode(raw: string | undefined): ClusterMode` (absent is
-   `single`; anything else throws with the accepted values in the message),
-   and `evaluateClusterBoot(env: ClusterBootInput): { refusals: string[]; warnings: string[] }`.
-   The input is a plain object (`mode`, `redisUrl`, `attachmentProvider`,
-   `attachmentSharedVolume`, `backupsEnabled`, `backupSharedVolume`,
-   `jwtSecret`) so the matrix is testable without Nest or env.
-2. Encode the design doc's boot matrix exactly: in `multi`, missing
-   `REDIS_URL` refuses; `local` attachments without
-   `ATTACHMENT_SHARED_VOLUME=true` refuses naming `database` and `s3` as the
-   alternatives; backups without `BACKUP_SHARED_VOLUME=true` refuses; in every
-   mode an absent or short `JWT_SECRET` refuses. `REDIS_URL` set in `single`
-   warns "set but unused". The `PING` itself is F2's; F1 only checks presence.
-3. `main.ts`: a new `assertClusterModeOrExit(config)` in the same position as
-   the other pre-listen checks (after `assertRequiredDbFunctionsOrExit`,
-   before `app.listen`), with a `new Logger("ClusterModeCheck")`. Refusals log
-   each line then `process.exit(1)`; warnings log and continue.
-4. `.env.example`: a new `# Cluster / High Availability (Optional)` section
-   after `# Backup`, documenting `CLUSTER_MODE`, `REDIS_URL`,
-   `REDIS_KEY_PREFIX`, `ATTACHMENT_SHARED_VOLUME`, `BACKUP_SHARED_VOLUME`, each
-   with the one-line meaning from the design doc's configuration table.
-
-**Acceptance:** with no `CLUSTER_MODE` set, boot logs nothing new and behaves
-identically. `CLUSTER_MODE=bogus` exits 1 with the accepted values in the
-first ten log lines. `CLUSTER_MODE=multi` with no `REDIS_URL` exits 1. A boot
-with no `JWT_SECRET` exits 1 in `single` (this is the one deliberate
-behaviour change; name it in the PR description and the next release note).
-
-**Tests:** `cluster-mode.spec.ts` is table-driven, one row per line of the
-design doc's boot matrix plus the `single` no-op row; a `main.ts`-level test
-is not required (the other `*OrExit` helpers have none) but the pure function
-must be fully covered.
-
-**Traps:** `JWT_SECRET` today is checked lazily in several services (the OAuth
-provider throws on `< 32` chars at `onModuleInit`). Keep those checks; F1 adds
-the early one. Do not read `process.env` inside `cluster-mode.ts`; the caller
-passes values so the spec stays pure. `scripts/check-env-docs.mjs` needs every
-new `configService.get("X")` string to appear in `.env.example`.
-
-**Notes:**
+**Notes:** the storage refusals in the design doc's boot matrix were left to
+S1; the compose files carry no explicit `CLUSTER_MODE` (unset is `single`).
 
 ### F2 -- `ClusterModule` and the Redis connection
 
@@ -193,7 +162,9 @@ new `configService.get("X")` string to appear in `.env.example`.
    separate connection because a connection in subscribe mode cannot run
    commands.
 3. `cluster.module.ts`: `@Global()`, provides `CLUSTER_MODE` (the parsed
-   value) and the two clients; `onModuleDestroy` quits both.
+   value from `getClusterMode()` in `cluster-mode.ts`) and the two clients;
+   `onModuleDestroy` quits both. Document `REDIS_KEY_PREFIX` in
+   `.env.example` beside `REDIS_URL`.
 4. `main.ts`: after the F1 check, in `multi` only, `await client.ping()` with a
    5 s timeout; failure refuses the boot with the URL's host (never the
    password) in the message.
@@ -220,34 +191,39 @@ a log line.
 
 ### F3 -- Doc corrections
 
+- [x] Status: done (commit `dc361624`).
+
+**What shipped:** scheduled auto-posting and the demo reset left the gap
+register in `docs/concurrency-and-idempotency.md`; the budget-rollover row
+was rewritten to the gap that actually remains (see C1); the bill and
+mortgage reminder rows in `docs/external-side-effects.md` now describe the
+lease and delivery record, with the mortgage key's per-user clock read as the
+surviving gap; `docs/cron-jobs.md` says `CLUSTER_MODE` does not gate the
+scheduler.
+
+**Notes:** the `users.failed_login_attempts` row was not part of F3 and is
+still stale on `main`; it is F5.
+
+### F5 -- Retire the stale `users.failed_login_attempts` gap row
+
 - [ ] Status:
 
-**Scope:** `docs/concurrency-and-idempotency.md`,
-`docs/external-side-effects.md`, `docs/cron-jobs.md`.
+**Scope:** `docs/concurrency-and-idempotency.md` (section 8 only).
 
-**Steps:**
+**Pattern:** the rows F3 moved out of the gap register in commit `dc361624`.
 
-1. `concurrency-and-idempotency.md` section 8 gap register: move scheduled
-   auto-posting (now `scheduled_transaction_postings` unique claim), demo
-   reset (`claimLease(DemoReset)`) and `users.failed_login_attempts`
-   (`recordFailedAttempt` is one atomic `UPDATE ... RETURNING`) out of the gap
-   table and into the "locks and claims that exist" table, each with its
-   mechanism and file.
-2. `external-side-effects.md` section 4 email table: bill and mortgage
-   reminders now use `claimLease` + `markDelivered` (at-least-once, delivery
-   recorded); section 3: automatic backup writes through `writeFileAtomic`
-   (`backend/src/backup/atomic-file.ts`), temp name carries `randomUUID`.
-3. `cron-jobs.md` header: add one sentence that `CLUSTER_MODE=multi` changes
-   nothing about cron fan-out; every replica still fires every cron and the
-   per-row mechanism is what makes it safe.
+**Steps:** the gap row says the counter is read in one statement, incremented
+in JavaScript and written back with no lock. `recordFailedAttempt` in
+`backend/src/auth/auth.service.ts` is one `UPDATE users ... SET failed_login_attempts = u.failed_login_attempts + 1 ... RETURNING`
+that also decides `locked_until` in the same statement. Move the row into the
+table of mechanisms that exist, naming the statement and the file, and drop
+the CONC-001/CONC-007 reference from it.
 
-**Acceptance:** `npm run test:unit -- doc-paths` and
-`npm run test:unit -- cron-doc` green from `backend/`; every path cited
-resolves.
+**Acceptance:** `npm run test:unit -- doc-paths` green from `backend/`; the
+gap register no longer names `failed_login_attempts`.
 
-**Traps:** these are contract documents, so every backticked path must
-resolve today (strict policy, not the future-plans policy). Do not rewrite
-the rationale paragraphs; the register rows are the drift.
+**Traps:** confirm against the source at the time of the task, not against
+this list; if the statement has changed shape, the row may be right.
 
 **Notes:**
 
@@ -848,16 +824,19 @@ rows already exist from F1; this task wires the inputs), `backend/src/main.ts`,
 `backend/src/backup/auto-backup.service.ts` only to expose "backups enabled"
 if no cheap predicate exists.
 
-**Steps:** feed `ATTACHMENT_STORAGE_PROVIDER`, `ATTACHMENT_SHARED_VOLUME`,
-`BACKUP_SHARED_VOLUME` and whether the backup directory is configured into
-`evaluateClusterBoot`; the `database` provider warns (not refuses) in `multi`
-with the sentence from the design doc's open questions.
+**Steps:** add `ATTACHMENT_STORAGE_PROVIDER`, `ATTACHMENT_SHARED_VOLUME`,
+`BACKUP_CONTAINER_DIR` (or whatever cheap predicate says backups are
+configured) and `BACKUP_SHARED_VOLUME` to `ClusterBootEnv`, to
+`checkClusterBoot`'s matrix, and to the named list `assertClusterBootOrExit`
+passes in `main.ts`; the `database` provider warns (not refuses) in `multi`
+with the sentence from the design doc's open questions. Document the two new
+`*_SHARED_VOLUME` variables in `.env.example` beside `CLUSTER_MODE`.
 
 **Acceptance:** `CLUSTER_MODE=multi ATTACHMENT_STORAGE_PROVIDER=local` exits 1
 naming `ATTACHMENT_SHARED_VOLUME=true`, `database` and `s3`;
 `ATTACHMENT_SHARED_VOLUME=true` boots.
 
-**Tests:** the F1 table gains the rows.
+**Tests:** `cluster-mode.spec.ts`'s table gains the rows.
 
 **Traps:** `ATTACHMENT_LOCAL_DIR` is a deprecated alias for
 `ATTACHMENT_CONTAINER_DIR`; treat both as `local`.
@@ -919,7 +898,14 @@ owner's `withUserContext` body before creating that owner's periods. A losing
 replica skips the owner. The claim is permanent (a month rolls over once) and
 is never released on failure: a failed rollover is repaired by the request
 path that creates a period on demand, not by a retry of the cron. Keep the
-23505 handling as the second wall. Update the cron doc row's mechanism.
+`ON CONFLICT (budget_id, period_start) DO NOTHING RETURNING` insert as the
+second wall. The gap F3 recorded is the report, not the data: the loser of
+`closePeriod`'s row lock finds no OPEN period, raises `BadRequestException`,
+and the cron counts a normal two-replica tick as a failure. With the claim in
+place that path is unreachable for a claimed owner; make the "no OPEN period"
+outcome a logged skip rather than a counted error anyway, so a rollout that
+overlaps two processes at one replica stays quiet. Update the cron doc row's
+mechanism and the register row in `docs/concurrency-and-idempotency.md`.
 
 **Acceptance:** two runners on one month produce one set of periods per owner
 and zero counted errors.

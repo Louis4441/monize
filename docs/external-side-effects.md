@@ -219,8 +219,8 @@ Every caller is a cron, and each has a different amount of protection:
 
 | Sender | Duplicate protection |
 | --- | --- |
-| `BillReminderService` | None. It recomputes the window from `nextDueDate`/`reminderDaysBefore` daily; there is no "already reminded for this due date" flag. Sending every day the bill is inside the window is intentional, but a crash-restart or a second replica sends the same reminder twice with nothing able to notice. |
-| `MortgageReminderService` | None -- same shape, no dedup state at all. |
+| `BillReminderService` | Full, and the opposite trade from `ProviderOutageAlertService`. A `claimLease(JobClaimType.BillReminder, ...)` excludes the other replicas for the length of an SMTP round trip, and `markDelivered` writes the durable record **after** the send; the next run re-reads it and skips. The key is `buildReminderClaimKey` -- the run's date plus a sha256 digest of which bills the reminder covers -- so a second bill falling due later the same day is still a reminder to send, and the same set is not re-sent tomorrow. The run's date is passed in rather than read per user, because a run spanning local midnight otherwise claims the early users under one key and the rest under another. The contract is **at-least-once**: a process killed after SMTP accepted but before the record committed re-sends next run, which is the right way round for a reminder. |
+| `MortgageReminderService` | The same lease plus delivery record, under `JobClaimType.MortgageReminder`, checked with `wasDelivered` before the send and written with `markDelivered` after it; a lease the send does not use is handed straight back rather than held for its TTL. Its key is fingerprinted on the mortgages and their term-end dates, but the date half is read from the clock inside the key builder rather than passed in from the run, so the midnight split the bill reminder pinned is still reachable here. |
 | `BudgetAlertService` | Full, by insert-winner, since migration 140. The in-memory dedup against existing rows by `(budgetId, type, budgetCategoryId, periodStart)` is a check-then-act and never was the arbiter; the unique fingerprint index is, through `NotificationService.create`, which answers `null` for the replica that loses the race so only the winner emails. `isEmailSent` is set after the send, so a crash in between leaves it `false` forever without causing a duplicate. |
 | Emergency-access grant | The one deliberate design. See section 5. |
 | `SystemAlertService` | Full, by insert-winner. Each admin's alert row goes through `NotificationService.create`, whose `INSERT ... ON CONFLICT DO NOTHING RETURNING id` is arbitrated for these rows by the partial unique index from migration 170, and the email goes only to rows the INSERT returned -- with the same at-most-once trade as `ProviderOutageAlertService`: a crash between the commit and SMTP loses that email, and the in-app row survives as the durable notice (`docs/specs/system-alerts.md`, INV-ALERT-001). |
@@ -448,7 +448,7 @@ restriction at all.
 No generic `pending -> externally_created -> verified -> available` state machine
 exists. Attachments have no state column; backups have a post-hoc
 success/failed string; emergency access has an ad hoc set of timestamp columns;
-AI insights and reminder emails have no state beyond a time-window read.
+AI insights have no state beyond a time-window read; the bill and mortgage reminders have a lease and a delivery record but no state column tying them together.
 
 The nearest thing to a lifecycle belongs to the `.mny` import job. It wraps a
 local parse rather than a provider call, and it is incomplete in one instructive
@@ -489,18 +489,20 @@ added rather than as it stands.
 | Attachment delete, local and S3 | Bytes deleted before commit; a failed commit leaves a metadata row resolving to nothing | EXT-001 |
 | Attachment provider comment | Claims joint commit for all providers; true only of the database provider | EXT-004 |
 | Backup restore validation, plaintext `.json.gz` | No content hash of its own: truncation and random corruption are caught by the gzip trailer and `JSON.parse`, a deliberate alteration is not. An encrypted `.mzbe` is authenticated frame by frame and has no such gap | EXT-002 |
-| Bill and mortgage reminders | No dedup state of any kind; duplicate sends unbounded across replicas and restarts | EXT-001 |
-| Budget alerts | Durable state written before the send, but the dedup read and insert are not atomic and no unique constraint backs them | EXT-001 |
+| Mortgage reminder delivery key | The lease and the delivery record are in place; what is not is the run date. `buildMortgageReminderClaimKey` reads `new Date()` per user, so a run crossing local midnight claims some users under D and the rest under D+1 while the windows are measured from D -- the duplicate the bill reminder closed by taking the date as a parameter | EXT-001 |
 | Emergency-access reminder | `lastReminderSentAt` written after the send, and it is the gate | EXT-001 |
 | AI insight generation | Process-local `Set` as the reentrancy guard; cooldown is a check-then-act; inserts carry no idempotency key | EXT-001 |
 | Payee contact enrichment | In-flight guard and admission queue are process-local; two replicas can both pay for one lookup (the second UPDATE affects zero rows, so the data is right and only the cost is duplicated) | EXT-001 |
 | Off-machine backup copy (email) | An accepted trade, not an omission: a claim expired by the lease is re-attempted, and SMTP offers no way to tell a message already delivered from one never sent, so the same artifact can arrive twice. Delivering a duplicate copy is the survivable direction against never delivering it | EXT-003 |
 | Off-machine backup copy (S3) | A stuck `uploading` row is reclaimed after the lease and re-attempted, reconciled by digest. What remains: nothing reconciles a bucket object against the ledger, so an object written by an attempt whose row never reached `uploaded` is referenced by nothing -- bytes nobody references, the survivable side, and the operator's lifecycle policy is what ages them out | EXT-003 |
 
-Four rows are absent from this table on purpose, and all four are settled:
+Six workflows are absent from this table on purpose, and all six are settled:
 per-user backup sharding with admin-gated folder endpoints, the FX/price
 natural-key upserts, the atomic backup write with its in-document completeness
-verdict (INV-BACKUP-001), and the UUID-named writability probe whose failed
-cleanup is a log line rather than a verdict. Section 5's
-grant-commit-after-delivery belongs in the same category. Those are the patterns
-the rest of this table should be closed by imitating.
+verdict (INV-BACKUP-001), the UUID-named writability probe whose failed cleanup
+is a log line rather than a verdict, the budget alerts (migration 140's unique
+fingerprint, arbitrated through `NotificationService.create`, so only the
+replica whose INSERT returned a row emails), and the bill reminder (a lease plus
+a delivery record written after the send, keyed on the run's date and the set of
+bills). Section 5's grant-commit-after-delivery belongs in the same category.
+Those are the patterns the rest of this table should be closed by imitating.
