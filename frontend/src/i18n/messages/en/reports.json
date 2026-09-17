@@ -728,6 +728,7 @@
     "showingLatest": "Showing the latest market day.",
     "nativeNote": "Values shown in each holding's native currency.",
     "baseNote": "Values shown in {currency}.",
+    "partialFxNote": "Some figures are unavailable: no exchange rate for {pairs}. The % of portfolio column stays blank while a rate is missing.",
     "asOf": "As of {date}",
     "holdingCount": "{count, plural, one {# holding} other {# holdings}}",
     "noHoldings": "No holdings found for the selected accounts and date.",

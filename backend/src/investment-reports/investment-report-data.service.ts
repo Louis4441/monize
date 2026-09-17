@@ -21,6 +21,23 @@ import { roundToDecimals } from "../common/round.util";
 import { FxAggregate } from "../common/fx-aggregate";
 import { todayYMD } from "../common/date-utils";
 
+/**
+ * The rows of a holdings computation and how complete their conversion was.
+ *
+ * `fxComplete` and `missingPairs` travel with the rows because the rate gap is
+ * not visible in them: an unresolvable pair leaves `exchangeRate` null on one
+ * row and blanks `portfolioPercent` on *every* row, and nothing in the payload
+ * said why. A consumer reads `fxComplete === false` and relabels the figures;
+ * `missingPairs` names what to fix.
+ */
+export interface ComputedHoldings {
+  rows: ComputedHolding[];
+  /** False when any pair the rows needed could not be resolved. */
+  fxComplete: boolean;
+  /** `"SEK->USD"` for each unresolvable pair, in first-seen order. */
+  missingPairs: string[];
+}
+
 /** One computed holding row plus the fields needed to group it. */
 export interface ComputedHolding {
   accountId: string;
@@ -197,8 +214,9 @@ export class InvestmentReportDataService {
     asOfDate: string,
     baseCurrency: string,
     mergeAccounts = false,
-  ): Promise<ComputedHolding[]> {
-    if (accountIds.length === 0) return [];
+  ): Promise<ComputedHoldings> {
+    if (accountIds.length === 0)
+      return { rows: [], fxComplete: true, missingPairs: [] };
 
     const accountMap = await this.loadAccounts(accountIds);
 
@@ -450,7 +468,19 @@ export class InvestmentReportDataService {
       }
     }
 
-    return computed.map((c) => c.holding);
+    // The cache holds one entry per pair the rows actually needed, and a `null`
+    // entry is a pair the door refused. Read here rather than tracked
+    // separately so the report cannot report itself complete while a row's
+    // conversion was refused.
+    const missingPairs = [...fxCache.entries()]
+      .filter(([, rate]) => rate === null)
+      .map(([pair]) => pair);
+
+    return {
+      rows: computed.map((c) => c.holding),
+      fxComplete: missingPairs.length === 0,
+      missingPairs,
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -846,10 +876,14 @@ export class InvestmentReportDataService {
     const key = `${from}->${to}`;
     const cached = cache.get(key);
     if (cached !== undefined) return cached;
+    // `fetchMissing: false`: running a report is a read. Fanning out to the
+    // provider per unresolved pair made a GET write rate rows and, with no
+    // negative cache on that path, repeat the fan-out on every refresh.
     const rate = await this.exchangeRateService.getRateForDate(
       from,
       to,
       onDate,
+      { fetchMissing: false },
     );
     const usable = rate !== null && rate > 0 ? rate : null;
     if (usable === null) {

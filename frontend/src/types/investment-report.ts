@@ -164,4 +164,13 @@ export interface InvestmentReportResult {
   columns: string[];
   groups: InvestmentReportGroup[];
   rowCount: number;
+  /**
+   * False when a pair the rows needed had no admissible rate. Read as
+   * `=== false`: absent means the server said nothing, not that everything
+   * converted. Every base-currency figure and every row's `portfolioPercent`
+   * is then partial, and the caption over them says so.
+   */
+  fxComplete?: boolean;
+  /** `"SEK->USD"` for each pair the rate door could not resolve. */
+  missingPairs?: string[];
 }

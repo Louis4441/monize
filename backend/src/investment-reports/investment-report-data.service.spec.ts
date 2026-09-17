@@ -88,7 +88,12 @@ describe("InvestmentReportDataService", () => {
   });
 
   it("returns no rows when there are no accounts", async () => {
-    const rows = await service.computeHoldings("u1", [], "2024-06-10", "USD");
+    const { rows } = await service.computeHoldings(
+      "u1",
+      [],
+      "2024-06-10",
+      "USD",
+    );
     expect(rows).toEqual([]);
   });
 
@@ -156,7 +161,7 @@ describe("InvestmentReportDataService", () => {
       }),
     ]);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -229,7 +234,7 @@ describe("InvestmentReportDataService", () => {
       priceRow({ price_date: "2024-02-10", close_price: "130" }),
     ]);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -264,7 +269,7 @@ describe("InvestmentReportDataService", () => {
     ]);
     manager.query.mockResolvedValue([priceRow({ close_price: "120" })]);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -298,7 +303,7 @@ describe("InvestmentReportDataService", () => {
     ]);
     manager.query.mockResolvedValue([priceRow({ close_price: "120" })]);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -341,7 +346,7 @@ describe("InvestmentReportDataService", () => {
       priceRow({ price_date: "2024-05-01", close_price: "110" }),
     ]);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -389,7 +394,7 @@ describe("InvestmentReportDataService", () => {
     ]);
     manager.query.mockResolvedValue([priceRow({ close_price: "130" })]);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1", "acc2"],
       "2024-06-10",
@@ -441,7 +446,7 @@ describe("InvestmentReportDataService", () => {
     ]);
     manager.query.mockResolvedValue([priceRow({ close_price: "130" })]);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1", "acc2"],
       "2024-06-10",
@@ -479,7 +484,7 @@ describe("InvestmentReportDataService", () => {
       },
     ]);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -525,7 +530,7 @@ describe("InvestmentReportDataService", () => {
     ]);
     exchangeRateService.getRateForDate.mockResolvedValue(0.75); // CAD -> USD
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -603,7 +608,7 @@ describe("InvestmentReportDataService", () => {
       }),
     ]);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -616,6 +621,87 @@ describe("InvestmentReportDataService", () => {
     // Held > 0.5 years -> annualized return is computed (not null)
     expect(v.totalAnnualizedReturn).not.toBeNull();
     expect(v.totalReturn3Year).not.toBeNull();
+  });
+
+  /**
+   * Issue #1390. One unresolvable pair blanks every row's % of portfolio --
+   * the denominator is withheld, correctly -- but the response said nothing
+   * about why, so the blanks read as zero and only a server log named the
+   * pair. The completeness now travels with the rows.
+   */
+  it("reports the pair it could not resolve instead of only logging it", async () => {
+    securitiesRepository.find.mockResolvedValue([
+      {
+        id: "sec1",
+        symbol: "AAA",
+        name: "Alpha",
+        securityType: "STOCK",
+        currencyCode: "SEK",
+      },
+    ]);
+    holdingsRepository.find.mockResolvedValue([
+      holding({ quantity: 10, averageCost: 100 }),
+    ]);
+    txRepository.find.mockResolvedValue([
+      makeTx({
+        action: InvestmentAction.BUY,
+        transactionDate: "2024-01-10",
+        quantity: 10,
+        price: 100,
+        totalAmount: 1000,
+      }),
+    ]);
+    manager.query.mockResolvedValue([priceRow({ close_price: "120" })]);
+    exchangeRateService.getRateForDate.mockResolvedValue(null);
+
+    const result = await service.computeHoldings(
+      "u1",
+      ["acc1"],
+      "2024-06-10",
+      "USD",
+    );
+
+    expect(result.fxComplete).toBe(false);
+    expect(result.missingPairs).toEqual(["SEK->USD"]);
+    // The withheld figures stay withheld: the flag explains them, it does not
+    // replace them with a number.
+    expect(result.rows[0].values.portfolioPercent).toBeNull();
+    expect(result.rows[0].exchangeRate).toBeNull();
+  });
+
+  it("reports a fully converted run as complete", async () => {
+    securitiesRepository.find.mockResolvedValue([
+      {
+        id: "sec1",
+        symbol: "AAA",
+        name: "Alpha",
+        securityType: "STOCK",
+        currencyCode: "USD",
+      },
+    ]);
+    holdingsRepository.find.mockResolvedValue([
+      holding({ quantity: 10, averageCost: 100 }),
+    ]);
+    txRepository.find.mockResolvedValue([
+      makeTx({
+        action: InvestmentAction.BUY,
+        transactionDate: "2024-01-10",
+        quantity: 10,
+        price: 100,
+        totalAmount: 1000,
+      }),
+    ]);
+    manager.query.mockResolvedValue([priceRow({ close_price: "120" })]);
+
+    const result = await service.computeHoldings(
+      "u1",
+      ["acc1"],
+      "2024-06-10",
+      "USD",
+    );
+
+    expect(result.fxComplete).toBe(true);
+    expect(result.missingPairs).toEqual([]);
   });
 
   it("leaves the direct/inverse decision to the one ladder and converts at the as-of date", async () => {
@@ -646,19 +732,21 @@ describe("InvestmentReportDataService", () => {
     // resolver (issue #1390). 1/0.8 = 1.25 is what the ladder hands back.
     exchangeRateService.getRateForDate.mockResolvedValue(1.25);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
       "USD",
     );
     expect(rows[0].values.exchangeRate).toBe(1.25);
-    // The report's as-of date, not today: a report run "as of" a past date used
-    // to be valued at the latest rate and changed every morning.
+    // The report's as-of date, not today; and `fetchMissing: false`, because
+    // running a report is a read: the provider fan-out it used to trigger
+    // wrote rate rows from a GET and repeated on every refresh.
     expect(exchangeRateService.getRateForDate).toHaveBeenCalledWith(
       "EUR",
       "USD",
       "2024-06-10",
+      { fetchMissing: false },
     );
   });
 
@@ -686,7 +774,7 @@ describe("InvestmentReportDataService", () => {
     ]);
     manager.query.mockResolvedValue([]); // no stored prices
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -776,7 +864,7 @@ describe("InvestmentReportDataService", () => {
       }),
     ]);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -806,7 +894,7 @@ describe("InvestmentReportDataService", () => {
       }),
     ]);
     manager.query.mockResolvedValue([]);
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -858,7 +946,7 @@ describe("InvestmentReportDataService", () => {
       priceRow({ security_id: "sec1", close_price: "100" }),
       priceRow({ security_id: "sec2", close_price: "50" }),
     ]);
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",

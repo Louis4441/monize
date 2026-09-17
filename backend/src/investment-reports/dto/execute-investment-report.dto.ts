@@ -71,4 +71,12 @@ export interface InvestmentReportResult {
   columns: string[];
   groups: InvestmentReportGroup[];
   rowCount: number;
+  /**
+   * False when a currency pair the rows needed had no admissible rate. The
+   * base-currency figures and every row's `portfolioPercent` are then partial,
+   * and the surface says so rather than leaving a total's caption over them.
+   */
+  fxComplete?: boolean;
+  /** `"SEK->USD"` for each pair that could not be resolved. */
+  missingPairs?: string[];
 }
