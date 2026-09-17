@@ -21,6 +21,7 @@ import {
   OidcReauthService,
 } from "../oidc/oidc-reauth.service";
 import { tr } from "../../i18n/translate";
+import { AuthAttemptCounterService } from "../auth-attempt-counter.service";
 
 interface VerifyArgs {
   password?: string;
@@ -40,6 +41,13 @@ export interface StepUpVerificationResult {
 }
 
 /**
+ * `auth_attempt_counters.scope` for the step-up limiter. The key is
+ * `userId:purpose`, both of which the caller already holds -- neither is a
+ * secret, so neither is hashed.
+ */
+export const STEP_UP_ATTEMPT_SCOPE = "step-up";
+
+/**
  * Step-up re-authentication. The user is already authenticated (JWT
  * session); for a small set of high-sensitivity surfaces we re-prompt for
  * their strongest factor and hand back a short-lived token scoped to that
@@ -51,10 +59,6 @@ export class StepUpAuthService {
   private readonly STEP_UP_TTL_SECONDS = 5 * 60;
   private readonly MAX_ATTEMPTS = 10;
   private readonly LOCKOUT_WINDOW_MS = 30 * 60 * 1000;
-  private readonly attempts = new Map<
-    string,
-    { count: number; expiresAt: number }
-  >();
 
   constructor(
     private readonly dataSource: DataSource,
@@ -62,6 +66,7 @@ export class StepUpAuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly oidcReauth: OidcReauthService,
+    private readonly attemptCounters: AuthAttemptCounterService,
   ) {
     // Forces ConfigService to be retained so step-up TTL can be tuned later
     // via env without changing the constructor signature.
@@ -88,10 +93,12 @@ export class StepUpAuthService {
     purpose: StepUpPurpose,
     args: VerifyArgs,
   ): Promise<StepUpVerificationResult> {
-    this.cleanupExpiredAttempts();
     const attemptKey = `${userId}:${purpose}`;
-    const record = this.attempts.get(attemptKey);
-    if (record && record.count >= this.MAX_ATTEMPTS) {
+    const attempts = await this.attemptCounters.peek(
+      STEP_UP_ATTEMPT_SCOPE,
+      attemptKey,
+    );
+    if (attempts >= this.MAX_ATTEMPTS) {
       this.logger.warn(
         `Step-up rejected: too many attempts for user ${userId} purpose ${purpose}`,
       );
@@ -184,7 +191,7 @@ export class StepUpAuthService {
     }
 
     if (!verified) {
-      this.recordFailure(attemptKey);
+      await this.recordFailure(attemptKey);
       this.logger.warn(
         `Step-up verification failed for user ${userId} purpose ${purpose}`,
       );
@@ -198,7 +205,7 @@ export class StepUpAuthService {
       );
     }
 
-    this.attempts.delete(attemptKey);
+    await this.attemptCounters.reset(STEP_UP_ATTEMPT_SCOPE, attemptKey);
 
     const jti = crypto.randomUUID();
     const stepUpToken = this.jwtService.sign(
@@ -220,20 +227,11 @@ export class StepUpAuthService {
     };
   }
 
-  private recordFailure(key: string): void {
-    const existing = this.attempts.get(key);
-    this.attempts.set(key, {
-      count: (existing?.count ?? 0) + 1,
-      expiresAt: Date.now() + this.LOCKOUT_WINDOW_MS,
-    });
-  }
-
-  private cleanupExpiredAttempts(): void {
-    const now = Date.now();
-    for (const [key, value] of this.attempts.entries()) {
-      if (value.expiresAt <= now) {
-        this.attempts.delete(key);
-      }
-    }
+  private async recordFailure(key: string): Promise<void> {
+    await this.attemptCounters.increment(
+      STEP_UP_ATTEMPT_SCOPE,
+      key,
+      this.LOCKOUT_WINDOW_MS,
+    );
   }
 }

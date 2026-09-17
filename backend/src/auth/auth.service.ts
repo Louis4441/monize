@@ -1102,8 +1102,12 @@ export class AuthService {
     );
   }
 
-  checkForgotPasswordEmailLimit(email: string) {
-    return this.authEmailService.checkForgotPasswordEmailLimit(email);
+  async checkForgotPasswordEmailLimit(email: string) {
+    // RLS: public forgot-password path (no req.user). The throttle is a row
+    // now, so it needs the same ambient identity its siblings here already seed.
+    return withSystemContext(() =>
+      this.authEmailService.checkForgotPasswordEmailLimit(email),
+    );
   }
 
   async generateVerificationToken(email: string) {
@@ -1118,7 +1122,10 @@ export class AuthService {
     return withSystemContext(() => this.authEmailService.verifyEmail(token));
   }
 
-  checkVerificationEmailLimit(email: string) {
-    return this.authEmailService.checkVerificationEmailLimit(email);
+  async checkVerificationEmailLimit(email: string) {
+    // RLS: public resend-verification path (no req.user); see above.
+    return withSystemContext(() =>
+      this.authEmailService.checkVerificationEmailLimit(email),
+    );
   }
 }

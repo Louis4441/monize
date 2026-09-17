@@ -82,7 +82,7 @@
 | A1 | Migration: `auth_attempt_counters`, `single_use_tokens`; RLS exemption; sweep cron | -- | none | [x] |
 | A2 | `AuthAttemptCounterService`; 2FA attempt maps replaced | A1 | neutral | [x] |
 | A3 | `usedTotpCodes` replaced by a `single_use_tokens` claim | A1 | neutral | [x] |
-| A4 | Step-up and auth-email counters onto the service; interval prune removed | A2 | neutral | [ ] |
+| A4 | Step-up and auth-email counters onto the service; interval prune removed | A2 | neutral | [x] |
 | K1 | `oauth_instance_config` + `OauthSigningKeysService`; provider gets `jwks` | -- | neutral | [ ] |
 | X1 | AI action anti-replay onto `single_use_tokens`, MCP path included | A1 | neutral | [ ] |
 | R1 | `EVENT_BUS` token, interface, `MemoryEventBus` wired as default | -- | none | [x] |
@@ -470,10 +470,15 @@ back. X1 depends on that.
 
 ### A4 -- Step-up and auth-email counters; interval prune removed
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `backend/src/auth/step-up/step-up.service.ts` and its spec,
-`backend/src/auth/auth-email.service.ts` and its spec.
+`backend/src/auth/auth-email.service.ts` and its spec,
+`backend/src/auth/auth.service.ts` and `backend/src/auth/auth.controller.ts`
+(added to scope: the two limit checks are asynchronous now, so the controller
+awaits them and `auth.service.ts` -- already on `WITH_CONTEXT_ALLOWLIST` --
+seeds the system context its sibling public-path methods already seed),
+`backend/src/auth/auth.service.spec.ts` (it drives both limits end to end).
 
 **Pattern:** A2's `AuthAttemptCounterService`.
 
@@ -502,7 +507,26 @@ request's ambient context on the unauthenticated route. Confirm
 it does not, wrap with `withSystemContext` and add the file to the
 allowlist).
 
-**Notes:**
+**Notes:** the forgot-password route does **not** seed a usable context. The
+`RequestContextInterceptor` runs `requestContextStorage.run` with `userId`
+undefined on an unauthenticated request, and `withScopedDb` throws on a context
+that carries neither a user nor `system`. The `withSystemContext` wrap therefore
+went on `auth.service.ts`, beside `resetPassword`, `generateVerificationToken`
+and `verifyEmail`, which each already wrap the same service for the same reason
+-- so `WITH_CONTEXT_ALLOWLIST` did not have to grow.
+
+Both checks return `Promise<boolean>` now, so the two controller call sites
+await them. The semantics are unchanged: `increment` keeps `window_expires_at`
+where the first attempt set it, which is what the old `windowStart` field did,
+and the limit is `count <= 3`.
+
+Keys are `sha256(lowercased, trimmed email)`. The plaintext address would have
+made an RLS-exempt, owner-less table a directory of who has asked for a password
+reset -- exactly the enumeration both endpoints answer generically to prevent.
+The step-up key stays plaintext `userId:purpose`: neither half is a secret.
+
+Scopes are exported (`FORGOT_PASSWORD_SCOPE`, `VERIFICATION_EMAIL_SCOPE`,
+`STEP_UP_ATTEMPT_SCOPE`) and asserted in the specs.
 
 ### K1 -- OIDC provider signing keys persisted
 

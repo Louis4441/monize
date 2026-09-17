@@ -890,7 +890,7 @@ export class AuthController {
     }
 
     // M7: Per-email rate limiting (max 3 per email per hour)
-    if (!this.authService.checkForgotPasswordEmailLimit(dto.email)) {
+    if (!(await this.authService.checkForgotPasswordEmailLimit(dto.email))) {
       // SECURITY: Still return success to prevent account enumeration
       return {
         message:
@@ -990,7 +990,7 @@ export class AuthController {
     };
 
     // Per-email rate limiting (max 3 per email per hour)
-    if (!this.authService.checkVerificationEmailLimit(dto.email)) {
+    if (!(await this.authService.checkVerificationEmailLimit(dto.email))) {
       return genericResponse;
     }
 
