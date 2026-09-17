@@ -124,8 +124,6 @@
     "noDataForPeriod": "Немає інвестиційних даних за цей period.",
     "highestValue": "Найвища вартість",
     "lowestValue": "Найнижча вартість",
-    "change": "Зміна",
-    "changePercent": "Зміна %",
     "priorCloseTooltip": "Вимірюється від ціни закриття попереднього торгового дня ({date}).",
     "notAvailable": "Н/Д",
     "portfolioLabel": "Портфель:"

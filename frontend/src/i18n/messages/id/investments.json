@@ -124,8 +124,6 @@
     "noDataForPeriod": "Tidak ada data investasi untuk periode ini.",
     "highestValue": "Nilai Tertinggi",
     "lowestValue": "Nilai Terendah",
-    "change": "Perubahan",
-    "changePercent": "Perubahan %",
     "priorCloseTooltip": "Diukur dari harga penutupan hari bursa sebelumnya pada {date}.",
     "notAvailable": "N/A",
     "portfolioLabel": "Portofolio:"

@@ -124,8 +124,6 @@
     "noDataForPeriod": "Aucune donnée d'investissement pour cette période.",
     "highestValue": "Valeur maximale",
     "lowestValue": "Valeur minimale",
-    "change": "Variation",
-    "changePercent": "Variation %",
     "priorCloseTooltip": "Mesuré à partir de la clôture de la séance précédente, le {date}.",
     "notAvailable": "N/D",
     "portfolioLabel": "Portefeuille :"

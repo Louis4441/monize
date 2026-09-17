@@ -124,8 +124,6 @@
     "noDataForPeriod": "इस अवधि के लिए कोई निवेश डेटा नहीं।",
     "highestValue": "उच्चतम मूल्य",
     "lowestValue": "न्यूनतम मूल्य",
-    "change": "परिवर्तन",
-    "changePercent": "परिवर्तन %",
     "priorCloseTooltip": "पिछले कारोबारी दिन ({date}) के समापन भाव से मापा गया।",
     "notAvailable": "उपलब्ध नहीं",
     "portfolioLabel": "पोर्टफोलियो:"

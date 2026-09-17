@@ -124,8 +124,6 @@
     "noDataForPeriod": "Không có dữ liệu đầu tư cho kỳ này.",
     "highestValue": "Giá trị cao nhất",
     "lowestValue": "Giá trị thấp nhất",
-    "change": "Thay đổi",
-    "changePercent": "Thay đổi %",
     "priorCloseTooltip": "Được tính từ giá đóng cửa của phiên giao dịch trước đó, ngày {date}.",
     "notAvailable": "N/A",
     "portfolioLabel": "Danh mục:"

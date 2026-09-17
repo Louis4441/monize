@@ -124,8 +124,6 @@
     "noDataForPeriod": "Bu dönem için yatırım verisi yok.",
     "highestValue": "En Yüksek Değer",
     "lowestValue": "En Düşük Değer",
-    "change": "Değişim",
-    "changePercent": "Değişim %",
     "priorCloseTooltip": "Bir önceki işlem gününün ({date}) kapanışına göre ölçülür.",
     "notAvailable": "Yok",
     "portfolioLabel": "Portföy:"

@@ -124,8 +124,6 @@
     "noDataForPeriod": "Нет инвестиционных данных за этот период.",
     "highestValue": "Наибольшая стоимость",
     "lowestValue": "Наименьшая стоимость",
-    "change": "Изменение",
-    "changePercent": "Изменение %",
     "priorCloseTooltip": "Измеряется от цены закрытия предыдущего торгового дня ({date}).",
     "notAvailable": "Н/Д",
     "portfolioLabel": "Портфель:"

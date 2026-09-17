@@ -124,8 +124,6 @@
     "noDataForPeriod": "이 기간에 대한 투자 데이터가 없습니다.",
     "highestValue": "최고 가치",
     "lowestValue": "최저 가치",
-    "change": "변동",
-    "changePercent": "변동 %",
     "priorCloseTooltip": "직전 거래일({date}) 종가를 기준으로 계산한 값입니다.",
     "notAvailable": "해당 없음",
     "portfolioLabel": "포트폴리오:"

@@ -8,6 +8,7 @@ import {
 import { netWorthApi } from '@/lib/net-worth';
 import { investmentsApi } from '@/lib/investments';
 import { usePreferencesStore } from '@/store/preferencesStore';
+import type { PortfolioPeriodResult } from '@/types/net-worth';
 
 const dateRangeState = { dateRange: '1y', resolvedRange: { start: '2023-01-01', end: '2024-01-01' } };
 
@@ -86,8 +87,39 @@ vi.mock('@/lib/net-worth', () => ({
       { date: '2024-01-01', value: 15000 },
     ]),
     getInvestmentsMonthly: vi.fn().mockResolvedValue([]),
+    getInvestmentsPeriodResult: vi.fn(),
   },
 }));
+
+/**
+ * A period result as the server sends it: what the portfolio did over the
+ * window, with the reader's own deposits reported separately. Nothing on the
+ * client derives any of it from the plotted series (INV-PORTRESULT-001), so
+ * every figure a card prints comes from here.
+ */
+function periodResult(
+  overrides: Partial<PortfolioPeriodResult> = {},
+): PortfolioPeriodResult {
+  return {
+    currency: 'CAD',
+    startDate: '2023-06-01',
+    endDate: '2024-01-01',
+    startValue: 10000,
+    endValue: 15000,
+    valueChange: 5000,
+    netExternalFlows: 0,
+    knownFlowSubtotal: 0,
+    investmentResult: 5000,
+    returnPercent: 50,
+    returnMethod: 'simple' as const,
+    complete: true,
+    reasons: [],
+    missingRatePairs: [],
+    unpricedSecurityIds: [],
+    unknownCashAccountIds: [],
+    ...overrides,
+  };
+}
 
 vi.mock('@/lib/investments', () => ({
   investmentsApi: {
@@ -146,6 +178,9 @@ describe('InvestmentValueChart', () => {
       { date: '2023-06-01', value: 10000 },
       { date: '2024-01-01', value: 15000 },
     ]);
+    vi.mocked(netWorthApi.getInvestmentsPeriodResult).mockResolvedValue(
+      periodResult(),
+    );
   });
 
   it('renders loading state initially', async () => {
@@ -172,8 +207,8 @@ describe('InvestmentValueChart', () => {
     const highest = await screen.findByText('Highest Value');
     expect(highest).toBeInTheDocument();
     expect(screen.getByText('Lowest Value')).toBeInTheDocument();
-    expect(screen.getByText('Change')).toBeInTheDocument();
-    expect(screen.getByText('Change %')).toBeInTheDocument();
+    expect(screen.getByText('Investment Result')).toBeInTheDocument();
+    expect(screen.getByText('Return')).toBeInTheDocument();
   });
 
   it('renders the chart component after data loads', async () => {
@@ -232,11 +267,21 @@ describe('InvestmentValueChart', () => {
   it('displays computed summary values', async () => {
     render(<InvestmentValueChart />);
     await screen.findByText('Portfolio Value Over Time');
-    // highest=15000, lowest=10000, change=+5000, percent=+50.0%
+    // highest=15000, lowest=10000 are the series' own extremes; the result and
+    // its percent are the server's, and the value change and the flows behind
+    // them are named on the secondary lines.
     expect(screen.getByText('$15000.00')).toBeInTheDocument();
     expect(screen.getByText('$10000.00')).toBeInTheDocument();
     expect(screen.getByText('+$5000.00')).toBeInTheDocument();
     expect(screen.getByText('+50.0%')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('period-value-change')).toHaveTextContent(
+        'Value change +$5000.00',
+      ),
+    );
+    expect(screen.getByTestId('period-net-flows')).toHaveTextContent(
+      'Net deposits and withdrawals +$0.00',
+    );
   });
 
   it('shows no data message when API returns empty', async () => {
@@ -307,17 +352,15 @@ describe('InvestmentValueChart', () => {
         expect.objectContaining({ range: '1m' }),
       )
     );
-    // The daily endpoint is still reached, but only for the prior-close
-    // baseline -- its window ends the day before the chart's first point, so
-    // none of the plotted series comes from it.
+    // MTD reports against the previous close, so the day before the chart's
+    // first point goes out as the period's baseline. Nothing is valued twice:
+    // the daily endpoint is not reached at all.
     await waitFor(() =>
-      expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledTimes(1)
-    );
-    await waitFor(() =>
-      expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledWith(
-        expect.objectContaining({ endDate: '2023-12-31' }),
+      expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith(
+        expect.objectContaining({ baselineDate: '2023-12-31' }),
       )
     );
+    expect(netWorthApi.getInvestmentsDaily).not.toHaveBeenCalled();
   });
 
   it('filters mtd intraday points to current month only', async () => {
@@ -365,11 +408,14 @@ describe('InvestmentValueChart', () => {
       // Highest/lowest are exactly the series' own extremes -- no extra point.
       expect(screen.getByText('$12000.00')).toBeInTheDocument();
       expect(screen.getByText('$10000.00')).toBeInTheDocument();
-      // 3M is not a prior-close range, so Change is measured from the first
-      // plotted point (11000 - 10000), not from any injected boundary value.
-      expect(screen.getByText('+$1000.00')).toBeInTheDocument();
-      expect(screen.getByText('+10.0%')).toBeInTheDocument();
-      // Only the chart's own daily request -- 3M looks up no prior-close baseline.
+      // 3M is not a prior-close range, so the period is measured from the
+      // window itself and no baseline date is sent.
+      await waitFor(() =>
+        expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith(
+          expect.objectContaining({ baselineDate: undefined }),
+        ),
+      );
+      // Only the chart's own daily request -- the period is the server's.
       await waitFor(() =>
         expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledTimes(1),
       );
@@ -391,47 +437,49 @@ describe('InvestmentValueChart', () => {
         failedSymbols: [],
         fallbackToDaily: false,
       });
-      // The prior close (19000) is what 1W measures its change against. It is a
-      // lower value than every plotted point, so if it were rendered as the
-      // first chart point the lowest card would read 19000.
-      vi.mocked(netWorthApi.getInvestmentsDaily).mockResolvedValue([
-        { date: '2024-09-01', value: 19000 },
-      ]);
+      vi.mocked(netWorthApi.getInvestmentsPeriodResult).mockResolvedValue(
+        periodResult({ investmentResult: 2000, returnPercent: 10.5 }),
+      );
       render(<InvestmentValueChart />);
       await screen.findByText('Portfolio Value Over Time');
-      // Highest/lowest are the intraday extremes only -- the 19000 baseline is
-      // not on the chart.
+      // Highest/lowest are the intraday extremes only.
       expect(screen.getByText('$21000.00')).toBeInTheDocument();
       expect(screen.getByText('$20000.00')).toBeInTheDocument();
-      expect(screen.queryByText('$19000.00')).not.toBeInTheDocument();
-      // Change is measured from the prior close: 21000 - 19000 = +2000. The
-      // baseline is second-stage (it cannot fire until the first point is
-      // known), so wait for it rather than the static title.
+      // The result is the server's, measured from the prior close. The request
+      // is second-stage (it cannot fire until the first point is known), so
+      // wait for it rather than the static title.
       await waitFor(() =>
         expect(screen.getByText('+$2000.00')).toBeInTheDocument(),
       );
-      // The daily endpoint is reached once, only for that baseline, and its
-      // window ends the day before the first plotted point.
       await waitFor(() =>
-        expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledTimes(1),
-      );
-      await waitFor(() =>
-        expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledWith(
-          expect.objectContaining({ endDate: '2024-09-01' }),
+        expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith(
+          expect.objectContaining({ baselineDate: '2024-09-01' }),
         ),
       );
+      // The daily endpoint is never reached: the chart draws intraday points
+      // and the period comes from its own endpoint.
+      expect(netWorthApi.getInvestmentsDaily).not.toHaveBeenCalled();
     });
   });
 
-  it('shows negative change values correctly', async () => {
+  it('shows a negative result and its percent correctly', async () => {
     vi.mocked(netWorthApi.getInvestmentsDaily).mockResolvedValue([
       { date: '2023-06-01', value: 20000 },
       { date: '2024-01-01', value: 15000 },
     ]);
+    vi.mocked(netWorthApi.getInvestmentsPeriodResult).mockResolvedValue(
+      periodResult({
+        valueChange: -5000,
+        investmentResult: -5000,
+        returnPercent: -25,
+      }),
+    );
     render(<InvestmentValueChart />);
     await screen.findByText('Portfolio Value Over Time');
     expect(screen.getByText('$15000.00')).toBeInTheDocument();
-    expect(screen.getByText('-25.0%')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByText('-25.0%')).toBeInTheDocument(),
+    );
   });
 
   it('uses daily API for 1y range (DAILY_RANGES)', async () => {
@@ -476,21 +524,20 @@ describe('InvestmentValueChart', () => {
         expect.objectContaining({ range: '1d' }),
       )
     );
-    // As above: the only daily call is the prior-close baseline, whose window
-    // ends the day before the session on screen.
+    // As above: the period is measured against the previous session's close,
+    // and the daily endpoint is not reached for it.
     await waitFor(() =>
-      expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledTimes(1)
-    );
-    await waitFor(() =>
-      expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledWith(
-        expect.objectContaining({ endDate: '2024-01-01' }),
+      expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith(
+        expect.objectContaining({ baselineDate: '2024-01-01' }),
       )
     );
+    expect(netWorthApi.getInvestmentsDaily).not.toHaveBeenCalled();
   });
 
-  describe('prior-close change baseline', () => {
+  describe('the period result the cards print', () => {
     /** Text of the summary card carrying `label`. */
-    const card = (label: string) => screen.getByText(label).parentElement!.textContent;
+    const card = (label: string) =>
+      screen.getByText(label).parentElement!.parentElement!.textContent;
 
     const intraday = (points: Array<{ timestamp: string; value: number }>) => ({
       points,
@@ -503,7 +550,47 @@ describe('InvestmentValueChart', () => {
       fallbackToDaily: false,
     });
 
-    it('measures the 1w change from the close before the week shown', async () => {
+    /**
+     * The issue's reproduction (#1392): two deposits of 10,000 with a price
+     * that never moves. The series doubles and the market did nothing, so the
+     * headline is the server's result of 0 / 0% -- and the +10,000 the reader
+     * put in is on the secondary line, never under the result's caption.
+     */
+    it('prints the investment result, with the value change beside it', async () => {
+      dateRangeState.dateRange = '1y';
+      vi.mocked(netWorthApi.getInvestmentsDaily).mockResolvedValue([
+        { date: '2026-01-02', value: 10000 },
+        { date: '2026-06-01', value: 20000 },
+      ]);
+      vi.mocked(netWorthApi.getInvestmentsPeriodResult).mockResolvedValue(
+        periodResult({
+          startValue: 10000,
+          endValue: 20000,
+          valueChange: 10000,
+          netExternalFlows: 10000,
+          knownFlowSubtotal: 10000,
+          investmentResult: 0,
+          returnPercent: 0,
+        }),
+      );
+      render(<InvestmentValueChart />);
+      await screen.findByText('Portfolio Value Over Time');
+
+      await waitFor(() =>
+        expect(card('Investment Result')).toContain('+$0.00'),
+      );
+      expect(card('Return')).toContain('+0.0%');
+      // The deposit is reported as what it is, and never as performance.
+      expect(screen.getByTestId('period-value-change')).toHaveTextContent(
+        'Value change +$10000.00',
+      );
+      expect(screen.getByTestId('period-net-flows')).toHaveTextContent(
+        'Net deposits and withdrawals +$10000.00',
+      );
+      expect(card('Return')).not.toContain('100.0%');
+    });
+
+    it('asks for the 1w period against the close before the week shown', async () => {
       dateRangeState.dateRange = '1w';
       dateRangeState.resolvedRange = { start: '2024-01-08', end: '2024-01-15' };
       vi.mocked(investmentsApi.getIntradayValue).mockResolvedValue(
@@ -512,29 +599,27 @@ describe('InvestmentValueChart', () => {
           { timestamp: '2024-01-15T14:30:00.000Z', value: 11000 },
         ]),
       );
-      // Jan 6/7 is a weekend, so the daily series' Jan 7 point already carries
-      // Friday Jan 5's close -- which is the previous trading day.
-      vi.mocked(netWorthApi.getInvestmentsDaily).mockResolvedValue([
-        { date: '2024-01-05', value: 9000 },
-        { date: '2024-01-06', value: 9000 },
-        { date: '2024-01-07', value: 9000 },
-      ]);
+      vi.mocked(netWorthApi.getInvestmentsPeriodResult).mockResolvedValue(
+        periodResult({ investmentResult: 2000, returnPercent: 22.2 }),
+      );
       render(<InvestmentValueChart />);
       await screen.findByText('Portfolio Value Over Time');
 
       await waitFor(() =>
-        expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledWith(
-          expect.objectContaining({ endDate: '2024-01-07' }),
+        expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith(
+          expect.objectContaining({ baselineDate: '2024-01-07' }),
         ),
       );
-      await waitFor(() => expect(card('Change')).toContain('+$2000.00'));
+      await waitFor(() =>
+        expect(card('Investment Result')).toContain('+$2000.00'),
+      );
       // Not the change from the first point plotted, which is what this
       // measured before and would still read as plausible.
-      expect(card('Change')).not.toContain('+$1000.00');
-      expect(card('Change %')).toContain('+22.2%');
+      expect(card('Investment Result')).not.toContain('+$1000.00');
+      expect(card('Return')).toContain('+22.2%');
     });
 
-    it('measures the mtd change from the close before the month started', async () => {
+    it('asks for the mtd period against the close before the month started', async () => {
       dateRangeState.dateRange = 'mtd';
       dateRangeState.resolvedRange = { start: '2024-02-01', end: '2024-02-15' };
       vi.mocked(investmentsApi.getIntradayValue).mockResolvedValue(
@@ -543,21 +628,17 @@ describe('InvestmentValueChart', () => {
           { timestamp: '2024-02-15T14:30:00.000Z', value: 10500 },
         ]),
       );
-      vi.mocked(netWorthApi.getInvestmentsDaily).mockResolvedValue([
-        { date: '2024-01-31', value: 9500 },
-      ]);
       render(<InvestmentValueChart />);
       await screen.findByText('Portfolio Value Over Time');
 
       await waitFor(() =>
-        expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledWith(
-          expect.objectContaining({ endDate: '2024-01-31' }),
+        expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith(
+          expect.objectContaining({ baselineDate: '2024-01-31' }),
         ),
       );
-      await waitFor(() => expect(card('Change')).toContain('+$1000.00'));
     });
 
-    it('measures the 1d change from the previous session, not from the open', async () => {
+    it('asks for the 1d period against the previous session, not the open', async () => {
       dateRangeState.dateRange = '1d';
       dateRangeState.resolvedRange = { start: '2024-01-08', end: '2024-01-15' };
       vi.mocked(investmentsApi.getIntradayValue).mockResolvedValue(
@@ -566,25 +647,31 @@ describe('InvestmentValueChart', () => {
           { timestamp: '2024-01-15T20:00:00.000Z', value: 10200 },
         ]),
       );
-      vi.mocked(netWorthApi.getInvestmentsDaily).mockResolvedValue([
-        { date: '2024-01-14', value: 10400 },
-      ]);
+      vi.mocked(netWorthApi.getInvestmentsPeriodResult).mockResolvedValue(
+        periodResult({
+          valueChange: -200,
+          investmentResult: -200,
+          returnPercent: -1.9,
+        }),
+      );
       render(<InvestmentValueChart />);
       await screen.findByText('Portfolio Value Over Time');
 
       // Up 200 since the open, down 200 against the previous close: the two
       // answers have opposite signs, so only one of them can be on screen.
       await waitFor(() =>
-        expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledWith(
-          expect.objectContaining({ endDate: '2024-01-14' }),
+        expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith(
+          expect.objectContaining({ baselineDate: '2024-01-14' }),
         ),
       );
-      await waitFor(() => expect(card('Change')).toContain('-200.00'));
-      expect(card('Change')).not.toContain('+$200.00');
-      expect(card('Change %')).toContain('-1.9%');
+      await waitFor(() =>
+        expect(card('Investment Result')).toContain('-200.00'),
+      );
+      expect(card('Investment Result')).not.toContain('+$200.00');
+      expect(card('Return')).toContain('-1.9%');
     });
 
-    it('reports the change as unknown when the baseline cannot be loaded', async () => {
+    it('leaves every figure unknown when the period request fails', async () => {
       dateRangeState.dateRange = '1w';
       dateRangeState.resolvedRange = { start: '2024-01-08', end: '2024-01-15' };
       vi.mocked(investmentsApi.getIntradayValue).mockResolvedValue(
@@ -593,63 +680,70 @@ describe('InvestmentValueChart', () => {
           { timestamp: '2024-01-15T14:30:00.000Z', value: 11000 },
         ]),
       );
-      vi.mocked(netWorthApi.getInvestmentsDaily).mockRejectedValue(
-        new Error('baseline unavailable'),
+      vi.mocked(netWorthApi.getInvestmentsPeriodResult).mockRejectedValue(
+        new Error('period unavailable'),
       );
       render(<InvestmentValueChart />);
       await screen.findByText('Portfolio Value Over Time');
 
-      // A missing baseline is not a change of zero, and not the first point's
-      // change wearing the prior close's label.
-      await waitFor(() => expect(card('Change')).toContain('N/A'));
-      expect(card('Change %')).toContain('N/A');
-      expect(card('Change')).not.toContain('$1000.00');
-    });
-
-    /**
-     * The period-start alternative was a user preference
-     * (`portfolio_change_baseline`, migration 152, dropped by 153). With it
-     * gone, a prior-close range always looks the close up -- there is no
-     * stored setting that can turn it off.
-     */
-    it('always uses the prior close on a short range', async () => {
-      dateRangeState.dateRange = '1w';
-      dateRangeState.resolvedRange = { start: '2024-01-08', end: '2024-01-15' };
-      vi.mocked(investmentsApi.getIntradayValue).mockResolvedValue(
-        intraday([
-          { timestamp: '2024-01-08T14:30:00.000Z', value: 10000 },
-          { timestamp: '2024-01-15T14:30:00.000Z', value: 11000 },
-        ]),
-      );
-      vi.mocked(netWorthApi.getInvestmentsDaily).mockResolvedValue([
-        { date: '2024-01-07', value: 9000 },
-      ]);
-      render(<InvestmentValueChart />);
-      await screen.findByText('Portfolio Value Over Time');
-
-      // From 9000, not from the 10000 first point.
-      await waitFor(() => expect(card('Change')).toContain('+$2000.00'));
+      // A failed request is not a period that did nothing, and not the
+      // series' own move wearing the result's caption.
       await waitFor(() =>
-        expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalled()
+        expect(screen.getAllByTestId('unknown-amount').length).toBe(2),
+      );
+      expect(card('Investment Result')).not.toContain('$1000.00');
+      expect(card('Investment Result')).not.toContain('$0.00');
+      expect(screen.getByTestId('period-value-change')).toHaveTextContent(
+        'Value change N/A',
       );
     });
 
-    it('still measures a long range from the first point plotted', async () => {
-      // 1y: its first point already is a close, so no separate baseline
-      // request is made. The window's own start comes from the portfolio
-      // rule rather than from useDateRange -- pinned in the test below, and
-      // exhaustively in portfolio-range-window.test.ts.
+    it('marks a withheld result with the cause the server gave', async () => {
+      vi.mocked(netWorthApi.getInvestmentsPeriodResult).mockResolvedValue(
+        periodResult({
+          valueChange: null,
+          netExternalFlows: null,
+          investmentResult: null,
+          returnPercent: null,
+          complete: false,
+          reasons: ['incompletePrices'],
+          unpricedSecurityIds: ['sec-1'],
+        }),
+      );
       render(<InvestmentValueChart />);
       await screen.findByText('Portfolio Value Over Time');
-      await waitFor(() => expect(card('Change')).toContain('+$5000.00'));
-      // One call, for the chart itself -- no baseline lookup.
+
       await waitFor(() =>
-        expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledTimes(1)
+        expect(screen.getAllByTestId('unknown-amount').length).toBe(2),
+      );
+      // An unpriced holding is a price to add, not a rate to refresh.
+      expect(
+        screen.getAllByLabelText(/the security has no price to value them at/)
+          .length,
+      ).toBeGreaterThan(0);
+      expect(card('Investment Result')).not.toContain('+$5000.00');
+    });
+
+    it('still measures a long range from the window it drew', async () => {
+      // 1y: its first point already is a close, so no baseline date is sent.
+      render(<InvestmentValueChart />);
+      await screen.findByText('Portfolio Value Over Time');
+      await waitFor(() =>
+        expect(card('Investment Result')).toContain('+$5000.00'),
+      );
+      await waitFor(() =>
+        expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith(
+          expect.objectContaining({ baselineDate: undefined }),
+        ),
+      );
+      // One call, for the chart itself.
+      await waitFor(() =>
+        expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledTimes(1),
       );
       await waitFor(() =>
         expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledWith(
           expect.objectContaining({ endDate: '2024-01-01' }),
-        )
+        ),
       );
     });
 
@@ -990,18 +1084,32 @@ describe('InvestmentValueChart', () => {
     expect(screen.getByText('$15000.00 USD')).toBeInTheDocument();
   });
 
-  it('reports no changePercent when the baseline value is zero', async () => {
+  it('reports no percentage when the period started at nothing', async () => {
     // A move away from nothing has no percentage: 0% would say the portfolio
-    // held its ground, which is the opposite of what an empty baseline means.
-    // The money change is still known and still zero.
+    // held its ground. The server decides that (reason `zeroStart`) and still
+    // reports the money, which is a known zero rather than an unknown.
     vi.mocked(netWorthApi.getInvestmentsDaily).mockResolvedValue([
       { date: '2023-06-01', value: 0 },
       { date: '2024-01-01', value: 0 },
     ]);
+    vi.mocked(netWorthApi.getInvestmentsPeriodResult).mockResolvedValue(
+      periodResult({
+        startValue: 0,
+        endValue: 0,
+        valueChange: 0,
+        investmentResult: 0,
+        returnPercent: null,
+        complete: true,
+        reasons: ['zeroStart'],
+      }),
+    );
     render(<InvestmentValueChart />);
     await screen.findByText('Portfolio Value Over Time');
+    await waitFor(() =>
+      expect(screen.getByTestId('unknown-amount')).toBeInTheDocument(),
+    );
     expect(screen.queryByText('+0.0%')).toBeNull();
-    expect(screen.getAllByText('N/A').length).toBeGreaterThan(0);
+    expect(screen.getByText('+$0.00')).toBeInTheDocument();
   });
 
   it('shows empty chart message with skipped symbols in intradayUnavailable state', async () => {

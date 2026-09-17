@@ -23,7 +23,7 @@ import { useDateRange } from '@/hooks/useDateRange';
 import { usePortfolioRangeWindow } from '@/hooks/usePortfolioRangeWindow';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { usePortfolioChangeBaseline } from '@/hooks/usePortfolioChangeBaseline';
+import { usePortfolioPeriodResult } from '@/hooks/usePortfolioPeriodResult';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { createLogger } from '@/lib/logger';
@@ -39,8 +39,12 @@ import {
   renderChartFlagDot,
   ChartFlagShadowFilter,
 } from './portfolio-chart-utils';
-import { isoDatePart, portfolioSeriesChange } from './portfolio-change-baseline';
+import {
+  hasUnmeasuredFlow,
+  periodResultUnknownReason,
+} from './portfolio-period-result';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { UnknownAmount } from '@/components/ui/UnknownAmount';
 import { preferredCurrency } from '@/lib/default-currency';
 
 const logger = createLogger('InvestmentChart');
@@ -361,39 +365,46 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
     void loadData({ skipCache: true });
   }, [refreshKey, isIntraday, loadData]);
 
-  // On 1D / 1W / MTD the change is reported against the close of the trading
-  // day before the window rather than against the first point drawn, unless the
-  // user's Settings preference says otherwise. The baseline is looked up for
-  // the first point actually on screen.
-  const { usesPriorClose, priorClose } = usePortfolioChangeBaseline({
+  // What the portfolio DID over this window, as the server worked it out: the
+  // value change, the money the reader moved in or out, and what is left. A
+  // change read off the plotted series counts a deposit as performance
+  // (INV-PORTRESULT-001), so nothing here subtracts two points. On 1D / 1W /
+  // MTD the period is measured from the close of the trading day before the
+  // first point on screen; which date that is, is all this layer decides.
+  const { periodResult, usesPriorClose } = usePortfolioPeriodResult({
     range: dateRange,
-    firstPointDate: isoDatePart(chartPoints[0]?.iso),
+    startDate: chartWindow.start,
+    endDate: chartWindow.end,
+    firstPointIso: chartPoints[0]?.iso,
+    hasSeries: chartPoints.length > 0,
     accountIds: accountIds?.length ? accountIds.join(',') : undefined,
     displayCurrency: foreignCurrency || undefined,
+    reloadKey: refreshKey,
   });
+
+  // The three figures the cards print, and the one repair a withheld one points
+  // at. `null` is the server's answer that it withheld the figure and said why.
+  const valueChange = periodResult?.valueChange ?? null;
+  const netExternalFlows = periodResult?.netExternalFlows ?? null;
+  const investmentResult = periodResult?.investmentResult ?? null;
+  const returnPercent = periodResult?.returnPercent ?? null;
+  const unknownReason = periodResultUnknownReason(periodResult?.reasons ?? []);
+  /** A secondary figure's text: the amount, or the words the cards print. */
+  const secondaryText = (value: number | null) =>
+    value === null
+      ? t('investmentValueChart.notAvailable')
+      : `${value >= 0 ? '+' : ''}${fmtFull(value)}`;
 
   const summary = useMemo(() => {
     if (chartPoints.length === 0) {
-      return {
-        highest: 0,
-        lowest: 0,
-        change: 0 as number | null,
-        changePercent: 0 as number | null,
-      };
+      return { highest: 0, lowest: 0 };
     }
     const values = chartPoints.map((p) => p.Value);
     return {
       highest: Math.max(...values),
       lowest: Math.min(...values),
-      // A baseline that has not loaded (or could not be established) leaves the
-      // change unknown -- never the first point's change wearing the prior
-      // close's label.
-      ...portfolioSeriesChange(values, {
-        usesPriorClose,
-        priorCloseValue: priorClose?.value ?? null,
-      }),
     };
-  }, [chartPoints, usesPriorClose, priorClose]);
+  }, [chartPoints]);
 
   const xAxisTicks = useMemo(() => {
     if (chartPoints.length <= 36) return undefined;
@@ -551,37 +562,69 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
             {fmtFull(summary.lowest)}
           </div>
         </div>
+        {/* What the holdings earned over the window, with the reader's own
+            deposits and withdrawals taken out. The value change and the flows
+            it is made of are the secondary line beneath, because a value change
+            under a "Change" caption reports a transfer as a gain (#1392). */}
         <div>
           <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
-            {t('investmentValueChart.change')}
-            {priorClose && (
+            {t('investmentValueChart.investmentResult')}
+            <InfoTooltip
+              placement="top"
+              text={t('investmentValueChart.investmentResultTooltip')}
+            />
+            {usesPriorClose && periodResult && (
               <InfoTooltip
                 placement="top"
                 text={t('investmentValueChart.priorCloseTooltip', {
-                  date: formatChartDate(priorClose.date, 'MMM d, yyyy'),
+                  date: formatChartDate(periodResult.startDate, 'MMM d, yyyy'),
                 })}
               />
             )}
-          </div>
-          <div className={`text-lg font-bold ${summary.change === null ? '' : gainLossColor(summary.change)}`}>
-            {summary.change === null ? (
-              <span className="text-gray-400 dark:text-gray-500 text-sm font-normal">
-                {t('investmentValueChart.notAvailable')}
-              </span>
-            ) : (
-              <>{summary.change >= 0 ? '+' : ''}{fmtFull(summary.change)}</>
+            {/* Two movements the server could not count as a flow: nothing is
+                missing from the data, so the marker alone would send the
+                reader to a screen with nothing to do on it. */}
+            {hasUnmeasuredFlow(periodResult?.reasons ?? []) && (
+              <InfoTooltip
+                placement="top"
+                text={t('investmentValueChart.unmeasuredFlowTooltip')}
+              />
             )}
+          </div>
+          <div className={`text-lg font-bold ${investmentResult === null ? '' : gainLossColor(investmentResult)}`}>
+            {investmentResult === null ? (
+              <UnknownAmount reason={unknownReason} className="text-sm font-normal" />
+            ) : (
+              <>{investmentResult >= 0 ? '+' : ''}{fmtFull(investmentResult)}</>
+            )}
+          </div>
+          {/* The two figures the result is the difference of. Secondary, but
+              named: a reader who deposited during the window is owed the
+              number that explains why the value moved more than the result. */}
+          <div
+            className="text-xs text-gray-500 dark:text-gray-400"
+            data-testid="period-value-change"
+          >
+            {t('investmentValueChart.valueChangeLine', {
+              amount: secondaryText(valueChange),
+            })}
+          </div>
+          <div
+            className="text-xs text-gray-500 dark:text-gray-400"
+            data-testid="period-net-flows"
+          >
+            {t('investmentValueChart.netFlowsLine', {
+              amount: secondaryText(netExternalFlows),
+            })}
           </div>
         </div>
         <div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">{t('investmentValueChart.changePercent')}</div>
-          <div className={`text-lg font-bold ${summary.changePercent === null ? '' : gainLossColor(summary.changePercent)}`}>
-            {summary.changePercent === null ? (
-              <span className="text-gray-400 dark:text-gray-500 text-sm font-normal">
-                {t('investmentValueChart.notAvailable')}
-              </span>
+          <div className="text-xs text-gray-500 dark:text-gray-400">{t('investmentValueChart.investmentReturn')}</div>
+          <div className={`text-lg font-bold ${returnPercent === null ? '' : gainLossColor(returnPercent)}`}>
+            {returnPercent === null ? (
+              <UnknownAmount reason={unknownReason} className="text-sm font-normal" />
             ) : (
-              formatSignedPercent(summary.changePercent, 1)
+              formatSignedPercent(returnPercent, 1)
             )}
           </div>
         </div>

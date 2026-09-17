@@ -124,8 +124,6 @@
     "noDataForPeriod": "Geen beleggingsgegevens voor deze periode.",
     "highestValue": "Hoogste waarde",
     "lowestValue": "Laagste waarde",
-    "change": "Wijziging",
-    "changePercent": "Wijziging %",
     "priorCloseTooltip": "Gemeten vanaf de slotkoers van de vorige handelsdag op {date}.",
     "notAvailable": "N/A",
     "portfolioLabel": "Portefeuille:"
