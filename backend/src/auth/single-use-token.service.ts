@@ -52,4 +52,25 @@ export class SingleUseTokenService {
     );
     return returnedRows(rows).length > 0;
   }
+
+  /**
+   * Give a claim back, so the thing it guarded can be attempted again.
+   *
+   * For a claim whose guarded work runs in the same transaction, the rollback
+   * does this and nothing calls it. It exists for the callers whose work spans
+   * several transactions of its own -- there the claim has to be taken before
+   * the work and handed back when the work fails, or a transient error would
+   * burn a descriptor its owner is entitled to retry.
+   *
+   * Only the holder reaches this: `claim` returned `true` to exactly one caller,
+   * and that caller is the only one on this path.
+   */
+  async release(purpose: string, token: string): Promise<void> {
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        `DELETE FROM single_use_tokens WHERE purpose = $1 AND token_hash = $2`,
+        [purpose, hashToken(token)],
+      ),
+    );
+  }
 }

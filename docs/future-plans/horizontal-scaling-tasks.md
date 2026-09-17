@@ -84,7 +84,7 @@
 | A3 | `usedTotpCodes` replaced by a `single_use_tokens` claim | A1 | neutral | [x] |
 | A4 | Step-up and auth-email counters onto the service; interval prune removed | A2 | neutral | [x] |
 | K1 | `oauth_instance_config` + `OauthSigningKeysService`; provider gets `jwks` | -- | neutral | [ ] |
-| X1 | AI action anti-replay onto `single_use_tokens`, MCP path included | A1 | neutral | [ ] |
+| X1 | AI action anti-replay onto `single_use_tokens`, MCP path included | A1 | neutral | [x] |
 | R1 | `EVENT_BUS` token, interface, `MemoryEventBus` wired as default | -- | none | [x] |
 | R2 | Migration: `ai_relay_prompts`, `ai_relay_agents` with RLS policies | -- | none | [x] |
 | R3 | Relay queue on rows: insert, claim, answer; in-memory queue maps removed | R1, R2 | neutral | [ ] |
@@ -581,13 +581,18 @@ Rotation is out of scope; leave a `// rotation: see design doc WP4` marker.
 
 ### X1 -- AI action anti-replay onto `single_use_tokens`
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `backend/src/ai/actions/ai-actions.service.ts` and its spec,
 `backend/src/ai/ai.module.ts` (import of the auth single-use service or a
 shared module), the MCP confirmation path under `backend/src/mcp/` that
 accepts the same descriptor (grep `actionId` and the descriptor verifier),
-`backend/test/integration/ai-action-replay.integration.spec.ts` (new).
+`backend/test/integration/ai-action-replay.integration.spec.ts` (new),
+`backend/src/auth/single-use-token.module.ts` (new) and
+`backend/src/auth/single-use-token.service.ts` (`release`),
+`backend/src/auth/auth.module.ts`,
+`backend/src/test-helpers/single-use-token-testing.ts` (`release` on the
+double). **No file under `backend/src/mcp/` changed** -- see the notes.
 
 **Pattern:** A3's `SingleUseTokenService`.
 
@@ -616,7 +621,36 @@ exactly one apply; unit spec for the rollback-releases-claim case.
 the service to `backend/src/common/single-use/` in this task and update A3's
 imports. Do not create a second single-use table.
 
-**Notes:**
+**Notes:** three things this task assumed turned out not to hold. Each is
+recorded here because the next task that reasons about these paths will assume
+them too.
+
+1. **There is no `withScopedDb` that applies the action.** `execute` dispatches
+   to `TransactionsService`, `PayeesService`, `SecuritiesService` and the rest,
+   and each opens its own. Wrapping `execute` in one transaction so the claim
+   could roll back with it would make every nested call join that transaction,
+   which moves the post-commit cache invalidation (INV-CACHE-001) and the
+   action-history write inside it -- both of which are documented to happen
+   after the commit, and one of which has its own guard spec. The claim is
+   therefore taken before `execute` and released in the `catch`, which is
+   exactly the `Map`'s old lifecycle, now durable and shared. The task's
+   acceptance is met either way: one apply and one refusal across two replicas,
+   and a failed apply leaves the descriptor confirmable.
+2. **The claim is taken after the write-limit check**, where the `Map`'s
+   reservation was. A refused limit must not burn a descriptor the user can
+   confirm tomorrow.
+3. **The MCP surface already shares the claim, and has no second entry point.**
+   `AiActionsService.confirm` is the only place that verifies a descriptor
+   returned by a client. The MCP write tools mint and commit their own pending
+   action in-process (`commitCard`) and never accept one back, and a relayed
+   card is committed through `/ai/actions/confirm` -- the same method, the same
+   `actionId`, the same claim. Nothing under `src/mcp/` needed changing.
+
+`AiModule` imports a new one-provider `SingleUseTokenModule` rather than
+`AuthModule`: the service's only dependency is `DataSource`, and the
+`AuthModule` edge would have pulled users, notifications and delegation into
+`AiModule` to reach it. `AuthModule` imports and re-exports the same module, so
+there is still one service and one table.
 
 ### R1 -- Event bus token, interface, memory implementation
 
