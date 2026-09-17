@@ -346,6 +346,7 @@
   "netWorth": {
     "invalidStartDate": "startDate must be YYYY-MM-DD",
     "invalidEndDate": "endDate must be YYYY-MM-DD",
+    "invalidBaselineDate": "baselineDate must be YYYY-MM-DD",
     "invalidAccountIds": "accountIds must be comma-separated UUIDs",
     "invalidGranularity": "granularity must be 'daily' or 'monthly'"
   },

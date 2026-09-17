@@ -18,6 +18,7 @@ import {
 } from "@nestjs/swagger";
 import { assertStringParam } from "../common/query-param-utils";
 import { NetWorthService, JointNetWorthScope } from "./net-worth.service";
+import { PortfolioPeriodResultService } from "./portfolio-period-result.service";
 import {
   AllowDelegate,
   DelegateRequiresSection,
@@ -37,6 +38,7 @@ const NO_READABLE_ACCOUNT = "00000000-0000-0000-0000-000000000000";
 export class NetWorthController {
   constructor(
     private readonly netWorthService: NetWorthService,
+    private readonly periodResult: PortfolioPeriodResultService,
     private readonly delegationService: DelegationService,
     private readonly jointAccounts: JointAccountsService,
   ) {}
@@ -237,6 +239,89 @@ export class NetWorthController {
       await this.scopeIds(req, ids),
       safeCurrency,
     );
+  }
+
+  @Get("investments-period-result")
+  @AllowDelegate()
+  @DelegateRequiresSection("investments")
+  @ApiOperation({
+    summary: "What the portfolio did over a period, net of deposits",
+    description:
+      "Three separate figures over the same series the chart draws: valueChange (last close minus first), netExternalFlows (cash that crossed the scope's boundary after the baseline, each day converted at its own date) and investmentResult (the difference). returnPercent is the result over the starting value, method 'simple'. Each is null with a named reason when a component is unknown; see docs/specs/portfolio-period-result.md.",
+  })
+  @ApiQuery({ name: "startDate", required: true, example: "2026-01-02" })
+  @ApiQuery({ name: "endDate", required: false, example: "2026-09-17" })
+  @ApiQuery({
+    name: "baselineDate",
+    required: false,
+    description:
+      "The close the period is measured from, when that is earlier than startDate (the 1d / 1w / mtd ranges report against the previous trading day's close). Flows are counted strictly after it.",
+  })
+  @ApiQuery({
+    name: "accountIds",
+    required: false,
+    description:
+      "Comma-separated account IDs to filter by (will include linked pairs)",
+  })
+  @ApiQuery({
+    name: "displayCurrency",
+    required: false,
+    description:
+      "Currency code to display values in (defaults to user preference)",
+  })
+  @ApiResponse({ status: 200, description: "The period's result" })
+  @ApiResponse({ status: 401, description: "Unauthorized" })
+  async getPeriodResult(
+    @Request() req,
+    @Query("startDate") startDate?: string,
+    @Query("endDate") endDate?: string,
+    @Query("baselineDate") baselineDate?: string,
+    @Query("accountIds") accountIds?: string,
+    @Query("displayCurrency") displayCurrency?: string,
+  ) {
+    const sd = assertStringParam(startDate, "startDate");
+    const ed = assertStringParam(endDate, "endDate");
+    const bd = assertStringParam(baselineDate, "baselineDate");
+    const aIds = assertStringParam(accountIds, "accountIds");
+    const curr = assertStringParam(displayCurrency, "displayCurrency");
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!sd || !dateRegex.test(sd))
+      throw new BadRequestException(
+        tr("errors.netWorth.invalidStartDate", "startDate must be YYYY-MM-DD"),
+      );
+    if (ed && !dateRegex.test(ed))
+      throw new BadRequestException(
+        tr("errors.netWorth.invalidEndDate", "endDate must be YYYY-MM-DD"),
+      );
+    if (bd && !dateRegex.test(bd))
+      throw new BadRequestException(
+        tr(
+          "errors.netWorth.invalidBaselineDate",
+          "baselineDate must be YYYY-MM-DD",
+        ),
+      );
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const ids = aIds ? aIds.split(",").filter(Boolean) : undefined;
+    if (ids) {
+      for (const id of ids) {
+        if (!uuidRegex.test(id))
+          throw new BadRequestException(
+            tr(
+              "errors.netWorth.invalidAccountIds",
+              "accountIds must be comma-separated UUIDs",
+            ),
+          );
+      }
+    }
+    const safeCurrency = curr ? curr.slice(0, 3).toUpperCase() : undefined;
+    return this.periodResult.getPeriodResult(req.user.id, {
+      startDate: sd,
+      endDate: ed,
+      baselineDate: bd,
+      accountIds: await this.scopeIds(req, ids),
+      displayCurrency: safeCurrency,
+    });
   }
 
   @Get("investments-first-priced-day")

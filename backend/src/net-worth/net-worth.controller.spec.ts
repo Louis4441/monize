@@ -2,12 +2,16 @@ import { BadRequestException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { NetWorthController } from "./net-worth.controller";
 import { NetWorthService } from "./net-worth.service";
+import { PortfolioPeriodResultService } from "./portfolio-period-result.service";
 import { DelegationService } from "../delegation/delegation.service";
 import { JointAccountsService } from "../delegation/joint-accounts.service";
 
 describe("NetWorthController", () => {
   let controller: NetWorthController;
   let mockNetWorthService: Partial<Record<keyof NetWorthService, jest.Mock>>;
+  let mockPeriodResult: Partial<
+    Record<keyof PortfolioPeriodResultService, jest.Mock>
+  >;
   let delegationService: Record<string, jest.Mock>;
   let jointAccounts: Record<string, jest.Mock>;
   const mockReq = { user: { id: "user-1" } };
@@ -24,6 +28,7 @@ describe("NetWorthController", () => {
       getInvestmentBreakdown: jest.fn(),
       recalculateAllAccounts: jest.fn(),
     };
+    mockPeriodResult = { getPeriodResult: jest.fn() };
     delegationService = {
       readableAccountIds: jest.fn().mockResolvedValue([]),
     };
@@ -38,6 +43,10 @@ describe("NetWorthController", () => {
         {
           provide: NetWorthService,
           useValue: mockNetWorthService,
+        },
+        {
+          provide: PortfolioPeriodResultService,
+          useValue: mockPeriodResult,
         },
         { provide: DelegationService, useValue: delegationService },
         { provide: JointAccountsService, useValue: jointAccounts },
@@ -239,6 +248,83 @@ describe("NetWorthController", () => {
         controller.getFirstPricedDay(mockReq, "2026-01-01", "not-a-uuid"),
       ).rejects.toThrow(BadRequestException);
       expect(mockNetWorthService.getFirstPricedDay).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("getPeriodResult()", () => {
+    it("passes the window, the baseline and the scope through", async () => {
+      mockPeriodResult.getPeriodResult!.mockReturnValue("result");
+
+      const result = await controller.getPeriodResult(
+        mockReq,
+        "2026-01-02",
+        "2026-09-17",
+        "2026-01-01",
+        UUID_A,
+        "usdx",
+      );
+
+      expect(result).toBe("result");
+      expect(mockPeriodResult.getPeriodResult).toHaveBeenCalledWith("user-1", {
+        startDate: "2026-01-02",
+        endDate: "2026-09-17",
+        baselineDate: "2026-01-01",
+        accountIds: [UUID_A],
+        displayCurrency: "USD",
+      });
+    });
+
+    it("requires a startDate", async () => {
+      await expect(
+        controller.getPeriodResult(mockReq, undefined),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("rejects a malformed baselineDate", async () => {
+      await expect(
+        controller.getPeriodResult(
+          mockReq,
+          "2026-01-02",
+          undefined,
+          "01/01/2026",
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("rejects a malformed endDate", async () => {
+      await expect(
+        controller.getPeriodResult(mockReq, "2026-01-02", "nope"),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("rejects an accountId that is not a UUID", async () => {
+      await expect(
+        controller.getPeriodResult(
+          mockReq,
+          "2026-01-02",
+          undefined,
+          undefined,
+          "not-a-uuid",
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("scopes the accounts to what an acting delegate may read", async () => {
+      mockPeriodResult.getPeriodResult!.mockReturnValue("ok");
+      delegationService.readableAccountIds.mockResolvedValue([UUID_A]);
+
+      await controller.getPeriodResult(
+        { user: { id: "owner-1", isActing: true, delegationId: "d-1" } },
+        "2026-01-02",
+        undefined,
+        undefined,
+        `${UUID_A},${UUID_B}`,
+      );
+
+      expect(mockPeriodResult.getPeriodResult).toHaveBeenCalledWith(
+        "owner-1",
+        expect.objectContaining({ accountIds: [UUID_A] }),
+      );
     });
   });
 

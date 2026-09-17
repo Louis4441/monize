@@ -8,6 +8,7 @@ import { Security } from "../securities/entities/security.entity";
 import { ExchangeRate } from "../currencies/entities/exchange-rate.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { NetWorthService } from "./net-worth.service";
+import { PortfolioPeriodResultService } from "./portfolio-period-result.service";
 import { NetWorthController } from "./net-worth.controller";
 import { DelegationModule } from "../delegation/delegation.module";
 import { NotificationsModule } from "../notifications/notifications.module";
@@ -31,8 +32,8 @@ import { NotificationsModule } from "../notifications/notifications.module";
     // threshold crossings there. NotificationsModule reaches back, so forwardRef.
     forwardRef(() => NotificationsModule),
   ],
-  providers: [NetWorthService],
+  providers: [NetWorthService, PortfolioPeriodResultService],
   controllers: [NetWorthController],
-  exports: [NetWorthService],
+  exports: [NetWorthService, PortfolioPeriodResultService],
 })
 export class NetWorthModule {}
