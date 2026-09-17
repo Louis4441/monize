@@ -109,6 +109,11 @@ const examples = {
     direction: "down",
     changePercent: -3.25,
     movementValue: -325,
+    baselineValue: 10_000,
+    currentValue: 9_675,
+    externalFlow: 0,
+    baselineDate: "2026-09-04",
+    valuationDate: "2026-09-07",
     currencyCode: "EUR",
   },
   GEM_SIGNAL_CHANGED: {
@@ -253,6 +258,33 @@ describe("notification email copy", () => {
         "pl",
       ).message,
     ).toContain("grudzień");
+  });
+
+  it("names the period a portfolio movement was measured over, not the run day", () => {
+    // A Monday run measures from Friday; "today" claimed a day the figure was
+    // never about (issue #1391). Both boundary dates come from the producer's
+    // `data`, so the copy can name them in the reader's language.
+    const message = notificationEmailCopy(
+      source(NotificationType.PORTFOLIO_MOVEMENT, examples.PORTFOLIO_MOVEMENT),
+      englishEmailT,
+      "en",
+    ).message;
+    expect(message).toContain("Sep 4, 2026");
+    expect(message).toContain("Sep 7, 2026");
+    expect(message).not.toContain("today");
+  });
+
+  it("falls back whole for a movement row written before the dates were carried", () => {
+    // Rolling deploy: no invented period, and no relabelling of an old row.
+    const { baselineDate, valuationDate, ...older } =
+      examples.PORTFOLIO_MOVEMENT;
+    expect(baselineDate && valuationDate).toBeTruthy();
+    const copy = notificationEmailCopy(
+      source(NotificationType.PORTFOLIO_MOVEMENT, older),
+      englishEmailT,
+      "en",
+    );
+    expect(copy).toEqual({ title: "Stored title", message: "Stored message" });
   });
 
   it("lets an explicit numberFormat decide the figures, and the language the dates", () => {

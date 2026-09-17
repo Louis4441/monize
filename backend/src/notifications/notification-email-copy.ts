@@ -152,16 +152,29 @@ export function composeLocalizedNotificationCopy(
       });
     }
     case NotificationType.PORTFOLIO_MOVEMENT: {
+      // The period is part of the claim, not decoration: a Monday run measures
+      // from Friday, and "today" was wrong as often as it was right. A row
+      // written before the producer carried the dates has no period to name, so
+      // it falls back WHOLE to its stored English copy rather than being
+      // relabelled with a day it was never about.
+      const from = calendarDate(data.baselineDate);
+      const to = calendarDate(data.valuationDate);
       if (
         !numbers(data, "changePercent") ||
-        !["up", "down"].includes(String(data.direction))
+        !["up", "down"].includes(String(data.direction)) ||
+        from === null ||
+        to === null
       )
         return null;
       const down = data.direction === "down";
       return pair(
         down ? "portfolioMovement.titleDown" : "portfolioMovement.titleUp",
         down ? "portfolioMovement.messageDown" : "portfolioMovement.messageUp",
-        { percent: number(Math.abs(data.changePercent), 2) },
+        {
+          percent: number(Math.abs(data.changePercent), 2),
+          from: dateLabel(from),
+          to: dateLabel(to),
+        },
       );
     }
     case NotificationType.GEM_SIGNAL_CHANGED: {
