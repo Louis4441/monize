@@ -81,7 +81,7 @@
 | F4 | ADR 0005 and index row | F1 | none | [ ] |
 | A1 | Migration: `auth_attempt_counters`, `single_use_tokens`; RLS exemption; sweep cron | -- | none | [x] |
 | A2 | `AuthAttemptCounterService`; 2FA attempt maps replaced | A1 | neutral | [x] |
-| A3 | `usedTotpCodes` replaced by a `single_use_tokens` claim | A1 | neutral | [ ] |
+| A3 | `usedTotpCodes` replaced by a `single_use_tokens` claim | A1 | neutral | [x] |
 | A4 | Step-up and auth-email counters onto the service; interval prune removed | A2 | neutral | [ ] |
 | K1 | `oauth_instance_config` + `OauthSigningKeysService`; provider gets `jwks` | -- | neutral | [ ] |
 | X1 | AI action anti-replay onto `single_use_tokens`, MCP path included | A1 | neutral | [ ] |
@@ -407,13 +407,18 @@ strings rather than re-spell them.
 
 ### A3 -- `usedTotpCodes` replaced by a single-use claim
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `backend/src/auth/single-use-token.service.ts` (new),
 `backend/src/auth/single-use-token.service.spec.ts` (new),
 `backend/src/auth/two-factor.service.ts`, `backend/src/auth/two-factor.service.spec.ts`,
 `backend/src/auth/auth.module.ts`,
-`backend/test/integration/single-use-token.integration.spec.ts` (new).
+`backend/test/integration/single-use-token.integration.spec.ts` (new),
+`backend/src/test-helpers/single-use-token-testing.ts` (new, added to scope: the
+double has to *lose* the second claim or the replay assertions assert nothing,
+and two specs need it), `backend/src/auth/auth.service.spec.ts` (added to scope:
+it builds a real `TwoFactorService`, so the new constructor argument is provided
+there too).
 
 **Pattern:** `claimJti` in `backend/src/auth/oidc/oidc-reauth.service.ts`
 (`INSERT ... ON CONFLICT (jti) DO NOTHING`, winner decided by row count).
@@ -443,7 +448,25 @@ claim).
 exhaust valid codes by guessing. Hash the key; never store `userId:code` in
 clear.
 
-**Notes:**
+**Notes:** the hash is taken in Node (`hashToken`, the helper the trusted-device
+path already uses) rather than as `sha256($2)` in SQL, so the code never leaves
+the process -- not as a bind parameter, not in a statement log. It also keeps the
+service off `pgcrypto`, which would otherwise need a
+`required-db-functions.ts` entry.
+
+On the login path the lost claim folds into `isValid` rather than throwing after
+it. The previous code treated a replayed code as an invalid one -- counters
+incremented, account lockable, same message -- and a separate refusal after the
+counter reset would have quietly let a replayer clear a victim's failure count.
+The claim still runs after `otplib.verifySync` and before any token is issued.
+
+`TOTP_CLAIM_PURPOSE` is exported and both TOTP paths (`verify2FA` and
+`verifyTotpForUser`) call one private `claimTotpCode`, so the login and step-up
+surfaces cannot drift into two purposes and stop protecting each other.
+
+`claim` joins the caller's transaction, which is the opposite of A2's
+`increment` and deliberate: a claim guards work, so a failed apply must give it
+back. X1 depends on that.
 
 ### A4 -- Step-up and auth-email counters; interval prune removed
 

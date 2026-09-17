@@ -12,6 +12,7 @@ import bcrypt from "bcryptjs";
 import * as otplib from "otplib";
 import {
   TwoFactorService,
+  TOTP_CLAIM_PURPOSE,
   TWO_FACTOR_TOKEN_SCOPE,
   TWO_FACTOR_USER_SCOPE,
 } from "./two-factor.service";
@@ -30,6 +31,12 @@ import {
   createAuthAttemptCounterMock,
   type AuthAttemptCounterMock,
 } from "../test-helpers/auth-attempt-counter-testing";
+import {
+  createSingleUseTokenMock,
+  singleUseKey,
+  singleUseTokenProvider,
+  type SingleUseTokenMock,
+} from "../test-helpers/single-use-token-testing";
 import { hashToken } from "./crypto.util";
 
 jest.mock("../common/db/scoped-db", () =>
@@ -64,6 +71,7 @@ describe("TwoFactorService", () => {
   let dataSource: Record<string, jest.Mock>;
   let tokenService: Record<string, jest.Mock>;
   let attemptCounters: AuthAttemptCounterMock;
+  let singleUseTokens: SingleUseTokenMock;
 
   const mockUser: Partial<User> = {
     id: "user-1",
@@ -190,6 +198,7 @@ describe("TwoFactorService", () => {
     });
 
     attemptCounters = createAuthAttemptCounterMock();
+    singleUseTokens = createSingleUseTokenMock();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -199,6 +208,7 @@ describe("TwoFactorService", () => {
         { provide: DataSource, useValue: dataSource },
         { provide: TokenService, useValue: tokenService },
         authAttemptCounterProvider(attemptCounters),
+        singleUseTokenProvider(singleUseTokens),
       ],
     }).compile();
 
@@ -1108,41 +1118,83 @@ describe("TwoFactorService", () => {
     });
   });
 
-  describe("cleanupExpiredTotpCodes", () => {
-    it("should clean up expired TOTP codes", async () => {
-      const encryptedSecret = encrypt("TOTP_SECRET", TEST_TOTP_KEY);
+  describe("TOTP single-use claim", () => {
+    const encryptedSecret = () => encrypt("TOTP_SECRET", TEST_TOTP_KEY);
+
+    beforeEach(() => {
       jwtService.verify.mockReturnValue({
         sub: "user-1",
         type: "2fa_pending",
       });
       usersRepository.findOne.mockResolvedValue({
         ...mockUser,
-        twoFactorSecret: encryptedSecret,
+        twoFactorSecret: encryptedSecret(),
+      });
+    });
+
+    it("claims the code under the shared purpose, keyed by user and code", async () => {
+      (otplib.verifySync as jest.Mock).mockReturnValue({ valid: true });
+
+      await service.verify2FA("token-1", "123456");
+
+      expect(singleUseTokens.claim).toHaveBeenCalledWith(
+        TOTP_CLAIM_PURPOSE,
+        "user-1:123456",
+        90 * 1000,
+      );
+    });
+
+    // Claiming before verification would let a guesser burn valid codes.
+    it("does not claim a code that failed verification", async () => {
+      (otplib.verifySync as jest.Mock).mockReturnValue({ valid: false });
+
+      await expect(service.verify2FA("token-1", "999999")).rejects.toThrow(
+        UnauthorizedException,
+      );
+
+      expect(singleUseTokens.claim).not.toHaveBeenCalled();
+    });
+
+    // The point of the table: the first spend may have happened on a replica
+    // this process has never spoken to.
+    it("refuses a code another replica already spent, and counts the attempt", async () => {
+      singleUseTokens.claimed.add(
+        singleUseKey(TOTP_CLAIM_PURPOSE, "user-1:123456"),
+      );
+      (otplib.verifySync as jest.Mock).mockReturnValue({ valid: true });
+
+      await expect(service.verify2FA("token-1", "123456")).rejects.toThrow(
+        "Invalid verification code",
+      );
+
+      // A replay is a failed attempt, exactly as a wrong code is.
+      expect(attemptCounters.increment).toHaveBeenCalledWith(
+        TWO_FACTOR_USER_SCOPE,
+        "user-1",
+        5 * 60 * 1000,
+      );
+      expect(tokenService.generateTokenPair).not.toHaveBeenCalled();
+    });
+
+    it("issues no session when the claim is lost", async () => {
+      (otplib.verifySync as jest.Mock).mockReturnValue({ valid: true });
+
+      await service.verify2FA("token-1", "123456");
+      jest.clearAllMocks();
+      jwtService.verify.mockReturnValue({
+        sub: "user-1",
+        type: "2fa_pending",
+      });
+      usersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        twoFactorSecret: encryptedSecret(),
       });
       (otplib.verifySync as jest.Mock).mockReturnValue({ valid: true });
 
-      // First call marks code as used
-      await service.verify2FA("token-1", "123456");
-
-      // Manually expire the code
-      const usedCodes = (service as any).usedTotpCodes;
-      for (const [key] of usedCodes.entries()) {
-        usedCodes.set(key, Date.now() - 1000);
-      }
-
-      // Reset mocks for second call
-      jwtService.verify.mockReturnValue({
-        sub: "user-1",
-        type: "2fa_pending",
-      });
-      usersRepository.findOne.mockResolvedValue({
-        ...mockUser,
-        twoFactorSecret: encryptedSecret,
-      });
-
-      // Same code should now be accepted since it was cleaned up
-      const result = await service.verify2FA("token-2", "123456");
-      expect(result.accessToken).toBe("mock-access-token");
+      await expect(service.verify2FA("token-2", "123456")).rejects.toThrow(
+        "Invalid verification code",
+      );
+      expect(tokenService.generateTokenPair).not.toHaveBeenCalled();
     });
   });
 
@@ -1185,7 +1237,7 @@ describe("TwoFactorService", () => {
       expect(result).toBe(true);
     });
 
-    it("returns false for an invalid code without stamping the replay map", async () => {
+    it("returns false for an invalid code without spending a claim", async () => {
       usersRepository.findOne.mockResolvedValue({
         ...mockUser,
         twoFactorSecret: encryptedSecret,
@@ -1194,7 +1246,25 @@ describe("TwoFactorService", () => {
 
       const result = await service.verifyTotpForUser("user-1", "999999");
       expect(result).toBe(false);
-      expect((service as any).usedTotpCodes.has("user-1:999999")).toBe(false);
+      expect(singleUseTokens.claim).not.toHaveBeenCalled();
+    });
+
+    // One purpose and one key shape across both TOTP paths is what stops a code
+    // presented at login from being replayed against a step-up endpoint.
+    it("shares the login path's claim purpose and key", async () => {
+      usersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        twoFactorSecret: encryptedSecret,
+      });
+      (otplib.verifySync as jest.Mock).mockReturnValue({ valid: true });
+
+      await service.verifyTotpForUser("user-1", "123456");
+
+      expect(singleUseTokens.claim).toHaveBeenCalledWith(
+        TOTP_CLAIM_PURPOSE,
+        "user-1:123456",
+        90 * 1000,
+      );
     });
 
     it("rejects a code that was already used in this window (replay)", async () => {

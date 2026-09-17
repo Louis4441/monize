@@ -16,6 +16,7 @@ import { TwoFactorService } from "./two-factor.service";
 import { AuthEmailService } from "./auth-email.service";
 import { AuthStateSweeperService } from "./auth-state-sweeper.service";
 import { AuthAttemptCounterService } from "./auth-attempt-counter.service";
+import { SingleUseTokenService } from "./single-use-token.service";
 import { PatController } from "./pat.controller";
 import { StepUpAuthService } from "./step-up/step-up.service";
 import { StepUpAuthController } from "./step-up/step-up.controller";
@@ -49,6 +50,7 @@ import { DelegationModule } from "../delegation/delegation.module";
     AuthService,
     AuthStateSweeperService,
     AuthAttemptCounterService,
+    SingleUseTokenService,
     TokenService,
     TwoFactorService,
     AuthEmailService,
@@ -65,6 +67,7 @@ import { DelegationModule } from "../delegation/delegation.module";
   exports: [
     AuthService,
     AuthAttemptCounterService,
+    SingleUseTokenService,
     TokenService,
     TwoFactorService,
     AuthEmailService,
