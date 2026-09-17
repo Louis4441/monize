@@ -2451,13 +2451,15 @@ export class InvestmentTransactionsService {
    * Advisory-lock the holding scope of every brokerage account holding an
    * embedded investment row of these split parents.
    *
-   * Called by a split-status path as the first lock of its transaction,
-   * because that path row-locks `accounts` for the parent's own balance and
-   * the embedded rows' rebuild takes this advisory lock afterwards -- the
-   * opposite order from an investment write, which is a deadlock for both
-   * (`common/db/locks.ts`, 40P01). The read is unlocked, so it may run before
-   * the advisory lock; `pg_advisory_xact_lock` is re-entrant, so calling this
-   * twice in one transaction costs nothing.
+   * Called by a split-status path as the first statement of its transaction,
+   * before it row-locks the parent and before it row-locks `accounts` for the
+   * parent's balance. `update()` reaches the same parent the other way round --
+   * `lockHoldingScope`, then `updateEmbeddedSplitParent`'s `lockTransactionRow`
+   * on that parent -- so an advisory lock taken between the two row locks is
+   * still a deadlock for both (`common/db/locks.ts`, 40P01). The read is
+   * unlocked, so it may run before the advisory lock;
+   * `pg_advisory_xact_lock` is re-entrant, so calling this twice in one
+   * transaction costs nothing.
    */
   async lockEmbeddedHoldingScopes(
     manager: EntityManager,

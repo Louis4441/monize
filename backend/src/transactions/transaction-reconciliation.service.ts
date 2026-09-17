@@ -79,6 +79,22 @@ export class TransactionReconciliationService {
     counterpartAccountIds: string[];
   }> {
     return withScopedDb(this.dataSource, async (m) => {
+      // First lock of the transaction: advisory before row locks
+      // (`common/db/locks.ts`). If this row is a split parent whose legs carry
+      // embedded investment rows, those rows are rebuilt under the holdings
+      // advisory lock, and `InvestmentTransactionsService.update()` reaches the
+      // same parent the other way round -- advisory lock first, then this
+      // parent's `FOR UPDATE`. Taking the advisory lock after the row lock left
+      // the two paths each holding the other's next lock (40P01).
+      //
+      // Unconditional, and before the row is read: what the row is cannot be
+      // known without locking it, and the ids come from an unlocked `SELECT`
+      // inside the helper, which takes no lock and so may precede the advisory
+      // one. A row with no embedded investment legs locks nothing.
+      await this.splitService.lockEmbeddedInvestmentScopes(m, userId, [
+        transactionId,
+      ]);
+
       const locked = await lockTransactionRow(m, transactionId, userId);
       if (!locked) {
         throw new NotFoundException(
@@ -133,17 +149,6 @@ export class TransactionReconciliationService {
       const counterpartAccountIds: string[] = [];
       if (balanceMoved) {
         await assertVoidTransitionAllowedOnRow(m, transactionId);
-      }
-
-      if (balanceMoved && locked.isSplit) {
-        // Before the balance write below, which row-locks `accounts`: the
-        // embedded investment rows this parent carries across the VOID
-        // boundary are rebuilt under the holdings advisory lock, and an
-        // investment write takes that lock first and the `accounts` row lock
-        // second (`common/db/locks.ts`, 40P01).
-        await this.splitService.lockEmbeddedInvestmentScopes(m, userId, [
-          transactionId,
-        ]);
       }
 
       const fields: Partial<Transaction> = { status };

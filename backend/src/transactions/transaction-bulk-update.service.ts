@@ -251,6 +251,24 @@ export class TransactionBulkUpdateService {
             )
           : { crossingParentIds: [], counterpartIds: [] };
 
+      // First lock of the transaction: advisory before row locks
+      // (`common/db/locks.ts`). The embedded investment rows these parents
+      // carry across the VOID boundary are rebuilt under the holdings advisory
+      // lock, and `InvestmentTransactionsService.update()` reaches the same
+      // parent the other way round -- advisory lock first, then the parent's
+      // `FOR UPDATE`. Taking it after the row locks below left the two paths
+      // each holding the other's next lock (40P01). The ids come from an
+      // unlocked `SELECT` inside the helper, which takes no lock and so may
+      // precede the advisory one; the re-entrant call before the balance pass
+      // costs nothing.
+      if (crossingParentIds.length > 0) {
+        await this.splitService.lockEmbeddedInvestmentScopes(
+          m,
+          userId,
+          crossingParentIds,
+        );
+      }
+
       // Lock every row this batch will write, ascending by id, before anything
       // reads the statuses the VOID adjustment is derived from. One transaction
       // was not enough: handleStatusBalanceChanges aggregates the *current*
@@ -293,24 +311,6 @@ export class TransactionBulkUpdateService {
         updateFields,
         isUpdatingTags,
       );
-
-      // Before the balance pass below, which row-locks `accounts`: the
-      // embedded investment rows those parents carry across the VOID boundary
-      // are rebuilt under the holdings advisory lock, and an investment write
-      // takes that lock first and the `accounts` row lock second
-      // (`common/db/locks.ts`, 40P01).
-      // Before the balance pass below, which row-locks `accounts`: the
-      // embedded investment rows those parents carry across the VOID boundary
-      // are rebuilt under the holdings advisory lock, and an investment write
-      // takes that lock first and the `accounts` row lock second
-      // (`common/db/locks.ts`, 40P01).
-      if (crossingParentIds.length > 0) {
-        await this.splitService.lockEmbeddedInvestmentScopes(
-          m,
-          userId,
-          crossingParentIds,
-        );
-      }
 
       // Step 3: Handle balance adjustments for VOID status changes
       if (isUpdatingStatus) {

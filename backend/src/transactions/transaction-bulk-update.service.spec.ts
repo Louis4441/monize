@@ -1139,6 +1139,11 @@ describe("TransactionBulkUpdateService", () => {
         new Set(["acc-target"]),
       );
 
+      // The module mock is shared across this file's tests, so its recorded
+      // invocation order carries earlier cases' calls; the ordering assertion
+      // below is about this run only.
+      (lockTransactionRows as jest.Mock).mockClear();
+
       await service.bulkUpdate(userId, {
         mode: "ids",
         transactionIds: ["parent-tx"],
@@ -1159,6 +1164,13 @@ describe("TransactionBulkUpdateService", () => {
       // advisory lock, and the batch took it only there -- after the balance
       // pass had row-locked `accounts`, the opposite order from an investment
       // write (40P01).
+      //
+      // `lockTransactionRows` is the second round of the same defect: the
+      // advisory lock moved above the balance pass but stayed below the batch's
+      // `FOR UPDATE` over the parents, while
+      // `InvestmentTransactionsService.update()` takes the advisory lock first
+      // and then row-locks the same parent -- each path holding the other's
+      // next lock, 40P01 for both.
       expect(splitService.lockEmbeddedInvestmentScopes).toHaveBeenCalledWith(
         expect.anything(),
         userId,
@@ -1167,6 +1179,12 @@ describe("TransactionBulkUpdateService", () => {
       expect(
         splitService.lockEmbeddedInvestmentScopes.mock.invocationCallOrder[0],
       ).toBeLessThan(balanceQb.getRawMany.mock.invocationCallOrder[0]);
+      expect(lockTransactionRows).toHaveBeenCalled();
+      expect(
+        splitService.lockEmbeddedInvestmentScopes.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        (lockTransactionRows as jest.Mock).mock.invocationCallOrder[0],
+      );
     });
 
     it("does not propagate a split parent status that stays on one side of VOID", async () => {

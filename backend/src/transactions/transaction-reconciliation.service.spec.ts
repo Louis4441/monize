@@ -456,8 +456,15 @@ describe("TransactionReconciliationService", () => {
      * advisory lock, and this path took it only there -- after the parent's
      * balance write had row-locked `accounts`, the opposite order from an
      * investment write (40P01).
+     *
+     * The `lockTransactionRow` half is the second round of the same defect:
+     * moving the advisory lock above the balance write but below the parent's
+     * own `FOR UPDATE` still leaves it after a row lock, and
+     * `InvestmentTransactionsService.update()` takes the advisory lock first
+     * and then row-locks the very same parent -- advisory A vs. row P against
+     * row P vs. advisory A, which is 40P01 for both.
      */
-    it("locks the embedded investment scopes before the parent's balance write", async () => {
+    it("locks the embedded investment scopes before the parent's row lock and balance write", async () => {
       const transaction = stageTransaction({
         status: TransactionStatus.CLEARED,
         amount: 100,
@@ -466,6 +473,11 @@ describe("TransactionReconciliationService", () => {
       mockFindOne.mockResolvedValue(
         makeTransaction({ status: TransactionStatus.VOID, isSplit: true }),
       );
+
+      // The module mock is shared across this file's tests, so its recorded
+      // invocation order carries earlier cases' calls; the ordering assertion
+      // below is about this run only.
+      (lockTransactionRow as jest.Mock).mockClear();
 
       await service.updateStatus(
         userId,
@@ -484,6 +496,12 @@ describe("TransactionReconciliationService", () => {
       expect(
         splitService.lockEmbeddedInvestmentScopes.mock.invocationCallOrder[0],
       ).toBeLessThan(accountsService.updateBalance.mock.invocationCallOrder[0]);
+      expect(lockTransactionRow).toHaveBeenCalled();
+      expect(
+        splitService.lockEmbeddedInvestmentScopes.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        (lockTransactionRow as jest.Mock).mock.invocationCallOrder[0],
+      );
     });
 
     it("does not change balance when staying VOID", async () => {
