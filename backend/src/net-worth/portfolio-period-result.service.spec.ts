@@ -32,13 +32,30 @@ describe("PortfolioPeriodResultService", () => {
   let scopeRows: FakeRow[];
   let flowRows: FakeRow[];
   let rateRows: FakeRow[];
+  let settledTradeRows: FakeRow[];
+  let mixedSplitRows: FakeRow[];
   let queries: Array<{ sql: string; params: unknown[] }>;
 
   beforeEach(async () => {
     queries = [];
-    scopeRows = [{ id: "brok-1" }, { id: "cash-1" }];
+    // The brokerage holds the positions; only the cash sleeve's ledger cash is
+    // valued, which is what the flow boundary is drawn around.
+    scopeRows = [
+      {
+        id: "brok-1",
+        account_type: "INVESTMENT",
+        account_sub_type: "INVESTMENT_BROKERAGE",
+      },
+      {
+        id: "cash-1",
+        account_type: "INVESTMENT",
+        account_sub_type: "INVESTMENT_CASH",
+      },
+    ];
     flowRows = [];
     rateRows = [];
+    settledTradeRows = [{ count: "0" }];
+    mixedSplitRows = [{ count: "0" }];
 
     const preferenceRepo = {
       findOne: jest.fn(async () => ({ defaultCurrency: "CAD" })),
@@ -47,7 +64,12 @@ describe("PortfolioPeriodResultService", () => {
     mocks.manager.query.mockImplementation(
       async (sql: string, params: unknown[]) => {
         queries.push({ sql, params });
+        // Three statements name `investment_transactions` (the flow query and
+        // the mixed-split count do so inside their exclusions), so each is
+        // matched on a fragment only it carries.
         if (sql.includes("SUM(t.amount)")) return flowRows;
+        if (sql.includes("it.funding_account_id")) return settledTradeRows;
+        if (sql.includes("COUNT(*) AS count")) return mixedSplitRows;
         if (sql.includes("FROM exchange_rates")) return rateRows;
         if (sql.includes("FROM accounts")) return scopeRows;
         throw new Error(`unexpected query: ${sql}`);
@@ -237,6 +259,56 @@ describe("PortfolioPeriodResultService", () => {
     expect(result.netExternalFlows).toBe(10_000);
   });
 
+  /**
+   * The audit's case (#1389, F1): a 10,000 BUY settled from a chequing account.
+   * The purchase raises the market value by 10,000 and leaves no cash leg in
+   * the scope, so the flow query sees nothing and a subtraction of the two
+   * reports the reader's own money as a hundred per cent gain -- the #1392
+   * defect reached by a second route.
+   */
+  it("withholds the result when a trade settled outside the valued cash", async () => {
+    netWorth.getDailyInvestments.mockResolvedValue(flatSeries());
+    settledTradeRows = [{ count: "1" }];
+
+    const result = await run();
+
+    expect(result.investmentResult).toBeNull();
+    expect(result.returnPercent).toBeNull();
+    expect(result.reasons).toEqual(["externallySettledTrade"]);
+    // The two measured figures still stand; only their difference is unknown.
+    expect(result.valueChange).toBe(10_000);
+    expect(result.netExternalFlows).toBe(0);
+  });
+
+  it("asks about trades on the whole scope, settled against the valued cash", async () => {
+    netWorth.getDailyInvestments.mockResolvedValue(flatSeries());
+
+    await run();
+
+    const settled = queries.find((q) =>
+      q.sql.includes("it.funding_account_id"),
+    )!;
+    expect(settled.params[1]).toBe("2026-01-02");
+    expect(settled.params[2]).toBe("2026-09-17");
+    expect(settled.params[3]).toEqual(["brok-1", "cash-1"]);
+    expect(settled.params[4]).toEqual(["cash-1"]);
+  });
+
+  /**
+   * The flow sum drops a mixed split parent WHOLE (`external-flow.util.ts`), so
+   * its ordinary cash line is in the value change with nothing to subtract it.
+   */
+  it("withholds the result when a split parent mixes investment and cash lines", async () => {
+    netWorth.getDailyInvestments.mockResolvedValue(flatSeries());
+    mixedSplitRows = [{ count: "2" }];
+
+    const result = await run();
+
+    expect(result.investmentResult).toBeNull();
+    expect(result.reasons).toEqual(["mixedSplit"]);
+    expect(result.valueChange).toBe(10_000);
+  });
+
   it("reports nothing for a scope with no accounts", async () => {
     scopeRows = [];
 
@@ -256,13 +328,16 @@ describe("PortfolioPeriodResultService", () => {
     expect(result.startDate).toBe("2026-01-02");
   });
 
-  it("resolves the scope's linked pairs before asking for the flows", async () => {
+  it("draws the flow boundary around the accounts whose cash is valued", async () => {
     netWorth.getDailyInvestments.mockResolvedValue(flatSeries());
 
     await run({ accountIds: ["brok-1"] });
 
     const flowQuery = queries.find((q) => q.sql.includes("SUM(t.amount)"))!;
-    expect(flowQuery.params[3]).toEqual(["brok-1", "cash-1"]);
+    // The brokerage row's own ledger cash is NOT in the series, so a row posted
+    // to it is not a flow of this period either: one boundary, or a deposit
+    // there is subtracted from a value change that never held it.
+    expect(flowQuery.params[3]).toEqual(["cash-1"]);
     // The series is asked with the ids the caller gave: getDailyInvestments
     // does the same widening itself, and doing it twice is a no-op.
     expect(netWorth.getDailyInvestments).toHaveBeenCalledWith(

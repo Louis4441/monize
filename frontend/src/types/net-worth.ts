@@ -96,7 +96,11 @@ export type PeriodResultReason =
   | 'incompletePrices'
   | 'incompleteCash'
   | 'missingRatePairs'
-  | 'zeroStart';
+  | 'zeroStart'
+  /** A trade in the window settled outside the accounts whose cash is valued. */
+  | 'externallySettledTrade'
+  /** A split parent in the window mixes an investment line with ordinary cash. */
+  | 'mixedSplit';
 
 /**
  * What GET /net-worth/investments-period-result answers: what the portfolio did

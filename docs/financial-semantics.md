@@ -357,6 +357,17 @@ rather than smaller (`FxAggregate`).
 day and already holds every flow that landed on it, so counting those again
 subtracts them from a starting value that contains them.
 
+**One boundary for both figures.** The flow is measured over the accounts whose
+ledger cash `MV` values -- the cash sleeves and the standalone investment
+accounts, `isValuationCashAccount` -- on both sides of a transfer, never over the
+wider investment scope: a deposit posted straight to a brokerage row is a flow
+the series cannot see, and subtracting it is a loss nobody made. A movement that
+crosses that boundary without producing a countable flow (a trade settled
+outside it, a split parent mixing an investment line with ordinary cash) is
+counted per window and withholds `investmentResult` with the reason
+`externallySettledTrade` or `mixedSplit`; the two figures either side of the
+subtraction are still reported.
+
 **The return method is named on the wire.** `returnMethod: "simple"` divides
 the period's result by the value it started with and ignores when each flow
 arrived; it is neither Modified Dietz nor a time-weighted return, both of which

@@ -39,9 +39,15 @@ INV-REPORT-001), `b` the baseline date and `e` the end date.
   the chart draws, with the same completeness bits (`fxComplete`,
   `pricesComplete`, `cashComplete`). Never a second valuation.
 - `valueChange = MV(e) - MV(b)`.
-- `netExternalFlows` -- the net cash that crossed `A`'s boundary from outside `A`
-  on the days `(b, e]`, converted per day at that day's rate and summed in the
-  reporting currency. Which rows are external flow is
+- `netExternalFlows` -- the net cash that crossed the boundary of `C` from
+  outside it on the days `(b, e]`, converted per day at that day's rate and
+  summed in the reporting currency. **`C` is not `A`**: it is the subset of `A`
+  whose ledger cash `MV` actually values -- the cash sleeves and the standalone
+  investment accounts, `isValuationCashAccount`
+  (`backend/src/net-worth/net-worth.service.ts`) -- and the same set is used on
+  both sides of a transfer. One boundary, or a deposit posted straight to a
+  brokerage row is subtracted from a value change that never held it. Which rows
+  are external flow is
   `loadExternalFlowSubtotals` (`backend/src/securities/external-flow.util.ts`),
   the classifier the daily notification and the calendar already share: a
   deposit, a withdrawal, or a transfer leg whose counterparty is outside `A`.
@@ -93,6 +99,12 @@ different question over a different input.
 - **INV-PORTRESULT-004 (zero start has no percentage).** `MV(b) = 0` yields
   `returnPercent: null` with reason `zeroStart`; the money figures are still
   reported.
+- **INV-PORTRESULT-005 (a movement the classifier cannot count withholds the
+  result).** When the window holds an investment action settled outside `C`, or
+  a split parent mixing an investment line with ordinary cash, `investmentResult`
+  and `returnPercent` are `null` with the reason `externallySettledTrade` or
+  `mixedSplit`. `valueChange` and `netExternalFlows` are both still measured;
+  what is unknown is whether their difference is the market's.
 
 Every completeness read is `=== false` (absent is no information), and every
 withheld figure names its cause at the surface that withholds it.
@@ -106,6 +118,7 @@ withheld figure names its cause at the surface that withholds it.
 | incomplete | complete | complete | any | `null` | number | `null` | `null` | the point's own causes |
 | complete | incomplete | complete | any | `null` | number | `null` | `null` | the point's own causes |
 | complete | complete | incomplete | any | number | `null` | `null` | `null` | `missingRatePairs` |
+| complete | complete | complete, but a movement is uncountable | any | number | number | `null` | `null` | `externallySettledTrade`, `mixedSplit` |
 | no series | -- | -- | -- | `null` | `null` | `null` | `null` | `noValueSeries` |
 
 A point's own causes are `incompletePrices` (a held position with no accepted
@@ -149,6 +162,43 @@ number and is reported as one.
 The partial flow sum, when a rate is missing, is returned beside the `null` under
 its own name (`knownFlowSubtotal`) rather than under `netExternalFlows`.
 
+### 6.1 The two movements the flow classifier cannot count
+
+Both are the coarse cases `external-flow.util.ts` documents. Each moves value
+across the boundary of `C` without producing a countable flow, so the difference
+`valueChange - netExternalFlows` stops being the market's. Each is **counted**
+per window -- one `COUNT(*)` beside the flow query, in
+`PortfolioPeriodResultService.countUnmeasuredFlows` -- and a count above zero
+withholds `investmentResult` and `returnPercent` with the reason named. Counting
+is deliberate: measuring either is a line-granular rewrite of the classifier, and
+a count is all that withholding needs.
+
+1. **`externallySettledTrade`.** An investment action in the window, on an
+   account of `A`, whose settlement cash is outside `C`: an explicit
+   `funding_account_id` naming an account outside it, a generated cash leg
+   (`transaction_id`) posted to an account outside it, or an embedded investment
+   split whose parent sits on one. A 10,000 BUY funded from a chequing account
+   raises `MV` by 10,000 and leaves no cash leg in `C` at all, so the flow query
+   reports zero and the naive subtraction calls the reader's own money a hundred
+   per cent gain -- the defect of section 1, reached by a second route.
+   The same reason covers an action that moved SHARES with no cash leg of any
+   kind -- `TRANSFER_IN`, `TRANSFER_OUT`, `ADD_SHARES`, `REMOVE_SHARES` -- unless
+   its linked leg is on an account of `A`, which makes it a move inside the
+   portfolio rather than across its boundary. Shares arriving from outside are
+   value entering with no cash to net it against.
+   A brokerage account with no linked cash sleeve settles its own trades on
+   itself, which is outside `C` by construction; such a scope reports
+   `valueChange` and withholds the result, which is the honest answer while its
+   cash is not valued.
+2. **`mixedSplit`.** A split parent in the window, on an account of `C`, that
+   carries BOTH an investment-linked line and an ordinary one. The flow sum is
+   over `t.amount`, so the classifier drops such a parent WHOLE: its ordinary
+   cash is in `MV` and in no flow.
+
+Neither is a boundary nobody can fix: recording the trade's cash inside the
+portfolio, or splitting the mixed parent into its two rows, makes the period
+measurable again. The surface says which one it hit.
+
 ## 7. Where it is computed, and by whom
 
 One answer, on the server:
@@ -177,6 +227,9 @@ Backend unit (`portfolio-period-result.util.spec.ts`,
 | `MV(b) = 0` | percent `null`, reason `zeroStart`, money reported |
 | empty series | every figure `null`, reason `noValueSeries` |
 | an explicit `baselineDate` | the baseline's close is the start, flows after it |
+| a BUY settled outside `C` | result and percent `null`, reason `externallySettledTrade` |
+| a mixed split parent in the window | result `null`, reason `mixedSplit` |
+| the flow query's account set | the valued cash accounts, not the whole scope |
 
 Frontend (`PortfolioValueReport.test.tsx`): the KPI cards show value change, net
 deposits and withdrawals, and the investment result as three separate figures;

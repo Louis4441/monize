@@ -23,7 +23,19 @@ export type PeriodResultReason =
    * The starting value is not positive: a percentage of nothing, and a ratio
    * over a negative base reverses its own sign. The money figures still stand.
    */
-  | "zeroStart";
+  | "zeroStart"
+  /**
+   * An investment action in the window settled outside the cash the valuation
+   * walks, or moved shares with no cash leg at all. The value it brought in is
+   * in `valueChange` and in no flow, so the difference is not the market's.
+   */
+  | "externallySettledTrade"
+  /**
+   * A split parent in the window mixes an investment line with ordinary cash.
+   * The flow classifier drops such a parent whole, so its ordinary part sits in
+   * the value change with nothing to subtract it.
+   */
+  | "mixedSplit";
 
 /**
  * How `returnPercent` was arrived at, named on the wire.
@@ -63,12 +75,31 @@ export interface PeriodFlow {
   missingPairs: string[];
 }
 
+/**
+ * Movements inside the window that raised or lowered the value without the
+ * market having moved, and which the flow classifier cannot count.
+ *
+ * Both are the coarse cases `external-flow.util.ts` documents, counted rather
+ * than measured: counting them is cheap and honest, and measuring them is a
+ * line-granular rewrite of the classifier. A count above zero withholds the
+ * result rather than shrinking it, exactly as an unconvertible flow subtotal
+ * does (`docs/specs/portfolio-period-result.md` section 6).
+ */
+export interface UnmeasuredFlowCounts {
+  /** Investment actions settled outside the cash accounts the valuation walks. */
+  externallySettledTrades: number;
+  /** Split parents mixing an embedded investment line with ordinary cash. */
+  mixedSplitParents: number;
+}
+
 export interface PeriodResultInput {
   /** MV(b): the close the period is measured from; null when there is none. */
   start: PeriodBoundaryValue | null;
   /** MV(e): the close the period is measured to; null when there is none. */
   end: PeriodBoundaryValue | null;
   flow: PeriodFlow;
+  /** Absent means the caller counted none, not that none exist. */
+  unmeasuredFlows?: UnmeasuredFlowCounts;
 }
 
 export interface PeriodResultDecision {
@@ -117,7 +148,11 @@ export interface PeriodResultDecision {
  *    result, with the pairs named. Dropping the currency that would not convert
  *    reports the reader's own deposit as a gain, which is the whole defect
  *    (INV-PORTRESULT-003).
- * 4. A zero starting value -> the money is known, the ratio is not.
+ * 4. A movement the flow classifier cannot see (a trade settled outside the
+ *    valued cash accounts, a mixed split parent) -> no result, with the cause
+ *    named. `valueChange` and `netExternalFlows` are both still measured; what
+ *    is not known is whether their difference is the market's.
+ * 5. A zero starting value -> the money is known, the ratio is not.
  *
  * Pure, so the whole policy is table-tested without a database, and so no
  * consumer re-derives a row of it.
@@ -205,8 +240,22 @@ export function decidePeriodResult(
   // A difference of two decimal(20,4) values is rounded once here rather than
   // accumulating drift through the two figures derived from it.
   const valueChange = roundMoney(end.value - start.value);
+
+  // A movement the flow classifier could not see is value that entered or left
+  // without the market having moved it, so the subtraction below would report
+  // it as performance -- the same defect as a dropped flow currency, reached by
+  // a different route. The two figures either side of it are still measured.
+  const unmeasured = input.unmeasuredFlows;
+  if ((unmeasured?.externallySettledTrades ?? 0) > 0) {
+    reasons.add("externallySettledTrade");
+  }
+  if ((unmeasured?.mixedSplitParents ?? 0) > 0) reasons.add("mixedSplit");
+  const flowsFullyMeasured =
+    (unmeasured?.externallySettledTrades ?? 0) === 0 &&
+    (unmeasured?.mixedSplitParents ?? 0) === 0;
+
   const investmentResult =
-    netExternalFlows === null
+    netExternalFlows === null || !flowsFullyMeasured
       ? null
       : roundMoney(valueChange - netExternalFlows);
 

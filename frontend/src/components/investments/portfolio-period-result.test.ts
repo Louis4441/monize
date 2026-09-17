@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { periodResultUnknownReason } from './portfolio-period-result';
+import {
+  hasUnmeasuredFlow,
+  periodResultUnknownReason,
+} from './portfolio-period-result';
 
 /**
  * One glyph, five server reasons: the mapping decides which repair the reader
@@ -36,5 +39,28 @@ describe('periodResultUnknownReason', () => {
 
   it('says nothing about a reason list it was never given', () => {
     expect(periodResultUnknownReason([])).toBe('noBaseline');
+  });
+
+  it.each(['externallySettledTrade', 'mixedSplit'] as const)(
+    'sends %s nowhere, because no missing datum caused it',
+    (reason) => {
+      expect(periodResultUnknownReason([reason])).toBe('noBaseline');
+    },
+  );
+});
+
+describe('hasUnmeasuredFlow', () => {
+  it.each(['externallySettledTrade', 'mixedSplit'] as const)(
+    'is true for %s, so the card can name the cause',
+    (reason) => {
+      expect(hasUnmeasuredFlow([reason])).toBe(true);
+    },
+  );
+
+  it('is false for a period whose figures are merely missing data', () => {
+    expect(hasUnmeasuredFlow(['incompletePrices', 'missingRatePairs'])).toBe(
+      false,
+    );
+    expect(hasUnmeasuredFlow([])).toBe(false);
   });
 });

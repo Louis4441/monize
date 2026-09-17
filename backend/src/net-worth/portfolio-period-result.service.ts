@@ -5,6 +5,7 @@ import { withScopedDb } from "../common/db/scoped-db";
 import { todayYMD } from "../common/date-utils";
 import { preferredCurrency } from "../common/default-currency.util";
 import { FxAggregate } from "../common/fx-aggregate";
+import { investmentLinkedSplitExclusion } from "../common/investment-filter.util";
 import {
   buildRateIndex,
   convertAtDate,
@@ -15,12 +16,20 @@ import {
   resolveInvestmentScopeAccountIds,
 } from "../securities/investment-scope.util";
 import { UserPreference } from "../users/entities/user-preference.entity";
-import { NetWorthService } from "./net-worth.service";
+import { NetWorthService, isValuationCashAccount } from "./net-worth.service";
 import {
   PeriodResultReason,
   PeriodReturnMethod,
+  UnmeasuredFlowCounts,
   decidePeriodResult,
 } from "./portfolio-period-result.util";
+
+/** One account of the scope, with what the cash boundary is decided from. */
+interface ScopeAccount {
+  id: string;
+  account_type: string;
+  account_sub_type: string | null;
+}
 
 export { PeriodResultReason, PeriodReturnMethod };
 
@@ -139,13 +148,21 @@ export class PortfolioPeriodResultService {
 
     const scope = await this.resolveScope(userId, opts.accountIds);
     if (scope.length === 0) return empty;
+    // ONE boundary. The flow is drawn around the accounts whose cash the
+    // valuation actually walks, on both sides of a transfer: a deposit posted
+    // straight to a brokerage row is a flow the series never sees, and
+    // subtracting it from a value change that does not hold it is a loss
+    // nobody made (`docs/specs/portfolio-period-result.md` section 6).
+    const cashScope = scope
+      .filter((row) => isValuationCashAccount(row))
+      .map((row) => row.id);
 
     // The same series the chart reads, for the same scope, in the same currency.
     // Its first and last points ARE the period's boundaries: a day is valued
     // from the latest accepted close on or before it, and the price loaders
     // carry one pre-window observation, so the first point does not depend on
     // how wide a window the caller asked for.
-    const [series, flowRows] = await Promise.all([
+    const [series, flowRows, unmeasuredFlows] = await Promise.all([
       this.netWorth.getDailyInvestments(
         userId,
         from,
@@ -161,10 +178,14 @@ export class PortfolioPeriodResultService {
           // Exclusive: a flow dated on the baseline is already inside MV(b).
           afterDate: from,
           throughDate: end,
-          accountIds: scope,
+          accountIds: cashScope,
           perDay: true,
         },
       ),
+      this.countUnmeasuredFlows(userId, from, end, {
+        scope: scope.map((row) => row.id),
+        cashScope,
+      }),
     ]);
 
     if (series.length === 0) return empty;
@@ -175,6 +196,7 @@ export class PortfolioPeriodResultService {
       start: series[0],
       end: series[series.length - 1],
       flow,
+      unmeasuredFlows,
     });
 
     return {
@@ -261,28 +283,134 @@ export class PortfolioPeriodResultService {
     return preferredCurrency(pref);
   }
 
-  /** The accounts in scope, widened to linked pairs exactly as valuation does. */
+  /**
+   * How many movements in the window the flow classifier cannot count.
+   *
+   * Two coarse cases, both documented in `external-flow.util.ts` and both able
+   * to move the value without the market having moved:
+   *
+   *  - an investment action settled somewhere the valuation does not walk cash
+   *    (an explicit funding account outside the set, a cash leg posted to an
+   *    account outside it), or one that moved shares with no cash leg at all
+   *    and no linked leg inside the set -- shares arriving from outside;
+   *  - a split parent mixing an embedded investment line with ordinary cash,
+   *    which the flow sum drops WHOLE, so its ordinary part is in the value
+   *    change and in no flow.
+   *
+   * Counted, not measured: what each is worth is a line-granular rewrite of the
+   * classifier, and a count is enough to withhold. `COUNT(*)` comes back as a
+   * string from the driver, so it is coerced at this boundary.
+   */
+  private async countUnmeasuredFlows(
+    userId: string,
+    afterDate: string,
+    throughDate: string,
+    sets: { scope: string[]; cashScope: string[] },
+  ): Promise<UnmeasuredFlowCounts> {
+    const params = [
+      userId,
+      afterDate,
+      throughDate,
+      sets.scope,
+      sets.cashScope,
+    ] as const;
+
+    const [settled, mixed] = await withScopedDb(this.dataSource, async (m) => {
+      const settledRows: Array<{ count: string }> = await m.query(
+        `SELECT COUNT(*) AS count
+           FROM investment_transactions it
+          WHERE it.user_id = $1
+            AND it.account_id = ANY($4::UUID[])
+            AND it.transaction_date > $2
+            AND it.transaction_date <= $3
+            AND it.status IS DISTINCT FROM 'VOID'
+            AND (
+              it.funding_account_id IS NOT NULL
+              AND NOT (it.funding_account_id = ANY($5::UUID[]))
+              OR EXISTS (
+                SELECT 1 FROM transactions ct
+                 WHERE ct.id = it.transaction_id
+                   AND NOT (ct.account_id = ANY($5::UUID[]))
+              )
+              OR EXISTS (
+                SELECT 1 FROM transaction_splits s
+                  JOIN transactions pt ON pt.id = s.transaction_id
+                 WHERE s.id = it.transaction_split_id
+                   AND NOT (pt.account_id = ANY($5::UUID[]))
+              )
+              OR (
+                it.transaction_id IS NULL
+                AND it.transaction_split_id IS NULL
+                AND it.action IN (
+                  'TRANSFER_IN', 'TRANSFER_OUT', 'ADD_SHARES', 'REMOVE_SHARES'
+                )
+                AND NOT EXISTS (
+                  SELECT 1 FROM investment_transactions li
+                   WHERE li.id = it.linked_transaction_id
+                     AND li.account_id = ANY($4::UUID[])
+                )
+              )
+            )`,
+        [...params],
+      );
+      const mixedRows: Array<{ count: string }> = await m.query(
+        `SELECT COUNT(*) AS count
+           FROM transactions t
+          WHERE t.user_id = $1
+            AND t.account_id = ANY($5::UUID[])
+            AND t.parent_transaction_id IS NULL
+            AND t.transaction_date > $2
+            AND t.transaction_date <= $3
+            AND t.status IS DISTINCT FROM 'VOID'
+            AND EXISTS (
+              SELECT 1 FROM transaction_splits s
+               WHERE s.transaction_id = t.id
+                 AND NOT (${investmentLinkedSplitExclusion("s")})
+            )
+            AND EXISTS (
+              SELECT 1 FROM transaction_splits s
+               WHERE s.transaction_id = t.id
+                 AND ${investmentLinkedSplitExclusion("s")}
+            )`,
+        [...params],
+      );
+      return [settledRows, mixedRows];
+    });
+
+    return {
+      externallySettledTrades: Number(settled[0]?.count ?? 0),
+      mixedSplitParents: Number(mixed[0]?.count ?? 0),
+    };
+  }
+
+  /**
+   * The accounts in scope, widened to linked pairs exactly as valuation does,
+   * carrying the type columns the cash boundary is drawn from.
+   */
   private async resolveScope(
     userId: string,
     accountIds?: string[],
-  ): Promise<string[]> {
+  ): Promise<ScopeAccount[]> {
+    const query = (sql: string, params: unknown[]) =>
+      withScopedDb(this.dataSource, (m) => m.query(sql, params));
+
     if (accountIds && accountIds.length > 0) {
-      return resolveInvestmentScopeAccountIds(
-        (sql, params) =>
-          withScopedDb(this.dataSource, (m) => m.query(sql, params)),
+      const ids = await resolveInvestmentScopeAccountIds(
+        query,
         userId,
         accountIds,
       );
+      if (ids.length === 0) return [];
+      return query(
+        `SELECT a.id, a.account_type, a.account_sub_type FROM accounts a
+          WHERE a.user_id = $1 AND a.id = ANY($2::UUID[])`,
+        [userId, ids],
+      ) as Promise<ScopeAccount[]>;
     }
-    const rows: Array<{ id: string }> = await withScopedDb(
-      this.dataSource,
-      (m) =>
-        m.query(
-          `SELECT a.id FROM accounts a
-            WHERE a.user_id = $1 AND ${UNFILTERED_INVESTMENT_SCOPE_SQL}`,
-          [userId],
-        ),
-    );
-    return rows.map((row) => row.id);
+    return query(
+      `SELECT a.id, a.account_type, a.account_sub_type FROM accounts a
+        WHERE a.user_id = $1 AND ${UNFILTERED_INVESTMENT_SCOPE_SQL}`,
+      [userId],
+    ) as Promise<ScopeAccount[]>;
   }
 }

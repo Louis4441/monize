@@ -158,6 +158,86 @@ describe("decidePeriodResult", () => {
     expect(decision.missingRatePairs).toEqual(["CAD->USD"]);
   });
 
+  /**
+   * A cash account with no balance for a boundary day makes that day a
+   * subtotal on its own, with neither a price nor a rate missing. Asserted
+   * alone because the case that names every cause carries three false bits at
+   * once, and would still read as incomplete with this one ignored.
+   */
+  it("withholds the value change when only a boundary's cash is incomplete", () => {
+    const decision = decidePeriodResult({
+      start: day("2026-01-02", 10_000, {
+        cashComplete: false,
+        unknownCashAccountIds: ["acct-2"],
+      }),
+      end: day("2026-06-30", 20_000),
+      flow: complete(10_000),
+    });
+
+    expect(decision.valueChange).toBeNull();
+    expect(decision.investmentResult).toBeNull();
+    expect(decision.startValue).toBeNull();
+    expect(decision.reasons).toEqual(["incompleteCash"]);
+    expect(decision.unknownCashAccountIds).toEqual(["acct-2"]);
+  });
+
+  it("reads an absent cashComplete as no information, not as incomplete", () => {
+    const decision = decidePeriodResult({
+      start: { date: "2026-01-02", value: 10_000, fxComplete: true, pricesComplete: true },
+      end: { date: "2026-06-30", value: 11_000, fxComplete: true, pricesComplete: true },
+      flow: complete(0),
+    });
+
+    expect(decision.valueChange).toBe(1_000);
+    expect(decision.complete).toBe(true);
+    expect(decision.reasons).toEqual([]);
+  });
+
+  /**
+   * A trade settled outside the valued cash accounts raised the value with no
+   * flow to subtract, so the difference is not the market's (#1389). Both
+   * measured figures survive; only their difference is withheld.
+   */
+  it("withholds the result when a trade settled outside the valued cash", () => {
+    const decision = decidePeriodResult({
+      start: day("2026-01-02", 10_000),
+      end: day("2026-06-30", 20_000),
+      flow: complete(0),
+      unmeasuredFlows: { externallySettledTrades: 1, mixedSplitParents: 0 },
+    });
+
+    expect(decision.valueChange).toBe(10_000);
+    expect(decision.netExternalFlows).toBe(0);
+    expect(decision.investmentResult).toBeNull();
+    expect(decision.returnPercent).toBeNull();
+    expect(decision.complete).toBe(false);
+    expect(decision.reasons).toEqual(["externallySettledTrade"]);
+  });
+
+  it("withholds the result when a mixed split parent is in the window", () => {
+    const decision = decidePeriodResult({
+      start: day("2026-01-02", 10_000),
+      end: day("2026-06-30", 20_000),
+      flow: complete(0),
+      unmeasuredFlows: { externallySettledTrades: 0, mixedSplitParents: 3 },
+    });
+
+    expect(decision.investmentResult).toBeNull();
+    expect(decision.reasons).toEqual(["mixedSplit"]);
+  });
+
+  it("counts of zero are a measured period, not an unknown one", () => {
+    const decision = decidePeriodResult({
+      start: day("2026-01-02", 10_000),
+      end: day("2026-06-30", 11_000),
+      flow: complete(0),
+      unmeasuredFlows: { externallySettledTrades: 0, mixedSplitParents: 0 },
+    });
+
+    expect(decision.investmentResult).toBe(1_000);
+    expect(decision.complete).toBe(true);
+  });
+
   it("reads an absent completeness bit as no information, not as incomplete", () => {
     const decision = decidePeriodResult({
       start: { date: "2026-01-02", value: 10_000 },

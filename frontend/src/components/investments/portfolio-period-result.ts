@@ -14,6 +14,12 @@ import type { PeriodResultReason } from '@/types/net-worth';
  * `zeroStart` and `noValueSeries` are both boundaries: a period that started at
  * nothing has no percentage to report, and a scope that produced no valued day
  * has nothing to compare. Neither is a defect to repair.
+ *
+ * `externallySettledTrade` and `mixedSplit` fall to the same marker for want of
+ * a truer one: nothing is missing from the data, so naming a price, a rate or a
+ * balance would send the reader to a screen with nothing to do on it. What they
+ * DO have is a cause worth reading, which the card names beside the figure
+ * rather than inside this marker.
  */
 export function periodResultUnknownReason(
   reasons: readonly PeriodResultReason[],
@@ -22,4 +28,13 @@ export function periodResultUnknownReason(
   if (reasons.includes('incompleteCash')) return 'noCashBalance';
   if (reasons.includes('missingRatePairs')) return 'displayFx';
   return 'noBaseline';
+}
+
+/** Whether the window holds a movement the server could not count as a flow. */
+export function hasUnmeasuredFlow(
+  reasons: readonly PeriodResultReason[],
+): boolean {
+  return (
+    reasons.includes('externallySettledTrade') || reasons.includes('mixedSplit')
+  );
 }

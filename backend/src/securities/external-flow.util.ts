@@ -33,7 +33,11 @@ import { returnedRows } from "../common/db/query-result";
  *    between two scoped accounts never crossed the boundary.
  *
  * TWO KNOWN COARSE CASES (INV-PORTMOVE, tracked in the spec's open items), both
- * narrowing rather than corrupting the common path:
+ * narrowing rather than corrupting the common path. A caller that subtracts this
+ * figure from a value change has to decide what to do about them: the period
+ * result counts both per window and withholds its result rather than reporting a
+ * difference that is not the market's (`docs/specs/portfolio-period-result.md`
+ * section 6.1).
  *
  *  - A split parent that mixes an embedded investment line with an ordinary
  *    external cash line is excluded WHOLE (the sum is over `t.amount`, so it

@@ -779,7 +779,13 @@ Statement           A surface reporting what a portfolio did over a period
                     cause named, whenever a component is unknown: a boundary
                     close that is a subtotal withholds the value change, and a
                     flow subtotal with no rate for its day withholds the flow
-                    and the result rather than shrinking them.
+                    and the result rather than shrinking them. The flow and the
+                    value are measured over ONE set of accounts -- the accounts
+                    whose cash the series values -- and a movement the flow
+                    classifier cannot count (a trade settled outside that set, a
+                    split parent mixing an investment line with ordinary cash)
+                    withholds the result rather than letting it read as the
+                    market's.
 Source of truth     The value series from
                     NetWorthService.getDailyInvestments with its completeness
                     bits, and the external-flow classifier
@@ -792,7 +798,10 @@ Enforcement         decidePeriodResult
                     table-tested; PortfolioPeriodResultService serves it at
                     GET /net-worth/investments-period-result over the very
                     series the chart draws, converting each day's flow at that
-                    day's rate through resolveFxRate and FxAggregate.
+                    day's rate through resolveFxRate and FxAggregate, over the
+                    cash accounts isValuationCashAccount names on both sides of
+                    a transfer, and counting the two unmeasurable cases into the
+                    reasons externallySettledTrade and mixedSplit.
                     PortfolioValueReport prints it and derives nothing.
                     docs/specs/portfolio-period-result.md has the truth table,
                     the numerical examples and the test matrix.
