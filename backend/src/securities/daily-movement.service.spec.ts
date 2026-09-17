@@ -92,7 +92,11 @@ describe("DailyMovementService", () => {
   const value = (
     date: string,
     amount: number,
-    flags: { fxComplete?: boolean; pricesComplete?: boolean } = {},
+    flags: {
+      fxComplete?: boolean;
+      pricesComplete?: boolean;
+      cashComplete?: boolean;
+    } = {},
   ) => ({
     date,
     value: amount,
@@ -100,6 +104,8 @@ describe("DailyMovementService", () => {
     missingRatePairs: [],
     pricesComplete: flags.pricesComplete ?? true,
     unpricedSecurityIds: [],
+    cashComplete: flags.cashComplete ?? true,
+    unknownCashAccountIds: [],
   });
 
   const buy = (
@@ -330,6 +336,42 @@ describe("DailyMovementService", () => {
       expect(res.days[0].isTradingDay).toBe(true);
       expect(res.days[0].movement).toBeNull();
       expect(res.days[0].reasons).toEqual(["unpricedHolding"]);
+    });
+  });
+
+  /**
+   * A scoped cash account with no balance for the day makes the value a
+   * subtotal with neither a price nor a rate missing, so the day's move is
+   * unknown. Asserted at the service, not only on `valueReasons`: the reason
+   * list and the completeness the movement is withheld on are two reads of the
+   * same bit, and only this one decides whether a figure is printed.
+   */
+  describe("a day whose cash is incomplete", () => {
+    it("has no movement, and names the cash as the cause", async () => {
+      replayRows = [buy("abc", 100, "2026-09-01")];
+      securities = [{ id: "abc", symbol: "ABC", currencyCode: "CAD" }];
+      netWorth.loadValuationSeries.mockResolvedValue(
+        series({
+          abc: [
+            { date: "2026-09-10", close: 50 },
+            { date: "2026-09-11", close: 52 },
+          ],
+        }),
+      );
+      netWorth.getDailyInvestments.mockResolvedValue([
+        value("2026-09-10", 5000, { cashComplete: false }),
+        value("2026-09-11", 5200, { cashComplete: false }),
+      ]);
+
+      const res = await service.getDailyMovements(
+        "user-1",
+        "2026-09-11",
+        "2026-09-11",
+      );
+
+      expect(res.days[0].isTradingDay).toBe(true);
+      expect(res.days[0].movement).toBeNull();
+      expect(res.days[0].reasons).toEqual(["cashIncomplete"]);
     });
   });
 
