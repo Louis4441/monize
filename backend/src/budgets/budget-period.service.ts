@@ -25,6 +25,24 @@ import {
 } from "./budget-spending.util";
 import { roundMoney, sumMoney } from "../common/round.util";
 
+/**
+ * "There is no OPEN period to close."
+ *
+ * A `BadRequestException` still -- the HTTP surface answers 400 with the same
+ * translated message as before -- but a *named* one, because the monthly cron
+ * has to tell this apart from a genuine failure. It is what the loser of the
+ * row lock above sees when another replica closed the period first, and
+ * counting a normal two-process tick as an error is the gap F3 recorded.
+ *
+ * The distinction is carried by the type rather than by the message: `tr`
+ * translates, so matching on the text would be matching on copy.
+ */
+export class NoOpenPeriodError extends BadRequestException {
+  constructor() {
+    super(tr("errors.budgets.noOpenPeriod", "No open period to close"));
+  }
+}
+
 @Injectable()
 export class BudgetPeriodService {
   constructor(
@@ -106,9 +124,7 @@ export class BudgetPeriodService {
         // Either there never was one, or another replica closed it while this
         // call was waiting for the lock. Both are "nothing to do here", and the
         // caller reports it as a skip rather than an error.
-        throw new BadRequestException(
-          tr("errors.budgets.noOpenPeriod", "No open period to close"),
-        );
+        throw new NoOpenPeriodError();
       }
 
       const openPeriod = await periods.findOne({
@@ -120,9 +136,7 @@ export class BudgetPeriodService {
         // period being deleted underneath the lock. Refuse rather than carry on
         // with the unhydrated copy: `periodCategories` would be undefined and
         // the close would silently write a period with no category actuals.
-        throw new BadRequestException(
-          tr("errors.budgets.noOpenPeriod", "No open period to close"),
-        );
+        throw new NoOpenPeriodError();
       }
 
       const actuals = await this.computePeriodActuals(

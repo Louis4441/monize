@@ -9,6 +9,7 @@ import { ScheduledTransaction } from "../scheduled-transactions/entities/schedul
 import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+import { createJobClaimMock } from "../test-helpers/job-claim-testing";
 
 /**
  * RLS smoke for the budgets module's cron entry points (task R4).
@@ -98,6 +99,7 @@ describe("budgets module RLS context smoke (real withScopedDb)", () => {
       configService as never,
       i18n as never,
       { resolveEmail: jest.fn().mockResolvedValue(true) } as never,
+      createJobClaimMock() as never,
     );
     const errorSpy = jest
       .spyOn(service["logger"], "error")

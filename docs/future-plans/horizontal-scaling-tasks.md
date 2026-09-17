@@ -95,7 +95,7 @@
 | M1 | MCP 2025-era sessions: persisted rows or documented sticky routing | F1 | neutral | [ ] |
 | S1 | Boot refusals in `multi` for per-pod attachments and backups | F1 | multi-only | [ ] |
 | S2 | S3 backup target for automatic backups | -- | none until selected | [ ] |
-| C1 | `claimOnce` per owner and month around budget period rollover | -- | neutral | [ ] |
+| C1 | `claimOnce` per owner and month around budget period rollover | -- | neutral | [x] |
 | C2 | Deployment-wide `fetch_sync` lease around FX, security price and market index fetches | -- | neutral | [ ] |
 | C3 | Release-check cache to a one-row table | -- | neutral | [ ] |
 | C4 | Demo seed under the lifecycle advisory lock | -- | neutral (demo only) | [ ] |
@@ -1083,13 +1083,18 @@ filesystem target has.
 
 ### C1 -- Budget period rollover under a per-owner `claimOnce`
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `backend/src/budgets/budget-period-cron.service.ts` and spec,
 `backend/src/common/jobs/job-claim.service.ts` (a `BudgetPeriodRollover`
 member on the `JobClaimType` const), `docs/cron-jobs.md`,
-`backend/test/integration/budget-period-rollover.integration.spec.ts` (new
-or extended).
+`backend/test/integration/budget-period-rollover.integration.spec.ts` (new),
+`docs/concurrency-and-idempotency.md` (the register row, which the task's own
+steps call for), `backend/src/budgets/budget-period.service.ts` (added to
+scope: `NoOpenPeriodError` -- see the notes),
+`backend/src/budgets/budget-period-lifecycle.spec.ts` and
+`backend/src/budgets/rls-context-smoke.spec.ts` (they construct the cron
+service, so the new constructor argument is provided there too).
 
 **Pattern:** `backend/src/database/demo-reset.service.ts` (`claimOnce` per
 window; the intraday cron's `DemoIntraday` claim keyed `<date>-<hour>`).
@@ -1122,7 +1127,32 @@ that creates a missing period on demand exists before relying on it for
 repair; if it does not, use `claimLease` with a short TTL instead so a failed
 run can retry next tick.
 
-**Notes:**
+**Notes:** the repair path exists --
+`BudgetPeriodService.getOrCreateCurrentPeriod`, reached by opening the Budgets
+screen, which inserts the month's period with
+`ON CONFLICT (budget_id, period_start) DO NOTHING` -- so the permanent
+`claimOnce` is the right primitive and `claimLease` was not needed.
+
+The loop is now over owners rather than over budgets: `groupByOwner` collects
+each owner's active budgets, one claim is taken for the owner, and the whole
+group is skipped when it is lost. The per-budget body inside is unchanged.
+
+The "no OPEN period" skip is carried by a **named error**, not by a message
+match. `closePeriod` threw a bare `BadRequestException` whose message goes
+through `tr`, so matching it in the cron would be matching on translated copy;
+`NoOpenPeriodError` (still a `BadRequestException`, same status and same
+message on the HTTP path) makes it a type test. That is why
+`budget-period.service.ts` joined the scope. A first attempt discriminated by
+re-reading the period's status instead -- it worked, but it cost a query per
+error and its signature ("an OPEN period exists whose end is in the future")
+was a heuristic rather than the fact.
+
+`rolloverMonthKey` is UTC and exported, so two replicas in two zones derive one
+key from one instant. `job_claims.claim_type` is a plain `VARCHAR(64)` with no
+CHECK constraint, so the new member needed no migration.
+
+The gap row in `docs/concurrency-and-idempotency.md` is retired and the job
+moved into the resolved-claims paragraphs beside the demo reset.
 
 ### C2 -- Fetch crons behind a deployment-wide sync claim
 

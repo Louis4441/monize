@@ -64,6 +64,7 @@ export const JobClaimType = {
   DemoReset: "demo_reset",
   DemoIntraday: "demo_intraday",
   SystemAlertEmail: "system_alert_email",
+  BudgetPeriodRollover: "budget_period_rollover",
 } as const;
 
 export type JobClaimType = (typeof JobClaimType)[keyof typeof JobClaimType];
