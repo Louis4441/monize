@@ -253,6 +253,15 @@ shapes.
   four unobserved months is indistinguishable from measured data, and a
   tooltip admitting "unknown" under the cursor does not undo it. Whoever adds
   the `null` owns its rendering.
+- **A withheld figure names its cause where it is withheld.** The gap says
+  that something is unknown; it does not say what to repair. The surface that
+  withholds carries the causes the series already dates -- which instrument,
+  which currency pair, which account, over which dates -- close enough to the
+  withheld figure to be read with it, and resolved to names rather than ids.
+  `foldIncompleteData` and `IncompleteDataDetails`
+  (`frontend/src/lib/incomplete-data-ranges.ts`,
+  `frontend/src/components/reports/IncompleteDataDetails.tsx`) are that
+  rendering for the portfolio series.
 
 ## 4. Incomplete history: reject or disclose
 

@@ -436,6 +436,19 @@ into `DailyMovementService`'s `complete` as the `cashIncomplete` reason. Before
 local `Date` had shifted, so the first day of every range reported a portfolio
 with no cash in it at all.
 
+The by-security breakdown answers the same two questions per point:
+`InvestmentBreakdownPoint` carries `pricesComplete`, `unpricedSecurityIds` and
+its own `missingRatePairs` beside `cashComplete`, because the response-level
+`fxComplete` names pairs without saying which dates need them. And the flags
+reach the pixel: `PortfolioValueReport` plots `null` for an incomplete point
+rather than the subtotal, with `connectNulls={false}`, and
+`IncompleteDataDetails` folds the per-point causes into dated ranges naming the
+security, the pair and the account. The replay itself never filtered by what is
+held today -- a security bought, held and sold out is valued over its holding
+period from the ledger -- but `backfillHistoricalPrices` used to skip inactive
+securities, so the one operation that fills price history could not fill the
+history of exactly those positions (#1389).
+
 ### INV-TRANSFER-001 -- both legs, one decision
 
 ```text
