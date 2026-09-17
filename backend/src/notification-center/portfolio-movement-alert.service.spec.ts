@@ -214,7 +214,9 @@ describe("PortfolioMovementAlertService", () => {
       { value: 100_700, currency: "USD", on: TODAY },
     ]);
     // The subtotals have to arrive dated, or there is no day to price at.
-    expect(flowStatements[0]).toContain("t.transaction_date::TEXT AS date");
+    expect(flowStatements[0]).toContain(
+      "TO_CHAR(t.transaction_date, 'YYYY-MM-DD') AS date",
+    );
     expect(flowStatements[0]).toContain(
       "GROUP BY t.transaction_date, t.currency_code",
     );

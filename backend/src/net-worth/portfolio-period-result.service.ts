@@ -6,6 +6,7 @@ import { todayYMD } from "../common/date-utils";
 import { preferredCurrency } from "../common/default-currency.util";
 import { FxAggregate } from "../common/fx-aggregate";
 import { investmentLinkedSplitExclusion } from "../common/investment-filter.util";
+import { LEDGER_TOP_LEVEL_ONLY } from "../common/ledger-balance.sql";
 import {
   buildRateIndex,
   convertAtDate,
@@ -317,13 +318,15 @@ export class PortfolioPeriodResultService {
 
     const [settled, mixed] = await withScopedDb(this.dataSource, async (m) => {
       const settledRows: Array<{ count: string }> = await m.query(
+        // Effects reader: a VOID trade moved nothing, so it cannot have moved
+        // value across the boundary either (status != 'VOID').
         `SELECT COUNT(*) AS count
            FROM investment_transactions it
           WHERE it.user_id = $1
             AND it.account_id = ANY($4::UUID[])
             AND it.transaction_date > $2
             AND it.transaction_date <= $3
-            AND it.status IS DISTINCT FROM 'VOID'
+            AND it.status != 'VOID'
             AND (
               (
                 it.funding_account_id IS NOT NULL
@@ -347,6 +350,8 @@ export class PortfolioPeriodResultService {
                   'TRANSFER_IN', 'TRANSFER_OUT', 'ADD_SHARES', 'REMOVE_SHARES'
                 )
                 AND NOT EXISTS (
+                  -- The linked leg is looked up as a record (includes VOID):
+                  -- the effect is decided by the row above.
                   SELECT 1 FROM investment_transactions li
                    WHERE li.id = it.linked_transaction_id
                      AND li.account_id = ANY($4::UUID[])
@@ -360,7 +365,7 @@ export class PortfolioPeriodResultService {
            FROM transactions t
           WHERE t.user_id = $1
             AND t.account_id = ANY($5::UUID[])
-            AND t.parent_transaction_id IS NULL
+            AND ${LEDGER_TOP_LEVEL_ONLY}
             AND t.transaction_date > $2
             AND t.transaction_date <= $3
             AND t.status IS DISTINCT FROM 'VOID'
