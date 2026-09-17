@@ -201,7 +201,11 @@
   "portfolioValue": {
     "title": "[XX-Portfolio Value over Time-XX]",
     "empty": "[XX-No investment history to show yet.-XX]",
-    "refresh": "[XX-Refresh current value-XX]"
+    "refresh": "[XX-Refresh current value-XX]",
+    "investmentResult": "[XX-Investment result-XX]",
+    "notAvailable": "[XX-N/A-XX]",
+    "periodBreakdownTooltip": "[XX-Value change {valueChange}, of which deposits and withdrawals were {netFlows}. The investment result is what is left.-XX]",
+    "unmeasuredFlowTooltip": "[XX-A trade settled outside these accounts, or a split mixing an investment line with ordinary spending, means the result cannot be separated from the money moved in.-XX]"
   },
   "spendingByPayee": {
     "title": "[XX-Spending by Payee-XX]",
