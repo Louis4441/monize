@@ -25,6 +25,14 @@
     increment), a two-connection spec under `backend/test/integration/` and
     `npm run test:integration` green. A unit test with a mocked manager does
     not discharge this (`docs/verification-contract.md`, VER-001).
+  - **A new table is classified in the backup** in the same PR:
+    `INTENTIONALLY_EXCLUDED_TABLES` in
+    `backend/src/backup/export-table-queries.ts`, or an export query. The
+    coverage guard in
+    `backend/test/integration/backup-restore.integration.spec.ts` fails a table
+    in neither, and it needs a live PostgreSQL, so `npm run test:unit` will not
+    tell you. Every table these tasks add is coordination state for one
+    deployment and belongs in the excluded set with its reason.
   - Migrations: file named `date -u +%Y%m%d%H%M%S`_description.sql per
     `docs/database-migrations.md`, every statement idempotent (`IF NOT
     EXISTS`, `DROP ... IF EXISTS` before `CREATE POLICY`/`TRIGGER`), mirrored
