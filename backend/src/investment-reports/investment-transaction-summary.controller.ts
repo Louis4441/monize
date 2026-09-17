@@ -15,6 +15,16 @@ import {
  * Its own controller rather than a route on `InvestmentReportsController`:
  * that one is CRUD over saved reports and owns `GET /reports/investment/:id`,
  * which any sibling literal path would have to be declared ahead of.
+ *
+ * A delegate reaches this GET under the `reports` section, as every read-only
+ * report route does, while the rows it summarizes come from
+ * `GET /investment-transactions` under the `investments` section. The two
+ * grants are deliberately separate -- each route takes its own subject area's
+ * section -- so a delegate holding `reports` but not `investments` sees the
+ * KPI cards over a table the API gives them no rows for. That is the section
+ * grants speaking, not a figure about somebody else's portfolio: both routes
+ * read the owner's rows under the owner's identity, and the summary answers
+ * over exactly the row set the list route would return.
  */
 @ApiTags("Investment Reports")
 @Controller("reports/investment-transactions")
