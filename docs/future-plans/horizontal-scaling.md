@@ -39,6 +39,7 @@ Much of the work is already done. The claims below are what a reviewer should
 | Two containers starting together against one database | `backend/src/common/db/advisory-locks.ts` | `db-init` and `db-migrate` take `pg_advisory_lock(DB_LIFECYCLE_LOCK_KEY)` and re-read state after acquiring |
 | First-user-becomes-admin race | `backend/src/auth/auth.service.ts` | `withScopedDb(..., "SERIALIZABLE")` |
 | Refresh-token rotation, PATs, OAuth artifacts, TOTP secrets | `backend/src/auth/token.service.ts`, `backend/src/oauth/postgres.adapter.ts` | rows, not memory; rotation under a row lock |
+| Password lockout counter | `backend/src/auth/auth.service.ts` `recordFailedAttempt` | one `UPDATE users SET failed_login_attempts = failed_login_attempts + 1 ... RETURNING`; the gap-register row in `docs/concurrency-and-idempotency.md` that still calls it a JavaScript read-modify-write is stale |
 | OIDC step-up single-use artifacts | `backend/src/auth/oidc/oidc-reauth.service.ts` | `INSERT ... ON CONFLICT (jti) DO NOTHING` -- the comment there already names the multi-replica reason |
 | Web Push VAPID key pair | `backend/src/push/push-config.service.ts` | one row, `INSERT ... ON CONFLICT (id) DO NOTHING` as the arbiter, re-read in the same transaction |
 | Restore upload ticket | `backend/src/backup/restore-upload-ticket.ts` | HMAC over `{userId, expiry}` keyed from `JWT_SECRET`, chosen so the upload can land on a different pod from the JSON request |
@@ -54,7 +55,6 @@ What remains, in severity order:
 | Security | `backend/src/auth/two-factor.service.ts` -- `twoFactorAttempts`, `user2FAAttempts`, `usedTotpCodes` are `Map`s | 2FA attempt budgets become 3N and 10N. The TOTP replay window is per process, so a captured code can be spent once on each replica |
 | Security | `backend/src/auth/step-up/step-up.service.ts` `attempts`; `backend/src/auth/auth-email.service.ts` `forgotPasswordAttempts`, `verificationEmailAttempts` | step-up lockout and the 3-per-hour email throttles multiply by N |
 | Security | `ThrottlerModule.forRoot` in `backend/src/app.module.ts` passes no `storage`, so `@nestjs/throttler` keeps counters in process | every `@Throttle` override (login 5 per 15 minutes, password reset 3 per 15 minutes, and the rest) becomes limit x N |
-| Security | `users.failed_login_attempts` is a JavaScript read-modify-write | already on the gap register in `docs/concurrency-and-idempotency.md` (CONC-001, CONC-007); replicas make the lost increment routine |
 | Correctness | `backend/src/ai/actions/ai-actions.service.ts` `consumed` | "a confirmed action descriptor cannot be submitted twice" is enforced per process; the same descriptor confirms once per replica |
 | Correctness | `backend/src/oauth/oauth-provider.service.ts` constructs `oidc-provider` with **no `jwks`** | the library generates a development signing key per process. `/oauth/jwks` differs per replica and per restart; an ID token signed by one replica does not verify against the JWKS document served by another. Today this is masked because access tokens are opaque and `userinfo` is disabled, so only the ID token is affected -- and it already breaks across a restart |
 | Blocker | `backend/src/ai/relay/ai-relay.service.ts` (`pending`, `inFlight`, `waiters`, `buffered`, `awaitingLate`, `bufferedActions`) and `backend/src/ai/relay/relay-attachment.store.ts` | the browser SSE stream, the agent's long-poll and the agent's answer POST each hold a live promise in a `Map`; the three requests must reach the same process. Both files say so in their header comments |
@@ -73,9 +73,10 @@ open on two. `JWT_SECRET` should be fatal at boot in every mode.
 
 Doc drift to correct in the same body of work, so this plan does not inherit
 it: section 8 of `docs/concurrency-and-idempotency.md` still lists scheduled
-auto-posting and the demo reset as unclaimed, and `docs/external-side-effects.md`
-still says bill and mortgage reminders have no dedupe state and that the
-automatic backup writes with a bare `fs.writeFile`. All four are fixed in code.
+auto-posting, the demo reset and `users.failed_login_attempts` as unprotected,
+and `docs/external-side-effects.md` still says bill and mortgage reminders have
+no dedupe state and that the automatic backup writes with a bare
+`fs.writeFile`. All five are fixed in code.
 
 ## Principles
 
@@ -167,8 +168,9 @@ resets every lockout).
   only write is `INSERT ... ON CONFLICT (scope, key) DO UPDATE SET count = CASE WHEN window_expires_at < now() THEN 1 ELSE count + 1 END, window_expires_at = ... RETURNING count`.
   Scopes: 2FA per temp token, 2FA per user, step-up per `userId:purpose`,
   forgot-password per email, verification email per email.
-- `users.failed_login_attempts` moves to `UPDATE users SET failed_login_attempts = failed_login_attempts + 1 WHERE id = $1 RETURNING failed_login_attempts`
-  (closes the CONC-001 register entry).
+- `users.failed_login_attempts` needs no change: `recordFailedAttempt` is
+  already one atomic `UPDATE ... RETURNING`. The counter service copies its
+  shape (increment and threshold decision in one statement).
 - New table `single_use_tokens (purpose TEXT, token_hash TEXT, expires_at TIMESTAMPTZ, PRIMARY KEY (purpose, token_hash))`
   with `claim(purpose, token)` doing `INSERT ... ON CONFLICT DO NOTHING RETURNING` --
   the `claimJti` shape from `backend/src/auth/oidc/oidc-reauth.service.ts`,
@@ -299,11 +301,15 @@ selected.
 
 ### WP8 -- Cron duplication and bootstrap fan-out
 
-- `claimLease` (new `JobClaimType` members) around: the budget period
-  rollover; the exchange-rate startup sweep and 17:05 fetch; the security
-  price and market index fetches. Data is already idempotent; the claim
-  removes N provider calls and the counted 23505 errors. Each cron's row in
-  `docs/cron-jobs.md` gains the mechanism, and
+- The budget period rollover claims per owner and month with `claimOnce`
+  (the `DemoIntraday` shape), since it already works owner by owner.
+- The exchange-rate startup sweep and 17:05 fetch, the security price fetch
+  and the market index fetch belong to no user, and `job_claims.user_id` is
+  a foreign key to `users`, so they take a deployment-wide lease on a new
+  `fetch_sync` row (`INSERT ... ON CONFLICT (job) DO UPDATE ... WHERE lease_until < now() RETURNING lease_token`,
+  the `market_index_sync` and `provider_health` shape). Data is already
+  idempotent; the claim removes N provider calls and the counted 23505
+  errors. Each cron's row in `docs/cron-jobs.md` gains the mechanism, and
   `backend/src/common/cron-doc.spec.ts` checks the expression verbatim.
 - `updates.service.ts` keeps its release check in a one-row table so every
   replica answers the same and GitHub is asked once per 12 hours per
@@ -364,7 +370,7 @@ lacks an ID). Proposed wording:
 | ID | Statement | Mechanism | Test kind |
 |---|---|---|---|
 | INV-HA-001 | A process in `CLUSTER_MODE=multi` serves traffic only while every replica-shared dependency it needs is reachable | boot refusal in `main.ts`; Redis `PING` in readiness | unit (boot matrix), E2E (readiness flips) |
-| INV-HA-002 | An authentication attempt budget is one number per deployment, not per process | `auth_attempt_counters` atomic upsert; `users.failed_login_attempts` atomic increment | two connections |
+| INV-HA-002 | An authentication attempt budget is one number per deployment, not per process | `auth_attempt_counters` atomic upsert, the same shape as the existing `users.failed_login_attempts` increment | two connections |
 | INV-HA-003 | A single-use artifact (TOTP code, AI action descriptor, re-auth jti) is consumed at most once across all replicas | `single_use_tokens` primary key, `ON CONFLICT DO NOTHING RETURNING` | two connections |
 | INV-HA-004 | One deployment publishes one OIDC signing key set, stable across restarts | `oauth_instance_config` insert-as-arbiter | two instances |
 | INV-HA-005 | A relay prompt is claimed by exactly one agent poll and answered at most once | `ai_relay_prompts` conditional `UPDATE ... RETURNING` under `FOR UPDATE SKIP LOCKED` | two connections, two instances |
