@@ -70,7 +70,7 @@
 | A4 | Step-up and auth-email counters onto the service; interval prune removed | A2 | neutral | [ ] |
 | K1 | `oauth_instance_config` + `OauthSigningKeysService`; provider gets `jwks` | -- | neutral | [ ] |
 | X1 | AI action anti-replay onto `single_use_tokens`, MCP path included | A1 | neutral | [ ] |
-| R1 | `EVENT_BUS` token, interface, `MemoryEventBus` wired as default | -- | none | [ ] |
+| R1 | `EVENT_BUS` token, interface, `MemoryEventBus` wired as default | -- | none | [x] |
 | R2 | Migration: `ai_relay_prompts`, `ai_relay_agents` with RLS policies | -- | none | [ ] |
 | R3 | Relay queue on rows: insert, claim, answer; in-memory queue maps removed | R1, R2 | neutral | [ ] |
 | R4 | Late answers, buffered actions and agent liveness on rows; remaining maps removed | R3 | neutral | [ ] |
@@ -536,7 +536,7 @@ imports. Do not create a second single-use table.
 
 ### R1 -- Event bus token, interface, memory implementation
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `backend/src/common/events/event-bus.interface.ts` (new),
 `backend/src/common/events/memory-event-bus.ts` (new) + spec,
@@ -567,7 +567,17 @@ throwing handler does not stop the others.
 **Traps:** the `Map` in `MemoryEventBus` is process-local by design; when G1
 lands, allowlist it with that reason.
 
-**Notes:**
+**Notes:** `publish` snapshots the subscriber set before the `await`. A handler
+that unsubscribes its neighbour is the ordinary SSE case (one request ending
+closes the waiter it shares a user channel with), and iterating the live `Set`
+would then skip a handler that was subscribed when the message was published.
+The unsubscribe closure is idempotent for the same reason: a waiter that
+unsubscribes on both the disconnect and the timeout path must not remove a
+handler a later subscribe re-added. Both have a spec.
+
+`activeChannels()` is on `MemoryEventBus` only, not on `EventBus`: an empty
+`Set` left behind after the last unsubscribe is a slow leak in a process
+serving many per-user channels, and this is how a spec sees it.
 
 ### R2 -- Migration: `ai_relay_prompts`, `ai_relay_agents`
 
