@@ -3,7 +3,10 @@ import { DataSource } from "typeorm";
 
 import { NetWorthModule } from "@/net-worth/net-worth.module";
 import { NetWorthService } from "@/net-worth/net-worth.service";
-import { AccountSubType, AccountType } from "@/accounts/entities/account.entity";
+import {
+  AccountSubType,
+  AccountType,
+} from "@/accounts/entities/account.entity";
 import { Security } from "@/securities/entities/security.entity";
 import { SecurityPrice } from "@/securities/entities/security-price.entity";
 import {

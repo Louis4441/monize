@@ -1280,6 +1280,51 @@ describe("SecurityPriceService", () => {
       );
     });
 
+    // Issue #1389: `deactivate` refuses while a holding is non-zero, so an
+    // inactive security is one that was held and sold out -- and the days it
+    // was held still have to be valued. The backfill is the only operation that
+    // fills price HISTORY, so skipping it there left that holding period
+    // permanently unpriced on "Portfolio value over time".
+    it("backfills an inactive security that was once held (#1389)", async () => {
+      const soldOut = { ...mockSecurity, id: "sec-sold", isActive: false };
+      securitiesRepository.find.mockResolvedValue([soldOut]);
+      dataSourceMock.query.mockResolvedValueOnce([
+        { security_id: "sec-sold", earliest: "2025-05-01" },
+      ]);
+
+      const historicalData = makeYahooHistoricalResponse({
+        timestamps: [1748700000, 1748800000],
+        closes: [193.0, 194.0],
+      });
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(historicalData),
+        ) as jest.Mock;
+      dataSourceMock.query.mockResolvedValue(undefined);
+
+      const result = await service.backfillHistoricalPrices();
+
+      expect(result.totalSecurities).toBe(1);
+      expect(result.successful).toBe(1);
+      expect(global.fetch).toHaveBeenCalled();
+    });
+
+    // The other side of the same predicate: an inactive security nobody ever
+    // transacted has no holding period to value, so it stays out.
+    it("leaves an inactive, never-held security out of the backfill (#1389)", async () => {
+      securitiesRepository.find.mockResolvedValue([
+        { ...mockSecurity, id: "sec-watch", isActive: false },
+      ]);
+      dataSourceMock.query.mockResolvedValueOnce([]);
+      global.fetch = jest.fn() as jest.Mock;
+
+      const result = await service.backfillHistoricalPrices();
+
+      expect(result.totalSecurities).toBe(0);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
     it("successfully backfills historical prices", async () => {
       securitiesRepository.find.mockResolvedValue([mockSecurity]);
       dataSourceMock.query.mockResolvedValueOnce([

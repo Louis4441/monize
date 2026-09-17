@@ -1233,17 +1233,6 @@ export class SecurityPriceService {
     const startTime = Date.now();
     this.logger.log("Starting historical price backfill");
 
-    const allActive = await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(Security).find({
-        where: { isActive: true },
-      }),
-    );
-    const securities = allActive.filter((s) => isRefreshEligible(s));
-
-    const userContexts = await this.loadUserContexts(
-      securities.map((s) => s.userId),
-    );
-
     const earliestTxRows: Array<{ security_id: string; earliest: string }> =
       await withScopedDb(this.dataSource, (m) =>
         m.query(
@@ -1256,6 +1245,28 @@ export class SecurityPriceService {
       );
     const earliestTxDate = new Map(
       earliestTxRows.map((r) => [r.security_id, r.earliest]),
+    );
+
+    // Active securities, plus every security the user has ever held.
+    //
+    // `SecuritiesService.deactivate` refuses while any holding is non-zero, so
+    // an INACTIVE security is by definition one that was bought, held, and sold
+    // out completely -- and the days it was held are days the portfolio series
+    // still has to value. Filtering this backfill by `isActive` meant the one
+    // operation whose whole purpose is price HISTORY could never fill the
+    // history of the position a reader is looking at, so its holding period
+    // read as an unpriced gap forever (#1389). The daily quote refresh is a
+    // different question and is deliberately left alone: today's quote for
+    // something nobody holds buys nothing.
+    const allSecurities = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Security).find(),
+    );
+    const securities = allSecurities.filter(
+      (s) => (s.isActive || earliestTxDate.has(s.id)) && isRefreshEligible(s),
+    );
+
+    const userContexts = await this.loadUserContexts(
+      securities.map((s) => s.userId),
     );
 
     const oneYearAgo = new Date();
