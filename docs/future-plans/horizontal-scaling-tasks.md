@@ -62,7 +62,7 @@
 | F1 | `CLUSTER_MODE` parsing, boot-matrix check, `main.ts` wiring, `JWT_SECRET` fatal, `.env.example` | -- | none (`JWT_SECRET` refusal is the one deliberate exception) | [x] |
 | F2 | `ClusterModule`: mode provider, Redis client and subscriber in `multi`, `PING` at boot, readiness probe | F1 | multi-only | [ ] |
 | F3 | Doc corrections in `concurrency-and-idempotency.md`, `external-side-effects.md`, `cron-jobs.md` | -- | none | [x] |
-| F5 | Concurrency register: retire the stale `users.failed_login_attempts` gap row | -- | none | [ ] |
+| F5 | Concurrency register: retire the stale `users.failed_login_attempts` gap row | -- | none | [x] |
 | F4 | ADR 0005 and index row | F1 | none | [ ] |
 | A1 | Migration: `auth_attempt_counters`, `single_use_tokens`; RLS exemption; sweep cron | -- | none | [ ] |
 | A2 | `AuthAttemptCounterService`; 2FA attempt maps replaced | A1 | neutral | [ ] |
@@ -206,7 +206,7 @@ still stale on `main`; it is F5.
 
 ### F5 -- Retire the stale `users.failed_login_attempts` gap row
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `docs/concurrency-and-idempotency.md` (section 8 only).
 
