@@ -99,9 +99,7 @@ On `1d`, `1w` and `mtd` the Change and Change % measure from the close of the la
 
 This was briefly a user preference (migration 152, dropped by 153); it was removed because the prior close is the right answer rather than a taste. `usesPriorCloseBaseline` takes the range and nothing else -- if you find yourself adding a second argument, first ask whether the alternative is actually defensible.
 
-Both halves come from **one hook**, `hooks/usePortfolioChangeBaseline.ts` (`usesPriorClose` and the `priorClose` together); the arithmetic and range set live once in `components/investments/portfolio-change-baseline.ts`. Deciding *whether* a prior close applies in one place and reading the close in another is the specific bug the single hook prevents. The baseline is looked up for the **first point on screen**, never the requested window start (on a weekend the 1D chart shows the last session). A baseline that has not loaded makes the change **unknown** -- both cards read N/A, never the first-point change.
-
-The change itself is `portfolioSeriesChange(values, { usesPriorClose, priorCloseValue })`, read by the Investments chart and the Portfolio Value widget alike, so no surface can report a different move for the same window. A **baseline of zero has no percentage**: the money change is still known, the percentage is `null`, and 0% -- which would say the portfolio held its ground -- is never shown.
+The date is all the client decides. `usesPriorCloseBaseline` and `previousCalendarDay` (`components/investments/portfolio-change-baseline.ts`) answer which day the period is measured from, and that day goes out as `baselineDate` on the period-result request; the arithmetic over it is the server's, and the client-side helpers that used to do it here are deleted rather than left exported for the next surface to reach for. The baseline is the close before the **first point on screen**, never the requested window start (on a weekend the 1D chart shows the last session), so the request waits for that point rather than guessing a date.
 
 ## The window a price chart requests is not the period its range names
 
@@ -277,11 +275,18 @@ unconvertible amount is a rate to refresh, and a boundary (`zeroStart`,
 `noValueSeries`) is nothing anybody can fix. It is the sibling of
 `movementUnknownReason`, for the same reason.
 
-**Still to migrate**: `PortfolioValueWidget` and `InvestmentValueChart` print a
-change and a percentage derived from the series through
-`portfolioSeriesChange`. Both are value changes with no flow beside them, so a
-deposit still moves the percentage they show; the endpoint above is what they
-should read.
+**Three surfaces read it**, through one request each and no arithmetic of their
+own: `PortfolioValueReport` (five cards plus the PDF and CSV exports),
+`PortfolioValueWidget` (one figure and a caption -- the investment result and
+its percent, with the value change and the net flows in the card's tooltip) and
+`InvestmentValueChart` (the result and its percent as two of its four cards,
+with the value change and the net flows on the secondary lines beneath). The
+widget and the chart go through `hooks/usePortfolioPeriodResult.ts`, which keeps
+the payload with the key of the request that produced it, asks nothing while the
+series is empty or a prior-close range has no first point yet, and leaves every
+figure unknown when the request fails. A **caption is part of the figure**: the
+widget's one line says "Investment result", never "Change", because the number
+under a change's caption is the one that counts a deposit.
 
 ## An unknown value must not render as a measured zero
 

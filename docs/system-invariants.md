@@ -97,7 +97,7 @@ implied.
 | INV-RECONCILE-001 | While the strict lock is on, a reconciled transaction is not altered | enforced |
 | INV-FX-001 | An unavailable rate never becomes 1:1, a rate from after the date, or an unboundedly old one | partial |
 | INV-PRICE-001 | A stored price is in the currency the security is recorded in | partial |
-| INV-PORTRESULT-001 | A period change is not a return: value change, external flows and investment result are three figures | partial |
+| INV-PORTRESULT-001 | A period change is not a return: value change, external flows and investment result are three figures | enforced |
 | INV-REPORT-001 | A report's account scope is investment linkage, not account type | enforced |
 | INV-REPORT-002 | A chart's down-sampling never reaches a count, a total or an export | enforced |
 | INV-LOAN-001 | A recurring overpayment's cadence is a calendar, not a payment interval | enforced |
@@ -828,19 +828,23 @@ Enforcement         decidePeriodResult
                     cash accounts isValuationCashAccount names on both sides of
                     a transfer, and counting the two unmeasurable cases into the
                     reasons externallySettledTrade and mixedSplit.
-                    PortfolioValueReport prints it and derives nothing.
-                    docs/specs/portfolio-period-result.md has the truth table,
-                    the numerical examples and the test matrix.
-Status              partial
+                    PortfolioValueReport, PortfolioValueWidget and
+                    InvestmentValueChart print it and derive nothing; the
+                    client-side arithmetic they used to share is deleted
+                    rather than left exported.
+                    docs/specs/portfolio-period-result.md has the
+                    truth table, the numerical examples and the test matrix.
+Status              enforced
 ```
 
-The Portfolio Value Over Time report is the surface this was written for, and
-it upholds it. Two others do not yet: `PortfolioValueWidget` and
-`InvestmentValueChart` still derive a change and a percentage from the plotted
-series through `portfolioSeriesChange`, so a deposit inside their window still
-moves the figure they show. They are value changes with no flow beside them,
-which is why the status here is `partial` rather than `enforced` -- the
-endpoint exists and the migration is the remaining work, not a new decision.
+Every surface that reports what a portfolio did over a period now reads
+`GET /net-worth/investments-period-result`: the Portfolio Value Over Time
+report, the dashboard's Portfolio Value widget and the Investments page's
+chart. Each prints the investment result as its headline with a percentage
+only over that, and names the value change and the net external flows beside
+it. The dashboard's Net Worth chart is not one of these surfaces -- it reports
+what a person is worth rather than what a portfolio earned, and its own
+measure has not been specified.
 
 ### INV-REPORT-001 -- a report's account scope is investment linkage, not account type
 
