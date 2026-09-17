@@ -2,6 +2,17 @@
 
 Cron jobs use the `@Cron()` decorator from `@nestjs/schedule`. They run in the API process (`ScheduleModule.forRoot()` in `backend/src/app.module.ts`); there is no separate scheduler process, and on k8s with more than one backend replica every replica fires every cron.
 
+`CLUSTER_MODE` does not gate any of this. It selects Redis-backed throttling and
+the cross-replica wake-up channel (`docs/future-plans/horizontal-scaling.md`),
+never the scheduler: every replica fires every cron in `single` and in `multi`
+alike, so what stops a second replica repeating an effect is always the job's
+own claim. `CLUSTER_MODE=single` states how the deployment is meant to run, not
+how many processes exist -- a rollout whose strategy starts the new container
+before the old one exits has two, briefly -- so "there is only one replica" is
+never an answer to section 7 of `docs/concurrency-and-idempotency.md` ("what
+prevents two healthy replicas from producing the same effect twice?"), in either
+mode.
+
 One row per `@Cron` handler. The Cron column is the decorator's expression verbatim (a
 `CronExpression` member resolved to its value -- some carry a leading seconds field), with the
 `timeZone` option in parentheses; times without one are server-local.

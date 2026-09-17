@@ -352,6 +352,19 @@ month boundary from minting quota rather than returning it. There is no `@Versio
 anywhere in the codebase -- conditional `WHERE` is the whole of its optimistic
 concurrency control.
 
+Two jobs this register once listed as gaps are claimed, and are listed here
+instead. Scheduled auto-posting (`scheduled-transactions.service.ts` `post`,
+reached by the hourly cron and by a manual post alike) claims the occurrence
+with `INSERT INTO scheduled_transaction_postings ... ON CONFLICT (scheduled_transaction_id, original_due_date) DO NOTHING RETURNING id`
+inside the transaction that writes the money, so the unique key from migration
+140 is the serialization point and the losing replica's `ConflictException` is
+counted as a skip, not an error (INV-OCCURRENCE-001). The demo reset
+(`backend/src/database/demo-reset.service.ts`) takes `claimLease(JobClaimType.DemoReset, ...)`
+around the whole wipe-and-reseed and releases it **by lease token**, so a run
+that outran its lease cannot free the one a replica now reseeding holds; the
+lease expiry is what keeps a killed replica from leaving the demo
+un-resettable.
+
 ### Gaps
 
 Each row is a place where the rules above are not currently met. A row leaves
@@ -363,9 +376,7 @@ this table when a mechanism lands, not when someone judges the window small.
 | `holdings.quantity` / `average_cost` | Every mutation path is a JavaScript read-modify-write inside a transaction with no lock and no atomic delta. `UNIQUE(account_id, security_id)` prevents duplicate rows and does nothing about a lost update to the same row. | CONC-001 |
 | `users.failed_login_attempts` | Read in one statement, incremented in JavaScript, written as an absolute value in a later statement with no lock. Two concurrent failures lose an increment, so the counter under-counts and the lockout threshold is reached late. The comment directly above it reads "Atomically increment failed attempts". | CONC-001, CONC-007 |
 | Emergency-access claim consumption | Check-then-act: the in-transaction re-read passes no `lock` option, and the consuming write is an entity `save` by primary key with no `WHERE claim_token_used_at IS NULL`. The code immediately beside it uses the CAS predicate correctly for voiding *sibling* tokens. The comment claims re-validation "under lock". There is no partial unique index on unused tokens to act as a backstop. | CONC-001, CONC-002, CONC-007 |
-| Scheduled auto-posting (`processAutoPostTransactions`, hourly at minute 5 -- `"5 * * * *"`) | Reads due schedules by `nextDueDate <= today`, then posts and advances `nextDueDate` with no row lock, no CAS on the previous `nextDueDate`, and no unique constraint on `(scheduled_transaction_id, transaction_date)`. Two replicas on the same tick can both post the same occurrence. | CONC-004 |
-| `budget-period-cron` monthly rollover | No claim. `UNIQUE(budget_id, period_start)` is the only backstop, and the loser's unique violation is caught by a per-budget `try/catch` that increments an error count -- so the losing replica's period close silently fails rather than converging. | CONC-004, CONC-006 |
-| `demo-reset.service` | Full delete-and-reseed with no lock; two concurrent runs can interleave one's delete with the other's insert. | CONC-004 |
+| `budget-period-cron` monthly rollover | No claim around the tick: every replica walks every active budget. The writes beneath it are guarded -- `closePeriod` takes a pessimistic lock on the OPEN period row, and the next period is created with `ON CONFLICT (budget_id, period_start) DO NOTHING RETURNING` whose loser re-reads the winner's row -- so the data converges. What does not converge is the report: the loser of the close lock finds no OPEN period, `closePeriod` raises `BadRequestException`, and the cron's per-budget `try/catch` counts the normal outcome of a two-replica tick as a failure and logs a stack for it. | CONC-004, CONC-006 |
 | Logout vs rotation | Logout's family revoke is an unlocked bulk `UPDATE`. It happens to be safe because `isRevoked = true` is idempotent and the end state is order-independent -- but this is a property of the value, not a protocol, and it stops holding the moment logout writes anything else. | CONC-003 (tolerated; document, do not copy) |
 | MNY import retry after a committed write | `writeAll`'s transaction commits before post-processing, verification, staged-file deletion and the terminal status update. A failure in that window leaves committed rows behind a retryable job, and a retry re-parses with fresh UUIDs. No checkpoint, run id, or per-record key. See INV-IMPORT-002. | CONC-006, CONC-007 |
 
