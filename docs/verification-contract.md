@@ -84,6 +84,7 @@ INV-LOAN-002's entry names the missing source scan while its row said `--`.
 | INV-RECONCILE-001 reconciled lock | supporting | **required** | required | required | -- | -- | -- | optional |
 | INV-FX-001 no 1:1 fallback | **required** | **required** | required | -- | -- | required | optional | required |
 | INV-PRICE-001 price in the security's currency | **required** | supporting | required (not yet met) | -- | -- | -- | **required** | optional |
+| INV-PORTRESULT-001 period change is not a return | **required** | -- | optional | -- | -- | -- | -- | optional |
 | INV-REPORT-001 report account scope | supporting | **required** | **required** | -- | -- | -- | -- | optional |
 | INV-REPORT-002 chart reduction | **required** | **required** | -- | -- | -- | -- | -- | -- |
 | INV-LOAN-001 overpayment cadence | **required** | -- | -- | -- | -- | -- | -- | optional |
