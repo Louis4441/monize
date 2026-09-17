@@ -663,6 +663,29 @@ export class TransactionSplitService {
    * Runs inside the caller's transaction so the parent's own status change and
    * every counterpart's move commit together.
    */
+  /**
+   * Take the holdings advisory lock for every brokerage account an embedded
+   * investment row of these split parents sits in.
+   *
+   * A split-status path calls this as the first lock of its transaction: the
+   * parent's balance write row-locks `accounts`, and the embedded rows'
+   * rebuild takes the advisory lock afterwards, which is the opposite order
+   * from an investment write (`common/db/locks.ts`, 40P01). Only the parents
+   * whose status actually crosses the VOID boundary need it, because only
+   * those reach `applyParentStatusToEmbeddedRows`.
+   */
+  lockEmbeddedInvestmentScopes(
+    m: EntityManager,
+    userId: string,
+    parentTransactionIds: readonly string[],
+  ): Promise<void> {
+    return this.investmentTransactionsService.lockEmbeddedHoldingScopes(
+      m,
+      userId,
+      parentTransactionIds,
+    );
+  }
+
   async applyParentStatusToTransferCounterparts(
     m: EntityManager,
     transactionId: string,

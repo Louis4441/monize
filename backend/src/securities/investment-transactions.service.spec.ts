@@ -38,6 +38,7 @@ describe("InvestmentTransactionsService", () => {
   let service: InvestmentTransactionsService;
   let investmentTransactionsRepository: Record<string, jest.Mock>;
   let transactionRepository: Record<string, jest.Mock>;
+  let transactionSplitRepository: Record<string, jest.Mock>;
   let accountsService: Record<string, jest.Mock>;
   let portfolioCalculationService: Record<string, jest.Mock>;
   let transactionsService: Record<string, jest.Mock>;
@@ -346,9 +347,14 @@ describe("InvestmentTransactionsService", () => {
       calculateCapitalGainsByMonth: jest.fn().mockResolvedValue([]),
     };
 
+    // The embedded-row status pass reads the parent's splits; default "this
+    // parent has none", which is what a non-investment split parent looks like.
+    transactionSplitRepository = { find: jest.fn().mockResolvedValue([]) };
+
     const mocks = createScopedDbMocks([
       [InvestmentTransaction, investmentTransactionsRepository],
       [Transaction, transactionRepository],
+      [TransactionSplit, transactionSplitRepository],
     ]);
     dataSource = mocks.dataSource;
     // Reuse the direct-manager behaviours the spec already defines.
@@ -2949,6 +2955,18 @@ describe("InvestmentTransactionsService", () => {
       mockQueryRunner.manager.query.mockImplementation(
         async (sql: string, params?: unknown[]) => {
           const text = String(sql);
+          // The unlocked scope read that feeds the advisory lock: the row's
+          // own account and its linked transfer leg's.
+          if (text.includes("SELECT DISTINCT account_id")) {
+            const self = invRows.find((row) => row.id === params?.[0]);
+            const legId = self?.linked_transaction_id ?? null;
+            const rows = invRows.filter(
+              (row) => row.id === params?.[0] || row.id === legId,
+            );
+            return [...new Set(rows.map((row) => row.account_id))].map(
+              (account_id) => ({ account_id }),
+            );
+          }
           if (!text.includes("FOR UPDATE")) return [];
           const rows = text.includes("FROM investment_transactions")
             ? invRows
@@ -2967,6 +2985,58 @@ describe("InvestmentTransactionsService", () => {
       const findOneQB = createMockQueryBuilder(mockBuyTransaction);
       investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
         findOneQB,
+      );
+    });
+
+    /**
+     * Advisory locks are taken before row locks (`common/db/locks.ts`).
+     * `updateStatus` reached the holdings advisory lock only inside the
+     * rebuild at the end, by which time `applyVoidTransitionToMirrorLeg` had
+     * already row-locked `accounts` for the cash leg -- the opposite order
+     * from create/update/remove, so two concurrent writers of one account
+     * deadlock (40P01).
+     */
+    it("takes the holdings advisory lock before its first row lock", async () => {
+      stageLocks([invLockRow()], [cashLockRow()]);
+
+      await service.updateStatus(userId, transactionId, TransactionStatus.VOID);
+
+      const calls = mockQueryRunner.manager.query.mock.calls as unknown[][];
+      const advisory = calls.findIndex(([sql]) =>
+        String(sql).includes("pg_advisory_xact_lock"),
+      );
+      const firstRowLock = calls.findIndex(([sql]) =>
+        String(sql).includes("FOR UPDATE"),
+      );
+      expect(advisory).toBeGreaterThanOrEqual(0);
+      expect(firstRowLock).toBeGreaterThanOrEqual(0);
+      expect(advisory).toBeLessThan(firstRowLock);
+    });
+
+    /** The scope covers the transfer leg that crosses the boundary with it. */
+    it("locks both legs' accounts when a linked transfer leg crosses too", async () => {
+      stageLocks(
+        [
+          invLockRow({ linked_transaction_id: "inv-tx-2" }),
+          invLockRow({
+            id: "inv-tx-2",
+            account_id: "other-brokerage",
+            linked_transaction_id: transactionId,
+            transaction_id: null,
+          }),
+        ],
+        [cashLockRow()],
+      );
+
+      await service.updateStatus(userId, transactionId, TransactionStatus.VOID);
+
+      const advisoryIds = (
+        mockQueryRunner.manager.query.mock.calls as unknown[][]
+      )
+        .filter(([sql]) => String(sql).includes("pg_advisory_xact_lock"))
+        .map(([, params]) => (params as unknown[])[1]);
+      expect(advisoryIds).toEqual(
+        [accountId, "other-brokerage"].sort((a, b) => (a < b ? -1 : 1)),
       );
     });
 
@@ -3199,6 +3269,36 @@ describe("InvestmentTransactionsService", () => {
         expect.anything(),
       );
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("applyParentStatusToEmbeddedRows", () => {
+    /**
+     * The split parent's status change row-locks `accounts` for the parent's
+     * own balance; this pass rebuilds the embedded rows' positions under the
+     * holdings advisory lock. Taking that lock only inside the rebuild put the
+     * two in the opposite order from an investment write (40P01), so the lock
+     * is this method's own first statement as well as its callers'.
+     */
+    it("takes the holdings advisory lock before it touches a row", async () => {
+      mockQueryRunner.manager.query.mockImplementation(async (sql: string) =>
+        String(sql).includes("SELECT DISTINCT it.account_id")
+          ? [{ account_id: accountId }]
+          : [],
+      );
+
+      await service.applyParentStatusToEmbeddedRows(
+        mockQueryRunner.manager as never,
+        userId,
+        "parent-tx-1",
+        TransactionStatus.VOID,
+      );
+
+      const advisory = (
+        mockQueryRunner.manager.query.mock.calls as unknown[][]
+      ).filter(([sql]) => String(sql).includes("pg_advisory_xact_lock"));
+      expect(advisory).toHaveLength(1);
+      expect((advisory[0][1] as unknown[])[1]).toBe(accountId);
     });
   });
 

@@ -1723,6 +1723,84 @@ describe("ImportService", () => {
       });
     });
 
+    /**
+     * Advisory locks are taken before row locks (`common/db/locks.ts`). An
+     * import row-locks `accounts` on every balance write and only then reached
+     * `rebuildImportedHoldings`, which takes the holdings advisory lock -- the
+     * opposite order from an investment write, so an import running beside a
+     * trade on the same account could deadlock both (40P01).
+     */
+    it("takes the holdings advisory lock before the first balance write", async () => {
+      const dto = makeBaseDto({ accountId: "acct-brokerage" });
+      accountsRepository.findOne.mockResolvedValue(mockBrokerageAccount);
+
+      mockedParseQif.mockReturnValue({
+        accountType: "INVESTMENT",
+        accountName: "",
+        transactions: [
+          makeQifTransaction({
+            action: "Buy",
+            security: "AAPL",
+            price: 150,
+            quantity: 10,
+            amount: 1500,
+            payee: "",
+            category: "",
+          }),
+        ],
+        categories: [],
+        transferAccounts: [],
+        securities: ["AAPL"],
+        detectedDateFormat: "MM/DD/YYYY",
+        sampleDates: [],
+        openingBalance: null,
+        openingBalanceDate: null,
+      });
+
+      // The investment accounts the import can reach, as the lock's scope
+      // query sees them.
+      mockQueryRunner.manager.find.mockImplementation(
+        (entity: unknown, options?: { where?: { accountType?: string } }) =>
+          entity === Account &&
+          options?.where?.accountType === AccountType.INVESTMENT
+            ? Promise.resolve([mockBrokerageAccount])
+            : Promise.resolve([]),
+      );
+      mockQueryRunner.manager.findOne.mockImplementation(
+        (entity: unknown, options: { where?: { id?: string } }) => {
+          if (entity === Account && options?.where?.id === "acct-brokerage") {
+            return Promise.resolve({ ...mockBrokerageAccount });
+          }
+          if (
+            entity === Account &&
+            options?.where?.id === "acct-brokerage-cash"
+          ) {
+            return Promise.resolve({ ...mockBrokerageCashAccount });
+          }
+          return Promise.resolve(null);
+        },
+      );
+
+      await service.importQifFile(userId, dto);
+
+      const calls = mockQueryRunner.query.mock.calls as unknown[][];
+      const advisory = calls.findIndex(([sql]) =>
+        String(sql).includes("pg_advisory_xact_lock"),
+      );
+      expect(advisory).toBeGreaterThanOrEqual(0);
+      expect((calls[advisory][1] as unknown[])[1]).toBe("acct-brokerage");
+
+      const accountUpdate = (
+        mockQueryRunner.manager.update.mock.calls as unknown[][]
+      ).findIndex((call) => call[0] === Account);
+      expect(accountUpdate).toBeGreaterThanOrEqual(0);
+      expect(
+        mockQueryRunner.query.mock.invocationCallOrder[advisory],
+      ).toBeLessThan(
+        mockQueryRunner.manager.update.mock.invocationCallOrder[accountUpdate],
+      );
+    });
+
     describe("security handling", () => {
       it("creates new security from mapping", async () => {
         const dto = makeBaseDto({

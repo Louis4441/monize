@@ -176,6 +176,9 @@ describe("TransactionReconciliationService", () => {
       applyParentStatusToTransferCounterparts: jest
         .fn()
         .mockResolvedValue(new Set<string>()),
+      // Takes the holdings advisory lock for the parent's embedded investment
+      // rows; the real method resolves to nothing.
+      lockEmbeddedInvestmentScopes: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -445,6 +448,42 @@ describe("TransactionReconciliationService", () => {
         userId,
         TransactionStatus.VOID,
       );
+    });
+
+    /**
+     * Advisory locks are taken before row locks (`common/db/locks.ts`). The
+     * parent's embedded investment rows are rebuilt under the holdings
+     * advisory lock, and this path took it only there -- after the parent's
+     * balance write had row-locked `accounts`, the opposite order from an
+     * investment write (40P01).
+     */
+    it("locks the embedded investment scopes before the parent's balance write", async () => {
+      const transaction = stageTransaction({
+        status: TransactionStatus.CLEARED,
+        amount: 100,
+        isSplit: true,
+      });
+      mockFindOne.mockResolvedValue(
+        makeTransaction({ status: TransactionStatus.VOID, isSplit: true }),
+      );
+
+      await service.updateStatus(
+        userId,
+        transaction.id,
+        TransactionStatus.VOID,
+        mockTriggerNetWorthRecalc,
+        mockFindOne,
+      );
+
+      expect(splitService.lockEmbeddedInvestmentScopes).toHaveBeenCalledWith(
+        expect.anything(),
+        userId,
+        [transaction.id],
+      );
+      expect(accountsService.updateBalance).toHaveBeenCalled();
+      expect(
+        splitService.lockEmbeddedInvestmentScopes.mock.invocationCallOrder[0],
+      ).toBeLessThan(accountsService.updateBalance.mock.invocationCallOrder[0]);
     });
 
     it("does not change balance when staying VOID", async () => {

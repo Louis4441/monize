@@ -2447,12 +2447,55 @@ export class InvestmentTransactionsService {
    * so every route a parent's status change takes (single update, dedicated
    * status endpoint, bulk update) propagates through one place.
    */
+  /**
+   * Advisory-lock the holding scope of every brokerage account holding an
+   * embedded investment row of these split parents.
+   *
+   * Called by a split-status path as the first lock of its transaction,
+   * because that path row-locks `accounts` for the parent's own balance and
+   * the embedded rows' rebuild takes this advisory lock afterwards -- the
+   * opposite order from an investment write, which is a deadlock for both
+   * (`common/db/locks.ts`, 40P01). The read is unlocked, so it may run before
+   * the advisory lock; `pg_advisory_xact_lock` is re-entrant, so calling this
+   * twice in one transaction costs nothing.
+   */
+  async lockEmbeddedHoldingScopes(
+    manager: EntityManager,
+    userId: string,
+    parentTransactionIds: readonly string[],
+  ): Promise<void> {
+    const ids = [...new Set(parentTransactionIds)];
+    if (ids.length === 0) return;
+    const rows: { account_id: string }[] = await manager.query(
+      // includes VOID rows: records read -- a crossing in either direction
+      // re-derives the same position.
+      `SELECT DISTINCT it.account_id
+         FROM investment_transactions it
+         JOIN transaction_splits ts ON ts.id = it.transaction_split_id
+        WHERE it.user_id = $2
+          AND ts.transaction_id = ANY($1)`,
+      [ids, userId],
+    );
+    await lockHoldingScope(
+      manager,
+      rows.map((row) => row.account_id),
+    );
+  }
+
   async applyParentStatusToEmbeddedRows(
     manager: EntityManager,
     userId: string,
     parentTransactionId: string,
     newStatus: TransactionStatus,
   ): Promise<Set<string>> {
+    // Re-entrant with the call the split-status paths make before their first
+    // balance write (`lockEmbeddedHoldingScopes`): the advisory lock must
+    // precede the `accounts` row locks the parent's balance takes, and a
+    // caller that forgot still cannot reach the rebuild below without it.
+    await this.lockEmbeddedHoldingScopes(manager, userId, [
+      parentTransactionId,
+    ]);
+
     const affectedAccountIds = new Set<string>();
 
     const splits = await manager.getRepository(TransactionSplit).find({
@@ -3496,12 +3539,54 @@ export class InvestmentTransactionsService {
    * holdings move, the oversell validation -- runs inside one transaction under
    * a row lock, so a refusal leaves nothing written (contract section 7).
    */
+  /**
+   * The brokerage accounts a status change on this row can re-derive: the
+   * row's own and its linked transfer leg's.
+   *
+   * Read without a lock on purpose. The advisory lock has to be the
+   * transaction's first lock, so the ids it is given cannot come from a row
+   * lock; a row that moved account between this read and the lock loses only
+   * a lock it never needed, exactly as `remove()`'s pre-read does.
+   */
+  private async readStatusHoldingScopeAccountIds(
+    manager: EntityManager,
+    userId: string,
+    id: string,
+  ): Promise<string[]> {
+    const rows: { account_id: string }[] = await manager.query(
+      // includes VOID rows: records read -- the scope of a crossing is the
+      // same whichever side of the boundary the row is on.
+      `SELECT DISTINCT account_id
+         FROM investment_transactions
+        WHERE user_id = $2
+          AND (id = $1
+               OR id = (SELECT linked_transaction_id
+                          FROM investment_transactions
+                         WHERE id = $1 AND user_id = $2))`,
+      [id, userId],
+    );
+    return rows.map((row) => row.account_id);
+  }
+
   async updateStatus(
     userId: string,
     id: string,
     newStatus: TransactionStatus,
   ): Promise<InvestmentTransaction> {
     const outcome = await withScopedDb(this.dataSource, async (manager) => {
+      // First lock of the transaction: advisory before row locks
+      // (`common/db/locks.ts`). The scope ids come from an unlocked read --
+      // a plain `SELECT` takes no lock, so it may precede the advisory one --
+      // covering this row and the transfer leg that crosses the VOID boundary
+      // with it. The rebuild at the end takes the same re-entrant lock, and
+      // `applyVoidTransitionToMirrorLeg` below row-locks `accounts`; taking
+      // the advisory lock only inside the rebuild put those two in the
+      // opposite order from every other investment write (40P01).
+      await lockHoldingScope(
+        manager,
+        await this.readStatusHoldingScopeAccountIds(manager, userId, id),
+      );
+
       const locked = await lockInvestmentTransactionRow(manager, id, userId);
       if (!locked) {
         throw new NotFoundException(

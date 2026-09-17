@@ -192,6 +192,9 @@ describe("TransactionBulkUpdateService", () => {
       // Split-line recategorization: default "no lines changed", the shape the
       // real method returns for a batch with no matching category-kind lines.
       bulkRecategorizeCategorySplits: jest.fn().mockResolvedValue([]),
+      // Takes the holdings advisory lock for the parents' embedded investment
+      // rows; the real method resolves to nothing.
+      lockEmbeddedInvestmentScopes: jest.fn().mockResolvedValue(undefined),
     };
 
     tagsService = {
@@ -1150,6 +1153,20 @@ describe("TransactionBulkUpdateService", () => {
         "acc-target",
         userId,
       );
+
+      // Advisory locks are taken before row locks (`common/db/locks.ts`). The
+      // parents' embedded investment rows are rebuilt under the holdings
+      // advisory lock, and the batch took it only there -- after the balance
+      // pass had row-locked `accounts`, the opposite order from an investment
+      // write (40P01).
+      expect(splitService.lockEmbeddedInvestmentScopes).toHaveBeenCalledWith(
+        expect.anything(),
+        userId,
+        ["parent-tx"],
+      );
+      expect(
+        splitService.lockEmbeddedInvestmentScopes.mock.invocationCallOrder[0],
+      ).toBeLessThan(balanceQb.getRawMany.mock.invocationCallOrder[0]);
     });
 
     it("does not propagate a split parent status that stays on one side of VOID", async () => {

@@ -135,6 +135,17 @@ export class TransactionReconciliationService {
         await assertVoidTransitionAllowedOnRow(m, transactionId);
       }
 
+      if (balanceMoved && locked.isSplit) {
+        // Before the balance write below, which row-locks `accounts`: the
+        // embedded investment rows this parent carries across the VOID
+        // boundary are rebuilt under the holdings advisory lock, and an
+        // investment write takes that lock first and the `accounts` row lock
+        // second (`common/db/locks.ts`, 40P01).
+        await this.splitService.lockEmbeddedInvestmentScopes(m, userId, [
+          transactionId,
+        ]);
+      }
+
       const fields: Partial<Transaction> = { status };
       if (
         status === TransactionStatus.RECONCILED &&

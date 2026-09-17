@@ -294,6 +294,24 @@ export class TransactionBulkUpdateService {
         isUpdatingTags,
       );
 
+      // Before the balance pass below, which row-locks `accounts`: the
+      // embedded investment rows those parents carry across the VOID boundary
+      // are rebuilt under the holdings advisory lock, and an investment write
+      // takes that lock first and the `accounts` row lock second
+      // (`common/db/locks.ts`, 40P01).
+      // Before the balance pass below, which row-locks `accounts`: the
+      // embedded investment rows those parents carry across the VOID boundary
+      // are rebuilt under the holdings advisory lock, and an investment write
+      // takes that lock first and the `accounts` row lock second
+      // (`common/db/locks.ts`, 40P01).
+      if (crossingParentIds.length > 0) {
+        await this.splitService.lockEmbeddedInvestmentScopes(
+          m,
+          userId,
+          crossingParentIds,
+        );
+      }
+
       // Step 3: Handle balance adjustments for VOID status changes
       if (isUpdatingStatus) {
         await this.handleStatusBalanceChanges(

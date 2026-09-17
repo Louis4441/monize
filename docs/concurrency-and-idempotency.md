@@ -294,8 +294,8 @@ applies from the first one that does.
 it.** Every writer of a position takes `lockHoldingScope` (`common/db/locks.ts`,
 `LockScope.Holdings`, keyed by account) as the *first statement* of its
 transaction, naming every account whose position the transaction will re-derive:
-`InvestmentTransactionsService.create`, `update`, `remove`, `transferSecurity`
-and `createEmbeddedForSplit`, as well as
+`InvestmentTransactionsService.create`, `update`, `remove`, `updateStatus`,
+`transferSecurity` and `createEmbeddedForSplit`, as well as
 `HoldingsService.rebuildScopesFromTransactions` itself. A ledger write that
 waited until the rebuild at the end of its transaction had already row-locked
 `accounts` for its cash effects, which is the opposite order from a split status
@@ -306,6 +306,24 @@ with `40P01` on one of them. `pg_advisory_xact_lock` is re-entrant within a
 transaction, so the opening call never double-acquires and the rebuild's own call
 stays where it is -- a rebuild reached from anywhere else still takes it before
 reading the ledger.
+
+The same obligation falls on the two paths that reach a position *through*
+something else, because both of them row-lock `accounts` on the way:
+
+- **A split parent's status change.** The parent's balance write comes before
+  `applyParentStatusToEmbeddedRows` on the reconciliation and bulk routes, so
+  each split-status transaction calls
+  `TransactionSplitService.lockEmbeddedInvestmentScopes` (which delegates to
+  `InvestmentTransactionsService.lockEmbeddedHoldingScopes`) before that write.
+  `applyParentStatusToEmbeddedRows` takes the same re-entrant lock itself, so a
+  caller that forgets still cannot reach the rebuild without it.
+- **An import.** `ImportService` takes `lockHoldingScope` over every investment
+  account the user already has as the first statement of both import
+  transactions, because the accounts the file turns out to touch are discovered
+  as it is read and the per-row balance writes row-lock `accounts` long before
+  `rebuildImportedHoldings` runs. Accounts the import creates inside its own
+  transaction are covered by the rebuild's call: no other transaction can see
+  them, so nothing can be holding their lock.
 
 ## 6. Idempotency keys
 
@@ -356,6 +374,8 @@ worth keeping: CONC-003 can only be checked against a list of all writers.
 | `accounts/accounts.service.ts` `close` | `Account` row | Race between the balance check and the close |
 | `strategies/gem-signal.service.ts` | advisory, per `strategyId` | Materialization interleaving with a settings save |
 | `securities/investment-transactions.service.ts` `create`, `update`, `remove`, `transferSecurity`, `createEmbeddedForSplit` | advisory, per account (`lockHoldingScope`), first statement of the transaction | A ledger write and a rebuild racing on one position, and the lock order that keeps it deadlock-free |
+| `transactions/transaction-reconciliation.service.ts`, `transactions/transaction-bulk-update.service.ts` (split-status routes) | advisory, per brokerage account (`lockEmbeddedInvestmentScopes`), before the parent's balance write | The embedded rows' rebuild takes the same lock after `accounts` is row-locked |
+| `import/import.service.ts` | advisory, per investment account (`lockHoldingScope`), first statement of the import transaction | The import's balance writes row-lock `accounts` before `rebuildImportedHoldings` |
 
 ### Conditional claims that exist
 
