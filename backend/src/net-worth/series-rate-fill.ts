@@ -206,3 +206,34 @@ export async function fillSeriesRates(
   }
   return stored;
 }
+
+/**
+ * A series, computed once from what the database holds, and -- when that was
+ * not enough -- computed again from what the provider could add.
+ *
+ * Three properties this shape exists to keep:
+ *
+ * - **Demand-driven.** The plan comes from the points that actually failed to
+ *     convert, so a currency whose accounts held zero over the window costs no
+ *     provider call.
+ * - **Re-read, never patched.** `compute` reloads the rate index from the
+ *     database on its second run, so the series converts with what was just
+ *     persisted rather than with an in-memory patch of the first read.
+ * - **Best-effort.** A provider failure leaves the series exactly as the first
+ *     computation produced it; the request never fails because of the fill.
+ *
+ * It runs outside any transaction: the callers' reads open and close one per
+ * statement, so no provider call is made with a transaction held open.
+ */
+export async function computeWithRateFill<R>(
+  filler: SeriesRateFiller | undefined,
+  compute: () => Promise<R>,
+  gapsOf: (result: R) => ReadonlyArray<SeriesRateGap>,
+  options: SeriesFetchOptions | undefined,
+  logger: SeriesRateFillLogger,
+): Promise<R> {
+  const result = await compute();
+  const stored = await fillSeriesRates(filler, gapsOf(result), options, logger);
+  if (stored === 0) return result;
+  return compute();
+}

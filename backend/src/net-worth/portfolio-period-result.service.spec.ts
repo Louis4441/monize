@@ -3,6 +3,7 @@ import { DataSource } from "typeorm";
 
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import { UserPreference } from "../users/entities/user-preference.entity";
+import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { NetWorthService } from "./net-worth.service";
 import { PortfolioPeriodResultService } from "./portfolio-period-result.service";
 
@@ -28,6 +29,7 @@ interface FakeRow {
 describe("PortfolioPeriodResultService", () => {
   let service: PortfolioPeriodResultService;
   let netWorth: { getDailyInvestments: jest.Mock };
+  let exchangeRates: { ensureRatesForDate: jest.Mock };
   let mocks: ReturnType<typeof createScopedDbMocks>;
   let scopeRows: FakeRow[];
   let flowRows: FakeRow[];
@@ -77,12 +79,14 @@ describe("PortfolioPeriodResultService", () => {
     );
 
     netWorth = { getDailyInvestments: jest.fn().mockResolvedValue([]) };
+    exchangeRates = { ensureRatesForDate: jest.fn().mockResolvedValue(0) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PortfolioPeriodResultService,
         { provide: DataSource, useValue: mocks.dataSource },
         { provide: NetWorthService, useValue: netWorth },
+        { provide: ExchangeRateService, useValue: exchangeRates },
       ],
     }).compile();
 
@@ -190,6 +194,7 @@ describe("PortfolioPeriodResultService", () => {
       "2026-09-17",
       undefined,
       "CAD",
+      { fetchMissing: undefined },
     );
     const flowQuery = queries.find((q) => q.sql.includes("SUM(t.amount)"))!;
     expect(flowQuery.params[1]).toBe("2026-09-16");
@@ -346,6 +351,7 @@ describe("PortfolioPeriodResultService", () => {
       "2026-09-17",
       ["brok-1"],
       "CAD",
+      { fetchMissing: undefined },
     );
   });
 
@@ -361,6 +367,81 @@ describe("PortfolioPeriodResultService", () => {
       "2026-09-17",
       undefined,
       "USD",
+      { fetchMissing: undefined },
     );
+  });
+
+  describe("read-path FX fill", () => {
+    // A EUR deposit into a CAD-reported portfolio, over a window the
+    // exchange_rates table has no row for: the flow is the component that
+    // cannot convert, so it is the flow fold that asks the provider (#1390).
+    const eurFlow = () => {
+      netWorth.getDailyInvestments.mockResolvedValue(flatSeries());
+      flowRows = [{ date: "2026-06-01", currency: "EUR", total: "10000" }];
+    };
+
+    it("asks the provider for the month the flow could not convert", async () => {
+      eurFlow();
+
+      const result = await run();
+
+      expect(exchangeRates.ensureRatesForDate).toHaveBeenCalledTimes(1);
+      expect(exchangeRates.ensureRatesForDate).toHaveBeenCalledWith(
+        [{ from: "EUR", to: "CAD" }],
+        "2026-06-01",
+      );
+      // Nothing was stored, so the pair stays missing and the figure withheld.
+      expect(result.netExternalFlows).toBeNull();
+      expect(result.missingRatePairs).toContain("EUR->CAD");
+    });
+
+    it("re-reads the rates and completes the flow when the fill stored rows", async () => {
+      eurFlow();
+      exchangeRates.ensureRatesForDate.mockImplementation(async () => {
+        rateRows = [
+          {
+            from_currency: "EUR",
+            to_currency: "CAD",
+            rate: "1.5",
+            rate_date: "2026-06-01",
+          },
+        ];
+        return 20;
+      });
+
+      const result = await run();
+
+      expect(result.netExternalFlows).toBe(15_000);
+      expect(result.missingRatePairs).toEqual([]);
+    });
+
+    it("makes no provider call, on either half, when the caller opted out", async () => {
+      eurFlow();
+
+      const result = await run({ fetchMissing: false });
+
+      expect(exchangeRates.ensureRatesForDate).not.toHaveBeenCalled();
+      expect(netWorth.getDailyInvestments).toHaveBeenCalledWith(
+        "user-1",
+        "2026-01-02",
+        "2026-09-17",
+        undefined,
+        "CAD",
+        { fetchMissing: false },
+      );
+      expect(result.netExternalFlows).toBeNull();
+    });
+
+    it("answers the period when the provider throws", async () => {
+      eurFlow();
+      exchangeRates.ensureRatesForDate.mockRejectedValue(
+        new Error("provider unreachable"),
+      );
+
+      const result = await run();
+
+      expect(result.netExternalFlows).toBeNull();
+      expect(result.missingRatePairs).toContain("EUR->CAD");
+    });
   });
 });

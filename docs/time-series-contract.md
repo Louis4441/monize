@@ -134,6 +134,40 @@ site that bypasses it, in the manner of
 `frontend/src/test/ui-conventions.test.ts`.
 `backend/src/common/time-series/price-boundary.one-door.spec.ts` is that test.
 
+### 2.2 A series read may fill its own gaps, once, before it reports them
+
+A pair missing from the stored history is usually a fact about what has been
+fetched, not about the world: the daily refresh writes today only and
+`backfillHistoricalRates` skips a pair the moment it holds any row, so a chart
+over a span nobody ever loaded names every point incomplete for rates the
+provider has had all along. A series read may therefore ask for them, under
+five conditions that are not negotiable, and only these:
+
+- **Demand-driven.** The plan comes from the points that actually failed to
+  convert -- the same `missingRatePairs` the response reports -- so a currency
+  the window never had to convert costs no provider call.
+- **Month-granular and deduplicated.** One `ensureRatesForDate` call fetches
+  the whole calendar month around a date and persists both directions, so the
+  unit is `(month, directionless pair)`: a 400-point chart costs one call per
+  month per pair, not four hundred.
+- **Bounded.** `MAX_FILL_MONTHS` (24) months per request, newest first. A wider
+  range fills the newest two years and reports the rest as still missing; one
+  HTTP request must not become an unbounded number of outbound ones.
+- **Re-read, never patched.** Only a fill that persisted something triggers a
+  rebuild of the rate index **from the database** and a recomputation through
+  the same code, so the series converts with what a second request would find.
+- **Best-effort, and it never invents a rate.** A provider that is down or has
+  no history for a pair leaves the point exactly where section 3 leaves it: the
+  pair named, the figure withheld. The read never fails because an outbound
+  fetch did, and a caller that must not reach the network at all (a cron, an
+  LLM tool) passes `fetchMissing: false`.
+
+`backend/src/net-worth/series-rate-fill.ts` is the shared planner and runner,
+used by the investment series, the investment breakdown, the monthly net-worth
+series and `PortfolioPeriodResultService`;
+`backend/src/accounts/account-balances-report.service.ts` is the same shape for
+a point-in-time report (`docs/specs/account-balances-as-of.md` section 7.1).
+
 One deliberate exception lives **inside** the door rather than beside it:
 `backend/src/common/time-series/nearest-observation.ts` answers "what is the
 closest thing anybody ever observed", unbounded, for a surface that has decided

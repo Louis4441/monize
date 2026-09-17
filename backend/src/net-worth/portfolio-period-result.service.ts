@@ -1,4 +1,10 @@
-import { Injectable, Logger } from "@nestjs/common";
+import {
+  Inject,
+  Injectable,
+  Logger,
+  Optional,
+  forwardRef,
+} from "@nestjs/common";
 import { DataSource } from "typeorm";
 
 import { withScopedDb } from "../common/db/scoped-db";
@@ -16,8 +22,10 @@ import {
   UNFILTERED_INVESTMENT_SCOPE_SQL,
   resolveInvestmentScopeAccountIds,
 } from "../securities/investment-scope.util";
+import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { NetWorthService, isValuationCashAccount } from "./net-worth.service";
+import { SeriesFetchOptions, computeWithRateFill } from "./series-rate-fill";
 import {
   PeriodResultReason,
   PeriodReturnMethod,
@@ -94,6 +102,13 @@ export class PortfolioPeriodResultService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly netWorth: NetWorthService,
+    // The read-path FX fill for the flow fold; the value series fills through
+    // NetWorthService. Optional + forwardRef for the same reasons it is there:
+    // CurrenciesModule reaches back here through SecuritiesModule, and a
+    // harness without it reports the pair missing exactly as before.
+    @Optional()
+    @Inject(forwardRef(() => ExchangeRateService))
+    private readonly exchangeRates?: ExchangeRateService,
   ) {}
 
   /**
@@ -115,7 +130,7 @@ export class PortfolioPeriodResultService {
       baselineDate?: string;
       accountIds?: string[];
       displayCurrency?: string;
-    },
+    } & SeriesFetchOptions,
   ): Promise<PortfolioPeriodResult> {
     const currency = await this.reportingCurrency(userId, opts.displayCurrency);
     const end = opts.endDate || todayYMD();
@@ -170,6 +185,9 @@ export class PortfolioPeriodResultService {
         end,
         opts.accountIds,
         currency,
+        // One opt-out for the whole answer: the value series and the flow fold
+        // read the same rates and must not disagree about whether to fetch.
+        { fetchMissing: opts.fetchMissing },
       ),
       loadExternalFlowSubtotals(
         (sql, params) =>
@@ -191,7 +209,9 @@ export class PortfolioPeriodResultService {
 
     if (series.length === 0) return empty;
 
-    const flow = await this.foldFlows(flowRows, currency, from, end);
+    const flow = await this.foldFlows(flowRows, currency, from, end, {
+      fetchMissing: opts.fetchMissing,
+    });
 
     const decision = decidePeriodResult({
       start: series[0],
@@ -218,18 +238,54 @@ export class PortfolioPeriodResultService {
    * `FxAggregate` is what keeps "could not convert" distinguishable from
    * "converted to zero": a subtotal it could not convert makes the whole flow
    * incomplete, which withholds the result rather than shrinking it.
+   *
+   * A day whose flow could not be converted is also a gap the provider may be
+   * able to close, so the fold runs through `computeWithRateFill`: it names the
+   * months and pairs it was short of, the provider is asked once per unit, and
+   * on a successful fill the index is re-read from the database and the fold
+   * re-run. Nothing is invented -- what the provider does not carry stays in
+   * `missingPairs` and still withholds the result.
    */
-  private async foldFlows(
+  private foldFlows(
     rows: Array<{ date: string | null; currency: string; amount: number }>,
     currency: string,
     start: string,
     end: string,
-  ): Promise<{ complete: boolean; value: number; missingPairs: string[] }> {
+    options?: SeriesFetchOptions,
+  ): Promise<{
+    complete: boolean;
+    value: number;
+    missingPairs: string[];
+    /** Per-day gaps, for the fill plan; not part of the period's answer. */
+    gaps: Array<{ date: string; missingRatePairs: string[] }>;
+  }> {
     const currencies = new Set<string>();
     for (const row of rows) {
       if (row.currency !== currency) currencies.add(row.currency);
     }
 
+    return computeWithRateFill(
+      this.exchangeRates,
+      () => this.foldFlowsAt(rows, currency, currencies, start, end),
+      (folded) => folded.gaps,
+      options,
+      this.logger,
+    );
+  }
+
+  /** One pass of `foldFlows` over one rate index, freshly loaded. */
+  private async foldFlowsAt(
+    rows: Array<{ date: string | null; currency: string; amount: number }>,
+    currency: string,
+    currencies: Set<string>,
+    start: string,
+    end: string,
+  ): Promise<{
+    complete: boolean;
+    value: number;
+    missingPairs: string[];
+    gaps: Array<{ date: string; missingRatePairs: string[] }>;
+  }> {
     const rateIndex = await buildRateIndex(
       (sql, params) =>
         withScopedDb(this.dataSource, (m) => m.query(sql, params)),
@@ -240,6 +296,7 @@ export class PortfolioPeriodResultService {
     );
 
     const aggregate = new FxAggregate();
+    const gaps: Array<{ date: string; missingRatePairs: string[] }> = [];
     for (const row of rows) {
       if (row.amount === 0) continue;
       if (row.currency === currency) {
@@ -252,24 +309,31 @@ export class PortfolioPeriodResultService {
         aggregate.addUnknown();
         continue;
       }
-      aggregate.add(
-        convertAtDate(
-          row.amount,
-          row.currency,
-          currency,
-          row.date,
-          rateIndex,
-          this.logger,
-        ),
+      const converted = convertAtDate(
+        row.amount,
         row.currency,
         currency,
+        row.date,
+        rateIndex,
+        this.logger,
       );
+      // The date matters as much as the pair: a fill is planned per calendar
+      // month, so "January could not convert EUR" is what makes the January
+      // window the one that gets fetched.
+      if (converted === null) {
+        gaps.push({
+          date: row.date,
+          missingRatePairs: [`${row.currency}->${currency}`],
+        });
+      }
+      aggregate.add(converted, row.currency, currency);
     }
 
     return {
       complete: aggregate.isComplete,
       value: aggregate.knownSubtotal,
       missingPairs: aggregate.missingPairs,
+      gaps,
     };
   }
 

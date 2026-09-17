@@ -38,7 +38,7 @@ import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import {
   SeriesFetchOptions,
   SeriesRateGap,
-  fillSeriesRates,
+  computeWithRateFill,
 } from "./series-rate-fill";
 import {
   applyActionToQuantity,
@@ -273,49 +273,28 @@ export class NetWorthService {
   ) {}
 
   /**
-   * A series, computed once from what the database holds, and -- when that was
-   * not enough -- computed again from what the provider could add.
+   * A series read that fills its own exchange-rate gaps; see
+   * `series-rate-fill.ts` for what that means and what it refuses to do.
    *
-   * The gap this closes: the daily refresh writes today only and
+   * The gap it closes: the daily refresh writes today only and
    * `backfillHistoricalRates` skips a pair that has any row at all, so a user
    * who bought their first EUR holding in June has no EUR->PLN observation for
    * January through May and every chart point in that span reports the pair as
    * missing. Nothing is wrong with the data path; nobody ever asked the
    * provider. A read may ask, once, for the months its own diagnostics name.
-   *
-   * Three properties this shape is here to keep:
-   *
-   * - **Demand-driven.** The fetch plan comes from the points that actually
-   *     failed to convert, so a currency whose accounts held zero over the
-   *     window costs no provider call.
-   * - **Re-read, never patched.** A successful fill rebuilds the rate index
-   *     from the database and recomputes, so what the series converts with is
-   *     what a second request would find.
-   * - **Best-effort.** A provider failure is logged and the series renders with
-   *     the pair still missing; the request never fails because of the fill.
-   *     Nothing is invented -- INV-FX-001.
-   *
-   * It runs outside any transaction: `scopedQuery` opens and closes one per
-   * statement here, so the provider call is never made with a database
-   * transaction held open.
    */
-  private async computeWithRateFill<R>(
+  private computeWithRateFill<R>(
     compute: () => Promise<R>,
     gapsOf: (result: R) => ReadonlyArray<SeriesRateGap>,
     options?: SeriesFetchOptions,
   ): Promise<R> {
-    const result = await compute();
-    const stored = await fillSeriesRates(
+    return computeWithRateFill(
       this.exchangeRates,
-      gapsOf(result),
+      compute,
+      gapsOf,
       options,
       this.logger,
     );
-    // `compute` reloads the rate index from the database on its second run, so
-    // the series converts with what was just persisted rather than with an
-    // in-memory patch of what it read the first time.
-    if (stored === 0) return result;
-    return compute();
   }
 
   /**

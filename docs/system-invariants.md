@@ -633,6 +633,17 @@ Enforcement         The 1:1 half is enforced. Consumers return null on an absent
                     exemption for currencies/exchange-rate.service.ts is
                     getLatestRate's own declaration, not the whole file, so a new
                     unbounded read beside it fails.
+                    A read that finds no observation may ask the provider for the
+                    months it was short of before it reports the gap --
+                    accounts/account-balances-report.service.ts for a
+                    point-in-time report, net-worth/series-rate-fill.ts for the
+                    investment series, the investment breakdown, the monthly
+                    net-worth series and PortfolioPeriodResultService -- but only
+                    through ExchangeRateService.ensureRatesForDate, which
+                    persists and is then RE-READ from the database. A fetch that
+                    stored nothing, failed, or fell outside the bound leaves the
+                    pair missing and the figure withheld; it never becomes 1:1
+                    (docs/time-series-contract.md section 2.2).
                     The mislabelling half is NOT enforced on the built-in report
                     path: see Known gap below.
 Known gap           **An unconverted amount still reaches a report under the
