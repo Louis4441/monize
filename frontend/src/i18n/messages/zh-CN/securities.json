@@ -3,6 +3,7 @@
     "noneToUpdate": "无证券需要更新",
     "updated": "{count, plural, one {# 个证券价格已更新} other {# 个证券价格已更新}}",
     "partialFailure": "价格已更新：{updated} 个成功，{failed} 个失败{symbols}",
+    "partialFailureWithReasons": "价格已更新：{updated} 个成功，{failed} 个失败{symbols}\n{reasons}",
     "failed": "刷新价格失败"
   },
   "page": {

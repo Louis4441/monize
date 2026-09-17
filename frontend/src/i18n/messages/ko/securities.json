@@ -3,6 +3,7 @@
     "noneToUpdate": "업데이트할 유가증권이 없습니다",
     "updated": "{count, plural, one {# 개의 유가증권 가격이 업데이트되었습니다} other {# 개의 유가증권 가격이 업데이트되었습니다}}",
     "partialFailure": "가격 업데이트: {updated}개 성공, {failed}개 실패{symbols}",
+    "partialFailureWithReasons": "가격 업데이트: {updated}개 성공, {failed}개 실패{symbols}\n{reasons}",
     "failed": "가격 갱신에 실패했습니다"
   },
   "page": {

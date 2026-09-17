@@ -3,6 +3,7 @@
     "noneToUpdate": "Tidak ada sekuritas untuk diperbarui",
     "updated": "{count, plural, one {# harga sekuritas diperbarui} other {# harga sekuritas diperbarui}}",
     "partialFailure": "Harga diperbarui: {updated} berhasil, {failed} gagal{symbols}",
+    "partialFailureWithReasons": "Harga diperbarui: {updated} berhasil, {failed} gagal{symbols}\n{reasons}",
     "failed": "Gagal menyegarkan harga"
   },
   "page": {

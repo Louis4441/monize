@@ -3,6 +3,7 @@
     "noneToUpdate": "Geen waardepapieren om bij te werken",
     "updated": "{count, plural, one {# koers bijgewerkt} other {# koersen bijgewerkt}}",
     "partialFailure": "Koersen bijgewerkt: {updated} geslaagd, {failed} mislukt{symbols}",
+    "partialFailureWithReasons": "Koersen bijgewerkt: {updated} geslaagd, {failed} mislukt{symbols}\n{reasons}",
     "failed": "Koersen vernieuwen mislukt"
   },
   "page": {

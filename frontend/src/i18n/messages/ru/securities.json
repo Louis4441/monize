@@ -3,6 +3,7 @@
     "noneToUpdate": "Нет ценных бумаг для обновления",
     "updated": "{count, plural, one {# цена ценной бумаги обновлена} other {# цен ценных бумаг обновлено}}",
     "partialFailure": "Цены обновлены: {updated} успешно, {failed} не удалось{symbols}",
+    "partialFailureWithReasons": "Цены обновлены: {updated} успешно, {failed} не удалось{symbols}\n{reasons}",
     "failed": "Не удалось обновить цены"
   },
   "page": {

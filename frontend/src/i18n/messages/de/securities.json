@@ -3,6 +3,7 @@
     "noneToUpdate": "Keine Wertpapiere zu aktualisieren",
     "updated": "{count, plural, one {# Wertpapierkurs aktualisiert} other {# Wertpapierkurse aktualisiert}}",
     "partialFailure": "Kurse aktualisiert: {updated} erfolgreich, {failed} fehlgeschlagen{symbols}",
+    "partialFailureWithReasons": "Kurse aktualisiert: {updated} erfolgreich, {failed} fehlgeschlagen{symbols}\n{reasons}",
     "failed": "Kursaktualisierung fehlgeschlagen"
   },
   "page": {
