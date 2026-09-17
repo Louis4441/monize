@@ -8,6 +8,7 @@ import {
 import {
   DataSource,
   EntityManager,
+  FindOperator,
   MoreThanOrEqual,
   LessThanOrEqual,
   And,
@@ -20,7 +21,7 @@ import { YahooFinanceService } from "../securities/yahoo-finance.service";
 import { mapWithConcurrency } from "../common/concurrency.util";
 import { roundFxRate, resolveFxRateOrNull } from "../common/fx-entry.util";
 import { roundMoney } from "../common/round.util";
-import { todayYMD } from "../common/date-utils";
+import { addDaysYMD, todayYMD } from "../common/date-utils";
 import { withScopedDb } from "../common/db/scoped-db";
 import { returnedRows } from "../common/db/query-result";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
@@ -49,6 +50,25 @@ const FX_FETCH_CONCURRENCY = 6;
  */
 function directionlessPairKey(from: string, to: string): string {
   return [from, to].sort().join("|");
+}
+
+/**
+ * An inclusive `rate_date` range, both bounds as `YYYY-MM-DD` strings.
+ *
+ * The entity declares `rateDate: Date` because the column is a SQL `date`, but
+ * the values that cross the driver in both directions are strings: `main.ts`
+ * sets the `pg` DATE parser to hand the literal back unparsed, and a select-side
+ * parameter is rendered by `pg` rather than normalised by TypeORM -- so a `Date`
+ * bound is rendered in the process time zone and, west of UTC, names the
+ * previous calendar day. The cast is to the declared column type only; the
+ * comparison itself is string-to-date, which PostgreSQL resolves per calendar
+ * date in every time zone.
+ */
+function ymdSpan(fromYmd: string, toYmd: string): FindOperator<Date> {
+  return And(
+    MoreThanOrEqual(fromYmd),
+    LessThanOrEqual(toYmd),
+  ) as unknown as FindOperator<Date>;
 }
 
 /**
@@ -951,12 +971,16 @@ export class ExchangeRateService implements OnModuleInit {
     const requested = onDate.slice(0, 10);
     const reference =
       mode === "live" ? today : requested > today ? today : requested;
-    const floor = new Date(`${reference}T00:00:00.000Z`);
-    floor.setUTCDate(floor.getUTCDate() - maxAgeDays);
-    const span = And(
-      MoreThanOrEqual(floor),
-      LessThanOrEqual(new Date(`${reference}T00:00:00.000Z`)),
-    );
+    // The span is expressed as YYYY-MM-DD strings, never `Date` objects.
+    // TypeORM does not normalise a select-side parameter: `pg` renders a `Date`
+    // in the process time zone, and PostgreSQL's cast to `date` keeps whatever
+    // literal date that rendering produced. West of UTC a UTC-midnight `Date`
+    // renders as the previous day, so the upper bound became yesterday and the
+    // reference date's own row -- today's rate, in `live` mode -- dropped out of
+    // the result. A string is compared as the calendar date it names in every
+    // time zone.
+    const floor = addDaysYMD(reference, -maxAgeDays);
+    const span = ymdSpan(floor, reference);
 
     const rows = await withScopedDb(this.dataSource, (manager) =>
       manager.getRepository(ExchangeRate).find({

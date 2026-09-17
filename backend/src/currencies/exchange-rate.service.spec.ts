@@ -899,18 +899,97 @@ describe("ExchangeRateService", () => {
     fromCurrency: from,
     toCurrency: to,
     rate,
-    rateDate: new Date(`${date}T00:00:00.000Z`),
+    // `main.ts` sets the pg DATE parser to hand the literal back unparsed, so a
+    // row that crossed the driver carries the `YYYY-MM-DD` string. The entity
+    // declares `Date` for the SQL column type; the fixture is the shape
+    // production actually produces, because a fixture the producer could not
+    // have written is not evidence.
+    rateDate: date as unknown as Date,
   });
 
   /** The [floor, ceiling] the span query asked the database for. */
   const spanBounds = (call: any): [string, string] => {
     const operator = call.where[0].rateDate;
-    const [lower, upper] = operator.value as Array<{ value: Date }>;
-    return [
-      lower.value.toISOString().slice(0, 10),
-      upper.value.toISOString().slice(0, 10),
-    ];
+    const [lower, upper] = operator.value as Array<{ value: unknown }>;
+    return [String(lower.value), String(upper.value)];
   };
+
+  describe("resolveStoredRate", () => {
+    /**
+     * Issue #1390. The span used to be built from UTC-midnight `Date` objects.
+     * TypeORM does not normalise a select-side parameter, `pg` renders a `Date`
+     * in the process time zone and PostgreSQL's cast to `date` keeps whatever
+     * literal that rendering produced, so anywhere west of UTC the upper bound
+     * named the previous calendar day and the reference date's own row -- in
+     * `live` mode, today's rate -- was excluded from the result. The bounds are
+     * calendar-date strings, which name the same day in every time zone.
+     */
+    it("bounds the span with calendar-date strings on both sides", async () => {
+      exchangeRateRepository.find.mockResolvedValue([]);
+
+      await service.resolveStoredRate("USD", "CAD", "2026-06-08");
+
+      const call = exchangeRateRepository.find.mock.calls[0][0];
+      const [lower, upper] = (call.where[0].rateDate as any).value as Array<{
+        value: unknown;
+      }>;
+      expect(typeof lower.value).toBe("string");
+      expect(typeof upper.value).toBe("string");
+      expect(upper.value).toBe("2026-06-08");
+      expect(lower.value).toBe("2026-04-24"); // the 45-day age bound
+      // Both stored directions are read over the one span.
+      expect(call.where[1].rateDate).toBe(call.where[0].rateDate);
+    });
+
+    it("bounds a live lookup at today, so today's own row is inside the span", async () => {
+      // Today is the suite's fixture date (`todayYMD` is mocked above).
+      exchangeRateRepository.find.mockResolvedValue([
+        storedRow("USD", "CAD", 1.42, "2026-08-18"),
+      ]);
+
+      const resolution = await service.resolveStoredRate(
+        "USD",
+        "CAD",
+        "2026-06-08",
+        { mode: "live" },
+      );
+
+      const [floor, ceiling] = spanBounds(
+        exchangeRateRepository.find.mock.calls[0][0],
+      );
+      expect(ceiling).toBe("2026-08-18");
+      expect(floor).toBe("2026-07-04"); // today minus the 45-day bound
+      expect(resolution.rate).toBe(1.42);
+      expect(resolution.observedOn).toBe("2026-08-18");
+    });
+
+    /**
+     * The entity declares `rateDate: Date` and only the pg DATE parser makes it
+     * a string, so the normalisation keeps a `Date` readable for any caller
+     * that builds a row without the driver. One case, deliberately: every other
+     * fixture carries the string production produces.
+     */
+    it("normalises a Date-valued rateDate as well as the stored string", async () => {
+      exchangeRateRepository.find.mockResolvedValue([
+        {
+          ...mockExchangeRate,
+          fromCurrency: "USD",
+          toCurrency: "CAD",
+          rate: 1.31,
+          rateDate: new Date("2026-06-05T00:00:00.000Z"),
+        },
+      ]);
+
+      const resolution = await service.resolveStoredRate(
+        "USD",
+        "CAD",
+        "2026-06-08",
+      );
+
+      expect(resolution.rate).toBe(1.31);
+      expect(resolution.observedOn).toBe("2026-06-05");
+    });
+  });
 
   describe("getRateForDate", () => {
     it("returns 1 for the same currency without any lookup", async () => {
