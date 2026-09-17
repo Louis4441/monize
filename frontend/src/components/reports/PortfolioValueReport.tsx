@@ -33,6 +33,12 @@ import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
 import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
+import { IncompleteDataDetails } from '@/components/reports/IncompleteDataDetails';
+import {
+  foldIncompleteData,
+  hasIncompleteData,
+  type IncompleteDataCauses,
+} from '@/lib/incomplete-data-ranges';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import type {
@@ -103,6 +109,13 @@ import { preferredCurrency } from '@/lib/default-currency';
 const logger = createLogger('PortfolioValueReport');
 
 const DAILY_RANGES = new Set(['1w', '1m', '3m', 'ytd', '1y']);
+
+/** Nothing reported missing. A frozen module constant, so the identity is stable. */
+const NO_INCOMPLETE_DATA: IncompleteDataCauses = {
+  prices: [],
+  rates: [],
+  cash: [],
+};
 const RANGE_STORAGE_KEY = 'monize-reports-portfolio-value-range';
 const ACCOUNTS_STORAGE_KEY = 'monize-reports-portfolio-value-accounts';
 
@@ -212,6 +225,18 @@ export function PortfolioValueReport() {
   } | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  // What the withheld figures are waiting for, folded into ranges per cause.
+  // Set by whichever loader produced the points on screen, and empty for the
+  // endpoints that report no completeness (intraday, monthly aggregates) --
+  // which is no information, not a claim that everything is known (#1389).
+  const [incompleteCauses, setIncompleteCauses] =
+    useState<IncompleteDataCauses>(NO_INCOMPLETE_DATA);
+  // symbol / name per security id, so a missing price names the instrument
+  // rather than a UUID. Inactive ones included: a security sold out of the
+  // portfolio is exactly the one whose history the reader is missing.
+  const [securityNames, setSecurityNames] = useState<Map<string, string>>(
+    new Map(),
+  );
   // Account filter is persisted so the report opens on the same set of accounts
   // the user last looked at, matching the investments page.
   const [selectedAccountIds, setSelectedAccountIds] = usePersistedAccountFilter(
@@ -375,6 +400,7 @@ export function PortfolioValueReport() {
             };
           }),
         );
+        setIncompleteCauses(foldIncompleteData(data));
       } else {
         const data = await netWorthApi.getInvestmentsMonthly(params);
         if (loadSeqRef.current !== seq) return;
@@ -385,6 +411,9 @@ export function PortfolioValueReport() {
             iso: d.month,
           })),
         );
+        // The monthly endpoint reports no completeness, which is no
+        // information rather than a clean bill of health.
+        setIncompleteCauses(NO_INCOMPLETE_DATA);
       }
     };
 
@@ -428,6 +457,16 @@ export function PortfolioValueReport() {
             : data.fxComplete !== false),
       }));
       setBreakdown({ series: data.series, points, kind: granularity });
+      setIncompleteCauses(
+        foldIncompleteData(
+          data.points.map((p) => ({
+            date: p.date,
+            unpricedSecurityIds: p.unpricedSecurityIds,
+            missingRatePairs: p.missingRatePairs,
+            unknownCashAccountIds: p.unknownCashAccountIds,
+          })),
+        ),
+      );
       setChartPoints(
         points.map((p) => ({
           name: p.name,
@@ -480,6 +519,7 @@ export function PortfolioValueReport() {
         values: p.values,
       }));
       setBreakdown({ series: data.series, points, kind: 'intraday' });
+      setIncompleteCauses(NO_INCOMPLETE_DATA);
       setChartPoints(
         points.map((p) => ({ name: p.name, Value: p.total, iso: p.iso })),
       );
@@ -489,6 +529,9 @@ export function PortfolioValueReport() {
       setIsLoading(true);
       setIntradayUnavailable(null);
       setIntradayFallbackNotice(null);
+      // The previous window's causes describe the previous window. Each loader
+      // below fills this in for the points it produced.
+      setIncompleteCauses(NO_INCOMPLETE_DATA);
 
       try {
         // Portfolio summary + accounts list always load in parallel — they
@@ -713,6 +756,48 @@ export function PortfolioValueReport() {
     () => chartPoints.some((p) => p.complete === false),
     [chartPoints],
   );
+
+  // Names for the ids in the diagnostics. Loaded only once something is
+  // actually missing, and including inactive securities: a holding sold out of
+  // the portfolio is exactly the one whose price history is missing (#1389).
+  const needsSecurityNames = incompleteCauses.prices.length > 0;
+  useEffect(() => {
+    if (!needsSecurityNames) return;
+    let cancelled = false;
+    investmentsApi
+      .getSecurities(true)
+      .then((securities) => {
+        if (cancelled) return;
+        setSecurityNames(
+          new Map(securities.map((s) => [s.id, s.symbol || s.name])),
+        );
+      })
+      .catch((error) => {
+        // A failed lookup is not an empty portfolio: the list simply keeps the
+        // names it already has and the fallback label stands in.
+        logger.error('Failed to load securities for the incomplete-data list:', error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [needsSecurityNames]);
+
+  const securityLabel = useCallback(
+    (securityId: string) =>
+      securityNames.get(securityId) ??
+      t('portfolioValue.incompleteUnknownSecurity'),
+    [securityNames, t],
+  );
+  const accountLabel = useCallback(
+    (accountId: string) => {
+      const account = accounts.find((a) => a.id === accountId);
+      return account
+        ? mainAccountName(account.name)
+        : t('portfolioValue.incompleteUnknownAccount');
+    },
+    [accounts, mainAccountName, t],
+  );
+  const showIncompleteDetails = hasIncompleteData(incompleteCauses);
 
   const sortedChartTableData = useMemo(() => {
     const sorted = chartPoints.map((p, idx) => ({ ...p, index: idx }));
@@ -1173,6 +1258,17 @@ export function PortfolioValueReport() {
           </div>
         </div>
       </div>
+
+      {/* What the withheld figures above are waiting for, named and dated.
+          Beside the cards rather than inside a tooltip: a repair the reader
+          cannot find is the same dead end as no explanation at all (#1389). */}
+      {showIncompleteDetails && (
+        <IncompleteDataDetails
+          causes={incompleteCauses}
+          securityLabel={securityLabel}
+          accountLabel={accountLabel}
+        />
+      )}
 
       {/* Controls */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">

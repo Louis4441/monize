@@ -169,6 +169,7 @@ const mockGetPortfolioSummary = vi.fn();
 const mockGetInvestmentAccounts = vi.fn();
 const mockGetIntradayValue = vi.fn();
 const mockGetIntradayBreakdown = vi.fn();
+const mockGetSecurities = vi.fn().mockResolvedValue([]);
 
 vi.mock('@/lib/net-worth', () => ({
   netWorthApi: {
@@ -185,6 +186,7 @@ vi.mock('@/lib/investments', () => ({
     getInvestmentAccounts: (...args: any[]) => mockGetInvestmentAccounts(...args),
     getIntradayValue: (...args: any[]) => mockGetIntradayValue(...args),
     getIntradayBreakdown: (...args: any[]) => mockGetIntradayBreakdown(...args),
+    getSecurities: (...args: any[]) => mockGetSecurities(...args),
   },
 }));
 
@@ -243,6 +245,7 @@ const periodResult = (overrides: Record<string, unknown> = {}) => ({
 describe('PortfolioValueReport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetSecurities.mockResolvedValue([]);
     // A null store is the pre-load state, where the hook takes the default.
     usePreferencesStore.setState({ preferences: null });
     mockDateRangeValue = '2y';
@@ -901,6 +904,57 @@ describe('PortfolioValueReport', () => {
       });
       // ...and the gap is a gap, not a segment drawn across it.
       expect(screen.getByTestId('area-connect-nulls').textContent).toBe('false');
+    });
+
+    it('names the security and the dates behind a withheld figure', async () => {
+      // "Some days are incomplete" is a dead end; the security, the pair and
+      // the account with their dates are the repair (#1389).
+      mockDateRangeValue = '3m';
+      mockGetSecurities.mockResolvedValue([
+        { id: 'sec-a', symbol: 'AGGG', name: 'Global Aggregate Bond' },
+      ]);
+      mockGetInvestmentsDaily.mockResolvedValue([
+        {
+          date: '2024-06-01',
+          value: 0,
+          fxComplete: true,
+          missingRatePairs: [],
+          pricesComplete: false,
+          unpricedSecurityIds: ['sec-a'],
+          cashComplete: true,
+          unknownCashAccountIds: [],
+        },
+        {
+          date: '2024-06-02',
+          value: 0,
+          fxComplete: true,
+          missingRatePairs: [],
+          pricesComplete: false,
+          unpricedSecurityIds: ['sec-a'],
+          cashComplete: true,
+          unknownCashAccountIds: [],
+        },
+      ]);
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      render(<PortfolioValueReport />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('incomplete-data-details')).toBeInTheDocument();
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId('incomplete-data-details')).toHaveTextContent(
+          'AGGG',
+        );
+      });
+      // Both days are one run, and the panel links to where it is repaired.
+      expect(screen.getByRole('link', { name: 'AGGG' })).toHaveAttribute(
+        'href',
+        '/securities/sec-a?tab=prices',
+      );
+      expect(
+        screen.getByTestId('incomplete-data-details').textContent,
+      ).not.toContain('sec-a:');
     });
 
     it('prints the figures when every day is complete', async () => {

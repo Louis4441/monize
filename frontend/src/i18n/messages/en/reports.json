@@ -1220,7 +1220,15 @@
     "pdfColHoldings": "Holdings",
     "pdfColCash": "Cash",
     "pdfColTotal": "Total",
-    "pdfColGainLoss": "Gain/Loss"
+    "pdfColGainLoss": "Gain/Loss",
+    "incompleteDetailsTitle": "Incomplete data in the selected period",
+    "incompleteMissingPrices": "Missing prices",
+    "incompleteMissingRates": "Missing exchange rates",
+    "incompleteMissingCash": "Missing cash balances",
+    "incompleteDateRange": "{start} to {end}",
+    "incompleteEntrySeparator": ": ",
+    "incompleteUnknownSecurity": "Unknown security",
+    "incompleteUnknownAccount": "Unknown account"
   },
   "realizedGains": {
     "totalProceeds": "Total Proceeds",
