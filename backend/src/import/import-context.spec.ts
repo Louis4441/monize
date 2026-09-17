@@ -28,8 +28,11 @@ describe("updateAccountBalance", () => {
     expect(manager.query).toHaveBeenCalledTimes(1);
     const [sql, params] = manager.query.mock.calls[0] as [string, unknown[]];
     expect(normalize(sql)).toBe(
-      "UPDATE accounts SET current_balance = ROUND(CAST(current_balance AS numeric) + $1, 4) WHERE id = $2",
+      "UPDATE accounts SET current_balance = ROUND(CAST(current_balance AS numeric) + $1, 4) WHERE id = $2 RETURNING id",
     );
+    // The import does not refuse a closed account here; that predicate belongs
+    // to `AccountsService.updateBalance`.
+    expect(sql).not.toContain("is_closed");
     expect(params).toEqual([50, "acc-1"]);
     // No SELECT of the account, and no absolute write.
     expect(manager.findOne).not.toHaveBeenCalled();

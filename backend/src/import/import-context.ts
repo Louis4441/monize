@@ -1,5 +1,6 @@
 import { EntityManager } from "typeorm";
 import { Account } from "../accounts/entities/account.entity";
+import { applyAccountBalanceDelta } from "../accounts/accounts.service";
 import { roundMoney } from "../common/round.util";
 import { ImportResultDto } from "./dto/import.dto";
 
@@ -24,9 +25,10 @@ export interface ImportContext {
 }
 
 /**
- * Move an account's balance by `amount`, as the atomic delta every balance
- * writer in this codebase uses (`docs/concurrency-and-idempotency.md` section 2,
- * row 1; the same statement as `AccountsService.updateBalance`).
+ * Move an account's balance by `amount`, through the same atomic delta
+ * statement every balance writer uses (`applyAccountBalanceDelta` in
+ * `accounts/accounts.service.ts`; `docs/concurrency-and-idempotency.md`
+ * section 2, row 1).
  *
  * One statement, so the read and the write cannot be interleaved: a second
  * delta committing in between composes instead of being overwritten, which a
@@ -45,10 +47,7 @@ export async function updateAccountBalance(
   amount: number,
 ): Promise<void> {
   const delta = roundMoney(Number(amount) || 0);
-  await manager.query(
-    `UPDATE accounts
-        SET current_balance = ROUND(CAST(current_balance AS numeric) + $1, 4)
-      WHERE id = $2`,
-    [delta, accountId],
-  );
+  await applyAccountBalanceDelta(manager, accountId, delta, {
+    openOnly: false,
+  });
 }
