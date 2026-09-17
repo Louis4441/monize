@@ -181,6 +181,14 @@ vi.mock('@/lib/investments', () => ({
   },
 }));
 
+// The writer itself is the app's one CSV door and is tested there; what this
+// suite asserts is the sections the report hands it.
+const mockExportCsvSections = vi.fn();
+vi.mock('@/lib/csv-export', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/csv-export')>()),
+  exportCsvSections: (...args: unknown[]) => mockExportCsvSections(...args),
+}));
+
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({
     error: vi.fn(),
@@ -678,6 +686,76 @@ describe('PortfolioValueReport', () => {
     });
   });
 
+  /**
+   * The period result belongs to the request that produced it (#1392 follow-up).
+   * Switching from a populated 3M to a 1D window whose intraday data is
+   * unavailable leaves the effect with no first point to measure from, so it
+   * never asks -- and the cards must not go on printing the 3M figures under the
+   * 1D caption.
+   */
+  it('drops the previous range figures when the new range never asks', async () => {
+    const kpi = (label: string) =>
+      screen.getByText(label).parentElement!.parentElement!.textContent;
+    mockDateRangeValue = '3m';
+    mockGetInvestmentsDaily.mockResolvedValue([
+      { date: '2024-06-01', value: 50000 },
+      { date: '2024-06-02', value: 51000 },
+    ]);
+    mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+    mockGetInvestmentAccounts.mockResolvedValue([]);
+    const { rerender } = render(<PortfolioValueReport />);
+    await waitFor(() => expect(kpi('Value Change')).toContain('+$5000'));
+
+    mockDateRangeValue = '1d';
+    mockGetIntradayValue.mockResolvedValue({
+      points: [],
+      interval: '5m',
+      currency: 'CAD',
+      range: '1d',
+      fetchedAt: new Date().toISOString(),
+      skippedSymbols: [],
+      fallbackToDaily: true,
+    });
+    await act(async () => {
+      rerender(<PortfolioValueReport />);
+    });
+
+    await waitFor(() =>
+      expect(screen.getByText(/Intraday view unavailable/i)).toBeInTheDocument(),
+    );
+    expect(kpi('Value Change')).not.toContain('5000');
+    expect(screen.getAllByTestId('unknown-amount').length).toBeGreaterThan(0);
+  });
+
+  it('exports the period summary with raw amounts and their currency', async () => {
+    mockDateRangeValue = '3m';
+    mockGetInvestmentsDaily.mockResolvedValue([
+      { date: '2024-06-01', value: 50000, complete: true },
+      { date: '2024-06-02', value: 51000, complete: true },
+    ]);
+    mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+    mockGetInvestmentAccounts.mockResolvedValue([]);
+    render(<PortfolioValueReport />);
+    await waitFor(() => expect(screen.getByTestId('export-csv')).toBeInTheDocument());
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('export-csv'));
+    });
+
+    const [, sections] = mockExportCsvSections.mock.calls[0];
+    expect(sections[0].headers).toEqual(['Figure', 'Amount', 'Currency']);
+    // Raw numbers, so a spreadsheet adds the column up, and the unit beside
+    // each one, so a foreign-currency export cannot be read as the reader's.
+    expect(sections[0].rows).toEqual([
+      ['Highest Value', 51000, 'CAD'],
+      ['Lowest Value', 50000, 'CAD'],
+      ['Value Change', 5000, 'CAD'],
+      ['Net Deposits and Withdrawals', 0, 'CAD'],
+      ['Investment Result', 5000, 'CAD'],
+      ['Investment Return', 10, '%'],
+    ]);
+  });
+
   it('handles daily range (3m) using getInvestmentsDaily', async () => {
     // 3m is in DAILY_RANGES but not in INTRADAY_RANGES, so it uses the daily endpoint
     mockDateRangeValue = '3m';
@@ -904,6 +982,63 @@ describe('PortfolioValueReport', () => {
     await waitFor(() => {
       expect(screen.getByTestId('area-chart')).toBeInTheDocument();
     });
+  });
+
+  it('dates the closes the cards are measured between on an intraday range', async () => {
+    mockDateRangeValue = '1d';
+    mockGetIntradayValue.mockResolvedValue({
+      points: [
+        { timestamp: '2024-06-01T10:00:00Z', value: 50000 },
+        { timestamp: '2024-06-01T11:00:00Z', value: 51000 },
+      ],
+      interval: '5m',
+      currency: 'CAD',
+      range: '1d',
+      fetchedAt: new Date().toISOString(),
+      skippedSymbols: [],
+      fallbackToDaily: false,
+    });
+    mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+    mockGetInvestmentAccounts.mockResolvedValue([]);
+    mockGetPeriodResult.mockResolvedValue(
+      periodResult({ startDate: '2026-01-14', endDate: '2026-01-15' }),
+    );
+    render(<PortfolioValueReport />);
+
+    // The chart draws live prices; these figures are two stored closes, and the
+    // reader is told which, rather than left with a card that reads 0.00 beside
+    // a line that moved.
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText(/measured between the stored closing values/i),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByLabelText(/Jan 14, 2026.*Jan 15, 2026/i),
+    ).toBeInTheDocument();
+  });
+
+  it('names the movement it could not count when the result is withheld', async () => {
+    mockGetInvestmentsMonthly.mockResolvedValue([
+      { month: '2024-01-01', value: 50000 },
+    ]);
+    mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+    mockGetInvestmentAccounts.mockResolvedValue([]);
+    mockGetPeriodResult.mockResolvedValue(
+      periodResult({
+        investmentResult: null,
+        returnPercent: null,
+        complete: false,
+        reasons: ['externallySettledTrade'],
+      }),
+    );
+    render(<PortfolioValueReport />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText(/cannot be counted here/i),
+      ).toBeInTheDocument(),
+    );
   });
 
   describe('mtd range', () => {

@@ -40,7 +40,7 @@ import type {
   SortColumnsByField as TableSortColumnsByField,
 } from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
-import { exportCsvSections } from '@/lib/csv-export';
+import { exportCsvSections, type CsvValue } from '@/lib/csv-export';
 import { createLogger } from '@/lib/logger';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
@@ -94,7 +94,10 @@ import {
   previousCalendarDay,
   usesPriorCloseBaseline,
 } from '@/components/investments/portfolio-change-baseline';
-import { periodResultUnknownReason } from '@/components/investments/portfolio-period-result';
+import {
+  hasUnmeasuredFlow,
+  periodResultUnknownReason,
+} from '@/components/investments/portfolio-period-result';
 import { preferredCurrency } from '@/lib/default-currency';
 
 const logger = createLogger('PortfolioValueReport');
@@ -190,9 +193,15 @@ export function PortfolioValueReport() {
   // value change, the money the reader moved in or out, and what is left. Null
   // until it answers, and never re-derived here -- deriving a change from the
   // plotted series is exactly what reported a deposit as a gain (#1392).
-  const [periodResult, setPeriodResult] = useState<PortfolioPeriodResult | null>(
-    null,
-  );
+  //
+  // Kept WITH the key of the request that produced it. A range whose request is
+  // never made -- a 1D window with no intraday points, where the effect below
+  // returns before asking -- would otherwise leave the previous range's figures
+  // on the cards under the new range's caption.
+  const [periodResultState, setPeriodResultState] = useState<{
+    key: string;
+    result: PortfolioPeriodResult;
+  } | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   // Account filter is persisted so the report opens on the same set of accounts
@@ -590,46 +599,59 @@ export function PortfolioValueReport() {
   // is, is all this layer decides: the arithmetic over it is the server's.
   const usesPriorClose = usesPriorCloseBaseline(dateRange);
   const firstPointDate = isoDatePart(chartPoints[0]?.iso);
-  const periodSeqRef = useRef(0);
+  const periodAccountIdsCsv =
+    selectedAccountIds.length > 0 ? selectedAccountIds.join(',') : undefined;
+  const periodBaselineDate =
+    usesPriorClose && firstPointDate
+      ? previousCalendarDay(firstPointDate)
+      : undefined;
+  // Everything the answer depends on. An answer is shown only under the key it
+  // was asked for; anything else is the previous window's figures.
+  const periodKey = JSON.stringify([
+    chartWindow.start,
+    chartWindow.end,
+    periodBaselineDate ?? null,
+    periodAccountIdsCsv ?? null,
+    foreignCurrency,
+    usesPriorClose,
+    reloadKey,
+  ]);
 
   useEffect(() => {
     if (!isValid) return;
     // A prior-close range measures from the close before the first point ON
     // SCREEN, so it waits for that point rather than guessing at a date.
     if (usesPriorClose && !firstPointDate) return;
-    const seq = ++periodSeqRef.current;
     netWorthApi
       .getInvestmentsPeriodResult({
         startDate: chartWindow.start,
         endDate: chartWindow.end,
-        baselineDate:
-          usesPriorClose && firstPointDate
-            ? previousCalendarDay(firstPointDate)
-            : undefined,
-        accountIds:
-          selectedAccountIds.length > 0
-            ? selectedAccountIds.join(',')
-            : undefined,
+        baselineDate: periodBaselineDate,
+        accountIds: periodAccountIdsCsv,
         displayCurrency: foreignCurrency || undefined,
       })
       .then((result) => {
-        if (periodSeqRef.current === seq) setPeriodResult(result);
+        setPeriodResultState({ key: periodKey, result });
       })
       .catch((error) => {
         logger.error('Failed to load the period result:', error);
         // A failed request is not a period that did nothing: every figure stays
         // unknown until the server answers.
-        if (periodSeqRef.current === seq) setPeriodResult(null);
+        setPeriodResultState((prev) => (prev?.key === periodKey ? null : prev));
       });
   }, [
     chartWindow,
     isValid,
     usesPriorClose,
     firstPointDate,
-    selectedAccountIds,
     foreignCurrency,
-    reloadKey,
+    periodAccountIdsCsv,
+    periodBaselineDate,
+    periodKey,
   ]);
+
+  const periodResult =
+    periodResultState?.key === periodKey ? periodResultState.result : null;
 
   const summary = useMemo(() => {
     if (chartPoints.length === 0) {
@@ -883,25 +905,43 @@ export function PortfolioValueReport() {
     });
   };
 
-  // The period's three figures, as their own CSV section above the series. A
-  // reader exporting the chart was previously given the dates and values and
-  // left to work the period out themselves, which is the arithmetic this
-  // change exists to stop anybody doing (#1392).
-  const periodSummarySection = () => ({
-    title: t('portfolioValue.csvSummaryTitle'),
-    headers: [t('portfolioValue.csvColFigure'), t('portfolioValue.csvColAmount')],
-    rows: [
-      [t('portfolioValue.valueChange'), signedMoneyText(valueChange)],
-      [t('portfolioValue.netExternalFlows'), signedMoneyText(netExternalFlows)],
-      [t('portfolioValue.investmentResult'), signedMoneyText(investmentResult)],
-      [
-        t('portfolioValue.investmentReturn'),
-        returnPercent === null
-          ? t('portfolioValue.notAvailable')
-          : formatSignedPercent(returnPercent, 1),
+  // The period's figures, as their own CSV section above the series, and the
+  // same five the PDF prints: a reader exporting the chart was previously given
+  // the dates and values and left to work the period out themselves, which is
+  // the arithmetic this change exists to stop anybody doing (#1392).
+  //
+  // The amount column holds the RAW number and the unit is its own column, so a
+  // spreadsheet adds the cells up instead of reading a formatted string as text
+  // and a foreign-currency export cannot be mistaken for the reader's own
+  // currency. A figure the server withheld is the explicit marker, never an
+  // empty cell (indistinguishable from zero once a column is totalled).
+  const periodSummarySection = () => {
+    const money = (value: number | null): CsvValue[] =>
+      value === null
+        ? [t('portfolioValue.notAvailable'), '']
+        : [value, effectiveCurrency];
+    return {
+      title: t('portfolioValue.csvSummaryTitle'),
+      headers: [
+        t('portfolioValue.csvColFigure'),
+        t('portfolioValue.csvColAmount'),
+        t('portfolioValue.csvColCurrency'),
       ],
-    ],
-  });
+      rows: [
+        [t('portfolioValue.highestValue'), ...money(summary.highest)],
+        [t('portfolioValue.lowestValue'), ...money(summary.lowest)],
+        [t('portfolioValue.valueChange'), ...money(valueChange)],
+        [t('portfolioValue.netExternalFlows'), ...money(netExternalFlows)],
+        [t('portfolioValue.investmentResult'), ...money(investmentResult)],
+        [
+          t('portfolioValue.investmentReturn'),
+          ...(returnPercent === null
+            ? [t('portfolioValue.notAvailable'), '']
+            : [returnPercent, t('portfolioValue.csvUnitPercent')]),
+        ],
+      ] as CsvValue[][],
+    };
+  };
 
   const handleExportCsv = () => {
     if (securitiesActive && breakdown) {
@@ -996,6 +1036,19 @@ export function PortfolioValueReport() {
                 })}
               />
             )}
+            {/* An intraday chart draws live prices while these figures are
+                measured between two STORED closes, so the line can move while
+                the cards read 0.00. The dates are on the wire; naming them is
+                the difference between a wrong figure and a dated one. */}
+            {isIntraday && periodResult && (
+              <InfoTooltip
+                placement="top"
+                text={t('portfolioValue.closeBoundsTooltip', {
+                  start: formatChartDate(periodResult.startDate, 'MMM d, yyyy'),
+                  end: formatChartDate(periodResult.endDate, 'MMM d, yyyy'),
+                })}
+              />
+            )}
           </div>
           <div className={`text-xl font-bold ${valueChange === null ? '' : gainLossColor(valueChange)}`}>
             {valueChange === null ? (
@@ -1038,6 +1091,15 @@ export function PortfolioValueReport() {
           <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
             {t('portfolioValue.investmentResult')}
             <InfoTooltip placement="top" text={t('portfolioValue.investmentResultTooltip')} />
+            {/* A withheld figure names its own cause: these two are movements
+                the server could not count as a flow, so the marker's generic
+                copy would leave the reader with nowhere to go. */}
+            {hasUnmeasuredFlow(periodResult?.reasons ?? []) && (
+              <InfoTooltip
+                placement="top"
+                text={t('portfolioValue.unmeasuredFlowTooltip')}
+              />
+            )}
           </div>
           <div className={`text-xl font-bold ${investmentResult === null ? '' : gainLossColor(investmentResult)}`}>
             {investmentResult === null ? (

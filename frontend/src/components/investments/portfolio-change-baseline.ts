@@ -21,12 +21,14 @@ const logger = createLogger('PortfolioChangeBaseline');
 export const PRIOR_CLOSE_BASELINE_RANGES = new Set(['1d', '1w', 'mtd']);
 
 /**
- * How far back the baseline lookup reaches. The daily-value endpoint prices a
- * day from the latest close at or before it, but only loads prices from a week
- * before the window it is asked for -- so asking for the single baseline day
- * alone would value a thinly-traded holding at nothing over a long market
- * closure. Asking for a month of context costs one cheap query and removes the
- * cliff.
+ * How far back the baseline lookup reaches.
+ *
+ * The daily-value endpoint values every calendar day of the window it is asked
+ * for from the latest accepted close on or before that day, and its price
+ * loaders carry one pre-window observation, so even a single-day request prices
+ * a thinly-traded holding across a long market closure. The month here is a
+ * margin rather than the mechanism -- one cheap query that still yields a row
+ * to pick if the series ever comes back shorter than the window asked for.
  */
 export const BASELINE_LOOKBACK_DAYS = 30;
 
