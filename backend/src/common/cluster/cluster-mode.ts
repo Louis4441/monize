@@ -10,7 +10,7 @@
  *                row or a Redis key, so the mode is a precondition the boot
  *                checks rather than a hint.
  *
- * The parse-and-throw shape is `parseRlsMode` in `../db/rls-config.ts`: an
+ * The parse-and-throw shape is `parseRlsMode` in `backend/src/common/db/rls-config.ts`: an
  * unrecognized value refuses the boot instead of silently falling back to a
  * mode the operator did not ask for.
  *
