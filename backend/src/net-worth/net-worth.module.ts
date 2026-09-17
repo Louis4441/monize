@@ -12,6 +12,7 @@ import { PortfolioPeriodResultService } from "./portfolio-period-result.service"
 import { NetWorthController } from "./net-worth.controller";
 import { DelegationModule } from "../delegation/delegation.module";
 import { NotificationsModule } from "../notifications/notifications.module";
+import { CurrenciesModule } from "../currencies/currencies.module";
 
 @Module({
   imports: [
@@ -31,6 +32,10 @@ import { NotificationsModule } from "../notifications/notifications.module";
     // post-commit balance-invalidation seam, so it also evaluates balance-
     // threshold crossings there. NotificationsModule reaches back, so forwardRef.
     forwardRef(() => NotificationsModule),
+    // For ExchangeRateService: a series read fills its own exchange-rate gaps
+    // from the provider (`series-rate-fill.ts`). CurrenciesModule reaches back
+    // here through SecuritiesModule, so forwardRef.
+    forwardRef(() => CurrenciesModule),
   ],
   providers: [NetWorthService, PortfolioPeriodResultService],
   controllers: [NetWorthController],

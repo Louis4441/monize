@@ -1222,7 +1222,15 @@ describe("NetWorthService", () => {
 
       await service.getLlmHistory("user-1", "2024-01-01", "2024-12-31");
 
-      expect(spy).toHaveBeenCalledWith("user-1", "2024-01-01", "2024-12-31");
+      // `fetchMissing: false`: an LLM tool reads what is stored and never
+      // sends the server to a rate provider on a model's behalf.
+      expect(spy).toHaveBeenCalledWith(
+        "user-1",
+        "2024-01-01",
+        "2024-12-31",
+        undefined,
+        { fetchMissing: false },
+      );
       spy.mockRestore();
     });
 

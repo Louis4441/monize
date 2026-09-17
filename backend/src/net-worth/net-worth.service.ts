@@ -34,6 +34,12 @@ import {
   convertAtDate,
 } from "../common/time-series/rate-index.util";
 import { FxAggregate } from "../common/fx-aggregate";
+import { ExchangeRateService } from "../currencies/exchange-rate.service";
+import {
+  SeriesFetchOptions,
+  SeriesRateGap,
+  fillSeriesRates,
+} from "./series-rate-fill";
 import {
   applyActionToQuantity,
   INVESTMENT_REPLAY_ORDER,
@@ -257,7 +263,60 @@ export class NetWorthService {
     @Optional()
     @Inject(forwardRef(() => BalanceThresholdAlertService))
     private balanceAlerts?: BalanceThresholdAlertService,
+    // The read-path FX fill (see `computeWithRateFill`). Optional + forwardRef
+    // for the same two reasons: CurrenciesModule reaches back here through
+    // SecuritiesModule, and a harness that omits it simply reports the rates as
+    // missing, which is what the series did before the fill existed.
+    @Optional()
+    @Inject(forwardRef(() => ExchangeRateService))
+    private exchangeRates?: ExchangeRateService,
   ) {}
+
+  /**
+   * A series, computed once from what the database holds, and -- when that was
+   * not enough -- computed again from what the provider could add.
+   *
+   * The gap this closes: the daily refresh writes today only and
+   * `backfillHistoricalRates` skips a pair that has any row at all, so a user
+   * who bought their first EUR holding in June has no EUR->PLN observation for
+   * January through May and every chart point in that span reports the pair as
+   * missing. Nothing is wrong with the data path; nobody ever asked the
+   * provider. A read may ask, once, for the months its own diagnostics name.
+   *
+   * Three properties this shape is here to keep:
+   *
+   * - **Demand-driven.** The fetch plan comes from the points that actually
+   *     failed to convert, so a currency whose accounts held zero over the
+   *     window costs no provider call.
+   * - **Re-read, never patched.** A successful fill rebuilds the rate index
+   *     from the database and recomputes, so what the series converts with is
+   *     what a second request would find.
+   * - **Best-effort.** A provider failure is logged and the series renders with
+   *     the pair still missing; the request never fails because of the fill.
+   *     Nothing is invented -- INV-FX-001.
+   *
+   * It runs outside any transaction: `scopedQuery` opens and closes one per
+   * statement here, so the provider call is never made with a database
+   * transaction held open.
+   */
+  private async computeWithRateFill<R>(
+    compute: () => Promise<R>,
+    gapsOf: (result: R) => ReadonlyArray<SeriesRateGap>,
+    options?: SeriesFetchOptions,
+  ): Promise<R> {
+    const result = await compute();
+    const stored = await fillSeriesRates(
+      this.exchangeRates,
+      gapsOf(result),
+      options,
+      this.logger,
+    );
+    // `compute` reloads the rate index from the database on its second run, so
+    // the series converts with what was just persisted rather than with an
+    // in-memory patch of what it read the first time.
+    if (stored === 0) return result;
+    return compute();
+  }
 
   /**
    * One raw statement in its own short scoped transaction -- the RLS-compliant
@@ -647,7 +706,19 @@ export class NetWorthService {
       .substring(0, 10);
     const resolvedStart = startDate || defaultStart;
     const resolvedEnd = endDate || today.toISOString().substring(0, 10);
-    return this.getMonthlyNetWorth(userId, resolvedStart, resolvedEnd);
+    // `fetchMissing: false`: a tool call is not a user waiting on a chart. The
+    // model gets what the database holds, with the same completeness flags and
+    // the same named pairs it would get for any other gap, and no HTTP request
+    // to a provider is made on an LLM's behalf.
+    return this.getMonthlyNetWorth(
+      userId,
+      resolvedStart,
+      resolvedEnd,
+      undefined,
+      {
+        fetchMissing: false,
+      },
+    );
   }
 
   async getMonthlyNetWorth(
@@ -655,6 +726,7 @@ export class NetWorthService {
     startDate?: string,
     endDate?: string,
     jointScope?: JointNetWorthScope,
+    options?: SeriesFetchOptions,
   ): Promise<
     {
       month: string;
@@ -713,13 +785,37 @@ export class NetWorthService {
       }
     }
 
-    const rateIndex = await this.buildRateIndex(
-      currencies,
-      defaultCurrency,
-      start,
-      end,
+    return this.computeWithRateFill(
+      async () =>
+        this.foldMonthlyNetWorth(
+          snapshots,
+          defaultCurrency,
+          await this.buildRateIndex(currencies, defaultCurrency, start, end),
+        ),
+      // A monthly point's `month` is its month-first date, which is the month
+      // the fill fetches; the conversion happens at that month's end.
+      (months) =>
+        months.map((m) => ({
+          date: m.month,
+          missingRatePairs: m.missingRatePairs,
+        })),
+      options,
     );
+  }
 
+  /** The month-by-month fold of `getMonthlyNetWorth`, at one rate index. */
+  private foldMonthlyNetWorth(
+    snapshots: any[],
+    defaultCurrency: string,
+    rateIndex: RateIndex,
+  ): {
+    month: string;
+    assets: number;
+    liabilities: number;
+    netWorth: number;
+    fxComplete: boolean;
+    missingRatePairs: string[];
+  }[] {
     // Aggregate by month. Assets and liabilities each accumulate through an
     // FxAggregate so a month containing a component with no available rate
     // reports an unknown total instead of a plausible wrong one (P5-009).
@@ -856,6 +952,7 @@ export class NetWorthService {
     endDate?: string,
     accountIds?: string[],
     displayCurrency?: string,
+    options?: SeriesFetchOptions,
   ): Promise<
     {
       month: string;
@@ -915,6 +1012,54 @@ export class NetWorthService {
 
     if (snapshots.length === 0) return [];
 
+    const currencies = new Set<string>();
+    for (const s of snapshots) {
+      if (s.currency_code !== defaultCurrency) {
+        currencies.add(s.currency_code);
+      }
+    }
+
+    return this.computeWithRateFill(
+      () =>
+        this.foldMonthlyInvestments(
+          userId,
+          snapshots,
+          defaultCurrency,
+          currencies,
+          start,
+          end,
+        ),
+      (months) =>
+        months.map((m) => ({
+          date: m.month,
+          missingRatePairs: m.missingRatePairs,
+        })),
+      options,
+    );
+  }
+
+  /**
+   * The month-by-month fold of `getMonthlyInvestments`, at one rate index.
+   *
+   * The first-month cost basis is recomputed here rather than hoisted out
+   * because it converts too: after a fill stored the rates it was short of, its
+   * own gaps have to close with everyone else's.
+   */
+  private async foldMonthlyInvestments(
+    userId: string,
+    snapshots: any[],
+    defaultCurrency: string,
+    currencies: Set<string>,
+    start: string,
+    end: string,
+  ): Promise<
+    {
+      month: string;
+      value: number;
+      fxComplete: boolean;
+      missingRatePairs: string[];
+    }[]
+  > {
     // For the first active month of an account, the stored market_value is the
     // month-end snapshot which silently absorbs any gains/losses on positions
     // that were established earlier the same month -- skewing the chart's
@@ -929,13 +1074,6 @@ export class NetWorthService {
         start,
         end,
       );
-
-    const currencies = new Set<string>();
-    for (const s of snapshots) {
-      if (s.currency_code !== defaultCurrency) {
-        currencies.add(s.currency_code);
-      }
-    }
 
     const rateIndex = await this.buildRateIndex(
       currencies,
@@ -1199,6 +1337,7 @@ export class NetWorthService {
     endDate?: string,
     accountIds?: string[],
     displayCurrency?: string,
+    options?: SeriesFetchOptions,
   ): Promise<DailyInvestmentValue[]> {
     const pref = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(UserPreference).findOne({ where: { userId } }),
@@ -1335,18 +1474,59 @@ export class NetWorthService {
         currencies.add(sec.currencyCode);
       }
     }
-    const rateIndex = await this.buildRateIndex(
-      currencies,
-      defaultCurrency,
-      start,
-      end,
-    );
-
     // Build account currency map (used for cash balance conversion)
     const acctCurrency = new Map<string, string>();
     for (const a of investAccounts) {
       acctCurrency.set(a.id, a.currency_code);
     }
+
+    return this.computeWithRateFill(
+      async () =>
+        this.foldDailyInvestments(
+          await this.buildRateIndex(currencies, defaultCurrency, start, end),
+          {
+            dates,
+            invTxs,
+            securityMap,
+            pricesBySec,
+            txPricesBySec,
+            cashIds,
+            cashBalances,
+            acctCurrency,
+            defaultCurrency,
+          },
+        ),
+      (points) => points,
+      options,
+    );
+  }
+
+  /** The day-by-day fold of `getDailyInvestments`, at one rate index. */
+  private foldDailyInvestments(
+    rateIndex: RateIndex,
+    input: {
+      dates: string[];
+      invTxs: any[];
+      securityMap: Map<string, Security>;
+      pricesBySec: Map<string, PricePoint[]>;
+      txPricesBySec: Map<string, PricePoint[]>;
+      cashIds: string[];
+      cashBalances: Map<string, Map<string, number>>;
+      acctCurrency: Map<string, string>;
+      defaultCurrency: string;
+    },
+  ): DailyInvestmentValue[] {
+    const {
+      dates,
+      invTxs,
+      securityMap,
+      pricesBySec,
+      txPricesBySec,
+      cashIds,
+      cashBalances,
+      acctCurrency,
+      defaultCurrency,
+    } = input;
 
     // Replay holdings per-account day by day and compute market value
     // Key: account_id -> (security_id -> quantity)
@@ -1495,7 +1675,7 @@ export class NetWorthService {
       accountIds?: string[];
       displayCurrency?: string;
       limit?: number;
-    },
+    } & SeriesFetchOptions,
   ): Promise<InvestmentBreakdown> {
     const { granularity } = opts;
     const limit = opts.limit ?? 10;
@@ -1619,15 +1799,62 @@ export class NetWorthService {
         currencies.add(sec.currencyCode);
       }
     }
-    const rateIndex = await this.buildRateIndex(
-      currencies,
-      defaultCurrency,
-      start,
-      end,
-    );
-
     const acctCurrency = new Map<string, string>();
     for (const a of investAccounts) acctCurrency.set(a.id, a.currency_code);
+
+    return this.computeWithRateFill(
+      async () =>
+        this.foldInvestmentBreakdown(
+          await this.buildRateIndex(currencies, defaultCurrency, start, end),
+          {
+            granularity,
+            limit,
+            defaultCurrency,
+            sampleDates,
+            invTxs,
+            securityMap,
+            storedSeries,
+            txSeries,
+            cashIds,
+            cashBalances,
+            acctCurrency,
+          },
+        ),
+      (breakdown) => breakdown.points,
+      opts,
+    );
+  }
+
+  /** The point-by-point fold of `getInvestmentBreakdown`, at one rate index. */
+  private foldInvestmentBreakdown(
+    rateIndex: RateIndex,
+    input: {
+      granularity: InvestmentBreakdownGranularity;
+      limit: number;
+      defaultCurrency: string;
+      sampleDates: string[];
+      invTxs: any[];
+      securityMap: Map<string, Security>;
+      storedSeries: Map<string, PricePoint[]>;
+      txSeries: Map<string, PricePoint[]>;
+      cashIds: string[];
+      cashBalances: Map<string, Map<string, number>>;
+      acctCurrency: Map<string, string>;
+    },
+  ): InvestmentBreakdown {
+    const {
+      granularity,
+      limit,
+      defaultCurrency,
+      sampleDates,
+      invTxs,
+      securityMap,
+      storedSeries,
+      txSeries,
+      cashIds,
+      cashBalances,
+      acctCurrency,
+    } = input;
 
     // --- Replay holdings, accumulating per security --------------------------
     const holdings = new Map<string, number>(); // securityId -> quantity
