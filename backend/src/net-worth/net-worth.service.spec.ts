@@ -4011,12 +4011,71 @@ describe("NetWorthService", () => {
         date: "2024-05-01",
         total: 6000,
         values: { "sec-1": 1000, cash: 5000 },
+        cashComplete: true,
+        unknownCashAccountIds: [],
       });
       expect(result.points[1]).toEqual({
         date: "2024-06-01",
         total: 6100,
         values: { "sec-1": 1100, cash: 5000 },
+        cashComplete: true,
+        unknownCashAccountIds: [],
       });
+    });
+
+    /**
+     * #1389, in the breakdown: the per-point cash walk read the maps the query
+     * returned and defaulted a point it had no row for to zero, so a cash
+     * account that produced no balance for a day it was asked for contributed a
+     * real-looking zero to the stacked total. The balance query carries the
+     * opening balance and everything dated before the window, so a missing row
+     * is missing data, not an empty account.
+     */
+    it("says so when a scoped cash account produced no balance for a point", async () => {
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "cash-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_CASH",
+          currency_code: "USD",
+          opening_balance: 5000,
+        },
+        {
+          id: "cash-2",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_CASH",
+          currency_code: "USD",
+          opening_balance: 1000,
+        },
+      ]);
+      // No brokerage in scope, so no investment transactions are loaded.
+      securityRepository.findByIds.mockResolvedValue([]);
+      // The daily cash query answers for cash-1 only on the second day, and
+      // never for cash-2.
+      reportQuery.mockResolvedValueOnce([
+        { account_id: "cash-1", date: "2025-03-02", balance: "5000" },
+      ]);
+
+      const result = await service.getInvestmentBreakdown("user-1", {
+        granularity: "daily",
+        startDate: "2025-03-01",
+        endDate: "2025-03-02",
+      });
+
+      expect(result.points[0]).toMatchObject({
+        date: "2025-03-01",
+        cashComplete: false,
+        unknownCashAccountIds: ["cash-1", "cash-2"],
+      });
+      expect(result.points[1]).toMatchObject({
+        date: "2025-03-02",
+        cashComplete: false,
+        unknownCashAccountIds: ["cash-2"],
+      });
+      // What did resolve is still carried; it is the flag that says it is part.
+      expect(result.points[1].values.cash).toBe(5000);
     });
 
     it("values each daily point at the latest close on or before the date", async () => {
@@ -4064,8 +4123,20 @@ describe("NetWorthService", () => {
         { key: "sec-1", type: "security", symbol: "MSFT", name: "Microsoft" },
       ]);
       expect(result.points).toEqual([
-        { date: "2025-03-01", total: 1000, values: { "sec-1": 1000 } },
-        { date: "2025-03-02", total: 1000, values: { "sec-1": 1000 } },
+        {
+          date: "2025-03-01",
+          total: 1000,
+          values: { "sec-1": 1000 },
+          cashComplete: true,
+          unknownCashAccountIds: [],
+        },
+        {
+          date: "2025-03-02",
+          total: 1000,
+          values: { "sec-1": 1000 },
+          cashComplete: true,
+          unknownCashAccountIds: [],
+        },
       ]);
     });
 
@@ -4250,6 +4321,8 @@ describe("NetWorthService", () => {
           date: "2024-05-01",
           total: 1250,
           values: { "sec-1": 1000, other: 250 },
+          cashComplete: true,
+          unknownCashAccountIds: [],
         },
       ]);
     });

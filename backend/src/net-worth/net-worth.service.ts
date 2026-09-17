@@ -143,6 +143,15 @@ export interface InvestmentBreakdownPoint {
   total: number;
   /** Per-series value keyed by {@link InvestmentBreakdownSeries.key}. */
   values: Record<string, number>;
+  /**
+   * False when a cash account in the scope produced no balance for this point,
+   * so the cash band -- and therefore `total` -- is short a component whose
+   * value is unknown rather than zero. Read as `=== false`: an absent flag is
+   * an older backend saying nothing, which is no information (#1389).
+   */
+  cashComplete: boolean;
+  /** The accounts behind `cashComplete: false`. */
+  unknownCashAccountIds: string[];
 }
 
 export interface InvestmentBreakdown {
@@ -1623,6 +1632,8 @@ export class NetWorthService {
       date: string;
       valuesBySec: Map<string, number>;
       cash: number;
+      /** Scoped cash accounts with no balance for this point; see the point. */
+      unknownCashAccountIds: string[];
     }> = [];
 
     // Pairs the whole breakdown could not resolve a rate for. Collected across
@@ -1685,10 +1696,19 @@ export class NetWorthService {
       }
 
       // Cash maps are keyed by the sample date itself: day strings for daily,
-      // month-first strings for monthly.
+      // month-first strings for monthly. The walk is over the accounts IN
+      // SCOPE, not over the maps the query returned: an account with no row for
+      // a point it was asked for is a missing component, and `?? 0` turned
+      // exactly that into a real-looking zero balance (#1389).
       const cashAggregate = new FxAggregate();
-      for (const [acctId, dailyMap] of cashBalances) {
-        const bal = dailyMap.get(sampleDate) ?? 0;
+      const unknownCashAccountIds = new Set<string>();
+      for (const acctId of cashIds) {
+        const bal = cashBalances.get(acctId)?.get(sampleDate);
+        if (bal === undefined) {
+          unknownCashAccountIds.add(acctId);
+          continue;
+        }
+        // Zero needs no rate, and an emptied account is a settled zero.
         if (bal === 0) continue;
         const currency = acctCurrency.get(acctId) || defaultCurrency;
         cashAggregate.add(
@@ -1709,6 +1729,7 @@ export class NetWorthService {
         date: sampleDate,
         valuesBySec,
         cash: cashAggregate.knownSubtotal,
+        unknownCashAccountIds: [...unknownCashAccountIds].sort(),
       });
     }
 
@@ -1953,6 +1974,7 @@ export class NetWorthService {
       date: string;
       valuesBySec: Map<string, number>;
       cash: number;
+      unknownCashAccountIds: string[];
     }>,
     securityMap: Map<string, Security>,
     limit: number,
@@ -2020,7 +2042,13 @@ export class NetWorthService {
         values.cash = v;
         total += v;
       }
-      return { date: pt.date, total, values };
+      return {
+        date: pt.date,
+        total,
+        values,
+        cashComplete: pt.unknownCashAccountIds.length === 0,
+        unknownCashAccountIds: pt.unknownCashAccountIds,
+      };
     });
 
     return { series, points };
