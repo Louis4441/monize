@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { DataSource, In } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
+import { returnedRows } from "../common/db/query-result";
 import { FxAggregate } from "../common/fx-aggregate";
 import {
   preferredCurrency,
@@ -458,6 +459,25 @@ export class PortfolioService {
    * Uses DISTINCT ON for efficient single-pass query instead of correlated subquery
    */
   async getLatestPrices(securityIds: string[]): Promise<Map<string, number>> {
+    const observations = await this.getLatestPriceObservations(securityIds);
+    return new Map(
+      [...observations].map(([securityId, point]) => [securityId, point.close]),
+    );
+  }
+
+  /**
+   * The same latest observations, each with the date it was actually struck on.
+   *
+   * `getLatestPrices` is this query with the date dropped, so the two cannot
+   * name different rows: a caller that has to know whether today's valuation is
+   * dated today or carried forward from a month ago is asking about the very
+   * observation that priced it, and a second query would be a second rule. The
+   * daily portfolio-movement producer reads it for exactly that
+   * (INV-PORTMOVE-008).
+   */
+  async getLatestPriceObservations(
+    securityIds: string[],
+  ): Promise<Map<string, { close: number; date: string }>> {
     if (securityIds.length === 0) {
       return new Map();
     }
@@ -473,12 +493,19 @@ export class PortfolioService {
       ),
     );
 
-    const priceMap = new Map<string, number>();
-    for (const price of latestPrices) {
-      priceMap.set(price.security_id, Number(price.close_price));
+    const observations = new Map<string, { close: number; date: string }>();
+    for (const price of returnedRows<{
+      security_id: string;
+      close_price: string;
+      price_date: string | Date;
+    }>(latestPrices)) {
+      observations.set(price.security_id, {
+        close: Number(price.close_price),
+        date: priceDateYmd(price.price_date),
+      });
     }
 
-    return priceMap;
+    return observations;
   }
 
   /**

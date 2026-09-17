@@ -19,6 +19,10 @@ import {
 import { CreateNotificationInput } from "./notification.service";
 import { FlowSubtotal, foldExternalFlow } from "./portfolio-flow.util";
 import {
+  HeldPosition,
+  stalePricedSecurityIds,
+} from "./portfolio-price-freshness.util";
+import {
   NumberT,
   defaultNumberT,
   numberFormatterFor,
@@ -49,10 +53,19 @@ interface PortfolioStateRow {
  * and the day's cash that crossed the investment-account boundary from outside.
  * A subtotal is never fired and never becomes a baseline (INV-PORTMOVE-001).
  *
+ * Two things make the figure evidence rather than arithmetic. The flow is
+ * converted at the date each amount crossed the boundary, never at the run's
+ * date (INV-PORTMOVE-007), and a run in which a held position's latest close
+ * predates the baseline is withheld, because that position's value is carried
+ * from before the period and the day its price arrives would book the catch-up
+ * as a market move (INV-PORTMOVE-008).
+ *
  * The withhold policy and the arithmetic live in `decideMovement`
- * (`portfolio-movement.util.ts`) and the flow conversion in `foldExternalFlow`
- * (`portfolio-flow.util.ts`); both are pure and unit-tested. This service is the
- * cron plumbing, the flow query and the baseline read-modify-write.
+ * (`portfolio-movement.util.ts`), the flow conversion in `foldExternalFlow`
+ * (`portfolio-flow.util.ts`) and the freshness rule in `stalePricedSecurityIds`
+ * (`portfolio-price-freshness.util.ts`); all three are pure and unit-tested.
+ * This service is the cron plumbing, the flow query and the baseline
+ * read-modify-write.
  */
 @Injectable()
 export class PortfolioMovementAlertService {
@@ -132,24 +145,39 @@ export class PortfolioMovementAlertService {
           }
         : null;
 
-    // The flow only matters when there is a same-currency baseline to compare
-    // against; otherwise the decision rebaselines or withholds before reading it.
-    const flow =
+    // The flow and the price evidence only matter when there is a same-currency
+    // baseline to measure a period against; otherwise the decision rebaselines
+    // or withholds before reading either.
+    const comparable =
       baseline != null &&
       baseline.currency === currency &&
       state?.baseline_captured_on != null &&
-      summary.valuationComplete === true
-        ? await this.externalFlow(
-            userId,
-            state.baseline_captured_on,
-            today,
-            currency,
-          )
-        : { complete: true, value: 0 };
+      summary.valuationComplete === true;
+    const baselineDate = comparable
+      ? (state!.baseline_captured_on as string)
+      : null;
+
+    const flow =
+      baselineDate === null
+        ? { complete: true, value: 0 }
+        : await this.externalFlow(userId, baselineDate, today, currency);
+
+    const stale =
+      baselineDate === null
+        ? []
+        : await this.stalePricedHoldings(summary.holdings, baselineDate);
+    if (stale.length > 0) {
+      this.logger.warn(
+        `Portfolio movement withheld for user ${userId}: ${stale.length} held ` +
+          `position(s) priced before the ${baselineDate} baseline ` +
+          `(${stale.join(", ")})`,
+      );
+    }
 
     const inputs: MovementInputs = {
       mvComplete: summary.valuationComplete === true,
       mvToday: summary.totalPortfolioValue,
+      pricesCurrentSinceBaseline: stale.length === 0,
       currency,
       baseline,
       flow,
@@ -170,11 +198,40 @@ export class PortfolioMovementAlertService {
       buildPortfolioNotification(
         decision.fire,
         currency,
+        // `baselineDate` is non-null on every path that fires: a decision only
+        // reaches `fire` through the comparable branch above.
+        baselineDate ?? today,
         today,
         numberFormatterFor(prefs?.numberFormat, prefs?.language),
       ),
     );
     return written != null;
+  }
+
+  /**
+   * The held securities whose latest accepted close predates `baselineDate`.
+   *
+   * The dates come from the very observations that priced today's value
+   * (`PortfolioService.getLatestPriceObservations`, the dated form of the query
+   * `getPortfolioSummary` values from), so this cannot disagree with the figure
+   * it is vouching for. The policy is `stalePricedSecurityIds`
+   * (INV-PORTMOVE-008).
+   */
+  private async stalePricedHoldings(
+    holdings: readonly HeldPosition[],
+    baselineDate: string,
+  ): Promise<string[]> {
+    const securityIds = [
+      ...new Set(holdings.map((holding) => holding.securityId)),
+    ];
+    if (securityIds.length === 0) return [];
+    const observations =
+      await this.portfolio.getLatestPriceObservations(securityIds);
+    return stalePricedSecurityIds(
+      holdings,
+      (securityId) => observations.get(securityId)?.date ?? null,
+      baselineDate,
+    );
   }
 
   /** The user's reporting currency, resolved through the one shared reader. */
@@ -232,10 +289,16 @@ export class PortfolioMovementAlertService {
    * (`securities/external-flow.util.ts`), shared with the calendar's daily
    * change layer so the two surfaces cannot measure different things under one
    * name; its doc comment carries the classification and the two coarse cases
-   * (INV-PORTMOVE-006). What is this caller's own is the rate: each currency is
-   * resolved once, at TODAY's rate, through the shared rate service, and a
-   * currency with no rate makes the flow incomplete -- which withholds the
-   * movement rather than shrinking it (INV-PORTMOVE-002).
+   * (INV-PORTMOVE-006).
+   *
+   * What is this caller's own is the rate, and it is the flow's OWN date's, not
+   * the day the cron runs (INV-PORTMOVE-007). The subtotals are read per day
+   * and each `(date, currency)` pair is converted through the shared resolver
+   * at that date, so a Friday deposit is worth Friday's rate on a Monday run;
+   * pricing a weekend's flows at Monday's close moved the whole FX difference
+   * into the movement and reported it as a market return. A `(date, currency)`
+   * pair with no rate makes the flow incomplete -- which withholds the movement
+   * rather than shrinking it (INV-PORTMOVE-002).
    */
   private async externalFlow(
     userId: string,
@@ -246,26 +309,30 @@ export class PortfolioMovementAlertService {
     const subtotals = await loadExternalFlowSubtotals(
       (sql, params) =>
         withScopedDb(this.dataSource, (m) => m.query(sql, params)),
-      { userId, afterDate: sinceDate, throughDate: today },
+      { userId, afterDate: sinceDate, throughDate: today, perDay: true },
     );
 
     const flowRows: FlowSubtotal[] = subtotals.map((row) => ({
+      date: row.date,
       currency: row.currency,
       amount: row.amount,
     }));
 
-    // Resolve each currency's rate into the reporting currency, once.
+    // One resolution per (date, currency) pair, in historical mode: the rate
+    // that applied on the day the cash crossed the boundary.
     const rates = new Map<string, number | null>();
-    for (const { currency } of flowRows) {
-      if (rates.has(currency)) continue;
+    for (const { currency, date } of flowRows) {
+      const on = date ?? today;
+      const key = `${currency}@${on}`;
+      if (rates.has(key)) continue;
       rates.set(
-        currency,
+        key,
         currency === reportingCurrency
           ? 1
           : await this.exchangeRates.getRateForDate(
               currency,
               reportingCurrency,
-              today,
+              on,
             ),
       );
     }
@@ -273,36 +340,55 @@ export class PortfolioMovementAlertService {
     const folded = foldExternalFlow(
       flowRows,
       reportingCurrency,
-      (currency) => rates.get(currency) ?? null,
+      (currency, date) => rates.get(`${currency}@${date ?? today}`) ?? null,
     );
+    if (!folded.complete) {
+      this.logger.warn(
+        `Portfolio movement withheld for user ${userId}: external flow has no ` +
+          `rate for ${folded.missingPairs.join(", ")}`,
+      );
+    }
     return { complete: folded.complete, value: folded.value };
   }
 }
 
 /**
- * The notification a fired movement raises, as a pure function of the movement
- * and the reporting currency -- so the type/severity, deep link and `data`
- * snapshot are testable without the cron. Dedupe key carries the day, so at most
- * one movement alert exists per day.
+ * The notification a fired movement raises, as a pure function of the movement,
+ * the reporting currency and the two dates it spans -- so the type/severity,
+ * deep link and `data` snapshot are testable without the cron. Dedupe key
+ * carries the day, so at most one movement alert exists per day.
+ *
+ * The payload names what was measured and over which period, because a figure a
+ * reader cannot reproduce is a figure they have to trust: both boundary dates
+ * and all three components (`baselineValue`, `currentValue`, `externalFlow`) in
+ * the one currency. "Today" alone was wrong as often as it was right -- a Monday
+ * run measures from Friday -- so the copy names the period rather than the day.
  */
 export function buildPortfolioNotification(
   fire: FiredMovement,
   currency: string,
+  baselineDate: string,
   today: string,
   n: NumberT = defaultNumberT,
 ): CreateNotificationInput {
+  const percent = n.formatPercentTrimmed(Math.abs(fire.changePercent));
+  const moved = fire.direction === "up" ? "up" : "down";
   return {
     type: NotificationType.PORTFOLIO_MOVEMENT,
     severity: NotificationSeverity.INFO,
     title: "Investment value moved",
     message:
-      fire.direction === "up"
-        ? `Your investments are up ${n.formatPercentTrimmed(fire.changePercent)} today (excluding deposits). Open Monize for the details.`
-        : `Your investments are down ${n.formatPercentTrimmed(Math.abs(fire.changePercent))} today (excluding deposits). Open Monize for the details.`,
+      `Your investments are ${moved} ${percent} from ${baselineDate} to ` +
+      `${today} (excluding deposits and withdrawals). Open Monize for the details.`,
     data: {
       changePercent: fire.changePercent,
       direction: fire.direction,
       movementValue: fire.movementValue,
+      baselineValue: fire.baselineValue,
+      currentValue: fire.currentValue,
+      externalFlow: fire.externalFlow,
+      baselineDate,
+      valuationDate: today,
       currencyCode: currency,
     },
     target: "/investments",

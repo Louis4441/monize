@@ -3,6 +3,7 @@ import { MovementInputs, decideMovement } from "./portfolio-movement.util";
 const base = (over: Partial<MovementInputs>): MovementInputs => ({
   mvComplete: true,
   mvToday: 100_000,
+  pricesCurrentSinceBaseline: true,
   currency: "USD",
   baseline: { value: 100_000, currency: "USD" },
   flow: { complete: true, value: 0 },
@@ -88,6 +89,10 @@ describe("decideMovement", () => {
       changePercent: -8,
       direction: "down",
       movementValue: -8_000,
+      // The components travel with the figure so a reader can reproduce it.
+      baselineValue: 100_000,
+      currentValue: 92_000,
+      externalFlow: 0,
     });
     expect(d.rebaselineTo).toBe(92_000);
   });
@@ -100,7 +105,33 @@ describe("decideMovement", () => {
       changePercent: 6,
       direction: "up",
       movementValue: 6_000,
+      baselineValue: 100_000,
+      currentValue: 106_000,
+      externalFlow: 0,
     });
+  });
+
+  it("withholds and does not rebaseline on a holding priced before the baseline", () => {
+    // INV-PORTMOVE-008: part of today's value is carried from before the period,
+    // so the difference is not a market move. Withholding rather than
+    // rebaselining is what stops the catch-up firing on the day the price lands.
+    const d = decideMovement(
+      base({
+        mvToday: 92_000,
+        baseline: { value: 100_000, currency: "USD" },
+        pricesCurrentSinceBaseline: false,
+      }),
+    );
+    expect(d).toEqual({ fire: null, rebaselineTo: null });
+  });
+
+  it("ignores stale prices before there is a baseline to be stale against", () => {
+    const d = decideMovement(
+      base({ baseline: null, pricesCurrentSinceBaseline: false }),
+    );
+    // The producer passes `true` here; even so, a first capture must not be
+    // blocked by a rule about a period that does not exist yet.
+    expect(d.rebaselineTo).toBe(100_000);
   });
 
   it("stays silent below the threshold but still rebaselines", () => {
