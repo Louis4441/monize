@@ -5,6 +5,7 @@ import {
   DailyInvestmentValue,
   InvestmentBreakdown,
   InvestmentBreakdownGranularity,
+  PortfolioPeriodResult,
 } from '@/types/net-worth';
 
 export const netWorthApi = {
@@ -58,6 +59,31 @@ export const netWorthApi = {
   }): Promise<{ date: string | null }> => {
     const response = await apiClient.get<{ date: string | null }>(
       '/net-worth/investments-first-priced-day',
+      { params },
+    );
+    return response.data;
+  },
+
+  /**
+   * What the portfolio did over the window, net of the money its owner moved
+   * in or out: `valueChange`, `netExternalFlows` and `investmentResult` as
+   * three separate figures, with a percentage only over the last of them.
+   *
+   * `baselineDate` is the close the period is measured from where that is
+   * earlier than `startDate` -- the 1d / 1w / mtd ranges report against the
+   * previous trading day's close. The client picks the date; the server does
+   * the arithmetic, so no surface can disagree with another about what the
+   * portfolio earned.
+   */
+  getInvestmentsPeriodResult: async (params: {
+    startDate: string;
+    endDate?: string;
+    baselineDate?: string;
+    accountIds?: string;
+    displayCurrency?: string;
+  }): Promise<PortfolioPeriodResult> => {
+    const response = await apiClient.get<PortfolioPeriodResult>(
+      '/net-worth/investments-period-result',
       { params },
     );
     return response.data;

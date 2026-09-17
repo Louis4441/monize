@@ -1,0 +1,40 @@
+import { describe, it, expect } from 'vitest';
+import { periodResultUnknownReason } from './portfolio-period-result';
+
+/**
+ * One glyph, five server reasons: the mapping decides which repair the reader
+ * is sent to, and sending them to the wrong screen is the defect `displayFx`
+ * exists to avoid.
+ */
+describe('periodResultUnknownReason', () => {
+  it('sends an unpriced holding to the security, not to the rates', () => {
+    expect(periodResultUnknownReason(['incompletePrices'])).toBe('noPrice');
+  });
+
+  it('sends a cash gap to neither a price nor a rate', () => {
+    expect(periodResultUnknownReason(['incompleteCash'])).toBe('noCashBalance');
+  });
+
+  it('sends an unconvertible amount to the rates', () => {
+    expect(periodResultUnknownReason(['missingRatePairs'])).toBe('displayFx');
+  });
+
+  it.each(['zeroStart', 'noValueSeries'] as const)(
+    'treats %s as a boundary with nothing to repair',
+    (reason) => {
+      expect(periodResultUnknownReason([reason])).toBe('noBaseline');
+    },
+  );
+
+  it('names the price when a day is short of more than one component', () => {
+    // A price is the repair the reader can make first, and repairing it may
+    // resolve the rest of the day; the banner still carries every cause.
+    expect(
+      periodResultUnknownReason(['missingRatePairs', 'incompletePrices']),
+    ).toBe('noPrice');
+  });
+
+  it('says nothing about a reason list it was never given', () => {
+    expect(periodResultUnknownReason([])).toBe('noBaseline');
+  });
+});

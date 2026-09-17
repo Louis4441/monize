@@ -157,6 +157,7 @@ vi.mock('@/components/investments/portfolio-chart-utils', async (importActual) =
 const mockGetInvestmentsMonthly = vi.fn();
 const mockGetInvestmentsDaily = vi.fn();
 const mockGetInvestmentsBreakdown = vi.fn();
+const mockGetPeriodResult = vi.fn();
 const mockGetPortfolioSummary = vi.fn();
 const mockGetInvestmentAccounts = vi.fn();
 const mockGetIntradayValue = vi.fn();
@@ -167,6 +168,7 @@ vi.mock('@/lib/net-worth', () => ({
     getInvestmentsMonthly: (...args: any[]) => mockGetInvestmentsMonthly(...args),
     getInvestmentsDaily: (...args: any[]) => mockGetInvestmentsDaily(...args),
     getInvestmentsBreakdown: (...args: any[]) => mockGetInvestmentsBreakdown(...args),
+    getInvestmentsPeriodResult: (...args: any[]) => mockGetPeriodResult(...args),
   },
 }));
 
@@ -198,6 +200,31 @@ const emptyPortfolio = {
   totalGainLossPercent: 0,
 };
 
+/**
+ * The server's period result, complete unless a case says otherwise. Every
+ * figure the KPI cards print comes from here: the report does no arithmetic
+ * over the plotted series any more (#1392).
+ */
+const periodResult = (overrides: Record<string, unknown> = {}) => ({
+  currency: 'CAD',
+  startDate: '2024-01-01',
+  endDate: '2026-01-01',
+  startValue: 50000,
+  endValue: 55000,
+  valueChange: 5000,
+  netExternalFlows: 0,
+  knownFlowSubtotal: 0,
+  investmentResult: 5000,
+  returnPercent: 10,
+  returnMethod: 'simple' as const,
+  complete: true,
+  reasons: [] as string[],
+  missingRatePairs: [] as string[],
+  unpricedSecurityIds: [] as string[],
+  unknownCashAccountIds: [] as string[],
+  ...overrides,
+});
+
 describe('PortfolioValueReport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -206,10 +233,12 @@ describe('PortfolioValueReport', () => {
     mockDateRangeValue = '2y';
     mockSeriesMode = 'total';
     mockStoredValues.clear();
+    mockGetPeriodResult.mockResolvedValue(periodResult());
   });
 
   it('shows loading state initially', () => {
     mockGetInvestmentsMonthly.mockReturnValue(new Promise(() => {}));
+    mockGetPeriodResult.mockReturnValue(new Promise(() => {}));
     mockGetPortfolioSummary.mockReturnValue(new Promise(() => {}));
     mockGetInvestmentAccounts.mockReturnValue(new Promise(() => {}));
     render(<PortfolioValueReport />);
@@ -258,8 +287,9 @@ describe('PortfolioValueReport', () => {
       expect(screen.getByText('Highest Value')).toBeInTheDocument();
     });
     expect(screen.getByText('Lowest Value')).toBeInTheDocument();
-    expect(screen.getByText('Period Change')).toBeInTheDocument();
-    expect(screen.getByText('Period Return')).toBeInTheDocument();
+    expect(screen.getByText('Value Change')).toBeInTheDocument();
+    expect(screen.getByText('Net Deposits and Withdrawals')).toBeInTheDocument();
+    expect(screen.getByText('Investment Result')).toBeInTheDocument();
   });
 
   it('lets the user dismiss a high or low value bubble without persisting it', async () => {
@@ -511,10 +541,19 @@ describe('PortfolioValueReport', () => {
       totalGainLossPercent: -8.33,
     });
     mockGetInvestmentAccounts.mockResolvedValue([]);
+    mockGetPeriodResult.mockResolvedValue(
+      periodResult({
+        valueChange: -5000,
+        investmentResult: -5000,
+        returnPercent: -8.33,
+      }),
+    );
     render(<PortfolioValueReport />);
     await waitFor(() => {
-      expect(screen.getByText('Period Change')).toBeInTheDocument();
+      expect(screen.getByText('Value Change')).toBeInTheDocument();
     });
+    // The percentage belongs to the result, never to the value change.
+    expect(screen.getByText('-8.3%')).toBeInTheDocument();
   });
 
   it('handles many monthly data points (>36) for axis ticks', async () => {
@@ -692,8 +731,44 @@ describe('PortfolioValueReport', () => {
       await waitFor(() => expect(kpi('Lowest Value')).toContain('N/A'));
       expect(kpi('Lowest Value')).not.toContain('$50000');
       expect(kpi('Highest Value')).toContain('N/A');
-      expect(kpi('Period Change')).toContain('N/A');
-      expect(kpi('Period Return')).toContain('N/A');
+    });
+
+    /**
+     * The money figures are the server's, so what withholds them is the
+     * server's answer and not the chart's: a period whose boundary day was a
+     * subtotal comes back with every figure null and the cause named, and each
+     * card draws the unknown marker rather than a number.
+     */
+    it('draws the unknown marker on each money card the server withheld', async () => {
+      mockDateRangeValue = '3m';
+      mockGetInvestmentsDaily.mockResolvedValue([
+        { date: '2024-06-01', value: 50000 },
+        { date: '2024-06-02', value: 51000 },
+      ]);
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      mockGetPeriodResult.mockResolvedValue(
+        periodResult({
+          valueChange: null,
+          netExternalFlows: null,
+          investmentResult: null,
+          returnPercent: null,
+          complete: false,
+          reasons: ['incompletePrices'],
+          unpricedSecurityIds: ['sec-1'],
+        }),
+      );
+      render(<PortfolioValueReport />);
+      await waitFor(() => {
+        expect(screen.getByText('Value Change')).toBeInTheDocument();
+      });
+
+      await waitFor(() =>
+        expect(screen.getAllByTestId('unknown-amount')).toHaveLength(3),
+      );
+      expect(kpi('Value Change')).not.toContain('$');
+      expect(kpi('Net Deposits and Withdrawals')).not.toContain('$');
+      expect(kpi('Investment Result')).toContain('N/A');
     });
 
     it('prints the figures when every day is complete', async () => {
@@ -725,7 +800,7 @@ describe('PortfolioValueReport', () => {
 
       await waitFor(() => expect(kpi('Lowest Value')).toContain('$50000'));
       expect(kpi('Highest Value')).toContain('$51000');
-      expect(kpi('Period Change')).not.toContain('N/A');
+      expect(kpi('Value Change')).not.toContain('N/A');
     });
 
     it('says nothing about completeness a response never claimed', async () => {
@@ -894,7 +969,7 @@ describe('PortfolioValueReport', () => {
       ).not.toContain('$40000');
     });
 
-    it('measures the mtd change from the close before the month started', async () => {
+    it('asks for the period result against the close before the month started', async () => {
       mockDateRangeValue = 'mtd';
       mockGetIntradayValue.mockResolvedValue(
         intraday([
@@ -902,29 +977,32 @@ describe('PortfolioValueReport', () => {
           { timestamp: '2024-01-10T14:30:00Z', value: 52000 },
         ]),
       );
-      mockGetInvestmentsDaily.mockResolvedValue([
-        { date: '2023-12-31', value: 49000 },
-      ]);
       mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
       mockGetInvestmentAccounts.mockResolvedValue([]);
+      mockGetPeriodResult.mockResolvedValue(
+        periodResult({ valueChange: 3000, investmentResult: 3000 }),
+      );
       render(<PortfolioValueReport />);
       await waitFor(() => {
-        expect(screen.getByText('Period Change')).toBeInTheDocument();
+        expect(screen.getByText('Value Change')).toBeInTheDocument();
       });
 
+      // The baseline is the day before the first point ON SCREEN, and the
+      // server measures from it: the client picks the date and nothing else.
       await waitFor(() =>
-        expect(mockGetInvestmentsDaily).toHaveBeenCalledWith(
-          expect.objectContaining({ endDate: '2024-01-01' }),
+        expect(mockGetPeriodResult).toHaveBeenCalledWith(
+          expect.objectContaining({ baselineDate: '2024-01-01' }),
         ),
       );
       await waitFor(() =>
         expect(
-          screen.getByText('Period Change').parentElement!.textContent,
+          screen.getByText('Value Change').parentElement!.textContent,
         ).toContain('+$3000'),
       );
-      // Not the change from the first point plotted.
+      // Not the change between the two points plotted, which is what the
+      // client used to work out for itself.
       expect(
-        screen.getByText('Period Change').parentElement!.textContent,
+        screen.getByText('Value Change').parentElement!.textContent,
       ).not.toContain('+$2000');
     });
 
@@ -964,114 +1042,72 @@ describe('PortfolioValueReport', () => {
     });
   });
 
-  describe('prior-close change baseline', () => {
+  describe('prior-close baseline', () => {
     /** Text of the summary card carrying `label`. */
     const card = (label: string) => screen.getByText(label).parentElement!.textContent;
 
-    it('measures the 1w change from the close before the week shown', async () => {
+    const intradayWeek = () => ({
+      points: [
+        { timestamp: '2024-06-03T13:30:00Z', value: 50000 },
+        { timestamp: '2024-06-07T20:00:00Z', value: 51000 },
+      ],
+      interval: '15m',
+      currency: 'CAD',
+      range: '1w',
+      fetchedAt: new Date().toISOString(),
+      skippedSymbols: [],
+      fallbackToDaily: false,
+    });
+
+    it('sends the close before the week shown as the baseline', async () => {
       mockDateRangeValue = '1w';
-      mockGetIntradayValue.mockResolvedValue({
-        points: [
-          { timestamp: '2024-06-03T13:30:00Z', value: 50000 },
-          { timestamp: '2024-06-07T20:00:00Z', value: 51000 },
-        ],
-        interval: '15m',
-        currency: 'CAD',
-        range: '1w',
-        fetchedAt: new Date().toISOString(),
-        skippedSymbols: [],
-        fallbackToDaily: false,
-      });
-      // Jun 1/2 is a weekend, so the Jun 2 point already carries Friday's close.
-      mockGetInvestmentsDaily.mockResolvedValue([
-        { date: '2024-06-01', value: 49000 },
-        { date: '2024-06-02', value: 49000 },
-      ]);
+      mockGetIntradayValue.mockResolvedValue(intradayWeek());
       mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
       mockGetInvestmentAccounts.mockResolvedValue([]);
+      mockGetPeriodResult.mockResolvedValue(
+        periodResult({
+          startDate: '2024-06-02',
+          valueChange: 2000,
+          investmentResult: 2000,
+          returnPercent: 4.08,
+        }),
+      );
       render(<PortfolioValueReport />);
       await waitFor(() => {
-        expect(screen.getByText('Period Change')).toBeInTheDocument();
+        expect(screen.getByText('Value Change')).toBeInTheDocument();
       });
 
       await waitFor(() =>
-        expect(mockGetInvestmentsDaily).toHaveBeenCalledWith(
-          expect.objectContaining({ endDate: '2024-06-02' }),
+        expect(mockGetPeriodResult).toHaveBeenCalledWith(
+          expect.objectContaining({ baselineDate: '2024-06-02' }),
         ),
       );
-      await waitFor(() => expect(card('Period Change')).toContain('+$2000'));
-      // Not the change from the first point plotted, which is what this
-      // measured before and would still read as plausible.
-      expect(card('Period Change')).not.toContain('+$1000');
-      expect(card('Period Return')).toContain('+4.1%');
+      await waitFor(() => expect(card('Value Change')).toContain('+$2000'));
+      // Not the move between the two points plotted, which is the figure the
+      // report used to derive for itself.
+      expect(card('Value Change')).not.toContain('+$1000');
+      expect(card('Investment Result')).toContain('+4.1%');
     });
 
-    it('reports the change as unknown when the baseline cannot be loaded', async () => {
+    it('reports every figure as unknown when the server cannot answer', async () => {
       mockDateRangeValue = '1w';
-      mockGetIntradayValue.mockResolvedValue({
-        points: [
-          { timestamp: '2024-06-03T13:30:00Z', value: 50000 },
-          { timestamp: '2024-06-07T20:00:00Z', value: 51000 },
-        ],
-        interval: '15m',
-        currency: 'CAD',
-        range: '1w',
-        fetchedAt: new Date().toISOString(),
-        skippedSymbols: [],
-        fallbackToDaily: false,
-      });
-      mockGetInvestmentsDaily.mockRejectedValue(new Error('baseline unavailable'));
+      mockGetIntradayValue.mockResolvedValue(intradayWeek());
       mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
       mockGetInvestmentAccounts.mockResolvedValue([]);
+      mockGetPeriodResult.mockRejectedValue(new Error('period result unavailable'));
       render(<PortfolioValueReport />);
       await waitFor(() => {
-        expect(screen.getByText('Period Change')).toBeInTheDocument();
+        expect(screen.getByText('Value Change')).toBeInTheDocument();
       });
 
-      // A missing baseline is not a change of zero, and not the first point's
+      // A failed request is not a change of zero, and not the first point's
       // change wearing the prior close's label.
-      await waitFor(() => expect(card('Period Change')).toContain('N/A'));
-      expect(card('Period Return')).toContain('N/A');
-      expect(card('Period Change')).not.toContain('$1000');
+      await waitFor(() => expect(card('Investment Result')).toContain('N/A'));
+      expect(card('Value Change')).not.toContain('$1000');
+      expect(screen.getAllByTestId('unknown-amount').length).toBeGreaterThan(0);
     });
 
-    /**
-     * The period-start alternative was a user preference
-     * (`portfolio_change_baseline`, migration 152, dropped by 153). With it
-     * gone, a prior-close range always looks the close up.
-     */
-    it('always uses the prior close on a short range', async () => {
-      mockDateRangeValue = '1w';
-      mockGetIntradayValue.mockResolvedValue({
-        points: [
-          { timestamp: '2024-06-03T13:30:00Z', value: 50000 },
-          { timestamp: '2024-06-07T20:00:00Z', value: 51000 },
-        ],
-        interval: '15m',
-        currency: 'CAD',
-        range: '1w',
-        fetchedAt: new Date().toISOString(),
-        skippedSymbols: [],
-        fallbackToDaily: false,
-      });
-      mockGetInvestmentsDaily.mockResolvedValue([
-        { date: '2024-06-02', value: 49000 },
-      ]);
-      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
-      mockGetInvestmentAccounts.mockResolvedValue([]);
-      render(<PortfolioValueReport />);
-      await waitFor(() => {
-        expect(screen.getByText('Period Change')).toBeInTheDocument();
-      });
-
-      // From 49000, not from the 50000 first point.
-      await waitFor(() => expect(card('Period Change')).toContain('+$2000'));
-      expect(mockGetInvestmentsDaily).toHaveBeenCalled();
-    });
-
-    it('still measures a long range from the first point plotted', async () => {
-      // 2y: the window opens on an arbitrary calendar date, and its first
-      // point already is that month's close.
+    it('sends no baseline on a long range, which measures from its first point', async () => {
       mockGetInvestmentsMonthly.mockResolvedValue([
         { month: '2024-06-01', value: 50000 },
         { month: '2024-07-01', value: 55000 },
@@ -1080,10 +1116,13 @@ describe('PortfolioValueReport', () => {
       mockGetInvestmentAccounts.mockResolvedValue([]);
       render(<PortfolioValueReport />);
       await waitFor(() => {
-        expect(screen.getByText('Period Change')).toBeInTheDocument();
+        expect(screen.getByText('Value Change')).toBeInTheDocument();
       });
-      await waitFor(() => expect(card('Period Change')).toContain('+$5000'));
-      expect(mockGetInvestmentsDaily).not.toHaveBeenCalled();
+
+      await waitFor(() => expect(card('Value Change')).toContain('+$5000'));
+      expect(mockGetPeriodResult).toHaveBeenCalledWith(
+        expect.objectContaining({ baselineDate: undefined }),
+      );
     });
   });
 
@@ -1141,12 +1180,15 @@ describe('PortfolioValueReport', () => {
     expect(mockGetInvestmentsDaily).toHaveBeenCalled();
   });
 
-  it('computes summary with single chart point (initial === current, change = 0)', async () => {
+  it('prints the zero return the server sent over a single chart point', async () => {
     mockGetInvestmentsMonthly.mockResolvedValue([
       { month: '2024-06-01', value: 50000 },
     ]);
     mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
     mockGetInvestmentAccounts.mockResolvedValue([]);
+    mockGetPeriodResult.mockResolvedValue(
+      periodResult({ valueChange: 0, investmentResult: 0, returnPercent: 0 }),
+    );
     render(<PortfolioValueReport />);
     await waitFor(() => {
       expect(screen.getByText('+0.0%')).toBeInTheDocument();

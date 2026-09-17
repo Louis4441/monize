@@ -18,7 +18,7 @@ import { chartColors, chartSeriesColor } from '@/lib/chart-colors';
 import { netWorthApi } from '@/lib/net-worth';
 import { investmentsApi } from '@/lib/investments';
 import { PortfolioSummary } from '@/types/investment';
-import { InvestmentBreakdownSeries } from '@/types/net-worth';
+import { InvestmentBreakdownSeries, PortfolioPeriodResult } from '@/types/net-worth';
 import { Account } from '@/types/account';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -28,7 +28,6 @@ import { useDateRange } from '@/hooks/useDateRange';
 import { usePortfolioRangeWindow } from '@/hooks/usePortfolioRangeWindow';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
-import { usePortfolioChangeBaseline } from '@/hooks/usePortfolioChangeBaseline';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
@@ -41,9 +40,10 @@ import type {
   SortColumnsByField as TableSortColumnsByField,
 } from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
-import { exportToCsv } from '@/lib/csv-export';
+import { exportCsvSections } from '@/lib/csv-export';
 import { createLogger } from '@/lib/logger';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { UnknownAmount } from '@/components/ui/UnknownAmount';
 
 type PortfolioBreakdownSortField = 'account' | 'holdings' | 'cash' | 'total' | 'gainLoss';
 type PortfolioChartSortField = 'name' | 'value';
@@ -69,6 +69,12 @@ type SecuritiesBreakdown = {
     iso: string;
     total: number;
     values: Record<string, number>;
+    /**
+     * The server's completeness for this point, absent where the endpoint
+     * reports none (intraday). Absent is NO INFORMATION, so every read is
+     * `=== false`.
+     */
+    complete?: boolean;
   }>;
   kind: 'daily' | 'monthly' | 'intraday';
 };
@@ -85,8 +91,10 @@ import {
 } from '@/components/investments/portfolio-chart-utils';
 import {
   isoDatePart,
-  priorCloseChange,
+  previousCalendarDay,
+  usesPriorCloseBaseline,
 } from '@/components/investments/portfolio-change-baseline';
+import { periodResultUnknownReason } from '@/components/investments/portfolio-period-result';
 import { preferredCurrency } from '@/lib/default-currency';
 
 const logger = createLogger('PortfolioValueReport');
@@ -178,6 +186,13 @@ export function PortfolioValueReport() {
   const [chartPoints, setChartPoints] = useState<
     Array<{ name: string; Value: number; iso: string; complete?: boolean }>
   >([]);
+  // What the portfolio DID over the window, as the server worked it out: the
+  // value change, the money the reader moved in or out, and what is left. Null
+  // until it answers, and never re-derived here -- deriving a change from the
+  // plotted series is exactly what reported a deposit as a gain (#1392).
+  const [periodResult, setPeriodResult] = useState<PortfolioPeriodResult | null>(
+    null,
+  );
   const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   // Account filter is persisted so the report opens on the same set of accounts
@@ -374,10 +389,19 @@ export function PortfolioValueReport() {
         iso: p.date,
         total: p.total,
         values: p.values,
+        // A point missing a cash balance, or a breakdown missing a rate, is a
+        // subtotal: the KPI cards refuse to call it a high or a low. Read as
+        // `=== false` -- an older backend sends neither flag (#1389).
+        complete: p.cashComplete !== false && data.fxComplete !== false,
       }));
       setBreakdown({ series: data.series, points, kind: granularity });
       setChartPoints(
-        points.map((p) => ({ name: p.name, Value: p.total, iso: p.iso })),
+        points.map((p) => ({
+          name: p.name,
+          Value: p.total,
+          iso: p.iso,
+          complete: p.complete,
+        })),
       );
     };
 
@@ -561,26 +585,55 @@ export function PortfolioValueReport() {
     formatChartDate,
   ]);
 
-  // On 1D / 1W / MTD the change is reported against the close of the trading
-  // day before the window rather than against the first point drawn, unless the
-  // user's Settings preference says otherwise. The baseline is looked up for
-  // the first point actually on screen.
-  const { usesPriorClose, priorClose } = usePortfolioChangeBaseline({
-    range: dateRange,
-    firstPointDate: isoDatePart(chartPoints[0]?.iso),
-    accountIds:
-      selectedAccountIds.length > 0 ? selectedAccountIds.join(',') : undefined,
-    displayCurrency: foreignCurrency || undefined,
-  });
+  // On 1D / 1W / MTD the period is measured from the close of the trading day
+  // before the window rather than from the first point drawn. Which date that
+  // is, is all this layer decides: the arithmetic over it is the server's.
+  const usesPriorClose = usesPriorCloseBaseline(dateRange);
+  const firstPointDate = isoDatePart(chartPoints[0]?.iso);
+  const periodSeqRef = useRef(0);
+
+  useEffect(() => {
+    if (!isValid) return;
+    // A prior-close range measures from the close before the first point ON
+    // SCREEN, so it waits for that point rather than guessing at a date.
+    if (usesPriorClose && !firstPointDate) return;
+    const seq = ++periodSeqRef.current;
+    netWorthApi
+      .getInvestmentsPeriodResult({
+        startDate: chartWindow.start,
+        endDate: chartWindow.end,
+        baselineDate:
+          usesPriorClose && firstPointDate
+            ? previousCalendarDay(firstPointDate)
+            : undefined,
+        accountIds:
+          selectedAccountIds.length > 0
+            ? selectedAccountIds.join(',')
+            : undefined,
+        displayCurrency: foreignCurrency || undefined,
+      })
+      .then((result) => {
+        if (periodSeqRef.current === seq) setPeriodResult(result);
+      })
+      .catch((error) => {
+        logger.error('Failed to load the period result:', error);
+        // A failed request is not a period that did nothing: every figure stays
+        // unknown until the server answers.
+        if (periodSeqRef.current === seq) setPeriodResult(null);
+      });
+  }, [
+    chartWindow,
+    isValid,
+    usesPriorClose,
+    firstPointDate,
+    selectedAccountIds,
+    foreignCurrency,
+    reloadKey,
+  ]);
 
   const summary = useMemo(() => {
     if (chartPoints.length === 0) {
-      return {
-        change: 0 as number | null,
-        changePercent: 0 as number | null,
-        highest: 0 as number | null,
-        lowest: 0 as number | null,
-      };
+      return { highest: null as number | null, lowest: null as number | null };
     }
     const values = chartPoints.map((d) => d.Value);
     // A point the server could not finish is a subtotal, and a subtotal can sit
@@ -588,39 +641,20 @@ export function PortfolioValueReport() {
     // missing a component. One incomplete point therefore leaves BOTH extremes
     // unknown rather than quietly ranking a partial figure against whole ones.
     const extremesKnown = chartPoints.every((p) => p.complete !== false);
-    const highest = extremesKnown ? Math.max(...values) : null;
-    const lowest = extremesKnown ? Math.min(...values) : null;
-    const lastPoint = chartPoints[chartPoints.length - 1];
-    const firstPoint = chartPoints[0];
-    const current = lastPoint?.Value || 0;
-    // A change is a difference of its two endpoints, so an endpoint that is a
-    // subtotal makes the difference unknown, not approximate.
-    const endpointIncomplete =
-      lastPoint?.complete === false ||
-      (!usesPriorClose && firstPoint?.complete === false);
-    if (endpointIncomplete) {
-      return { change: null, changePercent: null, highest, lowest };
-    }
-    if (usesPriorClose) {
-      // A baseline that has not loaded (or could not be established) leaves
-      // the change unknown -- never the first point's change wearing the
-      // prior close's label.
-      return {
-        highest,
-        lowest,
-        ...priorCloseChange(current, priorClose?.value ?? null),
-      };
-    }
-    const initial = firstPoint?.Value || 0;
-    const change = current - initial;
-    const changePercent = initial !== 0 ? (change / Math.abs(initial)) * 100 : 0;
     return {
-      change: change as number | null,
-      changePercent: changePercent as number | null,
-      highest,
-      lowest,
+      highest: extremesKnown ? Math.max(...values) : null,
+      lowest: extremesKnown ? Math.min(...values) : null,
     };
-  }, [chartPoints, usesPriorClose, priorClose]);
+  }, [chartPoints]);
+
+  // The three figures the cards print, and the one repair a withheld one points
+  // at. Every completeness read is the server's: `null` means it withheld the
+  // figure and said why, and nothing here recomputes it from the chart.
+  const valueChange = periodResult?.valueChange ?? null;
+  const netExternalFlows = periodResult?.netExternalFlows ?? null;
+  const investmentResult = periodResult?.investmentResult ?? null;
+  const returnPercent = periodResult?.returnPercent ?? null;
+  const unknownReason = periodResultUnknownReason(periodResult?.reasons ?? []);
 
   // Which KPI captions the window cannot stand behind, so the cards say so
   // rather than printing a partial figure under a total's caption.
@@ -771,6 +805,16 @@ export function PortfolioValueReport() {
   };
   const breakdownSortColumns: readonly PortfolioBreakdownSortColumn[] = Object.values(breakdownColumns);
 
+  // A withheld figure prints as unavailable and in grey wherever the export
+  // formats cannot carry the marker the cards use. Never a zero, and never the
+  // gain colour over nothing.
+  const signedMoneyText = (value: number | null) =>
+    value === null
+      ? t('portfolioValue.notAvailable')
+      : `${value >= 0 ? '+' : ''}${fmtVal(value)}`;
+  const signedColour = (value: number | null) =>
+    value === null ? '#6b7280' : value >= 0 ? '#16a34a' : '#dc2626';
+
   const handleExportPdf = async () => {
     const { exportToPdf } = await import('@/lib/pdf-export');
     const accountLabel = selectedAccount
@@ -805,25 +849,28 @@ export function PortfolioValueReport() {
           color: summary.lowest === null ? '#6b7280' : '#111827',
         },
         {
-          label: t('portfolioValue.periodChange'),
-          value:
-            summary.change === null
-              ? t('portfolioValue.notAvailable')
-              : `${summary.change >= 0 ? '+' : ''}${fmtVal(summary.change)}`,
-          color: summary.change === null ? '#6b7280' : summary.change >= 0 ? '#16a34a' : '#dc2626',
+          label: t('portfolioValue.valueChange'),
+          value: signedMoneyText(valueChange),
+          color: signedColour(valueChange),
         },
         {
-          label: t('portfolioValue.periodReturn'),
+          label: t('portfolioValue.netExternalFlows'),
+          value: signedMoneyText(netExternalFlows),
+          // A flow is neither a gain nor a loss, so it is not painted as one.
+          color: netExternalFlows === null ? '#6b7280' : '#111827',
+        },
+        {
+          label: t('portfolioValue.investmentResult'),
+          value: signedMoneyText(investmentResult),
+          color: signedColour(investmentResult),
+        },
+        {
+          label: t('portfolioValue.investmentReturn'),
           value:
-            summary.changePercent === null
+            returnPercent === null
               ? t('portfolioValue.notAvailable')
-              : formatSignedPercent(summary.changePercent, 1),
-          color:
-            summary.changePercent === null
-              ? '#6b7280'
-              : summary.changePercent >= 0
-                ? '#16a34a'
-                : '#dc2626',
+              : formatSignedPercent(returnPercent, 1),
+          color: signedColour(returnPercent),
         },
       ],
       chartContainer: chartRef.current,
@@ -835,6 +882,26 @@ export function PortfolioValueReport() {
       filename: 'portfolio-value',
     });
   };
+
+  // The period's three figures, as their own CSV section above the series. A
+  // reader exporting the chart was previously given the dates and values and
+  // left to work the period out themselves, which is the arithmetic this
+  // change exists to stop anybody doing (#1392).
+  const periodSummarySection = () => ({
+    title: t('portfolioValue.csvSummaryTitle'),
+    headers: [t('portfolioValue.csvColFigure'), t('portfolioValue.csvColAmount')],
+    rows: [
+      [t('portfolioValue.valueChange'), signedMoneyText(valueChange)],
+      [t('portfolioValue.netExternalFlows'), signedMoneyText(netExternalFlows)],
+      [t('portfolioValue.investmentResult'), signedMoneyText(investmentResult)],
+      [
+        t('portfolioValue.investmentReturn'),
+        returnPercent === null
+          ? t('portfolioValue.notAvailable')
+          : formatSignedPercent(returnPercent, 1),
+      ],
+    ],
+  });
 
   const handleExportCsv = () => {
     if (securitiesActive && breakdown) {
@@ -848,12 +915,18 @@ export function PortfolioValueReport() {
         ...securitiesSeries.map((s) => row.values[s.key] ?? 0),
         row.total,
       ]);
-      exportToCsv('portfolio-value-by-security', headers, rows);
+      exportCsvSections('portfolio-value-by-security', [
+        periodSummarySection(),
+        { headers, rows },
+      ]);
       return;
     }
     const headers = [t('portfolioValue.csvColDate'), t('portfolioValue.csvColValue')];
     const rows = sortedChartTableData.map((p) => [p.name, p.Value]);
-    exportToCsv('portfolio-value', headers, rows);
+    exportCsvSections('portfolio-value', [
+      periodSummarySection(),
+      { headers, rows },
+    ]);
   };
 
   // Only show the full-card skeleton on the very first paint. Subsequent
@@ -873,7 +946,7 @@ export function PortfolioValueReport() {
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
             {t('portfolioValue.highestValue')}
@@ -908,41 +981,79 @@ export function PortfolioValueReport() {
             )}
           </div>
         </div>
+        {/* Value change: what the portfolio is worth now against then. It
+            INCLUDES the reader's own deposits, which is why it is captioned as
+            a value change and never as a return. */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
-            {t('portfolioValue.periodChange')}
-            {valuesIncomplete && (
-              <InfoTooltip placement="top" text={t('portfolioValue.incompleteTooltip')} />
-            )}
-            {priorClose && (
+            {t('portfolioValue.valueChange')}
+            <InfoTooltip placement="top" text={t('portfolioValue.valueChangeTooltip')} />
+            {usesPriorClose && periodResult && (
               <InfoTooltip
                 placement="top"
                 text={t('portfolioValue.priorCloseTooltip', {
-                  date: formatChartDate(priorClose.date, 'MMM d, yyyy'),
+                  date: formatChartDate(periodResult.startDate, 'MMM d, yyyy'),
                 })}
               />
             )}
           </div>
-          <div className={`text-xl font-bold ${summary.change === null ? '' : gainLossColor(summary.change)}`}>
-            {summary.change === null ? (
-              <span className="text-gray-400 dark:text-gray-500 text-base font-normal">
-                {t('portfolioValue.notAvailable')}
-              </span>
+          <div className={`text-xl font-bold ${valueChange === null ? '' : gainLossColor(valueChange)}`}>
+            {valueChange === null ? (
+              <UnknownAmount reason={unknownReason} className="text-base font-normal" />
             ) : (
-              <>{summary.change >= 0 ? '+' : ''}{fmtVal(summary.change)}</>
+              <>{valueChange >= 0 ? '+' : ''}{fmtVal(valueChange)}</>
             )}
           </div>
         </div>
+        {/* The money the reader moved across the boundary of these accounts. It
+            is the part of the value change that is not performance. */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">{t('portfolioValue.periodReturn')}</div>
-          <div className={`text-xl font-bold ${summary.changePercent === null ? '' : gainLossColor(summary.changePercent)}`}>
-            {summary.changePercent === null ? (
-              <span className="text-gray-400 dark:text-gray-500 text-base font-normal">
-                {t('portfolioValue.notAvailable')}
-              </span>
-            ) : (
-              formatSignedPercent(summary.changePercent, 1)
+          <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
+            {t('portfolioValue.netExternalFlows')}
+            <InfoTooltip placement="top" text={t('portfolioValue.netExternalFlowsTooltip')} />
+            {/* The partial sum is named only where a rate is what withheld
+                the total: naming it for any other cause offers a subtotal of
+                something that was never in doubt. */}
+            {netExternalFlows === null &&
+              periodResult?.reasons.includes('missingRatePairs') && (
+              <InfoTooltip
+                placement="top"
+                text={t('portfolioValue.flowsPartial', {
+                  amount: fmtVal(periodResult.knownFlowSubtotal),
+                })}
+              />
             )}
+          </div>
+          <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+            {netExternalFlows === null ? (
+              <UnknownAmount reason={unknownReason} className="text-base font-normal" />
+            ) : (
+              <>{netExternalFlows >= 0 ? '+' : ''}{fmtVal(netExternalFlows)}</>
+            )}
+          </div>
+        </div>
+        {/* What is left once the deposits are taken out: the only figure a
+            percentage belongs over. */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
+            {t('portfolioValue.investmentResult')}
+            <InfoTooltip placement="top" text={t('portfolioValue.investmentResultTooltip')} />
+          </div>
+          <div className={`text-xl font-bold ${investmentResult === null ? '' : gainLossColor(investmentResult)}`}>
+            {investmentResult === null ? (
+              <UnknownAmount reason={unknownReason} className="text-base font-normal" />
+            ) : (
+              <>{investmentResult >= 0 ? '+' : ''}{fmtVal(investmentResult)}</>
+            )}
+          </div>
+          <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
+            <span className={returnPercent === null ? '' : gainLossColor(returnPercent)}>
+              {returnPercent === null
+                ? t('portfolioValue.notAvailable')
+                : formatSignedPercent(returnPercent, 1)}
+            </span>
+            <InfoTooltip placement="top" text={t('portfolioValue.investmentReturnTooltip')} />
+            <span className="sr-only">{t('portfolioValue.investmentReturn')}</span>
           </div>
         </div>
       </div>

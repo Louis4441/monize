@@ -65,6 +65,15 @@ export interface InvestmentBreakdownPoint {
   date: string; // YYYY-MM-DD; month-first for monthly granularity
   total: number;
   values: Record<string, number>; // keyed by InvestmentBreakdownSeries.key
+  /**
+   * False when a cash account in the scope produced no balance for this point,
+   * so the cash band and `total` are short a component whose value is unknown
+   * rather than zero. Optional, and read as `=== false`: an older backend
+   * mid-deploy sends neither flag, which is no information.
+   */
+  cashComplete?: boolean;
+  /** The accounts behind `cashComplete: false`. */
+  unknownCashAccountIds?: string[];
 }
 
 export interface InvestmentBreakdown {
@@ -72,6 +81,56 @@ export interface InvestmentBreakdown {
   currency: string;
   series: InvestmentBreakdownSeries[];
   points: InvestmentBreakdownPoint[];
+  /** False when a component could not be converted into `currency`. */
+  fxComplete?: boolean;
+  /** `"USD->EUR"` for each pair with no rate; empty when complete. */
+  missingRatePairs?: string[];
+}
+
+/**
+ * Why a period's figures could not be reported, as the server's closed set.
+ * `docs/specs/portfolio-period-result.md` section 4 is the truth table.
+ */
+export type PeriodResultReason =
+  | 'noValueSeries'
+  | 'incompletePrices'
+  | 'incompleteCash'
+  | 'missingRatePairs'
+  | 'zeroStart';
+
+/**
+ * What GET /net-worth/investments-period-result answers: what the portfolio did
+ * over the window, and how much of that was the reader's own money.
+ *
+ * Three figures, deliberately not one. `valueChange` is what the portfolio is
+ * worth now less what it was worth then -- it counts a deposit. `netExternalFlows`
+ * is that deposit. `investmentResult` is what is left, and it is the only one a
+ * percentage belongs over: the report used to print the value change under a
+ * "Return" caption, so two deposits with a flat price read as +100% (#1392).
+ *
+ * Every figure is nullable and carries its cause in `reasons`; nothing here is
+ * re-derived on the client.
+ */
+export interface PortfolioPeriodResult {
+  currency: string;
+  /** The close the period is measured from (the baseline, where one applied). */
+  startDate: string;
+  endDate: string;
+  startValue: number | null;
+  endValue: number | null;
+  valueChange: number | null;
+  netExternalFlows: number | null;
+  /** The part of the flow that converted, when the total is withheld. */
+  knownFlowSubtotal: number;
+  investmentResult: number | null;
+  returnPercent: number | null;
+  /** How the percentage was arrived at; `simple` is not time-weighted. */
+  returnMethod: 'simple';
+  complete: boolean;
+  reasons: PeriodResultReason[];
+  missingRatePairs: string[];
+  unpricedSecurityIds: string[];
+  unknownCashAccountIds: string[];
 }
 
 /**
