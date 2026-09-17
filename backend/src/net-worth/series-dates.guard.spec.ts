@@ -132,7 +132,8 @@ describe("the net-worth series iterates calendar dates as strings", () => {
 
 describe("blankComments", () => {
   it("hides the banned shape when it is being explained", () => {
-    const prose = '// new Date(start + "T00:00:00") is local midnight\nconst a = 1;\n';
+    const prose =
+      '// new Date(start + "T00:00:00") is local midnight\nconst a = 1;\n';
     expect(/T00:00:00/.test(blankComments(prose))).toBe(false);
     expect(blankComments(prose).split("\n")[1]).toBe("const a = 1;");
   });
