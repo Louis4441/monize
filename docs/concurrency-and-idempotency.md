@@ -290,6 +290,23 @@ This ordering is a rule this document introduces rather than one the code
 currently demonstrates: no existing site locks two rows of the same kind. It
 applies from the first one that does.
 
+**Advisory locks come before row locks, and holdings are the case that proves
+it.** Every writer of a position takes `lockHoldingScope` (`common/db/locks.ts`,
+`LockScope.Holdings`, keyed by account) as the *first statement* of its
+transaction, naming every account whose position the transaction will re-derive:
+`InvestmentTransactionsService.create`, `update`, `remove`, `transferSecurity`
+and `createEmbeddedForSplit`, as well as
+`HoldingsService.rebuildScopesFromTransactions` itself. A ledger write that
+waited until the rebuild at the end of its transaction had already row-locked
+`accounts` for its cash effects, which is the opposite order from a split status
+change reaching the same rows (`applyParentStatusToEmbeddedRows` takes the
+advisory lock first, then row-locks the legs): two concurrent writers of one
+account can then hold each other's next lock, and PostgreSQL breaks the cycle
+with `40P01` on one of them. `pg_advisory_xact_lock` is re-entrant within a
+transaction, so the opening call never double-acquires and the rebuild's own call
+stays where it is -- a rebuild reached from anywhere else still takes it before
+reading the ledger.
+
 ## 6. Idempotency keys
 
 When a key is genuinely needed (the effect cannot be folded into one
@@ -338,6 +355,7 @@ worth keeping: CONC-003 can only be checked against a list of all writers.
 | `accounts/accounts.service.ts` `update` | `Account` row | Concurrent balance modification |
 | `accounts/accounts.service.ts` `close` | `Account` row | Race between the balance check and the close |
 | `strategies/gem-signal.service.ts` | advisory, per `strategyId` | Materialization interleaving with a settings save |
+| `securities/investment-transactions.service.ts` `create`, `update`, `remove`, `transferSecurity`, `createEmbeddedForSplit` | advisory, per account (`lockHoldingScope`), first statement of the transaction | A ledger write and a rebuild racing on one position, and the lock order that keeps it deadlock-free |
 
 ### Conditional claims that exist
 

@@ -14,6 +14,7 @@ import {
   lockTransactionRow,
   lockTransactionRows,
   lockInvestmentTransactionRow,
+  lockHoldingScope,
   LockedInvestmentTransactionRow,
 } from "../common/db/locks";
 import { applyVoidTransitionToMirrorLeg } from "../transactions/void-status-transition.util";
@@ -1082,6 +1083,13 @@ export class InvestmentTransactionsService {
     );
 
     const savedId = await withScopedDb(this.dataSource, async (manager) => {
+      // First statement of the transaction: advisory locks are taken before row
+      // locks (see `common/db/locks.ts`), and the cash effects below row-lock
+      // `accounts`. The rebuild at the end takes this same lock; an advisory
+      // xact lock is re-entrant, so taking it here costs nothing and is what
+      // keeps this path in the one order every holdings writer uses.
+      await lockHoldingScope(manager, [createDto.accountId]);
+
       const investmentTransaction = manager.create(InvestmentTransaction, {
         userId,
         accountId: createDto.accountId,
@@ -1956,6 +1964,10 @@ export class InvestmentTransactionsService {
     const { outId, inId } = await withScopedDb(
       this.dataSource,
       async (manager) => {
+        // First statement of the transaction: advisory before row locks
+        // (`common/db/locks.ts`), both accounts, ascending inside the helper.
+        await lockHoldingScope(manager, [dto.fromAccountId, dto.toAccountId]);
+
         const transferOut = manager.create(InvestmentTransaction, {
           userId,
           accountId: dto.fromAccountId,
@@ -2235,6 +2247,11 @@ export class InvestmentTransactionsService {
      */
     parentStatus?: TransactionStatus,
   ): Promise<InvestmentTransaction> {
+    // First database statement this method makes in the caller's transaction:
+    // advisory before row locks (`common/db/locks.ts`). The rebuild at the end
+    // takes the same re-entrant lock.
+    await lockHoldingScope(manager, [brokerageAccountId]);
+
     if (!isInvestmentActionAllowedInSplit(dto.action)) {
       throw new BadRequestException(
         tr(
@@ -3790,6 +3807,14 @@ export class InvestmentTransactionsService {
     const priorPrice = transaction.price;
 
     const savedId = await withScopedDb(this.dataSource, async (manager) => {
+      // First statement of the transaction: advisory before row locks
+      // (`common/db/locks.ts`). Both the account the row leaves and the one it
+      // joins, because the rebuild at the end covers both.
+      await lockHoldingScope(
+        manager,
+        [accountId, updateDto.accountId].filter((id): id is string => !!id),
+      );
+
       // Resolved before the reversal, while the row still carries its stored
       // action: an edit may take the action away from REDEEM, and the companion
       // still has to be found so it can be refused or removed.
@@ -4224,6 +4249,10 @@ export class InvestmentTransactionsService {
     );
 
     await withScopedDb(this.dataSource, async (manager) => {
+      // First statement of the transaction: advisory before row locks
+      // (`common/db/locks.ts`); the reversals below row-lock `accounts`.
+      await lockHoldingScope(manager, affectedAccountIds);
+
       // Break the mutual link before deleting so neither row's FK points at a
       // row that is about to disappear.
       for (const leg of legsToRemove) {

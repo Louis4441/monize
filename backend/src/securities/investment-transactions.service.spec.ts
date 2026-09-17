@@ -5329,6 +5329,162 @@ describe("InvestmentTransactionsService", () => {
       expect(dataSource.transaction).toHaveBeenCalled();
       expect(mockActionHistoryService.record).not.toHaveBeenCalled();
     });
+
+    /**
+     * Advisory locks are taken before row locks (`common/db/locks.ts`). A
+     * ledger write that took the holdings advisory lock only inside the
+     * rebuild at the end had already row-locked `accounts` for its cash
+     * effects -- the opposite order from a split status change, which takes
+     * the advisory lock first and then row-locks the legs, so two concurrent
+     * writers of one account can deadlock (40P01).
+     */
+    const lockOrder = (): number => {
+      const calls = mockQueryRunner.manager.query.mock.calls as unknown[][];
+      const index = calls.findIndex(([sql]) =>
+        String(sql).includes("pg_advisory_xact_lock"),
+      );
+      expect(index).toBeGreaterThanOrEqual(0);
+      return mockQueryRunner.manager.query.mock.invocationCallOrder[index];
+    };
+
+    /** When the transaction first touched a row lock or wrote anything. */
+    const firstRowTouchOrder = (): number =>
+      Math.min(
+        ...[
+          ...mockQueryRunner.manager.save.mock.invocationCallOrder,
+          ...accountsService.updateBalance.mock.invocationCallOrder,
+          ...mockQueryRunner.manager.remove.mock.invocationCallOrder,
+          ...(mockQueryRunner.manager.query.mock.calls as unknown[][])
+            .map(([sql], i) =>
+              String(sql).includes("FOR UPDATE")
+                ? mockQueryRunner.manager.query.mock.invocationCallOrder[i]
+                : Number.POSITIVE_INFINITY,
+            )
+            .filter((n) => Number.isFinite(n)),
+          Number.POSITIVE_INFINITY,
+        ],
+      );
+
+    it("create takes the holdings advisory lock before its first row lock or write", async () => {
+      const savedTx = {
+        id: "inv-tx-1",
+        ...createBuyDto,
+        userId,
+        totalAmount: 1500,
+        commission: 0,
+        fundingAccountId: null,
+        transactionId: "cash-tx-1",
+        account: mockInvestmentAccount,
+        security: mockSecurity,
+      };
+      investmentTransactionsRepository.save.mockResolvedValue(savedTx);
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder(savedTx),
+      );
+
+      await service.create(userId, createBuyDto);
+
+      expect(lockOrder()).toBeLessThan(firstRowTouchOrder());
+    });
+
+    it("remove takes the holdings advisory lock before its first row lock or write", async () => {
+      const existingTx = {
+        id: "inv-tx-1",
+        userId,
+        accountId,
+        securityId,
+        action: InvestmentAction.BUY,
+        transactionDate: "2025-01-15",
+        quantity: 10,
+        price: 150,
+        totalAmount: 1500,
+        commission: 0,
+        fundingAccountId: null,
+        transactionId: null,
+        account: mockInvestmentAccount,
+        security: mockSecurity,
+      };
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder(existingTx),
+      );
+
+      await service.remove(userId, "inv-tx-1");
+
+      expect(lockOrder()).toBeLessThan(firstRowTouchOrder());
+    });
+
+    it("update takes the holdings advisory lock before its first row lock or write", async () => {
+      const existingTx = {
+        id: "inv-tx-1",
+        userId,
+        accountId,
+        securityId,
+        action: InvestmentAction.BUY,
+        transactionDate: "2025-01-15",
+        quantity: 10,
+        price: 150,
+        totalAmount: 1500,
+        commission: 0,
+        fundingAccountId: null,
+        transactionId: null,
+        account: mockInvestmentAccount,
+        security: mockSecurity,
+      };
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder(existingTx),
+      );
+      investmentTransactionsRepository.save.mockResolvedValue(existingTx);
+
+      await service.update(userId, "inv-tx-1", { quantity: 20 });
+
+      expect(lockOrder()).toBeLessThan(firstRowTouchOrder());
+    });
+
+    /**
+     * The rebuild is the ledger write's own last statement, not a follow-up:
+     * dispatched after the commit it would read a ledger another writer had
+     * already changed, and the position would be written from outside the
+     * lock the write took.
+     */
+    it("rebuilds the position on the transaction's own manager, before the transaction returns", async () => {
+      const savedTx = {
+        id: "inv-tx-1",
+        ...createBuyDto,
+        userId,
+        totalAmount: 1500,
+        commission: 0,
+        fundingAccountId: null,
+        transactionId: "cash-tx-1",
+        account: mockInvestmentAccount,
+        security: mockSecurity,
+      };
+      investmentTransactionsRepository.save.mockResolvedValue(savedTx);
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder(savedTx),
+      );
+
+      let rebuiltBeforeReturn = false;
+      dataSource.transaction.mockImplementation(async (...args: unknown[]) => {
+        const fn = (
+          typeof args[0] === "function" ? args[0] : args[1]
+        ) as (m: unknown) => Promise<unknown>;
+        const result = await fn(mockQueryRunner.manager);
+        rebuiltBeforeReturn =
+          holdingsService.rebuildScopesFromTransactions.mock.calls.length > 0;
+        return result;
+      });
+
+      await service.create(userId, createBuyDto);
+
+      expect(rebuiltBeforeReturn).toBe(true);
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
+        userId,
+        [{ accountId, securityId }],
+        mockQueryRunner.manager,
+      );
+    });
   });
 
   describe("createEmbeddedForSplit", () => {
