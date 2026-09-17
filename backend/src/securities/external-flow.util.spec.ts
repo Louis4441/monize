@@ -69,7 +69,12 @@ describe("external-flow.util", () => {
       const perDay = squash(
         externalFlowSubtotalsSql({ scoped: true, perDay: true }),
       );
-      expect(perDay).toContain("t.transaction_date::TEXT AS date");
+      // The day is rendered, never cast: a `::TEXT` DATE follows the session's
+      // DateStyle, and the caller keys a map on this string.
+      expect(perDay).toContain(
+        "TO_CHAR(t.transaction_date, 'YYYY-MM-DD') AS date",
+      );
+      expect(perDay).not.toContain("t.transaction_date::TEXT");
       expect(perDay).toContain("GROUP BY t.transaction_date, t.currency_code");
 
       const whole = squash(

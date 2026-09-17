@@ -98,8 +98,11 @@ export function externalFlowSubtotalsSql(options: {
   const counterpartyInScope = options.scoped
     ? "la.id = ANY($4::UUID[])"
     : "la.account_type = 'INVESTMENT'";
+  // `TO_CHAR(..., 'YYYY-MM-DD')`, never `::TEXT`: the caller keys its per-day
+  // map on this string and compares it with `YYYY-MM-DD` keys, and a DATE
+  // rendered through the session's DateStyle is not obliged to be that.
   const dateColumn = options.perDay
-    ? "t.transaction_date::TEXT AS date, "
+    ? "TO_CHAR(t.transaction_date, 'YYYY-MM-DD') AS date, "
     : "NULL::TEXT AS date, ";
   const groupBy = options.perDay
     ? "GROUP BY t.transaction_date, t.currency_code"
