@@ -3673,6 +3673,123 @@ describe("NetWorthService", () => {
       expect(result[0].value).toBe(14400);
     });
 
+    // Issue #1389 follow-up: the series is the ledger's answer for each day,
+    // not a backcast of what is held today. A security bought, held, and sold
+    // out completely still carries the portfolio over its holding period, and
+    // the security bought afterwards carries it from its own purchase.
+    it("values a fully sold security over its holding period and its successor after (#1389)", async () => {
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "brok-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_BROKERAGE",
+          currency_code: "USD",
+          opening_balance: 0,
+        },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        {
+          account_id: "brok-1",
+          security_id: "sec-a",
+          action: "BUY",
+          quantity: "10",
+          transaction_date: "2026-01-05",
+        },
+        {
+          account_id: "brok-1",
+          security_id: "sec-a",
+          action: "SELL",
+          quantity: "10",
+          transaction_date: "2026-01-08",
+        },
+        {
+          account_id: "brok-1",
+          security_id: "sec-b",
+          action: "BUY",
+          quantity: "5",
+          transaction_date: "2026-01-10",
+        },
+      ]);
+      securityRepository.findByIds.mockResolvedValue([
+        { id: "sec-a", skipPriceUpdates: false, currencyCode: "USD" },
+        { id: "sec-b", skipPriceUpdates: false, currencyCode: "USD" },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        { security_id: "sec-a", price_date: "2026-01-05", close_price: "100" },
+        { security_id: "sec-b", price_date: "2026-01-10", close_price: "200" },
+      ]);
+
+      const result = await service.getDailyInvestments(
+        "user-1",
+        "2026-01-04",
+        "2026-01-11",
+      );
+
+      const valueOn = (date: string) =>
+        result.find((p) => p.date === date)?.value;
+      expect(valueOn("2026-01-04")).toBe(0);
+      expect(valueOn("2026-01-05")).toBe(1000);
+      expect(valueOn("2026-01-07")).toBe(1000);
+      // Sold out: zero here is measured, not a gap.
+      expect(valueOn("2026-01-08")).toBe(0);
+      expect(valueOn("2026-01-09")).toBe(0);
+      expect(valueOn("2026-01-10")).toBe(1000);
+      expect(valueOn("2026-01-11")).toBe(1000);
+      expect(result.every((p) => p.pricesComplete)).toBe(true);
+    });
+
+    // The other half of the same report: when nothing can price the sold-out
+    // security, its holding period is NOT a measured zero -- the day names it.
+    it("names the sold-out security on days nothing could price it (#1389)", async () => {
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "brok-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_BROKERAGE",
+          currency_code: "USD",
+          opening_balance: 0,
+        },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        {
+          account_id: "brok-1",
+          security_id: "sec-a",
+          action: "BUY",
+          quantity: "10",
+          transaction_date: "2026-01-05",
+        },
+        {
+          account_id: "brok-1",
+          security_id: "sec-a",
+          action: "SELL",
+          quantity: "10",
+          transaction_date: "2026-01-08",
+        },
+      ]);
+      securityRepository.findByIds.mockResolvedValue([
+        { id: "sec-a", skipPriceUpdates: false, currencyCode: "USD" },
+      ]);
+      // Neither a stored close nor a transaction-derived one.
+
+      const result = await service.getDailyInvestments(
+        "user-1",
+        "2026-01-04",
+        "2026-01-09",
+      );
+
+      const pointOn = (date: string) => result.find((p) => p.date === date)!;
+      expect(pointOn("2026-01-04").pricesComplete).toBe(true);
+      expect(pointOn("2026-01-06").pricesComplete).toBe(false);
+      expect(pointOn("2026-01-06").unpricedSecurityIds).toEqual(["sec-a"]);
+      // The subtotal a consumer must not draw as a measured value.
+      expect(pointOn("2026-01-06").value).toBe(0);
+      expect(pointOn("2026-01-08").pricesComplete).toBe(true);
+    });
+
     // Issue #1242, daily as-of boundary: each day is valued at the latest
     // accepted close on or before it, and a future observation never leaks
     // back to an earlier day.
