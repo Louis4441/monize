@@ -2114,6 +2114,46 @@ CREATE TRIGGER trg_job_claims_guard_update
     )
     EXECUTE FUNCTION guard_job_claim_lease_ownership();
 
+-- Authentication attempt counters: the rate limits and lockouts that used to
+-- live in a Map per process. A counter in process memory is not a limit when
+-- more than one process serves the same account -- each replica enforces its
+-- own -- and it forgets everything on a restart, which is the cheapest way to
+-- clear a lockout there is.
+--
+-- No user_id: these are written on the failure path, before any identity is
+-- established, and `key` is a hash so a table every session can read is not a
+-- directory of who tried to log in. Exempt; see the block at the foot of this
+-- file and docs/row-level-security-contract.md.
+--
+-- The increment and the window reset are one INSERT ... ON CONFLICT DO UPDATE
+-- in the service, so two concurrent failures cannot lose one.
+CREATE TABLE IF NOT EXISTS auth_attempt_counters (
+    scope TEXT NOT NULL,
+    key TEXT NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0,
+    window_expires_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (scope, key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_auth_attempt_counters_expiry
+    ON auth_attempt_counters(window_expires_at);
+
+-- One-shot claims: a TOTP code, a confirmed AI action descriptor. The claim is
+-- the INSERT, so the winner is decided by the primary key rather than by a
+-- read the loser also passed.
+--
+-- token_hash is SHA-256 of the secret, never the secret: with no owner column
+-- every session can read this table, and what it holds must not be replayable.
+CREATE TABLE IF NOT EXISTS single_use_tokens (
+    purpose TEXT NOT NULL,
+    token_hash TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (purpose, token_hash)
+);
+
+CREATE INDEX IF NOT EXISTS idx_single_use_tokens_expiry
+    ON single_use_tokens(expires_at);
+
 -- Trigger for tags updated_at
 CREATE TRIGGER update_tags_updated_at BEFORE UPDATE ON tags FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -3206,6 +3246,7 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- table in neither a policy migration nor this list fails
 -- backend/test/integration/rls-enforcement.integration.spec.ts.
 --
+-- rls-exempt: auth_attempt_counters
 -- rls-exempt: currencies
 -- rls-exempt: exchange_rates
 -- rls-exempt: google_places_instance_usage
@@ -3216,6 +3257,7 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- rls-exempt: push_chart_artifacts
 -- rls-exempt: push_instance_config
 -- rls-exempt: schema_migrations
+-- rls-exempt: single_use_tokens
 -- ---------------------------------------------------------------------------
 
 -- Verification helper (run manually; not part of the migration's effect):

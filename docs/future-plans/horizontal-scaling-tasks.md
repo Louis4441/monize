@@ -64,7 +64,7 @@
 | F3 | Doc corrections in `concurrency-and-idempotency.md`, `external-side-effects.md`, `cron-jobs.md` | -- | none | [x] |
 | F5 | Concurrency register: retire the stale `users.failed_login_attempts` gap row | -- | none | [x] |
 | F4 | ADR 0005 and index row | F1 | none | [ ] |
-| A1 | Migration: `auth_attempt_counters`, `single_use_tokens`; RLS exemption; sweep cron | -- | none | [ ] |
+| A1 | Migration: `auth_attempt_counters`, `single_use_tokens`; RLS exemption; sweep cron | -- | none | [x] |
 | A2 | `AuthAttemptCounterService`; 2FA attempt maps replaced | A1 | neutral | [ ] |
 | A3 | `usedTotpCodes` replaced by a `single_use_tokens` claim | A1 | neutral | [ ] |
 | A4 | Step-up and auth-email counters onto the service; interval prune removed | A2 | neutral | [ ] |
@@ -254,7 +254,7 @@ requirement is that single-replica deployments need nothing new).
 
 ### A1 -- Migration: `auth_attempt_counters`, `single_use_tokens`
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** one new file under `database/migrations/`, `database/schema.sql`,
 `backend/src/common/db/rls-exempt-tables.ts`,
@@ -305,7 +305,19 @@ too or the harness's catalog check (`rls-catalog.ts`) fails. A cron file that
 holds a `Map`/`Set` field fails `derived-state-writers.guard.spec.ts`; the
 sweeper holds none.
 
-**Notes:**
+**Notes:** the `rls-exempt:` marker goes **only** in the block at the foot of
+`database/schema.sql`. `rls-exempt-tables.spec.ts` parses every such line in
+the file and compares the sorted list without de-duplicating, so a second copy
+above the table definition fails it. The migration may carry one (the
+`push_chart_artifacts` migration does); nothing parses migrations.
+
+The sweeper spec asserts the statements, not a fake clock: the predicate is the
+stored expiry against the database's `CURRENT_TIMESTAMP`, so there is no
+process clock to fake, and a spec that faked one would be asserting the defect.
+`verify-schema.sh` needs Docker; where that is unavailable the same two
+databases and the same double replay run against a local PostgreSQL 16 and the
+normalized `pg_dump` diff is empty, with CI's `Schema vs Migrations Drift` job
+as the gate.
 
 ### A2 -- `AuthAttemptCounterService`; 2FA attempt maps replaced
 
