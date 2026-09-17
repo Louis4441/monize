@@ -278,3 +278,30 @@ export function acquisitionUnitCost(tx: {
 
   return cost / quantity;
 }
+
+/**
+ * Below this many shares a replayed position is not a holding at all: the
+ * stored quantity scale is 8 decimal places, so anything smaller is a rounding
+ * residue of the fold rather than a share somebody owns.
+ */
+export const HOLDING_QUANTITY_EPSILON = 0.00000001;
+
+/**
+ * The `holdings` row a rebuild writes for a replayed position, or `null` when a
+ * rebuild would store no row for it at all.
+ *
+ * Every rebuild writer projects the fold the same way -- drop the position when
+ * the ledger accounts for no shares, and store `averageCost = 0` for a negative
+ * (short) quantity, because the per-share basis of shares you do not hold is
+ * not a number. The drift report compares the stored row against this rather
+ * than against an idea of its own, so what it reports is exactly what a rebuild
+ * would change.
+ */
+export function projectedHoldingRow(
+  position: { quantity: number; totalCost: number } | undefined | null,
+): { quantity: number; averageCost: number } | null {
+  if (!position) return null;
+  const { quantity, totalCost } = position;
+  if (Math.abs(quantity) <= HOLDING_QUANTITY_EPSILON) return null;
+  return { quantity, averageCost: quantity > 0 ? totalCost / quantity : 0 };
+}

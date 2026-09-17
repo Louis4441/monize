@@ -23,6 +23,7 @@ import {
   acquisitionCost,
   isQuantityOnlyAction,
   INVESTMENT_REPLAY_ORDER,
+  projectedHoldingRow,
 } from "./investment-replay.util";
 import { Holding } from "./entities/holding.entity";
 import {
@@ -51,8 +52,11 @@ export interface HoldingScope {
  * One position where the stored row and a replay of the ledger disagree.
  *
  * Read-only evidence: `replayedQuantity` / `replayedAverageCost` are `null`
- * when the ledger accounts for no shares at all, which is a different finding
- * from "it accounts for a different number".
+ * when a rebuild would store no row for this position at all -- the ledger
+ * accounts for no shares -- which is a different finding from "it accounts for
+ * a different number". They are the row a rebuild *would* write otherwise, so a
+ * short position's `replayedAverageCost` is the `0` the writers store, not an
+ * average nothing computes.
  */
 export interface HoldingDiscrepancy {
   accountId: string;
@@ -418,8 +422,10 @@ export class HoldingsService {
    * why this refuses to make the choice.
    *
    * The replay is `computeHoldingsMap` over `INVESTMENT_REPLAY_ORDER` -- the
-   * same fold `rebuildScopesFromTransactions` writes from -- so a position this
-   * reports is exactly one a rebuild would change.
+   * same fold `rebuildScopesFromTransactions` writes from -- and the comparison
+   * is against `projectedHoldingRow`, the same projection of that fold the
+   * rebuild writers store, so a position this reports is exactly one a rebuild
+   * would change.
    */
   async findLedgerDiscrepancies(
     userId: string,
@@ -461,9 +467,15 @@ export class HoldingsService {
       const storedQuantity = Number(row.quantity);
       const storedAverageCost =
         row.averageCost === null ? null : Number(row.averageCost);
-      const replayedQuantity = data ? data.quantity : null;
-      const replayedAverageCost =
-        data && data.quantity > 0 ? data.totalCost / data.quantity : null;
+      // What a rebuild would store for this position, through the same helper
+      // the rebuild writers use. Deriving the expected average here instead
+      // reported every short position as disagreeing -- the writers store
+      // `averageCost = 0` for a negative quantity, so `POST /holdings/rebuild`
+      // wrote back exactly what was already there and the finding came back at
+      // the next boot. `null` is a rebuild that would store no row at all.
+      const projected = projectedHoldingRow(data);
+      const replayedQuantity = projected ? projected.quantity : null;
+      const replayedAverageCost = projected ? projected.averageCost : null;
 
       // Both figures are stored to a fixed scale (quantity 8, average cost 10),
       // so the comparison is against the smallest difference the column can
@@ -688,26 +700,25 @@ export class HoldingsService {
       const key = `${scope.accountId}:${scope.securityId}`;
       const data = holdingsMap.get(scope.accountId)?.get(scope.securityId);
       const row = existingByScope.get(key);
-      const quantity = data?.quantity ?? 0;
+      const projected = projectedHoldingRow(data);
 
-      if (Math.abs(quantity) <= 0.00000001) {
+      if (!projected) {
         // No shares the ledger can account for: the projection is "no holding".
         if (row) await repo.remove(row);
         continue;
       }
 
-      const averageCost = quantity > 0 ? data!.totalCost / quantity : 0;
       if (row) {
-        row.quantity = quantity;
-        row.averageCost = averageCost;
+        row.quantity = projected.quantity;
+        row.averageCost = projected.averageCost;
         await repo.save(row);
       } else {
         await repo.save(
           repo.create({
             accountId: scope.accountId,
             securityId: scope.securityId,
-            quantity,
-            averageCost,
+            quantity: projected.quantity,
+            averageCost: projected.averageCost,
           }),
         );
       }
@@ -787,15 +798,14 @@ export class HoldingsService {
     const holdingsToCreate: Holding[] = [];
     for (const [accountId, securities] of holdingsMap) {
       for (const [securityId, data] of securities) {
-        if (Math.abs(data.quantity) > 0.00000001) {
-          const avgCost =
-            data.quantity > 0 ? data.totalCost / data.quantity : 0;
+        const projected = projectedHoldingRow(data);
+        if (projected) {
           holdingsToCreate.push(
             holdingsRepo.create({
               accountId,
               securityId,
-              quantity: data.quantity,
-              averageCost: avgCost,
+              quantity: projected.quantity,
+              averageCost: projected.averageCost,
             }),
           );
         }
@@ -889,16 +899,15 @@ export class HoldingsService {
       const holdingsToCreate: Holding[] = [];
       for (const [accountId, securities] of holdingsMap) {
         for (const [securityId, data] of securities) {
-          // Only create holding if there's a non-zero quantity
-          if (Math.abs(data.quantity) > 0.00000001) {
-            const avgCost =
-              data.quantity > 0 ? data.totalCost / data.quantity : 0;
+          // Only create a holding the ledger accounts for shares in.
+          const projected = projectedHoldingRow(data);
+          if (projected) {
             holdingsToCreate.push(
               holdingsRepo.create({
                 accountId,
                 securityId,
-                quantity: data.quantity,
-                averageCost: avgCost,
+                quantity: projected.quantity,
+                averageCost: projected.averageCost,
               }),
             );
           }

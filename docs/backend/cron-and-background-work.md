@@ -16,7 +16,10 @@ Every `@Cron` handler is an out-of-request entry point, so its body must seed it
 once per process start (`OnApplicationBootstrap`) and compares every stored
 holding with a replay of its own ledger through
 `HoldingsService.findLedgerDiscrepancies`, logging each disagreement with both
-figures and the repair to run. It **writes nothing**: no migration, no delete,
+figures and the repair to run. What it compares against is `projectedHoldingRow`
+(`securities/investment-replay.util.ts`), the same projection of the fold the
+rebuild writers store, so a position it reports is one a rebuild would change --
+a short position, whose stored average cost is `0` by that projection, is not. It **writes nothing**: no migration, no delete,
 no automatic rebuild. A rebuild replaces a figure a person may have reconciled
 against a statement, and the same replay that repairs pre-rule drift would
 overwrite an incomplete imported history without asking; the owner runs `POST

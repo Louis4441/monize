@@ -971,6 +971,56 @@ describe("HoldingsService", () => {
       expect(found[0].replayedQuantity).toBeNull();
       expect(found[0].replayedAverageCost).toBeNull();
     });
+
+    /**
+     * A short position carries no per-share basis, and every rebuild writer
+     * stores `averageCost = 0` for a negative quantity. The report derived its
+     * own expected average instead and refused to produce one below zero
+     * shares, so a short position was reported as disagreeing at every boot and
+     * `POST /holdings/rebuild` could never clear it -- the rebuild wrote back
+     * exactly the `0` that was already stored.
+     */
+    const shortSale = [
+      {
+        id: "tx-short",
+        accountId: "acc-1",
+        securityId: "sec-1",
+        action: InvestmentAction.SELL,
+        transactionDate: "2026-01-01",
+        quantity: 10,
+        price: 30,
+        commission: 0,
+        createdAt: new Date("2026-04-01T00:00:00.000Z"),
+      },
+    ];
+
+    it("reports nothing for a short position a rebuild would leave alone", async () => {
+      stubReads([{ ...mockHolding, quantity: -10, averageCost: 0 }], shortSale);
+
+      const found = await service.findLedgerDiscrepancies(
+        USER,
+        mockQueryRunner.manager as never,
+      );
+
+      expect(found).toEqual([]);
+    });
+
+    it("still reports a short position whose stored average a rebuild would change", async () => {
+      stubReads(
+        [{ ...mockHolding, quantity: -10, averageCost: 30 }],
+        shortSale,
+      );
+
+      const found = await service.findLedgerDiscrepancies(
+        USER,
+        mockQueryRunner.manager as never,
+      );
+
+      expect(found).toHaveLength(1);
+      expect(found[0].storedAverageCost).toBeCloseTo(30, 8);
+      expect(found[0].replayedQuantity).toBeCloseTo(-10, 8);
+      expect(found[0].replayedAverageCost).toBe(0);
+    });
   });
 
   describe("getHoldingsSummary", () => {

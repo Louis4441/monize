@@ -332,7 +332,9 @@ Enforcement         No path writes the columns incrementally. Every ledger write
                     projection that never saw it.
                     UNIQUE(account_id, security_id) still prevents duplicate rows.
                     A scope the ledger has no rows for projects to "no holding":
-                    the row is deleted. An imported opening position is an
+                    the row is deleted. Every writer takes that decision, and
+                    the average cost a short position stores, through
+                    projectedHoldingRow. An imported opening position is an
                     ADD_SHARES row, not a holding with nothing behind it.
 Concurrency scope   per (account, security)
 Retry semantics     Serialized by the lock; a lost update cannot occur.
@@ -344,7 +346,15 @@ Repair path         a row written before this rule can still be wrong, and
                     (securities/holdings-drift-report.service.ts) reports them at
                     boot, read-only, through
                     HoldingsService.findLedgerDiscrepancies -- the same fold the
-                    rebuild writes from -- naming both figures and
+                    rebuild writes from, compared through projectedHoldingRow
+                    (securities/investment-replay.util.ts), the same projection
+                    of that fold the rebuild writers store, so what is reported
+                    is what a rebuild would change and nothing else. Deriving
+                    the expected average in the report instead reported every
+                    short position at every boot: the writers store
+                    average_cost = 0 for a negative quantity, so the rebuild
+                    wrote back exactly the figure the report refused to expect.
+                    It names both figures and
                     POST /holdings/rebuild. It writes nothing: no migration and
                     no unattended rebuild, because the same replay that repairs
                     pre-rule drift would silently overwrite an incomplete
