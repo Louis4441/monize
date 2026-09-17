@@ -150,6 +150,11 @@ export const INTENTIONALLY_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
   // the backup/restore lifecycle of ENCRYPTION_KEY rather than of a ledger.
   "push_instance_config",
   "push_chart_artifacts",
+  // The deployment's OIDC signing identity: the same installation-secret
+  // category as the VAPID pair above. Restoring a production backup onto a test
+  // instance must not hand it the keys that sign for the real issuer, and the
+  // ciphertext would be unreadable there anyway without the same ENCRYPTION_KEY.
+  "oauth_instance_config",
   // Instance-bound delivery ledger for this deployment's egress; not portable
   // user data. Same category as push_subscriptions above: a row names an object
   // key in a bucket this instance uploads to, and restored elsewhere it would

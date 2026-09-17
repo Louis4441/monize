@@ -137,6 +137,10 @@ const WITH_CONTEXT_ALLOWLIST = [
   "src/notifications/provider-outage-alert.service.ts",
   "src/oauth/oauth-interaction.controller.ts",
   "src/oauth/oauth-provider.service.ts",
+  // The deployment's OIDC signing identity: one singleton row that belongs to
+  // no user (one issuer signs for every account), minted from the provider's
+  // initialization, which has no request to inherit an identity from.
+  "src/oauth/oauth-signing-keys.service.ts",
   // Provider availability bookkeeping: a global provider_health row written
   // from whatever code path happened to call the provider, so there is no
   // caller identity that could own it -- and it is written outside the caller's

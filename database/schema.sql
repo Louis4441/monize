@@ -2513,6 +2513,36 @@ CREATE TABLE push_instance_config (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- ---------------------------------------------------------------------------
+-- OIDC provider signing keys (migration 186).
+--
+-- oauth_instance_config is this deployment's OIDC signing identity: the JWKS
+-- the provider signs ID tokens with, generated on first start. Without it
+-- oidc-provider mints a development key pair per process, so two replicas serve
+-- two /oauth/jwks documents and a client that fetched one cannot verify a token
+-- signed by the other -- and a single pod does the same to itself across a
+-- restart.
+--
+-- Singleton for the same reason push_instance_config is: the key admits exactly
+-- one value, so replicas racing on first start collide and the loser re-reads
+-- the winner's row. jwks_enc is AES-256-GCM ciphertext under ENCRYPTION_KEY; an
+-- instance without that variable stores nothing and keeps the per-process
+-- behaviour rather than writing private signing keys in clear. Deployment-wide
+-- state with no owner column, so RLS-exempt -- see the marker block at the foot
+-- of the RLS section.
+--
+-- Not exported by a backup (INTENTIONALLY_EXCLUDED_TABLES in
+-- backend/src/backup/export-table-queries.ts): restoring a production backup
+-- onto a test instance must not hand it the keys that sign for the real issuer.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE oauth_instance_config (
+    -- Singleton. One deployment, one signing identity.
+    id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
+    jwks_enc TEXT NOT NULL,
+    generated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE push_subscriptions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -3318,6 +3348,7 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- rls-exempt: google_places_instance_usage
 -- rls-exempt: market_index_prices
 -- rls-exempt: market_index_sync
+-- rls-exempt: oauth_instance_config
 -- rls-exempt: oauth_payloads
 -- rls-exempt: provider_health
 -- rls-exempt: push_chart_artifacts

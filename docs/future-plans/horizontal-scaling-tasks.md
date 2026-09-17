@@ -83,7 +83,7 @@
 | A2 | `AuthAttemptCounterService`; 2FA attempt maps replaced | A1 | neutral | [x] |
 | A3 | `usedTotpCodes` replaced by a `single_use_tokens` claim | A1 | neutral | [x] |
 | A4 | Step-up and auth-email counters onto the service; interval prune removed | A2 | neutral | [x] |
-| K1 | `oauth_instance_config` + `OauthSigningKeysService`; provider gets `jwks` | -- | neutral | [ ] |
+| K1 | `oauth_instance_config` + `OauthSigningKeysService`; provider gets `jwks` | -- | neutral | [x] |
 | X1 | AI action anti-replay onto `single_use_tokens`, MCP path included | A1 | neutral | [x] |
 | R1 | `EVENT_BUS` token, interface, `MemoryEventBus` wired as default | -- | none | [x] |
 | R2 | Migration: `ai_relay_prompts`, `ai_relay_agents` with RLS policies | -- | none | [x] |
@@ -530,15 +530,21 @@ Scopes are exported (`FORGOT_PASSWORD_SCOPE`, `VERIFICATION_EMAIL_SCOPE`,
 
 ### K1 -- OIDC provider signing keys persisted
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** one migration + `schema.sql` (`oauth_instance_config`),
 `backend/src/oauth/entities/oauth-instance-config.entity.ts` (new),
 `backend/src/oauth/oauth-signing-keys.service.ts` (new) + spec,
 `backend/src/oauth/oauth-provider.service.ts` and its spec,
 `backend/src/oauth/oauth.module.ts`, `backend/src/common/db/rls-exempt-tables.ts`,
-`docs/row-level-security-contract.md`, `backend/src/main.ts` (warning text),
-`e2e/tests/` (the OAuth spec, restart case).
+`docs/row-level-security-contract.md`,
+`backend/src/common/encryption/encryption-key.ts` (the warning text -- it lives
+there, not in `main.ts`, which only calls `logEncryptionKeyStatus`),
+`backend/eslint.config.mjs` (`WITH_CONTEXT_ALLOWLIST`),
+`backend/src/backup/export-table-queries.ts` (the new table's backup
+classification, which the definition of done requires),
+`backend/test/integration/oauth-signing-keys.integration.spec.ts` (new, in place
+of the E2E restart case -- see the notes). **No file under `e2e/` changed.**
 
 **Pattern:** `ensureKeyPair` in `backend/src/push/push-config.service.ts`
 (generate, `INSERT ... ON CONFLICT (id) DO NOTHING`, re-read in the same
@@ -577,7 +583,36 @@ development keys must disappear from the boot log in the configured case
 (`backend/src/oauth/oidc-provider-log-bridge.ts` routes it; assert on it).
 Rotation is out of scope; leave a `// rotation: see design doc WP4` marker.
 
-**Notes:**
+**Notes:** three deviations, each deliberate.
+
+1. **`node:crypto`, not `jose`.** `generateKeyPairSync` plus
+   `KeyObject.export({ format: "jwk" })` is the whole of what this needed, and
+   the `kid` is a hand-written RFC 7638 thumbprint (nine lines). `jose` is
+   ESM-only, so reaching it from this CommonJS build means a dynamic import, and
+   pinning it directly is a dependency change -- which `AGENTS.md` puts under
+   "ask first" -- for something the platform already does synchronously.
+2. **An integration spec instead of the E2E restart case.** The property is "a
+   second process over the same row serves the same `kid`s", and a fresh service
+   over the same database is exactly that, with a real `EncryptionService` and a
+   real key. A `docker compose restart backend` inside the E2E suite would say
+   the same thing at far higher cost, and the spec that says it is where the
+   race between two starting replicas is also tested.
+3. **The warning text is in `encryption-key.ts`.** `main.ts` only calls
+   `logEncryptionKeyStatus`; the words are `MISSING_ENCRYPTION_KEY_WARNING_LINES`,
+   and that is the line that now also names the per-process JWKS. The service
+   logs its own, more specific warning at the point it declines to store keys.
+
+The provider's development-key `NOTICE` was not asserted on: it is emitted by
+`oidc-provider` itself, which the provider spec replaces with a mock (it is ESM
+and never loaded there), so an assertion would be about the mock. What the spec
+asserts instead is the input that decides it -- `jwks` present in the
+constructor config when there are stored keys, and the option absent entirely
+when there are not.
+
+An unreadable row (a database restored onto an instance with a different
+`ENCRYPTION_KEY`) logs and falls back to per-process keys rather than throwing:
+refusing to start the OAuth provider would take the whole MCP surface down over
+something an operator fixes by deleting one row.
 
 ### X1 -- AI action anti-replay onto `single_use_tokens`
 

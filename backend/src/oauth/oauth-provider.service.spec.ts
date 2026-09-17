@@ -6,6 +6,10 @@ import {
   MCP_RESOURCE_SCOPES,
 } from "./oauth-provider.service";
 import { getRequestContext } from "../common/request-context";
+import {
+  OauthSigningKeysService,
+  type InstanceJwks,
+} from "./oauth-signing-keys.service";
 
 // A real OAuth subject/accountId is a user UUID. findAccount and
 // validateAccessToken now read the auth-state row under withUserContext(sub),
@@ -80,6 +84,25 @@ function makeAuthService(
   } as unknown as import("../auth/auth.service").AuthService;
 }
 
+/**
+ * An `OauthSigningKeysService` double.
+ *
+ * Defaults to a stored JWKS, because that is the configured deployment and the
+ * assertion worth making is that it reaches the provider. `null` is the
+ * unkeyed case, where the provider is expected to mint its own exactly as it
+ * did before this existed.
+ */
+function makeSigningKeys(jwks: InstanceJwks | null = SPEC_JWKS) {
+  return {
+    ensureJwks: jest.fn().mockResolvedValue(jwks),
+    readJwks: jest.fn().mockResolvedValue(jwks),
+  } as unknown as OauthSigningKeysService;
+}
+
+const SPEC_JWKS: InstanceJwks = {
+  keys: [{ kty: "RSA", kid: "spec-rsa", use: "sig", n: "n", e: "AQAB" }],
+};
+
 function makeDataSource(deleteAffected = 1) {
   const execute = jest.fn().mockResolvedValue({ affected: deleteAffected });
   const where = jest.fn().mockReturnValue({ execute });
@@ -104,12 +127,48 @@ describe("OAuthProviderService", () => {
     for (const k of Object.keys(eventListeners)) delete eventListeners[k];
   });
 
+  describe("signing keys", () => {
+    const initWith = async (jwks: InstanceJwks | null) => {
+      const svc = new OAuthProviderService(
+        makeConfigService({
+          PUBLIC_APP_URL: "https://app.test",
+          JWT_SECRET: VALID_JWT,
+        }),
+        makeDataSource().dataSource,
+        makeAuthService(null),
+        makeSigningKeys(jwks),
+      );
+      await svc.ensureInitialized();
+      return providerConstructorCalls[0].config;
+    };
+
+    // Without this the provider mints a development key pair per process, so
+    // two replicas serve two /oauth/jwks documents and a token signed by one
+    // cannot be verified against the other.
+    it("hands the stored JWKS to the provider", async () => {
+      const config = await initWith(SPEC_JWKS);
+
+      expect(config.jwks).toEqual(SPEC_JWKS);
+    });
+
+    // A deployment with no ENCRYPTION_KEY has nowhere to put private signing
+    // keys, and plaintext would be worse than per-process keys -- so the
+    // option is omitted entirely rather than passed as null, which the
+    // provider would reject.
+    it("omits the option entirely when there are no stored keys", async () => {
+      const config = await initWith(null);
+
+      expect(config).not.toHaveProperty("jwks");
+    });
+  });
+
   describe("requirePublicUrl / URL helpers (uninitialized)", () => {
     it("throws if PUBLIC_APP_URL is missing during initialize()", async () => {
       const svc = new OAuthProviderService(
         makeConfigService({}),
         makeDataSource().dataSource,
         makeAuthService(null),
+        makeSigningKeys(),
       );
       await expect(svc.ensureInitialized()).rejects.toThrow(/PUBLIC_APP_URL/);
     });
@@ -122,6 +181,7 @@ describe("OAuthProviderService", () => {
         }),
         makeDataSource().dataSource,
         makeAuthService(null),
+        makeSigningKeys(),
       );
       await expect(svc.ensureInitialized()).rejects.toThrow(/JWT_SECRET/);
     });
@@ -131,6 +191,7 @@ describe("OAuthProviderService", () => {
         makeConfigService({}),
         makeDataSource().dataSource,
         makeAuthService(null),
+        makeSigningKeys(),
       );
       expect(() => svc.getProvider()).toThrow(InternalServerErrorException);
     });
@@ -147,6 +208,7 @@ describe("OAuthProviderService", () => {
           isActive: true,
           mustChangePassword: false,
         }),
+        makeSigningKeys(),
       );
       // The public-URL helpers do not require initialization.
       expect(svc.getMcpResourceUrl()).toBe("https://app.test/api/v1/mcp");
@@ -168,6 +230,7 @@ describe("OAuthProviderService", () => {
           isActive: true,
           mustChangePassword: false,
         }),
+        makeSigningKeys(),
       );
 
       const p1 = await svc.ensureInitialized();
@@ -213,6 +276,7 @@ describe("OAuthProviderService", () => {
           isActive: true,
           mustChangePassword: false,
         }),
+        makeSigningKeys(),
       );
       await svc.ensureInitialized();
 
@@ -272,6 +336,7 @@ describe("OAuthProviderService", () => {
           isActive: true,
           mustChangePassword: false,
         }),
+        makeSigningKeys(),
       );
 
       const [a, b] = await Promise.all([
@@ -295,6 +360,7 @@ describe("OAuthProviderService", () => {
           isActive: true,
           mustChangePassword: false,
         }),
+        makeSigningKeys(),
       );
       await svc.onModuleInit();
       expect(providerConstructorCalls).toHaveLength(1);
@@ -317,6 +383,7 @@ describe("OAuthProviderService", () => {
         }),
         makeDataSource().dataSource,
         auth,
+        makeSigningKeys(),
       );
       await svc.ensureInitialized();
       return {
@@ -465,6 +532,7 @@ describe("OAuthProviderService", () => {
           isActive: true,
           mustChangePassword: false,
         }),
+        makeSigningKeys(),
       );
       await svc.ensureInitialized();
 
@@ -500,6 +568,7 @@ describe("OAuthProviderService", () => {
           isActive: true,
           mustChangePassword: false,
         }),
+        makeSigningKeys(),
       );
       await svc.ensureInitialized();
 
@@ -585,6 +654,7 @@ describe("OAuthProviderService", () => {
         }),
         makeDataSource().dataSource,
         makeAuthService(authUser),
+        makeSigningKeys(),
       );
       await svc.ensureInitialized();
       return { svc, find: lastMockProvider.AccessToken.find };
@@ -782,6 +852,7 @@ describe("OAuthProviderService", () => {
           isActive: true,
           mustChangePassword: false,
         }),
+        makeSigningKeys(),
       );
       await expect(svc.revokeAllForUser(ACCOUNT_ID)).resolves.toBe(3);
       expect(ds.where).toHaveBeenCalledWith(
@@ -804,6 +875,7 @@ describe("OAuthProviderService", () => {
           isActive: true,
           mustChangePassword: false,
         }),
+        makeSigningKeys(),
       );
       await expect(svc.revokeAllForUser(ACCOUNT_ID)).resolves.toBe(0);
     });
@@ -828,6 +900,7 @@ describe("OAuthProviderService", () => {
           isActive: true,
           mustChangePassword: false,
         }),
+        makeSigningKeys(),
       );
 
       await svc.revokeAllForUser(hostile);
@@ -852,6 +925,7 @@ describe("OAuthProviderService", () => {
           isActive: true,
           mustChangePassword: false,
         }),
+        makeSigningKeys(),
       );
       await expect(svc.revokeAllForUser(ACCOUNT_ID)).resolves.toBe(0);
     });
