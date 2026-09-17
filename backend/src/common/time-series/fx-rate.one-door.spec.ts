@@ -26,18 +26,66 @@ import { join, relative } from "path";
 const SRC_ROOT = join(__dirname, "..", "..");
 
 /**
- * The door itself, plus the service that is its database side, plus the one
- * deliberate exception `docs/time-series-contract.md` section 2.1 records as
- * living *inside* the door: `nearest-observation.ts` answers "what is the
- * closest thing anybody ever observed", explicitly approximate, and carries the
- * observation's date to the user rather than presenting it as that date's rate.
+ * The door itself, plus the one deliberate exception
+ * `docs/time-series-contract.md` section 2.1 records as living *inside* the
+ * door: `nearest-observation.ts` answers "what is the closest thing anybody
+ * ever observed", explicitly approximate, and carries the observation's date to
+ * the user rather than presenting it as that date's rate.
+ *
+ * `currencies/exchange-rate.service.ts` is deliberately **not** here. It is the
+ * door's database side, but exempting the whole file meant a new unbounded
+ * newest-rate read inside it passed the guard -- which is exactly how
+ * `getLiveRate` came to seed a 276-day-old rate as live (issue #1390). Only
+ * `getLatestRate`'s own declaration is exempt; see `DOOR_MEMBERS`.
  */
 const DOOR_FILES = new Set([
   "common/time-series/fx-rate-resolver.ts",
   "common/time-series/rate-index.util.ts",
   "common/time-series/nearest-observation.ts",
-  "currencies/exchange-rate.service.ts",
 ]);
+
+/**
+ * A member whose own body *is* the newest-rate read the rest of the codebase is
+ * steered away from, so its lines are not an outside read. Shrink-only, like
+ * the baseline: everything else in the same file is scanned.
+ */
+const DOOR_MEMBERS: ReadonlyArray<{
+  file: string;
+  /** The declaration line; its body runs to the first line that closes it. */
+  declaration: RegExp;
+  reason: string;
+}> = [
+  {
+    file: "currencies/exchange-rate.service.ts",
+    declaration: /^ {2}async getLatestRate\(/,
+    reason:
+      "The bounded-age `getLatestRate` itself: the members around it -- " +
+      "`resolveStoredRate`, `getRateForDate`, `getLiveRate` -- are scanned " +
+      "like any other file, so a new unbounded read inside this service " +
+      "fails the guard rather than inheriting a file-wide exemption.",
+  },
+];
+
+/**
+ * Line indices (0-based) inside `rel` that a `DOOR_MEMBERS` entry covers: the
+ * declaration through the first line that closes it at the same indent.
+ */
+function doorMemberLines(rel: string, lines: string[]): Set<number> {
+  const covered = new Set<number>();
+  for (const member of DOOR_MEMBERS) {
+    if (member.file !== rel) continue;
+    lines.forEach((line, index) => {
+      if (!member.declaration.test(line)) return;
+      const indent = line.length - line.trimStart().length;
+      const close = `${" ".repeat(indent)}}`;
+      for (let i = index; i < lines.length; i++) {
+        covered.add(i);
+        if (i > index && lines[i] === close) break;
+      }
+    });
+  }
+  return covered;
+}
 
 /**
  * Call sites still reading a newest-stored-rate outside the resolver.
@@ -113,7 +161,9 @@ function findOffenders(): string[] {
     const rel = relative(SRC_ROOT, file).replace(/\\/g, "/");
     if (DOOR_FILES.has(rel)) continue;
     const lines = readFileSync(file, "utf8").split("\n");
+    const exempt = doorMemberLines(rel, lines);
     lines.forEach((line, index) => {
+      if (exempt.has(index)) return;
       if (LATEST_RATE_CALL.test(line)) {
         offenders.add(rel);
         return;
@@ -147,6 +197,35 @@ describe("one door for a rate-for-a-date", () => {
         .filter((file) => !found.has(file))
         .sort(),
     ).toEqual([]);
+  });
+
+  it("exempts only the declaration a door member owns, not its file", () => {
+    for (const member of DOOR_MEMBERS) {
+      const lines = readFileSync(join(SRC_ROOT, member.file), "utf8").split(
+        "\n",
+      );
+      const covered = doorMemberLines(member.file, lines);
+      expect(covered.size).toBeGreaterThan(0);
+      // A slice of one member, not the file: the rest stays scanned.
+      expect(covered.size).toBeLessThan(lines.length / 2);
+      expect(member.reason.length).toBeGreaterThan(30);
+    }
+  });
+
+  it("would flag a new unbounded read added beside the exempt member", () => {
+    const service = "currencies/exchange-rate.service.ts";
+    const lines = readFileSync(join(SRC_ROOT, service), "utf8").split("\n");
+    const withNewRead = [
+      ...lines,
+      "  async somethingNew() {",
+      "    return this.getLatestRate(from, to);",
+      "  }",
+    ];
+    const exempt = doorMemberLines(service, withNewRead);
+    const flagged = withNewRead.some(
+      (line, index) => !exempt.has(index) && LATEST_RATE_CALL.test(line),
+    );
+    expect(flagged).toBe(true);
   });
 
   it("every baseline entry states why it is tolerated", () => {

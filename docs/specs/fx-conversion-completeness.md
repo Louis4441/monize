@@ -179,11 +179,24 @@ The policy now, in one place -- `backend/src/common/time-series/fx-rate-resolver
 | Missing code? | Unknown. Not `1`. |
 | "Right now"? | `live` mode: the freshest observation, under the same age bound. |
 
-Every rate lookup that feeds a reported figure routes through it:
+Every rate lookup that feeds a reported figure routes through it, each in the
+mode that matches the question it is answering. The dated doors are
 `convertAtDate` / `resolveIndexedRate` (the chart and daily-balance indexes),
 `ExchangeRateService.resolveStoredRate` and `getRateForDate`,
-`PortfolioCalculationService.resolveDailyRate` and `convertToDefault`, and
-`InvestmentReportDataService.fxRate`. `buildRateIndex` and
+`PortfolioCalculationService.resolveDailyRate` (the intraday chart's own
+per-bar close) and `InvestmentReportDataService.fxRate`. The `live` doors --
+`ExchangeRateService.getLiveRate` and
+`PortfolioCalculationService.convertToDefault` -- answer "right now" and are
+bounded by the same age rule but **not** dated: `convertToDefault` is not a
+historical lookup, and a caller holding a date must not use it as one.
+
+**Known gap: two portfolio figures convert historical amounts at today's
+rate.** `calculateTWR`'s `computeValueAtDate` and `calculateCapitalGains`'
+local `fxRate` both value past positions through the live door, so a past
+period's figure moves with today's currency market. This predates issue #1390
+and is not closed by it; closing it means handing both the dated door with the
+position's own date, and deciding what a date with no admissible rate does to
+each figure (`null` per section 2, not a silent 1:1 and not today's rate). `buildRateIndex` and
 `buildDailyRateIndex` load the reported window plus one age bound before it,
 rather than a fixed day margin, so a date's rate does not change when the chart
 around it is widened. A caller that converts at a date *later* than the window

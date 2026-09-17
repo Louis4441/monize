@@ -646,6 +646,63 @@ describe("PortfolioCalculationService.calculateCapitalGainsByMonth", () => {
     expect(jan.realizedGain).toBe(0);
   });
 
+  it("resolves an unrated pair once, however many securities carry it", async () => {
+    // The cache held only found rates, so a refusal was re-resolved (and
+    // re-warned) for every security group in that currency. An absence is an
+    // answer and is cached like one.
+    exchangeRateService.resolveStoredRate = storedRateDouble();
+    txRepo.find.mockResolvedValue([
+      makeTx({
+        id: "buy-a",
+        securityId: "sec-a",
+        action: InvestmentAction.BUY,
+        transactionDate: "2023-12-15",
+        quantity: 100,
+        price: 50,
+        totalAmount: 5000,
+        security: {
+          id: "sec-a",
+          symbol: "AAA",
+          name: "AAA Corp",
+          currencyCode: "USD",
+        },
+      } as never),
+      makeTx({
+        id: "buy-b",
+        securityId: "sec-b",
+        action: InvestmentAction.BUY,
+        transactionDate: "2023-12-16",
+        quantity: 50,
+        price: 20,
+        totalAmount: 1000,
+        security: {
+          id: "sec-b",
+          symbol: "BBB",
+          name: "BBB Corp",
+          currencyCode: "USD",
+        },
+      } as never),
+    ]);
+    priceRepo.query.mockResolvedValue(
+      priceRows([
+        { date: "2023-12-31", price: 50, securityId: "sec-a" },
+        { date: "2024-01-31", price: 55, securityId: "sec-a" },
+        { date: "2023-12-31", price: 20, securityId: "sec-b" },
+        { date: "2024-01-31", price: 22, securityId: "sec-b" },
+      ]),
+    );
+
+    await service.calculateCapitalGainsByMonth(userId, {
+      startDate: "2024-01-01",
+      endDate: "2024-01-31",
+    });
+
+    const usdCad = exchangeRateService.resolveStoredRate.mock.calls.filter(
+      (call: unknown[]) => call[0] === "USD" && call[1] === "CAD",
+    );
+    expect(usdCad).toHaveLength(1);
+  });
+
   it("still computes gains when the security and account share a currency", async () => {
     // The same-currency path must not be caught by the missing-rate handling:
     // rate 1 is correct here because the codes are equal, and no lookup happens.
@@ -1128,6 +1185,47 @@ describe("PortfolioCalculationService.primeLiveRates", () => {
     await service.primeLiveRates(rateCache, [account("USD")], [], "CAD");
 
     expect(rateCache.has("USD->CAD")).toBe(false);
+  });
+
+  /**
+   * Issue #1390, the consequence chain. With the provider down and the only
+   * stored observation past the age bound, `getLiveRate` answers `null` (the
+   * bound itself is proven in `exchange-rate.service.spec.ts`), so nothing is
+   * seeded here and `convertToDefault` refuses the same pair through the same
+   * door. The figure that reaches the caller is a subtotal that says so, rather
+   * than a total built on a nine-month-old rate.
+   */
+  it("leaves a refused pair out of the cash total instead of valuing it at a stale rate", async () => {
+    rawCurrencies = [];
+    exchangeRateService.getLiveRate.mockResolvedValue(null);
+    const withStored = {
+      getLiveRate: exchangeRateService.getLiveRate,
+      resolveStoredRate: storedRateDouble(),
+    };
+    const cashService = buildService([[Holding, holdingsRepo]], withStored);
+    const rateCache = new Map<string, number | null>();
+
+    const accounts = [
+      { id: "usd", currencyCode: "USD", currentBalance: 1000 } as Account,
+      { id: "cad", currencyCode: "CAD", currentBalance: 250 } as Account,
+    ];
+    await cashService.primeLiveRates(rateCache, accounts, [], "CAD");
+    // Nothing seeded: priming leaves the pair for the door to refuse.
+    expect(rateCache.has("USD->CAD")).toBe(false);
+
+    const cash = await cashService.computeTotalCashValue(
+      accounts,
+      new Map<string, number>(),
+      "CAD",
+      rateCache,
+    );
+
+    // The refusal is cached as an absence, never as a number.
+    expect(rateCache.get("USD->CAD")).toBeNull();
+    expect(cash.fxComplete).toBe(false);
+    expect(cash.missingRatePairs).toEqual(["USD->CAD"]);
+    // The CAD balance still converts; the subtotal carries what is known.
+    expect(cash.total).toBe(250);
   });
 
   it("does not query holdings when there are no holdings accounts", async () => {

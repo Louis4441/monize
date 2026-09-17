@@ -1513,38 +1513,67 @@ describe("ExchangeRateService", () => {
       expect(exchangeRateRepository.findOne).not.toHaveBeenCalled();
     });
 
-    it("falls back to the stored daily rate when no live quote is available", async () => {
+    it("falls back to a recent stored rate when no live quote is available", async () => {
       yahooFinanceService.fetchQuote.mockResolvedValue({
         regularMarketPrice: null,
       });
-      exchangeRateRepository.findOne.mockResolvedValue(mockExchangeRate);
+      exchangeRateRepository.find.mockResolvedValue([
+        storedRow("USD", "CAD", 1.365, "2026-08-15"),
+      ]);
 
       const result = await service.getLiveRate("USD", "CAD");
 
       expect(result).toBe(1.365);
-      expect(exchangeRateRepository.findOne).toHaveBeenCalledWith({
-        where: { fromCurrency: "USD", toCurrency: "CAD" },
-        order: { rateDate: "DESC" },
-      });
+      // Through the one door, over the bounded span -- not an unbounded
+      // newest-row read.
+      expect(exchangeRateRepository.findOne).not.toHaveBeenCalled();
+      const [floor, ceiling] = spanBounds(
+        exchangeRateRepository.find.mock.calls[0][0],
+      );
+      expect(floor).toBe("2026-07-04");
+      expect(ceiling).toBe("2026-08-18");
     });
 
-    it("falls back to the stored daily rate when the live fetch throws", async () => {
+    it("falls back to a recent stored rate when the live fetch throws", async () => {
       yahooFinanceService.fetchQuote.mockRejectedValue(
         new Error("rate limited"),
       );
-      exchangeRateRepository.findOne.mockResolvedValue(mockExchangeRate);
+      exchangeRateRepository.find.mockResolvedValue([
+        storedRow("USD", "CAD", 1.365, "2026-08-15"),
+      ]);
 
       const result = await service.getLiveRate("USD", "CAD");
 
       expect(result).toBe(1.365);
-      expect(exchangeRateRepository.findOne).toHaveBeenCalled();
+      expect(exchangeRateRepository.find).toHaveBeenCalled();
+    });
+
+    /**
+     * Issue #1390. The stored fallback was `getLatestRate` with no age bound,
+     * so with the provider down a rate struck nine months ago was returned as
+     * the live one -- and cached as live by `primeLiveRates`, which is how a
+     * portfolio total was built on it and still reported itself complete. A
+     * rate quoted as "right now" is a price: past the age bound it is unknown.
+     */
+    it("refuses a stored rate older than the age bound instead of quoting it as live", async () => {
+      yahooFinanceService.fetchQuote.mockResolvedValue({
+        regularMarketPrice: null,
+      });
+      // 276 days before the fixture's today: outside FX_MAX_RATE_AGE_DAYS.
+      exchangeRateRepository.find.mockResolvedValue([
+        storedRow("USD", "CAD", 1.2, "2025-11-15"),
+      ]);
+
+      const result = await service.getLiveRate("USD", "CAD");
+
+      expect(result).toBeNull();
     });
 
     it("returns null when neither a live quote nor a stored rate exists", async () => {
       yahooFinanceService.fetchQuote.mockResolvedValue({
         regularMarketPrice: null,
       });
-      exchangeRateRepository.findOne.mockResolvedValue(null);
+      exchangeRateRepository.find.mockResolvedValue([]);
 
       const result = await service.getLiveRate("USD", "XYZ");
 

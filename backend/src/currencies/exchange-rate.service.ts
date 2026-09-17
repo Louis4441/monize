@@ -1021,7 +1021,7 @@ export class ExchangeRateService implements OnModuleInit {
   /**
    * Get the exchange rate for a currency pair as of a specific date.
    *
-   * Unlike getLatestRate (the once-a-day stored snapshot), this returns the
+   * Unlike the once-a-day stored snapshot, this returns the
    * rate that applied on the transaction's date -- essential for back-dated
    * transactions, where the latest snapshot can be far from the historical
    * rate. Precedence:
@@ -1208,16 +1208,22 @@ export class ExchangeRateService implements OnModuleInit {
 
   /**
    * Get the current spot rate for a currency pair, fetched live from the quote
-   * provider. Tries the direct pair, then the reverse pair (inverted), then
-   * falls back to the most recent stored daily rate when the live fetch is
-   * unavailable (rate limited, unsupported pair, offline).
+   * provider. Tries the direct pair, then the reverse pair (inverted), then the
+   * stored history when the live fetch is unavailable (rate limited,
+   * unsupported pair, offline).
+   *
+   * The stored fallback is `resolveStoredRate` in `live` mode, not an
+   * unbounded newest-row read: a rate quoted as "right now" is still a price,
+   * so an observation older than `FX_MAX_RATE_AGE_DAYS` is not one. The
+   * unbounded read is what let a 276-day-old rate be cached as live and carried
+   * into a portfolio total that reported itself complete (issue #1390).
    *
    * Use this for "as of now" valuations such as the Investments portfolio
    * summary so they line up with the live intraday Portfolio Value Over Time
    * chart, which fetches live FX directly from the quote provider, rather than
-   * the once-a-day stored snapshot returned by getLatestRate. Returns null when
-   * neither a live quote nor a stored rate is available, letting callers apply
-   * their own fallback (e.g. reverse lookup or treating the rate as 1).
+   * the once-a-day stored snapshot. Returns `null` when neither a live quote
+   * nor an admissible stored rate exists; `null` is unknown, and no caller may
+   * read it as 1 or as the unconverted amount (INV-FX-001).
    */
   async getLiveRate(from: string, to: string): Promise<number | null> {
     if (from === to) return 1;
@@ -1233,7 +1239,15 @@ export class ExchangeRateService implements OnModuleInit {
         }`,
       );
     }
-    return this.getLatestRate(from, to);
+    const stored = await this.resolveStoredRate(from, to, todayYMD(), {
+      mode: "live",
+    });
+    if (stored.rate === null && stored.reason !== null) {
+      this.logger.warn(
+        describeFxGap(`${from}->${to}`, todayYMD(), stored.reason),
+      );
+    }
+    return stored.rate;
   }
 
   /**

@@ -555,16 +555,26 @@ Enforcement         The 1:1 half is enforced. Consumers return null on an absent
                     reason otherwise; live mode takes the freshest observation
                     under the same bound. rate-index.util.ts (convertAtDate,
                     resolveIndexedRate), ExchangeRateService.resolveStoredRate /
-                    getRateForDate, PortfolioCalculationService.resolveDailyRate
-                    and InvestmentReportDataService.fxRate all route through it,
+                    getRateForDate / getLiveRate,
+                    PortfolioCalculationService.resolveDailyRate and
+                    convertToDefault (the last two `live` mode) and
+                    InvestmentReportDataService.fxRate all route through it,
                     and buildRateIndex / buildDailyRateIndex load the window plus
                     one age bound before it so a date's answer does not depend on
                     the window's width (issue #1390, which also closed DR-02 in
-                    docs/specs/fx-conversion-completeness.md section 6). A second
-                    scanning guard,
+                    docs/specs/fx-conversion-completeness.md section 6). A caller
+                    that converts past its window states buildRateIndex's
+                    conversionHorizon, which is how NetWorthService's month-end
+                    points stopped moving with the requested range.
+                    resolveStoredRate compares its span as YYYY-MM-DD strings, so
+                    the reference date's own row is inside it in every process
+                    time zone. A second scanning guard,
                     common/time-series/fx-rate.one-door.spec.ts, fails a new
                     newest-rate read outside the door and carries the shrink-only
-                    baseline of the dateless call sites that remain.
+                    baseline of the dateless call sites that remain; its
+                    exemption for currencies/exchange-rate.service.ts is
+                    getLatestRate's own declaration, not the whole file, so a new
+                    unbounded read beside it fails.
                     The mislabelling half is NOT enforced on the built-in report
                     path: see Known gap below.
 Known gap           **An unconverted amount still reaches a report under the

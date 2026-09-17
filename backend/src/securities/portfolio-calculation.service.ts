@@ -420,12 +420,14 @@ export class PortfolioCalculationService {
    * currency held across the given accounts and their holdings. The portfolio
    * summary's "as of now" valuations (holdings value, cash, allocation, net
    * invested) then convert at the current rate -- matching the live Portfolio
-   * Value Over Time chart -- instead of the once-a-day stored snapshot used by
-   * getLatestRate.
+   * Value Over Time chart -- instead of the once-a-day stored snapshot.
    *
-   * Best effort: when a live quote is unavailable for a currency the cache is
-   * left unset for that pair, so the downstream convertToDefault falls back to
-   * the stored daily rate (its existing behaviour).
+   * Best effort: when no rate is available for a currency the cache is left
+   * unset for that pair and `convertToDefault` resolves it through the same
+   * door under the same age bound. What it must not do is seed a rate the door
+   * would refuse: `getLiveRate` used to fall back to an unbounded newest-row
+   * read, so a 276-day-old observation was cached as "live" and every figure
+   * built on it reported itself complete (issue #1390).
    */
   async primeLiveRates(
     rateCache: FxRateCache,
@@ -1486,7 +1488,7 @@ export class PortfolioCalculationService {
     }
 
     // Cache FX rates: securityCurrency -> accountCurrency
-    const fxCache = new Map<string, number>();
+    const fxCache = new Map<string, number | null>();
     // `null` when the pair has no rate. This used to end `: 1`, valuing a
     // foreign security's period start and end as though its currency were the
     // account's (audit P5-009). Rate 1 only when the codes are equal -- a
@@ -1507,7 +1509,8 @@ export class PortfolioCalculationService {
         todayYMD(),
         { mode: "live" },
       );
-      if (resolved.rate === null) return null;
+      // The absence is cached too, so a portfolio holding many securities in
+      // one unrated currency resolves that pair once instead of per group.
       fxCache.set(cacheKey, resolved.rate);
       return resolved.rate;
     };
