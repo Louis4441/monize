@@ -3302,15 +3302,33 @@ describe("a month grid is MonthGrid", () => {
 describe("an investment amount is formatted with its own currency", () => {
   /**
    * A `formatCurrency*` call whose single argument mentions one of the three
-   * fields. The argument list is matched up to the first `)` or `,`, so a call
-   * that DOES pass a currency has a comma and does not match.
+   * fields. The argument list is matched up to the first top-level `)` or `,`
+   * (one level of nesting is allowed, for `Math.abs(tx.totalAmount)`), so a
+   * call that DOES pass a currency has a comma and does not match.
    */
-  const UNLABELLED_INVESTMENT_MONEY =
-    /\b(?:formatCurrency\w*|fmtValue)\(\s*[^,()]*\b(?:totalAmount|\.price|\.commission)\b[^,()]*\)/;
+  const SINGLE_ARGUMENT_FORMAT_CALL =
+    /\b(?:formatCurrency\w*|fmtValue)\(\s*((?:[^,()]|\([^()]*\))*)\)/g;
+  const INVESTMENT_MONEY_FIELD = /\b(?:totalAmount|\.price|\.commission)\b/;
+  const UNLABELLED_INVESTMENT_MONEY = {
+    test(line: string): boolean {
+      for (const match of line.matchAll(SINGLE_ARGUMENT_FORMAT_CALL)) {
+        if (INVESTMENT_MONEY_FIELD.test(match[1])) return true;
+      }
+      return false;
+    },
+  };
+
+  /**
+   * Only a file that handles investment rows is in scope: `totalAmount` is
+   * also the name of an ordinary transaction aggregate (the recurring-expense
+   * surfaces), which is in the account's currency and is not this rule's.
+   */
+  const INVESTMENT_ROW_TYPES = /\b(?:InvestmentTransaction|RealizedGain)\w*\b/;
 
   function offendingLines(): string[] {
     const found: string[] = [];
     for (const [path, content] of productionSources()) {
+      if (!INVESTMENT_ROW_TYPES.test(content)) continue;
       withoutComments(content)
         .split("\n")
         .forEach((line, index) => {
