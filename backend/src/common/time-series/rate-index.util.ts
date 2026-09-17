@@ -62,6 +62,15 @@ export interface RateIndexLogger {
  * the future is priced at today's rate (the resolver clamps a future date), and
  * the preceding-observation branch has to be anchored where the lookups will
  * actually land.
+ *
+ * `conversionHorizon` is the latest date the caller will actually *convert* at,
+ * when that is later than the window it asked for. A monthly series requested to
+ * 2024-06-15 prices its June point at the month end, 2024-06-30: loading only to
+ * the requested end left the newest admissible observation out of the index, so
+ * the June figure changed when the same chart was asked for a wider range --
+ * exactly the "a date's rate depends on the window around it" defect this module
+ * exists to prevent. Every caller states its horizon rather than the loader
+ * widening the window on a guess; omitted, the horizon is the window's end.
  */
 export async function buildRateIndex(
   query: RateIndexQuery,
@@ -69,9 +78,14 @@ export async function buildRateIndex(
   defaultCurrency: string,
   startDate: string,
   endDate: string,
+  conversionHorizon?: string,
 ): Promise<RateIndex> {
   if (currencies.size === 0) return new Map();
 
+  const loadTo =
+    conversionHorizon && conversionHorizon > endDate
+      ? conversionHorizon
+      : endDate;
   const currArr = Array.from(currencies);
   const rates = await query(
     `WITH pairs AS (
@@ -106,7 +120,7 @@ export async function buildRateIndex(
              ) pre
          ) loaded
         ORDER BY rate_date`,
-    [currArr, defaultCurrency, startDate, endDate],
+    [currArr, defaultCurrency, startDate, loadTo],
   );
 
   return indexRateRows(rates);

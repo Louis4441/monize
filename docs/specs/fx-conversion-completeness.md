@@ -186,7 +186,12 @@ Every rate lookup that feeds a reported figure routes through it:
 `InvestmentReportDataService.fxRate`. `buildRateIndex` and
 `buildDailyRateIndex` load the reported window plus one age bound before it,
 rather than a fixed day margin, so a date's rate does not change when the chart
-around it is widened. `backend/src/common/time-series/fx-rate.one-door.spec.ts`
+around it is widened. A caller that converts at a date *later* than the window
+it asked for states that date as `buildRateIndex`'s `conversionHorizon`:
+`NetWorthService` prices every monthly point at the month end, so its wrapper
+passes `monthEndDate(endDate)` and a June point is the same figure whether the
+range ends 2024-06-15 or 2024-07-31. The loader never widens on a guess, so a
+caller that converts inside its window loads exactly its window. `backend/src/common/time-series/fx-rate.one-door.spec.ts`
 fails a new newest-rate read outside the door and carries the shrink-only
 baseline of the dateless call sites that remain.
 

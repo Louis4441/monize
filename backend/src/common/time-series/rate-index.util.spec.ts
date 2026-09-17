@@ -127,6 +127,79 @@ describe("rate-index.util", () => {
       );
       expect(convertAtDate(1000, "USD", "CAD", "2026-06-17", wide)).toBe(1365);
     });
+
+    /**
+     * Issue #1390. A caller that converts at a date later than the window it
+     * asked for -- a monthly series requested to mid-month prices its last
+     * point at the month end -- got an index that stopped short of that date,
+     * so the point was priced by an older observation and moved when the same
+     * chart was asked for a wider range. The horizon is stated by the caller
+     * and the loader reads to it.
+     */
+    it("loads out to a conversion horizon later than the requested end", async () => {
+      const query = jest.fn().mockResolvedValue([]);
+
+      await buildRateIndex(
+        query,
+        new Set(["EUR"]),
+        "USD",
+        "2024-06-01",
+        "2024-06-15",
+        "2024-06-30",
+      );
+
+      expect(query.mock.calls[0][1]).toEqual([
+        ["EUR"],
+        "USD",
+        "2024-06-01",
+        "2024-06-30",
+      ]);
+    });
+
+    it("never narrows the window when the horizon is earlier than the end", async () => {
+      const query = jest.fn().mockResolvedValue([]);
+
+      await buildRateIndex(
+        query,
+        new Set(["EUR"]),
+        "USD",
+        "2024-06-01",
+        "2024-07-31",
+        "2024-06-30",
+      );
+
+      expect(query.mock.calls[0][1][3]).toBe("2024-07-31");
+    });
+
+    it("prices a month end that falls after the requested end from the observation dated on it", async () => {
+      const history = [
+        row("EUR", "USD", 1.07, "2024-06-14"),
+        row("EUR", "USD", 1.09, "2024-06-28"),
+      ];
+      // The database answers the upper bound the loader actually sent, so the
+      // fixture cannot hand back a row the query did not ask for.
+      const serve = jest
+        .fn()
+        .mockImplementation(async (_sql: string, params: unknown[]) =>
+          history.filter((r) => String(r.rate_date) <= String(params[3])),
+        );
+
+      // The window stops at 2024-06-15, but June's point is converted at
+      // 2024-06-30: without the horizon the 06-28 observation is not loaded and
+      // the point is priced at 1.07.
+      const index = await buildRateIndex(
+        serve,
+        new Set(["EUR"]),
+        "USD",
+        "2024-06-01",
+        "2024-06-15",
+        "2024-06-30",
+      );
+
+      expect(convertAtDate(10000, "EUR", "USD", "2024-06-30", index)).toBe(
+        10900,
+      );
+    });
   });
 
   describe("indexRateRows", () => {

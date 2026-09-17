@@ -2180,6 +2180,75 @@ describe("NetWorthService", () => {
       expect(queryArgs[1]).toContain("2024-12-31");
     });
 
+    /**
+     * Issue #1390. A month's point is converted at the month end, which for a
+     * range ending mid-month is later than the requested end. The rate index
+     * used to be loaded only to the requested end, so June's figure was priced
+     * by the 06-14 observation when the range ended 06-15 and by the 06-28 one
+     * when it ended 07-31: the same month, two numbers, decided by the width of
+     * the chart around it.
+     */
+    it("gives a month the same value whether the range ends mid-month or later", async () => {
+      const history = [
+        {
+          from_currency: "EUR",
+          to_currency: "USD",
+          rate: "1.07",
+          rate_date: "2024-06-14",
+        },
+        {
+          from_currency: "EUR",
+          to_currency: "USD",
+          rate: "1.09",
+          rate_date: "2024-06-28",
+        },
+      ];
+
+      const runTo = async (end: string) => {
+        mabRepository.count.mockResolvedValue(5);
+        prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+        reportQuery.mockReset();
+        // Served by statement, not by call order: the exchange-rate query
+        // answers exactly the span it asked for, so a row outside the loaded
+        // window cannot reach the index.
+        reportQuery.mockImplementation(
+          async (sql: string, params: unknown[]) => {
+            if (sql.includes("exchange_rates")) {
+              return history.filter(
+                (r) => r.rate_date <= String(params[3] ?? ""),
+              );
+            }
+            if (sql.includes("first_month")) {
+              return [{ account_id: "eur-inv", first_month: "2023-01-01" }];
+            }
+            if (sql.includes("monthly_account_balances")) {
+              return [
+                {
+                  month: "2024-06-01",
+                  balance: 10000,
+                  market_value: null,
+                  account_id: "eur-inv",
+                  account_sub_type: "INVESTMENT_CASH",
+                  currency_code: "EUR",
+                },
+              ];
+            }
+            return [];
+          },
+        );
+
+        return service.getMonthlyInvestments("user-1", "2024-06-01", end);
+      };
+
+      const narrow = await runTo("2024-06-15");
+      const wide = await runTo("2024-07-31");
+
+      // 10,000 EUR at the June month end: the 2024-06-28 observation, 1.09.
+      expect(narrow[0].value).toBe(10900);
+      expect(wide[0].value).toBe(10900);
+      expect(narrow[0].fxComplete).toBe(true);
+    });
+
     it("converts foreign currency investment values", async () => {
       mabRepository.count.mockResolvedValue(5);
       prefRepository.findOne.mockResolvedValue({

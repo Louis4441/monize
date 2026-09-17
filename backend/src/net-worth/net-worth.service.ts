@@ -2531,6 +2531,17 @@ export class NetWorthService {
     return { stored, txFallback };
   }
 
+  /**
+   * The rate index for a net-worth window.
+   *
+   * Every monthly series in this service converts its points at the month end
+   * (`convertCurrency(..., monthEndDate(month), ...)`), which for a window
+   * ending mid-month is later than `endDate`. The conversion horizon is stated
+   * here, once, so the loader covers the dates the conversions actually ask
+   * about: without it the last month's rate came from whatever observation
+   * happened to fall inside the requested window, and the same month's figure
+   * differed between a range ending 2024-06-15 and one ending 2024-07-31.
+   */
   private buildRateIndex(
     currencies: Set<string>,
     defaultCurrency: string,
@@ -2543,6 +2554,7 @@ export class NetWorthService {
       defaultCurrency,
       startDate,
       endDate,
+      this.monthEndDate(endDate),
     );
   }
 
