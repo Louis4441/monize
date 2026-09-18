@@ -957,7 +957,17 @@ Statement           A figure captioned as what a portfolio's INVESTMENTS earned,
                     time-weighted return chained daily over the same window,
                     which neutralises buys funded by deposits, sells, share
                     transfers and quantity changes and keeps price change,
-                    distributions and reinvestments. Both are null, with the
+                    distributions and reinvestments. A SECOND figure of the same
+                    measure answers the reader's own question over the same
+                    flows and the same days: the annualised money-weighted
+                    return (XIRR) of -IV(b), the per-day capital and income, and
+                    +IV(e), which weights each purchase, disposal and
+                    distribution by when it happened. Same inputs, same
+                    completeness: it is withheld whenever the two figures above
+                    are, and additionally when the window is too short to
+                    annualise (windowTooShort, under 30 days) or the schedule
+                    defines no single rate (mwrUndefined, which is a refusal
+                    rather than whichever root a search reaches first). Both are null, with the
                     cause named, whenever a day the chain spans is a subtotal, a
                     capital or income row did not convert, or the window holds a
                     movement the flow classifier cannot count. A window in which
@@ -979,7 +989,9 @@ Enforcement         investedPeriodResult
                     backend/src/net-worth/invested-period-result.util.spec.ts.
                     Its factor arithmetic is
                     backend/src/common/time-series/twr-chain.util.ts, whose
-                    only caller it is.
+                    only caller it is, and its rate solver is
+                    backend/src/common/time-series/xirr.util.ts, bracketed and
+                    pure, with its own spec.
                     Both period-result routes fill the fields from the same
                     arrays, and the batch route's equivalence spec compares
                     them preset by preset. A spec holds every InvestmentAction
@@ -994,12 +1006,14 @@ Enforcement         investedPeriodResult
                     PortfolioPeriodResultService.getInvestedResultSinceInception,
                     and carries timeWeightedReturnReasons and
                     timeWeightedReturnSince on the REST shape, the LLM summary
-                    and the MCP payload; investedValue
+                    and the MCP payload, with moneyWeightedReturn and
+                    moneyWeightedReturnReasons beside them from the same slice; investedValue
                     (frontend/src/lib/invested-value.ts) is the one door to the
                     invested component of a series point.
                     docs/specs/portfolio-period-result.md section 10 has the
                     definitions, the truth table, the twelve numerical cases
-                    and the test matrix.
+                    and the test matrix; section 11 does the same for the
+                    money-weighted figure.
 Status              enforced. The second definition of the same caption --
                     PortfolioCalculationService.calculateTWR, which valued its
                     boundaries from stored closes alone and dropped an unpriced

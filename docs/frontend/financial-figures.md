@@ -273,8 +273,11 @@ account, so a reader with 8,000 invested and 2,000 idle who gains 10% reads
 "TWR (time-weighted)" is that same `investmentReturnPercent` asked since the
 portfolio's first transaction, withheld through `UnknownAmount` with
 `periodResultUnknownReason(summary.timeWeightedReturnReasons)` rather than a
-causeless "N/A"; the card's "Simple Return" and "CAGR" beside it are
-cost-basis measures and keep their own captions. The four investment
+causeless "N/A", and "MWR (money-weighted)" beside it is the same measure's
+annualised XIRR over the same flows (`summary.moneyWeightedReturn`, withheld
+the same way, `mwrUndefined` or `windowTooShort` when it is the rate rather
+than the data that is unknown -- section 11); the card's "Simple Return" and
+"CAGR" beside them are cost-basis measures and keep their own captions. The four investment
 surfaces LEAD with those two: `PortfolioPerformanceCard` shows
 `investmentReturnPercent` over `investmentPnl`, and `InvestmentValueChart`,
 `PortfolioValueWidget` and `PortfolioValueReport` put them where their result

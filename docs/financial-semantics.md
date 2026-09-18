@@ -402,6 +402,17 @@ counted per window and withholds `investmentResult` with the reason
 `externallySettledTrade` or `mixedSplit`; the two figures either side of the
 subtraction are still reported.
 
+**A time-weighted return and a money-weighted one are two figures, not two
+spellings.** The invested part reports both over the same flows and the same
+days: `investmentReturnPercent` (`"twr"`, chained daily, the reader's timing
+neutralised) and `investmentMoneyWeightedReturnPercent` (`"xirr"`, annualised,
+each purchase, disposal and distribution weighted by its own date). They differ
+wherever the reader invested more before a rise or a fall, and neither is a
+correction of the other. A window under 30 days gets no annualised rate
+(`windowTooShort`), a schedule with no single rate gets none at all
+(`mwrUndefined`), and anything that withholds the P&L withholds both
+(`docs/specs/portfolio-period-result.md` section 11).
+
 **The return method is named on the wire.** `returnMethod: "simple"` divides
 the period's result by the value it started with and ignores when each flow
 arrived; it is neither Modified Dietz nor a time-weighted return, both of which
