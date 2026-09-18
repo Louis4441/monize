@@ -4,6 +4,8 @@ import { McpHttpController } from "./mcp-http.controller";
 import { McpServerService } from "./mcp-server.service";
 import { PatService } from "../auth/pat.service";
 import { OAuthProviderService } from "../oauth/oauth-provider.service";
+import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
+import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/server";
 
 describe("McpHttpController", () => {
   let controller: McpHttpController;
@@ -1304,6 +1306,62 @@ describe("McpHttpController", () => {
         scopes: "read",
         credentialId: "oauth:grant-9",
       });
+    });
+  });
+
+  /**
+   * M1 (`docs/future-plans/horizontal-scaling-tasks.md`) asked whether a 2025-era
+   * session can be re-created on another replica from a persisted
+   * `session_id -> user_id` row. It cannot, and these two SDK facts are why.
+   * They are pinned here rather than written down only in prose: an SDK upgrade
+   * that adds a session-restore seam should turn this red and send the reader
+   * back to M1's persisted variant, instead of leaving the sticky-routing
+   * requirement in `helm/README.md` standing on a limitation that has lapsed.
+   */
+  describe("a 2025-era session cannot be rehydrated on another replica", () => {
+    it("exposes sessionId as a getter, so a persisted id cannot be assigned", () => {
+      const transport = new NodeStreamableHTTPServerTransport({
+        sessionIdGenerator: () => "generated-session-id",
+      });
+      const descriptor = Object.getOwnPropertyDescriptor(
+        Object.getPrototypeOf(transport),
+        "sessionId",
+      );
+
+      expect(descriptor?.get).toBeDefined();
+      expect(descriptor?.set).toBeUndefined();
+      expect(() => {
+        (transport as unknown as { sessionId: string }).sessionId =
+          "rehydrated-from-a-row";
+      }).toThrow(TypeError);
+    });
+
+    // The Node transport wraps this one, and answers the same way; the web
+    // standard transport is driven here because it returns the `Response`
+    // itself, so the refusal can be read rather than inferred from a status.
+    it("refuses a known session id on a transport that has not seen initialize", async () => {
+      const transport = new WebStandardStreamableHTTPServerTransport({
+        sessionIdGenerator: () => "generated-session-id",
+      });
+      const body = { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} };
+      const response = await transport.handleRequest(
+        new Request("https://app.monize.test/api/v1/mcp", {
+          method: "POST",
+          headers: {
+            accept: "application/json, text/event-stream",
+            "content-type": "application/json",
+            // The id a second replica would have read out of an `mcp_sessions` row.
+            "mcp-session-id": "generated-session-id",
+          },
+          body: JSON.stringify(body),
+        }),
+        { parsedBody: body },
+      );
+
+      // `_initialized` is private and only an `initialize` request sets it, so
+      // the replica holding the row still answers as an uninitialized server.
+      expect(response.status).toBe(400);
+      expect(await response.text()).toContain("Server not initialized");
     });
   });
 

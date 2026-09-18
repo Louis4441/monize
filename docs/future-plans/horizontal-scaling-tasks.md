@@ -92,7 +92,7 @@
 | R5 | Relay attachments on rows (not the storage provider -- see its Notes) | R3 | neutral | [x] |
 | R6 | `RedisEventBus`; selected in `multi`; two-instance spec | F2, R1, D3 | multi-only | [ ] |
 | T1 | `RedisThrottlerStorage`; selected in `multi`; fail-open | F2, D3 | multi-only | [ ] |
-| M1 | MCP 2025-era sessions: persisted rows or documented sticky routing | F1 | neutral | [ ] |
+| M1 | MCP 2025-era sessions: persisted rows or documented sticky routing | F1 | none | [x] |
 | S1 | Boot refusals in `multi` for per-pod attachments and backups | F1 | multi-only | [ ] |
 | S2 | S3 backup target for automatic backups | -- | none until selected | [ ] |
 | C1 | `claimOnce` per owner and month around budget period rollover | -- | neutral | [x] |
@@ -1101,7 +1101,7 @@ health controller is `@SkipThrottle()`; keep it so.
 
 ### M1 -- MCP 2025-era sessions
 
-- [ ] Status:
+- [x] Status: done (sticky-routing variant).
 
 **Scope:** `backend/src/mcp/mcp-http.controller.ts` and spec,
 `backend/src/mcp/CLAUDE.md`, possibly a migration for `mcp_sessions`, `helm/templates/ingress.yaml`
@@ -1134,6 +1134,72 @@ sticky variant, a Helm render test in D1 that the annotation appears only
 when the value is set.
 
 **Notes:**
+
+**Step 1, answered: no.** On `@modelcontextprotocol/server` and
+`@modelcontextprotocol/node` **2.0.0**, the session id is not the only state and
+cannot be put back anyway:
+
+- `NodeStreamableHTTPServerTransport.sessionId` is a getter with no setter --
+  assigning a persisted id throws `TypeError`.
+- `_initialized` is private and set only by handling an `initialize` request;
+  `validateSession` answers `400 Bad Request: Server not initialized` to a
+  request carrying a known session id on a transport that has not seen one.
+- Even with a seam to put the id back, the live state of an exchange is the open
+  response stream on that pod's socket (`_streamMapping`), the
+  `Protocol._responseHandlers` entry holding the promise a `confirmWrite`
+  elicitation waits on, and the per-`McpServer` record in
+  `mcp-elicitation-support.ts`. A session id addresses none of them, so
+  `mcp_sessions` would make the id resolvable and the session no more servable.
+
+Both SDK facts are pinned in `mcp-http.controller.spec.ts`, so an SDK upgrade
+that adds a session-restore seam turns red and sends the next reader back to the
+persisted variant.
+
+**So step 3 shipped:** `mcp.stickySessions` (default `false`), rendering an
+`nginx.ingress.kubernetes.io/affinity` Ingress of its own under
+`ingress.enabled`, and an HTTPRoute rule with `sessionPersistence` under
+`httpRoute.enabled`.
+
+**Two things the step-3 sketch did not account for**, both now documented in
+`helm/README.md` rather than papered over:
+
+1. **The route has to reach the backend Service directly.** Every other path is
+   served by the frontend, which proxies to `monize-backend-service` with a
+   server-side `fetch` (`frontend/src/proxy.ts`), so an affinity annotation on
+   the existing Ingress would pin the frontend pod while kube-proxy still spread
+   that fetch across backend replicas. Hence a second Ingress / an extra
+   HTTPRoute rule rather than an annotation on the existing one.
+2. **Cookie affinity pins only clients that keep cookies**, and Gateway API
+   `sessionPersistence` is an experimental-channel field. Where neither holds,
+   the working configurations are one backend replica or a 2026-07-28 client.
+   Without stickiness a misrouted session id is answered `404` and the client
+   re-initializes, so reads recover -- but a confirmation in flight does not: its
+   answer never reaches the replica that asked, the wait expires, and
+   `clientAnsweredForItself` reads the timeout as `"unsupported"`, so the write
+   proceeds under the client's own approval prompt.
+
+**Scope additions** (per the "add the file and say why" rule): `helm/values.yaml`
+and `helm/README.md`, because a Helm value that exists in no `values.yaml` cannot
+be set and `scripts/check-docs-manifests.mjs` checks documented defaults against
+it; `docs/backend/mcp.md`, because `AGENTS.md` requires the full entry beside the
+one-line rule added to `backend/src/mcp/CLAUDE.md`.
+
+**Deploy impact is `none`, not `neutral`:** no runtime code changed. The
+controller keeps its four process-local maps and its `setInterval` sweep -- both
+correct for state that cannot outlive its process -- and the chart's new value
+defaults off, so a rendered chart is byte-identical until it is set. The
+2026-07-28 leg is untouched.
+
+**For D1:** the render test this task owes is the one named under Tests above --
+`mcp.stickySessions.enabled=true` renders the `monize-mcp` Ingress (with
+`ingress.enabled=true`) and the `sessionPersistence` rule (with
+`httpRoute.enabled=true`), and neither appears at the default. `helm lint` and
+`helm template` could not be run in the session that did M1 (the sandbox's egress
+policy blocks `get.helm.sh`); the templates were rendered by substitution and
+YAML-parsed, and CI's `helm-chart` job is the real gate.
+
+**For G1:** `mcp-http.controller.ts` needs its four session maps on the
+process-local-state allowlist, as sticky-routed state rather than a gap.
 
 ### S1 -- Boot refusals for per-pod storage in `multi`
 

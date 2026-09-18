@@ -70,6 +70,52 @@ ingress:
 
 > **Note**: Both can technically be enabled simultaneously, but it is recommended to only enable one.
 
+### MCP sessions and more than one backend replica
+
+The MCP endpoint serves two protocol revisions. The 2026-07-28 one is stateless
+per request and runs on any number of replicas as it is. The 2025-era one -- what
+Claude Desktop's connector, `claude mcp add` and Codex negotiate today -- opens a
+session that lives in **one backend process**, and that session cannot be moved:
+the SDK offers no way to restore a session id into a new transport, and the live
+state of an exchange is the open response stream and the pending write
+confirmation held by the replica that answered `initialize`.
+
+With `backend.replicas: 1` (the default) there is nothing to configure. Raising
+it while 2025-era clients connect needs this:
+
+```yaml
+mcp:
+  stickySessions:
+    enabled: true
+```
+
+That renders a route for `/api/v1/mcp` straight to the backend Service, asking
+the edge to pin each session to one replica -- an `nginx.ingress.kubernetes.io/affinity`
+Ingress of its own when `ingress.enabled` is set, and an HTTPRoute rule carrying
+`sessionPersistence` when `httpRoute.enabled` is. The route bypasses the frontend
+on purpose: every other path is served by the frontend, which proxies to
+`monize-backend-service` with a server-side fetch, so affinity at the edge would
+pin the frontend pod while kube-proxy still spread that fetch across backend
+replicas.
+
+Three limits to know before relying on it:
+
+- **It pins by cookie, so it pins only clients that keep cookies.** A client that
+  discards them is spread across replicas as before.
+- **Gateway API `sessionPersistence` is an experimental-channel field.** Install
+  the experimental CRDs and confirm your implementation honours it; otherwise the
+  rule is admitted and does nothing.
+- **It covers the documented URL, `https://<host>/api/v1/mcp`.** A client pointed
+  at the bare origin is recognised by its headers inside the frontend proxy,
+  which no path-matching route can reproduce.
+
+Where none of that holds, the two configurations that work are one backend
+replica, or clients that speak 2026-07-28. Without stickiness a misrouted session
+id is answered `404`, which the spec requires a client to recover from by
+re-initializing: reads recover, but a write confirmation in flight does not --
+its answer never reaches the replica that asked, that replica's wait expires, and
+the write proceeds under the client's own approval prompt.
+
 ## Configuration
 
 ### Global Settings
@@ -316,6 +362,14 @@ Notes on sizing and behaviour:
   without it the first write fails with EACCES.
 - `/tmp` always gets an `emptyDir`. Node and the `.mny` import both need
   somewhere to spill, and nothing there needs to survive a restart.
+
+### MCP Routing
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `mcp.stickySessions.enabled` | Pin 2025-era MCP sessions to one backend replica | `false` |
+| `mcp.stickySessions.path` | Path prefix routed straight to the backend | `/api/v1/mcp` |
+| `mcp.stickySessions.cookieName` | Name of the affinity cookie the edge sets | `monize-mcp-affinity` |
 
 ### Frontend
 
