@@ -241,6 +241,13 @@ export const getPortfolioSummaryOutput = toolOutput({
   // costs ~95 bytes of `tools/list` on every request and this tool is at its
   // budget (`tools-list-budget.spec.ts`).
   timeWeightedReturn: numNull,
+  // `moneyWeightedReturn` is the same measure's second figure: the invested
+  // part's annualised XIRR since the first transaction -- what the caller's own
+  // money earned, each purchase, sale and distribution weighted by when it
+  // happened -- with `moneyWeightedReturnReasons` beside it. Both are
+  // UNDECLARED here and reach the caller through the loose object, for the
+  // reason above: the tool is at its `tools/list` byte budget, which is
+  // shrink-only.
   cagr: numNull,
   // securityId is the id an entity link must quote, so it is named here.
   holdings: z.array(looseObject({ securityId: str })),

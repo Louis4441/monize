@@ -174,6 +174,18 @@ export interface PortfolioSummary {
   timeWeightedReturnReasons: PeriodResultReason[];
   /** The baseline close the return is measured from, or `null` for no window. */
   timeWeightedReturnSince: string | null;
+  /**
+   * The same measure's second figure: the invested part's ANNUALISED
+   * money-weighted return (XIRR) since the portfolio's first transaction, the
+   * rate the reader's own money earned with each purchase, sale and
+   * distribution weighted by when it happened
+   * (`docs/specs/portfolio-period-result.md` section 11). `null` is withheld,
+   * never zero, and `moneyWeightedReturnReasons` says why -- a window under 30
+   * days is not annualised at all.
+   */
+  moneyWeightedReturn: number | null;
+  /** Why `moneyWeightedReturn` is withheld; empty when the figure is known. */
+  moneyWeightedReturnReasons: PeriodResultReason[];
   cagr: number | null;
   /**
    * False when a component of these totals could not be converted into the
@@ -318,6 +330,10 @@ export interface LlmPortfolioSummary {
   timeWeightedReturnReasons: PeriodResultReason[];
   /** The baseline close it is measured from, so the answer can name the window. */
   timeWeightedReturnSince: string | null;
+  /** The invested part's annualised XIRR over the same window; null is withheld. */
+  moneyWeightedReturn: number | null;
+  /** Why it is withheld, so a model reports the cause rather than "n/a". */
+  moneyWeightedReturnReasons: PeriodResultReason[];
   cagr: number | null;
   holdings: LlmPortfolioHolding[];
   holdingsByAccount: LlmAccountHoldings[];
@@ -770,6 +786,15 @@ export class PortfolioService {
       ? null
       : investedSinceInception.startDate;
 
+    // The second figure of that same measure, from the same slice: what the
+    // reader's own money earned, annualised, with every purchase, sale and
+    // distribution weighted by when it happened (section 11). Withheld with
+    // its cause -- including a portfolio too young to annualise -- rather than
+    // approximated or defaulted to the time-weighted one.
+    const moneyWeightedReturn =
+      investedSinceInception.investmentMoneyWeightedReturnPercent;
+    const moneyWeightedReturnReasons = investedSinceInception.investedReasons;
+
     // CAGR divides the portfolio value by what was invested to get there, so an
     // incomplete numerator or denominator produces a growth rate for a portfolio
     // nobody owns: with one unconvertible EUR account, 100 USD of known net
@@ -819,6 +844,8 @@ export class PortfolioService {
       timeWeightedReturn,
       timeWeightedReturnReasons,
       timeWeightedReturnSince,
+      moneyWeightedReturn,
+      moneyWeightedReturnReasons,
       cagr,
       fxComplete: missingRatePairs.length === 0,
       missingRatePairs,
@@ -912,6 +939,8 @@ export class PortfolioService {
       timeWeightedReturn: roundPct(summary.timeWeightedReturn),
       timeWeightedReturnReasons: summary.timeWeightedReturnReasons,
       timeWeightedReturnSince: summary.timeWeightedReturnSince,
+      moneyWeightedReturn: roundPct(summary.moneyWeightedReturn),
+      moneyWeightedReturnReasons: summary.moneyWeightedReturnReasons,
       cagr: roundPct(summary.cagr),
       fxComplete: summary.fxComplete,
       missingRatePairs: summary.missingRatePairs,

@@ -43,6 +43,7 @@ describe("PortfolioService", () => {
   const investedSince = (
     overrides: Partial<{
       investmentReturnPercent: number | null;
+      investmentMoneyWeightedReturnPercent: number | null;
       investedReasons: string[];
       startDate: string;
     }> = {},
@@ -1665,6 +1666,8 @@ describe("PortfolioService", () => {
         timeWeightedReturn: null,
         timeWeightedReturnReasons: [],
         timeWeightedReturnSince: null,
+        moneyWeightedReturn: null,
+        moneyWeightedReturnReasons: [],
         cagr: null,
         holdings: [],
         holdingsByAccount: [],
@@ -1711,6 +1714,8 @@ describe("PortfolioService", () => {
           timeWeightedReturn: 8.56789,
           timeWeightedReturnReasons: [],
           timeWeightedReturnSince: null,
+          moneyWeightedReturn: null,
+          moneyWeightedReturnReasons: [],
           cagr: null,
           holdings: [
             {
@@ -1798,6 +1803,8 @@ describe("PortfolioService", () => {
         timeWeightedReturn: null,
         timeWeightedReturnReasons: [],
         timeWeightedReturnSince: null,
+        moneyWeightedReturn: null,
+        moneyWeightedReturnReasons: [],
         cagr: null,
         holdings: [],
         holdingsByAccount: [],
@@ -1831,6 +1838,8 @@ describe("PortfolioService", () => {
         timeWeightedReturn: null,
         timeWeightedReturnReasons: [],
         timeWeightedReturnSince: null,
+        moneyWeightedReturn: null,
+        moneyWeightedReturnReasons: [],
         cagr: null,
         holdings: [],
         holdingsByAccount: [],
@@ -1860,6 +1869,8 @@ describe("PortfolioService", () => {
         timeWeightedReturn: null,
         timeWeightedReturnReasons: [],
         timeWeightedReturnSince: null,
+        moneyWeightedReturn: null,
+        moneyWeightedReturnReasons: [],
         cagr: null,
         holdings: [
           {
@@ -1908,6 +1919,8 @@ describe("PortfolioService", () => {
         timeWeightedReturn: null,
         timeWeightedReturnReasons: [],
         timeWeightedReturnSince: null,
+        moneyWeightedReturn: null,
+        moneyWeightedReturnReasons: [],
         cagr: null,
         holdings: [],
         holdingsByAccount: [
@@ -2928,6 +2941,63 @@ describe("PortfolioService", () => {
       expect(result.timeWeightedReturnReasons).toEqual(["incompletePrices"]);
       // The window is still named: what is unknown is the return, not the dates.
       expect(result.timeWeightedReturnSince).toBe("2025-06-14");
+    });
+
+    it("prints the money-weighted return from the same slice", async () => {
+      // One call, two figures: the summary asks the invested measure once and
+      // reports what it answered, rather than deriving a second rate of its own
+      // (spec section 11.8).
+      periodResultService.getInvestedResultSinceInception.mockResolvedValue(
+        investedSince({
+          investmentReturnPercent: 25.8,
+          investmentMoneyWeightedReturnPercent: 19.42,
+          startDate: "2025-06-14",
+        }),
+      );
+
+      const result = await service.getPortfolioSummary(userId);
+
+      expect(result.moneyWeightedReturn).toBe(19.42);
+      expect(result.moneyWeightedReturnReasons).toEqual([]);
+      expect(
+        periodResultService.getInvestedResultSinceInception,
+      ).toHaveBeenCalledTimes(1);
+    });
+
+    it("withholds the money-weighted return with its cause", async () => {
+      // A portfolio younger than a month has a time-weighted return and no
+      // annualised rate: a fortnight's move is not a claim about a year.
+      periodResultService.getInvestedResultSinceInception.mockResolvedValue(
+        investedSince({
+          investmentReturnPercent: 1.4,
+          investmentMoneyWeightedReturnPercent: null,
+          investedReasons: ["windowTooShort"],
+          startDate: "2026-02-10",
+        }),
+      );
+
+      const result = await service.getPortfolioSummary(userId);
+
+      expect(result.timeWeightedReturn).toBe(1.4);
+      expect(result.moneyWeightedReturn).toBeNull();
+      expect(result.moneyWeightedReturnReasons).toEqual(["windowTooShort"]);
+    });
+
+    it("carries both returns and their causes to the LLM summary", async () => {
+      periodResultService.getInvestedResultSinceInception.mockResolvedValue(
+        investedSince({
+          investmentReturnPercent: 25.8,
+          investmentMoneyWeightedReturnPercent: 19.4242,
+          investedReasons: [],
+          startDate: "2025-06-14",
+        }),
+      );
+
+      const summary = await service.getLlmSummary(userId);
+
+      // Rounded like every other percentage the model is handed.
+      expect(summary.moneyWeightedReturn).toBe(19.42);
+      expect(summary.moneyWeightedReturnReasons).toEqual([]);
     });
 
     it("has no window at all when the scope never held an investment", async () => {
@@ -4248,6 +4318,8 @@ describe("PortfolioService", () => {
         timeWeightedReturn: null,
         timeWeightedReturnReasons: [],
         timeWeightedReturnSince: null,
+        moneyWeightedReturn: null,
+        moneyWeightedReturnReasons: [],
         cagr: null,
         holdings: [],
         holdingsByAccount: [],
