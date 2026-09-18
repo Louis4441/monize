@@ -643,10 +643,14 @@ describe("PortfolioCalculationService.calculateCapitalGainsByMonth", () => {
     expect(jan.realizedGain).toBe(0);
   });
 
-  it("resolves an unrated pair once, however many securities carry it", async () => {
+  it("resolves an unrated pair once per boundary date, however many securities carry it", async () => {
     // The cache held only found rates, so a refusal was re-resolved (and
     // re-warned) for every security group in that currency. An absence is an
-    // answer and is cached like one.
+    // answer and is cached like one. The cache is now keyed by boundary date
+    // too (the fold values each boundary at that date's FX, P5), so the pair is
+    // resolved once PER DISTINCT boundary date -- here the two January
+    // boundaries, 2023-12-31 and 2024-01-31 -- and shared across both security
+    // groups rather than re-resolved four times.
     exchangeRateService.resolveStoredRate = storedRateDouble();
     txRepo.find.mockResolvedValue([
       makeTx({
@@ -697,7 +701,11 @@ describe("PortfolioCalculationService.calculateCapitalGainsByMonth", () => {
     const usdCad = exchangeRateService.resolveStoredRate.mock.calls.filter(
       (call: unknown[]) => call[0] === "USD" && call[1] === "CAD",
     );
-    expect(usdCad).toHaveLength(1);
+    // Two distinct boundary dates, each resolved once -- not four times (two
+    // securities * two dates), which is what dropping the cache would cost.
+    const distinctDates = new Set(usdCad.map((call: unknown[]) => call[2]));
+    expect(distinctDates).toEqual(new Set(["2023-12-31", "2024-01-31"]));
+    expect(usdCad).toHaveLength(2);
   });
 
   it("still computes gains when the security and account share a currency", async () => {
@@ -729,6 +737,183 @@ describe("PortfolioCalculationService.calculateCapitalGainsByMonth", () => {
     expect(result[0].totalCapitalGain).toBe(500);
     expect(result[0].startValue).toBe(5000);
     expect(result[0].endValue).toBe(5500);
+  });
+
+  it("values each boundary at that boundary's own accepted FX, not today's (P5)", async () => {
+    // 10 units of a USD security held in a PLN account, no trades, price flat at
+    // 100 USD. USD/PLN was 4.0 on the period's start boundary (2023-12-31) and
+    // 5.0 on its end boundary (2024-01-31), so the PLN value moved
+    // 10*100*4 = 4,000 -> 10*100*5 = 5,000: a +1,000 change that is purely the
+    // currency's. The old fold resolved USD->PLN ONCE, at todayYMD() in live
+    // mode, and multiplied that single rate into both ends, reporting a flat
+    // price as a flat value (0) and hiding the FX move entirely.
+    const byDate: Record<string, number> = {
+      "2023-12-31": 4.0,
+      "2024-01-31": 5.0,
+    };
+    exchangeRateService.resolveStoredRate = jest.fn(
+      async (from: string, to: string, onDate: string) => {
+        if (from === to) return resolutionFor(1);
+        if (from === "USD" && to === "PLN") {
+          // Any date the fold did not ask for -- notably today, which the old
+          // code used for both ends -- resolves to a distinct rate so the old
+          // single-rate behaviour reports a change of 0.
+          return resolutionFor(byDate[onDate] ?? 4.5);
+        }
+        return resolutionFor(null);
+      },
+    );
+    txRepo.find.mockResolvedValue([
+      makeTx({
+        id: "buy",
+        action: InvestmentAction.BUY,
+        transactionDate: "2023-12-15",
+        quantity: 10,
+        price: 100,
+        totalAmount: 1000,
+        account: { id: accountId, name: "Brokerage", currencyCode: "PLN" },
+        security: {
+          id: securityId,
+          symbol: "ABC",
+          name: "ABC Corp",
+          currencyCode: "USD",
+        },
+      } as never),
+    ]);
+    priceRepo.query.mockResolvedValue(
+      priceRows([
+        { date: "2023-12-31", price: 100 },
+        { date: "2024-01-31", price: 100 },
+      ]),
+    );
+
+    const result = await service.calculateCapitalGainsByMonth(userId, {
+      startDate: "2024-01-01",
+      endDate: "2024-01-31",
+    });
+
+    expect(result).toHaveLength(1);
+    const jan = result[0];
+    expect(jan.startValue).toBe(4000);
+    expect(jan.endValue).toBe(5000);
+    // +1,000, the currency's move on a flat price -- NOT 0 (one rate for both
+    // ends) and NOT a figure using either boundary's rate for both.
+    expect(jan.totalCapitalGain).toBe(1000);
+    expect(jan.unrealizedGain).toBe(1000);
+
+    // The two ends were resolved at their own dates, in historical (non-live)
+    // mode, never at todayYMD().
+    expect(exchangeRateService.resolveStoredRate).toHaveBeenCalledWith(
+      "USD",
+      "PLN",
+      "2023-12-31",
+      { mode: "historical" },
+    );
+    expect(exchangeRateService.resolveStoredRate).toHaveBeenCalledWith(
+      "USD",
+      "PLN",
+      "2024-01-31",
+      { mode: "historical" },
+    );
+  });
+
+  it("withholds the period when a held position has no price on a boundary it spans (P5)", async () => {
+    // 10 units held across January in a same-currency account, but the security
+    // has no stored close on or before either boundary. Its market value is then
+    // UNKNOWN, so both boundary values and the gain are withheld (null). The old
+    // `lookupPrice(...) ?? 0` valued the held position at zero and reported a
+    // confident 0 gain.
+    txRepo.find.mockResolvedValue([
+      makeTx({
+        id: "buy",
+        action: InvestmentAction.BUY,
+        transactionDate: "2023-12-15",
+        quantity: 10,
+        price: 100,
+        totalAmount: 1000,
+      }),
+    ]);
+    // No prices at all for the security.
+    priceRepo.query.mockResolvedValue(priceRows([]));
+
+    const result = await service.calculateCapitalGainsByMonth(userId, {
+      startDate: "2024-01-01",
+      endDate: "2024-01-31",
+    });
+
+    expect(result).toHaveLength(1);
+    const jan = result[0];
+    expect(jan.startQuantity).toBe(10);
+    expect(jan.endQuantity).toBe(10);
+    expect(jan.startValue).toBeNull();
+    expect(jan.endValue).toBeNull();
+    expect(jan.totalCapitalGain).toBeNull();
+    expect(jan.unrealizedGain).toBeNull();
+  });
+
+  it("values a closed (zero-quantity) boundary at 0 without needing a rate (P5)", async () => {
+    // A full round-trip within January of a USD security in a PLN account with
+    // NO USD/PLN rate available in either direction. The position is zero at both
+    // period boundaries, so each boundary value is a genuine zero that needs no
+    // rate; the realized figures come from each transaction's own stored rate.
+    // The old fold resolved the pair once, got null, and withheld the boundary
+    // values even though the position was empty at both ends.
+    exchangeRateService.resolveStoredRate = jest.fn(
+      async (from: string, to: string) => resolutionFor(from === to ? 1 : null),
+    );
+    txRepo.find.mockResolvedValue([
+      makeTx({
+        id: "buy",
+        action: InvestmentAction.BUY,
+        transactionDate: "2024-01-10",
+        quantity: 10,
+        price: 100,
+        totalAmount: 1000,
+        exchangeRate: 4,
+        account: { id: accountId, name: "Brokerage", currencyCode: "PLN" },
+        security: {
+          id: securityId,
+          symbol: "ABC",
+          name: "ABC Corp",
+          currencyCode: "USD",
+        },
+      } as never),
+      makeTx({
+        id: "sell",
+        action: InvestmentAction.SELL,
+        transactionDate: "2024-01-20",
+        quantity: 10,
+        price: 110,
+        totalAmount: 1100,
+        exchangeRate: 4,
+        account: { id: accountId, name: "Brokerage", currencyCode: "PLN" },
+        security: {
+          id: securityId,
+          symbol: "ABC",
+          name: "ABC Corp",
+          currencyCode: "USD",
+        },
+      } as never),
+    ]);
+    priceRepo.query.mockResolvedValue(
+      priceRows([
+        { date: "2023-12-31", price: 100 },
+        { date: "2024-01-31", price: 110 },
+      ]),
+    );
+
+    const result = await service.calculateCapitalGainsByMonth(userId, {
+      startDate: "2024-01-01",
+      endDate: "2024-01-31",
+    });
+
+    expect(result).toHaveLength(1);
+    const jan = result[0];
+    expect(jan.startQuantity).toBe(0);
+    expect(jan.endQuantity).toBe(0);
+    // A zero position is worth zero on any date and needs no rate.
+    expect(jan.startValue).toBe(0);
+    expect(jan.endValue).toBe(0);
   });
 
   it("decomposes a SELL month into realized + unrealized capital gains", async () => {
@@ -1242,6 +1427,35 @@ describe("PortfolioCalculationService.primeLiveRates", () => {
  * A double that returned a bare number could not express the second, which is
  * the half the callers branch on.
  */
+/**
+ * The `FxRateResolution` shape `resolveStoredRate` returns for a single rate:
+ * `resolved` with the number, or `unknown` naming why there is none. Used by the
+ * date-aware doubles that assert the capital-gains fold resolves each boundary
+ * at that boundary's own date.
+ */
+function resolutionFor(rate: number | null) {
+  if (rate === null || !(rate > 0)) {
+    return {
+      status: "unknown",
+      rate: null,
+      observedRate: null,
+      observedOn: null,
+      direction: null,
+      ageDays: null,
+      reason: "no_observation",
+    };
+  }
+  return {
+    status: "resolved",
+    rate,
+    observedRate: rate,
+    observedOn: null,
+    direction: "direct",
+    ageDays: 0,
+    reason: null,
+  };
+}
+
 function storedRateDouble(
   rates: Record<string, number | null> = {},
 ): jest.Mock {

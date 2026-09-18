@@ -619,8 +619,17 @@ Enforcement         The 1:1 half is enforced. Consumers return null on an absent
                     getRateForDate / getLiveRate,
                     PortfolioCalculationService.resolveDailyRate and
                     convertToDefault (the last two `live` mode) and
-                    InvestmentReportDataService.fxRate all route through it,
-                    and buildRateIndex / buildDailyRateIndex load the window plus
+                    InvestmentReportDataService.fxRate all route through it.
+                    calculateCapitalGains' local fxRate resolves the
+                    security->account pair AT EACH BOUNDARY'S OWN DATE in
+                    historical mode (start at priceLookupStart, end at periodEnd,
+                    cached per (pair, date)); it used to resolve once at
+                    todayYMD() in live mode and price every historical boundary
+                    at one rate, reading a currency's move over the window as
+                    none. A held position with no accepted price on a boundary is
+                    withheld (null) there rather than valued at zero, and a zero
+                    quantity is zero without a rate. All the above route through
+                    the door, and buildRateIndex / buildDailyRateIndex load the window plus
                     one age bound before it so a date's answer does not depend on
                     the window's width (issue #1390, which also closed DR-02 in
                     docs/specs/fx-conversion-completeness.md section 6). A caller

@@ -209,6 +209,12 @@ on or before the date, in either stored direction, within
 reason otherwise -- `backend/src/common/time-series/fx-rate.one-door.spec.ts`
 fails a newest-rate read that bypasses it.
 
+The periodic capital-gains report (`calculateCapitalGains`) is bound by this:
+it values each period boundary at the FX accepted for that boundary's own date
+in historical mode -- the start at `priceLookupStart`, the end at `periodEnd` --
+never once at today's live rate for both ends, which read a currency's move over
+the window as none.
+
 ### 2.3 A boundary needs two observations, not two lookups
 
 When a span's two ends are bounded independently, both can resolve to the

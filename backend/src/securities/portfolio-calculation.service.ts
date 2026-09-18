@@ -1488,32 +1488,65 @@ export class PortfolioCalculationService {
       group.txs.push(tx);
     }
 
-    // Cache FX rates: securityCurrency -> accountCurrency
+    // Cache FX rates: (securityCurrency -> accountCurrency, on a given date).
     const fxCache = new Map<string, number | null>();
     // `null` when the pair has no rate. This used to end `: 1`, valuing a
     // foreign security's period start and end as though its currency were the
     // account's (audit P5-009). Rate 1 only when the codes are equal -- a
     // missing code is unknown, and the lookup is the one bounded door rather
     // than two unbounded latest-rate reads with a hand-rolled reciprocal.
+    //
+    // The rate is resolved AT THE BOUNDARY'S OWN DATE in historical mode -- the
+    // newest observation on or before that date within FX_MAX_RATE_AGE_DAYS,
+    // never a future rate and never today's (INV-FX-001, docs/time-series-
+    // contract.md sections 2 and 4). Resolving once at todayYMD() in `live` mode
+    // priced every historical boundary of every period at one rate, so the
+    // report reads a currency's move over the window as no move at all. The
+    // cache is keyed by date so a portfolio holding one pair still resolves each
+    // distinct boundary date once.
     const fxRate = async (
       from: string | null,
       to: string | null,
+      onDate: string,
     ): Promise<number | null> => {
       if (!from || !to) return null;
       if (from === to) return 1;
-      const cacheKey = `${from}->${to}`;
+      const cacheKey = `${from}->${to}@${onDate}`;
       const cached = fxCache.get(cacheKey);
       if (cached !== undefined) return cached;
       const resolved = await this.exchangeRateService.resolveStoredRate(
         from,
         to,
-        todayYMD(),
-        { mode: "live" },
+        onDate,
+        { mode: "historical" },
       );
       // The absence is cached too, so a portfolio holding many securities in
-      // one unrated currency resolves that pair once instead of per group.
+      // one unrated currency resolves that pair once per date instead of per
+      // group.
       fxCache.set(cacheKey, resolved.rate);
       return resolved.rate;
+    };
+
+    // A boundary's market value in the account's currency. A zero position is
+    // worth zero on any date and needs no rate; a held position with no accepted
+    // price on or before the boundary is UNKNOWN (`null`), never zero; otherwise
+    // the security-currency value is converted at the FX accepted for the
+    // boundary's own date.
+    const boundaryValue = async (
+      quantity: number,
+      rawPrice: number | null,
+      onDate: string,
+      securityCurrencyCode: string | null,
+      accountCurrencyCode: string | null,
+    ): Promise<number | null> => {
+      if (Math.abs(quantity) < COST_BASIS_QUANTITY_TOLERANCE) return 0;
+      if (rawPrice === null) return null;
+      const fx = await fxRate(
+        securityCurrencyCode,
+        accountCurrencyCode,
+        onDate,
+      );
+      return fx === null ? null : quantity * rawPrice * fx;
     };
 
     const results: CapitalGainEntry[] = [];
@@ -1522,10 +1555,6 @@ export class PortfolioCalculationService {
       const txs = group.txs;
       const state = { quantity: 0, costBasis: 0, basisKnown: true };
       let txIdx = 0;
-      const securityToAccountFx = await fxRate(
-        group.securityCurrencyCode,
-        group.accountCurrencyCode,
-      );
 
       // Replay any transactions strictly before the first period to seed state.
       while (
@@ -1538,15 +1567,19 @@ export class PortfolioCalculationService {
 
       for (const { key: periodKey, periodEnd, priceLookupStart } of periods) {
         const startQuantity = state.quantity;
-        const startPrice =
-          this.lookupPrice(group.securityId, priceLookupStart, allPrices) ?? 0;
-        // A period whose security currency cannot be converted into the
-        // account's has no knowable start or end value; the rate is 1 only when
-        // the two currencies are the same.
-        const startValue =
-          securityToAccountFx === null
-            ? null
-            : startQuantity * startPrice * securityToAccountFx;
+        // The start value uses the FX accepted for the day BEFORE the period's
+        // start (priceLookupStart), where the position was carried into the
+        // period; the end value uses the FX accepted for periodEnd. A held
+        // position with no price on a boundary makes that boundary unknown, and
+        // an unconvertible currency does the same -- the rate is 1 only when the
+        // two currencies are the same.
+        const startValue = await boundaryValue(
+          startQuantity,
+          this.lookupPrice(group.securityId, priceLookupStart, allPrices),
+          priceLookupStart,
+          group.securityCurrencyCode,
+          group.accountCurrencyCode,
+        );
 
         let buys = 0;
         let sells = 0;
@@ -1622,12 +1655,13 @@ export class PortfolioCalculationService {
         }
 
         const endQuantity = state.quantity;
-        const endPrice =
-          this.lookupPrice(group.securityId, periodEnd, allPrices) ?? 0;
-        const endValue =
-          securityToAccountFx === null
-            ? null
-            : endQuantity * endPrice * securityToAccountFx;
+        const endValue = await boundaryValue(
+          endQuantity,
+          this.lookupPrice(group.securityId, periodEnd, allPrices),
+          periodEnd,
+          group.securityCurrencyCode,
+          group.accountCurrencyCode,
+        );
 
         // Unknown boundary values -- or an incomplete `buys` -- make the
         // capital gain unknown rather than equal to the known cash movements.

@@ -190,16 +190,21 @@ per-bar close) and `InvestmentReportDataService.fxRate`. The `live` doors --
 bounded by the same age rule but **not** dated: `convertToDefault` is not a
 historical lookup, and a caller holding a date must not use it as one.
 
-**Known gap: a portfolio figure converts historical amounts at today's
-rate.** `calculateCapitalGains`' local `fxRate` values past positions through
-the live door, so a past period's figure moves with today's currency market.
-(`calculateTWR`'s `computeValueAtDate` was the other half of this gap and is
-gone with the function: the summary's time-weighted return is now the invested
-measure, which converts every day at its own rate through the shared rate
-index.) This predates issue #1390 and is not closed by it; closing the half
-that remains means handing that helper the dated door with the position's own
-date, and deciding what a date with no admissible rate does to the figure
-(`null` per section 2, not a silent 1:1 and not today's rate). `buildRateIndex` and
+**Closed: the capital-gains report now converts each boundary at its own
+date.** `calculateCapitalGains`' local `fxRate` used to value every past
+position through the live door at `todayYMD()`, so a past period's figure moved
+with today's currency market -- and one rate priced both ends of every period,
+which read a currency's move over the window as no move at all. It now takes the
+dated historical door (`resolveStoredRate` in `historical` mode) at the
+boundary's own date: the start value uses the FX at `priceLookupStart`, the end
+value the FX at `periodEnd`, cached per `(pair, date)`. A boundary whose pair has
+no admissible rate on or before its date is `null` per section 2 (not a silent
+1:1 and not today's rate), and a held position with no accepted price on a
+boundary is `null` too rather than valued at zero; a genuine zero quantity is
+zero without a rate. (`calculateTWR`'s `computeValueAtDate` was the other half of
+this gap and is gone with the function: the summary's time-weighted return is
+now the invested measure, which converts every day at its own rate through the
+shared rate index.) `buildRateIndex` and
 `buildDailyRateIndex` load the reported window plus one age bound before it,
 rather than a fixed day margin, so a date's rate does not change when the chart
 around it is widened. A caller that converts at a date *later* than the window
