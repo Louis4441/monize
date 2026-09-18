@@ -2924,6 +2924,42 @@ describe("NetWorthService", () => {
     });
 
     /**
+     * Cash held in an investment account is not an investment
+     * (INV-PORTRESULT-002). The scope above holds 5,000 of cash and takes in
+     * another 100, and owns no security at all: the INVESTED value is zero on
+     * both days, and the investment charts that plot it draw zero rather than
+     * the reader's own deposit.
+     */
+    it("reports an invested value of zero for a cash-only scope", async () => {
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "cash-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_CASH",
+          currency_code: "USD",
+          opening_balance: 5000,
+        },
+      ]);
+      securityRepository.findByIds.mockResolvedValue([]);
+      reportQuery.mockResolvedValueOnce([
+        { date: "2025-03-01", balance: "5000", account_id: "cash-1" },
+        { date: "2025-03-02", balance: "5100", account_id: "cash-1" },
+      ]);
+
+      const result = await service.getDailyInvestments(
+        "user-1",
+        "2025-03-01",
+        "2025-03-02",
+      );
+
+      expect(result.map((point) => point.securitiesValue)).toEqual([0, 0]);
+      // The whole value is still reported, cash included: the net worth chart
+      // and the account-level measure both read it.
+      expect(result.map((point) => point.value)).toEqual([5000, 5100]);
+    });
+
+    /**
      * A day's cash is a property of the day, not of the window it was asked
      * about. #1389: the series keyed its points off a local-midnight `Date`, so
      * every key was a day early east of Greenwich and the first requested day

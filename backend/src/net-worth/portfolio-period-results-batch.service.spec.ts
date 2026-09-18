@@ -287,6 +287,51 @@ describe("PortfolioPeriodResultsBatchService", () => {
     });
   });
 
+  /**
+   * The same slicing, read through the invested measure (spec section 10): the
+   * 10,000 that arrived on 2026-06-01 was INVESTED that day, so it is a capital
+   * flow in the windows that contain it and factor 1 on its own day. The 2,000
+   * of idle cash is in neither window's base, which is why the invested return
+   * is larger than the account-level one over the same days.
+   */
+  it("slices the invested figures per preset from the one load", async () => {
+    const results = await batch.getPeriodResults("user-1");
+
+    expect(results.periods.ytd).toMatchObject({
+      investedValueStart: 8_000,
+      investedValueEnd: 18_200,
+      investmentCapitalFlows: 10_000,
+      investmentIncome: 0,
+      investmentPnl: 200,
+      // 18,000 / (8,000 + 10,000) = 1 on the purchase day, 18,200 / 18,000 on
+      // the last: the deposit that was invested is not a gain.
+      investmentReturnPercent: 1.11,
+      investmentReturnMethod: "twr",
+      investedComplete: true,
+      investedReasons: [],
+    });
+    // The purchase is outside the 3M window, which sees only the real gain.
+    expect(results.periods["3m"]).toMatchObject({
+      investmentCapitalFlows: 0,
+      investmentPnl: 200,
+      investmentReturnPercent: 1.11,
+    });
+    // The account-level return over the same days divides by a base that holds
+    // the idle cash, so the two measures disagree -- and each says which it is.
+    expect(results.periods.ytd?.returnPercent).toBe(2);
+  });
+
+  it("loads the invested capital and income once, over the widest window", async () => {
+    await batch.getPeriodResults("user-1");
+
+    const investedQueries = queries.filter((q) =>
+      q.sql.includes("it.action AS action"),
+    );
+    expect(investedQueries).toHaveLength(1);
+    expect(investedQueries[0].params[1]).toBe("2025-09-17");
+    expect(investedQueries[0].params[2]).toBe(TODAY);
+  });
+
   it("withholds a window that holds an uncountable movement, and no other", async () => {
     settledTradeDays = [{ date: "2026-06-02", count: "1" }];
 

@@ -171,6 +171,88 @@ describe("PortfolioPeriodResultService", () => {
     expect(result.returnPercent).not.toBe(100);
   });
 
+  /**
+   * The second reading of the same caption (spec section 10). "Portfolio
+   * performance" must answer what the INVESTMENTS did, so cash the reader pays
+   * in cannot move it -- not the amount, and not the percentage.
+   *
+   * The series is the same three closes, but with the invested part named: the
+   * portfolio holds 8,000 of securities that gain 10% to 8,800, and on
+   * 2026-09-16 a 50,000 deposit lands and is left as cash. The ACCOUNT-level
+   * value change moves by that 50,000; the invested figures do not move at all.
+   */
+  it("keeps a late cash deposit out of the invested figures", async () => {
+    const invested = [
+      point("2026-01-02", 10_000, { securitiesValue: 8_000 }),
+      point("2026-06-01", 10_800, { securitiesValue: 8_800 }),
+      point("2026-09-17", 60_800, { securitiesValue: 8_800 }),
+    ];
+    netWorth.getDailyInvestments.mockResolvedValue(invested);
+    flowRows = [{ date: "2026-09-16", currency: "CAD", total: "50000" }];
+
+    const result = await run();
+
+    // The account-level measure sees the deposit and subtracts it.
+    expect(result.valueChange).toBe(50_800);
+    expect(result.netExternalFlows).toBe(50_000);
+
+    // The invested measure never saw it: 8,800 - 8,000 with no capital flow.
+    expect(result.investmentPnl).toBe(800);
+    // +10% on the securities, not +8% on securities-plus-cash, and not a
+    // fraction of a base the 50,000 joined.
+    expect(result.investmentReturnPercent).toBe(10);
+    expect(result.investmentReturnMethod).toBe("twr");
+    expect(result.investedComplete).toBe(true);
+  });
+
+  it("reports the same invested figures without the late deposit", async () => {
+    // The control for the case above: removing the deposit changes the
+    // account-level figures and leaves the invested ones identical.
+    netWorth.getDailyInvestments.mockResolvedValue([
+      point("2026-01-02", 10_000, { securitiesValue: 8_000 }),
+      point("2026-06-01", 10_800, { securitiesValue: 8_800 }),
+      point("2026-09-17", 10_800, { securitiesValue: 8_800 }),
+    ]);
+
+    const result = await run();
+
+    expect(result.valueChange).toBe(800);
+    expect(result.investmentPnl).toBe(800);
+    expect(result.investmentReturnPercent).toBe(10);
+  });
+
+  it("counts a buy as capital and a dividend as income", async () => {
+    netWorth.getDailyInvestments.mockResolvedValue([
+      point("2026-01-02", 10_000, { securitiesValue: 0 }),
+      point("2026-06-01", 10_000, { securitiesValue: 8_000 }),
+      point("2026-09-17", 10_100, { securitiesValue: 8_000 }),
+    ]);
+    investedRows = [
+      {
+        date: "2026-06-01",
+        currency: "CAD",
+        action: "BUY",
+        total: "8000",
+        gross: "8000",
+      },
+      {
+        date: "2026-09-17",
+        currency: "CAD",
+        action: "DIVIDEND",
+        total: "100",
+        gross: "100",
+      },
+    ];
+
+    const result = await run();
+
+    expect(result.investmentCapitalFlows).toBe(8_000);
+    expect(result.investmentIncome).toBe(100);
+    // The purchase is not a gain; the distribution is, although it ends as cash.
+    expect(result.investmentPnl).toBe(100);
+    expect(result.investmentReturnPercent).toBe(1.25);
+  });
+
   it("counts no flow dated on the baseline day", async () => {
     netWorth.getDailyInvestments.mockResolvedValue(flatSeries());
 
