@@ -1861,6 +1861,29 @@ export class PortfolioCalculationService {
           defaultCurrency,
         );
       }
+      // The row's value in the account and reporting currencies, from the SAME
+      // rateCache the totals use, so the row and the total it joins share one
+      // FX snapshot. `null` when the pair has no rate or the value is unknown;
+      // the default-currency figure is exactly this holding's contribution to
+      // `holdingsValueTotal` below.
+      const marketValueAccountCurrency =
+        marketValue === null
+          ? null
+          : await this.convertToDefault(
+              marketValue,
+              holdingCurrency,
+              accountCurrency,
+              rateCache,
+            );
+      const marketValueDefaultCurrency =
+        marketValue === null
+          ? null
+          : await this.convertToDefault(
+              marketValue,
+              holdingCurrency,
+              defaultCurrency,
+              rateCache,
+            );
       if (marketValue !== null) {
         holdingsValueTotal.add(
           await this.convertToDefault(
@@ -1892,6 +1915,8 @@ export class PortfolioCalculationService {
         costBasisAccountCurrency,
         currentPrice,
         marketValue,
+        marketValueAccountCurrency,
+        marketValueDefaultCurrency,
         gainLoss,
         gainLossPercent,
       });

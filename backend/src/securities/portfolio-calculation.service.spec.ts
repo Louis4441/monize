@@ -3069,6 +3069,18 @@ describe("PortfolioCalculationService.calculateHoldingsWithValues", () => {
     expect(result.totalCostBasis).toBe(900);
   });
 
+  it("carries the market value in the account and reporting currencies from one snapshot (P9)", async () => {
+    // Price 50 x 10 = 500, all in PLN here, so both converted figures equal the
+    // market value and neither is null: the row now carries the value the
+    // client used to re-derive with a second, drifting client-side rate.
+    const result = await valuation(lot());
+
+    const h = result.holdingsWithValues[0];
+    expect(h.marketValue).toBe(500);
+    expect(h.marketValueAccountCurrency).toBe(500);
+    expect(h.marketValueDefaultCurrency).toBe(500);
+  });
+
   it("ignores a basis denominated in another currency", async () => {
     const result = await valuation(lot({ currencyCode: "EUR" }));
 

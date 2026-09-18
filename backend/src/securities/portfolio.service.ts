@@ -118,6 +118,22 @@ export interface HoldingWithMarketValue {
   costBasisAccountCurrency: number | null;
   currentPrice: number | null;
   marketValue: number | null;
+  /**
+   * `marketValue` converted into the holding account's currency by the SAME
+   * `rateCache` snapshot that produces the account and portfolio totals, so a
+   * row and the total it belongs to share one FX snapshot rather than the row
+   * re-converting with the client's live rate (which drifted from the total).
+   * `null` when the pair has no rate (unknown, never an implicit 1:1) and when
+   * `marketValue` itself is null.
+   */
+  marketValueAccountCurrency: number | null;
+  /**
+   * `marketValue` converted into the user's default (reporting) currency from
+   * the same snapshot that produces `totalPortfolioValue`, so the share of the
+   * portfolio has one numerator and denominator in one currency. It is exactly
+   * this holding's contribution to `holdingsValueTotal`.
+   */
+  marketValueDefaultCurrency: number | null;
   gainLoss: number | null;
   gainLossPercent: number | null;
 }

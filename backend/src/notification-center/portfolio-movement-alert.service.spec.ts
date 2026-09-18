@@ -52,6 +52,8 @@ const holding = (
   costBasisAccountCurrency: 20_000,
   currentPrice: 250,
   marketValue: 25_000,
+  marketValueAccountCurrency: 25_000,
+  marketValueDefaultCurrency: 25_000,
   gainLoss: 5_000,
   gainLossPercent: 25,
   ...over,
