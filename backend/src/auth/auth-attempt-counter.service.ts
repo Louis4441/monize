@@ -8,6 +8,26 @@ import {
 import { returnedRows } from "../common/db/query-result";
 
 /**
+ * How a further failure inside a live window treats the window's end.
+ *
+ * The two shapes are different security controls, and the one that suits a
+ * per-email send throttle silently weakens a lockout counter -- so the call
+ * site spells it and there is no safe default to fall into.
+ *
+ * - `fixed` -- the first attempt sets the end and nothing moves it, so N
+ *   attempts are allowed per window however they are spaced. What the
+ *   forgot-password and resend-verification throttles have always done; their
+ *   `windowStart` field was never pushed out by a refused send.
+ * - `sliding` -- every attempt pushes the end out, so a count only lapses after
+ *   a full quiet window. What the 2FA and step-up limiters did as `Map`
+ *   entries, each of which wrote `expiresAt: Date.now() + window` on *every*
+ *   failure. It is the stronger control: under `fixed`, an attacker pacing
+ *   themselves at one attempt per window never accumulates, so the tenth
+ *   failure that writes `users.locked_until` is never reached.
+ */
+export type AttemptWindow = "fixed" | "sliding";
+
+/**
  * Every rate-limit and lockout counter the auth layer keeps, on rows.
  *
  * What this replaces was a `Map` per limiter per process. That is two defects
@@ -37,6 +57,11 @@ export class AuthAttemptCounterService {
    * makes the daily sweep (`AuthStateSweeperService`) a collection of garbage
    * and never a part of the limit.
    *
+   * `window` decides what a further failure does to a window that is still
+   * live, and the caller must say which control it is running -- see
+   * `AttemptWindow`. Getting it wrong does not fail: it quietly turns a lockout
+   * into a rate limit.
+   *
    * **It runs outside the caller's transaction, deliberately.** A failure
    * counter exists to be recorded on the path that then *refuses* the request,
    * and a refusal usually throws -- so an increment joined to the caller's
@@ -50,6 +75,7 @@ export class AuthAttemptCounterService {
     scope: string,
     key: string,
     windowMs: number,
+    window: AttemptWindow,
   ): Promise<{ count: number; windowExpiresAt: Date }> {
     const rows = await runOutsideActiveScopedManager(() =>
       withScopedDb(this.dataSource, (manager) =>
@@ -62,12 +88,13 @@ export class AuthAttemptCounterService {
                     ELSE auth_attempt_counters.count + 1
                   END,
                   window_expires_at = CASE
-                    WHEN auth_attempt_counters.window_expires_at < CURRENT_TIMESTAMP
+                    WHEN $4::boolean
+                      OR auth_attempt_counters.window_expires_at < CURRENT_TIMESTAMP
                       THEN CURRENT_TIMESTAMP + ($3::bigint::text || ' milliseconds')::interval
                     ELSE auth_attempt_counters.window_expires_at
                   END
            RETURNING count AS count, window_expires_at AS window_expires_at`,
-          [scope, key, Math.round(windowMs)],
+          [scope, key, Math.round(windowMs), window === "sliding"],
         ),
       ),
     );

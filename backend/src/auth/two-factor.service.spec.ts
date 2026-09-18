@@ -1071,15 +1071,20 @@ describe("TwoFactorService", () => {
         UnauthorizedException,
       );
 
+      // "sliding" is the shape the `Map` entries had: each failure pushed the
+      // expiry out, so a paced attacker still reaches the tenth failure that
+      // locks the account. A fixed window would silently never lock it.
       expect(attemptCounters.increment).toHaveBeenCalledWith(
         TWO_FACTOR_TOKEN_SCOPE,
         hashToken("temp-token"),
         5 * 60 * 1000,
+        "sliding",
       );
       expect(attemptCounters.increment).toHaveBeenCalledWith(
         TWO_FACTOR_USER_SCOPE,
         "user-1",
         5 * 60 * 1000,
+        "sliding",
       );
       // The raw JWT never reaches the table.
       for (const [, key] of attemptCounters.increment.mock.calls) {
@@ -1172,6 +1177,7 @@ describe("TwoFactorService", () => {
         TWO_FACTOR_USER_SCOPE,
         "user-1",
         5 * 60 * 1000,
+        "sliding",
       );
       expect(tokenService.generateTokenPair).not.toHaveBeenCalled();
     });

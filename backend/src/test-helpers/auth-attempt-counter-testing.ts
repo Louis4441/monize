@@ -1,4 +1,7 @@
-import { AuthAttemptCounterService } from "../auth/auth-attempt-counter.service";
+import {
+  AttemptWindow,
+  AuthAttemptCounterService,
+} from "../auth/auth-attempt-counter.service";
 
 /**
  * An `AuthAttemptCounterService` double backed by a `Map`.
@@ -30,20 +33,34 @@ export function createAuthAttemptCounterMock(): AuthAttemptCounterMock {
 
   const mock: AuthAttemptCounterMock = {
     rows,
-    increment: jest.fn(async (scope: string, key: string, windowMs: number) => {
-      const id = rowKey(scope, key);
-      const existing = rows.get(id);
-      const now = Date.now();
-      const next =
-        !existing || existing.windowExpiresAt.getTime() < now
-          ? { count: 1, windowExpiresAt: new Date(now + windowMs) }
-          : {
-              count: existing.count + 1,
-              windowExpiresAt: existing.windowExpiresAt,
-            };
-      rows.set(id, next);
-      return next;
-    }),
+    increment: jest.fn(
+      async (
+        scope: string,
+        key: string,
+        windowMs: number,
+        window: AttemptWindow,
+      ) => {
+        const id = rowKey(scope, key);
+        const existing = rows.get(id);
+        const now = Date.now();
+        // `window` is honoured here for the same reason the map exists: a double
+        // that always kept the first window would make every caller look fixed,
+        // and the specs that assert a lockout accumulating would pass against a
+        // limiter that never locks.
+        const next =
+          !existing || existing.windowExpiresAt.getTime() < now
+            ? { count: 1, windowExpiresAt: new Date(now + windowMs) }
+            : {
+                count: existing.count + 1,
+                windowExpiresAt:
+                  window === "sliding"
+                    ? new Date(now + windowMs)
+                    : existing.windowExpiresAt,
+              };
+        rows.set(id, next);
+        return next;
+      },
+    ),
     peek: jest.fn(async (scope: string, key: string) => {
       const row = rows.get(rowKey(scope, key));
       if (!row || row.windowExpiresAt.getTime() < Date.now()) return 0;

@@ -38,7 +38,12 @@ describe("AuthAttemptCounterService", () => {
         { count: 3, window_expires_at: windowExpiresAt },
       ]);
 
-      const result = await service.increment("2fa-user", "user-1", 300_000);
+      const result = await service.increment(
+        "2fa-user",
+        "user-1",
+        300_000,
+        "sliding",
+      );
 
       expect(result).toEqual({ count: 3, windowExpiresAt });
       expect(manager.query).toHaveBeenCalledTimes(1);
@@ -48,7 +53,32 @@ describe("AuthAttemptCounterService", () => {
       expect(sql).toContain("INSERT INTO auth_attempt_counters");
       expect(sql).toContain("ON CONFLICT (scope, key) DO UPDATE");
       expect(sql).toContain("RETURNING");
-      expect(params).toEqual(["2fa-user", "user-1", 300_000]);
+      expect(params).toEqual(["2fa-user", "user-1", 300_000, true]);
+    });
+
+    // The two shapes are different security controls, and nothing about the
+    // statement says which one a call site meant -- so the parameter is pinned
+    // here and the mode is asserted at each call site below.
+    it("asks the statement to push a sliding window's end out", async () => {
+      manager.query.mockResolvedValue([
+        { count: 2, window_expires_at: new Date() },
+      ]);
+
+      await service.increment("step-up", "user-1:export", 1000, "sliding");
+
+      const [sql, params] = manager.query.mock.calls[0];
+      expect(sql).toContain("WHEN $4::boolean");
+      expect(params[3]).toBe(true);
+    });
+
+    it("leaves a fixed window's end where the first attempt put it", async () => {
+      manager.query.mockResolvedValue([
+        { count: 2, window_expires_at: new Date() },
+      ]);
+
+      await service.increment("forgot-password", "hash", 1000, "fixed");
+
+      expect(manager.query.mock.calls[0][1][3]).toBe(false);
     });
 
     it("compares the window against the database clock, never this process's", async () => {
@@ -56,7 +86,7 @@ describe("AuthAttemptCounterService", () => {
         { count: 1, window_expires_at: new Date() },
       ]);
 
-      await service.increment("2fa-user", "user-1", 300_000);
+      await service.increment("2fa-user", "user-1", 300_000, "sliding");
 
       const [sql] = manager.query.mock.calls[0];
       expect(sql).toContain("CURRENT_TIMESTAMP");
@@ -68,7 +98,12 @@ describe("AuthAttemptCounterService", () => {
         { count: "7", window_expires_at: "2026-01-01T12:05:00.000Z" },
       ]);
 
-      const result = await service.increment("2fa-token", "hash", 1000);
+      const result = await service.increment(
+        "2fa-token",
+        "hash",
+        1000,
+        "fixed",
+      );
 
       expect(result.count).toBe(7);
       expect(result.windowExpiresAt).toBeInstanceOf(Date);
@@ -84,7 +119,7 @@ describe("AuthAttemptCounterService", () => {
         { count: 1, window_expires_at: new Date() },
       ]);
 
-      await service.increment("2fa-user", "user-1", 1000);
+      await service.increment("2fa-user", "user-1", 1000, "sliding");
 
       expect(runOutsideActiveScopedManager).toHaveBeenCalledTimes(1);
     });

@@ -299,6 +299,9 @@ describe("AuthEmailService", () => {
         FORGOT_PASSWORD_SCOPE,
         hashToken("test@example.com"),
         60 * 60 * 1000,
+        // "fixed" here, unlike the lockout counters: three sends an hour is
+        // three sends an hour, and a refused one must not extend the window.
+        "fixed",
       );
       for (const [, key] of attemptCounters.increment.mock.calls) {
         expect(key).not.toContain("@");
@@ -518,6 +521,7 @@ describe("AuthEmailService", () => {
         VERIFICATION_EMAIL_SCOPE,
         hashToken("v3@example.com"),
         60 * 60 * 1000,
+        "fixed",
       );
     });
 

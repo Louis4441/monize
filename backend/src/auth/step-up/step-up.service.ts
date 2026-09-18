@@ -228,10 +228,15 @@ export class StepUpAuthService {
   }
 
   private async recordFailure(key: string): Promise<void> {
+    // "sliding", matching the `Map` this replaced: it wrote
+    // `expiresAt: Date.now() + LOCKOUT_WINDOW_MS` on every failure, so the
+    // lockout lifted only after a quiet window rather than a fixed 30 minutes
+    // from the first attempt. See `AttemptWindow`.
     await this.attemptCounters.increment(
       STEP_UP_ATTEMPT_SCOPE,
       key,
       this.LOCKOUT_WINDOW_MS,
+      "sliding",
     );
   }
 }

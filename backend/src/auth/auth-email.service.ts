@@ -76,6 +76,10 @@ export class AuthEmailService {
       scope,
       hashToken(email.toLowerCase().trim()),
       windowMs,
+      // "fixed", which is what the `windowStart` field did: a refused send does
+      // not push the window out, so three sends per hour stays three sends per
+      // hour however they are spaced.
+      "fixed",
     );
     return count <= limit;
   }
