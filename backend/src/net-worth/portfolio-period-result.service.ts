@@ -10,13 +10,6 @@ import { DataSource } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { todayYMD } from "../common/date-utils";
 import { preferredCurrency } from "../common/default-currency.util";
-import { FxAggregate } from "../common/fx-aggregate";
-import { investmentLinkedSplitExclusion } from "../common/investment-filter.util";
-import { LEDGER_TOP_LEVEL_ONLY } from "../common/ledger-balance.sql";
-import {
-  buildRateIndex,
-  convertAtDate,
-} from "../common/time-series/rate-index.util";
 import { loadExternalFlowSubtotals } from "../securities/external-flow.util";
 import {
   UNFILTERED_INVESTMENT_SCOPE_SQL,
@@ -27,14 +20,25 @@ import { UserPreference } from "../users/entities/user-preference.entity";
 import { NetWorthService, isValuationCashAccount } from "./net-worth.service";
 import { SeriesFetchOptions, computeWithRateFill } from "./series-rate-fill";
 import {
+  FlowSubtotalRow,
+  FoldedFlow,
+  buildFlowRateIndex,
+  foldFlowSubtotals,
+} from "./period-flow-fold.util";
+import {
+  PeriodFlow,
   PeriodResultReason,
   PeriodReturnMethod,
   UnmeasuredFlowCounts,
   decidePeriodResult,
 } from "./portfolio-period-result.util";
+import {
+  loadUnmeasuredFlowRows,
+  unmeasuredFlowsAfter,
+} from "./unmeasured-flows.util";
 
 /** One account of the scope, with what the cash boundary is decided from. */
-interface ScopeAccount {
+export interface ScopeAccount {
   id: string;
   account_type: string;
   account_sub_type: string | null;
@@ -229,15 +233,10 @@ export class PortfolioPeriodResultService {
   }
 
   /**
-   * The period's net external flow in the reporting currency.
-   *
-   * Each day-currency subtotal is converted at the rate that stood on ITS OWN
-   * day -- a deposit made in January is January's money, not today's -- through
-   * the one date-aware resolver (`resolveFxRate`, reached here via the bulk
-   * `RateIndex` so a year of flows costs one query rather than one per day).
-   * `FxAggregate` is what keeps "could not convert" distinguishable from
-   * "converted to zero": a subtotal it could not convert makes the whole flow
-   * incomplete, which withholds the result rather than shrinking it.
+   * The period's net external flow in the reporting currency, through the one
+   * fold every period route shares (`period-flow-fold.util.ts`): each day's
+   * subtotal converted at that day's own rate, and a subtotal that would not
+   * convert making the whole flow incomplete rather than smaller.
    *
    * A day whose flow could not be converted is also a gap the provider may be
    * able to close, so the fold runs through `computeWithRateFill`: it names the
@@ -247,26 +246,15 @@ export class PortfolioPeriodResultService {
    * `missingPairs` and still withholds the result.
    */
   private foldFlows(
-    rows: Array<{ date: string | null; currency: string; amount: number }>,
+    rows: FlowSubtotalRow[],
     currency: string,
     start: string,
     end: string,
     options?: SeriesFetchOptions,
-  ): Promise<{
-    complete: boolean;
-    value: number;
-    missingPairs: string[];
-    /** Per-day gaps, for the fill plan; not part of the period's answer. */
-    gaps: Array<{ date: string; missingRatePairs: string[] }>;
-  }> {
-    const currencies = new Set<string>();
-    for (const row of rows) {
-      if (row.currency !== currency) currencies.add(row.currency);
-    }
-
+  ): Promise<FoldedFlow> {
     return computeWithRateFill(
       this.exchangeRates,
-      () => this.foldFlowsAt(rows, currency, currencies, start, end),
+      () => this.foldFlowsAt(rows, currency, start, end),
       (folded) => folded.gaps,
       options,
       this.logger,
@@ -275,69 +263,25 @@ export class PortfolioPeriodResultService {
 
   /** One pass of `foldFlows` over one rate index, freshly loaded. */
   private async foldFlowsAt(
-    rows: Array<{ date: string | null; currency: string; amount: number }>,
+    rows: FlowSubtotalRow[],
     currency: string,
-    currencies: Set<string>,
     start: string,
     end: string,
-  ): Promise<{
-    complete: boolean;
-    value: number;
-    missingPairs: string[];
-    gaps: Array<{ date: string; missingRatePairs: string[] }>;
-  }> {
-    const rateIndex = await buildRateIndex(
-      (sql, params) =>
-        withScopedDb(this.dataSource, (m) => m.query(sql, params)),
-      currencies,
+  ): Promise<FoldedFlow> {
+    const query = (sql: string, params: unknown[]) =>
+      withScopedDb(this.dataSource, (m) => m.query(sql, params));
+    const rateIndex = await buildFlowRateIndex(
+      query,
+      rows,
       currency,
       start,
       end,
     );
-
-    const aggregate = new FxAggregate();
-    const gaps: Array<{ date: string; missingRatePairs: string[] }> = [];
-    for (const row of rows) {
-      if (row.amount === 0) continue;
-      if (row.currency === currency) {
-        aggregate.addConverted(row.amount);
-        continue;
-      }
-      // A row with no date cannot be priced at its own date; this loader is
-      // asked for per-day subtotals, so that is a shape it does not return.
-      if (!row.date) {
-        aggregate.addUnknown();
-        continue;
-      }
-      const converted = convertAtDate(
-        row.amount,
-        row.currency,
-        currency,
-        row.date,
-        rateIndex,
-        this.logger,
-      );
-      // The date matters as much as the pair: a fill is planned per calendar
-      // month, so "January could not convert EUR" is what makes the January
-      // window the one that gets fetched.
-      if (converted === null) {
-        gaps.push({
-          date: row.date,
-          missingRatePairs: [`${row.currency}->${currency}`],
-        });
-      }
-      aggregate.add(converted, row.currency, currency);
-    }
-
-    return {
-      complete: aggregate.isComplete,
-      value: aggregate.knownSubtotal,
-      missingPairs: aggregate.missingPairs,
-      gaps,
-    };
+    return foldFlowSubtotals(rows, currency, rateIndex, this.logger);
   }
 
-  private async reportingCurrency(
+  /** Public because the batch route reports in the very same currency. */
+  async reportingCurrency(
     userId: string,
     displayCurrency?: string,
   ): Promise<string> {
@@ -351,20 +295,10 @@ export class PortfolioPeriodResultService {
   /**
    * How many movements in the window the flow classifier cannot count.
    *
-   * Two coarse cases, both documented in `external-flow.util.ts` and both able
-   * to move the value without the market having moved:
-   *
-   *  - an investment action settled somewhere the valuation does not walk cash
-   *    (an explicit funding account outside the set, a cash leg posted to an
-   *    account outside it), or one that moved shares with no cash leg at all
-   *    and no linked leg inside the set -- shares arriving from outside;
-   *  - a split parent mixing an embedded investment line with ordinary cash,
-   *    which the flow sum drops WHOLE, so its ordinary part is in the value
-   *    change and in no flow.
-   *
-   * Counted, not measured: what each is worth is a line-granular rewrite of the
-   * classifier, and a count is enough to withhold. `COUNT(*)` comes back as a
-   * string from the driver, so it is coerced at this boundary.
+   * The two coarse cases and their predicates are `unmeasured-flows.util.ts`,
+   * shared with the batch route so the two cannot disagree about whether a
+   * period is measurable. Counted, not measured: what each is worth is a
+   * line-granular rewrite of the classifier, and a count is enough to withhold.
    */
   private async countUnmeasuredFlows(
     userId: string,
@@ -372,93 +306,27 @@ export class PortfolioPeriodResultService {
     throughDate: string,
     sets: { scope: string[]; cashScope: string[] },
   ): Promise<UnmeasuredFlowCounts> {
-    const params = [
-      userId,
-      afterDate,
-      throughDate,
-      sets.scope,
-      sets.cashScope,
-    ] as const;
-
-    const [settled, mixed] = await withScopedDb(this.dataSource, async (m) => {
-      const settledRows: Array<{ count: string }> = await m.query(
-        // Effects reader: a VOID trade moved nothing, so it cannot have moved
-        // value across the boundary either (status != 'VOID').
-        `SELECT COUNT(*) AS count
-           FROM investment_transactions it
-          WHERE it.user_id = $1
-            AND it.account_id = ANY($4::UUID[])
-            AND it.transaction_date > $2
-            AND it.transaction_date <= $3
-            AND it.status != 'VOID'
-            AND (
-              (
-                it.funding_account_id IS NOT NULL
-                AND NOT (it.funding_account_id = ANY($5::UUID[]))
-              )
-              OR EXISTS (
-                SELECT 1 FROM transactions ct
-                 WHERE ct.id = it.transaction_id
-                   AND NOT (ct.account_id = ANY($5::UUID[]))
-              )
-              OR EXISTS (
-                SELECT 1 FROM transaction_splits s
-                  JOIN transactions pt ON pt.id = s.transaction_id
-                 WHERE s.id = it.transaction_split_id
-                   AND NOT (pt.account_id = ANY($5::UUID[]))
-              )
-              OR (
-                it.transaction_id IS NULL
-                AND it.transaction_split_id IS NULL
-                AND it.action IN (
-                  'TRANSFER_IN', 'TRANSFER_OUT', 'ADD_SHARES', 'REMOVE_SHARES'
-                )
-                AND NOT EXISTS (
-                  -- The linked leg is looked up as a record (includes VOID):
-                  -- the effect is decided by the row above.
-                  SELECT 1 FROM investment_transactions li
-                   WHERE li.id = it.linked_transaction_id
-                     AND li.account_id = ANY($4::UUID[])
-                )
-              )
-            )`,
-        [...params],
-      );
-      const mixedRows: Array<{ count: string }> = await m.query(
-        `SELECT COUNT(*) AS count
-           FROM transactions t
-          WHERE t.user_id = $1
-            AND t.account_id = ANY($5::UUID[])
-            AND ${LEDGER_TOP_LEVEL_ONLY}
-            AND t.transaction_date > $2
-            AND t.transaction_date <= $3
-            AND t.status IS DISTINCT FROM 'VOID'
-            AND EXISTS (
-              SELECT 1 FROM transaction_splits s
-               WHERE s.transaction_id = t.id
-                 AND NOT (${investmentLinkedSplitExclusion("s")})
-            )
-            AND EXISTS (
-              SELECT 1 FROM transaction_splits s
-               WHERE s.transaction_id = t.id
-                 AND ${investmentLinkedSplitExclusion("s")}
-            )`,
-        [...params],
-      );
-      return [settledRows, mixedRows];
-    });
-
-    return {
-      externallySettledTrades: Number(settled[0]?.count ?? 0),
-      mixedSplitParents: Number(mixed[0]?.count ?? 0),
-    };
+    const rows = await loadUnmeasuredFlowRows(
+      (sql, params) =>
+        withScopedDb(this.dataSource, (m) => m.query(sql, params)),
+      {
+        userId,
+        afterDate,
+        throughDate,
+        scope: sets.scope,
+        cashScope: sets.cashScope,
+      },
+    );
+    return unmeasuredFlowsAfter(rows);
   }
 
   /**
    * The accounts in scope, widened to linked pairs exactly as valuation does,
-   * carrying the type columns the cash boundary is drawn from.
+   * carrying the type columns the cash boundary is drawn from. Public for the
+   * same reason as `reportingCurrency`: one scope, resolved once, for every
+   * route that reports over it.
    */
-  private async resolveScope(
+  async resolveScope(
     userId: string,
     accountIds?: string[],
   ): Promise<ScopeAccount[]> {
