@@ -1,4 +1,10 @@
-import { Entity, Column, PrimaryColumn, UpdateDateColumn } from "typeorm";
+import {
+  Check,
+  Entity,
+  Column,
+  PrimaryColumn,
+  UpdateDateColumn,
+} from "typeorm";
 
 /**
  * This deployment's Web Push identity: one VAPID key pair per Monize instance,
@@ -14,6 +20,9 @@ import { Entity, Column, PrimaryColumn, UpdateDateColumn } from "typeorm";
  * the same reason `provider_health` is (`docs/row-level-security-contract.md`).
  */
 @Entity("push_instance_config")
+// See `UpdateCheckState`: the singleton constraint belongs on the entity too,
+// so the harness and production agree about what a second row would do.
+@Check("id")
 export class PushInstanceConfig {
   /**
    * Singleton discriminator. The column admits exactly one value, so a second

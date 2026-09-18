@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryColumn } from "typeorm";
+import { Check, Column, Entity, PrimaryColumn } from "typeorm";
 
 /**
  * What this deployment last learned about the upstream release, and when it
@@ -16,6 +16,12 @@ import { Column, Entity, PrimaryColumn } from "typeorm";
  * `docs/row-level-security-contract.md`).
  */
 @Entity("update_check_state")
+// Declared here as well as in schema.sql, and for the same reason the relay
+// tables declare theirs: TypeORM builds the integration harness's database from
+// this metadata, so a constraint only schema.sql carries is one no integration
+// spec can observe. `CHECK (id)` is what makes the table a singleton -- the
+// primary key alone would admit a second row keyed FALSE.
+@Check("id")
 export class UpdateCheckState {
   /**
    * Singleton discriminator. The column admits exactly one value, which is what
@@ -32,7 +38,11 @@ export class UpdateCheckState {
    * an unreachable GitHub into a request from every replica on every tick --
    * which is exactly when the rate limit is least affordable.
    */
-  @Column({ type: "timestamptz", name: "checked_at" })
+  @Column({
+    type: "timestamptz",
+    name: "checked_at",
+    default: () => "CURRENT_TIMESTAMP",
+  })
   checkedAt: Date;
 
   /** The upstream tag with any leading `v` stripped, or null before a first success. */
