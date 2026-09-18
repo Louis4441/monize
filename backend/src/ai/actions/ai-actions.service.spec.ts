@@ -426,6 +426,26 @@ describe("AiActionsService", () => {
       const result = await service.confirm(USER, dtoFor(descriptor));
       expect(result).toEqual({ type: "create_transaction", id: "tx-new" });
     });
+
+    it("surfaces the execute error when the claim release itself fails", async () => {
+      // The claim is a row now, so giving it back can fail -- and the likeliest
+      // reason the write failed is the same reason the release will. The caller
+      // must still see what refused the action, not the cleanup's driver error.
+      const executeError = new Error("account not found");
+      transactions.create.mockRejectedValueOnce(executeError);
+      singleUseTokens.release.mockRejectedValueOnce(
+        new Error("Connection terminated"),
+      );
+      const descriptor = createTxDescriptor({ actionId: "act-release-fails" });
+
+      await expect(service.confirm(USER, dtoFor(descriptor))).rejects.toBe(
+        executeError,
+      );
+      expect(singleUseTokens.release).toHaveBeenCalledWith(
+        AI_ACTION_CLAIM_PURPOSE,
+        "act-release-fails",
+      );
+    });
   });
 
   it("categorizes a transaction on a valid confirmation", async () => {

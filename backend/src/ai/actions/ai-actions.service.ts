@@ -4,6 +4,7 @@ import {
   forwardRef,
   Inject,
   Injectable,
+  Logger,
 } from "@nestjs/common";
 import { createHash, timingSafeEqual } from "crypto";
 import { plainToInstance } from "class-transformer";
@@ -93,6 +94,8 @@ export const AI_ACTION_CLAIM_PURPOSE = "ai-action";
 
 @Injectable()
 export class AiActionsService {
+  private readonly logger = new Logger(AiActionsService.name);
+
   constructor(
     @Inject(forwardRef(() => TransactionsService))
     private readonly transactionsService: TransactionsService,
@@ -206,10 +209,30 @@ export class AiActionsService {
       }
       return result;
     } catch (err) {
-      await this.singleUseTokens.release(
-        AI_ACTION_CLAIM_PURPOSE,
-        descriptor.actionId,
-      );
+      // Best-effort, and it must never replace the error it is cleaning up
+      // after. The `Map` this claim replaced could not fail; a row can, and the
+      // most likely reason `execute` threw -- an unreachable database, an
+      // exhausted pool -- is the same reason the release would. Letting that
+      // rejection propagate would swap the refusal the user needed to read for
+      // a driver error, AND leave the claim in place, so the descriptor the
+      // release exists to keep confirmable would be spent for work that never
+      // happened.
+      //
+      // A claim left behind expires with the descriptor and is swept
+      // (`AuthStateSweeperService`), so the cost of failing here is one
+      // re-ask, never a permanent loss.
+      try {
+        await this.singleUseTokens.release(
+          AI_ACTION_CLAIM_PURPOSE,
+          descriptor.actionId,
+        );
+      } catch (releaseError) {
+        this.logger.warn(
+          `Could not release the claim on AI action ${descriptor.actionId}; ` +
+            "it stays spent until it expires: " +
+            `${releaseError instanceof Error ? releaseError.message : String(releaseError)}`,
+        );
+      }
       throw err;
     }
   }

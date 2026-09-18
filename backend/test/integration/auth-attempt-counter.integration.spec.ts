@@ -57,8 +57,8 @@ describe("AuthAttemptCounterService (real PostgreSQL)", () => {
   it("serializes two concurrent increments of one key", async () => {
     const [first, second] = await withSystemContext(() =>
       Promise.all([
-        serviceA.increment(SCOPE, KEY, WINDOW_MS),
-        serviceB.increment(SCOPE, KEY, WINDOW_MS),
+        serviceA.increment(SCOPE, KEY, WINDOW_MS, "sliding"),
+        serviceB.increment(SCOPE, KEY, WINDOW_MS, "sliding"),
       ]),
     );
 
@@ -75,8 +75,12 @@ describe("AuthAttemptCounterService (real PostgreSQL)", () => {
   });
 
   it("restarts the count once the window has passed, without deleting the row", async () => {
-    await withSystemContext(() => serviceA.increment(SCOPE, KEY, WINDOW_MS));
-    await withSystemContext(() => serviceB.increment(SCOPE, KEY, WINDOW_MS));
+    await withSystemContext(() =>
+      serviceA.increment(SCOPE, KEY, WINDOW_MS, "sliding"),
+    );
+    await withSystemContext(() =>
+      serviceB.increment(SCOPE, KEY, WINDOW_MS, "sliding"),
+    );
 
     // Age the row rather than wait: what the statement reads is
     // `window_expires_at`, so moving it into the past is exactly the state a
@@ -89,15 +93,54 @@ describe("AuthAttemptCounterService (real PostgreSQL)", () => {
     );
 
     const afterExpiry = await withSystemContext(() =>
-      serviceA.increment(SCOPE, KEY, WINDOW_MS),
+      serviceA.increment(SCOPE, KEY, WINDOW_MS, "sliding"),
     );
 
     expect(afterExpiry.count).toBe(1);
     expect(afterExpiry.windowExpiresAt.getTime()).toBeGreaterThan(Date.now());
   });
 
+  // The two window shapes are the security control itself, and the statement
+  // alone does not say which one a call site meant -- so both are pinned here,
+  // against the database clock that decides them.
+  it("leaves a fixed window's end where the first attempt put it", async () => {
+    const first = await withSystemContext(() =>
+      serviceA.increment(SCOPE, KEY, WINDOW_MS, "fixed"),
+    );
+    const second = await withSystemContext(() =>
+      serviceB.increment(SCOPE, KEY, WINDOW_MS, "fixed"),
+    );
+
+    expect(second.count).toBe(2);
+    expect(second.windowExpiresAt.getTime()).toBe(
+      first.windowExpiresAt.getTime(),
+    );
+  });
+
+  it("pushes a sliding window's end out on every attempt", async () => {
+    // What the 2FA and step-up `Map` entries did. Under a fixed window an
+    // attacker pacing themselves at one attempt per window never accumulates,
+    // so the tenth failure that writes `users.locked_until` never arrives.
+    const first = await withSystemContext(() =>
+      serviceA.increment(SCOPE, KEY, WINDOW_MS, "sliding"),
+    );
+    // The statement stamps CURRENT_TIMESTAMP, which is the transaction's start
+    // time, so the two increments need distinguishable clock readings.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const second = await withSystemContext(() =>
+      serviceB.increment(SCOPE, KEY, WINDOW_MS, "sliding"),
+    );
+
+    expect(second.count).toBe(2);
+    expect(second.windowExpiresAt.getTime()).toBeGreaterThan(
+      first.windowExpiresAt.getTime(),
+    );
+  });
+
   it("reads and clears the count another connection wrote", async () => {
-    await withSystemContext(() => serviceA.increment(SCOPE, KEY, WINDOW_MS));
+    await withSystemContext(() =>
+      serviceA.increment(SCOPE, KEY, WINDOW_MS, "sliding"),
+    );
 
     // The reason the table exists: B never incremented anything.
     await expect(
@@ -111,7 +154,9 @@ describe("AuthAttemptCounterService (real PostgreSQL)", () => {
   });
 
   it("reports an expired window as zero without a sweep having run", async () => {
-    await withSystemContext(() => serviceA.increment(SCOPE, KEY, WINDOW_MS));
+    await withSystemContext(() =>
+      serviceA.increment(SCOPE, KEY, WINDOW_MS, "sliding"),
+    );
     await dataSourceA.query(
       `UPDATE auth_attempt_counters
           SET window_expires_at = CURRENT_TIMESTAMP - INTERVAL '1 second'

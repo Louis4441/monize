@@ -224,10 +224,16 @@ export class TwoFactorService {
 
     if (!isValid) {
       // Track failed attempt per-token
+      // "sliding", because that is what the `Map` entries this replaced did:
+      // each failure wrote `expiresAt: Date.now() + ATTEMPT_WINDOW_MS`, so a run
+      // of failures only lapsed after a full quiet window. Under a fixed window
+      // an attacker spacing attempts one per window never accumulates, and the
+      // tenth failure that locks the account below is never reached.
       await this.attemptCounters.increment(
         TWO_FACTOR_TOKEN_SCOPE,
         tokenCounterKey,
         this.ATTEMPT_WINDOW_MS,
+        "sliding",
       );
 
       // Track failed attempt per-user
@@ -235,6 +241,7 @@ export class TwoFactorService {
         TWO_FACTOR_USER_SCOPE,
         payload.sub,
         this.ATTEMPT_WINDOW_MS,
+        "sliding",
       );
 
       // Lock account after exceeding per-user threshold

@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryColumn } from "typeorm";
+import { Check, Column, Entity, PrimaryColumn } from "typeorm";
 
 /**
  * This deployment's OIDC signing identity: one JWKS per Monize instance, not
@@ -16,6 +16,11 @@ import { Column, Entity, PrimaryColumn } from "typeorm";
  * `docs/row-level-security-contract.md`).
  */
 @Entity("oauth_instance_config")
+// See `UpdateCheckState`: the singleton constraint has to be on the entity or
+// the harness builds a table a second row fits into, and the race spec that
+// proves one JWKS per deployment is then contending over a weaker schema than
+// production has.
+@Check("id")
 export class OauthInstanceConfig {
   /**
    * Singleton discriminator. The column admits exactly one value, so a second
@@ -37,6 +42,10 @@ export class OauthInstanceConfig {
   @Column({ name: "jwks_enc", type: "text" })
   jwksEnc: string;
 
-  @Column({ name: "generated_at", type: "timestamptz" })
+  @Column({
+    name: "generated_at",
+    type: "timestamptz",
+    default: () => "CURRENT_TIMESTAMP",
+  })
   generatedAt: Date;
 }

@@ -305,6 +305,9 @@ describe("StepUpAuthService", () => {
         STEP_UP_ATTEMPT_SCOPE,
         `${userId}:emergency-access`,
         30 * 60 * 1000,
+        // As the `Map` did: the lockout lifts after a quiet window, not a fixed
+        // thirty minutes from the first failure.
+        "sliding",
       );
     });
 
