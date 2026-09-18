@@ -591,9 +591,11 @@ resolves those two dates and then runs `getPeriodResult`, so the summary and
 the six-period card share one series, one capital and income load, one rate
 index and one decision; a spec asserts the two are the same answer for one
 fixture. The summary carries `timeWeightedReturnReasons` and
-`timeWeightedReturnSince` beside the figure, to the REST shape, the LLM summary
-and the MCP output schema, so a withheld return names its cause instead of
-reading as "n/a" or as zero. The summary's other two figures are NOT this
+`timeWeightedReturnSince` beside the figure, on the REST shape, the LLM summary
+and the MCP payload, so a withheld return names its cause instead of reading as
+"n/a" or as zero. (The MCP OUTPUT SCHEMA declares neither: the loose object
+carries them to the caller either way, and `get_portfolio_summary` is at its
+`tools/list` byte budget, which a declared field would break.) The summary's other two figures are NOT this
 measure and keep their own captions: `totalGainLossPercent` ("Simple Return")
 and `cagr` are cost-basis measures, not returns over time.
 

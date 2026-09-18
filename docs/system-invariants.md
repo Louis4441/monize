@@ -993,8 +993,8 @@ Enforcement         investedPeriodResult
                     inception, through
                     PortfolioPeriodResultService.getInvestedResultSinceInception,
                     and carries timeWeightedReturnReasons and
-                    timeWeightedReturnSince to the REST shape, the LLM summary
-                    and the MCP output schema; investedValue
+                    timeWeightedReturnSince on the REST shape, the LLM summary
+                    and the MCP payload; investedValue
                     (frontend/src/lib/invested-value.ts) is the one door to the
                     invested component of a series point.
                     docs/specs/portfolio-period-result.md section 10 has the

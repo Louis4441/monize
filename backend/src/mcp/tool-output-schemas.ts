@@ -233,12 +233,14 @@ export const getPortfolioSummaryOutput = toolOutput({
   totalPortfolioValue: num,
   totalGainLoss: num,
   totalGainLossPercent: numNull,
+  // `timeWeightedReturn` is the invested part's TWR since the first
+  // transaction; `null` is withheld, never zero. It travels with
+  // `timeWeightedReturnReasons` (the withheld cause) and
+  // `timeWeightedReturnSince` (the close it is measured from), which reach the
+  // caller through the loose object rather than the schema: declaring either
+  // costs ~95 bytes of `tools/list` on every request and this tool is at its
+  // budget (`tools-list-budget.spec.ts`).
   timeWeightedReturn: numNull,
-  // A withheld return names its cause and the close it would be measured from:
-  // a bare null leaves a model nothing to say, and nothing to stop it reading
-  // the absence as a zero return.
-  timeWeightedReturnReasons: z.array(str),
-  timeWeightedReturnSince: strNull,
   cagr: numNull,
   // securityId is the id an entity link must quote, so it is named here.
   holdings: z.array(looseObject({ securityId: str })),
