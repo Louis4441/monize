@@ -247,6 +247,17 @@ missingPeriods?: string[];   // which periods lacked usable prices
   identifiable from the response, so the consumer can fix the data instead of
   distrusting the feature.
 
+**Fetch before you disclose.** A gap the provider can close is fetched on the
+read path before it is reported: the series names the months and pairs it is
+short of, asks once per unit within a fixed cap, re-reads the store, and only
+then folds what is still missing into `missingPeriods` / `missingRatePairs`.
+The fetch is best-effort and never invents: a provider outage leaves the gap
+named and the request successful, a pair the provider does not carry stays a
+gap, and a caller that must not reach the network (a cron, an LLM tool, an
+export) opts out and reads the store as it is. What is then disclosed obeys
+`docs/financial-calculation-contract.md` section 1.3: the thing missing, by
+name, and the way to obtain it.
+
 ## 5. Signal and simulation coherence
 
 For strategies that materialize periodic signals and simulate acting on them:

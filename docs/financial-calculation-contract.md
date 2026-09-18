@@ -91,6 +91,50 @@ A caller that stores only one side's currency -- a scheduled transaction -- send
 neither code and lets the service derive both. Sending a stored code risks it
 having gone stale, which now fails the posting rather than corrupting it.
 
+### 1.3 A withheld figure carries its repair
+
+"This cannot be worked out because some data is missing" is not an answer; it
+is the shape of one. Every figure a surface withholds owes the reader three
+things, and a surface that gives fewer has not finished:
+
+1. **What is missing, by name.** The security (its symbol, never its id), the
+   currency pair, the account, and the dates the gap covers. The server
+   already carries these -- `FxAggregate.missingPairs`, `unpricedSecurityIds`,
+   `unknownCashAccountIds`, per-point `missingRatePairs` -- and the client
+   resolves ids to names before printing them. A count alone ("3 positions
+   unpriced") is a subtotal of an explanation.
+2. **How the reader obtains it.** Each cause has one repair and the copy names
+   it: an unpriced holding is a price to refresh or add on the security's
+   price history; a missing rate is history to add on the Currencies page; a
+   cash account with no balance for the day is a reload and, if it persists,
+   a defect to report; a boundary (no earlier value to compare against) has no
+   repair and says so. `UnknownAmount`'s `reason` on the client is the catalog
+   of these repairs; a new cause is a new reason there, not a new sentence in
+   a component.
+3. **What the system tried first.** Where a provider can supply the missing
+   observation, the read path fetches it before it discloses the gap: bounded
+   (one calendar month per pair per call, a fixed number of months per
+   request), best-effort (a provider failure is logged and the report renders
+   with the gap still named, never a failed request), re-read from the
+   database rather than patched in memory, and never invented (a pair the
+   provider does not carry stays missing). `ExchangeRateService.ensureRatesForDate`
+   is the fetch, and `AccountBalancesReportService.ratesForReport` the shape
+   of a caller: compute what is unanswerable, fetch, re-read, disclose the
+   rest. A cron, an LLM tool or an export takes the opt-out and reads only
+   what is stored.
+
+Two states are not missing data and must never be shown as it. A request
+that has not answered is loading; a request that failed is a failure, named
+as one with the invitation to ask again. A card that falls to "not enough
+history" or "nothing to show" because its request was rejected makes a claim
+about the portfolio it has no grounds for (`docs/frontend/api-and-cache.md`).
+
+The test obligation follows the three parts: a spec per surface that every
+server reason renders its own named cause (a table over the reason union, so
+a new reason fails it until it has copy); a spec that the read path calls the
+fetch once per missing unit and re-reads before it discloses; and a spec that
+a rejected request renders as a failure, not as an empty result.
+
 ## 2. Cost basis and tax
 
 Realized result is market value minus cost basis; tax applies only to gains.
