@@ -1772,4 +1772,124 @@ describe('PortfolioValueReport', () => {
       expect.objectContaining({ granularity: 'daily' }),
     );
   });
+
+  // One valuation scope across the whole report: the INVESTED value (securities,
+  // no cash). The "By security" breakdown response folds cash into each point's
+  // `total`, so reading it made that view draw securities+cash while the "Total"
+  // view drew securities alone -- the same window peaked at two different
+  // numbers depending only on which toggle was pressed (audit of #1397).
+  describe('one valuation scope (point 8)', () => {
+    const kpi = (label: string) =>
+      screen.getByText(label).parentElement!.textContent;
+
+    // 800 + 200 securities, 500 cash: invested 1000/1200, cash-inclusive
+    // 1500/1700. Reused by the sum-view case below with the same numbers.
+    const scopedBreakdown = {
+      granularity: 'monthly' as const,
+      currency: 'CAD',
+      series: [
+        { key: 'sec-1', type: 'security' as const, symbol: 'AAPL', name: 'Apple Inc.' },
+        { key: 'other', type: 'other' as const, symbol: null, name: '' },
+        { key: 'cash', type: 'cash' as const, symbol: null, name: '' },
+      ],
+      points: [
+        { date: '2024-06-01', total: 1500, values: { 'sec-1': 800, other: 200, cash: 500 } },
+        { date: '2024-07-01', total: 1700, values: { 'sec-1': 900, other: 300, cash: 500 } },
+      ],
+    };
+
+    it('takes the breakdown high/low from the invested value, not the cash-inclusive total', async () => {
+      mockSeriesMode = 'securities';
+      mockGetInvestmentsBreakdown.mockResolvedValue(scopedBreakdown);
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      render(<PortfolioValueReport />);
+
+      await waitFor(() => expect(kpi('Highest Value')).toContain('$1200'));
+      expect(kpi('Lowest Value')).toContain('$1000');
+      // The old behaviour read `total` (cash folded in), which would have
+      // peaked at 1700 and bottomed at 1500 -- a scope change, not a market
+      // difference.
+      expect(kpi('Highest Value')).not.toContain('$1700');
+      expect(kpi('Lowest Value')).not.toContain('$1500');
+    });
+
+    it('the sum view lands on the same invested high/low for the same numbers', async () => {
+      // Same underlying figures reaching the report through the sum endpoint:
+      // `value` folds cash in, `securitiesValue` is the invested part.
+      mockSeriesMode = 'total';
+      mockGetInvestmentsMonthly.mockResolvedValue([
+        { month: '2024-06-01', value: 1500, securitiesValue: 1000 },
+        { month: '2024-07-01', value: 1700, securitiesValue: 1200 },
+      ]);
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      render(<PortfolioValueReport />);
+
+      await waitFor(() => expect(kpi('Highest Value')).toContain('$1200'));
+      expect(kpi('Lowest Value')).toContain('$1000');
+      // Both views agree: switching the toggle cannot move the high or the low.
+      expect(kpi('Highest Value')).not.toContain('$1700');
+    });
+
+    it('exports the invested value as each breakdown row total, never invested+cash', async () => {
+      mockSeriesMode = 'securities';
+      mockGetInvestmentsBreakdown.mockResolvedValue(scopedBreakdown);
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      render(<PortfolioValueReport />);
+      await waitFor(() => expect(screen.getByTestId('area-chart')).toBeInTheDocument());
+      await act(async () => { fireEvent.click(screen.getByTestId('export-csv')); });
+
+      const sections = mockExportCsvSections.mock.calls.at(-1)![1];
+      // The series section is the last one; its rows are [date, ...bands, total].
+      const seriesRows = sections.at(-1).rows as unknown[][];
+      const totals = seriesRows.map((r) => r[r.length - 1]);
+      // The invested value, not the cash-inclusive 1500/1700.
+      expect(totals).toEqual(expect.arrayContaining([1000, 1200]));
+      expect(totals).not.toContain(1500);
+      expect(totals).not.toContain(1700);
+    });
+
+    it('renders a month missing a price as a subtotal, withholding the high', async () => {
+      // A month whose backend point carries pricesComplete:false is a subtotal
+      // of the invested value: it cannot be ranked against whole months.
+      mockSeriesMode = 'securities';
+      mockGetInvestmentsBreakdown.mockResolvedValue({
+        ...scopedBreakdown,
+        fxComplete: true,
+        points: [
+          {
+            date: '2024-06-01',
+            total: 1500,
+            values: { 'sec-1': 800, other: 200, cash: 500 },
+            pricesComplete: false,
+            unpricedSecurityIds: ['sec-1'],
+            cashComplete: true,
+            unknownCashAccountIds: [],
+            missingRatePairs: [],
+          },
+          {
+            date: '2024-07-01',
+            total: 1700,
+            values: { 'sec-1': 900, other: 300, cash: 500 },
+            pricesComplete: true,
+            unpricedSecurityIds: [],
+            cashComplete: true,
+            unknownCashAccountIds: [],
+            missingRatePairs: [],
+          },
+        ],
+      });
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      render(<PortfolioValueReport />);
+
+      await waitFor(() => expect(kpi('Highest Value')).toContain('N/A'));
+      expect(kpi('Lowest Value')).toContain('N/A');
+      // Not the invested high of the whole month -- one incomplete point leaves
+      // both extremes unknown.
+      expect(kpi('Highest Value')).not.toContain('$1200');
+    });
+  });
 });

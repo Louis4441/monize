@@ -73,7 +73,19 @@ type SecuritiesBreakdown = {
     name: string;
     /** The point's own date/timestamp, kept beside the display label. */
     iso: string;
+    /**
+     * The whole value at this point, cash folded in -- the sum of every band,
+     * so the stacked chart draws to it. NOT the report's measure.
+     */
     total: number;
+    /**
+     * The report's ONE measure: securities only, the cash band subtracted
+     * (`breakdownInvestedValue`). The KPIs, the table's total column and the
+     * CSV all read THIS, so the "By security" view and the "Total" view draw
+     * the same quantity and switching between them cannot move the high, the
+     * low or the exported figure (INV-PORTRESULT-002).
+     */
+    invested: number;
     values: Record<string, number>;
     /**
      * The server's completeness for this point, absent where the endpoint
@@ -104,7 +116,11 @@ import {
   hasUnmeasuredFlow,
   periodResultUnknownReason,
 } from '@/components/investments/portfolio-period-result';
-import { investedValue } from '@/lib/invested-value';
+import {
+  investedValue,
+  breakdownCashKey,
+  breakdownInvestedValue,
+} from '@/lib/invested-value';
 import { preferredCurrency } from '@/lib/default-currency';
 
 const logger = createLogger('PortfolioValueReport');
@@ -433,6 +449,7 @@ export function PortfolioValueReport() {
         displayCurrency: foreignCurrency || undefined,
       });
       if (loadSeqRef.current !== seq) return;
+      const cashKey = breakdownCashKey(data.series);
       const points = data.points.map((p) => ({
         name:
           granularity === 'monthly'
@@ -440,11 +457,18 @@ export function PortfolioValueReport() {
             : formatChartDate(p.date, 'MMM d, yyyy'),
         iso: p.date,
         total: p.total,
+        invested: breakdownInvestedValue(p, cashKey),
         values: p.values,
-        // A point missing a cash balance, a price or a rate is a subtotal: the
-        // KPI cards refuse to call it a high or a low and the chart draws no
-        // band for it. Read as `=== false` -- an older backend sends neither
-        // flag (#1389).
+        // A point missing a price or a rate is a subtotal of the INVESTED
+        // value: the KPI cards refuse to call it a high or a low and the chart
+        // draws no band for it. Read as `=== false` -- an older backend sends
+        // neither flag (#1389).
+        //
+        // `cashComplete` is NOT read here, exactly as on the daily sum path:
+        // the report's measure is the invested value, which holds no cash, so
+        // a cash account with no balance for a point cannot make the invested
+        // figure wrong. It is still folded into the incomplete-data details
+        // below so the reader learns of the cash gap.
         //
         // The rate read is the POINT's own list where the response carries one,
         // because the response-level `fxComplete` is the union over the window
@@ -452,7 +476,6 @@ export function PortfolioValueReport() {
         // without per-point lists is an older backend, and then the union is
         // all there is.
         complete:
-          p.cashComplete !== false &&
           p.pricesComplete !== false &&
           (p.missingRatePairs
             ? p.missingRatePairs.length === 0
@@ -472,7 +495,7 @@ export function PortfolioValueReport() {
       setChartPoints(
         points.map((p) => ({
           name: p.name,
-          Value: p.complete ? p.total : null,
+          Value: p.complete ? p.invested : null,
           iso: p.iso,
           complete: p.complete,
         })),
@@ -510,6 +533,7 @@ export function PortfolioValueReport() {
         return;
       }
 
+      const cashKey = breakdownCashKey(data.series);
       const points = trimIntradayPoints(
         data.points,
         dateRange,
@@ -518,12 +542,13 @@ export function PortfolioValueReport() {
         name: formatIntradayLabel(p.timestamp, dateRange),
         iso: p.timestamp,
         total: p.total,
+        invested: breakdownInvestedValue(p, cashKey),
         values: p.values,
       }));
       setBreakdown({ series: data.series, points, kind: 'intraday' });
       setIncompleteCauses(NO_INCOMPLETE_DATA);
       setChartPoints(
-        points.map((p) => ({ name: p.name, Value: p.total, iso: p.iso })),
+        points.map((p) => ({ name: p.name, Value: p.invested, iso: p.iso })),
       );
     };
 
@@ -898,7 +923,9 @@ export function PortfolioValueReport() {
     const rows = breakdown.points.map((p, idx) => ({
       index: idx,
       name: p.name,
-      total: p.total,
+      // The report's measure: securities, no cash. The cash band still has its
+      // own column, but the total column is the invested value.
+      total: p.invested,
       values: p.values,
     }));
     rows.sort((a, b) => {
