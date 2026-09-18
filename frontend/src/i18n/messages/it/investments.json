@@ -63,7 +63,10 @@
     "unpricedHoldings": "Valutazione parziale: {count, plural, one {# posizione non ha} other {# posizioni non hanno}} un prezzo corrente ({symbols}), quindi i valori qui sotto {count, plural, one {la escludono} other {le escludono}}.",
     "mwr": "MWR",
     "mwrFull": "(Ponderato per il denaro)",
-    "mwrTooltip": "Rendimento ponderato per il denaro (XIRR) dei tuoi investimenti dalla prima transazione: il tasso annuo guadagnato dal tuo denaro, ponderando ogni acquisto, vendita e dividendo in base a quando è avvenuto. Depositi, prelievi e liquidità non investita sono esclusi. Differisce dal TWR quando hai investito di più prima di un rialzo o di un ribasso."
+    "mwrTooltip": "Rendimento ponderato per il denaro (XIRR) dei tuoi investimenti dalla prima transazione: il tasso annuo guadagnato dal tuo denaro, ponderando ogni acquisto, vendita e dividendo in base a quando è avvenuto. Depositi, prelievi e liquidità non investita sono esclusi. Differisce dal TWR quando hai investito di più prima di un rialzo o di un ribasso.",
+    "returnDiagnosticsLead": "TWR e MWR non vengono mostrati perché lo storico presenta delle lacune:",
+    "returnDiagnosticsRepair": "Aggiungi le quotazioni mancanti nello storico delle quotazioni di ciascun titolo; i rendimenti sono calcolati sui conti mostrati.",
+    "returnDiagnosticsRepairFiltered": "Aggiungi le quotazioni mancanti nello storico delle quotazioni di ciascun titolo, oppure escludi quei conti dalla vista con il filtro conti sopra; i rendimenti sono calcolati sui conti mostrati."
   },
   "assetAllocation": {
     "title": "Allocazione attività",

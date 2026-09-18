@@ -63,7 +63,10 @@
     "unpricedHoldings": "Teilbewertung: {count, plural, one {# Bestand hat} other {# Bestände haben}} keinen aktuellen Preis ({symbols}); die Werte unten schließen {count, plural, one {ihn} other {sie}} aus.",
     "mwr": "MWR",
     "mwrFull": "(Geldgewichtet)",
-    "mwrTooltip": "Geldgewichtete Rendite (XIRR) Ihrer Investitionen seit der ersten Transaktion: die jährliche Rendite, die Ihr eigenes Geld erwirtschaftet hat, wobei jeder Kauf, Verkauf und jede Dividende nach ihrem Zeitpunkt gewichtet wird. Einzahlungen, Auszahlungen und nicht investierte Barmittel bleiben unberücksichtigt. Weicht von der TWR ab, wenn Sie vor einem Anstieg oder Rückgang mehr investiert haben."
+    "mwrTooltip": "Geldgewichtete Rendite (XIRR) Ihrer Investitionen seit der ersten Transaktion: die jährliche Rendite, die Ihr eigenes Geld erwirtschaftet hat, wobei jeder Kauf, Verkauf und jede Dividende nach ihrem Zeitpunkt gewichtet wird. Einzahlungen, Auszahlungen und nicht investierte Barmittel bleiben unberücksichtigt. Weicht von der TWR ab, wenn Sie vor einem Anstieg oder Rückgang mehr investiert haben.",
+    "returnDiagnosticsLead": "TWR und MWR werden zurückgehalten, weil der Verlauf Lücken aufweist:",
+    "returnDiagnosticsRepair": "Ergänzen Sie die fehlenden Kurse im Kursverlauf des jeweiligen Wertpapiers; die Renditen werden über die angezeigten Konten berechnet.",
+    "returnDiagnosticsRepairFiltered": "Ergänzen Sie die fehlenden Kurse im Kursverlauf des jeweiligen Wertpapiers, oder blenden Sie diese Konten mit dem Kontofilter oben aus der Ansicht aus; die Renditen werden über die angezeigten Konten berechnet."
   },
   "assetAllocation": {
     "title": "Vermögensaufteilung",

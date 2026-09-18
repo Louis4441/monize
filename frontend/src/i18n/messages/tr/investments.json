@@ -63,7 +63,10 @@
     "unpricedHoldings": "Kısmi değerleme: {count, plural, one {# pozisyonun} other {# pozisyonun}} güncel fiyatı yok ({symbols}); aşağıdaki değerler bunları içermez.",
     "mwr": "MWR",
     "mwrFull": "(Para Ağırlıklı)",
-    "mwrTooltip": "Yatırımlarınızın ilk işlemden bu yana para ağırlıklı getirisi (XIRR): her alış, satış ve temettüyü gerçekleştiği zamana göre ağırlıklandırarak kendi paranızın kazandığı yıllık oran. Para yatırma, para çekme ve yatırıma dönüştürülmemiş nakit hariç tutulur. Bir yükselişten veya düşüşten önce daha fazla yatırım yaptığınızda TWR'den farklılaşır."
+    "mwrTooltip": "Yatırımlarınızın ilk işlemden bu yana para ağırlıklı getirisi (XIRR): her alış, satış ve temettüyü gerçekleştiği zamana göre ağırlıklandırarak kendi paranızın kazandığı yıllık oran. Para yatırma, para çekme ve yatırıma dönüştürülmemiş nakit hariç tutulur. Bir yükselişten veya düşüşten önce daha fazla yatırım yaptığınızda TWR'den farklılaşır.",
+    "returnDiagnosticsLead": "Geçmişte boşluklar olduğu için TWR ve MWR gösterilmiyor:",
+    "returnDiagnosticsRepair": "Her menkul kıymetin fiyat geçmişindeki eksik fiyatları ekleyin; getiriler gösterilen hesaplar üzerinden hesaplanır.",
+    "returnDiagnosticsRepairFiltered": "Her menkul kıymetin fiyat geçmişindeki eksik fiyatları ekleyin veya yukarıdaki hesap filtresiyle bu hesapları görünümden çıkarın; getiriler gösterilen hesaplar üzerinden hesaplanır."
   },
   "assetAllocation": {
     "title": "Varlık Dağılımı",

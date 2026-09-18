@@ -63,7 +63,10 @@
     "unpricedHoldings": "Valorisation partielle : {count, plural, one {# position n'a} other {# positions n'ont}} pas de prix actuel ({symbols}) ; les valeurs ci-dessous {count, plural, one {l'excluent} other {les excluent}}.",
     "mwr": "MWR",
     "mwrFull": "(Pondéré par l'argent)",
-    "mwrTooltip": "Rendement pondéré par l'argent (XIRR) de vos investissements depuis la première transaction : le taux annuel que votre propre argent a rapporté, en pondérant chaque achat, vente et dividende selon le moment où il a eu lieu. Les dépôts, les retraits et les liquidités non investies sont exclus. Diffère du TWR lorsque vous avez investi davantage avant une hausse ou une baisse."
+    "mwrTooltip": "Rendement pondéré par l'argent (XIRR) de vos investissements depuis la première transaction : le taux annuel que votre propre argent a rapporté, en pondérant chaque achat, vente et dividende selon le moment où il a eu lieu. Les dépôts, les retraits et les liquidités non investies sont exclus. Diffère du TWR lorsque vous avez investi davantage avant une hausse ou une baisse.",
+    "returnDiagnosticsLead": "TWR et MWR ne sont pas affichés car l'historique comporte des lacunes :",
+    "returnDiagnosticsRepair": "Ajoutez les cours manquants dans l'historique des cours de chaque titre ; les rendements sont calculés sur les comptes affichés.",
+    "returnDiagnosticsRepairFiltered": "Ajoutez les cours manquants dans l'historique des cours de chaque titre, ou excluez ces comptes de la vue avec le filtre de comptes ci-dessus ; les rendements sont calculés sur les comptes affichés."
   },
   "assetAllocation": {
     "title": "Répartition des actifs",

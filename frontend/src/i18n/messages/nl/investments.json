@@ -63,7 +63,10 @@
     "unpricedHoldings": "Gedeeltelijke waardering: {count, plural, one {# positie heeft} other {# posities hebben}} geen actuele prijs ({symbols}); de waarden hieronder laten {count, plural, one {die} other {ze}} buiten beschouwing.",
     "mwr": "MWR",
     "mwrFull": "(geldgewogen)",
-    "mwrTooltip": "Geldgewogen rendement (XIRR) van uw beleggingen sinds de eerste transactie: het jaarlijkse rendement dat uw eigen geld heeft opgeleverd, waarbij elke aankoop, verkoop en dividend wordt gewogen naar het moment waarop het plaatsvond. Stortingen, opnames en niet-belegd geld blijven buiten beschouwing. Wijkt af van TWR wanneer u meer heeft belegd vóór een stijging of een daling."
+    "mwrTooltip": "Geldgewogen rendement (XIRR) van uw beleggingen sinds de eerste transactie: het jaarlijkse rendement dat uw eigen geld heeft opgeleverd, waarbij elke aankoop, verkoop en dividend wordt gewogen naar het moment waarop het plaatsvond. Stortingen, opnames en niet-belegd geld blijven buiten beschouwing. Wijkt af van TWR wanneer u meer heeft belegd vóór een stijging of een daling.",
+    "returnDiagnosticsLead": "TWR en MWR worden niet weergegeven omdat de historie hiaten bevat:",
+    "returnDiagnosticsRepair": "Voeg de ontbrekende koersen toe aan de koershistorie van elk waardepapier; het rendement wordt berekend over de weergegeven rekeningen.",
+    "returnDiagnosticsRepairFiltered": "Voeg de ontbrekende koersen toe aan de koershistorie van elk waardepapier, of sluit die rekeningen uit van de weergave met het rekeningfilter hierboven; het rendement wordt berekend over de weergegeven rekeningen."
   },
   "assetAllocation": {
     "title": "Activaspreiding",

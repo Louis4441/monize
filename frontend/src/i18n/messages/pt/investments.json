@@ -63,7 +63,10 @@
     "unpricedHoldings": "Avaliação parcial: {count, plural, one {# posição não tem} other {# posições não têm}} preço atual ({symbols}), pelo que os valores abaixo {count, plural, one {a excluem} other {as excluem}}.",
     "mwr": "MWR",
     "mwrFull": "(Ponderado pelo Dinheiro)",
-    "mwrTooltip": "Retorno ponderado pelo dinheiro (XIRR) dos seus investimentos desde a primeira transação: a taxa anual que o seu próprio dinheiro rendeu, ponderando cada compra, venda e dividendo pelo momento em que ocorreu. Os depósitos, os levantamentos e o numerário não investido são excluídos. Difere do TWR quando investiu mais antes de uma subida ou de uma descida."
+    "mwrTooltip": "Retorno ponderado pelo dinheiro (XIRR) dos seus investimentos desde a primeira transação: a taxa anual que o seu próprio dinheiro rendeu, ponderando cada compra, venda e dividendo pelo momento em que ocorreu. Os depósitos, os levantamentos e o numerário não investido são excluídos. Difere do TWR quando investiu mais antes de uma subida ou de uma descida.",
+    "returnDiagnosticsLead": "O TWR e o MWR são omitidos porque o histórico tem lacunas:",
+    "returnDiagnosticsRepair": "Adicione as cotações em falta no histórico de cotações de cada título; as rentabilidades são calculadas sobre as contas apresentadas.",
+    "returnDiagnosticsRepairFiltered": "Adicione as cotações em falta no histórico de cotações de cada título, ou exclua essas contas da vista com o filtro de contas acima; as rentabilidades são calculadas sobre as contas apresentadas."
   },
   "assetAllocation": {
     "title": "Alocação de Ativos",

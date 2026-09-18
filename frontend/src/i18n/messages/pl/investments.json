@@ -63,7 +63,10 @@
     "unpricedHoldings": "Wycena częściowa: {count, plural, one {# pozycja nie ma} few {# pozycje nie mają} many {# pozycji nie ma} other {# pozycji nie ma}} bieżącej ceny ({symbols}), więc poniższe wartości ich nie obejmują.",
     "mwr": "MWR",
     "mwrFull": "(ważony pieniądzem)",
-    "mwrTooltip": "Stopa zwrotu ważona pieniądzem (XIRR) Twoich inwestycji od pierwszej transakcji: roczna stopa zwrotu wypracowana przez Twoje własne pieniądze, ważąca każdy zakup, sprzedaż i dywidendę momentem ich wystąpienia. Wpłaty, wypłaty i niezainwestowana gotówka są pomijane. Różni się od TWR (stopy zwrotu ważonej czasem), gdy zainwestowałeś więcej przed wzrostem lub spadkiem."
+    "mwrTooltip": "Stopa zwrotu ważona pieniądzem (XIRR) Twoich inwestycji od pierwszej transakcji: roczna stopa zwrotu wypracowana przez Twoje własne pieniądze, ważąca każdy zakup, sprzedaż i dywidendę momentem ich wystąpienia. Wpłaty, wypłaty i niezainwestowana gotówka są pomijane. Różni się od TWR (stopy zwrotu ważonej czasem), gdy zainwestowałeś więcej przed wzrostem lub spadkiem.",
+    "returnDiagnosticsLead": "TWR i MWR nie są pokazywane, ponieważ w historii występują luki:",
+    "returnDiagnosticsRepair": "Uzupełnij brakujące ceny w historii cen każdego papieru wartościowego; stopy zwrotu są liczone dla wyświetlanych kont.",
+    "returnDiagnosticsRepairFiltered": "Uzupełnij brakujące ceny w historii cen każdego papieru wartościowego albo wyklucz te konta z widoku za pomocą filtra kont powyżej; stopy zwrotu są liczone dla wyświetlanych kont."
   },
   "assetAllocation": {
     "title": "Alokacja aktywów",

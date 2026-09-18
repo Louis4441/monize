@@ -63,7 +63,10 @@
     "unpricedHoldings": "Định giá một phần: {count, plural, one {# vị thế} other {# vị thế}} không có giá hiện tại ({symbols}), nên các giá trị bên dưới không bao gồm chúng.",
     "mwr": "MWR",
     "mwrFull": "(Tỷ lệ có trọng số tiền)",
-    "mwrTooltip": "Lợi nhuận có trọng số tiền (XIRR) của khoản đầu tư của bạn kể từ giao dịch đầu tiên: tỷ lệ hàng năm mà tiền của chính bạn kiếm được, trong đó mỗi lần mua, bán và cổ tức được tính trọng số theo thời điểm xảy ra. Các khoản nạp, rút và tiền mặt chưa đầu tư không được tính. Khác với TWR khi bạn đầu tư nhiều hơn trước một đợt tăng hoặc giảm."
+    "mwrTooltip": "Lợi nhuận có trọng số tiền (XIRR) của khoản đầu tư của bạn kể từ giao dịch đầu tiên: tỷ lệ hàng năm mà tiền của chính bạn kiếm được, trong đó mỗi lần mua, bán và cổ tức được tính trọng số theo thời điểm xảy ra. Các khoản nạp, rút và tiền mặt chưa đầu tư không được tính. Khác với TWR khi bạn đầu tư nhiều hơn trước một đợt tăng hoặc giảm.",
+    "returnDiagnosticsLead": "TWR và MWR không được hiển thị vì lịch sử có khoảng trống:",
+    "returnDiagnosticsRepair": "Thêm các mức giá còn thiếu vào lịch sử giá của từng chứng khoán; lợi nhuận được tính trên các tài khoản đang hiển thị.",
+    "returnDiagnosticsRepairFiltered": "Thêm các mức giá còn thiếu vào lịch sử giá của từng chứng khoán, hoặc loại các tài khoản đó khỏi chế độ xem bằng bộ lọc tài khoản ở trên; lợi nhuận được tính trên các tài khoản đang hiển thị."
   },
   "assetAllocation": {
     "title": "Phân bổ tài sản",

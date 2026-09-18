@@ -63,7 +63,10 @@
     "unpricedHoldings": "Penilaian sebagian: {count, plural, one {# posisi} other {# posisi}} tidak memiliki harga saat ini ({symbols}), jadi nilai di bawah tidak menyertakannya.",
     "mwr": "MWR",
     "mwrFull": "(Tertimbang Uang)",
-    "mwrTooltip": "Imbal hasil tertimbang uang (XIRR) dari investasi Anda sejak transaksi pertama: tingkat tahunan yang dihasilkan oleh uang Anda sendiri, dengan menimbang setiap pembelian, penjualan, dan dividen berdasarkan kapan itu terjadi. Setoran, penarikan, dan tunai yang belum diinvestasikan tidak dihitung. Berbeda dari TWR ketika Anda berinvestasi lebih banyak sebelum kenaikan atau penurunan."
+    "mwrTooltip": "Imbal hasil tertimbang uang (XIRR) dari investasi Anda sejak transaksi pertama: tingkat tahunan yang dihasilkan oleh uang Anda sendiri, dengan menimbang setiap pembelian, penjualan, dan dividen berdasarkan kapan itu terjadi. Setoran, penarikan, dan tunai yang belum diinvestasikan tidak dihitung. Berbeda dari TWR ketika Anda berinvestasi lebih banyak sebelum kenaikan atau penurunan.",
+    "returnDiagnosticsLead": "TWR dan MWR tidak ditampilkan karena riwayat memiliki celah:",
+    "returnDiagnosticsRepair": "Tambahkan harga yang hilang pada riwayat harga setiap sekuritas; imbal hasil diukur berdasarkan akun yang ditampilkan.",
+    "returnDiagnosticsRepairFiltered": "Tambahkan harga yang hilang pada riwayat harga setiap sekuritas, atau keluarkan akun tersebut dari tampilan dengan filter akun di atas; imbal hasil diukur berdasarkan akun yang ditampilkan."
   },
   "assetAllocation": {
     "title": "Alokasi Aset",

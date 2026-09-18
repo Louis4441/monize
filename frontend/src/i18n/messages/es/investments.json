@@ -63,7 +63,10 @@
     "unpricedHoldings": "Valoración parcial: {count, plural, one {# posición no tiene} other {# posiciones no tienen}} precio actual ({symbols}), así que los valores de abajo {count, plural, one {la excluyen} other {las excluyen}}.",
     "mwr": "MWR",
     "mwrFull": "(Ponderado por Dinero)",
-    "mwrTooltip": "Rendimiento ponderado por dinero (XIRR) de tus inversiones desde la primera transacción: la tasa anual que ganó tu propio dinero, ponderando cada compra, venta y dividendo según el momento en que ocurrió. Los depósitos, los retiros y el efectivo sin invertir quedan excluidos. Difiere del TWR cuando invertiste más antes de una subida o una bajada."
+    "mwrTooltip": "Rendimiento ponderado por dinero (XIRR) de tus inversiones desde la primera transacción: la tasa anual que ganó tu propio dinero, ponderando cada compra, venta y dividendo según el momento en que ocurrió. Los depósitos, los retiros y el efectivo sin invertir quedan excluidos. Difiere del TWR cuando invertiste más antes de una subida o una bajada.",
+    "returnDiagnosticsLead": "TWR y MWR se han omitido porque el historial tiene lagunas:",
+    "returnDiagnosticsRepair": "Agregue los precios que faltan en el historial de precios de cada valor; las rentabilidades se calculan sobre las cuentas mostradas.",
+    "returnDiagnosticsRepairFiltered": "Agregue los precios que faltan en el historial de precios de cada valor, o excluya esas cuentas de la vista con el filtro de cuentas de arriba; las rentabilidades se calculan sobre las cuentas mostradas."
   },
   "assetAllocation": {
     "title": "Asignación de Activos",
