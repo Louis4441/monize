@@ -75,9 +75,10 @@
 | ID | Task | Depends on | Deploy impact | Status |
 |----|------|-----------|---------------|--------|
 | F1 | `CLUSTER_MODE` parsing, boot-matrix check, `main.ts` wiring, `JWT_SECRET` fatal, `.env.example` | -- | none (`JWT_SECRET` refusal is the one deliberate exception) | [x] |
-| F2 | `ClusterModule`: mode provider, Redis client and subscriber in `multi`, `PING` at boot, readiness probe | F1 | multi-only | [ ] |
+| F2 | `ClusterModule`: mode provider, the `LISTEN` connection in `multi`, connect at boot, readiness probe | F1, F6 | multi-only | [ ] |
 | F3 | Doc corrections in `concurrency-and-idempotency.md`, `external-side-effects.md`, `cron-jobs.md` | -- | none | [x] |
 | F5 | Concurrency register: retire the stale `users.failed_login_attempts` gap row | -- | none | [x] |
+| F6 | Retire `REDIS_URL` from F1's boot matrix, `main.ts` and `.env.example` | -- | none | [ ] |
 | F4 | ADR 0005 and index row | F1 | none | [ ] |
 | A1 | Migration: `auth_attempt_counters`, `single_use_tokens`; RLS exemption; sweep cron | -- | none | [x] |
 | A2 | `AuthAttemptCounterService`; 2FA attempt maps replaced | A1 | neutral | [x] |
@@ -90,8 +91,8 @@
 | R3 | Relay queue on rows: insert, claim, answer; in-memory queue maps removed | R1, R2 | neutral | [x] |
 | R4 | Late answers, buffered actions and agent liveness on rows; remaining maps removed | R3 | neutral | [x] |
 | R5 | Relay attachments on rows (not the storage provider -- see its Notes) | R3 | neutral | [x] |
-| R6 | `RedisEventBus`; selected in `multi`; two-instance spec | F2, R1, D3 | multi-only | [ ] |
-| T1 | `RedisThrottlerStorage`; selected in `multi`; fail-open | F2, D3 | multi-only | [ ] |
+| R6 | `PostgresEventBus`; selected in `multi`; two-instance spec | F2, R1 | multi-only | [ ] |
+| T1 | Migration `http_throttle_counters`; `PostgresThrottlerStorage`; selected in `multi`; fail-open | F2 | multi-only | [ ] |
 | M1 | MCP 2025-era sessions: persisted rows or documented sticky routing | F1 | none | [x] |
 | S1 | Boot refusals in `multi` for per-pod attachments and backups | F1 | multi-only | [ ] |
 | S2 | S3 backup target for automatic backups | -- | none until selected | [ ] |
@@ -101,15 +102,16 @@
 | C4 | Demo seed under the lifecycle advisory lock | -- | neutral (demo only) | [x] |
 | G1 | Whole-tree process-local-state guard with allowlist | A4, X1, R4 | none | [ ] |
 | G2 | `INV-HA-001..005` in both contract docs | A3, K1, R3, S1 | none | [ ] |
-| D1 | Helm: Deployments, PDB, spread, autoscaling, `clusterMode`, `redis.url` | F2 | none (defaults unchanged) | [ ] |
+| D1 | Helm: Deployments, PDB, spread, autoscaling, `clusterMode` | F2 | none (defaults unchanged) | [ ] |
 | D2 | `docker-compose.ha.yml` example | F2 | none | [ ] |
-| D3 | CI: `redis` service in the integration job | -- | none | [x] |
+| D3 | CI: retire the `redis` service and `REDIS_URL` from the integration job | -- | none | [ ] |
 | D4 | E2E: one shard on `CLUSTER_MODE=multi` with two backends | R6, T1, D1 | none | [ ] |
 
 ## Suggested order
 
-1. F1 and F3 (done), F5, A1, R1, R2, D3 (no behaviour change, unblock
-   everything).
+1. F1 and F3 (done), F5, A1, R1, R2 (no behaviour change, unblock
+   everything), then F6 and D3 (undo the two Redis-shaped pieces that shipped
+   against the earlier draft, before anything builds on them).
 2. A2, A3, A4, X1, K1, C1, C2, C3, C4 (the `neutral` durability fixes; each
    improves a single-replica deployment on its own).
 3. R3, R4, R5, M1 (relay and MCP on rows).
@@ -150,57 +152,79 @@ doing the work.
 **Notes:** the storage refusals in the design doc's boot matrix were left to
 S1; the compose files carry no explicit `CLUSTER_MODE` (unset is `single`).
 
-### F2 -- `ClusterModule` and the Redis connection
+The `REDIS_URL` input (its `multi` refusal, its `single` warning, the spec
+rows and the `.env.example` entry) shipped against the earlier draft, which
+reserved an optional Redis. The design no longer asks for it; task F6 retires
+it, and until F6 lands the code refuses `multi` without a `REDIS_URL` nothing
+will read.
+
+### F2 -- `ClusterModule` and the `LISTEN` connection
 
 - [ ] Status:
 
 **Scope:** `backend/src/common/cluster/cluster.module.ts` (new),
 `backend/src/common/cluster/cluster.module.spec.ts` (new),
-`backend/src/common/cluster/redis-client.provider.ts` (new),
+`backend/src/common/cluster/pg-listener.provider.ts` (new) + spec,
 `backend/src/app.module.ts`, `backend/src/health/health.controller.ts`,
 `backend/src/health/health.controller.spec.ts`, `backend/src/health/health.module.ts`,
-`backend/package.json` (`ioredis`), `backend/src/main.ts` (the `PING`).
+`backend/src/main.ts` (the connect-at-boot check),
+`docs/row-level-security-contract.md` (the sanctioned direct-connection
+entry). No dependency: `pg` is already the driver.
 
 **Pattern:** `backend/src/common/demo-mode.module.ts` (a two-provider
-`@Global()` module) for the module; `backend/src/notifications/email.service.ts`
-`onModuleInit` for "configured or not, logged once".
+`@Global()` module) for the module; `backend/src/db-init.ts` for a dedicated
+`pg.Client` built from `DATABASE_*`, except that this one takes the runtime
+role from `resolveRlsDatabaseAuth` in `backend/src/common/db/rls-config.ts`,
+the same resolution `app.module.ts` gives the pool, because `LISTEN` and
+`pg_notify()` need nothing the runtime role lacks;
+`backend/src/notifications/email.service.ts` `onModuleInit` for "configured
+or not, logged once".
 
 **Steps:**
 
-1. Add `ioredis` (pin an exact version; the `License Compliance` CI job
-   checks its licence, there is no local script).
-2. `redis-client.provider.ts` exports two tokens, `REDIS_CLIENT` and
-   `REDIS_SUBSCRIBER`, and a factory that returns `null` for both in `single`
-   and two `ioredis` instances in `multi` (`lazyConnect: false`,
-   `keyPrefix: REDIS_KEY_PREFIX`, `maxRetriesPerRequest: 1`, `enableOfflineQueue: false`
-   so a lost Redis fails fast rather than queueing). The subscriber is a
-   separate connection because a connection in subscribe mode cannot run
-   commands.
-3. `cluster.module.ts`: `@Global()`, provides `CLUSTER_MODE` (the parsed
-   value from `getClusterMode()` in `cluster-mode.ts`) and the two clients;
-   `onModuleDestroy` quits both. Document `REDIS_KEY_PREFIX` in
-   `.env.example` beside `REDIS_URL`.
-4. `main.ts`: after the F1 check, in `multi` only, `await client.ping()` with a
-   5 s timeout; failure refuses the boot with the URL's host (never the
-   password) in the message.
-5. `health.controller.ts`: `ready()` in `multi` also pings Redis; failure is
-   `503` like the database. `check()` reports `checks.redis` in `multi` and
-   omits it in `single`. `live()` is untouched.
+1. `pg-listener.provider.ts` exports the token `PG_LISTENER` and a small
+   class `PgListener` over one `pg.Client`: `connect()` (with `keepAlive`),
+   `listen(channel)`, `notify(channel, payload)` (`SELECT pg_notify($1, $2)`),
+   an `onNotification` hook, `isConnected()`, and `close()`. On `error` or
+   `end` it builds a new client, reconnects with capped exponential backoff
+   (1 s to 30 s) and re-issues every `LISTEN` it held, logging through
+   `Logger`, never `console`. The factory returns `null` in `single` and a
+   connected instance in `multi`.
+2. `cluster.module.ts`: `@Global()`, provides `CLUSTER_MODE` (the parsed value
+   from `getClusterMode()` in `cluster-mode.ts`) and `PG_LISTENER`;
+   `onModuleDestroy` closes it.
+3. `main.ts`: after the F1 check, in `multi` only, open the listener and issue
+   its first `LISTEN` with a 5 s timeout; failure refuses the boot naming the
+   host (never the password) and saying that a transaction-mode pooler cannot
+   carry `LISTEN`.
+4. `health.controller.ts`: `ready()` in `multi` also requires
+   `isConnected()`; failure is `503` like the database. `check()` reports
+   `checks.eventBus` in `multi` and omits it in `single`. `live()` is untouched.
+5. `docs/row-level-security-contract.md`: a second direct-connection decision
+   beside the OAuth adapter's, in the same shape (what it touches: no table;
+   why it is outside the door: no tenant and no transaction; what it does not
+   authorize: anything else). The adapter's entry says a second exception is a
+   separate decision documented there, and this is it.
 
-**Acceptance:** in `single` the module registers nulls and Redis is never
-dialled (assert with a spy that the factory returned `null`). In `multi`
-readiness goes 503 when Redis stops and recovers when it returns.
+**Acceptance:** in `single` the module registers `null` and no second
+connection is opened (assert with a spy that the factory returned `null`). In
+`multi` readiness goes 503 while the listener is disconnected and recovers when
+it reconnects, with `LISTEN` re-issued.
 
 **Tests:** module spec for both modes with the client factory mocked;
-`health.controller.spec.ts` gains `ready()` rows for `multi` with Redis up and
-down, and asserts `single` never calls the client.
+`pg-listener.provider.spec.ts` with a `pg.Client` double for connect, listen,
+notify, and the reconnect-and-relisten path; `health.controller.spec.ts` gains
+`ready()` rows for `multi` with the listener up and down, and asserts `single`
+never consults it.
 
 **Traps:** `backend/src/module-graph.spec.ts` fails a new module edge that
 creates a require cycle without `forwardRef`; a `@Global()` module imported
-only by `AppModule` avoids it. `ioredis` logs to `console` on some errors;
-attach an `error` listener that forwards to `Logger` so `no-console` and
-`startup-logging.spec.ts` stay green. Never put the URL with credentials in
-a log line.
+only by `AppModule` avoids it. A `pg.Client` that has emitted `error` is
+unusable afterwards; reconnect means a new `Client`, never `connect()` again
+on the old one. The connection must be the runtime role: the owner's
+credentials belong to the startup scripts, not to a long-lived connection in
+the serving process. Never put a connection string with credentials in a log
+line.
 
 **Notes:**
 
@@ -242,26 +266,70 @@ this list; if the statement has changed shape, the row may be right.
 
 **Notes:**
 
+### F6 -- Retire `REDIS_URL` from F1
+
+- [ ] Status:
+
+**Scope:** `backend/src/common/cluster/cluster-mode.ts` and its spec,
+`backend/src/main.ts` (the `assertClusterBootOrExit` call), `.env.example`
+(the `REDIS_URL` entry, and the sentence in the `CLUSTER_MODE` entry that
+names it).
+
+**Pattern:** the F1 commits, run backwards; the header comment in
+`cluster-mode.ts` ("a row or a Redis key") becomes "a row".
+
+**Steps:** remove `REDIS_URL` from `ClusterBootEnv`, its `multi` refusal and
+its `single` warning from `checkClusterBoot`, the four matrix rows and the two
+assertions that name it from `cluster-mode.spec.ts`, the argument from the
+call in `main.ts`, and the entry from `.env.example`; reword the `multi` line
+there to what `multi` now requires (a session-capable `DATABASE_HOST`, and the
+storage assertions S1 adds). `node scripts/check-env-docs.mjs` stays green
+only if nothing still reads `process.env.REDIS_URL` when its `.env.example`
+entry goes.
+
+**Acceptance:** `grep -ri redis backend/src/common/cluster .env.example` is
+empty; `CLUSTER_MODE=multi` with a valid `JWT_SECRET` and no `REDIS_URL`
+passes the matrix (F2 then adds the connection check).
+
+**Tests:** the spec's matrix loses the four rows and gains one: `multi` with
+only `JWT_SECRET` set reports no refusal.
+
+**Traps:** this task lands **before** F2, so between the two nothing checks
+at boot that a second replica can be woken. That is acceptable only because
+nothing selects a multi-replica bus until R6; say so in the PR.
+
+**Notes:**
+
 ### F4 -- ADR 0005
 
 - [ ] Status:
 
-**Scope:** `docs/adr/0005-cluster-mode-and-optional-redis.md` (new),
+**Scope:** `docs/adr/0005-cluster-mode-on-postgresql-alone.md` (new),
 `docs/adr/README.md` (index row).
 
 **Pattern:** `docs/adr/0004-mcp-two-eras-request-identity-and-mrtr-confirmation.md`
 for length and tone; the template in `docs/adr/README.md`.
 
 **Steps:** Status `accepted`, today's date. Context: the survey in the design
-doc's "current state" table. Decision: PostgreSQL for correctness-bearing
-state in both modes; Redis only for throttler counters and wake-up pub/sub;
-explicit `CLUSTER_MODE`. Consequences: `single` gains durability across
-restarts; `multi` adds one dependency and one readiness check; the relay is
-now a table. Alternatives considered: PostgreSQL `LISTEN`/`NOTIFY` as the bus
-(rejected for now: a dedicated connection per replica and no transaction-mode
-pooling), sticky routing (rejected: it does not fix the correctness rows and
-it silently fails on a replica loss), always-on Redis (rejected: the user's
-requirement is that single-replica deployments need nothing new).
+doc's "current state" table, and that the plan's first draft reserved an
+optional Redis for the throttler's counters and the wake-up channel.
+Decision: PostgreSQL for every piece of replica-shared state in both modes:
+correctness-bearing rows under the mechanisms of
+`docs/concurrency-and-idempotency.md`, the throttler's counters on an
+`UNLOGGED` table, the wake-up channel on `LISTEN`/`NOTIFY` over one dedicated
+connection per replica; explicit `CLUSTER_MODE`. Consequences: `single` gains
+durability across restarts; `multi` adds no dependency, one session-level
+connection per replica and one readiness check; the relay is now a table; the
+throttler path costs one write per request in `multi`. Alternatives
+considered: an optional Redis (rejected: a second stateful service to run,
+back up, secure and probe, for two concerns whose PostgreSQL shapes cost less
+than the operations of a second store, and whose one real advantage, a
+hot-path counter without a write, `UNLOGGED` answers); sticky routing
+(rejected: it does not fix the correctness rows and it silently fails on a
+replica loss); `LISTEN` on the pooled connections (rejected: session state on
+the runtime pool is what the RLS design forbids, and a transaction-mode pooler
+drops it); always-on clustering (rejected: the requirement is that
+single-replica deployments need nothing new).
 
 **Acceptance:** index row present; `doc-paths` guard green.
 
@@ -732,6 +800,11 @@ handler a later subscribe re-added. Both have a spec.
 `Set` left behind after the last unsubscribe is a slow leak in a process
 serving many per-user channels, and this is how a spec sees it.
 
+The `name` literal shipped as `"memory" | "redis"`, and the header comments of
+the interface, the memory bus and `wake-signal.ts` describe a Redis restart as
+the way a wake-up is lost. R6 renames the literal to `"postgres"` and rewrites
+the three comments with the implementation they name.
+
 ### R2 -- Migration: `ai_relay_prompts`, `ai_relay_agents`
 
 - [x] Status: done.
@@ -850,8 +923,8 @@ concurrently on one `pending` row, one gets it; a `post_response` after a
 repository double plus the memory bus.
 
 **Traps:** the SSE heartbeat `setInterval` in the controller stays (it
-describes one socket). Wake-ups can be lost (Redis restart), so every waiter
-also polls the row on a slow timer (the existing long-poll timeout is the
+describes one socket). Wake-ups can be lost (a listener reconnecting), so
+every waiter also polls the row on a slow timer (the existing long-poll timeout is the
 ceiling). Do not let the bus payload carry the prompt or the answer.
 
 **Notes:**
@@ -1031,71 +1104,136 @@ CHECK-constrained column can accept.
 `byUser` is gone, and with it the per-user cap: it bounded process memory, and
 the TTL plus the sweep bound a table.
 
-### R6 -- `RedisEventBus`
+### R6 -- `PostgresEventBus`
 
 - [ ] Status:
 
-**Scope:** `backend/src/common/events/redis-event-bus.ts` (new) + spec,
+**Scope:** `backend/src/common/events/postgres-event-bus.ts` (new) + spec,
 `backend/src/common/events/event-bus.module.ts`,
-`backend/test/integration/redis-event-bus.integration.spec.ts` (new).
+`backend/src/common/events/event-bus.interface.ts` (the `name` literal and
+the header comment), `backend/src/common/events/memory-event-bus.ts` and
+`backend/src/common/events/wake-signal.ts` (header comments that name the
+Redis bus R1 expected), `backend/src/ai/relay/ai-relay.service.spec.ts` (the
+"redis unreachable" error text in its rejected-publish case),
+`backend/test/integration/postgres-event-bus.integration.spec.ts` (new).
+
+**Pattern:** `MemoryEventBus` for the local fan-out and the
+snapshot-before-delivery rule; F2's `PgListener` for the connection.
 
 **Steps:**
 
-1. `RedisEventBus` takes `REDIS_CLIENT` (publish) and `REDIS_SUBSCRIBER`
-   (`psubscribe` on `<prefix>relay:*` and any other channel families as they
-   appear) and fans messages to local handlers by exact channel.
-2. `event-bus.module.ts`'s factory returns it in `multi`.
-3. Serialize payloads as JSON; reject anything over 4 KB (a wake-up is
-   small).
+1. `PostgresEventBus` takes `PG_LISTENER`. On construction it issues one
+   `LISTEN monize_wakeups` (re-issued by the listener on reconnect) and
+   registers an `onNotification` hook that parses the JSON payload
+   `{ "channel": string, "payload": object }` and delivers to the local
+   handlers subscribed to exactly that channel, on the next microtask, with
+   the same snapshot-and-idempotent-unsubscribe semantics as `MemoryEventBus`.
+   `subscribe` and unsubscribe touch only the local map; the session sees one
+   `LISTEN` for the life of the process.
+2. `publish` serialises `{ channel, payload }`, refuses anything over 4 KB
+   (the server's limit is 8000 bytes and a wake-up is a few ids), and calls
+   `notify("monize_wakeups", json)` on the listener connection. A publish
+   while the connection is down rejects; the relay already tolerates a
+   rejected publish (its spec has the case) because every waiter polls.
+3. `event-bus.module.ts`'s factory returns it in `multi`, injecting
+   `CLUSTER_MODE` and `PG_LISTENER`. `name` becomes `"memory" | "postgres"`.
+4. Rewrite the three header comments: the bus can lose a message because a
+   notification sent while a listener is reconnecting is gone, not because
+   of a Redis restart.
 
-**Acceptance:** with `CLUSTER_MODE=multi` in the integration job, two bus
-instances over one Redis deliver a publish on A to a subscriber on B.
+**Acceptance:** two bus instances over two `PgListener`s to one database
+deliver a publish on A to a subscriber on B, and a publish on A to a
+subscriber on A.
 
-**Tests:** unit spec with an `ioredis` double; the integration spec uses the
-D3 service (`REDIS_URL` in the job env; skip with a clear message when it is
-unset locally, following the `describe.skip` idiom in `doc-paths.spec.ts`).
+**Tests:** unit spec with a `PgListener` double (delivery by exact channel,
+the 4 KB refusal, a malformed payload logged and dropped, a throwing handler
+not stopping the others); the integration spec opens two real `pg.Client`s
+against the PostgreSQL service the integration job already has.
 
-**Traps:** `keyPrefix` on `ioredis` does not apply to pub/sub channel names;
-prefix them explicitly. A subscriber connection reconnects silently; re-issue
-`psubscribe` on `ready`.
+**Traps:** `NOTIFY` de-duplicates identical payloads within one transaction;
+the listener connection is autocommit so that never applies, but a future
+caller publishing through the pool inside a transaction would see two
+identical wake-ups collapse to one, harmless for a hint and worth a comment.
+A dropped socket surfaces as `error` on the client; the reconnect is F2's, not
+this file's. A `LISTEN` channel is an identifier (63 bytes, quoted if it
+carries anything but a plain name) while `pg_notify()` takes text; keep the
+one fixed channel and put the routing in the payload.
 
 **Notes:**
 
-### T1 -- `RedisThrottlerStorage`
+### T1 -- `PostgresThrottlerStorage`
 
 - [ ] Status:
 
-**Scope:** `backend/src/common/throttler/redis-throttler-storage.ts` (new) +
-spec, `backend/src/app.module.ts` (`ThrottlerModule.forRootAsync`),
-`backend/test/integration/redis-throttler.integration.spec.ts` (new).
+**Scope:** one migration + `database/schema.sql` (`http_throttle_counters`),
+`backend/src/common/throttler/http-throttle-counter.entity.ts` (new),
+`backend/src/common/throttler/postgres-throttler-storage.ts` (new) + spec,
+`backend/src/app.module.ts` (`ThrottlerModule.forRootAsync`),
+`backend/src/common/db/rls-exempt-tables.ts`,
+`docs/row-level-security-contract.md`,
+`backend/src/backup/export-table-queries.ts` (the table's backup
+classification), `backend/src/auth/auth-state-sweeper.service.ts` and spec (a
+third `DELETE`), `docs/cron-jobs.md` (that sweeper's row),
+`backend/eslint.config.mjs` (`WITH_CONTEXT_ALLOWLIST`),
+`backend/test/integration/postgres-throttler.integration.spec.ts` (new).
 
 **Pattern:** `@nestjs/throttler` 6.x's `ThrottlerStorage` interface
 (`increment(key, ttl, limit, blockDuration, throttlerName)` returning
 `{ totalHits, timeToExpire, isBlocked, timeToBlockExpire }`); verify the exact
 signature against the installed version in `backend/node_modules` before
-writing.
+writing. A2's `AuthAttemptCounterService` for the one-statement upsert and for
+`runOutsideActiveScopedManager`.
 
 **Steps:**
 
-1. Implement `increment` as one Lua script (`INCR`, `PEXPIRE` on first hit,
-   block-key logic) so two replicas cannot double-count; key names carry
-   `REDIS_KEY_PREFIX` and `throttlerName`.
-2. Fail open: on any Redis error return `{ totalHits: 0, ... }` and log at
-   most once per minute with a process-local timestamp (allowlist it in G1
-   with the reason: it is a log throttle).
-3. `app.module.ts`: `ThrottlerModule.forRootAsync` with `inject: [CLUSTER_MODE, REDIS_CLIENT]`;
-   `storage` is set only in `multi`, so `single` keeps the library default
-   object untouched.
+1. Migration: `CREATE UNLOGGED TABLE IF NOT EXISTS http_throttle_counters (name TEXT NOT NULL, key TEXT NOT NULL, hits INTEGER NOT NULL, window_expires_at TIMESTAMPTZ NOT NULL, blocked_until TIMESTAMPTZ, PRIMARY KEY (name, key))`
+   with an index on `window_expires_at` for the sweep; mirrored in
+   `schema.sql` without the `IF NOT EXISTS` but with the `UNLOGGED`. The
+   entity cannot express `UNLOGGED` and does not need to: the integration
+   harness builds a logged copy, and nothing the spec asserts depends on
+   durability. RLS-exempt with the `auth_attempt_counters` reason (opaque
+   key, no owner, written before any identity exists); excluded from the
+   backup with the reason that it is a cache.
+2. `increment` is one statement: `INSERT INTO http_throttle_counters (name, key, hits, window_expires_at, blocked_until) VALUES ($1, $2, 1, now() + $3, NULL) ON CONFLICT (name, key) DO UPDATE SET hits = CASE WHEN t.window_expires_at < now() THEN 1 ELSE t.hits + 1 END, window_expires_at = CASE WHEN t.window_expires_at < now() THEN now() + $3 ELSE t.window_expires_at END, blocked_until = CASE WHEN (CASE WHEN t.window_expires_at < now() THEN 1 ELSE t.hits + 1 END) > $4 THEN now() + $5 ELSE t.blocked_until END RETURNING hits, window_expires_at, blocked_until, now() AS db_now`
+   (`t` aliasing the table). The nested `CASE` repeats the hits expression
+   because a `SET` list cannot read the value it is assigning. `isBlocked` is
+   `blocked_until > db_now`; `timeToExpire` and `timeToBlockExpire` are the
+   stored timestamps minus `db_now`, never the process clock. While a row is
+   blocked its count no longer matters; the block wins, as the library's
+   in-memory storage does.
+3. The guard runs before `RequestContextInterceptor`, so there is no ambient
+   identity: the storage seeds `withSystemContext` around its one
+   `withScopedDb` and the file joins `WITH_CONTEXT_ALLOWLIST` as a reviewed
+   decision. Run it through `runOutsideActiveScopedManager` as A2 does, for
+   the same reason: a counter that joins a transaction the handler later rolls
+   back counts nothing.
+4. Fail open: on any error return `{ totalHits: 0, timeToExpire: 0, isBlocked: false, timeToBlockExpire: 0 }`
+   and log at most once per minute with a process-local timestamp (allowlist
+   it in G1 with the reason: it is a log throttle).
+5. `app.module.ts`: `ThrottlerModule.forRootAsync` with
+   `inject: [CLUSTER_MODE, PostgresThrottlerStorage]`; `storage` is set only in
+   `multi`, so `single` keeps the library default object untouched and pays
+   no write.
+6. `auth-state-sweeper.service.ts` gains
+   `DELETE FROM http_throttle_counters WHERE window_expires_at < now() AND (blocked_until IS NULL OR blocked_until < now())`;
+   the `docs/cron-jobs.md` row names the third table.
 
 **Acceptance:** in `multi`, 100 requests spread over two backends trip the
 default `limit(100)`; in `single`, the storage class is never constructed.
 
-**Tests:** unit spec for the Lua path with a double; integration spec against
-the D3 Redis with two storage instances sharing keys.
+**Tests:** unit spec for the statement and the fail-open path with a mocked
+manager; integration spec with two storage instances over two connections
+incrementing one key concurrently and reading `{1, 2}` in some order, a block
+once `hits > limit`, and a reset once `window_expires_at` passes (`pg_sleep`
+on a short ttl, not a fake clock: the predicate is the database's).
 
 **Traps:** `RATE_LIMIT_MAX` via `rateLimit()` in
 `backend/src/common/throttle.util.ts` is raise-only; do not change it. The
-health controller is `@SkipThrottle()`; keep it so.
+health controller is `@SkipThrottle()`; keep it so. The key the guard hands
+over is already an opaque hash of tracker and route; do not add the raw IP to
+the row. `UNLOGGED` tables are not replicated to a streaming standby: a
+failover starts with an empty table, one window of leniency, which is the
+documented cost, not a defect.
 
 **Notes:**
 
@@ -1255,8 +1393,8 @@ promotes and prunes per the existing retention spec.
 
 **Tests:** the existing `auto-backup.service.spec.ts` matrix runs against both
 targets (the `local` one on a real `mkdtemp` per the CLAUDE.md rule); an
-integration spec against a MinIO service (add it to D3's job if it is not
-there).
+integration spec against a MinIO service (add it to the
+`backend-integration-tests` job if it is not there).
 
 **Traps:** `docs/external-side-effects.md` EXT-001: durable state before the
 external write, or reconstructibility; a backup object with no record is a
@@ -1558,8 +1696,9 @@ shrink, never grow without a reason").
 after stripping comments with `extractTsComments` from
 `backend/src/common/repo-paths.util.ts`; seed the allowlist from the design
 doc's "Per-replica state that stays" table, plus `MemoryEventBus` (R1), the
-T1 log throttle, and M1's transport cache if that variant shipped, each with
-its reason as the map value. Leave the cron-scoped guard in place (it has a
+local fan-out map in `PostgresEventBus` (R6), the T1 log throttle, and the
+four session maps in `mcp-http.controller.ts` (M1 shipped the sticky-routing
+variant; its Notes say why they stay), each with its reason as the map value. Leave the cron-scoped guard in place (it has a
 narrower, stronger claim).
 
 **Acceptance:** the guard is green on the tree after A4, X1 and R4; removing
@@ -1601,7 +1740,6 @@ missing path listed.
 `helm/templates/statefulset-frontend.yaml` (renamed to `deployment-*.yaml`),
 new `helm/templates/pdb-backend.yaml`, `helm/templates/pdb-frontend.yaml`,
 `helm/templates/hpa-backend.yaml` (optional), `helm/templates/configmap-backend.yaml`,
-`helm/templates/secret-redis.yaml` (new, when `redis.url` carries a password),
 `helm/templates/NOTES.txt`, `helm/README.md`, `.github/workflows/ci.yml` (the
 `helm-chart` job renders a second values file), `helm/ci/multi-values.yaml`
 (new).
@@ -1613,11 +1751,15 @@ new `helm/templates/pdb-backend.yaml`, `helm/templates/pdb-frontend.yaml`,
    `readOnlyRootFilesystem` and the `/tmp` `emptyDir` as they are.
 2. Values: `backend.replicas`, `backend.podDisruptionBudget.minAvailable`,
    `backend.topologySpreadConstraints`, `backend.autoscaling.{enabled,minReplicas,maxReplicas,targetCPU}`,
-   `cluster.mode` (`single|multi`), `redis.url`, `redis.existingSecret`,
-   `redis.keyPrefix`; the same replica/PDB/spread block for the frontend.
+   `cluster.mode` (`single|multi`); the same replica/PDB/spread block for the
+   frontend. No `redis.*` block and no new Secret: `multi` needs nothing the
+   chart's database settings do not already carry.
 3. `NOTES.txt`: when `cluster.mode=multi` and `attachments` or `backups`
    persistence is enabled, print the ReadWriteMany requirement and the
-   `*_SHARED_VOLUME` assertion values.
+   `*_SHARED_VOLUME` assertion values; when `cluster.mode=multi`, print that
+   the database host must be a session-capable endpoint (a transaction-mode
+   pooler such as pgBouncer cannot carry the `LISTEN` each replica holds; a
+   direct service such as CNPG's `-rw` is fine).
 4. CI: `helm template` with `helm/ci/multi-values.yaml` as well as defaults;
    assert the rendered `Deployment` kind and that `CLUSTER_MODE` lands in
    the configmap.
@@ -1641,12 +1783,14 @@ step, and keep PVCs `helm.sh/resource-policy: keep`. The
 **Scope:** `docker-compose.ha.yml` (new), `README.md` or `docs/` deployment
 page that lists compose files, `.env.example` comments.
 
-**Steps:** postgres, redis, two `backend` replicas via `deploy.replicas: 2`
-(no `container_name`), two `frontend` replicas, one reverse proxy (Caddy or
-nginx) in front of the frontend; `CLUSTER_MODE: multi`, `REDIS_URL: redis://redis:6379`;
-attachments on the `database` provider; backups on a shared named volume
-with `BACKUP_SHARED_VOLUME: "true"` (a single-host volume is shared by
-definition). Every documented command carries `-f docker-compose.ha.yml`
+**Steps:** postgres, two `backend` replicas via `deploy.replicas: 2` (no
+`container_name`), two `frontend` replicas, one reverse proxy (Caddy or nginx)
+in front of the frontend; `CLUSTER_MODE: multi`; attachments on the
+`database` provider; backups on a shared named volume with
+`BACKUP_SHARED_VOLUME: "true"` (a single-host volume is shared by
+definition). No other service: both backends point `DATABASE_HOST` at the one
+`postgres` service directly, which is the session-capable endpoint `multi`
+needs. Every documented command carries `-f docker-compose.ha.yml`
 (`scripts/check-docs-manifests.mjs` rejects a bare `docker compose`).
 
 **Acceptance:** `docker compose -f docker-compose.ha.yml up -d --wait` boots
@@ -1654,32 +1798,32 @@ both backends green; killing one backend leaves the app usable.
 
 **Notes:**
 
-### D3 -- CI Redis service
+### D3 -- CI: retire the `redis` service
 
-- [x] Status: done.
+- [ ] Status: open. The task as first written ("add a `redis` service")
+  shipped against the earlier draft; this is its reversal.
 
 **Scope:** `.github/workflows/ci.yml` (`backend-integration-tests` job).
+`.github/` is an ask-first change under `AGENTS.md`; this task is the
+agreement.
 
-**Pattern:** the existing `postgres` service block in that job (digest-pinned
-image, `options: --health-cmd ...`, port mapping, job-level env).
+**Steps:** remove the `redis:` service block (the digest-pinned
+`redis:7-alpine`, its health command and port) and `REDIS_URL` from the job
+env; keep the comment that `CLUSTER_MODE` is deliberately not set job-wide,
+because that reasoning still holds for the two-instance specs R6 and T1 add.
+Nothing else in the job changes: those specs need only the PostgreSQL service
+already there.
 
-**Steps:** add `redis:` with a digest-pinned `redis:7-alpine`,
-`--health-cmd "redis-cli ping"`, port `6379:6379`, and `REDIS_URL: redis://localhost:6379`
-in the job env. Do not set `CLUSTER_MODE` job-wide; the specs that need it set
-it per test.
+**Acceptance:** the job runs unchanged; `zizmor --offline .github/workflows/ci.yml`
+reports no findings; `grep -i redis .github/workflows/ci.yml` is empty.
 
-**Acceptance:** the `zizmor-scan` job stays green (the pin); the job runs
-unchanged until R6/T1 add specs.
-
-**Notes:** `redis:7-alpine` resolved to
+**Notes (what shipped, so the reversal removes the right lines):**
+`redis:7-alpine` was pinned to
 `sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf`, a
-multi-arch index. Resolve a refresh the same way rather than copying a
-per-architecture manifest digest, which would pin CI to one runner
-architecture.
-
-`zizmor --offline .github/workflows/ci.yml` reports no findings. Note that the
-`zizmor-scan` job runs the scan with `|| true` and only uploads SARIF, so it
-cannot go red on a finding; the pin is for the finding's sake, not the job's.
+multi-arch index, with `--health-cmd "redis-cli ping"`, port `6379:6379`, and
+`REDIS_URL: redis://localhost:6379` in the job env. The `zizmor-scan` job runs
+with `|| true` and only uploads SARIF, so it could not go red on the pin and
+cannot go red on its removal.
 
 ### D4 -- E2E shard on `CLUSTER_MODE=multi`
 
@@ -1689,10 +1833,10 @@ cannot go red on a finding; the pin is for the finding's sake, not the job's.
 matrix), `e2e/tests/` (a relay round trip and a login-lockout spec that
 alternate backends), `e2e/playwright.config.ts` if a project needs the mode.
 
-**Steps:** add `redis` and a second backend service to the compose file
-behind the frontend's `INTERNAL_API_URL` (a tiny nginx `upstream` with two
-backends, round-robin); one matrix entry sets `CLUSTER_MODE: multi`; the
-other three stay `single`. The lockout spec fails login six times and asserts
+**Steps:** add a second backend service to the compose file behind the
+frontend's `INTERNAL_API_URL` (a tiny nginx `upstream` with two backends,
+round-robin), both on the file's `postgres` service; one matrix entry sets
+`CLUSTER_MODE: multi`; the other three stay `single`. The lockout spec fails login six times and asserts
 the seventh is refused regardless of which backend served each attempt.
 
 **Acceptance:** all four shards green; the `multi` shard's container logs

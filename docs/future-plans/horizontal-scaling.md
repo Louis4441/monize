@@ -3,10 +3,12 @@
 > **Status: proposed. Nothing in this document has shipped.** It records what
 > stands between the current single-replica deployment and one where several
 > backend and frontend replicas serve one database behind an ordinary load
-> balancer, and the order in which to close that gap. Redis (or a compatible
-> server) becomes a requirement only for an operator who opts into
-> multi-replica mode; a single-replica deployment keeps running exactly as it
-> does today, with no new dependency. Companion task list:
+> balancer, and the order in which to close that gap. PostgreSQL is the only
+> shared store in either mode: nothing here adds a dependency, and a
+> single-replica deployment keeps running exactly as it does today. An earlier
+> draft gave two ephemeral concerns (the HTTP throttler's counters and the
+> cross-replica wake-up channel) to an optional Redis; this revision keeps
+> them in PostgreSQL too, and says what that costs. Companion task list:
 > [`horizontal-scaling-tasks.md`](./horizontal-scaling-tasks.md).
 
 ## Goal
@@ -15,13 +17,16 @@
   load balancer with **no session affinity**, over one PostgreSQL.
 - A new `CLUSTER_MODE` setting: `single` (the default, today's behaviour,
   byte-for-byte) or `multi`. In `multi` the process refuses to boot unless the
-  things a second replica needs are present: a Redis URL, and cluster-safe
+  things a second replica needs are present: a PostgreSQL connection that can
+  hold `LISTEN` (a session, not a transaction-mode pooler), and cluster-safe
   storage for attachments and backups.
 - Everything that must be *correct* across replicas (rate-limit budgets, replay
   protection, signing keys, cron claims) lives in PostgreSQL and therefore
-  behaves identically in both modes. Redis carries only what is ephemeral and
-  latency-bound: the HTTP throttler's counters and a publish/subscribe channel
-  that wakes the replica holding a live connection.
+  behaves identically in both modes. The two things that are ephemeral and
+  latency-bound live there too, in the shapes PostgreSQL has for exactly that:
+  the HTTP throttler's counters are one upsert on an `UNLOGGED` table, and the
+  wake-up that reaches the replica holding a live connection is `NOTIFY`,
+  received on one dedicated `LISTEN` connection per replica.
 - Rolling upgrades with zero downtime, and one replica failing without a user
   noticing more than a retried request.
 
@@ -84,13 +89,23 @@ no dedupe state and that the automatic backup writes with a bare
    replay sets, signing keys and claims are rows, arbitrated by the mechanisms
    in `docs/concurrency-and-idempotency.md` section 2 (atomic arithmetic, unique
    index, conditional `UPDATE ... RETURNING`, `ON CONFLICT DO NOTHING`). They
-   then work the same in `single` and `multi`, and losing Redis never widens a
-   brute-force budget or replays a confirmation.
-2. **Redis carries only what is ephemeral and latency-bound.** Two things:
-   the HTTP throttler's sliding counters (a hot path, and losing them costs at
-   most one window of leniency on non-auth routes, because auth routes keep a
-   PostgreSQL counter beneath the throttler) and a publish/subscribe channel
-   whose only message is "re-read this row".
+   then work the same in `single` and `multi`, and there is no second store
+   whose loss could widen a brute-force budget or replay a confirmation.
+2. **The ephemeral, latency-bound state is PostgreSQL's too, in its cheaper
+   shapes.** Two things. The HTTP throttler's counters are one atomic upsert on
+   an `UNLOGGED` table: no WAL, no replication, truncated on crash recovery,
+   which is precisely the durability a cache offered, and losing them costs at
+   most one window of leniency on non-auth routes because auth routes keep a
+   logged counter beneath the throttler (WP1). The wake-up channel, whose only
+   message is "re-read this row", is `pg_notify()` sent and `LISTEN` held on
+   one dedicated connection per replica. What this buys is one dependency, one
+   backup, one readiness check and one connection string. What it costs is
+   named rather than hidden: one indexed write per request on the throttler
+   path in `multi`; one session-level connection per replica that a
+   transaction-mode pooler cannot carry (the startup scripts already have the
+   same requirement, `backend/src/common/db/advisory-locks.ts`); an 8000-byte
+   payload cap a wake-up never approaches; and notifications lost while a
+   listener reconnects, which the slow poll every waiter already runs absorbs.
 3. **One door per concern, behind a DI token, selected by config, memory by
    default.** Copy `ATTACHMENT_STORAGE_PROVIDER` in
    `backend/src/attachments/attachments.module.ts`: register every
@@ -115,25 +130,37 @@ no dedupe state and that the automatic backup writes with a bare
 
 | Variable | Values | Meaning |
 |---|---|---|
-| `CLUSTER_MODE` | `single` (default), `multi` | `multi` enables the Redis-backed throttler storage and event bus, adds the Redis probe to readiness, and turns on the boot refusals below. Parsed like `RLS_MODE`: an unknown value throws and refuses the boot |
-| `REDIS_URL` | `redis://` or `rediss://` URL | required in `multi`; ignored in `single` (a warning notes it is set but unused) |
-| `REDIS_KEY_PREFIX` | string, default `monize:` | lets one Redis serve several Monize deployments |
+| `CLUSTER_MODE` | `single` (default), `multi` | `multi` selects the table-backed throttler storage and the `LISTEN`/`NOTIFY` event bus, adds the listener connection to readiness, and turns on the boot refusals below. Parsed like `RLS_MODE`: an unknown value throws and refuses the boot |
 | `ATTACHMENT_SHARED_VOLUME` | `true` | operator assertion that `ATTACHMENT_CONTAINER_DIR` is a volume every replica mounts (ReadWriteMany or equivalent). Read only in `multi`, only when `ATTACHMENT_STORAGE_PROVIDER=local` |
 | `BACKUP_SHARED_VOLUME` | `true` | the same assertion for `BACKUP_CONTAINER_DIR` |
+
+No connection variable is added. The listener uses the same `DATABASE_*`
+settings and the same resolved runtime role as the TypeORM pool
+(`resolveRlsDatabaseAuth` in `backend/src/common/db/rls-config.ts`), because
+`LISTEN` and `pg_notify()` need no privilege the runtime role lacks. The
+constraint that comes with it is not new: `DATABASE_HOST` must reach a session,
+not a transaction-mode pooler, which `db-init` and `db-migrate` already require
+for the lifecycle lock. No key prefix is needed either: several Monize
+deployments on one PostgreSQL server are separate databases, and `NOTIFY` is
+scoped to the database. Task F1 shipped a `REDIS_URL` input to the boot matrix
+against the earlier draft; task F6 retires it.
 
 Boot matrix in `multi`:
 
 | Condition | Outcome |
 |---|---|
-| `REDIS_URL` absent, or `PING` fails at boot | refuse |
+| the listener connection cannot connect and `LISTEN` within 5 s at boot | refuse, naming the host (never the password) and that a transaction-mode pooler cannot carry `LISTEN` |
 | `ATTACHMENT_STORAGE_PROVIDER=local` without `ATTACHMENT_SHARED_VOLUME=true` | refuse, naming the `database` and `s3` providers as the alternatives |
 | automatic backups enabled and `BACKUP_SHARED_VOLUME` not `true` | refuse (until the S3 backup target ships, see WP7) |
 | `JWT_SECRET` absent | refuse (in every mode -- this is the CSRF trap above) |
 | `ENCRYPTION_KEY` absent | warn, as today; Web Push and the persisted OIDC keys stay unavailable |
 
-Readiness (`backend/src/health/health.controller.ts`) gains a Redis `PING` in
-`multi` only, so a replica that lost Redis leaves the load balancer instead of
-serving a throttler that counts nothing. Liveness stays dependency-free.
+Readiness (`backend/src/health/health.controller.ts`) gains the listener
+connection's state in `multi` only, so a replica whose wake-ups are dead leaves
+the load balancer until its reconnect succeeds, instead of holding SSE streams
+that only advance on the slow poll. The throttler needs no probe of its own: its
+table is on the pool the existing `SELECT 1` already checks. Liveness stays
+dependency-free.
 
 Every new variable lands in `.env.example` in the same PR;
 `scripts/check-env-docs.mjs` fails the `Documentation vs Manifests` job
@@ -151,10 +178,13 @@ New `backend/src/common/cluster/cluster-mode.ts` (`parseClusterMode`, the
 boot-matrix check as a pure function returning refusals and warnings) and a
 global `ClusterModule` (`backend/src/common/cluster/cluster.module.ts`, the
 two-provider shape of `backend/src/common/demo-mode.module.ts`) exposing the
-mode and, in `multi`, one shared `ioredis` client plus one dedicated subscriber
-connection. `main.ts` calls the check before `app.listen`. Readiness probe
-extension. `docs/cron-jobs.md` and the two stale doc sections corrected. ADR
-`0005` written when this lands (next free number in `docs/adr/README.md`).
+mode and, in `multi`, one dedicated `pg.Client` for `LISTEN` and `pg_notify()`
+(`PG_LISTENER`), opened the way `backend/src/db-init.ts` opens its lock
+connection but on the runtime role, `null` in `single`. `main.ts` calls the
+check before `app.listen`. Readiness probe extension. `docs/cron-jobs.md` and
+the two stale doc sections corrected. ADR `0005` written when this lands (next
+free number in `docs/adr/README.md`). The `REDIS_URL` input F1 shipped is
+retired first (task F6).
 
 Deploy impact: `none` for `single`.
 
@@ -193,20 +223,34 @@ concurrent claims of one TOTP code yield exactly one winner. Deploy impact:
 
 ### WP2 -- HTTP throttler storage
 
-`backend/src/common/throttler/redis-throttler-storage.ts` implementing
+`backend/src/common/throttler/postgres-throttler-storage.ts` implementing
 `@nestjs/throttler`'s `ThrottlerStorage` (`increment(key, ttl, limit, blockDuration, name)`)
-with a Lua script or `MULTI`/`INCR`/`PEXPIRE`, prefixed by `REDIS_KEY_PREFIX`.
-`ThrottlerModule.forRootAsync` selects it in `multi`; `single` keeps the
-library default. Auth routes are protected twice on purpose: the throttler is
-the cheap first gate, WP1's counters are the correctness gate. If Redis is
-unreachable at request time the storage fails **open** and logs once per
-minute (a closed throttler would take the whole API down with Redis, and the
-readiness probe already removes the replica).
+over a new `UNLOGGED` table
+`http_throttle_counters (name TEXT, key TEXT, hits INT, window_expires_at TIMESTAMPTZ, blocked_until TIMESTAMPTZ, PRIMARY KEY (name, key))`.
+`increment` is one statement, the `auth_attempt_counters` shape from WP1 with
+the block decision added: `INSERT ... ON CONFLICT (name, key) DO UPDATE SET hits = CASE WHEN window_expires_at < now() THEN 1 ELSE hits + 1 END, window_expires_at = CASE WHEN expired THEN now() + $ttl ELSE window_expires_at END, blocked_until = CASE WHEN <the same hits expression> > $limit THEN now() + $block ELSE blocked_until END RETURNING hits, window_expires_at, blocked_until`,
+so two replicas cannot double-count and the block is decided where the count
+is. `UNLOGGED` is the point: the rows are a cache, WAL for them is waste, and
+a crash truncating the table costs one window of leniency, the same as the
+cache restart the earlier draft accepted. The guard runs before
+`RequestContextInterceptor`, so there is no ambient identity; the storage seeds
+`withSystemContext` (a `WITH_CONTEXT_ALLOWLIST` entry, reviewed) and the table
+is RLS-exempt with no owner column, like WP1's. `ThrottlerModule.forRootAsync`
+selects it in `multi`; `single` keeps the library default and pays no write.
+Auth routes are protected twice on purpose: the throttler is the cheap first
+gate, WP1's counters are the correctness gate. If the statement fails at
+request time the storage fails **open** and logs once per minute (a closed
+throttler would turn a database blip into a 500 before the handler decides
+anything, and the readiness probe already removes a replica that lost its
+database). WP1's daily sweeper deletes expired rows; the primary key bounds
+the table to the number of distinct keys in the meantime.
 
-Invariant: INV-HA-001 (readiness). Tests: unit spec with an in-memory Redis
-double, plus one integration spec against the CI Redis service asserting the
-limit holds across two `ThrottlerStorage` instances sharing one server. Deploy
-impact: `multi-only`.
+Invariant: INV-HA-001 (readiness). Tests: unit spec with a mocked manager for
+the statement's shape and the fail-open path; a two-connection integration
+spec asserting the limit holds across two `ThrottlerStorage` instances over one
+database (the harness builds the table from entity metadata, which cannot say
+`UNLOGGED`; the spec asserts counting, not durability, so that changes
+nothing). Deploy impact: `multi-only`.
 
 ### WP3 -- AI action anti-replay
 
@@ -240,9 +284,25 @@ visible improvement for `single` (ID tokens survive restarts).
 `backend/src/common/events/event-bus.interface.ts` (`publish(channel, payload)`,
 `subscribe(channel, handler)`, `EVENT_BUS` token), with
 `backend/src/common/events/memory-event-bus.ts` (default) and
-`backend/src/common/events/redis-event-bus.ts` (one subscriber connection per
-process from `ClusterModule`, `psubscribe` on the prefix). Messages are wake-ups
-only -- `{ userId, promptId }` -- never the payload.
+`backend/src/common/events/postgres-event-bus.ts`. The PostgreSQL bus holds
+`LISTEN` on one channel per deployment (`monize_wakeups`) over the
+`PG_LISTENER` connection from `ClusterModule`, and fans each notification out
+to local subscribers by the exact channel named inside its JSON payload
+(`{ "channel": "relay:<userId>", "payload": { ... } }`). One `LISTEN` rather
+than one per subscriber, because a subscribe happens on every SSE open and
+`LISTEN`/`UNLISTEN` churn on the session would be the hot path. `publish` is
+`SELECT pg_notify($1, $2)` on that same dedicated connection, not on the pool:
+the message carries no tenant, so the RLS door is the wrong door for it (a
+statement that touches no table needs no identity GUC, and seeding one would
+widen an allowlist for nothing), and a connection outside every transaction
+sends when called, which is what the interface's after-commit rule means.
+That connection is the second sanctioned direct-connection path in
+`docs/row-level-security-contract.md`, written in its own words beside the
+OAuth adapter's. Messages are wake-ups only -- `{ userId, promptId }` -- never
+the payload; anything over 4 KB is refused (the server's cap is 8000 bytes).
+The listener reconnects with backoff and re-issues `LISTEN` on every connect;
+notifications sent in the gap are lost, which the slow poll every waiter runs
+already covers.
 
 The relay itself moves its queue to rows:
 
@@ -326,20 +386,23 @@ Deploy impact: `neutral`.
 - **Helm.** Backend and frontend become `Deployment`s (nothing about them is
   ordinal; a StatefulSet only slows rollouts). Values: `replicas`,
   `podDisruptionBudget.minAvailable`, `topologySpreadConstraints`, an optional
-  `autoscaling` block, `clusterMode`, `redis.url` (external) or a `redis`
-  subchart toggle, `persistence.*.accessMode: ReadWriteMany` guidance in
-  `helm/templates/NOTES.txt` when `clusterMode=multi` and the `local` provider
-  is chosen. `CLUSTER_MODE` and `REDIS_URL` in `helm/templates/configmap-backend.yaml`
-  (the URL through a Secret when it carries a password). The chart lint job
-  renders both modes.
+  `autoscaling` block, `clusterMode`, `persistence.*.accessMode: ReadWriteMany`
+  guidance in `helm/templates/NOTES.txt` when `clusterMode=multi` and the
+  `local` provider is chosen, and a `NOTES.txt` line that `multi` needs the
+  database host to be a session-capable endpoint (a transaction-mode pooler
+  cannot carry `LISTEN`). `CLUSTER_MODE` in
+  `helm/templates/configmap-backend.yaml`. The chart lint job renders both
+  modes.
 - **Compose.** A new `docker-compose.ha.yml` example with `deploy.replicas`,
-  no `container_name`, a `redis` service and a reverse proxy in front; the
-  production file is left as the single-replica reference.
-- **CI.** A digest-pinned `redis` service beside PostgreSQL in the
-  `backend-integration-tests` job of `.github/workflows/ci.yml` (the
-  `zizmor-scan` job requires the pin), `REDIS_URL` in that job's env; a `redis`
-  service in `docker-compose.e2e.yml` so one E2E shard runs with
-  `CLUSTER_MODE=multi` and two backend replicas behind the frontend proxy.
+  no `container_name` and a reverse proxy in front; the production file is left
+  as the single-replica reference. No new service: both replicas point at the
+  `postgres` service the file already has.
+- **CI.** Nothing to add. The two-connection and two-instance specs run
+  against the PostgreSQL service the `backend-integration-tests` job already
+  has. The `redis` service and `REDIS_URL` that task D3 added against the
+  earlier draft come out again (`.github/` is an ask-first change; D3 as now
+  written is the agreement). One E2E shard runs with `CLUSTER_MODE=multi` and
+  two backend replicas behind the frontend proxy in `docker-compose.e2e.yml`.
 
 Deploy impact: `none` for existing deployments (defaults unchanged).
 
@@ -369,7 +432,7 @@ lacks an ID). Proposed wording:
 
 | ID | Statement | Mechanism | Test kind |
 |---|---|---|---|
-| INV-HA-001 | A process in `CLUSTER_MODE=multi` serves traffic only while every replica-shared dependency it needs is reachable | boot refusal in `main.ts`; Redis `PING` in readiness | unit (boot matrix), E2E (readiness flips) |
+| INV-HA-001 | A process in `CLUSTER_MODE=multi` serves traffic only while every replica-shared dependency it needs is reachable | boot refusal in `main.ts`; the `LISTEN` connection's state in readiness | unit (boot matrix), E2E (readiness flips) |
 | INV-HA-002 | An authentication attempt budget is one number per deployment, not per process | `auth_attempt_counters` atomic upsert, the same shape as the existing `users.failed_login_attempts` increment | two connections |
 | INV-HA-003 | A single-use artifact (TOTP code, AI action descriptor, re-auth jti) is consumed at most once across all replicas | `single_use_tokens` primary key, `ON CONFLICT DO NOTHING RETURNING` | two connections |
 | INV-HA-004 | One deployment publishes one OIDC signing key set, stable across restarts | `oauth_instance_config` insert-as-arbiter | two instances |
@@ -396,7 +459,7 @@ lacks an ID). Proposed wording:
 |---|---|---|
 | 1 | WP0 (mode parsing and checks only), WP1, WP3, WP4, WP8 | `neutral`: same behaviour, durable across restarts; auth lockouts stop resetting on restart, ID tokens stop breaking on restart |
 | 2 | WP5 (relay rows + memory bus), WP6 | `neutral` |
-| 3 | WP2, WP5 (Redis bus), WP7 refusals, WP9 | `multi-only`: no effect unless `CLUSTER_MODE=multi` |
+| 3 | WP2, WP5 (PostgreSQL bus), WP7 refusals, WP9 | `multi-only`: no effect unless `CLUSTER_MODE=multi` |
 | 4 | WP7 S3 backup target | `none` until selected |
 
 Every task lands behind `CLUSTER_MODE=single` unchanged; the task list's
@@ -404,19 +467,31 @@ definition of done requires proving that.
 
 ## Open questions
 
-- **Redis topology.** `ioredis` handles Sentinel and Cluster URLs, but the
-  throttler's Lua script and the subscriber connection need testing against
-  each. First release: a single Redis or a Sentinel pair; Cluster later.
+- **A pooler in front of `DATABASE_HOST`.** `LISTEN` is session state, and a
+  transaction-mode pgBouncer does not carry it. The startup scripts already
+  require a session-capable endpoint under the same variables, so `multi`
+  adds no new requirement, only a second reason for it; the boot refusal
+  names it. Whether a separate direct endpoint for the listener alone
+  (`DATABASE_LISTEN_HOST` or similar) is worth a variable is decided when an
+  operator runs one, not before.
+- **Throttler write cost.** In `multi` every request the throttler guards
+  costs one upsert on an `UNLOGGED` table. If D4's shard or a real deployment
+  shows it on the pool, the fallback is the cheaper design, not a cache: let
+  the default 100-per-minute limiter count per replica (its budget is a soft
+  guardrail; every auth route carries WP1's deployment-wide counter beneath
+  it) and keep the table only for the routes with a `@Throttle` override.
+  Measure first.
 - **Cluster-wide restore admission.** The per-pod gate protects a pod's memory;
   N pods can each admit a restore. A `claimLease` per user around restore would
   add a cluster ceiling. Not needed for correctness.
 - **Frontend body buffer.** `frontend/src/proxy.ts` buffers the whole request
   body, so each frontend replica's memory request must still cover
   `MNY_IMPORT_LIMIT_MB + 8`. Document in the Helm values, no code.
-- **pgBouncer.** Nothing in this plan uses `LISTEN`/`NOTIFY` or session-level
-  locks on the runtime pool, so transaction-mode pooling stays possible for the
-  API; the startup scripts still need a direct connection for the lifecycle
-  lock, as `advisory-locks.ts` already states.
+- **pgBouncer and the runtime pool.** The pool itself still holds no session
+  state: every `LISTEN` and every `pg_notify()` lives on the one dedicated
+  connection above, so transaction-mode pooling stays possible for the API
+  provided that one connection, like the startup scripts' lock connection,
+  reaches PostgreSQL directly, as `advisory-locks.ts` already states.
 - **Should `multi` warn about the `database` attachment provider?** It is
   cluster-safe by construction, but large blobs on the primary are a scaling
   concern of a different kind. Warn, do not refuse.
