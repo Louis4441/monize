@@ -281,7 +281,6 @@ export function GroupedHoldingsList({
                           holding={holding}
                           defaultCurrency={defaultCurrency}
                           accountCurrency={account.currencyCode}
-                          getRate={getRate}
                           formatCurrency={formatCurrency}
                           formatCurrencyWithCode={formatCurrencyBase}
                           formatPrice={formatPrice}
@@ -393,7 +392,6 @@ interface HoldingRowProps {
   holding: HoldingWithMarketValue;
   defaultCurrency: string;
   accountCurrency: string;
-  getRate: (fromCurrency: string, toCurrency?: string) => number | null;
   formatCurrency: (value: number | null) => string;
   formatCurrencyWithCode: (value: number, currencyCode: string) => string;
   formatPrice: (value: number | null, currencyCode?: string) => string;
@@ -408,7 +406,6 @@ const HoldingRow = memo(function HoldingRow({
   holding,
   defaultCurrency,
   accountCurrency,
-  getRate,
   formatCurrency,
   formatCurrencyWithCode,
   formatPrice,
@@ -435,30 +432,36 @@ const HoldingRow = memo(function HoldingRow({
     return formatPrice(value);
   };
 
-  // Cost basis in account currency comes from the backend using historical
-  // exchange rates stored on each BUY transaction. Market value uses the
-  // current rate (shares are worth what the market says today), so the
-  // gain/loss line below it is derived from those two values — keeping the
-  // displayed rows aligned with the account total row beneath the table.
-  //
-  // Through getRate, not convert(): convert passes the amount through
-  // unchanged when the pair has no rate, so a EUR value rendered as
-  // "≈ ¥600 JPY" directly beside the account's Partial marker saying the
-  // value could not be worked out in JPY (review #1133). No rate means the
-  // account-currency value is unknown, and the ≈ sub-line stays absent like
-  // the backend's own costBasisAccountCurrency does.
-  const acctRate = isForeignToAccount
-    ? getRate(holding.currencyCode, accountCurrency)
-    : 1;
-  const marketValueAcct =
-    holding.marketValue !== null && acctRate !== null
-      ? holding.marketValue * acctRate
-      : null;
-  // Unknown basis makes the gain unknown, not equal to the market value.
+  // Both account-currency figures come from the backend, from the SAME
+  // valuation that produced the account and portfolio totals: the cost basis at
+  // the historical rates on each BUY, the market value at the server's live
+  // snapshot. Re-converting `marketValue` here with the client's own `getRate`
+  // was a SECOND FX for one snapshot -- the rows then disagreed with the total
+  // beneath them by the drift between the two rate tables. The account currency
+  // equals the security's when they match (1:1 by definition), otherwise the
+  // server's `marketValueAccountCurrency`, which is `null` when the pair had no
+  // rate: unknown, so the ≈ sub-line stays absent, never an implicit 1:1
+  // (review #1133).
+  const marketValueAcct = !isForeignToAccount
+    ? holding.marketValue
+    : holding.marketValueAccountCurrency ?? null;
+  // Unknown basis or unknown market value makes the gain unknown, not equal to
+  // the market value. Both sides are the server's, so their difference shares
+  // one snapshot too.
   const gainLossAcct =
     marketValueAcct !== null && holding.costBasisAccountCurrency !== null
       ? marketValueAcct - holding.costBasisAccountCurrency
       : null;
+
+  // The market value in the reporting currency the portfolio total is in, for
+  // the share of the portfolio: the security's own value when it already is
+  // that currency, otherwise the server's converted figure from the same
+  // snapshot as the total, never a client-side re-conversion. `null` when the
+  // pair is unresolved -- an unknown share, not a wrong-denominator percent.
+  const marketValueInDefault =
+    holding.currencyCode === defaultCurrency
+      ? holding.marketValue
+      : holding.marketValueDefaultCurrency ?? null;
 
   const fmtAcctConverted = (value: number | null) => {
     if (value === null || !isForeignToAccount) return null;
@@ -532,7 +535,9 @@ const HoldingRow = memo(function HoldingRow({
       </td>
       <td role="cell" className={`col-start-4 row-start-2 text-gray-500 dark:text-gray-400 ${FIGURE_CELL}`}>
         <CellLabel className={CAPTION_CLASS}>{t('groupedHoldings.portfolioPercentColumn')}</CellLabel>
-        {getPortfolioPercent(holding.marketValue, holding.currencyCode)}
+        {/* The value is already in the reporting currency, so no code is passed
+            -- getPortfolioPercent must not re-convert it against a second rate. */}
+        {getPortfolioPercent(marketValueInDefault)}
       </td>
     </tr>
   );

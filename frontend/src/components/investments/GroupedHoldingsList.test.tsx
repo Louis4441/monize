@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@/test/render';
+import { render, screen, fireEvent, within } from '@/test/render';
 import { GroupedHoldingsList } from './GroupedHoldingsList';
 
 vi.mock('@heroicons/react/24/outline', async (importOriginal) => {
@@ -179,24 +179,23 @@ describe('GroupedHoldingsList', () => {
     expect(screen.queryByText('XEQT')).not.toBeInTheDocument();
   });
 
-  it('shows account-currency converted values for foreign securities', () => {
-    // CAD brokerage holding a USD security. Cost basis in the account's
-    // currency comes from the backend (historical exchange rates), while
-    // market value still uses the current rate since shares are worth what
-    // the market says today. Gain/loss is derived from those two values.
-    //
-    // Historical cost basis: 1000 USD was bought when rate was 1.25 -> 1250 CAD
-    // Current market rate (from mock): USD->CAD @ 1.35 -> market value 2025 CAD
-    // Gain/loss in CAD = 2025 - 1250 = 775
+  it('shows the server-converted account-currency values for foreign securities', () => {
+    // CAD brokerage holding a USD security. Both account-currency figures come
+    // from the backend, from the SAME valuation that produced the totals: the
+    // cost basis at the historical rates, the market value at the server's live
+    // snapshot. The row must NOT re-convert `marketValue` with the client's own
+    // `getRate` (that was a second FX for one snapshot). The mock's USD->CAD is
+    // 1.35, so a client conversion would read 1500 * 1.35 = 2025; the server's
+    // snapshot says 2020, and 2020 is what the row shows.
     const holdingsByAccount = [
       {
         accountId: 'a1',
         accountName: 'CAD Brokerage',
         currencyCode: 'CAD',
-        totalMarketValue: 2025,
+        totalMarketValue: 2020,
         totalCostBasis: 1250,
-        totalGainLoss: 775,
-        totalGainLossPercent: 62,
+        totalGainLoss: 770,
+        totalGainLossPercent: 61.6,
         cashBalance: 0,
         holdings: [
           {
@@ -209,6 +208,8 @@ describe('GroupedHoldingsList', () => {
             costBasis: 1000,
             costBasisAccountCurrency: 1250,
             marketValue: 1500,
+            marketValueAccountCurrency: 2020,
+            marketValueDefaultCurrency: 2020,
             gainLoss: 500,
             gainLossPercent: 50,
             currencyCode: 'USD',
@@ -221,7 +222,7 @@ describe('GroupedHoldingsList', () => {
       <GroupedHoldingsList
         holdingsByAccount={holdingsByAccount}
         isLoading={false}
-        totalPortfolioValue={2025}
+        totalPortfolioValue={2020}
       />,
     );
 
@@ -230,18 +231,21 @@ describe('GroupedHoldingsList', () => {
     expect(screen.getByText(/USD \$1500\.00 USD/)).toBeInTheDocument(); // market value
     expect(screen.getByText(/USD \$500\.00 USD/)).toBeInTheDocument(); // gain/loss
 
-    // Cost basis uses the historical account-currency value from the backend
-    // (1250 CAD), not the current-rate conversion (which would be 1350 CAD).
+    // Cost basis uses the historical account-currency value from the backend.
     expect(
       screen.getByText(/\u2248 CAD \$1250\.00 CAD/),
     ).toBeInTheDocument();
-    // Market value uses the current rate (1500 USD * 1.35 = 2025 CAD)
+    // Market value uses the SERVER snapshot (2020 CAD), not the client's rate
+    // (which would read 2025 CAD).
     expect(
-      screen.getByText(/\u2248 CAD \$2025\.00 CAD/),
+      screen.getByText(/\u2248 CAD \$2020\.00 CAD/),
     ).toBeInTheDocument();
-    // Gain/loss in CAD is derived: 2025 - 1250 = 775 CAD
     expect(
-      screen.getByText(/\u2248 CAD \$775\.00 CAD/),
+      screen.queryByText(/\u2248 CAD \$2025\.00 CAD/),
+    ).not.toBeInTheDocument();
+    // Gain/loss in CAD is derived from the two server figures: 2020 - 1250 = 770.
+    expect(
+      screen.getByText(/\u2248 CAD \$770\.00 CAD/),
     ).toBeInTheDocument();
   });
 
@@ -632,5 +636,136 @@ describe('GroupedHoldingsList', () => {
     // This holding is 100% of the KNOWN subtotal; presenting that as its share
     // of the portfolio is exactly the subtotal-as-total mistake.
     expect(screen.queryByText('100.0%')).not.toBeInTheDocument();
+  });
+
+  // The holding rows and the account/portfolio total must convert from ONE
+  // snapshot -- the server's, the one that produced the total. Re-converting a
+  // row's `marketValue` with the client's live `getRate` was a second FX, so
+  // the rows did not sum to the total and a row's share used a denominator in a
+  // different snapshot from its numerator (audit of #1397, point 9).
+  describe('one FX snapshot for a holding and the total (point 9)', () => {
+    it('reads the server-converted amount, not a divergent client rate', () => {
+      // The mock resolves USD->CAD at 1.35, so a client conversion of the
+      // 1500 USD market value would read 2025 CAD and a share of 2025/3600 =
+      // 56.3%. The server's snapshot says 1800 CAD -- a deliberately different
+      // rate -- and 1800 is what both the row and its share must use, so the
+      // row agrees with the total the same snapshot produced.
+      const holdingsByAccount = [
+        {
+          accountId: 'a1',
+          accountName: 'CAD Brokerage',
+          currencyCode: 'CAD',
+          totalMarketValue: 1800,
+          totalCostBasis: 1250,
+          totalGainLoss: 550,
+          totalGainLossPercent: 44,
+          cashBalance: 0,
+          holdings: [
+            {
+              id: 'h1',
+              securityId: 'sec-aapl',
+              symbol: 'AAPL',
+              name: 'Apple Inc.',
+              quantity: 10,
+              averageCost: 100,
+              currentPrice: 150,
+              costBasis: 1000,
+              costBasisAccountCurrency: 1250,
+              marketValue: 1500,
+              marketValueAccountCurrency: 1800,
+              marketValueDefaultCurrency: 1800,
+              gainLoss: 500,
+              gainLossPercent: 50,
+              currencyCode: 'USD',
+            },
+          ],
+        },
+      ] as any[];
+
+      render(
+        <GroupedHoldingsList
+          holdingsByAccount={holdingsByAccount}
+          isLoading={false}
+          totalPortfolioValue={3600}
+        />,
+      );
+
+      const row = screen
+        .getAllByRole('row')
+        .find((r) => r.textContent?.includes('AAPL'))!;
+      // The security-currency value is still shown (a real, different number).
+      expect(row.textContent).toContain('USD $1500.00 USD');
+      // The account-currency line is the server's 1800, never the client's 2025.
+      expect(screen.getByText(/≈ CAD \$1800\.00 CAD/)).toBeInTheDocument();
+      expect(
+        screen.queryByText(/≈ CAD \$2025\.00 CAD/),
+      ).not.toBeInTheDocument();
+      // Share of portfolio: 1800 / 3600 = 50.0%, not the client rate's
+      // 2025 / 3600 = 56.3%.
+      const portCell = within(row).getAllByRole('cell').at(-1)!;
+      expect(portCell.textContent).toContain('50.0%');
+      expect(portCell.textContent).not.toContain('56.3%');
+    });
+
+    it('renders an unresolved pair as unknown, not a wrong-denominator percent', () => {
+      // The server could not convert this holding's pair, so its account- and
+      // reporting-currency values are null. The client's own rate for the pair
+      // WOULD resolve (USD->CAD 1.35 in the mock), so the old code would have
+      // computed a share from 1500 * 1.35 / 6000 = 33.8%. Reading the server's
+      // null instead, the share is unknown ('-') -- not a wrong-denominator
+      // percent from a second, divergent rate.
+      const holdingsByAccount = [
+        {
+          accountId: 'a1',
+          accountName: 'CAD Brokerage',
+          currencyCode: 'CAD',
+          cashBalance: 0,
+          totalMarketValue: 0,
+          totalCostBasis: 0,
+          totalGainLoss: 0,
+          totalGainLossPercent: 0,
+          holdings: [
+            {
+              id: 'h1',
+              securityId: 'sec-aapl',
+              symbol: 'AAPL',
+              name: 'Apple Inc.',
+              securityType: 'ETF',
+              quantity: 10,
+              averageCost: 100,
+              currentPrice: 150,
+              costBasis: 1000,
+              costBasisAccountCurrency: null,
+              marketValue: 1500,
+              marketValueAccountCurrency: null,
+              marketValueDefaultCurrency: null,
+              gainLoss: 500,
+              gainLossPercent: 50,
+              currencyCode: 'USD',
+            },
+          ],
+        },
+      ] as any[];
+
+      render(
+        <GroupedHoldingsList
+          holdingsByAccount={holdingsByAccount}
+          isLoading={false}
+          totalPortfolioValue={6000}
+        />,
+      );
+
+      const row = screen
+        .getAllByRole('row')
+        .find((r) => r.textContent?.includes('AAPL'))!;
+      // The security-currency value is still shown.
+      expect(row.textContent).toContain('USD $1500.00 USD');
+      // No account-currency approximation (the server's converted value is null).
+      expect(screen.queryByText(/≈/)).not.toBeInTheDocument();
+      // The share of portfolio is unknown, never the client-rate 33.8%.
+      const portCell = within(row).getAllByRole('cell').at(-1)!;
+      expect(portCell.textContent).toContain('-');
+      expect(portCell.textContent).not.toMatch(/\d/);
+    });
   });
 });

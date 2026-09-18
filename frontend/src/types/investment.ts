@@ -171,6 +171,28 @@ export interface HoldingWithMarketValue {
   costBasisAccountCurrency: number | null;
   currentPrice: number | null;
   marketValue: number | null;
+  /**
+   * `marketValue` converted into the holding account's currency by the SAME
+   * server valuation that produced the account and portfolio totals, so a row
+   * and the total it belongs to share one FX snapshot. Reading it, rather than
+   * re-converting `marketValue` with the client's live `getRate`, is what keeps
+   * the rows summing to the account total (a second client-side rate made the
+   * rows disagree with the summary by the FX drift between the two snapshots).
+   *
+   * `null` when the pair had no rate -- unknown, not the unconverted figure and
+   * never an implicit 1:1. Optional for the rolling-deploy reason
+   * `costBasisAccountCurrency` gives: absent is no information, so a foreign
+   * holding's account-currency line stays absent rather than reaching for a
+   * second rate.
+   */
+  marketValueAccountCurrency?: number | null;
+  /**
+   * `marketValue` converted into the user's default (reporting) currency by the
+   * same server valuation that produced `totalPortfolioValue`, so the share of
+   * the portfolio has one numerator and denominator in one currency from one
+   * snapshot. `null`/absent read as unknown, exactly as above.
+   */
+  marketValueDefaultCurrency?: number | null;
   gainLoss: number | null;
   gainLossPercent: number | null;
 }
