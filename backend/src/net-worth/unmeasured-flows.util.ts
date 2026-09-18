@@ -120,10 +120,14 @@ export function externallySettledTradesSql(perDay: boolean): string {
  * in the value change and in no flow.
  */
 export function mixedSplitParentsSql(perDay: boolean): string {
+  // Its own parameter list ($1..$4), not the settled-trade statement's: a
+  // statement that named $5 without ever naming $4 left PostgreSQL unable to
+  // infer $4's type and refused at PARSE ("could not determine data type of
+  // parameter $4"), which no mocked-query spec could see.
   return `SELECT ${dayColumn(perDay, "t")}COUNT(*) AS count
            FROM transactions t
           WHERE t.user_id = $1
-            AND t.account_id = ANY($5::UUID[])
+            AND t.account_id = ANY($4::UUID[])
             AND ${LEDGER_TOP_LEVEL_ONLY}
             AND t.transaction_date > $2
             AND t.transaction_date <= $3
@@ -150,11 +154,19 @@ export async function loadUnmeasuredFlowRows(
   options: UnmeasuredFlowOptions,
 ): Promise<UnmeasuredFlowRows> {
   const perDay = options.perDay === true;
-  const params: unknown[] = [
+  const settledParams: unknown[] = [
     options.userId,
     options.afterDate,
     options.throughDate,
     options.scope,
+    options.cashScope,
+  ];
+  // Every placeholder a statement carries is bound, and nothing more: an
+  // unreferenced parameter is a type PostgreSQL cannot infer.
+  const mixedParams: unknown[] = [
+    options.userId,
+    options.afterDate,
+    options.throughDate,
     options.cashScope,
   ];
 
@@ -167,8 +179,8 @@ export async function loadUnmeasuredFlowRows(
     }));
 
   const [settled, mixed] = await Promise.all([
-    query(externallySettledTradesSql(perDay), params),
-    query(mixedSplitParentsSql(perDay), params),
+    query(externallySettledTradesSql(perDay), settledParams),
+    query(mixedSplitParentsSql(perDay), mixedParams),
   ]);
 
   return {
