@@ -1,0 +1,29 @@
+{{- if .Values.backend.podDisruptionBudget.enabled }}
+{{- /*
+  What keeps a voluntary disruption -- a node drain, a cluster upgrade, a
+  descheduler -- from taking every replica at once. Kubernetes will not evict
+  past this, so the rollout the operator did not schedule is held to the same
+  availability the rollout they did schedule already has.
+
+  Deliberately not enabled by default: at replicas: 1 a PDB with
+  minAvailable: 1 makes a node drain block forever rather than briefly
+  interrupt the service, which is a worse surprise than the interruption. It is
+  turned on with the replica count, and helm/README.md says so.
+*/}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: monize-backend
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "monize.backend.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.backend.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.backend.podDisruptionBudget.maxUnavailable }}
+  {{- else }}
+  minAvailable: {{ .Values.backend.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "monize.backend.selectorLabels" . | nindent 6 }}
+{{- end }}

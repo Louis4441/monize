@@ -68,7 +68,7 @@ What remains, in severity order:
 | Startup | `backend/docker-entrypoint.sh` runs the demo seed **after** `db-migrate` releases the lifecycle lock | two demo pods can both fail `db-demo-check` and both seed |
 | Duplication (cost, not data) | `backend/src/currencies/exchange-rate.service.ts` (`onModuleInit` sweep and the 17:05 cron), `backend/src/securities/security-price.service.ts`, `backend/src/securities/market-index.service.ts`, `backend/src/updates/updates.service.ts` | N provider fetches per tick and per rollout; the writes are natural-key upserts, so data stays right |
 | Duplication (a counted error) | `backend/src/budgets/budget-period-cron.service.ts` | no claim; the loser's 23505 on `UNIQUE(budget_id, period_start)` is caught and counted as a failure |
-| Deployment | `helm/templates/statefulset-backend.yaml`, `helm/templates/statefulset-frontend.yaml`, `helm/templates/service-backend.yaml`, `docker-compose.prod.yml` | `replicas: 1`, no PodDisruptionBudget, no spread constraints, no HPA, no `sessionAffinity`; compose pins `container_name`, so it cannot replicate at all |
+| Deployment (compose only; the chart is done) | `docker-compose.prod.yml` | compose pins `container_name`, so it cannot replicate at all. The chart's half closed at task D1: `helm/templates/deployment-backend.yaml` and `helm/templates/deployment-frontend.yaml` replaced the StatefulSets, with PodDisruptionBudgets, spread constraints, an optional HPA and `cluster.mode` |
 
 One latent trap to close on the way: `backend/src/common/csrf.util.ts` keeps a
 per-process random `FALLBACK_KEY` that is reached only when `JWT_SECRET` is

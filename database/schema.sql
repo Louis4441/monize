@@ -2287,6 +2287,24 @@ CREATE TABLE auth_attempt_counters (
 CREATE INDEX idx_auth_attempt_counters_expiry
     ON auth_attempt_counters(window_expires_at);
 
+-- The HTTP throttler's counters in CLUSTER_MODE=multi, so a rate limit is one
+-- budget per deployment rather than one per process. UNLOGGED on purpose: the
+-- rows are a cache, written on every guarded request and meaningless once their
+-- window passes, so crash-truncation costs one window of leniency and WAL for
+-- them would be waste. `single` never writes here -- it keeps the library's
+-- in-process Map.
+CREATE UNLOGGED TABLE http_throttle_counters (
+    name TEXT NOT NULL,
+    key TEXT NOT NULL,
+    hits INTEGER NOT NULL,
+    window_expires_at TIMESTAMPTZ NOT NULL,
+    blocked_until TIMESTAMPTZ,
+    PRIMARY KEY (name, key)
+);
+
+CREATE INDEX idx_http_throttle_counters_expiry
+    ON http_throttle_counters(window_expires_at);
+
 -- One-shot claims: a TOTP code, a confirmed AI action descriptor. The claim is
 -- the INSERT, so the winner is decided by the primary key rather than by a
 -- read the loser also passed.
@@ -3448,6 +3466,7 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- rls-exempt: exchange_rates
 -- rls-exempt: fetch_sync
 -- rls-exempt: google_places_instance_usage
+-- rls-exempt: http_throttle_counters
 -- rls-exempt: market_index_prices
 -- rls-exempt: market_index_sync
 -- rls-exempt: oauth_instance_config

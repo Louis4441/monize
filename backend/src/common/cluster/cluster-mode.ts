@@ -67,10 +67,28 @@ export function getClusterMode(): ClusterMode {
   return parseClusterMode(process.env.CLUSTER_MODE);
 }
 
+/**
+ * An operator's assertion that a container directory is one every replica
+ * mounts. Compared as the string it is, per the numeric/boolean env rule.
+ */
+const SHARED_VOLUME_ASSERTED = "true";
+
 /** The subset of the environment the boot matrix reads. */
 export interface ClusterBootEnv {
   CLUSTER_MODE?: string;
   JWT_SECRET?: string;
+  /** `database` (default), `local` or `s3`; see `attachments.module.ts`. */
+  ATTACHMENT_STORAGE_PROVIDER?: string;
+  /** Where the `local` provider writes. Named in the refusal, never parsed. */
+  ATTACHMENT_CONTAINER_DIR?: string;
+  /** The deprecated alias for the above; both name the same directory. */
+  ATTACHMENT_LOCAL_DIR?: string;
+  /** `true` asserts `ATTACHMENT_CONTAINER_DIR` is mounted by every replica. */
+  ATTACHMENT_SHARED_VOLUME?: string;
+  /** Where automatic backups are written. Named in the refusal, never parsed. */
+  BACKUP_CONTAINER_DIR?: string;
+  /** `true` asserts `BACKUP_CONTAINER_DIR` is mounted by every replica. */
+  BACKUP_SHARED_VOLUME?: string;
 }
 
 export interface ClusterBootReport {
@@ -91,11 +109,17 @@ export interface ClusterBootReport {
  * crash-looping container should need one restart, not one per missing
  * variable.
  *
- * What it deliberately does not cover: anything that needs a connection (in
- * `multi`, that the database host can hold the `LISTEN` each replica keeps --
- * a transaction-mode pooler cannot) or a module's own configuration (which
- * attachment and backup providers are selected). Those are checks the later
- * work packages add here, fed from values their modules resolve.
+ * What it deliberately does not cover: anything that needs a connection. In
+ * `multi`, that the database host can actually hold the `LISTEN` each replica
+ * keeps -- a transaction-mode pooler cannot -- is checked in `main.ts` once the
+ * listener is built, because it takes a round trip.
+ *
+ * The storage checks below are the other half of what `multi` needs, and they
+ * are assertions rather than measurements: no process can see from the inside
+ * whether the directory under its mount point is the same directory another pod
+ * sees. So the operator states it, and the refusal exists to make sure they
+ * state it knowingly rather than discover it from a restore that cannot find
+ * its bytes.
  */
 export function checkClusterBoot(env: ClusterBootEnv): ClusterBootReport {
   const refusals: string[] = [];
@@ -126,6 +150,59 @@ export function checkClusterBoot(env: ClusterBootEnv): ClusterBootReport {
         "keys, so a server without it cannot protect a request. Generate one " +
         'with "openssl rand -base64 32" and set JWT_SECRET.',
     );
+  }
+
+  if (mode === "multi") {
+    // Attachments. `local` writes one file per attachment to a container path;
+    // on a second pod that path is a different disk, so an upload served by one
+    // replica 404s from the other. The chart mounts a ReadWriteOnce claim,
+    // which a second pod on another node cannot even attach.
+    const provider = (env.ATTACHMENT_STORAGE_PROVIDER ?? "database")
+      .trim()
+      .toLowerCase();
+    const attachmentDir =
+      env.ATTACHMENT_CONTAINER_DIR?.trim() ||
+      env.ATTACHMENT_LOCAL_DIR?.trim() ||
+      "/data/attachments";
+    if (
+      provider === "local" &&
+      env.ATTACHMENT_SHARED_VOLUME?.trim() !== SHARED_VOLUME_ASSERTED
+    ) {
+      refusals.push(
+        `ATTACHMENT_STORAGE_PROVIDER=local writes attachment bytes to ` +
+          `${attachmentDir}, which a second replica cannot read unless every ` +
+          "replica mounts that same directory (ReadWriteMany or equivalent). " +
+          "Set ATTACHMENT_SHARED_VOLUME=true to assert that it does, or use " +
+          "ATTACHMENT_STORAGE_PROVIDER=database (cluster-safe by " +
+          "construction) or =s3.",
+      );
+    }
+    if (provider === "database") {
+      warnings.push(
+        "CLUSTER_MODE=multi with ATTACHMENT_STORAGE_PROVIDER=database is " +
+          "cluster-safe, and every replica reads the same bytes. Note that it " +
+          "puts attachment blobs on the primary, which is a scaling concern of " +
+          "a different kind: the s3 provider keeps them off it.",
+      );
+    }
+
+    // Backups. Unlike attachments there is no provider to choose yet -- the
+    // automatic backup always writes to the filesystem -- and whether any user
+    // has switched theirs on is a row, not an environment variable, so the
+    // check cannot be conditional on it. The refusal is therefore
+    // unconditional in `multi` until the S3 backup target ships (plan task S2).
+    const backupDir = env.BACKUP_CONTAINER_DIR?.trim() || "/data/backups";
+    if (env.BACKUP_SHARED_VOLUME?.trim() !== SHARED_VOLUME_ASSERTED) {
+      refusals.push(
+        `CLUSTER_MODE=multi writes automatic backups to ${backupDir} on ` +
+          "whichever replica runs the hourly job, and a restore served by " +
+          "another replica cannot find them. Automatic backups are enabled " +
+          "per user, so no setting here says whether any exist. Mount that " +
+          "directory on every replica (ReadWriteMany, or a single-host volume " +
+          "under docker compose, where it is shared by definition) and set " +
+          "BACKUP_SHARED_VOLUME=true.",
+      );
+    }
   }
 
   return { mode, refusals, warnings };

@@ -78,6 +78,11 @@ const WITH_CONTEXT_ALLOWLIST = [
   // claims table that belongs to no single user, from cron entry points with no
   // request to inherit an identity from -- system context by construction.
   "src/common/jobs/job-claim.service.ts",
+  // The HTTP throttler's counters in CLUSTER_MODE=multi. ThrottlerGuard runs
+  // before RequestContextInterceptor, so there is no request identity to
+  // inherit, and http_throttle_counters has no owner column to establish one
+  // for -- system context by construction (task T1).
+  "src/common/throttler/postgres-throttler-storage.ts",
   // Joint category creation: the owner-scoped write window for a grantee who
   // holds the delegation's categories-can-create capability, opened only after
   // JointCategoriesService has decided authorization in full.

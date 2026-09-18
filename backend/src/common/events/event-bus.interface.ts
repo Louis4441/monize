@@ -5,9 +5,9 @@
  * response to one is to go and look at the database; it must never act on the
  * payload itself. Two reasons, and both have teeth:
  *
- * - **The bus can lose a message.** Redis pub/sub is fire-and-forget, a
- *   subscriber reconnecting after a Redis restart misses everything sent while
- *   it was away, and no delivery is acknowledged. A reader that treats a
+ * - **The bus can lose a message.** `NOTIFY` is fire-and-forget, a replica
+ *   whose `LISTEN` connection is reconnecting misses everything sent while it
+ *   was away, and PostgreSQL acknowledges no delivery. A reader that treats a
  *   wake-up as the notification waits forever for one that was dropped, so
  *   every waiter also polls on a slow timer and the wake-up only shortens the
  *   wait.
@@ -20,14 +20,14 @@
  *   whole of what belongs here.
  *
  * `MemoryEventBus` is the implementation in `CLUSTER_MODE=single`, where the
- * only subscriber is in the publishing process. `RedisEventBus` (task R6)
- * replaces it in `multi`.
+ * only subscriber is in the publishing process. `PostgresEventBus` replaces it
+ * in `multi`, over the one `LISTEN` connection each replica holds.
  *
  * `docs/future-plans/horizontal-scaling.md` has the work this supports.
  */
 export interface EventBus {
   /** Which implementation this is. Logged at boot and asserted in specs. */
-  readonly name: "memory" | "redis";
+  readonly name: "memory" | "postgres";
 
   /**
    * Wake every subscriber of `channel`.

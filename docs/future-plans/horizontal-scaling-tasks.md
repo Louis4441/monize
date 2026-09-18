@@ -91,10 +91,10 @@
 | R3 | Relay queue on rows: insert, claim, answer; in-memory queue maps removed | R1, R2 | neutral | [x] |
 | R4 | Late answers, buffered actions and agent liveness on rows; remaining maps removed | R3 | neutral | [x] |
 | R5 | Relay attachments on rows (not the storage provider -- see its Notes) | R3 | neutral | [x] |
-| R6 | `PostgresEventBus`; selected in `multi`; two-instance spec | F2, R1 | multi-only | [ ] |
-| T1 | Migration `http_throttle_counters`; `PostgresThrottlerStorage`; selected in `multi`; fail-open | F2 | multi-only | [ ] |
+| R6 | `PostgresEventBus`; selected in `multi`; two-instance spec | F2, R1 | multi-only | [x] |
+| T1 | Migration `http_throttle_counters`; `PostgresThrottlerStorage`; selected in `multi`; fail-open | F2 | multi-only | [x] |
 | M1 | MCP 2025-era sessions: persisted rows or documented sticky routing | F1 | none | [x] |
-| S1 | Boot refusals in `multi` for per-pod attachments and backups | F1 | multi-only | [ ] |
+| S1 | Boot refusals in `multi` for per-pod attachments and backups | F1 | multi-only | [x] |
 | S2 | S3 backup target for automatic backups | -- | none until selected | [ ] |
 | C1 | `claimOnce` per owner and month around budget period rollover | -- | neutral | [x] |
 | C2 | Deployment-wide `fetch_sync` lease around FX, security price and market index fetches | -- | neutral | [x] |
@@ -102,8 +102,8 @@
 | C4 | Demo seed under the lifecycle advisory lock | -- | neutral (demo only) | [x] |
 | G1 | Whole-tree process-local-state guard with allowlist | A4, X1, R4 | none | [ ] |
 | G2 | `INV-HA-001..005` in both contract docs | A3, K1, R3, S1 | none | [ ] |
-| D1 | Helm: Deployments, PDB, spread, autoscaling, `clusterMode` | F2 | none (defaults unchanged) | [ ] |
-| D2 | `docker-compose.ha.yml` example | F2 | none | [ ] |
+| D1 | Helm: Deployments, PDB, spread, autoscaling, `clusterMode` | F2 | none (defaults unchanged) | [x] |
+| D2 | `docker-compose.ha.yml` example | F2 | none | [x] |
 | D3 | CI: retire the `redis` service and `REDIS_URL` from the integration job | -- | none | [x] |
 | D4 | E2E: one shard on `CLUSTER_MODE=multi` with two backends | R6, T1, D1 | none | [ ] |
 
@@ -1204,7 +1204,7 @@ the TTL plus the sweep bound a table.
 
 ### R6 -- `PostgresEventBus`
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `backend/src/common/events/postgres-event-bus.ts` (new) + spec,
 `backend/src/common/events/event-bus.module.ts`,
@@ -1259,9 +1259,57 @@ one fixed channel and put the routing in the payload.
 
 **Notes:**
 
+**`UNLISTEN` is global to the session, which is why `subscribe` does not touch
+the connection at all.** One `LISTEN monize_wakeups` is issued for the life of
+the process and every subscribe and unsubscribe is a local map operation. Per
+subscriber channels would have been the obvious design and are wrong twice
+over: a subscribe happens on every SSE open and every agent long-poll, so the
+churn would be on the hot path, and one request's `UNLISTEN` would deafen every
+other request sharing that session. The cost is that each replica hears every
+wake-up and drops the ones it has no subscriber for -- a string comparison per
+replica, against a volume bounded by how often a person sends a chat message.
+
+**The `EventBusModule` factory refuses rather than falling back.** A `multi`
+deployment with no `PG_LISTENER` is a wiring defect, not a mode, and quietly
+returning `MemoryEventBus` there would leave every SSE stream on its slow poll
+with nothing in the log saying why. `main.ts` already refuses the boot before
+this is reached, so the throw is a second wall.
+
+**The bus subscribes to the connection in its constructor, not in `start()`.**
+`main.ts` issues the same `LISTEN` as its boot check, so the two race; a bus
+that only wired its handler in `start()` could miss a notification that arrived
+first. `start()` is therefore just the idempotent `listen()` call, kept so a bus
+constructed in a spec or a script is not silently deaf. A spec asserts delivery
+without `start()` ever being called.
+
+**The size limit is measured in bytes.** PostgreSQL's cap is 8000 bytes, the
+bus refuses at 4096, and `Buffer.byteLength` rather than `String.length` is
+what makes a multi-byte payload fail here with a message naming the rule rather
+than at the server with a `22023`.
+
+**Three comments that named Redis were rewritten, not just re-pointed**:
+`event-bus.interface.ts` (the reason a message can be lost is now a listener
+reconnecting, which is the mechanism that actually applies), `memory-event-bus.ts`
+(both its allowlist reason and its next-microtask rationale) and
+`wake-signal.ts`. The `name` literal is `"memory" | "postgres"`. The relay
+spec's two rejected-publish cases spelled their error `"redis unreachable"`;
+they now spell what `PgListener.notify` actually throws.
+
+**The reconnect case in the integration spec kills by `application_name`.** The
+two listeners set one at connect, so `pg_terminate_backend` finds exactly them
+and leaves the rest of the suite's pools alone. Matching on `query` -- the
+obvious alternative -- holds whichever statement ran last on that session, which
+is `SELECT pg_notify(...)` as often as it is `LISTEN`. Both sessions are
+dropped together, which is what a database restart looks like from here, and
+the assertion that matters is not that the connection came back but that its
+`LISTEN` came back with it.
+
+**For G1:** `PostgresEventBus.handlers` is process-local by design, the same as
+`MemoryEventBus.handlers`: it describes the requests this replica is serving.
+
 ### T1 -- `PostgresThrottlerStorage`
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** one migration + `database/schema.sql` (`http_throttle_counters`),
 `backend/src/common/throttler/http-throttle-counter.entity.ts` (new),
@@ -1334,6 +1382,57 @@ failover starts with an empty table, one window of leniency, which is the
 documented cost, not a defect.
 
 **Notes:**
+
+**Scope additions**, each with its reason:
+`backend/src/common/throttler/throttler-storage.module.ts` (new -- see below);
+`backend/src/common/throttler/http-throttle-counter.entity.ts` (the integration
+harness builds its schema from entity metadata, so a table with no entity does
+not exist there); this task list.
+
+**`forRootAsync` needs the storage in a module it imports.** It resolves its
+`inject` list inside the dynamic module it builds, so a provider declared
+beside it in `AppModule`'s own `providers` is out of scope there and the
+failure is a boot-time "Nest can't resolve dependencies" naming a class that is
+plainly present. Hence a one-provider `ThrottlerStorageModule` passed as
+`imports`. `CLUSTER_MODE` needs no import -- `ClusterModule` is `@Global`.
+
+**`ThrottlerStorageRecord` is not exported from the package barrel.** Reaching
+`@nestjs/throttler/dist/throttler-storage-record.interface` is the deep-path
+shape that type-checks under `tsc` and then fails to resolve under `ts-jest`,
+which is why `ScopedDbIsolation` is spelled out in `scoped-db.ts`. The return
+type is therefore a local `ThrottleRecord` interface; TypeScript is structural,
+so `implements ThrottlerStorage` still checks it against the library's own
+signature and a field renamed upstream fails the build.
+
+**The block semantics are the library's, deliberately.** A blocked key stops
+accumulating hits until the block lapses, and a lapsed block resets the count
+to one. Letting hits keep climbing would turn a fixed sentence into an
+indefinite one for a client that keeps retrying -- a different control from the
+one the `@Throttle` decorators describe. The integration spec asserts both.
+
+**Three `CASE` expressions repeat one guard sequence** (blocked / block lapsed
+/ window expired / otherwise) because a `SET` list cannot read the value it is
+assigning, so "what are the hits now" has to be spelled once per column. The
+statement is the mechanism, so it is one statement: a read then a write lets
+two replicas each see "4 of 5" and both allow the fifth.
+
+**The sweeper spares a blocked row.** Its predicate is
+`window_expires_at < now() AND (blocked_until IS NULL OR blocked_until < now())`:
+a key whose window has passed but whose block has not is still serving a
+refusal, and deleting it would hand a blocked client a clean count. That is the
+one way a garbage collector could weaken a limit, so the integration spec runs
+the sweeper's exact predicate and asserts both directions.
+
+**`verify-schema.sh` needs Docker, which this session did not have.** The same
+two databases, the same double replay and the same normalized `pg_dump` diff
+were run against a local PostgreSQL 16 instead, and the dump confirms
+`CREATE UNLOGGED TABLE` on both sides. CI's `Schema vs Migrations Drift` job is
+the real gate.
+
+**For G1:** `PostgresThrottlerStorage.lastFailureLoggedAt` is a process-local
+number, not a `Map` or `Set`, so the guard's regex will not see it. It is
+allowlisted in spirit either way: it is a log throttle, so one line a minute
+per replica is the intended behaviour.
 
 ### M1 -- MCP 2025-era sessions
 
@@ -1439,7 +1538,7 @@ process-local-state allowlist, as sticky-routed state rather than a gap.
 
 ### S1 -- Boot refusals for per-pod storage in `multi`
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `backend/src/common/cluster/cluster-mode.ts` and spec (the matrix
 rows already exist from F1; this task wires the inputs), `backend/src/main.ts`,
@@ -1464,6 +1563,41 @@ naming `ATTACHMENT_SHARED_VOLUME=true`, `database` and `s3`;
 `ATTACHMENT_CONTAINER_DIR`; treat both as `local`.
 
 **Notes:**
+
+**The backup refusal is unconditional in `multi`, not conditional on backups
+being enabled.** The task's step 1 asked for "whatever cheap predicate says
+backups are configured", and there is none: automatic backups are a row
+(`auto_backup_settings.enabled`, per user), so any user can switch theirs on at
+any time and no environment variable can say whether one has. A check that
+tried to be conditional would be reading the wrong thing. The refusal therefore
+holds until the S3 backup target ships (task S2), and the message says so.
+
+**`auto-backup.service.ts` was not touched.** The task allowed exposing a
+"backups enabled" predicate from it if none existed; since the honest answer is
+that backups are always potentially enabled, exposing one would have meant
+inventing a predicate to justify a conditional the check should not have.
+
+**The assertions are assertions, and the code says so.** No process can see
+from inside its own mount namespace whether the directory under its mount point
+is the one another pod sees, so `*_SHARED_VOLUME=true` is the operator stating
+it. The refusal exists so they state it knowingly rather than discover it from
+a restore that cannot find its bytes. Only the exact string `true` counts:
+`yes` and `1` are what an operator reaches for, and accepting them would pass
+the check on a value nobody chose deliberately. There is a matrix row for that.
+
+**The `database` attachment provider warns rather than refuses**, with the
+sentence the design doc's open questions asked for: it is cluster-safe by
+construction, and the note is about blobs on the primary being a scaling
+concern of a different kind. That warning fires on the default, so every
+`multi` row in the matrix that is about something else now carries it, and the
+storage rows state their own inputs rather than inheriting them.
+
+**`ATTACHMENT_LOCAL_DIR` joined `.env.example`.** It was referenced only in
+prose there, and `scripts/check-env-docs.mjs` scans `process.env` reads: naming
+the deprecated alias in a refusal made it a documented variable. It is
+documented as deprecated, beside the current name.
+
+**Scope additions:** `.env.example` (the task named it), and this task list.
 
 ### S2 -- S3 backup target
 
@@ -1833,7 +1967,7 @@ missing path listed.
 
 ### D1 -- Helm
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `helm/values.yaml`, `helm/templates/statefulset-backend.yaml` and
 `helm/templates/statefulset-frontend.yaml` (renamed to `deployment-*.yaml`),
@@ -1875,9 +2009,56 @@ step, and keep PVCs `helm.sh/resource-policy: keep`. The
 
 **Notes:**
 
+**The value is `cluster.mode`, not `backend.clusterMode`.** It sits beside the
+two storage assertions it constrains (`cluster.attachmentSharedVolume`,
+`cluster.backupSharedVolume`), because all three answer one question and an
+operator who sets one needs to see the others. There is no `redis.*` block and
+no `secret-redis.yaml`, which the task's scope still named from the earlier
+draft.
+
+**The Deployment omits `replicas` entirely when its HPA is on.** A Deployment
+that keeps a replica count in its spec fights the autoscaler on every
+`helm upgrade`, scaling back to the chart's number until the HPA scales out
+again. This is the defect that makes people think their HPA is broken.
+
+**`maxUnavailable: 0` with `maxSurge: 1`**, so a rollout is zero-downtime at
+`replicas: 1` -- still the default -- because the new pod must pass readiness
+before the old one goes. The reverse is the ordinary way a "rolling" update
+drops every request for a few seconds.
+
+**The PodDisruptionBudgets default to off.** At one replica a budget of
+`minAvailable: 1` makes a node drain block indefinitely rather than interrupt
+the service briefly, which is the worse surprise. They are turned on with the
+replica count, and the README says so.
+
+**`NOTES.txt` prints the mismatch, not just the requirement.** Asserting
+`cluster.backupSharedVolume: true` while the claim is still `ReadWriteOnce` is
+a deployment that boots and then loses backups, so the notes compare the two
+and name whichever is wrong. It also states the `DATABASE_HOST` requirement,
+which no template can check.
+
+**`helm lint` and `helm template` could not be run here**: the sandbox's egress
+policy blocks `get.helm.sh` (the same wall task M1 hit), and Helm publishes no
+binary on GitHub releases. What was run instead is a check with real teeth
+rather than a reading: every `.Values.<path>` in every template resolved
+against `helm/values.yaml`, plus an if/with/range-versus-end balance per file.
+The only unresolved paths are `.Values.nameOverride` and
+`.Values.fullnameOverride` in the untouched `_helpers.tpl`, which are optional
+by construction. `helm/ci/multi-values.yaml` was checked the same way and
+parses as YAML, as does the workflow. CI's `Helm Chart Lint & Render` job is
+the real gate, and it now renders the multi values file and asserts the
+PodDisruptionBudget, the HPA, `CLUSTER_MODE` in the configmap, that a
+Deployment is present and that no StatefulSet is.
+
+**Scope additions:** `helm/templates/NOTES.txt` prose beyond the storage note,
+`helm/values.yaml` comments that described the workload as a StatefulSet, and
+`docs/future-plans/horizontal-scaling.md` (its "what remains" table named the
+two template files this task renamed, so it pointed at paths that no longer
+exist).
+
 ### D2 -- Compose HA example
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `docker-compose.ha.yml` (new), `README.md` or `docs/` deployment
 page that lists compose files, `.env.example` comments.
@@ -1896,6 +2077,48 @@ needs. Every documented command carries `-f docker-compose.ha.yml`
 both backends green; killing one backend leaves the app usable.
 
 **Notes:**
+
+**The acceptance could not be executed here**: this sandbox has the compose CLI
+but no usable Docker daemon. What was run is
+`docker compose -f docker-compose.ha.yml config`, which resolves and validates
+the whole file, plus structural assertions on the parsed YAML: no
+`container_name` on either replicated service, `deploy.replicas: 2` on both,
+`CLUSTER_MODE=multi` and `BACKUP_SHARED_VOLUME=true` on the backend, and
+exactly one service publishing a host port. Booting it and killing a replica is
+still owed and belongs with D4, which is the shard that actually runs two
+backends.
+
+**Caddy, not nginx.** Its whole configuration is the one `caddy reverse-proxy`
+command line, and it re-resolves the `frontend` service name per request, so a
+replica that comes back after a restart is used without reloading the proxy --
+which is exactly the behaviour the example is demonstrating. An nginx
+`upstream` block caches the DNS answer at start, so a restarted replica stays
+out until a reload, which would teach the reader the opposite lesson.
+
+**The frontend publishes no port.** Two replicas cannot both bind one host
+port, and that is the concrete reason this file needs a proxy at all rather
+than a stylistic preference. `PROXY_PORT` defaults to the port
+`docker-compose.prod.yml` publishes, so the URL a reader already has keeps
+working.
+
+**Backups are a named volume, not a bind.** On one host either is shared, but
+the named volume states the sharing rather than relying on the reader noticing
+that two services bind the same path -- and it is what
+`BACKUP_SHARED_VOLUME=true` is asserting. Attachments sidestep the question
+entirely: `ATTACHMENT_STORAGE_PROVIDER=database` is cluster-safe by
+construction, which is the recommendation for this shape of deployment.
+
+**The backend healthcheck is `/ready`, not `/live`.** `docker-compose.prod.yml`
+uses liveness, which is right for one replica. Here the check decides whether a
+replica is in `depends_on: service_healthy` and, more importantly, whether it
+should be taking traffic at all: in `multi` a replica whose notification
+connection is down is alive and cannot be woken, and only readiness reports
+that.
+
+**Scope additions:** `README.md` (its compose tree, which
+`scripts/check-docs-manifests.mjs` checks against the files on disk), and this
+task list. `.env.example` needed nothing: the file introduces one variable,
+`PROXY_PORT`, and it is read by compose rather than by the application.
 
 ### D3 -- CI: retire the `redis` service
 

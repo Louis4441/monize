@@ -966,7 +966,7 @@ describe("AiRelayService", () => {
       const claimed = await service.waitForPrompt(USER, "session-a");
       jest
         .spyOn(bus, "publish")
-        .mockRejectedValue(new Error("redis unreachable"));
+        .mockRejectedValue(new Error("notification connection is down"));
 
       // The row is already committed. Reporting failure would have the agent
       // retry a turn it has finished -- and the retry would be refused, so its
@@ -980,7 +980,7 @@ describe("AiRelayService", () => {
     it("still queues a prompt when the wake-up cannot be published", async () => {
       jest
         .spyOn(bus, "publish")
-        .mockRejectedValue(new Error("redis unreachable"));
+        .mockRejectedValue(new Error("notification connection is down"));
 
       const pending = start(USER, "q");
       await settle();

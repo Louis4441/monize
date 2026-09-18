@@ -429,6 +429,27 @@ jobs:
             || { echo "ingress.enabled=true rendered no Ingress -- the value flag is not turning the resource on"; exit 1; }
       - name: Render with HTTPRoute disabled
         run: helm template monize ./helm --set httpRoute.enabled=false > "$RUNNER_TEMP/rendered-minimal.yaml"
+      # CLUSTER_MODE=multi turns on templates the default render never reaches:
+      # both PodDisruptionBudgets, the backend HPA and CLUSTER_MODE in the
+      # configmap. Asserted by presence for the same reason as the Ingress
+      # above -- parsing a doc that never rendered cannot fail.
+      - name: Render with CLUSTER_MODE=multi
+        run: |
+          helm template monize ./helm -f ./helm/ci/multi-values.yaml \
+            > "$RUNNER_TEMP/rendered-multi.yaml"
+          grep -q '^kind: PodDisruptionBudget$' "$RUNNER_TEMP/rendered-multi.yaml" \
+            || { echo "multi values rendered no PodDisruptionBudget"; exit 1; }
+          grep -q '^kind: HorizontalPodAutoscaler$' "$RUNNER_TEMP/rendered-multi.yaml" \
+            || { echo "multi values rendered no HorizontalPodAutoscaler"; exit 1; }
+          grep -q 'CLUSTER_MODE: "multi"' "$RUNNER_TEMP/rendered-multi.yaml" \
+            || { echo "CLUSTER_MODE did not reach the backend configmap"; exit 1; }
+          # The workloads are Deployments now; a StatefulSet in the output means
+          # the conversion was partly reverted, which upgrades in place and then
+          # fails on the first `helm upgrade` against a real cluster.
+          ! grep -q '^kind: StatefulSet$' "$RUNNER_TEMP/rendered-multi.yaml" \
+            || { echo "a StatefulSet is still being rendered"; exit 1; }
+          grep -q '^kind: Deployment$' "$RUNNER_TEMP/rendered-multi.yaml" \
+            || { echo "no Deployment rendered"; exit 1; }
       # PyYAML happens to be present on the current ubuntu-latest image, which
       # is not the same as this job declaring it. An undeclared dependency that
       # disappears in a runner-image bump turns the check below into an

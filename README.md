@@ -237,6 +237,7 @@ monize/
 ├── docker-compose.prod.yml    # Production environment
 ├── docker-compose.demo.yml    # Demo environment
 ├── docker-compose.e2e.yml     # End-to-end test environment
+├── docker-compose.ha.yml      # Multi-replica example (CLUSTER_MODE=multi)
 ├── docker-compose.zap.yml     # ZAP security-scan environment
 ├── .env.example               # Environment variables template
 └── README.md

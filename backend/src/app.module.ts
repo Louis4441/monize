@@ -11,6 +11,9 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ScheduleModule } from "@nestjs/schedule";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { PostgresThrottlerStorage } from "./common/throttler/postgres-throttler-storage";
+import { ThrottlerStorageModule } from "./common/throttler/throttler-storage.module";
+import { CLUSTER_MODE, ClusterMode } from "./common/cluster/cluster-mode";
 import { rateLimit } from "./common/throttle.util";
 import { CsrfGuard } from "./common/guards/csrf.guard";
 import { DemoModeGuard } from "./common/guards/demo-mode.guard";
@@ -117,14 +120,32 @@ import { I18nModule } from "./i18n/i18n.module";
       },
     }),
 
-    // Rate limiting — global default; auth endpoints override with stricter limits
-    ThrottlerModule.forRoot([
-      {
-        name: "default",
-        ttl: 60000, // 1 minute
-        limit: rateLimit(100), // 100 requests per minute for general API
-      },
-    ]),
+    // Rate limiting — global default; auth endpoints override with stricter limits.
+    //
+    // `storage` is set only in CLUSTER_MODE=multi, where the library's
+    // in-process Map would enforce every cap once per replica. In `single` the
+    // option is absent entirely, so the default object is untouched and a
+    // single-replica deployment pays no write per request. The storage class is
+    // a provider either way (Nest has to be able to construct it to inject it),
+    // but in `single` nothing calls it.
+    ThrottlerModule.forRootAsync({
+      // forRootAsync resolves `inject` inside the dynamic module it builds, so
+      // the storage has to be exported by a module it imports -- a provider
+      // declared beside it in AppModule is out of scope there. CLUSTER_MODE
+      // needs no import: ClusterModule is @Global.
+      imports: [ThrottlerStorageModule],
+      inject: [CLUSTER_MODE, PostgresThrottlerStorage],
+      useFactory: (mode: ClusterMode, storage: PostgresThrottlerStorage) => ({
+        throttlers: [
+          {
+            name: "default",
+            ttl: 60000, // 1 minute
+            limit: rateLimit(100), // 100 requests per minute for general API
+          },
+        ],
+        ...(mode === "multi" ? { storage } : {}),
+      }),
+    }),
 
     // Scheduled tasks
     ScheduleModule.forRoot(),

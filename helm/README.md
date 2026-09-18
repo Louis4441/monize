@@ -144,6 +144,14 @@ the write proceeds under the client's own approval prompt.
 | `backend.image.tag` | Image tag | `latest` |
 | `backend.image.pullPolicy` | Image pull policy | `IfNotPresent` |
 | `backend.replicas` | Number of replicas | `1` |
+| `backend.podDisruptionBudget.enabled` | Create a PodDisruptionBudget | `false` |
+| `backend.podDisruptionBudget.minAvailable` | Pods that must stay available | `1` |
+| `backend.podDisruptionBudget.maxUnavailable` | Pods that may go; wins over minAvailable | `""` |
+| `backend.topologySpreadConstraints` | Scheduler spread across nodes | `[]` |
+| `backend.autoscaling.enabled` | Create a HorizontalPodAutoscaler | `false` |
+| `backend.autoscaling.minReplicas` | Lower bound when autoscaling | `2` |
+| `backend.autoscaling.maxReplicas` | Upper bound when autoscaling | `4` |
+| `backend.autoscaling.targetCPUUtilizationPercentage` | Target CPU, % of request | `75` |
 | `backend.service.port` | Service port | `3001` |
 | `backend.service.type` | Service type | `ClusterIP` |
 | `backend.resources` | CPU/memory requests and limits | See values.yaml |
@@ -300,7 +308,7 @@ otherwise, and truncates rather than rejecting anything larger).
 #### Storage for data kept outside Postgres
 
 The backend container runs with `readOnlyRootFilesystem: true`, so it can only
-write where a volume is mounted. Until this block existed the StatefulSet
+write where a volume is mounted. Until this block existed the workload
 rendered no volumes at all, which meant two features visible in the UI could not
 work in the canonical chart -- and both failed at the point of use rather than at
 install time, so the UI went on presenting them as configured:
@@ -380,6 +388,14 @@ Notes on sizing and behaviour:
 | `frontend.image.tag` | Image tag | `latest` |
 | `frontend.image.pullPolicy` | Image pull policy | `IfNotPresent` |
 | `frontend.replicas` | Number of replicas | `1` |
+| `frontend.podDisruptionBudget.enabled` | Create a PodDisruptionBudget | `false` |
+| `frontend.podDisruptionBudget.minAvailable` | Pods that must stay available | `1` |
+| `frontend.podDisruptionBudget.maxUnavailable` | Pods that may go; wins over minAvailable | `""` |
+| `frontend.topologySpreadConstraints` | Scheduler spread across nodes | `[]` |
+| `frontend.autoscaling.enabled` | Create a HorizontalPodAutoscaler | `false` |
+| `frontend.autoscaling.minReplicas` | Lower bound when autoscaling | `2` |
+| `frontend.autoscaling.maxReplicas` | Upper bound when autoscaling | `4` |
+| `frontend.autoscaling.targetCPUUtilizationPercentage` | Target CPU, % of request | `75` |
 | `frontend.service.port` | Service port | `3000` |
 | `frontend.service.type` | Service type | `ClusterIP` |
 | `frontend.resources` | CPU/memory requests and limits | See values.yaml |
@@ -387,6 +403,65 @@ Notes on sizing and behaviour:
 | `frontend.livenessProbe` | Liveness probe config | `/api/v1/health/live` |
 | `frontend.readinessProbe` | Readiness probe config | `/api/v1/health/ready` |
 | `frontend.env.*` | Frontend environment variables | See values.yaml |
+
+### Horizontal scaling
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `cluster.mode` | `single` (one backend replica) or `multi` | `single` |
+| `cluster.attachmentSharedVolume` | Assert every replica mounts the attachment dir | `false` |
+| `cluster.backupSharedVolume` | Assert every replica mounts the backup dir | `false` |
+
+`cluster.mode` becomes `CLUSTER_MODE` in the backend's configmap. At `single`
+the backend keeps rate-limit counters and cross-replica wake-ups in its own
+process, which is correct for one replica and wrong for two; at `multi` both
+live in PostgreSQL. Nothing else is added -- there is no second datastore to
+run, back up or secure. `docs/future-plans/horizontal-scaling.md` has the
+design.
+
+Two things the chart cannot verify, and the backend refuses to boot without:
+
+1. **`backend.database.DATABASE_HOST` must reach a PostgreSQL session.** Each
+   replica holds one `LISTEN` open, and a transaction-mode pooler (pgBouncer in
+   its default mode) accepts the connection and then drops the subscription --
+   so wake-ups never arrive and the application merely looks slow. A direct
+   service (CNPG's `-rw`, a plain Service, a session-mode pooler) is what this
+   needs. The boot check catches it and says so in one line.
+
+2. **The storage assertions must be true, not merely set.** No process can see
+   from inside its own mount namespace whether the directory under its mount
+   point is the one another pod sees, so the operator states it. Setting
+   `cluster.backupSharedVolume: true` while the claim is still `ReadWriteOnce`
+   is a deployment that boots and then loses backups, which is why `NOTES.txt`
+   prints the mismatch at install time.
+
+A worked `multi` configuration, including the `ReadWriteMany` claims that make
+the assertions true, is `helm/ci/multi-values.yaml` -- rendered by CI on every
+push so none of these templates can silently stop working.
+
+Raising `backend.replicas` while 2025-era MCP clients connect also needs
+`mcp.stickySessions`; see "MCP sessions and more than one backend replica"
+above.
+
+#### Upgrading from a chart version that used StatefulSets
+
+The backend and frontend workloads are `Deployment`s. They were `StatefulSet`s,
+and **a StatefulSet cannot be converted in place** -- `helm upgrade` fails with
+a message about an immutable field. Nothing about these pods was ever ordinal
+(no per-pod identity, no per-pod claim, no ordered start); what the StatefulSet
+cost was a slower rollout.
+
+The one-time step, before the upgrade:
+
+```bash
+kubectl delete statefulset monize-backend monize-frontend \
+  --namespace monize --cascade=orphan
+```
+
+`--cascade=orphan` leaves the running pods alone, so the service keeps
+answering until the new Deployment adopts them. The PersistentVolumeClaims are
+untouched by this: they are ordinary claims the chart creates, not
+`volumeClaimTemplates`, and they carry `helm.sh/resource-policy: keep`.
 
 ### Row-Level Security (RLS)
 

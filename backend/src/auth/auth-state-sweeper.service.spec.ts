@@ -48,17 +48,20 @@ describe("AuthStateSweeperService", () => {
       )
       .mockImplementation();
 
-  it("deletes both tables by their stored expiry, with no clock of its own", async () => {
+  it("deletes all three tables by their stored expiry, with no clock of its own", async () => {
     manager.query.mockResolvedValue([[], 0]);
 
     await service.sweepExpiredAuthState();
 
-    const [counters, tokens] = statements();
+    const [counters, tokens, throttles] = statements();
     expect(counters).toMatch(
       /DELETE FROM auth_attempt_counters\s+WHERE window_expires_at < CURRENT_TIMESTAMP/,
     );
     expect(tokens).toMatch(
       /DELETE FROM single_use_tokens\s+WHERE expires_at < CURRENT_TIMESTAMP/,
+    );
+    expect(throttles).toMatch(
+      /DELETE FROM http_throttle_counters\s+WHERE window_expires_at < CURRENT_TIMESTAMP/,
     );
     // No bound parameters: a time this process computed is the defect above.
     for (const call of manager.query.mock.calls) {
@@ -66,13 +69,28 @@ describe("AuthStateSweeperService", () => {
     }
   });
 
-  it("sweeps both tables in one transaction", async () => {
+  it("spares a throttle counter whose block outlives its window", async () => {
+    manager.query.mockResolvedValue([[], 0]);
+
+    await service.sweepExpiredAuthState();
+
+    // A key past its window but still blocked is serving a refusal, and
+    // deleting it would hand a blocked client a clean count -- the one way a
+    // garbage collector could weaken a rate limit. The other two tables have no
+    // equivalent state, which is why only this predicate carries the clause.
+    const [, , throttles] = statements();
+    expect(throttles).toMatch(
+      /AND \(blocked_until IS NULL OR blocked_until < CURRENT_TIMESTAMP\)/,
+    );
+  });
+
+  it("sweeps all three tables in one transaction", async () => {
     manager.query.mockResolvedValue([[], 0]);
 
     await service.sweepExpiredAuthState();
 
     expect(dataSource.transaction).toHaveBeenCalledTimes(1);
-    expect(statements()).toHaveLength(2);
+    expect(statements()).toHaveLength(3);
   });
 
   it("logs what it removed only when it removed something", async () => {
@@ -88,7 +106,26 @@ describe("AuthStateSweeperService", () => {
     manager.query.mockResolvedValue([[], 3]);
     await service.sweepExpiredAuthState();
     expect(log).toHaveBeenCalledWith(
-      "Swept 3 expired attempt counter(s) and 3 expired single-use token(s)",
+      "Swept 3 expired attempt counter(s), 3 expired single-use token(s) and " +
+        "3 expired throttle counter(s)",
+    );
+  });
+
+  it("logs when only the throttle counters had anything to remove", async () => {
+    // Each table is swept whether or not the others found rows, and a run that
+    // collected only throttle counters still reports it -- the `> 0` test is on
+    // the three together, so a per-table one would have gone silent here.
+    const log = spyOnLogger("log");
+    manager.query
+      .mockResolvedValueOnce([[], 0])
+      .mockResolvedValueOnce([[], 0])
+      .mockResolvedValueOnce([[], 5]);
+
+    await service.sweepExpiredAuthState();
+
+    expect(log).toHaveBeenCalledWith(
+      "Swept 0 expired attempt counter(s), 0 expired single-use token(s) and " +
+        "5 expired throttle counter(s)",
     );
   });
 

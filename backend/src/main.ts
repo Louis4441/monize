@@ -113,6 +113,12 @@ function assertClusterBootOrExit(): void {
   const report = checkClusterBoot({
     CLUSTER_MODE: process.env.CLUSTER_MODE,
     JWT_SECRET: process.env.JWT_SECRET,
+    ATTACHMENT_STORAGE_PROVIDER: process.env.ATTACHMENT_STORAGE_PROVIDER,
+    ATTACHMENT_CONTAINER_DIR: process.env.ATTACHMENT_CONTAINER_DIR,
+    ATTACHMENT_LOCAL_DIR: process.env.ATTACHMENT_LOCAL_DIR,
+    ATTACHMENT_SHARED_VOLUME: process.env.ATTACHMENT_SHARED_VOLUME,
+    BACKUP_CONTAINER_DIR: process.env.BACKUP_CONTAINER_DIR,
+    BACKUP_SHARED_VOLUME: process.env.BACKUP_SHARED_VOLUME,
   });
   for (const warning of report.warnings) {
     logger.warn(warning);

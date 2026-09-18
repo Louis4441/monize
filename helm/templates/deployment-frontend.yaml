@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: monize-frontend
   namespace: {{ .Values.global.namespace }}
@@ -13,10 +13,31 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  serviceName: monize-frontend
-  updateStrategy:
+  {{- /*
+    A Deployment, not a StatefulSet. Nothing about these pods is ordinal: no
+    per-pod identity, no per-pod claim, no ordered start. What a StatefulSet
+    added was a slower rollout -- one pod at a time, the next waiting on the
+    last -- and an upgrade that cannot be performed in place (see helm/README.md
+    for the one-time recreate step).
+
+    maxUnavailable: 0 with maxSurge: 1 is what makes a rollout zero-downtime at
+    replicas: 1, which is still the default: the new pod must pass its readiness
+    probe before the old one is taken away. Reversing those two is the ordinary
+    way a "rolling" update drops every request for a few seconds.
+  */}}
+  strategy:
     type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  {{- if not .Values.frontend.autoscaling.enabled }}
+  {{- /*
+    Omitted entirely when an HPA owns the count. A Deployment that keeps
+    `replicas` in its spec fights the autoscaler on every `helm upgrade`,
+    scaling back to the chart's number until the HPA scales it out again.
+  */}}
   replicas: {{ .Values.frontend.replicas }}
+  {{- end }}
   revisionHistoryLimit: 2
   selector:
     matchLabels:
@@ -29,6 +50,15 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
+      {{- with .Values.frontend.topologySpreadConstraints }}
+      {{- /*
+        Without this, the scheduler is free to put every replica on one node,
+        which makes the replica count look like availability while a single
+        node drain still takes the whole service down.
+      */}}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       dnsPolicy: ClusterFirstWithHostNet
       hostNetwork: false
       restartPolicy: Always

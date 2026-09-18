@@ -8,6 +8,15 @@ import {
 
 const GOOD_SECRET = "x".repeat(MIN_JWT_SECRET_LENGTH);
 
+/**
+ * What a `multi` deployment must assert about its storage before it can boot.
+ *
+ * Spread into the rows below that are about something else, so a row testing
+ * the JWT secret is not also silently testing the storage refusals. The
+ * storage rows state their own inputs.
+ */
+const SHARED_STORAGE = { BACKUP_SHARED_VOLUME: "true" } as const;
+
 describe("parseClusterMode", () => {
   it.each([
     [undefined, "single"],
@@ -77,8 +86,102 @@ describe("checkClusterBoot", () => {
         // LISTEN, and cluster-safe attachment and backup storage -- is a
         // connection and a module's configuration, which F2 and S1 add.
         name: "multi with a secret",
-        env: { CLUSTER_MODE: "multi", JWT_SECRET: GOOD_SECRET },
+        env: {
+          CLUSTER_MODE: "multi",
+          JWT_SECRET: GOOD_SECRET,
+          ...SHARED_STORAGE,
+        },
         mode: "multi",
+        refusals: [],
+        // The default attachment provider is `database`, which is cluster-safe
+        // and says so rather than passing in silence.
+        warnings: [/ATTACHMENT_STORAGE_PROVIDER=database/],
+      },
+      {
+        name: "multi with attachments on s3",
+        env: {
+          CLUSTER_MODE: "multi",
+          JWT_SECRET: GOOD_SECRET,
+          ATTACHMENT_STORAGE_PROVIDER: "s3",
+          ...SHARED_STORAGE,
+        },
+        mode: "multi",
+        refusals: [],
+        warnings: [],
+      },
+      {
+        name: "multi with per-pod attachments",
+        env: {
+          CLUSTER_MODE: "multi",
+          JWT_SECRET: GOOD_SECRET,
+          ATTACHMENT_STORAGE_PROVIDER: "local",
+          ...SHARED_STORAGE,
+        },
+        mode: "multi",
+        refusals: [/ATTACHMENT_SHARED_VOLUME=true/],
+        warnings: [],
+      },
+      {
+        name: "multi with local attachments on an asserted shared volume",
+        env: {
+          CLUSTER_MODE: "multi",
+          JWT_SECRET: GOOD_SECRET,
+          ATTACHMENT_STORAGE_PROVIDER: "local",
+          ATTACHMENT_SHARED_VOLUME: "true",
+          ...SHARED_STORAGE,
+        },
+        mode: "multi",
+        refusals: [],
+        warnings: [],
+      },
+      {
+        // The provider is read case- and whitespace-insensitively, as the
+        // module that selects it reads it.
+        name: "multi with LOCAL attachments spelled loudly",
+        env: {
+          CLUSTER_MODE: "multi",
+          JWT_SECRET: GOOD_SECRET,
+          ATTACHMENT_STORAGE_PROVIDER: "  LOCAL ",
+          ...SHARED_STORAGE,
+        },
+        mode: "multi",
+        refusals: [/ATTACHMENT_SHARED_VOLUME=true/],
+        warnings: [],
+      },
+      {
+        name: "multi without the backup assertion",
+        env: {
+          CLUSTER_MODE: "multi",
+          JWT_SECRET: GOOD_SECRET,
+          ATTACHMENT_STORAGE_PROVIDER: "s3",
+        },
+        mode: "multi",
+        refusals: [/BACKUP_SHARED_VOLUME=true/],
+        warnings: [],
+      },
+      {
+        // Anything but the exact assertion is not an assertion. "yes" and "1"
+        // are what an operator reaches for, and accepting them would mean the
+        // check passes on a value nobody chose deliberately.
+        name: "multi with a backup assertion that is not true",
+        env: {
+          CLUSTER_MODE: "multi",
+          JWT_SECRET: GOOD_SECRET,
+          ATTACHMENT_STORAGE_PROVIDER: "s3",
+          BACKUP_SHARED_VOLUME: "yes",
+        },
+        mode: "multi",
+        refusals: [/BACKUP_SHARED_VOLUME=true/],
+        warnings: [],
+      },
+      {
+        name: "single ignores the storage settings entirely",
+        env: {
+          CLUSTER_MODE: "single",
+          JWT_SECRET: GOOD_SECRET,
+          ATTACHMENT_STORAGE_PROVIDER: "local",
+        },
+        mode: "single",
         refusals: [],
         warnings: [],
       },
@@ -91,10 +194,10 @@ describe("checkClusterBoot", () => {
       },
       {
         name: "JWT_SECRET missing in multi",
-        env: { CLUSTER_MODE: "multi" },
+        env: { CLUSTER_MODE: "multi", ...SHARED_STORAGE },
         mode: "multi",
         refusals: [/JWT_SECRET is not set/],
-        warnings: [],
+        warnings: [/ATTACHMENT_STORAGE_PROVIDER=database/],
       },
       {
         name: "JWT_SECRET too short",
@@ -133,6 +236,48 @@ describe("checkClusterBoot", () => {
         expect(report.warnings[i]).toMatch(pattern),
       );
     });
+  });
+
+  it("names the directory an operator has to share", () => {
+    // The refusal is only useful if it says which path to mount, and the
+    // deprecated alias names the same directory as the current variable.
+    const withAlias = checkClusterBoot({
+      CLUSTER_MODE: "multi",
+      JWT_SECRET: GOOD_SECRET,
+      ATTACHMENT_STORAGE_PROVIDER: "local",
+      ATTACHMENT_LOCAL_DIR: "/srv/legacy-attachments",
+      BACKUP_CONTAINER_DIR: "/srv/backups",
+    });
+
+    expect(withAlias.refusals.join("\n")).toContain("/srv/legacy-attachments");
+    expect(withAlias.refusals.join("\n")).toContain("/srv/backups");
+  });
+
+  it("prefers the current directory variable over the deprecated alias", () => {
+    const both = checkClusterBoot({
+      CLUSTER_MODE: "multi",
+      JWT_SECRET: GOOD_SECRET,
+      ATTACHMENT_STORAGE_PROVIDER: "local",
+      ATTACHMENT_CONTAINER_DIR: "/srv/current",
+      ATTACHMENT_LOCAL_DIR: "/srv/legacy",
+      ...SHARED_STORAGE,
+    });
+
+    expect(both.refusals.join("\n")).toContain("/srv/current");
+    expect(both.refusals.join("\n")).not.toContain("/srv/legacy");
+  });
+
+  it("names the container defaults when no directory is set", () => {
+    // An operator who never set the paths still has to be told which ones to
+    // mount, and the defaults are the chart's.
+    const defaults = checkClusterBoot({
+      CLUSTER_MODE: "multi",
+      JWT_SECRET: GOOD_SECRET,
+      ATTACHMENT_STORAGE_PROVIDER: "local",
+    });
+
+    expect(defaults.refusals.join("\n")).toContain("/data/attachments");
+    expect(defaults.refusals.join("\n")).toContain("/data/backups");
   });
 
   it("reports every problem at once, so one restart is enough", () => {
