@@ -389,6 +389,60 @@ describe("BudgetPeriodCronService", () => {
       errorSpy.mockRestore();
     });
 
+    // A claim is not a record that the work was done. Keeping it after a
+    // failure asserts a rollover that did not happen, and because this cron is
+    // monthly there is no later tick to notice.
+    it("hands the month back when a budget's close failed", async () => {
+      budgetsRepository.find.mockResolvedValue([mockBudget]);
+      periodsRepository.findOne.mockResolvedValue({
+        ...mockOpenPeriod,
+        periodEnd: "2025-12-31",
+      });
+      budgetPeriodService.closePeriod.mockRejectedValue(
+        new Error("could not serialize access"),
+      );
+      jest
+        .spyOn(service["logger"], "error")
+        .mockImplementation(() => undefined);
+
+      await service.closeExpiredPeriods();
+
+      expect(jobClaims.releasePermanentClaim).toHaveBeenCalledWith(
+        JobClaimType.BudgetPeriodRollover,
+        "11111111-1111-1111-1111-111111111111",
+        rolloverMonthKey(new Date()),
+      );
+    });
+
+    it("keeps the month when every budget got through", async () => {
+      budgetsRepository.find.mockResolvedValue([mockBudget]);
+      periodsRepository.findOne.mockResolvedValue({
+        ...mockOpenPeriod,
+        periodEnd: "2025-12-31",
+      });
+
+      await service.closeExpiredPeriods();
+
+      expect(jobClaims.releasePermanentClaim).not.toHaveBeenCalled();
+    });
+
+    // The loser of the row lock is a normal tick, not a failure -- so it must
+    // not hand back a month the winner has just rolled over.
+    it("keeps the month when the only error was a NoOpenPeriodError", async () => {
+      budgetsRepository.find.mockResolvedValue([mockBudget]);
+      periodsRepository.findOne.mockResolvedValue({
+        ...mockOpenPeriod,
+        periodEnd: "2025-12-31",
+      });
+      budgetPeriodService.closePeriod.mockRejectedValue(
+        new NoOpenPeriodError(),
+      );
+
+      await service.closeExpiredPeriods();
+
+      expect(jobClaims.releasePermanentClaim).not.toHaveBeenCalled();
+    });
+
     it("skips budgets with no open period", async () => {
       budgetsRepository.find.mockResolvedValue([mockBudget]);
       periodsRepository.findOne.mockResolvedValue(null);

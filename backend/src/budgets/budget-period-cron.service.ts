@@ -101,12 +101,18 @@ export class BudgetPeriodCronService {
 
       for (const [ownerUserId, ownedBudgets] of groupByOwner(activeBudgets)) {
         // One month rolls over once per owner, and every replica fires this
-        // cron. The claim is permanent because a month that has rolled over
-        // must never roll over again, and it is never released on failure: a
-        // failed rollover is repaired by `getOrCreateCurrentPeriod` on the
-        // request path, which materializes the missing period the next time
-        // somebody opens the Budgets screen -- not by a second cron run that
-        // would have to re-derive the same actuals from a ledger that has moved.
+        // cron. The claim is what keeps a losing replica out of the owner
+        // entirely, rather than racing it budget by budget.
+        //
+        // It is **not** the record that the rollover happened --
+        // `JobClaimService`'s own contract: "a claim is not a record that the
+        // work was done, and reaching for `claimOnce` as though it were is how
+        // a delivery gets lost". So it is handed back below whenever the
+        // owner's pass did not complete. Nothing is rolled over twice as a
+        // result: `closePeriod` locks the OPEN period row and the next period
+        // is `ON CONFLICT (budget_id, period_start) DO NOTHING`, which is what
+        // actually enforces "once", and a second pass over an owner already
+        // rolled over finds no expired OPEN period and does nothing.
         //
         // The claim is per OWNER rather than per deployment because
         // `job_claims.user_id` is a NOT NULL foreign key to `users`, and per
@@ -125,6 +131,12 @@ export class BudgetPeriodCronService {
           );
           continue;
         }
+
+        // Whether this owner's whole pass got through. One budget failing is
+        // enough to hand the month back: the claim covers the owner, so keeping
+        // it would assert a rollover that did not happen for that budget and
+        // lock every other replica out of finishing it.
+        let ownerComplete = true;
 
         for (const budget of ownedBudgets) {
           try {
@@ -168,11 +180,32 @@ export class BudgetPeriodCronService {
               continue;
             }
             errorCount++;
+            ownerComplete = false;
             this.logger.error(
               `Failed to close period for budget ${budget.id}`,
               error instanceof Error ? error.stack : error,
             );
           }
+        }
+
+        if (!ownerComplete) {
+          // Give the month back. Without this, one transient error -- a
+          // serialization failure on the period lock, a pool timeout -- consumed
+          // the owner's claim permanently, and because this cron is monthly
+          // there was no later tick to repair it: the previous month's period
+          // stayed OPEN and the following month's tick then skipped straight to
+          // the month it ran in.
+          //
+          // Releasing does not by itself produce a retry within the month (see
+          // the gap this leaves in docs/concurrency-and-idempotency.md); what it
+          // does is stop a failure from being recorded as a success.
+          await withUserContext(ownerUserId, () =>
+            this.jobClaims.releasePermanentClaim(
+              JobClaimType.BudgetPeriodRollover,
+              ownerUserId,
+              monthKey,
+            ),
+          );
         }
       }
 
