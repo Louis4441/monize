@@ -269,8 +269,9 @@ this list; if the statement has changed shape, the row may be right.
 
 ### F6 -- Retire `REDIS_URL` from F1
 
-- [x] Status: done (PR
-  [#1407](https://github.com/kenlasko/monize/pull/1407)).
+- [x] Status: done, in the follow-up to PR
+  [#1407](https://github.com/kenlasko/monize/pull/1407) (that PR revised the
+  plan; this task and D3 carry the revision into the code and the workflow).
 
 **Scope:** `backend/src/common/cluster/cluster-mode.ts` and its spec,
 `backend/src/main.ts` (the `assertClusterBootOrExit` call), `.env.example`
@@ -1828,10 +1829,10 @@ both backends green; killing one backend leaves the app usable.
 
 ### D3 -- CI: retire the `redis` service
 
-- [x] Status: done (PR
-  [#1407](https://github.com/kenlasko/monize/pull/1407)). The task as first
-  written ("add a `redis` service") shipped against the earlier draft; this is
-  its reversal.
+- [x] Status: done, in the follow-up to PR
+  [#1407](https://github.com/kenlasko/monize/pull/1407), alongside F6. The task
+  as first written ("add a `redis` service") shipped against the earlier draft;
+  this is its reversal.
 
 **Scope:** `.github/workflows/ci.yml` (`backend-integration-tests` job).
 `.github/` is an ask-first change under `AGENTS.md`; this task is the
