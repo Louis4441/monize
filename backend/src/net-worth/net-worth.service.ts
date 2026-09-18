@@ -35,6 +35,7 @@ import {
   convertAtDate,
 } from "../common/time-series/rate-index.util";
 import { FxAggregate } from "../common/fx-aggregate";
+import { roundMoney } from "../common/round.util";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import {
   SeriesFetchOptions,
@@ -1187,8 +1188,11 @@ export class NetWorthService {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([month, aggregate]) => ({
         month,
-        value: Math.round(aggregate.knownSubtotal),
-        securitiesValue: Math.round(
+        // 4dp money precision, not whole units: the value carries into the
+        // period-result P&L and TWR, so the grosze must survive the fold and be
+        // rounded only for display at the surface.
+        value: roundMoney(aggregate.knownSubtotal),
+        securitiesValue: roundMoney(
           securitiesMap.get(month)?.knownSubtotal ?? 0,
         ),
         fxComplete: aggregate.isComplete,
@@ -1685,11 +1689,15 @@ export class NetWorthService {
 
       result.push({
         date: dateStr,
-        value: Math.round(dayValue.knownSubtotal),
+        // Carried at the money pipeline's 4dp precision, never whole units:
+        // this value feeds investedPeriodResult's P&L, TWR and MWR, and
+        // rounding the grosze away here read a sub-unit holding as a -100%
+        // return. Whole-unit rounding is a presentation step at the surface.
+        value: roundMoney(dayValue.knownSubtotal),
         // The securities-only subtotal of the very same fold, rounded the same
         // way `value` is, so `value - securitiesValue` is the cash the walk
         // above added and the two cannot disagree about a position.
-        securitiesValue: Math.round(securitiesSubtotal),
+        securitiesValue: roundMoney(securitiesSubtotal),
         fxComplete: dayValue.isComplete,
         missingRatePairs: dayValue.missingPairs,
         pricesComplete: unpricedSecurityIds.size === 0,
@@ -2328,8 +2336,11 @@ export class NetWorthService {
     const points: InvestmentBreakdownPoint[] = ungrouped.map((pt) => {
       const values: Record<string, number> = {};
       let total = 0;
+      // Each band and the cash band carry 4dp money precision, not whole units:
+      // the bands stack into `total`, so rounding each one lost grosze from the
+      // stacked total. Whole-unit rounding is a presentation step at the chart.
       for (const secId of topIds) {
-        const v = Math.round(pt.valuesBySec.get(secId) ?? 0);
+        const v = roundMoney(pt.valuesBySec.get(secId) ?? 0);
         values[secId] = v;
         total += v;
       }
@@ -2337,18 +2348,20 @@ export class NetWorthService {
         let otherSum = 0;
         for (const secId of otherIds)
           otherSum += pt.valuesBySec.get(secId) ?? 0;
-        const v = Math.round(otherSum);
+        const v = roundMoney(otherSum);
         values.other = v;
         total += v;
       }
       if (hasCash) {
-        const v = Math.round(pt.cash);
+        const v = roundMoney(pt.cash);
         values.cash = v;
         total += v;
       }
       return {
         date: pt.date,
-        total,
+        // Rounded once after summing the 4dp bands so float drift does not leak
+        // into the stacked total.
+        total: roundMoney(total),
         values,
         cashComplete: pt.unknownCashAccountIds.length === 0,
         unknownCashAccountIds: pt.unknownCashAccountIds,

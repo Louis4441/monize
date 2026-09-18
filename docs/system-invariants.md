@@ -1032,6 +1032,14 @@ Enforcement         investedPeriodResult
                     definitions, the truth table, the twelve numerical cases
                     and the test matrix; section 11 does the same for the
                     money-weighted figure.
+                    foldDailyInvestments and foldMonthlyInvestments carry value
+                    and securitiesValue at the money pipeline's 4dp precision
+                    (roundMoney), never Math.round to whole units, and
+                    groupSecurityBreakdown does the same for each band and the
+                    stacked total: the fold rounding grosze away read a sub-unit
+                    holding against a zero baseline as a -100% return, and no
+                    downstream ten-thousandths recover the lost precision.
+                    Whole-unit rounding is a presentation step at the surface.
 Status              enforced. The second definition of the same caption --
                     PortfolioCalculationService.calculateTWR, which valued its
                     boundaries from stored closes alone and dropped an unpriced

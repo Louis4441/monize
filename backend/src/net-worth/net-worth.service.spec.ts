@@ -2135,6 +2135,34 @@ describe("NetWorthService", () => {
       expect(result[0].value).toBe(10000);
     });
 
+    it("carries a fractional month-end value at full precision, not rounded (P7)", async () => {
+      // The monthly fold Math.round-ed value and securitiesValue to whole units,
+      // so a month worth 8,000.49 shipped 8,000 into the period-result P&L and
+      // TWR. The value must carry the grosze; rounding is a presentation step.
+      mabRepository.count.mockResolvedValue(5);
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+      reportQuery
+        .mockResolvedValueOnce([
+          {
+            month: "2024-01-01",
+            balance: 0,
+            market_value: "8000.49",
+            account_id: "inv-1",
+            account_sub_type: "INVESTMENT_BROKERAGE",
+            currency_code: "USD",
+          },
+        ])
+        .mockResolvedValueOnce([
+          { account_id: "inv-1", first_month: "2023-01-01" },
+        ]);
+
+      const result = await service.getMonthlyInvestments("user-1");
+
+      expect(result).toHaveLength(1);
+      expect(result[0].value).toBe(8000.49);
+    });
+
     it("filters by specific accountIds when provided", async () => {
       mabRepository.count.mockResolvedValue(5);
       prefRepository.findOne.mockResolvedValue({
@@ -2325,7 +2353,11 @@ describe("NetWorthService", () => {
       expect(result[1].month).toBe("2024-03-01");
     });
 
-    it("rounds values to whole numbers", async () => {
+    it("carries values at 4dp money precision, not whole units (P7)", async () => {
+      // The fold used to Math.round to whole units here; it now carries the
+      // money pipeline's 4dp precision so the value that feeds the period-result
+      // P&L and TWR keeps its grosze. Rounding to whole units is a presentation
+      // step at the surface, not part of the calculation.
       mabRepository.count.mockResolvedValue(5);
       prefRepository.findOne.mockResolvedValue({
         defaultCurrency: "USD",
@@ -2344,8 +2376,7 @@ describe("NetWorthService", () => {
 
       const result = await service.getMonthlyInvestments("user-1");
 
-      expect(result[0].value).toBe(1235);
-      expect(Number.isInteger(result[0].value)).toBe(true);
+      expect(result[0].value).toBe(1234.567);
     });
 
     it("defaults to filtering INVESTMENT_CASH and INVESTMENT_BROKERAGE sub types when no accountIds", async () => {
@@ -4095,9 +4126,10 @@ describe("NetWorthService", () => {
       );
 
       // 100 shares * $25.675 USD = $2,567.50 USD
-      // $2,567.50 USD * 1.35 = $3,466.125 CAD -> rounded to 3466
+      // $2,567.50 USD * 1.35 = $3,466.125 CAD, carried at 4dp precision (P7);
+      // whole-unit rounding is a presentation step at the surface.
       expect(result).toHaveLength(1);
-      expect(result[0].value).toBe(3466);
+      expect(result[0].value).toBe(3466.125);
     });
 
     // Same defect as issue #1081 on the total series: omitting startDate used
@@ -4146,6 +4178,102 @@ describe("NetWorthService", () => {
         "2025-03-02",
         "2025-03-03",
       ]);
+    });
+
+    it("carries a sub-unit invested value at full precision, not rounded to 0 (P7)", async () => {
+      // A single holding worth 0.49 in the reporting currency. The fold used to
+      // Math.round(value) and Math.round(securitiesValue), so 0.49 became 0 --
+      // and a baseline of 0 against a rounded-to-0 endpoint reads as a -100%
+      // return in investedPeriodResult. The value that feeds P&L and TWR must
+      // carry the grosze; whole-unit rounding is a presentation step.
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "brok-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_BROKERAGE",
+          currency_code: "USD",
+          opening_balance: 0,
+        },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        {
+          account_id: "brok-1",
+          security_id: "sec-1",
+          action: "BUY",
+          quantity: "1",
+          transaction_date: "2025-03-01",
+        },
+      ]);
+      securityRepository.findByIds.mockResolvedValue([
+        { id: "sec-1", skipPriceUpdates: false, currencyCode: "USD" },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        { security_id: "sec-1", price_date: "2025-03-01", close_price: "0.49" },
+      ]);
+
+      const result = await service.getDailyInvestments(
+        "user-1",
+        "2025-03-01",
+        "2025-03-01",
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].value).toBe(0.49);
+      expect(result[0].securitiesValue).toBe(0.49);
+    });
+
+    it("preserves a few-grosze move across a period, not a rounded-away 0 (P7)", async () => {
+      // A larger position moves by 0.03 over two days: 100.00 -> 100.03. Whole-
+      // unit rounding made both ends 100, so the period's P&L read 0; the move
+      // must survive to the cent because value feeds investedPeriodResult.
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "brok-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_BROKERAGE",
+          currency_code: "USD",
+          opening_balance: 0,
+        },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        {
+          account_id: "brok-1",
+          security_id: "sec-1",
+          action: "BUY",
+          quantity: "1",
+          transaction_date: "2025-02-01",
+        },
+      ]);
+      securityRepository.findByIds.mockResolvedValue([
+        { id: "sec-1", skipPriceUpdates: false, currencyCode: "USD" },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        {
+          security_id: "sec-1",
+          price_date: "2025-03-01",
+          close_price: "100.00",
+        },
+        {
+          security_id: "sec-1",
+          price_date: "2025-03-02",
+          close_price: "100.03",
+        },
+      ]);
+
+      const result = await service.getDailyInvestments(
+        "user-1",
+        "2025-03-01",
+        "2025-03-02",
+      );
+
+      expect(result).toHaveLength(2);
+      expect(result[0].value).toBe(100);
+      expect(result[1].value).toBe(100.03);
+      expect(result[1].value - result[0].value).toBeCloseTo(0.03, 4);
     });
   });
 
@@ -4259,6 +4387,74 @@ describe("NetWorthService", () => {
         unpricedSecurityIds: [],
         missingRatePairs: [],
       });
+    });
+
+    it("carries fractional band and cash values at full precision (P7)", async () => {
+      // groupSecurityBreakdown Math.round-ed each band and the cash band, so a
+      // holding worth 1,004.90 and cash of 5,000.51 shipped 1,005 and 5,001. The
+      // bands stack into `total`, so rounding each one loses grosze from the
+      // stacked total the chart plots; rounding is a presentation step.
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "brok-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_BROKERAGE",
+          currency_code: "USD",
+          opening_balance: 0,
+        },
+        {
+          id: "cash-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_CASH",
+          currency_code: "USD",
+          opening_balance: 5000.51,
+        },
+      ]);
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          account_id: "brok-1",
+          security_id: "sec-1",
+          action: "BUY",
+          quantity: "10",
+          transaction_date: "2024-05-15",
+        },
+      ]);
+
+      securityRepository.findByIds.mockResolvedValue([
+        {
+          id: "sec-1",
+          symbol: "AAPL",
+          name: "Apple Inc.",
+          currencyCode: "USD",
+          skipPriceUpdates: false,
+        },
+      ]);
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          security_id: "sec-1",
+          price_date: "2024-05-31",
+          close_price: "100.49",
+        },
+      ]);
+      reportQuery.mockResolvedValueOnce([]);
+      reportQuery.mockResolvedValueOnce([
+        { account_id: "cash-1", month: "2024-05-01", balance: "5000.51" },
+      ]);
+
+      const result = await service.getInvestmentBreakdown("user-1", {
+        granularity: "monthly",
+        startDate: "2024-05-01",
+        endDate: "2024-05-31",
+      });
+
+      expect(result.points).toHaveLength(1);
+      expect(result.points[0].values["sec-1"]).toBe(1004.9);
+      expect(result.points[0].values.cash).toBe(5000.51);
+      expect(result.points[0].total).toBeCloseTo(6005.41, 4);
     });
 
     /**
