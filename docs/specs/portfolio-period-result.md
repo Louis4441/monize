@@ -641,3 +641,261 @@ deposit.
 The adversarial case, per `docs/financial-calculation-contract.md` section 8:
 case 4. A `totalValue - cash` patch at the two ends passes cases 1-4 and fails
 5, 6, 7 and 9.
+
+---
+
+## 11. Money-weighted return of the invested part
+
+Status: **proposed.** Scope from kenlasko/monize#1392, the third reading of the
+same caption. Sections 10.1-10.8 stay exactly as they are: `IV(t)`, `K(d)`,
+`I(d)`, `investmentPnl` and the daily-chained `investmentReturnPercent` are
+unchanged, and INV-PORTRESULT-002 still governs them. This section adds a
+SECOND FIGURE to that same measure -- the same flows, the same days, the same
+completeness -- answering the question the time-weighted one deliberately does
+not.
+
+### 11.1 The question TWR does not answer
+
+A time-weighted return is the manager's figure: it neutralises every capital
+flow on purpose, so two readers who bought the same fund on the same days see
+the same TWR however differently they sized their purchases. What a reader
+usually means by "what did I earn" is the other one: the rate their OWN money
+earned, with each purchase, sale and distribution weighted by when it happened.
+That is the money-weighted return, and its usual spelling is the XIRR -- the
+internal rate of return over dated cash flows, Excel's `XIRR`, myfund.pl's
+"stopa zwrotu ważona kapitałem".
+
+The two differ exactly where the reader's timing differs from the market's: pay
+more in before a rise and the MWR is above the TWR; pay more in before a fall
+and it is below. Neither is a correction of the other, and neither replaces the
+existing `totalGainLossPercent` ("Simple Return"), which is a cost-basis ratio
+with no time in it at all (section 11.8).
+
+### 11.2 The cash flows
+
+From the INVESTOR's point of view, over `(b, e]`, on the INVESTED part only --
+the same `IV`, `K` and `I` of section 10.2, not one component more:
+
+| When | Flow | Why |
+| --- | --- | --- |
+| `b` | `-IV(b)` | what was already invested is a purchase made on day one |
+| each `d` in `(b, e]` | `-capitalIn(d)` | a buy, a share transfer in, an ADD_SHARES |
+| each `d` in `(b, e]` | `+capitalOut(d)` | a sale, a share transfer out, a REMOVE_SHARES |
+| each `d` in `(b, e]` | `+I(d)` | a dividend, interest, a capital-gain distribution |
+| `e` | `+IV(e)` | the position is notionally liquidated at the end |
+
+Deposits, withdrawals, idle cash and a transfer between the reader's own
+accounts are in none of them, exactly as for the TWR (INV-PORTRESULT-002): they
+are not flows of the invested part. A SPLIT and a REINVEST are neither capital
+nor income here for the same reason section 10.2 gives.
+
+The day-`e` flows and `+IV(e)` carry the same date and are therefore one term;
+so are the day-`b` flows -- there are none, because the window is `(b, e]` and
+`IV(b)` is a close that already holds everything dated `b`.
+
+### 11.3 The figures
+
+- **`investmentMoneyWeightedReturnPercent`** -- the ANNUALISED rate `r`
+  solving
+
+  ```
+  sum_i  CF_i / (1 + r)^((t_i - b)/365)  =  0
+  ```
+
+  as a percentage, actual days over 365 (the XIRR convention). This is the
+  primary number: "XIRR" means an annual rate to every reader who has met one,
+  and it is what myfund calls "średnioroczna".
+- **`investmentMoneyWeightedTotalPercent`** -- `(1 + r)^((e - b)/365) - 1`, as a
+  percentage: the same rate expressed over the window rather than over a year,
+  carried so a later surface can print "since inception" beside the annual
+  figure without re-deriving anything.
+
+  **It is an extrapolation of the rate, not a realised total, and a caption must
+  not say otherwise.** Case 6 below is the proof: money returned in full after
+  one year of a two-year window earns 12.5% annualised, and the total field then
+  reads 26.5625% -- the rate compounded over a window in which the second year
+  held nothing. `investmentPnl` is the realised amount; this field is a rate in
+  another dress.
+- **`investmentMoneyWeightedMethod: "xirr"`** -- named on the wire for the
+  reason `PeriodReturnMethod` and `InvestedReturnMethod` are: a later method is
+  a new union member rather than a silent change of meaning under one caption.
+
+Both percentages are rounded to `PORTFOLIO_MOVE_PERCENT_DECIMALS`, as every
+other ratio in this document is; a percentage is not money and never goes
+through `roundMoney`.
+
+### 11.4 The solver
+
+`xirrAnnualRate` (`backend/src/common/time-series/xirr.util.ts`), pure, no
+dependency, its own spec. It takes flows already folded per day in integer
+ten-thousandths (AGENTS.md, Financial math: money is never accumulated as
+floats) with a whole-day offset from `b`, and answers the annual rate as a
+fraction or `null`.
+
+- **Bracketed bisection** over `(-0.999999, 10]`: a rate at or below -100% makes
+  a discount factor undefined, and a portfolio compounding at more than 1000% a
+  year is a data defect rather than a return. No Newton step: a bracketed method
+  cannot run away from a root, and a derivative-based one has to be told what to
+  do when it does.
+- At most **200 iterations**, and a tolerance of **1e-10** on the NPV in
+  currency units. Bisection halves the bracket every step, so 200 iterations is
+  an upper bound nothing reaches, not a budget the answer depends on.
+- **`null` rather than a number** whenever the schedule does not define one
+  rate:
+  - fewer than two dated flows, or every amount zero -- there is nothing to
+    solve;
+  - no sign change among the amounts (only purchases, or only proceeds) -- no
+    rate exists;
+  - the NPV has the same sign at both ends of the bracket -- the root, if any,
+    is outside the range a return can be reported over;
+  - **several roots.** A refusal, never the first root the search happens to
+    land on: a printed "IRR" that depends on which end the bisection started
+    from is the #1387 class of defect. Uniqueness is accepted on either
+    sufficient condition, and refused otherwise:
+    1. the amounts in date order change sign exactly once (every purchase
+       before every disposal -- a simple investment, whose NPV is strictly
+       decreasing in `r`); or
+    2. the CUMULATIVE flow sequence, in date order, changes sign exactly once
+       (Norstrom's criterion).
+
+    A schedule such as `-1000, +2500, -1600` satisfies neither and is reported
+    as undefined.
+
+### 11.5 Missing data, and the window it refuses to annualise
+
+- **`investedComplete === false` withholds both figures**, with the same
+  `investedReasons` the P&L and the TWR carry. The MWR is a second figure of one
+  measure, not a second measure: it reads the same `IV`, the same `K`, the same
+  `I` and the same uncountable-movement counts, so anything that makes the TWR
+  unreportable makes it unreportable too. There is no branch in which one is a
+  number and the other silently isn't.
+- **A schedule with no defined rate** (11.4) is `null` with the reason
+  `mwrUndefined`, added to `PeriodResultReason`. Both figures go, because both
+  are `r` in different clothes.
+- **A window shorter than 30 days does not get an annual rate.**
+  `investmentMoneyWeightedReturnPercent` is `null` with the reason
+  `windowTooShort`, and `investmentMoneyWeightedTotalPercent` is still reported.
+  A 1% week annualises to 68.0% (case 8) -- a figure that is arithmetically
+  correct, reads as a claim about a year, and moves by tens of points on the
+  next day's close. The total over the window is the same reader's own money
+  weighted the same way, with no extrapolation in it, so it is the honest half
+  of the pair and it stays. Thirty days is a boundary, not a discovery: it is
+  the shortest window over which the annualisation multiplier is under 13.
+- `zeroStart` -- a window in which nothing was ever invested -- has no schedule
+  to solve either: both MWR figures are `null` with the reasons already on the
+  decision. A window in which nothing was invested and nothing was earned is a
+  known zero for the P&L and the TWR (case 1 of section 10.5); the MWR of no
+  capital is not zero, it is undefined, and it says so.
+
+`mwrUndefined` and `windowTooShort` are causes of the MWR alone. Neither
+withholds `investmentPnl` or `investmentReturnPercent`, neither flips
+`investedComplete` (which is about those two), and both print NOTHING at the
+surfaces that summarise a withheld period: `periodResultUnknownReason` falls
+through to `noBaseline` (there is no price, rate or balance to repair) and
+`withheldPeriodCause` returns `null` for them, which is the existing behaviour
+of both functions for a reason they do not name.
+
+### 11.6 Truth table
+
+`b`, `e` and the days between them exactly as section 10.4 defines them.
+
+| investedComplete | window `e - b` | schedule | MWR annual | MWR total | reasons |
+| --- | --- | --- | --- | --- | --- |
+| true | >= 30 days | one rate | number | number | -- |
+| true | >= 30 days | no rate, or several | `null` | `null` | `mwrUndefined` |
+| true | < 30 days | one rate | `null` | number | `windowTooShort` |
+| true | < 30 days | no rate | `null` | `null` | `mwrUndefined` |
+| true, `zeroStart` | any | nothing invested | `null` | `null` | `zeroStart` |
+| false | any | any | `null` | `null` | the decision's own causes |
+| no series | -- | -- | `null` | `null` | `noValueSeries` |
+
+### 11.7 The worked cases
+
+Flat prices unless stated, one currency, `b` the day before the first purchase,
+amounts in the reporting currency. Each rate below is the solver's answer to six
+decimal places.
+
+1. **One purchase, one year, +10%.** `IV(b) = 1,000`, no flow inside the
+   window, `IV(e) = 1,100`, `e - b = 365`. Flows `-1,000 @ b`, `+1,100 @ e`.
+   `1,100 / (1+r) = 1,000` -> **r = 10.000000%**, total **10%**. Equal to the
+   TWR, as it must be: one flow at each end leaves nothing for the weighting to
+   do.
+2. **The same over two years.** `e - b = 730`: `(1+r)^2 = 1.1` ->
+   **r = 4.880885%**, total **10%**. The TWR is 10% (it is not annualised), so
+   the pair reports the same journey at two different cadences, which is why the
+   card labels them rather than printing two bare percentages.
+3. **A second purchase before the rise.** `IV(b) = 1,000` at `b`; the price is
+   flat for a year; on day 365 a second 1,000 is bought; the price then rises
+   10%; `IV(e) = 2,200` on day 730. TWR: factor 1 on the purchase day (the buy
+   enters the base), 1.1 in the second year -> **+10%** over the window,
+   4.880885% a year. MWR: `-1,000 @ 0`, `-1,000 @ 365`, `+2,200 @ 730` ->
+   `x^2 + x - 2.2 = 0`, `x = 1.06524758` -> **r = 6.524758%**, total
+   **13.475242%**. Higher than the TWR's annual figure, and for the reason the
+   tooltip gives: more of the reader's money was invested while the rise
+   happened. This is the adversarial case of section 11 -- a solver that
+   ignored the dates, or weighted by amount alone, reproduces neither figure.
+4. **A dividend halfway.** `IV(b) = 1,000`, price flat, a dividend of 10 (1% of
+   the value) on day 365, `IV(e) = 1,000` on day 730. TWR: one factor of
+   `(1,000 + 10) / 1,000` -> **+1.000000%** over the window. MWR: `-1,000 @ 0`,
+   `+10 @ 365`, `+1,000 @ 730` -> `x^2 - 0.01x - 1 = 0`, `x = 1.00501250` ->
+   **r = 0.501250%** a year, total **1.005012%**. The totals are NOT the same
+   figure, and the difference is the point: the TWR credits the distribution on
+   the day it arrived and stops, while the MWR also credits the reader for
+   having had it a year before the end. Four decimal places apart is exactly
+   what a half-window distribution is worth.
+5. **A late cash deposit.** Case 3 plus 50,000 deposited the day before `e` and
+   left uninvested. It is in no `K`, no `I` and no `IV`, so it is in no flow of
+   11.2: **r = 6.524758%**, unchanged. (The account-level `valueChange` moves by
+   50,000; that is sections 2-5's business.)
+6. **Sold in full inside the window.** `IV(b) = 8,000`; on day 365 the lot is
+   sold for 9,000; `IV(e) = 0` on day 730; the proceeds sit as cash. Flows
+   `-8,000 @ 0`, `+9,000 @ 365`, `0 @ 730` -> **r = 12.500000%**: defined from
+   the sale, and the cash afterwards is not a flow (money that stopped being
+   invested stops earning, the TWR's case 7). The TOTAL field reads
+   `1.125^2 - 1 = 26.5625%`, which is the rate extrapolated over a window whose
+   second year held nothing -- see the caption rule in 11.3.
+7. **An incomplete price inside the window.** Both figures `null`,
+   `investedReasons: ["incompletePrices"]`, exactly as `investmentPnl` and the
+   TWR. Never a rate solved over a schedule with a subtotal in it.
+8. **A seven-day window.** `IV(b) = 1,000`, `IV(e) = 1,010`, `e - b = 7`. The
+   rate exists and is 68.007541% a year; the annual figure is nevertheless
+   `null` with `windowTooShort`, and the total, **1.000000%**, is reported.
+
+### 11.8 Where it is read
+
+| Surface | Figure |
+| --- | --- |
+| Portfolio summary card, "MWR (Money-Weighted)" | `moneyWeightedReturn` since inception, annualised |
+| Portfolio summary (REST, LLM summary, MCP payload) | the same, with `moneyWeightedReturnReasons` |
+| `GET /net-worth/investments-period-result(s)` | both figures per window, for a future toggle |
+| "Portfolio performance" card | NOT shown: six periods times three figures does not fit its column. The payload carries the fields |
+
+The summary's window is the one section 10.7 already defines -- the day before
+the scope's earliest non-VOID investment transaction to `todayYMD()` -- through
+the same `getInvestedResultSinceInception`, so the card's TWR and MWR are two
+answers over ONE series, ONE capital and income load and ONE rate index. A
+portfolio younger than 30 days shows the TWR and `UnknownAmount` for the MWR,
+which is the `windowTooShort` rule reaching the reader.
+
+The card's other two figures keep their own captions and are neither of these:
+`cagr` is growth of the portfolio value against NET INVESTED, with no dates in
+it beyond the first and the last, and `totalGainLossPercent` ("Simple Return")
+is `(market value - cost basis) / cost basis`, which has no time in it at all
+and jumps whenever a purchase enlarges the denominator. Its tooltip says so, in
+the reader's own terms, because a figure that moves when nothing was earned has
+to explain itself where it is printed.
+
+### 11.9 Test matrix
+
+| Suite | Case |
+| --- | --- |
+| `xirr.util.spec.ts` | a single in/out pair equals `(out/in)^(365/days) - 1`; the eight-case schedule set of 11.7; an all-zero schedule, a one-flow schedule and a no-sign-change schedule are `null`; `-1000, +2500, -1600` is `null` (several roots) rather than either root; a Norstrom-only schedule (two raw sign changes, one cumulative) IS solved; a rate beyond the bracket is `null`; the solver is a pure function of its input (no ambient date) |
+| `invested-period-result.util.spec.ts` | the eight cases of 11.7 with their worked numbers; an incomplete day withholds both MWR figures with the same reasons as the TWR; a 7-day window withholds the annual figure and keeps the total; `zeroStart` withholds both |
+| `portfolio-period-results-batch.service.spec.ts` | batch == single on the new fields, preset by preset |
+| `portfolio.service.spec.ts` | the summary carries `moneyWeightedReturn` and `moneyWeightedReturnReasons` from the since-inception slice, withholds with the cause, and rounds like the other percentages |
+| `PortfolioSummaryCard.test.tsx` | the fourth figure renders; a withheld one renders `UnknownAmount` with the reason; both tooltips carry their copy |
+
+The adversarial case, per `docs/financial-calculation-contract.md` section 8:
+case 3. An implementation that returns the TWR under the MWR's caption, or that
+solves the rate over undated flows, passes cases 1, 2, 5 and 7 and fails 3, 4
+and 6.
