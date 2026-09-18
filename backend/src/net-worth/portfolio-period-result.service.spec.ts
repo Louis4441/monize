@@ -356,6 +356,117 @@ describe("PortfolioPeriodResultService", () => {
   });
 
   /**
+   * The union sets say WHAT is missing; the ranges say when, which is the
+   * difference between "no price" and "AGGG, Jun 3 to Jun 5" (#1392). The fold
+   * runs over the whole window, not the two boundaries, because a gap in the
+   * middle is what breaks the time-weighted chain.
+   */
+  describe("incompleteRanges", () => {
+    const unpricedOn = (dates: string[]) =>
+      [
+        "2026-06-01",
+        "2026-06-02",
+        "2026-06-03",
+        "2026-06-04",
+        "2026-06-05",
+        "2026-06-06",
+        "2026-06-07",
+        "2026-06-08",
+        "2026-06-09",
+      ].map((date) =>
+        dates.includes(date)
+          ? point(date, 10_000, {
+              pricesComplete: false,
+              unpricedSecurityIds: ["sec-1"],
+            })
+          : point(date, 10_000),
+      );
+
+    it("reports nothing for a window with no gap", async () => {
+      netWorth.getDailyInvestments.mockResolvedValue(flatSeries());
+
+      const result = await run();
+
+      expect(result.incompleteRanges).toEqual({
+        prices: [],
+        rates: [],
+        cash: [],
+        truncated: { prices: false, rates: false, cash: false },
+      });
+    });
+
+    it("folds a security unpriced on days 3-5 and 9 into two runs", async () => {
+      netWorth.getDailyInvestments.mockResolvedValue(
+        unpricedOn(["2026-06-03", "2026-06-04", "2026-06-05", "2026-06-09"]),
+      );
+
+      const result = await run({ startDate: "2026-06-01" });
+
+      expect(result.incompleteRanges.prices).toEqual([
+        { key: "sec-1", start: "2026-06-03", end: "2026-06-05" },
+        { key: "sec-1", start: "2026-06-09", end: "2026-06-09" },
+      ]);
+      expect(result.incompleteRanges.truncated.prices).toBe(false);
+    });
+
+    it("dates a missing rate and a cash account with no balance", async () => {
+      netWorth.getDailyInvestments.mockResolvedValue([
+        point("2026-06-01", 10_000),
+        {
+          ...point("2026-06-02", 10_000, {
+            fxComplete: false,
+            cashComplete: false,
+            unknownCashAccountIds: ["cash-1"],
+          }),
+          missingRatePairs: ["USD->CAD"],
+        },
+        {
+          ...point("2026-06-03", 10_000, { fxComplete: false }),
+          missingRatePairs: ["USD->CAD"],
+        },
+      ]);
+
+      const result = await run({ startDate: "2026-06-01" });
+
+      expect(result.incompleteRanges.rates).toEqual([
+        { key: "USD->CAD", start: "2026-06-02", end: "2026-06-03" },
+      ]);
+      expect(result.incompleteRanges.cash).toEqual([
+        { key: "cash-1", start: "2026-06-02", end: "2026-06-02" },
+      ]);
+    });
+
+    it("keeps the newest runs, and says so, past the per-cause bound", async () => {
+      // Every other day unpriced over 220 days is 110 runs; the response
+      // carries the newest 50 rather than all of them.
+      const series = Array.from({ length: 220 }, (_, i) => {
+        const date = new Date(Date.UTC(2026, 0, 1 + i))
+          .toISOString()
+          .slice(0, 10);
+        return i % 2 === 0
+          ? point(date, 10_000, {
+              pricesComplete: false,
+              unpricedSecurityIds: ["sec-1"],
+            })
+          : point(date, 10_000);
+      });
+      netWorth.getDailyInvestments.mockResolvedValue(series);
+
+      const result = await run({ startDate: "2026-01-01" });
+
+      expect(result.incompleteRanges.prices).toHaveLength(50);
+      expect(result.incompleteRanges.truncated.prices).toBe(true);
+      // The tail, so the runs a reader can still act on are the ones kept.
+      const newest = result.incompleteRanges.prices[49];
+      expect(newest).toEqual({
+        key: "sec-1",
+        start: series[218].date,
+        end: series[218].date,
+      });
+    });
+  });
+
+  /**
    * The audit's case (#1389, F1): a 10,000 BUY settled from a chequing account.
    * The purchase raises the market value by 10,000 and leaves no cash leg in
    * the scope, so the flow query sees nothing and a subtraction of the two

@@ -28,6 +28,11 @@ import {
   foldFlowSubtotals,
 } from "./period-flow-fold.util";
 import {
+  EMPTY_INCOMPLETE_RANGES,
+  IncompleteDataRanges,
+  foldIncompleteData,
+} from "./incomplete-data-ranges.util";
+import {
   PeriodResultReason,
   PeriodReturnMethod,
   UnmeasuredFlowCounts,
@@ -100,6 +105,14 @@ export interface PortfolioPeriodResult {
   missingRatePairs: string[];
   unpricedSecurityIds: string[];
   unknownCashAccountIds: string[];
+  /**
+   * The same three causes DATED: each key's runs of consecutive points over the
+   * window, rather than the union sets above, which say what is missing and not
+   * when. "AGGG, Jun 16-20" is a repair; a set of ids is a guess
+   * (`docs/specs/portfolio-period-result.md` section 10.7). Bounded per cause;
+   * `truncated` says a list is the newest runs rather than all of them.
+   */
+  incompleteRanges: IncompleteDataRanges;
 
   // The invested part of the same window: securities only, cash excluded
   // entirely (INV-PORTRESULT-002, `docs/specs/portfolio-period-result.md`
@@ -300,6 +313,11 @@ export class PortfolioPeriodResultService {
       startDate: series[0].date,
       endDate: series[series.length - 1].date,
       ...decision,
+      // The whole window's points, not only its two boundaries: a gap in the
+      // middle is what withholds the time-weighted chain, and the reader is
+      // told which security on which days rather than that "a price" is
+      // missing (#1392).
+      incompleteRanges: foldIncompleteData(series),
       ...investedDecision,
     };
   }
@@ -406,6 +424,7 @@ export class PortfolioPeriodResultService {
       missingRatePairs: [],
       unpricedSecurityIds: [],
       unknownCashAccountIds: [],
+      incompleteRanges: EMPTY_INCOMPLETE_RANGES,
       ...NO_INVESTED_PERIOD,
     };
   }

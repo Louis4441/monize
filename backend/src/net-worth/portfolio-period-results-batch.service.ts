@@ -31,6 +31,10 @@ import {
 } from "./portfolio-period-result.service";
 import { decidePeriodResult } from "./portfolio-period-result.util";
 import {
+  EMPTY_INCOMPLETE_RANGES,
+  foldIncompleteData,
+} from "./incomplete-data-ranges.util";
+import {
   loadUnmeasuredFlowRows,
   unmeasuredFlowsAfter,
 } from "./unmeasured-flows.util";
@@ -144,6 +148,7 @@ export class PortfolioPeriodResultsBatchService {
         end: null,
         flow: { complete: true, value: 0, missingPairs: [] },
       }),
+      incompleteRanges: EMPTY_INCOMPLETE_RANGES,
       ...NO_INVESTED_PERIOD,
     });
 
@@ -272,17 +277,23 @@ export class PortfolioPeriodResultsBatchService {
         this.logger,
       );
       const unmeasuredFlows = unmeasuredFlowsAfter(unmeasuredRows, from);
+      const startIndex = series.indexOf(start);
       periods[preset] = {
         currency,
         startDate: start.date,
         endDate: last.date,
         ...decidePeriodResult({ start, end: last, flow, unmeasuredFlows }),
+        // This preset's OWN slice of the one series, so a preset reports the
+        // gaps inside its window and not the wider window's: the single-range
+        // route folds exactly the points it valued, and these two must answer
+        // the same thing for the same window.
+        incompleteRanges: foldIncompleteData(series.slice(startIndex)),
         // The same one series, sliced at this preset's own boundary: the TWR
         // for a preset is a product over that preset's days, O(days), over the
         // per-day flows folded once above.
         ...investedPeriodResult({
           points: series,
-          startIndex: series.indexOf(start),
+          startIndex,
           endIndex: series.length - 1,
           flowsByDay: investedByDay,
           unmeasuredFlows,

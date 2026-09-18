@@ -252,6 +252,42 @@ describe("PortfolioPeriodResultsBatchService", () => {
     );
   });
 
+  it("dates each preset's gaps from its own slice, as the single route does", async () => {
+    // Two outages of one security: one inside the 3M window, one only the
+    // wider windows reach back to. A preset folding the whole series would
+    // report a gap from before its own window opened, which is a repair the
+    // reader's figure does not depend on (#1392).
+    const unpriced = (date: string) => {
+      const p = series.find((point) => point.date === date)!;
+      p.pricesComplete = false;
+      p.unpricedSecurityIds = ["sec-1"];
+    };
+    unpriced("2026-01-05");
+    unpriced("2026-01-06");
+    unpriced("2026-08-10");
+
+    const results = await batch.getPeriodResults("user-1");
+
+    for (const preset of PORTFOLIO_PERIOD_PRESETS) {
+      const expected = await single.getPeriodResult(
+        "user-1",
+        singleRouteArgs(preset),
+      );
+      expect(results.periods[preset]?.incompleteRanges).toEqual(
+        expected.incompleteRanges,
+      );
+    }
+    // Not a vacuous comparison of two empty lists: the year holds both runs,
+    // the quarter only the newer one.
+    expect(results.periods["1y"]?.incompleteRanges.prices).toEqual([
+      { key: "sec-1", start: "2026-01-05", end: "2026-01-06" },
+      { key: "sec-1", start: "2026-08-10", end: "2026-08-10" },
+    ]);
+    expect(results.periods["3m"]?.incompleteRanges.prices).toEqual([
+      { key: "sec-1", start: "2026-08-10", end: "2026-08-10" },
+    ]);
+  });
+
   it("builds the value series once, over the widest window asked for", async () => {
     await batch.getPeriodResults("user-1");
 
