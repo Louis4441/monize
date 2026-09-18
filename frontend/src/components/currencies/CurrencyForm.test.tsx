@@ -10,10 +10,16 @@ vi.mock('@hookform/resolvers/zod', () => ({
 }));
 
 const mockLookupCurrency = vi.fn().mockResolvedValue(null);
+const mockGetRateCoverage = vi.fn();
 
 vi.mock('@/lib/exchange-rates', () => ({
   exchangeRatesApi: {
     lookupCurrency: (...args: any[]) => mockLookupCurrency(...args),
+    // The edit dialog carries the rate-history section, which reads coverage on
+    // mount and the rate table through `useExchangeRates`.
+    getRateCoverage: (...args: any[]) => mockGetRateCoverage(...args),
+    extendRateHistory: vi.fn(),
+    getLatestRates: () => Promise.resolve([]),
   },
 }));
 
@@ -32,6 +38,13 @@ describe('CurrencyForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockLookupCurrency.mockResolvedValue(null);
+    mockGetRateCoverage.mockResolvedValue({
+      from: 'USD',
+      to: 'CAD',
+      earliestDate: '2026-01-02',
+      latestDate: '2026-09-16',
+      observations: 180,
+    });
   });
 
   it('renders create form fields', () => {
@@ -47,7 +60,7 @@ describe('CurrencyForm', () => {
     expect(screen.getByText('Create Currency')).toBeInTheDocument();
   });
 
-  it('shows Update Currency button when editing', () => {
+  it('shows Update Currency button when editing', async () => {
     const currency = {
       code: 'USD',
       name: 'US Dollar',
@@ -57,7 +70,10 @@ describe('CurrencyForm', () => {
       isSystem: false,
       createdAt: '2025-01-01T00:00:00Z',
     } as any;
-    render(<CurrencyForm currency={currency} onSubmit={onSubmit} onCancel={onCancel} />);
+    // Awaited: the edit dialog's rate-history section loads coverage on mount.
+    await act(async () => {
+      render(<CurrencyForm currency={currency} onSubmit={onSubmit} onCancel={onCancel} />);
+    });
     expect(screen.getByText('Update Currency')).toBeInTheDocument();
   });
 
@@ -66,7 +82,7 @@ describe('CurrencyForm', () => {
     expect(screen.getByText('Lookup')).toBeInTheDocument();
   });
 
-  it('hides Lookup button when editing', () => {
+  it('hides Lookup button when editing', async () => {
     const currency = {
       code: 'EUR',
       name: 'Euro',
@@ -76,8 +92,34 @@ describe('CurrencyForm', () => {
       isSystem: true,
       createdAt: '2025-01-01T00:00:00Z',
     } as any;
-    render(<CurrencyForm currency={currency} onSubmit={onSubmit} onCancel={onCancel} />);
+    // Awaited: the edit dialog's rate-history section loads coverage on mount.
+    await act(async () => {
+      render(<CurrencyForm currency={currency} onSubmit={onSubmit} onCancel={onCancel} />);
+    });
     expect(screen.queryByText('Lookup')).not.toBeInTheDocument();
+  });
+
+  it('shows the rate history section when editing a non-default currency', async () => {
+    const currency = {
+      code: 'EUR',
+      name: 'Euro',
+      symbol: '€',
+      decimalPlaces: 2,
+      isActive: true,
+      isSystem: true,
+      createdAt: '2025-01-01T00:00:00Z',
+    } as any;
+    await act(async () => {
+      render(<CurrencyForm currency={currency} onSubmit={onSubmit} onCancel={onCancel} />);
+    });
+    expect(screen.getByText('Rate history')).toBeInTheDocument();
+    expect(mockGetRateCoverage).toHaveBeenCalledWith('EUR');
+  });
+
+  it('hides the rate history section in create mode', () => {
+    render(<CurrencyForm onSubmit={onSubmit} onCancel={onCancel} />);
+    expect(screen.queryByText('Rate history')).not.toBeInTheDocument();
+    expect(mockGetRateCoverage).not.toHaveBeenCalled();
   });
 
   it('calls onCancel when cancel is clicked', () => {
@@ -86,7 +128,7 @@ describe('CurrencyForm', () => {
     expect(onCancel).toHaveBeenCalled();
   });
 
-  it('disables currency code input when editing', () => {
+  it('disables currency code input when editing', async () => {
     const currency = {
       code: 'CAD',
       name: 'Canadian Dollar',
@@ -96,7 +138,10 @@ describe('CurrencyForm', () => {
       isSystem: true,
       createdAt: '2025-01-01T00:00:00Z',
     } as any;
-    render(<CurrencyForm currency={currency} onSubmit={onSubmit} onCancel={onCancel} />);
+    // Awaited: the edit dialog's rate-history section loads coverage on mount.
+    await act(async () => {
+      render(<CurrencyForm currency={currency} onSubmit={onSubmit} onCancel={onCancel} />);
+    });
     const codeInput = screen.getByDisplayValue('CAD');
     expect(codeInput).toBeDisabled();
   });

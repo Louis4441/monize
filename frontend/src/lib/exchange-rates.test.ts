@@ -91,6 +91,84 @@ describe('exchangeRatesApi', () => {
     });
   });
 
+  describe('getRateCoverage', () => {
+    it('fetches the stored coverage for a code', async () => {
+      const coverage = {
+        from: 'EUR',
+        to: 'PLN',
+        earliestDate: '2026-01-02',
+        latestDate: '2026-09-16',
+        observations: 180,
+      };
+      vi.mocked(apiClient.get).mockResolvedValue({ data: coverage });
+
+      const result = await exchangeRatesApi.getRateCoverage('EUR');
+
+      expect(apiClient.get).toHaveBeenCalledWith(
+        '/currencies/exchange-rates/coverage',
+        { params: { code: 'EUR' } },
+      );
+      expect(result).toEqual(coverage);
+    });
+
+    // Not deduped: the dialog re-reads it immediately after an extension wrote
+    // rows, and a cached answer would report the history it just replaced.
+    it('asks the server again on a second call', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: { observations: 0 } });
+
+      await exchangeRatesApi.getRateCoverage('EUR');
+      await exchangeRatesApi.getRateCoverage('EUR');
+
+      expect(apiClient.get).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('extendRateHistory', () => {
+    it('posts the code and returns the extension summary', async () => {
+      const extension = {
+        from: 'EUR',
+        to: 'PLN',
+        requestedFrom: '2025-01-02',
+        requestedTo: '2026-01-01',
+        stored: 240,
+        earliestDate: '2025-01-02',
+        answered: true,
+      };
+      vi.mocked(apiClient.post).mockResolvedValue({ data: extension });
+
+      const result = await exchangeRatesApi.extendRateHistory('EUR');
+
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/currencies/exchange-rates/extend-history',
+        { code: 'EUR' },
+      );
+      expect(result).toEqual(extension);
+    });
+
+    it('drops the cached rate reads so a dated lookup sees the new rows', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [{ rate: 1.36 }] });
+      await exchangeRatesApi.getLatestRates();
+      expect(apiClient.get).toHaveBeenCalledTimes(1);
+
+      vi.mocked(apiClient.post).mockResolvedValue({ data: { stored: 240 } });
+      await exchangeRatesApi.extendRateHistory('EUR');
+
+      await exchangeRatesApi.getLatestRates();
+      expect(apiClient.get).toHaveBeenCalledTimes(2);
+    });
+
+    it('leaves the cache alone when the request fails', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [{ rate: 1.36 }] });
+      await exchangeRatesApi.getLatestRates();
+      vi.mocked(apiClient.post).mockRejectedValue(new Error('503'));
+
+      await expect(exchangeRatesApi.extendRateHistory('EUR')).rejects.toThrow();
+
+      await exchangeRatesApi.getLatestRates();
+      expect(apiClient.get).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('refreshRates', () => {
     it('posts to /currencies/exchange-rates/refresh', async () => {
       vi.mocked(apiClient.post).mockResolvedValue({ data: { updated: 5 } });
