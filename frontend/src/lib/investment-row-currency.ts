@@ -27,3 +27,21 @@ export function rowPriceCurrency(tx: InvestmentTransaction): string | null {
 export function rowCommissionCurrency(tx: InvestmentTransaction): string | null {
   return tx.commissionCurrencyCode ?? tx.security?.currencyCode ?? null;
 }
+
+/**
+ * Which rate converts this row wherever it is reported in the reader's own
+ * currency: its own settlement rate, or the market rate on its trade date.
+ *
+ * The row's rate is the one the realized-gains report multiplies by and the one
+ * the summary KPIs now use, so the export states it per row rather than leaving
+ * a reader to wonder which of two figures for one sale is the broker's
+ * (INV-FX-002). A non-positive or absent rate is not a rate: such a row is
+ * converted at the market rate on its trade date, which is what the server
+ * counts in `marketRateCount`.
+ */
+export function rowConversionBasis(
+  tx: InvestmentTransaction,
+): 'transaction' | 'market' {
+  const rate = Number(tx.exchangeRate);
+  return Number.isFinite(rate) && rate > 0 ? 'transaction' : 'market';
+}

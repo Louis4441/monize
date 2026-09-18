@@ -8,6 +8,7 @@ import { investmentReportsApi } from '@/lib/investment-reports';
 import {
   rowAmountCurrency,
   rowCommissionCurrency,
+  rowConversionBasis,
   rowPriceCurrency,
 } from '@/lib/investment-row-currency';
 import {
@@ -35,6 +36,7 @@ import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Ta
 import { PartialTotal } from '@/components/ui/PartialTotal';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
 import type { ConvertedTotal } from '@/lib/currency-total';
+import { priceDecimals, TRADE_PRICE_DISPLAY_DECIMALS } from '@/lib/security-detail';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 import { useTranslations } from 'next-intl';
@@ -165,6 +167,23 @@ export function InvestmentTransactionHistoryReport() {
     [formatCurrencyFull, defaultCurrency],
   );
 
+  /**
+   * A per-share price, at the decimals the stored figure actually carries.
+   *
+   * A price derived from an executed total is a quotient -- 141 shares for
+   * 820.91 went at 5.822057 -- and the reader's currency decimals round that
+   * back to the two-decimal figure this report is here to stop reporting.
+   */
+  const fmtRowPrice = useCallback(
+    (value: number, currency: string | null): string | null => {
+      if (currency === null) return null;
+      const decimals = priceDecimals([value], TRADE_PRICE_DISPLAY_DECIMALS);
+      const text = formatCurrencyFull(value, currency, decimals);
+      return currency === defaultCurrency ? text : `${text} ${currency}`;
+    },
+    [formatCurrencyFull, defaultCurrency],
+  );
+
   // Fetch accounts once on mount
   useEffect(() => {
     investmentsApi.getInvestmentAccounts()
@@ -262,6 +281,29 @@ export function InvestmentTransactionHistoryReport() {
    * the request has not answered yet.
    */
   const unknownKpi = tCommon('unknownAmount.marker');
+
+  /**
+   * The one line under the KPIs naming the rate each row was converted at.
+   *
+   * Nothing to say when no row needed converting at all -- every amount is
+   * already in the reader's currency, so neither count is above zero and a
+   * sentence about rates would invent a question nobody asked.
+   */
+  const conversionNote = useMemo<string | null>(() => {
+    if (!summary) return null;
+    const own = summary.transactionRateCount;
+    const market = summary.marketRateCount;
+    const onward = summary.onwardMarketCount;
+    if (own === 0 && market === 0) return null;
+    if (own === 0) return t('investmentTransactions.convertedAtMarketRate', { count: market });
+    const base =
+      market === 0
+        ? t('investmentTransactions.convertedAtOwnRate')
+        : t('investmentTransactions.convertedAtOwnRateWithMarket', { count: market });
+    return onward > 0
+      ? `${base} ${t('investmentTransactions.convertedOnward', { count: onward })}`
+      : base;
+  }, [summary, t]);
 
   /** The KPI's own figure, in the reporting currency the server named. */
   const fmtReportingMoney = useCallback(
@@ -390,7 +432,7 @@ export function InvestmentTransactionHistoryReport() {
       csvValue: (tx, formatted) =>
         tx.price != null
           ? formatted
-            ? (fmtRowMoney(tx.price, rowPriceCurrency(tx)) ?? tCommon('unknownAmount.marker'))
+            ? (fmtRowPrice(tx.price, rowPriceCurrency(tx)) ?? tCommon('unknownAmount.marker'))
             : tx.price
           : '',
     },
@@ -404,7 +446,7 @@ export function InvestmentTransactionHistoryReport() {
             tCommon('unknownAmount.marker'))
           : Math.abs(tx.totalAmount),
     },
-  }), [t, tCommon, actionLabels, accountNameMap, fmtRowMoney, formatShareQuantity]);
+  }), [t, tCommon, actionLabels, accountNameMap, fmtRowMoney, fmtRowPrice, formatShareQuantity]);
 
   /**
    * The export's own columns, for the CSV and the PDF alike.
@@ -442,6 +484,15 @@ export function InvestmentTransactionHistoryReport() {
       {
         label: t('investmentTransactions.colCommissionCurrency'),
         value: (tx: InvestmentTransaction) => rowCommissionCurrency(tx) ?? '',
+      },
+      {
+        // Which rate the converted figures above the table were struck at for
+        // this row: its own settlement rate, or the market rate on its date.
+        label: t('investmentTransactions.colConversionBasis'),
+        value: (tx: InvestmentTransaction) =>
+          rowConversionBasis(tx) === 'transaction'
+            ? t('investmentTransactions.basisTransaction')
+            : t('investmentTransactions.basisMarket'),
       },
       {
         label: t('investmentTransactions.colCommission'),
@@ -631,6 +682,16 @@ export function InvestmentTransactionHistoryReport() {
           </div>
         </div>
       </div>
+
+      {/* Which rate answered. One sale used to read one figure here and another
+          in the realized-gains report, with nothing on either saying why: these
+          KPIs converted every row at the market rate on its trade date while
+          the gains report multiplied by the rate the trade actually settled at.
+          The row's own rate wins on both surfaces now, and this line says how
+          many rows had none (INV-FX-002). */}
+      {conversionNote && (
+        <p className="text-xs text-gray-500 dark:text-gray-400">{conversionNote}</p>
+      )}
 
       {/* Controls */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">

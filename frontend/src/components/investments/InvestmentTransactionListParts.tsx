@@ -10,6 +10,7 @@ import {
   supportsAccruedInterest,
 } from '@/lib/investment-actions';
 import { rowAmountCurrency, rowPriceCurrency } from '@/lib/investment-row-currency';
+import { priceDecimals, TRADE_PRICE_DISPLAY_DECIMALS } from '@/lib/security-detail';
 import type { RowAction } from '@/components/ui/row-actions/rowAction';
 
 /**
@@ -212,7 +213,16 @@ export function InvestmentPriceValue({
   if (!currencyCode) return <UnknownAmount reason="unknownCurrency" />;
   return (
     <>
-      {formatCurrency(tx.price, currencyCode, 4)}
+      {/* Four decimals unless the stored price needs more of its own: a price
+          derived from an executed total is a quotient (141 shares for 820.91
+          went at 5.822057), and rounding it to the column's old width printed
+          a figure that does not multiply back to the total beside it. Capped
+          at six, the most a person reads. */}
+      {formatCurrency(
+        tx.price,
+        currencyCode,
+        Math.max(4, priceDecimals([tx.price], TRADE_PRICE_DISPLAY_DECIMALS)),
+      )}
       {currencyCode !== defaultCurrency && <span className="ml-1">{currencyCode}</span>}
     </>
   );

@@ -79,6 +79,9 @@ function summaryFixture(over: Record<string, unknown> = {}) {
     byAction: [],
     amountCurrencies: [],
     hasUnknownCurrency: false,
+    transactionRateCount: 0,
+    marketRateCount: 0,
+    onwardMarketCount: 0,
     ...over,
   };
 }
@@ -528,6 +531,43 @@ describe('InvestmentTransactionHistoryReport', () => {
       expect(mockGetTransactions).toHaveBeenCalledWith(
         expect.objectContaining({ accountIds: 'acc-1' }),
       );
+    });
+  });
+  describe('which rate converted each row', () => {
+    /**
+     * Invariant: a row carrying its own exchange rate is converted at that rate
+     * on every surface, and the surface says which rate it used (INV-FX-002).
+     * Canonical adversarial input: a filtered set where most rows settled at
+     * their own rate and one did not.
+     * Minimal mutation: drop the line.
+     * Test that fails under it: this one -- the KPIs and the realized-gains
+     * report show two figures for one sale with nothing explaining either.
+     */
+    it('names the rows converted at the market rate for want of their own', async () => {
+      mockGetTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      mockGetTransactionSummary.mockResolvedValue(
+        summaryFixture({ transactionRateCount: 4, marketRateCount: 2 }),
+      );
+      render(<InvestmentTransactionHistoryReport />);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/2 rows without one use the market rate/),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('says nothing when no row needed converting at all', async () => {
+      mockGetTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      mockGetTransactionSummary.mockResolvedValue(summaryFixture());
+      render(<InvestmentTransactionHistoryReport />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Total Transactions')).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/market rate/)).not.toBeInTheDocument();
     });
   });
 });

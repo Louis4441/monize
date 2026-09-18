@@ -374,7 +374,30 @@ export interface InvestmentTransactionSummary extends InvestmentConvertedAggrega
   amountCurrencies: string[];
   /** True when some row names no security, so its amount has no unit at all. */
   hasUnknownCurrency: boolean;
+  /**
+   * Rows converted at their OWN stored rate -- the rate the trade settled at,
+   * which is the one the realized-gains report multiplies by. A row already in
+   * the reporting currency is in neither count: nothing was converted.
+   */
+  transactionRateCount: number;
+  /**
+   * Rows with no usable rate of their own, converted at the market rate that
+   * stood on their trade date. The report names this count.
+   */
+  marketRateCount: number;
+  /**
+   * Rows inside `transactionRateCount` whose own rate only reached their
+   * settlement currency, carried onward at the market rate from there.
+   */
+  onwardMarketCount: number;
 }
+
+/**
+ * Which rate converted one row: its own stored settlement rate, the market rate
+ * on its trade date, or neither (nothing to convert). Mirrors the backend's
+ * `InvestmentConversionBasis`.
+ */
+export type InvestmentConversionBasis = 'transaction' | 'market' | null;
 
 export interface SecurityHistoryAccount {
   accountId: string;
@@ -563,6 +586,13 @@ export interface CreateInvestmentTransactionData {
   transactionDate: string;
   quantity?: number;
   price?: number;
+  /**
+   * What the trade actually came to, in the security's currency: commission
+   * included on an acquisition, deducted on a disposal, accrued interest left
+   * out. Sent, it is the fact -- the server stores it as given and derives the
+   * price from it (INV-TRADE-001). Omitted, the total comes from the price.
+   */
+  totalAmount?: number;
   commission?: number;
   /** REDEEM only. Recorded as a linked INTEREST transaction, not a second cash entry. */
   accruedInterest?: number;
