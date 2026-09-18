@@ -9,6 +9,7 @@ import { ExchangeRate } from "../currencies/entities/exchange-rate.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { NetWorthService } from "./net-worth.service";
 import { PortfolioPeriodResultService } from "./portfolio-period-result.service";
+import { PortfolioPeriodResultsBatchService } from "./portfolio-period-results-batch.service";
 import { NetWorthController } from "./net-worth.controller";
 import { DelegationModule } from "../delegation/delegation.module";
 import { NotificationsModule } from "../notifications/notifications.module";
@@ -37,8 +38,16 @@ import { CurrenciesModule } from "../currencies/currencies.module";
     // here through SecuritiesModule, so forwardRef.
     forwardRef(() => CurrenciesModule),
   ],
-  providers: [NetWorthService, PortfolioPeriodResultService],
+  providers: [
+    NetWorthService,
+    PortfolioPeriodResultService,
+    PortfolioPeriodResultsBatchService,
+  ],
   controllers: [NetWorthController],
-  exports: [NetWorthService, PortfolioPeriodResultService],
+  exports: [
+    NetWorthService,
+    PortfolioPeriodResultService,
+    PortfolioPeriodResultsBatchService,
+  ],
 })
 export class NetWorthModule {}

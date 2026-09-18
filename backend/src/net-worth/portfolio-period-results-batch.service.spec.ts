@@ -65,7 +65,8 @@ function point(date: string, value: number): SeriesPoint {
 function canonicalSeries(from = "2025-09-17", to = TODAY): SeriesPoint[] {
   const points: SeriesPoint[] = [];
   for (let date = from; date <= to; date = addDaysYMD(date, 1)) {
-    const value = date === TODAY ? 20_200 : date >= "2026-06-01" ? 20_000 : 10_000;
+    const value =
+      date === TODAY ? 20_200 : date >= "2026-06-01" ? 20_000 : 10_000;
     points.push(point(date, value));
   }
   return points;

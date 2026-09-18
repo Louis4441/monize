@@ -3,6 +3,7 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { NetWorthController } from "./net-worth.controller";
 import { NetWorthService } from "./net-worth.service";
 import { PortfolioPeriodResultService } from "./portfolio-period-result.service";
+import { PortfolioPeriodResultsBatchService } from "./portfolio-period-results-batch.service";
 import { DelegationService } from "../delegation/delegation.service";
 import { JointAccountsService } from "../delegation/joint-accounts.service";
 
@@ -11,6 +12,9 @@ describe("NetWorthController", () => {
   let mockNetWorthService: Partial<Record<keyof NetWorthService, jest.Mock>>;
   let mockPeriodResult: Partial<
     Record<keyof PortfolioPeriodResultService, jest.Mock>
+  >;
+  let mockPeriodResults: Partial<
+    Record<keyof PortfolioPeriodResultsBatchService, jest.Mock>
   >;
   let delegationService: Record<string, jest.Mock>;
   let jointAccounts: Record<string, jest.Mock>;
@@ -29,6 +33,7 @@ describe("NetWorthController", () => {
       recalculateAllAccounts: jest.fn(),
     };
     mockPeriodResult = { getPeriodResult: jest.fn() };
+    mockPeriodResults = { getPeriodResults: jest.fn() };
     delegationService = {
       readableAccountIds: jest.fn().mockResolvedValue([]),
     };
@@ -47,6 +52,10 @@ describe("NetWorthController", () => {
         {
           provide: PortfolioPeriodResultService,
           useValue: mockPeriodResult,
+        },
+        {
+          provide: PortfolioPeriodResultsBatchService,
+          useValue: mockPeriodResults,
         },
         { provide: DelegationService, useValue: delegationService },
         { provide: JointAccountsService, useValue: jointAccounts },
@@ -248,6 +257,73 @@ describe("NetWorthController", () => {
         controller.getFirstPricedDay(mockReq, "2026-01-01", "not-a-uuid"),
       ).rejects.toThrow(BadRequestException);
       expect(mockNetWorthService.getFirstPricedDay).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("getPeriodResults()", () => {
+    it("passes the presets and the scope through", async () => {
+      mockPeriodResults.getPeriodResults!.mockReturnValue("results");
+
+      const result = await controller.getPeriodResults(
+        mockReq,
+        "1d,1w,ytd",
+        UUID_A,
+        "usdx",
+      );
+
+      expect(result).toBe("results");
+      expect(mockPeriodResults.getPeriodResults).toHaveBeenCalledWith(
+        "user-1",
+        {
+          periods: ["1d", "1w", "ytd"],
+          accountIds: [UUID_A],
+          displayCurrency: "USD",
+        },
+      );
+    });
+
+    it("asks for every preset when none is named", async () => {
+      mockPeriodResults.getPeriodResults!.mockReturnValue("results");
+
+      await controller.getPeriodResults(mockReq);
+
+      expect(mockPeriodResults.getPeriodResults).toHaveBeenCalledWith(
+        "user-1",
+        {
+          periods: [],
+          accountIds: undefined,
+          displayCurrency: undefined,
+        },
+      );
+    });
+
+    it("rejects a period that is not a preset", async () => {
+      await expect(
+        controller.getPeriodResults(mockReq, "1d,10y"),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(mockPeriodResults.getPeriodResults).not.toHaveBeenCalled();
+    });
+
+    it("rejects an accountId that is not a UUID", async () => {
+      await expect(
+        controller.getPeriodResults(mockReq, "1m", "not-a-uuid"),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("scopes the accounts to what an acting delegate may read", async () => {
+      mockPeriodResults.getPeriodResults!.mockReturnValue("ok");
+      delegationService.readableAccountIds.mockResolvedValue([UUID_A]);
+
+      await controller.getPeriodResults(
+        { user: { id: "owner-1", isActing: true, delegationId: "d-1" } },
+        "1m",
+        `${UUID_A},${UUID_B}`,
+      );
+
+      expect(mockPeriodResults.getPeriodResults).toHaveBeenCalledWith(
+        "owner-1",
+        expect.objectContaining({ accountIds: [UUID_A] }),
+      );
     });
   });
 

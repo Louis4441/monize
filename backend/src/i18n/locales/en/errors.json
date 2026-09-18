@@ -350,7 +350,8 @@
     "invalidEndDate": "endDate must be YYYY-MM-DD",
     "invalidBaselineDate": "baselineDate must be YYYY-MM-DD",
     "invalidAccountIds": "accountIds must be comma-separated UUIDs",
-    "invalidGranularity": "granularity must be 'daily' or 'monthly'"
+    "invalidGranularity": "granularity must be 'daily' or 'monthly'",
+    "invalidPeriods": "periods must be comma-separated period presets"
   },
   "notifications": {
     "notFound": "Notification with ID {{ id }} not found",

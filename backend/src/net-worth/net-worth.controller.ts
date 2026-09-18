@@ -19,6 +19,12 @@ import {
 import { assertStringParam } from "../common/query-param-utils";
 import { NetWorthService, JointNetWorthScope } from "./net-worth.service";
 import { PortfolioPeriodResultService } from "./portfolio-period-result.service";
+import { PortfolioPeriodResultsBatchService } from "./portfolio-period-results-batch.service";
+import {
+  PORTFOLIO_PERIOD_PRESETS,
+  PortfolioPeriodPreset,
+  isPortfolioPeriodPreset,
+} from "./portfolio-period-presets.util";
 import {
   AllowDelegate,
   DelegateRequiresSection,
@@ -39,6 +45,7 @@ export class NetWorthController {
   constructor(
     private readonly netWorthService: NetWorthService,
     private readonly periodResult: PortfolioPeriodResultService,
+    private readonly periodResults: PortfolioPeriodResultsBatchService,
     private readonly delegationService: DelegationService,
     private readonly jointAccounts: JointAccountsService,
   ) {}
@@ -62,6 +69,29 @@ export class NetWorthController {
       .filter(([accountId]) => !exclusions.has(accountId))
       .map(([accountId, g]) => ({ accountId, ownerUserId: g.ownerUserId }));
     return accounts.length > 0 ? { accounts } : undefined;
+  }
+
+  /**
+   * The `accountIds` query parameter as a checked list of UUIDs.
+   *
+   * A malformed id is a caller error, not a filter to apply loosely: passing it
+   * through would widen or narrow a scope by accident.
+   */
+  private parseAccountIds(value?: string): string[] | undefined {
+    const ids = value ? value.split(",").filter(Boolean) : undefined;
+    if (!ids) return undefined;
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    for (const id of ids) {
+      if (!uuidRegex.test(id))
+        throw new BadRequestException(
+          tr(
+            "errors.netWorth.invalidAccountIds",
+            "accountIds must be comma-separated UUIDs",
+          ),
+        );
+    }
+    return ids;
   }
 
   /**
@@ -319,6 +349,64 @@ export class NetWorthController {
       startDate: sd,
       endDate: ed,
       baselineDate: bd,
+      accountIds: await this.scopeIds(req, ids),
+      displayCurrency: safeCurrency,
+    });
+  }
+
+  @Get("investments-period-results")
+  @AllowDelegate()
+  @DelegateRequiresSection("investments")
+  @ApiOperation({
+    summary: "What the portfolio did over each trailing period",
+    description:
+      "The same measure as investments-period-result, answered for several trailing windows at once (1d, 1w, 1m, 3m, ytd, 1y) from ONE valuation of the widest of them. Each entry is the figures that route would have returned for that window; a window the value series does not reach back to is null with the reason noValueSeries. See docs/specs/portfolio-period-result.md.",
+  })
+  @ApiQuery({
+    name: "periods",
+    required: false,
+    description: `Comma-separated presets; every one when omitted (${PORTFOLIO_PERIOD_PRESETS.join(", ")})`,
+  })
+  @ApiQuery({
+    name: "accountIds",
+    required: false,
+    description:
+      "Comma-separated account IDs to filter by (will include linked pairs)",
+  })
+  @ApiQuery({
+    name: "displayCurrency",
+    required: false,
+    description:
+      "Currency code to display values in (defaults to user preference)",
+  })
+  @ApiResponse({ status: 200, description: "One result per period asked for" })
+  @ApiResponse({ status: 401, description: "Unauthorized" })
+  async getPeriodResults(
+    @Request() req,
+    @Query("periods") periods?: string,
+    @Query("accountIds") accountIds?: string,
+    @Query("displayCurrency") displayCurrency?: string,
+  ) {
+    const raw = assertStringParam(periods, "periods");
+    const aIds = assertStringParam(accountIds, "accountIds");
+    const curr = assertStringParam(displayCurrency, "displayCurrency");
+    // A bounded, closed set: the windows are the server's own arithmetic, so
+    // an unknown name is a caller error rather than a window to invent.
+    const presets: PortfolioPeriodPreset[] = [];
+    for (const name of raw ? raw.split(",").filter(Boolean) : []) {
+      if (!isPortfolioPeriodPreset(name))
+        throw new BadRequestException(
+          tr(
+            "errors.netWorth.invalidPeriods",
+            "periods must be comma-separated period presets",
+          ),
+        );
+      presets.push(name);
+    }
+    const ids = this.parseAccountIds(aIds);
+    const safeCurrency = curr ? curr.slice(0, 3).toUpperCase() : undefined;
+    return this.periodResults.getPeriodResults(req.user.id, {
+      periods: presets,
       accountIds: await this.scopeIds(req, ids),
       displayCurrency: safeCurrency,
     });
