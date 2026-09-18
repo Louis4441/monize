@@ -24,6 +24,13 @@ type ToolHandler = (
  * calls reach us -- so surfacing them gives the web chat live "Looking up ..."
  * progress automatically. Outside relay context `reportToolActivity` finds no
  * in-flight prompt and is a no-op.
+ *
+ * The `result` report is awaited inside a `finally`, where a throw would
+ * replace the handler's own return value or mask its error -- so a successful
+ * write would surface to the agent as a failure it then retries.
+ * `reportToolActivity` therefore swallows its own failures by contract
+ * (`ai-relay.service.ts`); this call site depends on that and must not be
+ * changed to a bare call that leaves a rejection unhandled instead.
  */
 export function wrapToolHandlerForRelay(
   name: string,

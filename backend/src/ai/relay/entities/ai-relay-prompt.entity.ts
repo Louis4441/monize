@@ -25,8 +25,14 @@ export interface RelayAnswerPayload {
 }
 
 /**
- * `pending` -> `claimed` -> `answered`, or `expired` from either of the first
- * two.
+ * `pending` -> `claimed` -> `answered` -> `expired`, and `expired` directly
+ * from either of the first two.
+ *
+ * `expired` is the one terminal state and it carries both endings: a turn
+ * nobody finished, and one whose answer the browser has taken. They are not
+ * told apart because nothing needs to -- the row is dead to every reader either
+ * way, and the sweep deletes it on the same schedule. `answered_at` is what
+ * distinguishes them for a human reading the table.
  *
  * Every transition is a conditional `UPDATE` whose `WHERE` names the status it
  * is leaving, so the loser of a race gets zero rows back and learns it lost

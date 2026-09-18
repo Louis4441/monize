@@ -465,4 +465,121 @@ describe("AI relay claim (real PostgreSQL)", () => {
       expect(count).toBe(0);
     });
   });
+
+  describe("what the unit harness cannot show", () => {
+    it("claims in FIFO order even when physical row order disagrees", async () => {
+      // The unit spec's double re-implements the claim in TypeScript and
+      // returns rows in insertion order whatever the SQL says, so dropping the
+      // statement's ORDER BY leaves it green. Nor is inserting two rows enough
+      // here: both the index on (user_id, status, created_at) and a sequential
+      // scan of a freshly-written table yield them in the order they arrived,
+      // so FIFO comes out right by accident.
+      //
+      // Rewriting the OLDER row moves its tuple to the end of the heap, so
+      // physical order now contradicts created_at. Without the ORDER BY a
+      // sequential scan hands over the newer prompt first.
+      const first = await queue("first");
+      const second = await queue("second");
+      await db.query(
+        `UPDATE ai_relay_prompts
+            SET created_at = CURRENT_TIMESTAMP - INTERVAL '1 minute'
+          WHERE id = $1`,
+        [first],
+      );
+
+      const claimed = await asUser(() => relay.waitForPrompt(userId, "s-a"));
+      expect(claimed?.promptId).toBe(first);
+      const next = await asUser(() => relay.waitForPrompt(userId, "s-b"));
+      expect(next?.promptId).toBe(second);
+    });
+
+    it("rolls the claim back when the inactivity reset in the same transaction fails", async () => {
+      const id = await queue("q");
+      // Fail the reset in the DATABASE, not by stubbing the method: a stub
+      // rejects before either statement runs, so it cannot tell one
+      // transaction from two.
+      //
+      // The trigger has to fire on the reset ALONE. `waitForPrompt` writes the
+      // same table twice -- `recordPoll` stamps last_poll_at before the claim,
+      // the reset touches only idle_since after it -- and a trigger that fired
+      // on both would raise before the claim ever ran, leaving the row pending
+      // for the wrong reason and passing whatever the code did. The WHEN clause
+      // is what tells the two statements apart: only the reset leaves
+      // last_poll_at where it found it.
+      await db.query(
+        `INSERT INTO ai_relay_agents (user_id, last_poll_at)
+         VALUES ($1, CURRENT_TIMESTAMP - INTERVAL '1 hour')`,
+        [userId],
+      );
+      await db.query(`
+        CREATE OR REPLACE FUNCTION relay_test_block_reset()
+        RETURNS trigger AS $$
+        BEGIN RAISE EXCEPTION 'clock reset failed'; END;
+        $$ LANGUAGE plpgsql;
+      `);
+      await db.query(`
+        CREATE TRIGGER relay_test_block_reset
+        BEFORE UPDATE ON ai_relay_agents
+        FOR EACH ROW
+        WHEN (NEW.last_poll_at IS NOT DISTINCT FROM OLD.last_poll_at)
+        EXECUTE FUNCTION relay_test_block_reset();
+      `);
+
+      try {
+        await expect(
+          asUser(() => relay.waitForPrompt(userId, "s-a")),
+        ).rejects.toThrow(/clock reset failed/);
+
+        // A claim that committed before the reset ran would leave the turn
+        // marked `claimed` by an agent that never learned its id, and the
+        // browser would wait out the idle window for an answer nobody was
+        // writing.
+        expect(await statusOf(id)).toBe("pending");
+      } finally {
+        await db.query(
+          `DROP TRIGGER IF EXISTS relay_test_block_reset ON ai_relay_agents`,
+        );
+        await db.query(`DROP FUNCTION IF EXISTS relay_test_block_reset()`);
+      }
+    });
+
+    it("leaves an expired turn in place for one more sweep", async () => {
+      const id = await queue("nobody came");
+      await asUser(() => relay.waitForPrompt(userId, "s-a"));
+      await db.query(
+        `UPDATE ai_relay_prompts
+            SET expires_at = CURRENT_TIMESTAMP - INTERVAL '11 minutes'
+          WHERE id = $1`,
+        [id],
+      );
+
+      await sweeper.sweepRelayState();
+
+      // The delete's cutoff is strictly later than the expiry's. With one
+      // cutoff for both, the second statement would match every row the first
+      // had just expired -- same transaction, so it sees those writes -- and
+      // the turn would vanish in the tick that ended it, taking the claimed_at
+      // that decides which message the browser is shown.
+      expect(await statusOf(id)).toBe("expired");
+    });
+
+    it("deletes the turn once the longer retention has passed", async () => {
+      const id = await queue("long gone");
+      await db.query(
+        `UPDATE ai_relay_prompts
+            SET status = 'expired',
+                expires_at = CURRENT_TIMESTAMP - INTERVAL '25 minutes'
+          WHERE id = $1`,
+        [id],
+      );
+
+      await sweeper.sweepRelayState();
+
+      const rows = await db.query(
+        `SELECT id FROM ai_relay_prompts WHERE id = $1`,
+        [id],
+      );
+      expect(rows).toHaveLength(0);
+    });
+  });
 });

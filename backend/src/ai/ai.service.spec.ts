@@ -740,7 +740,7 @@ describe("AiService", () => {
         model: null,
       });
       mockConfigRepository.find.mockResolvedValue([relayConfig]);
-      mockRelayService.getStatus!.mockReturnValue({
+      mockRelayService.getStatus!.mockResolvedValue({
         state: "listening",
         queued: 0,
       });
@@ -787,7 +787,7 @@ describe("AiService", () => {
         model: null,
       });
       mockConfigRepository.find.mockResolvedValue([relayConfig]);
-      mockRelayService.getStatus!.mockReturnValue({
+      mockRelayService.getStatus!.mockResolvedValue({
         state: "listening",
         queued: 0,
       });
@@ -861,7 +861,7 @@ describe("AiService", () => {
         apiKeyEnc: null,
       });
       mockConfigRepository.find.mockResolvedValue([relayConfig]);
-      mockRelayService.getStatus!.mockReturnValue({
+      mockRelayService.getStatus!.mockResolvedValue({
         state: "listening",
         queued: 0,
       });
@@ -890,7 +890,7 @@ describe("AiService", () => {
         relayConfig,
         anthropicConfig,
       ]);
-      mockRelayService.getStatus!.mockReturnValue({
+      mockRelayService.getStatus!.mockResolvedValue({
         state: "listening",
         queued: 0,
       });
@@ -1020,7 +1020,7 @@ describe("AiService", () => {
       mockConfigRepository.find.mockResolvedValue([
         makeConfig({ provider: "mcp_relay", apiKeyEnc: null, model: null }),
       ]);
-      mockRelayService.getStatus!.mockReturnValue({
+      mockRelayService.getStatus!.mockResolvedValue({
         state: "listening",
         queued: 0,
       });
@@ -1110,7 +1110,7 @@ describe("AiService", () => {
       mockConfigRepository.find.mockResolvedValue([
         makeConfig({ provider: "mcp_relay", apiKeyEnc: null, model: null }),
       ]);
-      mockRelayService.getStatus!.mockReturnValue({
+      mockRelayService.getStatus!.mockResolvedValue({
         state: "offline",
         queued: 0,
       });

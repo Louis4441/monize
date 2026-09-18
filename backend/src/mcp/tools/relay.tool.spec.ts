@@ -71,7 +71,7 @@ describe("McpRelayTools", () => {
     it("returns hasPrompt:false when the poll window elapses (still listening)", async () => {
       const handlers = register({
         waitForPrompt: jest.fn().mockResolvedValue(null),
-        shouldStopForIdle: jest.fn().mockReturnValue(false),
+        shouldStopForIdle: jest.fn().mockResolvedValue(false),
       });
       const result = await handlers.get_next_prompt({}, ctx());
       expect(parse(result)).toEqual({ hasPrompt: false });
@@ -80,7 +80,7 @@ describe("McpRelayTools", () => {
     it("returns stop:true when the user has been inactive too long", async () => {
       const handlers = register({
         waitForPrompt: jest.fn().mockResolvedValue(null),
-        shouldStopForIdle: jest.fn().mockReturnValue(true),
+        shouldStopForIdle: jest.fn().mockResolvedValue(true),
       });
       const result = await handlers.get_next_prompt({}, ctx());
       expect(parse(result)).toEqual({ hasPrompt: false, stop: true });
@@ -104,7 +104,7 @@ describe("McpRelayTools", () => {
 
   describe("post_response", () => {
     it("reports delivered:true when the response is routed", async () => {
-      const postResponse = jest.fn().mockReturnValue(true);
+      const postResponse = jest.fn().mockResolvedValue(true);
       const handlers = register({ postResponse });
       const result = await handlers.post_response(
         { promptId: "p1", text: "answer" },
@@ -116,7 +116,7 @@ describe("McpRelayTools", () => {
 
     it("reports delivered:false for an unknown prompt", async () => {
       const handlers = register({
-        postResponse: jest.fn().mockReturnValue(false),
+        postResponse: jest.fn().mockResolvedValue(false),
       });
       const result = await handlers.post_response(
         { promptId: "p1", text: "answer" },
@@ -128,7 +128,7 @@ describe("McpRelayTools", () => {
 
   describe("report_progress", () => {
     it("streams the update and reports delivered:true", async () => {
-      const reportProgress = jest.fn().mockReturnValue(true);
+      const reportProgress = jest.fn().mockResolvedValue(true);
       const handlers = register({ reportProgress });
       const result = await handlers.report_progress(
         { promptId: "p1", text: "looking up category" },
@@ -147,7 +147,7 @@ describe("McpRelayTools", () => {
 
     it("reports delivered:false when the prompt is no longer active", async () => {
       const handlers = register({
-        reportProgress: jest.fn().mockReturnValue(false),
+        reportProgress: jest.fn().mockResolvedValue(false),
       });
       const result = await handlers.report_progress(
         { promptId: "p1", text: "late update" },

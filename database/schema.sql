@@ -1659,7 +1659,10 @@ CREATE INDEX idx_ai_insights_user_type ON ai_insights(user_id, type);
 CREATE TABLE ai_relay_prompts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    -- pending -> claimed -> answered, or expired from either of the first two.
+    -- pending -> claimed -> answered -> expired, and expired directly from
+    -- either of the first two. `expired` is the one terminal state and carries
+    -- both endings: a turn nobody finished, and one whose answer the browser
+    -- has taken (answered_at is what tells a human reading the table apart).
     -- The CHECK is the state machine's vocabulary; the transitions are
     -- conditional UPDATEs where the loser gets zero rows.
     -- Born pending: the default is the initial state, not a convenience.

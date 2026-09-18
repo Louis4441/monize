@@ -338,7 +338,7 @@ describe("AiActionsService", () => {
     }
 
     it("persists parked attachments after creating the transaction and releases the refs", async () => {
-      attachmentStore.get.mockReturnValue({ data: FILE_BYTES });
+      attachmentStore.get.mockResolvedValue({ data: FILE_BYTES });
       const descriptor = createTxDescriptor({
         attachments: [attachmentRef()],
       });
@@ -357,7 +357,7 @@ describe("AiActionsService", () => {
     });
 
     it("persists attachments on an update_transaction confirmation", async () => {
-      attachmentStore.get.mockReturnValue({ data: FILE_BYTES });
+      attachmentStore.get.mockResolvedValue({ data: FILE_BYTES });
       const descriptor: AiActionDescriptor = {
         type: "update_transaction",
         userId: USER,
@@ -387,7 +387,7 @@ describe("AiActionsService", () => {
     });
 
     it("rejects with a clear error and writes nothing when the parked bytes are gone", async () => {
-      attachmentStore.get.mockReturnValue(undefined);
+      attachmentStore.get.mockResolvedValue(undefined);
       const descriptor = createTxDescriptor({
         actionId: "act-expired-ref",
         attachments: [attachmentRef()],
@@ -400,7 +400,7 @@ describe("AiActionsService", () => {
     });
 
     it("rejects when the parked bytes do not match the signed sha256", async () => {
-      attachmentStore.get.mockReturnValue({
+      attachmentStore.get.mockResolvedValue({
         data: Buffer.from("different bytes"),
       });
       const descriptor = createTxDescriptor({
@@ -415,14 +415,14 @@ describe("AiActionsService", () => {
     });
 
     it("allows a retry after an attachment-ref failure (action id released)", async () => {
-      attachmentStore.get.mockReturnValueOnce(undefined);
+      attachmentStore.get.mockResolvedValueOnce(undefined);
       const descriptor = createTxDescriptor({
         actionId: "act-retry-ref",
         attachments: [attachmentRef()],
       });
       await expect(service.confirm(USER, dtoFor(descriptor))).rejects.toThrow();
 
-      attachmentStore.get.mockReturnValue({ data: FILE_BYTES });
+      attachmentStore.get.mockResolvedValue({ data: FILE_BYTES });
       const result = await service.confirm(USER, dtoFor(descriptor));
       expect(result).toEqual({ type: "create_transaction", id: "tx-new" });
     });

@@ -431,15 +431,29 @@ export class AiRelayService {
     // claimed and captured every later direct write's confirmation card -- and
     // mirrored the direct client's tool chips into a web chat nobody was
     // watching.
-    const promptId = await this.bumpLiveness(userId, sessionId);
-    if (!promptId) {
-      return;
+    try {
+      const promptId = await this.bumpLiveness(userId, sessionId);
+      if (!promptId) {
+        return;
+      }
+      const event: RelayServerEvent =
+        phase === "start"
+          ? { type: "tool_start", name: toolName }
+          : { type: "tool_result", name: toolName, isError };
+      this.streams.emit(userId, promptId, event);
+    } catch (error) {
+      // Never throws, because of where it is called from: the MCP wrapper
+      // reports the `result` phase in a `finally`, and a throw there replaces
+      // the tool's own outcome. A liveness UPDATE that fails after a write tool
+      // committed would tell the agent its write failed, and the agent's
+      // documented response to an error is to retry -- which would write twice.
+      // A missing progress chip is the right price.
+      this.logger.warn(
+        `Relay tool activity for user ${userId} was not recorded: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     }
-    const event: RelayServerEvent =
-      phase === "start"
-        ? { type: "tool_start", name: toolName }
-        : { type: "tool_result", name: toolName, isError };
-    this.streams.emit(userId, promptId, event);
   }
 
   /**
@@ -585,9 +599,14 @@ export class AiRelayService {
           throw new RelayTimeoutError("no_agent", promptId);
         }
         if (row.status === "answered") {
-          await this.consumeAnswer(userId, promptId);
+          // The conditional UPDATE is the exactly-once gate, so its result is
+          // the answer. Zero rows means the pickup endpoint took it first --
+          // the same browser, the same text -- so hand that over rather than
+          // looping round to read `expired` and report that the agent went
+          // quiet after it had plainly answered.
+          const consumed = await this.consumeAnswer(userId, promptId);
           await this.releaseAttachments(userId, attachments);
-          return { text: row.answer?.text ?? "" };
+          return consumed ?? { text: row.answer?.text ?? "" };
         }
         if (row.status === "expired" || row.expired) {
           await this.settleExpired(userId, promptId, row, attachments);
@@ -670,41 +689,56 @@ export class AiRelayService {
    *
    * `FOR UPDATE SKIP LOCKED` is what makes two agents polling one user claim
    * different prompts instead of queueing on the same row, and the `UPDATE`'s
-   * `WHERE status = 'pending'` is what makes exactly one of them win
-   * (INV-HA-005).
+   * own `AND status = 'pending'` is what makes exactly one of them win
+   * (INV-HA-005). The lock alone would do it today -- a concurrent claimer
+   * skips a locked row, and `SELECT ... FOR UPDATE` re-checks its qual against
+   * the updated tuple -- but then the invariant would rest on a mechanism this
+   * statement does not name, and the next edit to the CTE would quietly remove
+   * it.
    */
   private async claimNextPrompt(
     userId: string,
     sessionId?: string,
   ): Promise<RelayClaimedPrompt | null> {
-    const [row] = returnedRows<{ id: string; prompt: RelayPromptPayload }>(
-      await this.relayQuery(
-        `WITH next AS (
-           SELECT id AS next_id
-             FROM ai_relay_prompts
-            WHERE user_id = $1
-              AND status = 'pending'
-              AND expires_at > CURRENT_TIMESTAMP
-            ORDER BY created_at
-            LIMIT 1
-            FOR UPDATE SKIP LOCKED
-         )
-         UPDATE ai_relay_prompts
-            SET status = 'claimed',
-                claimed_at = CURRENT_TIMESTAMP,
-                claimed_by = $2,
-                expires_at = CURRENT_TIMESTAMP + ${msInterval("$3")}
-           FROM next
-          WHERE ai_relay_prompts.id = next.next_id
-         RETURNING id, prompt`,
-        [userId, sessionId ?? null, IDLE_TIMEOUT_MS],
-      ),
-    );
+    // The claim and the inactivity reset commit together. A second transaction
+    // for the clock could fail after the claim was durable, and the agent would
+    // never learn the promptId of a prompt now marked `claimed` -- the browser
+    // would wait out the idle window to be told its assistant went quiet. Here
+    // a failed clock write rolls the claim back and the next poll takes it.
+    const [row] = await this.relayTransaction(async (manager) => {
+      const claimed = returnedRows<{ id: string; prompt: RelayPromptPayload }>(
+        await manager.query(
+          `WITH next AS (
+             SELECT id AS next_id
+               FROM ai_relay_prompts
+              WHERE user_id = $1
+                AND status = 'pending'
+                AND expires_at > CURRENT_TIMESTAMP
+              ORDER BY created_at
+              LIMIT 1
+              FOR UPDATE SKIP LOCKED
+           )
+           UPDATE ai_relay_prompts
+              SET status = 'claimed',
+                  claimed_at = CURRENT_TIMESTAMP,
+                  claimed_by = $2,
+                  expires_at = CURRENT_TIMESTAMP + ${msInterval("$3")}
+             FROM next
+            WHERE ai_relay_prompts.id = next.next_id
+              AND ai_relay_prompts.status = 'pending'
+           RETURNING id, prompt`,
+          [userId, sessionId ?? null, IDLE_TIMEOUT_MS],
+        ),
+      );
+      if (claimed.length > 0) {
+        // Claiming a prompt is activity: restart the inactivity clock.
+        await this.markActivity(userId, manager);
+      }
+      return claimed;
+    });
     if (!row) {
       return null;
     }
-    // Claiming a prompt is activity: restart the inactivity clock.
-    await this.markActivity(userId);
     return {
       promptId: row.id,
       prompt: row.prompt.prompt,
@@ -773,7 +807,7 @@ export class AiRelayService {
     userId: string,
     sessionId?: string,
   ): Promise<string | null> {
-    const [row] = returnedRows<{ id: string }>(
+    const rows = returnedRows<{ id: string; claimed_at: Date }>(
       await this.relayQuery(
         `UPDATE ai_relay_prompts
             SET expires_at = LEAST(
@@ -784,11 +818,23 @@ export class AiRelayService {
             AND status = 'claimed'
             AND claimed_by IS NOT DISTINCT FROM $2
             AND expires_at > CURRENT_TIMESTAMP
-         RETURNING id`,
+         RETURNING id, claimed_at`,
         [userId, sessionId ?? null, IDLE_TIMEOUT_MS, HARD_WAIT_MS],
       ),
     );
-    return row?.id ?? null;
+    // Nothing stops an agent claiming a second prompt while still working the
+    // first, and an UPDATE's RETURNING has no order -- so taking the first row
+    // would route this call's tool chip to whichever turn the executor happened
+    // to emit. Every live turn of this session is kept alive; the newest is the
+    // one the caller is working, the same choice `findSessionTurn` makes.
+    const newest = rows.reduce<{ id: string; claimed_at: Date } | null>(
+      (best, row) =>
+        !best || new Date(row.claimed_at) > new Date(best.claimed_at)
+          ? row
+          : best,
+      null,
+    );
+    return newest?.id ?? null;
   }
 
   /**
@@ -835,6 +881,15 @@ export class AiRelayService {
    *    made afterwards.
    *  - not unbounded in time. A turn past its deadline stands in for a live one
    *    only for as long as its answer would still be accepted.
+   *
+   * `IS NOT DISTINCT FROM` rather than `=` so a claim made without a caller key
+   * is matched by a later call that also has none. The MCP tool layer cannot
+   * produce that state -- `callerKey` falls back to the credential id, and the
+   * relay tools refuse a request with no user context at all -- so it occurs
+   * only in tests, where the unbound behaviour is what keeps them honest about
+   * ordering. A plain `=` would silently never match a NULL and take liveness
+   * with it; tightening this means making `claimNextPrompt` refuse a keyless
+   * claim in the same change.
    */
   private async findSessionTurn(
     userId: string,
@@ -867,18 +922,46 @@ export class AiRelayService {
    * whole wait.
    */
   private relayQuery(sql: string, params: unknown[]): Promise<unknown> {
+    return this.relayTransaction((manager) => manager.query(sql, params));
+  }
+
+  /**
+   * Several statements in one such transaction, for the one case that needs it:
+   * a claim and the clock reset that goes with it must not be able to half
+   * happen.
+   */
+  private relayTransaction<T>(
+    fn: (manager: EntityManager) => Promise<T>,
+  ): Promise<T> {
     return runOutsideActiveScopedManager(() =>
-      withScopedDb(this.dataSource, (manager: EntityManager) =>
-        manager.query(sql, params),
-      ),
+      withScopedDb(this.dataSource, fn),
     );
   }
 
-  /** Wake every replica holding a stream or a poll for this user. */
+  /**
+   * Wake every replica holding a stream or a poll for this user.
+   *
+   * Never throws. The row is already committed by the time this runs, and a
+   * wake-up is a hint: every waiter re-reads on its own timer, so a bus that is
+   * unreachable costs one poll interval of latency and nothing else. Letting it
+   * throw would report a failure for work that is durably done -- an agent told
+   * `delivered:false` for an answer the database is holding retries a turn it
+   * has already finished, and a browser is shown a timeout for a prompt that is
+   * live in the queue.
+   */
   private async publishWake(userId: string, promptId: string): Promise<void> {
-    // Ids only: the payload crosses replicas outside RLS, and the recipient
-    // reads the row back under its own scope.
-    await this.bus.publish(relayChannel(userId), { userId, promptId });
+    try {
+      // Ids only: the payload crosses replicas outside RLS, and the recipient
+      // reads the row back under its own scope.
+      await this.bus.publish(relayChannel(userId), { userId, promptId });
+    } catch (error) {
+      this.logger.warn(
+        `Relay wake-up for user ${userId} was not published; waiters fall back ` +
+          `to their own poll: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+      );
+    }
   }
 
   // --------------------------------------------------- the agent's liveness
@@ -906,15 +989,22 @@ export class AiRelayService {
    * one. Restarts the inactivity clock and clears the disconnect notice, so the
    * chat shows the live state again.
    */
-  private async markActivity(userId: string): Promise<void> {
-    await this.relayQuery(
-      `INSERT INTO ai_relay_agents (user_id)
+  private async markActivity(
+    userId: string,
+    manager?: EntityManager,
+  ): Promise<void> {
+    const sql = `INSERT INTO ai_relay_agents (user_id)
        VALUES ($1)
        ON CONFLICT (user_id) DO UPDATE
           SET idle_since = NULL,
-              idle_disconnected_at = NULL`,
-      [userId],
-    );
+              idle_disconnected_at = NULL`;
+    // A caller already inside a relay transaction passes its manager, so the
+    // reset commits with whatever it accompanies.
+    if (manager) {
+      await manager.query(sql, [userId]);
+      return;
+    }
+    await this.relayQuery(sql, [userId]);
   }
 
   // ------------------------------------------------------- the action buffer
@@ -932,16 +1022,24 @@ export class AiRelayService {
     userId: string,
     action: PendingAiAction,
   ): Promise<void> {
-    await this.relayQuery(
-      `INSERT INTO ai_relay_actions (user_id, id, card, expires_at)
-       VALUES ($1, $2, $3::jsonb, CURRENT_TIMESTAMP + ${msInterval("$4")})
-       ON CONFLICT (user_id, id) DO NOTHING`,
-      [userId, action.actionId, JSON.stringify(action), BUFFER_TTL_MS],
+    const inserted = returnedRows<{ id: string }>(
+      await this.relayQuery(
+        `INSERT INTO ai_relay_actions (user_id, id, card, expires_at)
+         VALUES ($1, $2, $3::jsonb, CURRENT_TIMESTAMP + ${msInterval("$4")})
+         ON CONFLICT (user_id, id) DO NOTHING
+         RETURNING id`,
+        [userId, action.actionId, JSON.stringify(action), BUFFER_TTL_MS],
+      ),
     );
-    this.logger.warn(
-      `Relay confirmation card ${action.actionId} for user ${userId} emitted ` +
-        `after the stream gave up; buffered for pickup`,
-    );
+    // `RETURNING` is what tells the two cases apart: without it a conflict and
+    // an insert both report nothing, and the line below would announce a
+    // buffered card every time an agent re-emitted one already waiting.
+    if (inserted.length > 0) {
+      this.logger.warn(
+        `Relay confirmation card ${action.actionId} for user ${userId} emitted ` +
+          `after the stream gave up; buffered for pickup`,
+      );
+    }
   }
 
   /** Eagerly drop a settled turn's attachments from the store (TTL backstop). */
@@ -952,10 +1050,23 @@ export class AiRelayService {
     if (attachments.length === 0) {
       return;
     }
-    await this.attachmentStore.releaseForPrompt(
-      userId,
-      attachments.map((a) => a.id),
-    );
+    try {
+      await this.attachmentStore.releaseForPrompt(
+        userId,
+        attachments.map((a) => a.id),
+      );
+    } catch (error) {
+      // The TTL and the sweep are the backstop, which is the whole reason this
+      // is eager rather than required. Letting it throw would replace the
+      // answer this turn just produced -- already consumed, so unrecoverable --
+      // with an error, or replace a precise timeout reason with a generic one.
+      this.logger.warn(
+        `Relay attachments for user ${userId} were not released early; the ` +
+          `sweep will take them: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+      );
+    }
   }
 }
 

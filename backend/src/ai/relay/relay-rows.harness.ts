@@ -17,10 +17,21 @@ import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
  * So this evaluates them, on the same rules the real table does -- conditional
  * on `status`, compared against a single clock, `LEAST`-clamped.
  *
- * What it deliberately does not model, because no in-process double can: `FOR
- * UPDATE SKIP LOCKED` under real concurrency. That property belongs to
- * PostgreSQL and is proved by `test/integration/ai-relay-claim.integration.spec.ts`
- * with two connections (VER-001).
+ * Two things it deliberately does not model, because no in-process double can,
+ * both proved by `test/integration/ai-relay-claim.integration.spec.ts` against
+ * real connections (VER-001):
+ *
+ * - `FOR UPDATE SKIP LOCKED` under real concurrency.
+ * - **Rollback.** `dataSource.transaction` here runs the callback and keeps
+ *   whatever it wrote, so a spec about a failed transaction leaving no trace
+ *   cannot be written against this. What a spec *can* assert here is that two
+ *   statements were grouped into one transaction, from
+ *   `dataSource.transaction.mock.calls`.
+ *
+ * It also cannot see a change to a statement's own semantics: the branches
+ * below are matched on a fragment of the SQL and then re-implement the rule in
+ * TypeScript, so dropping a `WHERE` clause or an `ORDER BY` leaves this green.
+ * Every such rule therefore has an integration test as well.
  */
 export interface RelayPromptRow {
   id: string;
@@ -81,6 +92,12 @@ export interface RelayRowsHarness {
   attachmentStore: RelayAttachmentStore;
   /** Every statement the service issued, for the rare assertion about SQL itself. */
   statements: string[];
+  /**
+   * The same statements grouped by the transaction that carried them. Rollback
+   * is not modelled, so this is how a spec asserts that two statements were at
+   * least handed to one transaction.
+   */
+  transactions: string[][];
 }
 
 /** `CURRENT_TIMESTAMP`, which under a spec's fake timers is the spec's clock. */
@@ -100,7 +117,25 @@ export function createRelayRowsHarness(): RelayRowsHarness {
   const actions: RelayActionRow[] = [];
   const attachments: RelayAttachmentRow[] = [];
   const statements: string[] = [];
+  const transactions: string[][] = [];
+  let current: string[] | undefined;
   let sequence = 0;
+
+  // Group each callback's statements, so "these two went together" is a claim a
+  // spec can make even though this double cannot roll anything back.
+  const runTransaction = scoped.dataSource.transaction.getMockImplementation()!;
+  scoped.dataSource.transaction.mockImplementation(
+    async (...args: unknown[]) => {
+      const previous = current;
+      current = [];
+      transactions.push(current);
+      try {
+        return await (runTransaction as (...a: unknown[]) => unknown)(...args);
+      } finally {
+        current = previous;
+      }
+    },
+  );
 
   const agentOf = (userId: string): RelayAgentRow => {
     const existing = agents.find((a) => a.userId === userId);
@@ -121,6 +156,7 @@ export function createRelayRowsHarness(): RelayRowsHarness {
   scoped.manager.query.mockImplementation(
     async (sql: string, params: unknown[] = []) => {
       statements.push(sql);
+      current?.push(sql);
 
       if (sql.includes("INSERT INTO ai_relay_attachments\n")) {
         const [id, userId, filename, kind, mime, size, ttlMs] = params as [
@@ -350,7 +386,13 @@ export function createRelayRowsHarness(): RelayRowsHarness {
             (row.claimedAt ?? 0) + hardMs,
           );
         }
-        return matches.map((r) => ({ id: r.id }));
+        // `claimed_at` too: the caller picks the newest of several claimed
+        // turns from it, and a double that withheld it would make that choice
+        // untestable.
+        return matches.map((r) => ({
+          id: r.id,
+          claimed_at: new Date(r.claimedAt ?? 0),
+        }));
       }
 
       if (sql.includes("COUNT(*) FILTER")) {
@@ -420,5 +462,6 @@ export function createRelayRowsHarness(): RelayRowsHarness {
     attachments,
     attachmentStore: new RelayAttachmentStore(scoped.dataSource as never),
     statements,
+    transactions,
   };
 }

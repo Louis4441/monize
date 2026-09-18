@@ -70,7 +70,7 @@ describe("McpInvestmentsTools", () => {
         .mockResolvedValue({ accountIds: undefined }),
     };
 
-    relayService = { emitPendingAction: jest.fn().mockReturnValue(false) };
+    relayService = { emitPendingAction: jest.fn().mockResolvedValue(false) };
     const actionBuilder = {
       buildCreateInvestmentTransaction: jest
         .fn()
@@ -709,7 +709,7 @@ describe("McpInvestmentsTools", () => {
 
     it("shows the web-chat card via relay instead of persisting", async () => {
       ctx.setUser({ userId: "u1", scopes: "write" });
-      relayService.emitPendingAction.mockReturnValue(true);
+      relayService.emitPendingAction.mockResolvedValue(true);
 
       const result = await handlers["manage_securities"](createArgs, ctx);
 
@@ -954,7 +954,7 @@ describe("McpInvestmentsTools", () => {
 
     it("single update/delete go through the relay when relayed", async () => {
       ctx.setUser({ userId: "u1", scopes: "write" });
-      relayService.emitPendingAction.mockReturnValue(true);
+      relayService.emitPendingAction.mockResolvedValue(true);
 
       const upd = await handlers["manage_securities"](
         { operation: "update", items: [{ symbol: "AAPL", isFavourite: true }] },
@@ -972,7 +972,7 @@ describe("McpInvestmentsTools", () => {
 
     it("bulk update/delete go through the relay when relayed", async () => {
       ctx.setUser({ userId: "u1", scopes: "write" });
-      relayService.emitPendingAction.mockReturnValue(true);
+      relayService.emitPendingAction.mockResolvedValue(true);
       const okPrev = {
         okPreviews: [
           {
@@ -1187,7 +1187,7 @@ describe("McpInvestmentsTools", () => {
 
     it("shows a relay card for a single create without writing", async () => {
       ctx.setUser({ userId: "u1", scopes: "write" });
-      relayService.emitPendingAction.mockReturnValue(true);
+      relayService.emitPendingAction.mockResolvedValue(true);
       investmentTransactionsService.prepareCreateInvestmentSingle.mockResolvedValue(
         createPreview,
       );
@@ -1330,7 +1330,7 @@ describe("McpInvestmentsTools", () => {
 
     it("emits individual cards for a bulk create in individual mode (relay)", async () => {
       ctx.setUser({ userId: "u1", scopes: "write" });
-      relayService.emitPendingAction.mockReturnValue(true);
+      relayService.emitPendingAction.mockResolvedValue(true);
       investmentTransactionsService.prepareCreateInvestmentBulk.mockResolvedValue(
         {
           okPreviews: [createPreview, createPreview],

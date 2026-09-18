@@ -28,6 +28,7 @@ const QUEUE_WAIT_MS = 5 * 60 * 1000;
 const IDLE_TIMEOUT_MS = 180 * 1000;
 const BUFFER_TTL_MS = 10 * 60 * 1000;
 const POLL_PARK_MS = 25 * 1000;
+const WAKE_POLL_INTERVAL_MS = 5 * 1000;
 
 // A valid 1x1 PNG (header + minimal body) so attachment validation passes.
 const PNG_BASE64 =
@@ -943,6 +944,148 @@ describe("AiRelayService", () => {
       await expect(service.takeBufferedActions(USER)).resolves.toEqual([
         card("a1"),
       ]);
+    });
+  });
+
+  describe("failures that must not lose committed work", () => {
+    /** Make one statement reject, leaving the harness to answer the rest. */
+    function breakStatement(fragment: string): void {
+      const query = harness.dataSource.manager.query as jest.Mock;
+      const rows = query.getMockImplementation()!;
+      query.mockImplementation(async (sql: string, params?: unknown[]) => {
+        if (String(sql).includes(fragment)) {
+          throw new Error(`statement failed: ${fragment}`);
+        }
+        return rows(sql, params);
+      });
+    }
+
+    it("still reports an answer as delivered when the wake-up cannot be published", async () => {
+      start(USER, "q");
+      await settle();
+      const claimed = await service.waitForPrompt(USER, "session-a");
+      jest
+        .spyOn(bus, "publish")
+        .mockRejectedValue(new Error("redis unreachable"));
+
+      // The row is already committed. Reporting failure would have the agent
+      // retry a turn it has finished -- and the retry would be refused, so its
+      // work would look lost twice over.
+      await expect(
+        service.postResponse(USER, claimed!.promptId, "done"),
+      ).resolves.toBe(true);
+      expect(harness.rows[0].status).toBe("answered");
+    });
+
+    it("still queues a prompt when the wake-up cannot be published", async () => {
+      jest
+        .spyOn(bus, "publish")
+        .mockRejectedValue(new Error("redis unreachable"));
+
+      const pending = start(USER, "q");
+      await settle();
+
+      // A waiter re-reads on its own timer, so a lost wake-up costs latency.
+      // Failing here would show a timeout for a prompt live in the queue.
+      expect(harness.rows).toHaveLength(1);
+      const claimed = await service.waitForPrompt(USER, "session-a");
+      expect(claimed?.prompt).toBe("q");
+      await service.postResponse(USER, claimed!.promptId, "a");
+      await jest.advanceTimersByTimeAsync(WAKE_POLL_INTERVAL_MS);
+      await expect(pending).resolves.toEqual({ text: "a" });
+    });
+
+    it("claims and resets the inactivity clock in one transaction", async () => {
+      start(USER, "q");
+      await settle();
+      await service.waitForPrompt(USER, "session-a");
+
+      // A second transaction for the clock could fail after the claim was
+      // durable, leaving a turn marked `claimed` by an agent that never learned
+      // its id. That the rollback really happens is a PostgreSQL property and
+      // is asserted in ai-relay-claim.integration.spec.ts; what this proves is
+      // that the two statements were handed to one transaction to begin with.
+      const grouped = harness.transactions.find((tx) =>
+        tx.some((sql) => sql.includes("WITH next AS")),
+      );
+      expect(grouped).toBeDefined();
+      expect(
+        grouped!.some((sql) => sql.includes("INSERT INTO ai_relay_agents")),
+      ).toBe(true);
+    });
+
+    it("still hands over the answer when the attachment release fails", async () => {
+      const pending = start(USER, "q", [], {
+        attachments: [
+          {
+            kind: "image" as const,
+            mediaType: "image/png",
+            filename: "shot.png",
+            data: PNG_BASE64,
+          },
+        ],
+      });
+      await settle();
+      const claimed = await service.waitForPrompt(USER, "session-a");
+      jest
+        .spyOn(attachmentStore, "releaseForPrompt")
+        .mockRejectedValue(new Error("delete failed"));
+
+      await service.postResponse(USER, claimed!.promptId, "a picture");
+      await settle();
+
+      // The answer is already consumed, so throwing here would destroy it. The
+      // TTL and the sweep are the backstop, which is why the release is eager
+      // rather than required.
+      await expect(pending).resolves.toEqual({ text: "a picture" });
+    });
+
+    it("never throws out of reportToolActivity", async () => {
+      start(USER, "q");
+      await settle();
+      await service.waitForPrompt(USER, "session-a");
+      breakStatement("SET expires_at = LEAST");
+
+      // The MCP wrapper reports the result phase in a `finally`, where a throw
+      // replaces the tool's own outcome -- so a committed write would surface
+      // as an error the agent then retries.
+      await expect(
+        service.reportToolActivity(
+          USER,
+          "manage_transactions",
+          "result",
+          false,
+          "session-a",
+        ),
+      ).resolves.toBeUndefined();
+    });
+
+    it("keeps one session's tool chip on the turn it is working", async () => {
+      // An agent that polls again mid-turn holds two claimed prompts. An
+      // UPDATE's RETURNING has no order, so the newest claim decides -- the
+      // same choice the card lookup makes.
+      const events: RelayServerEvent[] = [];
+      start(USER, "first");
+      await settle();
+      const first = await service.waitForPrompt(USER, "session-a");
+      start(USER, "second", [], { emit: (e) => events.push(e) });
+      await settle();
+      await jest.advanceTimersByTimeAsync(1000);
+      const second = await service.waitForPrompt(USER, "session-a");
+      expect(second?.promptId).not.toBe(first?.promptId);
+
+      await service.reportToolActivity(
+        USER,
+        "list_accounts",
+        "start",
+        false,
+        "session-a",
+      );
+
+      expect(events).toContainEqual({
+        type: "tool_start",
+        name: "list_accounts",
+      });
     });
   });
 

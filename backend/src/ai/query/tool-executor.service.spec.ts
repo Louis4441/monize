@@ -645,7 +645,7 @@ describe("ToolExecutorService", () => {
       ]),
     };
     attachmentStore = {
-      store: jest.fn().mockReturnValue([{ id: "fresh-1" }]),
+      store: jest.fn().mockResolvedValue([{ id: "fresh-1" }]),
       get: jest.fn(),
       releaseForPrompt: jest.fn(),
     };

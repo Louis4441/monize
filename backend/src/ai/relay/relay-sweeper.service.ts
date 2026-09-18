@@ -4,6 +4,17 @@ import { DataSource } from "typeorm";
 
 import { BUFFER_TTL_MS } from "./ai-relay.service";
 import { RelayAttachmentStore } from "./relay-attachment.store";
+
+/**
+ * How long a terminal (`expired`) turn is kept before its row goes.
+ *
+ * Twice the answer's grace, so the delete's cutoff is strictly later than the
+ * expiry's: a row that this sweep marks `expired` survives at least until the
+ * next one. A turn's evidence -- whether an agent ever claimed it -- is what
+ * decides which of two messages the browser is shown, and deleting the row in
+ * the same tick that expired it would throw that away at the boundary.
+ */
+const RETAIN_EXPIRED_MS = 2 * BUFFER_TTL_MS;
 import { withScopedDb } from "../../common/db/scoped-db";
 import { withSystemContext } from "../../common/db/with-context";
 import { affectedRowCount } from "../../common/db/query-result";
@@ -60,16 +71,20 @@ export class RelaySweeperService {
                     )`,
             [BUFFER_TTL_MS],
           );
-          // Only once the row has been terminal for another grace period: the
-          // pickup endpoint reads an `expired` row's answer for exactly as long
-          // as it would have read an `answered` one's.
+          // Strictly later than the expiry above, and that is the whole point:
+          // with the same cutoff this predicate would match every row the
+          // statement above had just expired -- both run in one transaction, so
+          // the second sees the first's writes -- and a turn would be expired
+          // and deleted in the same tick. Keeping the row a while longer is
+          // what lets a browser arriving late still read `claimed_at` and be
+          // told its assistant went quiet, rather than that no agent ever came.
           const deletedResult: unknown = await manager.query(
             `DELETE FROM ai_relay_prompts
               WHERE status = 'expired'
                 AND GREATEST(expires_at, COALESCE(answered_at, expires_at))
                     + ($1::numeric / 1000 * INTERVAL '1 second')
                     <= CURRENT_TIMESTAMP`,
-            [BUFFER_TTL_MS],
+            [RETAIN_EXPIRED_MS],
           );
           const cardResult: unknown = await manager.query(
             `DELETE FROM ai_relay_actions

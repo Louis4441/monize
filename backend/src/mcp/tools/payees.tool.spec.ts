@@ -49,7 +49,7 @@ describe("McpPayeesTools", () => {
 
     // Default: not serving a relayed prompt, so the tool uses its normal
     // (direct MCP-client) confirmation path.
-    relayService = { emitPendingAction: jest.fn().mockReturnValue(false) };
+    relayService = { emitPendingAction: jest.fn().mockResolvedValue(false) };
     actionBuilder = {
       buildCreatePayee: jest.fn().mockReturnValue({
         type: "create_payee",
@@ -393,7 +393,7 @@ describe("McpPayeesTools", () => {
 
     it("shows a web-chat card (no write) when serving a relayed prompt", async () => {
       ctx.setUser({ userId: "u1", scopes: "read,write" });
-      relayService.emitPendingAction.mockReturnValue(true);
+      relayService.emitPendingAction.mockResolvedValue(true);
 
       const result = await handlers["manage_payees"](
         { operation: "create", items: [{ name: "New Payee" }] },
@@ -584,7 +584,7 @@ describe("McpPayeesTools", () => {
 
     it("individual mode emits all cards via relay when relayed", async () => {
       ctx.setUser({ userId: "u1", scopes: "read,write" });
-      relayService.emitPendingAction.mockReturnValue(true);
+      relayService.emitPendingAction.mockResolvedValue(true);
       prepService.prepareDeletePayees.mockResolvedValue({
         okPreviews: [
           { payeeId: "p1", name: "A" },
@@ -724,7 +724,7 @@ describe("McpPayeesTools", () => {
 
     it("single update/delete go through the relay when relayed", async () => {
       ctx.setUser({ userId: "u1", scopes: "read,write" });
-      relayService.emitPendingAction.mockReturnValue(true);
+      relayService.emitPendingAction.mockResolvedValue(true);
 
       const upd = await handlers["manage_payees"](
         { operation: "update", items: [{ name: "A", newName: "B" }] },
@@ -743,7 +743,7 @@ describe("McpPayeesTools", () => {
 
     it("bulk update/delete go through the relay when relayed", async () => {
       ctx.setUser({ userId: "u1", scopes: "read,write" });
-      relayService.emitPendingAction.mockReturnValue(true);
+      relayService.emitPendingAction.mockResolvedValue(true);
       const okPrev = {
         okPreviews: [
           { payeeId: "p1", name: "A", defaultCategoryId: null },

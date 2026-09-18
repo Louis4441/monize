@@ -112,7 +112,7 @@ describe("McpTransactionsTools", () => {
 
     // Default: not serving a relayed prompt, so the tool uses its normal
     // (direct MCP-client) confirmation path and the existing assertions hold.
-    relayService = { emitPendingAction: jest.fn().mockReturnValue(false) };
+    relayService = { emitPendingAction: jest.fn().mockResolvedValue(false) };
     actionBuilder = buildActionBuilderMock();
     prepService = {
       prepareCreate: jest.fn(),
@@ -141,7 +141,7 @@ describe("McpTransactionsTools", () => {
     };
     relayAttachmentStore = {
       get: jest.fn(),
-      store: jest.fn().mockReturnValue([]),
+      store: jest.fn().mockResolvedValue([]),
       releaseForPrompt: jest.fn(),
     };
 
@@ -708,7 +708,7 @@ describe("McpTransactionsTools", () => {
 
     it("bulk create (>= 6 items) emits one relay card", async () => {
       ctx.setUser({ userId: "u1", scopes: "write" });
-      relayService.emitPendingAction.mockReturnValue(true);
+      relayService.emitPendingAction.mockResolvedValue(true);
       prepService.prepareCreate.mockResolvedValue({
         okPreviews: [stdPreview, stdPreview],
         okCreatePayee: [true, true],
@@ -738,7 +738,7 @@ describe("McpTransactionsTools", () => {
 
     it("bulk create (individual mode) emits one relay card per item", async () => {
       ctx.setUser({ userId: "u1", scopes: "write" });
-      relayService.emitPendingAction.mockReturnValue(true);
+      relayService.emitPendingAction.mockResolvedValue(true);
       prepService.prepareCreate.mockResolvedValue({
         okPreviews: [stdPreview, stdPreview],
         okCreatePayee: [true, true],
@@ -843,7 +843,7 @@ describe("McpTransactionsTools", () => {
 
     it("bulk update (>= 6 items) builds one batch card", async () => {
       ctx.setUser({ userId: "u1", scopes: "write" });
-      relayService.emitPendingAction.mockReturnValue(true);
+      relayService.emitPendingAction.mockResolvedValue(true);
       prepService.prepareUpdateBulk.mockResolvedValue({
         okRows: [
           {
@@ -909,7 +909,7 @@ describe("McpTransactionsTools", () => {
 
     it("bulk delete (>= 6 items) builds one batch card", async () => {
       ctx.setUser({ userId: "u1", scopes: "write" });
-      relayService.emitPendingAction.mockReturnValue(true);
+      relayService.emitPendingAction.mockResolvedValue(true);
       prepService.prepareDeleteBulk.mockResolvedValue({
         okRows: [{ transactionId: "t1" }, { transactionId: "t2" }],
         previewRows: [{ status: "ok" }, { status: "ok" }],
@@ -1029,7 +1029,7 @@ describe("McpTransactionsTools", () => {
     });
 
     it("commits a bulk create through confirmWrite when relay is unavailable", async () => {
-      relayService.emitPendingAction.mockReturnValue(false);
+      relayService.emitPendingAction.mockResolvedValue(false);
       acceptingClient();
       prepService.prepareCreate.mockResolvedValue(
         okStd([stdPreview, stdPreview]),
@@ -1085,7 +1085,7 @@ describe("McpTransactionsTools", () => {
 
       beforeEach(() => {
         installConfirmSupport(server as any, codec);
-        relayService.emitPendingAction.mockReturnValue(false);
+        relayService.emitPendingAction.mockResolvedValue(false);
         prepService.prepareCreate.mockResolvedValue(okStd());
       });
 
@@ -1190,7 +1190,7 @@ describe("McpTransactionsTools", () => {
         // Only the retry round is under test: the asking round legitimately
         // offered the card to the web chat, and nobody took it.
         relayService.emitPendingAction.mockClear();
-        relayService.emitPendingAction.mockReturnValue(true);
+        relayService.emitPendingAction.mockResolvedValue(true);
         transactionsService.create.mockResolvedValue({
           id: "t1",
           transactionDate: "2025-01-15",
@@ -1211,7 +1211,7 @@ describe("McpTransactionsTools", () => {
     });
 
     it("declines a bulk create through confirmWrite", async () => {
-      relayService.emitPendingAction.mockReturnValue(false);
+      relayService.emitPendingAction.mockResolvedValue(false);
       decliningClient();
       prepService.prepareCreate.mockResolvedValue(
         okStd([stdPreview, stdPreview]),
@@ -1232,7 +1232,7 @@ describe("McpTransactionsTools", () => {
     });
 
     it("commits a bulk create including a transfer card via confirmWrite", async () => {
-      relayService.emitPendingAction.mockReturnValue(false);
+      relayService.emitPendingAction.mockResolvedValue(false);
       acceptingClient();
       prepService.prepareCreate.mockResolvedValue(okStd());
       prepService.prepareCreateTransfer.mockResolvedValue({
@@ -1274,7 +1274,7 @@ describe("McpTransactionsTools", () => {
     });
 
     it("runs individual create cards via confirmWrite, skipping declined ones", async () => {
-      relayService.emitPendingAction.mockReturnValue(false);
+      relayService.emitPendingAction.mockResolvedValue(false);
       server.server.getClientCapabilities.mockReturnValue({
         elicitation: { form: {} },
       });
@@ -1402,7 +1402,7 @@ describe("McpTransactionsTools", () => {
     });
 
     it("commits a bulk update via confirmWrite when relay is unavailable", async () => {
-      relayService.emitPendingAction.mockReturnValue(false);
+      relayService.emitPendingAction.mockResolvedValue(false);
       acceptingClient();
       prepService.prepareUpdateBulk.mockResolvedValue({
         okRows: [
@@ -1458,7 +1458,7 @@ describe("McpTransactionsTools", () => {
     });
 
     it("commits a single transfer update via confirmWrite (resolving the payee)", async () => {
-      relayService.emitPendingAction.mockReturnValue(false);
+      relayService.emitPendingAction.mockResolvedValue(false);
       acceptingClient();
       prepService.prepareUpdate.mockResolvedValue({
         kind: "transfer",
@@ -1500,7 +1500,7 @@ describe("McpTransactionsTools", () => {
     });
 
     it("runs individual update cards via confirmWrite", async () => {
-      relayService.emitPendingAction.mockReturnValue(false);
+      relayService.emitPendingAction.mockResolvedValue(false);
       acceptingClient();
       prepService.prepareUpdate.mockResolvedValue({
         kind: "standard",
@@ -1605,7 +1605,7 @@ describe("McpTransactionsTools", () => {
     });
 
     it("commits a bulk delete via confirmWrite when relay is unavailable", async () => {
-      relayService.emitPendingAction.mockReturnValue(false);
+      relayService.emitPendingAction.mockResolvedValue(false);
       acceptingClient();
       prepService.prepareDeleteBulk.mockResolvedValue({
         okRows: [{ transactionId: "t1" }, { transactionId: "t2" }],
@@ -1646,7 +1646,7 @@ describe("McpTransactionsTools", () => {
     });
 
     it("runs individual delete cards via confirmWrite", async () => {
-      relayService.emitPendingAction.mockReturnValue(false);
+      relayService.emitPendingAction.mockResolvedValue(false);
       acceptingClient();
       prepService.prepareDelete.mockResolvedValue({
         transactionId: "t1",
@@ -1677,7 +1677,7 @@ describe("McpTransactionsTools", () => {
     });
 
     it("commits an individual create_transfer card via confirmWrite", async () => {
-      relayService.emitPendingAction.mockReturnValue(false);
+      relayService.emitPendingAction.mockResolvedValue(false);
       acceptingClient();
       prepService.prepareCreate.mockResolvedValue(emptyStd());
       prepService.prepareCreateTransfer.mockResolvedValue({
@@ -1740,7 +1740,7 @@ describe("McpTransactionsTools", () => {
     });
 
     it("commits an individual update_transfer card via confirmWrite", async () => {
-      relayService.emitPendingAction.mockReturnValue(false);
+      relayService.emitPendingAction.mockResolvedValue(false);
       acceptingClient();
       prepService.prepareUpdate.mockResolvedValue({
         kind: "transfer",
@@ -1806,7 +1806,7 @@ describe("McpTransactionsTools", () => {
     });
 
     it("skips individual delete cards that cannot be prepared", async () => {
-      relayService.emitPendingAction.mockReturnValue(false);
+      relayService.emitPendingAction.mockResolvedValue(false);
       acceptingClient();
       prepService.prepareDelete
         .mockResolvedValueOnce({
@@ -2148,7 +2148,7 @@ describe("McpTransactionsTools", () => {
       attachmentPrepService.prepareAttachments.mockResolvedValue([
         attachmentPreview,
       ]);
-      relayAttachmentStore.store.mockReturnValue([{ id: "fresh-1" }]);
+      relayAttachmentStore.store.mockResolvedValue([{ id: "fresh-1" }]);
     });
 
     function createArgs(attachments: unknown) {
@@ -2254,7 +2254,7 @@ describe("McpTransactionsTools", () => {
     });
 
     it("rejects an unknown or expired relay attachment reference", async () => {
-      relayAttachmentStore.get.mockReturnValue(undefined);
+      relayAttachmentStore.get.mockResolvedValue(undefined);
       const result = await handlers["manage_transactions"](
         createArgs([{ attachmentUri: "monize-attachment://gone" }]),
         ctx,
@@ -2265,7 +2265,7 @@ describe("McpTransactionsTools", () => {
     });
 
     it("rejects a text-kind relay attachment", async () => {
-      relayAttachmentStore.get.mockReturnValue({
+      relayAttachmentStore.get.mockResolvedValue({
         kind: "text",
         mediaType: "text/csv",
         filename: "data.csv",
@@ -2345,7 +2345,7 @@ describe("McpTransactionsTools", () => {
     });
 
     it("resolves a relayed attachment reference into the same flow", async () => {
-      relayAttachmentStore.get.mockReturnValue({
+      relayAttachmentStore.get.mockResolvedValue({
         kind: "image",
         mediaType: "image/png",
         filename: "receipt.png",
@@ -2414,7 +2414,7 @@ describe("McpTransactionsTools", () => {
     });
 
     it("emits the card to the relay without writing when a relay prompt is in flight", async () => {
-      relayService.emitPendingAction.mockReturnValue(true);
+      relayService.emitPendingAction.mockResolvedValue(true);
       const result = await handlers["manage_transactions"](
         createArgs([{ fileData: PNG_B64, fileName: "receipt.png" }]),
         ctx,
