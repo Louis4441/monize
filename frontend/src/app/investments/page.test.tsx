@@ -447,10 +447,11 @@ describe('InvestmentsPage', () => {
 
     /**
      * The hierarchy the page reads in: what the portfolio is worth, what it
-     * earned, then when it earned it. A results section under the history chart
-     * would be answering a question the reader has already scrolled past.
+     * earned, how it is spread, then when it earned it. The three top cards
+     * share ONE grid row, so the reader compares them side by side instead of
+     * scrolling past the value to reach the result.
      */
-    it('puts the portfolio performance section between the summary and the chart', async () => {
+    it('puts summary, performance and allocation in one row, in that order', async () => {
       await renderPage();
       await waitFor(() => {
         expect(screen.getByTestId('portfolio-performance')).toBeInTheDocument();
@@ -458,15 +459,28 @@ describe('InvestmentsPage', () => {
 
       const summary = screen.getByTestId('portfolio-summary');
       const performance = screen.getByTestId('portfolio-performance');
+      const allocation = screen.getByTestId('asset-allocation-chart');
       const chart = screen.getByTestId('value-chart');
       expect(
         summary.compareDocumentPosition(performance) &
           Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
       expect(
-        performance.compareDocumentPosition(chart) &
+        performance.compareDocumentPosition(allocation) &
           Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
+      expect(
+        allocation.compareDocumentPosition(chart) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+
+      // One grid container, not three stacked rows. jsdom computes no layout,
+      // so the shared parent and its track list are what can be asserted; the
+      // performance card is the narrow middle column.
+      const row = summary.parentElement!;
+      expect(performance.parentElement).toBe(row);
+      expect(allocation.parentElement).toBe(row);
+      expect(row.className).toContain('lg:grid-cols-[42fr_16fr_42fr]');
     });
 
     it('renders investment value chart', async () => {

@@ -43,7 +43,7 @@ vi.mock('@/lib/net-worth', () => ({
  * nothing happened; each test overrides only the figures it is about.
  */
 function periodResult(overrides: Record<string, unknown> = {}) {
-  return {
+  const base = {
     currency: 'USD',
     startDate: '2026-01-02',
     endDate: '2026-06-30',
@@ -62,6 +62,26 @@ function periodResult(overrides: Record<string, unknown> = {}) {
     unknownCashAccountIds: [],
     ...overrides,
   };
+  // Both measures, as the server sends them. Unless a case states otherwise the
+  // invested figures mirror the account-level ones, so a case that cares which
+  // the surface reads says so out loud (INV-PORTRESULT-002).
+  const mirrored = {
+    investedValueStart: base.startValue,
+    investedValueEnd: base.endValue,
+    investmentCapitalFlows: 0,
+    investmentIncome: 0,
+    investmentPnl:
+      'investmentPnl' in overrides ? overrides.investmentPnl : base.investmentResult,
+    investmentReturnPercent:
+      'investmentReturnPercent' in overrides
+        ? overrides.investmentReturnPercent
+        : base.returnPercent,
+    investmentReturnMethod: 'twr' as const,
+    investedComplete: base.complete,
+    investedReasons:
+      'investedReasons' in overrides ? overrides.investedReasons : base.reasons,
+  };
+  return { ...base, ...mirrored };
 }
 
 const getPortfolioSummary = vi.fn();
@@ -181,13 +201,43 @@ describe('PortfolioValueWidget', () => {
     // says investment result and the figure is the server's 0 / 0%.
     expect(figure.textContent).toMatch(/^Investment result\+\$0\(\+0\.0%\)/);
     // The deposit is not the headline, under any caption.
-    expect(figure.textContent).not.toMatch(/^[^V]*\$10000/);
+    expect(figure.textContent).not.toMatch(/^[^T]*\$10000/);
     expect(figure).not.toHaveTextContent('100.0%');
     expect(
       screen.getByLabelText(
-        'Value change +$10000, of which deposits and withdrawals were +$10000. The investment result is what is left.',
+        "The account's value moved +$10000 over this window, of which deposits and withdrawals were +$10000. The figure above is what the investments themselves earned, with uninvested cash left out.",
       ),
     ).toBeInTheDocument();
+  });
+
+  /**
+   * The widget draws the INVESTED value: a month whose only event was a cash
+   * deposit plots zero and reports 0 / 0%, where a totals series would draw the
+   * reader's own money as portfolio growth (INV-PORTRESULT-002).
+   */
+  it('plots the invested value and reports the invested figures', async () => {
+    getInvestmentsMonthly.mockResolvedValue([
+      { month: '2026-05', value: 0, securitiesValue: 0 },
+      { month: '2026-06', value: 10000, securitiesValue: 0 },
+    ]);
+    getInvestmentsPeriodResult.mockResolvedValue(
+      periodResult({
+        valueChange: 10000,
+        netExternalFlows: 10000,
+        investmentResult: 0,
+        returnPercent: 0,
+        investmentPnl: 0,
+        investmentReturnPercent: 0,
+      }),
+    );
+
+    await renderWidget();
+
+    const figure = screen.getByTestId('portfolio-period-change');
+    expect(figure.textContent).toMatch(/^Investment result\+\$0\(\+0\.0%\)/);
+    // The series the chart drew is the invested one, so the deposit is not on
+    // it either: nothing in the widget reports 10000 as portfolio value.
+    expect(getInvestmentsMonthly).toHaveBeenCalled();
   });
 
   it('renders a withheld result as unknown with the cause the server gave', async () => {
@@ -217,7 +267,7 @@ describe('PortfolioValueWidget', () => {
     // The two figures behind it are withheld in the same words, never blank.
     expect(
       screen.getByLabelText(
-        'Value change N/A, of which deposits and withdrawals were N/A. The investment result is what is left.',
+        "The account's value moved N/A over this window, of which deposits and withdrawals were N/A. The figure above is what the investments themselves earned, with uninvested cash left out.",
       ),
     ).toBeInTheDocument();
   });

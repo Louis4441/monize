@@ -31,10 +31,16 @@ vi.mock('@/hooks/useNumberFormat', async () => {
   };
 });
 
+/**
+ * One period as the server sends it -- BOTH measures. Unless a case states
+ * otherwise the invested figures mirror the account-level ones, so a case that
+ * cares which the card reads (the ones below that set `investmentPnl` or
+ * `investmentReturnPercent` on their own) says so out loud.
+ */
 function period(
   overrides: Partial<PortfolioPeriodResult> = {},
 ): PortfolioPeriodResult {
-  return {
+  const base: PortfolioPeriodResult = {
     currency: 'USD',
     startDate: '2026-08-18',
     endDate: '2026-09-17',
@@ -52,6 +58,19 @@ function period(
     unpricedSecurityIds: [],
     unknownCashAccountIds: [],
     ...overrides,
+  };
+  return {
+    ...base,
+    investedValueStart: base.startValue,
+    investedValueEnd: base.endValue,
+    investmentCapitalFlows: 0,
+    investmentIncome: 0,
+    investmentPnl: overrides.investmentPnl ?? base.investmentResult,
+    investmentReturnPercent:
+      overrides.investmentReturnPercent ?? base.returnPercent,
+    investmentReturnMethod: 'twr',
+    investedComplete: base.complete,
+    investedReasons: overrides.investedReasons ?? base.reasons,
   };
 }
 
@@ -101,10 +120,67 @@ describe('PortfolioPerformanceCard', () => {
     await waitFor(() =>
       expect(
         screen.getByText(
-          'Deposits and withdrawals are not counted as investment result.',
+          'Deposits, withdrawals and uninvested cash are not counted as investment result.',
         ),
       ).toBeInTheDocument(),
     );
+    expect(
+      screen.getByText(
+        'How your investments did, without the effect of deposits, withdrawals and uninvested cash.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  /**
+   * The card reports what the INVESTMENTS earned, not what the account did.
+   * Here the account-level measure would say +2% on 200 -- it divides by a
+   * base holding 2,000 of idle cash -- and the invested measure says +2.5% on
+   * the same 200. Reading the wrong pair is the defect (INV-PORTRESULT-002).
+   */
+  it('reads the invested figures, not the account-level ones', async () => {
+    api.mockResolvedValue(
+      results({
+        '1m': period({
+          investmentResult: 200,
+          returnPercent: 2,
+          investmentPnl: 200,
+          investmentReturnPercent: 2.5,
+        }),
+      }),
+    );
+
+    render(<PortfolioPerformanceCard />);
+
+    await waitFor(() =>
+      expect(screen.getByText('+2.50%')).toBeInTheDocument(),
+    );
+    expect(screen.queryByText('+2.00%')).not.toBeInTheDocument();
+  });
+
+  /**
+   * A deposit the reader leaves as cash moves the account-level figures and
+   * must move neither of these: the card shows the invested zero.
+   */
+  it('shows zero for a window whose only event was a cash deposit', async () => {
+    api.mockResolvedValue(
+      results({
+        '1m': period({
+          valueChange: 50000,
+          netExternalFlows: 50000,
+          investmentResult: 0,
+          returnPercent: 0,
+          investmentPnl: 0,
+          investmentReturnPercent: 0,
+        }),
+      }),
+    );
+
+    render(<PortfolioPerformanceCard />);
+
+    await waitFor(() =>
+      expect(screen.getByText('+0.00%')).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/50,000/)).not.toBeInTheDocument();
   });
 
   it('says n/a for a period the server withheld', async () => {

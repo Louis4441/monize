@@ -100,7 +100,7 @@ vi.mock('@/lib/net-worth', () => ({
 function periodResult(
   overrides: Partial<PortfolioPeriodResult> = {},
 ): PortfolioPeriodResult {
-  return {
+  const base = {
     currency: 'CAD',
     startDate: '2023-06-01',
     endDate: '2024-01-01',
@@ -119,6 +119,26 @@ function periodResult(
     unknownCashAccountIds: [],
     ...overrides,
   };
+  // Both measures, as the server sends them. Unless a case states otherwise the
+  // invested figures mirror the account-level ones, so a case that cares which
+  // the surface reads says so out loud (INV-PORTRESULT-002).
+  const mirrored = {
+    investedValueStart: base.startValue,
+    investedValueEnd: base.endValue,
+    investmentCapitalFlows: 0,
+    investmentIncome: 0,
+    investmentPnl:
+      'investmentPnl' in overrides ? overrides.investmentPnl : base.investmentResult,
+    investmentReturnPercent:
+      'investmentReturnPercent' in overrides
+        ? overrides.investmentReturnPercent
+        : base.returnPercent,
+    investmentReturnMethod: 'twr' as const,
+    investedComplete: base.complete,
+    investedReasons:
+      'investedReasons' in overrides ? overrides.investedReasons : base.reasons,
+  };
+  return { ...base, ...mirrored };
 }
 
 vi.mock('@/lib/investments', () => ({
@@ -286,6 +306,60 @@ describe('InvestmentValueChart', () => {
     expect(screen.getByTestId('period-net-flows')).toHaveTextContent(
       'Net deposits and withdrawals +$0.00',
     );
+  });
+
+  /**
+   * The chart draws the INVESTED value, so a cash deposit with nothing bought
+   * plots zero rather than the deposit, and the result and return beside it are
+   * the invested part's: a `totalValue` series would draw the reader's own
+   * money as portfolio growth (INV-PORTRESULT-002).
+   */
+  it('plots the invested value and reads the invested figures', async () => {
+    vi.mocked(netWorthApi.getInvestmentsDaily).mockResolvedValue([
+      { date: '2023-06-01', value: 10000, securitiesValue: 0 },
+      { date: '2024-01-01', value: 10000, securitiesValue: 0 },
+    ] as never);
+    vi.mocked(netWorthApi.getInvestmentsPeriodResult).mockResolvedValue(
+      periodResult({
+        startValue: 10000,
+        endValue: 10000,
+        valueChange: 0,
+        investmentResult: 0,
+        returnPercent: 0,
+        investmentPnl: 0,
+        investmentReturnPercent: 0,
+      }),
+    );
+
+    render(<InvestmentValueChart />);
+    await screen.findByText('Portfolio Value Over Time');
+
+    // Both extremes are the invested value: a cash-only scope holds zero.
+    await waitFor(() =>
+      expect(screen.getAllByText('$0.00').length).toBeGreaterThan(0),
+    );
+    expect(screen.queryByText('$10000.00')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('+0.0%')).toBeInTheDocument());
+  });
+
+  it('prefers the invested figures over the account-level ones', async () => {
+    vi.mocked(netWorthApi.getInvestmentsPeriodResult).mockResolvedValue(
+      periodResult({
+        investmentResult: 5000,
+        returnPercent: 50,
+        investmentPnl: 4000,
+        investmentReturnPercent: 40,
+      }),
+    );
+
+    render(<InvestmentValueChart />);
+    await screen.findByText('Portfolio Value Over Time');
+
+    await waitFor(() =>
+      expect(screen.getByText('+$4000.00')).toBeInTheDocument(),
+    );
+    expect(screen.getByText('+40.0%')).toBeInTheDocument();
+    expect(screen.queryByText('+50.0%')).not.toBeInTheDocument();
   });
 
   it('shows no data message when API returns empty', async () => {

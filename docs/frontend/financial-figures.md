@@ -261,6 +261,25 @@ as the performance, and a percentage only over the last of the three. Nothing
 on the client subtracts, divides or falls back to the series when the request
 fails -- an unanswered request leaves every figure unknown, never zero.
 
+**Two measures travel on one payload, and the caption says which.** The three
+figures above are the ACCOUNT's: they count the cash sitting in an investment
+account, so a reader with 8,000 invested and 2,000 idle who gains 10% reads
++8%. Beside them the same payload carries the INVESTED part --
+`investmentPnl` (the securities' own P&L, capital flows out and income in) and
+`investmentReturnPercent` (a time-weighted return over the securities alone,
+`investmentReturnMethod: "twr"`), each withheld with its cause in
+`investedReasons` (INV-PORTRESULT-002,
+`docs/specs/portfolio-period-result.md` section 10). The four investment
+surfaces LEAD with those two: `PortfolioPerformanceCard` shows
+`investmentReturnPercent` over `investmentPnl`, and `InvestmentValueChart`,
+`PortfolioValueWidget` and `PortfolioValueReport` put them where their result
+and return used to be, keeping `valueChange` and `netExternalFlows` beside them
+under their own captions. Those three also PLOT the invested value --
+`investedValue(point)` (`lib/invested-value.ts`) over the point's
+`securitiesValue`, never `value` -- so a chart and the figures under it cannot
+answer two different questions. The dashboard's Net Worth chart is net worth
+and keeps its cash.
+
 **The client picks the dates; the server measures.** `usesPriorCloseBaseline`
 and `previousCalendarDay` (`components/investments/portfolio-change-baseline.ts`)
 still decide that 1d, 1w and mtd report against the previous trading day's

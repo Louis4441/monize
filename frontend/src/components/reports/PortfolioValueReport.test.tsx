@@ -222,7 +222,8 @@ const emptyPortfolio = {
  * figure the KPI cards print comes from here: the report does no arithmetic
  * over the plotted series any more (#1392).
  */
-const periodResult = (overrides: Record<string, unknown> = {}) => ({
+const periodResult = (overrides: Record<string, unknown> = {}) => {
+  const base = {
   currency: 'CAD',
   startDate: '2024-01-01',
   endDate: '2026-01-01',
@@ -240,7 +241,28 @@ const periodResult = (overrides: Record<string, unknown> = {}) => ({
   unpricedSecurityIds: [] as string[],
   unknownCashAccountIds: [] as string[],
   ...overrides,
-});
+  };
+  // Both measures, as the server sends them. Unless a case states otherwise the
+  // invested figures mirror the account-level ones, so a case that cares which
+  // the surface reads says so out loud (INV-PORTRESULT-002).
+  const mirrored = {
+    investedValueStart: base.startValue,
+    investedValueEnd: base.endValue,
+    investmentCapitalFlows: 0,
+    investmentIncome: 0,
+    investmentPnl:
+      'investmentPnl' in overrides ? overrides.investmentPnl : base.investmentResult,
+    investmentReturnPercent:
+      'investmentReturnPercent' in overrides
+        ? overrides.investmentReturnPercent
+        : base.returnPercent,
+    investmentReturnMethod: 'twr' as const,
+    investedComplete: base.complete,
+    investedReasons:
+      'investedReasons' in overrides ? overrides.investedReasons : base.reasons,
+  };
+  return { ...base, ...mirrored };
+};
 
 describe('PortfolioValueReport', () => {
   beforeEach(() => {
@@ -787,22 +809,25 @@ describe('PortfolioValueReport', () => {
       screen.getByText(label).parentElement!.textContent;
 
     it('withholds the high, the low and the change when a day is incomplete', async () => {
-      // The cash sleeve of one account has no balance for 06-01, so that point
-      // is a subtotal: it cannot be ranked against whole days, and it is one of
-      // the two endpoints the period change is measured between (#1389).
+      // A position held on 06-01 had no accepted close, so the INVESTED value
+      // of that point is a subtotal: it cannot be ranked against whole days,
+      // and it is one of the two endpoints the change is measured between.
       mockDateRangeValue = '3m';
       mockGetInvestmentsDaily.mockResolvedValue([
         {
           date: '2024-06-01',
           value: 50000,
+          securitiesValue: 50000,
           fxComplete: true,
-          pricesComplete: true,
-          cashComplete: false,
-          unknownCashAccountIds: ['cash-1'],
+          pricesComplete: false,
+          unpricedSecurityIds: ['sec-1'],
+          cashComplete: true,
+          unknownCashAccountIds: [],
         },
         {
           date: '2024-06-02',
           value: 51000,
+          securitiesValue: 51000,
           fxComplete: true,
           pricesComplete: true,
           cashComplete: true,
@@ -819,6 +844,84 @@ describe('PortfolioValueReport', () => {
       await waitFor(() => expect(kpi('Lowest Value')).toContain('N/A'));
       expect(kpi('Lowest Value')).not.toContain('$50000');
       expect(kpi('Highest Value')).toContain('N/A');
+    });
+
+    /**
+     * A cash account with no balance for a day is a real gap, and it used to
+     * blank this chart's point. It no longer can: the chart plots the INVESTED
+     * value and no cash is in it (INV-PORTRESULT-002), so the point is a whole
+     * day's answer. The gap is still reported in the incomplete-data details,
+     * because the reader who has one wants to know.
+     */
+    it('keeps a day whose only gap is a cash balance', async () => {
+      mockDateRangeValue = '3m';
+      mockGetInvestmentsDaily.mockResolvedValue([
+        {
+          date: '2024-06-01',
+          value: 50000,
+          securitiesValue: 48000,
+          fxComplete: true,
+          pricesComplete: true,
+          cashComplete: false,
+          unknownCashAccountIds: ['cash-1'],
+        },
+        {
+          date: '2024-06-02',
+          value: 51000,
+          securitiesValue: 49000,
+          fxComplete: true,
+          pricesComplete: true,
+          cashComplete: true,
+          unknownCashAccountIds: [],
+        },
+      ]);
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      render(<PortfolioValueReport />);
+      await waitFor(() => {
+        expect(screen.getByText('Lowest Value')).toBeInTheDocument();
+      });
+
+      // The invested value, not the value with the cash in it.
+      await waitFor(() => expect(kpi('Lowest Value')).toContain('$48000'));
+      expect(kpi('Highest Value')).toContain('$49000');
+      expect(kpi('Lowest Value')).not.toContain('N/A');
+    });
+
+    /**
+     * The report draws the INVESTED value, so a cash deposit with nothing
+     * bought does not move the chart or its KPIs, and the result and return
+     * are the invested part's (INV-PORTRESULT-002).
+     */
+    it('plots the invested value and reports the invested figures', async () => {
+      mockDateRangeValue = '3m';
+      mockGetInvestmentsDaily.mockResolvedValue([
+        { date: '2024-06-01', value: 10000, securitiesValue: 0 },
+        { date: '2024-06-02', value: 60000, securitiesValue: 0 },
+      ]);
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      mockGetPeriodResult.mockResolvedValue(
+        periodResult({
+          valueChange: 50000,
+          netExternalFlows: 50000,
+          investmentResult: 0,
+          returnPercent: 0,
+          investmentPnl: 0,
+          investmentReturnPercent: 0,
+        }),
+      );
+      render(<PortfolioValueReport />);
+      await waitFor(() => {
+        expect(screen.getByText('Lowest Value')).toBeInTheDocument();
+      });
+
+      await waitFor(() => expect(kpi('Highest Value')).toContain('$0'));
+      expect(kpi('Highest Value')).not.toContain('$60000');
+      // The account's value change is still named as such, beside a zero
+      // investment result.
+      expect(kpi('Value Change')).toContain('$50000');
+      expect(kpi('Investment Result')).toContain('$0');
     });
 
     /**

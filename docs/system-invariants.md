@@ -100,6 +100,7 @@ implied.
 | INV-TRADE-001 | The executed total is the fact; the per-share price is derived from it | enforced |
 | INV-PRICE-001 | A stored price is in the currency the security is recorded in | partial |
 | INV-PORTRESULT-001 | A period change is not a return: value change, external flows and investment result are three figures | enforced |
+| INV-PORTRESULT-002 | Cash is not an investment: the invested part's P&L and TWR exclude deposits, withdrawals and idle cash | enforced |
 | INV-REPORT-001 | A report's account scope is investment linkage, not account type | enforced |
 | INV-REPORT-002 | A chart's down-sampling never reaches a count, a total or an export | enforced |
 | INV-LOAN-001 | A recurring overpayment's cadence is a calendar, not a payment interval | enforced |
@@ -916,11 +917,12 @@ Enforcement         decidePeriodResult
                     GET /net-worth/investments-period-results by slicing ONE
                     valuation instead of recomputing it, and the spec's
                     section 8 holds the two routes to identical answers.
-                    PortfolioValueReport, PortfolioValueWidget,
-                    InvestmentValueChart and the Investments page's
-                    PortfolioPerformanceCard print it and derive nothing; the
-                    client-side arithmetic they used to share is deleted
-                    rather than left exported.
+                    PortfolioValueReport, PortfolioValueWidget and
+                    InvestmentValueChart print the account-level figures beside
+                    their own headline and derive nothing; the client-side
+                    arithmetic they used to share is deleted rather than left
+                    exported. What they lead with is the INVESTED part
+                    (INV-PORTRESULT-002), which the same payload carries.
                     docs/specs/portfolio-period-result.md has the
                     truth table, the numerical examples and the test matrix.
 Status              enforced
@@ -930,11 +932,79 @@ Every surface that reports what a portfolio did over a period now reads
 `GET /net-worth/investments-period-result`, or its batch sibling
 `GET /net-worth/investments-period-results`: the Portfolio Value Over Time
 report, the dashboard's Portfolio Value widget, the Investments page's chart
-and the Investments page's Portfolio performance card. Each prints the investment result as its headline with a percentage
-only over that, and names the value change and the net external flows beside
-it. The dashboard's Net Worth chart is not one of these surfaces -- it reports
-what a person is worth rather than what a portfolio earned, and its own
-measure has not been specified.
+and the Investments page's Portfolio performance card. None of them derives a
+figure of its own. Which of the payload's two measures each one leads with is
+INV-PORTRESULT-002 below and `docs/specs/portfolio-period-result.md` section
+10.7: the four investment surfaces lead with the invested part and name the
+account-level value change and net external flows beside it, while the daily
+movement notification and the calendar's day layer report the account-level
+measure, which is the question they ask. The dashboard's Net Worth chart is not
+one of these surfaces -- it reports what a person is worth rather than what a
+portfolio earned, and its own measure has not been specified.
+
+### INV-PORTRESULT-002 -- cash is not an investment
+
+```text
+Statement           A figure captioned as what a portfolio's INVESTMENTS earned,
+                    or as their return, excludes uninvested cash entirely:
+                    cash is in neither the amount, nor the numerator, nor the
+                    base of the percentage, and paying it into or out of an
+                    investment account moves neither figure. The amount is
+                    IV(e) - IV(b) - capital flows + income over the securities
+                    alone, reconstructed from the ledger as of each day rather
+                    than from today's holdings, so a position sold before today
+                    still counts on the days it was held. The percentage is a
+                    time-weighted return chained daily over the same window,
+                    which neutralises buys funded by deposits, sells, share
+                    transfers and quantity changes and keeps price change,
+                    distributions and reinvestments. Both are null, with the
+                    cause named, whenever a day the chain spans is a subtotal, a
+                    capital or income row did not convert, or the window holds a
+                    movement the flow classifier cannot count. A window in which
+                    nothing was ever invested and nothing was earned is a known
+                    zero, not unknown.
+Source of truth     The securitiesValue component of
+                    NetWorthService.getDailyInvestments -- the same replay and
+                    the same accepted closes the whole value uses, with the cash
+                    left out rather than a second valuation -- and the capital
+                    and income rows of loadInvestedCapitalFlowRows
+                    (backend/src/net-worth/invested-capital-flow.util.ts),
+                    classified by INVESTED_FLOW_KIND_BY_BASE_ACTION in
+                    backend/src/securities/investment-replay.util.ts and folded
+                    through the same RateIndex the external flows use.
+Enforcement         investedPeriodResult
+                    (backend/src/net-worth/invested-period-result.util.ts) is
+                    the only place the policy is written, pure and
+                    table-tested over the spec's twelve worked cases in
+                    backend/src/net-worth/invested-period-result.util.spec.ts.
+                    Its factor arithmetic is
+                    backend/src/common/time-series/twr-chain.util.ts, shared
+                    with PortfolioCalculationService.calculateTWR so the two
+                    chained returns cannot drift into two definitions.
+                    Both period-result routes fill the fields from the same
+                    arrays, and the batch route's equivalence spec compares
+                    them preset by preset. A spec holds every InvestmentAction
+                    member to a classification, so a new action is a failing
+                    test rather than a silent zero in a capital flow.
+                    PortfolioPerformanceCard, InvestmentValueChart,
+                    PortfolioValueWidget and PortfolioValueReport read
+                    investmentPnl and investmentReturnPercent and plot
+                    securitiesValue; investedValue
+                    (frontend/src/lib/invested-value.ts) is the one door to the
+                    invested component of a series point.
+                    docs/specs/portfolio-period-result.md section 10 has the
+                    definitions, the truth table, the twelve numerical cases
+                    and the test matrix.
+Status              enforced
+```
+
+Cash held in an investment account earns nothing and is not what the reader
+means by "how did my investments do". The account-level measure counts it: a
+reader with 8,000 invested and 2,000 idle who gains 10% is told +8%, and the
+figure moves when they pay cash in without buying anything. The invested
+measure is the answer to the question the caption asks, and the account-level
+measure -- which is the right answer to a different question -- keeps its own
+fields, its own caption and its own consumers.
 
 ### INV-REPORT-001 -- a report's account scope is investment linkage, not account type
 
